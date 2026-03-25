@@ -87,8 +87,13 @@
 ## 3. Adaptive Learning & Stagnation Detection
 
 ### Current Landscape
-- Every competitor adjusts content *difficulty* or *sequence*
-- Nobody adjusts the *teaching method itself* — this is Cena's genuine innovation
+- Every competitor adjusts content *difficulty* or *sequence*:
+  - **Squirrel AI**: adjusts question difficulty and topic sequence based on probabilistic knowledge state; does not change pedagogical approach
+  - **ALEKS**: selects the next topic based on Knowledge Space Theory readiness; always uses the same mastery-and-assess cycle
+  - **Khanmigo**: adjusts hint depth and Socratic question phrasing; stays within the Socratic method exclusively
+  - **Brilliant**: adjusts problem complexity and scaffolding; always uses problem-first pedagogy
+- Nobody adjusts the *teaching method itself* — switching from Socratic dialogue to project-based learning to spaced repetition based on what works for each individual student is Cena's genuine innovation
+- This creates a defensible moat: methodology switching requires both a pedagogical framework (mapping error types to methods) and per-student effectiveness tracking, which no current competitor has infrastructure for
 
 ### Behavioral Signals for Stagnation Detection
 - Response time increasing on similar-difficulty problems
