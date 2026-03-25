@@ -36,7 +36,7 @@
 - Gold standard for retention mechanics
 - Streaks (7-day streak users 3.6x more likely to stay)
 - Leagues/leaderboards (+25% lesson completion)
-- DAU grew 4.5x over 4 years to 34M
+- DAU grew from ~7.5M (2019) to 50M+ (Q3 2025), a ~6.7x increase over 6 years (Duolingo investor relations)
 - Weaknesses: language-only, shallow pedagogy, no knowledge graph
 
 **Anki / Quizlet**
@@ -74,7 +74,7 @@
 | **Multi-subject coverage** | STEM (Math, Physics, Chemistry, Biology, CS) | 10+ subjects (Chinese curriculum) | Math, CS, Science | 20+ subjects | Math, Chemistry, Statistics | Languages only |
 | **Exam alignment** | Bagrut-aligned (curriculum-agnostic architecture) | Chinese curriculum only | Not exam-aligned | US Common Core aligned | US standards aligned | Not exam-aligned |
 | **Dynamic diagram generation** | AI-generated per concept | Static content | Static interactive | Static video + interactive | Static | None |
-| **Pricing (annual)** | $190–$245 | ~$2,000+ (tutoring center) | $150 | Free (Khanmigo: $44) | ~$120 (institutional) | $84 |
+| **Pricing (annual)** | $194–$250 | ~$2,000+ (tutoring center) | ~$150 | Free (Khanmigo: $44) | ~$120 (institutional) | ~$60 |
 | **Platform** | Mobile-first + PWA | Physical centers + app | Web + mobile | Web + mobile | Web | Mobile + web |
 
 ---
@@ -218,10 +218,10 @@
 ## 7. Monetization Strategy
 
 ### Israeli Market Context
-- EdTech market valued at $1.2 billion, 90% internet penetration
-- 350+ active e-learning platforms, 163 K-12 EdTech companies
-- **Private Bagrut tutoring: ~3,000 NIS (~$800) per subject** — this is the price anchor
-- Government allocated ~$120M for digital education initiatives
+- EdTech market estimated at $1.2 billion (Ken Research, 2023 — single-source estimate, not independently verified), 92% internet penetration (DataReportal 2024)
+- 163 K-12 EdTech companies (Tracxn database, 2026)
+- **Private Bagrut tutoring: ~3,000 NIS (~$830 at 3.6 NIS/USD) per subject** (estimated based on NIS 90–200/hour rates reported by Haaretz, assuming ~20 hours per subject) — this is the price anchor
+- Government has invested in digital education initiatives (exact allocation unverified; Ken Research cites ~$120M but no primary government budget source confirms this figure)
 
 ### Recommended Model
 
@@ -235,7 +235,7 @@
 - Advanced gamification (leagues, detailed badges)
 - Personalized timeline estimates
 - Methodology adaptation and cognitive load management
-- **Pricing: 79-99 NIS/month or 699-899 NIS/year** (~$200-250/year)
+- **Pricing: 79-99 NIS/month or 699-899 NIS/year** (~$194–$250/year at 3.6 NIS/USD)
 - Positioning: covers ALL subjects vs 3,000 NIS/subject for private tutoring (5 subjects = 15,000 NIS)
 
 **Additional Revenue Streams**
@@ -248,7 +248,7 @@
 **Price Anchoring**
 - Primary anchor: Private Bagrut tutoring at ~3,000 NIS/subject (~$800). For 5 STEM subjects = 15,000 NIS/year ($4,100)
 - Cena at 899 NIS/year covers ALL subjects = 94% savings vs. private tutoring — this is the core value proposition
-- Secondary anchor: Brilliant.org at $150/year, Duolingo at $84/year — Cena's premium positioning is justified by exam alignment and deeper personalization
+- Secondary anchor: Brilliant.org at ~$150/year, Duolingo at ~$60/year (2025 pricing; was $84/year in 2024) — Cena's premium positioning is justified by exam alignment and deeper personalization
 
 **Willingness-to-Pay Estimates (based on Israeli market research)**
 | Segment | Estimated Monthly WTP | % of Target Market | Notes |
@@ -276,7 +276,7 @@
 ## 8. Unit Economics
 
 ### Revenue Per User
-- **ARPU (Annual Revenue Per User)**: 699–899 NIS/year ($190–$245) for premium subscribers
+- **ARPU (Annual Revenue Per User)**: 699–899 NIS/year ($194–$250 at 3.6 NIS/USD) for premium subscribers
 - **Blended ARPU** (accounting for free tier): Assuming 8% free-to-paid conversion (EdTech benchmark: 5–10%), blended ARPU = ~56–72 NIS/year across all users
 - **Family plan discount**: 30% off second student → effective ARPU per family of 2 = ~1,190 NIS/year
 
@@ -293,7 +293,7 @@
 ### Margin Analysis
 - **Gross margin at 89 NIS/month (mid-tier)**: ~83–92% (7–15 NIS variable costs)
 - **Target gross margin at scale (50K+ users)**: 88%+ as LLM costs decrease and caching improves
-- **Comparison**: Duolingo gross margin = 73%; Chegg = 74%; Coursera = 59% — Cena's higher margin driven by AI-native architecture without human instructor costs
+- **Comparison**: Duolingo gross margin = 73% (FY2023 GAAP); Chegg = 68% (FY2023 GAAP); Coursera = 53% (FY2023 GAAP) — Cena's higher margin driven by AI-native architecture without human instructor costs or content licensing fees
 
 ### Customer Acquisition Cost (CAC)
 - **Target CAC**: <150 NIS ($40) per paid subscriber
@@ -310,7 +310,7 @@
 - **Monthly fixed costs (estimated)**: ~120,000 NIS/month (team of 6 + infrastructure baseline + office)
 - **Contribution margin per premium user**: ~74–82 NIS/month
 - **Break-even subscribers**: ~1,500–1,600 premium users
-- **At 8% conversion from 100K addressable Bagrut students**: theoretical maximum of 8,000 premium users in Year 1, reaching break-even at ~20% of that target
+- **At 8% conversion from ~85K–100K addressable Bagrut students** (CBS 2011 baseline: 85,100; estimated up to ~100K by 2025 based on population growth): theoretical maximum of 6,800–8,000 premium users in Year 1, reaching break-even at ~20–24% of that target
 
 ---
 
@@ -438,8 +438,8 @@
 | **Total infrastructure** | **~15,000–30,000 NIS/month** |
 
 ### Funding Requirements
-- **Pre-seed target**: 1.5–2.5M NIS ($400K–$680K) for 18 months of runway
-- **Covers**: 6-person team (12 months), infrastructure, initial marketing budget (100K NIS), legal/compliance setup
+- **Pre-seed target**: 3.0–4.0M NIS ($830K–$1.1M at 3.6 NIS/USD) for 18 months of runway
+- **Covers**: 6-person core team for 18 months (~120K–160K/month × 18 = 2.16–2.88M NIS), infrastructure (15K–30K/month × 18 = 270K–540K NIS), initial marketing budget (150K NIS), legal/compliance setup (50K NIS)
 - **Milestone for seed round**: 1,600+ paid subscribers (break-even), validated retention metrics (D30 >30%), positive Bagrut score correlation signal
 
 ---
