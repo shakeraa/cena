@@ -318,7 +318,7 @@
 
 ### Phase 1: Bagrut Beachhead (Months 1–6)
 - **Target segment**: 11th–12th grade STEM students preparing for 5-unit Bagrut exams (Mathematics and Physics first — highest private tutoring spend)
-- **Addressable market**: ~100,000 Bagrut students/year; ~35,000 taking 5-unit Math; ~20,000 taking 5-unit Physics
+- **Addressable market**: ~100,000 Bagrut exam takers/year (CBS 2011 baseline: 85,100; estimated ~100,000 by 2025 based on population growth); ~15,000–20,000 taking 5-unit Math (Taub Center 2016: 13.8% of cohort); ~8,500–10,000 taking 5-unit Physics (estimated from Bank of Israel scientific reserves data)
 - **Launch channel**: Direct-to-student via social media (Instagram, TikTok, Telegram study groups) with "your knowledge graph" as the viral hook
 - **Pricing launch**: Free tier (2 concepts/day) + 30-day full trial on signup; conversion push at day 14 with personalized progress report showing "here's what you'd lose"
 - **Goal**: 5,000 registered users, 400 paid subscribers by Month 6
