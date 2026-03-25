@@ -100,3 +100,41 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - Syllabus follows the Israeli Ministry of Education curriculum
 - STEM subjects: Mathematics, Physics, Chemistry, Biology, Computer Science
 - Depth levels align with the Bagrut study units system (3/4/5 units per subject)
+
+## Visual Design
+
+### Graphic Style
+- **Flat illustration style** for concept diagrams — clean, clear layouts with arrows and graphic elements showing processes and relationships (similar to FigureLabs scientific figures)
+- **Colorful icon cards** for topic navigation — each concept/topic gets a distinct colored card with a simple illustrative icon and label (similar to smartyme_physics grid style)
+- **Tech-inspired visuals** for the knowledge graph and brand — glowing network nodes, interconnected data points, dark backgrounds with vibrant highlights (similar to Technion/HUJI AI course visuals)
+- White/clean backgrounds for learning content; dark/immersive backgrounds for the knowledge graph visualization
+
+### Design Principles
+- Visuals should make complex concepts feel approachable and clear
+- Every diagram, figure, and concept should have a consistent illustrative style
+- The overall aesthetic should feel modern, tech-forward, and engaging for students
+
+## Gamification
+
+- Learning progress is gamified to keep students motivated and engaged
+- Elements include: XP/points for completing concepts, streaks for daily engagement, badges/achievements for milestones
+- Leveling system tied to mastery depth — unlocking deeper levels feels like progression
+- Leaderboards (optional) for friendly competition
+- The knowledge graph itself serves as a visual reward — watching it grow is inherently motivating
+
+## Cognitive Load Management
+
+### Quantum Learning (Small Units of Information)
+- Content is delivered in **small, digestible quants** — bite-sized pieces that prevent cognitive overload
+- Each learning session is calibrated to avoid exhausting the student
+- The system learns each student's **personal thresholds** — how much new information they can absorb before fatigue
+
+### Threshold Detection
+- Monitors engagement signals (response time, accuracy drop-off, session duration patterns)
+- Builds a per-student cognitive load profile over time
+- Adjusts session length and content density dynamically based on the student's current state
+
+### Estimated Timelines
+- The system provides **personalized time estimates** for achieving specific goals (e.g., "Master 5-unit Math by Bagrut exam date")
+- Timelines factor in: current knowledge level, learning pace, available study time, and historical performance
+- Estimates update dynamically as the student progresses
