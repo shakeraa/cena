@@ -90,8 +90,13 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 
 ## Target Audience
 
-### Bagrut (Israeli Matriculation)
-- Target students are preparing for **Bagrut** exams
+### Syllabus-Agnostic Design
+- The system is designed to support **any country's syllabus** as structured input
+- Syllabus defines the curriculum tree, subjects, and depth levels for that country
+- The architecture does not hardcode any specific curriculum
+
+### Initial Target: Bagrut (Israeli Matriculation)
+- First deployment targets students preparing for **Bagrut** exams
 - Syllabus follows the Israeli Ministry of Education curriculum
 - STEM subjects: Mathematics, Physics, Chemistry, Biology, Computer Science
 - Depth levels align with the Bagrut study units system (3/4/5 units per subject)
