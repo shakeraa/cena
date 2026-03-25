@@ -356,7 +356,49 @@
 
 ---
 
-## 11. Unique Value Proposition & Strategy
+## 11. Team & Resource Requirements
+
+### Core Team (Pre-Launch, Months 1–6)
+| Role | Count | Key Responsibilities | Monthly Cost (NIS) |
+|---|---|---|---|
+| Technical Co-founder / CTO | 1 | Architecture, AI/LLM integration, infrastructure | 25,000–35,000 |
+| Full-Stack Engineer | 2 | React Native mobile app, React web app, API layer | 22,000–28,000 each |
+| ML/AI Engineer | 1 | Knowledge graph pipeline, LLM prompt engineering, stagnation detection models | 25,000–32,000 |
+| Product Designer (UI/UX) | 1 | Knowledge graph visualization, onboarding flow, gamification design | 20,000–25,000 |
+| Education Domain Expert (part-time) | 1 | Bagrut syllabus validation, pedagogical methodology review, content QA | 8,000–12,000 |
+| **Total pre-launch team** | **6** | | **~120,000–160,000/month** |
+
+### Growth Team (Post-Launch, Months 6–12)
+| Role | Count | Key Responsibilities |
+|---|---|---|
+| Growth Marketer | 1 | Paid social campaigns, school outreach, content marketing |
+| Community Manager | 1 | Student community on Telegram/Discord, social media presence, school partnerships |
+| Customer Support (part-time) | 1 | Ticket triage, escalation for technical issues |
+| Content Engineer | 1 | Knowledge graph expansion to new subjects, diagram template creation |
+
+### Advisors (Non-Salaried)
+- **Education advisor**: Licensed Bagrut teacher with 10+ years experience — validates pedagogical approach and syllabus alignment
+- **EdTech founder advisor**: Operator who has scaled an EdTech product past 100K users — guides GTM and retention strategy
+- **AI/ML advisor**: Researcher or practitioner with experience in adaptive learning systems — reviews model architecture decisions
+
+### Infrastructure Costs (Monthly, at 10K Users)
+| Resource | Estimated Monthly Cost |
+|---|---|
+| Cloud compute (AWS/GCP) | 3,000–5,000 NIS |
+| LLM API costs | 8,000–20,000 NIS |
+| Database (managed PostgreSQL + graph DB) | 1,500–3,000 NIS |
+| CDN + storage | 500–1,000 NIS |
+| Monitoring + observability | 500–1,000 NIS |
+| **Total infrastructure** | **~15,000–30,000 NIS/month** |
+
+### Funding Requirements
+- **Pre-seed target**: 1.5–2.5M NIS ($400K–$680K) for 18 months of runway
+- **Covers**: 6-person team (12 months), infrastructure, initial marketing budget (100K NIS), legal/compliance setup
+- **Milestone for seed round**: 1,600+ paid subscribers (break-even), validated retention metrics (D30 >30%), positive Bagrut score correlation signal
+
+---
+
+## 12. Unique Value Proposition & Strategy
 
 ### Cena's Four Pillars (No Competitor Has All Four)
 1. **Student-facing knowledge graph visualization** — the graph IS the product
