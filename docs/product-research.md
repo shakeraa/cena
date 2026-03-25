@@ -268,7 +268,42 @@
 
 ---
 
-## 9. Unique Value Proposition & Strategy
+## 9. Go-to-Market Strategy
+
+### Phase 1: Bagrut Beachhead (Months 1–6)
+- **Target segment**: 11th–12th grade STEM students preparing for 5-unit Bagrut exams (Mathematics and Physics first — highest private tutoring spend)
+- **Addressable market**: ~100,000 Bagrut students/year; ~35,000 taking 5-unit Math; ~20,000 taking 5-unit Physics
+- **Launch channel**: Direct-to-student via social media (Instagram, TikTok, Telegram study groups) with "your knowledge graph" as the viral hook
+- **Pricing launch**: Free tier (2 concepts/day) + 30-day full trial on signup; conversion push at day 14 with personalized progress report showing "here's what you'd lose"
+- **Goal**: 5,000 registered users, 400 paid subscribers by Month 6
+
+### Phase 2: School Partnerships (Months 6–12)
+- **B2B2C model**: Partner with 10–20 high schools to offer Cena as a supplementary tool; teacher dashboards show class-level knowledge gaps
+- **Pricing**: School license at 50 NIS/student/year (subsidized vs. direct pricing to drive adoption); upsell individual students to premium features
+- **Referral loop**: Students in partner schools invite friends from other schools via knowledge graph sharing ("compare your graph with mine")
+- **Goal**: 20,000 registered users, 1,600 paid subscribers (break-even) by Month 12
+
+### Phase 3: National Expansion (Months 12–18)
+- **Subject expansion**: Add Chemistry, Biology, Computer Science to cover full STEM Bagrut suite
+- **Channel expansion**: Partnerships with private tutoring centers (position as "between sessions" tool), parent-focused marketing (WhatsApp parent groups)
+- **Seasonal campaigns**: 3-month intensive bundles before Bagrut exam periods (January and June)
+- **Goal**: 50,000 registered users, 4,000 paid subscribers by Month 18
+
+### Phase 4: International Readiness (Months 18–24)
+- **First international target**: AP exams (US) — largest English-speaking standardized exam market, strong overlap with STEM focus
+- **Localization requirements**: English UI (already partially built), AP syllabus knowledge graph construction (LLM-assisted, ~4 weeks per subject), US-market payment processing
+- **Go-to-market in US**: Partnership with AP tutoring services, Reddit r/APStudents community, College Confidential forums
+- **Second target**: A-Levels (UK) — similar exam structure, English-language, Commonwealth expansion path
+
+### Distribution Channels (Ranked by Expected ROI)
+1. **Organic/viral** (40% of acquisition): Knowledge graph screenshots shared on social media; "challenge a friend" comparison feature; shareable milestone badges
+2. **School partnerships** (30%): B2B2C with teacher dashboards; school-wide adoption drives volume at lower CAC
+3. **Paid social** (20%): Instagram and TikTok ads targeting ages 16–18 with "stop wasting money on private tutors" messaging; retargeting free-tier users who hit the daily limit
+4. **Referral program** (10%): Give 1 month free for each referred paid subscriber; referred user gets extended 60-day trial
+
+---
+
+## 10. Unique Value Proposition & Strategy
 
 ### Cena's Four Pillars (No Competitor Has All Four)
 1. **Student-facing knowledge graph visualization** — the graph IS the product
