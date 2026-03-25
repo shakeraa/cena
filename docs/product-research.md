@@ -243,6 +243,34 @@
 - B2B school licensing: teacher dashboards with class-level analytics
 - Seasonal exam-prep bundles (3 months before Bagrut)
 
+### Pricing Sensitivity Analysis
+
+**Price Anchoring**
+- Primary anchor: Private Bagrut tutoring at ~3,000 NIS/subject (~$800). For 5 STEM subjects = 15,000 NIS/year ($4,100)
+- Cena at 899 NIS/year covers ALL subjects = 94% savings vs. private tutoring — this is the core value proposition
+- Secondary anchor: Brilliant.org at $150/year, Duolingo at $84/year — Cena's premium positioning is justified by exam alignment and deeper personalization
+
+**Willingness-to-Pay Estimates (based on Israeli market research)**
+| Segment | Estimated Monthly WTP | % of Target Market | Notes |
+|---|---|---|---|
+| 5-unit students (high-stakes exams) | 100–150 NIS | ~35% of Bagrut students | Highest motivation, parents willing to invest |
+| 4-unit students | 60–90 NIS | ~40% | Moderate stakes, price-sensitive |
+| 3-unit students | 30–50 NIS | ~25% | Lower stakes, most price-sensitive |
+
+**Price Tier Scenarios**
+| Scenario | Monthly Price | Annual Price | Projected Conversion | Annual Revenue at 100K Users |
+|---|---|---|---|---|
+| Aggressive (low) | 59 NIS | 499 NIS | 12% | 5.99M NIS |
+| Target (mid) | 89 NIS | 799 NIS | 8% | 6.39M NIS |
+| Premium (high) | 119 NIS | 999 NIS | 5% | 4.99M NIS |
+
+**Recommendation**: Launch at 89 NIS/month (799 NIS/year) — maximizes revenue while staying well below the private tutoring anchor. The annual plan at 799 NIS should be positioned as "less than 1 hour of private tutoring per month."
+
+**Price Sensitivity Risks**
+- Israeli parents comparison-shop aggressively for education expenses — must clearly communicate value vs. tutoring
+- Free tier must be genuinely useful (not crippled) to build trust; conversion comes from demonstrated personal value (knowledge graph), not feature gating
+- Seasonal pricing (exam-prep bundles at 249 NIS for 3 months) captures students unwilling to commit annually
+
 ---
 
 ## 8. Unit Economics
