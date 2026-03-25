@@ -142,7 +142,7 @@
 - **Microlearning sweet spot: 5-10 minutes** per focused learning unit
 - **Sustained attention: ~20 minutes** before needing a break
 - Cap sessions at **20-25 minutes** before suggesting a break (adjustable per student)
-- Some students handle 30-min sessions; others fatigue at 12 minutes — build individual profiles
+- Student session tolerance varies widely (12–30 minutes based on age, subject difficulty, and time of day) — the system builds individual cognitive load profiles from the first 5 sessions and refines continuously
 
 ### Fatigue Detection Metrics
 1. Response time increase (rolling average drift)
@@ -153,7 +153,7 @@
 
 ### Fatigue Response
 - Don't hard-stop — offer lighter "cooldown" activities (review mastered content, explore knowledge graph, read own annotations)
-- Ensure learning quanta are genuinely atomic (don't require holding too many new ideas simultaneously)
+- Ensure learning quanta are genuinely atomic (each quantum introduces at most 2 new ideas, keeping total working memory demand within the 2–4 simultaneous chunk processing limit)
 
 ---
 
