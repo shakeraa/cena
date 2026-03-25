@@ -160,3 +160,30 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - The system provides **personalized time estimates** for achieving specific goals (e.g., "Master 5-unit Math by Bagrut exam date")
 - Timelines factor in: current knowledge level, learning pace, available study time, and historical performance
 - Estimates update dynamically as the student progresses
+
+## AI/LLM Integration Strategy
+
+### Model Architecture
+- **Primary LLM**: Claude (Anthropic) for all student-facing interactions — Socratic questioning, explanation generation, annotation analysis, and methodology-aware tutoring
+- **Fallback model**: GPT-4o (OpenAI) as secondary provider for redundancy; model-agnostic prompt layer ensures provider switching without UX impact
+- **Embedding model**: text-embedding-3-small (OpenAI) or equivalent for knowledge graph semantic search and concept similarity scoring
+- The system is designed with a **model-agnostic abstraction layer** — all LLM calls go through a unified interface that handles prompt formatting, token tracking, and provider routing
+
+### LLM Use Cases
+1. **Socratic tutoring conversations**: Multi-turn dialogue with per-student context window (learning history, current mastery, active methodology)
+2. **Knowledge graph construction**: LLM extracts concept nodes and prerequisite edges from syllabus documents and textbooks (batch processing, not real-time)
+3. **Stagnation analysis**: LLM classifies error types from student responses (procedural vs. conceptual vs. motivational) to inform methodology switching
+4. **Annotation understanding**: NLP analysis of student-written notes to detect confusion, insight, or frustration signals
+5. **Dynamic diagram generation**: LLM generates SVG diagram descriptions from concept definitions, rendered by a deterministic SVG engine
+6. **Personalized explanation generation**: Adapts explanation depth and analogy selection based on student's knowledge graph state
+
+### Cost Management
+- **Per-student monthly LLM cost target**: $0.50–$2.00 (at 79–99 NIS/month subscription, LLM costs must stay below 15% of revenue)
+- **Token optimization**: Cache common explanations per concept; use smaller models (Haiku-class) for classification tasks; reserve large models for generative tutoring
+- **Batch vs. real-time**: Knowledge graph construction and content pre-generation run as offline batch jobs; only tutoring conversations and annotation analysis are real-time
+- **Rate limiting**: Students limited to 50 LLM-powered interactions per day (sufficient for 2–3 learning sessions); prevents abuse while keeping costs predictable
+
+### Prompt Engineering
+- **System prompts per methodology**: Each teaching method (Socratic, Feynman, spaced repetition) has a dedicated system prompt that shapes the LLM's behavior
+- **Student context injection**: Each request includes a compressed summary of the student's knowledge state (mastered concepts, current gaps, recent errors, active methodology)
+- **Safety rails**: Content filtered to stay within curriculum scope; LLM cannot provide direct answers during Socratic mode; age-appropriate language enforcement
