@@ -303,7 +303,60 @@
 
 ---
 
-## 10. Unique Value Proposition & Strategy
+## 10. Success Metrics & KPIs
+
+### North Star Metric
+- **Weekly Active Learners (WAL)**: Students who complete at least 1 learning session (≥3 concept interactions) in a given week
+- Why WAL over DAU: Learning is not a daily habit for all students; weekly captures consistent engagement without penalizing healthy study patterns
+
+### Acquisition KPIs
+| Metric | Month 6 Target | Month 12 Target | Month 18 Target |
+|---|---|---|---|
+| Registered users | 5,000 | 20,000 | 50,000 |
+| Paid subscribers | 400 | 1,600 | 4,000 |
+| Free-to-paid conversion rate | 8% | 8% | 8% |
+| CAC (paid channels) | <200 NIS | <150 NIS | <120 NIS |
+| Organic signup share | 30% | 40% | 50% |
+
+### Engagement KPIs
+| Metric | Target | Benchmark Source |
+|---|---|---|
+| WAL / MAU ratio | >60% | Duolingo: ~52% |
+| Average sessions per week (active users) | ≥3 | Internal goal |
+| Average session duration | 12–20 minutes | Cognitive load research optimal range |
+| Knowledge graph nodes added per session | ≥2 | Internal goal |
+| 7-day streak retention | >40% | Duolingo: ~35% |
+| Methodology switch rate (per 100 active students/month) | 5–15 | No benchmark — novel metric |
+
+### Retention KPIs
+| Metric | Target | EdTech Benchmark |
+|---|---|---|
+| Day 1 retention | >70% | EdTech avg: 40–50% |
+| Day 7 retention | >45% | EdTech avg: 20–30% |
+| Day 30 retention | >30% | EdTech avg: 10–15% |
+| 3-month subscription renewal rate | >75% | EdTech avg: 50–60% |
+| 12-month subscription renewal rate | >55% | EdTech avg: 25–35% |
+
+### Learning Outcome KPIs
+| Metric | Target | Measurement Method |
+|---|---|---|
+| Concept mastery rate | >70% of attempted concepts reach "mastered" within 30 days | Knowledge graph node status tracking |
+| Knowledge retention (30-day recall) | >80% accuracy on spaced repetition reviews | Automated review quiz scores |
+| Bagrut score correlation | Positive correlation (r > 0.3) between Cena engagement and Bagrut scores | Post-exam survey + opt-in score sharing (Year 2+) |
+| Student self-reported confidence | >4.0/5.0 average | In-app quarterly survey |
+
+### Business Health KPIs
+| Metric | Target |
+|---|---|
+| Gross margin | >85% |
+| LTV:CAC ratio | >10:1 |
+| Monthly burn rate | <150,000 NIS pre-break-even |
+| Months to break-even | ≤12 |
+| NPS (Net Promoter Score) | >50 (EdTech avg: 30–40) |
+
+---
+
+## 11. Unique Value Proposition & Strategy
 
 ### Cena's Four Pillars (No Competitor Has All Four)
 1. **Student-facing knowledge graph visualization** — the graph IS the product
