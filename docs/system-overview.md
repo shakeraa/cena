@@ -109,6 +109,14 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - **Tech-inspired visuals** for the knowledge graph and brand — glowing network nodes, interconnected data points, dark backgrounds with vibrant highlights (similar to Technion/HUJI AI course visuals)
 - White/clean backgrounds for learning content; dark/immersive backgrounds for the knowledge graph visualization
 
+### Dynamic Diagram Generation
+- The system must be capable of **generating or serving concept diagrams on-the-fly** for any topic in the syllabus
+- **Concept cards** — labeled illustrations paired with core formulas/equations (e.g., aerodynamics wing diagram + L = 1/2pv^2SC_L)
+- **Process flow diagrams** — step-by-step visual flows with arrows showing how things work (chemical reactions, biological processes, circuit flows)
+- **Icon-based topic grids** — color-coded navigational cards per topic area, each with a distinct icon
+- Diagrams are not static assets — they are generated/composed per concept so the system can scale across any syllabus without manually creating thousands of images
+- Potential approaches: AI-generated SVGs, templated illustration engine, or a hybrid with a curated asset library + dynamic composition
+
 ### Design Principles
 - Visuals should make complex concepts feel approachable and clear
 - Every diagram, figure, and concept should have a consistent illustrative style
