@@ -53,7 +53,7 @@
 | Gap | Who Has It? | Cena's Approach |
 |-----|------------|-----------------|
 | Student-facing knowledge graph visualization | Nobody does this well | Interactive visual map where growth is visible and motivating |
-| Adaptive methodology switching | Nobody | Seamlessly switches between Socratic, spaced repetition, project-based, Feynman, etc. |
+| Adaptive methodology switching | Nobody | Seamlessly switches between Socratic, spaced repetition, project-based, Feynman, worked examples, analogy-based, and retrieval practice |
 | Cognitive load personalization with per-student thresholds | Squirrel AI partially | Per-student fatigue threshold detection and session calibration |
 | Exam-aligned + curriculum-agnostic | Most are either generic or locked to one system | Syllabus-agnostic architecture with Bagrut as first target |
 | Mentor persona (not just a tool) | Khanmigo partially | Full mentor relationship: remembers history, thoughts, annotations |
