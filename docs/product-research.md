@@ -52,8 +52,8 @@
 
 | Gap | Who Has It? | Cena's Approach |
 |-----|------------|-----------------|
-| Student-facing knowledge graph visualization | Nobody does this well | Interactive visual map where growth is visible and motivating |
-| Adaptive methodology switching | Nobody | Seamlessly switches between Socratic, spaced repetition, project-based, Feynman, worked examples, analogy-based, and retrieval practice |
+| Student-facing knowledge graph visualization | Verified across 7 competitors (see Feature Matrix above): ALEKS offers a pie chart; Squirrel AI uses internal-only graph; Brilliant, Khan, Duolingo have no graph visualization | Interactive visual map where growth is visible and motivating |
+| Adaptive methodology switching | Verified across 7 competitors (see Feature Matrix above): all adjust difficulty/sequence, none switch teaching methodology itself — confirmed by 2024 IJAIED systematic review of adaptive learning systems | Seamlessly switches between Socratic, spaced repetition, project-based, Feynman, worked examples, analogy-based, and retrieval practice |
 | Cognitive load personalization with per-student thresholds | Squirrel AI partially | Per-student fatigue threshold detection and session calibration |
 | Exam-aligned + curriculum-agnostic | Most are either generic or locked to one system | Syllabus-agnostic architecture with Bagrut as first target |
 | Mentor persona (not just a tool) | Khanmigo partially | Full mentor relationship: remembers history, thoughts, annotations |
@@ -446,9 +446,9 @@
 
 ## 12. Unique Value Proposition & Strategy
 
-### Cena's Four Pillars (No Competitor Has All Four)
-1. **Student-facing knowledge graph visualization** — the graph IS the product
-2. **Adaptive methodology switching** — genuinely novel, no competitor does this
+### Cena's Four Pillars (Validated Against 7 Competitors — See Feature Matrix)
+1. **Student-facing knowledge graph visualization** — the graph IS the product (ALEKS has a pie chart; Squirrel AI's graph is internal-only; the remaining 5 competitors have no student-facing graph)
+2. **Adaptive methodology switching** — validated as novel: all 7 competitors adjust difficulty or sequence, but none switch the teaching method itself (confirmed by 2024 IJAIED systematic review of adaptive learning systems)
 3. **Cognitive load personalization** — per-student fatigue thresholds
 4. **Exam-aligned, curriculum-agnostic architecture** — Bagrut first, then any country
 
