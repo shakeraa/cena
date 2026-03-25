@@ -406,42 +406,53 @@
 
 ## 11. Team & Resource Requirements
 
-### Core Team (Pre-Launch, Months 1–6)
+### AI-Augmented Development Model
+- The founding team leverages **AI coding agents** (Claude Code, Kimi Code) as force multipliers — an experienced architect with these tools matches the output of a traditional 4-5 person engineering team
+- This is not theoretical: AI agents handle full-stack implementation (React Native, backend APIs, database schemas), test generation, code review, refactoring, and documentation in real-time pair-programming sessions
+- The founder brings deep enterprise architectural knowledge across the full technology stack, enabling AI agents to operate at maximum effectiveness (clear specifications → higher-quality AI output)
+
+### Core Team (Pre-Launch, Months 1–3)
 | Role | Count | Key Responsibilities | Monthly Cost (NIS) |
 |---|---|---|---|
-| Technical Co-founder / CTO | 1 | Architecture, AI/LLM integration, infrastructure | 25,000–35,000 |
-| Full-Stack Engineer | 2 | React Native mobile app, React web app, API layer | 22,000–28,000 each |
-| ML/AI Engineer | 1 | Knowledge graph pipeline, LLM prompt engineering, stagnation detection models | 25,000–32,000 |
-| Product Designer (UI/UX) | 1 | Knowledge graph visualization, onboarding flow, gamification design | 20,000–25,000 |
+| Technical Founder / Architect | 1 | Architecture, full-stack development (with Claude Code + Kimi agents), AI/LLM integration, infrastructure, knowledge graph pipeline | 25,000–35,000 |
+| Product Designer (UI/UX) | 1 | Knowledge graph visualization, onboarding flow, gamification design, mobile-first responsive design | 20,000–25,000 |
 | Education Domain Expert (part-time) | 1 | Bagrut syllabus validation, pedagogical methodology review, content QA | 8,000–12,000 |
-| **Total pre-launch team** | **6** | | **~120,000–160,000/month** |
+| **Total pre-launch team** | **3** | | **~53,000–72,000/month** |
 
-### Growth Team (Post-Launch, Months 6–12)
+### Why 3 People, Not 6
+- **No dedicated full-stack engineers**: The architect + AI coding agents (Claude Code, Kimi) produce React Native mobile, React PWA, Node.js/Python backend, and database layer at 3–5× the speed of manual development. AI agents handle boilerplate, testing, and refactoring autonomously
+- **No dedicated ML/AI engineer**: LLM integration (prompt engineering, knowledge graph extraction pipelines, stagnation detection) is the architect's core competency — AI agents accelerate implementation but the design decisions are architectural, not ML-research
+- **Designer is essential**: AI agents cannot replace visual design judgment for the knowledge graph visualization, which is the product's hero feature. This is the one role that must be human
+
+### Growth Team (Post-Launch, Months 3–12)
 | Role | Count | Key Responsibilities |
 |---|---|---|
-| Growth Marketer | 1 | Paid social campaigns, school outreach, content marketing |
-| Community Manager | 1 | Student community on Telegram/Discord, social media presence, school partnerships |
-| Customer Support (part-time) | 1 | Ticket triage, escalation for technical issues |
-| Content Engineer | 1 | Knowledge graph expansion to new subjects, diagram template creation |
+| Growth Marketer | 1 | Paid social campaigns, school outreach, content marketing, community management |
+| **Total growth additions** | **1** | |
+
+- Customer support is primarily automated (AI-powered FAQ + chatbot); human escalation handled by the founder until scale demands a dedicated hire
+- Content engineering (knowledge graph expansion to new subjects) is handled by the architect + AI agents using the established extraction pipeline
+- Community management combined with growth marketing role — Israeli student market is compact enough for one person
 
 ### Advisors (Non-Salaried)
 - **Education advisor**: Licensed Bagrut teacher with 10+ years experience — validates pedagogical approach and syllabus alignment
 - **EdTech founder advisor**: Operator who has scaled an EdTech product past 100K users — guides GTM and retention strategy
-- **AI/ML advisor**: Researcher or practitioner with experience in adaptive learning systems — reviews model architecture decisions
 
 ### Infrastructure Costs (Monthly, at 10K Users)
 | Resource | Estimated Monthly Cost |
 |---|---|
 | Cloud compute (AWS/GCP) | 3,000–5,000 NIS |
-| LLM API costs | 8,000–20,000 NIS |
+| LLM API costs (production — student-facing) | 8,000–20,000 NIS |
+| AI development tools (Claude Max, Kimi Pro, GitHub Copilot) | 2,000–3,000 NIS |
 | Database (managed PostgreSQL + graph DB) | 1,500–3,000 NIS |
 | CDN + storage | 500–1,000 NIS |
 | Monitoring + observability | 500–1,000 NIS |
-| **Total infrastructure** | **~15,000–30,000 NIS/month** |
+| **Total infrastructure** | **~17,000–33,000 NIS/month** |
 
 ### Funding Requirements
-- **Pre-seed target**: 3.0–4.0M NIS ($830K–$1.1M at 3.6 NIS/USD) for 18 months of runway
-- **Covers**: 6-person core team for 18 months (~120K–160K/month × 18 = 2.16–2.88M NIS), infrastructure (15K–30K/month × 18 = 270K–540K NIS), initial marketing budget (150K NIS), legal/compliance setup (50K NIS)
+- **Pre-seed target**: 1.2–1.8M NIS ($330K–$500K at 3.6 NIS/USD) for 18 months of runway
+- **Covers**: 3-person core team for 18 months (~53K–72K/month × 18 = 954K–1,296K NIS), infrastructure (17K–33K/month × 18 = 306K–594K NIS), marketing budget (100K NIS), legal/compliance (40K NIS)
+- **Why this is enough**: AI coding agents reduce the team from 6→3 people, cutting monthly burn by ~60%. The architect's enterprise experience eliminates the need for senior engineering hires. The technical risk is lower because the architect has built similar systems before
 - **Milestone for seed round**: 1,600+ paid subscribers (break-even), validated retention metrics (D30 >30%), positive Bagrut score correlation signal
 
 ---
