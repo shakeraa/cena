@@ -121,6 +121,10 @@
 ### Construction Strategy
 - **LLM-assisted extraction** from Bagrut syllabi and textbooks with human expert validation
 - Far more scalable than Squirrel AI's fully manual approach (10,000-30,000 points per subject)
+- **Pipeline**: (1) Feed official Bagrut syllabus PDFs and approved textbooks to LLM → (2) Extract concept nodes with prerequisite relationships → (3) Human subject-matter expert reviews and corrects edges → (4) QA pass validates prerequisite ordering against actual curriculum sequence
+- **Estimated density**: 500–2,000 concept nodes per subject (vs. Squirrel AI's 10K–30K), optimized for meaningful pedagogical granularity rather than maximum decomposition
+- **Maintenance**: Re-run extraction pipeline annually when Ministry of Education updates syllabi; delta-diff against existing graph to preserve student overlay data
+- **Quality gate**: No concept node enters the production graph without at least one expert-validated prerequisite chain from a foundational node
 
 ### Architecture
 - **Two-layer model**: Domain knowledge graph (shared, what exists to learn) + Student knowledge overlay (personal, what this student knows)
