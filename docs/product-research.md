@@ -248,7 +248,7 @@
 **Price Anchoring**
 - Primary anchor: Private Bagrut tutoring at ~3,000 NIS/subject (~$800). For 5 STEM subjects = 15,000 NIS/year ($4,100)
 - Cena at 899 NIS/year covers ALL subjects = 94% savings vs. private tutoring — this is the core value proposition
-- Secondary anchor: Brilliant.org at ~$150/year, Duolingo at ~$60/year (2025 pricing; was $84/year in 2024) — Cena's premium positioning is justified by exam alignment and deeper personalization
+- Secondary anchor: Brilliant.org at ~$150/year, Duolingo at ~$60/year (2025 pricing) — Cena's premium positioning is justified by exam alignment and deeper personalization
 
 **Willingness-to-Pay Estimates (based on Israeli market research)**
 | Segment | Estimated Monthly WTP | % of Target Market | Notes |
@@ -318,7 +318,9 @@
 
 ### Phase 1: Bagrut Beachhead (Months 1–6)
 - **Target segment**: 11th–12th grade STEM students preparing for 5-unit Bagrut exams (Mathematics and Physics first — highest private tutoring spend)
-- **Addressable market**: ~100,000 Bagrut exam takers/year (CBS 2011 baseline: 85,100; estimated ~100,000 by 2025 based on population growth); ~15,000–20,000 taking 5-unit Math (Taub Center 2016: 13.8% of cohort); ~8,500–10,000 taking 5-unit Physics (estimated from Bank of Israel scientific reserves data)
+- **Addressable market**: ~85,000–100,000 Bagrut exam takers/year (CBS 2011 baseline: 85,100; estimated up to 100K by 2025 based on population growth)
+  - 5-unit Math: ~15,000–18,000 students (Taub Center 2016: 13.8% of cohort)
+  - 5-unit Physics: ~8,500–10,000 students (estimated from Bank of Israel scientific reserves data)
 - **Launch channel**: Direct-to-student via social media (Instagram, TikTok, Telegram study groups) with "your knowledge graph" as the viral hook
 - **Pricing launch**: Free tier (2 concepts/day) + 30-day full trial on signup; conversion push at day 14 with personalized progress report showing "here's what you'd lose"
 - **Goal**: 5,000 registered users, 400 paid subscribers by Month 6
