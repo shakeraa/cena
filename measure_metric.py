@@ -98,8 +98,8 @@ CHECKS = [
     ("product-research.md", r"Duolingo.*at\s*\$84/year(?!.*was\b)",
      "Duolingo annual pricing cited as $84/year (2024 price); now ~$60/year as of 2025", 2, "OUTDATED"),
 
-    # 100K Bagrut students — only flag if not sourced with CBS caveat
-    ("product-research.md", r"(?<!~85,000.{0,20})100,?000\s*Bagrut\s*students(?!.*CBS)",
+    # 100K Bagrut students — only flag if stated without CBS caveat nearby
+    ("product-research.md", r"100,?000\s*Bagrut\s*students(?!.*CBS)",
      "100,000 Bagrut students/year is plausible but imprecise — needs CBS sourcing caveat", 2, "UNVERIFIABLE"),
 ]
 
@@ -115,7 +115,7 @@ def main():
     for file_pattern, pattern, description, weight, category in CHECKS:
         if file_pattern in all_text:
             text = all_text[file_pattern]
-            if re.search(pattern, text, re.IGNORECASE | re.DOTALL):
+            if re.search(pattern, text, re.IGNORECASE | re.MULTILINE):
                 total_score += weight
                 if category not in results_by_category:
                     results_by_category[category] = []
