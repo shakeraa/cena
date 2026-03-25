@@ -59,6 +59,24 @@
 | Mentor persona (not just a tool) | Khanmigo partially | Full mentor relationship: remembers history, thoughts, annotations |
 | Combined gamification + deep pedagogy | Duolingo has gamification; Squirrel AI has pedagogy | Both in one system |
 
+### Competitor Feature Comparison Matrix
+
+| Feature | Cena | Squirrel AI | Brilliant | Khan (Khanmigo) | ALEKS | Duolingo |
+|---|---|---|---|---|---|---|
+| **Adaptive difficulty** | Yes | Yes | Yes | Yes | Yes | Yes |
+| **Adaptive methodology switching** | Yes | No | No | No | No | No |
+| **Student-facing knowledge graph** | Interactive, visual, shareable | No (internal only) | No | No | Pie chart only | No |
+| **Stagnation detection** | 5-signal composite score | Basic (accuracy only) | No | No | Time-based re-assessment | No |
+| **Cognitive load profiling** | Per-student thresholds, 12–30 min adaptive sessions | Partial (session length only) | Fixed lesson length | No | No | Fixed lesson length |
+| **Gamification depth** | Streaks, XP, badges, graph growth, optional leaderboards | Minimal | Streaks, XP, levels, characters | Minimal | None | Streaks, XP, leagues, characters |
+| **Spaced repetition** | Integrated into methodology mix | No | No | No | Periodic re-assessment | No |
+| **Student annotations** | Captures, analyzes, updates knowledge graph | No | No | No | No | No |
+| **Multi-subject coverage** | STEM (Math, Physics, Chemistry, Biology, CS) | 10+ subjects (Chinese curriculum) | Math, CS, Science | 20+ subjects | Math, Chemistry, Statistics | Languages only |
+| **Exam alignment** | Bagrut-aligned (curriculum-agnostic architecture) | Chinese curriculum only | Not exam-aligned | US Common Core aligned | US standards aligned | Not exam-aligned |
+| **Dynamic diagram generation** | AI-generated per concept | Static content | Static interactive | Static video + interactive | Static | None |
+| **Pricing (annual)** | $190–$245 | ~$2,000+ (tutoring center) | $150 | Free (Khanmigo: $44) | ~$120 (institutional) | $84 |
+| **Platform** | Mobile-first + PWA | Physical centers + app | Web + mobile | Web + mobile | Web | Mobile + web |
+
 ---
 
 ## 2. Gamification Best Practices
