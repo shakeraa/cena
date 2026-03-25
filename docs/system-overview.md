@@ -47,9 +47,29 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - Students can request a different learning approach at any time (e.g., "I'd rather learn this through a project")
 - The system honors the request without exposing internal methodology labels
 
+## Knowledge Storage
+
+### Knowledge Graph
+- Student knowledge is stored as a **knowledge graph**
+- Concepts are nodes, relationships are edges (prerequisite, builds-on, related-to)
+- Each node tracks: mastery level, date learned, review history, method effectiveness
+- The graph powers gap detection, learning path suggestions, and concept connections
+
+### Visualization
+- Students see an interactive visual map of their knowledge graph
+- Node colors/sizes reflect mastery level (mastered, in progress, weak)
+- Edges show how concepts relate to each other
+- Clusters group related topics naturally
+- Graph grows visibly over time as the student learns — serves as motivation
+
+## Subjects & Scope
+
+- **Initial focus: STEM** (Science, Technology, Engineering, Mathematics)
+- Syllabus-based — aligned to high-grade curriculum standards
+- **Depth levels** — each topic has multiple levels of depth, allowing students to go from surface understanding to deep mastery
+- Syllabus will be provided to the system as structured input
+
 ## Open Questions
 
-- How is the student's memory/knowledge stored and structured?
-- What subjects/domains will be covered initially?
 - How does the student interact with the system? (chat, dashboard, scheduled sessions)
 - What defines "high-grade" — university level, advanced high school, gifted programs?
