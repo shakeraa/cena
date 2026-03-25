@@ -413,11 +413,18 @@
 4. **Bagrut as wedge, not ceiling** — then expand to AP (US), A-Levels (UK), JEE/NEET (India), Gaokao (China)
 5. **Cognitive load management as care signal** — "the app told me to take a break" builds trust
 
-### Key Risks
-- Knowledge graph construction cost — mitigate with LLM-assisted extraction
-- Gamification backlash — keep it "stealth," weight toward intrinsic rewards
-- Day 3-30 retention cliff — invest disproportionately in onboarding
-- Hebrew-first market size (~100K Bagrut students/year) — architecture must be ready for international expansion within 12-18 months
+### Risk Mitigation Matrix
+
+| Risk | Likelihood | Impact | Mitigation Strategy | Contingency |
+|---|---|---|---|---|
+| **Knowledge graph construction takes longer than estimated** | Medium | High | LLM-assisted extraction pipeline reduces per-subject construction from ~6 months (manual) to ~4 weeks; validate with 1 subject (Math) before committing to full suite | Launch with Math-only MVP; add subjects incrementally post-launch |
+| **Day 3–30 retention cliff** | High | Critical | Onboarding designed for <5 min to first value; streak mechanics from Day 1; push notification opt-in during onboarding; methodology switching prevents early frustration | A/B test 3 onboarding variants in first 1,000 users; iterate weekly on retention cohort data |
+| **LLM costs exceed budget at scale** | Medium | High | Aggressive caching of common explanations; Haiku-class models for classification; 50 interaction/day cap; batch pre-generation of content | Negotiate volume pricing with Anthropic/OpenAI at 10K+ user tier; build fine-tuned smaller model for high-frequency interactions |
+| **Hebrew-first market too small for VC returns** | Low | High | Architecture is curriculum-agnostic from Day 1; AP expansion planned at Month 18; Bagrut is proof-of-concept, not ceiling | Accelerate international timeline if Israeli traction validates product-market fit faster than expected |
+| **Gamification reduces intrinsic motivation** | Medium | Medium | "Stealth gamification" — knowledge graph growth IS the reward; adaptive intensity (less gamification for intrinsically motivated students); meaningful badges tied to intellectual milestones | A/B test gamification-on vs. gamification-off cohorts; measure learning outcomes, not just engagement |
+| **Competitor launches similar features** | Low | Medium | Methodology switching + knowledge graph visualization combination creates compound defensibility; per-student learning history creates switching costs | Accelerate feature development on most defensible pillar (methodology switching — hardest to replicate) |
+| **Regulatory changes (Israeli privacy law tightening)** | Low | Medium | GDPR-ready architecture from Day 1 exceeds current Israeli requirements; DPO role planned for post-seed | Legal advisor on retainer; data architecture supports any jurisdiction's deletion/portability requirements |
+| **LLM provider API disruption or pricing change** | Medium | Medium | Model-agnostic abstraction layer; dual-provider setup (Claude primary, GPT-4o fallback); no fine-tuned models that lock to one provider | Switch primary provider within 48 hours; cached content continues serving during transition |
 
 ---
 
