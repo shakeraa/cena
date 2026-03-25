@@ -41,7 +41,17 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - Monitors progress and detects when a student plateaus
 - Automatically switches to a different methodology when stagnation is detected
 - The switch happens **seamlessly** — the student is not made aware of the methodology change
-- Stagnation detection criteria (time-based, attempt-based, etc.) — TBD
+- Stagnation detection uses a **composite score** from five signals:
+  1. **Accuracy plateau**: Less than 5% improvement over the last 10 attempts on a concept cluster
+  2. **Response time drift**: Rolling average response time increases by more than 20% compared to the student's baseline for similar-difficulty problems
+  3. **Session abandonment**: Student ends sessions more than 30% earlier than their personal average session duration
+  4. **Error type repetition**: The same error pattern (classified by error taxonomy) recurs 3 or more times across sessions
+  5. **Annotation sentiment**: NLP analysis of student annotations detects frustration or confusion signals
+- A methodology switch is triggered when the composite stagnation score exceeds a threshold of 0.7 (on a 0–1 normalized scale) for 3 consecutive sessions
+- The switching strategy is error-type-driven:
+  - Rule-based/procedural errors → switch to drill-and-practice or spaced repetition
+  - Conceptual misunderstanding → switch to Socratic dialogue or Feynman technique
+  - Motivational stagnation → switch to project-based learning or real-world application contexts
 
 ### Student Control
 - Students can request a different learning approach at any time (e.g., "I'd rather learn this through a project")
