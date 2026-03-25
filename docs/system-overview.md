@@ -88,6 +88,10 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - **Web app** and **mobile app** (mobile-first approach)
 - Consistent experience across both platforms
 
-## Open Questions
+## Target Audience
 
-- What defines "high-grade" — university level, advanced high school, gifted programs?
+### Bagrut (Israeli Matriculation)
+- Target students are preparing for **Bagrut** exams
+- Syllabus follows the Israeli Ministry of Education curriculum
+- STEM subjects: Mathematics, Physics, Chemistry, Biology, Computer Science
+- Depth levels align with the Bagrut study units system (3/4/5 units per subject)
