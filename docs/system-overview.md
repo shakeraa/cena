@@ -69,7 +69,25 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - **Depth levels** — each topic has multiple levels of depth, allowing students to go from surface understanding to deep mastery
 - Syllabus will be provided to the system as structured input
 
+## Interaction & Platform
+
+### Multi-Level Interaction
+- Interaction is not a single mode — the system dynamically presents what's relevant
+- **Interactive sessions** — guided mentoring conversations
+- **Concept visualization** — knowledge graph, concept maps, relationships shown in context
+- **Thought tracking** — surfaces the student's own recorded thoughts and ideas
+- **Data presentation** — progress metrics, mastery levels, learning patterns
+- The UI is a **living workspace** that adapts based on what the student is doing
+
+### Student Annotations
+- Students can annotate concepts — add their own thoughts, notes, and ideas
+- Annotations are captured by the system as input to understand the student's thinking
+- The knowledge graph is updated based on annotations (new connections, thoughts, insights)
+
+### Platforms
+- **Web app** and **mobile app** (mobile-first approach)
+- Consistent experience across both platforms
+
 ## Open Questions
 
-- How does the student interact with the system? (chat, dashboard, scheduled sessions)
 - What defines "high-grade" — university level, advanced high school, gifted programs?
