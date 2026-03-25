@@ -29,9 +29,26 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - High-grade students seeking structured personal mentorship
 - Students who want to organize and retain their learning effectively
 
+## Methodology Approach
+
+### Adaptive Methodology Selection
+- The system selects the best methodology per student automatically
+- Supported methods include: Socratic method, spaced repetition, project-based learning, Bloom's taxonomy progression, Feynman technique, and others
+- The system profiles each student to determine which method is most effective for them
+- Tracks per-student method effectiveness over time
+
+### Stagnation Detection & Switching
+- Monitors progress and detects when a student plateaus
+- Automatically switches to a different methodology when stagnation is detected
+- The switch happens **seamlessly** — the student is not made aware of the methodology change
+- Stagnation detection criteria (time-based, attempt-based, etc.) — TBD
+
+### Student Control
+- Students can request a different learning approach at any time (e.g., "I'd rather learn this through a project")
+- The system honors the request without exposing internal methodology labels
+
 ## Open Questions
 
-- Which specific methodologies will be supported? (e.g., Socratic method, spaced repetition, project-based learning)
 - How is the student's memory/knowledge stored and structured?
 - What subjects/domains will be covered initially?
 - How does the student interact with the system? (chat, dashboard, scheduled sessions)
