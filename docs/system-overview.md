@@ -33,7 +33,7 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 
 ### Adaptive Methodology Selection
 - The system selects the best methodology per student automatically
-- Supported methods include: Socratic method, spaced repetition, project-based learning, Bloom's taxonomy progression, Feynman technique, and others
+- Supported methods include: Socratic method, spaced repetition, project-based learning, Bloom's taxonomy progression, Feynman technique, worked examples with fading, analogy-based instruction, and retrieval practice
 - The system profiles each student to determine which method is most effective for them
 - Tracks per-student method effectiveness over time
 
