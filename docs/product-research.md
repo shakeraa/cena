@@ -39,14 +39,45 @@
 - DAU grew 4.5x over 4 years to 34M
 - Weaknesses: language-only, shallow pedagogy, no knowledge graph
 
+**SmartyMe (Physics / Engineering)**
+- Engaging visual diagram style — concept cards with illustrations + formulas in a grid layout
+- "Addictive game" framing — positions learning as a game you can't stop playing
+- Topic cards: Aerodynamics (L=1/2pv^2SC_L), Propulsion (F=m(v_e-v_0)+(p_e-p_0)A), Flight Mechanics (F=ma), etc.
+- Human element in marketing — person reacting with excitement, relatable and social
+- Weaknesses: no adaptive system, no knowledge graph, no deep personalization, no cognitive load management
+
+**Nibble**
+- "Replace Scrolling with Engineering Game" — positions learning as a doomscrolling replacement
+- **Skill proficiency meters** per domain (Systems Thinking 89.9%, Mechanics 91.4%, Logic & Circuits 37.5%, Design Principles 56.7%)
+- 5-minute lessons, system-based challenges & scenarios
+- "Think sharper" framing — sells the outcome (better thinking), not the tool
+- "Boost your problem-solving skills" positioning
+- Weaknesses: engineering-focused only, no knowledge graph, no adaptive methodology, no personalized cognitive load
+
 **Anki / Quizlet**
 - Spaced repetition tools with strong retention for factual recall
 - "Tools" not "mentors" — no pedagogical guidance, no adaptation, no knowledge graph
 
-**SmartyMe**
-- Engaging visual diagram style for physics/engineering
-- Addictive gamified learning framing
-- Weaknesses: no adaptive system, no knowledge graph, no deep personalization
+**Century Tech (UK)**
+- Adaptive platform with teacher analytics and intelligent tutoring
+- Primarily B2B/institutional — less student-facing than Cena's vision
+
+### Competitive Landscape Matrix
+
+| Feature | Squirrel AI | Brilliant | Khan Academy | ALEKS | Duolingo | SmartyMe | Nibble | **Cena** |
+|---------|:-----------:|:---------:|:------------:|:-----:|:--------:|:--------:|:------:|:--------:|
+| Knowledge graph (internal) | Yes | No | No | Yes | No | No | No | **Yes** |
+| Knowledge graph (student-facing) | No | No | No | Pie chart | No | No | No | **Yes** |
+| Skill proficiency meters | No | Partial | Partial | Pie chart | No | No | Yes | **Yes** |
+| Adaptive difficulty | Yes | Yes | Yes | Yes | Partial | No | No | **Yes** |
+| Adaptive methodology | No | No | No | No | No | No | No | **Yes** |
+| Stagnation detection | Partial | No | No | Partial | No | No | No | **Yes** |
+| Cognitive load management | Partial | No | No | No | No | No | No | **Yes** |
+| Gamification | No | Strong | Minimal | No | Gold std | Strong | Moderate | **Stealth** |
+| Exam-aligned | China only | No | No | US only | No | No | No | **Any syllabus** |
+| Dynamic diagrams | No | Interactive | Videos | No | No | Static | Static | **Dynamic** |
+| Mentor memory | No | No | Partial | No | No | No | No | **Yes** |
+| Mobile-first | No | Yes | Yes | No | Yes | Yes | Yes | **Yes** |
 
 ### Gaps Cena Fills
 
@@ -58,6 +89,8 @@
 | Exam-aligned + curriculum-agnostic | Most are either generic or locked to one system | Syllabus-agnostic architecture with Bagrut as first target |
 | Mentor persona (not just a tool) | Khanmigo partially | Full mentor relationship: remembers history, thoughts, annotations |
 | Combined gamification + deep pedagogy | Duolingo has gamification; Squirrel AI has pedagogy | Both in one system |
+| Skill proficiency meters + knowledge graph | Nibble has meters; nobody has both | Both — quick glance meters + deep interactive graph |
+| "Replace scrolling" mobile positioning | Nibble | Mobile-first with same positioning + deeper learning engine |
 
 ---
 
@@ -68,6 +101,8 @@
 - **Progress visualization** (XP bars, leveling, unlocking) — courses under 5 min had 74% completion vs 36% for 15+ min
 - **Milestone celebrations** — Duolingo's animations increased learning time by 17%
 - **Leagues/leaderboards** — +25% lesson completion, but must be optional
+- **Skill proficiency meters** — clean at-a-glance mastery percentages per domain (Nibble model)
+- **"Addictive" framing** — positioning as a game creates curiosity-driven downloads (SmartyMe model)
 
 ### Risks
 - **Extrinsic crowding out intrinsic**: Extrinsic rewards harm academic performance in highly intrinsically motivated students while helping low-motivation students
@@ -81,6 +116,8 @@
 3. **Loss aversion > reward seeking**: Streak mechanics and "protect your progress" framing outperform pure rewards
 4. **Social proof without toxic competition**: "X students mastered this concept this week" rather than rank-ordered leaderboards
 5. **Meaningful badges**: Represent intellectual achievement ("Mastered Integration," "Connected 50 Concepts") not just activity
+6. **Evolving reward structure**: Badges, seasonal events, changing challenges to combat novelty decay
+7. **Gradually shift** from extrinsic to intrinsic rewards as mastery deepens
 
 ---
 
@@ -106,7 +143,11 @@
 
 ### Methodology Switching Principles
 - Seamlessness matters — student should not feel a jarring switch
-- **Multi-modal error analysis**: Rule-based errors -> drill/practice; conceptual misunderstanding -> Socratic dialogue; motivational stagnation -> project-based or Feynman technique
+- **Multi-modal error analysis**:
+  - Rule-based errors -> drill/practice
+  - Conceptual misunderstanding -> Socratic dialogue
+  - Motivational stagnation -> project-based or Feynman technique
+  - Engagement drop -> challenge-based scenarios (Nibble-style)
 - Log which methodology was active at switch time to build per-student effectiveness profile
 
 ---
@@ -139,7 +180,7 @@
 - **Germane load** (schema construction) is the "good" effort — maximize this while keeping total load below threshold
 
 ### Optimal Session Design
-- **Microlearning sweet spot: 5-10 minutes** per focused learning unit
+- **Microlearning sweet spot: 5-10 minutes** per focused learning unit (validated by Nibble's "5-minute lessons" approach)
 - **Sustained attention: ~20 minutes** before needing a break
 - Cap sessions at **20-25 minutes** before suggesting a break (adjustable per student)
 - Some students handle 30-min sessions; others fatigue at 12 minutes — build individual profiles
@@ -168,10 +209,12 @@
 1. **Daily habit loop**: Streak + notification + short session + reward
 2. **Early wins**: First session must demonstrate value — diagnostic -> "here's your knowledge map" -> first micro-lesson -> graph grows
 3. **Visible progress**: Knowledge graph growing is Cena's secret weapon — every session should end with new nodes/connections
-4. **Personalized timeline**: "You're 67% of the way to mastering 5-unit Math" with date estimate
-5. **Social proof**: "3 students in your class also mastered this today" (cohort models see 2-3x higher retention)
-6. **Proactive re-engagement**: Detect declining engagement and intervene before student disappears
-7. **Emotional design**: Celebrations, encouragement, personality in the mentor
+4. **Skill proficiency meters**: Quick "how am I doing" check without diving into the full graph (Nibble model)
+5. **Personalized timeline**: "You're 67% of the way to mastering 5-unit Math" with date estimate
+6. **Social proof**: "3 students in your class also mastered this today" (cohort models see 2-3x higher retention)
+7. **Proactive re-engagement**: Detect declining engagement and intervene before student disappears
+8. **Emotional design**: Celebrations, encouragement, personality in the mentor
+9. **"Replace scrolling" positioning**: Frame as a productive alternative to social media, not homework (Nibble model)
 
 ### Common Drop-Off Points
 - After diagnostic/onboarding (if too long or no immediate value)
@@ -185,6 +228,7 @@
 - Implement streaks from day 1 with streak freeze as premium feature
 - Weekly progress summaries: "This week you learned 12 new concepts and strengthened 8"
 - After Bagrut exams, pivot messaging to "continue growing" — position as lifelong learning tool
+- Market as **"addictive learning game"** to drive curiosity-based downloads (SmartyMe model)
 
 ---
 
@@ -195,6 +239,7 @@
 - 350+ active e-learning platforms, 163 K-12 EdTech companies
 - **Private Bagrut tutoring: ~3,000 NIS (~$800) per subject** — this is the price anchor
 - Government allocated ~$120M for digital education initiatives
+- ~100K students/year taking Bagrut exams
 
 ### Recommended Model
 
@@ -208,6 +253,7 @@
 - Advanced gamification (leagues, detailed badges)
 - Personalized timeline estimates
 - Methodology adaptation and cognitive load management
+- Full skill proficiency meters and analytics
 - **Pricing: 79-99 NIS/month or 699-899 NIS/year** (~$200-250/year)
 - Positioning: covers ALL subjects vs 3,000 NIS/subject for private tutoring (5 subjects = 15,000 NIS)
 
@@ -218,7 +264,33 @@
 
 ---
 
-## 8. Unique Value Proposition & Strategy
+## 8. Visual & UX Reference Analysis
+
+### Reference Products & What to Adopt
+
+| Reference | Source | Visual Style | What Cena Adopts |
+|-----------|--------|-------------|------------------|
+| **FigureLabs** | Instagram ad | Flat scientific illustration, clean white background, process flows with arrows, labeled steps | Concept diagram style for processes and relationships |
+| **SmartyMe Physics** | Instagram ad | Colorful icon grid, each topic gets a pastel-colored card with illustration + label | Topic navigation grids, color-coded concept cards |
+| **SmartyMe Engineering** | Instagram post | Concept cards with labeled illustrations + core formulas, grid layout by discipline | Concept card format: illustration + equation per concept |
+| **Technion Big Data** | Instagram ad | Glowing network/atom visual in a hand, dark background, vibrant node connections | Knowledge graph visualization aesthetic, brand imagery |
+| **HUJI AI Course** | Instagram ad | Circuit-brain hybrid visual, dark tech aesthetic, bold typography | Tech-forward brand identity, dark mode graph views |
+| **Snowflake/MIT** | Instagram ad | Neural network diagram, clean data visualization, professional layout | Data presentation style, progress analytics views |
+| **Nibble** | Instagram post | Skill proficiency meters with icons + percentages, "Replace Scrolling" headline, challenge framing | Domain mastery meters, mobile positioning, scenario challenges |
+
+### Key Visual Takeaways
+1. **Concept cards = illustration + formula** — every concept should have a visual + its key equation, clean and self-contained
+2. **Grid navigation** — topics organized in colorful grids, easy to scan on mobile
+3. **Dark mode for graphs** — tech-inspired, glowing nodes for the knowledge graph
+4. **White mode for learning** — clean, distraction-free backgrounds for content
+5. **Skill meters** — simple icon + percentage per domain, always visible
+6. **"Addictive" / "Replace scrolling"** — marketing language that reframes learning as entertainment
+7. **Dynamic diagrams** — must be generated per concept, not static images, to scale across syllabi
+8. **Human element** — consider using relatable personalities/reactions in marketing (SmartyMe model)
+
+---
+
+## 9. Unique Value Proposition & Strategy
 
 ### Cena's Four Pillars (No Competitor Has All Four)
 1. **Student-facing knowledge graph visualization** — the graph IS the product
@@ -227,17 +299,44 @@
 4. **Exam-aligned, curriculum-agnostic architecture** — Bagrut first, then any country
 
 ### Where to Double Down
-1. **Knowledge graph as hero product** — beautiful, interactive, shareable (viral acquisition)
+1. **Knowledge graph as hero product** — beautiful, interactive, shareable (viral acquisition). Students screenshot their graph and share it.
 2. **Methodology switching as "invisible magic"** — "this app just gets how I need to learn"
-3. **Mentor memory creates switching costs** — leaving Cena = losing your entire learning history
+3. **Mentor memory creates switching costs** — leaving Cena = losing your entire learning history and knowledge map
 4. **Bagrut as wedge, not ceiling** — then expand to AP (US), A-Levels (UK), JEE/NEET (India), Gaokao (China)
-5. **Cognitive load management as care signal** — "the app told me to take a break" builds trust
+5. **Cognitive load management as care signal** — "the app told me to take a break because it noticed I was tired" builds trust
+6. **"Replace scrolling" mobile positioning** — frame as productive alternative to social media
+7. **Skill proficiency meters + knowledge graph** — both quick-glance and deep-dive progress views
 
 ### Key Risks
-- Knowledge graph construction cost — mitigate with LLM-assisted extraction
-- Gamification backlash — keep it "stealth," weight toward intrinsic rewards
-- Day 3-30 retention cliff — invest disproportionately in onboarding
-- Hebrew-first market size (~100K Bagrut students/year) — architecture must be ready for international expansion within 12-18 months
+- **Knowledge graph construction cost** — mitigate with LLM-assisted extraction + expert validation
+- **Gamification backlash** — keep it "stealth," weight toward intrinsic rewards (graph growth)
+- **Day 3-30 retention cliff** — invest disproportionately in onboarding and first 5 minutes
+- **Hebrew-first market size** (~100K Bagrut students/year) — architecture must be ready for international expansion within 12-18 months
+- **Dynamic diagram quality** — AI-generated diagrams must be consistently high quality and accurate
+
+---
+
+## 10. Key Takeaways
+
+### Product Differentiation
+- Cena's combination of visible knowledge graph + adaptive methodology + cognitive load personalization is **unique in the market**
+- Closest competitor (Squirrel AI) is locked to China and doesn't expose the graph to students
+- The "invisible magic" of methodology switching is the hardest thing for competitors to replicate
+
+### Validated Decisions
+- **5-10 min learning units** — confirmed by cognitive load research AND competitor success (Nibble, Duolingo)
+- **Stealth gamification** — research shows adaptive intensity outperforms one-size-fits-all
+- **Knowledge graph as primary reward** — Open Learner Model research confirms this drives motivation
+- **Exam-aligned but agnostic** — creates beachhead in Israel with clear expansion path
+- **Mobile-first** — every successful EdTech competitor in this space is mobile-first
+
+### Action Items for Next Phase
+1. Design the **first 5 minutes** experience (diagnostic -> graph reveal -> first lesson -> graph grows)
+2. Define the **knowledge graph schema** for Bagrut Math as first subject
+3. Create **visual design system** based on reference analysis (concept cards, graph aesthetic, skill meters)
+4. Prototype the **stagnation detection algorithm** with composite scoring
+5. Build **fatigue detection** baseline model from initial user sessions
+6. Develop **dynamic diagram generation** pipeline (templated illustration engine + AI composition)
 
 ---
 
@@ -251,3 +350,4 @@
 - Monetizely, Ptolemay — EdTech pricing models
 - Ken Research, Tracxn — Israeli market data
 - MIT Technology Review, HundrED — Squirrel AI analysis
+- SmartyMe, Nibble, FigureLabs, Technion, HUJI — visual reference analysis
