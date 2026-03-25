@@ -187,3 +187,28 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - **System prompts per methodology**: Each teaching method (Socratic, Feynman, spaced repetition) has a dedicated system prompt that shapes the LLM's behavior
 - **Student context injection**: Each request includes a compressed summary of the student's knowledge state (mastered concepts, current gaps, recent errors, active methodology)
 - **Safety rails**: Content filtered to stay within curriculum scope; LLM cannot provide direct answers during Socratic mode; age-appropriate language enforcement
+
+## Security & Privacy
+
+### Data Protection
+- **Student data classification**: All student data (learning history, annotations, knowledge graph state, engagement metrics) classified as **PII** and treated accordingly
+- **Encryption**: AES-256 at rest for all databases; TLS 1.3 in transit for all API communication; field-level encryption for sensitive student identifiers
+- **Data residency**: Primary storage in AWS eu-west-1 (Ireland) or il-central-1 (Tel Aviv) to comply with Israeli Privacy Protection Law (5741-1981)
+- **Data retention**: Active student data retained for duration of subscription + 12 months; anonymized aggregate data retained indefinitely for model improvement; full deletion within 30 days of request
+
+### Regulatory Compliance
+- **Israeli Privacy Protection Law (5741-1981)**: Registration with the Israeli Law, Information and Technology Authority (ILITA) database registry; compliance with data processing requirements
+- **GDPR readiness**: Architecture designed for GDPR compliance from day one (EU expansion planned within 18 months) — data portability, right to erasure, consent management, DPO appointment
+- **COPPA considerations**: While primary target is ages 16-18 (Bagrut), system architecture supports parental consent flows for any future expansion to younger students (<16 under Israeli law, <13 under COPPA)
+- **Ministry of Education**: No formal approval required for supplementary ed-tech tools in Israel, but content alignment with official Bagrut syllabi will be independently verified by licensed teachers
+
+### Authentication & Access Control
+- **Student authentication**: Email/password with bcrypt hashing + optional social login (Google); mandatory email verification
+- **MFA**: Optional TOTP-based MFA for students; mandatory for admin and teacher accounts
+- **Session management**: JWT tokens with 1-hour expiry, refresh tokens with 30-day expiry, device-based session tracking with anomaly detection
+- **Role-based access**: Four roles — student, parent (read-only view of child's progress), teacher (class dashboard), admin (system management)
+
+### LLM-Specific Security
+- **No student PII in LLM prompts**: Student context passed to LLMs uses anonymized identifiers; real names, emails, and school names are never included in API calls to third-party model providers
+- **Prompt injection protection**: Input sanitization layer between student text input and LLM prompts; output validation ensures responses stay within educational context
+- **Audit logging**: All LLM interactions logged (prompt hash + response hash, not full content) for abuse detection and cost monitoring
