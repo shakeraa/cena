@@ -150,7 +150,7 @@
 ### Optimal Session Design
 - **Microlearning sweet spot: 5-10 minutes** per focused learning unit
 - **Sustained attention: ~20 minutes** before needing a break
-- Cap sessions at **20-25 minutes** before suggesting a break (adjustable per student)
+- Cap sessions at **20-25 minutes** before suggesting a break; the system learns each student's optimal session length from their first 5 sessions and adjusts the cap within a 12–30 minute range based on their cognitive load profile
 - Student session tolerance varies widely (12–30 minutes based on age, subject difficulty, and time of day) — the system builds individual cognitive load profiles from the first 5 sessions and refines continuously
 
 ### Fatigue Detection Metrics
