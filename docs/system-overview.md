@@ -212,3 +212,48 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - **No student PII in LLM prompts**: Student context passed to LLMs uses anonymized identifiers; real names, emails, and school names are never included in API calls to third-party model providers
 - **Prompt injection protection**: Input sanitization layer between student text input and LLM prompts; output validation ensures responses stay within educational context
 - **Audit logging**: All LLM interactions logged (prompt hash + response hash, not full content) for abuse detection and cost monitoring
+
+## Onboarding Flow Specification
+
+### Design Principle
+- The first 5 minutes must deliver immediate value — the student sees their knowledge graph populated and growing before being asked to pay or commit
+- Total onboarding target: under 4 minutes to first "aha moment" (seeing their personal knowledge map for the first time)
+
+### Step-by-Step Flow
+
+**Step 1: Signup (30 seconds)**
+- Email + password or Google social login
+- Name, grade level (11th/12th), and primary Bagrut subjects (multi-select from: Mathematics, Physics, Chemistry, Biology, Computer Science)
+- No school name required (reduces friction); optional field for cohort features later
+
+**Step 2: Diagnostic Assessment (2–3 minutes)**
+- Adaptive 10–15 question diagnostic quiz on the selected primary subject
+- Questions span Bloom's taxonomy levels (recall → application → analysis) to map depth, not just breadth
+- Uses the ALEKS-inspired Knowledge Space approach: each answer eliminates a cluster of concepts from "unknown" status
+- UI: clean, one-question-at-a-time, progress bar showing "Building your knowledge map..."
+- Student can skip questions they don't understand (skip = signal of gap, not penalized)
+
+**Step 3: Knowledge Graph Reveal (30 seconds)**
+- Animated reveal of the student's personal knowledge graph based on diagnostic results
+- Mastered concepts glow green, gaps shown as dim/gray nodes, connections animate in
+- Key moment: student sees the visual scope of what they know vs. what they need to learn
+- Call to action: "Let's light up your next node" → starts first micro-lesson
+
+**Step 4: First Micro-Lesson (2–3 minutes)**
+- System selects the highest-impact concept adjacent to an existing mastered node (minimizes cognitive load, maximizes perceived progress)
+- Lesson uses the methodology best suited to the student's diagnostic error patterns (default: Socratic for conceptual, spaced repetition for factual)
+- Lesson completes with a mastery check (2–3 questions)
+- On success: knowledge graph animates — new node lights up green, edge connects to existing knowledge
+- This is the "aha moment": the student visually sees their graph grow from their own effort
+
+**Step 5: Session Summary & Hook (30 seconds)**
+- "You mastered [concept name] and connected it to [existing concept]. Your graph grew by 1 node."
+- Streak initialized: "Day 1 — come back tomorrow to keep your streak alive"
+- Free tier limit explained: "You have 2 more concepts today, or unlock unlimited with Premium"
+- Push notification permission request (framed as "streak reminders")
+
+### Onboarding Success Criteria
+- **Completion rate target**: >75% of signups complete through Step 4 (first micro-lesson)
+- **Time to value**: <5 minutes from signup to first knowledge graph node earned
+- **Day 1 → Day 2 return rate**: >50% (driven by streak initialization and push notification opt-in)
+- **Diagnostic skip rate**: <20% of questions skipped (if higher, diagnostic is too hard or too long)
