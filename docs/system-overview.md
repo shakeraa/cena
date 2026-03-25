@@ -95,8 +95,8 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - The knowledge graph is updated based on annotations (new connections, thoughts, insights)
 
 ### Platforms
-- **Mobile app** (primary platform, mobile-first): React Native for iOS and Android from a single codebase
-- **Web app** (secondary platform): React-based progressive web app (PWA) sharing component library with mobile
+- **Mobile app** (primary platform, mobile-first): React Native for iOS and Android from a single codebase — developed using AI coding agents (Claude Code, Kimi) for 3–5× development velocity
+- **Web app** (secondary platform): React-based progressive web app (PWA) sharing component library with mobile — AI agents generate shared component library across both platforms
 - Consistent experience across both platforms via shared design system and API layer
 - Offline support: core learning sessions and knowledge graph browsable offline, synced when connectivity returns
 - Push notifications for streak reminders, session nudges, and spaced repetition review alerts

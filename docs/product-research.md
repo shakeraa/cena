@@ -306,42 +306,53 @@
 - **LTV:CAC ratio target**: >10:1 (1,600/150) — well above the 3:1 minimum for healthy SaaS
 - **Payback period**: <2 months (CAC 150 NIS ÷ 89 NIS/month gross contribution)
 
-### Break-Even Analysis
-- **Monthly fixed costs (estimated)**: ~120,000 NIS/month (team of 6 + infrastructure baseline + office)
+### Break-Even Analysis (AI-Lean Team Model)
+- **Monthly fixed costs (estimated)**: ~70,000–105,000 NIS/month (3-person core team ~53K–72K + infrastructure ~17K–33K)
 - **Contribution margin per premium user**: ~74–82 NIS/month
-- **Break-even subscribers**: ~1,500–1,600 premium users
-- **At 8% conversion from ~85K–100K addressable Bagrut students** (CBS 2011 baseline: 85,100; estimated up to ~100K by 2025 based on population growth): theoretical maximum of 6,800–8,000 premium users in Year 1, reaching break-even at ~20–24% of that target
+- **Break-even subscribers**: ~850–1,420 premium users (vs. ~1,500–1,600 with traditional 6-person team)
+- **At 8% conversion from ~85K–100K addressable Bagrut students** (CBS 2011 baseline: 85,100; estimated up to ~100K by 2025 based on population growth): theoretical maximum of 6,800–8,000 premium users in Year 1
+- **Break-even timeline**: Month 6–8 (vs. Month 12 with traditional team) — the AI-lean cost structure means profitability arrives 4–6 months earlier, preserving more runway for growth investment
+- **Key insight**: The AI-augmented model doesn't just cut costs — it makes the business viable at a much smaller scale, reducing the risk of not finding product-market fit before running out of money
 
 ---
 
 ## 9. Go-to-Market Strategy
 
-### Phase 1: Bagrut Beachhead (Months 1–6)
-- **Target segment**: 11th–12th grade STEM students preparing for 5-unit Bagrut exams (Mathematics and Physics first — highest private tutoring spend)
-- **Addressable market**: ~85,000–100,000 Bagrut exam takers/year (CBS 2011 baseline: 85,100; estimated up to 100K by 2025 based on population growth)
+### Development Velocity Advantage
+- AI coding agents (Claude Code, Kimi) compress the traditional development timeline by 3–5×
+- An experienced architect with AI agents ships working features in days, not weeks: full API endpoints, React Native screens, database migrations, test suites — all generated in pair-programming sessions
+- Knowledge graph construction pipeline: architect + Claude Code builds the extraction → validation → QA pipeline in 1–2 weeks per subject (vs. 4 weeks with a traditional team)
+
+### Phase 1: Build + Bagrut Beachhead (Months 1–3)
+- **Month 1**: MVP core — onboarding flow, diagnostic quiz, knowledge graph (Math only), Socratic tutoring mode. Architect + AI agents deliver full-stack in ~4 weeks
+- **Month 2**: Gamification layer (streaks, XP, badges), spaced repetition, stagnation detection v1. Add Physics knowledge graph (1–2 weeks with established pipeline)
+- **Month 3**: Beta launch to 200–500 students from Bagrut study groups (Telegram, WhatsApp). Iterate on retention and onboarding based on real data
+- **Target segment**: 11th–12th grade STEM students preparing for 5-unit Bagrut exams (Mathematics and Physics first)
+- **Addressable market**: ~85,000–100,000 Bagrut exam takers/year (CBS 2011 baseline: 85,100; estimated up to 100K by 2025)
   - 5-unit Math: ~15,000–18,000 students (Taub Center 2016: 13.8% of cohort)
   - 5-unit Physics: ~8,500–10,000 students (estimated from Bank of Israel scientific reserves data)
+- **Goal**: 2,000 registered users, 160 paid subscribers by Month 3
+
+### Phase 2: Growth + School Partnerships (Months 3–8)
 - **Launch channel**: Direct-to-student via social media (Instagram, TikTok, Telegram study groups) with "your knowledge graph" as the viral hook
-- **Pricing launch**: Free tier (2 concepts/day) + 30-day full trial on signup; conversion push at day 14 with personalized progress report showing "here's what you'd lose"
-- **Goal**: 5,000 registered users, 400 paid subscribers by Month 6
+- **Pricing launch**: Free tier (2 concepts/day) + 30-day full trial on signup; conversion push at day 14
+- **B2B2C model**: Partner with 10–20 high schools; teacher dashboards show class-level knowledge gaps
+- **School pricing**: 50 NIS/student/year (subsidized to drive adoption); upsell individuals to premium
+- **Referral loop**: Knowledge graph sharing ("compare your graph with mine")
+- **Goal**: 15,000 registered users, 1,200 paid subscribers by Month 8 (break-even)
 
-### Phase 2: School Partnerships (Months 6–12)
-- **B2B2C model**: Partner with 10–20 high schools to offer Cena as a supplementary tool; teacher dashboards show class-level knowledge gaps
-- **Pricing**: School license at 50 NIS/student/year (subsidized vs. direct pricing to drive adoption); upsell individual students to premium features
-- **Referral loop**: Students in partner schools invite friends from other schools via knowledge graph sharing ("compare your graph with mine")
-- **Goal**: 20,000 registered users, 1,600 paid subscribers (break-even) by Month 12
-
-### Phase 3: National Expansion (Months 12–18)
-- **Subject expansion**: Add Chemistry, Biology, Computer Science to cover full STEM Bagrut suite
-- **Channel expansion**: Partnerships with private tutoring centers (position as "between sessions" tool), parent-focused marketing (WhatsApp parent groups)
+### Phase 3: National + Subject Expansion (Months 8–14)
+- **Subject expansion**: Add Chemistry, Biology, Computer Science — 1–2 weeks per subject using the established KG pipeline + AI agents
+- **Channel expansion**: Private tutoring center partnerships, parent-focused WhatsApp marketing
 - **Seasonal campaigns**: 3-month intensive bundles before Bagrut exam periods (January and June)
-- **Goal**: 50,000 registered users, 4,000 paid subscribers by Month 18
+- **Goal**: 35,000 registered users, 3,000 paid subscribers by Month 14
 
-### Phase 4: International Readiness (Months 18–24)
-- **First international target**: AP exams (US) — largest English-speaking standardized exam market, strong overlap with STEM focus
-- **Localization requirements**: English UI (already partially built), AP syllabus knowledge graph construction (LLM-assisted, ~4 weeks per subject), US-market payment processing
-- **Go-to-market in US**: Partnership with AP tutoring services, Reddit r/APStudents community, College Confidential forums
-- **Second target**: A-Levels (UK) — similar exam structure, English-language, Commonwealth expansion path
+### Phase 4: International Readiness (Months 14–20)
+- **First international target**: AP exams (US) — largest English-speaking standardized exam market
+- **Localization**: English UI, AP syllabus knowledge graph construction (1–2 weeks per subject with AI agents), US-market payment processing
+- **Go-to-market in US**: AP tutoring service partnerships, Reddit r/APStudents, College Confidential
+- **Second target**: A-Levels (UK) — similar exam structure, English-language, Commonwealth path
+- **Goal**: 60,000+ registered users globally, 5,000+ paid subscribers by Month 20
 
 ### Distribution Channels (Ranked by Expected ROI)
 1. **Organic/viral** (40% of acquisition): Knowledge graph screenshots shared on social media; "challenge a friend" comparison feature; shareable milestone badges
@@ -398,8 +409,8 @@
 |---|---|
 | Gross margin | >85% |
 | LTV:CAC ratio | >10:1 |
-| Monthly burn rate | <150,000 NIS pre-break-even |
-| Months to break-even | ≤12 |
+| Monthly burn rate | <105,000 NIS pre-break-even |
+| Months to break-even | ≤8 (AI-lean team) |
 | NPS (Net Promoter Score) | >50 (EdTech avg: 30–40) |
 
 ---
@@ -476,7 +487,7 @@
 
 | Risk | Likelihood | Impact | Mitigation Strategy | Contingency |
 |---|---|---|---|---|
-| **Knowledge graph construction takes longer than estimated** | Medium | High | LLM-assisted extraction pipeline reduces per-subject construction from ~6 months (manual) to ~4 weeks; validate with 1 subject (Math) before committing to full suite | Launch with Math-only MVP; add subjects incrementally post-launch |
+| **Knowledge graph construction takes longer than estimated** | Low | Medium | AI-agent-assisted extraction pipeline (Claude Code + structured prompts) reduces per-subject construction to 1–2 weeks; architect builds and validates the pipeline on Math first, then replicates for each additional subject | Launch with Math-only MVP; add subjects incrementally post-launch |
 | **Day 3–30 retention cliff** | High | Critical | Onboarding designed for <5 min to first value; streak mechanics from Day 1; push notification opt-in during onboarding; methodology switching prevents early frustration | A/B test 3 onboarding variants in first 1,000 users; iterate weekly on retention cohort data |
 | **LLM costs exceed budget at scale** | Medium | High | Aggressive caching of common explanations; Haiku-class models for classification; 50 interaction/day cap; batch pre-generation of content | Negotiate volume pricing with Anthropic/OpenAI at 10K+ user tier; build fine-tuned smaller model for high-frequency interactions |
 | **Hebrew-first market too small for VC returns** | Low | High | Architecture is curriculum-agnostic from Day 1; AP expansion planned at Month 18; Bagrut is proof-of-concept, not ceiling | Accelerate international timeline if Israeli traction validates product-market fit faster than expected |
