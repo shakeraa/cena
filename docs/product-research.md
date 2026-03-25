@@ -227,7 +227,48 @@
 
 ---
 
-## 8. Unique Value Proposition & Strategy
+## 8. Unit Economics
+
+### Revenue Per User
+- **ARPU (Annual Revenue Per User)**: 699–899 NIS/year ($190–$245) for premium subscribers
+- **Blended ARPU** (accounting for free tier): Assuming 8% free-to-paid conversion (EdTech benchmark: 5–10%), blended ARPU = ~56–72 NIS/year across all users
+- **Family plan discount**: 30% off second student → effective ARPU per family of 2 = ~1,190 NIS/year
+
+### Cost Per User (Monthly)
+| Cost Component | Per User/Month | Notes |
+|---|---|---|
+| LLM API costs | 3–8 NIS ($0.80–$2.20) | 50 interactions/day cap; cached common explanations |
+| Cloud infrastructure | 1–2 NIS ($0.25–$0.55) | Compute, storage, CDN (amortized at 10K users) |
+| Knowledge graph maintenance | 0.5 NIS ($0.14) | Amortized annual syllabus update cost |
+| Payment processing | 2–3% of revenue | Stripe/local processor fees |
+| Customer support | 1–2 NIS ($0.25–$0.55) | Primarily automated; human escalation for <5% of issues |
+| **Total variable cost** | **~7–15 NIS/month** | |
+
+### Margin Analysis
+- **Gross margin at 89 NIS/month (mid-tier)**: ~83–92% (7–15 NIS variable costs)
+- **Target gross margin at scale (50K+ users)**: 88%+ as LLM costs decrease and caching improves
+- **Comparison**: Duolingo gross margin = 73%; Chegg = 74%; Coursera = 59% — Cena's higher margin driven by AI-native architecture without human instructor costs
+
+### Customer Acquisition Cost (CAC)
+- **Target CAC**: <150 NIS ($40) per paid subscriber
+- **Primary channels**: Organic (SEO, knowledge graph sharing virality), school partnerships (B2B2C), Bagrut study groups on social media (Telegram, WhatsApp)
+- **Estimated channel mix**: 40% organic/viral, 30% school partnerships, 20% paid social (Instagram/TikTok targeting ages 16–18), 10% referral program
+
+### Lifetime Value (LTV)
+- **Average subscription duration**: 18 months (targeting above EdTech average of ~4 months through knowledge graph lock-in and methodology adaptation)
+- **LTV at 89 NIS/month × 18 months**: ~1,600 NIS ($435)
+- **LTV:CAC ratio target**: >10:1 (1,600/150) — well above the 3:1 minimum for healthy SaaS
+- **Payback period**: <2 months (CAC 150 NIS ÷ 89 NIS/month gross contribution)
+
+### Break-Even Analysis
+- **Monthly fixed costs (estimated)**: ~120,000 NIS/month (team of 6 + infrastructure baseline + office)
+- **Contribution margin per premium user**: ~74–82 NIS/month
+- **Break-even subscribers**: ~1,500–1,600 premium users
+- **At 8% conversion from 100K addressable Bagrut students**: theoretical maximum of 8,000 premium users in Year 1, reaching break-even at ~20% of that target
+
+---
+
+## 9. Unique Value Proposition & Strategy
 
 ### Cena's Four Pillars (No Competitor Has All Four)
 1. **Student-facing knowledge graph visualization** — the graph IS the product
