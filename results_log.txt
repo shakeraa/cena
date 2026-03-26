@@ -33,3 +33,11 @@
 [2026-03-26] Iteration #43 | Metric: 5 | Change: Added API versioning and deprecation policy to api-contracts.md (5 API surfaces, 90-day overlap, <1% removal threshold) | Result: improved (-3)
 [2026-03-26] Iteration #44 | Metric: 3 | Change: Added competitor-eself-deep-dive.md cross-reference to fundraising playbook "Why now" and "Differentiation" sections | Result: improved (-2)
 [2026-03-26] Iteration #45 | Metric: 0 | Change: Filled all 26 rows in cross-doc-audit.md Fix Tracker (16 fixed, 8 acknowledged with rationale, 2 N/A) | Result: GOAL REACHED
+[2026-03-26] Iteration #46 | Metric: 35 | Change: NEW BASELINE - Phase 6: Honest business model & spec gaps (8 checks across BUSINESS_MODEL, VALIDATION, SPEC_GAP) | Result: baseline-phase-6
+[2026-03-26] Iteration #47 | Metric: 29 | Change: Replaced 18-month LTV assumption with honest 6-12 month range; recalculated LTV:CAC from 4.2:1 to 2.1:1; added honest risk callout | Result: improved (-6)
+[2026-03-26] Iteration #48 | Metric: 24 | Change: Explicitly named pricing strategy as premium tutoring replacement, not volume play; addressed eSelf free competitor positioning | Result: improved (-5)
+[2026-03-26] Iteration #49 | Metric: 19 | Change: Added structural churn model to break-even: 33% graduation churn, seasonal acquisition, revised break-even from Month 8-12 to Month 13-18 | Result: improved (-5)
+[2026-03-26] Iteration #50 | Metric: 14 | Change: Added concrete methodology switching A/B test plan: 200 students, mastery velocity metric, failure protocol (pivot to KG visualization) | Result: improved (-5)
+[2026-03-26] Iteration #51 | Metric: 10 | Change: Added stagnation signal normalization formulas — continuous sigmoid/linear encoding for all 5 signals with baseline definitions | Result: improved (-4)
+[2026-03-26] Iteration #52 | Metric: 6 | Change: Defined cognitive load baseline variables: per-concept-cluster trailing 20-question median, per-question-type, current-session-only rolling windows | Result: improved (-4)
+[2026-03-26] Iteration #53 | Metric: 0 | Change: Added BKT pre-launch calibration plan (500 completions, EM fitting, guard rails) + content expert rejection handling (rate tracking, escalation thresholds, prompt feedback loop) | Result: GOAL REACHED

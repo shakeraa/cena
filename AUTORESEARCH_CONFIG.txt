@@ -5,4 +5,5 @@ BASELINE PHASE 1: 28 (vagueness) → 0 in 8 iterations (completed 2026-03-25)
 BASELINE PHASE 2: 70 (investor-readiness) → 0 in 11 iterations (completed 2026-03-25)
 BASELINE PHASE 3: 47 (factual accuracy) → 0 in 8 iterations (completed 2026-03-25)
 BASELINE PHASE 4: 41 (AI-agent dev model) → 0 in 4 iterations (completed 2026-03-26)
-BASELINE PHASE 5: 40 (cross-doc consistency & completeness) measured 2026-03-26
+BASELINE PHASE 5: 40 (cross-doc consistency & completeness) → 0 in 10 iterations (completed 2026-03-26)
+BASELINE PHASE 6: 35 (honest business model & spec gaps) → 0 in 8 iterations (completed 2026-03-26)
