@@ -323,7 +323,21 @@
 - **Break-even subscribers**: ~1,620–2,340 premium users
 - **At 8% conversion from ~85K–100K addressable Bagrut students** (CBS 2011 baseline: 85,100; estimated up to ~100K by 2025 based on population growth): theoretical maximum of 6,800–8,000 premium users in Year 1
 - **Break-even timeline**: Month 8–12 — achievable within 18-month runway. As LLM costs decline (~50%/year), contribution margin improves and break-even threshold drops to ~1,000–1,400 subscribers by Month 12–18
-- **Key insight**: The AI-augmented model keeps the team lean (3 people, not 6), and while LLM costs are currently the dominant variable expense, the industry-wide pricing decline creates a natural margin expansion tailwind. The business becomes increasingly profitable over time without any operational changes
+
+**Structural churn model** (per `docs/business-viability-assessment.md` Section 6): Bagrut students have a bounded study window. Each annual cohort (grades 10–12) enters and exits the addressable market. This creates three dynamics the break-even analysis must account for:
+
+1. **Cohort replacement**: ~33% of subscribers churn annually due to graduation (completing Bagrut). This must be replaced by the incoming cohort just to maintain subscriber count.
+2. **Seasonal acquisition**: New subscriber acquisition peaks in September–November (school year start) and January–February (pre-exam push). Summer months (June–August) see near-zero new signups but continued churn from post-exam graduates.
+3. **Net growth math**: To reach 2,000 steady-state subscribers with 9-month average retention and 33% annual graduation churn, you need ~660 new subscribers/year just to replace churn + ~2,000 initial cohort = ~2,660 total acquisitions in Year 1. At CAC of 150 NIS, that's ~400K NIS in acquisition spend over 12 months.
+
+**Revised break-even scenario** accounting for churn:
+- Month 1–3: 0 subscribers (building MVP)
+- Month 4–8: Ramp to ~800 subscribers (September launch, peak acquisition)
+- Month 9–12: Churn offsets new signups; plateau at ~1,200–1,600 subscribers
+- Month 13–18: Second September cohort pushes to ~2,000–2,500 (break-even range)
+- **Realistic break-even: Month 13–18** (not Month 8–12 as previously stated), accounting for seasonal acquisition and graduation churn
+
+- **Key insight**: The AI-augmented model keeps the team lean (3 people, not 6), and while LLM costs are currently the dominant variable expense, the industry-wide pricing decline creates a natural margin expansion tailwind. The business becomes increasingly profitable over time. However, the seasonal/churn dynamics mean break-even likely requires surviving two acquisition cycles (two Septembers), making the 18-month runway tight. Buffer recommendation: target 1.5M NIS pre-seed, not 1.2M
 
 ---
 
