@@ -41,3 +41,7 @@
 [2026-03-26] Iteration #51 | Metric: 10 | Change: Added stagnation signal normalization formulas — continuous sigmoid/linear encoding for all 5 signals with baseline definitions | Result: improved (-4)
 [2026-03-26] Iteration #52 | Metric: 6 | Change: Defined cognitive load baseline variables: per-concept-cluster trailing 20-question median, per-question-type, current-session-only rolling windows | Result: improved (-4)
 [2026-03-26] Iteration #53 | Metric: 0 | Change: Added BKT pre-launch calibration plan (500 completions, EM fitting, guard rails) + content expert rejection handling (rate tracking, escalation thresholds, prompt feedback loop) | Result: GOAL REACHED
+[2026-03-26] Iteration #54 | Metric: 26 | Change: NEW BASELINE - Phase 7: Methodology switching deep validation (CITATION, ALGORITHM, VALIDATION) | Result: baseline-phase-7
+[2026-03-26] Iteration #55 | Metric: 21 | Change: Replaced unverifiable 'IJAIED systematic review' citation with honest 'verified by direct analysis of competitor documentation' | Result: improved (-5)
+[2026-03-26] Iteration #56 | Metric: 10 | Change: Added 5-step switching algorithm (precedence, MCM lookup, cycling prevention, cooldown, escalation) + MCM graph schema/lookup/fallback spec | Result: improved (-11)
+[2026-03-26] Iteration #57 | Metric: 0 | Change: Overhauled A/B test: n=500 (power analysis d=0.4), OSF pre-registration, ANCOVA plan, treatment fidelity diagnostics (switches/student, adherence, contamination) | Result: GOAL REACHED
