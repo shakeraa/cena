@@ -209,16 +209,33 @@ abstract class LlmBudget {
 // Localization
 // ---------------------------------------------------------------------------
 
-/// Supported locales.
+/// Supported locales — Hebrew (primary), Arabic, English (fallback).
+/// Both Hebrew and Arabic are RTL. Arabic support enables expansion to:
+/// - Israeli Arab students (~30% of Israeli student population)
+/// - Future Gulf/MENA markets (UAE, Saudi Arabia, Jordan, Egypt)
 abstract class AppLocales {
   /// Primary locale: Hebrew (Israel).
-  static const Locale primary = Locale('he', 'IL');
+  static const Locale hebrew = Locale('he', 'IL');
+
+  /// Arabic locale — Israeli Arab students + future MENA expansion.
+  /// Uses Modern Standard Arabic (MSA) for math terminology with
+  /// regional dialect support for UI strings.
+  static const Locale arabic = Locale('ar');
 
   /// Fallback locale: English (US).
-  static const Locale fallback = Locale('en', 'US');
+  static const Locale english = Locale('en', 'US');
 
-  /// All supported locales.
-  static const List<Locale> supported = [primary, fallback];
+  /// Primary locale (default for new users, overridden by device locale detection).
+  static const Locale primary = hebrew;
+
+  /// All supported locales (order matters — first match wins in locale resolution).
+  static const List<Locale> supported = [hebrew, arabic, english];
+
+  /// RTL locales — both Hebrew and Arabic are right-to-left.
+  static const Set<String> rtlLanguages = {'he', 'ar'};
+
+  /// Check if a locale is RTL.
+  static bool isRtl(Locale locale) => rtlLanguages.contains(locale.languageCode);
 
   /// Default text direction for primary locale.
   static const TextDirection primaryDirection = TextDirection.rtl;
@@ -269,8 +286,20 @@ abstract class TypographyTokens {
   /// Primary font family for Hebrew text.
   static const String hebrewFontFamily = 'Heebo';
 
+  /// Primary font family for Arabic text (Noto Sans Arabic — full diacritics support).
+  static const String arabicFontFamily = 'Noto Sans Arabic';
+
   /// Primary font family for English/Latin text.
   static const String latinFontFamily = 'Inter';
+
+  /// Get the appropriate font family for a locale.
+  static String fontFamilyForLocale(String locale) {
+    switch (locale) {
+      case 'ar': return arabicFontFamily;
+      case 'he': return hebrewFontFamily;
+      default: return latinFontFamily;
+    }
+  }
 
   /// Monospace font for math/code content.
   static const String monoFontFamily = 'JetBrains Mono';

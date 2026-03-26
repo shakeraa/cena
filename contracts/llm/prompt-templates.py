@@ -79,6 +79,58 @@ HEBREW_MATH_GLOSSARY = """
 - Fractions: use "½" or "1/2" notation, not "חצי" unless in natural language context.
 """.strip()
 
+# ═══════════════════════════════════════════════════════════════════════
+# 1B. ARABIC MATHEMATICS GLOSSARY
+# ═══════════════════════════════════════════════════════════════════════
+
+ARABIC_MATH_GLOSSARY = """
+## قاموس المصطلحات الرياضية (Arabic Math Terminology)
+
+| English | Arabic | Transliteration |
+|---------|--------|----------------|
+| Equation | معادلة | Mu'adala |
+| Inequality | متباينة | Mutabayna |
+| Variable | متغير | Mutaghayyir |
+| Coefficient | معامل | Mu'amil |
+| Function | دالة | Dalla |
+| Derivative | مشتقة | Mushtaqqa |
+| Integral | تكامل | Takamul |
+| Limit | نهاية | Nihaya |
+| Slope | ميل | Mayl |
+| Intercept | نقطة تقاطع | Nuqtat Taqatu' |
+| Quadratic | تربيعي | Tarbi'i |
+| Linear | خطي | Khatti |
+| Polynomial | كثير حدود | Kathir Hudud |
+| Fraction | كسر | Kasr |
+| Common denominator | مقام مشترك | Maqam Mushtarak |
+| Factoring | تحليل إلى عوامل | Tahlil ila Awamil |
+| Chain rule | قاعدة السلسلة | Qa'idat al-Silsila |
+| Product rule | قاعدة الضرب | Qa'idat al-Darb |
+| Trigonometric | مثلثي | Muthallathi |
+| Pythagorean theorem | نظرية فيثاغورس | Nazariyyat Fithaghuras |
+| Proof | برهان | Burhan |
+| Theorem | نظرية | Nazariyya |
+| Sequence | متتالية | Mutataaliya |
+| Series | متسلسلة | Mutasalsila |
+| Probability | احتمال | Ihtimal |
+| Domain | مجال | Majal |
+| Range | مدى | Mada |
+| Square root | جذر تربيعي | Jidhr Tarbi'i |
+| Logarithm | لوغاريتم | Lugharitm |
+| Vector | متجه | Muttajih |
+
+### ملاحظات هامة (Important Notes):
+- Use Modern Standard Arabic (MSA) for Israeli Arab Bagrut students.
+- Aligns with Palestinian/Jordanian curriculum conventions.
+- Write math in standard notation, not Arabic transliterations.
+""".strip()
+
+def get_math_glossary(locale: str = "he") -> str:
+    """Return the appropriate math glossary for the student's locale."""
+    if locale == "ar":
+        return ARABIC_MATH_GLOSSARY
+    return HEBREW_MATH_GLOSSARY
+
 
 # ═══════════════════════════════════════════════════════════════════════
 # 2. OUTPUT SCHEMAS (JSON templates for structured responses)

@@ -76,9 +76,9 @@ dependencies:
   flutter_local_notifications: ^18.0.1  # Local notification scheduling
 
   # ---------------------------------------------------------------------------
-  # Internationalization (Hebrew primary, English fallback)
+  # Internationalization (Hebrew + Arabic + English)
   # ---------------------------------------------------------------------------
-  intl: ^0.19.0                     # i18n utilities
+  intl: ^0.19.0                     # i18n utilities, Hebrew/Arabic calendar support
 
   # ---------------------------------------------------------------------------
   # Utilities
@@ -131,6 +131,7 @@ flutter:
     - assets/fonts/
 
   fonts:
+    # Hebrew primary font
     - family: Heebo
       fonts:
         - asset: assets/fonts/Heebo-Regular.ttf
@@ -142,6 +143,20 @@ flutter:
         - asset: assets/fonts/Heebo-ExtraBold.ttf
           weight: 800
 
+    # Arabic font — Noto Sans Arabic (Google Fonts, supports all Arabic diacritics)
+    # Covers: MSA, Palestinian dialect, Gulf Arabic glyphs
+    - family: Noto Sans Arabic
+      fonts:
+        - asset: assets/fonts/NotoSansArabic-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/NotoSansArabic-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/NotoSansArabic-Bold.ttf
+          weight: 700
+        - asset: assets/fonts/NotoSansArabic-ExtraBold.ttf
+          weight: 800
+
+    # Latin font (English fallback + formulas)
     - family: Inter
       fonts:
         - asset: assets/fonts/Inter-Regular.ttf

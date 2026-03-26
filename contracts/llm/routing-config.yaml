@@ -431,6 +431,52 @@ hebrew_quality_gate:
 
 
 # ─────────────────────────────────────────────────────────────────────
+# 7B. ARABIC QUALITY GATE (same structure, Arabic-specific criteria)
+# ─────────────────────────────────────────────────────────────────────
+
+arabic_quality_gate:
+  enabled: true
+  minimum_score_threshold: 3.5
+  blocker_threshold: 2.0
+
+  criteria:
+    - id: "arabic_terminology_accuracy"
+      description: "Uses standard MSA math terms (e.g., مشتقة for derivative, not transliterations)"
+      weight: 0.25
+
+    - id: "socratic_quality"
+      description: "Asks guiding questions without revealing answer (in Arabic)"
+      weight: 0.20
+
+    - id: "mathematical_correctness"
+      description: "Formulas, steps, and notation are correct"
+      weight: 0.25
+
+    - id: "pedagogical_appropriateness"
+      description: "Matches Bagrut level for Arab-sector schools"
+      weight: 0.15
+
+    - id: "arabic_fluency"
+      description: "Natural MSA phrasing, not translated Hebrew or English"
+      weight: 0.15
+
+  sampling:
+    mode: "percentage"
+    sample_rate: 0.10                   # Higher sample rate during Arabic rollout (10% vs 5% Hebrew)
+    force_check_on:
+      - "new_concept_introduction"
+      - "methodology_switch"
+      - "first_arabic_session"          # Always check first session in Arabic for a student
+    store_results: true
+
+  on_failure:
+    action: "fallback_to_opus"          # Stricter during Arabic launch — fall back to Opus
+    alert_channel: "slack://cena-quality-alerts"
+    escalation:
+      consecutive_failures: 2           # Lower threshold during Arabic rollout
+      escalation_action: "fallback_to_opus"
+
+# ─────────────────────────────────────────────────────────────────────
 # 8. PII HANDLING
 # ─────────────────────────────────────────────────────────────────────
 

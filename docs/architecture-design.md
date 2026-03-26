@@ -22,7 +22,7 @@ At 10K users, the estimated infrastructure cost is **~1,230-1,970 NIS/month (~$3
 | **Students are autonomous agents** | Each student is a virtual actor that proactively schedules outreach — no external cron jobs |
 | **Event sourcing as the source of truth** | Every state change is an immutable event; enables replay, audit, crypto-shredding, and CQRS projections |
 | **Polyglot by design** | .NET core cluster, Python LLM layer, Node.js video pipeline, React Native/React clients — connected via gRPC and NATS |
-| **Hebrew RTL from day one** | All UI components bidirectional by default; i18n architecture supports future Arabic expansion |
+| **Hebrew + Arabic RTL from day one** | All UI components bidirectional by default; i18n supports Hebrew (he_IL), Arabic (ar), and English (en_US). Arabic enables ~30% of Israeli students (Arab sector) and future MENA market expansion (UAE, Jordan, Egypt). Both Hebrew and Arabic are RTL with LTR math formula islands |
 | **Privacy by design** | GDPR-compliant crypto-shredding; no PII sent to Kimi (China-based); anonymized LLM identifiers throughout |
 
 ---

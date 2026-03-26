@@ -115,11 +115,15 @@ class ConceptDiagram with _$ConceptDiagram {
     /// Interactive hotspots — tap targets within the diagram
     @Default([]) List<DiagramHotspot> hotspots,
 
-    /// Hebrew title displayed above diagram
+    /// Localized title displayed above diagram (Hebrew primary, Arabic, English fallback).
     required String titleHe,
+    String? titleAr,
+    String? titleEn,
 
-    /// Hebrew description / challenge prompt
+    /// Localized description / challenge prompt.
     required String descriptionHe,
+    String? descriptionAr,
+    String? descriptionEn,
 
     /// Formula(s) shown on the diagram (LaTeX)
     @Default([]) List<String> formulas,
@@ -153,11 +157,15 @@ class DiagramHotspot with _$DiagramHotspot {
     /// Normalized bounding box (0.0-1.0 relative to diagram dimensions)
     required HotspotBounds bounds,
 
-    /// Hebrew label shown on hover/tap
+    /// Localized label shown on hover/tap (Hebrew primary, Arabic, English).
     required String labelHe,
+    String? labelAr,
+    String? labelEn,
 
-    /// Hebrew explanation revealed on tap (supports markdown + LaTeX)
+    /// Localized explanation revealed on tap (supports markdown + LaTeX).
     required String explanationHe,
+    String? explanationAr,
+    String? explanationEn,
 
     /// Optional: link to prerequisite concept (tap to navigate in KG)
     String? linkedConceptId,

@@ -134,7 +134,9 @@ class Student with _$Student {
     @Default(0) int xp,
     required DateTime lastActive,
 
-    /// ISO 639-1 locale code, e.g. "he" or "en".
+    /// ISO 639-1 locale code: "he" (Hebrew), "ar" (Arabic), "en" (English).
+    /// Hebrew and Arabic are both RTL. Arabic enables Israeli Arab students
+    /// (~30% of student population) and future MENA market expansion.
     @Default('he') String locale,
 
     /// Current student level derived from XP.

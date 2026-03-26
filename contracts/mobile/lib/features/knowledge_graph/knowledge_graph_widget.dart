@@ -457,23 +457,37 @@ class KnowledgeGraphSemantics extends StatelessWidget {
 }
 
 /// Generates human-readable mastery labels for screen readers.
-/// Supports both Hebrew (primary) and English (fallback).
+/// Supports Hebrew (primary), Arabic, and English (fallback).
 class MasteryAccessibilityLabel {
   static String forMastery(double pKnown, {String locale = 'he'}) {
-    if (locale == 'he') {
-      if (pKnown >= 0.85) return 'נשלט'; // Mastered
-      if (pKnown >= 0.3) return 'בתהליך (${(pKnown * 100).round()}%)'; // In Progress
-      return 'טרם התחיל'; // Not Started
+    final pct = (pKnown * 100).round();
+    switch (locale) {
+      case 'he':
+        if (pKnown >= 0.85) return 'נשלט';
+        if (pKnown >= 0.3) return 'בתהליך ($pct%)';
+        return 'טרם התחיל';
+      case 'ar':
+        if (pKnown >= 0.85) return 'مُتقَن';                  // Mastered
+        if (pKnown >= 0.3) return 'قيد التقدم ($pct%)';       // In Progress
+        return 'لم يبدأ بعد';                                   // Not Started
+      default: // English fallback
+        if (pKnown >= 0.85) return 'Mastered';
+        if (pKnown >= 0.3) return 'In Progress ($pct%)';
+        return 'Not Started';
     }
-    // English fallback
-    if (pKnown >= 0.85) return 'Mastered';
-    if (pKnown >= 0.3) return 'In Progress (${(pKnown * 100).round()}%)';
-    return 'Not Started';
   }
 
   /// Semantic label for a concept node (used by Semantics widget).
-  static String nodeLabel(String conceptName, double pKnown, int prereqCount, int prereqMet) {
-    final mastery = forMastery(pKnown);
-    return '$conceptName — $mastery. $prereqMet מתוך $prereqCount דרישות קדם מולאו.';
+  /// Supports Hebrew, Arabic, and English.
+  static String nodeLabel(String conceptName, double pKnown, int prereqCount, int prereqMet, {String locale = 'he'}) {
+    final mastery = forMastery(pKnown, locale: locale);
+    switch (locale) {
+      case 'he':
+        return '$conceptName — $mastery. $prereqMet מתוך $prereqCount דרישות קדם מולאו.';
+      case 'ar':
+        return '$conceptName — $mastery. $prereqMet من أصل $prereqCount متطلبات مسبقة مستوفاة.';
+      default:
+        return '$conceptName — $mastery. $prereqMet of $prereqCount prerequisites met.';
+    }
   }
 }
