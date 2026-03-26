@@ -563,6 +563,22 @@ Methodology switching is Cena's core differentiator and the hardest claim to def
 - **Deci, E.L., Koestner, R. & Ryan, R.M. (1999)**. A Meta-Analytic Review of Experiments Examining the Effects of Extrinsic Rewards on Intrinsic Motivation. *Psychological Bulletin*, 125(6), 627–668. [Self-Determination Theory foundation for Cena's gamification risk analysis.]
 - **Sailer, M. & Homner, L. (2020)**. The Gamification of Learning: a Meta-Analysis. *Educational Psychology Review*, 32, 77–112. [Gamification effects on cognitive, motivational, and behavioral outcomes.]
 
+### Methodology Research (peer-reviewed — one per teaching method)
+- **Roediger, H.L. & Karpicke, J.D. (2006)**. Test-Enhanced Learning: Taking Memory Tests Improves Long-Term Retention. *Psychological Science*, 17(3), 249–255. [Retrieval practice: testing > restudying for long-term retention. Foundation for Cena's retrieval-practice methodology.]
+- **Renkl, A. & Atkinson, R.K. (2003)**. Structuring the Transition from Example Study to Problem Solving in Cognitive Skill Acquisition. *Educational Psychologist*, 38(1), 15–22. [Worked examples with fading: gradually removing solution steps triggers self-explanation. Foundation for Cena's worked-example methodology.]
+- **Gentner, D. (1983)**. Structure-Mapping: A Theoretical Framework for Analogy. *Cognitive Science*, 7(2), 155–170. [Analogical reasoning maps relational structure between domains. Foundation for Cena's analogy-based methodology.]
+- **Chen, C.H. & Yang, Y.C. (2019)**. Revisiting the Effects of Project-Based Learning on Students' Academic Achievement: A Meta-Analysis. *Educational Research Review*, 26, 71–81. [PBL effect size d=0.71 across 12,585 students in 189 schools. Foundation for Cena's project-based methodology.]
+- **Sweller, J. (1988)**. Cognitive Load During Problem Solving: Effects on Learning. *Cognitive Science*, 12(2), 257–285. [Cognitive load theory: working memory limits drive instructional design. Foundation for Cena's cognitive load management.]
+- **Cepeda, N.J., Pashler, H., Vul, E., Wixted, J.T. & Rohrer, D. (2006)**. Distributed Practice in Verbal Recall Tasks: A Review and Quantitative Synthesis. *Psychological Bulletin*, 132(3), 354–380. [839 assessments, 317 experiments: optimal spacing interval depends on retention interval. Foundation for Cena's spaced repetition scheduling.]
+- **Anderson, L.W. & Krathwohl, D.R. (2001)**. *A Taxonomy for Learning, Teaching, and Assessing: A Revision of Bloom's Taxonomy*. Longman. [Revised 6-level cognitive framework (Remember→Create). Foundation for Cena's Bloom's progression methodology and question difficulty tagging.]
+- **Embretson, S.E. & Reise, S.P. (2000)**. *Item Response Theory for Psychologists*. LEA. [2PL model for question difficulty/discrimination estimation. Foundation for Cena's IRT question calibration pipeline.]
+
+### Educational Knowledge Graphs (systematic reviews)
+- **Systematic literature review of KG construction and application in education (2024)**. *Heliyon*, 10(3), e25414. [Five primary KG application domains: adaptive learning, curriculum design, concept mapping, semantic search, recommendation. Validates Cena's KG-centric architecture.]
+
+### AI Socratic Tutoring (RCT)
+- **AI tutoring can safely and effectively support students (2024)**. Exploratory RCT in UK classrooms. arXiv:2512.23633. [AI Socratic tutors matched human tutors on learning outcomes; +5.5pp on novel problem-solving. Validates Cena's Socratic approach with LLMs.]
+
 ### Competitive Intelligence (verified sources)
 - **eSelf AI / CET pilot results (August 2025)**. "Study shows thousands of students see test score gains in just 25 minutes with eSelf's AI avatar tutors." PR Newswire / Morningstar, August 14, 2025. [2,031 Israeli students, 1,841 active, +3.94 points (p<0.001), Harvard/MIT Media Lab validated. Source: prnewswire.com/news-releases/302530283]
 - **Squirrel AI MCM model**. "The Squirrel AI Adaptive Learning System Accompanying Millions of Children in Their Growth." Springer, 2025. [MCM = Mode of Thinking, Capacity, Methodology — Cena's MCM graph is inspired by this but adapted for error-type-driven switching rather than Squirrel AI's knowledge-point decomposition.]

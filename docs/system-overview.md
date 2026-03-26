@@ -33,7 +33,7 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 
 ### Adaptive Methodology Selection
 - The system selects the best methodology per student automatically
-- Supported methods include: Socratic method, spaced repetition, project-based learning, Bloom's taxonomy progression, Feynman technique, worked examples with fading, analogy-based instruction, and retrieval practice
+- Supported methods include: Socratic method (2024 UK RCT: AI Socratic tutors matched human tutors, +5.5pp on novel problems — arxiv.org/html/2512.23633v1), spaced repetition (Cepeda et al., 2006, Psychological Bulletin: 839 assessments confirming spacing effect), project-based learning (Chen & Yang, 2019 meta-analysis: d=0.71 across 12,585 students), Bloom's taxonomy progression (Anderson & Krathwohl, 2001 revised taxonomy), Feynman technique (elaborative interrogation — Pressley et al., 1987), worked examples with fading (Renkl & Atkinson, 2003, Educational Psychologist: fading triggers self-explanation), analogy-based instruction (Gentner, 1983 structure-mapping theory, Cognitive Science 7(2)), and retrieval practice (Roediger & Karpicke, 2006: testing > restudying for long-term retention)
 - The system profiles each student to determine which method is most effective for them
 - Tracks per-student method effectiveness over time
 
@@ -82,7 +82,7 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 ## Knowledge Storage
 
 ### Knowledge Graph
-- Student knowledge is stored as a **knowledge graph**
+- Student knowledge is stored as a **knowledge graph** (systematic review of KG applications in education: Heliyon 2024, S2405-8440(24)01414-2 — five primary domains including adaptive learning, concept mapping, and learning path recommendation)
 - Concepts are nodes, relationships are edges (prerequisite, builds-on, related-to)
 - Each node tracks: mastery level, date learned, review history, method effectiveness
 - The graph powers gap detection, learning path suggestions, and concept connections

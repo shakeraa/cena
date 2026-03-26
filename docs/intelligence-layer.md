@@ -40,7 +40,7 @@ The MCM (Mode x Capability x Methodology) graph maps error types + concept categ
 - **Data source**: Per-question accuracy rates, response times, hint usage
 - **Signal**: If 95% of students get a question right instantly, it is too easy. If 10% get it right even with hints, it is too hard or poorly worded.
 - **Process**: Monthly automated analysis flags questions outside the target difficulty band (30%-80% first-attempt accuracy). Content team reviews and adjusts via the Content Authoring tool.
-- **IRT calibration**: Use Item Response Theory (2-parameter model) to estimate question discrimination and difficulty parameters from real response data. Feed calibrated parameters back into item selection, replacing initial hand-estimated difficulty ratings.
+- **IRT calibration**: Use Item Response Theory 2-parameter logistic model (Embretson & Reise, 2000, *Item Response Theory for Psychologists*, LEA; see also de Ayala, 2009, *The Theory and Practice of IRT*, Guilford) to estimate question discrimination and difficulty parameters from real response data. Feed calibrated parameters back into item selection, replacing initial hand-estimated difficulty ratings.
 
 ### Flywheel 4: Spaced Repetition Half-Life Personalization
 
