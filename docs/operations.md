@@ -271,7 +271,7 @@ These alerts indicate imminent or active user impact. Each one pages the founder
 | **Cluster undersize** | Proto.Actor node count < 2 for > 1 minute | Single node = no partition tolerance, one failure away from total outage |
 | **DB connection exhaustion** | PostgreSQL connection pool utilization > 80% for > 2 minutes | Approaching the ceiling where new actor activations and event persists start failing |
 | **NATS outreach lag** | Consumer lag > 30 seconds on the `cena.outreach.events` stream | Streak reminders and review nudges are being delayed — students may lose streaks |
-| **LLM error spike** | LLM ACL error rate > 10% in any 5-minute window | Students are getting degraded sessions or failures; circuit breaker may be about to open |
+| **LLM error spike** | LLM ACL error rate > 5% in any 5-minute window (aligned with `docs/llm-routing-strategy.md` Section 7.3 fallback trigger rate) | Students are getting degraded sessions or failures; circuit breaker may be about to open |
 | **LLM budget overrun** | Daily LLM spend > 150% of daily budget | Runaway cost — could burn through monthly budget in days |
 | **Event store disk** | RDS `FreeStorageSpace` < 20% of allocated | If disk fills, all writes stop — every student is locked out |
 
