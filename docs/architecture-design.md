@@ -152,6 +152,7 @@ The system is decomposed into **nine bounded contexts** with clear seams. Cross-
   - `ClassifyError` -> Kimi K2.5 classification
 - **Model Router:** Selects Kimi / Sonnet / Opus based on task type (see Section 7)
 - **Responsibilities:** Prompt construction, anonymized context injection, response validation, safety filtering, cost tracking
+- **Hard per-student rate limiting:** The ACL enforces a daily token budget per student (default: 25,000 output tokens/day, ~50 interactions × ~500 tokens). When exhausted, the ACL returns cached/pre-generated content instead of making LLM calls. This is a hard cutoff — no exceptions, no override. The budget resets at midnight UTC. Budget exhaustion is logged as a `StudentBudgetExhausted` metric for monitoring (high exhaust rates indicate the cap is too low or a student is gaming the system)
 - **Remotion video generation pipeline** (batch + personalized modes)
 
 #### 3.2.5 Engagement Context (supporting)
@@ -492,9 +493,9 @@ Remotion worker runs as a Fargate task that scales to zero when idle. Batch rend
 | **Object Storage** | S3 | Generated videos, analytics archive, static curriculum artifacts | Archive |
 | **Cluster State** | DynamoDB | Proto.Actor cluster discovery and membership | Infrastructure |
 
-### 12.1 Event Store Design (Marten)
+### 12.1 Event Store Design (Marten v7.x)
 
-Marten (on PostgreSQL) provides:
+Marten v7.x on PostgreSQL 16 (pin to latest 7.x stable; Marten 8.x has breaking changes in projection API — evaluate before upgrading). Provides:
 - **Event streams** per student aggregate (append-only)
 - **Inline projections** for CQRS read models (teacher dashboards, parent views)
 - **Snapshot storage** (every 100 events per student)
@@ -668,6 +669,8 @@ PERSISTENCE LAYER:
 | S3 + CDN | ~35-70 | ~$10-20 |
 | **Total (infra, excl. LLM)** | **~1,230-1,970** | **~$344-549** |
 | **Total (infra + LLM at 10K)** | **~6,030-6,770** | **~$1,674-1,879** |
+
+**Neo4j AuraDB cost at scale:** AuraDB is $65/GB/month. At launch (1 subject, ~2K nodes), 1GB is sufficient (~$65/month). At 5 subjects (~10K nodes + edges), may need 3-5GB (~$195-325/month). **Self-hosted fallback:** If AuraDB cost exceeds $300/month, migrate to self-hosted Neo4j Community Edition on EC2 m7i.large (~$180/month all-in) — same Cypher API, no code changes, just connection string swap.
 
 ---
 

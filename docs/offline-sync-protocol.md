@@ -597,3 +597,46 @@ Complete list of client-generatable events and their classifications:
 | `async_sync_threshold` | 50 | No | Event count triggering async sync processing |
 | `idempotency_cache_ttl_hours` | 72 | No | Redis TTL for idempotency keys |
 | `outreach_correction_window_hours` | 24 | No | Maximum age of outreach message eligible for correction |
+
+---
+
+## 8. Pre-Launch Load & Chaos Test Plan
+
+Offline sync is the most complex client-server interaction in Cena. Before beta launch, the following tests must pass:
+
+**Load tests** (run on staging with production-equivalent infrastructure):
+
+| Test | Setup | Pass Criteria |
+|------|-------|---------------|
+| Sync 10 events, single student | 1 client, 10 offline events | p99 < 500ms, all events accepted |
+| Sync 50 events, single student | 1 client, 50 offline events | p99 < 2s, all events validated correctly |
+| Sync 100 events, single student | 1 client, 100 events (async threshold) | p99 < 5s, async processing completes < 10s via SignalR/polling |
+| Concurrent sync, 100 students | 100 simultaneous sync requests, 20 events each | p99 < 3s, no PostgreSQL connection pool exhaustion, no NATS consumer lag > 100 |
+| Concurrent sync, 1000 students | 1000 simultaneous sync requests, 10 events each | p99 < 5s, no OOM on actor cluster, no Marten event append failures |
+
+**Chaos tests** (inject failures during sync):
+
+| Test | Injection | Pass Criteria |
+|------|-----------|---------------|
+| Server crash mid-sync | Kill ECS task after accepting request, before persisting | Client retries with idempotency key; no duplicate events on recovery |
+| PostgreSQL connection timeout | Introduce 30s latency on RDS | Circuit breaker opens; client receives 503; retry succeeds after recovery |
+| NATS unavailable | Stop NATS JetStream | Sync still persists to Marten (source of truth); downstream consumers catch up when NATS recovers |
+| Redis idempotency cache down | Kill ElastiCache node | Fallback to Marten-based idempotency check (slower but correct); no duplicates |
+
+**Client-side tests:**
+
+| Test | Setup | Pass Criteria |
+|------|-------|---------------|
+| SQLite corruption | Corrupt offline queue DB file | App detects corruption, creates new DB, warns user "some offline work may need to be redone" — no crash |
+| Clock skew | Set device clock 6 hours ahead, then sync | Events accepted with adjusted timestamps; no mastery calculation errors |
+| Large queue | Generate 500 events over 4-hour offline session | Sync completes < 30s; BKT recalculation produces correct mastery state |
+
+**Performance baselines** (document after first test run, update quarterly):
+
+| Metric | Target | Measured |
+|--------|--------|----------|
+| p50 sync latency (50 events) | < 1s | TBD |
+| p95 sync latency (50 events) | < 3s | TBD |
+| p99 sync latency (50 events) | < 5s | TBD |
+| Max concurrent syncs before degradation | > 500 | TBD |
+| PostgreSQL IOPS during 1000-student burst | < 80% provisioned | TBD |

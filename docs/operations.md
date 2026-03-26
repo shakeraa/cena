@@ -539,6 +539,28 @@ Content updates do **not** require a deployment:
 
 ---
 
+## 5. Secrets Management
+
+All secrets are stored in **AWS Secrets Manager** (not environment variables, not config files, not hardcoded):
+
+| Secret | Rotation | Access |
+|--------|----------|--------|
+| PostgreSQL/Marten connection string | 90-day automatic rotation via AWS Secrets Manager | ECS task role |
+| Neo4j AuraDB credentials | Manual rotation (AuraDB doesn't support auto-rotation) | ECS task role |
+| NATS JetStream credentials | 90-day rotation via Synadia Cloud portal | ECS task role |
+| Anthropic API key (Claude) | Manual rotation; stored with version label `ANTHROPIC_API_KEY` | LLM ACL FastAPI task role |
+| Moonshot API key (Kimi) | Manual rotation; stored with version label `MOONSHOT_API_KEY` | LLM ACL FastAPI task role |
+| WhatsApp Business API token | 90-day rotation via Meta Business Manager | Outreach service task role |
+| Firebase/Auth credentials | Managed by Firebase SDK (auto-refreshed) | All services |
+
+**Injection:** ECS Fargate tasks reference secrets via `secrets` block in task definition (not `environment`). The secret ARN resolves at container start. No secrets in Docker images.
+
+**Rotation protocol:** When a secret rotates, the new version becomes `AWSCURRENT`. Services that cache credentials (LLM ACL connection pool, PostgreSQL connection string) must handle `CredentialsExpiredException` by re-fetching from Secrets Manager. Connection pool libraries (Npgsql, psycopg2) support this natively.
+
+**Developer access:** Developers use `aws secretsmanager get-secret-value` with MFA for local development. Never copy secrets to `.env` files in the repo. `.gitignore` blocks `*.env`, `.env.*`, and `secrets/` patterns.
+
+---
+
 ## Appendix: Related Documents
 
 - `docs/architecture-design.md` — System architecture and technology choices
