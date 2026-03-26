@@ -53,6 +53,17 @@ The MCM (Mode x Capability x Methodology) graph maps error types + concept categ
 
 - **Data source**: `StagnationDetected` events + what happened next (did the student overcome stagnation after the recommended action?)
 - **Signal**: Which stagnation sub-signals (accuracy plateau, response time drift, session abandonment, error repetition, annotation sentiment) are most predictive of actual stagnation?
+- **Default weights** (used until first retraining, derived from engagement-signals-research.md and EdTech stagnation literature):
+
+| Signal | Default Weight | Rationale |
+|---|---|---|
+| Accuracy plateau | 0.30 | Strongest direct indicator of learning stall (Corbett & Anderson, 1994) |
+| Response time drift | 0.20 | Cognitive load proxy — slower responses signal difficulty or disengagement |
+| Session abandonment | 0.20 | Behavioral disengagement — strongest churn predictor in EdTech (see `docs/engagement-signals-research.md`) |
+| Error type repetition | 0.20 | Persistent misconception — indicates methodology is not working |
+| Annotation sentiment | 0.10 | Weakest signal (NLP-dependent, noisy) — weighted low until model matures |
+
+- **Composite formula**: `stagnation_score = Σ(weight_i × normalized_signal_i)`, where each signal is normalized to [0, 1]. Trigger methodology switch when score > 0.7 for 3 consecutive sessions (see `system-overview.md`).
 - **Retraining**: Quarterly. Logistic regression on stagnation outcomes to re-weight the composite score used by the `StagnationDetectorActor` (see `architecture-design.md` Section 3.2.3).
 - **Minimum data**: 500+ stagnation events with outcome tracking before first retraining.
 
