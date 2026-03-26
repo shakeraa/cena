@@ -205,13 +205,14 @@ interface SessionStartedPayload {
 }
 
 type MethodologyType =
-  | "socratic-dialogue"
-  | "worked-examples"
-  | "scaffolded-practice"
-  | "visual-spatial"
-  | "analogy-based"
-  | "error-analysis"
-  | "spaced-retrieval";
+  | "socratic"
+  | "spaced-repetition"
+  | "project-based"
+  | "blooms-progression"
+  | "feynman"
+  | "worked-example"
+  | "analogy"
+  | "retrieval-practice";
 
 type SessionStarted = MessageEnvelope<"SessionStarted", SessionStartedPayload>;
 ```
@@ -1638,15 +1639,18 @@ Events within a single student or session are **ordered** (same NATS subject = s
 
 ### Methodology Types
 
-| Value | Description |
-|-------|-------------|
-| `socratic-dialogue` | Question-led discovery (Claude Sonnet generates probing questions) |
-| `worked-examples` | Step-by-step solved examples with explanation |
-| `scaffolded-practice` | Gradually increasing difficulty with support |
-| `visual-spatial` | Diagram-heavy, geometry-oriented explanations |
-| `analogy-based` | Explanations via real-world analogies |
-| `error-analysis` | Learn by analyzing common mistakes |
-| `spaced-retrieval` | Review-focused, spaced repetition retrieval practice |
+Canonical list — aligned with `event-schemas.md` (`methodology_active` field) and `system-overview.md` (Methodology Approach section). API uses kebab-case; event store uses snake_case.
+
+| API Value (kebab-case) | Event Store Value (snake_case) | Description |
+|---|---|---|
+| `socratic` | `socratic` | Question-led discovery (Claude Sonnet generates probing questions) |
+| `spaced-repetition` | `spaced_repetition` | Spaced repetition scheduling for long-term retention |
+| `project-based` | `project_based` | Real-world projects and applied problem-solving |
+| `blooms-progression` | `blooms_progression` | Bloom's taxonomy progression from recall to creation |
+| `feynman` | `feynman` | Feynman technique — student explains concept in own words |
+| `worked-example` | `worked_example` | Step-by-step solved examples with fading scaffolding |
+| `analogy` | `analogy` | Explanations via real-world analogies |
+| `retrieval-practice` | `retrieval_practice` | Active recall testing to strengthen memory |
 
 ### Error Types
 
