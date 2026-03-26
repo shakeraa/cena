@@ -1,308 +1,207 @@
 #!/usr/bin/env python3
 """
-Autoresearch metric Phase 12: Contract Code Quality & Completeness.
-Validates the 38 generated contract files for real implementation issues:
-missing types, broken cross-references, inconsistent naming, unimplemented
-interfaces, and patterns that won't compile.
+Autoresearch metric Phase 13: Fix All Architect-Identified CRITICALs.
+25 CRITICAL issues from 5 architect reviews. Fix them all → 10/10.
 Target: 0.
 """
 
 import os
-import re
 from pathlib import Path
 
 CONTRACTS_DIR = Path(__file__).parent / "contracts"
 
 
-def main():
-    total_score = 0
-    results_by_category = {}
-
-    def flag(weight, description, file_pattern, category):
-        nonlocal total_score
-        total_score += weight
-        if category not in results_by_category:
-            results_by_category[category] = []
-        results_by_category[category].append((weight, description, file_pattern))
-
-    # Load all contract files
+def read_all():
     files = {}
     for root, _, filenames in os.walk(CONTRACTS_DIR):
         for fname in filenames:
-            if fname.endswith(('.cs', '.ts', '.py', '.dart', '.proto', '.graphql', '.yaml', '.cypher', '.json')):
-                fpath = os.path.join(root, fname)
-                rel = os.path.relpath(fpath, CONTRACTS_DIR)
+            if fname.startswith('REVIEW_'):
+                continue
+            fpath = os.path.join(root, fname)
+            rel = os.path.relpath(fpath, CONTRACTS_DIR)
+            try:
                 files[rel] = open(fpath).read()
-
-    # ═══════════════════════════════════════════════════════════════
-    # 1. CROSS-LAYER TYPE CONSISTENCY
-    # ═══════════════════════════════════════════════════════════════
-
-    # Check: Methodology enum values consistent across C#, TypeScript, Dart, Python, Proto
-    methodology_values = {
-        "socratic", "spaced_repetition", "feynman", "project_based",
-        "blooms_progression", "worked_example", "analogy", "retrieval_practice"
-    }
-
-    for rel, content in files.items():
-        if rel.endswith('.cs') and 'Methodology' in content:
-            # Check C# has all 8 values
-            if 'enum Methodology' in content or 'enum MethodologyId' in content:
-                missing = [m for m in ["Socratic", "Feynman", "Analogy", "WorkedExample"]
-                          if m not in content and "methodology" in rel.lower()]
-                # Don't flag if it's not the enum definition file
+            except:
                 pass
+    return files
 
-    # Check: ErrorType values consistent (procedural, conceptual, motivational)
-    error_types = {"procedural", "conceptual", "motivational"}
-    for rel, content in files.items():
-        if 'ErrorType' in content and ('enum' in content or 'Enum' in content):
-            has_all = all(et in content.lower() for et in error_types)
-            if not has_all and 'none' not in content.lower():
-                flag(3, f"ErrorType enum in {rel} missing one of: procedural/conceptual/motivational",
-                     rel, "CONSISTENCY")
 
-    # ═══════════════════════════════════════════════════════════════
-    # 2. UNIMPLEMENTED INTERFACES / ABSTRACT METHODS
-    # ═══════════════════════════════════════════════════════════════
+def main():
+    files = read_all()
+    total = 0
+    results = {}
 
-    # Check: Python ABC classes have all abstract methods
-    for rel, content in files.items():
-        if rel.endswith('.py'):
-            abstract_count = content.count('@abstractmethod')
-            ellipsis_count = content.count('...')
-            if abstract_count > 0 and ellipsis_count < abstract_count:
-                flag(2, f"{rel}: {abstract_count} @abstractmethod but only {ellipsis_count} ... bodies — some may be missing implementation stubs",
-                     rel, "INCOMPLETE")
+    def flag(w, desc, f, cat):
+        nonlocal total
+        total += w
+        results.setdefault(cat, []).append((w, desc, f))
 
-    # Check: C# interfaces have matching implementations referenced
-    for rel, content in files.items():
-        if rel.endswith('.cs'):
-            interfaces = re.findall(r'public interface (I\w+)', content)
-            for iface in interfaces:
-                # Check if any other file references this interface
-                impl_found = any(
-                    iface in other_content and other_rel != rel
-                    for other_rel, other_content in files.items()
-                    if other_rel.endswith('.cs')
-                )
-                if not impl_found and iface not in ['IHealthCheck', 'IActor', 'IContext']:
-                    # Don't flag standard framework interfaces
-                    pass  # Acceptable for contract files — implementations come later
+    # Helper to get file content
+    def get(pattern):
+        for k, v in files.items():
+            if pattern in k:
+                return v
+        return ""
 
-    # ═══════════════════════════════════════════════════════════════
-    # 3. PROTO.ACTOR SPECIFIC ISSUES
-    # ═══════════════════════════════════════════════════════════════
-
-    actor_files = {r: c for r, c in files.items() if r.startswith('actors/')}
-
-    # Check: Every actor has ReceiveAsync
-    for rel, content in actor_files.items():
-        if 'IActor' in content and 'class' in content:
-            actor_classes = re.findall(r'public sealed class (\w+Actor)\b', content)
-            for actor in actor_classes:
-                if 'ReceiveAsync' not in content:
-                    flag(3, f"{rel}: {actor} implements IActor but has no ReceiveAsync method",
-                         rel, "ACTOR_ISSUE")
-
-    # Check: StudentActor has passivation (ReceiveTimeout handling)
-    # Only check the PRIMARY student_actor.cs file, not files that merely reference it
-    for rel, content in actor_files.items():
-        if 'student_actor' in rel.lower() and 'class StudentActor' in content:
-            if 'ReceiveTimeout' not in content and 'Passivat' not in content:
-                flag(4, f"{rel}: StudentActor has no passivation handling (ReceiveTimeout). Virtual actors MUST passivate to avoid memory leaks",
-                     rel, "ACTOR_ISSUE")
-
-    # Check: Event sourcing actors persist events (Marten reference)
-    for rel, content in actor_files.items():
-        if 'event-sourced' in content.lower() or 'EventSourced' in content:
-            if 'Persist' not in content and 'AppendStream' not in content and 'Marten' not in content:
-                flag(3, f"{rel}: Claims to be event-sourced but has no Persist/AppendStream/Marten reference",
-                     rel, "ACTOR_ISSUE")
-
-    # Check: Circuit breaker actors have all 3 states
-    for rel, content in actor_files.items():
-        if 'CircuitBreaker' in content:
-            for state in ['Closed', 'Open', 'HalfOpen']:
-                if state not in content:
-                    flag(3, f"{rel}: Circuit breaker missing state: {state}",
-                         rel, "ACTOR_ISSUE")
+    sa = get("student_actor")
+    marten = get("marten-event-store")
+    topo = get("actor_system_topology")
+    session = get("learning_session")
+    stag = get("stagnation_detector")
+    outreach = get("outreach_scheduler")
+    domain = get("domain-services")
+    acl = get("acl-interfaces")
+    prompts = get("prompt-templates")
+    routing = get("routing-config")
+    cost = get("cost-tracking")
+    dart_models = get("domain_models.dart")
+    dart_sync = get("offline_sync_service")
+    dart_state = get("app_state")
+    dart_kg = get("knowledge_graph_widget")
+    dart_session = get("session_screen")
+    dart_streak = get("streak_widget")
+    dart_config = get("app_config")
+    graphql = get("graphql-schema")
+    signalr = get("signalr-messages")
+    grpc = get("grpc-protos")
+    nats = get("nats-subjects")
+    neo4j = get("neo4j-schema")
 
     # ═══════════════════════════════════════════════════════════════
-    # 4. FLUTTER / DART ISSUES
+    # EVENT SOURCING CRITICALS
     # ═══════════════════════════════════════════════════════════════
 
-    dart_files = {r: c for r, c in files.items() if r.endswith('.dart')}
+    # ES-1: Apply uses DateTimeOffset.UtcNow instead of event timestamp
+    if "DateTimeOffset.UtcNow" in marten and "Apply(" in marten:
+        flag(4, "Apply methods use DateTimeOffset.UtcNow — must use event timestamp for deterministic replay", "marten-event-store.cs", "ES")
 
-    # Check: freezed models have part directives
-    for rel, content in dart_files.items():
-        if '@freezed' in content:
-            if 'part ' not in content:
-                flag(3, f"{rel}: Uses @freezed but missing 'part' directive for code generation",
-                     rel, "DART_ISSUE")
+    # ES-2: Non-atomic multi-event writes (separate sessions per event)
+    if sa and "PersistAndPublish" in sa:
+        # Check if there's batch support
+        if "AppendBatch" not in sa and "events.ToArray()" not in sa and "Append(_studentId, events)" not in sa:
+            flag(4, "PersistAndPublish creates separate sessions — must batch all events from one command into single Append", "student_actor.cs", "ES")
 
-    # Check: Riverpod providers are properly typed
-    for rel, content in dart_files.items():
-        if 'Notifier' in content and 'riverpod' in content.lower():
-            if 'StateNotifier' not in content and 'Notifier' in content:
-                pass  # Riverpod 2.0+ uses Notifier, not StateNotifier
+    # ES-3: No expected version on Marten append (no optimistic concurrency)
+    if sa and "Append(" in sa and "expectedVersion" not in sa.lower() and "ExpectedVersion" not in sa:
+        flag(3, "Marten Append without expected version — no optimistic concurrency protection", "student_actor.cs", "ES")
 
-    # Check: pubspec.yaml exists and has required deps
-    pubspec_files = {r: c for r, c in files.items() if 'pubspec.yaml' in r}
-    for rel, content in pubspec_files.items():
-        required_deps = ['flutter_riverpod', 'drift', 'freezed', 'dio']
-        for dep in required_deps:
-            if dep not in content:
-                flag(2, f"{rel}: Missing required dependency: {dep}",
-                     rel, "DART_ISSUE")
+    # ES-4: Offline sync no idempotency
+    if sa and "HandleSyncOffline" in sa:
+        if "idempotency" not in sa.lower() and "IdempotencyKey" not in sa and "SET NX" not in sa:
+            flag(4, "Offline sync processes events without idempotency check — retry = double everything", "student_actor.cs", "ES")
 
     # ═══════════════════════════════════════════════════════════════
-    # 5. PYTHON / LLM LAYER ISSUES
+    # EDTECH CRITICALS (pedagogical soundness)
     # ═══════════════════════════════════════════════════════════════
 
-    py_files = {r: c for r, c in files.items() if r.endswith('.py')}
+    # ET-1: Single mastery threshold — need dual (0.85 progression, 0.95 prereq gate)
+    if domain:
+        has_dual = "prerequisite" in domain.lower() and ("0.95" in domain or "PrerequisiteGate" in domain)
+        if not has_dual:
+            flag(4, "Single mastery threshold 0.85 — need dual: 0.85 for progression, 0.95 for prerequisite gates (Corbett & Anderson standard)", "domain-services.cs", "EDTECH")
 
-    # Check: Pydantic models use proper Field() syntax
-    for rel, content in py_files.items():
-        if 'BaseModel' in content:
-            # Check for common Pydantic v2 issues
-            if 'class Config:' in content and 'model_config' not in content:
-                # Pydantic v2 uses model_config, not class Config
-                # But class Config still works with compatibility — don't flag
-                pass
+    # ET-2: BKT P(forget)=0 contradicts HLR
+    if domain and "p_forget" in domain.lower():
+        if "= 0" in domain or "forget = 0.0" in domain.lower():
+            flag(3, "BKT P(forget)=0 contradicts HLR spaced repetition — mastery should decay in BKT too", "domain-services.cs", "EDTECH")
+    elif domain and "PForget" not in domain and "p_forget" not in domain:
+        flag(3, "BKT has no P(forget) parameter — mastery decay not modeled in BKT (only in HLR)", "domain-services.cs", "EDTECH")
 
-    # Check: Prompt templates have all required variables
-    for rel, content in py_files.items():
-        if 'PROMPT' in content and '{' in content:
-            # Check for unclosed template variables
-            open_braces = content.count('{')
-            close_braces = content.count('}')
-            # JSON in prompts will have balanced braces — only flag if wildly off
-            if abs(open_braces - close_braces) > 5:
-                flag(2, f"{rel}: Unbalanced braces ({open_braces} open, {close_braces} close) — possible broken template",
-                     rel, "PYTHON_ISSUE")
+    # ET-3: No prerequisite enforcement service
+    if domain:
+        has_prereq = "IPrerequisiteEnforcementService" in domain or "PrerequisiteGate" in domain or "CheckPrerequisites" in domain
+        if not has_prereq:
+            flag(4, "No prerequisite enforcement service — knowledge graph is decorative without gate checks", "domain-services.cs", "EDTECH")
 
-    # Check: routing-config.yaml has all task types mapped
-    for rel, content in files.items():
-        if 'routing-config' in rel and rel.endswith('.yaml'):
-            required_tasks = ['socratic', 'evaluat', 'classif', 'methodology']
-            for task in required_tasks:
-                if task not in content.lower():
-                    flag(2, f"{rel}: Missing task mapping for: {task}",
-                         rel, "PYTHON_ISSUE")
+    # ET-4: Error classification on Kimi (cheapest) despite being linchpin
+    if routing and "error_classification" in routing.lower():
+        if "kimi" in routing.lower() and "sonnet" not in routing[routing.lower().find("error_classification"):routing.lower().find("error_classification")+200].lower():
+            flag(3, "Error classification routed to cheapest model (Kimi) — this is the linchpin of adaptive routing, needs higher quality", "routing-config.yaml", "EDTECH")
 
-    # ═══════════════════════════════════════════════════════════════
-    # 6. GRAPHQL / FRONTEND ISSUES
-    # ═══════════════════════════════════════════════════════════════
+    # ET-5: Stagnation threshold not personalized
+    if stag:
+        has_personal = "per-student" in stag.lower() or "personalized_threshold" in stag.lower() or "student-specific" in stag.lower() or "adaptive threshold" in stag.lower()
+        if not has_personal:
+            flag(3, "Stagnation 5% improvement threshold is fixed — slow learners will trigger false positives. Need per-student adaptive threshold", "stagnation_detector_actor.cs", "EDTECH")
 
-    # Check: GraphQL schema has Query type
-    for rel, content in files.items():
-        if rel.endswith('.graphql'):
-            if 'type Query' not in content:
-                flag(3, f"{rel}: GraphQL schema missing 'type Query' root",
-                     rel, "FRONTEND_ISSUE")
-            if 'type Subscription' not in content:
-                flag(2, f"{rel}: GraphQL schema missing subscriptions (needed for real-time dashboards)",
-                     rel, "FRONTEND_ISSUE")
-
-    # Check: TypeScript has proper export statements
-    for rel, content in files.items():
-        if rel.endswith('.ts'):
-            type_count = len(re.findall(r'\b(?:interface|type|enum|class)\s+\w+', content))
-            export_count = content.count('export ')
-            if type_count > 5 and export_count == 0:
-                flag(2, f"{rel}: Defines {type_count} types but has 0 exports — nothing is usable from outside",
-                     rel, "FRONTEND_ISSUE")
+    # ET-6: XP rewards volume not mastery depth
+    if marten and "XpAwarded" in marten:
+        has_difficulty_xp = "difficulty" in marten[marten.find("XpAwarded"):marten.find("XpAwarded")+300].lower() if "XpAwarded" in marten else False
+        if not has_difficulty_xp:
+            flag(2, "XP award has no difficulty multiplier — students farm easy questions. Need: XP = base * difficulty_level", "marten-event-store.cs", "EDTECH")
 
     # ═══════════════════════════════════════════════════════════════
-    # 7. PROTOBUF / gRPC ISSUES
+    # SECURITY CRITICALS
     # ═══════════════════════════════════════════════════════════════
 
-    for rel, content in files.items():
-        if rel.endswith('.proto'):
-            if 'syntax = "proto3"' not in content:
-                flag(3, f"{rel}: Missing 'syntax = \"proto3\"' declaration",
-                     rel, "PROTO_ISSUE")
-            if 'package ' not in content:
-                flag(2, f"{rel}: Missing package declaration",
-                     rel, "PROTO_ISSUE")
-            # Check service definitions have rpc methods
-            services = re.findall(r'service (\w+)', content)
-            for svc in services:
-                rpcs = re.findall(rf'rpc \w+', content)
-                if len(rpcs) == 0:
-                    flag(3, f"{rel}: Service {svc} has no rpc methods defined",
-                         rel, "PROTO_ISSUE")
+    # SEC-1: No answer sanitization before LLM routing
+    if acl:
+        has_sanitize = "sanitize" in acl.lower() or "sanitization" in acl.lower() or "InputSanitizer" in acl
+        if not has_sanitize:
+            flag(4, "No input sanitization contract for student answers before LLM routing — prompt injection risk", "acl-interfaces.py", "SECURITY")
+
+    # SEC-2: GraphQL no auth enforcement in schema
+    if graphql:
+        has_auth = "@auth" in graphql or "directive @auth" in graphql or "authorization" in graphql.lower()
+        if not has_auth:
+            flag(3, "GraphQL schema has no @auth directive — IDOR risk (student A queries student B data)", "graphql-schema.graphql", "SECURITY")
 
     # ═══════════════════════════════════════════════════════════════
-    # 8. NEO4J / CYPHER ISSUES
+    # MOBILE CRITICALS
     # ═══════════════════════════════════════════════════════════════
 
-    for rel, content in files.items():
-        if rel.endswith('.cypher'):
-            if 'CREATE CONSTRAINT' not in content and 'CONSTRAINT' not in content:
-                flag(2, f"{rel}: No constraints defined — data integrity at risk",
-                     rel, "DATA_ISSUE")
-            if 'CREATE INDEX' not in content and 'INDEX' not in content:
-                flag(2, f"{rel}: No indexes defined — queries will be slow",
-                     rel, "DATA_ISSUE")
+    # MOB-1: No durable command queue (app crash = lost work)
+    if dart_sync:
+        has_cmd_queue = "CommandQueue" in dart_sync or "command_queue" in dart_sync or "DurableCommandQueue" in dart_sync
+        if not has_cmd_queue:
+            flag(3, "No durable command queue — app crash between answer submit and server ack = lost work", "offline_sync_service.dart", "MOBILE")
+
+    # MOB-2: No accessibility contracts
+    if dart_kg:
+        has_a11y = "Semantics" in dart_kg or "semanticLabel" in dart_kg or "accessibility" in dart_kg.lower()
+        if not has_a11y:
+            flag(3, "Knowledge graph widget has zero accessibility — invisible to screen readers", "knowledge_graph_widget.dart", "MOBILE")
+
+    # MOB-3: No streak freeze / vacation mode
+    if dart_streak:
+        has_freeze = "freeze" in dart_streak.lower() or "vacation" in dart_streak.lower() or "Shabbat" in dart_streak
+        if not has_freeze:
+            flag(2, "No streak freeze / vacation mode — punishes observant students on Shabbat/holidays", "streak_widget.dart", "MOBILE")
 
     # ═══════════════════════════════════════════════════════════════
-    # 9. CROSS-REFERENCE INTEGRITY
+    # DISTRIBUTED SYSTEMS CRITICALS
     # ═══════════════════════════════════════════════════════════════
 
-    # Check: Backend gRPC proto referenced from Python ACL
-    if 'backend/grpc-protos.proto' in files:
-        proto_services = re.findall(r'service (\w+)', files['backend/grpc-protos.proto'])
-        for rel, content in py_files.items():
-            if 'acl' in rel.lower():
-                for svc in proto_services:
-                    if svc not in content and svc.replace('Service', '') not in content:
-                        # Only flag if NO reference to the service exists
-                        pass
-
-    # Check: Event names consistent between Marten (C#) and NATS subjects (md)
-    marten_events = set()
-    for rel, content in files.items():
-        if 'marten' in rel.lower() and rel.endswith('.cs'):
-            marten_events.update(re.findall(r'public record (\w+_V\d+)', content))
-
-    if marten_events:
-        for rel, content in files.items():
-            if 'nats' in rel.lower() and rel.endswith('.md'):
-                missing_in_nats = [e for e in marten_events
-                                   if e.replace('_V1', '') not in content
-                                   and e.split('_')[0] not in content]
-                if len(missing_in_nats) > 5:
-                    flag(3, f"{rel}: {len(missing_in_nats)} Marten events not referenced in NATS subjects",
-                         rel, "CROSS_REF")
+    # DS-1: NATS publish before Marten commit (outbox pattern missing)
+    if sa and "PublishToNats" in sa:
+        if "outbox" not in sa.lower() and "after.*SaveChanges" not in sa.lower():
+            has_outbox = "OutboxPublisher" in sa or "nats_published_at" in sa
+            if not has_outbox:
+                flag(3, "NATS publish may fire before Marten commit — need outbox pattern", "student_actor.cs", "DISTRIBUTED")
 
     # ═══════════════════════════════════════════════════════════════
-    # PRINT RESULTS
+    # PRINT
     # ═══════════════════════════════════════════════════════════════
 
     print("=" * 70)
-    print("CONTRACT CODE QUALITY & COMPLETENESS (lower=better, target: 0)")
+    print("FIX ALL ARCHITECT CRITICALS (lower=better, target: 0)")
     print("=" * 70)
 
-    categories = ["CONSISTENCY", "INCOMPLETE", "ACTOR_ISSUE", "DART_ISSUE",
-                   "PYTHON_ISSUE", "FRONTEND_ISSUE", "PROTO_ISSUE", "DATA_ISSUE", "CROSS_REF"]
-
-    for category in categories:
-        if category in results_by_category:
-            items = results_by_category[category]
-            cat_total = sum(w for w, _, _ in items)
-            print(f"\n  [{category}: {cat_total} points]")
-            for weight, desc, fname in items:
-                print(f"    (w={weight}) {fname}: {desc}")
+    for cat in ["ES", "EDTECH", "SECURITY", "MOBILE", "DISTRIBUTED"]:
+        if cat in results:
+            items = results[cat]
+            ct = sum(w for w, _, _ in items)
+            print(f"\n  [{cat}: {ct} points]")
+            for w, d, f in items:
+                print(f"    (w={w}) {f}: {d}")
 
     print(f"\n{'=' * 70}")
-    for category in categories:
-        if category in results_by_category:
-            print(f"  {category}: {sum(w for w,_,_ in results_by_category[category])}")
-    print(f"\n  TOTAL GAP: {total_score}")
+    for cat in ["ES", "EDTECH", "SECURITY", "MOBILE", "DISTRIBUTED"]:
+        if cat in results:
+            print(f"  {cat}: {sum(w for w,_,_ in results[cat])}")
+    print(f"\n  TOTAL GAP: {total}")
     print(f"{'=' * 70}")
-    print(f"\nMETRIC:{total_score}")
+    print(f"\nMETRIC:{total}")
 
 
 if __name__ == "__main__":
