@@ -48,10 +48,29 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
   4. **Error type repetition**: The same error pattern (classified by error taxonomy) recurs 3 or more times across sessions
   5. **Annotation sentiment**: NLP analysis of student annotations detects frustration or confusion signals
 - A methodology switch is triggered when the composite stagnation score exceeds a threshold of 0.7 (on a 0–1 normalized scale) for 3 consecutive sessions
-- The switching strategy is error-type-driven:
-  - Rule-based/procedural errors → switch to drill-and-practice or spaced repetition
-  - Conceptual misunderstanding → switch to Socratic dialogue or Feynman technique
-  - Motivational stagnation → switch to project-based learning or real-world application contexts
+- The switching strategy is error-type-driven, with explicit precedence and cycling prevention:
+
+**Methodology selection algorithm:**
+1. **Classify the dominant error type** from the last 3 sessions' error logs. If multiple error types are present, use precedence order: conceptual > procedural > motivational (conceptual errors are hardest to overcome and most damaging if left unaddressed).
+2. **Consult the MCM graph** (see `docs/architecture-design.md` Section 3.2.3 and below) for the (error_type, concept_category) → methodology mapping.
+3. **Exclude previously attempted methods**: The `StudentProfile` actor maintains a `method_attempt_history` per concept cluster — a list of (methodology, outcome) pairs. Any methodology attempted in the last 3 stagnation cycles for this concept is excluded from candidates.
+4. **Select from remaining candidates**: If multiple candidates remain, choose the one with the highest MCM confidence score. If only one remains, use it. If NO candidates remain (all methodologies exhausted for this concept), escalate — see below.
+5. **Apply 3-session cooldown**: The new methodology runs for a minimum of 3 sessions before re-evaluating stagnation. This prevents rapid cycling.
+
+**Error type → methodology mapping (with tie-breaking precedence):**
+
+| Priority | Error Type | Primary Methodology | Secondary (if primary exhausted) |
+|---|---|---|---|
+| 1 (highest) | Conceptual misunderstanding | Socratic dialogue | Feynman technique |
+| 2 | Procedural / rule-based errors | Drill-and-practice | Worked examples with fading |
+| 3 | Motivational stagnation | Project-based learning | Analogy-based instruction |
+
+**Escalation when all methodologies exhausted for a concept:**
+- If a student has cycled through all 8 methodologies on a concept cluster without resolving stagnation (rare — requires 8 × 3 = 24+ sessions of stagnation), the system:
+  1. Flags the concept as "mentor-resistant" in the student's profile
+  2. Suggests the student skip to a related concept and return later (prerequisite graph allows this if the concept is not blocking)
+  3. If the concept IS a prerequisite blocker, surfaces a recommendation: "This concept may benefit from human tutoring — consider asking your teacher or a tutor for 1-on-1 help"
+  4. Logs the escalation for analytics (these cases are high-value data for improving the MCM graph)
 
 ### Student Control
 - Students can request a different learning approach at any time (e.g., "I'd rather learn this through a project")

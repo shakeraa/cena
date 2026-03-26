@@ -83,8 +83,26 @@ The system is decomposed into **nine bounded contexts** with clear seams. Cross-
 - **Owns:** Domain knowledge graph, syllabus structure, concept metadata, difficulty ratings
 - **Storage:** Neo4j AuraDB (source of truth) with in-memory cache loaded at silo startup
 - **Change frequency:** Rare (annual syllabus updates, new subjects)
-- **MCM Graph:** Mode x Capability x Methodology mapping — connects error types and concept categories to recommended teaching methodologies
-- **Approximate size:** ~2,000 nodes per subject
+- **MCM Graph** (Mode x Capability x Methodology): A lookup table stored as Neo4j edges connecting error types and concept categories to recommended teaching methodologies. Structure:
+
+  ```
+  MCM schema: (ErrorType, ConceptCategory) → [(Methodology, confidence)]
+
+  Example entries:
+    (conceptual, algebra)       → [(socratic, 0.85), (feynman, 0.70), (analogy, 0.55)]
+    (procedural, trigonometry)  → [(drill, 0.90), (worked-example, 0.80)]
+    (motivational, calculus)    → [(project-based, 0.75), (analogy, 0.60)]
+  ```
+
+  **Lookup algorithm** (`MethodologySwitchService`):
+  1. Query: `MCM_LOOKUP(dominant_error_type, concept_category)` → returns candidate list sorted by confidence descending
+  2. Filter: remove any methodology in `method_attempt_history` for this concept cluster (see `system-overview.md` cycling prevention)
+  3. Select: first remaining candidate with confidence > 0.5. If none above 0.5, use first remaining regardless (best available)
+  4. Fallback: if no MCM entry exists for this (error_type, concept_category) pair, fall back to the error-type-only defaults in `system-overview.md`
+
+  **Population**: Initially hand-crafted by education advisor (one entry per error_type × concept_category combination for Math, ~50 entries). Confidence scores updated monthly by Intelligence Layer Flywheel 1 (see `docs/intelligence-layer.md`) based on post-switch outcome data.
+
+- **Approximate size:** ~2,000 concept nodes per subject + ~50–100 MCM edges per subject
 
 #### 3.2.2 Learner Context (core domain)
 
