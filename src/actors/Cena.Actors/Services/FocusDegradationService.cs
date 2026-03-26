@@ -1,0 +1,518 @@
+// ═══════════════════════════════════════════════════════════════════════
+// Cena Platform — Focus Degradation & Student Resilience Service
+//
+// Models student focus decay within and across sessions using:
+// 1. Within-session attention curve (vigilance decrement theory)
+// 2. Cross-session resilience scoring (grit/persistence measurement)
+// 3. Productive struggle detection (distinguish fatigue from learning)
+// 4. Recovery prediction (optimal break duration, re-engagement timing)
+//
+// References:
+// - Vigilance decrement: Warm (1984), Parasuraman (1986)
+// - Productive struggle: Kapur (2008) "Productive Failure"
+// - Flow state: Csikszentmihalyi (1990) — challenge/skill balance
+// ═══════════════════════════════════════════════════════════════════════
+
+using System.Diagnostics.Metrics;
+
+namespace Cena.Actors.Services;
+
+/// <summary>
+/// Models student focus degradation and resilience.
+/// Goes beyond simple fatigue detection to predict WHEN focus will drop
+/// and distinguish productive struggle (learning) from unproductive frustration.
+/// </summary>
+public interface IFocusDegradationService
+{
+    /// <summary>
+    /// Compute the current focus state from session signals.
+    /// Called after each question to get real-time focus assessment.
+    /// </summary>
+    FocusState ComputeFocusState(FocusInput input);
+
+    /// <summary>
+    /// Predict how many more productive questions the student can handle.
+    /// Returns 0 if the student should take a break NOW.
+    /// </summary>
+    int PredictRemainingProductiveQuestions(FocusState state);
+
+    /// <summary>
+    /// Compute the student's resilience score (long-term grit metric).
+    /// Updated after each session based on how they handled difficulty.
+    /// </summary>
+    ResilienceScore ComputeResilience(ResilienceInput input);
+
+    /// <summary>
+    /// Determine if the student is in productive struggle (learning from difficulty)
+    /// vs unproductive frustration (spinning wheels, about to disengage).
+    /// </summary>
+    StruggleClassification ClassifyStruggle(StruggleInput input);
+
+    /// <summary>
+    /// Predict optimal break duration based on focus history and time of day.
+    /// </summary>
+    BreakRecommendation RecommendBreak(FocusState state, TimeOfDayContext timeContext);
+}
+
+public sealed class FocusDegradationService : IFocusDegradationService
+{
+    private static readonly Histogram<double> FocusHistogram =
+        new Meter("Cena.Actors.Focus").CreateHistogram<double>("cena.focus.score");
+
+    // ═══════════════════════════════════════════════════════════════
+    // 1. FOCUS STATE (within-session attention curve)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Computes a multi-dimensional focus state.
+    /// The model uses 4 signals to build a complete picture:
+    ///   - Attention (from response time variance — focused students are consistent)
+    ///   - Engagement (from voluntary actions — hints, annotations, approach changes)
+    ///   - Accuracy trend (slope of recent performance)
+    ///   - Time decay (vigilance decrement — focus naturally drops over time)
+    /// </summary>
+    public FocusState ComputeFocusState(FocusInput input)
+    {
+        // ── Signal 1: Attention (response time consistency) ──
+        // Focused students have LOW RT variance. Distracted students are erratic.
+        double rtVariance = ComputeRtVariance(input.RecentResponseTimesMs);
+        double baselineVariance = ComputeRtVariance(input.BaselineResponseTimesMs);
+        double attentionScore = baselineVariance > 1.0
+            ? Math.Clamp(1.0 - (rtVariance - baselineVariance) / (baselineVariance * 2), 0, 1)
+            : 0.8; // Default if insufficient baseline
+
+        // ── Signal 2: Engagement (voluntary interaction rate) ──
+        // Students who request hints, add annotations, or change approach are engaged.
+        // Students who just answer questions passively may be disengaged.
+        double engagementRate = input.QuestionsAttempted > 0
+            ? (double)(input.HintsRequested + input.AnnotationsAdded + input.ApproachChanges)
+              / input.QuestionsAttempted
+            : 0;
+        // Normalize: 0.2 interactions/question = highly engaged
+        double engagementScore = Math.Clamp(engagementRate / 0.2, 0, 1);
+
+        // ── Signal 3: Accuracy Trend (slope over last 10 questions) ──
+        // Rising accuracy = learning (good). Flat = plateau. Falling = degradation.
+        double accuracySlope = ComputeAccuracySlope(input.RecentAccuracies);
+        // Map slope to [0, 1]: -0.1 = 0 (declining), 0 = 0.5 (flat), +0.1 = 1 (improving)
+        double trendScore = Math.Clamp(0.5 + accuracySlope * 5, 0, 1);
+
+        // ── Signal 4: Vigilance Decrement (time-based natural decay) ──
+        // Warm (1984): sustained attention degrades logarithmically over time.
+        // Most students peak at ~10-15 minutes, then decline.
+        double minutesActive = input.ElapsedMinutes;
+        double peakMinutes = input.PersonalPeakMinutes > 0
+            ? input.PersonalPeakMinutes
+            : 15.0; // Default peak attention at 15 minutes
+        double vigilanceScore;
+        if (minutesActive <= peakMinutes)
+        {
+            // Ramping up to peak
+            vigilanceScore = Math.Clamp(minutesActive / peakMinutes, 0.5, 1.0);
+        }
+        else
+        {
+            // Declining after peak (logarithmic decay)
+            double decayFactor = 1.0 - 0.3 * Math.Log(1.0 + (minutesActive - peakMinutes) / peakMinutes);
+            vigilanceScore = Math.Clamp(decayFactor, 0.1, 1.0);
+        }
+
+        // ── Composite Focus Score ──
+        // Weighted blend: attention matters most, time decay is automatic
+        double focusScore =
+            0.30 * attentionScore +
+            0.20 * engagementScore +
+            0.25 * trendScore +
+            0.25 * vigilanceScore;
+
+        focusScore = Math.Clamp(focusScore, 0, 1);
+        FocusHistogram.Record(focusScore);
+
+        // ── Classify focus level ──
+        var level = focusScore switch
+        {
+            >= 0.8 => FocusLevel.Flow,           // In the zone — challenge appropriately
+            >= 0.6 => FocusLevel.Engaged,         // Good — maintain current approach
+            >= 0.4 => FocusLevel.Drifting,         // Attention wavering — simplify or change method
+            >= 0.2 => FocusLevel.Fatigued,         // Significantly degraded — suggest break soon
+            _ => FocusLevel.Disengaged             // Lost — end session, suggest break
+        };
+
+        return new FocusState(
+            FocusScore: focusScore,
+            Level: level,
+            AttentionScore: attentionScore,
+            EngagementScore: engagementScore,
+            TrendScore: trendScore,
+            VigilanceScore: vigilanceScore,
+            MinutesActive: minutesActive,
+            QuestionsAttempted: input.QuestionsAttempted
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 2. REMAINING PRODUCTIVE QUESTIONS
+    // ═══════════════════════════════════════════════════════════════
+
+    public int PredictRemainingProductiveQuestions(FocusState state)
+    {
+        // Below engagement threshold — stop now
+        if (state.Level == FocusLevel.Disengaged) return 0;
+        if (state.Level == FocusLevel.Fatigued) return 1; // One more, then break
+
+        // Estimate based on vigilance decay rate
+        // Assume ~2 minutes per question, predict how many before focus < 0.4 (Drifting)
+        double currentFocus = state.FocusScore;
+        double decayPerQuestion = 0.03; // ~3% focus loss per question at steady state
+
+        // Adjust decay by engagement (engaged students decay slower)
+        decayPerQuestion *= (1.0 - state.EngagementScore * 0.5);
+
+        int remaining = 0;
+        while (currentFocus >= 0.4 && remaining < 20) // Cap at 20
+        {
+            currentFocus -= decayPerQuestion;
+            remaining++;
+        }
+
+        return remaining;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 3. RESILIENCE SCORING (cross-session grit)
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Resilience = how well the student persists through difficulty.
+    /// High resilience students: continue after wrong answers, try harder problems,
+    /// return after breaks, maintain streaks through challenging material.
+    /// </summary>
+    public ResilienceScore ComputeResilience(ResilienceInput input)
+    {
+        // ── Persistence: ratio of sessions completed vs abandoned ──
+        double persistence = input.TotalSessionsStarted > 0
+            ? (double)input.SessionsCompletedNormally / input.TotalSessionsStarted
+            : 0.5; // Default for new students
+
+        // ── Recovery: how quickly they return after a bad session ──
+        // Bad session = fatigue > 0.7 or accuracy < 30%
+        double recoveryRate = input.BadSessionCount > 0
+            ? (double)input.ReturnedAfterBadSession / input.BadSessionCount
+            : 1.0; // No bad sessions = assume resilient
+
+        // ── Challenge seeking: do they attempt harder problems? ──
+        // Students who stay on "recall" level vs those who progress to "analysis"
+        double challengeRatio = input.TotalAttempts > 0
+            ? (double)input.AttemptsAboveComfortZone / input.TotalAttempts
+            : 0.3; // Default
+
+        // ── Streak maintenance: consistency over time ──
+        double streakScore = input.LongestStreak > 0
+            ? Math.Clamp((double)input.CurrentStreak / input.LongestStreak, 0, 1)
+            : 0;
+
+        // ── Composite resilience ──
+        double score =
+            0.35 * persistence +
+            0.25 * recoveryRate +
+            0.25 * challengeRatio +
+            0.15 * streakScore;
+
+        score = Math.Clamp(score, 0, 1);
+
+        var level = score switch
+        {
+            >= 0.8 => ResilienceLevel.HighGrit,
+            >= 0.6 => ResilienceLevel.Moderate,
+            >= 0.4 => ResilienceLevel.Developing,
+            _ => ResilienceLevel.AtRisk
+        };
+
+        return new ResilienceScore(
+            Score: score,
+            Level: level,
+            Persistence: persistence,
+            RecoveryRate: recoveryRate,
+            ChallengeSeeking: challengeRatio,
+            StreakConsistency: streakScore
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 4. PRODUCTIVE STRUGGLE vs FRUSTRATION
+    // ═══════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Distinguishes productive struggle (Kapur 2008) from unproductive frustration.
+    ///
+    /// PRODUCTIVE: Student is wrong but LEARNING — accuracy is low but improving,
+    ///   response times are consistent (engaged), error types are VARIED (exploring).
+    ///
+    /// UNPRODUCTIVE: Student is wrong and STUCK — accuracy flat, RT increasing or
+    ///   highly variable, same error type repeating, annotation sentiment negative.
+    /// </summary>
+    public StruggleClassification ClassifyStruggle(StruggleInput input)
+    {
+        // ── Is accuracy improving despite being low? ──
+        bool accuracyImproving = input.AccuracySlope > 0.01;
+
+        // ── Are errors diverse (exploring) or repetitive (stuck)? ──
+        bool errorsRepetitive = input.SameErrorTypeCount >= 3;
+
+        // ── Is response time stable (engaged) or erratic (distracted)? ──
+        double rtCv = input.ResponseTimeMean > 0
+            ? input.ResponseTimeStdDev / input.ResponseTimeMean
+            : 0;
+        bool rtStable = rtCv < 0.4; // Coefficient of variation < 40%
+
+        // ── Is sentiment negative? ──
+        bool sentimentNegative = input.AnnotationSentiment < 0.3;
+
+        // ── Classification ──
+        if (accuracyImproving && !errorsRepetitive && rtStable)
+        {
+            return new StruggleClassification(
+                Type: StruggleType.ProductiveStruggle,
+                Confidence: 0.8 + (input.AccuracySlope * 2), // Higher slope = more confident
+                Recommendation: "Student is learning through difficulty. Maintain current approach. " +
+                                "Do NOT switch methodology or reduce difficulty — this is productive failure."
+            );
+        }
+
+        if (!accuracyImproving && errorsRepetitive && sentimentNegative)
+        {
+            return new StruggleClassification(
+                Type: StruggleType.UnproductiveFrustration,
+                Confidence: 0.9,
+                Recommendation: "Student is stuck. Switch methodology (methodology switch service) " +
+                                "or reduce difficulty. If methodology already switched 3+ times, " +
+                                "suggest a different concept (prerequisite review or adjacent topic)."
+            );
+        }
+
+        if (!accuracyImproving && !rtStable)
+        {
+            return new StruggleClassification(
+                Type: StruggleType.Disengagement,
+                Confidence: 0.7,
+                Recommendation: "Student is losing attention. Suggest a break or switch to a " +
+                                "gamified challenge (challenge card) to re-engage."
+            );
+        }
+
+        // Mixed signals — default to moderate struggle
+        return new StruggleClassification(
+            Type: StruggleType.ModerateStruggle,
+            Confidence: 0.5,
+            Recommendation: "Signals are mixed. Continue current approach for 2 more questions, " +
+                            "then re-evaluate. If accuracy doesn't improve, switch methodology."
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 5. BREAK RECOMMENDATION
+    // ═══════════════════════════════════════════════════════════════
+
+    public BreakRecommendation RecommendBreak(FocusState state, TimeOfDayContext timeContext)
+    {
+        // Base break duration from focus score
+        int baseMinutes = state.Level switch
+        {
+            FocusLevel.Flow => 0,           // Don't interrupt flow state!
+            FocusLevel.Engaged => 0,         // No break needed
+            FocusLevel.Drifting => 5,         // Short break to reset attention
+            FocusLevel.Fatigued => 15,        // Moderate break
+            FocusLevel.Disengaged => 30,      // Long break — student needs to step away
+            _ => 10
+        };
+
+        if (baseMinutes == 0)
+        {
+            return new BreakRecommendation(
+                ShouldBreak: false,
+                Minutes: 0,
+                Activity: BreakActivity.None,
+                Message: null
+            );
+        }
+
+        // Adjust for time of day (late evening = longer breaks needed)
+        if (timeContext.IsLateEvening) // After 21:00
+            baseMinutes = (int)(baseMinutes * 1.5);
+
+        // Adjust for session count today (more sessions = more fatigued)
+        if (timeContext.SessionsToday >= 3)
+            baseMinutes = (int)(baseMinutes * 1.3);
+
+        // Suggest activity based on break length
+        var activity = baseMinutes switch
+        {
+            <= 5 => BreakActivity.StretchOrWater,
+            <= 15 => BreakActivity.WalkOrSnack,
+            _ => BreakActivity.FullRest
+        };
+
+        // Hebrew/Arabic/English message
+        string message = state.Level switch
+        {
+            FocusLevel.Drifting => "קצת הפסקה תעזור לך להתרכז טוב יותר", // "A short break will help you focus better"
+            FocusLevel.Fatigued => "עשית עבודה מעולה! זמן להפסקה", // "Great work! Time for a break"
+            FocusLevel.Disengaged => "בוא נחזור אחרי הפסקה עם אנרגיה חדשה", // "Let's come back after a break with fresh energy"
+            _ => "הפסקה קצרה?" // "Short break?"
+        };
+
+        return new BreakRecommendation(
+            ShouldBreak: true,
+            Minutes: baseMinutes,
+            Activity: activity,
+            Message: message
+        );
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // HELPERS
+    // ═══════════════════════════════════════════════════════════════
+
+    private static double ComputeRtVariance(IReadOnlyList<double> times)
+    {
+        if (times.Count < 2) return 0;
+        double mean = 0;
+        for (int i = 0; i < times.Count; i++) mean += times[i];
+        mean /= times.Count;
+
+        double variance = 0;
+        for (int i = 0; i < times.Count; i++)
+        {
+            double diff = times[i] - mean;
+            variance += diff * diff;
+        }
+        return variance / (times.Count - 1);
+    }
+
+    private static double ComputeAccuracySlope(IReadOnlyList<double> accuracies)
+    {
+        if (accuracies.Count < 3) return 0;
+
+        // Simple linear regression slope
+        int n = accuracies.Count;
+        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        for (int i = 0; i < n; i++)
+        {
+            sumX += i;
+            sumY += accuracies[i];
+            sumXY += i * accuracies[i];
+            sumX2 += i * i;
+        }
+
+        double denominator = n * sumX2 - sumX * sumX;
+        if (Math.Abs(denominator) < 0.0001) return 0;
+
+        return (n * sumXY - sumX * sumY) / denominator;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// TYPES
+// ═══════════════════════════════════════════════════════════════
+
+public record FocusInput(
+    IReadOnlyList<double> RecentResponseTimesMs,
+    IReadOnlyList<double> BaselineResponseTimesMs,
+    IReadOnlyList<double> RecentAccuracies,
+    double ElapsedMinutes,
+    int QuestionsAttempted,
+    int HintsRequested,
+    int AnnotationsAdded,
+    int ApproachChanges,
+    double PersonalPeakMinutes // 0 = use default (15 min)
+);
+
+public record FocusState(
+    double FocusScore,
+    FocusLevel Level,
+    double AttentionScore,
+    double EngagementScore,
+    double TrendScore,
+    double VigilanceScore,
+    double MinutesActive,
+    int QuestionsAttempted
+);
+
+public enum FocusLevel
+{
+    Flow,           // 0.8+ — in the zone, challenge appropriately
+    Engaged,        // 0.6-0.8 — good, maintain
+    Drifting,       // 0.4-0.6 — attention wavering, simplify or change
+    Fatigued,       // 0.2-0.4 — suggest break soon
+    Disengaged      // <0.2 — end session
+}
+
+public record ResilienceInput(
+    int TotalSessionsStarted,
+    int SessionsCompletedNormally,
+    int BadSessionCount,
+    int ReturnedAfterBadSession,
+    int TotalAttempts,
+    int AttemptsAboveComfortZone,
+    int CurrentStreak,
+    int LongestStreak
+);
+
+public record ResilienceScore(
+    double Score,
+    ResilienceLevel Level,
+    double Persistence,
+    double RecoveryRate,
+    double ChallengeSeeking,
+    double StreakConsistency
+);
+
+public enum ResilienceLevel
+{
+    HighGrit,     // 0.8+ — persists through difficulty, seeks challenge
+    Moderate,     // 0.6-0.8 — generally persistent
+    Developing,   // 0.4-0.6 — needs encouragement
+    AtRisk        // <0.4 — may disengage; needs gamification + easier wins
+}
+
+public record StruggleInput(
+    double AccuracySlope,
+    int SameErrorTypeCount,
+    double ResponseTimeMean,
+    double ResponseTimeStdDev,
+    double AnnotationSentiment
+);
+
+public record StruggleClassification(
+    StruggleType Type,
+    double Confidence,
+    string Recommendation
+);
+
+public enum StruggleType
+{
+    ProductiveStruggle,       // Learning from difficulty — DON'T intervene
+    ModerateStruggle,         // Mixed signals — observe 2 more questions
+    UnproductiveFrustration,  // Stuck — switch methodology or reduce difficulty
+    Disengagement             // Lost attention — suggest break or gamified challenge
+}
+
+public record BreakRecommendation(
+    bool ShouldBreak,
+    int Minutes,
+    BreakActivity Activity,
+    string? Message
+);
+
+public enum BreakActivity
+{
+    None,
+    StretchOrWater,
+    WalkOrSnack,
+    FullRest
+}
+
+public record TimeOfDayContext(
+    bool IsLateEvening,  // After 21:00 Israel time
+    int SessionsToday
+);
