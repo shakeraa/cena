@@ -304,13 +304,15 @@
 - **Estimated channel mix**: 40% organic/viral, 30% school partnerships, 20% paid social (Instagram/TikTok targeting ages 16–18), 10% referral program
 
 ### Lifetime Value (LTV)
-- **Average subscription duration**: 18 months (targeting above EdTech average of ~4 months through knowledge graph lock-in and methodology adaptation)
-- **LTV at 89 NIS/month × 18 months**: ~1,600 NIS ($435)
+- **Realistic subscription duration**: 6–12 months (Bagrut students prep for specific exams with a bounded study window — see `docs/business-viability-assessment.md` Section 6 on structural churn). The 6-month floor assumes exam-focused students who subscribe for one testing cycle; the 12-month ceiling assumes students who start early or continue for a second subject
+- **Aspirational ceiling**: 18–24 months for multi-subject students (Math + Physics + Chemistry) who stay through two Bagrut cycles. This is a retention target, not a planning assumption
+- **Conservative LTV at 89 NIS/month × 9 months** (midpoint): ~800 NIS ($222)
 - **Gross contribution per month**: ~35–37 NIS (89 NIS revenue - ~52–54 NIS variable costs)
-- **LTV (gross contribution)**: ~630–666 NIS over 18 months
-- **LTV:CAC ratio**: ~4.2–4.4:1 (630–666 / 150) — above the 3:1 minimum for healthy SaaS
-- **Payback period**: ~4 months (CAC 150 NIS ÷ ~37 NIS/month gross contribution)
-- **LTV improvement trajectory**: As LLM costs drop ~50%/year, contribution margin doubles within 12–18 months, pushing LTV:CAC to >8:1
+- **Conservative LTV (gross contribution)**: ~315–333 NIS over 9 months
+- **LTV:CAC ratio**: ~2.1–2.2:1 (315–333 / 150) — below the 3:1 SaaS benchmark at launch. Reaches 3:1 only with 12+ month retention or LLM cost reductions
+- **Payback period**: ~4 months (CAC 150 NIS ÷ ~37 NIS/month gross contribution) — healthy, but only meaningful if students stay >4 months
+- **Path to 3:1 LTV:CAC**: (1) Multi-subject upsell extends lifetime (adding Physics to Math student adds 3–6 months); (2) LLM cost drops ~50%/year double contribution margin by Month 12–18; (3) Knowledge graph lock-in creates switching cost that delays churn. Target: 12-month average retention by Month 18
+- **Honest risk**: If average retention is only 6 months, LTV:CAC drops to ~1.4:1 and the business is not venture-scale. This is the single most important metric to validate in the first 1,000 users
 
 ### Break-Even Analysis (AI-Lean Team Model)
 - **Monthly fixed costs (estimated)**: ~58,000–79,000 NIS/month (3-person core team ~53K–72K + cloud infrastructure ~5K–7K per `docs/architecture-design.md` Section 16)
