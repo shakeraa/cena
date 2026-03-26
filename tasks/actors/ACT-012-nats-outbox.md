@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 If NATS is temporarily unavailable when an actor persists an event to Marten, the event is stored but never published. The outbox pattern ensures eventual delivery: events written to an outbox table, a background publisher polls for unpublished events and publishes them to NATS.

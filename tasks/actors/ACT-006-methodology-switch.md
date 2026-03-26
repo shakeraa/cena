@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 When stagnation is detected, the MethodologySwitchService executes a 5-step algorithm: classify error type, MCM graph lookup, filter exhausted methods, select best candidate, fallback. Cycling prevention tracks last 3 stagnation cycles. Escalation when all 8 methodologies exhausted flags "mentor-resistant."

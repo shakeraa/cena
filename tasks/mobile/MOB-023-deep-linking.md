@@ -8,6 +8,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Cena's engagement loop depends on push notifications that land the student directly in the right learning context: "Review algebra-1 before it decays" should open the app on the exact concept with a pre-started review session. Without deep linking, push notifications open the home screen and students must manually navigate — a 40-60% drop-off per extra tap (Localytics benchmark). Deep links must work across iOS (Associated Domains), Android (App Links), and degrade gracefully to web for users without the app installed.
 

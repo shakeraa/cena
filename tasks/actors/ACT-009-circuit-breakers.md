@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Each LLM model (Kimi K2 Turbo, Kimi K2 0905, Kimi K2.5, Claude Sonnet, Claude Opus) gets an independent circuit breaker. A Kimi outage must not cascade to Claude. Thresholds: 5 failures in 30 seconds -> open for 60 seconds. Half-open allows one probe call.

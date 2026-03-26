@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Israeli privacy law (Protection of Privacy Law 5741-1981) and GDPR (for any EU-resident students) require the ability to permanently delete all personal data for a given student. In an append-only event store, you cannot delete individual events without breaking the stream. Crypto-shredding solves this: every student's PII fields are encrypted with a per-student AES-256-GCM key stored in AWS KMS. When a deletion request arrives, we destroy the KMS key — rendering all encrypted PII fields unreadable, while preserving the event stream structure and non-PII analytics data. This task implements the encryption envelope, Marten serialization hooks, KMS key lifecycle, and the deletion ceremony.
 

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Cena is offline-first: every student answer, session event, and annotation is persisted to SQLite (via drift) BEFORE being sent to the server. If the app crashes mid-submit, the durable command queue recovers on next launch. Events are classified into three tiers (unconditional, conditional, server-authoritative) that determine how the server handles them during sync. Clock skew detection uses NTP-style estimation to ensure event ordering across client and server. This is the most critical data safety layer — zero student work may be lost.
 

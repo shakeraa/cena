@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 When a student reconnects after offline learning, the client sends a `SyncRequest` with queued events. The server must process each event idempotently (using UUIDv7 idempotency keys in Redis with 72-hour TTL), validate HMAC signatures, reconcile with server state, and return authoritative mastery recalculation.

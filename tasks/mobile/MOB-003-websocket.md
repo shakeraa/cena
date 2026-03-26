@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Cena's real-time learning loop depends on a persistent WebSocket connection to a .NET 9 SignalR hub. The service must handle automatic reconnection with exponential backoff + jitter, heartbeat ping/pong, message framing via `MessageEnvelope`, and offline command queuing. The `MessageRouter` dispatches incoming events by `target` name to typed handlers. All 7 client commands (`StartSession`, `AttemptConcept`, `EndSession`, `RequestHint`, `SkipQuestion`, `AddAnnotation`, `SwitchApproach`) and 9 server events (`QuestionPresented`, `AnswerEvaluated`, `MasteryUpdated`, `MethodologySwitched`, `SessionSummary`, `XpAwarded`, `StreakUpdated`, `KnowledgeGraphUpdated`, `CognitiveLoadWarning`) must be routed correctly.
 

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Parents access the Cena web client to monitor their child's learning progress. The parent view shows a weekly summary report, active risk alerts (inactivity, declining accuracy, streak broken), and a child selector for parents with multiple children. Data comes from the `parentProgress` Marten async projection via GraphQL queries and the `onRiskAlert` subscription.
 

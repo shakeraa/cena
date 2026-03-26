@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 SignalR over WebSocket is the real-time channel between the React PWA and the ASP.NET Core backend. Every client command (StartSession, SubmitAnswer, etc.) and server event (QuestionPresented, AnswerEvaluated, etc.) flows through a typed `MessageEnvelope` with a `type` discriminator, `correlationId` for request-response tracking, and `direction` tag. The client must handle reconnection with exponential backoff and jitter for mobile network conditions.
 

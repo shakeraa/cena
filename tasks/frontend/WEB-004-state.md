@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The Cena web client uses Zustand with the slice pattern for state management. Five slices map to five domain concerns: Session, KnowledgeGraph, User, Offline, and ConnectionMeta. Each slice has its own state shape, actions, and selectors defined in the contract. The store uses Immer middleware for immutable updates and persist middleware (localStorage on web) for non-sensitive state.
 

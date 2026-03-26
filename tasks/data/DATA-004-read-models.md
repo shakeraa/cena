@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The Marten event store contract registers four async projections: `TeacherDashboardProjection`, `ParentProgressProjection`, `MethodologyEffectivenessProjection`, and `RetentionCohortProjection`. The `TeacherDashboardProjection` is covered elsewhere. This task implements the three remaining read model views and their projections that are currently stubs with only `{ public string Id { get; set; } = ""; }`. Each view needs a full schema, Apply methods for relevant events, and query patterns.
 

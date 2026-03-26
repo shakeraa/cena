@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Redis serves as the caching and rate-limiting layer. ElastiCache Redis 7.x in cluster mode with hash-tag slot affinity for per-student transactions. Connection via Secrets Manager AUTH token.

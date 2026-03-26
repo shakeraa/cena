@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Every LLM call costs money. Without hard per-student caps, a single misbehaving client or a stagnation loop could burn the entire monthly budget. This task implements the Redis-backed token budget system defined in `cost-tracking.py`: 25,000 output tokens per student per day, midnight Israel-time reset, with alert thresholds at 80% (WARNING) and 150% (CRITICAL). The budget is checked *before* routing to any LLM provider, and consumption is recorded *after* a successful response. Redis keys follow the schema from `redis-contracts.ts`: `cena:budget:tokens:{studentId}:{dateUtc}`.
 

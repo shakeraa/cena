@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Gamification drives engagement: daily streaks with flame animation, XP progress bar with level-ups, achievement badges, streak freeze (save streak on missed day), and vacation mode (pause streak tracking). XP formula: `xpForLevel(n) = 100 * n * (1 + 0.1 * n)`.

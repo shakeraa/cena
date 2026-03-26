@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The Router is the decision engine that maps every `TaskType` to the optimal `ModelConfig`, manages fallback chains when a model is unavailable, and integrates a per-model circuit breaker. This is the core of the cost-optimization strategy: Kimi K2 handles cheap classification at $0.40/MTok input while Opus handles high-stakes methodology switches at $5.00/MTok input. The router reads `routing-config.yaml` at startup and exposes the `LLMRouter` interface defined in `acl-interfaces.py`.
 

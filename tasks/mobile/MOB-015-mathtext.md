@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Math expressions are LTR (LaTeX) embedded in RTL Hebrew/Arabic text. The MathText widget must handle bidirectional text rendering correctly: Hebrew text flows RTL, but `x^2 + 3x - 4 = 0` renders LTR within the RTL context.

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 The GraphQL schema exposes queries like `knowledgeGraph(studentId, subjectId)` and `recentSessions(studentId)` that accept a `studentId` parameter. Without enforcement, Student A can query Student B's mastery maps, session history, and learning difficulties. This is an IDOR (Insecure Direct Object Reference) vulnerability flagged as CRITICAL in the security review (C-4). UUIDv7 IDs are time-sortable, making enumeration feasible.

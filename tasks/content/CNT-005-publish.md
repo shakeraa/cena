@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 After QA passes, approved content is published as an immutable versioned artifact to S3, the Neo4j graph is updated atomically, a NATS event notifies all caches, and active actors hot-reload the new graph without disrupting sessions.

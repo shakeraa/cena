@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The LearningSessionActor is a classic (non-virtual) child actor spawned by the StudentActor on `StartSession` and destroyed on `EndSession` or timeout. It owns the critical hot path: inline BKT updates (~100ns, zero allocations), fatigue scoring with a 5-signal sliding window, and KST-based item selection. All state is transient -- the parent StudentActor persists domain events to Marten. This actor must be fast, correct, and memory-efficient because every question attempt flows through it.
 

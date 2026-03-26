@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The teacher dashboard is the primary web interface. Teachers see a class overview with per-student mastery/streak/XP, a knowledge gap heatmap identifying concepts where students struggle, and assignment completion tracking. Real-time updates via GraphQL subscriptions show mastery events as they happen during class. The dashboard uses the `ClassRoom`, `ConceptGap`, and `AssignmentCompletion` types from the GraphQL schema.
 

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The knowledge graph is a visual DAG (directed acyclic graph) showing concepts as nodes with mastery overlays and prerequisite edges. Students see their own graph; teachers see a student's graph; parents see their child's graph. Nodes are colored by mastery status (gray=not-started, blue=in-progress, green=mastered, orange=decaying). Edges show prerequisite relationships (locked/unlocked). The renderer uses HTML Canvas for performance with large graphs (500+ nodes).
 

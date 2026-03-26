@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Each StudentActor consumes ~500KB. With 10,000 concurrent students, that is ~5GB memory. The pool governor limits concurrent active actors, applies back-pressure when memory exceeds 80%, and rate-limits new activations to prevent thundering herd on server restart.

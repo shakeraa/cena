@@ -8,6 +8,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The Cena NATS JetStream topology (per `nats-subjects.md`) has 8 bounded-context streams and 15+ consumer groups. Without account-based authorization, the outreach service can publish to `cena.learner.events.>`, the analytics consumer can modify learner streams, and a compromised service gains full cluster access. NATS decentralized auth with accounts, users, and JWTs enforces least-privilege per service at the wire level.
 

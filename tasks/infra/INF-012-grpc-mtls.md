@@ -8,6 +8,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The gRPC boundary between the .NET Proto.Actor silo and the Python FastAPI LLM ACL carries sensitive student data (mastery levels, error patterns, anonymized IDs). In production, both sides run in separate ECS tasks within the same VPC. Without mTLS, any process in the VPC can call the LLM ACL and burn token budget. mTLS ensures both client (.NET) and server (Python) authenticate each other with certificates issued by a private CA (AWS ACM PCA).
 

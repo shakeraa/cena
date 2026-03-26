@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 The Israeli Bagrut math curriculum (3-unit, 4-unit, 5-unit) needs to be modeled as a directed acyclic graph (DAG) in Neo4j. Each concept node carries Hebrew and Arabic names, Bloom's taxonomy level, difficulty rating, and subject metadata. Prerequisites form directed edges. This graph is the foundation for adaptive learning — BKT mastery tracking, HLR spaced repetition scheduling, and MCM methodology routing all depend on it.

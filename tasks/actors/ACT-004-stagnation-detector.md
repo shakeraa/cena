@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The StagnationDetectorActor is a classic child of the StudentActor that lives across sessions. It maintains a sliding window of the last 3 sessions per concept cluster and computes a 5-signal composite stagnation score. When the score exceeds 0.7 for 3 consecutive sessions, it fires `StagnationDetected` to the parent, triggering a methodology switch. It also enforces a 3-session cooldown after each switch to give the new methodology time to take effect. The actor uses a per-student adaptive threshold (not a fixed 5%) to prevent false positives on slow learners.
 

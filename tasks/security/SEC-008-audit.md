@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Before Cena goes live with Israeli high school students (minors), a comprehensive security audit must verify that all CRITICAL and HIGH findings from the adversarial security review are resolved. This covers OWASP Top 10 against the GraphQL/SignalR surface, dependency vulnerability scanning across .NET/Python/Dart, a focused penetration test, and mTLS for Proto.Actor inter-node gRPC.

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Marten event store requires PostgreSQL 16+ with JSONB support. Production uses Multi-AZ RDS for high availability. Connection credentials stored in AWS Secrets Manager, rotated every 90 days, injected into ECS tasks via environment variables.

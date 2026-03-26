@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 ECS sends SIGTERM before killing a task. The shutdown coordinator must: (1) stop accepting new activations, (2) passivate active actors (flush state), (3) drain outbox entries to NATS, (4) leave the cluster, (5) close connections. All within 30 seconds (ECS `stopTimeout`).

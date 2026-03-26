@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Seven prompt templates drive all LLM interactions: Socratic Question, Answer Evaluation, Error Classification, Methodology Switch, Content Filter, Diagram Generation, Feynman Explanation. Each template includes system prompt, glossary injection, few-shot examples, and structured JSON output schema. Templates are locale-aware: Hebrew glossary for he, Arabic glossary for ar.

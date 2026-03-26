@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 This is the implementation of the PIIStripper abstract class defined in the ACL contracts. It runs as middleware in the FastAPI LLM service, stripping PII fields before any request is routed to Kimi (non-trusted provider).

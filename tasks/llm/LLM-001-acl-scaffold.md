@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The LLM Anti-Corruption Layer is a standalone Python 3.12+ / FastAPI service that mediates all communication between the Cena domain layer and external LLM providers (Anthropic Claude, Moonshot Kimi). This task creates the project skeleton: FastAPI app, Pydantic models re-exported from contracts, gRPC stubs for the .NET actor system, Docker image, and health checks. Everything else in the LLM layer depends on this scaffold.
 

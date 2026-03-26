@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 The curriculum graph is loaded from Neo4j into an in-memory actor for microsecond-latency prerequisite lookups and exercise selection. The actor subscribes to `cena.curriculum.events.GraphPublished` for hot-reload without disrupting active sessions.

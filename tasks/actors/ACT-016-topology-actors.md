@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The actor system topology contract defines the full actor hierarchy. Several actors are covered by existing tasks (StudentActor in ACT-002, CurriculumGraphActor in ACT-008, StudentActorManager in ACT-010, GracefulShutdownCoordinator in ACT-014, LlmGatewayActor in ACT-009). This task fills the remaining gaps: the root ActorSystemManager, AnalyticsAggregatorActor, DeadLetterWatcher, OutreachDispatcherActor, and all four channel worker actors.
 

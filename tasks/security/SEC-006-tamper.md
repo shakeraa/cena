@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Offline events are stored in client-side SQLite and replayed on reconnection. A student can modify the SQLite database to insert fabricated `ExerciseAttempted` events (all `is_correct: true`), inflating BKT mastery. The existing `queueChecksum` only verifies queue integrity, not individual event authenticity. HMAC-SHA256 signatures per event using a device-bound key (iOS Keychain / Android Keystore) make tampering detectable.

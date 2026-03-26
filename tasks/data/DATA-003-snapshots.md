@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The `StudentProfileSnapshot` is the aggregate state rebuilt from events. Marten snapshots every 100 events and replays only the delta on activation. Every Apply method must be **deterministic** — using `e.Timestamp` instead of wall clock — so that replay produces identical state regardless of when it runs. A single non-deterministic Apply method breaks the entire event sourcing guarantee.
 

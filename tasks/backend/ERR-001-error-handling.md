@@ -8,6 +8,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Cena has 5 communication boundaries: REST API, SignalR WebSocket, gRPC (.NET↔Python), NATS JetStream, and Proto.Actor inter-grain messages. Without a unified error handling strategy, a failure in the Python LLM ACL surfaces as an opaque `500` to the student, the correlation between the SignalR command and the failing gRPC call is lost, and NATS poison messages silently drop into the DLQ without diagnostic context. This task establishes the error hierarchy, error envelopes per protocol, retry policies, and end-to-end correlation ID propagation.
 

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The knowledge graph is Cena's differentiator — students SEE their mastery grow. It must render 2000 nodes at 60fps on a mid-range Android device (Snapdragon 6xx, 4GB RAM). The initial contracts used a Stack of widgets — the architect review flagged this as CRITICAL. We must use a single CustomPainter with viewport culling.
 

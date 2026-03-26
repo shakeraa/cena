@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Cena serves Israeli high school students (ages 16-18), teachers, and parents. Firebase Authentication provides the identity layer. All API access (GraphQL, SignalR WebSocket, gRPC) must validate Firebase ID tokens server-side. Roles (`STUDENT`, `TEACHER`, `PARENT`, `ADMIN`) are stored as custom claims. Token refresh must be seamless to avoid session interruption during 25-minute learning sessions.

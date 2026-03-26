@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Marten v7 is the event store and document database backing every StudentActor. Every domain event (ConceptAttempted, ConceptMastered, MethodologySwitched, etc.) is appended to a PostgreSQL-backed event stream keyed by student UUID. The snapshot strategy rebuilds `StudentProfileSnapshot` every 100 events. Inline projections provide zero-latency reads for the knowledge graph UI, while async projections feed teacher dashboards and analytics. This task sets up the Marten configuration, registers all event types, and wires the inline + async projections defined in `marten-event-store.cs`.
 

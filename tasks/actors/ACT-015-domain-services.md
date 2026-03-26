@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The domain services are stateless, DI-injected into actors. Several service methods are referenced in contracts but not covered by existing actor tasks. This task fills the gap: BKT parameter hot-reload, HLR full review scheduling, cognitive load cooldown/difficulty adjustment, and the entire prerequisite enforcement service. Each subtask implements the exact interface from `domain-services.cs` with full acceptance criteria and tests.
 

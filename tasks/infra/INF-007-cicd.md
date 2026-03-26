@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 The Cena platform is polyglot: .NET 9 (actor cluster, outreach service), Python FastAPI (LLM ACL), Node.js (Remotion worker), React Native (mobile), and React (web PWA). Each service needs its own CI/CD pipeline with the environment topology defined in `docs/operations.md` Section 4.1:

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Proto.Actor needs a running cluster before any StudentActor can activate. This task sets up the cluster with DynamoDB discovery, gRPC transport, and health checks. Everything else in the actor system depends on this.
 

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 When the web PWA loses connectivity, the client buffers learning events (exercise attempts, annotations) into a durable IndexedDB queue. On reconnection, a sync handshake reconciles offline work with the server. The protocol has 5 steps: (1) SyncRequest with queued events, (2) SyncAck with server divergence, (3) client-side pre-classification, (4) SyncCommit with resolved events, (5) SyncResult with authoritative state. The web client uses IndexedDB (via `idb` library) instead of SQLite.
 

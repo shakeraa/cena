@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Redis serves as the fast-path cache layer for the Cena platform. It handles 5 concerns: (1) active session state cache, (2) offline sync idempotency keys, (3) daily token budget counters, (4) sliding-window rate limiting, and (5) knowledge graph query cache. The key schema, TTLs, and value types are defined in `redis-contracts.ts`. All keys use hash tags `{student_id}` for Redis Cluster slot affinity, enabling MULTI/EXEC transactions within a single shard. This task implements the TypeScript key builders, value types, rate limiter, and idempotency checker as production-ready modules.
 

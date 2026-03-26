@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Student data (minors aged 16-18) is stored across PostgreSQL (Marten events + snapshots), Redis (session cache, budgets, rate limits, idempotency), S3 (anonymized Parquet exports), NATS JetStream (90-day event retention), and Neo4j (MCM confidence scores). GDPR Article 17 right-to-erasure requires complete deletion. Crypto-shredding encrypts all PII with a per-student key stored in AWS KMS; erasure = delete the key. The append-only Marten event store makes physical deletion impossible, making crypto-shredding mandatory.

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Domain events are the single source of truth in Cena's event-sourced architecture. Every event is an immutable C# record with an explicit `Timestamp` field for deterministic replay. Events are append-only and versioned (`_V1` suffix). There are four bounded contexts: Learner, Pedagogy, Engagement, and Outreach, totaling 20 event types.
 

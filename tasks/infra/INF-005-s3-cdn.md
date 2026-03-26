@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Three S3 buckets: (1) diagram assets served via CloudFront CDN, (2) anonymized Parquet exports for ML training, (3) static web app hosting. CloudFront provides global CDN with CORS for the mobile app.

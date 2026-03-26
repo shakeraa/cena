@@ -8,6 +8,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Cena operates a freemium model in Israel: free tier (limited daily LLM budget, 25K output tokens/day) and premium tier (expanded budget, priority LLM routing, teacher dashboards). Israeli market requires dual payment gateway: Stripe (international cards, Apple Pay, Google Pay) and PayPlus (Israeli Shva network, local credit cards, bit payments). Israeli tax law requires `heshbonit mas` (tax invoice) with specific fields. Subscription lifecycle (trial, active, past_due, canceled) drives feature gating via Firebase custom claims (`tier: "free" | "premium"`).
 

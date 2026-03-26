@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The StudentActor uses optimistic concurrency control via Marten's expected version mechanism. When flushing staged events, the actor passes its known `EventVersion` to `session.Events.Append()`. If another writer has appended events since the actor last read the stream, Marten throws `EventStreamUnexpectedMaxEventIdException`. This prevents lost-update anomalies when two actor activations (across cluster nodes) write to the same stream.
 

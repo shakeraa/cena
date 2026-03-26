@@ -8,6 +8,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Cena targets 5,000 concurrent students during Bagrut exam preparation nights (January, June). Each student drives a Proto.Actor virtual actor, generates 2-5 NATS events per question attempt, and triggers LLM calls via gRPC. Without load testing, we have no confidence that the actor cluster scales, NATS JetStream keeps up, PostgreSQL/Marten handles event append throughput, and the LLM ACL stays within budget. The load testing infrastructure must be permanent (CI-integrated), not a one-off script.
 

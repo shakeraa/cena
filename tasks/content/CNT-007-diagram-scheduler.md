@@ -8,6 +8,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Cena uses pre-generated SVG diagrams for every concept in the curriculum, generated overnight by Kimi K2.5 (cheapest model at $0.45/MTok input, $2.20/MTok output). The scheduler runs nightly at 2:00 AM Israel time, identifies concepts with stale or missing diagrams, generates them via the batch pipeline, and publishes a `cena.content.events.ContentPublished` NATS event that triggers client-side cache invalidation. Cost control is critical: the `max_cost_per_run_usd` cap of $50 (from `DiagramPipelineConfig`) prevents runaway spend.
 

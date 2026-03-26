@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Event stores are append-only — you never change historical events. When a domain event schema evolves (e.g., `ConceptAttempted_V1` gains a new required field), Marten's upcasting pipeline transforms old events to the new shape at read time. This task builds the upcasting infrastructure, a sample V1->V2 upcaster, and tests that prove old events remain readable after schema evolution.
 

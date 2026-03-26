@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Kimi (Moonshot AI, China-hosted) handles error classification, content filtering, and diagram generation. Student PII must NEVER reach Kimi. The ACL defines a `PII` type annotation (`pii=True` in Pydantic field metadata) and a `PIIStripper` abstract class. Student free-text answers can contain self-identifying information ("my name is...", "in my school..."). This task implements the stripping pipeline, tokenization for consistent anonymization within a session, and an audit log proving compliance.

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Before publishing content to production, automated QA checks verify structural integrity of the curriculum graph and question pool. This prevents broken prerequisite chains, uneven difficulty distribution, and linguistically invalid Hebrew content from reaching students.

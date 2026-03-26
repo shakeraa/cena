@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 The platform has three existing rate limit scopes (api, llm, sync) but NO WebSocket rate limiting. An attacker can flood SignalR with `SubmitAnswer` commands at thousands/second, overwhelming the Proto.Actor cluster, PostgreSQL, and NATS. This task adds a WebSocket scope and implements all four scopes using Redis sorted-set sliding windows.

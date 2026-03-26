@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Every Cena service runs on AWS. Before any ECS task, RDS instance, or ElastiCache cluster can be created, the foundational VPC must exist with proper subnet topology, NAT gateways, and security groups. The architecture calls for `eu-west-1` as primary region with `eu-west-2` as passive DR region. This task provisions the primary region only; DR region is a future task triggered by the quarterly DR drill requirement.

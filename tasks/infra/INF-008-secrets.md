@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Seven secrets need centralized management: RDS credentials, Redis AUTH, NATS credentials, Kimi API key, Anthropic API key, Firebase service account, PII anonymization salt. All must rotate automatically and inject into ECS without restarts.

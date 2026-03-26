@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The basic supervision strategies (root restart, student child restart/stop) are covered in ACT-013. This task implements the three advanced patterns from the contract that make the system production-grade: poison message quarantine (prevents crash loops), per-actor circuit breakers (protects against cascading LLM failures), and exponential backoff (prevents restart storms). These are the strategies that distinguish a demo from a production system.
 

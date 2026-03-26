@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The Neo4j knowledge graph stores the curriculum structure (concepts, prerequisites, categories), methodology recommendations (MCM edges), and is queried on every exercise selection decision. The hot-path query is: "given error_type X on concept in category Y, which methodology should we switch to?" This task implements the full schema from `neo4j-schema.cypher`, seeds sample data, provides the .NET driver wrapper for the actor system, and validates DAG integrity (no cycles in prerequisite chains).
 

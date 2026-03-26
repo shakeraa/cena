@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The Cena web client is a React PWA (Progressive Web App) targeting teachers and parents (students use the React Native mobile app). It uses Vite for builds, TypeScript for type safety, and a service worker for offline capability. This task creates the project skeleton with all tooling configured: Vite + React + TS, PWA manifest, service worker registration, React Testing Library, ESLint, and the folder structure.
 

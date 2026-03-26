@@ -8,6 +8,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Firebase Auth is the single identity provider for all Cena clients (React Native iOS/Android, React PWA). Every downstream service (.NET SignalR hub, Python FastAPI LLM ACL, NATS publishers) must validate Firebase JWT tokens independently. Custom claims carry role (`student`, `teacher`, `parent`, `admin`) and optional `schoolId` for tenant isolation. Without this, the platform has zero access control.
 

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Configures the supervision tree: root strategy with exponential backoff for StudentActor grains, OneForOne child strategy for session/stagnation/outreach actors (3 failures in 60s -> stop), poison message quarantine, and dead letter handling.

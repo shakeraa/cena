@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 The session screen is the core learning loop: question -> answer -> feedback -> next. Supports MCQ, free text, numeric, proof, and diagram question types. RTL-aware for Hebrew. Includes cognitive load break screen when fatigue is detected.

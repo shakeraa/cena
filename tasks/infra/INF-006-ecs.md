@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Two ECS services: (1) .NET 9 actor cluster (Proto.Actor with DynamoDB discovery, Marten, NATS), (2) Python FastAPI LLM ACL (Kimi + Claude routing). Both run on Fargate with auto-scaling. Blue-green deployment prevents disruption during updates.

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The test contract defines three advanced test categories beyond standard unit/integration tests: property-based BKT verification, 10K-actor load tests, and chaos tests for resilience. These are the tests that catch the bugs unit tests miss -- invariant violations in mathematical models, performance regressions under load, and data loss during infrastructure failures. Each category has specific infrastructure requirements and is gated behind test category filters.
 

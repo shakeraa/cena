@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Cena is a Flutter 3.24+ app targeting iOS, Android, and web. The project must be set up with the exact dependency versions from the contract `pubspec.yaml`, configured for three locales (Hebrew primary, Arabic, English fallback), with both Hebrew and Arabic as RTL. The font stack includes Heebo (Hebrew), Noto Sans Arabic (Arabic), Inter (Latin), and JetBrains Mono (code/math). The project uses Riverpod for state, drift for offline SQLite, and Hive for key-value storage. All design tokens (colors, spacing, typography, animation durations) live in `app_config.dart`.
 

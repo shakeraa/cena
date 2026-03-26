@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 Every user-supplied text entering the LLM ACL must pass through the input sanitizer before reaching any prompt template. This covers three threat surfaces: (1) prompt injection attempts in English, Hebrew, and Arabic, (2) PII leakage from student free-text input, and (3) oversized payloads that could exploit context windows or inflate costs. The sanitizer runs synchronously as FastAPI middleware on every request, before the async LLM call. The content filter (Kimi K2 Turbo) is the LLM-powered second pass; this task handles the deterministic first pass.
 

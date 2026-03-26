@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 NATS JetStream is the event backbone connecting all nine bounded contexts. The architecture uses Synadia Cloud (managed NATS) at $49-99/month. This task provisions all 11 streams, 15 consumers, the dead-letter queue infrastructure, and deduplication configuration exactly as specified in `contracts/backend/nats-subjects.md`.

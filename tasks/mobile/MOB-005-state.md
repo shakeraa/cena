@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Five Riverpod StateNotifiers manage the app's reactive state: SessionNotifier (active learning session), KnowledgeGraphNotifier (visualization with zoom/pan), UserNotifier (auth, XP, streaks, study energy), OfflineNotifier (sync queue), OutreachNotifier (notifications, streak warnings). Study energy = 50 LLM interactions/day, tracked locally and enforced server-side.

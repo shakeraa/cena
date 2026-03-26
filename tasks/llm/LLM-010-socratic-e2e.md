@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 The Socratic dialogue is the primary tutoring interaction. Claude Sonnet 4.6 generates guided questions based on student mastery, dialogue history, and hint level. Prompt caching targets 60%+ hit rate for system prompt + student context.

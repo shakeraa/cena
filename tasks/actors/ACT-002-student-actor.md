@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 The StudentActor is the event-sourced aggregate root. Every student gets one. It holds mastery state, spawns child actors (session, stagnation, outreach), and persists all domain events to Marten. This is the most critical code path in the system — it must be correct, fast, and resilient.
 

@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 Production domain `cena.edu` (or similar) with SSL certificates via AWS ACM. Subdomains: `api.cena.edu` (backend), `app.cena.edu` (web app), `cdn.cena.edu` (CloudFront diagrams).

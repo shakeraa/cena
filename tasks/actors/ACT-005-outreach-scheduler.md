@@ -7,6 +7,8 @@
 
 ---
 
+> **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
+
 ## Context
 
 The OutreachSchedulerActor is a classic child actor of StudentActor. It manages Half-Life Regression (HLR) timers for spaced repetition scheduling, prioritized reminder delivery, daily throttling (max 3 messages/day), quiet hours (22:00-07:00), and channel routing (WhatsApp > Push > Telegram > Voice). Publishes to NATS JetStream for the Outreach bounded context to dispatch.
