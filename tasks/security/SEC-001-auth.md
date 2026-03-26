@@ -1,362 +1,218 @@
-# SEC-001: Firebase Authentication — JWT Validation, Roles, and Token Flow
+# SEC-001: Firebase Auth — Email/Password + Google Sign-In, JWT Roles, Token Validation, Refresh
 
-**Priority:** P0 — blocks ALL authenticated API access
-**Blocked by:** INF-001 (VPC), INF-008 (Firebase credentials in Secrets Manager)
-**Estimated effort:** 2.5 days
-**Contract:** `docs/api-contracts.md` (REST API Section 4), `contracts/REVIEW_security.md` (H-2, H-4)
+**Priority:** P0 — blocks all authenticated endpoints
+**Blocked by:** INF-001 (VPC), INF-002 (RDS)
+**Estimated effort:** 3 days
+**Contract:** `contracts/frontend/graphql-schema.graphql` (role-based queries), `contracts/backend/grpc-protos.proto` (JWT claims)
 
 ---
 
 ## Context
 
-Firebase Authentication is the identity provider for all Cena users: students (16-18 year old minors), parents, and teachers. The mobile app (React Native) and web app (React PWA) authenticate via Firebase SDK, which issues a JWT ID token. All backend services (.NET actor cluster, Python FastAPI LLM ACL, GraphQL API) must validate this JWT on every request.
-
-The architecture defines four roles: `student`, `parent`, `teacher`, `admin`. Role claims are stored as Firebase custom claims set during onboarding. The security review (`contracts/REVIEW_security.md`) flagged that GraphQL resolvers accept raw `studentId` parameters without enforcement (C-4), and that SignalR WebSocket connections have no rate limiting (H-4). This task establishes the authentication foundation that SEC-002 builds upon.
-
----
+Cena serves Israeli high school students (ages 16-18), teachers, and parents. Firebase Authentication provides the identity layer. All API access (GraphQL, SignalR WebSocket, gRPC) must validate Firebase ID tokens server-side. Roles (`STUDENT`, `TEACHER`, `PARENT`, `ADMIN`) are stored as custom claims. Token refresh must be seamless to avoid session interruption during 25-minute learning sessions.
 
 ## Subtasks
 
-### SEC-001.1: Firebase Project Setup + Custom Claims Schema
+### SEC-001.1: Firebase Project Configuration + Auth Providers
 
 **Files to create/modify:**
-- `config/firebase/firebase.json` — Firebase project configuration
-- `src/Cena.Infrastructure/Auth/FirebaseClaimsSchema.cs` — custom claims definition
-- `src/Cena.Infrastructure/Auth/ClaimsConstants.cs` — claim key constants
-- `functions/set-custom-claims/index.ts` — Firebase Cloud Function for setting claims on user creation
+- `infra/terraform/modules/firebase/main.tf` — Firebase project with Auth enabled
+- `config/firebase/auth-config.json` — provider configuration
+- `src/Cena.Web/appsettings.json` — Firebase project ID, API key (non-secret)
 
 **Acceptance:**
-- [ ] Firebase project `cena-staging` and `cena-prod` created (separate projects per environment)
-- [ ] Authentication providers enabled: Email/Password, Google, Apple (Israel market requires Apple Sign-In for iOS)
-- [ ] Custom claims schema:
-  ```json
-  {
-    "role": "student | parent | teacher | admin",
-    "school_id": "uuid | null",
-    "student_ids": ["uuid"],  // For parent/teacher: which students they can access
-    "locale": "he-IL | ar | en-US"
-  }
-  ```
-- [ ] Custom claims set via Cloud Function trigger on `auth.user().onCreate` (not client-side)
-- [ ] Default role on signup: `student` (elevated to `parent`/`teacher` via admin action or invite flow)
-- [ ] Custom claims total size < 1000 bytes (Firebase limit)
-- [ ] Claim `student_ids` for parent/teacher limited to 50 entries (prevents claim bloat)
-- [ ] Firebase Admin SDK credentials stored in AWS Secrets Manager (`cena/auth/firebase`)
+- [ ] Email/password provider enabled with email verification required
+- [ ] Google Sign-In provider enabled with OAuth 2.0 client
+- [ ] Password policy: minimum 8 characters, at least 1 uppercase, 1 number
+- [ ] Account linking enabled (email+Google same user = merged)
+- [ ] Multi-tenancy disabled (single Firebase project for all schools)
+- [ ] Rate limiting: 100 sign-ups per hour per IP (Firebase default + custom Cloud Function enforcement)
+- [ ] Email templates localized: Hebrew (primary), Arabic, English
 
 **Test:**
-```typescript
-// Firebase Cloud Function test
-import { test } from 'firebase-functions-test';
-const wrapped = test().wrap(setCustomClaims);
-
-it('sets student role on new user creation', async () => {
-  const user = test().auth.makeUserRecord('uid-123', { email: 'student@test.com' });
-  await wrapped(user);
-
-  const claims = await admin.auth().getUser('uid-123').then(u => u.customClaims);
-  expect(claims.role).toBe('student');
-  expect(claims.school_id).toBeNull();
-  expect(claims.student_ids).toEqual([]);
-});
-
-it('rejects custom claims exceeding 1000 bytes', async () => {
-  const bigClaims = { role: 'teacher', student_ids: Array(100).fill('a'.repeat(36)) };
-  const size = JSON.stringify(bigClaims).length;
-  expect(size).toBeGreaterThan(1000);
-  // Function should truncate or reject
-});
-```
-
 ```bash
-# Verify Firebase project exists
-firebase projects:list | grep -q "cena-staging" && echo "PASS" || echo "FAIL"
+# Verify Firebase project config
+firebase auth:export --format=json /tmp/auth-test.json --project cena-prod
+# Assert: providers include "password" and "google.com"
 
-# Verify authentication providers
-firebase auth:export --project cena-staging /dev/null 2>&1 | grep -q "error" && echo "FAIL" || echo "PASS"
+# Verify email/password signup
+curl -X POST "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${FIREBASE_API_KEY}" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@cena.edu","password":"Test1234","returnSecureToken":true}'
+# Assert: 200 OK, response contains idToken
 ```
 
 **Edge cases:**
-- Firebase custom claims propagation delay (up to 1 hour) — client must force token refresh after claim change (`getIdToken(true)`)
-- User signs up with email, then links Google account — claims must survive account linking
-- Student turns 18 during usage — no COPPA/age-gate change needed (Israeli PPL treats 14+ as capable of consent)
+- User signs up with email, later tries Google with same email -> account linking flow, not duplicate
+- Password reset during active session -> existing tokens remain valid until expiry (1 hour)
+- Firebase Auth service degradation -> app shows offline mode, queues events locally
 
 ---
 
-### SEC-001.2: JWT Validation Middleware (.NET)
+### SEC-001.2: Custom Claims — Role Assignment
 
 **Files to create/modify:**
-- `src/Cena.Infrastructure/Auth/FirebaseJwtValidator.cs` — JWT validation logic
-- `src/Cena.Infrastructure/Auth/FirebaseAuthMiddleware.cs` — ASP.NET Core middleware
-- `src/Cena.Infrastructure/Auth/CenaIdentity.cs` — parsed identity object
+- `src/Cena.Functions/SetCustomClaims.cs` — Firebase Admin SDK Cloud Function
+- `src/Cena.Web/Services/ClaimsService.cs` — server-side claims reader
+
+**Acceptance:**
+- [ ] Custom claims set on user creation: `{ role: "student", schoolId: "<uuid>", gradeLevel: <int> }`
+- [ ] Teacher claim includes `classRoomIds: string[]` (max 10 classrooms)
+- [ ] Parent claim includes `childIds: string[]` (max 5 children)
+- [ ] Admin claim: `{ role: "admin", permissions: ["content_review", "user_management"] }`
+- [ ] Claims propagate within 1 hour (Firebase limitation) — force refresh on role change
+- [ ] Claims size < 1000 bytes (Firebase limit)
+- [ ] Role assignment requires ADMIN caller or automated enrollment pipeline
+- [ ] Claims cannot be set client-side (server-only via Admin SDK)
+
+**Test:**
+```csharp
+[Fact]
+public async Task SetCustomClaims_SetsStudentRole()
+{
+    var uid = await CreateTestFirebaseUser("student@test.com");
+    await _claimsService.SetStudentClaims(uid, schoolId: "school-1", gradeLevel: 11);
+
+    var user = await _firebaseAdmin.GetUserAsync(uid);
+    var claims = user.CustomClaims;
+
+    Assert.Equal("student", claims["role"]);
+    Assert.Equal("school-1", claims["schoolId"]);
+    Assert.Equal(11, (int)(long)claims["gradeLevel"]);
+}
+
+[Fact]
+public async Task SetCustomClaims_RejectsOversizedPayload()
+{
+    var uid = await CreateTestFirebaseUser("teacher@test.com");
+    var tooManyClassrooms = Enumerable.Range(0, 50).Select(i => Guid.NewGuid().ToString()).ToList();
+
+    await Assert.ThrowsAsync<ArgumentException>(() =>
+        _claimsService.SetTeacherClaims(uid, tooManyClassrooms));
+}
+```
+
+**Edge cases:**
+- Claims size approaches 1000 bytes with many classrooms -> reject and log
+- Race condition: two admin calls setting claims simultaneously -> last write wins (Firebase behavior), log warning
+- User exists in Firebase but not in Marten -> create Marten aggregate on first authenticated request
+
+---
+
+### SEC-001.3: Server-Side JWT Validation Middleware
+
+**Files to create/modify:**
+- `src/Cena.Web/Middleware/FirebaseAuthMiddleware.cs`
+- `src/Cena.Web/Extensions/AuthenticationExtensions.cs`
 - `src/Cena.Actors.Host/Program.cs` — register middleware
 
 **Acceptance:**
-- [ ] Firebase JWT validated on every HTTP request and SignalR connection
-- [ ] Validation checks:
-  1. Signature verification against Google's public keys (JWKS at `https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com`)
-  2. `iss` claim matches `https://securetoken.google.com/{firebase_project_id}`
-  3. `aud` claim matches the Firebase project ID
-  4. `exp` not expired (with 5-second clock skew tolerance)
-  5. `sub` (user ID) is non-empty
-  6. Token is not revoked (optional check against Firebase Auth API for sensitive operations)
-- [ ] Parsed identity available throughout request:
-  ```csharp
-  public record CenaIdentity(
-      string UserId,          // Firebase UID
-      string Email,
-      CenaRole Role,          // From custom claims
-      string? SchoolId,       // From custom claims
-      string[] StudentIds,    // From custom claims (parent/teacher)
-      string Locale           // From custom claims
-  );
-  ```
-- [ ] JWKS keys cached for 1 hour (configurable) with background refresh
-- [ ] Unauthenticated requests return `401 Unauthorized` (not `403`)
-- [ ] Expired token returns `401` with `WWW-Authenticate: Bearer error="invalid_token", error_description="token expired"`
-- [ ] Health check endpoints (`/health/ready`, `/health/live`) exempt from auth
+- [ ] Every HTTP/GraphQL/SignalR request validates the `Authorization: Bearer <idToken>` header
+- [ ] Validation uses Firebase Admin SDK `VerifyIdTokenAsync()` with `checkRevoked: true`
+- [ ] Extracted claims mapped to `ClaimsPrincipal`: `sub` (Firebase UID), `role`, `schoolId`, `gradeLevel`
+- [ ] Token signature verified against Google's public keys (auto-rotated by SDK)
+- [ ] Token expiry checked: reject expired tokens with 401
+- [ ] Revoked tokens rejected (check against Firebase revocation list)
+- [ ] Invalid/malformed tokens -> 401 with JSON error body `{ "error": "invalid_token", "message": "..." }`
+- [ ] `iss` must be `https://securetoken.google.com/<project-id>`
+- [ ] `aud` must match the Firebase project ID
+- [ ] Clock skew tolerance: 5 minutes (server-side)
+- [ ] Anonymous requests allowed only on `/health/*` and `/auth/signup`
+- [ ] SignalR WebSocket: token passed as query param `?access_token=<token>` on initial handshake
 
 **Test:**
 ```csharp
 [Fact]
-public async Task ValidJwt_ParsesIdentityCorrectly()
+public async Task Middleware_RejectsExpiredToken()
 {
-    var token = CreateTestJwt(claims: new
-    {
-        sub = "firebase-uid-123",
-        email = "student@test.com",
-        role = "student",
-        school_id = (string?)null,
-        student_ids = Array.Empty<string>(),
-        locale = "he-IL"
-    });
+    var expiredToken = GenerateTestJwt(expiresAt: DateTime.UtcNow.AddHours(-1));
+    _httpClient.DefaultRequestHeaders.Authorization =
+        new AuthenticationHeaderValue("Bearer", expiredToken);
 
-    var identity = await _validator.ValidateAndParseAsync(token);
-
-    Assert.Equal("firebase-uid-123", identity.UserId);
-    Assert.Equal(CenaRole.Student, identity.Role);
-    Assert.Equal("he-IL", identity.Locale);
-}
-
-[Fact]
-public async Task ExpiredJwt_ReturnsUnauthorized()
-{
-    var token = CreateTestJwt(expiresAt: DateTime.UtcNow.AddMinutes(-5));
-    var response = await _httpClient.SendAsync(
-        new HttpRequestMessage(HttpMethod.Get, "/api/v1/profile")
-        {
-            Headers = { Authorization = new AuthenticationHeaderValue("Bearer", token) }
-        });
+    var response = await _httpClient.GetAsync("/graphql");
     Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+
+    var body = await response.Content.ReadFromJsonAsync<ErrorResponse>();
+    Assert.Equal("invalid_token", body.Error);
 }
 
 [Fact]
-public async Task MissingToken_ReturnsUnauthorized()
+public async Task Middleware_ExtractsCustomClaims()
 {
-    var response = await _httpClient.GetAsync("/api/v1/profile");
-    Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    var token = await GetValidFirebaseToken("student@test.com");
+    _httpClient.DefaultRequestHeaders.Authorization =
+        new AuthenticationHeaderValue("Bearer", token);
+
+    var response = await _httpClient.GetAsync("/api/me");
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+    var profile = await response.Content.ReadFromJsonAsync<StudentProfile>();
+    Assert.Equal("student", profile.Role);
 }
 
 [Fact]
-public async Task HealthEndpoint_BypassesAuth()
+public async Task Middleware_AllowsHealthCheckWithoutAuth()
 {
     var response = await _httpClient.GetAsync("/health/ready");
-    Assert.NotEqual(HttpStatusCode.Unauthorized, response.StatusCode);
-}
-
-[Fact]
-public async Task WrongAudience_ReturnsUnauthorized()
-{
-    var token = CreateTestJwt(audience: "wrong-project-id");
-    var identity = await Assert.ThrowsAsync<AuthenticationException>(
-        () => _validator.ValidateAndParseAsync(token));
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 }
 ```
 
 **Edge cases:**
-- Google JWKS endpoint down — use cached keys; log WARNING; if cache expires and JWKS unreachable, fail open for health checks only, fail closed for all other requests
-- Clock skew between Firebase and server — 5-second tolerance handles most cases; NTP must be running on ECS tasks
-- Custom claims missing from token — user signed up before Cloud Function deployed; treat as `student` role with empty `student_ids`
-- Token revocation check adds latency — only check on sensitive operations (role change, data export, account deletion), not on every request
+- Google public key rotation during request -> SDK handles automatically via cache
+- Firebase Auth outage -> cache valid public keys locally, degrade gracefully (allow valid cached tokens for 15 min)
+- Token revoked mid-session -> next heartbeat fails auth, SignalR disconnects, client triggers re-auth
+- Multiple simultaneous requests with same token -> no contention (stateless validation)
 
 ---
 
-### SEC-001.3: SignalR Authentication + WebSocket Rate Limiting
+### SEC-001.4: Token Refresh — Seamless Client-Side Renewal
 
 **Files to create/modify:**
-- `src/Cena.Actors.Host/Hubs/CenaHub.cs` — SignalR hub with auth
-- `src/Cena.Infrastructure/Auth/SignalRAuthHandler.cs` — WebSocket auth handler
-- `src/Cena.Infrastructure/RateLimiting/WebSocketRateLimiter.cs` — per-student rate limiter
+- `src/mobile/lib/core/services/auth_service.dart` — Flutter auth service
+- `src/mobile/lib/core/interceptors/auth_interceptor.dart` — HTTP interceptor
+- `src/mobile/lib/core/services/websocket_service.dart` — SignalR reconnect with new token
 
 **Acceptance:**
-- [ ] SignalR hub requires authentication (`[Authorize]` attribute)
-- [ ] JWT passed via query string on WebSocket upgrade: `?access_token={jwt}` (standard SignalR pattern since WebSocket headers are not supported in browsers)
-- [ ] `CenaIdentity` injected into hub context: `Context.User.FindFirst("sub")` available in all hub methods
-- [ ] Student can only interact with their own actor — hub method `SubmitAnswer` routes to `StudentActor(Context.User.UserId)`, ignoring any client-provided `studentId`
-- [ ] WebSocket rate limiting (fixes `contracts/REVIEW_security.md` H-4):
-  - 30 commands/minute per student (Redis-backed sliding window)
-  - Rate limit exceeded returns SignalR error: `{ "error": "rate_limit_exceeded", "retry_after_ms": 2000 }`
-  - Rate limit counter resets per sliding window, not fixed window
-- [ ] Connection limit: max 3 concurrent WebSocket connections per student (prevents multi-tab abuse)
-- [ ] Idle timeout: disconnect after 30 minutes of no messages (free server resources)
-- [ ] Reconnection: client auto-reconnects with fresh JWT (SignalR automatic reconnect)
+- [ ] Firebase ID token auto-refreshes 5 minutes before expiry (Firebase SDK default)
+- [ ] HTTP interceptor attaches fresh token to every request
+- [ ] If token refresh fails (offline) -> queue requests, retry on reconnection
+- [ ] SignalR WebSocket: on token refresh, close and reconnect with new token within 2 seconds
+- [ ] No visible interruption during 25-minute learning session (token expires every 60 min)
+- [ ] Refresh token stored in secure storage (iOS Keychain / Android Keystore)
+- [ ] Refresh token revocation on logout clears all local state
+- [ ] Force refresh triggered on 401 response (exactly once, then fail to login screen)
 
 **Test:**
-```csharp
-[Fact]
-public async Task SignalR_RejectsUnauthenticatedConnection()
-{
-    var connection = new HubConnectionBuilder()
-        .WithUrl("http://localhost:5000/hub/cena")  // No access_token
-        .Build();
+```dart
+testWidgets('Token refresh does not interrupt active session', (tester) async {
+  final authService = MockAuthService();
+  when(authService.currentToken).thenAnswer((_) async => 'new-token');
 
-    await Assert.ThrowsAsync<HttpRequestException>(
-        () => connection.StartAsync());
-}
+  await tester.pumpWidget(SessionScreen(authService: authService));
+  await tester.pump(Duration(minutes: 55));
 
-[Fact]
-public async Task SignalR_AcceptsAuthenticatedConnection()
-{
-    var token = CreateTestJwt(sub: "student-123", role: "student");
-    var connection = new HubConnectionBuilder()
-        .WithUrl("http://localhost:5000/hub/cena",
-            options => options.AccessTokenProvider = () => Task.FromResult(token))
-        .Build();
+  expect(find.byType(QuestionCard), findsOneWidget);
+  verify(authService.refreshToken()).called(greaterThanOrEqualTo(1));
+});
 
-    await connection.StartAsync();
-    Assert.Equal(HubConnectionState.Connected, connection.State);
-    await connection.StopAsync();
-}
+testWidgets('401 triggers re-auth flow', (tester) async {
+  final httpClient = MockHttpClient();
+  when(httpClient.get(any)).thenAnswer((_) async =>
+    Response('{"error":"invalid_token"}', 401));
 
-[Fact]
-public async Task SignalR_RateLimitsExcessiveCommands()
-{
-    var token = CreateTestJwt(sub: "student-123");
-    var connection = await CreateAuthenticatedConnection(token);
+  await tester.pumpWidget(App(httpClient: httpClient));
+  await tester.pump();
 
-    // Send 35 commands rapidly (limit is 30/min)
-    var errors = new List<string>();
-    for (int i = 0; i < 35; i++)
-    {
-        try
-        {
-            await connection.InvokeAsync("SubmitAnswer", new { sessionId = "s1", questionId = "q1", answer = "42" });
-        }
-        catch (HubException ex) when (ex.Message.Contains("rate_limit_exceeded"))
-        {
-            errors.Add(ex.Message);
-        }
-    }
-
-    Assert.True(errors.Count >= 5, $"Expected >=5 rate limit errors, got {errors.Count}");
-}
-
-[Fact]
-public async Task SignalR_StudentCannotAccessOtherStudentActor()
-{
-    var token = CreateTestJwt(sub: "student-A");
-    var connection = await CreateAuthenticatedConnection(token);
-
-    // Even if malicious client sends another student's ID, hub routes to authenticated user's actor
-    var result = await connection.InvokeAsync<object>("GetProfile", new { studentId = "student-B" });
-    // The hub IGNORES the studentId parameter and uses Context.User.UserId
-    // Result should be student-A's profile, not student-B's
-}
+  expect(find.byType(LoginScreen), findsOneWidget);
+});
 ```
 
 **Edge cases:**
-- JWT expires during WebSocket session — SignalR does not re-validate JWT on each message; implement periodic token refresh check (every 5 minutes) or on sensitive operations
-- Rate limiter Redis unavailable — fail open (allow requests) but log CRITICAL alert; rate limiting is defense-in-depth, not sole protection
-- Student opens 4+ tabs — 4th connection rejected; existing connections remain active; client shows "session active in another tab" message
-- SignalR fallback to Server-Sent Events — auth still works (query string token); rate limiting still applies
-
----
-
-### SEC-001.4: Python FastAPI JWT Validation (LLM ACL)
-
-**Files to create/modify:**
-- `services/llm-acl/app/auth/firebase_validator.py` — JWT validation for Python
-- `services/llm-acl/app/auth/dependencies.py` — FastAPI dependency injection
-- `services/llm-acl/app/middleware/auth_middleware.py` — request middleware
-- `services/llm-acl/tests/test_auth.py`
-
-**Acceptance:**
-- [ ] gRPC requests from the actor cluster to LLM ACL are authenticated via service-to-service JWT (not Firebase user token)
-- [ ] Service-to-service auth: actor cluster signs requests with a shared secret (HMAC-SHA256) or uses mTLS
-- [ ] Alternative: if gRPC is internal-only (within VPC, no public endpoint), rely on VPC network isolation + security group rules as the auth boundary
-- [ ] If external access is ever needed, Firebase Admin SDK verifies user tokens:
-  ```python
-  from firebase_admin import auth
-
-  async def verify_firebase_token(token: str) -> dict:
-      decoded = auth.verify_id_token(token)
-      return {
-          "uid": decoded["uid"],
-          "role": decoded.get("role", "student"),
-          "school_id": decoded.get("school_id"),
-      }
-  ```
-- [ ] LLM ACL enforces per-student token budget (25,000 output tokens/day from `docs/architecture-design.md` Section 3.2.4)
-- [ ] Budget check uses `student_id` from authenticated context, not from request body (prevents budget bypass)
-- [ ] Health endpoint `/health` exempt from auth
-- [ ] Firebase Admin SDK initialized with credentials from Secrets Manager (not environment variable)
-
-**Test:**
-```python
-import pytest
-from unittest.mock import patch, MagicMock
-
-def test_valid_firebase_token_extracts_identity():
-    with patch('firebase_admin.auth.verify_id_token') as mock_verify:
-        mock_verify.return_value = {
-            'uid': 'student-123',
-            'role': 'student',
-            'school_id': None,
-            'email': 'test@example.com'
-        }
-        identity = verify_firebase_token('valid-token')
-        assert identity['uid'] == 'student-123'
-        assert identity['role'] == 'student'
-
-def test_expired_token_raises_401():
-    with patch('firebase_admin.auth.verify_id_token') as mock_verify:
-        mock_verify.side_effect = auth.ExpiredIdTokenError('Token expired')
-        with pytest.raises(HTTPException) as exc:
-            verify_firebase_token('expired-token')
-        assert exc.value.status_code == 401
-
-def test_budget_check_uses_authenticated_student_id():
-    """Budget must use the authenticated student_id, not the one in the request body."""
-    with patch('app.auth.get_current_user') as mock_user:
-        mock_user.return_value = {'uid': 'real-student-123'}
-        request = AnswerEvaluationRequest(
-            student_id='spoofed-student-456',  # Attacker's attempt
-            concept_id='math_derivatives',
-            student_answer='f(x) = 2x'
-        )
-        # The budget check should use 'real-student-123', not 'spoofed-student-456'
-        budget_student = get_budget_student_id(request, mock_user.return_value)
-        assert budget_student == 'real-student-123'
-
-def test_health_endpoint_no_auth_required(client):
-    response = client.get('/health')
-    assert response.status_code == 200
-```
-
-```bash
-# Verify gRPC is not exposed on public endpoint
-# LLM ACL should only be reachable from within the VPC (sg-ecs-app)
-nmap -p 50051 <llm-acl-private-ip> 2>/dev/null
-# Should be reachable from within VPC
-
-nmap -p 50051 <llm-acl-public-dns> 2>/dev/null
-# Should be unreachable from outside VPC
-```
-
-**Edge cases:**
-- Firebase Admin SDK initialization fails (bad credentials) — fail fast on startup, don't serve requests without auth
-- gRPC internal auth bypass with network-level security — if an attacker compromises any ECS task in `sg-ecs-app`, they can call LLM ACL without auth; defense-in-depth recommends mTLS even internally
-- Token budget race condition — two concurrent requests from same student both check budget before either deducts; use Redis atomic `DECRBY` for budget tracking
-- Python `firebase-admin` SDK caches verification keys — ensure cache refreshes on Google key rotation
+- Device clock 30+ minutes ahead -> token appears expired client-side, force refresh
+- Airplane mode for >24 hours -> refresh token may expire (Firebase: 30 days), show re-login
+- Multiple tabs/windows -> share token via secure storage, avoid concurrent refresh races
+- Firebase refresh endpoint rate limited -> exponential backoff (1s, 2s, 4s) up to 30s
 
 ---
 
@@ -364,67 +220,44 @@ nmap -p 50051 <llm-acl-public-dns> 2>/dev/null
 
 ```csharp
 [Fact]
-public async Task FullAuthFlow_StudentLoginToActorInteraction()
+public async Task FullAuthFlow_SignupToAuthenticatedQuery()
 {
-    // 1. Simulate Firebase login (get test JWT)
-    var token = await FirebaseTestHelper.CreateCustomToken("test-student-001", new
-    {
-        role = "student",
-        locale = "he-IL"
-    });
-    var idToken = await FirebaseTestHelper.ExchangeForIdToken(token);
+    // 1. Sign up with email/password
+    var uid = await SignUpWithEmail("student@bagrut.edu", "SecurePass1!");
 
-    // 2. REST API accepts the token
+    // 2. Set custom claims
+    await _claimsService.SetStudentClaims(uid, schoolId: "school-1", gradeLevel: 11);
+
+    // 3. Get ID token
+    var token = await SignInAndGetToken("student@bagrut.edu", "SecurePass1!");
+
+    // 4. Query GraphQL with token
     _httpClient.DefaultRequestHeaders.Authorization =
-        new AuthenticationHeaderValue("Bearer", idToken);
-    var profileResponse = await _httpClient.GetAsync("/api/v1/profile");
-    Assert.Equal(HttpStatusCode.OK, profileResponse.StatusCode);
+        new AuthenticationHeaderValue("Bearer", token);
+    var response = await _httpClient.PostAsJsonAsync("/graphql", new {
+        query = "{ myProfile { displayName gradeLevel } }"
+    });
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-    // 3. SignalR accepts the token
-    var hubConnection = new HubConnectionBuilder()
-        .WithUrl("http://localhost:5000/hub/cena",
-            options => options.AccessTokenProvider = () => Task.FromResult(idToken))
-        .Build();
-    await hubConnection.StartAsync();
-    Assert.Equal(HubConnectionState.Connected, hubConnection.State);
-
-    // 4. Hub routes to correct student actor
-    var profile = await hubConnection.InvokeAsync<StudentProfile>("GetProfile");
-    Assert.Equal("test-student-001", profile.StudentId);
-
-    // 5. Rate limiting works
-    var submitted = 0;
-    for (int i = 0; i < 35; i++)
-    {
-        try
-        {
-            await hubConnection.InvokeAsync("SubmitAnswer", new { sessionId = "s1", questionId = "q1", answer = "42", responseTimeMs = 5000 });
-            submitted++;
-        }
-        catch (HubException) { break; }
-    }
-    Assert.True(submitted <= 30, $"Rate limit should kick in at 30, but {submitted} succeeded");
-
-    await hubConnection.StopAsync();
+    // 5. Verify role-based access
+    var forbiddenResponse = await _httpClient.PostAsJsonAsync("/graphql", new {
+        query = "{ classOverview(classRoomId: \"some-id\") { name } }"
+    });
+    var body = await forbiddenResponse.Content.ReadAsStringAsync();
+    Assert.Contains("FORBIDDEN", body);
 }
 ```
 
 ## Rollback Criteria
-
-If this task fails or introduces instability:
-- Disable auth middleware temporarily (staging only) by setting `CENA_AUTH_BYPASS=true` environment variable — allows development to continue
-- Never bypass auth in production
-- If Firebase project is misconfigured: create a new project; Firebase UIDs are project-scoped, so a fresh project means fresh users
-- If rate limiting causes false positives: increase the limit to 100/min temporarily, investigate and tune
+If Firebase Auth introduces instability:
+- Fall back to JWT-only validation without revocation checks (remove `checkRevoked: true`)
+- Disable Google Sign-In, keep email/password only
+- Acceptable temporary state: authentication works but role enforcement is coarse-grained
 
 ## Definition of Done
-
 - [ ] All 4 subtasks pass their individual tests
-- [ ] Integration test passes end-to-end (login -> SignalR -> actor interaction)
-- [ ] Firebase custom claims schema documented and enforced
-- [ ] JWT validated on every HTTP and WebSocket request (except health checks)
-- [ ] WebSocket rate limiting at 30 commands/minute per student
-- [ ] Student cannot access another student's actor (hub enforces identity)
-- [ ] LLM ACL budget check uses authenticated identity, not request body
-- [ ] No tokens, secrets, or credentials in source code
-- [ ] PR reviewed by architect and security reviewer
+- [ ] Integration test passes
+- [ ] `dotnet test --filter "Category=FirebaseAuth"` -> 0 failures
+- [ ] Staging: full signup -> login -> authenticated GraphQL query -> token refresh cycle works
+- [ ] Penetration test: expired/malformed/revoked tokens all return 401
+- [ ] PR reviewed by architect
