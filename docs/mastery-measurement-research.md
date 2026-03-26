@@ -295,6 +295,211 @@ Joint estimation via variational inference or MCMC:
 
 ---
 
+#### 1.1.6 Performance Factors Analysis (PFA)
+
+**What it measures:** The probability of a correct response as a function of accumulated successes and failures on each knowledge component, without requiring a hidden state model.
+
+**Mathematical formulation:**
+
+```
+P(correct | KC_set) = sigmoid(sum_j(beta_j + gamma_j * s_j + rho_j * f_j))
+```
+where for each knowledge component `j` tagged to the current item:
+- `s_j` = count of prior successes on KC j
+- `f_j` = count of prior failures on KC j
+- `beta_j` = difficulty intercept for KC j
+- `gamma_j` = learning rate from successes (positive — each success increases P)
+- `rho_j` = learning rate from failures (negative or small positive — failures indicate difficulty)
+
+**Strengths:**
+- Directly observable features (success/failure counts) — no hidden states, no EM fitting
+- Naturally handles multiple KCs per item (sum over tagged KCs)
+- Parameters trained via logistic regression — fast, scalable, well-understood
+- Outperforms BKT on several benchmark datasets (Pavlik et al. 2009, doi:10.3233/978-1-60750-028-5-531)
+- Each KC's gamma/rho reveals how quickly students learn from practice vs. mistakes
+
+**Weaknesses:**
+- No temporal dynamics — counts are cumulative, no forgetting
+- Assumes each success/failure contributes equally regardless of recency
+- Cannot model the "unknown → known" transition that BKT captures
+- Sensitive to KC granularity — too coarse and it masks patterns, too fine and data is sparse
+
+**When to use it:**
+- As a lightweight alternative to BKT when per-KC fitting is impractical
+- For rapid prototyping — logistic regression trains in seconds
+- As a secondary validation model: if PFA and BKT disagree on mastery, the concept needs more data
+- NOT as Cena's primary model (lacks temporal dynamics and forgetting)
+
+**How it maps to a concept graph:**
+- One (s_j, f_j, beta_j, gamma_j, rho_j) tuple per concept node
+- The graph structure is not used by PFA — nodes are independent
+- Can be layered with graph constraints the same way as BKT
+
+---
+
+#### 1.1.7 Elo Rating System for Education
+
+**What it measures:** Student ability and item difficulty on a shared scale, updated after each interaction using the chess Elo rating update rule. Both student and item ratings are dynamic.
+
+**Mathematical formulation:**
+
+Expected score for student i on item j:
+```
+E_ij = 1 / (1 + 10^((D_j - theta_i) / 400))
+```
+
+After observing outcome `S_ij` (1 = correct, 0 = incorrect):
+```
+theta_i_new = theta_i + K_student * (S_ij - E_ij)
+D_j_new     = D_j     + K_item    * (E_ij - S_ij)
+```
+
+where:
+- `theta_i` = student ability rating
+- `D_j` = item difficulty rating
+- `K_student` = student learning rate (typically 40 for new students, decreasing to 10 with experience)
+- `K_item` = item update rate (typically 10, decreasing as more data accumulates)
+- The factor 400 is the Elo scale parameter (convention from chess)
+
+**Strengths:**
+- Extremely simple to implement — two update equations, no libraries needed
+- Both student ability AND item difficulty are estimated simultaneously and dynamically
+- No batch training required — fully online, updates in real-time
+- Well-understood convergence properties (Pelánek 2016, doi:10.1016/j.compedu.2016.03.017)
+- Naturally calibrates item difficulty from student interactions — items that everyone gets right drift to low difficulty
+- Can be computed per concept by maintaining per-concept Elo ratings
+
+**Weaknesses:**
+- Single-dimensional — one rating per student (or per student-concept pair)
+- No forgetting model — ratings only change on interaction, not with time
+- K-factor selection is heuristic
+- Assumes item responses are independent (no sequencing effects)
+- Less principled than IRT for high-stakes assessments
+
+**When to use it:**
+- For rapid item difficulty calibration during content authoring
+- As a lightweight real-time signal alongside BKT (Elo for ranking, BKT for mastery state)
+- For adaptive item selection: present items where E_ij ≈ 0.5 (maximum information)
+- For gamification: student Elo can power leaderboards and matchmaking
+
+**How it maps to a concept graph:**
+- One Elo rating per (student, concept) pair — equivalent to a per-concept ability estimate
+- Item Elo ratings stored as concept node metadata
+- Student Elo can be compared across concepts to identify relative strengths/weaknesses
+- The gap between student Elo and item Elo determines item selection priority
+
+---
+
+#### 1.1.8 FSRS (Free Spaced Repetition Scheduler)
+
+**What it measures:** Optimal review timing using a three-component memory model: stability (S), difficulty (D), and retrievability (R). Next-generation open-source scheduler that outperforms SM-2 (Ye 2022, arXiv:2402.01032).
+
+**Mathematical formulation:**
+
+Retrievability (probability of recall after `t` days since last review):
+```
+R(t, S) = (1 + t / (9 * S))^(-1)
+```
+
+This is a power-law decay (not exponential like Ebbinghaus). Stability `S` represents the interval at which R drops to 90%.
+
+Stability update after review (correct response):
+```
+S_new = S * (1 + e^(w_8) * (11 - D) * S^(-w_9) * (e^(w_10 * (1 - R)) - 1))
+```
+
+Stability update after review (incorrect response / lapse):
+```
+S_new = w_11 * D^(-w_12) * ((S + 1)^w_13 - 1) * e^(w_14 * (1 - R))
+```
+
+Difficulty update:
+```
+D_new = D - w_6 * (grade - 3)
+```
+
+where `w_0..w_14` are 15 learnable parameters optimized per user via gradient descent on review history.
+
+**Strengths:**
+- Power-law decay better fits empirical data than exponential (Wixted & Ebbesen 1991)
+- Only 15 parameters — trainable from a single student's history (no global dataset needed)
+- Open-source, MIT licensed, actively maintained
+- Validated on 10K+ Anki users — significantly outperforms SM-2 on retention prediction
+- Separates stability from difficulty — a hard concept can still be well-memorized
+
+**Weaknesses:**
+- Primarily designed for flashcard-style atomic facts, not multi-step STEM problems
+- Assumes each review is independent — no modeling of related concept interactions
+- Power-law vs. exponential debate is unresolved for all domains
+- Requires ~20 reviews per card to converge on per-user parameters
+
+**When to use it:**
+- As a potential upgrade path from HLR for Cena's spaced repetition scheduling
+- For factual/recall concepts (definitions, formulas, constants) where flashcard-style review is appropriate
+- NOT for conceptual understanding items — those are better served by Bloom's-level progression
+- Consider for Phase 3 as an alternative to HLR, with A/B testing to compare retention rates
+
+**How it maps to a concept graph:**
+- One (S, D, R) triple per concept node per student
+- `R` is computed in real-time: `R = (1 + t/(9*S))^(-1)` — same role as HLR's `p(recall)`
+- Scheduling: review when `R < 0.9` (FSRS convention) vs. HLR's configurable threshold
+- Stability `S` serves the same role as HLR's half-life `h` — both encode memory durability
+
+---
+
+#### 1.1.9 Leitner System
+
+**What it measures:** A box-based spaced repetition system where items move between boxes (levels) based on response correctness. Simpler than algorithmic approaches, but effective and easy to explain to students.
+
+**Mathematical formulation:**
+
+Box assignment rules:
+```
+if correct: box(item) = min(box(item) + 1, max_box)
+if incorrect: box(item) = 1  // reset to first box
+```
+
+Review interval per box:
+```
+interval(box_k) = base_interval * multiplier^(k - 1)
+```
+
+Typical configuration:
+```
+Box 1: review every 1 day    (base_interval = 1)
+Box 2: review every 3 days   (multiplier ≈ 3)
+Box 3: review every 9 days
+Box 4: review every 27 days
+Box 5: review every 81 days  (mastered — quarterly review)
+```
+
+**Strengths:**
+- Extremely intuitive — students understand the "box" metaphor immediately
+- No parameters to train — heuristic but effective
+- Maps naturally to gamification: "Promote this concept to Box 5!"
+- The visual of items moving through boxes is inherently motivating
+- Leitner (1972) — decades of practical validation
+
+**Weaknesses:**
+- Binary outcome only (correct/incorrect) — no partial credit
+- Fixed intervals — not personalized to student memory characteristics
+- Harsh reset on failure (back to Box 1) can be demoralizing
+- No item difficulty modeling — hard and easy items in the same box have the same interval
+- Inferior retention rates compared to algorithmic approaches (HLR, FSRS)
+
+**When to use it:**
+- NOT as Cena's primary scheduling algorithm (HLR is already specified and superior)
+- As a gamification layer: map HLR's continuous half-life to discrete "boxes" for student display
+- For the student-facing visualization: "This concept is in Box 4 — nearly mastered!"
+- As a simplified mental model when explaining spaced repetition to students and parents
+
+**How it maps to a concept graph:**
+- One box number per concept node per student (derived from HLR half-life ranges)
+- Mapping: `box = floor(log(half_life_hours / base_hours) / log(multiplier)) + 1`
+- Purely a presentation layer — the underlying model is HLR, Leitner is the UX skin
+
+---
+
 ### 1.2 Item Response Theory Family
 
 #### 1.2.1 Rasch Model (1PL IRT)
