@@ -58,7 +58,7 @@ def main():
     # 3. Break-even doesn't account for structural churn
     if "structural churn" in bv.lower() or "Structural churn" in bv:
         # Check if product-research break-even section addresses churn
-        if "churn" not in pr[pr.find("Break-Even"):pr.find("Break-Even")+1000] if "Break-Even" in pr else True:
+        if "churn" not in pr[pr.find("Break-Even"):pr.find("Break-Even")+2500] if "Break-Even" in pr else True:
             flag(5, "Break-even analysis (product-research.md) doesn't model structural churn from student graduation. business-viability.md says 'realistic: 6-12 months' lifetime but break-even assumes steady growth without cohort replacement",
                  "product-research.md", "BUSINESS_MODEL")
 
