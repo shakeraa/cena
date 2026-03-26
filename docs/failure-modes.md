@@ -124,7 +124,7 @@ A malformed event exists in Student 7392's event stream. Perhaps a bug in a prev
 
 ### Why This Is Dangerous
 
-This is a permanent, self-inflicted denial of service for a single student. The actor will never recover without intervention. If the bug that produced the corrupt event affected multiple students, the blast radius could be dozens or hundreds of locked-out users.
+This is a permanent, self-inflicted denial of service for a single student. The actor will never recover without intervention. If the bug that produced the corrupt event affected multiple students (e.g., a serialization bug in a deployment that ran for 30 minutes before rollback), the blast radius is proportional to the number of students who had active sessions during that window — at 10K MAU with 20% concurrent during peak, that is up to 2,000 locked-out users.
 
 ### Detection
 
@@ -464,7 +464,7 @@ PostgreSQL (the event store) becomes unavailable — RDS failover, network parti
 #### Manual Recovery
 
 1. **If RDS failover:** Wait for automatic failover (typically 1-2 minutes for Multi-AZ). The connection pool will reconnect automatically.
-2. **If storage full:** Increase allocated storage in RDS console (online operation for GP3 volumes). Identify and archive old event streams if needed.
+2. **If storage full:** Increase allocated storage in RDS console (online operation for GP3 volumes). Archive event streams for students inactive for >12 months to S3 cold storage, then reclaim space.
 3. **Post-recovery:** All actors that were alive during the outage resume normal operation automatically. Actors that failed to activate during the outage will activate on the next request.
 4. **Verify event stream integrity:** Run the nightly deserialization health check immediately after recovery.
 

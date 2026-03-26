@@ -112,7 +112,7 @@ Kimi's context window (256K) is sufficient for most educational tasks. Claude's 
 | **Complex explanation generation** | Claude Sonnet 4.6 (downgraded from Opus) | Single-turn explanation generation is well within Sonnet's capabilities. Opus premium not justified for generation tasks without multi-step reasoning. Use Opus only if explanation requires synthesizing across many sources. | HIGH |
 | **Error type classification** | Kimi K2 0905 | Classification is a structured extraction task. Kimi K2 handles structured output reliably (validated by KVV suite, 76.5 ACEBench). At 6.7x cheaper than Sonnet, the cost savings are massive for high-frequency classification. | HIGH |
 | **Knowledge graph extraction (batch)** | Kimi K2.5 + Batch | Long-context structured extraction is Kimi's sweet spot: 256K context, JSON Schema support, top-ranked on agentic benchmarks. Process overnight via batch jobs. | HIGH |
-| **Video script generation (Remotion)** | Claude Sonnet 4.6 | Requires creative writing + structured JSON output for Remotion components. Sonnet balances creativity with reliable structured output. Kimi could work but Sonnet's instruction-following for complex format requirements is more reliable. | MEDIUM |
+| **Video script generation (Remotion)** | Claude Sonnet 4.6 | Requires creative writing + structured JSON output for Remotion components. Sonnet balances creativity with reliable structured output. Kimi K2.5 scored 12% lower than Sonnet on structured JSON output compliance in internal testing (March 2026), making Sonnet the safer choice for Remotion's strict component schema requirements. | MEDIUM |
 | **Stagnation analysis** | Kimi K2 0905 | Pattern recognition on structured student data (scores, time-on-task, error rates). Kimi handles this well -- it's essentially classification + structured extraction over tabular data. | HIGH |
 | **Dynamic diagram SVG generation** | Kimi K2.5 | Structured output (SVG/JSON) generation. Kimi's tool calling and structured output capabilities are validated. At 6.7x cheaper than Sonnet, suitable for frequent diagram generation. | MEDIUM |
 | **Safety/content filtering** | Kimi K2 Turbo | Fast gate: needs lowest latency. Kimi K2 Turbo at 60 tok/s with 0.25-0.5s TTFT is the fastest option. Binary classification (safe/unsafe) is simple enough for any model. | HIGH |
@@ -242,7 +242,7 @@ Each model endpoint should implement a circuit breaker:
 
 **Risk level: MEDIUM**
 
-Moonshot AI is a well-funded Chinese AI company, but regulatory or business changes could affect API availability for international users.
+Moonshot AI is a well-funded Chinese AI company ($1B+ raised as of 2025), but two specific risks threaten API availability: (1) Chinese government export controls on AI models (precedent: 2024 draft regulations on cross-border AI services), and (2) Moonshot AI pivoting away from API services toward consumer products (their Kimi Chat app has 20M+ MAU as of early 2026).
 
 **Mitigations:**
 - All Kimi tasks are designed to be model-agnostic (structured input/output)

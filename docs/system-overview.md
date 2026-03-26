@@ -56,6 +56,9 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 ### Student Control
 - Students can request a different learning approach at any time (e.g., "I'd rather learn this through a project")
 - The system honors the request without exposing internal methodology labels
+- Request mechanism: a persistent "Change approach" button in the learning session UI opens a natural-language picker with student-friendly labels (e.g., "Explain it differently", "Give me practice problems", "Show me a real-world example", "Let me explain it back")
+- Each student-friendly label maps to an internal methodology: "Explain it differently" -> Feynman technique, "Give me practice problems" -> drill-and-practice, "Show me a real-world example" -> project-based learning, "Let me explain it back" -> retrieval practice
+- Student-initiated switches are logged as `MethodologySwitched` events with trigger = `student_requested` and are weighted higher in the per-student methodology effectiveness profile
 
 ## Knowledge Storage
 
@@ -129,12 +132,12 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - **Process flow diagrams** — step-by-step visual flows with arrows showing how things work (chemical reactions, biological processes, circuit flows)
 - **Icon-based topic grids** — color-coded navigational cards per topic area, each with a distinct icon
 - Diagrams are not static assets — they are generated/composed per concept so the system can scale across any syllabus without manually creating thousands of images
-- Potential approaches: AI-generated SVGs, templated illustration engine, or a hybrid with a curated asset library + dynamic composition
+- **Implementation approach**: Hybrid system — a templated SVG engine (using D3.js and React components) composes diagrams from a curated asset library of ~200 base shapes and symbols per subject, combined with LLM-generated layout instructions (Kimi K2.5 outputs structured JSON describing element placement, labels, and connections). For concepts where templates are insufficient, the LLM generates raw SVG markup validated by a deterministic sanitizer before rendering. This hybrid avoids the quality risk of pure AI generation while scaling beyond a fixed asset library
 
 ### Design Principles
-- Visuals should make complex concepts feel approachable and clear
-- Every diagram, figure, and concept should have a consistent illustrative style
-- The overall aesthetic should feel modern, tech-forward, and engaging for students
+- Visuals should make complex concepts feel approachable and clear — measured by A/B testing diagram comprehension rates (target: >80% of students correctly interpret a diagram's key relationship on first exposure)
+- Every diagram, figure, and concept card follows a single illustrative style guide: flat vector style, 4-color palette per subject (e.g., Math = blue/teal, Physics = orange/amber, Chemistry = green/emerald, Biology = purple/violet, CS = gray/slate), consistent stroke width (2px), rounded corners (8px radius), and Hebrew-first text with LTR fallback for formulas
+- The overall aesthetic targets the visual language of apps that Israeli teens already use (Duolingo, Instagram, TikTok) — high contrast, generous whitespace, micro-animations on state transitions, dark mode support from launch
 
 ## Gamification
 
@@ -164,10 +167,12 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 ## AI/LLM Integration Strategy
 
 ### Model Architecture
-- **Primary LLM**: Claude (Anthropic) for all student-facing interactions — Socratic questioning, explanation generation, annotation analysis, and methodology-aware tutoring
-- **Fallback model**: GPT-4o (OpenAI) as secondary provider for redundancy; model-agnostic prompt layer ensures provider switching without UX impact
-- **Embedding model**: text-embedding-3-small (OpenAI) or equivalent for knowledge graph semantic search and concept similarity scoring
-- The system is designed with a **model-agnostic abstraction layer** — all LLM calls go through a unified interface that handles prompt formatting, token tracking, and provider routing
+- **Tiered multi-model routing** behind an Anti-Corruption Layer (see `docs/llm-routing-strategy.md` for full analysis):
+  - **Fast/Cheap tier**: Kimi K2.5 (Moonshot AI) for classification, extraction, structured evaluation — $0.45/MTok input, no PII sent
+  - **Balanced tier**: Claude Sonnet 4.6 (Anthropic) for real-time tutoring, Socratic dialogue, explanation generation — $3.00/MTok input
+  - **Reasoning tier**: Claude Opus 4.6 (Anthropic) for methodology switching decisions, complex pedagogical reasoning — $5.00/MTok input
+- **Embedding model**: text-embedding-3-small (OpenAI) for knowledge graph semantic search and concept similarity scoring (see `docs/intelligence-layer.md`)
+- The system is designed with a **model-agnostic abstraction layer** — all LLM calls go through a unified interface (Python FastAPI Anti-Corruption Layer) that handles prompt formatting, token tracking, model routing, and provider fallback
 
 ### LLM Use Cases
 1. **Socratic tutoring conversations**: Multi-turn dialogue with per-student context window (learning history, current mastery, active methodology)
@@ -178,8 +183,8 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 6. **Personalized explanation generation**: Adapts explanation depth and analogy selection based on student's knowledge graph state
 
 ### Cost Management
-- **Per-student monthly LLM cost target**: $0.50–$2.00 (at 79–99 NIS/month subscription, LLM costs must stay below 15% of revenue)
-- **Token optimization**: Cache common explanations per concept; use smaller models (Haiku-class) for classification tasks; reserve large models for generative tutoring
+- **Per-student monthly LLM cost**: ~$13.32/month with tiered routing (~$10.26 Sonnet + $2.40 Opus + $0.66 Kimi), approximately 40% cheaper than a Sonnet-only approach ($22.05). See `docs/llm-routing-strategy.md` Section 4 for full breakdown.
+- **Token optimization**: Prompt caching (60% cache hit target on tutoring context reduces Sonnet costs by 30-40%); Kimi K2.5 for high-frequency classification tasks at 6.7x lower cost; batch API for async tasks at 50% discount
 - **Batch vs. real-time**: Knowledge graph construction and content pre-generation run as offline batch jobs; only tutoring conversations and annotation analysis are real-time
 - **Rate limiting**: Students limited to 50 LLM-powered interactions per day (sufficient for 2–3 learning sessions); prevents abuse while keeping costs predictable
 

@@ -334,7 +334,7 @@ For: Founder (cost management). Reviewed weekly.
 
 #### 3.4.4 Content Dashboard
 
-For: Curriculum team. Reviewed as needed.
+For: Curriculum team. Reviewed weekly by the education domain expert, or on demand after a content publication cycle.
 
 | Panel | Source | Visualization |
 |-------|--------|--------------|
@@ -521,7 +521,7 @@ Content updates do **not** require a deployment:
 5. Merge hotfix branch back to `main`.
 
 **Mobile app:**
-- **JS-only changes:** Deploy via CodePush (React Native OTA updates). Bypasses App Store review. Available to users within minutes.
+- **JS-only changes:** Deploy via EAS Updates or Bitrise CodePush (React Native OTA updates). Microsoft App Center CodePush was retired March 31, 2025; use a supported alternative. Bypasses App Store review. Available to users within minutes.
 - **Native changes (new native modules, SDK updates):** Full App Store submission required. Use expedited review if available.
 
 **Web app:**
@@ -534,7 +534,7 @@ Content updates do **not** require a deployment:
 | .NET Actor Cluster | Shift ALB traffic back to blue target group | < 1 minute |
 | Python FastAPI | App Runner: revert to previous revision | < 2 minutes |
 | Remotion Worker | Update task definition to previous image tag | Next task uses old image |
-| React Native | CodePush rollback (JS) or App Store revert (native) | Minutes (JS) / 24-48h (native) |
+| React Native | EAS Updates / Bitrise CodePush rollback (JS) or App Store revert (native) | Minutes (JS) / 24-48h (native) |
 | React PWA | Redeploy previous build from S3 versioning | < 5 minutes |
 
 ---

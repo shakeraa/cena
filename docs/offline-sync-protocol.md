@@ -9,7 +9,7 @@
 
 ## 1. Problem Statement
 
-The React Native client supports offline learning sessions. A student can work offline for extended periods (30-60+ minutes), completing multiple exercises while the server-side `StudentActor` continues its autonomous lifecycle — emitting `MasteryDecayed` events via Half-Life Regression timers, firing `StreakExpiring` triggers through the `OutreachSchedulerActor`, and potentially receiving input from another device (web app).
+The React Native client supports offline learning sessions. A student can work offline for extended periods (30-60+ minutes), completing multiple exercises while the server-side `StudentActor` continues its autonomous lifecycle — emitting `MasteryDecayed` events via Half-Life Regression timers, firing `StreakExpiring` triggers through the `OutreachSchedulerActor`, and receiving input from another device (web app) if the student logs in from multiple devices simultaneously.
 
 When the client reconnects, it holds a queue of offline events that must reconcile with server state that has diverged independently. This document specifies the exact protocol for that reconciliation.
 

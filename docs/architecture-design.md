@@ -10,7 +10,7 @@ Cena is an adaptive learning platform that acts as a personal AI mentor for high
 
 The architecture is built on **Domain-Driven Design** with **event sourcing** on the student aggregate, an **actor-based distributed runtime** (Proto.Actor on .NET 9) serving as the "game server brain," and **NATS JetStream** as the event backbone connecting bounded contexts. LLM capabilities are delivered through a tiered multi-model routing strategy (Kimi K2.5 / Claude Sonnet 4.6 / Claude Opus 4.6) behind an Anti-Corruption Layer.
 
-At 10K users, the estimated infrastructure cost is **~1,700-2,500 NIS/month (~$470-700)** excluding LLM API costs, which run at approximately 480 NIS per 1,000 active users/month.
+At 10K users, the estimated infrastructure cost is **~1,230-1,970 NIS/month (~$344-549)** excluding LLM API costs, which run at approximately 480 NIS per 1,000 active users/month.
 
 ---
 
@@ -29,16 +29,21 @@ At 10K users, the estimated infrastructure cost is **~1,700-2,500 NIS/month (~$4
 
 ## 3. Core Pattern: Domain-Driven Design
 
-The system is decomposed into **eight bounded contexts** with clear seams. Cross-context communication is asynchronous via NATS JetStream domain events. The core domain (Learner + Pedagogy) is event-sourced; supporting contexts consume projections or subscribe to event streams.
+The system is decomposed into **nine bounded contexts** with clear seams. Cross-context communication is asynchronous via NATS JetStream domain events. The core domain (Learner + Pedagogy) is event-sourced; supporting contexts consume projections or subscribe to event streams.
 
 ### 3.1 Bounded Context Map
 
 ```
-                    ┌──────────────┐
-                    │  Curriculum   │  (upstream, rarely changes)
-                    │  Context      │
-                    └──────┬───────┘
-                           │ publishes domain graph
+    ┌─────────────────┐
+    │ Content Authoring│  (supporting, produces curriculum artifacts)
+    │    Context       │
+    └────────┬────────┘
+             │ publishes reviewed graph
+    ┌────────▼─────────┐
+    │   Curriculum      │  (upstream, rarely changes)
+    │   Context         │
+    └──────┬───────────┘
+           │ publishes domain graph
            ┌───────────────┼───────────────┐
            ▼               ▼               ▼
     ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
@@ -64,6 +69,15 @@ The system is decomposed into **eight bounded contexts** with clear seams. Cross
 
 ### 3.2 Bounded Context Definitions
 
+#### 3.2.0 Content Authoring Context (supporting)
+
+- **Type:** Supporting context (9th bounded context, see `docs/content-authoring.md`)
+- **Upstream dependency:** None (produces the Curriculum context's artifacts)
+- **Downstream consumers:** Curriculum Context (consumes published graphs), Delivery Context (consumes questions/explanations)
+- **Aggregate root:** `ContentGraph` (in-progress, unpublished version of a subject's knowledge graph)
+- **Responsibilities:** Corpus ingestion, LLM-assisted knowledge graph extraction, question generation, expert review workflow, QA pipeline, content publication, content correction after student interaction
+- **Full specification:** `docs/content-authoring.md`
+
 #### 3.2.1 Curriculum Context (upstream)
 
 - **Owns:** Domain knowledge graph, syllabus structure, concept metadata, difficulty ratings
@@ -74,7 +88,7 @@ The system is decomposed into **eight bounded contexts** with clear seams. Cross
 
 #### 3.2.2 Learner Context (core domain)
 
-- **Aggregate Root:** `StudentProfile` (virtual actor, event-sourced)
+- **Aggregate Root:** `StudentProfile` (implemented as `StudentActor` — a Proto.Actor virtual actor, event-sourced)
 - **Owns:**
   - Knowledge graph overlay (mastery level per concept)
   - Methodology effectiveness history per student
@@ -108,9 +122,9 @@ The system is decomposed into **eight bounded contexts** with clear seams. Cross
   - Error repetition
   - Annotation sentiment
 - **Domain Events:**
-  - `SessionStarted`, `SessionCompleted`
+  - `SessionStarted`, `SessionEnded`
   - `ExerciseAttempted`
-  - `MethodologySwitchTriggered`
+  - `MethodologySwitched`
 
 #### 3.2.4 Delivery Context (supporting)
 
@@ -165,7 +179,7 @@ The system is decomposed into **eight bounded contexts** with clear seams. Cross
 
 | Criterion | Proto.Actor | Akka.NET | Orleans |
 |-----------|-------------|----------|---------|
-| **License** | Apache 2.0 | BSL (expensive) | MIT but ecosystem stagnant |
+| **License** | Apache 2.0 | Apache 2.0 (but Akka JVM is BSL — ecosystem confusion risk) | MIT but ecosystem stagnant |
 | **Actor models** | Classic AND virtual | Classic only | Virtual only |
 | **Cross-language** | gRPC Actor Standard Protocol (.NET, Go, Kotlin) | .NET only | .NET only |
 | **Creator** | Roger Johansson (same as Akka.NET) | Roger Johansson | Microsoft Research |
@@ -270,9 +284,9 @@ Proto.Actor Cluster
 │
 ├── cena.pedagogy.events.>
 │   ├── SessionStarted
-│   ├── SessionCompleted
+│   ├── SessionEnded
 │   ├── ExerciseAttempted
-│   ├── MethodologySwitchTriggered
+│   ├── MethodologySwitched
 │   └── ...
 │
 Subscribers:
@@ -305,7 +319,7 @@ Subscribers:
 │  Source of truth for domain graph          │
 │  Used by: admin/authoring tools           │
 │  Complex cross-student analytics          │
-│  $65-130/month (AuraDB Professional)      │
+│  $65/GB/month (AuraDB Professional, 1-2GB) │
 └───────────────────────────────────────────┘
 ```
 
@@ -346,7 +360,7 @@ AnalyzeLearningTrajectory   → Claude Opus 4.6
 GenerateDiagnosticPlan      → Claude Opus 4.6
 ```
 
-**Fallback chain:** Opus -> Sonnet -> Kimi (if upstream model is unavailable)
+**Fallback chains (per tier):** Kimi tasks: Kimi K2.5 -> Kimi K2 -> Claude Haiku -> Claude Sonnet. Sonnet tasks: Sonnet 4.6 -> Sonnet 4.5 -> Haiku. Opus tasks: Opus 4.6 -> Sonnet 4.6 (with extended thinking) -> Sonnet 4.6. See `docs/llm-routing-strategy.md` Section 5 for full fallback design
 
 **Privacy rule:** Kimi (China-based) never receives PII. Only anonymized, structured data crosses that boundary.
 
@@ -409,7 +423,7 @@ Students can respond to quizzes **directly in WhatsApp and Telegram** without op
 
 ### 9.4 Channel Selection
 
-The Outreach Context manages per-student channel preferences and optimal contact times. Channel priority is configurable per student, with WhatsApp as the default primary channel for the Israeli market.
+The Outreach Context manages per-student channel preferences and optimal contact times. Default channel priority order: (1) WhatsApp, (2) Push notification, (3) Telegram, (4) Voice — configurable per student in their app settings. WhatsApp is the default primary channel for the Israeli market (90%+ penetration among ages 16–18, DataReportal Israel 2024). Default optimal contact window: 15:00–20:00 Israel time on weekdays, 10:00–20:00 on Fridays and Saturdays, personalized after 7 days of engagement data.
 
 ---
 
@@ -438,7 +452,7 @@ Remotion worker runs as a Fargate task that scales to zero when idle. Batch rend
 - **State management:** Local state machine mirroring the server actor state
 - **Offline support:** Learning sessions continue offline; events queue locally
 - **Sync:** On reconnect, queued events replay to server actor; server pushes any missed events back
-- **Real-time:** SignalR WebSocket for live push when online
+- **Real-time:** SignalR WebSocket for live push when online (note: `@microsoft/signalr` does not officially support React Native — use a community wrapper like `react-signalr` or `react-native-signalr`, or polyfill the transport layer)
 - **Knowledge graph visualization:** Interactive, zoomable graph of student's mastery overlay
 - **Hebrew RTL:** Baked into the component library from the first commit
 
@@ -626,7 +640,7 @@ PERSISTENCE LAYER:
 | Component | Monthly Cost (NIS) | Monthly Cost (USD) |
 |-----------|-------------------|-------------------|
 | ECS Fargate (Proto.Actor cluster, 2-3 nodes) | ~430 | ~$120 |
-| Neo4j AuraDB Professional | ~235-470 | ~$65-130 |
+| Neo4j AuraDB Professional (1-2GB) | ~235-470 | ~$65-130 |
 | NATS JetStream (Synadia Cloud) | ~175-355 | ~$49-99 |
 | Python FastAPI (App Runner) | ~70-145 | ~$20-40 |
 | PostgreSQL (RDS) | ~145-215 | ~$40-60 |
@@ -635,7 +649,7 @@ PERSISTENCE LAYER:
 | LLM API costs (Kimi/Sonnet/Opus) | ~480 per 1K active users | ~$133 per 1K active users |
 | S3 + CDN | ~35-70 | ~$10-20 |
 | **Total (infra, excl. LLM)** | **~1,230-1,970** | **~$344-549** |
-| **Total (infra + LLM at 10K)** | **~5,430-6,770** | **~$1,514-1,879** |
+| **Total (infra + LLM at 10K)** | **~6,030-6,770** | **~$1,674-1,879** |
 
 ---
 
@@ -662,7 +676,7 @@ PERSISTENCE LAYER:
 
 | Risk | Impact | Mitigation |
 |------|--------|-----------|
-| Proto.Actor maturity vs. Akka/Orleans | Medium | Community is smaller but active; Roger Johansson maintains it; Apache 2.0 license eliminates BSL cost risk |
+| Proto.Actor maturity vs. Akka/Orleans | Medium | Community is smaller but active; Roger Johansson maintains it; Apache 2.0 license avoids any licensing confusion with Akka JVM's BSL (note: Akka.NET itself remains Apache 2.0) |
 | Actor cluster state loss on Fargate task cycling | High | Event sourcing provides full replay; snapshots bound recovery time; Redis hot state is a cache, not the source of truth |
 | LLM cost escalation at scale | High | Tiered routing pushes 60%+ of calls to Kimi ($0.45/MTok); cost tracking in ACL; per-student cost caps |
 | Kimi availability / geopolitical risk | Medium | Fallback chain (Opus -> Sonnet -> Kimi) means Kimi is never the only option; structured tasks can degrade to local heuristics |
@@ -675,5 +689,13 @@ PERSISTENCE LAYER:
 
 - `docs/llm-routing-strategy.md` — Detailed LLM model routing, pricing analysis, and task mapping
 - `docs/product-research.md` — Market analysis and competitive landscape
-- `docs/adaptive-learning-architecture-research.md` — Research on adaptive learning algorithms (BKT, MIRT, HLR)
 - `docs/system-overview.md` — High-level system overview
+- `docs/content-authoring.md` — Content Authoring bounded context specification
+- `docs/assessment-specification.md` — Question taxonomy, evaluation pipeline, diagnostic algorithm
+- `docs/operations.md` — Notification throttling, backup/DR, monitoring, CI/CD
+- `docs/stakeholder-experiences.md` — Parent and teacher dashboard specifications
+- `docs/intelligence-layer.md` — Data flywheels and semantic search
+- `docs/engagement-signals-research.md` — Behavioral signal research for stagnation detection
+- `docs/event-schemas.md` — Domain event schemas and versioning strategy
+- `docs/offline-sync-protocol.md` — Client-server sync protocol for offline sessions
+- `docs/failure-modes.md` — Proto.Actor cluster failure mode analysis

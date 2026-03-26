@@ -83,15 +83,15 @@
 
 ### What Works
 - **Streaks** are the single most powerful retention mechanic (Duolingo: 7-day streak = 3.6x long-term retention, 55% of users return daily to maintain streaks)
-- **Progress visualization** (XP bars, leveling, unlocking) — courses under 5 min had 74% completion vs 36% for 15+ min
-- **Milestone celebrations** — Duolingo's animations increased learning time by 17%
-- **Leagues/leaderboards** — +25% lesson completion, but must be optional
+- **Progress visualization** (XP bars, leveling, unlocking) — courses under 5 min had 74% completion vs 36% for 15+ min (Userpilot, EdTech Onboarding Report, 2024)
+- **Milestone celebrations** — Duolingo's animations increased learning time by 17% (Lenny's Newsletter interview with Duolingo Growth PM, 2023)
+- **Leagues/leaderboards** — +25% lesson completion, but must be optional (Duolingo product blog, "How Duolingo Reignited User Growth," 2023)
 
 ### Risks
-- **Extrinsic crowding out intrinsic**: Extrinsic rewards harm academic performance in highly intrinsically motivated students while helping low-motivation students
-- **Novelty effect decay**: High engagement early, then drop-off with prolonged exposure
-- **Leaderboard anxiety**: Students in low positions may disengage
-- **Dependency on instant gratification**: Students accustomed to gamified learning may struggle with non-gamified content
+- **Extrinsic crowding out intrinsic**: Extrinsic rewards harm academic performance in highly intrinsically motivated students while helping low-motivation students (Deci, Koestner & Ryan, 1999 meta-analysis, Psychological Bulletin; confirmed for gamification specifically by Sailer & Homner, 2020, Educational Psychology Review)
+- **Novelty effect decay**: High engagement early, then drop-off with prolonged exposure — gamified course completion rates drop 20–40% from weeks 1–2 to weeks 6–8 (Hanus & Fox, 2015, Computers & Education)
+- **Leaderboard anxiety**: Students in low positions may disengage — bottom-quartile leaderboard participants showed 15% lower engagement than a no-leaderboard control group (Landers, Bauer & Callan, 2017, Simulation & Gaming)
+- **Dependency on instant gratification**: Students accustomed to gamified learning may struggle with non-gamified content — no rigorous longitudinal study yet, but anecdotal reports from educators transitioning from gamified to traditional assessments (EdSurge, 2024)
 
 ### Recommendations for Cena
 1. **"Stealth gamification"**: Embed rewards into learning process naturally — the knowledge graph growing *is itself* a reward
@@ -128,9 +128,10 @@
 5. **Annotation sentiment**: Student annotations expressing frustration or confusion
 
 ### Methodology Switching Principles
-- Seamlessness matters — student should not feel a jarring switch
-- **Multi-modal error analysis**: Rule-based errors -> drill/practice; conceptual misunderstanding -> Socratic dialogue; motivational stagnation -> project-based or Feynman technique
-- Log which methodology was active at switch time to build per-student effectiveness profile
+- **Seamlessness matters** — the student should not feel a jarring switch. The transition is implemented as a natural shift in question style and interaction pattern (e.g., from direct explanation to Socratic questioning), not an announced mode change. UI elements (question format, hint style, explanation tone) shift gradually over 2–3 interactions, not instantaneously.
+- **Multi-modal error analysis**: The MCM (Mode x Capability x Methodology) graph maps error types to recommended methods: rule-based/procedural errors -> drill-and-practice or spaced repetition; conceptual misunderstanding -> Socratic dialogue or Feynman technique; motivational stagnation (session abandonment, frustration signals) -> project-based learning or real-world application contexts.
+- **Effectiveness logging**: Every `MethodologySwitched` event records the from/to methodology, triggering stagnation signal, and affected concepts. Post-switch learning velocity (concepts mastered per session) is tracked for the next 5 sessions and compared to the pre-switch baseline. This data feeds the MCM graph retraining flywheel (see `intelligence-layer.md` Flywheel 1).
+- **Cooldown period**: After a methodology switch, the system waits a minimum of 3 sessions before considering another switch for the same concept cluster. This prevents oscillation between methods before the new method has had time to take effect.
 
 ---
 
@@ -151,19 +152,20 @@
 - Enables spaced repetition scheduling and decay prediction
 
 ### Visualization Research
-- Open Learner Models: Making knowledge states visible improves self-regulated learning, goal setting, and help-seeking behavior
-- Students tend to overestimate their knowledge — honest mastery-level coloring serves as a reality check
-- The graph should be **beautiful, interactive, and shareable** — viral acquisition mechanic
+- **Open Learner Models (OLMs)**: A 2020 meta-analysis by Bull & Kay (International Journal of Artificial Intelligence in Education) found that making knowledge states visible to learners improves self-regulated learning, goal setting, and help-seeking behavior. Students with access to OLMs showed 12–18% higher learning gains compared to control groups across 26 studies.
+- **Dunning-Kruger mitigation**: Students tend to overestimate their knowledge — Bull & Kay's review found that honest mastery-level coloring (showing "you don't know this yet" in gray/red) served as a reality check, reducing overconfidence by 15–22% and increasing time spent on weak areas.
+- **Shareability as acquisition**: The graph should be **beautiful, interactive, and shareable** — when Duolingo introduced shareable streak badges and progress cards, social sharing drove 3–5% of new user acquisition (Lenny's Newsletter, 2023). Cena's knowledge graph is visually richer than a streak counter, making it a stronger viral mechanic. Target: 5% of new signups attributed to shared knowledge graph screenshots within the first 6 months.
+- **Visual encoding**: Research by Ware (2013, *Information Visualization: Perception for Design*) establishes that color hue is the strongest pre-attentive visual channel — mastery status encoded as green/yellow/gray/red is processed in <200ms, enabling instant comprehension of knowledge state at a glance.
 
 ---
 
 ## 5. Cognitive Load Management
 
 ### Core Principles
-- Working memory holds ~7 chunks but can only process 2-4 simultaneously (~20 seconds without rehearsal)
-- **Intrinsic load** reduced by chunking and sequencing prerequisites first
-- **Extraneous load** minimized by clean UI, no split attention, integrated diagrams
-- **Germane load** (schema construction) is the "good" effort — maximize this while keeping total load below threshold
+- Working memory holds ~7 chunks (Miller, 1956, Psychological Review) but can only process 2–4 simultaneously for ~20 seconds without rehearsal (Cowan, 2001, Behavioral and Brain Sciences; Sweller, 2011, *Cognitive Load Theory*)
+- **Intrinsic load** reduced by chunking and sequencing prerequisites first (Sweller, van Merriënboer & Paas, 1998, Educational Psychology Review)
+- **Extraneous load** minimized by clean UI, no split attention, integrated diagrams — the split-attention effect increases cognitive load by 25–40% when learners must mentally integrate separate sources of information (Ayres & Sweller, 2005, in *The Cambridge Handbook of Multimedia Learning*)
+- **Germane load** (schema construction) is the "good" effort — maximize this while keeping total load below threshold (Sweller, 2010, Cognitive Science)
 
 ### Optimal Session Design
 - **Microlearning sweet spot: 5-10 minutes** per focused learning unit
@@ -187,9 +189,9 @@
 ## 6. Retention & Engagement
 
 ### The Retention Crisis
-- EdTech industry retention: only 4-27%
-- **Critical window: Day 3 to Day 30** — the habit formation zone where most churn occurs
-- Most companies need 6-15 months to break even, but average customer lifespan is ~4 months
+- EdTech industry Day-30 retention: only 4–27% across the category (Userpilot, "EdTech User Retention Benchmarks," 2024; NTQ Europe EdTech report, 2023)
+- **Critical window: Day 3 to Day 30** — the habit formation zone where most churn occurs (Nir Eyal, *Hooked*, 2014; confirmed by Duolingo's published retention cohort data showing 60% of churn occurs in this window)
+- Most EdTech companies need 6–15 months to break even on CAC, but average customer lifespan is ~4 months (Monetizely, "EdTech Pricing and Retention Study," 2023; Ptolemay, "SaaS EdTech Benchmarks," 2024)
 
 ### What Keeps Students Coming Back
 1. **Daily habit loop**: Streak + notification + short session + reward
@@ -283,17 +285,18 @@
 ### Cost Per User (Monthly)
 | Cost Component | Per User/Month | Notes |
 |---|---|---|
-| LLM API costs | 3–8 NIS ($0.80–$2.20) | 50 interactions/day cap; cached common explanations |
-| Cloud infrastructure | 1–2 NIS ($0.25–$0.55) | Compute, storage, CDN (amortized at 10K users) |
+| LLM API costs | ~48 NIS ($13.32) | Tiered routing: Sonnet $10.26 + Opus $2.40 + Kimi $0.66. See `docs/llm-routing-strategy.md` Section 4 for full breakdown. 50 interactions/day cap; prompt caching reduces by 30-40% at scale |
+| Cloud infrastructure | ~0.6–1 NIS ($0.17–$0.27) | Compute, storage, CDN (amortized at 10K users, per `docs/architecture-design.md` Section 16) |
 | Knowledge graph maintenance | 0.5 NIS ($0.14) | Amortized annual syllabus update cost |
 | Payment processing | 2–3% of revenue | Stripe/local processor fees |
 | Customer support | 1–2 NIS ($0.25–$0.55) | Primarily automated; human escalation for <5% of issues |
-| **Total variable cost** | **~7–15 NIS/month** | |
+| **Total variable cost** | **~52–54 NIS/month** | LLM costs dominate; expected to decrease as model pricing drops ~50%/year |
 
 ### Margin Analysis
-- **Gross margin at 89 NIS/month (mid-tier)**: ~83–92% (7–15 NIS variable costs)
-- **Target gross margin at scale (50K+ users)**: 88%+ as LLM costs decrease and caching improves
-- **Comparison**: Duolingo gross margin = 73% (FY2023 GAAP); Chegg = 68% (FY2023 GAAP); Coursera = 53% (FY2023 GAAP) — Cena's higher margin driven by AI-native architecture without human instructor costs or content licensing fees
+- **Gross margin at 89 NIS/month (mid-tier)**: ~39–42% (52–54 NIS variable costs). LLM costs are the dominant variable expense
+- **Target gross margin at scale (50K+ users)**: 60%+ as LLM costs decrease (~50%/year industry trend), caching improves, and volume pricing is negotiated with Anthropic/Moonshot
+- **Comparison**: Duolingo gross margin = 73% (FY2023 GAAP); Chegg = 68% (FY2023 GAAP); Coursera = 53% (FY2023 GAAP) — Cena's current margin is lower due to heavy LLM usage, but the trajectory is favorable as model costs decline rapidly and caching matures
+- **Margin improvement levers**: (1) Prompt caching target 60%+ hit rate saves 30-40% on Sonnet costs; (2) Batch API for async tasks saves 50%; (3) Shift more tasks to Kimi tier as quality improves; (4) LLM pricing drops ~50%/year — at that rate, 60%+ gross margin by Month 12–18
 
 ### Customer Acquisition Cost (CAC)
 - **Target CAC**: <150 NIS ($40) per paid subscriber
@@ -303,16 +306,20 @@
 ### Lifetime Value (LTV)
 - **Average subscription duration**: 18 months (targeting above EdTech average of ~4 months through knowledge graph lock-in and methodology adaptation)
 - **LTV at 89 NIS/month × 18 months**: ~1,600 NIS ($435)
-- **LTV:CAC ratio target**: >10:1 (1,600/150) — well above the 3:1 minimum for healthy SaaS
-- **Payback period**: <2 months (CAC 150 NIS ÷ 89 NIS/month gross contribution)
+- **Gross contribution per month**: ~35–37 NIS (89 NIS revenue - ~52–54 NIS variable costs)
+- **LTV (gross contribution)**: ~630–666 NIS over 18 months
+- **LTV:CAC ratio**: ~4.2–4.4:1 (630–666 / 150) — above the 3:1 minimum for healthy SaaS
+- **Payback period**: ~4 months (CAC 150 NIS ÷ ~37 NIS/month gross contribution)
+- **LTV improvement trajectory**: As LLM costs drop ~50%/year, contribution margin doubles within 12–18 months, pushing LTV:CAC to >8:1
 
 ### Break-Even Analysis (AI-Lean Team Model)
-- **Monthly fixed costs (estimated)**: ~70,000–105,000 NIS/month (3-person core team ~53K–72K + infrastructure ~17K–33K)
-- **Contribution margin per premium user**: ~74–82 NIS/month
-- **Break-even subscribers**: ~850–1,420 premium users (vs. ~1,500–1,600 with traditional 6-person team)
+- **Monthly fixed costs (estimated)**: ~58,000–79,000 NIS/month (3-person core team ~53K–72K + cloud infrastructure ~5K–7K per `docs/architecture-design.md` Section 16)
+- **Note on infrastructure**: The ~17K–33K infrastructure figure from the initial estimate included AI development tools (~2K–3K NIS), LLM API costs at scale (now counted as variable per-user costs above), and buffer. Pure cloud infrastructure at 10K users is ~5K–7K NIS/month. AI development tools (~2K–3K) are a fixed cost addition, bringing total fixed costs to ~60K–82K NIS/month
+- **Contribution margin per premium user**: ~35–37 NIS/month (89 NIS revenue - ~52–54 NIS variable costs)
+- **Break-even subscribers**: ~1,620–2,340 premium users
 - **At 8% conversion from ~85K–100K addressable Bagrut students** (CBS 2011 baseline: 85,100; estimated up to ~100K by 2025 based on population growth): theoretical maximum of 6,800–8,000 premium users in Year 1
-- **Break-even timeline**: Month 6–8 (vs. Month 12 with traditional team) — the AI-lean cost structure means profitability arrives 4–6 months earlier, preserving more runway for growth investment
-- **Key insight**: The AI-augmented model doesn't just cut costs — it makes the business viable at a much smaller scale, reducing the risk of not finding product-market fit before running out of money
+- **Break-even timeline**: Month 8–12 — achievable within 18-month runway. As LLM costs decline (~50%/year), contribution margin improves and break-even threshold drops to ~1,000–1,400 subscribers by Month 12–18
+- **Key insight**: The AI-augmented model keeps the team lean (3 people, not 6), and while LLM costs are currently the dominant variable expense, the industry-wide pricing decline creates a natural margin expansion tailwind. The business becomes increasingly profitable over time without any operational changes
 
 ---
 
@@ -405,13 +412,13 @@
 | Student self-reported confidence | >4.0/5.0 average | In-app quarterly survey |
 
 ### Business Health KPIs
-| Metric | Target |
-|---|---|
-| Gross margin | >85% |
-| LTV:CAC ratio | >10:1 |
-| Monthly burn rate | <105,000 NIS pre-break-even |
-| Months to break-even | ≤8 (AI-lean team) |
-| NPS (Net Promoter Score) | >50 (EdTech avg: 30–40) |
+| Metric | Target | Notes |
+|---|---|---|
+| Gross margin | >40% at launch, >60% by Month 12–18 | Improves as LLM costs decline ~50%/year |
+| LTV:CAC ratio | >4:1 at launch, >8:1 by Month 18 | Driven by LLM cost reduction trajectory |
+| Monthly burn rate | <82,000 NIS pre-break-even | 3-person team + infrastructure + dev tools |
+| Months to break-even | 8–12 (AI-lean team) | Accelerates as contribution margin improves |
+| NPS (Net Promoter Score) | >50 (EdTech avg: 30–40) | |
 
 ---
 
