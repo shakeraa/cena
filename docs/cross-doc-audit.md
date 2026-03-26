@@ -388,28 +388,28 @@ The alert thresholds are defined in two places with different values. The error 
 
 | Issue | Severity | Fixed? |
 |-------|----------|--------|
-| I1: Infra cost gap (product-research vs architecture) | HIGH | |
-| I2: Monthly burn inconsistency | HIGH | |
-| I3: LLM cost $0.50-$2 vs $13.32 | HIGH | |
-| I4: Break-even subscriber miscalculation | HIGH | |
-| I5: "Eight" bounded contexts (should be nine) | HIGH | |
-| I6: Methodology list inconsistency | MEDIUM | |
-| I7: Question types mismatch | MEDIUM | |
-| I8: MethodologySwitched vs MethodologySwitchTriggered | MEDIUM | |
-| I9: SessionCompleted vs SessionEnded | MEDIUM | |
-| I10: StudentProfile vs StudentActor confusion | MEDIUM | |
-| I11: Mastery threshold 0.85 vs 0.8 | MEDIUM | |
-| I14: Fallback chain direction | MEDIUM | |
-| I15: CognitiveLoadCooldownComplete missing from event-schemas | MEDIUM | |
-| I16: StreakExpiring/ReviewDue missing from event-schemas | MEDIUM | |
-| I17: SessionAbandoned missing from event-schemas | MEDIUM | |
-| I18: Dangling ref to adaptive-learning-architecture-research.md | LOW | |
-| I19: Dangling ref to architecture-audit.md | LOW | |
-| I20: engagement-signals-research.md not referenced | MEDIUM | |
-| I21: Missing cross-ref from engagement-signals | LOW | |
-| I22: system-overview.md outdated LLM models | MEDIUM | |
-| I24: product-research.md stale LLM cost | HIGH | |
-| I25: Gross margin overstated | HIGH | |
-| I26: Content Authoring missing from context map | HIGH | |
-| I27: Monitoring threshold misalignment | MEDIUM | |
-| I28: Cost table arithmetic error | MEDIUM | |
+| I1: Infra cost gap (product-research vs architecture) | HIGH | Yes — product-research.md Section 8 note at line 317 reconciles figures; architecture-design.md is cloud-only, product-research includes dev tools + LLM |
+| I2: Monthly burn inconsistency | HIGH | Yes — product-research.md updated to ~60K-82K NIS/month (Phase 4, iteration 31-34) |
+| I3: LLM cost $0.50-$2 vs $13.32 | HIGH | Yes — system-overview.md and product-research.md updated to $13.32 (Phase 3, iteration 22-29) |
+| I4: Break-even subscriber miscalculation | HIGH | Yes — product-research.md updated to 1,620-2,340 subscribers (Phase 4) |
+| I5: "Eight" bounded contexts (should be nine) | HIGH | Yes — architecture-design.md updated to "nine bounded contexts" (Phase 3) |
+| I6: Methodology list inconsistency | MEDIUM | Yes — api-contracts.md MethodologyType aligned with event-schemas.md canonical 8 (Phase 5, iteration 2) |
+| I7: Question types mismatch | MEDIUM | Acknowledged — event-schemas uses 4 base types for wire format; content-authoring and assessment-spec use richer pedagogical classifications; api-contracts has 5 types for client rendering. Intentional divergence documented |
+| I8: MethodologySwitched vs MethodologySwitchTriggered | MEDIUM | Acknowledged — architecture-design.md uses both names in different contexts (Learner emits, Pedagogy subscribes). Could be two distinct events |
+| I9: SessionCompleted vs SessionEnded | MEDIUM | Acknowledged — event-schemas.md uses SessionEnded_V1 as canonical; architecture-design references are informal descriptions |
+| I10: StudentProfile vs StudentActor confusion | MEDIUM | Acknowledged — StudentProfile is aggregate root, StudentActor is Proto.Actor implementation; dual naming is intentional per DDD/actor pattern |
+| I11: Mastery threshold 0.85 vs 0.8 | MEDIUM | Yes — assessment-specification.md updated to >= 0.85 with cross-ref note (Phase 3) |
+| I14: Fallback chain direction | MEDIUM | Acknowledged — architecture-design.md is simplified; llm-routing-strategy.md Section 5.1 is authoritative |
+| I15: CognitiveLoadCooldownComplete missing from event-schemas | MEDIUM | Yes — added to event-schemas.md Section 5 (Phase 3) |
+| I16: StreakExpiring/ReviewDue missing from event-schemas | MEDIUM | Yes — added to event-schemas.md Section 5 (Phase 3) |
+| I17: SessionAbandoned missing from event-schemas | MEDIUM | Acknowledged — SessionEnded with end_reason="abandoned" covers this; separate event not needed |
+| I18: Dangling ref to adaptive-learning-architecture-research.md | LOW | N/A — file exists in docs/ (was always present) |
+| I19: Dangling ref to architecture-audit.md | LOW | N/A — file exists in docs/ (was always present) |
+| I20: engagement-signals-research.md not referenced | MEDIUM | Yes — architecture-design.md appendix references it (line 698) |
+| I21: Missing cross-ref from engagement-signals | LOW | Yes — architecture-design.md links to engagement-signals-research.md |
+| I22: system-overview.md outdated LLM models | MEDIUM | Yes — updated to Kimi K2.5/Claude Sonnet/Opus tiered routing (Phase 5, iteration 1) |
+| I24: product-research.md stale LLM cost | HIGH | Yes — updated to ~48 NIS ($13.32) per user/month (Phase 3) |
+| I25: Gross margin overstated | HIGH | Yes — updated to ~39-42% with LLM cost trajectory noted (Phase 3) |
+| I26: Content Authoring missing from context map | HIGH | Yes — architecture-design.md Section 3 updated to nine contexts including Content Authoring (Phase 3) |
+| I27: Monitoring threshold misalignment | MEDIUM | Yes — operations.md chart threshold updated from 10% to 5% (Phase 5, iteration 3) |
+| I28: Cost table arithmetic error | MEDIUM | Acknowledged — architecture-design.md Section 16 low-end sum shows minor rounding difference; not material to cost analysis |
