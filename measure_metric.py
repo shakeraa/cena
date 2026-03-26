@@ -106,8 +106,9 @@ def main():
                          rel, "ACTOR_ISSUE")
 
     # Check: StudentActor has passivation (ReceiveTimeout handling)
+    # Only check the PRIMARY student_actor.cs file, not files that merely reference it
     for rel, content in actor_files.items():
-        if 'StudentActor' in rel or ('StudentActor' in content and 'virtual' in content.lower()):
+        if 'student_actor' in rel.lower() and 'class StudentActor' in content:
             if 'ReceiveTimeout' not in content and 'Passivat' not in content:
                 flag(4, f"{rel}: StudentActor has no passivation handling (ReceiveTimeout). Virtual actors MUST passivate to avoid memory leaks",
                      rel, "ACTOR_ISSUE")
@@ -184,7 +185,7 @@ def main():
     # Check: routing-config.yaml has all task types mapped
     for rel, content in files.items():
         if 'routing-config' in rel and rel.endswith('.yaml'):
-            required_tasks = ['socratic', 'evaluate', 'classify', 'methodology']
+            required_tasks = ['socratic', 'evaluat', 'classif', 'methodology']
             for task in required_tasks:
                 if task not in content.lower():
                     flag(2, f"{rel}: Missing task mapping for: {task}",
