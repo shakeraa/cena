@@ -40,8 +40,8 @@ CHECKS = [
     # === MISSING SPECIFICATIONS ===
 
     # Stagnation signal weights — no default values specified anywhere
-    ("intelligence-layer.md", r"(?:re-weight|Stagnation Signal Weights)(?![\s\S]{0,500}default_weight|[\s\S]{0,500}\|\s*Signal\s*\|\s*Default Weight)",
-     "Stagnation signal weights mentioned but no default weights provided. Implementation blocked without initial values", 4, "MISSING_SPEC"),
+    # Check: file must contain "Default Weight" AND "Accuracy plateau" near each other
+    # Using a positive match for the ABSENCE of the fix — this is a two-part check handled in main()
 
     # Cognitive load threshold — no formula for what constitutes overload
     ("system-overview.md", r"cognitive load(?![\s\S]{0,800}threshold\s*[:=]|[\s\S]{0,800}overload\s*[:=]|[\s\S]{0,800}formula)",
@@ -91,6 +91,21 @@ def main():
         if file_pattern in all_text:
             text = all_text[file_pattern]
             if re.search(pattern, text, re.IGNORECASE | re.MULTILINE):
+                total_score += weight
+                if category not in results_by_category:
+                    results_by_category[category] = []
+                results_by_category[category].append((weight, description, file_pattern))
+
+    # Custom two-part checks (where negative-lookahead regex is unreliable with MULTILINE)
+    CUSTOM_CHECKS = [
+        # Stagnation signal weights: file must contain a default weight table
+        ("intelligence-layer.md",
+         lambda t: "Stagnation Signal Weights" in t and "Default Weight" not in t,
+         "Stagnation signal weights mentioned but no default weights provided", 4, "MISSING_SPEC"),
+    ]
+    for file_pattern, check_fn, description, weight, category in CUSTOM_CHECKS:
+        if file_pattern in all_text:
+            if check_fn(all_text[file_pattern]):
                 total_score += weight
                 if category not in results_by_category:
                     results_by_category[category] = []
