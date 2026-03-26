@@ -156,7 +156,7 @@
 | 8 | Create pitch deck with real data | Free |
 | 8-10 | Pitch Eze Vidra (Remagine), iAngels, MindCET angels | Free |
 | 10-12 | Pitch Explorer Investments, Firstime VC | Free |
-| 12-16 | Close SAFE round: 1.2-1.5M NIS | Receive money |
+| 12-16 | Close SAFE round: 1.5M NIS target | Receive money |
 
 **Total cost to reach funded: Zero.** Everything uses free credits, your time, and AI agents.
 
