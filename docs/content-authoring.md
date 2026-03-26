@@ -32,16 +32,46 @@ The architecture extensively describes how content is served and adapted but was
 
 ---
 
-## 3. Content Pipeline: LLM Extraction → Expert Review → QA → Publication
+## 3. Content Pipeline: Corpus Learning → Generation → Expert Review → QA → Publication
 
-### 3.1 Stage 1: LLM Extraction (Architect + AI Agents)
+### Core Principle: Learn First, Generate Second
 
-**Input:** Official Bagrut syllabus PDFs, approved textbook chapters, Ministry of Education curriculum documents
+The LLM does NOT generate content from general knowledge. It first **learns the existing corpus** — real Bagrut exams, approved textbooks, teacher materials, Ministry of Education guidelines — and then generates questions and explanations that match the **exact style, difficulty, and terminology** of the Bagrut exam ecosystem.
+
+This produces questions that feel like real Bagrut prep, not generic AI-generated exercises.
+
+### 3.0 Stage 0: Corpus Ingestion (Foundation — runs once per subject)
+
+**Input corpus (per subject):**
+- Official Bagrut exam papers (last 10–15 years, publicly available from Ministry of Education)
+- Approved textbook chapters (1–2 primary textbooks per subject, e.g., Geva for Math, Halliday for Physics)
+- Ministry of Education syllabus documents and teaching guides
+- Teacher-created materials and worksheets (contributed by education advisor)
+- Common student errors documented by experienced Bagrut teachers
 
 **Process:**
-1. Feed source material to Kimi K2.5 (long context, structured extraction, cheapest tier)
-2. Prompt instructs: extract concept nodes, prerequisite edges, difficulty estimates, key formulas, common misconceptions
-3. Output: structured JSON graph per syllabus unit
+1. Feed the entire corpus into Kimi K2.5 (256K context, batch mode) in structured chunks
+2. For each corpus source, the LLM produces a **corpus analysis document**:
+   - Terminology index: exact Hebrew terms used for each concept, with English equivalents
+   - Question style patterns: how Bagrut exams phrase questions (e.g., "הוכח כי..." / "חשב את..." / "מצא את...")
+   - Difficulty distribution: how many questions at each Bloom's level per exam
+   - Common distractor patterns: what wrong answers appear in real MCQs and why they're wrong
+   - Scoring rubrics: how partial credit is awarded in real Bagrut grading
+   - Cross-concept connections: which concepts appear together in multi-part questions
+3. The corpus analysis documents become the **style guide** for all subsequent content generation
+4. Stored as structured JSON artifacts in S3, loaded by the generation pipeline
+
+**Why this matters:** A student preparing for Bagrut expects questions that look and feel like real Bagrut questions. If Cena generates generic math questions, it fails the credibility test. By learning the corpus first, every generated question inherits the exact phrasing patterns, difficulty calibration, and pedagogical style of real Bagrut materials.
+
+### 3.1 Stage 1: Knowledge Graph Extraction (from corpus)
+
+**Input:** Corpus analysis documents + official syllabus PDFs
+
+**Process:**
+1. Feed corpus analysis + syllabus to Kimi K2.5 (long context, structured extraction)
+2. Prompt instructs: extract concept nodes, prerequisite edges, difficulty estimates, key formulas, common misconceptions — **using the exact terminology from the corpus**
+3. Cross-reference extracted graph against real Bagrut exam coverage: every concept that has appeared in an exam in the last 10 years must be represented
+4. Output: structured JSON graph per syllabus unit, with corpus provenance (which textbook/exam each concept was derived from)
 
 **Output per concept node:**
 ```json
@@ -65,32 +95,45 @@ The architecture extensively describes how content is served and adapted but was
 
 **Estimated throughput:** 200–400 concept nodes per day using Kimi batch processing. One subject (2,000 nodes) takes 5–10 working days of extraction.
 
-### 3.2 Stage 2: Question Generation (Kimi + Sonnet)
+### 3.2 Stage 2: Question Generation (Corpus-Informed)
 
-For each concept node, generate a question bank:
-
-**Question types supported at MVP:**
-| Type | Evaluation Method | Example |
-|------|------------------|---------|
-| **Multiple choice** (4 options) | Deterministic | "Which rule applies to d/dx[sin(x²)]?" |
-| **True/False** with justification | LLM evaluation of justification | "The derivative of e^(2x) is e^(2x). True or false? Explain." |
-| **Numeric answer** | Exact match ± tolerance | "Find f'(3) if f(x) = x³ + 2x" → 29 |
-| **Expression input** | CAS (SymPy) equivalence check | "Differentiate f(x) = ln(3x+1)" → 3/(3x+1) |
-| **Ordering/Sequencing** | Deterministic | "Order these steps to solve using integration by parts" |
-
-**Target:** 8–15 questions per concept (mix of types and Bloom's levels)
+For each concept node, generate a question bank **in the style of real Bagrut exams**.
 
 **Generation process:**
-1. Kimi K2.5 generates initial question bank (batch, overnight)
-2. Claude Sonnet reviews for quality, ambiguity, and Bloom's level alignment
-3. Expert reviews flagged items (low confidence, complex wording)
+1. **Input to LLM:** The concept definition + the corpus style guide (terminology, question phrasing patterns, distractor patterns, scoring rubrics from Stage 0) + 3–5 real Bagrut questions on this concept as examples
+2. **Kimi K2.5** generates initial question bank (batch, overnight). Prompt: "Generate questions in the exact style of the provided Bagrut examples. Use the same Hebrew terminology. Match the difficulty distribution. Create distractors that reflect real student misconceptions documented in the corpus."
+3. **Claude Sonnet** reviews each question for: quality, ambiguity, Bloom's level alignment, and faithfulness to corpus style. Flags any question that "doesn't feel like a real Bagrut question."
+4. **SymPy validation** for numeric/expression questions: automatically verify that the correct answer is mathematically valid
+5. Expert reviews flagged items (low confidence, complex wording, style mismatch)
 
-### 3.3 Stage 3: Explanation & Diagram Generation
+**Question types supported at MVP:**
+| Type | Evaluation Method | Example (Bagrut style) |
+|------|------------------|------------------------|
+| **Multiple choice** (4 options) | Deterministic | "נתונה הפונקציה f(x)=sin(x²). מהי f'(x)?" with Bagrut-style distractors |
+| **True/False** with justification | LLM evaluation | "הנגזרת של e^(2x) היא e^(2x). נכון או לא? נמק." |
+| **Numeric answer** | Exact match ± tolerance | "חשב f'(3) עבור f(x)=x³+2x" → 29 |
+| **Expression input** | CAS (SymPy) equivalence | "גזור את f(x)=ln(3x+1)" → 3/(3x+1) |
+| **Ordering/Sequencing** | Deterministic | "סדר את השלבים בפתרון בעזרת אינטגרציה בחלקים" |
+| **Multi-part problem** | Staged evaluation | Bagrut-style "a), b), c)" problems where each part builds on the previous |
+| **Proof/Derivation** | LLM evaluation (Sonnet) | "הוכח כי..." — evaluated for logical flow and completeness |
+| **Diagram interpretation** | Deterministic + LLM | Given a graph/circuit/diagram, answer questions about it |
 
-For each concept:
-- **Explanation templates** (3 per concept): one per methodology family (Socratic prompt sequence, direct explanation, worked example). Generated by Sonnet, reviewed by expert.
-- **Diagram specifications** (1–2 per concept): JSON description for the Remotion/SVG engine. Generated by Kimi, rendered and visually reviewed.
-- **Video script** (1 per concept, optional): Sonnet generates script for Remotion rendering. Batch process.
+**Target:** 8–15 questions per concept (mix of types and Bloom's levels, matching the distribution found in real Bagrut exams from corpus analysis)
+
+**Corpus provenance tracking:** Each generated question records which real Bagrut questions it was modeled after, enabling traceability and quality auditing
+
+### 3.3 Stage 3: Explanation & Diagram Generation (Corpus-Informed)
+
+For each concept, explanations are generated **using the language and pedagogical patterns from the learned corpus** — matching how approved textbooks explain concepts, not generic LLM explanations.
+
+- **Explanation templates** (3 per concept, each methodology family):
+  - Socratic prompt sequence: modeled after the questioning patterns used in the corpus textbooks' "think about it" sections
+  - Direct explanation: mirrors the textbook's explanatory style, with the same notation conventions and Hebrew terminology
+  - Worked example: follows the step-by-step format from real Bagrut exam solutions (published by Ministry of Education)
+  - Generated by Sonnet with corpus style guide as context. Reviewed by expert.
+- **Diagram specifications** (1–2 per concept): JSON description for the Remotion/SVG engine. Generated by Kimi using visual descriptions from the textbook corpus (e.g., "draw the graph as shown in Geva Ch.5 Fig.3 style"). Rendered and visually reviewed.
+- **Video script** (1 per concept, optional): Sonnet generates script for Remotion rendering, using the explanation template as the narration base. Batch process.
+- **Common error explanations** (1–3 per concept): Generated from the corpus's documented common misconceptions. "Students often think X because Y — here's why that's wrong." These are served when the stagnation detector identifies a recurring error pattern.
 
 ### 3.4 Stage 4: Expert Review (Domain Expert, part-time)
 
