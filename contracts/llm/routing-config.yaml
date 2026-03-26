@@ -1,0 +1,506 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — LLM Model Routing Configuration
+# Layer: LLM ACL | Updated: March 2026
+#
+# This file defines task-to-model mapping, fallback chains, rate limits,
+# cost caps, circuit breaker thresholds, and prompt caching config.
+# Prices verified against: Anthropic & Moonshot AI official pricing (March 2026).
+# ═══════════════════════════════════════════════════════════════════════
+
+# ─────────────────────────────────────────────────────────────────────
+# 1. MODEL DEFINITIONS
+# ─────────────────────────────────────────────────────────────────────
+
+models:
+  kimi_k2_turbo:
+    model_id: "kimi-k2-turbo"
+    provider: "moonshot"
+    api_base_url: "${KIMI_API_BASE_URL}"
+    tier: "kimi_fast"
+    context_window: 262144
+    max_output_tokens: 65535
+    cost_per_input_mtok: 0.40
+    cost_per_output_mtok: 2.00
+    cost_per_cached_input_mtok: 0.10
+    is_trusted_provider: false     # PII stripped before sending
+    notes: "60 tok/s, lowest latency — content filtering gate"
+
+  kimi_k2_0905:
+    model_id: "kimi-k2-0905-preview"
+    provider: "moonshot"
+    api_base_url: "${KIMI_API_BASE_URL}"
+    tier: "kimi_standard"
+    context_window: 262144
+    max_output_tokens: 65535
+    cost_per_input_mtok: 0.40
+    cost_per_output_mtok: 2.00
+    cost_per_cached_input_mtok: 0.10
+    is_trusted_provider: false
+    notes: "Best value for structured extraction — JSON Schema support"
+
+  kimi_k2_5:
+    model_id: "kimi-k2.5"
+    provider: "moonshot"
+    api_base_url: "${KIMI_API_BASE_URL}"
+    tier: "kimi_advanced"
+    context_window: 262144
+    max_output_tokens: 65535
+    cost_per_input_mtok: 0.45
+    cost_per_output_mtok: 2.20
+    cost_per_cached_input_mtok: 0.12
+    is_trusted_provider: false
+    notes: "Multimodal, reasoning, tool calling — diagrams, long-context extraction"
+
+  claude_sonnet_4_6:
+    model_id: "claude-sonnet-4-6-20260215"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "sonnet"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 3.00
+    cost_per_output_mtok: 15.00
+    cost_per_cached_input_mtok: 0.30
+    is_trusted_provider: true      # Anthropic — PII allowed (with data residency)
+    notes: "Primary tutoring model — 40-63 tok/s"
+
+  claude_sonnet_4_5:
+    model_id: "claude-sonnet-4-5-20260101"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "sonnet"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 3.00
+    cost_per_output_mtok: 15.00
+    cost_per_cached_input_mtok: 0.30
+    is_trusted_provider: true
+    notes: "Fallback for Sonnet 4.6"
+
+  claude_haiku_4_5:
+    model_id: "claude-haiku-4-5-20260101"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "sonnet"   # treated as degraded-sonnet in fallback
+    context_window: 200000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 1.00
+    cost_per_output_mtok: 5.00
+    cost_per_cached_input_mtok: 0.10
+    is_trusted_provider: true
+    notes: "Degraded fallback for Kimi and Sonnet tasks"
+
+  claude_opus_4_6:
+    model_id: "claude-opus-4-6-20260215"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "opus"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 5.00
+    cost_per_output_mtok: 25.00
+    cost_per_cached_input_mtok: 0.50
+    is_trusted_provider: true
+    notes: "Multi-factor reasoning — methodology switches, complex decisions"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 2. TASK-TO-MODEL MAPPING & FALLBACK CHAINS
+# ─────────────────────────────────────────────────────────────────────
+
+task_routing:
+  socratic_question:
+    primary: claude_sonnet_4_6
+    fallback_chain:
+      - claude_sonnet_4_5
+      - claude_haiku_4_5
+    temperature: 0.4
+    max_tokens: 500
+    notes: "Conversational tutoring — Sonnet quality sufficient, 40% cheaper than Opus"
+
+  answer_evaluation:
+    primary: claude_sonnet_4_6
+    fallback_chain:
+      - claude_sonnet_4_5
+      - claude_haiku_4_5
+    temperature: 0.1
+    max_tokens: 800
+    notes: "Rubric evaluation — low temperature for consistent scoring"
+
+  error_classification:
+    primary: kimi_k2_0905
+    fallback_chain:
+      - kimi_k2_5
+      - claude_haiku_4_5
+      - claude_sonnet_4_6
+    temperature: 0.0
+    max_tokens: 200
+    notes: "Structured classification — Kimi is 6.7x cheaper. PII stripped."
+
+  methodology_switch:
+    primary: claude_opus_4_6
+    fallback_chain:
+      - claude_sonnet_4_6   # with extended thinking enabled
+      - claude_sonnet_4_5
+    temperature: 0.3
+    max_tokens: 800
+    notes: "Highest-stakes reasoning — Opus outperforms Sonnet by 15-29% on multi-factor decisions"
+
+  content_filter:
+    primary: kimi_k2_turbo
+    fallback_chain:
+      - kimi_k2_0905
+      - claude_haiku_4_5
+    temperature: 0.0
+    max_tokens: 50
+    notes: "Fast gate — binary classification, lowest latency path. PII stripped."
+
+  diagram_generation:
+    primary: kimi_k2_5
+    fallback_chain:
+      - kimi_k2_0905
+      - claude_sonnet_4_6
+    temperature: 0.2
+    max_tokens: 1500
+    notes: "Structured SVG output — Kimi K2.5 validated for tool calling + structured output"
+
+  feynman_explanation:
+    primary: claude_sonnet_4_6
+    fallback_chain:
+      - claude_sonnet_4_5
+      - claude_haiku_4_5
+    temperature: 0.2
+    max_tokens: 600
+    notes: "Evaluation of student explanation — Sonnet sufficient for grading quality"
+
+  stagnation_analysis:
+    primary: kimi_k2_0905
+    fallback_chain:
+      - kimi_k2_5
+      - claude_haiku_4_5
+    temperature: 0.0
+    max_tokens: 300
+    notes: "Pattern recognition on structured student data — classification + extraction"
+
+  video_script:
+    primary: claude_sonnet_4_6
+    fallback_chain:
+      - claude_sonnet_4_5
+    temperature: 0.5
+    max_tokens: 2000
+    notes: "Creative + structured JSON for Remotion — Sonnet 12% better than Kimi on JSON compliance"
+
+  knowledge_graph_extraction:
+    primary: kimi_k2_5
+    fallback_chain:
+      - kimi_k2_0905
+      - claude_sonnet_4_6
+    temperature: 0.0
+    max_tokens: 4000
+    notes: "Batch job — long-context structured extraction. Use batch API for 50% discount."
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 3. RATE LIMITS & TIMEOUTS
+# ─────────────────────────────────────────────────────────────────────
+
+rate_limits:
+  # Per-model rate limits (requests per minute)
+  kimi_k2_turbo:
+    rpm: 200
+    tpm: 500000          # tokens per minute
+    timeout_seconds: 10
+    retry_policy:
+      max_retries: 3
+      backoff_base_seconds: 0.5
+      backoff_max_seconds: 8
+      retry_on: [429, 500, 502, 503]
+
+  kimi_k2_0905:
+    rpm: 150
+    tpm: 400000
+    timeout_seconds: 15
+    retry_policy:
+      max_retries: 3
+      backoff_base_seconds: 0.5
+      backoff_max_seconds: 8
+      retry_on: [429, 500, 502, 503]
+
+  kimi_k2_5:
+    rpm: 100
+    tpm: 400000
+    timeout_seconds: 20
+    retry_policy:
+      max_retries: 2
+      backoff_base_seconds: 1.0
+      backoff_max_seconds: 16
+      retry_on: [429, 500, 502, 503]
+
+  claude_sonnet_4_6:
+    rpm: 100
+    tpm: 300000
+    timeout_seconds: 30
+    retry_policy:
+      max_retries: 2
+      backoff_base_seconds: 1.0
+      backoff_max_seconds: 16
+      retry_on: [429, 500, 502, 503, 529]
+
+  claude_sonnet_4_5:
+    rpm: 100
+    tpm: 300000
+    timeout_seconds: 30
+    retry_policy:
+      max_retries: 2
+      backoff_base_seconds: 1.0
+      backoff_max_seconds: 16
+      retry_on: [429, 500, 502, 503, 529]
+
+  claude_haiku_4_5:
+    rpm: 200
+    tpm: 500000
+    timeout_seconds: 15
+    retry_policy:
+      max_retries: 3
+      backoff_base_seconds: 0.5
+      backoff_max_seconds: 8
+      retry_on: [429, 500, 502, 503, 529]
+
+  claude_opus_4_6:
+    rpm: 50
+    tpm: 200000
+    timeout_seconds: 45          # Opus is slower, needs more headroom
+    retry_policy:
+      max_retries: 2
+      backoff_base_seconds: 2.0
+      backoff_max_seconds: 30
+      retry_on: [429, 500, 502, 503, 529]
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 4. COST CAPS & BUDGET ENFORCEMENT
+# ─────────────────────────────────────────────────────────────────────
+
+cost_caps:
+  per_student:
+    daily_output_token_limit: 25000    # Hard cutoff — 25K output tokens/day
+    daily_cost_limit_usd: 0.70         # Alert threshold; aligned with monitoring
+    daily_cost_hard_limit_usd: 1.50    # Absolute hard cap per student per day
+    monthly_cost_limit_usd: 20.00      # Per-student monthly budget
+
+  per_model_monthly:
+    kimi_k2_turbo: 500.00              # USD monthly cap
+    kimi_k2_0905: 1000.00
+    kimi_k2_5: 800.00
+    claude_sonnet_4_6: 15000.00
+    claude_sonnet_4_5: 5000.00
+    claude_haiku_4_5: 3000.00
+    claude_opus_4_6: 5000.00
+
+  global:
+    monthly_total_limit_usd: 30000.00  # All models combined
+    emergency_kill_switch: true         # Halt all LLM calls if global limit hit
+    kill_switch_notify:
+      - "ops@cena.edu"
+      - "cto@cena.edu"
+
+  alert_thresholds:
+    daily_budget_warning_pct: 80       # Alert at 80% of daily budget
+    daily_budget_critical_pct: 150     # Critical alert at 150% (overage)
+    monthly_budget_warning_pct: 70     # Alert at 70% of monthly budget
+    cost_spike_multiplier: 2.0         # Alert if daily cost > 2x rolling 7-day average
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 5. CIRCUIT BREAKER CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────
+
+circuit_breaker:
+  default:
+    failure_threshold: 5               # Consecutive failures before opening
+    success_threshold: 2               # Successes in half-open before closing
+    open_duration_seconds: 60          # How long circuit stays open
+    half_open_max_requests: 1          # Test requests in half-open state
+    monitored_status_codes: [500, 502, 503, 429]
+    exclude_from_failure_count: [400, 401, 403, 404]  # Client errors don't trip breaker
+
+  # Per-model overrides
+  overrides:
+    kimi_k2_turbo:
+      failure_threshold: 8             # Higher tolerance — it's a fast gate
+      open_duration_seconds: 30        # Recover faster
+
+    claude_opus_4_6:
+      failure_threshold: 3             # Lower tolerance — critical path
+      open_duration_seconds: 120       # Stay open longer to avoid cascading failures
+      success_threshold: 3             # Need more successes to restore trust
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 6. PROMPT CACHING CONFIGURATION
+# ─────────────────────────────────────────────────────────────────────
+
+prompt_caching:
+  enabled: true
+  target_cache_hit_rate: 0.60          # 60% target for tutoring context
+
+  strategies:
+    # System prompts are static — always cache
+    system_prompt:
+      ttl_seconds: 3600               # Anthropic 1-hour write tier ($6/MTok write, $0.30 read)
+      cache_key: "sha256(template_name + model_id)"
+      applies_to: ["claude_sonnet_4_6", "claude_sonnet_4_5", "claude_opus_4_6"]
+      notes: "System prompts change rarely. 1-hour TTL for lowest cache-read cost."
+
+    # Student context changes per-session — shorter TTL
+    student_context:
+      ttl_seconds: 300                 # Anthropic 5-minute write tier ($3.75/MTok write, $0.30 read)
+      cache_key: "sha256(student_id + session_id + mastery_snapshot_hash)"
+      applies_to: ["claude_sonnet_4_6", "claude_sonnet_4_5", "claude_opus_4_6"]
+      notes: "Student context is stable within a session. 5-min TTL sufficient."
+
+    # Kimi automatic caching — no explicit TTL needed
+    kimi_auto_cache:
+      ttl_seconds: 0                   # Kimi handles caching automatically
+      cache_key: "provider_managed"
+      applies_to: ["kimi_k2_turbo", "kimi_k2_0905", "kimi_k2_5"]
+      notes: "Kimi automatic context caching — 75% input cost reduction on hits."
+
+  # Cache key composition for Anthropic cache_control blocks
+  anthropic_cache_control:
+    # Order matters: items are cached in this order in the messages array
+    cacheable_blocks:
+      - type: "system"
+        position: 0
+        cache_control: { type: "ephemeral" }
+      - type: "student_context"
+        position: 1
+        cache_control: { type: "ephemeral" }
+    # Dialogue history is NOT cached — changes every turn
+    non_cacheable:
+      - "dialogue_history"
+      - "student_answer"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 7. HEBREW QUALITY GATE
+# ─────────────────────────────────────────────────────────────────────
+
+hebrew_quality_gate:
+  enabled: true
+  minimum_score_threshold: 3.5         # Average across all criteria (1-5 scale)
+  blocker_threshold: 2.0               # Any single criterion below this = blocker
+
+  criteria:
+    - id: "terminology_accuracy"
+      description: "Uses standard Hebrew math terms (e.g., כלל השרשרת, not transliterations)"
+      weight: 0.25
+
+    - id: "socratic_quality"
+      description: "Asks guiding questions without revealing answer"
+      weight: 0.20
+
+    - id: "mathematical_correctness"
+      description: "Formulas, steps, and notation are correct"
+      weight: 0.25
+
+    - id: "pedagogical_appropriateness"
+      description: "Matches Bagrut level, not university level"
+      weight: 0.15
+
+    - id: "hebrew_fluency"
+      description: "Natural phrasing, not translated English"
+      weight: 0.15
+
+  # When to run quality gate (not on every request — sampled)
+  sampling:
+    mode: "percentage"                 # "percentage" or "every_n"
+    sample_rate: 0.05                  # 5% of tutoring requests are quality-checked
+    force_check_on:
+      - "new_concept_introduction"     # Always check first interaction with new concept
+      - "methodology_switch"           # Always check first interaction after switch
+    store_results: true                # Persist for weekly quality reports
+
+  # Action on quality gate failure
+  on_failure:
+    action: "log_and_alert"            # Options: "block_response", "log_and_alert", "fallback_to_opus"
+    alert_channel: "slack://cena-quality-alerts"
+    escalation:
+      consecutive_failures: 3          # 3 consecutive failures = escalate
+      escalation_action: "fallback_to_opus"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 8. PII HANDLING
+# ─────────────────────────────────────────────────────────────────────
+
+pii_handling:
+  # Fields with pii=True annotation in acl-interfaces.py are stripped before
+  # sending to non-trusted providers (is_trusted_provider=false in model config).
+  strip_strategy: "replace_with_token"   # Options: "replace_with_token", "hash", "remove"
+  token_format: "ANON_{field}_{hash8}"   # e.g., ANON_student_id_a3f4b2c1
+  hash_algorithm: "sha256"
+  salt: "${PII_ANONYMIZATION_SALT}"      # Env var — consistent within session
+  log_anonymization_mapping: false       # NEVER log the mapping in production
+  restore_on_response: true              # Restore anonymized tokens in responses
+
+  trusted_providers:
+    - "anthropic"
+  untrusted_providers:
+    - "moonshot"
+
+
+# ─────────────────────────────────────────────────────────────────────
+# 9. OBSERVABILITY
+# ─────────────────────────────────────────────────────────────────────
+
+observability:
+  metrics:
+    - name: "llm_request_duration_ms"
+      type: "histogram"
+      labels: ["model_id", "task_type", "status"]
+      buckets: [100, 250, 500, 1000, 2500, 5000, 10000, 30000]
+
+    - name: "llm_tokens_total"
+      type: "counter"
+      labels: ["model_id", "task_type", "direction"]   # direction: input | output
+
+    - name: "llm_cost_usd"
+      type: "counter"
+      labels: ["model_id", "task_type", "student_id_hash"]
+
+    - name: "llm_cache_hits_total"
+      type: "counter"
+      labels: ["model_id", "cache_type"]
+
+    - name: "llm_fallback_total"
+      type: "counter"
+      labels: ["task_type", "from_model", "to_model", "reason"]
+
+    - name: "llm_circuit_breaker_state"
+      type: "gauge"
+      labels: ["model_id"]             # 0=closed, 1=half_open, 2=open
+
+    - name: "llm_budget_usage_pct"
+      type: "gauge"
+      labels: ["student_id_hash", "budget_type"]  # budget_type: daily | monthly
+
+  tracing:
+    enabled: true
+    service_name: "cena-llm-acl"
+    exporter: "otlp"                   # OpenTelemetry
+    sample_rate: 0.10                  # 10% of requests traced in production
+    always_trace_on:
+      - "methodology_switch"           # Always trace high-stakes decisions
+      - "circuit_breaker_trip"
+      - "budget_exhausted"
+      - "quality_gate_failure"
+
+  logging:
+    level: "INFO"
+    redact_pii: true                   # Redact PII from all log output
+    log_prompts: false                 # NEVER log full prompts in production
+    log_token_counts: true
+    log_latency: true
+    log_model_selection: true
+    log_cost: true
