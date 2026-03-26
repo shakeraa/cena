@@ -1,162 +1,144 @@
 #!/usr/bin/env python3
 """
-Autoresearch metric Phase 14: Task Plan Quality & Completeness.
-Validates that every task has strict acceptance criteria, tests,
-dependencies, and full domain coverage.
+Autoresearch metric Phase 15: Tasks ↔ Contracts Traceability.
+Every interface, method, algorithm, and read model in contracts/
+must have a corresponding task that explicitly implements it.
 Target: 0.
 """
 
+import os
 import re
 from pathlib import Path
 
-TASKS_DIR = Path(__file__).parent / "tasks"
+CONTRACTS = Path(__file__).parent / "contracts"
+TASKS = Path(__file__).parent / "tasks"
 
 
 def main():
     total = 0
     results = {}
 
-    def flag(w, desc, f, cat):
+    def flag(w, desc, cat):
         nonlocal total
         total += w
-        results.setdefault(cat, []).append((w, desc, f))
+        results.setdefault(cat, []).append((w, desc))
 
-    files = {}
-    for f in sorted(TASKS_DIR.glob("*.md")):
-        files[f.name] = f.read_text()
+    # Load all task content
+    task_text = ""
+    for root, _, files in os.walk(TASKS):
+        for f in files:
+            if f.endswith(".md"):
+                task_text += open(os.path.join(root, f)).read().lower()
 
-    # ═══════════════════════════════════════════════════════════════
-    # 1. STRUCTURAL CHECKS (every task file)
-    # ═══════════════════════════════════════════════════════════════
+    # Load contract content
+    contracts = {}
+    for root, _, files in os.walk(CONTRACTS):
+        for f in files:
+            if f.endswith(('.cs', '.py', '.ts', '.dart', '.proto', '.graphql', '.yaml', '.cypher')):
+                contracts[f] = open(os.path.join(root, f)).read()
 
-    for fname, content in files.items():
-        if fname == "00-master-plan.md":
-            continue
+    # ═══════════════════════════════════════════════════
+    # 1. DOMAIN SERVICES (each interface method needs a task)
+    # ═══════════════════════════════════════════════════
 
-        # Count tasks (## TASK-NNN or ## XXX-NNN patterns)
-        tasks = re.findall(r'^## \w+-\d+', content, re.MULTILINE)
-        if len(tasks) < 3:
-            flag(3, f"{fname}: Only {len(tasks)} tasks defined — expected at least 5", fname, "COVERAGE")
+    ds = contracts.get("domain-services.cs", "")
 
-        # Every task must have acceptance criteria checkboxes
-        checkbox_count = content.count("- [ ]")
-        if checkbox_count < len(tasks) * 3:
-            flag(3, f"{fname}: {checkbox_count} checkboxes for {len(tasks)} tasks — need at least 3 per task", fname, "CRITERIA")
+    services = [
+        ("IPrerequisiteEnforcementService", "prerequisiteenforcement", 4),
+        ("IBktService.BatchUpdate", "batchupdate", 3),
+        ("IBktService.ReloadParametersAsync", "reloadparameters", 2),
+        ("IHalfLifeRegressionService.ComputeReviewSchedule", "computereviewschedule", 2),
+        ("ICognitiveLoadService.ComputeCooldownMinutes", "cooldownminutes", 2),
+        ("ICognitiveLoadService.RecommendDifficultyAdjustment", "difficultyadjustment", 2),
+    ]
 
-        # Every task must have a Test section
-        test_count = len(re.findall(r'\*\*Test', content))
-        if test_count < len(tasks):
-            flag(2, f"{fname}: {test_count} tests for {len(tasks)} tasks — every task needs a test", fname, "TESTING")
+    for svc, keyword, weight in services:
+        if svc.split(".")[0] in ds and keyword not in task_text:
+            flag(weight, f"{svc} in domain-services.cs has no task", "DOMAIN_SERVICE")
 
-        # Every task must have Blocked by
-        blocked_count = len(re.findall(r'Blocked by', content, re.IGNORECASE))
-        if blocked_count < len(tasks):
-            flag(2, f"{fname}: {blocked_count} 'Blocked by' for {len(tasks)} tasks — missing dependencies", fname, "DEPS")
+    # ═══════════════════════════════════════════════════
+    # 2. READ MODEL VIEWS (each needs schema + Apply methods)
+    # ═══════════════════════════════════════════════════
 
-        # Every task must have Priority
-        priority_count = len(re.findall(r'Priority.*P[0-3]', content))
-        if priority_count < len(tasks):
-            flag(1, f"{fname}: {priority_count} priorities for {len(tasks)} tasks — all need P0-P3", fname, "PRIORITY")
+    views = [
+        ("TeacherDashboardView", "teacherdashboardview"),
+        ("ParentProgressView", "parentprogressview"),
+        ("MethodologyEffectivenessView", "methodologyeffectivenessview"),
+        ("RetentionCohortView", "retentioncohortview"),
+    ]
 
-    # ═══════════════════════════════════════════════════════════════
-    # 2. DOMAIN COVERAGE (all 8 domains must exist)
-    # ═══════════════════════════════════════════════════════════════
+    for view, keyword in views:
+        if view in contracts.get("marten-event-store.cs", "") and keyword not in task_text:
+            flag(2, f"{view} read model has no implementation task", "READ_MODEL")
 
-    required_domains = {
-        "01-data-layer.md": "PostgreSQL, Marten, Neo4j, Redis",
-        "02-actor-system.md": "Proto.Actor, event sourcing",
-        "03-llm-layer.md": "FastAPI, Claude, Kimi",
-        "04-mobile-app.md": "Flutter, Dart",
-        "05-frontend-web.md": "React, TypeScript",
-        "06-infrastructure.md": "AWS, NATS, CI/CD",
-        "07-content-pipeline.md": "Neo4j, Kimi batch",
-        "08-security-compliance.md": "GDPR, Auth, PII",
-    }
+    # ═══════════════════════════════════════════════════
+    # 3. ACTOR TOPOLOGY (each actor in topology needs a task)
+    # ═══════════════════════════════════════════════════
 
-    for domain_file, tech in required_domains.items():
-        if domain_file not in files:
-            flag(4, f"Missing domain file: {domain_file} ({tech})", domain_file, "COVERAGE")
+    topo = contracts.get("actor_system_topology.cs", "")
 
-    # ═══════════════════════════════════════════════════════════════
-    # 3. CROSS-DOMAIN DEPENDENCY INTEGRITY
-    # ═══════════════════════════════════════════════════════════════
+    topology_actors = [
+        ("ActorSystemManager", "actorsystemmanager", 3),
+        ("AnalyticsAggregatorActor", "analyticsaggregator", 2),
+        ("DeadLetterWatcher", "deadletterwatcher", 2),
+        ("OutreachDispatcherActor", "outreachdispatcher", 2),
+        ("WhatsAppWorkerActor", "whatsappworker", 1),
+    ]
 
-    all_content = "\n".join(files.values())
+    for actor, keyword, weight in topology_actors:
+        if actor in topo and keyword not in task_text:
+            flag(weight, f"{actor} in topology has no implementation task", "TOPOLOGY")
 
-    # Check: Data tasks reference contract files
-    if "01-data-layer.md" in files:
-        data = files["01-data-layer.md"]
-        if "marten-event-store.cs" not in data:
-            flag(2, "Data tasks don't reference marten-event-store.cs contract", "01-data-layer.md", "CONTRACT_REF")
-        if "neo4j-schema.cypher" not in data:
-            flag(2, "Data tasks don't reference neo4j-schema.cypher contract", "01-data-layer.md", "CONTRACT_REF")
+    # ═══════════════════════════════════════════════════
+    # 4. TEST PATTERNS (contract defines test patterns)
+    # ═══════════════════════════════════════════════════
 
-    # Check: Actor tasks reference actor contracts
-    if "02-actor-system.md" in files:
-        actor = files["02-actor-system.md"]
-        if "student_actor" not in actor.lower():
-            flag(2, "Actor tasks don't reference student_actor contract", "02-actor-system.md", "CONTRACT_REF")
+    tests = contracts.get("actor_tests.cs", "")
+    test_patterns = [
+        ("BktPropertyTests", "propertybased", 2),
+        ("StudentActorLoadTests", "loadtest", 2),
+        ("ChaosTests", "chaostest", 2),
+    ]
 
-    # Check: Mobile tasks have Arabic support task
-    if "04-mobile-app.md" in files:
-        mobile = files["04-mobile-app.md"]
-        if "arabic" not in mobile.lower() and "ar" not in mobile:
-            flag(3, "Mobile tasks missing Arabic language support task", "04-mobile-app.md", "ARABIC")
+    for tp, keyword, weight in test_patterns:
+        if tp in tests and keyword not in task_text:
+            flag(weight, f"{tp} in actor_tests.cs has no task", "TEST_PATTERN")
 
-    # Check: Security tasks cover all 5 architect-identified attack vectors
-    if "08-security-compliance.md" in files:
-        sec = files["08-security-compliance.md"]
-        attack_vectors = ["IDOR", "prompt injection", "PII", "GDPR", "rate limit"]
-        for av in attack_vectors:
-            if av.lower() not in sec.lower():
-                flag(2, f"Security tasks missing coverage for: {av}", "08-security-compliance.md", "SEC_COVERAGE")
+    # ═══════════════════════════════════════════════════
+    # 5. SUPERVISION (contract defines strategies)
+    # ═══════════════════════════════════════════════════
 
-    # ═══════════════════════════════════════════════════════════════
-    # 4. TASK QUALITY CHECKS
-    # ═══════════════════════════════════════════════════════════════
+    sup = contracts.get("supervision_strategies.cs", "")
+    sup_items = [
+        ("PoisonMessageAwareStrategy", "poisonmessageaware", 2),
+        ("ActorCircuitBreaker", "actorcircuitbreaker", 2),
+        ("ExponentialBackoffStrategy", "exponentialbackoff", 1),
+    ]
 
-    # Check: P0 tasks have concrete test code (not just "Test: ...")
-    for fname, content in files.items():
-        if fname == "00-master-plan.md":
-            continue
-        # Find P0 tasks
-        p0_sections = re.split(r'^## ', content, flags=re.MULTILINE)
-        for section in p0_sections:
-            if "P0" in section:
-                if "```" not in section:
-                    task_match = re.search(r'(\w+-\d+)', section)
-                    task_id = task_match.group(1) if task_match else "unknown"
-                    flag(2, f"{fname}: P0 task {task_id} has no code block in test — needs runnable test", fname, "TEST_QUALITY")
+    for item, keyword, weight in sup_items:
+        if item in sup and keyword not in task_text:
+            flag(weight, f"{item} in supervision_strategies.cs has no task", "SUPERVISION")
 
-    # Check: Master plan has stage timeline
-    if "00-master-plan.md" in files:
-        master = files["00-master-plan.md"]
-        if "Week" not in master:
-            flag(2, "Master plan missing weekly timeline", "00-master-plan.md", "PLANNING")
-
-    # ═══════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════
     # PRINT
-    # ═══════════════════════════════════════════════════════════════
+    # ═══════════════════════════════════════════════════
 
     print("=" * 70)
-    print("TASK PLAN QUALITY & COMPLETENESS (lower=better, target: 0)")
+    print("TASKS ↔ CONTRACTS TRACEABILITY (lower=better, target: 0)")
     print("=" * 70)
 
-    cats = ["COVERAGE", "CRITERIA", "TESTING", "DEPS", "PRIORITY",
-            "CONTRACT_REF", "ARABIC", "SEC_COVERAGE", "TEST_QUALITY", "PLANNING"]
-
-    for cat in cats:
+    for cat in ["DOMAIN_SERVICE", "READ_MODEL", "TOPOLOGY", "TEST_PATTERN", "SUPERVISION"]:
         if cat in results:
             items = results[cat]
-            ct = sum(w for w, _, _ in items)
+            ct = sum(w for w, _ in items)
             print(f"\n  [{cat}: {ct} points]")
-            for w, d, f in items:
-                print(f"    (w={w}) {f}: {d}")
+            for w, d in items:
+                print(f"    (w={w}) {d}")
 
     print(f"\n{'=' * 70}")
-    for cat in cats:
+    for cat in ["DOMAIN_SERVICE", "READ_MODEL", "TOPOLOGY", "TEST_PATTERN", "SUPERVISION"]:
         if cat in results:
-            print(f"  {cat}: {sum(w for w,_,_ in results[cat])}")
+            print(f"  {cat}: {sum(w for w,_ in results[cat])}")
     print(f"\n  TOTAL GAP: {total}")
     print(f"{'=' * 70}")
     print(f"\nMETRIC:{total}")
