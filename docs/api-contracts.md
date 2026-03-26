@@ -9,6 +9,20 @@ All timestamps are **ISO 8601 UTC** (`2026-03-26T14:30:00Z`).
 All monetary values are in **NIS** unless explicitly noted.
 All IDs are **UUIDv7** (time-sortable) unless explicitly noted.
 
+## API Versioning Policy
+
+**Event schemas** (NATS / event store): Versioned via `_V1`, `_V2` suffix (see `docs/event-schemas.md`). Old versions are never removed from the store — consumers must handle all versions they encounter. New fields are added as optional (backward-compatible). Breaking changes require a new version suffix and a 90-day overlap period where both versions are emitted.
+
+**SignalR messages**: Versioned via the `type` discriminator. New message types can be added freely (clients ignore unknown types). Existing message payloads follow additive-only changes — new optional fields are backward-compatible. Breaking payload changes require a new `type` value and the old type is deprecated with a 90-day sunset.
+
+**gRPC services** (LLM ACL): Versioned via proto package (`cena.acl.v1`, `cena.acl.v2`). Both versions run concurrently during migration. Old version is removed only after all consumers have migrated.
+
+**GraphQL schema**: Additive-only by default — new fields and types can be added without breaking existing queries. Field removal follows a deprecation cycle: mark `@deprecated(reason: "Use X instead")` → 90-day warning period → remove in next major release. The mobile app uses persisted queries pinned to specific schema versions.
+
+**REST API** (auth, settings, onboarding): Versioned via URL prefix (`/api/v1/`, `/api/v2/`). Old versions are supported for a minimum of 6 months after the new version ships, ensuring mobile clients on older app versions continue to work.
+
+**Deprecation policy**: All deprecated endpoints/fields/events emit a `Deprecation-Warning` header or metadata tag. The operations dashboard (see `docs/operations.md` Section 3) tracks deprecated endpoint usage. An endpoint is eligible for removal when < 1% of traffic uses it, or after the minimum overlap period, whichever is later.
+
 ---
 
 ## Table of Contents
