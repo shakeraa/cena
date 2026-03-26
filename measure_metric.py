@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Autoresearch metric Phase 5: Cross-Document Consistency & Completeness.
-Catches inconsistencies between documents, missing specs, and weak points
-that undermine investor confidence or block engineering implementation.
+Autoresearch metric Phase 6: Honest Business Model & Specification Gaps.
+Catches real investor red flags, contradicting financial assumptions, and
+specs too vague to implement. No softball checks.
 Target: 0.
 """
 
@@ -10,63 +10,6 @@ import re
 from pathlib import Path
 
 DOCS_DIR = Path(__file__).parent / "docs"
-
-CHECKS = [
-    # === CROSS-DOCUMENT INCONSISTENCIES ===
-
-    # GPT-4o still referenced as fallback — actual architecture uses Kimi K2.5
-    ("product-research.md", r"GPT-4o",
-     "GPT-4o referenced as fallback — actual architecture uses Kimi K2.5 (see llm-routing-strategy.md)", 4, "CONSISTENCY"),
-
-    # GPT-4o in adaptive-learning-architecture-research.md
-    ("adaptive-learning-architecture-research.md", r"GPT-4o",
-     "GPT-4o referenced in research doc — should reference Kimi K2.5 as the fallback/cheap tier", 3, "CONSISTENCY"),
-
-    # Methodology types in api-contracts.md don't match event-schemas.md
-    # api-contracts has 7 types (socratic-dialogue, worked-examples, scaffolded-practice, visual-spatial, analogy-based, error-analysis, spaced-retrieval)
-    # event-schemas has 8 types (socratic, spaced_repetition, feynman, project_based, blooms_progression, worked_example, analogy, retrieval_practice)
-    # Check: api-contracts is missing feynman, project_based, blooms_progression; has scaffolded-practice, visual-spatial, error-analysis instead
-    ("api-contracts.md", r'"scaffolded-practice"',
-     "api-contracts MethodologyType 'scaffolded-practice' not in event-schemas (which has 'feynman', 'project_based', 'blooms_progression'). Methodology type lists must be canonical across docs", 5, "CONSISTENCY"),
-
-    # Fundraising playbook says break-even at ~1,600 but product-research says 1,620-2,340
-    ("fundraising-playbook.md", r"1,600 subscribers",
-     "Fundraising playbook says break-even at ~1,600 subscribers but product-research.md says 1,620-2,340. Use consistent number", 3, "CONSISTENCY"),
-
-    # Operations monitoring chart shows 10% threshold line but alert is at 5%
-    ("operations.md", r"10% threshold line",
-     "Operations dashboard chart shows '10% threshold line' but the LLM error alert triggers at >5%. Chart should match alert threshold", 2, "CONSISTENCY"),
-
-    # === MISSING SPECIFICATIONS ===
-
-    # Stagnation signal weights — no default values specified anywhere
-    # Check: file must contain "Default Weight" AND "Accuracy plateau" near each other
-    # Using a positive match for the ABSENCE of the fix — this is a two-part check handled in main()
-
-    # Cognitive load threshold — handled as custom check below
-
-    # Offline sync conflict resolution — handled as custom check below
-
-    # Performance SLAs — handled as custom check below
-
-    # API versioning/deprecation policy — handled as custom check below
-
-    # === CROSS-REFERENCE GAPS ===
-
-    # Cross-doc audit fix tracker has empty Fixed? columns — all show just " |"
-    ("cross-doc-audit.md", r"\| I\d+:.*\|\s*\|$",
-     "Cross-doc audit Fix Tracker has unfilled 'Fixed?' column — should track which issues have been resolved", 3, "CROSS_REF"),
-
-    # engagement-signals-research.md not referenced from architecture-design.md
-    ("architecture-design.md",
-     r"^(?![\s\S]*engagement-signals-research\.md)[\s\S]*StagnationDetector",
-     "architecture-design.md references StagnationDetector but doesn't link to engagement-signals-research.md", 2, "CROSS_REF"),
-
-    # competitor-eself-deep-dive.md not integrated into fundraising playbook
-    ("fundraising-playbook.md",
-     r"^(?![\s\S]*competitor-eself-deep-dive\.md|[\s\S]*eself.*deep.dive)[\s\S]*eSelf",
-     "Fundraising playbook mentions eSelf but doesn't reference the detailed competitor-eself-deep-dive.md analysis", 2, "CROSS_REF"),
-]
 
 
 def main():
@@ -77,51 +20,138 @@ def main():
     total_score = 0
     results_by_category = {}
 
-    for file_pattern, pattern, description, weight, category in CHECKS:
-        if file_pattern in all_text:
-            text = all_text[file_pattern]
-            if re.search(pattern, text, re.IGNORECASE | re.MULTILINE):
-                total_score += weight
-                if category not in results_by_category:
-                    results_by_category[category] = []
-                results_by_category[category].append((weight, description, file_pattern))
+    def flag(weight, description, file_pattern, category):
+        nonlocal total_score
+        total_score += weight
+        if category not in results_by_category:
+            results_by_category[category] = []
+        results_by_category[category].append((weight, description, file_pattern))
 
-    # Custom two-part checks (where negative-lookahead regex is unreliable with MULTILINE)
-    CUSTOM_CHECKS = [
-        # Stagnation signal weights: file must contain a default weight table
-        ("intelligence-layer.md",
-         lambda t: "Stagnation Signal Weights" in t and "Default Weight" not in t,
-         "Stagnation signal weights mentioned but no default weights provided", 4, "MISSING_SPEC"),
-        # Cognitive load: file mentions cognitive load but has no threshold formula
-        ("system-overview.md",
-         lambda t: "Cognitive Load" in t and "fatigue_score" not in t,
-         "Cognitive load profiling described but no threshold formula for session end", 4, "MISSING_SPEC"),
-        # Offline sync: file mentions conflict resolution but no formal algorithm
-        ("offline-sync-protocol.md",
-         lambda t: "Server-authoritative" in t and "Conflict Resolution Algorithm" not in t,
-         "Offline sync mentions conflict resolution but no formal algorithm specified", 4, "MISSING_SPEC"),
-        # API versioning: file must contain versioning policy
-        ("api-contracts.md",
-         lambda t: "SignalR" in t and "Versioning Policy" not in t,
-         "No API versioning or deprecation policy defined", 3, "MISSING_SPEC"),
-        # Performance SLAs: file must contain P50/P95/P99 targets
-        ("system-overview.md",
-         lambda t: "Interactive sessions" in t and "P50" not in t,
-         "No performance SLAs defined (P50/P95/P99 latency targets)", 3, "MISSING_SPEC"),
-    ]
-    for file_pattern, check_fn, description, weight, category in CUSTOM_CHECKS:
-        if file_pattern in all_text:
-            if check_fn(all_text[file_pattern]):
-                total_score += weight
-                if category not in results_by_category:
-                    results_by_category[category] = []
-                results_by_category[category].append((weight, description, file_pattern))
+    pr = all_text.get("product-research.md", "")
+    bv = all_text.get("business-viability-assessment.md", "")
+    so = all_text.get("system-overview.md", "")
+    il = all_text.get("intelligence-layer.md", "")
+    fp = all_text.get("fundraising-playbook.md", "")
+    aspec = all_text.get("assessment-specification.md", "")
+    ca = all_text.get("content-authoring.md", "")
+
+    # === CRITICAL: BUSINESS MODEL CONTRADICTIONS ===
+
+    # 1. Customer lifetime: product-research says 18 months, business-viability says 6-12 months
+    if "18 months" in pr and "Average subscription duration" in pr:
+        if "realistic: 6-12 months" in bv or "realistic: 6–12 months" in bv:
+            # Both exist and contradict — flag unless product-research acknowledges the range
+            if "6-12 month" not in pr and "6–12 month" not in pr:
+                flag(6, "Customer lifetime: product-research.md claims 18 months, business-viability.md says realistic 6-12 months. LTV, break-even, and LTV:CAC all depend on this — pick one and recalculate",
+                     "product-research.md", "BUSINESS_MODEL")
+
+    # 2. Pricing: most expensive AI tool but positioned as accessible savings
+    if "most expensive" in bv.lower() and "94% saving" in pr:
+        # Check if product-research acknowledges the premium positioning tension
+        if "premium positioning" not in pr.lower() or "volume" in pr.lower():
+            # Need explicit acknowledgment that this is a premium product, not volume
+            if "pricing strategy" not in pr.lower() or "premium vs" not in pr.lower():
+                flag(5, "Pricing contradiction: business-viability says 'most expensive AI learning tool' but product-research positions as '94% savings'. These are opposite GTM strategies — clarify if this is premium or volume play",
+                     "product-research.md", "BUSINESS_MODEL")
+
+    # 3. Break-even doesn't account for structural churn
+    if "structural churn" in bv.lower() or "Structural churn" in bv:
+        # Check if product-research break-even section addresses churn
+        if "churn" not in pr[pr.find("Break-Even"):pr.find("Break-Even")+1000] if "Break-Even" in pr else True:
+            flag(5, "Break-even analysis (product-research.md) doesn't model structural churn from student graduation. business-viability.md says 'realistic: 6-12 months' lifetime but break-even assumes steady growth without cohort replacement",
+                 "product-research.md", "BUSINESS_MODEL")
+
+    # 4. eSelf/CET free competitor not surfaced in fundraising materials
+    if "eSelf" in fp:
+        # Check if fundraising playbook mentions the FREE aspect and CET institutional backing
+        if "free" not in fp.lower() or "CET" not in fp:
+            flag(4, "Fundraising playbook mentions eSelf but omits that it's FREE with CET institutional backing (10,000 students). Investors will discover this — address it proactively",
+                 "fundraising-playbook.md", "BUSINESS_MODEL")
+
+    # === HIGH: METHODOLOGY SWITCHING VALIDATION ===
+
+    # 5. Core differentiator has no validation plan
+    # Check across all docs that claim methodology switching as differentiator
+    claims_switching = ("methodology switching" in pr.lower() and
+                       ("novel" in pr.lower() or "no one" in pr.lower() or "none switch" in pr.lower()))
+    if claims_switching or ("genuinely novel" in fp.lower()):
+        # Check if there's a concrete pilot/validation plan anywhere
+        all_docs = pr + so + il + fp
+        has_validation = any(phrase in all_docs.lower() for phrase in [
+            "methodology switching pilot", "validate methodology switching",
+            "pilot with", "pre-launch validation of methodology",
+            "methodology a/b test", "methodology switching a/b",
+        ])
+        if not has_validation:
+            flag(5, "Methodology switching is THE core differentiator but has NO concrete validation plan (no pilot size, no timeline, no success metric). Need: 'Pilot with N students, measure X, by date Y'",
+                 "product-research.md", "VALIDATION")
+
+    # === HIGH: SPEC GAPS THAT BLOCK IMPLEMENTATION ===
+
+    # 6. Stagnation signal normalization undefined (binary vs continuous)
+    if "normalized to [0, 1]" in il or "normalized to [0, 1]" in so:
+        # Check if normalization METHOD is specified (not just "normalized to [0,1]")
+        has_normalization = any(phrase in il + so for phrase in [
+            "sigmoid", "linear interpolation", "min-max", "binary encoding",
+            "continuous encoding", "normalization formula",
+        ])
+        if not has_normalization:
+            flag(4, "Stagnation signals are 'normalized to [0,1]' but HOW? Binary (0 or 1 if threshold crossed) vs continuous (proportional to deviation) gives completely different behavior. Specify normalization functions",
+                 "intelligence-layer.md", "SPEC_GAP")
+
+    # 7. Cognitive load baselines undefined (when set, what window)
+    if "baseline_accuracy" in so:
+        # Check if baseline definition is specified
+        has_baseline_def = any(phrase in so for phrase in [
+            "baseline is set", "baseline window", "baseline computed",
+            "trailing average", "sessions to establish baseline",
+            "baseline_accuracy is the",
+        ])
+        if not has_baseline_def:
+            flag(4, "Cognitive load formula uses 'baseline_accuracy' and 'baseline_rt' but never defines when/how they're established. First session? Trailing 20-question average? Per-concept or per-student? Two engineers will implement this differently",
+                 "system-overview.md", "SPEC_GAP")
+
+    # 8. Mastery threshold 0.85 not justified (check assessment-spec and event-schemas)
+    es = all_text.get("event-schemas.md", "")
+    if "0.85" in aspec or "0.85" in es:
+        has_justification = any(phrase in aspec + so + il for phrase in [
+            "why 0.85", "threshold chosen", "sensitivity analysis",
+            "Corbett & Anderson", "BKT literature", "threshold justification",
+            "threshold rationale",
+        ])
+        if not has_justification:
+            flag(3, "Mastery threshold P(known) >= 0.85 is used everywhere but never justified. BKT literature uses 0.95 (Corbett & Anderson 1994). Why 0.85? What's the sensitivity to +/- 0.05? Add justification or A/B testing plan",
+                 "assessment-specification.md", "SPEC_GAP")
+
+    # 9. BKT p_slip/p_guess calibration plan missing
+    if "p_slip" in aspec or "p_guess" in aspec:
+        has_calibration = any(phrase in aspec + il for phrase in [
+            "calibration plan", "empirically fit", "maximum likelihood",
+            "pre-launch calibration", "calibrate p_slip",
+        ])
+        if not has_calibration:
+            flag(3, "BKT parameters p_slip=0.10 and p_guess=0.25 are hardcoded defaults with no pre-launch calibration plan. Need: collect N diagnostic attempts, fit parameters via MLE, compare to defaults",
+                 "assessment-specification.md", "SPEC_GAP")
+
+    # 10. Content authoring error recovery undefined
+    # "content correction" exists but that's about propagating corrections, not the operational procedure
+    if "content-authoring.md" in all_text:
+        has_error_procedure = any(phrase in ca.lower() for phrase in [
+            "rejection rate", "expert rejects", "student reports bug",
+            "question reported", "content hotfix", "emergency content",
+            "error recovery procedure", "content rollback",
+        ])
+        if not has_error_procedure:
+            flag(3, "Content authoring pipeline specifies creation flow but not error recovery: what happens when expert rejects 50% of LLM-generated questions? When a student finds a bug in a published question? Need operational procedures",
+                 "content-authoring.md", "SPEC_GAP")
+
+    # === PRINT RESULTS ===
 
     print("=" * 70)
-    print("CROSS-DOCUMENT CONSISTENCY & COMPLETENESS (lower=better, target: 0)")
+    print("HONEST BUSINESS MODEL & SPEC GAPS (lower=better, target: 0)")
     print("=" * 70)
 
-    for category in ["CONSISTENCY", "MISSING_SPEC", "CROSS_REF"]:
+    for category in ["BUSINESS_MODEL", "VALIDATION", "SPEC_GAP"]:
         if category in results_by_category:
             items = results_by_category[category]
             cat_total = sum(w for w, _, _ in items)
@@ -130,7 +160,7 @@ def main():
                 print(f"    (w={weight}) {fname}: {desc}")
 
     print(f"\n{'=' * 70}")
-    for category in ["CONSISTENCY", "MISSING_SPEC", "CROSS_REF"]:
+    for category in ["BUSINESS_MODEL", "VALIDATION", "SPEC_GAP"]:
         if category in results_by_category:
             print(f"  {category}: {sum(w for w,_,_ in results_by_category[category])}")
     print(f"\n  TOTAL GAP: {total_score}")
