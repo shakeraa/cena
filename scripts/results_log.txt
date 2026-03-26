@@ -1,0 +1,1 @@
+[2026-03-26T00:00] Iteration #0 | Metric: 309 | Change: BASELINE | Result: baseline | Citations: 14 | DOIs: 0 | Math: 29 | Cena: 4 | Missing: 11
