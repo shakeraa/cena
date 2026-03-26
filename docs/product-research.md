@@ -266,6 +266,8 @@
 | Target (mid) | 89 NIS | 799 NIS | 8% | 6.39M NIS |
 | Premium (high) | 119 NIS | 999 NIS | 5% | 4.99M NIS |
 
+**Pricing strategy: Premium tutoring replacement, not consumer app.** Cena is intentionally the most expensive AI learning tool on the market (see `docs/business-viability-assessment.md`). This is deliberate — the value anchor is private tutoring (3,000 NIS/subject), not Duolingo ($60/year). At 799 NIS/year for all subjects, Cena is a 94% discount on tutoring but a 5–13× premium over consumer AI tools. This is a premium positioning play: targeting the 35–40% of Bagrut families who currently spend on private tutoring and would switch to a cheaper-but-effective AI alternative. It is NOT a volume play competing with free/cheap consumer apps. The break-even math (1,620–2,340 subscribers at 8% conversion) reflects this: we need 8% of the addressable market, not 40%. If eSelf/CET offers a free alternative (see `docs/competitor-eself-deep-dive.md`), the competitive response is depth-of-personalization, not price reduction.
+
 **Recommendation**: Launch at 89 NIS/month (799 NIS/year) — maximizes revenue while staying well below the private tutoring anchor. The annual plan at 799 NIS should be positioned as "less than 1 hour of private tutoring per month."
 
 **Price Sensitivity Risks**
