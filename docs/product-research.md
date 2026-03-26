@@ -501,7 +501,7 @@
 | **Gamification reduces intrinsic motivation** | Medium | Medium | "Stealth gamification" — knowledge graph growth IS the reward; adaptive intensity (less gamification for intrinsically motivated students); meaningful badges tied to intellectual milestones | A/B test gamification-on vs. gamification-off cohorts; measure learning outcomes, not just engagement |
 | **Competitor launches similar features** | Low | Medium | Methodology switching + knowledge graph visualization combination creates compound defensibility; per-student learning history creates switching costs | Accelerate feature development on most defensible pillar (methodology switching — hardest to replicate) |
 | **Regulatory changes (Israeli privacy law tightening)** | Low | Medium | GDPR-ready architecture from Day 1 exceeds current Israeli requirements; DPO role planned for post-seed | Legal advisor on retainer; data architecture supports any jurisdiction's deletion/portability requirements |
-| **LLM provider API disruption or pricing change** | Medium | Medium | Model-agnostic abstraction layer; dual-provider setup (Claude primary, GPT-4o fallback); no fine-tuned models that lock to one provider | Switch primary provider within 48 hours; cached content continues serving during transition |
+| **LLM provider API disruption or pricing change** | Medium | Medium | Model-agnostic abstraction layer; tri-provider setup (Claude Sonnet/Opus primary, Kimi K2.5 fast/cheap tier — see `docs/llm-routing-strategy.md`); no fine-tuned models that lock to one provider | Switch primary provider within 48 hours; cached content continues serving during transition |
 
 ---
 

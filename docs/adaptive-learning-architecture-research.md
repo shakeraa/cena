@@ -444,7 +444,7 @@ Delivery [ACL around external] <--- Pedagogy
   (Pedagogy issues exercise selection commands to Delivery)
 ```
 
-The **Anti-Corruption Layer (ACL)** sits between Delivery and external LLM providers (Claude, GPT-4o). The Pedagogy context issues a `GenerateSocraticQuestion(context)` command; the ACL translates that to a specific Claude API call with the appropriate system prompt, injects the anonymized student context, handles rate limiting and fallback to GPT-4o, and returns the result in the Pedagogy context's language.
+The **Anti-Corruption Layer (ACL)** sits between Delivery and external LLM providers (Claude Sonnet/Opus, Kimi K2.5). The Pedagogy context issues a `GenerateSocraticQuestion(context)` command; the ACL translates that to a specific API call with the appropriate system prompt, injects the anonymized student context, handles rate limiting and tiered model routing (see `docs/llm-routing-strategy.md`), and returns the result in the Pedagogy context's language.
 
 ---
 
