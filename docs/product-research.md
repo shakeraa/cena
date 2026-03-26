@@ -501,6 +501,21 @@
 3. **Cognitive load personalization** — per-student fatigue thresholds
 4. **Exam-aligned, curriculum-agnostic architecture** — Bagrut first, then any country
 
+### Methodology Switching Pre-Launch Validation Plan
+
+Methodology switching is Cena's core differentiator and the hardest claim to defend without data. Before seed round, validate with a concrete pilot:
+
+**Methodology switching A/B test (Month 2–3 of MVP, target: 200 students)**
+- **Control group** (100 students): Adaptive difficulty only (like Khan/ALEKS) — system adjusts question difficulty but uses a single teaching method (Socratic) throughout
+- **Treatment group** (100 students): Full methodology switching — system detects stagnation and switches between Socratic, Feynman, worked examples, etc.
+- **Primary metric**: Mastery velocity — concepts mastered per week of active use (normalized for study time)
+- **Secondary metrics**: D7 retention, D30 retention, session duration, self-reported satisfaction
+- **Success threshold**: Treatment group achieves ≥15% higher mastery velocity than control (statistically significant, p<0.05)
+- **Failure protocol**: If treatment group shows no improvement, methodology switching becomes a configuration option rather than a core differentiator — the product pivots to knowledge graph visualization as the primary moat
+- **Timeline**: Recruit from first 500 beta signups, run for 4 weeks, analyze in Week 5. Results available before seed round pitch
+
+**Why this matters for investors**: eSelf showed 3.94-point Bagrut improvement in their CET pilot with 2,000 students. Cena needs comparable evidence that its approach works — even at smaller scale — before claiming superiority.
+
 ### Where to Double Down
 1. **Knowledge graph as hero product** — beautiful, interactive, shareable (viral acquisition)
 2. **Methodology switching as "invisible magic"** — "this app just gets how I need to learn"
