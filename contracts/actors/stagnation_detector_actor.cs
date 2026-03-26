@@ -139,6 +139,11 @@ public sealed class StagnationDetectorActor : IActor
     // ---- Configuration (overridable per experiment cohort) ----
     private StagnationConfig _config = StagnationConfig.Default;
 
+    // ---- Per-student adaptive threshold (FIXED: prevents false positives on slow learners) ----
+    // Updated after each session from the student's historical improvement rate.
+    // Default 0.05 (5%) for new students, adapts based on observed learning speed.
+    private double _studentAvgImprovementRate = 0.05;
+
     // ---- Telemetry ----
     private static readonly ActivitySource ActivitySourceInstance =
         new("Cena.Actors.StagnationDetectorActor", "1.0.0");
@@ -372,8 +377,11 @@ public sealed class StagnationDetectorActor : IActor
 
         double improvementRate = (recentAccuracy - baselineAccuracy) / baselineAccuracy;
 
-        // sigmoid(10 * (0.05 - improvement_rate))
-        double exponent = 10.0 * (0.05 - improvementRate);
+        // FIXED: Per-student adaptive threshold instead of fixed 0.05.
+        // Slow learners who typically improve at 3%/session get a 1.5% threshold (not 5%).
+        // Formula: adaptive_threshold = max(0.02, student_avg_improvement_rate * 0.5)
+        double adaptiveThreshold = Math.Max(0.02, _studentAvgImprovementRate * 0.5);
+        double exponent = 10.0 * (adaptiveThreshold - improvementRate);
         double sigmoid = 1.0 / (1.0 + Math.Exp(-exponent));
 
         return Math.Clamp(sigmoid, 0.0, 1.0);

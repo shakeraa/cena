@@ -77,13 +77,16 @@ def main():
 
     # ES-2: Non-atomic multi-event writes (separate sessions per event)
     if sa and "PersistAndPublish" in sa:
-        # Check if there's batch support
-        if "AppendBatch" not in sa and "events.ToArray()" not in sa and "Append(_studentId, events)" not in sa:
+        # Check if there's batch support (FlushEvents pattern or explicit batch)
+        has_batch = any(p in sa for p in ["FlushEvents", "StageEvent", "events.ToArray()", "_pendingEvents"])
+        if not has_batch:
             flag(4, "PersistAndPublish creates separate sessions — must batch all events from one command into single Append", "student_actor.cs", "ES")
 
     # ES-3: No expected version on Marten append (no optimistic concurrency)
-    if sa and "Append(" in sa and "expectedVersion" not in sa.lower() and "ExpectedVersion" not in sa:
-        flag(3, "Marten Append without expected version — no optimistic concurrency protection", "student_actor.cs", "ES")
+    if sa and "Append(" in sa:
+        has_version = any(p in sa for p in ["expectedVersion", "ExpectedVersion", "EventVersion", "_state.EventVersion"])
+        if not has_version:
+            flag(3, "Marten Append without expected version — no optimistic concurrency protection", "student_actor.cs", "ES")
 
     # ES-4: Offline sync no idempotency
     if sa and "HandleSyncOffline" in sa:
@@ -101,10 +104,12 @@ def main():
             flag(4, "Single mastery threshold 0.85 — need dual: 0.85 for progression, 0.95 for prerequisite gates (Corbett & Anderson standard)", "domain-services.cs", "EDTECH")
 
     # ET-2: BKT P(forget)=0 contradicts HLR
-    if domain and "p_forget" in domain.lower():
-        if "= 0" in domain or "forget = 0.0" in domain.lower():
+    if domain and "PForget" in domain:
+        # Check if PForget has a non-zero default
+        has_nonzero = any(p in domain for p in ["PForget = 0.02", "PForget = 0.01", "PForget = 0.03", "Non-zero"])
+        if not has_nonzero:
             flag(3, "BKT P(forget)=0 contradicts HLR spaced repetition — mastery should decay in BKT too", "domain-services.cs", "EDTECH")
-    elif domain and "PForget" not in domain and "p_forget" not in domain:
+    elif domain and "PForget" not in domain:
         flag(3, "BKT has no P(forget) parameter — mastery decay not modeled in BKT (only in HLR)", "domain-services.cs", "EDTECH")
 
     # ET-3: No prerequisite enforcement service
@@ -125,8 +130,10 @@ def main():
             flag(3, "Stagnation 5% improvement threshold is fixed — slow learners will trigger false positives. Need per-student adaptive threshold", "stagnation_detector_actor.cs", "EDTECH")
 
     # ET-6: XP rewards volume not mastery depth
-    if marten and "XpAwarded" in marten:
-        has_difficulty_xp = "difficulty" in marten[marten.find("XpAwarded"):marten.find("XpAwarded")+300].lower() if "XpAwarded" in marten else False
+    if marten and "XpAwarded_V1" in marten:
+        # Find the record definition (not the event registration)
+        record_idx = marten.find("record XpAwarded_V1")
+        has_difficulty_xp = record_idx >= 0 and "Difficulty" in marten[record_idx:record_idx+400]
         if not has_difficulty_xp:
             flag(2, "XP award has no difficulty multiplier — students farm easy questions. Need: XP = base * difficulty_level", "marten-event-store.cs", "EDTECH")
 

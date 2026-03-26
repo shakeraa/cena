@@ -418,7 +418,7 @@ public class StudentMasteryProjection : SingleStreamProjection<StudentMasteryVie
     public void Apply(ConceptAttempted_V1 e, StudentMasteryView view)
     {
         view.MasteryMap[e.ConceptId] = e.PosteriorMastery;
-        view.LastUpdated = DateTimeOffset.UtcNow;
+        view.LastUpdated = e.Timestamp /* FIXED: deterministic — use event timestamp, never wall clock */;
         view.ConceptsInProgress = view.MasteryMap.Count(kv => kv.Value > 0.3 && kv.Value < 0.85);
     }
 
@@ -426,7 +426,7 @@ public class StudentMasteryProjection : SingleStreamProjection<StudentMasteryVie
     {
         view.MasteryMap[e.ConceptId] = e.MasteryLevel;
         view.ConceptsMastered = view.MasteryMap.Count(kv => kv.Value >= 0.85);
-        view.LastUpdated = DateTimeOffset.UtcNow;
+        view.LastUpdated = e.Timestamp /* FIXED: deterministic — use event timestamp, never wall clock */;
     }
 
     public void Apply(XpAwarded_V1 e, StudentMasteryView view) => view.TotalXp = e.TotalXp;
