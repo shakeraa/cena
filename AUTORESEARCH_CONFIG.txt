@@ -1,0 +1,8 @@
+GOAL: Reduce cross-document consistency gap to 0 — all docs aligned on numbers, terminology, specs complete, cross-references intact
+METRIC: python3 measure_metric.py (outputs METRIC:N where N is the gap score, lower is better)
+CONSTRAINT: Only modify/create files in docs/ — fix inconsistencies, add missing specs, align terminology, update cross-references
+BASELINE PHASE 1: 28 (vagueness) → 0 in 8 iterations (completed 2026-03-25)
+BASELINE PHASE 2: 70 (investor-readiness) → 0 in 11 iterations (completed 2026-03-25)
+BASELINE PHASE 3: 47 (factual accuracy) → 0 in 8 iterations (completed 2026-03-25)
+BASELINE PHASE 4: 41 (AI-agent dev model) → 0 in 4 iterations (completed 2026-03-26)
+BASELINE PHASE 5: 40 (cross-doc consistency & completeness) measured 2026-03-26
