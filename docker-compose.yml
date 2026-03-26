@@ -1,0 +1,105 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — Local Development Environment
+# docker compose up — starts all dependencies for local dev
+# ═══════════════════════════════════════════════════════════════════════
+
+services:
+  # ── PostgreSQL 16 (Marten Event Store) ──
+  postgres:
+    image: postgres:16-alpine
+    container_name: cena-postgres
+    environment:
+      POSTGRES_DB: cena
+      POSTGRES_USER: cena
+      POSTGRES_PASSWORD: cena_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/infra/docker/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cena -d cena"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Redis 7 (Cache, Idempotency, Rate Limiting, Token Budget) ──
+  redis:
+    image: redis:7-alpine
+    container_name: cena-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── NATS JetStream (Event Backbone) ──
+  nats:
+    image: nats:2.10-alpine
+    container_name: cena-nats
+    ports:
+      - "4222:4222"   # Client
+      - "8222:8222"   # Monitoring
+    command: >
+      -js
+      -m 8222
+      --store_dir /data
+      --max_payload 4MB
+    volumes:
+      - nats_data:/data
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Neo4j 5 (Knowledge Graph) ──
+  neo4j:
+    image: neo4j:5-community
+    container_name: cena-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/cena_dev_password
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"   # Browser
+      - "7687:7687"   # Bolt
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p cena_dev_password 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── DynamoDB Local (Actor Cluster Discovery) ──
+  dynamodb:
+    image: amazon/dynamodb-local:latest
+    container_name: cena-dynamodb
+    ports:
+      - "8000:8000"
+    command: -jar DynamoDBLocal.jar -sharedDb -inMemory
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:8000 || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── NATS Stream Setup (runs once, creates streams + consumers) ──
+  nats-setup:
+    image: natsio/nats-box:latest
+    container_name: cena-nats-setup
+    depends_on:
+      nats:
+        condition: service_healthy
+    volumes:
+      - ./src/infra/docker/nats-setup.sh:/setup.sh
+    entrypoint: ["/bin/sh", "/setup.sh"]
+    restart: "no"
+
+volumes:
+  postgres_data:
+  nats_data:
+  neo4j_data:

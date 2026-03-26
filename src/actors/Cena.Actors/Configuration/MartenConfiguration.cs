@@ -1,0 +1,96 @@
+// ═══════════════════════════════════════════════════════════════════════
+// Cena Platform — Marten Event Store Configuration
+// Layer: Infrastructure Configuration | Runtime: .NET 9
+// DB: PostgreSQL 16 + Marten v8.x
+// ═══════════════════════════════════════════════════════════════════════
+
+using JasperFx;
+using JasperFx.Events;
+using Marten;
+using Marten.Storage;
+using Weasel.Core;
+using Cena.Actors.Events;
+
+namespace Cena.Actors.Configuration;
+
+public static class MartenConfiguration
+{
+    /// <summary>
+    /// Configures Marten as the event store for the Cena platform.
+    /// Call this from Program.cs / Startup via services.AddMarten(opts => opts.ConfigureCenaEventStore(connStr)).
+    /// </summary>
+    public static void ConfigureCenaEventStore(this StoreOptions opts, string connectionString)
+    {
+        opts.Connection(connectionString);
+        opts.AutoCreateSchemaObjects = JasperFx.AutoCreate.CreateOrUpdate;
+        opts.DatabaseSchemaName = "cena";
+
+        // ── Event Store Settings ──
+        opts.Events.StreamIdentity = StreamIdentity.AsString;
+        opts.Events.MetadataConfig.EnableAll();
+        opts.Events.TenancyStyle = Marten.Storage.TenancyStyle.Single;
+
+        // ── Serialization: System.Text.Json with camelCase ──
+        opts.UseSystemTextJsonForSerialization(
+            enumStorage: Weasel.Core.EnumStorage.AsString,
+            casing: Casing.CamelCase
+        );
+
+        // ── Register All Event Types (append-only, versioned) ──
+        RegisterLearnerEvents(opts);
+        RegisterPedagogyEvents(opts);
+        RegisterEngagementEvents(opts);
+        RegisterOutreachEvents(opts);
+
+        // ── Snapshot Strategy: every 100 events per student ──
+        // Snapshot projection requires the aggregate type to be registered.
+        // The StudentProfileSnapshot type and inline/async projections will be
+        // registered once the projection classes are implemented in the
+        // Cena.Data.EventStore assembly. This configuration is kept here to
+        // show the intended wiring; uncomment when projection types are available:
+        //
+        // opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline, 100);
+        // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
+        // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
+        // opts.Projections.Add<TeacherDashboardProjection>(ProjectionLifecycle.Async);
+        // opts.Projections.Add<ParentProgressProjection>(ProjectionLifecycle.Async);
+        // opts.Projections.Add<MethodologyEffectivenessProjection>(ProjectionLifecycle.Async);
+        // opts.Projections.Add<RetentionCohortProjection>(ProjectionLifecycle.Async);
+    }
+
+    private static void RegisterLearnerEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<ConceptAttempted_V1>();
+        opts.Events.AddEventType<ConceptMastered_V1>();
+        opts.Events.AddEventType<MasteryDecayed_V1>();
+        opts.Events.AddEventType<MethodologySwitched_V1>();
+        opts.Events.AddEventType<StagnationDetected_V1>();
+        opts.Events.AddEventType<AnnotationAdded_V1>();
+        opts.Events.AddEventType<CognitiveLoadCooldownComplete_V1>();
+    }
+
+    private static void RegisterPedagogyEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<SessionStarted_V1>();
+        opts.Events.AddEventType<SessionEnded_V1>();
+        opts.Events.AddEventType<ExercisePresented_V1>();
+        opts.Events.AddEventType<HintRequested_V1>();
+        opts.Events.AddEventType<QuestionSkipped_V1>();
+    }
+
+    private static void RegisterEngagementEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<XpAwarded_V1>();
+        opts.Events.AddEventType<StreakUpdated_V1>();
+        opts.Events.AddEventType<BadgeEarned_V1>();
+        opts.Events.AddEventType<StreakExpiring_V1>();
+        opts.Events.AddEventType<ReviewDue_V1>();
+    }
+
+    private static void RegisterOutreachEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<OutreachMessageSent_V1>();
+        opts.Events.AddEventType<OutreachMessageDelivered_V1>();
+        opts.Events.AddEventType<OutreachResponseReceived_V1>();
+    }
+}

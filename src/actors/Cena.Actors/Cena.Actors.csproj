@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Marten" Version="8.26.2" />
+    <PackageReference Include="NATS.Net" Version="2.7.3" />
+    <PackageReference Include="Neo4j.Driver" Version="6.0.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageReference Include="Proto.Actor" Version="1.8.0" />
+    <PackageReference Include="Proto.Cluster" Version="1.8.0" />
+    <PackageReference Include="Proto.Cluster.TestProvider" Version="1.8.0" />
+    <PackageReference Include="Proto.Remote" Version="1.8.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.12.8" />
+  </ItemGroup>
+
+</Project>
