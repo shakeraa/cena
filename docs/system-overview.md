@@ -48,7 +48,7 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
   4. **Error type repetition**: The same error pattern (classified by error taxonomy) recurs 3 or more times across sessions
   5. **Annotation sentiment**: NLP analysis of student annotations detects frustration or confusion signals
 - A methodology switch is triggered when the composite stagnation score exceeds a threshold of 0.7 (on a 0–1 normalized scale) for 3 consecutive sessions
-- The switching strategy is error-type-driven, with explicit precedence and cycling prevention:
+- The switching strategy is error-type-driven, with explicit precedence and cycling prevention. **Prior work:** Chi, VanLehn & Litman (2011, IJAIED 21:83–113) demonstrated that reinforcement learning can induce effective pedagogical policies in ITS, significantly improving learning gains. Cena's approach differs: instead of RL-induced policies (which require large training datasets), Cena uses a hand-crafted MCM lookup with data-driven confidence updates — a pragmatic choice for a pre-launch system that will migrate to RL-based policy optimization once sufficient interaction data exists (see `docs/intelligence-layer.md` Flywheel 1).
 
 **Methodology selection algorithm:**
 1. **Classify the dominant error type** from the last 3 sessions' error logs. If multiple error types are present, use precedence order: conceptual > procedural > motivational (conceptual errors are hardest to overcome and most damaging if left unaddressed).

@@ -553,10 +553,25 @@ Methodology switching is Cena's core differentiator and the hardest claim to def
 ---
 
 ## Sources
+
+### Foundational Research (peer-reviewed)
+- **Ma, W., Adesope, O.O., Nesbit, J.C. & Liu, Q. (2014)**. Intelligent Tutoring Systems and Learning Outcomes: A Meta-Analysis. *Journal of Educational Psychology*, 106(4), 901–918. DOI: 10.1037/a0037123. [107 effect sizes, 14,321 participants. ITS vs teacher-led instruction: g=0.42; ITS vs non-ITS computer: g=0.57. Foundational evidence that ITS works.]
+- **Corbett, A.T. & Anderson, J.R. (1994)**. Knowledge Tracing: Modeling the Acquisition of Procedural Knowledge. *User Modeling and User-Adapted Interaction*, 4(4), 253–278. [Original BKT paper; mastery threshold P(L)≥0.95. Cena uses 0.85 — see assessment-specification.md for justification.]
+- **Settles, B. & Meeder, B. (2016)**. A Trainable Spaced Repetition Model for Language Learning. *Proceedings of ACL*, 1848–1858. [Half-Life Regression model used by Duolingo; 13M learning traces; 9.5% retention improvement. Cena adapts HLR for STEM concept review.]
+- **Doignon, J.-P. & Falmagne, J.-C. (1999)**. *Knowledge Spaces*. Springer-Verlag. [Mathematical foundation of Knowledge Space Theory used in ALEKS. Cena's diagnostic quiz is ALEKS-inspired — see assessment-specification.md.]
+- **Chi, M., VanLehn, K. & Litman, D. (2011)**. An Evaluation of Pedagogical Tutorial Tactics for a Natural Language Tutoring System: A Reinforcement Learning Approach. *IJAIED*, 21, 83–113. [Used RL to induce pedagogical policies in ITS — closest prior work to Cena's methodology switching approach.]
+- **Deci, E.L., Koestner, R. & Ryan, R.M. (1999)**. A Meta-Analytic Review of Experiments Examining the Effects of Extrinsic Rewards on Intrinsic Motivation. *Psychological Bulletin*, 125(6), 627–668. [Self-Determination Theory foundation for Cena's gamification risk analysis.]
+- **Sailer, M. & Homner, L. (2020)**. The Gamification of Learning: a Meta-Analysis. *Educational Psychology Review*, 32, 77–112. [Gamification effects on cognitive, motivational, and behavioral outcomes.]
+
+### Competitive Intelligence (verified sources)
+- **eSelf AI / CET pilot results (August 2025)**. "Study shows thousands of students see test score gains in just 25 minutes with eSelf's AI avatar tutors." PR Newswire / Morningstar, August 14, 2025. [2,031 Israeli students, 1,841 active, +3.94 points (p<0.001), Harvard/MIT Media Lab validated. Source: prnewswire.com/news-releases/302530283]
+- **Squirrel AI MCM model**. "The Squirrel AI Adaptive Learning System Accompanying Millions of Children in Their Growth." Springer, 2025. [MCM = Mode of Thinking, Capacity, Methodology — Cena's MCM graph is inspired by this but adapted for error-type-driven switching rather than Squirrel AI's knowledge-point decomposition.]
+
+### Recent Methodology (2024-2025)
+- **TOPSIS instructional strategy selection (2025)**. "Personalized Instructional Strategy Adaptation Using TOPSIS." *MDPI Information*, 16(5), 409. [Multi-criteria decision-making for real-time pedagogical intervention selection; normalized gain g=0.49. Validates the multi-criteria approach Cena uses in MCM graph lookup.]
+
+### Industry Sources
 - LeveragAI, Lionwood, Cleveroad, Gloobia — EdTech landscape reviews
-- PMC, Springer, Frontiers — gamification systematic reviews and meta-analyses
-- Springer IJAIED, arXiv, CZI — knowledge graph research
-- MDPI Education Sciences, Brain Sciences — cognitive load theory
 - Userpilot, NTQ Europe, Loyalty.cx — EdTech retention data
 - Lenny's Newsletter, Sensor Tower — Duolingo case studies
 - Monetizely, Ptolemay — EdTech pricing models

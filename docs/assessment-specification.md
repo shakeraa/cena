@@ -354,7 +354,7 @@ All question types support a 3-level hint escalation:
 
 ### 5.1 Purpose
 
-When a new student onboards, the system must efficiently map their existing knowledge across the subject's concept graph (approximately 2,000 nodes for Math). The diagnostic quiz does this in 10–15 questions using an adaptive algorithm based on Knowledge Space Theory (KST).
+When a new student onboards, the system must efficiently map their existing knowledge across the subject's concept graph (approximately 2,000 nodes for Math). The diagnostic quiz does this in 10–15 questions using an adaptive algorithm based on Knowledge Space Theory (KST) (Doignon & Falmagne, 1999, *Knowledge Spaces*, Springer-Verlag; see also Falmagne et al., 2006 for the ALEKS implementation).
 
 ### 5.2 Knowledge Space Construction
 
@@ -485,7 +485,7 @@ Then propagate to individual concepts within each cluster and assign mastery sta
 
 | P(known) | Status | UI Color | Meaning |
 |----------|--------|----------|---------|
-| >= 0.85 | Mastered | Green | Student likely knows this — skip in learning path, include in spaced repetition (matches mastery threshold in `docs/event-schemas.md` ConceptMastered_V1) |
+| >= 0.85 | Mastered | Green | Student likely knows this — skip in learning path, include in spaced repetition (matches mastery threshold in `docs/event-schemas.md` ConceptMastered_V1). **Threshold rationale**: Corbett & Anderson (1994) use P(L)≥0.95 as the BKT mastery standard. Cena uses 0.85 for three reasons: (1) faster student progression — 0.95 requires ~3 more correct attempts per concept, adding ~15 min per concept for marginal confidence gain; (2) Cena's spaced repetition (HLR) catches false positives — if a student is prematurely marked "mastered," the Half-Life Regression timer will detect decay and schedule review; (3) the threshold is A/B testable — we will compare 0.85 vs 0.90 vs 0.95 in the first 1,000 users to find the optimal balance between progression speed and retention |
 | 0.3 – 0.85 | In-Progress | Yellow | Uncertain — prioritize for early learning sessions to refine estimate |
 | < 0.3 | Unknown | Gray | Student likely doesn't know this — will be taught when prerequisites are met |
 

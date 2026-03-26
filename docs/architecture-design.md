@@ -83,7 +83,7 @@ The system is decomposed into **nine bounded contexts** with clear seams. Cross-
 - **Owns:** Domain knowledge graph, syllabus structure, concept metadata, difficulty ratings
 - **Storage:** Neo4j AuraDB (source of truth) with in-memory cache loaded at silo startup
 - **Change frequency:** Rare (annual syllabus updates, new subjects)
-- **MCM Graph** (Mode x Capability x Methodology): A lookup table stored as Neo4j edges connecting error types and concept categories to recommended teaching methodologies. Structure:
+- **MCM Graph** (Mode x Capability x Methodology): Inspired by Squirrel AI's proprietary MCM model (Mode of Thinking, Capacity, Methodology — see "The Squirrel AI Adaptive Learning System", Springer, 2025), but adapted for Cena's error-type-driven switching rather than Squirrel AI's nano-knowledge-point decomposition. Stored as Neo4j edges connecting error types and concept categories to recommended teaching methodologies. Structure:
 
   ```
   MCM schema: (ErrorType, ConceptCategory) → [(Methodology, confidence)]
@@ -254,7 +254,7 @@ Domain Event emitted (e.g., ConceptAttempted)
 
 The spaced repetition engine runs **inside the actor**, not as an external cron job.
 
-- **Model:** Half-Life Regression (Duolingo's open-sourced model)
+- **Model:** Half-Life Regression (Settles & Meeder, 2016, "A Trainable Spaced Repetition Model for Language Learning", ACL; open-sourced by Duolingo at github.com/duolingo/halflife-regression)
 - **Formula:** `p(t) = 2^(-delta/h)` where `delta` is time elapsed and `h` is the concept's half-life
 - **Trigger:** When predicted recall drops below 0.85, the `OutreachSchedulerActor` schedules a Proto.Actor reminder
 - **Flow:** Reminder fires -> event to NATS -> Outreach service -> WhatsApp "Quick review: what's the derivative of sin(x)?"
