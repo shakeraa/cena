@@ -135,17 +135,18 @@ def main():
             flag(3, "BKT parameters p_slip=0.10 and p_guess=0.25 are hardcoded defaults with no pre-launch calibration plan. Need: collect N diagnostic attempts, fit parameters via MLE, compare to defaults",
                  "assessment-specification.md", "SPEC_GAP")
 
-    # 10. Content authoring error recovery undefined
-    # "content correction" exists but that's about propagating corrections, not the operational procedure
+    # 10. Content authoring error recovery
+    # Must have both: correction protocol (post-publication fixes) AND expert rejection handling (pre-publication QA)
     if "content-authoring.md" in all_text:
-        has_error_procedure = any(phrase in ca.lower() for phrase in [
-            "rejection rate", "expert rejects", "student reports bug",
-            "question reported", "content hotfix", "emergency content",
-            "error recovery procedure", "content rollback",
+        has_correction_protocol = "Correction Protocol" in ca or "Content Correction" in ca
+        has_rejection_handling = any(phrase in ca.lower() for phrase in [
+            "rejection rate", "expert rejects", "rejection threshold",
+            "expert rejection", "review rejection",
         ])
-        if not has_error_procedure:
-            flag(3, "Content authoring pipeline specifies creation flow but not error recovery: what happens when expert rejects 50% of LLM-generated questions? When a student finds a bug in a published question? Need operational procedures",
-                 "content-authoring.md", "SPEC_GAP")
+        if not has_correction_protocol or not has_rejection_handling:
+            if not has_rejection_handling:
+                flag(3, "Content authoring has a post-publication correction protocol but no expert rejection handling: what happens when SME rejects 50%+ of LLM-generated questions? Need: rejection rate tracking, escalation threshold, retraining trigger",
+                     "content-authoring.md", "SPEC_GAP")
 
     # === PRINT RESULTS ===
 

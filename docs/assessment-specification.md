@@ -429,6 +429,13 @@ P(correct | student doesn't know cluster c) = p_guess
 | p_slip | 0.10 | 10% chance of careless error on a known concept |
 | p_guess | 0.25 | MCQ with 4 options — random guessing baseline |
 
+**Pre-launch calibration plan** (these defaults are starting points — must be validated empirically):
+1. **Data collection**: First 500 diagnostic quiz completions (beta users) generate ~5,000–7,500 response records (10–15 questions each). This is sufficient for MLE parameter estimation.
+2. **Calibration method**: Fit p_slip and p_guess per question type via expectation-maximization (EM) on the response matrix, using the `pyBKT` library's built-in parameter fitting (see `docs/intelligence-layer.md` Flywheel 2).
+3. **Validation**: Compare fitted parameters to defaults. If fitted p_slip differs from 0.10 by more than ±0.05, or fitted p_guess differs from 0.25 by more than ±0.10, replace defaults with fitted values.
+4. **Ongoing recalibration**: Quarterly, as part of the Flywheel 2 BKT retraining cycle. Parameters are versioned (V1, V2, ...) and A/B tested before rollout.
+5. **Guard rail**: p_slip is capped at [0.01, 0.30] and p_guess at [0.01, 0.50] to prevent degenerate solutions from noisy data.
+
 For non-MCQ diagnostic questions, p_guess is adjusted:
 | Question Type | p_guess |
 |--------------|---------|

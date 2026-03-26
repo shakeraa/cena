@@ -154,6 +154,13 @@ The education domain expert (licensed Bagrut teacher) reviews:
 
 **Throughput estimate:** 1 expert, part-time (20 hrs/week), reviews ~100–150 concepts/week. One subject (2,000 nodes) takes ~15 weeks of expert review. With 2 experts: ~8 weeks.
 
+**Expert rejection handling:**
+- **Rejection rate tracking**: Dashboard tracks per-stage rejection rates (prerequisite edges, questions, explanations, diagrams). Target: <30% expert rejection rate for LLM-generated content.
+- **Escalation threshold**: If rejection rate exceeds 40% for a concept cluster (e.g., "Trigonometric Identities"), the cluster is flagged for prompt engineering review — the extraction/generation prompts for that subject area are not performing well enough.
+- **Retraining trigger**: If rejection rate exceeds 50% across any full subject for 2 consecutive review batches, the pipeline pauses for that subject. Root cause analysis: was the corpus insufficient? Is the extraction prompt misaligned with this subject's structure? Fix prompts before resuming generation.
+- **Rejected content lifecycle**: Rejected items are tagged with rejection reason (factual error, wrong difficulty, poor Hebrew, wrong prerequisite, wrong Bloom's level). Rejection reasons are aggregated weekly to identify systematic LLM weaknesses — e.g., if 60% of rejections are "wrong Bloom's level," the Bloom's classification prompt needs refinement.
+- **Expert feedback loop**: Accepted-with-edits items are especially valuable — the expert's edits become few-shot examples for improving the generation prompts for similar concepts.
+
 ### 3.5 Stage 5: QA Pass
 
 Automated checks before publication:
