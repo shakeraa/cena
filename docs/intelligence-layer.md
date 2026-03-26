@@ -63,7 +63,17 @@ The MCM (Mode x Capability x Methodology) graph maps error types + concept categ
 | Error type repetition | 0.20 | Persistent misconception — indicates methodology is not working |
 | Annotation sentiment | 0.10 | Weakest signal (NLP-dependent, noisy) — weighted low until model matures |
 
-- **Composite formula**: `stagnation_score = Σ(weight_i × normalized_signal_i)`, where each signal is normalized to [0, 1]. Trigger methodology switch when score > 0.7 for 3 consecutive sessions (see `system-overview.md`).
+- **Normalization functions** (each signal mapped to [0, 1] using continuous encoding, not binary):
+
+| Signal | Normalization Formula | Notes |
+|---|---|---|
+| Accuracy plateau | `sigmoid(10 * (0.05 - improvement_rate))` where `improvement_rate` = (accuracy_last_10 - accuracy_prev_10) / accuracy_prev_10 | Centers at 5% improvement threshold; outputs ~0.5 at threshold, ~0.95 at 0% improvement, ~0.05 at 10% improvement |
+| Response time drift | `min(1.0, max(0, (rolling_rt_5 - baseline_rt) / baseline_rt) / 0.4)` | Linear from 0 (no drift) to 1 (40%+ drift). `baseline_rt` = trailing 20-question median for this student |
+| Session abandonment | `min(1.0, max(0, (avg_duration - session_duration) / avg_duration) / 0.6)` | Linear from 0 (full session) to 1 (ended 60%+ early). `avg_duration` = trailing 5-session median |
+| Error type repetition | `min(1.0, repeat_count / 5)` where `repeat_count` = same error pattern across last 3 sessions | Linear from 0 (no repeats) to 1 (5+ repeats of same error type) |
+| Annotation sentiment | `1.0 - sentiment_score` where `sentiment_score` ∈ [0, 1] from Kimi-tier NLP classification | Inverted: high frustration → high stagnation signal. Default 0.5 if no annotations |
+
+- **Composite formula**: `stagnation_score = Σ(weight_i × normalized_signal_i)`, where each signal is normalized to [0, 1] per the formulas above. Trigger methodology switch when score > 0.7 for 3 consecutive sessions (see `system-overview.md`).
 - **Retraining**: Quarterly. Logistic regression on stagnation outcomes to re-weight the composite score used by the `StagnationDetectorActor` (see `architecture-design.md` Section 3.2.3).
 - **Minimum data**: 500+ stagnation events with outcome tracking before first retraining.
 
