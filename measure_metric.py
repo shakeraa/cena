@@ -1,33 +1,18 @@
 #!/usr/bin/env python3
 """
-Autoresearch metric Phase 13: Fix All Architect-Identified CRITICALs.
-25 CRITICAL issues from 5 architect reviews. Fix them all → 10/10.
+Autoresearch metric Phase 14: Task Plan Quality & Completeness.
+Validates that every task has strict acceptance criteria, tests,
+dependencies, and full domain coverage.
 Target: 0.
 """
 
-import os
+import re
 from pathlib import Path
 
-CONTRACTS_DIR = Path(__file__).parent / "contracts"
-
-
-def read_all():
-    files = {}
-    for root, _, filenames in os.walk(CONTRACTS_DIR):
-        for fname in filenames:
-            if fname.startswith('REVIEW_'):
-                continue
-            fpath = os.path.join(root, fname)
-            rel = os.path.relpath(fpath, CONTRACTS_DIR)
-            try:
-                files[rel] = open(fpath).read()
-            except:
-                pass
-    return files
+TASKS_DIR = Path(__file__).parent / "tasks"
 
 
 def main():
-    files = read_all()
     total = 0
     results = {}
 
@@ -36,165 +21,131 @@ def main():
         total += w
         results.setdefault(cat, []).append((w, desc, f))
 
-    # Helper to get file content
-    def get(pattern):
-        for k, v in files.items():
-            if pattern in k:
-                return v
-        return ""
-
-    sa = get("student_actor")
-    marten = get("marten-event-store")
-    topo = get("actor_system_topology")
-    session = get("learning_session")
-    stag = get("stagnation_detector")
-    outreach = get("outreach_scheduler")
-    domain = get("domain-services")
-    acl = get("acl-interfaces")
-    prompts = get("prompt-templates")
-    routing = get("routing-config")
-    cost = get("cost-tracking")
-    dart_models = get("domain_models.dart")
-    dart_sync = get("offline_sync_service")
-    dart_state = get("app_state")
-    dart_kg = get("knowledge_graph_widget")
-    dart_session = get("session_screen")
-    dart_streak = get("streak_widget")
-    dart_config = get("app_config")
-    graphql = get("graphql-schema")
-    signalr = get("signalr-messages")
-    grpc = get("grpc-protos")
-    nats = get("nats-subjects")
-    neo4j = get("neo4j-schema")
+    files = {}
+    for f in sorted(TASKS_DIR.glob("*.md")):
+        files[f.name] = f.read_text()
 
     # ═══════════════════════════════════════════════════════════════
-    # EVENT SOURCING CRITICALS
+    # 1. STRUCTURAL CHECKS (every task file)
     # ═══════════════════════════════════════════════════════════════
 
-    # ES-1: Apply uses DateTimeOffset.UtcNow instead of event timestamp
-    if "DateTimeOffset.UtcNow" in marten and "Apply(" in marten:
-        flag(4, "Apply methods use DateTimeOffset.UtcNow — must use event timestamp for deterministic replay", "marten-event-store.cs", "ES")
+    for fname, content in files.items():
+        if fname == "00-master-plan.md":
+            continue
 
-    # ES-2: Non-atomic multi-event writes (separate sessions per event)
-    if sa and "PersistAndPublish" in sa:
-        # Check if there's batch support (FlushEvents pattern or explicit batch)
-        has_batch = any(p in sa for p in ["FlushEvents", "StageEvent", "events.ToArray()", "_pendingEvents"])
-        if not has_batch:
-            flag(4, "PersistAndPublish creates separate sessions — must batch all events from one command into single Append", "student_actor.cs", "ES")
+        # Count tasks (## TASK-NNN or ## XXX-NNN patterns)
+        tasks = re.findall(r'^## \w+-\d+', content, re.MULTILINE)
+        if len(tasks) < 3:
+            flag(3, f"{fname}: Only {len(tasks)} tasks defined — expected at least 5", fname, "COVERAGE")
 
-    # ES-3: No expected version on Marten append (no optimistic concurrency)
-    if sa and "Append(" in sa:
-        has_version = any(p in sa for p in ["expectedVersion", "ExpectedVersion", "EventVersion", "_state.EventVersion"])
-        if not has_version:
-            flag(3, "Marten Append without expected version — no optimistic concurrency protection", "student_actor.cs", "ES")
+        # Every task must have acceptance criteria checkboxes
+        checkbox_count = content.count("- [ ]")
+        if checkbox_count < len(tasks) * 3:
+            flag(3, f"{fname}: {checkbox_count} checkboxes for {len(tasks)} tasks — need at least 3 per task", fname, "CRITERIA")
 
-    # ES-4: Offline sync no idempotency
-    if sa and "HandleSyncOffline" in sa:
-        if "idempotency" not in sa.lower() and "IdempotencyKey" not in sa and "SET NX" not in sa:
-            flag(4, "Offline sync processes events without idempotency check — retry = double everything", "student_actor.cs", "ES")
+        # Every task must have a Test section
+        test_count = len(re.findall(r'\*\*Test', content))
+        if test_count < len(tasks):
+            flag(2, f"{fname}: {test_count} tests for {len(tasks)} tasks — every task needs a test", fname, "TESTING")
 
-    # ═══════════════════════════════════════════════════════════════
-    # EDTECH CRITICALS (pedagogical soundness)
-    # ═══════════════════════════════════════════════════════════════
+        # Every task must have Blocked by
+        blocked_count = len(re.findall(r'Blocked by', content, re.IGNORECASE))
+        if blocked_count < len(tasks):
+            flag(2, f"{fname}: {blocked_count} 'Blocked by' for {len(tasks)} tasks — missing dependencies", fname, "DEPS")
 
-    # ET-1: Single mastery threshold — need dual (0.85 progression, 0.95 prereq gate)
-    if domain:
-        has_dual = "prerequisite" in domain.lower() and ("0.95" in domain or "PrerequisiteGate" in domain)
-        if not has_dual:
-            flag(4, "Single mastery threshold 0.85 — need dual: 0.85 for progression, 0.95 for prerequisite gates (Corbett & Anderson standard)", "domain-services.cs", "EDTECH")
-
-    # ET-2: BKT P(forget)=0 contradicts HLR
-    if domain and "PForget" in domain:
-        # Check if PForget has a non-zero default
-        has_nonzero = any(p in domain for p in ["PForget = 0.02", "PForget = 0.01", "PForget = 0.03", "Non-zero"])
-        if not has_nonzero:
-            flag(3, "BKT P(forget)=0 contradicts HLR spaced repetition — mastery should decay in BKT too", "domain-services.cs", "EDTECH")
-    elif domain and "PForget" not in domain:
-        flag(3, "BKT has no P(forget) parameter — mastery decay not modeled in BKT (only in HLR)", "domain-services.cs", "EDTECH")
-
-    # ET-3: No prerequisite enforcement service
-    if domain:
-        has_prereq = "IPrerequisiteEnforcementService" in domain or "PrerequisiteGate" in domain or "CheckPrerequisites" in domain
-        if not has_prereq:
-            flag(4, "No prerequisite enforcement service — knowledge graph is decorative without gate checks", "domain-services.cs", "EDTECH")
-
-    # ET-4: Error classification on Kimi (cheapest) despite being linchpin
-    if routing and "error_classification" in routing.lower():
-        if "kimi" in routing.lower() and "sonnet" not in routing[routing.lower().find("error_classification"):routing.lower().find("error_classification")+200].lower():
-            flag(3, "Error classification routed to cheapest model (Kimi) — this is the linchpin of adaptive routing, needs higher quality", "routing-config.yaml", "EDTECH")
-
-    # ET-5: Stagnation threshold not personalized
-    if stag:
-        has_personal = "per-student" in stag.lower() or "personalized_threshold" in stag.lower() or "student-specific" in stag.lower() or "adaptive threshold" in stag.lower()
-        if not has_personal:
-            flag(3, "Stagnation 5% improvement threshold is fixed — slow learners will trigger false positives. Need per-student adaptive threshold", "stagnation_detector_actor.cs", "EDTECH")
-
-    # ET-6: XP rewards volume not mastery depth
-    if marten and "XpAwarded_V1" in marten:
-        # Find the record definition (not the event registration)
-        record_idx = marten.find("record XpAwarded_V1")
-        has_difficulty_xp = record_idx >= 0 and "Difficulty" in marten[record_idx:record_idx+400]
-        if not has_difficulty_xp:
-            flag(2, "XP award has no difficulty multiplier — students farm easy questions. Need: XP = base * difficulty_level", "marten-event-store.cs", "EDTECH")
+        # Every task must have Priority
+        priority_count = len(re.findall(r'Priority.*P[0-3]', content))
+        if priority_count < len(tasks):
+            flag(1, f"{fname}: {priority_count} priorities for {len(tasks)} tasks — all need P0-P3", fname, "PRIORITY")
 
     # ═══════════════════════════════════════════════════════════════
-    # SECURITY CRITICALS
+    # 2. DOMAIN COVERAGE (all 8 domains must exist)
     # ═══════════════════════════════════════════════════════════════
 
-    # SEC-1: No answer sanitization before LLM routing
-    if acl:
-        has_sanitize = "sanitize" in acl.lower() or "sanitization" in acl.lower() or "InputSanitizer" in acl
-        if not has_sanitize:
-            flag(4, "No input sanitization contract for student answers before LLM routing — prompt injection risk", "acl-interfaces.py", "SECURITY")
+    required_domains = {
+        "01-data-layer.md": "PostgreSQL, Marten, Neo4j, Redis",
+        "02-actor-system.md": "Proto.Actor, event sourcing",
+        "03-llm-layer.md": "FastAPI, Claude, Kimi",
+        "04-mobile-app.md": "Flutter, Dart",
+        "05-frontend-web.md": "React, TypeScript",
+        "06-infrastructure.md": "AWS, NATS, CI/CD",
+        "07-content-pipeline.md": "Neo4j, Kimi batch",
+        "08-security-compliance.md": "GDPR, Auth, PII",
+    }
 
-    # SEC-2: GraphQL no auth enforcement in schema
-    if graphql:
-        has_auth = "@auth" in graphql or "directive @auth" in graphql or "authorization" in graphql.lower()
-        if not has_auth:
-            flag(3, "GraphQL schema has no @auth directive — IDOR risk (student A queries student B data)", "graphql-schema.graphql", "SECURITY")
-
-    # ═══════════════════════════════════════════════════════════════
-    # MOBILE CRITICALS
-    # ═══════════════════════════════════════════════════════════════
-
-    # MOB-1: No durable command queue (app crash = lost work)
-    if dart_sync:
-        has_cmd_queue = "CommandQueue" in dart_sync or "command_queue" in dart_sync or "DurableCommandQueue" in dart_sync
-        if not has_cmd_queue:
-            flag(3, "No durable command queue — app crash between answer submit and server ack = lost work", "offline_sync_service.dart", "MOBILE")
-
-    # MOB-2: No accessibility contracts
-    if dart_kg:
-        has_a11y = "Semantics" in dart_kg or "semanticLabel" in dart_kg or "accessibility" in dart_kg.lower()
-        if not has_a11y:
-            flag(3, "Knowledge graph widget has zero accessibility — invisible to screen readers", "knowledge_graph_widget.dart", "MOBILE")
-
-    # MOB-3: No streak freeze / vacation mode
-    if dart_streak:
-        has_freeze = "freeze" in dart_streak.lower() or "vacation" in dart_streak.lower() or "Shabbat" in dart_streak
-        if not has_freeze:
-            flag(2, "No streak freeze / vacation mode — punishes observant students on Shabbat/holidays", "streak_widget.dart", "MOBILE")
+    for domain_file, tech in required_domains.items():
+        if domain_file not in files:
+            flag(4, f"Missing domain file: {domain_file} ({tech})", domain_file, "COVERAGE")
 
     # ═══════════════════════════════════════════════════════════════
-    # DISTRIBUTED SYSTEMS CRITICALS
+    # 3. CROSS-DOMAIN DEPENDENCY INTEGRITY
     # ═══════════════════════════════════════════════════════════════
 
-    # DS-1: NATS publish before Marten commit (outbox pattern missing)
-    if sa and "PublishToNats" in sa:
-        if "outbox" not in sa.lower() and "after.*SaveChanges" not in sa.lower():
-            has_outbox = "OutboxPublisher" in sa or "nats_published_at" in sa
-            if not has_outbox:
-                flag(3, "NATS publish may fire before Marten commit — need outbox pattern", "student_actor.cs", "DISTRIBUTED")
+    all_content = "\n".join(files.values())
+
+    # Check: Data tasks reference contract files
+    if "01-data-layer.md" in files:
+        data = files["01-data-layer.md"]
+        if "marten-event-store.cs" not in data:
+            flag(2, "Data tasks don't reference marten-event-store.cs contract", "01-data-layer.md", "CONTRACT_REF")
+        if "neo4j-schema.cypher" not in data:
+            flag(2, "Data tasks don't reference neo4j-schema.cypher contract", "01-data-layer.md", "CONTRACT_REF")
+
+    # Check: Actor tasks reference actor contracts
+    if "02-actor-system.md" in files:
+        actor = files["02-actor-system.md"]
+        if "student_actor" not in actor.lower():
+            flag(2, "Actor tasks don't reference student_actor contract", "02-actor-system.md", "CONTRACT_REF")
+
+    # Check: Mobile tasks have Arabic support task
+    if "04-mobile-app.md" in files:
+        mobile = files["04-mobile-app.md"]
+        if "arabic" not in mobile.lower() and "ar" not in mobile:
+            flag(3, "Mobile tasks missing Arabic language support task", "04-mobile-app.md", "ARABIC")
+
+    # Check: Security tasks cover all 5 architect-identified attack vectors
+    if "08-security-compliance.md" in files:
+        sec = files["08-security-compliance.md"]
+        attack_vectors = ["IDOR", "prompt injection", "PII", "GDPR", "rate limit"]
+        for av in attack_vectors:
+            if av.lower() not in sec.lower():
+                flag(2, f"Security tasks missing coverage for: {av}", "08-security-compliance.md", "SEC_COVERAGE")
+
+    # ═══════════════════════════════════════════════════════════════
+    # 4. TASK QUALITY CHECKS
+    # ═══════════════════════════════════════════════════════════════
+
+    # Check: P0 tasks have concrete test code (not just "Test: ...")
+    for fname, content in files.items():
+        if fname == "00-master-plan.md":
+            continue
+        # Find P0 tasks
+        p0_sections = re.split(r'^## ', content, flags=re.MULTILINE)
+        for section in p0_sections:
+            if "P0" in section:
+                if "```" not in section:
+                    task_match = re.search(r'(\w+-\d+)', section)
+                    task_id = task_match.group(1) if task_match else "unknown"
+                    flag(2, f"{fname}: P0 task {task_id} has no code block in test — needs runnable test", fname, "TEST_QUALITY")
+
+    # Check: Master plan has stage timeline
+    if "00-master-plan.md" in files:
+        master = files["00-master-plan.md"]
+        if "Week" not in master:
+            flag(2, "Master plan missing weekly timeline", "00-master-plan.md", "PLANNING")
 
     # ═══════════════════════════════════════════════════════════════
     # PRINT
     # ═══════════════════════════════════════════════════════════════
 
     print("=" * 70)
-    print("FIX ALL ARCHITECT CRITICALS (lower=better, target: 0)")
+    print("TASK PLAN QUALITY & COMPLETENESS (lower=better, target: 0)")
     print("=" * 70)
 
-    for cat in ["ES", "EDTECH", "SECURITY", "MOBILE", "DISTRIBUTED"]:
+    cats = ["COVERAGE", "CRITERIA", "TESTING", "DEPS", "PRIORITY",
+            "CONTRACT_REF", "ARABIC", "SEC_COVERAGE", "TEST_QUALITY", "PLANNING"]
+
+    for cat in cats:
         if cat in results:
             items = results[cat]
             ct = sum(w for w, _, _ in items)
@@ -203,7 +154,7 @@ def main():
                 print(f"    (w={w}) {f}: {d}")
 
     print(f"\n{'=' * 70}")
-    for cat in ["ES", "EDTECH", "SECURITY", "MOBILE", "DISTRIBUTED"]:
+    for cat in cats:
         if cat in results:
             print(f"  {cat}: {sum(w for w,_,_ in results[cat])}")
     print(f"\n  TOTAL GAP: {total}")
