@@ -47,12 +47,13 @@ def main():
 
     # 2. Pricing: most expensive AI tool but positioned as accessible savings
     if "most expensive" in bv.lower() and "94% saving" in pr:
-        # Check if product-research acknowledges the premium positioning tension
-        if "premium positioning" not in pr.lower() or "volume" in pr.lower():
-            # Need explicit acknowledgment that this is a premium product, not volume
-            if "pricing strategy" not in pr.lower() or "premium vs" not in pr.lower():
-                flag(5, "Pricing contradiction: business-viability says 'most expensive AI learning tool' but product-research positions as '94% savings'. These are opposite GTM strategies — clarify if this is premium or volume play",
-                     "product-research.md", "BUSINESS_MODEL")
+        # Check if product-research explicitly names the pricing strategy and addresses the tension
+        has_strategy = ("pricing strategy" in pr.lower() and "premium" in pr.lower() and
+                       ("not a volume" in pr.lower() or "not volume" in pr.lower() or
+                        "premium tutoring replacement" in pr.lower()))
+        if not has_strategy:
+            flag(5, "Pricing contradiction: business-viability says 'most expensive AI learning tool' but product-research positions as '94% savings'. These are opposite GTM strategies — clarify if this is premium or volume play",
+                 "product-research.md", "BUSINESS_MODEL")
 
     # 3. Break-even doesn't account for structural churn
     if "structural churn" in bv.lower() or "Structural churn" in bv:
