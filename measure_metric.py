@@ -106,7 +106,8 @@ def main():
         has_baseline_def = any(phrase in so for phrase in [
             "baseline is set", "baseline window", "baseline computed",
             "trailing average", "sessions to establish baseline",
-            "baseline_accuracy is the",
+            "baseline_accuracy is the", "baseline_accuracy` is the",
+            "Baseline definitions", "trailing median",
         ])
         if not has_baseline_def:
             flag(4, "Cognitive load formula uses 'baseline_accuracy' and 'baseline_rt' but never defines when/how they're established. First session? Trailing 20-question average? Per-concept or per-student? Two engineers will implement this differently",
