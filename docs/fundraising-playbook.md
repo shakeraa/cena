@@ -128,8 +128,8 @@
 2. **Solution:** AI personal mentor that adapts teaching methodology + shows knowledge graph. Demo screenshot.
 3. **Live demo:** 60-second embedded video or "try it now" link
 4. **Market:** 85K-100K Bagrut students/year. Yschool proved 190K will pay for digital prep.
-5. **Why now:** eSelf acquired by Kaltura (education play absorbed). STEM Bagrut AI is untouched. LLM costs dropped 50%/year.
-6. **Differentiation:** Feature matrix vs. Khanmigo, Yschool, eSelf. Knowledge graph + methodology switching = genuinely novel.
+5. **Why now:** eSelf acquired by Kaltura (education play absorbed — see `docs/competitor-eself-deep-dive.md` for full competitive intelligence). STEM Bagrut AI is untouched. LLM costs dropped 50%/year.
+6. **Differentiation:** Feature matrix vs. Khanmigo, Yschool, eSelf. Knowledge graph + methodology switching = genuinely novel (see `docs/competitor-eself-deep-dive.md` Section 5 for gap analysis).
 7. **Business model:** 89 NIS/month. Unit economics table. Break-even at ~1,600–2,300 subscribers (see `docs/product-research.md` Section 8 for full analysis; range depends on LLM cost trajectory).
 8. **Traction:** [Demo users, session data, testimonials, waitlist — whatever you have]
 9. **Team:** Your enterprise architecture background. AI agents as force multiplier. Education advisor.
