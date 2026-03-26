@@ -105,6 +105,20 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - Push notifications for streak reminders, session nudges, and spaced repetition review alerts
 - Minimum supported versions: iOS 15+, Android 10+, modern evergreen browsers (Chrome, Safari, Firefox, Edge)
 
+### Performance SLAs
+
+| Operation | P50 | P95 | P99 | Notes |
+|---|---|---|---|---|
+| Question generation (Socratic) | < 1.5s | < 3s | < 5s | Includes LLM call via Sonnet; user sees typing indicator |
+| Answer evaluation | < 800ms | < 2s | < 4s | BKT update + LLM grading; optimistic UI shows "checking..." |
+| Knowledge graph render (initial) | < 500ms | < 1.2s | < 2s | Client-side rendering of pre-fetched graph data |
+| Knowledge graph update (after mastery) | < 200ms | < 500ms | < 1s | SignalR push + client-side animation |
+| Page load (cold start) | < 2s | < 4s | < 6s | Service worker caches shell; data fetched in parallel |
+| Diagnostic quiz question selection | < 100ms | < 300ms | < 500ms | KST posterior update is O(n) on concept count |
+| Offline sync (50 events) | < 2s | < 5s | < 10s | Bulk replay; larger batches processed async via SignalR push |
+
+**Measurement**: All SLAs are measured end-to-end from client perspective using OpenTelemetry distributed tracing (see `docs/operations.md` Section 3). P99 violations trigger on-call alerts when sustained for > 5 minutes.
+
 ## Target Audience
 
 ### Syllabus-Agnostic Design
