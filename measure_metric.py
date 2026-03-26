@@ -47,15 +47,9 @@ CHECKS = [
 
     # Offline sync conflict resolution — handled as custom check below
 
-    # Performance SLAs not defined — no P50/P95/P99 latency targets
-    ("system-overview.md",
-     r"^(?![\s\S]*(?:P50|P95|P99|latency target|\bSLA\b|response time target))[\s\S]*Interactive sessions",
-     "No performance SLAs defined (P50/P95/P99 latency targets for question generation, answer evaluation, page load)", 3, "MISSING_SPEC"),
+    # Performance SLAs — handled as custom check below
 
-    # API versioning/deprecation policy not specified
-    ("api-contracts.md",
-     r"^(?![\s\S]*(?:versioning policy|deprecation policy|backward.?compat|API version))[\s\S]*SignalR",
-     "No API versioning or deprecation policy defined — critical for mobile app deployment where old clients persist", 3, "MISSING_SPEC"),
+    # API versioning/deprecation policy — handled as custom check below
 
     # === CROSS-REFERENCE GAPS ===
 
@@ -106,6 +100,14 @@ def main():
         ("offline-sync-protocol.md",
          lambda t: "Server-authoritative" in t and "Conflict Resolution Algorithm" not in t,
          "Offline sync mentions conflict resolution but no formal algorithm specified", 4, "MISSING_SPEC"),
+        # API versioning: file must contain versioning policy
+        ("api-contracts.md",
+         lambda t: "SignalR" in t and "Versioning Policy" not in t,
+         "No API versioning or deprecation policy defined", 3, "MISSING_SPEC"),
+        # Performance SLAs: file must contain P50/P95/P99 targets
+        ("system-overview.md",
+         lambda t: "Interactive sessions" in t and "P50" not in t,
+         "No performance SLAs defined (P50/P95/P99 latency targets)", 3, "MISSING_SPEC"),
     ]
     for file_pattern, check_fn, description, weight, category in CUSTOM_CHECKS:
         if file_pattern in all_text:
