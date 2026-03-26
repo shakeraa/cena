@@ -158,6 +158,19 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - Monitors engagement signals (response time, accuracy drop-off, session duration patterns)
 - Builds a per-student cognitive load profile over time
 - Adjusts session length and content density dynamically based on the student's current state
+- **Cognitive load threshold formula**: The system computes a real-time fatigue score per session:
+
+  ```text
+  fatigue_score = w1 * accuracy_drop + w2 * rt_increase + w3 * time_fraction
+  ```
+
+  Where:
+  - `accuracy_drop` = max(0, baseline_accuracy - rolling_accuracy_last_5) / baseline_accuracy, normalized to [0, 1]
+  - `rt_increase` = max(0, rolling_rt_last_5 - baseline_rt) / baseline_rt, normalized to [0, 1]
+  - `time_fraction` = elapsed_minutes / student_max_session_minutes (from per-student profile, default 25 min, range 12–30 min)
+  - Default weights: w1=0.4, w2=0.3, w3=0.3
+  - **Session end trigger**: fatigue_score > 0.7 for 2 consecutive questions → system suggests a break and emits `CognitiveLoadCooldownComplete` after a configurable cooldown (default: 15 min)
+  - See `docs/engagement-signals-research.md` for signal calibration research
 
 ### Estimated Timelines
 - The system provides **personalized time estimates** for achieving specific goals (e.g., "Master 5-unit Math by Bagrut exam date")
