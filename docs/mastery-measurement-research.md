@@ -1601,33 +1601,58 @@ Train a meta-model on Phase 2 data to optimize weights. Use the meta-model's fea
 ## Sources and Key References
 
 **Knowledge Tracing:**
-- Corbett & Anderson (1995). Knowledge tracing: Modeling the acquisition of procedural knowledge. *User Modeling and User-Adapted Interaction*, 4(4), 253-278. (Original BKT paper)
-- Piech et al. (2015). Deep Knowledge Tracing. *NeurIPS*. (DKT)
-- Zhang et al. (2017). Dynamic Key-Value Memory Networks for Knowledge Tracing. *WWW*. (DKVMN)
-- Ghosh et al. (2020). Context-Aware Attentive Knowledge Tracing. *KDD*. (AKT)
-- Lan et al. (2014). Sparse Factor Analysis for Learning and Content Analytics. *JMLR*. (SPARFA)
+- Corbett & Anderson (1995). Knowledge tracing: Modeling the acquisition of procedural knowledge. *User Modeling and User-Adapted Interaction*, 4(4), 253-278. doi:10.1007/BF01099821 (Original BKT paper)
+- Piech et al. (2015). Deep Knowledge Tracing. *NeurIPS 2015*. arXiv:1506.05908 (DKT)
+- Zhang et al. (2017). Dynamic Key-Value Memory Networks for Knowledge Tracing. *WWW 2017*. doi:10.1145/3038912.3052580 (DKVMN)
+- Ghosh et al. (2020). Context-Aware Attentive Knowledge Tracing. *KDD 2020*. doi:10.1145/3394486.3403282 (AKT)
+- Lan et al. (2014). Sparse Factor Analysis for Learning and Content Analytics. *JMLR*, 15(1), 1771-1812. (SPARFA)
+- Pavlik et al. (2009). Performance Factors Analysis — A New Alternative to Knowledge Tracing. *AIED 2009*. doi:10.3233/978-1-60750-028-5-531 (PFA)
 
 **Item Response Theory:**
-- Reckase (2009). *Multidimensional Item Response Theory*. Springer. (MIRT comprehensive reference)
+- Reckase (2009). *Multidimensional Item Response Theory*. Springer. doi:10.1007/978-0-387-89976-3 (MIRT comprehensive reference)
 - De Ayala (2009). *The Theory and Practice of Item Response Theory*. Guilford Press.
+- Rasch (1960). *Probabilistic Models for Some Intelligence and Attainment Tests*. Danish Institute for Educational Research. (Original Rasch model)
 
 **Forgetting and Spaced Repetition:**
-- Settles & Meeder (2016). A Trainable Spaced Repetition Model for Language Learning. *ACL*. (HLR — Duolingo)
-- Bjork & Bjork (1992). A New Theory of Disuse and an Old Theory of Stimulus Fluctuation. (Storage vs. retrieval strength)
-- Lindsey et al. (2014). Improving Students' Long-Term Knowledge Retention Through Personalized Review. *Psychological Science*. (DASH)
+- Settles & Meeder (2016). A Trainable Spaced Repetition Model for Language Learning. *ACL 2016*. doi:10.18653/v1/P16-1174 (HLR — Duolingo)
+- Bjork & Bjork (1992). A New Theory of Disuse and an Old Theory of Stimulus Fluctuation. In *From Learning Processes to Cognitive Processes: Essays in Honor of William K. Estes*, Vol. 2, pp. 35-67. (Storage vs. retrieval strength)
+- Lindsey et al. (2014). Improving Students' Long-Term Knowledge Retention Through Personalized Review. *Psychological Science*, 25(3), 639-647. doi:10.1177/0956797613504302 (DASH)
+- Ebbinghaus (1885/1913). *Memory: A Contribution to Experimental Psychology*. Translated by Ruger & Bussenius. (Original forgetting curve)
+- Leitner (1972). *Lernen lernen* (Learning to Learn). Herder. (Leitner spaced repetition box system)
 
 **Knowledge Space Theory:**
-- Doignon & Falmagne (2011). *Learning Spaces: Interdisciplinary Applied Mathematics*. Springer.
+- Doignon & Falmagne (2011). *Learning Spaces: Interdisciplinary Applied Mathematics*. Springer. doi:10.1007/978-3-642-01039-2
 
 **Misconceptions:**
-- Chi (2005). Commonsense Conceptions of Emergent Processes. *Journal of the Learning Sciences*.
-- Vosniadou (2013). *International Handbook of Research on Conceptual Change*. Routledge.
+- Chi (2005). Commonsense Conceptions of Emergent Processes: Why Some Misconceptions Are Robust. *Journal of the Learning Sciences*, 14(2), 161-199. doi:10.1207/s15327809jls1402_1
+- Vosniadou (2013). *International Handbook of Research on Conceptual Change*, 2nd ed. Routledge. doi:10.4324/9780203154472
 
 **Bloom's Taxonomy:**
-- Anderson & Krathwohl (2001). *A Taxonomy for Learning, Teaching, and Assessing*. (Revised Bloom's)
+- Anderson & Krathwohl (2001). *A Taxonomy for Learning, Teaching, and Assessing: A Revision of Bloom's Taxonomy of Educational Objectives*. Longman.
+- Bloom et al. (1956). *Taxonomy of Educational Objectives: The Classification of Educational Goals. Handbook I: Cognitive Domain*. David McKay Company. (Original Bloom's taxonomy)
+
+**Cognitive Load and Learning Theory:**
+- Sweller (1988). Cognitive Load During Problem Solving: Effects on Learning. *Cognitive Science*, 12(2), 257-285. doi:10.1207/s15516709cog1202_4 (Cognitive Load Theory — CLT)
+- Vygotsky (1978). *Mind in Society: The Development of Higher Psychological Processes*. Harvard University Press. (Zone of Proximal Development — ZPD)
+- Roediger & Karpicke (2006). Test-Enhanced Learning: Taking Memory Tests Improves Long-Term Retention. *Psychological Science*, 17(3), 249-255. doi:10.1111/j.1467-9280.2006.01693.x (Testing effect / retrieval practice)
+- Kornell & Bjork (2008). Learning Concepts and Categories: Is Spacing the "Enemy of Induction"? *Psychological Science*, 19(6), 585-592. doi:10.1111/j.1467-9280.2008.02127.x (Interleaving effect)
+- Bjork (1994). Memory and Metamemory Considerations in the Training of Human Beings. In *Metacognition: Knowing about Knowing*, pp. 185-205. MIT Press. (Desirable difficulties framework)
+- Renkl & Atkinson (2003). Structuring the Transition from Example Study to Problem Solving in Cognitive Skill Acquisition: A Cognitive Load Perspective. *Educational Psychologist*, 38(1), 15-22. doi:10.1207/S15326985EP3801_3 (Worked examples with fading)
+
+**Elo-Based Models:**
+- Elo (1978). *The Rating of Chessplayers, Past and Present*. Arco. (Original Elo rating system)
+- Pelánek (2016). Applications of the Elo Rating System in Adaptive Educational Systems. *Computers & Education*, 98, 169-179. doi:10.1016/j.compedu.2016.03.017 (Elo in education)
+
+**Modern Spaced Repetition Algorithms:**
+- Wozniak (1990). *SuperMemo 2 Algorithm*. SuperMemo World. (SM-2 algorithm — basis for Anki)
+- Ye (2022). *Free Spaced Repetition Scheduler* (FSRS). Open-source. arXiv:2402.01032 (FSRS-4.5 — next-gen scheduler, outperforms SM-2 on 10K+ user study)
 
 **Production Systems:**
 - Duolingo Engineering Blog: Birdbrain, Session Generator, HLR papers
 - OATutor (CAHLR, UC Berkeley): Open-source ITS with BKT implementation
-- pyBKT: Python library for BKT parameter estimation
+- pyBKT: Python library for BKT parameter estimation (doi:10.21105/joss.05386)
 - Squirrel AI: PKS model and MCM graph architecture
+
+**Scaffolding and Transfer:**
+- Wood, Bruner & Ross (1976). The Role of Tutoring in Problem Solving. *Journal of Child Psychology and Psychiatry*, 17(2), 89-100. doi:10.1111/j.1469-7610.1976.tb00381.x (Original scaffolding paper)
+- Barnett & Ceci (2002). When and Where Do We Apply What We Learn? A Taxonomy for Far Transfer. *Psychological Bulletin*, 128(4), 612-637. doi:10.1037/0033-2909.128.4.612 (Near transfer vs. far transfer taxonomy)
