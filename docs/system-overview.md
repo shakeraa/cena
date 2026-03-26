@@ -186,6 +186,12 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
   - **Session end trigger**: fatigue_score > 0.7 for 2 consecutive questions → system suggests a break and emits `CognitiveLoadCooldownComplete` after a configurable cooldown (default: 15 min)
   - See `docs/engagement-signals-research.md` for signal calibration research
 
+  **Baseline definitions** (critical for implementation — `baseline_accuracy` and `baseline_rt` must be computed identically by all consumers):
+  - `baseline_accuracy` is the student's **per-concept-cluster trailing median accuracy over the last 20 questions** in that cluster. For new students with <20 questions, use the global population median for that concept's difficulty level (bootstrapped from diagnostic quiz data). Per-concept-cluster (not global) because a student strong in algebra may be weak in geometry — a global baseline would under-trigger for weak areas and over-trigger for strong ones.
+  - `baseline_rt` is the student's **per-question-type trailing median response time over the last 20 questions** of that type (e.g., MCQ vs free-text vs numeric). Per-type because MCQ response times are structurally different from free-text. For new students, use population median for that question type and difficulty level.
+  - `rolling_accuracy_last_5` and `rolling_rt_last_5` are computed over the **last 5 questions in the current session** (not across sessions). This ensures the fatigue detector responds to within-session degradation, not inter-session variance.
+  - **Baseline update frequency**: Baselines are recomputed after each session ends, incorporating the session's data into the trailing 20-question window. They are NOT updated mid-session (to avoid the fatigue detector chasing its own tail).
+
 ### Estimated Timelines
 - The system provides **personalized time estimates** for achieving specific goals (e.g., "Master 5-unit Math by Bagrut exam date")
 - Timelines factor in: current knowledge level, learning pace, available study time, and historical performance
