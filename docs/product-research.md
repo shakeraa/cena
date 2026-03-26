@@ -505,14 +505,28 @@
 
 Methodology switching is Cena's core differentiator and the hardest claim to defend without data. Before seed round, validate with a concrete pilot:
 
-**Methodology switching A/B test (Month 2–3 of MVP, target: 200 students)**
-- **Control group** (100 students): Adaptive difficulty only (like Khan/ALEKS) — system adjusts question difficulty but uses a single teaching method (Socratic) throughout
-- **Treatment group** (100 students): Full methodology switching — system detects stagnation and switches between Socratic, Feynman, worked examples, etc.
-- **Primary metric**: Mastery velocity — concepts mastered per week of active use (normalized for study time)
-- **Secondary metrics**: D7 retention, D30 retention, session duration, self-reported satisfaction
-- **Success threshold**: Treatment group achieves ≥15% higher mastery velocity than control (statistically significant, p<0.05)
-- **Failure protocol**: If treatment group shows no improvement, methodology switching becomes a configuration option rather than a core differentiator — the product pivots to knowledge graph visualization as the primary moat
-- **Timeline**: Recruit from first 500 beta signups, run for 4 weeks, analyze in Week 5. Results available before seed round pitch
+**Methodology switching A/B test (Month 2–3 of MVP, target: 500 students)**
+
+**Power analysis**: EdTech intervention effect sizes are typically d=0.3–0.5 (Hattie, 2008; What Works Clearinghouse standards). To detect d=0.4 with 80% power at p<0.05 (two-tailed), we need n=200 per group (G*Power, independent samples t-test). We target 250 per group (500 total) to account for ~20% attrition over 4 weeks.
+
+- **Control group** (250 students): Adaptive difficulty only (like Khan/ALEKS) — system adjusts question difficulty but uses a single teaching method (Socratic) throughout
+- **Treatment group** (250 students): Full methodology switching — system detects stagnation and switches between Socratic, Feynman, worked examples, etc.
+- **Random assignment**: Students randomly assigned at signup via the A/B cohort mechanism in `StudentProfile` actor (see `docs/architecture-design.md` Section 4.5). No self-selection.
+- **Primary metric**: Mastery velocity — concepts mastered per week, where "mastered" = P(known) ≥ 0.85 sustained for 3+ sessions (identical threshold for both groups)
+- **Secondary metrics**: D7 retention, D30 retention, total minutes studied, self-reported satisfaction (1–5 Likert)
+- **Treatment fidelity diagnostics** (measured but not used as success criteria — these verify the test is working):
+  - Average methodology switches per student in treatment group (expect ≥2 over 4 weeks; if <1, the stagnation detector isn't triggering and results are meaningless)
+  - Switch adherence rate: % of stagnation-detected sessions where a switch actually occurred (expect >90%)
+  - Control contamination check: confirm 0 switches occurred in control group
+- **Pre-specified analysis plan** (pre-registered on OSF before recruitment begins):
+  - Primary analysis: ANCOVA — `mastery_velocity ~ treatment + baseline_diagnostic_score + total_minutes_studied`
+  - Baseline covariate: diagnostic quiz score at onboarding (controls for prior knowledge)
+  - Time-on-task covariate: total minutes studied (controls for engagement differences between groups)
+  - Secondary: Mann-Whitney U for retention metrics (non-normal distributions expected)
+  - No interim analyses. No peeking at results before Week 5.
+- **Success threshold**: Treatment group achieves ≥15% higher mastery velocity than control (statistically significant, p<0.05, after controlling for covariates)
+- **Failure protocol**: If treatment group shows no improvement, methodology switching becomes a configuration option rather than a core differentiator — the product pivots to knowledge graph visualization as the primary moat. If effect is positive but not significant (p=0.05–0.15), extend study to 8 weeks with same cohort before deciding.
+- **Timeline**: Recruit from first 700 beta signups (accounting for 30% who won't complete onboarding), run for 4 weeks, analyze in Week 5. Results available before seed round pitch
 
 **Why this matters for investors**: eSelf showed 3.94-point Bagrut improvement in their CET pilot with 2,000 students. Cena needs comparable evidence that its approach works — even at smaller scale — before claiming superiority.
 
