@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Autoresearch metric Phase 6: Honest Business Model & Specification Gaps.
-Catches real investor red flags, contradicting financial assumptions, and
-specs too vague to implement. No softball checks.
+Autoresearch metric Phase 7: Methodology Switching — Deep Validation.
+Catches unverified claims, incomplete switching algorithm, underpowered
+A/B test, and missing learning transfer validation.
 Target: 0.
 """
 
@@ -28,133 +28,114 @@ def main():
         results_by_category[category].append((weight, description, file_pattern))
 
     pr = all_text.get("product-research.md", "")
-    bv = all_text.get("business-viability-assessment.md", "")
     so = all_text.get("system-overview.md", "")
+    ad = all_text.get("architecture-design.md", "")
     il = all_text.get("intelligence-layer.md", "")
-    fp = all_text.get("fundraising-playbook.md", "")
-    aspec = all_text.get("assessment-specification.md", "")
-    ca = all_text.get("content-authoring.md", "")
 
-    # === CRITICAL: BUSINESS MODEL CONTRADICTIONS ===
+    # === UNVERIFIED CITATION ===
 
-    # 1. Customer lifetime: product-research says 18 months, business-viability says 6-12 months
-    if "18 months" in pr and "Average subscription duration" in pr:
-        if "realistic: 6-12 months" in bv or "realistic: 6–12 months" in bv:
-            # Both exist and contradict — flag unless product-research acknowledges the range
-            if "6-12 month" not in pr and "6–12 month" not in pr:
-                flag(6, "Customer lifetime: product-research.md claims 18 months, business-viability.md says realistic 6-12 months. LTV, break-even, and LTV:CAC all depend on this — pick one and recalculate",
-                     "product-research.md", "BUSINESS_MODEL")
-
-    # 2. Pricing: most expensive AI tool but positioned as accessible savings
-    if "most expensive" in bv.lower() and "94% saving" in pr:
-        # Check if product-research explicitly names the pricing strategy and addresses the tension
-        has_strategy = ("pricing strategy" in pr.lower() and "premium" in pr.lower() and
-                       ("not a volume" in pr.lower() or "not volume" in pr.lower() or
-                        "premium tutoring replacement" in pr.lower()))
-        if not has_strategy:
-            flag(5, "Pricing contradiction: business-viability says 'most expensive AI learning tool' but product-research positions as '94% savings'. These are opposite GTM strategies — clarify if this is premium or volume play",
-                 "product-research.md", "BUSINESS_MODEL")
-
-    # 3. Break-even doesn't account for structural churn
-    if "structural churn" in bv.lower() or "Structural churn" in bv:
-        # Check if product-research break-even section addresses churn
-        if "churn" not in pr[pr.find("Break-Even"):pr.find("Break-Even")+2500] if "Break-Even" in pr else True:
-            flag(5, "Break-even analysis (product-research.md) doesn't model structural churn from student graduation. business-viability.md says 'realistic: 6-12 months' lifetime but break-even assumes steady growth without cohort replacement",
-                 "product-research.md", "BUSINESS_MODEL")
-
-    # 4. eSelf/CET free competitor not surfaced in fundraising materials
-    if "eSelf" in fp:
-        # Check if fundraising playbook mentions the FREE aspect and CET institutional backing
-        if "free" not in fp.lower() or "CET" not in fp:
-            flag(4, "Fundraising playbook mentions eSelf but omits that it's FREE with CET institutional backing (10,000 students). Investors will discover this — address it proactively",
-                 "fundraising-playbook.md", "BUSINESS_MODEL")
-
-    # === HIGH: METHODOLOGY SWITCHING VALIDATION ===
-
-    # 5. Core differentiator has no validation plan
-    # Check across all docs that claim methodology switching as differentiator
-    claims_switching = ("methodology switching" in pr.lower() and
-                       ("novel" in pr.lower() or "no one" in pr.lower() or "none switch" in pr.lower()))
-    if claims_switching or ("genuinely novel" in fp.lower()):
-        # Check if there's a concrete pilot/validation plan anywhere
-        all_docs = pr + so + il + fp
-        has_validation = any(phrase in all_docs.lower() for phrase in [
-            "methodology switching pilot", "validate methodology switching",
-            "pilot with", "pre-launch validation of methodology",
-            "methodology a/b test", "methodology switching a/b",
+    # 1. IJAIED citation — "2024 IJAIED systematic review" with no author, title, DOI
+    if "IJAIED systematic review" in pr or "IJAIED review" in pr:
+        # Check for proper academic citation near "IJAIED"
+        ijaied_idx = pr.find("IJAIED systematic review")
+        ijaied_context = pr[max(0,ijaied_idx-200):ijaied_idx+500] if ijaied_idx >= 0 else ""
+        has_proper_cite = any(phrase in ijaied_context for phrase in [
+            "doi.org", "DOI:", "et al.", "(20", "Vol.",
         ])
-        if not has_validation:
-            flag(5, "Methodology switching is THE core differentiator but has NO concrete validation plan (no pilot size, no timeline, no success metric). Need: 'Pilot with N students, measure X, by date Y'",
+        if not has_proper_cite:
+            flag(5, "IJAIED citation is unverifiable — 'confirmed by 2024 IJAIED systematic review' but no author, title, volume, DOI. Either find and properly cite, or downgrade to 'based on our analysis of 7 competitors'",
+                 "product-research.md", "CITATION")
+
+    # === INCOMPLETE SWITCHING ALGORITHM ===
+
+    # 2. No tie-breaking when multiple error types present
+    if "error-type-driven" in so.lower() or "error type" in so.lower():
+        has_tiebreak = any(phrase in so + ad for phrase in [
+            "tie-break", "tiebreak", "precedence",
+            "multiple error types", "conflicting error",
+            "dominant error", "primary error type",
+        ])
+        if not has_tiebreak:
+            flag(4, "Switching rules map error types → methodologies but don't specify tie-breaking when a student shows BOTH procedural and conceptual errors simultaneously. Need: precedence rules or weighted scoring",
+                 "system-overview.md", "ALGORITHM")
+
+    # 3. No cycling prevention (what if all methodologies fail)
+    if "methodology switch" in so.lower():
+        has_cycling = any(phrase in so + ad for phrase in [
+            "cycling prevention", "already tried", "exhausted",
+            "all methodologies", "method history", "previously attempted",
+            "backtrack", "method exclusion",
+        ])
+        if not has_cycling:
+            flag(4, "No cycling prevention: if student tried Feynman→drill→Socratic and all failed, does system loop back? Need: method attempt history per student per concept, escalation when all methods exhausted",
+                 "system-overview.md", "ALGORITHM")
+
+    # 4. MCM graph structure unspecified
+    if "MCM" in ad or "Mode x Capability x Methodology" in ad:
+        has_mcm_spec = any(phrase in ad + il for phrase in [
+            "MCM lookup", "MCM query", "MCM structure",
+            "MCM table", "MCM format", "MCM schema",
+            "methodology_for(error_type, concept_category)",
+        ])
+        if not has_mcm_spec:
+            flag(3, "MCM graph (Mode x Capability x Methodology) is referenced as the switching decision backbone but its structure, lookup algorithm, and fallback logic are never specified. An engineer cannot implement 'consult MCM graph' without this",
+                 "architecture-design.md", "ALGORITHM")
+
+    # === UNDERPOWERED A/B TEST ===
+
+    # 5. Sample size too small for moderate effect sizes
+    if "100 students" in pr and "a/b test" in pr.lower():
+        has_power = any(phrase in pr.lower() for phrase in [
+            "power analysis", "effect size", "cohen",
+            "statistical power", "sample size calculation",
+            "250 per group", "200 per group",
+        ])
+        if not has_power:
+            flag(4, "A/B test uses n=100 per group but no power analysis. EdTech effects are typically d=0.3-0.5 (moderate). Need n=200+ per group for 80% power. Current design has ~35-45% power — will likely miss real effects",
                  "product-research.md", "VALIDATION")
 
-    # === HIGH: SPEC GAPS THAT BLOCK IMPLEMENTATION ===
-
-    # 6. Stagnation signal normalization undefined (binary vs continuous)
-    if "normalized to [0, 1]" in il or "normalized to [0, 1]" in so:
-        # Check if normalization METHOD is specified (not just "normalized to [0,1]")
-        has_normalization = any(phrase in il + so for phrase in [
-            "sigmoid", "linear interpolation", "min-max", "binary encoding",
-            "continuous encoding", "normalization formula",
+    # 6. No pre-registration or analysis plan
+    if "A/B test" in pr:
+        has_preregister = any(phrase in pr.lower() for phrase in [
+            "pre-register", "preregister", "osf.io", "analysis plan",
+            "pre-specified analysis", "ancova", "mixed effects",
         ])
-        if not has_normalization:
-            flag(4, "Stagnation signals are 'normalized to [0,1]' but HOW? Binary (0 or 1 if threshold crossed) vs continuous (proportional to deviation) gives completely different behavior. Specify normalization functions",
-                 "intelligence-layer.md", "SPEC_GAP")
+        if not has_preregister:
+            flag(3, "A/B test has no pre-registration or pre-specified statistical analysis plan. Without this, risk of p-hacking. Need: pre-register on OSF, specify analysis (ANCOVA with baseline covariate)",
+                 "product-research.md", "VALIDATION")
 
-    # 7. Cognitive load baselines undefined (when set, what window)
-    if "baseline_accuracy" in so:
-        # Check if baseline definition is specified
-        has_baseline_def = any(phrase in so for phrase in [
-            "baseline is set", "baseline window", "baseline computed",
-            "trailing average", "sessions to establish baseline",
-            "baseline_accuracy is the", "baseline_accuracy` is the",
-            "Baseline definitions", "trailing median",
+    # 7. No diagnostic metrics for switching behavior itself
+    if "Methodology switching A/B" in pr or "methodology switching A/B" in pr:
+        has_diagnostics = any(phrase in pr.lower() for phrase in [
+            "switches per student", "switch count", "switch frequency",
+            "diagnostic metric", "treatment fidelity",
+            "avg switches", "average switches",
         ])
-        if not has_baseline_def:
-            flag(4, "Cognitive load formula uses 'baseline_accuracy' and 'baseline_rt' but never defines when/how they're established. First session? Trailing 20-question average? Per-concept or per-student? Two engineers will implement this differently",
-                 "system-overview.md", "SPEC_GAP")
+        if not has_diagnostics:
+            flag(3, "A/B test measures outcomes but not treatment fidelity: how many methodology switches actually happened per student? If system bugs prevent switching, test fails for wrong reason. Need: avg switches per student as diagnostic metric",
+                 "product-research.md", "VALIDATION")
 
-    # 8. Mastery threshold 0.85 not justified (check assessment-spec and event-schemas)
-    es = all_text.get("event-schemas.md", "")
-    if "0.85" in aspec or "0.85" in es:
-        has_justification = any(phrase in aspec + so + il for phrase in [
-            "why 0.85", "threshold chosen", "sensitivity analysis",
-            "Corbett & Anderson", "BKT literature", "threshold justification",
-            "threshold rationale",
-        ])
-        if not has_justification:
-            flag(3, "Mastery threshold P(known) >= 0.85 is used everywhere but never justified. BKT literature uses 0.95 (Corbett & Anderson 1994). Why 0.85? What's the sensitivity to +/- 0.05? Add justification or A/B testing plan",
-                 "assessment-specification.md", "SPEC_GAP")
+    # === MISSING LEARNING TRANSFER ===
 
-    # 9. BKT p_slip/p_guess calibration plan missing
-    if "p_slip" in aspec or "p_guess" in aspec:
-        has_calibration = any(phrase in aspec + il for phrase in [
-            "calibration plan", "empirically fit", "maximum likelihood",
-            "pre-launch calibration", "calibrate p_slip",
+    # 8. No validation against real exam outcomes
+    if "mastery velocity" in pr.lower() and "bagrut" in pr.lower():
+        has_transfer = any(phrase in pr.lower() for phrase in [
+            "bagrut score", "exam performance", "learning transfer",
+            "end-of-unit exam", "external validation",
+            "exam correlation", "bagrut improvement",
         ])
-        if not has_calibration:
-            flag(3, "BKT parameters p_slip=0.10 and p_guess=0.25 are hardcoded defaults with no pre-launch calibration plan. Need: collect N diagnostic attempts, fit parameters via MLE, compare to defaults",
-                 "assessment-specification.md", "SPEC_GAP")
-
-    # 10. Content authoring error recovery
-    # Must have both: correction protocol (post-publication fixes) AND expert rejection handling (pre-publication QA)
-    if "content-authoring.md" in all_text:
-        has_correction_protocol = "Correction Protocol" in ca or "Content Correction" in ca
-        has_rejection_handling = any(phrase in ca.lower() for phrase in [
-            "rejection rate", "expert rejects", "rejection threshold",
-            "expert rejection", "review rejection",
-        ])
-        if not has_correction_protocol or not has_rejection_handling:
-            if not has_rejection_handling:
-                flag(3, "Content authoring has a post-publication correction protocol but no expert rejection handling: what happens when SME rejects 50%+ of LLM-generated questions? Need: rejection rate tracking, escalation threshold, retraining trigger",
-                     "content-authoring.md", "SPEC_GAP")
+        # Check if there's BOTH internal metric AND external validation plan
+        if not has_transfer:
+            flag(3, "A/B test primary metric (mastery velocity) is internal to Cena — doesn't prove Bagrut exam improvement. eSelf validated against real exam scores. Need: even a proxy (end-of-unit quiz from actual Bagrut material) as secondary metric",
+                 "product-research.md", "VALIDATION")
 
     # === PRINT RESULTS ===
 
     print("=" * 70)
-    print("HONEST BUSINESS MODEL & SPEC GAPS (lower=better, target: 0)")
+    print("METHODOLOGY SWITCHING DEEP VALIDATION (lower=better, target: 0)")
     print("=" * 70)
 
-    for category in ["BUSINESS_MODEL", "VALIDATION", "SPEC_GAP"]:
+    for category in ["CITATION", "ALGORITHM", "VALIDATION"]:
         if category in results_by_category:
             items = results_by_category[category]
             cat_total = sum(w for w, _, _ in items)
@@ -163,7 +144,7 @@ def main():
                 print(f"    (w={weight}) {fname}: {desc}")
 
     print(f"\n{'=' * 70}")
-    for category in ["BUSINESS_MODEL", "VALIDATION", "SPEC_GAP"]:
+    for category in ["CITATION", "ALGORITHM", "VALIDATION"]:
         if category in results_by_category:
             print(f"  {category}: {sum(w for w,_,_ in results_by_category[category])}")
     print(f"\n  TOTAL GAP: {total_score}")
