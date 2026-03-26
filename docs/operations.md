@@ -302,7 +302,7 @@ For: On-call engineer (founder). Glance-able during incidents.
 | PostgreSQL active connections | RDS CloudWatch | Gauge with max threshold line |
 | PostgreSQL IOPS and latency | RDS CloudWatch | Time series |
 | NATS consumer lag per stream | NATS metrics exporter | Time series per consumer |
-| LLM ACL error rate | OpenTelemetry counter | Time series with 10% threshold line |
+| LLM ACL error rate | OpenTelemetry counter | Time series with 5% threshold line (aligned with alert at >5%, see Section 3.2) |
 | LLM circuit breaker state | OpenTelemetry gauge | State timeline (closed/half-open/open) |
 | Redis memory utilization | ElastiCache CloudWatch | Gauge |
 | ECS task health | ECS CloudWatch | Status grid per service |
