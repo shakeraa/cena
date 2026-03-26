@@ -7,10 +7,30 @@
 // 3. Productive struggle detection (distinguish fatigue from learning)
 // 4. Recovery prediction (optimal break duration, re-engagement timing)
 //
-// References:
-// - Vigilance decrement: Warm (1984), Parasuraman (1986)
-// - Productive struggle: Kapur (2008) "Productive Failure"
-// - Flow state: Csikszentmihalyi (1990) — challenge/skill balance
+// References (all verified):
+// - Warm, J.S. (1984). "An Introduction to Vigilance." In Warm (Ed.),
+//   Sustained Attention in Human Performance. Wiley. [Foundational vigilance theory]
+// - Parasuraman, R. (1986). "Vigilance, monitoring, and search." In Boff, Kaufman
+//   & Thomas (Eds.), Handbook of Human Perception and Performance, Vol II. Wiley.
+// - Kapur, M. (2008). "Productive Failure in Mathematical Problem Solving."
+//   Cognition and Instruction, 26(3), 379-424. DOI: 10.1080/07370000802212669
+// - Csikszentmihalyi, M. (1990). Flow: The Psychology of Optimal Experience.
+//   Harper & Row. [Challenge/skill balance, 9 flow conditions]
+// - Duckworth, A.L. et al. (2007). "Grit: Perseverance and Passion for Long-Term Goals."
+//   J. Personality and Social Psychology, 92(6), 1087-1101. DOI: 10.1037/0022-3514.92.6.1087
+//   NOTE: Grit has been critiqued — Crede et al. (2017) meta-analysis found weak
+//   incremental validity over conscientiousness. Our resilience score is a composite,
+//   not grit alone.
+// - Esterman, M. et al. (2013). "In the Zone or Zoning Out? Tracking Behavioral and
+//   Neural Fluctuations During Sustained Attention." Cerebral Cortex, 23(11), 2712-2723.
+//   [RT variance as attention/focus proxy — used for our attention signal]
+// - Wilson, D. & Conyers, M. (2020). "Developing Growth Mindsets Through Productive
+//   Struggle." Edutopia. [Classroom application of productive failure theory]
+//
+// Cena-proprietary (no external citation):
+// - Engagement-adjusted decay rate (3%/question baseline)
+// - Remaining productive questions prediction model
+// - Break duration linear interpolation formula
 // ═══════════════════════════════════════════════════════════════════════
 
 using System.Diagnostics.Metrics;
