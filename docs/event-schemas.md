@@ -50,8 +50,8 @@ message ConceptAttempted_V1 {
   bool is_correct = 4;
   int32 response_time_ms = 5;
   string question_id = 6;
-  string question_type = 7;       // "multiple_choice" | "free_text" | "expression" | "true_false"
-  string methodology_active = 8;  // "socratic" | "spaced_repetition" | "feynman" | "project_based" | "drill" | "worked_example" | "analogy" | "retrieval_practice"
+  string question_type = 7;       // "multiple_choice" | "numeric" | "expression" | "true_false_justification" | "ordering" | "fill_blank" | "diagram_labeling" | "free_text" (see docs/assessment-specification.md Section 1)
+  string methodology_active = 8;  // "socratic" | "spaced_repetition" | "feynman" | "project_based" | "blooms_progression" | "worked_example" | "analogy" | "retrieval_practice"
   string error_type = 9;          // "procedural" | "conceptual" | "motivational" | "none" (classified by Kimi)
   double prior_mastery = 10;      // BKT P(known) before this attempt
   double posterior_mastery = 11;   // BKT P(known) after this attempt
@@ -199,7 +199,7 @@ message QuestionPresented_V1 {
   string student_id = 2;
   string question_id = 3;
   string concept_id = 4;
-  string question_type = 5;       // "multiple_choice" | "free_text" | "expression" | "true_false" | "ordering"
+  string question_type = 5;       // "multiple_choice" | "numeric" | "expression" | "true_false_justification" | "ordering" | "fill_blank" | "diagram_labeling" | "free_text" (see docs/assessment-specification.md Section 1)
   string difficulty_level = 6;    // "recall" | "comprehension" | "application" | "analysis" (Bloom's)
   string selection_reason = 7;    // "gap_fill" | "spaced_review" | "prerequisite_check" | "mastery_probe"
   string methodology_active = 8;
@@ -265,6 +265,49 @@ message OutreachTriggered_V1 {
   string suppression_reason = 9;  // "daily_budget_exceeded" | "quiet_hours" | "cooldown_period" | "student_opted_out"
 }
 ```
+
+### StreakExpiring_V1
+
+Emitted by the `OutreachSchedulerActor` when a student's streak is about to expire.
+
+```protobuf
+message StreakExpiring_V1 {
+  string student_id = 1;
+  int32 current_streak = 2;
+  google.protobuf.Timestamp expires_at = 3;   // when the streak will break
+  string idempotency_key = 4;
+}
+```
+
+### ReviewDue_V1
+
+Emitted by the Half-Life Regression timer when a concept's predicted recall drops below the review threshold (0.85).
+
+```protobuf
+message ReviewDue_V1 {
+  string student_id = 1;
+  string concept_id = 2;
+  double predicted_recall = 3;
+  double half_life_hours = 4;
+  google.protobuf.Timestamp recommended_review_by = 5;
+  string idempotency_key = 6;
+}
+```
+
+### CognitiveLoadCooldownComplete_V1
+
+Emitted by the `OutreachSchedulerActor` when a student's cognitive load cooldown period has ended and they are ready for a new session.
+
+```protobuf
+message CognitiveLoadCooldownComplete_V1 {
+  string student_id = 1;
+  string previous_session_id = 2;
+  int32 cooldown_duration_minutes = 3;
+  string idempotency_key = 4;
+}
+```
+
+**Note on SessionAbandoned:** Session abandonment is signaled by `SessionEnded_V1` with `end_reason = "student_quit"` or `"app_backgrounded"`. A separate `SessionAbandoned` event is not needed; the Outreach Context subscribes to `SessionEnded_V1` and filters by `end_reason`.
 
 ---
 

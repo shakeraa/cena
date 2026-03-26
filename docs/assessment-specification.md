@@ -478,9 +478,9 @@ Then propagate to individual concepts within each cluster and assign mastery sta
 
 | P(known) | Status | UI Color | Meaning |
 |----------|--------|----------|---------|
-| > 0.8 | Mastered | Green | Student likely knows this — skip in learning path, include in spaced repetition |
-| 0.3 – 0.8 | In-Progress | Yellow | Uncertain — prioritize for early learning sessions to refine estimate |
-| ≤ 0.3 | Unknown | Gray | Student likely doesn't know this — will be taught when prerequisites are met |
+| >= 0.85 | Mastered | Green | Student likely knows this — skip in learning path, include in spaced repetition (matches mastery threshold in `docs/event-schemas.md` ConceptMastered_V1) |
+| 0.3 – 0.85 | In-Progress | Yellow | Uncertain — prioritize for early learning sessions to refine estimate |
+| < 0.3 | Unknown | Gray | Student likely doesn't know this — will be taught when prerequisites are met |
 
 **Initial BKT parameters:** The diagnostic result initializes the BKT model's P(known) prior for each concept. This replaces the default uniform prior (0.5) with an informed estimate, accelerating the adaptive learning from the first session.
 

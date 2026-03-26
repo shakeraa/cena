@@ -218,3 +218,10 @@ The embedding pipeline runs on the same trigger as the curriculum hot-reload, en
 |-------|-----------|-----------|
 | `ModelArtifactUpdated_V1` | Retraining pipeline (Fargate) | Proto.Actor silos (hot-reload models) |
 | `SearchIndexUpdated_V1` | Embedding pipeline (Fargate) | Client apps (cache invalidation) |
+
+## Appendix: Related Documents
+
+- `docs/architecture-design.md` — System architecture, actor hierarchy, event sourcing
+- `docs/content-authoring.md` — MCM Graph Authoring (Section 7), content pipeline
+- `docs/engagement-signals-research.md` — Behavioral signal research feeding Flywheel 5 (stagnation signals) and Flywheel 6 (engagement patterns)
+- `docs/event-schemas.md` — Domain event schemas consumed by flywheels
