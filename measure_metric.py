@@ -45,9 +45,7 @@ CHECKS = [
 
     # Cognitive load threshold — handled as custom check below
 
-    # Offline sync conflict resolution — no algorithm specified
-    ("offline-sync-protocol.md", r"conflict.*resolution|Server-authoritative",
-     "Offline sync mentions conflict resolution but no formal algorithm (LWW, vector clocks, CRDTs)", 4, "MISSING_SPEC"),
+    # Offline sync conflict resolution — handled as custom check below
 
     # Performance SLAs not defined — no P50/P95/P99 latency targets
     ("system-overview.md",
@@ -104,6 +102,10 @@ def main():
         ("system-overview.md",
          lambda t: "Cognitive Load" in t and "fatigue_score" not in t,
          "Cognitive load profiling described but no threshold formula for session end", 4, "MISSING_SPEC"),
+        # Offline sync: file mentions conflict resolution but no formal algorithm
+        ("offline-sync-protocol.md",
+         lambda t: "Server-authoritative" in t and "Conflict Resolution Algorithm" not in t,
+         "Offline sync mentions conflict resolution but no formal algorithm specified", 4, "MISSING_SPEC"),
     ]
     for file_pattern, check_fn, description, weight, category in CUSTOM_CHECKS:
         if file_pattern in all_text:

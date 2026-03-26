@@ -27,6 +27,28 @@ During an offline period, the following server-side processes continue independe
 
 ---
 
+## 1B. Conflict Resolution Algorithm
+
+Cena uses **operation-based conflict resolution** (a variant of operation-based CRDTs adapted for event sourcing). The algorithm is deterministic and does not require vector clocks or Last-Write-Wins (LWW), because all events are causally ordered within a single student aggregate.
+
+**Algorithm: Three-Tier Replay Classification**
+
+1. **Classify** each offline event into one of three tiers (see Section 2 below): Unconditional, Conditional, or Server-Authoritative.
+2. **Merge** offline events into the server event stream using client-reported timestamps adjusted for clock offset (see Section 6.3).
+3. **Resolve** conditional events by comparing the event's context snapshot (methodology, concept state) against current server state:
+   - Context unchanged → accept at full weight
+   - Context partially diverged (e.g., methodology switched) → accept at reduced weight (0.75, configurable)
+   - Context fundamentally diverged (e.g., concept removed) → accept as historical record only (weight = 0)
+4. **Recalculate** server-authoritative events (e.g., `ConceptMastered`) by replaying the merged event stream through BKT.
+5. **Emit corrections** for any outreach messages that were sent based on stale server state (see Section 4.5).
+
+**Why not LWW/vector clocks/CRDTs:**
+- LWW is inappropriate: student work should never be silently discarded in favor of server state.
+- Vector clocks add unnecessary complexity: Cena has a single writer per student (one active device at a time, enforced by session handoff).
+- CRDTs: the three-tier classification achieves the same "all operations are preserved" guarantee as an operation-based CRDT, but with domain-specific weighting that a generic CRDT cannot express.
+
+---
+
 ## 2. Event Classification
 
 Every client-generated event type is classified into one of three replay categories. This classification determines how the event is processed during sync.
