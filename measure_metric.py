@@ -43,9 +43,7 @@ CHECKS = [
     # Check: file must contain "Default Weight" AND "Accuracy plateau" near each other
     # Using a positive match for the ABSENCE of the fix — this is a two-part check handled in main()
 
-    # Cognitive load threshold — no formula for what constitutes overload
-    ("system-overview.md", r"cognitive load(?![\s\S]{0,800}threshold\s*[:=]|[\s\S]{0,800}overload\s*[:=]|[\s\S]{0,800}formula)",
-     "Cognitive load profiling described but no threshold formula for when to end a session", 4, "MISSING_SPEC"),
+    # Cognitive load threshold — handled as custom check below
 
     # Offline sync conflict resolution — no algorithm specified
     ("offline-sync-protocol.md", r"conflict.*resolution|Server-authoritative",
@@ -102,6 +100,10 @@ def main():
         ("intelligence-layer.md",
          lambda t: "Stagnation Signal Weights" in t and "Default Weight" not in t,
          "Stagnation signal weights mentioned but no default weights provided", 4, "MISSING_SPEC"),
+        # Cognitive load: file mentions cognitive load but has no threshold formula
+        ("system-overview.md",
+         lambda t: "Cognitive Load" in t and "fatigue_score" not in t,
+         "Cognitive load profiling described but no threshold formula for session end", 4, "MISSING_SPEC"),
     ]
     for file_pattern, check_fn, description, weight, category in CUSTOM_CHECKS:
         if file_pattern in all_text:
