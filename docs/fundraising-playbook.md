@@ -130,11 +130,11 @@
 4. **Market:** 85K-100K Bagrut students/year. Yschool proved 190K will pay for digital prep.
 5. **Why now:** eSelf acquired by Kaltura (education play absorbed — see `docs/competitor-eself-deep-dive.md` for full competitive intelligence). STEM Bagrut AI is untouched. LLM costs dropped 50%/year.
 6. **Differentiation:** Feature matrix vs. Khanmigo, Yschool, eSelf. Knowledge graph + methodology switching = genuinely novel (see `docs/competitor-eself-deep-dive.md` Section 5 for gap analysis).
-7. **Business model:** 89 NIS/month. Unit economics table. Break-even at ~1,600–2,300 subscribers (see `docs/product-research.md` Section 8 for full analysis; range depends on LLM cost trajectory).
+7. **Business model:** 89 NIS/month (premium tutoring replacement — see `docs/product-research.md` Section 7). Unit economics: LTV:CAC = 2.1:1 at launch (below 3:1 benchmark but with clear path to 3:1 via LLM cost decline ~50%/year and multi-subject upsell extending lifetime from 9 to 12+ months). Contribution margin: ~35-37 NIS/month. Payback period: ~4 months. Break-even at ~1,600–2,300 subscribers.
 8. **Traction:** [Demo users, session data, testimonials, waitlist — whatever you have]
-9. **Team:** Your enterprise architecture background. AI agents as force multiplier. Education advisor.
-10. **Ask:** 1.2-1.5M NIS on a SAFE, $3-4M cap. 18 months runway.
-11. **Milestones:** Month 3: MVP launch. Month 8: break-even. Month 14: international readiness.
+9. **Team:** Your enterprise architecture background. AI agents as force multiplier. Education advisor on retainer from Month 1 (content review critical path).
+10. **Ask:** 1.5M NIS target on a SAFE, $3-4M cap. 18 months runway. (1.2M NIS minimum but tight — only 14 months at 82K/month burn; 1.5M provides buffer for two September acquisition cycles.)
+11. **Milestones:** Month 3: MVP launch with ~50% of Math curriculum (expert review bottleneck — full Math by Month 5, Physics by Month 7). Month 13–18: break-even at 2,000+ subscribers (requires surviving two September acquisition cycles — see `docs/product-research.md` structural churn model). Month 18+: international readiness (AP curriculum).
 
 ### SAFE Terms (Standard Israel 2025)
 - Instrument: Y Combinator SAFE (post-money)

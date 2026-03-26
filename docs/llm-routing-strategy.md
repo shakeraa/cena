@@ -263,7 +263,28 @@ LLM pricing has been dropping ~50% per year. This benefits us but makes fixed co
 - Set per-model cost alerts in monitoring
 - Consider committed-use agreements with Anthropic for volume discounts
 
-### 6.3 Quality Regression Risk
+### 6.3 Hebrew LLM Quality Validation (Pre-Launch Blocker)
+
+**Risk level: HIGH** — The entire product depends on LLMs generating quality Socratic dialogue and evaluating free-text answers IN HEBREW FOR MATHEMATICS. English-language benchmarks don't transfer.
+
+**Pre-launch Hebrew benchmark** (must pass before beta launch):
+1. **Test set**: 10 Math concepts across difficulty levels (e.g., linear equations, quadratic formula, derivatives chain rule, integration by parts, trigonometric identities). For each concept:
+   - Generate 3 Socratic dialogue turns in Hebrew using Claude Sonnet 4.6
+   - Generate 1 Feynman explanation in Hebrew
+   - Evaluate 5 student free-text answers (mix of correct, partially correct, and wrong) in Hebrew
+2. **Quality rubric** (scored by education advisor, 1-5 per criterion):
+   - Hebrew math terminology accuracy (uses standard terms like כלל השרשרת, not transliterations)
+   - Socratic quality (asks guiding questions without revealing answer)
+   - Mathematical correctness (formulas, steps, notation)
+   - Pedagogical appropriateness (matches Bagrut level, not university level)
+   - Hebrew fluency (natural phrasing, not translated English)
+3. **Pass threshold**: Average score ≥ 3.5 across all criteria. Any single criterion < 2.0 is a blocker.
+4. **Kimi Hebrew quality**: Run same benchmark on Kimi K2.5 for classification tasks. Kimi is not used for Hebrew tutoring directly, but must correctly classify Hebrew error types.
+5. **Failure protocol**: If Claude Sonnet scores < 3.5, options: (a) test Claude Opus for Hebrew tasks (higher cost but possibly better quality); (b) add Hebrew-specific system prompts with glossary injection; (c) delay launch until quality improves.
+
+**Timeline**: Run benchmark in Week 1 of development. Results inform model selection and prompt engineering before any student-facing work begins.
+
+### 6.4 Quality Regression Risk (was 6.3)
 
 **Risk level: LOW-MEDIUM**
 
