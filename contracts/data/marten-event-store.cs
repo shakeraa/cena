@@ -126,7 +126,8 @@ public record ConceptAttempted_V1(
     string AnswerHash,
     int BackspaceCount,
     int AnswerChangeCount,
-    bool WasOffline
+    bool WasOffline,
+    DateTimeOffset Timestamp          // FIXED: explicit timestamp for deterministic Apply replay
 );
 
 public record ConceptMastered_V1(
@@ -137,7 +138,8 @@ public record ConceptMastered_V1(
     int TotalAttempts,
     int TotalSessions,
     string MethodologyAtMastery,
-    double InitialHalfLifeHours
+    double InitialHalfLifeHours,
+    DateTimeOffset Timestamp          // FIXED: explicit timestamp for deterministic Apply replay
 );
 
 public record MasteryDecayed_V1(
@@ -244,7 +246,9 @@ public record XpAwarded_V1(
     string StudentId,
     int XpAmount,
     string Source,                // "exercise_correct" | "mastery" | "streak_bonus" | "daily_goal"
-    int TotalXp
+    int TotalXp,
+    string DifficultyLevel,       // FIXED: "recall" | "comprehension" | "application" | "analysis" — XP scaled by difficulty
+    int DifficultyMultiplier      // FIXED: 1x recall, 2x comprehension, 3x application, 4x analysis — rewards mastery depth not volume
 );
 
 public record StreakUpdated_V1(
@@ -331,7 +335,7 @@ public class StudentProfileSnapshot
         var state = ConceptMastery[e.ConceptId];
         state.PKnown = e.PosteriorMastery;
         state.TotalAttempts++;
-        state.LastAttemptedAt = DateTimeOffset.UtcNow;
+        state.LastAttemptedAt = e.Timestamp; // FIXED: use event timestamp, not wall clock (deterministic replay)
         state.LastMethodology = e.MethodologyActive;
     }
 
@@ -341,7 +345,7 @@ public class StudentProfileSnapshot
             ConceptMastery[e.ConceptId] = new ConceptMasteryState();
 
         ConceptMastery[e.ConceptId].IsMastered = true;
-        ConceptMastery[e.ConceptId].MasteredAt = DateTimeOffset.UtcNow;
+        ConceptMastery[e.ConceptId].MasteredAt = e.Timestamp; // FIXED: use event timestamp, not wall clock
         HalfLifeMap[e.ConceptId] = e.InitialHalfLifeHours;
     }
 

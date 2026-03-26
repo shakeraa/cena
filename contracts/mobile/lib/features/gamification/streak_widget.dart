@@ -356,3 +356,69 @@ class GamificationDashboard extends ConsumerWidget {
     throw UnimplementedError('Widget build — see contract spec above');
   }
 }
+
+// ---------------------------------------------------------------------------
+// STREAK FREEZE / VACATION MODE (FIXED: prevents Shabbat/holiday anxiety)
+// ---------------------------------------------------------------------------
+
+/// Streak freeze button — lets students freeze their streak for holidays.
+/// Students get 2 free freezes per month. Hebrew holidays auto-detected.
+///
+/// DESIGN RATIONALE (EdTech domain review):
+/// - Israeli students observe Shabbat (Friday sunset → Saturday night) — no device use
+/// - Major holidays: Rosh Hashana (2d), Yom Kippur (1d), Sukkot (8d), Pesach (8d), etc.
+/// - Without freezes, observant students are penalized by the streak system
+/// - This is a dark pattern fix, not a feature — streaks should motivate, not punish
+class StreakFreezeButton extends StatelessWidget {
+  final int freezesRemaining;
+  final VoidCallback onActivateFreeze;
+
+  const StreakFreezeButton({
+    super.key,
+    required this.freezesRemaining,
+    required this.onActivateFreeze,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Contract: shield icon + "Freeze streak" + remaining count
+    // Disabled state when freezesRemaining == 0
+    throw UnimplementedError('Widget build — see contract spec above');
+  }
+}
+
+/// Vacation mode configuration — auto-freezes streaks during known holidays.
+class VacationModeConfig {
+  /// Whether the student has opted into automatic Shabbat freeze.
+  /// Default: false (opt-in, not opt-out — respect both observant and non-observant).
+  final bool shabbatAutoFreeze;
+
+  /// Whether to auto-freeze on Israeli national holidays.
+  /// Uses the Hebrew calendar from the `intl` package.
+  final bool holidayAutoFreeze;
+
+  /// Number of free freezes per month (default 2, configurable by A/B test).
+  final int monthlyFreezes;
+
+  /// Currently remaining freezes this month.
+  final int freezesRemaining;
+
+  /// When the current freeze expires (null if no active freeze).
+  final DateTime? freezeExpiresAt;
+
+  const VacationModeConfig({
+    this.shabbatAutoFreeze = false,
+    this.holidayAutoFreeze = true,
+    this.monthlyFreezes = 2,
+    this.freezesRemaining = 2,
+    this.freezeExpiresAt,
+  });
+
+  /// Check if today is an auto-freeze day (Shabbat or holiday).
+  /// Implementation uses Hebrew calendar from intl package.
+  bool isAutoFreezeDay(DateTime now) {
+    // Contract: check Hebrew calendar for Shabbat (Friday sunset-Saturday night)
+    // and major holidays (Rosh Hashana, Yom Kippur, Sukkot, Pesach, etc.)
+    throw UnimplementedError('Hebrew calendar check — use intl package');
+  }
+}

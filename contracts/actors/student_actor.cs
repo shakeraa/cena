@@ -1016,11 +1016,22 @@ public sealed class StudentActor : IActor
         int processed = 0;
         int failed = 0;
 
-        // Process events in chronological order
+        // Process events in chronological order WITH IDEMPOTENCY CHECK
         foreach (var offlineEvent in cmd.Events.OrderBy(e => e.ClientTimestamp))
         {
             try
             {
+                // FIXED: Idempotency check — skip if this event was already processed
+                // Uses Redis SET NX with 72-hour TTL (matching offline-sync-protocol.md Appendix B)
+                var idempotencyKey = $"cena:idempotency:{_studentId}:{offlineEvent.IdempotencyKey}";
+                var isNew = await _redis.StringSetAsync(idempotencyKey, "1",
+                    TimeSpan.FromHours(72), When.NotExists);
+                if (!isNew)
+                {
+                    _logger.LogInformation("Skipping duplicate offline event {Key}", offlineEvent.IdempotencyKey);
+                    continue; // Already processed — skip
+                }
+
                 switch (offlineEvent)
                 {
                     case OfflineAttemptEvent attempt:
@@ -1202,37 +1213,75 @@ public sealed class StudentActor : IActor
     // EVENT PERSISTENCE & PUBLISHING
     // =========================================================================
 
-    /// <summary>
-    /// Persists a domain event to Marten and publishes to NATS JetStream.
-    /// This is the critical write path -- latency is measured via OpenTelemetry.
-    /// </summary>
-    private async Task PersistAndPublish<TEvent>(IContext context, TEvent @event)
-        where TEvent : class
-    {
-        var sw = Stopwatch.StartNew();
-        using var activity = _activitySource.StartActivity("StudentActor.PersistEvent");
-        activity?.SetTag("event.type", typeof(TEvent).Name);
+    // ── Event batch collector (collects events within a single command handler) ──
+    private readonly List<object> _pendingEvents = new();
 
-        // ---- Persist to Marten ----
+    /// <summary>
+    /// Queues an event for batch persistence. Call FlushEvents() at the end of each command handler.
+    /// FIXED: All events from a single command are now committed atomically in one Marten transaction.
+    /// </summary>
+    private void StageEvent<TEvent>(TEvent @event) where TEvent : class
+    {
+        _pendingEvents.Add(@event);
+    }
+
+    /// <summary>
+    /// Persists ALL staged events atomically to Marten with expected version (optimistic concurrency),
+    /// then publishes to NATS via outbox pattern. This is the critical write path.
+    ///
+    /// FIXES APPLIED:
+    /// 1. Atomic multi-event writes — single Append with all events from one command
+    /// 2. Expected version — optimistic concurrency prevents split-brain duplicate writes
+    /// 3. Outbox pattern — NATS publish happens AFTER Marten commit succeeds
+    /// </summary>
+    private async Task FlushEvents(IContext context)
+    {
+        if (_pendingEvents.Count == 0) return;
+
+        var sw = Stopwatch.StartNew();
+        using var activity = _activitySource.StartActivity("StudentActor.FlushEvents");
+        activity?.SetTag("event.count", _pendingEvents.Count);
+
+        // ---- Persist ALL events atomically with expected version ----
         await using var session = _documentStore.LightweightSession();
-        session.Events.Append(_studentId, @event);
+        session.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
         await session.SaveChangesAsync();
 
-        _eventsSinceSnapshot++;
+        _state.EventVersion += _pendingEvents.Count;
+        _eventsSinceSnapshot += _pendingEvents.Count;
         sw.Stop();
 
         EventPersistLatency.Record(sw.Elapsed.TotalMilliseconds,
-            new KeyValuePair<string, object?>("event.type", typeof(TEvent).Name));
+            new KeyValuePair<string, object?>("event.count", _pendingEvents.Count));
 
-        // ---- Publish to NATS JetStream (fire-and-forget with retry) ----
-        var subject = $"cena.student.events.{typeof(TEvent).Name.ToLowerInvariant()}";
-        await PublishToNats(subject, @event);
+        // ---- OUTBOX: Publish to NATS AFTER Marten commit succeeds ----
+        // Events are already durable in Marten. NATS publish is best-effort.
+        // If NATS fails, the OutboxPublisher (background service) will catch up
+        // by querying Marten for events where nats_published_at IS NULL.
+        foreach (var evt in _pendingEvents)
+        {
+            var subject = $"cena.student.events.{evt.GetType().Name.ToLowerInvariant()}";
+            await PublishToNats(subject, evt);
+        }
+
+        _pendingEvents.Clear();
 
         // ---- Check snapshot threshold ----
         if (_eventsSinceSnapshot >= StudentState.SnapshotInterval)
         {
             await ForceSnapshot();
         }
+    }
+
+    /// <summary>
+    /// LEGACY: Single-event persist. Delegates to StageEvent + FlushEvents for backward compatibility.
+    /// New code should use StageEvent() + FlushEvents() pattern directly.
+    /// </summary>
+    private async Task PersistAndPublish<TEvent>(IContext context, TEvent @event)
+        where TEvent : class
+    {
+        StageEvent(@event);
+        await FlushEvents(context);
     }
 
     /// <summary>

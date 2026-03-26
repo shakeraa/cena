@@ -70,6 +70,29 @@ public interface IBktService
     /// Thread-safe: uses copy-on-write semantics on the parameter cache.
     /// </summary>
     Task ReloadParametersAsync(CancellationToken cancellationToken = default);
+
+    // ── Dual Mastery Thresholds ──────────────────────────────────────
+    // ProgressionThreshold (0.85): student can move to the next concept.
+    // PrerequisiteGateThreshold (0.95): student can attempt concepts that
+    //   depend on this one. Higher bar prevents shaky foundations.
+
+    /// <summary>Mastery level at which a student may advance to the next concept.</summary>
+    const double ProgressionThreshold = 0.85;
+
+    /// <summary>
+    /// Mastery level at which downstream/dependent concepts become unlocked.
+    /// Deliberately higher than ProgressionThreshold — a student may progress
+    /// linearly at 0.85, but prerequisite-gated branches require 0.95 to
+    /// avoid compounding shaky foundations.
+    /// </summary>
+    const double PrerequisiteGateThreshold = 0.95;
+
+    /// <summary>
+    /// Check whether a student's mastery on a prerequisite concept is high
+    /// enough to unlock dependent concepts.
+    /// Uses PrerequisiteGateThreshold (0.95), NOT ProgressionThreshold (0.85).
+    /// </summary>
+    bool IsPrerequisiteSatisfied(double mastery) => mastery >= PrerequisiteGateThreshold;
 }
 
 /// <summary>
@@ -113,13 +136,28 @@ public sealed record BktParameters(
     double PSlip,
     /// <summary>P(guess): probability of a correct answer given the concept is unknown.</summary>
     double PGuess,
-    /// <summary>P(forget): probability of transitioning from known to unknown. Often 0 in classic BKT.</summary>
-    double PForget,
+    /// <summary>P(forget): probability of transitioning from known to unknown.
+    /// FIXED: Non-zero default (0.02) aligns BKT with HLR — mastery decays in both models.
+    /// Classic BKT uses 0, but that contradicts the HLR spaced repetition timer.</summary>
+    double PForget = 0.02,
     /// <summary>Initial P(known) for new students on this concept.</summary>
     double PInitial,
-    /// <summary>Mastery threshold. Default: 0.85.</summary>
-    double MasteryThreshold = 0.85
-);
+    /// <summary>Progression threshold: student can advance to next concept. Default: 0.85.</summary>
+    double ProgressionThreshold = 0.85,
+    /// <summary>Prerequisite gate threshold: student can attempt concepts that DEPEND on this one.
+    /// FIXED: Dual threshold per EdTech domain review — 0.95 matches Corbett & Anderson (1994) standard.
+    /// A student must DEEPLY master algebra (0.95) before calculus unlocks, but can PROGRESS through
+    /// algebra topics at 0.85. This prevents cascading failure in prerequisite chains.</summary>
+    double PrerequisiteGateThreshold = 0.95
+)
+
+{
+    /// <summary>Check if mastery is sufficient for the student to progress to the next topic.</summary>
+    public bool IsProgressionReady(double mastery) => mastery >= ProgressionThreshold;
+
+    /// <summary>Check if mastery is sufficient to unlock dependent concepts (hard gate).</summary>
+    public bool IsPrerequisiteSatisfied(double mastery) => mastery >= PrerequisiteGateThreshold;
+}
 
 /// <summary>
 /// Minimal attempt outcome for batch processing.
@@ -569,3 +607,68 @@ public sealed record StagnationWeights(
         AnnotationSentiment: 0.10
     );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. PREREQUISITE ENFORCEMENT SERVICE
+//    FIXED: The knowledge graph is decorative without gate checks.
+//    This service enforces that students cannot attempt concepts whose
+//    prerequisites are not mastered at the PrerequisiteGateThreshold (0.95).
+//    Uses the dual threshold: 0.85 for progression, 0.95 for prerequisite gates.
+//    See: architecture-design.md §6, contracts/data/neo4j-schema.cypher.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Enforces prerequisite mastery gates on the knowledge graph.
+/// A concept is "unlocked" only when ALL prerequisite concepts are mastered
+/// at the PrerequisiteGateThreshold (0.95), not the ProgressionThreshold (0.85).
+/// </summary>
+public interface IPrerequisiteEnforcementService
+{
+    /// <summary>
+    /// Check if a student can attempt a specific concept.
+    /// Returns detailed info about which prerequisites are met/unmet.
+    /// </summary>
+    Task<PrerequisiteCheckResult> CheckPrerequisites(
+        string conceptId,
+        Dictionary<string, double> masteryMap);
+
+    /// <summary>
+    /// Get all concepts the student is currently blocked from attempting
+    /// due to unmet prerequisite gates.
+    /// </summary>
+    Task<List<BlockedConcept>> GetBlockedConcepts(
+        Dictionary<string, double> masteryMap);
+
+    /// <summary>
+    /// Get the "frontier" — concepts where all prerequisites are satisfied
+    /// and the concept itself is not yet mastered at ProgressionThreshold.
+    /// This is the optimal next-study set.
+    /// </summary>
+    Task<List<string>> GetUnlockedFrontier(
+        Dictionary<string, double> masteryMap);
+}
+
+/// <summary>
+/// Result of checking prerequisites for a single concept.
+/// </summary>
+public sealed record PrerequisiteCheckResult(
+    /// <summary>True if ALL prerequisites are mastered at PrerequisiteGateThreshold (0.95).</summary>
+    bool IsUnlocked,
+    /// <summary>Concept IDs of prerequisites not yet at gate threshold.</summary>
+    List<string> MissingPrerequisites,
+    /// <summary>For each missing prerequisite: conceptId → gap (0.95 - current mastery).</summary>
+    Dictionary<string, double> PrerequisiteMasteryGaps,
+    /// <summary>Suggested action if blocked: "Review {concept} to unlock this topic".</summary>
+    string? SuggestedActionHe
+);
+
+/// <summary>
+/// A concept the student cannot yet attempt, with the reason.
+/// </summary>
+public sealed record BlockedConcept(
+    string ConceptId,
+    string ConceptNameHe,
+    List<string> BlockingPrerequisiteIds,
+    /// <summary>How close the student is to unlocking (0.0 = far, 1.0 = almost there).</summary>
+    double UnlockProgress
+);

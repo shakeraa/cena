@@ -279,3 +279,59 @@ abstract class ConnectivityMonitor {
   /// Stop monitoring.
   Future<void> stop();
 }
+
+// ---------------------------------------------------------------------------
+// DURABLE COMMAND QUEUE (FIXED: prevents data loss on app crash)
+// ---------------------------------------------------------------------------
+
+/// Every outgoing command (SubmitAnswer, StartSession, etc.) is persisted to
+/// SQLite BEFORE sending to the server. If the app crashes between submit and
+/// server acknowledgment, the command survives and is retried on next app launch.
+///
+/// This is the critical data safety layer for student work preservation.
+abstract class DurableCommandQueue {
+  /// Persist a command to SQLite, then attempt to send it.
+  /// Returns the command ID for tracking.
+  Future<String> enqueueCommand(OutgoingCommand cmd);
+
+  /// Mark a command as successfully acknowledged by the server.
+  /// Removes it from the retry queue.
+  Future<void> markAcknowledged(String commandId);
+
+  /// Get all commands that were enqueued but not yet acknowledged.
+  /// Called on app startup to retry any commands lost during crashes.
+  Future<List<OutgoingCommand>> getPendingCommands();
+
+  /// Retry all pending commands in order. Called on app startup
+  /// and when connectivity is restored.
+  Future<DurableRetryResult> retryPending();
+
+  /// Total number of pending (unacknowledged) commands.
+  Future<int> pendingCount();
+}
+
+/// A command waiting to be sent or retried.
+class OutgoingCommand {
+  final String id;                // UUIDv7
+  final String type;              // "SubmitAnswer" | "StartSession" | "EndSession" | ...
+  final Map<String, dynamic> payload;
+  final DateTime enqueuedAt;
+  final int retryCount;
+  final String? lastError;
+
+  OutgoingCommand({
+    required this.id,
+    required this.type,
+    required this.payload,
+    required this.enqueuedAt,
+    this.retryCount = 0,
+    this.lastError,
+  });
+}
+
+class DurableRetryResult {
+  final int succeeded;
+  final int failed;
+  final int remaining;
+  DurableRetryResult({required this.succeeded, required this.failed, required this.remaining});
+}
