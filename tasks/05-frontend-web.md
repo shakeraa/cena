@@ -19,7 +19,26 @@
 - [ ] `MessageEnvelope<T,P>` discriminated union with exhaustive switch
 - [ ] 9 commands, 12 events typed
 - [ ] Auto-reconnection with exponential backoff
-- [ ] **Test:** Type-check passes with `tsc --noEmit`; mock WebSocket round-trips
+
+**Test:**
+```typescript
+// Type safety: discriminated union exhaustiveness
+function handleMessage(msg: ServerEvent) {
+  switch (msg.type) {
+    case 'QuestionPresented': /* ... */ break;
+    case 'AnswerEvaluated': /* ... */ break;
+    // tsc --noEmit errors if any case is missing
+  }
+}
+
+test('WebSocket reconnects with backoff', async () => {
+  const ws = createMockWebSocket({ failFirstN: 3 });
+  const client = new CenaHubProxy(ws);
+  await client.connect();
+  expect(ws.connectAttempts).toBe(4); // 3 failures + 1 success
+  expect(ws.backoffDelays).toEqual([1000, 2000, 4000]); // exponential
+});
+```
 
 ## WEB-003: GraphQL Schema + Apollo Client
 **Priority:** P1 | **Blocked by:** WEB-001
