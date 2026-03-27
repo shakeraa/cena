@@ -24,12 +24,12 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
 {
     private readonly ILogger<MethodologySwitchService> _logger;
 
-    // ── All 9 methodologies in the system (ACT-032: added drill_and_practice) ──
+    // ── All 9 methodologies — names must match Methodology enum for Enum.TryParse ──
     public static readonly string[] AllMethodologies =
     {
-        "socratic", "spaced_repetition", "feynman", "project_based",
-        "blooms_progression", "worked_example", "analogy", "retrieval_practice",
-        "drill_and_practice"
+        "Socratic", "SpacedRepetition", "Feynman", "ProjectBased",
+        "BloomsProgression", "WorkedExample", "Analogy", "RetrievalPractice",
+        "DrillAndPractice"
     };
 
     // ── Error-type precedence (Step 1) ──
@@ -41,11 +41,12 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
     };
 
     // ── Fallback defaults when MCM graph has no entry (Step 5) ──
+    // Methodology names must match Methodology enum for Enum.TryParse
     private static readonly Dictionary<string, List<McmCandidate>> ErrorTypeDefaults = new()
     {
-        ["conceptual"] = new() { new("socratic", 0.80), new("feynman", 0.65), new("analogy", 0.55) },
-        ["procedural"] = new() { new("worked_example", 0.85), new("retrieval_practice", 0.70), new("spaced_repetition", 0.60) },
-        ["motivational"] = new() { new("project_based", 0.75), new("analogy", 0.60), new("blooms_progression", 0.50) }
+        ["conceptual"] = new() { new("Socratic", 0.80), new("Feynman", 0.65), new("Analogy", 0.55) },
+        ["procedural"] = new() { new("WorkedExample", 0.85), new("RetrievalPractice", 0.70), new("SpacedRepetition", 0.60) },
+        ["motivational"] = new() { new("ProjectBased", 0.75), new("Analogy", 0.60), new("BloomsProgression", 0.50) }
     };
 
     public MethodologySwitchService(ILogger<MethodologySwitchService> logger)

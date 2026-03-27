@@ -50,6 +50,7 @@ public sealed partial class StudentActor : IActor
     private readonly IMethodologySwitchService _methodologySwitchService;
     private readonly IBktService _bktService;
     private readonly Sync.OfflineSyncHandler _offlineSyncHandler;
+    private readonly Infrastructure.GracefulShutdownCoordinator? _shutdownCoordinator;
 
     // ---- Actor State ----
     private StudentState _state = new();
@@ -79,6 +80,9 @@ public sealed partial class StudentActor : IActor
     // ---- RES-003: Redis circuit breaker PID (resolved from cluster root) ----
     private PID? _redisCbPid;
 
+    // ---- Pool governor PID (resolved from ActorSystemManager child) ----
+    private PID? _managerPid;
+
     // ---- Configuration ----
     private static readonly TimeSpan PassivationTimeout = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan MemoryCheckInterval = TimeSpan.FromMinutes(5);
@@ -102,7 +106,8 @@ public sealed partial class StudentActor : IActor
         IMethodologySwitchService methodologySwitchService,
         IBktService bktService,
         Sync.OfflineSyncHandler offlineSyncHandler,
-        IMeterFactory meterFactory)
+        IMeterFactory meterFactory,
+        Infrastructure.GracefulShutdownCoordinator? shutdownCoordinator = null)
     {
         _documentStore = documentStore ?? throw new ArgumentNullException(nameof(documentStore));
         _nats = nats ?? throw new ArgumentNullException(nameof(nats));
@@ -110,6 +115,7 @@ public sealed partial class StudentActor : IActor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _methodologySwitchService = methodologySwitchService ?? throw new ArgumentNullException(nameof(methodologySwitchService));
         _bktService = bktService ?? throw new ArgumentNullException(nameof(bktService));
+        _shutdownCoordinator = shutdownCoordinator;
         _offlineSyncHandler = offlineSyncHandler ?? throw new ArgumentNullException(nameof(offlineSyncHandler));
 
         // ACT-023: Instance-based telemetry via IMeterFactory
@@ -194,6 +200,9 @@ public sealed partial class StudentActor : IActor
         _timerCts = new CancellationTokenSource();
         ScheduleMemoryCheck(context);
 
+        // Register with pool governor for back-pressure and graceful shutdown
+        RegisterWithManager(context);
+
         sw.Stop();
         _activationCounter.Add(1, new KeyValuePair<string, object?>("student.id", _studentId));
 
@@ -246,6 +255,9 @@ public sealed partial class StudentActor : IActor
 
     private Task OnStopped(IContext context)
     {
+        // Deregister from pool governor so drain/shutdown tracking is accurate
+        DeregisterFromManager(context);
+
         _passivationCounter.Add(1, new KeyValuePair<string, object?>("student.id", _studentId));
         _activitySource.Dispose();
         _logger.LogInformation("StudentActor stopped for student {StudentId}", _studentId);
@@ -543,6 +555,48 @@ public sealed partial class StudentActor : IActor
         }
     }
 
+    // =========================================================================
+    // POOL GOVERNOR REGISTRATION
+    // =========================================================================
+
+    /// <summary>
+    /// Resolve the StudentActorManager PID and register this actor for
+    /// pool tracking, back-pressure, and graceful shutdown coordination.
+    /// The PID is registered in GracefulShutdownCoordinator during bootstrap;
+    /// we resolve it via the same coordinator injected into the system.
+    /// </summary>
+    private void RegisterWithManager(IContext context)
+    {
+        try
+        {
+            // Resolve manager PID from the shutdown coordinator (which holds it)
+            _managerPid = _shutdownCoordinator?.ManagerPid;
+            if (_managerPid != null)
+            {
+                context.Send(_managerPid, new Management.ActivateStudent(_studentId));
+            }
+        }
+        catch (Exception ex)
+        {
+            // Non-fatal: actor functions without pool governor
+            _logger.LogDebug(ex, "Could not register with StudentActorManager for {StudentId}", _studentId);
+        }
+    }
+
+    private void DeregisterFromManager(IContext context)
+    {
+        if (_managerPid != null)
+        {
+            try
+            {
+                context.Send(_managerPid, new Management.StudentDeactivated(_studentId));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Could not deregister from StudentActorManager for {StudentId}", _studentId);
+            }
+        }
+    }
 }
 
 // =============================================================================

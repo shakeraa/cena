@@ -33,8 +33,11 @@ public sealed class GracefulShutdownCoordinator : IHostedService
     private static readonly TimeSpan Phase3Timeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan Phase4Timeout = TimeSpan.FromSeconds(15);
 
-    // ── Manager PID (set during startup) ──
+    // ── Manager PID (set during startup, read by StudentActors for pool registration) ──
     private PID? _managerPid;
+
+    /// <summary>The StudentActorManager PID, if registered. Used by StudentActors to self-register.</summary>
+    public PID? ManagerPid => _managerPid;
 
     public GracefulShutdownCoordinator(
         ActorSystem actorSystem,

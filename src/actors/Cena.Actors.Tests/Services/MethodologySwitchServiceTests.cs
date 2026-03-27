@@ -96,4 +96,61 @@ public sealed class MethodologySwitchServiceTests
         Assert.True(result.ShouldSwitch);
         Assert.True(result.Confidence > 0);
     }
+
+    [Fact]
+    public async Task DecideSwitch_MotivationalError_RecommendsProjectBased()
+    {
+        var result = await _sut.DecideSwitch(new DecideSwitchRequest(
+            "student-1", "concept-1", "motivational",
+            ErrorType.Motivational, Methodology.Socratic,
+            MethodAttemptHistory: new List<string>(),
+            StagnationScore: 0.75,
+            ConsecutiveStagnantSessions: 3));
+
+        Assert.True(result.ShouldSwitch);
+        Assert.Equal(Methodology.ProjectBased, result.RecommendedMethodology);
+    }
+
+    [Fact]
+    public async Task DecideSwitch_HighConfidence_WhenFirstCandidate()
+    {
+        var result = await _sut.DecideSwitch(new DecideSwitchRequest(
+            "student-1", "concept-1", "conceptual",
+            ErrorType.Conceptual, Methodology.DrillAndPractice,
+            MethodAttemptHistory: new List<string>(),
+            StagnationScore: 0.7,
+            ConsecutiveStagnantSessions: 2));
+
+        Assert.True(result.Confidence >= 0.5,
+            $"First recommended method should have confidence >= 0.5, got {result.Confidence}");
+    }
+
+    [Fact]
+    public async Task DecideSwitch_FallbackWhenMcmExhausted_StillRecommends()
+    {
+        // Try all conceptual defaults — should fall through to general fallback
+        var tried = new List<string> { "socratic", "feynman", "analogy" };
+
+        var result = await _sut.DecideSwitch(new DecideSwitchRequest(
+            "student-1", "concept-1", "conceptual",
+            ErrorType.Conceptual, Methodology.WorkedExample,
+            MethodAttemptHistory: tried,
+            StagnationScore: 0.8,
+            ConsecutiveStagnantSessions: 4));
+
+        Assert.True(result.ShouldSwitch || result.AllMethodologiesExhausted);
+    }
+
+    [Fact]
+    public async Task DecideSwitch_DecisionTraceIsPopulated()
+    {
+        var result = await _sut.DecideSwitch(new DecideSwitchRequest(
+            "student-1", "concept-1", "procedural",
+            ErrorType.Procedural, Methodology.Socratic,
+            MethodAttemptHistory: new List<string>(),
+            StagnationScore: 0.6,
+            ConsecutiveStagnantSessions: 2));
+
+        Assert.NotEmpty(result.DecisionTrace);
+    }
 }
