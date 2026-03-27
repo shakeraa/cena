@@ -1,5 +1,6 @@
 import {
   GoogleAuthProvider,
+  OAuthProvider,
   onAuthStateChanged,
   sendPasswordResetEmail,
   signInWithEmailAndPassword,
@@ -209,6 +210,43 @@ export function useFirebaseAuth() {
     }
   }
 
+  const loginWithApple = async () => {
+    authError.value = null
+    try {
+      const provider = new OAuthProvider('apple.com')
+      provider.addScope('email')
+      provider.addScope('name')
+      const credential = await signInWithPopup(firebaseAuth, provider)
+
+      const tokenResult = await credential.user.getIdTokenResult(true)
+      const claims = tokenResult.claims as Record<string, unknown>
+      const role = (claims.role as CenaRole) || 'STUDENT'
+
+      if (!ADMIN_ROLES.includes(role)) {
+        await signOut(firebaseAuth)
+        throw new Error('Access denied. Admin, Moderator, or Super Admin role required.')
+      }
+
+      const user = extractCenaUser(credential.user, claims)
+
+      currentUser.value = user
+      const abilities = mapRoleToAbilities(role)
+
+      ability.update(abilities)
+      useCookie('userData').value = user as any
+      useCookie('accessToken').value = tokenResult.token
+      useCookie('userAbilityRules').value = abilities as any
+
+      return user
+    }
+    catch (error: unknown) {
+      const err = error as { code?: string; message?: string }
+
+      authError.value = err.message || 'Apple sign-in failed'
+      throw error
+    }
+  }
+
   const logout = async () => {
     await signOut(firebaseAuth)
     currentUser.value = null
@@ -259,6 +297,7 @@ export function useFirebaseAuth() {
     initAuth,
     loginWithEmail,
     loginWithGoogle,
+    loginWithApple,
     logout,
     resetPassword,
     getIdToken,

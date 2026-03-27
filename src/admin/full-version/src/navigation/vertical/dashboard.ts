@@ -26,10 +26,10 @@ export default [
       },
       {
         title: 'Outreach & Engagement',
+        to: 'apps-outreach-dashboard',
         icon: { icon: 'tabler-bell-ringing' },
         action: 'read',
         subject: 'Outreach',
-        disabled: true,
       },
     ],
   },

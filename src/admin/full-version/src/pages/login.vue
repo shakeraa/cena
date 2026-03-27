@@ -28,7 +28,7 @@ const isSubmitting = ref(false)
 const route = useRoute()
 const router = useRouter()
 
-const { loginWithEmail, loginWithGoogle, authError } = useFirebaseAuth()
+const { loginWithEmail, loginWithGoogle, loginWithApple, authError } = useFirebaseAuth()
 
 const refVForm = ref<VForm>()
 
@@ -60,6 +60,23 @@ const handleGoogleLogin = async () => {
   isSubmitting.value = true
   try {
     await loginWithGoogle()
+
+    await nextTick(() => {
+      router.replace(route.query.to ? String(route.query.to) : '/')
+    })
+  }
+  catch {
+    // Error is set in authError by useFirebaseAuth
+  }
+  finally {
+    isSubmitting.value = false
+  }
+}
+
+const handleAppleLogin = async () => {
+  isSubmitting.value = true
+  try {
+    await loginWithApple()
 
     await nextTick(() => {
       router.replace(route.query.to ? String(route.query.to) : '/')
@@ -235,6 +252,21 @@ const onSubmit = () => {
                     class="me-2"
                   />
                   Sign in with Google
+                </VBtn>
+
+                <VBtn
+                  variant="outlined"
+                  block
+                  :disabled="isSubmitting"
+                  class="mt-3"
+                  @click="handleAppleLogin"
+                >
+                  <VIcon
+                    icon="tabler-brand-apple"
+                    size="20"
+                    class="me-2"
+                  />
+                  Sign in with Apple
                 </VBtn>
               </VCol>
             </VRow>
