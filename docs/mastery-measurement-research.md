@@ -1258,6 +1258,144 @@ output: {
 
 ---
 
+### 2.6 Interleaving and Desirable Difficulties
+
+**What it measures:** Whether the learning schedule optimally interleaves different concepts (rather than blocking them) and introduces desirable difficulties that strengthen long-term retention.
+
+**Theoretical foundation:**
+
+Bjork (1994) introduced the "desirable difficulties" framework: learning conditions that appear to slow initial acquisition but enhance long-term retention and transfer. Three core desirable difficulties:
+
+1. **Spacing effect:** Distributing practice over time (vs. massing). Cepeda et al. (2006, doi:10.1037/0033-2909.132.3.354) meta-analyzed 839 assessments confirming spacing superiority across all domains.
+
+2. **Interleaving effect:** Mixing different concept types during practice (vs. blocking one concept at a time). Kornell & Bjork (2008, doi:10.1111/j.1467-9280.2008.02127.x) showed interleaving improves category learning. Rohrer et al. (2015, doi:10.1037/edu0000001) demonstrated interleaving doubled math test scores for 7th graders.
+
+3. **Testing effect / retrieval practice:** Using recall-based testing instead of re-study. Roediger & Karpicke (2006, doi:10.1111/j.1467-9280.2006.01693.x) showed testing produced 50% higher retention at 1-week delay compared to re-study.
+
+**Measuring interleaving quality:**
+
+```
+interleaving_ratio(session) = count(concept_switches) / (count(items) - 1)
+```
+
+where `concept_switches` = number of times the concept changes between consecutive items.
+
+- `interleaving_ratio = 0.0`: Pure blocking (all items from one concept, then all from another)
+- `interleaving_ratio = 1.0`: Full interleaving (every item is a different concept)
+- Optimal range for STEM: 0.3-0.7 (partial interleaving, Rohrer & Taylor 2007)
+
+**Measuring desirable difficulty level:**
+
+```
+difficulty_calibration(student, session) = mean(|P_predicted(correct) - 0.85|)
+```
+
+Items should target ~85% success rate (the "85% rule" — Wilson et al. 2019, doi:10.1038/s41467-019-12552-4). This maximizes the desirable difficulty: hard enough to strengthen memory, easy enough to avoid frustration.
+
+**Strengths:**
+- Directly actionable for session design — adjust interleaving ratio and difficulty targeting
+- Backed by robust experimental evidence across decades
+- Interleaving naturally prevents the "illusion of competence" from blocked practice
+- Compatible with all mastery models (BKT, MIRT, HLR)
+
+**Weaknesses:**
+- Interleaving can feel harder to students (lower perceived competence during practice — counterintuitive)
+- Optimal interleaving ratio depends on concept similarity — closely related concepts benefit more
+- The "desirable" threshold varies per student and per concept difficulty
+
+**Cena implementation mapping:**
+- The `LearningSession` actor in the Pedagogy Context controls item selection — it maintains the `interleaving_ratio` target for each session
+- Item selection algorithm: after presenting an item from concept A, the next item is drawn from a different concept B with probability `interleaving_target` (default 0.5, tunable per student based on `StagnationDetected` signals)
+- Difficulty calibration uses the BKT/Elo predicted P(correct) to select items near the 0.85 sweet spot — items where `|P_predicted - 0.85| < 0.15` are prioritized
+- The `ConceptAttempted` event logs the actual difficulty experienced (correct/incorrect + response time) — over time, the session generator learns each student's optimal difficulty zone
+
+**Graph mapping:**
+- Interleaving is a session-level property, not a concept-node property
+- The concept graph determines which concepts can be interleaved: concepts from the same topic cluster or sharing prerequisites are good interleaving candidates
+- Neo4j query for interleaving candidates: `MATCH (c1:Concept)-[:RELATED_TO|:SHARES_PREREQUISITE]-(c2:Concept) WHERE c1.id = $current AND student_mastery(c2) > 0.4 RETURN c2`
+
+---
+
+### 2.7 Cognitive Load Theory (CLT) and Zone of Proximal Development (ZPD)
+
+**What it measures:** Whether the learning material is calibrated to the student's current cognitive capacity (CLT) and falls within their zone of learnable concepts (ZPD).
+
+**Cognitive Load Theory (Sweller 1988, doi:10.1207/s15516709cog1202_4):**
+
+Three types of cognitive load:
+1. **Intrinsic load:** Complexity inherent to the concept itself (e.g., integration by parts has higher intrinsic load than basic addition)
+2. **Extraneous load:** Unnecessary complexity from poor instructional design (confusing diagrams, irrelevant information)
+3. **Germane load:** Productive mental effort that builds schemas and long-term memory
+
+**CLT measurement:**
+
+```
+estimated_cognitive_load(student, concept) =
+    intrinsic_load(concept) * (1 - mastery(prerequisites))
+  + extraneous_load(presentation_mode)
+  + germane_load(methodology_fit)
+```
+
+Where:
+- `intrinsic_load(concept)` = concept's inherent difficulty (stored in Neo4j as a node property, calibrated from aggregate student performance)
+- `(1 - mastery(prerequisites))` = intrinsic load is amplified when prerequisites are weak (element interactivity increases)
+- `extraneous_load` depends on presentation mode (text, diagram, animation, worked example)
+- `germane_load` depends on methodology fit (well-matched methodology increases productive germane load)
+
+**Overload detection signals:**
+- Response time exceeds 2x the student's baseline for similar difficulty → cognitive overload
+- Accuracy drops below 40% on items the model predicts > 60% → material too complex
+- Session abandonment after less than 5 minutes → likely overload or frustration
+- Annotation sentiment shows confusion signals → explicit overload indicator
+
+**Zone of Proximal Development (Vygotsky 1978):**
+
+The ZPD is the gap between what a student can do independently and what they can do with scaffolding. In graph terms:
+
+```
+ZPD(student) = {c : prerequisite_support(c) >= 0.6  // scaffolding can bridge the gap
+                AND mastery(c) < 0.4}                // not yet independently mastered
+```
+
+Concepts in the ZPD are the ideal learning targets — hard enough to challenge, close enough to existing knowledge that scaffolding is effective.
+
+**Scaffolding strategy (Wood, Bruner & Ross 1976, doi:10.1111/j.1469-7610.1976.tb00381.x):**
+
+```
+scaffolding_level(student, concept) =
+    if mastery(c) < 0.2 and PSI(c) < 0.8: "full scaffolding" (worked example)
+    if mastery(c) < 0.4 and PSI(c) >= 0.8: "partial scaffolding" (faded example)
+    if mastery(c) < 0.7: "hints on request" (student attempts first)
+    if mastery(c) >= 0.7: "no scaffolding" (independent practice)
+```
+
+This implements Renkl & Atkinson's (2003, doi:10.1207/S15326985EP3801_3) fading strategy — scaffolding is progressively removed as mastery increases.
+
+**Strengths:**
+- CLT provides a principled framework for session pacing — stop adding new concepts when cognitive load is high
+- ZPD focuses instruction on the most learnable concepts, preventing wasted effort on too-easy or too-hard material
+- Scaffolding level can be automatically derived from the mastery overlay
+- Both frameworks are deeply established in educational psychology
+
+**Weaknesses:**
+- Cognitive load is not directly observable — must be inferred from behavioral signals
+- ZPD boundaries are fuzzy — the 0.6 prerequisite threshold is heuristic
+- Scaffolding level transitions must be smooth to avoid jarring the student
+
+**Cena implementation mapping:**
+- The `StudentProfile` actor maintains a `cognitive_load_profile` — a per-student estimate of maximum information absorption rate, updated from session engagement signals
+- The Pedagogy Context's `LearningSession` actor checks `estimated_cognitive_load` before each new item — if the cumulative session load exceeds the student's threshold, the session ends with a review of previously-learned concepts instead of introducing new material
+- ZPD computation runs against the Neo4j concept graph: the learning frontier (PSI = 1.0 concepts) plus near-frontier concepts (PSI >= 0.6) form the ZPD
+- Scaffolding level is a parameter passed to the LLM prompt system — the system prompt for each methodology (Socratic, Feynman, etc.) has variants for each scaffolding level
+- The `StagnationDetected` event at the scaffolding level triggers methodology switching: if the student is stagnating with "hints on request", escalate to "partial scaffolding" before switching methodologies
+
+**Graph mapping:**
+- `intrinsic_load` is a property on each concept node in Neo4j, calibrated from aggregate student performance data
+- ZPD is computed from the mastery overlay + prerequisite structure — it IS a graph computation
+- Scaffolding level per concept is derived from `mastery(c)` and `PSI(c)` — both graph-overlay properties
+
+---
+
 ## 3. Decay and Forgetting Models
 
 ### 3.1 Ebbinghaus Forgetting Curve
