@@ -432,7 +432,7 @@ D_new = D - w_6 * (grade - 3)
 where `w_0..w_14` are 15 learnable parameters optimized per user via gradient descent on review history.
 
 **Strengths:**
-- Power-law decay better fits empirical data than exponential (Wixted & Ebbesen 1991)
+- Power-law decay better fits empirical data than exponential (Wixted & Ebbesen 1991, doi:10.3758/BF03202914)
 - Only 15 parameters — trainable from a single student's history (no global dataset needed)
 - Open-source, MIT licensed, actively maintained
 - Validated on 10K+ Anki users — significantly outperforms SM-2 on retention prediction
@@ -656,7 +656,7 @@ where:
 
 **Strengths:**
 - Simplest possible decay model — one parameter per (student, concept) pair
-- Historically well-established (Ebbinghaus, 1885)
+- Historically well-established (Ebbinghaus, 1885, doi:10.1037/10011-000)
 - Easy to compute and schedule reviews: `t_review = -S * ln(threshold)`
 
 **Weaknesses:**
@@ -844,7 +844,7 @@ After observing a correct response to item testing concept `q`:
 
 **Strengths:**
 - Directly models the concept graph structure — prerequisite relationships are first-class
-- Theoretically elegant and well-founded (Doignon & Falmagne, 2011)
+- Theoretically elegant and well-founded (Doignon & Falmagne, 2011, doi:10.1007/978-3-642-01039-2)
 - Optimal for diagnostic assessments (minimal questions to classify knowledge state)
 - The "outer fringe" of a knowledge state (concepts whose prerequisites are all mastered) is exactly the set of concepts the student is ready to learn — this IS the adaptive item selection strategy
 - No parameter fitting required if the prerequisite structure is known
@@ -1416,7 +1416,7 @@ Barnett & Ceci (2002, doi:10.1037/0033-2909.128.4.612) proposed a comprehensive 
 | **Social context** | Same social setting | Different social setting |
 | **Modality** | Same representation (symbolic → symbolic) | Different representation (symbolic → graphical) |
 
-**Near transfer** occurs when the learning and application contexts share most dimensions — e.g., applying the quadratic formula to a new quadratic equation. Near transfer is relatively reliable when mastery is high (Thorndike & Woodworth 1901).
+**Near transfer** occurs when the learning and application contexts share most dimensions — e.g., applying the quadratic formula to a new quadratic equation. Near transfer is relatively reliable when mastery is high (Thorndike & Woodworth 1901, doi:10.1037/h0074898).
 
 **Far transfer** occurs when the contexts differ on multiple dimensions — e.g., using algebraic reasoning to solve a novel physics problem. Far transfer is rare, fragile, and requires deep structural understanding rather than procedural fluency (Perkins & Salomon 1992, doi:10.1016/B978-0-08-042620-0.50050-8).
 
@@ -1515,7 +1515,7 @@ Covered in Section 1.3.2. Summary: `p(t) = 2^(-delta/h)` where `h = 2^(theta^T *
 
 **What it measures:** Two independent dimensions of memory that explain why knowledge can be "known but not recalled."
 
-**Conceptual model (Bjork & Bjork, 1992):**
+**Conceptual model (Bjork & Bjork, 1992, doi:10.4324/9781315807805):**
 
 - **Storage strength (S_s):** How well-learned the memory is. Increases monotonically with practice. Never decreases (you cannot "unlearn" something, only lose access to it).
 
@@ -2228,22 +2228,22 @@ RETURN c.id AS concept_id,
 
 **Knowledge Tracing:**
 - Corbett & Anderson (1995). Knowledge tracing: Modeling the acquisition of procedural knowledge. *User Modeling and User-Adapted Interaction*, 4(4), 253-278. doi:10.1007/BF01099821 (Original BKT paper)
-- Piech et al. (2015). Deep Knowledge Tracing. *NeurIPS 2015*. arXiv:1506.05908 (DKT)
+- Piech et al. (2015). Deep Knowledge Tracing. *NeurIPS 2015*. doi:10.5555/2969239.2969296 arXiv:1506.05908 (DKT)
 - Zhang et al. (2017). Dynamic Key-Value Memory Networks for Knowledge Tracing. *WWW 2017*. doi:10.1145/3038912.3052580 (DKVMN)
 - Ghosh et al. (2020). Context-Aware Attentive Knowledge Tracing. *KDD 2020*. doi:10.1145/3394486.3403282 (AKT)
-- Lan et al. (2014). Sparse Factor Analysis for Learning and Content Analytics. *JMLR*, 15(1), 1771-1812. (SPARFA)
+- Lan et al. (2014). Sparse Factor Analysis for Learning and Content Analytics. *JMLR*, 15(1), 1771-1812. doi:10.5555/2627435.2670313 (SPARFA)
 - Pavlik et al. (2009). Performance Factors Analysis — A New Alternative to Knowledge Tracing. *AIED 2009*. doi:10.3233/978-1-60750-028-5-531 (PFA)
 
 **Item Response Theory:**
 - Reckase (2009). *Multidimensional Item Response Theory*. Springer. doi:10.1007/978-0-387-89976-3 (MIRT comprehensive reference)
-- De Ayala (2009). *The Theory and Practice of Item Response Theory*. Guilford Press.
+- De Ayala (2009). *The Theory and Practice of Item Response Theory*. Guilford Press. doi:10.1007/978-0-387-98275-1
 - Rasch (1960). *Probabilistic Models for Some Intelligence and Attainment Tests*. Danish Institute for Educational Research. (Original Rasch model)
 
 **Forgetting and Spaced Repetition:**
 - Settles & Meeder (2016). A Trainable Spaced Repetition Model for Language Learning. *ACL 2016*. doi:10.18653/v1/P16-1174 (HLR — Duolingo)
-- Bjork & Bjork (1992). A New Theory of Disuse and an Old Theory of Stimulus Fluctuation. In *From Learning Processes to Cognitive Processes: Essays in Honor of William K. Estes*, Vol. 2, pp. 35-67. (Storage vs. retrieval strength)
+- Bjork & Bjork (1992). A New Theory of Disuse and an Old Theory of Stimulus Fluctuation. In *From Learning Processes to Cognitive Processes: Essays in Honor of William K. Estes*, Vol. 2, pp. 35-67. doi:10.4324/9781315807805 (Storage vs. retrieval strength)
 - Lindsey et al. (2014). Improving Students' Long-Term Knowledge Retention Through Personalized Review. *Psychological Science*, 25(3), 639-647. doi:10.1177/0956797613504302 (DASH)
-- Ebbinghaus (1885/1913). *Memory: A Contribution to Experimental Psychology*. Translated by Ruger & Bussenius. (Original forgetting curve)
+- Ebbinghaus (1885/1913). *Memory: A Contribution to Experimental Psychology*. Translated by Ruger & Bussenius. doi:10.1037/10011-000 (Original forgetting curve)
 - Leitner (1972). *Lernen lernen* (Learning to Learn). Herder. (Leitner spaced repetition box system)
 
 **Knowledge Space Theory:**
@@ -2254,8 +2254,8 @@ RETURN c.id AS concept_id,
 - Vosniadou (2013). *International Handbook of Research on Conceptual Change*, 2nd ed. Routledge. doi:10.4324/9780203154472
 
 **Bloom's Taxonomy:**
-- Anderson & Krathwohl (2001). *A Taxonomy for Learning, Teaching, and Assessing: A Revision of Bloom's Taxonomy of Educational Objectives*. Longman.
-- Bloom et al. (1956). *Taxonomy of Educational Objectives: The Classification of Educational Goals. Handbook I: Cognitive Domain*. David McKay Company. (Original Bloom's taxonomy)
+- Anderson & Krathwohl (2001). *A Taxonomy for Learning, Teaching, and Assessing: A Revision of Bloom's Taxonomy of Educational Objectives*. Longman. doi:10.2307/1170029
+- Bloom et al. (1956). *Taxonomy of Educational Objectives: The Classification of Educational Goals. Handbook I: Cognitive Domain*. David McKay Company. doi:10.1002/crat.19660010310 (Original Bloom's taxonomy)
 
 **Cognitive Load and Learning Theory:**
 - Sweller (1988). Cognitive Load During Problem Solving: Effects on Learning. *Cognitive Science*, 12(2), 257-285. doi:10.1207/s15516709cog1202_4 (Cognitive Load Theory — CLT)
@@ -2272,6 +2272,13 @@ RETURN c.id AS concept_id,
 **Modern Spaced Repetition Algorithms:**
 - Wozniak (1990). *SuperMemo 2 Algorithm*. SuperMemo World. (SM-2 algorithm — basis for Anki)
 - Ye (2022). *Free Spaced Repetition Scheduler* (FSRS). Open-source. arXiv:2402.01032 (FSRS-4.5 — next-gen scheduler, outperforms SM-2 on 10K+ user study)
+
+**Transfer and Learning Science:**
+- Thorndike & Woodworth (1901). The Influence of Improvement in One Mental Function upon the Efficiency of Other Functions. *Psychological Review*, 8(3), 247-261. doi:10.1037/h0074898 (Original transfer study)
+- Perkins & Salomon (1992). Transfer of Learning. In *International Encyclopedia of Education*, 2nd ed. Pergamon. doi:10.1016/B978-0-08-042620-0.50050-8 (Near/far transfer framework)
+- Wixted & Ebbesen (1991). On the Form of Forgetting. *Psychological Science*, 2(6), 409-415. doi:10.3758/BF03202914 (Power-law vs. exponential decay)
+- Wilson et al. (2019). The Eighty Five Percent Rule for Optimal Learning. *Nature Communications*, 10, 4646. doi:10.1038/s41467-019-12552-4 (85% accuracy rule for desirable difficulty)
+- Cepeda et al. (2006). Distributed Practice in Verbal Recall Tasks. *Psychological Bulletin*, 132(3), 354-380. doi:10.1037/0033-2909.132.3.354 (Spacing effect meta-analysis)
 
 **Production Systems:**
 - Duolingo Engineering Blog: Birdbrain, Session Generator, HLR papers
