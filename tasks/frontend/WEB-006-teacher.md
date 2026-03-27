@@ -1,16 +1,16 @@
 # WEB-006: Teacher Dashboard — Class Overview, Knowledge Gap Heatmap, Assignments
 
 **Priority:** P1 — primary web client use case
-**Blocked by:** WEB-001 (scaffold), WEB-003 (GraphQL), WEB-004 (state)
+**Blocked by:** WEB-001 (scaffold), WEB-003 (REST API client), WEB-004 (state)
 **Estimated effort:** 4 days
-**Contract:** `contracts/frontend/graphql-schema.graphql` (ClassRoom, ConceptGap, AssignmentCompletion types)
+**Contract:** `contracts/backend/kg-access-control.md` (teacher role endpoints)
 
 ---
 
 > **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
 
 ## Context
-The teacher dashboard is the primary web interface. Teachers see a class overview with per-student mastery/streak/XP, a knowledge gap heatmap identifying concepts where students struggle, and assignment completion tracking. Real-time updates via GraphQL subscriptions show mastery events as they happen during class. The dashboard uses the `ClassRoom`, `ConceptGap`, and `AssignmentCompletion` types from the GraphQL schema.
+The teacher dashboard is the primary web interface. Teachers see a class overview with per-student mastery/streak/XP, a knowledge gap heatmap identifying concepts where students struggle, and assignment completion tracking. Real-time updates via SignalR events show mastery events as they happen during class. Data is fetched from REST endpoints backed by Marten's `TeacherDashboardProjection` async read model.
 
 ## Subtasks
 
@@ -23,14 +23,14 @@ The teacher dashboard is the primary web interface. Teachers see a class overvie
 
 **Acceptance:**
 - [ ] Route: `/teacher/class/:classRoomId`
-- [ ] Uses `useClassOverview(classRoomId)` GraphQL hook
+- [ ] Uses `useClassOverview(classRoomId)` REST hook (`GET /api/teacher/class/:classRoomId/overview`)
 - [ ] `ClassStatsBar`: displays `studentCount`, `averageMastery` (0-100%), `averageStreak` (days)
 - [ ] `StudentTable`: columns = Name, Mastery (%), Streak (days), XP, Last Active, Risk Level
 - [ ] Sortable by any column (default: Last Active DESC) using `StudentSortField` enum
 - [ ] Relay cursor pagination with "Load more" button
 - [ ] Risk level badge: green (active, progressing), yellow (stagnating or inactive 3+ days), red (inactive 7+ days)
-- [ ] `LiveActivityFeed`: subscribes to `onClassMasteryUpdate(classRoomId)`, shows "Alice mastered Addition!" events in real-time
-- [ ] Inactive students section: students not active in 7+ days (from `inactiveStudents(daysThreshold: 7)`)
+- [ ] `LiveActivityFeed`: subscribes to SignalR `ClassMasteryUpdate` events for the class, shows "Alice mastered Addition!" in real-time
+- [ ] Inactive students section: students not active in 7+ days (from overview endpoint `inactiveStudents` field)
 - [ ] Empty state: no students enrolled -> show enrollment instructions
 
 **Test:**
@@ -82,15 +82,15 @@ test('live feed shows mastery events', async () => {
 
 **Acceptance:**
 - [ ] Route: `/teacher/class/:classRoomId/gaps`
-- [ ] Uses `useKnowledgeGapAnalysis(classRoomId, filter)` GraphQL hook
+- [ ] Uses `useKnowledgeGaps(classRoomId, filter)` REST hook (`GET /api/teacher/class/:classRoomId/gaps`)
 - [ ] `GapHeatmap`: grid of concepts colored by `studentsBelowThreshold` (green < 20%, yellow 20-50%, red > 50%)
 - [ ] Each cell shows concept name and `averageMastery` percentage
 - [ ] Clicking a cell opens `ConceptGapCard` with detail: `studentsAttempted`, `dominantErrorType`, `studentsBelowThreshold`
 - [ ] `dominantErrorType` displayed with icon and label: PROCEDURAL (gear), CONCEPTUAL (brain), MOTIVATIONAL (heart)
 - [ ] Filter controls: `masteryThreshold` slider (default 0.85), `minAttempts` input (default 3), `topic` dropdown
-- [ ] Uses `KnowledgeGapFilter` input type from schema
+- [ ] Filter passed as query params: `?threshold=0.85&minAttempts=3&topic=algebra`
 - [ ] Empty state: no gaps found -> "All students are on track!"
-- [ ] `ConceptGap` fields from schema: `concept { id, name, displayName }`, `studentsBelowThreshold`, `averageMastery`, `studentsAttempted`, `dominantErrorType`
+- [ ] `ConceptGap` DTO fields: `conceptId`, `conceptName`, `displayName`, `studentsBelowThreshold`, `averageMastery`, `studentsAttempted`, `dominantErrorType`
 
 **Test:**
 ```typescript
@@ -134,7 +134,7 @@ test('clicking gap cell shows detail card', async () => {
 
 **Acceptance:**
 - [ ] Route: `/teacher/class/:classRoomId/assignments`
-- [ ] Uses `useAssignmentCompletion(classRoomId, conceptIds)` GraphQL hook
+- [ ] Uses `useAssignmentCompletion(classRoomId, conceptIds)` REST hook (`GET /api/teacher/class/:classRoomId/assignments?conceptIds=c1,c2`)
 - [ ] Teacher selects concepts from a concept picker (search with full-text index)
 - [ ] `AssignmentCompletion` fields from schema: `conceptId`, `conceptName`, `totalStudents`, `masteredCount`, `inProgressCount`, `notStartedCount`, `averageMastery`, `estimatedRemainingMinutes`
 - [ ] `AssignmentProgressBar`: stacked bar showing mastered (green) / in-progress (yellow) / not-started (gray)
@@ -215,8 +215,8 @@ test('teacher dashboard full flow', async () => {
 
 ## Rollback Criteria
 - If heatmap performance is poor with 500+ concepts: paginate concepts or use canvas renderer
-- If real-time subscriptions cause too many re-renders: debounce subscription handler to 1s
-- If GraphQL queries are slow: add Redis caching layer for class overview
+- If real-time SignalR events cause too many re-renders: debounce handler to 1s
+- If REST queries are slow: add Redis caching layer or HTTP cache headers
 
 ## Definition of Done
 - [ ] All 3 subtasks pass their tests
@@ -224,7 +224,7 @@ test('teacher dashboard full flow', async () => {
 - [ ] Class overview with sortable paginated student table
 - [ ] Knowledge gap heatmap with severity coloring and detail cards
 - [ ] Assignment completion with stacked progress bars
-- [ ] Real-time subscription updates reflected in UI
-- [ ] All GraphQL types match schema exactly
+- [ ] Real-time SignalR updates reflected in UI
+- [ ] All DTO types match Marten projection output
 - [ ] Responsive layout (desktop 1024px+)
 - [ ] PR reviewed by frontend lead + UX designer

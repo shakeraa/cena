@@ -1,9 +1,9 @@
 # WEB-008: Knowledge Graph Canvas Renderer for Web
 
 **Priority:** P2 — visualization of student learning progress
-**Blocked by:** WEB-001 (scaffold), WEB-003 (GraphQL), WEB-004 (state)
+**Blocked by:** WEB-001 (scaffold), WEB-003 (REST API client), WEB-004 (state)
 **Estimated effort:** 4 days
-**Contract:** `contracts/frontend/graphql-schema.graphql` (KnowledgeGraph, MasteryEdge, GraphEdge types), `contracts/frontend/state-contracts.ts` (KnowledgeGraphState)
+**Contract:** `contracts/backend/kg-access-control.md` (role-scoped graph endpoints), `contracts/frontend/state-contracts.ts` (KnowledgeGraphState)
 
 ---
 
@@ -21,7 +21,7 @@ The knowledge graph is a visual DAG (directed acyclic graph) showing concepts as
 - `src/web/src/features/knowledge-graph/layout/types.ts` — layout types
 
 **Acceptance:**
-- [ ] Uses `useKnowledgeGraph` hook from WEB-003 to fetch graph data via GraphQL `myKnowledgeGraph(subjectId)` or `knowledgeGraph(studentId, subjectId)`
+- [ ] Uses `useStudentGraph(subjectId)` REST hook (`GET /api/student/me/graph/:subjectId`) or teacher variant (`GET /api/teacher/student/:studentId/graph/:subjectId`)
 - [ ] Transforms `KnowledgeGraph` -> internal layout format: `LayoutNode` with `x`, `y`, `conceptId`, `masteryLevel`, `status`, `radius` and `LayoutEdge` with `from`, `to`, `unlocked`
 - [ ] Force-directed layout with:
   - Repulsion between all nodes (Coulomb's law)

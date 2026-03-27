@@ -1,16 +1,16 @@
 # WEB-007: Parent View — Weekly Report, Risk Alerts, Child Selection
 
 **Priority:** P2 — important for parent engagement
-**Blocked by:** WEB-001 (scaffold), WEB-003 (GraphQL), WEB-004 (state)
+**Blocked by:** WEB-001 (scaffold), WEB-003 (REST API client), WEB-004 (state)
 **Estimated effort:** 2 days
-**Contract:** `contracts/frontend/graphql-schema.graphql` (WeeklyReport, RiskAlert, ChildProgress types)
+**Contract:** `contracts/backend/kg-access-control.md` (parent role endpoints)
 
 ---
 
 > **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
 
 ## Context
-Parents access the Cena web client to monitor their child's learning progress. The parent view shows a weekly summary report, active risk alerts (inactivity, declining accuracy, streak broken), and a child selector for parents with multiple children. Data comes from the `parentProgress` Marten async projection via GraphQL queries and the `onRiskAlert` subscription.
+Parents access the Cena web client to monitor their child's learning progress. The parent view shows a weekly summary report, active risk alerts (inactivity, declining accuracy, streak broken), and a child selector for parents with multiple children. Data comes from the `ParentProgressProjection` Marten async read model via REST endpoints. Real-time risk alerts arrive via SignalR.
 
 ## Subtasks
 
@@ -24,11 +24,11 @@ Parents access the Cena web client to monitor their child's learning progress. T
 
 **Acceptance:**
 - [ ] Route: `/parent` and `/parent/child/:childId`
-- [ ] Uses `useMyChildren()` to list linked children
-- [ ] Uses `useChildProgress(childId)` for progress overview
-- [ ] Uses `useWeeklyReport(childId, dateRange?)` for weekly summary
+- [ ] Uses `useMyChildren()` REST hook (`GET /api/parent/children`)
+- [ ] Uses `useChildProgress(childId)` REST hook (`GET /api/parent/child/:childId/progress`)
+- [ ] Uses `useWeeklyReport(childId, weekStart?)` REST hook (`GET /api/parent/child/:childId/weekly`)
 - [ ] `ChildSelector`: dropdown showing all linked children, auto-selects first child
-- [ ] `WeeklyReportCard` fields from schema: `totalTimeMinutes`, `sessionsCount`, `conceptsMastered`, `xpEarned`, `streakDays`, `accuracyTrend`, `encouragementMessage`
+- [ ] `WeeklyReportCard` DTO fields: `totalTimeMinutes`, `sessionsCount`, `conceptsMastered`, `xpEarned`, `streakDays`, `accuracyTrend`, `encouragementMessage`
 - [ ] `accuracyTrend`: shown as arrow up (positive) or down (negative) with percentage
 - [ ] `subjectBreakdown`: per-subject mini-cards with `timeMinutes`, `conceptsMastered`, `accuracy`, `masteryProgress`
 - [ ] `SubjectMasteryChart`: horizontal progress bars per subject from `ChildProgress.subjectMastery`
@@ -97,12 +97,12 @@ test('week navigation shows previous report', async () => {
 - `src/web/src/hooks/useRiskAlerts.ts` — GraphQL query + subscription
 
 **Acceptance:**
-- [ ] Uses `useRiskAlerts(childId, first, after, includeAcknowledged)` query with pagination
-- [ ] Subscribes to `onRiskAlert(childId)` for real-time new alerts
-- [ ] `RiskAlert` fields from schema: `id`, `studentId`, `detectedAt`, `severity` (INFO|WARNING|CRITICAL), `riskType`, `message`, `acknowledged`, `suggestedAction`
+- [ ] Uses `useRiskAlerts(childId)` REST hook (`GET /api/parent/child/:childId/alerts`)
+- [ ] Subscribes to SignalR `RiskAlert` events for real-time new alerts
+- [ ] `RiskAlert` DTO fields: `id`, `studentId`, `detectedAt`, `severity` (INFO|WARNING|CRITICAL), `riskType`, `message`, `acknowledged`, `suggestedAction`
 - [ ] `RiskAlertCard`: severity-colored border (blue INFO, orange WARNING, red CRITICAL)
 - [ ] `suggestedAction` displayed as actionable button (e.g., "Talk to your child about math")
-- [ ] Acknowledge button: calls `acknowledgeRiskAlert(alertId)` mutation, moves to acknowledged section
+- [ ] Acknowledge button: calls `POST /api/parent/child/:childId/alerts/:alertId/acknowledge`, moves to acknowledged section
 - [ ] Unacknowledged alerts shown first, sorted by severity (CRITICAL > WARNING > INFO) then by `detectedAt` DESC
 - [ ] Real-time: new CRITICAL alert shows notification toast
 - [ ] Badge on parent nav shows count of unacknowledged alerts
@@ -155,7 +155,7 @@ test('real-time alert shows toast notification', async () => {
 **Edge cases:**
 - Parent with no linked children -> show "Link a child" page with invite code input
 - Child has no risk alerts -> show "Everything looks good!" empty state
-- Alert acknowledged on another device -> subscription updates list
+- Alert acknowledged on another device -> SignalR event updates list
 - Very long `message` field -> truncate with "Read more" expansion
 
 ---
@@ -190,14 +190,14 @@ test('parent view full flow', async () => {
 ```
 
 ## Rollback Criteria
-- If subscription causes battery drain on mobile web: switch to polling every 60 seconds
+- If SignalR causes battery drain on mobile web: switch to polling every 60 seconds
 - If weekly report query is slow: cache in Redis, serve stale with 5-minute refresh
 - If parent UX is confusing: simplify to weekly email digest instead of web view
 
 ## Definition of Done
 - [ ] All 2 subtasks pass their tests
 - [ ] `npm test -- --filter parent` -> 0 failures
-- [ ] Weekly report displays all fields from WeeklyReport type
+- [ ] Weekly report displays all fields from WeeklyReportDto
 - [ ] Child selector works for multi-child parents
 - [ ] Risk alerts sorted by severity with real-time updates
 - [ ] Acknowledge mutation works

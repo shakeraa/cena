@@ -1,7 +1,7 @@
 # 05 — Frontend Web Tasks (React PWA)
 
-**Technology:** React 19, TypeScript, Zustand, GraphQL (Apollo), SignalR
-**Contract files:** `contracts/frontend/*.ts`, `contracts/frontend/*.graphql`
+**Technology:** React 19, TypeScript, Zustand, REST API, SignalR
+**Contract files:** `contracts/frontend/*.ts`, `contracts/backend/kg-access-control.md`
 **Stage:** Parallel with mobile (Weeks 8-14)
 
 ---
@@ -40,14 +40,15 @@ test('WebSocket reconnects with backoff', async () => {
 });
 ```
 
-## WEB-003: GraphQL Schema + Apollo Client
+## WEB-003: REST API Client
 **Priority:** P1 | **Blocked by:** WEB-001
-- [ ] Full schema from `graphql-schema.graphql` loads into Apollo
-- [ ] `@auth` directives on all queries (STUDENT/TEACHER/PARENT)
-- [ ] `ErrorType` enum present (PROCEDURAL/CONCEPTUAL/MOTIVATIONAL/NONE)
-- [ ] Cursor-based pagination on student/session lists
-- [ ] Subscriptions: `onKnowledgeGraphUpdate`, `onClassMasteryUpdate`
-- [ ] **Test:** `graphql-codegen` generates typed hooks; mock queries return expected shapes
+- [ ] Typed fetch wrapper with `get<T>(url)` and JWT auth injection
+- [ ] Token refresh on 401 with single retry
+- [ ] Teacher hooks: `useClassOverview`, `useKnowledgeGaps`, `useAssignmentCompletion`
+- [ ] Parent hooks: `useChildProgress`, `useWeeklyReport`, `useRiskAlerts`
+- [ ] Student hooks: `useStudentGraph`, `useStudentSessions`
+- [ ] Request deduplication for concurrent identical GETs
+- [ ] **Test:** Auth injection, 401 retry, typed responses verified
 
 ## WEB-004: Zustand State Management
 **Priority:** P1 | **Blocked by:** WEB-002
@@ -69,7 +70,7 @@ test('WebSocket reconnects with backoff', async () => {
 - [ ] Class overview: traffic light indicators per student (green/yellow/red)
 - [ ] Knowledge gap analysis: concept heatmap across class
 - [ ] Assignment completion tracking
-- [ ] Real-time via GraphQL subscription
+- [ ] Real-time via SignalR `onClassMasteryUpdate` events
 - [ ] **Test:** Mock 30-student class → verify heatmap renders correctly
 
 ## WEB-007: Parent Progress View
@@ -80,8 +81,9 @@ test('WebSocket reconnects with backoff', async () => {
 - [ ] **Test:** Mock parent with 2 children → verify both views render
 
 ## WEB-008: Knowledge Graph (Web)
-**Priority:** P2 | **Blocked by:** WEB-004
+**Priority:** P2 | **Blocked by:** WEB-003, WEB-004
 - [ ] Canvas-based renderer (similar to mobile CustomPainter but HTML Canvas)
+- [ ] Data from `GET /api/student/me/graph/:subjectId`, live updates via SignalR
 - [ ] Viewport culling for 2000+ nodes
 - [ ] Same mastery color palette as mobile
 - [ ] Accessible: `aria-label` on interactive elements
