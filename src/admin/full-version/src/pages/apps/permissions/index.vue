@@ -1,6 +1,13 @@
 <script setup lang="ts">
 import type { CenaRole } from '@/plugins/casl/ability'
 
+definePage({
+  meta: {
+    action: 'read',
+    subject: 'Users',
+  },
+})
+
 interface PermissionCategory {
   name: string
   actions: string[]

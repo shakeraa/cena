@@ -3,6 +3,13 @@ import type { CenaRole } from '@/plugins/casl/ability'
 import RoleCards from '@/views/apps/roles/RoleCards.vue'
 import UserList from '@/views/apps/roles/UserList.vue'
 
+definePage({
+  meta: {
+    action: 'read',
+    subject: 'Users',
+  },
+})
+
 const selectedRole = ref<CenaRole | undefined>()
 
 const onRoleSelected = (role: CenaRole) => {

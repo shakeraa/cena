@@ -167,6 +167,20 @@ public static class AdminUserEndpoints
             return Results.NoContent();
         }).WithName("RevokeUserSession");
 
+        // POST /api/admin/users/{id}/force-reset
+        group.MapPost("/{id}/force-reset", async (string id, IAdminUserService service) =>
+        {
+            var success = await service.ForcePasswordResetAsync(id);
+            return success ? Results.Ok() : Results.NotFound();
+        }).WithName("ForcePasswordReset");
+
+        // DELETE /api/admin/users/{id}/api-keys/{keyId}
+        group.MapDelete("/{id}/api-keys/{keyId}", async (string id, string keyId, IAdminUserService service) =>
+        {
+            var success = await service.RevokeApiKeyAsync(id, keyId);
+            return success ? Results.Ok() : Results.NotFound();
+        }).WithName("RevokeApiKey");
+
         return app;
     }
 }

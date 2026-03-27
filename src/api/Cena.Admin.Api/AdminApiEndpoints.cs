@@ -54,6 +54,18 @@ public static class AdminApiEndpoints
             return Results.Ok(alerts);
         }).WithName("GetFocusAlerts");
 
+        group.MapGet("/students/{studentId}/timeline", async (string studentId, string? period, IFocusAnalyticsService service) =>
+        {
+            var timeline = await service.GetStudentTimelineAsync(studentId, period ?? "7d");
+            return Results.Ok(timeline);
+        }).WithName("GetStudentFocusTimeline");
+
+        group.MapGet("/classes/{classId}/heatmap", async (string classId, IFocusAnalyticsService service) =>
+        {
+            var heatmap = await service.GetClassHeatmapAsync(classId);
+            return Results.Ok(heatmap);
+        }).WithName("GetClassFocusHeatmap");
+
         return app;
     }
 
@@ -187,6 +199,18 @@ public static class AdminApiEndpoints
             return Results.Ok(stats);
         }).WithName("GetPipelineStats");
 
+        group.MapPost("/items/{id}/move-to-review", async (string id, IIngestionPipelineService service) =>
+        {
+            var result = await service.MoveToReviewAsync(id);
+            return Results.Ok(result);
+        }).WithName("MoveItemToReview");
+
+        group.MapPost("/upload", async (HttpRequest request, IIngestionPipelineService service) =>
+        {
+            var result = await service.UploadFromRequestAsync(request);
+            return Results.Ok(result);
+        }).WithName("UploadPipelineFile").DisableAntiforgery();
+
         return app;
     }
 
@@ -247,6 +271,18 @@ public static class AdminApiEndpoints
             return Results.Ok(matches);
         }).WithName("AutocompleteConcepts");
 
+        group.MapGet("/{id}/performance", async (string id, IQuestionBankService service) =>
+        {
+            var perf = await service.GetPerformanceAsync(id);
+            return perf != null ? Results.Ok(perf) : Results.NotFound();
+        }).WithName("GetQuestionPerformance");
+
+        group.MapPost("/{id}/approve", async (string id, IQuestionBankService service) =>
+        {
+            var success = await service.ApproveAsync(id);
+            return success ? Results.Ok() : Results.NotFound();
+        }).WithName("ApproveQuestion");
+
         return app;
     }
 
@@ -297,6 +333,12 @@ public static class AdminApiEndpoints
             var success = await service.UpdateMcmEdgeAsync(request.Source, request.Target, request.Confidence);
             return success ? Results.Ok() : Results.BadRequest();
         }).WithName("UpdateMcmEdge");
+
+        group.MapPost("/mcm-graph/edge", async (UpdateMcmEdgeRequest request, IMethodologyAnalyticsService service) =>
+        {
+            var success = await service.UpdateMcmEdgeAsync(request.Source, request.Target, request.Confidence);
+            return success ? Results.Ok() : Results.BadRequest();
+        }).WithName("CreateMcmEdge");
 
         return app;
     }
@@ -381,6 +423,12 @@ public static class AdminApiEndpoints
             var alert = await service.CheckDlqDepthAsync();
             return Results.Ok(alert);
         }).WithName("GetDlqAlert");
+
+        group.MapPost("/dead-letters/{id}/discard", async (string id, IEventStreamService service) =>
+        {
+            var success = await service.DiscardDeadLetterAsync(id);
+            return success ? Results.Ok() : Results.NotFound();
+        }).WithName("DiscardDeadLetter");
 
         return app;
     }

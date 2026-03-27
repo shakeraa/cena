@@ -126,3 +126,26 @@ public sealed record StudentAttentionAlert(
     float CurrentScore,
     float BaselineScore,
     string Recommendation);
+
+// Student Focus Timeline
+public sealed record FocusTimelineResponse(
+    string StudentId,
+    string Period,
+    IReadOnlyList<FocusTimelinePoint> Points);
+
+public sealed record FocusTimelinePoint(
+    DateTimeOffset Timestamp,
+    float FocusScore,
+    int MindWanderingCount,
+    int MicrobreakCount);
+
+// Class Focus Heatmap
+public sealed record ClassHeatmapResponse(
+    string ClassId,
+    IReadOnlyList<HeatmapCell> Cells);
+
+public sealed record HeatmapCell(
+    string Day,
+    string Hour,
+    float AvgFocusScore,
+    int StudentCount);

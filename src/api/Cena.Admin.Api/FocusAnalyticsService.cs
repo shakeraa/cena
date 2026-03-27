@@ -17,6 +17,8 @@ public interface IFocusAnalyticsService
     Task<FocusDegradationResponse> GetDegradationCurveAsync();
     Task<FocusExperimentsResponse> GetExperimentsAsync();
     Task<StudentsNeedingAttentionResponse> GetStudentsNeedingAttentionAsync();
+    Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period);
+    Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId);
 }
 
 public sealed class FocusAnalyticsService : IFocusAnalyticsService
@@ -240,5 +242,41 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
         };
 
         return new StudentsNeedingAttentionResponse(alerts);
+    }
+
+    public async Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period)
+    {
+        var random = new Random(studentId.GetHashCode());
+        var days = period switch { "30d" => 30, "14d" => 14, _ => 7 };
+
+        var points = new List<FocusTimelinePoint>();
+        for (int i = days; i >= 0; i--)
+        {
+            points.Add(new FocusTimelinePoint(
+                DateTimeOffset.UtcNow.AddDays(-i),
+                55f + random.NextSingle() * 35f,
+                random.Next(0, 3),
+                random.Next(0, 2)));
+        }
+
+        return new FocusTimelineResponse(studentId, period, points);
+    }
+
+    public async Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId)
+    {
+        var random = new Random(classId.GetHashCode());
+        var hours = new[] { "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00" };
+        var days = new[] { "Mon", "Tue", "Wed", "Thu", "Fri" };
+
+        var cells = new List<HeatmapCell>();
+        foreach (var day in days)
+        {
+            foreach (var hour in hours)
+            {
+                cells.Add(new HeatmapCell(day, hour, 50f + random.NextSingle() * 40f, random.Next(5, 25)));
+            }
+        }
+
+        return new ClassHeatmapResponse(classId, cells);
     }
 }

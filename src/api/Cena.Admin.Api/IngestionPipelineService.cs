@@ -4,6 +4,7 @@
 // =============================================================================
 
 using Marten;
+using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -16,6 +17,8 @@ public interface IIngestionPipelineService
     Task<bool> RetryItemAsync(string id);
     Task<bool> RejectPipelineItemAsync(string id, string reason);
     Task<UploadFileResponse> UploadFileAsync(string filename, string contentType);
+    Task<bool> MoveToReviewAsync(string id);
+    Task<UploadFileResponse> UploadFromRequestAsync(HttpRequest request);
     Task<PipelineStatsResponse> GetStatsAsync();
 }
 
@@ -102,6 +105,22 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
     {
         _logger.LogInformation("Rejecting pipeline item {ItemId}: {Reason}", id, reason);
         return true;
+    }
+
+    public async Task<bool> MoveToReviewAsync(string id)
+    {
+        _logger.LogInformation("Moving pipeline item {ItemId} to review", id);
+        return true;
+    }
+
+    public async Task<UploadFileResponse> UploadFromRequestAsync(HttpRequest request)
+    {
+        var form = await request.ReadFormAsync();
+        var file = form.Files.GetFile("file");
+        var filename = file?.FileName ?? "unknown";
+        var contentType = file?.ContentType ?? "application/octet-stream";
+        _logger.LogInformation("Uploading file {Filename} ({ContentType}) via form", filename, contentType);
+        return await UploadFileAsync(filename, contentType);
     }
 
     public async Task<UploadFileResponse> UploadFileAsync(string filename, string contentType)

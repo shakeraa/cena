@@ -18,6 +18,7 @@ public interface IEventStreamService
     Task<RetryMessageResponse> RetryMessageAsync(string id);
     Task<BulkRetryResponse> BulkRetryAsync(IReadOnlyList<string> ids);
     Task<DlqDepthAlert> CheckDlqDepthAsync();
+    Task<bool> DiscardDeadLetterAsync(string id);
 }
 
 public sealed class EventStreamService : IEventStreamService
@@ -101,6 +102,14 @@ public sealed class EventStreamService : IEventStreamService
     {
         _logger.LogInformation("Bulk retrying {Count} DLQ messages", ids.Count);
         return new BulkRetryResponse(ids.Count, 0, new List<string>());
+    }
+
+    public async Task<bool> DiscardDeadLetterAsync(string id)
+    {
+        var exists = _mockDlq.Any(m => m.Id == id);
+        if (exists)
+            _logger.LogInformation("Discarding DLQ message {MessageId}", id);
+        return exists;
     }
 
     public async Task<DlqDepthAlert> CheckDlqDepthAsync()

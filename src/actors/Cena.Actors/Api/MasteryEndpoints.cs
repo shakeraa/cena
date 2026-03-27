@@ -43,7 +43,8 @@ public static class MasteryEndpoints
             return Results.Ok(response);
         })
         .WithName("GetStudentMastery")
-        .WithDescription("Get full mastery overlay for a student");
+        .WithDescription("Get full mastery overlay for a student")
+        .RequireAuthorization();
 
         // GET /api/v1/mastery/{studentId}/topics/{topicClusterId}
         group.MapGet("/{studentId}/topics/{topicClusterId}", async (
@@ -61,7 +62,8 @@ public static class MasteryEndpoints
             return Results.Ok(progress);
         })
         .WithName("GetTopicProgress")
-        .WithDescription("Get aggregated mastery progress for a topic cluster");
+        .WithDescription("Get aggregated mastery progress for a topic cluster")
+        .RequireAuthorization();
 
         // GET /api/v1/mastery/{studentId}/frontier?maxResults=10
         group.MapGet("/{studentId}/frontier", async (
@@ -79,7 +81,8 @@ public static class MasteryEndpoints
             return Results.Ok(frontier);
         })
         .WithName("GetLearningFrontier")
-        .WithDescription("Get concepts the student is ready to learn next");
+        .WithDescription("Get concepts the student is ready to learn next")
+        .RequireAuthorization();
 
         // GET /api/v1/mastery/{studentId}/decay-alerts
         group.MapGet("/{studentId}/decay-alerts", async (
@@ -96,7 +99,8 @@ public static class MasteryEndpoints
             return Results.Ok(alerts);
         })
         .WithName("GetDecayAlerts")
-        .WithDescription("Get concepts needing review due to memory decay");
+        .WithDescription("Get concepts needing review due to memory decay")
+        .RequireAuthorization();
 
         // GET /api/v1/mastery/{studentId}/review-schedule?maxItems=10
         group.MapGet("/{studentId}/review-schedule", async (
@@ -113,7 +117,8 @@ public static class MasteryEndpoints
             return Results.Ok(result.Data);
         })
         .WithName("GetReviewSchedule")
-        .WithDescription("Get spaced repetition review schedule");
+        .WithDescription("Get spaced repetition review schedule")
+        .RequireAuthorization();
 
         return app;
     }

@@ -2,6 +2,13 @@
 import AddNewUserDrawer from '@/views/apps/user/list/AddNewUserDrawer.vue'
 import type { CenaUserProperties, CenaUserRole, CenaUserStatus } from '@db/apps/users/types'
 
+definePage({
+  meta: {
+    action: 'read',
+    subject: 'Users',
+  },
+})
+
 // Store
 const searchQuery = ref('')
 const selectedRole = ref<CenaUserRole>()

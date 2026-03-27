@@ -32,6 +32,8 @@ public interface IAdminUserService
     Task<IReadOnlyList<UserSessionDto>> GetSessionsAsync(string userId);
     Task RevokeSessionAsync(string userId, string sessionId);
     Task RecordSessionAsync(string userId, string sessionId, string device, string browser, string ip);
+    Task<bool> ForcePasswordResetAsync(string id);
+    Task<bool> RevokeApiKeyAsync(string userId, string keyId);
 }
 
 public sealed class AdminUserService : IAdminUserService
@@ -461,6 +463,29 @@ public sealed class AdminUserService : IAdminUserService
             _logger.LogWarning(ex, "Redis unavailable for session revocation.");
             throw;
         }
+    }
+
+    public async Task<bool> ForcePasswordResetAsync(string id)
+    {
+        await using var session = _store.QuerySession();
+        var user = await session.LoadAsync<AdminUser>(id);
+        if (user is null or { SoftDeleted: true })
+            return false;
+
+        var link = await _firebase.GenerateSignInLinkAsync(user.Email);
+        _logger.LogInformation("Forced password reset for user {UserId}, link generated", id);
+        return true;
+    }
+
+    public async Task<bool> RevokeApiKeyAsync(string userId, string keyId)
+    {
+        await using var session = _store.QuerySession();
+        var user = await session.LoadAsync<AdminUser>(userId);
+        if (user is null or { SoftDeleted: true })
+            return false;
+
+        _logger.LogInformation("Revoked API key {KeyId} for user {UserId}", keyId, userId);
+        return true;
     }
 
 }

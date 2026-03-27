@@ -27,6 +27,8 @@ public interface IQuestionBankService
     Task<bool> DeprecateQuestionAsync(string id, DeprecateBankQuestionRequest request);
     Task<QuestionFiltersResponse> GetFiltersAsync();
     Task<ConceptAutocompleteResponse> AutocompleteConceptsAsync(string query);
+    Task<QuestionStats?> GetPerformanceAsync(string id);
+    Task<bool> ApproveAsync(string id);
 }
 
 public sealed class QuestionBankService : IQuestionBankService
@@ -174,6 +176,20 @@ public sealed class QuestionBankService : IQuestionBankService
                 new ConceptFilter("physics-dynamics", "Dynamics", "Physics")
             },
             new[] { "3 Units", "4 Units", "5 Units" });
+    }
+
+    public async Task<QuestionStats?> GetPerformanceAsync(string id)
+    {
+        var detail = await GetQuestionAsync(id);
+        return detail?.Performance;
+    }
+
+    public async Task<bool> ApproveAsync(string id)
+    {
+        var exists = _mockQuestions.Any(q => q.Id == id);
+        if (exists)
+            _logger.LogInformation("Approving question {QuestionId}", id);
+        return exists;
     }
 
     public async Task<ConceptAutocompleteResponse> AutocompleteConceptsAsync(string query)
