@@ -10,14 +10,24 @@ definePage({
   },
 })
 
-// --- Overview data ---
+// --- Overview data (matches MasteryOverviewResponse DTO) ---
+interface DistributionPoint {
+  level: string
+  count: number
+  percentage: number
+}
+interface SubjectMastery {
+  subject: string
+  avgMasteryLevel: number
+  conceptCount: number
+  masteredCount: number
+}
 interface OverviewData {
-  totalStudents: number
-  avgMastery: number
-  conceptsMasteredThisWeek: number
-  conceptsMasteredLastWeek: number
+  distribution: DistributionPoint[]
+  subjectBreakdown: SubjectMastery[]
+  learningVelocity: number
+  learningVelocityChange: number
   atRiskCount: number
-  learningVelocityTrend: number
 }
 
 const loading = ref(true)
@@ -41,16 +51,26 @@ const fetchOverview = async () => {
 
 onMounted(fetchOverview)
 
+const avgMastery = computed(() => {
+  if (!overview.value?.subjectBreakdown?.length) return 0
+  const sum = overview.value.subjectBreakdown.reduce((acc, s) => acc + (s.avgMasteryLevel ?? 0), 0)
+  return sum / overview.value.subjectBreakdown.length
+})
+
+const totalStudents = computed(() => {
+  if (!overview.value?.distribution?.length) return 0
+  return overview.value.distribution.reduce((acc, d) => acc + (d.count ?? 0), 0)
+})
+
 const velocityDisplay = computed(() => {
-  if (!overview.value) return '-- '
-  return String(overview.value.conceptsMasteredThisWeek)
+  if (!overview.value) return '--'
+  const val = overview.value.learningVelocity
+  return val != null ? String(Math.round(val * 10) / 10) : '--'
 })
 
 const velocityTrendPercent = computed(() => {
   if (!overview.value) return 0
-  const prev = overview.value.conceptsMasteredLastWeek
-  if (prev === 0) return 0
-  return Math.round(((overview.value.conceptsMasteredThisWeek - prev) / prev) * 100)
+  return Math.round((overview.value.learningVelocityChange ?? 0) * 100)
 })
 
 const atRiskCount = computed(() => overview.value?.atRiskCount ?? 0)
@@ -60,8 +80,8 @@ const widgetCards = computed(() => [
     icon: 'tabler-chart-histogram',
     color: 'primary',
     title: 'Mastery Distribution',
-    value: overview.value ? `${Math.round((overview.value.avgMastery ?? 0) * 100)}% avg` : '--',
-    subtitle: `${overview.value?.totalStudents ?? 0} students tracked`,
+    value: overview.value ? `${Math.round(avgMastery.value * 100)}% avg` : '--',
+    subtitle: `${totalStudents.value} students tracked`,
     isHover: false,
   },
   {

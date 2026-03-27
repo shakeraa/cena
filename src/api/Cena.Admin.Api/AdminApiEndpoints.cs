@@ -81,6 +81,18 @@ public static class AdminApiEndpoints
             return Results.Ok(overview);
         }).WithName("GetMasteryOverview");
 
+        group.MapGet("/overview/distribution", async (string? classId, IMasteryTrackingService service) =>
+        {
+            var overview = await service.GetOverviewAsync(classId);
+            return Results.Ok(new { bands = overview.Distribution.Select(d => new { label = d.Level, count = d.Count }) });
+        }).WithName("GetMasteryDistribution");
+
+        group.MapGet("/overview/subjects", async (string? classId, IMasteryTrackingService service) =>
+        {
+            var overview = await service.GetOverviewAsync(classId);
+            return Results.Ok(new { subjects = overview.SubjectBreakdown.Select(s => new { name = s.Subject, avgMastery = s.AvgMasteryLevel }) });
+        }).WithName("GetMasterySubjects");
+
         group.MapGet("/students/{studentId}", async (string studentId, IMasteryTrackingService service) =>
         {
             var detail = await service.GetStudentMasteryAsync(studentId);
