@@ -5,11 +5,11 @@
 // independently — no Proto.Actor cluster membership in this process.
 // =============================================================================
 
-using Cena.Actors.Api.Admin;
 using Cena.Actors.Configuration;
-using Cena.Actors.Infrastructure.Auth;
-using Cena.Actors.Infrastructure.Firebase;
-using Cena.Actors.Infrastructure.Seed;
+using Cena.Admin.Api;
+using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Firebase;
+using Cena.Infrastructure.Seed;
 using Marten;
 using Serilog;
 using StackExchange.Redis;
@@ -118,6 +118,7 @@ lifetime.ApplicationStarted.Register(async () =>
 {
     var store = app.Services.GetRequiredService<IDocumentStore>();
     await RoleSeedData.SeedRolesAsync(store, appLogger);
+    await UserSeedData.SeedUsersAsync(store, appLogger);
 });
 
 app.Run();
