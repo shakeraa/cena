@@ -136,7 +136,7 @@ builder.Services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
 builder.Services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
 builder.Services.AddScoped<IQuestionBankService, QuestionBankService>();
 builder.Services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();
-builder.Services.AddScoped<ICulturalContextService, CulturalContextService>();
+builder.Services.AddScoped<Cena.Admin.Api.ICulturalContextService, Cena.Admin.Api.CulturalContextService>();
 builder.Services.AddScoped<IEventStreamService, EventStreamService>();
 builder.Services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
 
