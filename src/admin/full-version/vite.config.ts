@@ -112,6 +112,10 @@ export default defineConfig({
     // COOP header removed — it blocks Firebase Google OAuth popup's window.close()
     // Only needed for SharedArrayBuffer/WASM which Cena doesn't use
     proxy: {
+      '/api/actors': {
+        target: 'http://localhost:5001',
+        changeOrigin: true,
+      },
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,

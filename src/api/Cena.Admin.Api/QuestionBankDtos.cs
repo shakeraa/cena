@@ -66,7 +66,23 @@ public sealed record QuestionBankDetailResponse(
     DateTimeOffset? UpdatedAt,
     string CreatedBy,
     QuestionStats? Performance,
-    QuestionProvenance? Provenance);
+    QuestionProvenance? Provenance,
+    QualityGateDetail? QualityGate = null);
+
+/// <summary>8-dimension quality gate breakdown for frontend display.</summary>
+public sealed record QualityGateDetail(
+    float CompositeScore,
+    string GateDecision,
+    int FactualAccuracy,
+    int LanguageQuality,
+    int PedagogicalQuality,
+    int DistractorQuality,
+    int StemClarity,
+    int BloomAlignment,
+    int StructuralValidity,
+    int CulturalSensitivity,
+    int ViolationCount,
+    DateTimeOffset? EvaluatedAt);
 
 public sealed record AnswerOptionDetail(
     string Id,

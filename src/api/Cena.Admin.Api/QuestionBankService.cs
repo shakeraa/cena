@@ -1,25 +1,26 @@
 // =============================================================================
-// Cena Platform -- Question Bank Service
+// Cena Platform -- Question Bank Service (Marten Event-Sourced)
 // ADM-010: Question bank browser and management
+// Replaces mock data with real event-sourced aggregates via Marten.
 // =============================================================================
 
+using System.Globalization;
+using System.Text.Json;
+using Cena.Actors.Events;
+using Cena.Actors.Questions;
+using Cena.Admin.Api.QualityGate;
 using Marten;
 using Microsoft.Extensions.Logging;
-using StackExchange.Redis;
+using DomainStatus = Cena.Actors.Questions.QuestionLifecycleStatus;
 
 namespace Cena.Admin.Api;
 
 public interface IQuestionBankService
 {
     Task<QuestionListResponse> GetQuestionsAsync(
-        string? subject,
-        int? bloomsLevel,
-        float? minDifficulty,
-        float? maxDifficulty,
-        string? status,
-        string? language,
-        string? conceptId,
-        string? search,
+        string? subject, int? bloomsLevel,
+        float? minDifficulty, float? maxDifficulty,
+        string? status, string? language, string? conceptId, string? search,
         int page, int pageSize, string sortBy, string orderBy);
 
     Task<QuestionBankDetailResponse?> GetQuestionAsync(string id);
@@ -29,405 +30,427 @@ public interface IQuestionBankService
     Task<ConceptAutocompleteResponse> AutocompleteConceptsAsync(string query);
     Task<QuestionStats?> GetPerformanceAsync(string id);
     Task<bool> ApproveAsync(string id);
+    Task<QuestionBankDetailResponse?> CreateQuestionAsync(CreateQuestionRequest request, string userId);
+    Task<bool> PublishAsync(string id, string userId);
+    Task<bool> AddLanguageVersionAsync(string id, AddLanguageVersionRequest request, string userId);
 }
 
 public sealed class QuestionBankService : IQuestionBankService
 {
     private readonly IDocumentStore _store;
-    private readonly IConnectionMultiplexer _redis;
+    private readonly IQualityGateService _qualityGate;
     private readonly ILogger<QuestionBankService> _logger;
-    private static readonly List<QuestionListItem> _mockQuestions = GenerateMockQuestions();
 
     public QuestionBankService(
         IDocumentStore store,
-        IConnectionMultiplexer redis,
+        IQualityGateService qualityGate,
         ILogger<QuestionBankService> logger)
     {
         _store = store;
-        _redis = redis;
+        _qualityGate = qualityGate;
         _logger = logger;
     }
 
     public async Task<QuestionListResponse> GetQuestionsAsync(
-        string? subject,
-        int? bloomsLevel,
-        float? minDifficulty,
-        float? maxDifficulty,
-        string? status,
-        string? language,
-        string? conceptId,
-        string? search,
+        string? subject, int? bloomsLevel,
+        float? minDifficulty, float? maxDifficulty,
+        string? status, string? language, string? conceptId, string? search,
         int page, int pageSize, string sortBy, string orderBy)
     {
-        var questions = _mockQuestions.AsEnumerable();
+        await using var session = _store.QuerySession();
+        var query = session.Query<QuestionReadModel>().AsQueryable();
 
         if (!string.IsNullOrEmpty(subject))
-            questions = questions.Where(q => q.Subject.Equals(subject, StringComparison.OrdinalIgnoreCase));
+            query = query.Where(q => q.Subject == subject);
 
         if (bloomsLevel.HasValue)
-            questions = questions.Where(q => q.BloomsLevel == bloomsLevel.Value);
+            query = query.Where(q => q.BloomsLevel == bloomsLevel.Value);
 
-        if (!string.IsNullOrEmpty(status) && Enum.TryParse<QuestionStatus>(status, true, out var statusEnum))
-            questions = questions.Where(q => q.Status == statusEnum);
+        if (minDifficulty.HasValue)
+            query = query.Where(q => q.Difficulty >= minDifficulty.Value);
+
+        if (maxDifficulty.HasValue)
+            query = query.Where(q => q.Difficulty <= maxDifficulty.Value);
+
+        if (!string.IsNullOrEmpty(status))
+            query = query.Where(q => q.Status == status);
+
+        if (!string.IsNullOrEmpty(language))
+            query = query.Where(q => q.Language == language);
+
+        if (!string.IsNullOrEmpty(conceptId))
+            query = query.Where(q => q.Concepts.Contains(conceptId));
 
         if (!string.IsNullOrEmpty(search))
-        {
-            var searchLower = search.ToLowerInvariant();
-            questions = questions.Where(q =>
-                q.StemPreview.ToLowerInvariant().Contains(searchLower) ||
-                q.Subject.ToLowerInvariant().Contains(searchLower));
-        }
+            query = query.Where(q => q.StemPreview.Contains(search, StringComparison.OrdinalIgnoreCase));
 
-        // Apply sorting
-        questions = sortBy?.ToLowerInvariant() switch
+        // Sorting
+        query = sortBy?.ToLowerInvariant() switch
         {
-            "difficulty" => orderBy?.ToLowerInvariant() == "desc"
-                ? questions.OrderByDescending(q => q.Difficulty)
-                : questions.OrderBy(q => q.Difficulty),
-            "qualityscore" => orderBy?.ToLowerInvariant() == "desc"
-                ? questions.OrderByDescending(q => q.QualityScore)
-                : questions.OrderBy(q => q.QualityScore),
-            _ => questions.OrderByDescending(q => q.QualityScore)
+            "difficulty" => orderBy == "desc"
+                ? query.OrderByDescending(q => q.Difficulty)
+                : query.OrderBy(q => q.Difficulty),
+            "bloomslevel" => orderBy == "desc"
+                ? query.OrderByDescending(q => q.BloomsLevel)
+                : query.OrderBy(q => q.BloomsLevel),
+            "createdat" => orderBy == "desc"
+                ? query.OrderByDescending(q => q.CreatedAt)
+                : query.OrderBy(q => q.CreatedAt),
+            _ => orderBy == "asc"
+                ? query.OrderBy(q => q.QualityScore)
+                : query.OrderByDescending(q => q.QualityScore)
         };
 
-        var total = questions.Count();
-        var paged = questions
+        var total = await query.CountAsync();
+        var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
-        return new QuestionListResponse(paged, total, page, pageSize);
+        var mapped = items.Select(q => new QuestionListItem(
+            q.Id, q.StemPreview, q.Subject, q.Concepts,
+            q.BloomsLevel, q.Difficulty,
+            Enum.TryParse<QuestionStatus>(q.Status, out var s) ? s : QuestionStatus.Draft,
+            q.QualityScore, q.UsageCount, q.SuccessRate)).ToList();
+
+        return new QuestionListResponse(mapped, total, page, pageSize);
     }
 
     public async Task<QuestionBankDetailResponse?> GetQuestionAsync(string id)
     {
-        var mockItem = _mockQuestions.FirstOrDefault(q => q.Id == id);
-        if (mockItem == null) return null;
-
-        var random = new Random(id.GetHashCode());
-
-        return new QuestionBankDetailResponse(
-            Id: id,
-            Stem: mockItem.StemPreview,
-            StemHtml: $"<p>{mockItem.StemPreview}</p>",
-            Options: new List<AnswerOptionDetail>
-            {
-                new("a", "A", "Option A text", "<p>Option A</p>", true, null),
-                new("b", "B", "Option B text", "<p>Option B</p>", false, "Common misconception about order of operations"),
-                new("c", "C", "Option C text", "<p>Option C</p>", false, "Incorrectly applies formula"),
-                new("d", "D", "Option D text", "<p>Option D</p>", false, "Calculation error")
-            },
-            CorrectAnswers: new[] { "A" },
-            Subject: mockItem.Subject,
-            Topic: $"{mockItem.Subject} Fundamentals",
-            Grade: "4 Units",
-            BloomsLevel: mockItem.BloomsLevel,
-            Difficulty: mockItem.Difficulty,
-            ConceptIds: mockItem.Concepts.ToList(),
-            ConceptNames: mockItem.Concepts.Select(c => c.Replace("-", " ")).ToList(),
-            Status: mockItem.Status,
-            QualityScore: mockItem.QualityScore,
-            SourceType: random.NextSingle() > 0.5 ? "authored" : "ingested",
-            SourceItemId: random.NextSingle() > 0.5 ? $"src-{random.Next(1000)}" : null,
-            CreatedAt: DateTimeOffset.UtcNow.AddDays(-random.Next(1, 365)),
-            UpdatedAt: DateTimeOffset.UtcNow.AddDays(-random.Next(1, 30)),
-            CreatedBy: $"author-{random.Next(1, 10)}",
-            Performance: new QuestionStats(
-                TimesServed: random.Next(100, 5000),
-                AccuracyRate: 0.4f + random.NextSingle() * 0.5f,
-                AvgTimeSeconds: random.Next(30, 300),
-                DiscriminationIndex: 0.3f + random.NextSingle() * 0.4f,
-                new List<PerformanceByDifficulty>
-                {
-                    new("Easy", random.Next(50, 200), 0.7f + random.NextSingle() * 0.25f),
-                    new("Medium", random.Next(100, 500), 0.5f + random.NextSingle() * 0.3f),
-                    new("Hard", random.Next(20, 100), 0.3f + random.NextSingle() * 0.3f)
-                }),
-            Provenance: random.NextSingle() > 0.7 ? new QuestionProvenance(
-                $"src-{random.Next(1000)}",
-                "https://example.com/source",
-                DateTimeOffset.UtcNow.AddDays(-random.Next(30, 365)),
-                $"importer-{random.Next(1, 5)}",
-                "Original text from source...") : null);
+        await using var session = _store.QuerySession();
+        var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        return state == null ? null : MapToDetail(state);
     }
 
-    public async Task<QuestionBankDetailResponse?> UpdateQuestionAsync(string id, UpdateBankQuestionRequest request)
+    public async Task<QuestionBankDetailResponse?> UpdateQuestionAsync(
+        string id, UpdateBankQuestionRequest request)
     {
-        _logger.LogInformation("Updating question {QuestionId}", id);
+        await using var session = _store.LightweightSession();
+        var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        if (state == null) return null;
+
+        var events = new List<object>();
+        var now = DateTimeOffset.UtcNow;
+        const string editor = "admin"; // TODO: extract from auth context
+
+        // Diff stem
+        if (!string.IsNullOrEmpty(request.Stem) && request.Stem != state.Stem)
+        {
+            events.Add(new QuestionStemEdited_V1(
+                id, state.Stem, request.Stem, $"<p>{request.Stem}</p>", editor, now));
+        }
+
+        // Diff options
+        if (request.Options != null)
+        {
+            foreach (var opt in request.Options)
+            {
+                var existing = state.Options.FirstOrDefault(o => o.Label == opt.Id);
+                if (existing != null && existing.Text != opt.Text)
+                {
+                    events.Add(new QuestionOptionChanged_V1(
+                        id, opt.Id, existing.Text, opt.Text, $"<p>{opt.Text}</p>",
+                        opt.IsCorrect, null, editor, now));
+                }
+            }
+        }
+
+        // Diff metadata
+        if (request.Difficulty.HasValue && Math.Abs(request.Difficulty.Value - state.Difficulty) > 0.001f)
+        {
+            events.Add(new QuestionMetadataUpdated_V1(
+                id, "difficulty",
+                state.Difficulty.ToString(CultureInfo.InvariantCulture),
+                request.Difficulty.Value.ToString(CultureInfo.InvariantCulture),
+                editor, now));
+        }
+
+        if (request.ConceptIds != null && !request.ConceptIds.SequenceEqual(state.ConceptIds))
+        {
+            events.Add(new QuestionMetadataUpdated_V1(
+                id, "conceptIds",
+                JsonSerializer.Serialize(state.ConceptIds),
+                JsonSerializer.Serialize(request.ConceptIds),
+                editor, now));
+        }
+
+        if (events.Count > 0)
+        {
+            // Re-run quality gate after edits
+            var gateResult = EvaluateQualityGate(state, request.Stem ?? state.Stem);
+            events.Add(MapGateEvent(id, gateResult, now));
+
+            session.Events.Append(id, state.EventVersion + events.Count, events.ToArray());
+            await session.SaveChangesAsync();
+        }
+
+        // Re-fetch updated state
         return await GetQuestionAsync(id);
     }
 
     public async Task<bool> DeprecateQuestionAsync(string id, DeprecateBankQuestionRequest request)
     {
-        _logger.LogInformation("Deprecating question {QuestionId}: {Reason}", id, request.Reason);
+        await using var session = _store.LightweightSession();
+        var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        if (state == null) return false;
+
+        var evt = new QuestionDeprecated_V1(
+            id, request.Reason, request.RemoveFromServing,
+            "admin", DateTimeOffset.UtcNow);
+
+        session.Events.Append(id, state.EventVersion + 1, evt);
+        await session.SaveChangesAsync();
+        _logger.LogInformation("Deprecated question {QuestionId}: {Reason}", id, request.Reason);
         return true;
     }
 
     public async Task<QuestionFiltersResponse> GetFiltersAsync()
     {
+        await using var session = _store.QuerySession();
+        var subjects = await session.Query<QuestionReadModel>()
+            .Select(q => q.Subject).Distinct().ToListAsync();
+
+        var concepts = await session.Query<QuestionReadModel>()
+            .SelectMany(q => q.Concepts).Distinct().ToListAsync();
+
+        var grades = await session.Query<QuestionReadModel>()
+            .Select(q => q.Grade).Where(g => g != "").Distinct().ToListAsync();
+
+        var conceptFilters = concepts.Select(c =>
+            new ConceptFilter(c, SlugToName(c), "")).ToList();
+
         return new QuestionFiltersResponse(
-            new[] { "Math", "Physics", "Chemistry", "Biology", "Computer Science", "English" },
-            new[]
-            {
-                new ConceptFilter("linear-equations", "Linear Equations", "Math"),
-                new ConceptFilter("quadratic-equations", "Quadratic Equations", "Math"),
-                new ConceptFilter("derivatives", "Derivatives", "Math"),
-                new ConceptFilter("integrals", "Integrals", "Math"),
-                new ConceptFilter("trigonometry", "Trigonometry", "Math"),
-                new ConceptFilter("probability", "Probability", "Math"),
-                new ConceptFilter("kinematics", "Kinematics", "Physics"),
-                new ConceptFilter("dynamics", "Dynamics", "Physics"),
-                new ConceptFilter("electricity", "Electricity", "Physics"),
-                new ConceptFilter("waves", "Waves", "Physics"),
-                new ConceptFilter("stoichiometry", "Stoichiometry", "Chemistry"),
-                new ConceptFilter("acids-bases", "Acids & Bases", "Chemistry"),
-                new ConceptFilter("organic-chemistry", "Organic Chemistry", "Chemistry"),
-                new ConceptFilter("genetics", "Genetics", "Biology"),
-                new ConceptFilter("cell-biology", "Cell Biology", "Biology"),
-                new ConceptFilter("evolution", "Evolution", "Biology"),
-                new ConceptFilter("algorithms", "Algorithms", "Computer Science"),
-                new ConceptFilter("data-structures", "Data Structures", "Computer Science"),
-                new ConceptFilter("reading-comprehension", "Reading Comprehension", "English"),
-                new ConceptFilter("grammar", "Grammar", "English")
-            },
-            new[] { "3 Units", "4 Units", "5 Units" });
-    }
-
-    public async Task<QuestionStats?> GetPerformanceAsync(string id)
-    {
-        var detail = await GetQuestionAsync(id);
-        return detail?.Performance;
-    }
-
-    public async Task<bool> ApproveAsync(string id)
-    {
-        var exists = _mockQuestions.Any(q => q.Id == id);
-        if (exists)
-            _logger.LogInformation("Approving question {QuestionId}", id);
-        return exists;
+            subjects.Where(s => !string.IsNullOrEmpty(s)).ToList(),
+            conceptFilters,
+            grades);
     }
 
     public async Task<ConceptAutocompleteResponse> AutocompleteConceptsAsync(string query)
     {
-        var allConcepts = new[]
-        {
-            ("linear-equations", "Linear Equations", "Math"),
-            ("quadratic-equations", "Quadratic Equations", "Math"),
-            ("functions", "Functions", "Math"),
-            ("derivatives", "Derivatives", "Math"),
-            ("integrals", "Integrals", "Math"),
-            ("trigonometry", "Trigonometry", "Math"),
-            ("probability", "Probability", "Math"),
-            ("statistics", "Statistics", "Math"),
-            ("sequences", "Sequences & Series", "Math"),
-            ("vectors", "Vectors", "Math"),
-            ("complex-numbers", "Complex Numbers", "Math"),
-            ("kinematics", "Kinematics", "Physics"),
-            ("dynamics", "Dynamics", "Physics"),
-            ("energy", "Energy & Work", "Physics"),
-            ("momentum", "Momentum", "Physics"),
-            ("waves", "Waves", "Physics"),
-            ("electricity", "Electricity", "Physics"),
-            ("magnetism", "Magnetism", "Physics"),
-            ("optics", "Optics", "Physics"),
-            ("stoichiometry", "Stoichiometry", "Chemistry"),
-            ("acids-bases", "Acids & Bases", "Chemistry"),
-            ("organic-chemistry", "Organic Chemistry", "Chemistry"),
-            ("equilibrium", "Chemical Equilibrium", "Chemistry"),
-            ("electrochemistry", "Electrochemistry", "Chemistry"),
-            ("genetics", "Genetics", "Biology"),
-            ("cell-biology", "Cell Biology", "Biology"),
-            ("evolution", "Evolution", "Biology"),
-            ("ecology", "Ecology", "Biology"),
-            ("photosynthesis", "Photosynthesis", "Biology"),
-            ("algorithms", "Algorithms", "Computer Science"),
-            ("data-structures", "Data Structures", "Computer Science"),
-            ("complexity", "Computational Complexity", "Computer Science"),
-            ("reading-comprehension", "Reading Comprehension", "English"),
-            ("grammar", "Grammar", "English"),
-            ("literature", "Literature Analysis", "English")
-        };
+        await using var session = _store.QuerySession();
+        var allConcepts = await session.Query<QuestionReadModel>()
+            .SelectMany(q => q.Concepts).Distinct().ToListAsync();
 
         var queryLower = query.ToLowerInvariant();
         var matches = allConcepts
-            .Where(c => c.Item2.ToLowerInvariant().Contains(queryLower))
-            .Select(c => new ConceptMatch(c.Item1, c.Item2, c.Item3, new Random().Next(10, 500)))
+            .Where(c => SlugToName(c).ToLowerInvariant().Contains(queryLower))
+            .Select(c => new ConceptMatch(c, SlugToName(c), "", 0))
+            .Take(20)
             .ToList();
 
         return new ConceptAutocompleteResponse(matches);
     }
 
-    private static List<QuestionListItem> GenerateMockQuestions()
+    public async Task<QuestionStats?> GetPerformanceAsync(string id)
     {
-        var questions = new List<QuestionListItem>();
+        // Performance data comes from student analytics (ConceptAttempted_V1 projections).
+        // Not yet wired — return null until the feedback loop is implemented.
+        await using var session = _store.QuerySession();
+        var exists = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        return exists == null ? null : null;
+    }
 
-        // Israeli Bagrut-aligned subjects and topics
-        var subjectTopics = new Dictionary<string, (string[] concepts, string[] stems)>
+    public async Task<bool> ApproveAsync(string id)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        if (state == null) return false;
+        if (state.Status == DomainStatus.Published) return true;
+
+        var evt = new QuestionApproved_V1(id, "admin", DateTimeOffset.UtcNow);
+        session.Events.Append(id, state.EventVersion + 1, evt);
+        await session.SaveChangesAsync();
+        _logger.LogInformation("Approved question {QuestionId}", id);
+        return true;
+    }
+
+    public async Task<QuestionBankDetailResponse?> CreateQuestionAsync(
+        CreateQuestionRequest request, string userId)
+    {
+        var id = $"q-{Guid.NewGuid():N}";
+        var now = DateTimeOffset.UtcNow;
+        var options = request.Options.Select(o => new QuestionOptionData(
+            o.Label, o.Text, o.TextHtml ?? $"<p>{o.Text}</p>",
+            o.IsCorrect, o.DistractorRationale)).ToList();
+
+        object creationEvent = request.SourceType switch
         {
-            ["Math"] = (
-                new[] { "linear-equations", "quadratic-equations", "functions", "derivatives", "integrals",
-                         "trigonometry", "probability", "statistics", "sequences", "vectors",
-                         "complex-numbers", "analytic-geometry", "logarithms", "inequalities", "combinatorics" },
-                new[]
-                {
-                    "Solve for x: 2x² + 5x - 3 = 0",
-                    "Find the derivative of f(x) = x³ - 3x² + 2x - 1",
-                    "Solve the integral ∫(3x² + 2x)dx",
-                    "Find equation of line passing through points (2,3) and (4,7)",
-                    "Simplify: (x² - 9)/(x² + 6x + 9)",
-                    "Calculate P(A∪B) given P(A)=0.4, P(B)=0.3, P(A∩B)=0.1",
-                    "Find the sum of arithmetic sequence: a₁=3, d=4, n=20",
-                    "Solve: log₂(x) + log₂(x-2) = 3",
-                    "Find the area enclosed by f(x)=x² and g(x)=2x",
-                    "Determine if f(x) = x³-3x has local extrema",
-                    "Express z = 3+4i in polar form",
-                    "Find the equation of a circle passing through A(1,2), B(3,4), C(5,0)",
-                    "How many ways can 5 students be arranged in a line?",
-                    "Solve the system: { 2x + 3y = 7, x - y = 1 }",
-                    "Find the angle between vectors u=(1,2) and v=(3,-1)",
-                    "Calculate the standard deviation of: 4, 7, 2, 9, 5, 8",
-                    "Prove by induction: 1+2+...+n = n(n+1)/2",
-                    "Find all x satisfying |2x-3| < 5",
-                    "Evaluate lim(x→0) sin(3x)/x",
-                    "Find the tangent line to y=eˣ at x=1"
-                }),
-            ["Physics"] = (
-                new[] { "kinematics", "dynamics", "energy", "momentum", "waves",
-                         "optics", "electricity", "magnetism", "thermodynamics", "modern-physics",
-                         "circular-motion", "gravitation", "fluid-mechanics", "oscillations" },
-                new[]
-                {
-                    "A ball is thrown upward with initial velocity 20 m/s. Calculate maximum height.",
-                    "Calculate the electric field at distance r from point charge q",
-                    "What is the momentum of a 5kg object moving at 10m/s?",
-                    "Calculate work done by force F=10N over distance d=5m at 30° angle",
-                    "A wave has frequency 440Hz and wavelength 0.77m. Find wave speed.",
-                    "Calculate the focal length of a converging lens with R₁=20cm, R₂=-30cm",
-                    "Find the equivalent resistance of three 6Ω resistors in parallel",
-                    "A car accelerates from rest at 3 m/s². Find distance covered in 8 seconds.",
-                    "Calculate the gravitational force between two 100kg masses separated by 2m",
-                    "What is the kinetic energy of a 2kg ball moving at 15 m/s?",
-                    "A projectile is launched at 45° with v₀=30 m/s. Find the range.",
-                    "Calculate the period of a simple pendulum of length 1.5m",
-                    "Find the current through a 12V battery with internal resistance 0.5Ω and external 5.5Ω",
-                    "A spring (k=200 N/m) is compressed 0.1m. Calculate stored potential energy.",
-                    "Calculate the de Broglie wavelength of an electron at 1.5×10⁶ m/s",
-                    "Find the magnetic force on a 2m wire carrying 5A in a 0.3T field at 90°",
-                    "Calculate heat needed to raise 500g of water from 20°C to 80°C",
-                    "A satellite orbits Earth at 400km altitude. Find orbital velocity."
-                }),
-            ["Chemistry"] = (
-                new[] { "atomic-structure", "chemical-bonding", "stoichiometry", "thermochemistry",
-                         "equilibrium", "acids-bases", "electrochemistry", "organic-chemistry",
-                         "reaction-rates", "periodic-trends", "solutions", "redox" },
-                new[]
-                {
-                    "Balance: Fe₂O₃ + CO → Fe + CO₂",
-                    "Calculate the pH of a 0.01M HCl solution",
-                    "How many moles of NaCl are in 58.5g?",
-                    "Draw the Lewis structure for CO₂",
-                    "Calculate the enthalpy change for: 2H₂ + O₂ → 2H₂O",
-                    "What is the electron configuration of Fe²⁺?",
-                    "Calculate the molarity of 4g NaOH in 500mL solution",
-                    "Predict the products: CH₃COOH + NaOH →",
-                    "Calculate the equilibrium constant Kc given concentrations",
-                    "Identify the oxidizing agent in: Zn + CuSO₄ → ZnSO₄ + Cu",
-                    "Calculate the voltage of a Zn/Cu galvanic cell",
-                    "Name the IUPAC name for CH₃CH₂CH(CH₃)CH₂OH",
-                    "Calculate the rate of reaction given concentration change over time",
-                    "Explain why NaCl dissolves in water but not in hexane",
-                    "Calculate the boiling point elevation of 1m glucose solution"
-                }),
-            ["Biology"] = (
-                new[] { "cell-biology", "genetics", "evolution", "ecology", "human-physiology",
-                         "molecular-biology", "photosynthesis", "respiration", "immune-system",
-                         "nervous-system", "plant-biology", "biotechnology" },
-                new[]
-                {
-                    "Describe the stages of mitosis and their significance",
-                    "Explain Mendel's law of independent assortment with an example",
-                    "Compare and contrast DNA replication in prokaryotes and eukaryotes",
-                    "Calculate the expected genotype ratio from a dihybrid cross (AaBb × AaBb)",
-                    "Explain the role of ATP synthase in oxidative phosphorylation",
-                    "Describe the light-dependent reactions of photosynthesis",
-                    "Compare Type I and Type II diabetes mellitus",
-                    "Explain how a nerve impulse is transmitted across a synapse",
-                    "Describe the structure and function of antibodies",
-                    "Explain the process of PCR and its applications",
-                    "Compare r-selected and K-selected species with examples",
-                    "Describe the feedback mechanisms regulating blood glucose levels",
-                    "Explain Hardy-Weinberg equilibrium and conditions for deviation",
-                    "Describe the structure of a chloroplast and its role in photosynthesis"
-                }),
-            ["Computer Science"] = (
-                new[] { "algorithms", "data-structures", "complexity", "recursion", "sorting",
-                         "graphs", "dynamic-programming", "oop", "boolean-logic", "databases" },
-                new[]
-                {
-                    "What is the time complexity of binary search?",
-                    "Write pseudocode for merge sort and analyze its complexity",
-                    "Explain the difference between stack and queue with examples",
-                    "Design a recursive function to calculate Fibonacci(n)",
-                    "Explain polymorphism in OOP with a Java/C# example",
-                    "Convert the boolean expression: NOT(A AND B) to NOR gates",
-                    "Write SQL to find students with grade > 90 in both Math and Physics",
-                    "Trace BFS on a given graph starting from vertex A",
-                    "Explain the difference between ArrayList and LinkedList",
-                    "Design a class hierarchy for a school management system",
-                    "What is the worst-case complexity of quicksort and when does it occur?",
-                    "Explain dynamic programming with the knapsack problem"
-                }),
-            ["English"] = (
-                new[] { "reading-comprehension", "grammar", "vocabulary", "writing", "literature",
-                         "unseen-text", "rhetoric", "poetry-analysis" },
-                new[]
-                {
-                    "Read the passage and identify the author's main argument",
-                    "Choose the correct form: If I ___ (know) earlier, I would have helped.",
-                    "Identify the literary device: 'The wind whispered through the trees'",
-                    "Write a paragraph arguing for or against school uniforms",
-                    "Analyze the theme of identity in the given poem",
-                    "Match the vocabulary words to their definitions (context-based)",
-                    "Rewrite the sentence in passive voice: 'The committee approved the proposal'",
-                    "Summarize the main conflict in the given short story excerpt",
-                    "Identify the tone and purpose of the newspaper editorial",
-                    "Compare the use of symbolism in two given poems"
-                })
+            "ingested" => new QuestionIngested_V1(
+                id, request.Stem, request.StemHtml ?? $"<p>{request.Stem}</p>",
+                options, request.Subject, request.Topic ?? "", request.Grade ?? "",
+                request.BloomsLevel, request.Difficulty,
+                request.ConceptIds ?? new List<string>(), request.Language,
+                request.SourceDocId ?? "", request.SourceUrl ?? "",
+                request.SourceFilename ?? "", request.OriginalText,
+                userId, now),
+            "ai-generated" => new QuestionAiGenerated_V1(
+                id, request.Stem, request.StemHtml ?? $"<p>{request.Stem}</p>",
+                options, request.Subject, request.Topic ?? "", request.Grade ?? "",
+                request.BloomsLevel, request.Difficulty,
+                request.ConceptIds ?? new List<string>(), request.Language,
+                request.PromptText ?? "", request.ModelId ?? "",
+                request.ModelTemperature ?? 0.7f, request.RawModelOutput ?? "",
+                userId, now),
+            _ => new QuestionAuthored_V1(
+                id, request.Stem, request.StemHtml ?? $"<p>{request.Stem}</p>",
+                options, request.Subject, request.Topic ?? "", request.Grade ?? "",
+                request.BloomsLevel, request.Difficulty,
+                request.ConceptIds ?? new List<string>(), request.Language,
+                userId, now)
         };
 
-        var random = new Random(42);
-        var statuses = Enum.GetValues<QuestionStatus>();
-        var languages = new[] { "he", "he", "he", "he", "ar", "en" }; // 67% Hebrew, 17% Arabic, 17% English
+        var events = new List<object> { creationEvent };
 
-        int id = 0;
-        foreach (var (subject, (concepts, stems)) in subjectTopics)
-        {
-            // Generate 250 questions per subject (1500 total)
-            int count = subject switch { "Math" => 400, "Physics" => 350, "Chemistry" => 250, "Biology" => 250, _ => 150 };
-            for (int i = 0; i < count; i++)
-            {
-                id++;
-                var concept1 = concepts[random.Next(concepts.Length)];
-                var concept2 = concepts[random.Next(concepts.Length)];
-                while (concept2 == concept1) concept2 = concepts[random.Next(concepts.Length)];
+        // Run quality gate
+        var gateInput = BuildGateInput(id, request.Stem, request.Options,
+            request.Subject, request.Language, request.BloomsLevel,
+            request.Difficulty, request.Grade, request.ConceptIds);
+        var gateResult = _qualityGate.Evaluate(gateInput);
+        events.Add(MapGateEvent(id, gateResult, now));
 
-                var difficulty = random.NextSingle();
-                var qualityBase = subject switch { "Math" => 70, "Physics" => 68, _ => 65 };
+        // Auto-approve if gate passes
+        if (gateResult.Decision == GateDecision.AutoApproved)
+            events.Add(new QuestionApproved_V1(id, "quality-gate", now));
 
-                questions.Add(new QuestionListItem(
-                    Id: $"q-{id:0000}",
-                    StemPreview: stems[random.Next(stems.Length)],
-                    Subject: subject,
-                    Concepts: new[] { concept1, concept2 },
-                    BloomsLevel: random.Next(1, 7),
-                    Difficulty: difficulty,
-                    Status: statuses[random.Next(statuses.Length)],
-                    QualityScore: random.Next(qualityBase, 99),
-                    UsageCount: random.Next(0, 8000),
-                    SuccessRate: random.NextSingle() > 0.15f ? 0.2f + random.NextSingle() * 0.7f : null));
-            }
-        }
+        await using var session = _store.LightweightSession();
+        session.Events.StartStream<QuestionState>(id, events.ToArray());
+        await session.SaveChangesAsync();
 
-        return questions;
+        _logger.LogInformation(
+            "Created question {QuestionId} ({SourceType}) — gate: {Decision}",
+            id, request.SourceType, gateResult.Decision);
+
+        return await GetQuestionAsync(id);
     }
+
+    public async Task<bool> PublishAsync(string id, string userId)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        if (state == null) return false;
+        if (state.Status != DomainStatus.Approved) return false;
+
+        var evt = new QuestionPublished_V1(id, userId, DateTimeOffset.UtcNow);
+        session.Events.Append(id, state.EventVersion + 1, evt);
+        await session.SaveChangesAsync();
+        _logger.LogInformation("Published question {QuestionId}", id);
+        return true;
+    }
+
+    public async Task<bool> AddLanguageVersionAsync(
+        string id, AddLanguageVersionRequest request, string userId)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        if (state == null) return false;
+
+        var options = request.Options.Select(o => new QuestionOptionData(
+            o.Label, o.Text, o.TextHtml ?? $"<p>{o.Text}</p>",
+            o.IsCorrect, o.DistractorRationale)).ToList();
+
+        var evt = new LanguageVersionAdded_V1(
+            id, request.Language, request.Stem,
+            request.StemHtml ?? $"<p>{request.Stem}</p>",
+            options, userId, DateTimeOffset.UtcNow);
+
+        session.Events.Append(id, state.EventVersion + 1, evt);
+        await session.SaveChangesAsync();
+        _logger.LogInformation("Added {Language} version to {QuestionId}", request.Language, id);
+        return true;
+    }
+
+    // ── Private Helpers ──
+
+    private QualityGate.QualityGateResult EvaluateQualityGate(QuestionState state, string stem)
+    {
+        var gateOptions = state.Options.Select(o =>
+            new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale)).ToList();
+
+        int correctIdx = gateOptions.FindIndex(o => o.IsCorrect);
+        var input = new QualityGateInput(
+            state.Id, stem, gateOptions, Math.Max(0, correctIdx),
+            state.Subject, state.PrimaryLanguage, state.BloomsLevel,
+            state.Difficulty, state.Grade, state.ConceptIds);
+
+        return _qualityGate.Evaluate(input);
+    }
+
+    private static QualityGateInput BuildGateInput(
+        string id, string stem, IReadOnlyList<CreateOptionRequest> options,
+        string subject, string language, int bloom, float difficulty,
+        string? grade, IReadOnlyList<string>? conceptIds)
+    {
+        var gateOptions = options.Select(o =>
+            new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale)).ToList();
+        int correctIdx = gateOptions.FindIndex(o => o.IsCorrect);
+        return new QualityGateInput(
+            id, stem, gateOptions, Math.Max(0, correctIdx),
+            subject, language, bloom, difficulty, grade, conceptIds);
+    }
+
+    private static QuestionQualityEvaluated_V1 MapGateEvent(
+        string id, QualityGate.QualityGateResult r, DateTimeOffset ts) =>
+        new(id, r.CompositeScore,
+            r.Scores.FactualAccuracy, r.Scores.LanguageQuality,
+            r.Scores.PedagogicalQuality, r.Scores.DistractorQuality,
+            r.Scores.StemClarity, r.Scores.BloomAlignment,
+            r.Scores.StructuralValidity, r.Scores.CulturalSensitivity,
+            r.Decision.ToString(), r.Violations.Count, ts);
+
+    private static QuestionBankDetailResponse MapToDetail(QuestionState s) =>
+        new(Id: s.Id,
+            Stem: s.Stem,
+            StemHtml: s.StemHtml,
+            Options: s.Options.Select(o => new AnswerOptionDetail(
+                o.Label, o.Label, o.Text, $"<p>{o.Text}</p>",
+                o.IsCorrect, o.DistractorRationale)).ToList(),
+            CorrectAnswers: s.Options.Where(o => o.IsCorrect)
+                .Select(o => o.Label).ToList(),
+            Subject: s.Subject,
+            Topic: s.Topic,
+            Grade: s.Grade,
+            BloomsLevel: s.BloomsLevel,
+            Difficulty: s.Difficulty,
+            ConceptIds: s.ConceptIds,
+            ConceptNames: s.ConceptIds.Select(SlugToName).ToList(),
+            Status: MapStatus(s.Status),
+            QualityScore: s.QualityScore,
+            SourceType: s.SourceType,
+            SourceItemId: s.Provenance?.SourceDocId,
+            CreatedAt: s.CreatedAt,
+            UpdatedAt: s.UpdatedAt,
+            CreatedBy: s.CreatedBy,
+            Performance: null,  // Populated later from student analytics
+            Provenance: s.Provenance != null ? new QuestionProvenance(
+                s.Provenance.SourceDocId, s.Provenance.SourceUrl,
+                s.Provenance.ImportedAt, s.Provenance.ImportedBy,
+                s.Provenance.OriginalText) : null,
+            QualityGate: s.LastQualityEvaluation != null ? new QualityGateDetail(
+                s.LastQualityEvaluation.CompositeScore,
+                s.LastQualityEvaluation.GateDecision,
+                s.LastQualityEvaluation.FactualAccuracy,
+                s.LastQualityEvaluation.LanguageQuality,
+                s.LastQualityEvaluation.PedagogicalQuality,
+                s.LastQualityEvaluation.DistractorQuality,
+                s.LastQualityEvaluation.StemClarity,
+                s.LastQualityEvaluation.BloomAlignment,
+                s.LastQualityEvaluation.StructuralValidity,
+                s.LastQualityEvaluation.CulturalSensitivity,
+                s.LastQualityEvaluation.ViolationCount,
+                s.LastQualityEvaluation.EvaluatedAt) : null);
+
+    private static QuestionStatus MapStatus(DomainStatus s) => s switch
+    {
+        DomainStatus.Draft => QuestionStatus.Draft,
+        DomainStatus.InReview => QuestionStatus.InReview,
+        DomainStatus.Approved => QuestionStatus.Approved,
+        DomainStatus.Published => QuestionStatus.Published,
+        DomainStatus.Deprecated => QuestionStatus.Deprecated,
+        _ => QuestionStatus.Draft
+    };
+
+    private static string SlugToName(string slug) =>
+        CultureInfo.InvariantCulture.TextInfo.ToTitleCase(
+            slug.Replace("-", " ").Replace("_", " "));
 }

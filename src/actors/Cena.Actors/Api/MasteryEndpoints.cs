@@ -8,6 +8,7 @@ using Cena.Actors.Students;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Proto;
 using Proto.Cluster;
 
@@ -28,12 +29,10 @@ public static class MasteryEndpoints
             .WithTags("Mastery");
 
         // GET /api/v1/mastery/{studentId}?subject=math
-        group.MapGet("/{studentId}", async (
-            string studentId,
-            string? subject,
-            ActorSystem actorSystem,
-            IConceptGraphCache? graphCache) =>
+        group.MapGet("/{studentId}", async (string studentId, string? subject, HttpContext ctx) =>
         {
+            var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
+            var graphCache = ctx.RequestServices.GetService<IConceptGraphCache>();
             var overlay = await GetMasteryOverlay(actorSystem, studentId);
             if (overlay == null)
                 return Results.NotFound(new { error = "Student not found or actor unavailable" });
@@ -43,16 +42,13 @@ public static class MasteryEndpoints
             return Results.Ok(response);
         })
         .WithName("GetStudentMasteryV1")
-        .WithDescription("Get full mastery overlay for a student")
         .RequireAuthorization();
 
         // GET /api/v1/mastery/{studentId}/topics/{topicClusterId}
-        group.MapGet("/{studentId}/topics/{topicClusterId}", async (
-            string studentId,
-            string topicClusterId,
-            ActorSystem actorSystem,
-            IConceptGraphCache graphCache) =>
+        group.MapGet("/{studentId}/topics/{topicClusterId}", async (string studentId, string topicClusterId, HttpContext ctx) =>
         {
+            var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
+            var graphCache = ctx.RequestServices.GetRequiredService<IConceptGraphCache>();
             var overlay = await GetMasteryOverlay(actorSystem, studentId);
             if (overlay == null)
                 return Results.NotFound(new { error = "Student not found or actor unavailable" });
@@ -62,16 +58,13 @@ public static class MasteryEndpoints
             return Results.Ok(progress);
         })
         .WithName("GetTopicProgress")
-        .WithDescription("Get aggregated mastery progress for a topic cluster")
         .RequireAuthorization();
 
         // GET /api/v1/mastery/{studentId}/frontier?maxResults=10
-        group.MapGet("/{studentId}/frontier", async (
-            string studentId,
-            int? maxResults,
-            ActorSystem actorSystem,
-            IConceptGraphCache graphCache) =>
+        group.MapGet("/{studentId}/frontier", async (string studentId, int? maxResults, HttpContext ctx) =>
         {
+            var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
+            var graphCache = ctx.RequestServices.GetRequiredService<IConceptGraphCache>();
             var overlay = await GetMasteryOverlay(actorSystem, studentId);
             if (overlay == null)
                 return Results.NotFound(new { error = "Student not found or actor unavailable" });
@@ -81,15 +74,13 @@ public static class MasteryEndpoints
             return Results.Ok(frontier);
         })
         .WithName("GetLearningFrontier")
-        .WithDescription("Get concepts the student is ready to learn next")
         .RequireAuthorization();
 
         // GET /api/v1/mastery/{studentId}/decay-alerts
-        group.MapGet("/{studentId}/decay-alerts", async (
-            string studentId,
-            ActorSystem actorSystem,
-            IConceptGraphCache graphCache) =>
+        group.MapGet("/{studentId}/decay-alerts", async (string studentId, HttpContext ctx) =>
         {
+            var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
+            var graphCache = ctx.RequestServices.GetRequiredService<IConceptGraphCache>();
             var overlay = await GetMasteryOverlay(actorSystem, studentId);
             if (overlay == null)
                 return Results.NotFound(new { error = "Student not found or actor unavailable" });
@@ -99,15 +90,12 @@ public static class MasteryEndpoints
             return Results.Ok(alerts);
         })
         .WithName("GetDecayAlerts")
-        .WithDescription("Get concepts needing review due to memory decay")
         .RequireAuthorization();
 
         // GET /api/v1/mastery/{studentId}/review-schedule?maxItems=10
-        group.MapGet("/{studentId}/review-schedule", async (
-            string studentId,
-            int? maxItems,
-            ActorSystem actorSystem) =>
+        group.MapGet("/{studentId}/review-schedule", async (string studentId, int? maxItems, HttpContext ctx) =>
         {
+            var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
             var result = await QueryStudentActor<GetReviewSchedule, ActorResult<IReadOnlyList<ReviewItem>>>(
                 actorSystem, studentId, new GetReviewSchedule(studentId, maxItems ?? 10));
 
@@ -117,7 +105,6 @@ public static class MasteryEndpoints
             return Results.Ok(result.Data);
         })
         .WithName("GetReviewSchedule")
-        .WithDescription("Get spaced repetition review schedule")
         .RequireAuthorization();
 
         return app;

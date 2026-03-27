@@ -7,6 +7,7 @@
 using JasperFx;
 using JasperFx.Events;
 using Marten;
+using JasperFx.Events.Projections;
 using Marten.Events.Projections;
 using Marten.Storage;
 using Weasel.Core;

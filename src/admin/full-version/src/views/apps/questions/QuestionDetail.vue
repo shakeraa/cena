@@ -84,6 +84,35 @@ const resolveDifficultyPercent = (difficulty: string) => {
   return map[difficulty] ?? 50
 }
 
+// Quality gate dimensions
+const qualityDimensions = [
+  { key: 'structuralValidity', label: 'Structural' },
+  { key: 'stemClarity', label: 'Stem Clarity' },
+  { key: 'distractorQuality', label: 'Distractors' },
+  { key: 'bloomAlignment', label: "Bloom's Alignment" },
+  { key: 'factualAccuracy', label: 'Factual Accuracy' },
+  { key: 'languageQuality', label: 'Language' },
+  { key: 'pedagogicalQuality', label: 'Pedagogy' },
+  { key: 'culturalSensitivity', label: 'Cultural' },
+]
+
+const resolveQualityColor = (score: number) => {
+  if (score >= 80) return 'success'
+  if (score >= 60) return 'info'
+  if (score >= 40) return 'warning'
+  return 'error'
+}
+
+const resolveGateDecisionColor = (decision: string) => {
+  const map: Record<string, string> = {
+    AutoApproved: 'success',
+    NeedsReview: 'warning',
+    AutoRejected: 'error',
+  }
+
+  return map[decision] ?? 'secondary'
+}
+
 // Actions
 const deprecateQuestion = async () => {
   if (!props.questionId)
@@ -332,6 +361,75 @@ const closeDrawer = () => {
                   >
                     {{ concept }}
                   </VChip>
+                </div>
+              </VCardText>
+            </VCard>
+
+            <!-- Quality Gate Card (8-dimension breakdown) -->
+            <VCard
+              v-if="question.qualityGate"
+              variant="outlined"
+              class="mb-4"
+            >
+              <VCardItem>
+                <VCardTitle class="text-body-1 font-weight-medium d-flex align-center gap-2">
+                  Quality Gate
+                  <VChip
+                    size="x-small"
+                    :color="resolveGateDecisionColor(question.qualityGate.gateDecision)"
+                    label
+                  >
+                    {{ question.qualityGate.gateDecision }}
+                  </VChip>
+                </VCardTitle>
+              </VCardItem>
+              <VCardText>
+                <!-- Composite score -->
+                <div class="d-flex align-center gap-2 mb-3">
+                  <span class="text-h4 font-weight-bold">{{ Math.round(question.qualityGate.compositeScore) }}</span>
+                  <span class="text-body-2 text-disabled">/ 100</span>
+                  <VSpacer />
+                  <span
+                    v-if="question.qualityGate.violationCount > 0"
+                    class="text-body-2 text-error"
+                  >
+                    {{ question.qualityGate.violationCount }} violation{{ question.qualityGate.violationCount !== 1 ? 's' : '' }}
+                  </span>
+                </div>
+                <VProgressLinear
+                  :model-value="question.qualityGate.compositeScore"
+                  :color="resolveQualityColor(Math.round(question.qualityGate.compositeScore))"
+                  height="8"
+                  rounded
+                  class="mb-4"
+                />
+
+                <!-- 8-dimension bars -->
+                <div class="d-flex flex-column gap-3">
+                  <div
+                    v-for="dim in qualityDimensions"
+                    :key="dim.key"
+                    class="d-flex align-center gap-2"
+                  >
+                    <span class="text-body-2 text-medium-emphasis" style="min-inline-size: 130px;">{{ dim.label }}</span>
+                    <VProgressLinear
+                      :model-value="question.qualityGate[dim.key]"
+                      :color="resolveQualityColor(question.qualityGate[dim.key])"
+                      height="6"
+                      rounded
+                      style="max-inline-size: 140px;"
+                    />
+                    <span class="text-body-2 font-weight-medium" style="min-inline-size: 30px;">
+                      {{ question.qualityGate[dim.key] }}
+                    </span>
+                  </div>
+                </div>
+
+                <div
+                  v-if="question.qualityGate.evaluatedAt"
+                  class="text-caption text-disabled mt-3"
+                >
+                  Evaluated {{ new Date(question.qualityGate.evaluatedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) }}
                 </div>
               </VCardText>
             </VCard>

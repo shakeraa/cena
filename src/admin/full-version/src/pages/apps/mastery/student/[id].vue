@@ -50,7 +50,7 @@ interface ConceptNode {
   conceptId: string
   name: string
   mastery: number
-  status: 'mastered' | 'learning' | 'not-started'
+  status: 'mastered' | 'proficient' | 'developing' | 'introduced' | 'not-started'
   subject: string
 }
 

@@ -10,7 +10,7 @@ using Marten.Events.Aggregation;
 
 namespace Cena.Actors.Questions;
 
-public class QuestionListProjection : SingleStreamProjection<QuestionReadModel>
+public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, string>
 {
     // ── Creation Events → Create Read Model ──
 

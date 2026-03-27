@@ -3,7 +3,7 @@ interface Props {
   conceptId: string
   name: string
   mastery: number
-  status: 'mastered' | 'learning' | 'not-started'
+  status: 'mastered' | 'proficient' | 'developing' | 'introduced' | 'not-started'
 }
 
 const props = defineProps<Props>()
@@ -19,8 +19,12 @@ const statusChipConfig = computed(() => {
   switch (props.status) {
     case 'mastered':
       return { color: 'success', label: 'Mastered', icon: 'tabler-circle-check' }
-    case 'learning':
-      return { color: 'warning', label: 'Learning', icon: 'tabler-book' }
+    case 'proficient':
+      return { color: 'info', label: 'Proficient', icon: 'tabler-star' }
+    case 'developing':
+      return { color: 'warning', label: 'Developing', icon: 'tabler-trending-up' }
+    case 'introduced':
+      return { color: 'primary', label: 'Introduced', icon: 'tabler-book' }
     case 'not-started':
       return { color: 'secondary', label: 'Not Started', icon: 'tabler-clock' }
     default:

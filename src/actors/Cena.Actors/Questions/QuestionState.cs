@@ -5,7 +5,6 @@
 // =============================================================================
 
 using Cena.Actors.Events;
-using Cena.Admin.Api;
 
 namespace Cena.Actors.Questions;
 
@@ -56,6 +55,17 @@ public sealed record QualityEvaluationState(
     int ViolationCount,
     DateTimeOffset EvaluatedAt);
 
+// ── Question Lifecycle Status (domain-owned) ──
+
+public enum QuestionLifecycleStatus
+{
+    Draft,
+    InReview,
+    Approved,
+    Published,
+    Deprecated
+}
+
 // ── Aggregate State ──
 
 public sealed class QuestionState
@@ -77,7 +87,7 @@ public sealed class QuestionState
     public List<string> ConceptIds { get; set; } = new();
 
     // Lifecycle
-    public QuestionStatus Status { get; set; } = QuestionStatus.Draft;
+    public QuestionLifecycleStatus Status { get; set; } = QuestionLifecycleStatus.Draft;
     public int QualityScore { get; set; }
     public string SourceType { get; set; } = "authored";
 
@@ -116,7 +126,7 @@ public sealed class QuestionState
         SourceType = "authored";
         CreatedBy = e.AuthorId;
         CreatedAt = e.Timestamp;
-        Status = QuestionStatus.Draft;
+        Status = QuestionLifecycleStatus.Draft;
         EventVersion++;
     }
 
@@ -136,7 +146,7 @@ public sealed class QuestionState
         SourceType = "ingested";
         CreatedBy = e.ImportedBy;
         CreatedAt = e.Timestamp;
-        Status = QuestionStatus.Draft;
+        Status = QuestionLifecycleStatus.Draft;
         Provenance = new QuestionProvenanceState(
             e.SourceDocId, e.SourceUrl, e.SourceFilename,
             e.OriginalText, e.ImportedBy, e.Timestamp);
@@ -159,7 +169,7 @@ public sealed class QuestionState
         SourceType = "ai-generated";
         CreatedBy = e.RequestedBy;
         CreatedAt = e.Timestamp;
-        Status = QuestionStatus.Draft;
+        Status = QuestionLifecycleStatus.Draft;
         AiProvenance = new AiGenerationState(
             e.PromptText, e.ModelId, e.ModelTemperature,
             e.RawModelOutput, e.RequestedBy, e.Timestamp);
@@ -222,8 +232,8 @@ public sealed class QuestionState
             e.GateDecision, e.ViolationCount, e.Timestamp);
 
         // Gate decision drives status transitions
-        if (e.GateDecision == "NeedsReview" && Status == QuestionStatus.Draft)
-            Status = QuestionStatus.InReview;
+        if (e.GateDecision == "NeedsReview" && Status == QuestionLifecycleStatus.Draft)
+            Status = QuestionLifecycleStatus.InReview;
 
         UpdatedAt = e.Timestamp;
         EventVersion++;
@@ -231,21 +241,21 @@ public sealed class QuestionState
 
     public void Apply(QuestionApproved_V1 e)
     {
-        Status = QuestionStatus.Approved;
+        Status = QuestionLifecycleStatus.Approved;
         UpdatedAt = e.Timestamp;
         EventVersion++;
     }
 
     public void Apply(QuestionPublished_V1 e)
     {
-        Status = QuestionStatus.Published;
+        Status = QuestionLifecycleStatus.Published;
         UpdatedAt = e.Timestamp;
         EventVersion++;
     }
 
     public void Apply(QuestionDeprecated_V1 e)
     {
-        Status = QuestionStatus.Deprecated;
+        Status = QuestionLifecycleStatus.Deprecated;
         UpdatedAt = e.Timestamp;
         EventVersion++;
     }

@@ -76,6 +76,20 @@ export default [
     subject: 'System',
   },
   {
+    title: 'Actor Dashboard',
+    icon: { icon: 'tabler-cpu' },
+    to: 'apps-system-actors',
+    action: 'read',
+    subject: 'System',
+  },
+  {
+    title: 'Architecture',
+    icon: { icon: 'tabler-topology-star-3' },
+    to: 'apps-system-architecture',
+    action: 'read',
+    subject: 'System',
+  },
+  {
     title: 'Event Stream',
     icon: { icon: 'tabler-activity' },
     to: 'apps-system-events',

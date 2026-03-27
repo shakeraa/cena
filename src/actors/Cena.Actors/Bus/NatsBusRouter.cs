@@ -4,6 +4,7 @@
 // Publishes actor events back to NATS for downstream consumers.
 // =============================================================================
 
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Cena.Actors.Students;
 using Microsoft.Extensions.Hosting;
@@ -28,6 +29,21 @@ public sealed class NatsBusRouter : BackgroundService
 
     private long _commandsRouted;
     private long _eventsPublished;
+    private long _sessionsStarted;
+    private long _errorsCount;
+    private readonly ConcurrentDictionary<string, ActorLiveStats> _actorStats = new();
+
+    public sealed record ActorLiveStats
+    {
+        public string StudentId { get; init; } = "";
+        public string? SessionId { get; set; }
+        public long MessagesProcessed { get; set; }
+        public long CorrectAttempts { get; set; }
+        public long TotalAttempts { get; set; }
+        public DateTimeOffset LastActivity { get; set; } = DateTimeOffset.UtcNow;
+        public DateTimeOffset ActivatedAt { get; init; } = DateTimeOffset.UtcNow;
+        public string Status { get; set; } = "active";
+    }
 
     public NatsBusRouter(
         INatsConnection nats,
@@ -41,6 +57,9 @@ public sealed class NatsBusRouter : BackgroundService
 
     public long CommandsRouted => Interlocked.Read(ref _commandsRouted);
     public long EventsPublished => Interlocked.Read(ref _eventsPublished);
+    public long SessionsStarted => Interlocked.Read(ref _sessionsStarted);
+    public long ErrorsCount => Interlocked.Read(ref _errorsCount);
+    public IReadOnlyDictionary<string, ActorLiveStats> ActiveActors => _actorStats;
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -84,6 +103,7 @@ public sealed class NatsBusRouter : BackgroundService
                 }
                 catch (Exception ex)
                 {
+                    Interlocked.Increment(ref _errorsCount);
                     _logger.LogError(ex, "Error routing message from {Subject}", subject);
                 }
             }
@@ -103,9 +123,14 @@ public sealed class NatsBusRouter : BackgroundService
         var response = await _actorSystem.Cluster()
             .RequestAsync<StartSessionResponse>(p.StudentId, "student", cmd, ct);
 
+        Interlocked.Increment(ref _sessionsStarted);
+
         if (response != null)
         {
-            // Publish session started event back on NATS
+            _actorStats.AddOrUpdate(p.StudentId,
+                new ActorLiveStats { StudentId = p.StudentId, SessionId = response.SessionId, MessagesProcessed = 1 },
+                (_, s) => { s.SessionId = response.SessionId; s.MessagesProcessed++; s.LastActivity = DateTimeOffset.UtcNow; s.Status = "active"; return s; });
+
             await PublishEventAsync(NatsSubjects.EventSessionStarted,
                 new BusSessionStartedEvent(
                     p.StudentId, response.SessionId, p.SubjectId,
@@ -143,6 +168,10 @@ public sealed class NatsBusRouter : BackgroundService
 
         await _actorSystem.Cluster()
             .RequestAsync<object>(p.StudentId, "student", cmd, ct);
+
+        _actorStats.AddOrUpdate(p.StudentId,
+            new ActorLiveStats { StudentId = p.StudentId, SessionId = p.SessionId, MessagesProcessed = 1, TotalAttempts = 1, CorrectAttempts = p.Answer == "correct" ? 1 : 0 },
+            (_, s) => { s.MessagesProcessed++; s.TotalAttempts++; if (p.Answer == "correct") s.CorrectAttempts++; s.LastActivity = DateTimeOffset.UtcNow; return s; });
 
         // Publish attempt event
         await PublishEventAsync(NatsSubjects.EventConceptAttempted,
