@@ -274,4 +274,123 @@ public static class UserSeedData
             "User seed complete: {Created} created, {Updated} updated, {Total} total demo users",
             created, updated, DemoUsers.Length);
     }
+
+    // ── Hebrew/Arabic name pools for simulated student generation ──
+    private static readonly string[] HebrewFirstNames =
+        ["נועה", "יעל", "שירה", "תמר", "מיכל", "דניאל", "עידו", "רועי", "אלון", "גיל",
+         "אורי", "ליאור", "עומר", "איתי", "נדב", "טל", "רון", "דור", "שי", "אריאל",
+         "הילה", "מאיה", "רותם", "ענבר", "אביב", "עדי", "ליבי", "נועם", "יונתן", "אמיר"];
+
+    private static readonly string[] HebrewLastNames =
+        ["כהן", "לוי", "מזרחי", "פרץ", "ביטון", "אזולאי", "שפירא", "אברהם", "דוד", "גולן",
+         "בן דוד", "אלון", "רוזן", "ברק", "שמעון", "חיים", "יוסף", "מלכה", "עמר", "סויסה"];
+
+    private static readonly string[] ArabicFirstNames =
+        ["عمر", "ليلى", "رامي", "نور", "مايا", "أحمد", "فاطمة", "محمد", "سارة", "يوسف",
+         "هناء", "خالد", "ريم", "طارق", "دانا", "سامي", "لينا", "عادل", "جنى", "كريم",
+         "ياسمين", "بشار", "رنا", "وليد", "آية", "حسام", "ميار", "فادي", "سلمى", "زيد"];
+
+    private static readonly string[] ArabicLastNames =
+        ["حداد", "خطيب", "منصور", "صالح", "داود", "أحمد", "عيسى", "نصار", "جبران", "سعيد",
+         "شحادة", "عودة", "بكري", "زعبي", "طوقان", "كنعان", "مصري", "حسين", "عمري", "قاسم"];
+
+    /// <summary>
+    /// Generate AdminUser records for simulated students from GenerateRealisticCohort.
+    /// Each simulated student gets a matching AdminUser in Marten for the admin dashboard.
+    /// </summary>
+    public static async Task SeedSimulatedStudentsAsync(
+        IDocumentStore store, ILogger logger, int totalStudents = 100, int seed = 42)
+    {
+        await using var session = store.LightweightSession();
+        var rng = new Random(seed);
+
+        // Distribution matching MasterySimulator.GenerateRealisticCohort
+        var distribution = new (string Archetype, double Pct, string Tag)[]
+        {
+            ("genius",           0.05, "Genius"),
+            ("highachiever",     0.10, "HighAchiever"),
+            ("steadylearner",    0.30, "SteadyLearner"),
+            ("struggling",       0.15, "Struggling"),
+            ("fastcareless",     0.10, "FastCareless"),
+            ("slowthorough",     0.10, "SlowThorough"),
+            ("inconsistent",     0.10, "Inconsistent"),
+            ("verylowcognitive", 0.10, "VeryLowCognitive"),
+        };
+
+        int studentIndex = 0;
+        int created = 0;
+        var startDate = DateTimeOffset.Parse("2026-01-20T00:00:00Z");
+
+        foreach (var (archetype, pct, tag) in distribution)
+        {
+            int count = (int)Math.Round(totalStudents * pct);
+
+            for (int i = 0; i < count; i++)
+            {
+                studentIndex++;
+                var id = $"sim-{archetype}-{studentIndex:D3}";
+
+                var existing = await session.LoadAsync<AdminUser>(id);
+                if (existing != null) continue; // Already seeded
+
+                // Alternate schools and locales
+                bool isHebrew = rng.NextDouble() < 0.55; // 55% Hebrew, 45% Arabic (Israeli demographics)
+                var school = isHebrew ? "school-haifa-01" : "school-nazareth-01";
+                var locale = isHebrew ? "he" : "ar";
+                var grade = rng.Next(9, 12).ToString(); // Grades 9-11
+
+                string fullName;
+                string email;
+                if (isHebrew)
+                {
+                    var first = HebrewFirstNames[rng.Next(HebrewFirstNames.Length)];
+                    var last = HebrewLastNames[rng.Next(HebrewLastNames.Length)];
+                    fullName = $"{first} {last}";
+                    email = $"sim.{studentIndex:D3}@cena-demo.edu";
+                }
+                else
+                {
+                    var first = ArabicFirstNames[rng.Next(ArabicFirstNames.Length)];
+                    var last = ArabicLastNames[rng.Next(ArabicLastNames.Length)];
+                    fullName = $"{first} {last}";
+                    email = $"sim.{studentIndex:D3}@cena-demo.edu";
+                }
+
+                // Last login varies by archetype engagement level
+                var daysAgo = tag switch
+                {
+                    "Genius" => rng.Next(0, 2),
+                    "HighAchiever" => rng.Next(0, 3),
+                    "SteadyLearner" => rng.Next(0, 5),
+                    "FastCareless" => rng.Next(0, 4),
+                    "SlowThorough" => rng.Next(0, 3),
+                    "Inconsistent" => rng.Next(3, 14),
+                    "Struggling" => rng.Next(2, 10),
+                    "VeryLowCognitive" => rng.Next(5, 21),
+                    _ => rng.Next(0, 7)
+                };
+
+                session.Store(new AdminUser
+                {
+                    Id = id,
+                    Email = email,
+                    FullName = fullName,
+                    Role = CenaRole.STUDENT,
+                    Status = UserStatus.Active,
+                    School = school,
+                    Grade = grade,
+                    Locale = locale,
+                    LastLoginAt = DateTimeOffset.UtcNow.AddDays(-daysAgo),
+                    CreatedAt = startDate.AddDays(rng.Next(0, 14))
+                });
+                created++;
+            }
+        }
+
+        await session.SaveChangesAsync();
+
+        logger.LogInformation(
+            "Simulated student seed: {Created} students created ({Total} target, 8 archetypes, 2-month history)",
+            created, totalStudents);
+    }
 }

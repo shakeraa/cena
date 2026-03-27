@@ -28,11 +28,23 @@ public sealed record StudentArchetype(
     int TypicalSessionLength)     // Attempts per session
 {
     /// <summary>
-    /// 6 research-based student archetypes covering the full performance spectrum.
+    /// 8 research-based student archetypes covering the full performance spectrum.
     /// Distributions are calibrated for realistic Israeli high-school math.
     /// </summary>
     public static readonly IReadOnlyList<StudentArchetype> All = new[]
     {
+        // 0. GENIUS (top 5%): Near-perfect, lightning fast, deep transfer, minimal decay
+        // Renzulli (2005): gifted = above-average ability × creativity × task commitment
+        // Bloom's 2-sigma problem: these students perform 2σ above mean
+        new StudentArchetype(
+            "Genius", "Exceptional ability; near-perfect accuracy, rapid mastery, deep transfer",
+            AccuracyMean: 0.96f, AccuracyStdDev: 0.02f,
+            ResponseTimeMeanMs: 4_500f, ResponseTimeStdDevMs: 1_500f,
+            InitialEloTheta: 1650f, DecayResistance: 2.5f,
+            ErrorTypeWeights: new[] { 0.05f, 0.02f, 0.40f, 0.03f, 0.50f }, // mostly transfer (pushing boundaries)
+            StudyConsistency: 0.90f, BloomCeiling: 6.0f, // reaches Create level
+            StreakProbability: 0.85f, TypicalSessionLength: 30),
+
         // 1. HIGH ACHIEVER (top 15%): Fast, accurate, few errors, strong retention
         new StudentArchetype(
             "HighAchiever", "Consistently strong student; fast recall, few errors, long retention",
@@ -92,5 +104,18 @@ public sealed record StudentArchetype(
             ErrorTypeWeights: new[] { 0.25f, 0.25f, 0.20f, 0.15f, 0.15f },
             StudyConsistency: 0.25f, BloomCeiling: 3.5f,
             StreakProbability: 0.20f, TypicalSessionLength: 15),
+
+        // 7. VERY LOW COGNITIVE (bottom 10%): Severe processing limitations
+        // Swanson & Jerman (2006): working memory deficits in math difficulties
+        // Very slow processing, high error rate, frequent session abandonment,
+        // rapid decay. These students need scaffolding, not just repetition.
+        new StudentArchetype(
+            "VeryLowCognitive", "Severe processing gaps; very slow, frequent abandonment, rapid forgetting",
+            AccuracyMean: 0.25f, AccuracyStdDev: 0.08f,
+            ResponseTimeMeanMs: 40_000f, ResponseTimeStdDevMs: 15_000f,
+            InitialEloTheta: 750f, DecayResistance: 0.3f,
+            ErrorTypeWeights: new[] { 0.15f, 0.55f, 0.05f, 0.20f, 0.05f }, // dominant conceptual + systematic
+            StudyConsistency: 0.20f, BloomCeiling: 1.5f, // rarely gets past Remember
+            StreakProbability: 0.15f, TypicalSessionLength: 6), // very short sessions
     };
 }

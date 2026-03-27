@@ -61,8 +61,8 @@ public sealed class MasterySimulatorTests
         var cohort = MasterySimulator.GenerateCohort(
             studentsPerArchetype: 2, simulationDays: 14, seed: 99);
 
-        Assert.Equal(12, cohort.Count); // 6 archetypes * 2 each
-        Assert.Equal(6, cohort.Select(s => s.ArchetypeName).Distinct().Count());
+        Assert.Equal(16, cohort.Count); // 8 archetypes * 2 each
+        Assert.Equal(8, cohort.Select(s => s.ArchetypeName).Distinct().Count());
     }
 
     [Fact]

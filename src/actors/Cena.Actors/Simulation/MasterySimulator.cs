@@ -49,7 +49,7 @@ public static class MasterySimulator
 {
     /// <summary>
     /// Generate a cohort of simulated students with diverse learning patterns.
-    /// Default: 30 students (5 per archetype), each with 60 days of history.
+    /// Default: 5 per archetype, each with 60 days of history.
     /// </summary>
     public static IReadOnlyList<SimulatedStudent> GenerateCohort(
         int studentsPerArchetype = 5,
@@ -68,6 +68,63 @@ public static class MasterySimulator
                 var studentSeed = seed + studentIndex * 1000;
                 var student = SimulateStudent(
                     $"sim-{archetype.Name.ToLower()}-{i + 1:D2}",
+                    archetype, graphCache, simulationDays, studentSeed);
+                results.Add(student);
+            }
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// Generate a realistically distributed cohort: 5% Genius, 10% VeryLowCognitive,
+    /// 85% distributed across middle archetypes. 2 months (60 days) of history.
+    ///
+    /// Distribution (per 100 students):
+    ///   Genius:           5  (5%)
+    ///   HighAchiever:    10  (10%)
+    ///   SteadyLearner:   30  (30%)
+    ///   Struggling:      15  (15%)
+    ///   FastCareless:    10  (10%)
+    ///   SlowThorough:    10  (10%)
+    ///   Inconsistent:    10  (10%)
+    ///   VeryLowCognitive:10  (10%)
+    /// </summary>
+    public static IReadOnlyList<SimulatedStudent> GenerateRealisticCohort(
+        int totalStudents = 100,
+        int simulationDays = 60,
+        int seed = 42)
+    {
+        var graphCache = CurriculumSeedData.BuildGraphCache();
+        var results = new List<SimulatedStudent>();
+
+        // Distribution table: archetype name → percentage of total
+        var distribution = new (string ArchetypeName, double Percentage)[]
+        {
+            ("Genius",           0.05),
+            ("HighAchiever",     0.10),
+            ("SteadyLearner",    0.30),
+            ("Struggling",       0.15),
+            ("FastCareless",     0.10),
+            ("SlowThorough",     0.10),
+            ("Inconsistent",     0.10),
+            ("VeryLowCognitive", 0.10),
+        };
+
+        var archetypeMap = StudentArchetype.All.ToDictionary(a => a.Name);
+        int studentIndex = 0;
+
+        foreach (var (archetypeName, percentage) in distribution)
+        {
+            int count = (int)Math.Round(totalStudents * percentage);
+            var archetype = archetypeMap[archetypeName];
+
+            for (int i = 0; i < count; i++)
+            {
+                studentIndex++;
+                var studentSeed = seed + studentIndex * 1000;
+                var student = SimulateStudent(
+                    $"sim-{archetype.Name.ToLower()}-{studentIndex:D3}",
                     archetype, graphCache, simulationDays, studentSeed);
                 results.Add(student);
             }

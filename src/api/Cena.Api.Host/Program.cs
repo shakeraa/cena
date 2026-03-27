@@ -119,6 +119,7 @@ lifetime.ApplicationStarted.Register(async () =>
     var store = app.Services.GetRequiredService<IDocumentStore>();
     await RoleSeedData.SeedRolesAsync(store, appLogger);
     await UserSeedData.SeedUsersAsync(store, appLogger);
+    await UserSeedData.SeedSimulatedStudentsAsync(store, appLogger, totalStudents: 100);
 });
 
 app.Run();
