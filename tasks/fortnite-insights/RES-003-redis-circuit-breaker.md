@@ -7,6 +7,7 @@
 | **Impact**    | Medium -- prevents cache failure cascade     |
 | **Origin**    | Fortnite Feb 2018: Memcached saturation → Nginx thread exhaustion → LB ejection |
 | **Status**    | TODO                                         |
+| **Execution** | See [EXECUTION.md](EXECUTION.md#res-003-redis-circuit-breaker--p1) |
 
 ---
 

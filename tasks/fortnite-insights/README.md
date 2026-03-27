@@ -4,6 +4,7 @@ Tasks derived from researching Fortnite's Akka backend architecture and mapping 
 
 > Research: `research/fortnite-akka/`
 > Architecture doc: `docs/resilience-architecture.md`
+> Execution plan & review notes: [EXECUTION.md](EXECUTION.md)
 
 ---
 

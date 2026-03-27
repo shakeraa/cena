@@ -7,6 +7,7 @@
 | **Impact**    | High -- Epic's #1 lesson: "invest in logging early" |
 | **Origin**    | Epic Games post-incident: "Metrics collection is a conversation that happens with a system over time" |
 | **Status**    | TODO                                         |
+| **Execution** | See [EXECUTION.md](EXECUTION.md#res-002-observability-stack--p0) |
 
 ---
 

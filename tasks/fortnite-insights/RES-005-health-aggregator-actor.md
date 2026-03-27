@@ -7,6 +7,7 @@
 | **Impact**    | Medium -- enables coordinated degradation    |
 | **Origin**    | Fortnite had no coordinated response when multiple systems failed simultaneously |
 | **Status**    | TODO                                         |
+| **Execution** | See [EXECUTION.md](EXECUTION.md#res-005-health-aggregator-actor--p2) |
 
 ---
 

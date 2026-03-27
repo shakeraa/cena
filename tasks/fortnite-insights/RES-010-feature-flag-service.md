@@ -7,6 +7,7 @@
 | **Impact**    | Low now, enables A/B testing and safe rollouts|
 | **Origin**    | Fortnite's "Lightswitch" service: system-wide feature availability control |
 | **Status**    | TODO                                         |
+| **Execution** | See [EXECUTION.md](EXECUTION.md#res-010-feature-flag-service--p3) |
 
 ---
 

@@ -7,6 +7,7 @@
 | **Impact**    | Medium -- parallel I/O, prevents hot table   |
 | **Origin**    | Fortnite's 9-shard MongoDB strategy (8 user shards + 1 config shard) |
 | **Status**    | TODO                                         |
+| **Execution** | See [EXECUTION.md](EXECUTION.md#res-004-postgresql-partitioning--p2) |
 
 ---
 
