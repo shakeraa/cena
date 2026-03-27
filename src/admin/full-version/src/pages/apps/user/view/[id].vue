@@ -27,6 +27,22 @@ const { data: userData, execute: refetchUser } = await useApi<any>(`/admin/users
 </script>
 
 <template>
+  <div>
+    <VBtn
+      variant="text"
+      color="default"
+      :to="{ name: 'apps-user-list' }"
+      class="mb-4"
+    >
+      <VIcon
+        icon="tabler-arrow-left"
+        size="20"
+        class="me-1"
+      />
+      Back to Users
+    </VBtn>
+  </div>
+
   <VRow v-if="userData">
     <VCol
       cols="12"

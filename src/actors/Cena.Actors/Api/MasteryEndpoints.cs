@@ -42,7 +42,7 @@ public static class MasteryEndpoints
                 studentId, overlay, graphCache, DateTimeOffset.UtcNow, subject);
             return Results.Ok(response);
         })
-        .WithName("GetStudentMastery")
+        .WithName("GetStudentMasteryV1")
         .WithDescription("Get full mastery overlay for a student")
         .RequireAuthorization();
 

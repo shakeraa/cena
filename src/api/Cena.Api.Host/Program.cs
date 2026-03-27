@@ -44,6 +44,18 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     return ConnectionMultiplexer.Connect(options);
 });
 
+// ---- NATS (event bus for real-time dashboard) ----
+var natsUrl = builder.Configuration.GetConnectionString("NATS") ?? "nats://localhost:4222";
+builder.Services.AddSingleton<NATS.Client.Core.INatsConnection>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<NATS.Client.Core.INatsConnection>>();
+    var opts = new NATS.Client.Core.NatsOpts { Url = natsUrl, Name = "cena-admin-api" };
+    logger.LogInformation("Configuring NATS connection to {NatsUrl}", natsUrl);
+    return new NATS.Client.Core.NatsConnection(opts);
+});
+builder.Services.AddSingleton<NatsEventSubscriber>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<NatsEventSubscriber>());
+
 // ---- Firebase Auth + Authorization (BKD-001) ----
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);

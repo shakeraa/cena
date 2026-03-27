@@ -89,7 +89,7 @@ const languageOptions = [
 const fetchSettings = async () => {
   loading.value = true
   try {
-    const data = await $api<SettingsResponse>('/admin/settings')
+    const data = await $api<SettingsResponse>('/admin/system/settings')
 
     if (data.organization) {
       organization.value = {
@@ -136,7 +136,7 @@ const saveSettings = async () => {
   saving.value = true
   saveSuccess.value = false
   try {
-    await $api('/admin/settings', {
+    await $api('/admin/system/settings', {
       method: 'PUT',
       body: {
         organization: organization.value,

@@ -11,6 +11,7 @@ using Marten.Events.Projections;
 using Marten.Storage;
 using Weasel.Core;
 using Cena.Actors.Events;
+using Cena.Actors.Questions;
 using Cena.Infrastructure.Documents;
 
 namespace Cena.Actors.Configuration;
@@ -43,6 +44,7 @@ public static class MartenConfiguration
         RegisterPedagogyEvents(opts);
         RegisterEngagementEvents(opts);
         RegisterOutreachEvents(opts);
+        RegisterQuestionEvents(opts);
 
         // ── Admin Document Types (BKD-002/003) ──
         opts.Schema.For<AdminUser>()
@@ -54,6 +56,17 @@ public static class MartenConfiguration
 
         opts.Schema.For<CenaRoleDefinition>()
             .Identity(x => x.Id);
+
+        // ── Question Read Model (inline projection for list queries) ──
+        opts.Projections.Add<QuestionListProjection>(ProjectionLifecycle.Inline);
+        opts.Schema.For<QuestionReadModel>()
+            .Identity(x => x.Id)
+            .Index(x => x.Subject)
+            .Index(x => x.Status)
+            .Index(x => x.BloomsLevel)
+            .Index(x => x.Difficulty)
+            .Index(x => x.QualityScore)
+            .Index(x => x.Grade);
 
         // ── Snapshot Strategy: every 100 events per student ──
         // ACT-026: Inline snapshot projection — Marten auto-creates/updates snapshot
@@ -104,5 +117,21 @@ public static class MartenConfiguration
         opts.Events.AddEventType<OutreachMessageSent_V1>();
         opts.Events.AddEventType<OutreachMessageDelivered_V1>();
         opts.Events.AddEventType<OutreachResponseReceived_V1>();
+    }
+
+    private static void RegisterQuestionEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<QuestionAuthored_V1>();
+        opts.Events.AddEventType<QuestionIngested_V1>();
+        opts.Events.AddEventType<QuestionAiGenerated_V1>();
+        opts.Events.AddEventType<QuestionStemEdited_V1>();
+        opts.Events.AddEventType<QuestionOptionChanged_V1>();
+        opts.Events.AddEventType<QuestionMetadataUpdated_V1>();
+        opts.Events.AddEventType<QuestionQualityEvaluated_V1>();
+        opts.Events.AddEventType<QuestionApproved_V1>();
+        opts.Events.AddEventType<QuestionPublished_V1>();
+        opts.Events.AddEventType<QuestionDeprecated_V1>();
+        opts.Events.AddEventType<QuestionForked_V1>();
+        opts.Events.AddEventType<LanguageVersionAdded_V1>();
     }
 }

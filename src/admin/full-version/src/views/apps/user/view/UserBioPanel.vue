@@ -242,6 +242,15 @@ const toggleSuspend = async () => {
 
           <VBtn
             variant="tonal"
+            color="info"
+            prepend-icon="tabler-chart-dots-3"
+            :to="{ path: `/apps/mastery/student/${props.userData.id}` }"
+          >
+            Mastery
+          </VBtn>
+
+          <VBtn
+            variant="tonal"
             :color="props.userData.status === 'suspended' ? 'success' : 'error'"
             :loading="isSuspending"
             @click="toggleSuspend"

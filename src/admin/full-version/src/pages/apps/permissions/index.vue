@@ -23,6 +23,7 @@ interface RolePermissions {
 const search = ref('')
 const isLoading = ref(true)
 const isSaving = ref(false)
+const fetchError = ref<string | null>(null)
 const expandedCategories = ref<string[]>([])
 
 const permissionCategories = ref<PermissionCategory[]>([])
@@ -185,8 +186,9 @@ const fetchData = async () => {
       permissions: role.permissions ?? {},
     }))
   }
-  catch (error) {
+  catch (error: any) {
     console.error('Failed to fetch permission data:', error)
+    fetchError.value = error.message ?? 'Failed to load permission data'
   }
   finally {
     isLoading.value = false
@@ -222,6 +224,24 @@ onMounted(() => {
 
         <VDivider />
 
+        <VAlert
+          v-if="fetchError"
+          type="error"
+          variant="tonal"
+          class="ma-4"
+        >
+          {{ fetchError }}
+        </VAlert>
+
+        <VAlert
+          v-if="!isLoading && !fetchError && orderedRoles.length === 0 && permissionCategories.length > 0"
+          type="info"
+          variant="tonal"
+          class="ma-4"
+        >
+          No roles loaded. Role columns will appear once role data is available.
+        </VAlert>
+
         <VProgressLinear
           v-if="isLoading"
           indeterminate
@@ -242,7 +262,7 @@ onMounted(() => {
                   class="permission-label-col"
                   style="min-inline-size: 200px;"
                 >
-                  Permission
+                  Resource / Action
                 </th>
                 <th
                   v-for="rp in orderedRoles"
@@ -313,6 +333,8 @@ onMounted(() => {
                     class="action-row"
                   >
                     <td class="ps-10">
+                      <span class="text-body-2 text-medium-emphasis">{{ category.name }}</span>
+                      <span class="text-body-2 text-medium-emphasis mx-1">&rsaquo;</span>
                       <span class="text-body-2">{{ action }}</span>
                     </td>
                     <td

@@ -188,7 +188,7 @@ watch([page, itemsPerPage], () => {
   fetchAuditLog()
 })
 
-onMounted(fetchAuditLog)
+// Initial fetch is triggered by VDataTableServer's @update:options → updateOptions
 </script>
 
 <template>

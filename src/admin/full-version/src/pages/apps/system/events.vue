@@ -33,8 +33,15 @@ const fetchEvents = async () => {
   try {
     const params = new URLSearchParams()
     if (filterType.value) params.set('type', filterType.value)
-    const response = await $api(`/admin/events/recent?${params.toString()}`)
-    const newEvents = response as EventData[]
+    const response = await $api<any>(`/admin/events/recent?${params.toString()}`)
+    const rawEvents = response?.events ?? response ?? []
+    const newEvents: EventData[] = (Array.isArray(rawEvents) ? rawEvents : []).map((e: any) => ({
+      id: e.id ?? e.Id ?? '',
+      timestamp: e.timestamp ?? e.Timestamp ?? '',
+      type: e.type ?? e.eventType ?? e.EventType ?? '',
+      summary: e.summary ?? `${e.eventType ?? e.EventType ?? 'Event'} on ${e.aggregateType ?? e.AggregateType ?? 'unknown'}`,
+      payload: e.payload ?? (e.payloadJson || e.PayloadJson ? JSON.parse(e.payloadJson ?? e.PayloadJson ?? '{}') : undefined),
+    })).filter((e: EventData) => e.id)
     if (!isPaused.value) {
       events.value = newEvents
       eventsPerSecond.value = Math.round(newEvents.length / 30)

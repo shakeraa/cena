@@ -1,7 +1,73 @@
 import type { RouteNamedMap, _RouterTyped } from 'unplugin-vue-router'
 import type { RouteLocationNormalized } from 'vue-router'
+import { onAuthStateChanged } from 'firebase/auth'
 import { firebaseAuth } from '@/plugins/firebase'
 import { ability } from '@/plugins/casl/ability'
+import type { CenaRole } from '@/plugins/casl/ability'
+
+/**
+ * Wait for Firebase Auth to finish restoring session from IndexedDB.
+ * Without this, firebaseAuth.currentUser is null on page refresh
+ * until the async initialization completes, causing false redirects to /login.
+ */
+let _authReady: Promise<void> | null = null
+function waitForAuthReady(): Promise<void> {
+  if (!_authReady) {
+    _authReady = new Promise(resolve => {
+      const unsubscribe = onAuthStateChanged(firebaseAuth, user => {
+        // Restore abilities from Firebase claims if user is logged in
+        if (user) {
+          user.getIdTokenResult().then(tokenResult => {
+            const claims = tokenResult.claims as Record<string, unknown>
+            const role = (claims.role as CenaRole) || 'STUDENT'
+
+            const ADMIN_ROLES: CenaRole[] = ['MODERATOR', 'ADMIN', 'SUPER_ADMIN']
+            if (ADMIN_ROLES.includes(role)) {
+              const abilities = mapRoleToAbilities(role)
+              ability.update(abilities)
+              useCookie('userAbilityRules').value = abilities as any
+              useCookie('accessToken').value = tokenResult.token
+            }
+            resolve()
+          }).catch(() => resolve())
+        }
+        else {
+          resolve()
+        }
+        unsubscribe()
+      })
+    })
+  }
+  return _authReady
+}
+
+function mapRoleToAbilities(role: CenaRole) {
+  switch (role) {
+    case 'SUPER_ADMIN':
+      return [{ action: 'manage' as const, subject: 'all' as const }]
+    case 'ADMIN':
+      return [
+        { action: 'manage' as const, subject: 'Users' as const },
+        { action: 'manage' as const, subject: 'Content' as const },
+        { action: 'manage' as const, subject: 'Questions' as const },
+        { action: 'manage' as const, subject: 'Analytics' as const },
+        { action: 'manage' as const, subject: 'Focus' as const },
+        { action: 'manage' as const, subject: 'Mastery' as const },
+        { action: 'manage' as const, subject: 'Pedagogy' as const },
+        { action: 'manage' as const, subject: 'Outreach' as const },
+        { action: 'read' as const, subject: 'System' as const },
+        { action: 'read' as const, subject: 'AuditLog' as const },
+      ]
+    case 'MODERATOR':
+      return [
+        { action: 'manage' as const, subject: 'Content' as const },
+        { action: 'manage' as const, subject: 'Questions' as const },
+        { action: 'read' as const, subject: 'Analytics' as const },
+      ]
+    default:
+      return []
+  }
+}
 
 /**
  * Check if user can navigate to the route using the shared CASL ability instance.
@@ -27,12 +93,15 @@ function canNavigateRoute(to: RouteLocationNormalized): boolean {
 }
 
 export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]: any }>) => {
-  router.beforeEach(to => {
+  router.beforeEach(async (to) => {
     // Public routes: 404, maintenance, etc.
     if (to.meta.public)
       return
 
-    // Check auth state from Firebase (cookie is kept in sync by useFirebaseAuth)
+    // Wait for Firebase to restore session from IndexedDB before checking auth
+    await waitForAuthReady()
+
+    // Check auth state from Firebase (authoritative after waitForAuthReady)
     const firebaseUser = firebaseAuth.currentUser
     const cookieUser = useCookie('userData').value
     const isLoggedIn = !!(firebaseUser || cookieUser)

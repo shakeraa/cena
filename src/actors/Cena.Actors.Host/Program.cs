@@ -120,6 +120,10 @@ builder.Services.AddSingleton<INatsConnection>(sp =>
 builder.Services.AddSingleton<Cena.Infrastructure.Firebase.IFirebaseAdminService,
     Cena.Infrastructure.Firebase.FirebaseAdminService>();
 
+// Curriculum graph cache (needed by Mastery REST API endpoints)
+builder.Services.AddSingleton<Cena.Actors.Mastery.IConceptGraphCache>(
+    Cena.Actors.Simulation.CurriculumSeedData.BuildGraphCache());
+
 // ACT-032: Register all domain services for DI
 builder.Services.AddSingleton<IMethodologySwitchService, MethodologySwitchService>();
 builder.Services.AddSingleton<IBktService, BktService>();
@@ -130,6 +134,10 @@ builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnfor
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
 builder.Services.AddSingleton<OfflineSyncHandler>();
 builder.Services.AddHostedService<NatsOutboxPublisher>();
+
+// NATS Bus Router: bridges NATS commands ↔ Proto.Actor virtual actors
+builder.Services.AddSingleton<Cena.Actors.Bus.NatsBusRouter>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<Cena.Actors.Bus.NatsBusRouter>());
 
 // ADM-004 through ADM-016: Register Admin API services
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();

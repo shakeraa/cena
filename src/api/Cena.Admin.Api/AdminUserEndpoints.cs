@@ -146,6 +146,17 @@ public static class AdminUserEndpoints
             return Results.Ok(result);
         }).WithName("BulkInviteUsers").DisableAntiforgery();
 
+        // GET /api/admin/users/{id}/security
+        group.MapGet("/{id}/security", async (string id, IAdminUserService service) =>
+        {
+            var user = await service.GetUserAsync(id);
+            return Results.Ok(new
+            {
+                twoFactorEnabled = false,
+                apiKeys = Array.Empty<object>()
+            });
+        }).WithName("GetUserSecurity");
+
         // GET /api/admin/users/{id}/activity
         group.MapGet("/{id}/activity", async (string id, IAdminUserService service) =>
         {

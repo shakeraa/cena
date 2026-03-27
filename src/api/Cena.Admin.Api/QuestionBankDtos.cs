@@ -123,3 +123,44 @@ public sealed record ConceptMatch(
     string Name,
     string Subject,
     int QuestionCount);
+
+// Create Question (3 paths: authored, ingested, ai-generated)
+public sealed record CreateQuestionRequest(
+    string SourceType,             // "authored" | "ingested" | "ai-generated"
+    string Stem,
+    string? StemHtml,
+    IReadOnlyList<CreateOptionRequest> Options,
+    string Subject,
+    string? Topic,
+    string? Grade,
+    int BloomsLevel,
+    float Difficulty,
+    IReadOnlyList<string>? ConceptIds,
+    string Language,               // "he" | "ar" | "en"
+    // Ingestion-specific
+    string? SourceDocId,
+    string? SourceUrl,
+    string? SourceFilename,
+    string? OriginalText,
+    // AI-specific
+    string? PromptText,
+    string? ModelId,
+    float? ModelTemperature,
+    string? RawModelOutput);
+
+public sealed record CreateOptionRequest(
+    string Label,
+    string Text,
+    string? TextHtml,
+    bool IsCorrect,
+    string? DistractorRationale);
+
+// Publish Question
+public sealed record PublishQuestionRequest(string? Reason);
+
+// Add Language Version
+public sealed record AddLanguageVersionRequest(
+    string Language,
+    string Stem,
+    string? StemHtml,
+    IReadOnlyList<CreateOptionRequest> Options);

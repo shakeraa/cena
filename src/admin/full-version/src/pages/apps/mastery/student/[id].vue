@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import ConceptCard from '@/views/apps/mastery/ConceptCard.vue'
+import ConceptGraph from '@/views/apps/mastery/ConceptGraph.vue'
 import { $api } from '@/utils/api'
 
 definePage({
@@ -282,6 +283,11 @@ const decayColor = (risk: number): string => {
       color="primary"
       class="mb-6"
     />
+
+    <!-- Concept Graph (interactive D3 force graph) -->
+    <div class="mb-6">
+      <ConceptGraph :student-id="String(studentId)" />
+    </div>
 
     <!-- Knowledge Map -->
     <VCard class="mb-6">

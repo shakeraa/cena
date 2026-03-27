@@ -19,6 +19,7 @@ const question = ref<any>(null)
 const performance = ref<any>(null)
 const isLoading = ref(false)
 const isDeprecating = ref(false)
+const isEditing = ref(false)
 
 // Fetch question detail when questionId changes
 watch(() => props.questionId, async (id) => {
@@ -435,9 +436,9 @@ const closeDrawer = () => {
               <VBtn
                 color="primary"
                 prepend-icon="tabler-pencil"
-                :to="{ name: 'apps-questions-edit-id', params: { id: question.id } }"
+                @click="isEditing = !isEditing"
               >
-                Edit
+                {{ isEditing ? 'Cancel Edit' : 'Edit' }}
               </VBtn>
               <VBtn
                 v-if="question.status !== 'deprecated'"

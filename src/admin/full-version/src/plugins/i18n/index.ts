@@ -18,6 +18,8 @@ export const getI18n = () => {
       locale: cookieRef('language', themeConfig.app.i18n.defaultLocale).value,
       fallbackLocale: 'en',
       messages,
+      silentTranslationWarn: true,
+      silentFallbackWarn: true,
     })
   }
 

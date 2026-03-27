@@ -25,14 +25,21 @@ public interface IFirebaseAdminService
 public sealed class FirebaseAdminService : IFirebaseAdminService
 {
     private readonly ILogger<FirebaseAdminService> _logger;
+    private readonly bool _initialized;
 
     public FirebaseAdminService(IConfiguration configuration, ILogger<FirebaseAdminService> logger)
     {
         _logger = logger;
 
-        if (FirebaseApp.DefaultInstance == null)
+        if (FirebaseApp.DefaultInstance != null)
         {
-            var credPath = configuration["Firebase:ServiceAccountKeyPath"];
+            _initialized = true;
+            return;
+        }
+
+        var credPath = configuration["Firebase:ServiceAccountKeyPath"];
+        try
+        {
             if (!string.IsNullOrEmpty(credPath) && File.Exists(credPath))
             {
                 FirebaseApp.Create(new AppOptions
@@ -40,17 +47,30 @@ public sealed class FirebaseAdminService : IFirebaseAdminService
                     Credential = GoogleCredential.FromFile(credPath),
                     ProjectId = configuration["Firebase:ProjectId"]
                 });
+                _initialized = true;
             }
             else
             {
-                // Use Application Default Credentials (ADC) in cloud environments
+                // Try Application Default Credentials (ADC) — available in cloud environments
                 FirebaseApp.Create(new AppOptions
                 {
                     Credential = GoogleCredential.GetApplicationDefault(),
                     ProjectId = configuration["Firebase:ProjectId"]
                 });
+                _initialized = true;
             }
         }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Firebase Admin SDK not initialized — user management operations will use local-only mode. {Message}", ex.Message);
+            _initialized = false;
+        }
+    }
+
+    private void EnsureInitialized()
+    {
+        if (!_initialized)
+            throw new InvalidOperationException("Firebase Admin SDK is not initialized. Set Firebase:ServiceAccountKeyPath in configuration or configure Application Default Credentials.");
     }
 
     public async Task<string> CreateUserAsync(string email, string fullName, string? password)

@@ -56,12 +56,16 @@ const { data: questionsData, execute: fetchQuestions } = await useApi<any>(creat
 }))
 
 const questions = computed(() => questionsData.value?.questions ?? [])
-const totalQuestions = computed(() => questionsData.value?.totalQuestions ?? 0)
+const totalQuestions = computed(() => questionsData.value?.total ?? questionsData.value?.totalQuestions ?? 0)
 
 // Filter options
 const subjects = [
-  { title: 'Math', value: 'math' },
-  { title: 'Physics', value: 'physics' },
+  { title: 'Math', value: 'Math' },
+  { title: 'Physics', value: 'Physics' },
+  { title: 'Chemistry', value: 'Chemistry' },
+  { title: 'Biology', value: 'Biology' },
+  { title: 'Computer Science', value: 'Computer Science' },
+  { title: 'English', value: 'English' },
 ]
 
 const bloomLevels = [
@@ -114,8 +118,12 @@ const resolveStatusColor = (status: string) => {
 
 const resolveSubjectColor = (subject: string) => {
   const map: Record<string, string> = {
-    math: 'primary',
-    physics: 'info',
+    'Math': 'primary',
+    'Physics': 'info',
+    'Chemistry': 'warning',
+    'Biology': 'success',
+    'Computer Science': 'secondary',
+    'English': 'error',
   }
 
   return map[subject] ?? 'secondary'

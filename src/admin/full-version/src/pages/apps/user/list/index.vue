@@ -566,6 +566,13 @@ fetchWidgetStats()
                   <VListItemTitle>Edit</VListItemTitle>
                 </VListItem>
 
+                <VListItem :to="{ path: `/apps/mastery/student/${item.id}` }">
+                  <template #prepend>
+                    <VIcon icon="tabler-chart-dots-3" />
+                  </template>
+                  <VListItemTitle>View Mastery</VListItemTitle>
+                </VListItem>
+
                 <VListItem
                   v-if="item.status === 'active'"
                   @click="suspendUser(item.id)"
