@@ -42,6 +42,9 @@ public sealed record CircuitBreakerConfig(
     public static CircuitBreakerConfig Sonnet => new("sonnet", 3, TimeSpan.FromSeconds(90));
     public static CircuitBreakerConfig Opus => new("opus", 2, TimeSpan.FromSeconds(120));
 
+    /// <summary>RES-003: Redis cache circuit breaker — 5 failures opens for 30s.</summary>
+    public static CircuitBreakerConfig Redis => new("redis", 5, TimeSpan.FromSeconds(30));
+
     public static CircuitBreakerConfig ForModel(string modelName)
     {
         return modelName.ToLowerInvariant() switch
@@ -49,6 +52,7 @@ public sealed record CircuitBreakerConfig(
             "kimi"   => Kimi,
             "sonnet" => Sonnet,
             "opus"   => Opus,
+            "redis"  => Redis,
             _        => new CircuitBreakerConfig(modelName, 3, TimeSpan.FromSeconds(90))
         };
     }

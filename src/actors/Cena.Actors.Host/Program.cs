@@ -6,8 +6,10 @@
 //             Redis cache, NATS messaging, OpenTelemetry, Serilog, health checks.
 // =============================================================================
 
+using System.Diagnostics.Metrics;
 using Cena.Actors.Api;
 using Cena.Actors.Configuration;
+using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Services;
 using Cena.Actors.Students;
@@ -270,6 +272,15 @@ lifetime.ApplicationStarted.Register(async () =>
     appLogger.LogInformation("Starting Proto.Actor cluster...");
     await actorSystem.Cluster().StartMemberAsync();
     appLogger.LogInformation("Proto.Actor cluster started. MemberID={MemberId}", actorSystem.Id);
+
+    // RES-003: Spawn Redis circuit breaker actor at root level
+    var redisCbProps = Props.FromProducer(() =>
+        new LlmCircuitBreakerActor(
+            CircuitBreakerConfig.Redis,
+            app.Services.GetRequiredService<ILoggerFactory>().CreateLogger<LlmCircuitBreakerActor>(),
+            app.Services.GetRequiredService<IMeterFactory>()));
+    var redisCbPid = actorSystem.Root.SpawnNamed(redisCbProps, "circuit-breaker-redis");
+    appLogger.LogInformation("RES-003: Redis circuit breaker spawned at {Pid}", redisCbPid);
 });
 
 lifetime.ApplicationStopping.Register(async () =>

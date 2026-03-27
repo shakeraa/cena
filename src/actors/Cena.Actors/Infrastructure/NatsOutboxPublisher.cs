@@ -61,11 +61,15 @@ public sealed class NatsOutboxPublisher : BackgroundService
     // ── Configuration ──
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
     private const int MaxEventsPerCycle = 100;
+    private const int MaxRetries = 10; // RES-008: dead-letter after 10 retries
     private const string SubjectPrefix = "cena.events.";
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
+
+    // ── RES-008: Retry tracking (in-memory, reset on process restart) ──
+    private readonly Dictionary<long, int> _retryCountBySequence = new();
 
     // ── Telemetry (ACT-031: instance-based via IMeterFactory) ──
     private readonly ActivitySource _activitySource;
@@ -73,6 +77,8 @@ public sealed class NatsOutboxPublisher : BackgroundService
     private readonly Counter<long> _cycleCounter;
     private readonly Counter<long> _errorCounter;
     private readonly Histogram<double> _cycleDurationMs;
+    private readonly Counter<long> _republishedCounter;
+    private readonly Counter<long> _deadLetteredCounter;
 
     public NatsOutboxPublisher(
         IDocumentStore documentStore,
@@ -90,6 +96,8 @@ public sealed class NatsOutboxPublisher : BackgroundService
         _cycleCounter = meter.CreateCounter<long>("cena.outbox.cycles_total", description: "Outbox poll cycles");
         _errorCounter = meter.CreateCounter<long>("cena.outbox.errors_total", description: "Outbox publish errors");
         _cycleDurationMs = meter.CreateHistogram<double>("cena.outbox.cycle_duration_ms", description: "Outbox cycle duration");
+        _republishedCounter = meter.CreateCounter<long>("cena.outbox.republished_total", description: "Events re-published after retry");
+        _deadLetteredCounter = meter.CreateCounter<long>("cena.outbox.dead_lettered_total", description: "Events moved to dead letter after max retries");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -171,6 +179,33 @@ public sealed class NatsOutboxPublisher : BackgroundService
         {
             if (ct.IsCancellationRequested) break;
 
+            // RES-008: Check retry count — dead-letter events that exceeded max retries
+            var retryCount = _retryCountBySequence.GetValueOrDefault(eventWrapper.Sequence, 0);
+            if (retryCount >= MaxRetries)
+            {
+                _deadLetteredCounter.Add(1);
+                _logger.LogError(
+                    "Dead-lettering event {Sequence} ({Type}) after {MaxRetries} failed retries. " +
+                    "Event will not be delivered to NATS consumers.",
+                    eventWrapper.Sequence, eventWrapper.EventTypeName, MaxRetries);
+
+                // Store dead letter record in Marten for audit
+                session.Store(new NatsOutboxDeadLetter
+                {
+                    EventSequence = eventWrapper.Sequence,
+                    StreamId = eventWrapper.StreamKey ?? "unknown",
+                    EventType = eventWrapper.EventTypeName,
+                    RetryCount = retryCount,
+                    DeadLetteredAt = DateTimeOffset.UtcNow
+                });
+
+                // Skip past this event
+                _retryCountBySequence.Remove(eventWrapper.Sequence);
+                highestSequence = eventWrapper.Sequence;
+                published++; // Count as processed (not delivered) to advance HWM
+                continue;
+            }
+
             try
             {
                 // Determine NATS subject from event type
@@ -186,13 +221,24 @@ public sealed class NatsOutboxPublisher : BackgroundService
                 highestSequence = eventWrapper.Sequence;
                 published++;
                 _publishedCounter.Add(1);
+
+                // RES-008: Track re-publishes (retryCount > 0 means this was a retry)
+                if (retryCount > 0)
+                {
+                    _republishedCounter.Add(1);
+                    _retryCountBySequence.Remove(eventWrapper.Sequence);
+                }
             }
             catch (Exception ex)
             {
+                // RES-008: Increment retry counter for this sequence
+                _retryCountBySequence[eventWrapper.Sequence] = retryCount + 1;
                 _errorCounter.Add(1);
                 _logger.LogError(ex,
-                    "Failed to publish event {Sequence} ({Type}) to NATS. Will retry next cycle.",
-                    eventWrapper.Sequence, eventWrapper.EventTypeName);
+                    "Failed to publish event {Sequence} ({Type}) to NATS. " +
+                    "Retry {Retry}/{MaxRetries}. Will retry next cycle.",
+                    eventWrapper.Sequence, eventWrapper.EventTypeName,
+                    retryCount + 1, MaxRetries);
                 // Stop this cycle on first publish failure to maintain ordering
                 break;
             }
@@ -233,4 +279,22 @@ public sealed class NatsOutboxPublisher : BackgroundService
         activity?.SetTag("outbox.hwm", highestSequence);
         activity?.SetTag("outbox.duration_ms", sw.ElapsedMilliseconds);
     }
+}
+
+// =============================================================================
+// RES-008: DEAD LETTER TRACKING DOCUMENT
+// =============================================================================
+
+/// <summary>
+/// Marten document recording events that failed NATS delivery after max retries.
+/// Persisted for audit and manual re-processing.
+/// </summary>
+public sealed class NatsOutboxDeadLetter
+{
+    public Guid Id { get; set; } = Guid.NewGuid();
+    public long EventSequence { get; set; }
+    public string StreamId { get; set; } = "";
+    public string EventType { get; set; } = "";
+    public int RetryCount { get; set; }
+    public DateTimeOffset DeadLetteredAt { get; set; }
 }

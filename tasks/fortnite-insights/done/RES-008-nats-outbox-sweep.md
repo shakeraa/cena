@@ -6,7 +6,7 @@
 | **Effort**    | Low (2-3 hours)                              |
 | **Impact**    | Medium -- prevents message loss on NATS downtime |
 | **Origin**    | Fortnite's XMPP was fire-and-forget with no delivery guarantee. Messages lost silently. |
-| **Status**    | TODO                                         |
+| **Status**    | DONE                                         |
 | **Execution** | See [EXECUTION.md](EXECUTION.md#res-008-nats-outbox-sweep--p1-mostly-solved) |
 
 ---

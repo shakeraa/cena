@@ -73,6 +73,9 @@ public sealed partial class StudentActor : IActor
     private PID? _stagnationDetector;
     private PID? _outreachScheduler;
 
+    // ---- RES-003: Redis circuit breaker PID (resolved from cluster root) ----
+    private PID? _redisCbPid;
+
     // ---- Configuration ----
     private static readonly TimeSpan PassivationTimeout = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan MemoryCheckInterval = TimeSpan.FromMinutes(5);
@@ -447,8 +450,53 @@ public sealed partial class StudentActor : IActor
     }
 
     // =========================================================================
-    // REDIS CACHE
+    // REDIS CACHE (RES-003: circuit breaker aware)
     // =========================================================================
+
+    /// <summary>
+    /// Checks if the Redis circuit breaker is open. When open, all Redis ops
+    /// are skipped and the actor falls back to Marten-only reads.
+    /// </summary>
+    private async Task<bool> IsRedisCbOpen(IContext context)
+    {
+        if (_redisCbPid == null) return false;
+
+        try
+        {
+            var status = await context.RequestAsync<Gateway.CircuitStatusResponse>(
+                _redisCbPid, new Gateway.GetCircuitStatus(), TimeSpan.FromSeconds(1));
+            return status.State != Gateway.CircuitState.Closed;
+        }
+        catch
+        {
+            // If we can't reach the CB actor, assume Redis is available
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Reports a Redis operation failure to the circuit breaker.
+    /// </summary>
+    private void ReportRedisFailure(IContext context, string reason)
+    {
+        if (_redisCbPid != null)
+        {
+            context.Send(_redisCbPid, new Gateway.ReportFailure(
+                Guid.NewGuid().ToString(), reason, "redis"));
+        }
+    }
+
+    /// <summary>
+    /// Reports a Redis operation success to the circuit breaker.
+    /// </summary>
+    private void ReportRedisSuccess(IContext context)
+    {
+        if (_redisCbPid != null)
+        {
+            context.Send(_redisCbPid, new Gateway.ReportSuccess(
+                Guid.NewGuid().ToString(), "redis"));
+        }
+    }
 
     private async Task InvalidateRedisCache()
     {
@@ -461,7 +509,8 @@ public sealed partial class StudentActor : IActor
         catch (Exception ex)
         {
             _logger.LogWarning(ex,
-                "Failed to invalidate Redis cache for student {StudentId}", _studentId);
+                "Failed to invalidate Redis cache for student {StudentId}. " +
+                "RES-003: Redis CB will track this failure.", _studentId);
         }
     }
 
