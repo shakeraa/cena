@@ -109,9 +109,8 @@ export default defineConfig({
   server: {
     port: 5174,
     strictPort: true,
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
-    },
+    // COOP header removed — it blocks Firebase Google OAuth popup's window.close()
+    // Only needed for SharedArrayBuffer/WASM which Cena doesn't use
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
