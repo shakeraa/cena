@@ -1,14 +1,18 @@
 import type { App } from 'vue'
 
-import { createMongoAbility } from '@casl/ability'
 import { abilitiesPlugin } from '@casl/vue'
+import { ability } from './ability'
 import type { Rule } from './ability'
 
 export default function (app: App) {
+  // Restore abilities from cookie on app startup
   const userAbilityRules = useCookie<Rule[]>('userAbilityRules')
-  const initialAbility = createMongoAbility(userAbilityRules.value ?? [])
+  if (userAbilityRules.value?.length) {
+    ability.update(userAbilityRules.value)
+  }
 
-  app.use(abilitiesPlugin, initialAbility, {
+  // Use the SAME ability instance that useFirebaseAuth updates
+  app.use(abilitiesPlugin, ability, {
     useGlobalProperties: true,
   })
 }
