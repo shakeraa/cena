@@ -10,6 +10,7 @@ using System.Diagnostics.Metrics;
 using Cena.Actors.Api;
 using Cena.Admin.Api;
 using Cena.Actors.Configuration;
+using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Services;
@@ -332,6 +333,12 @@ lifetime.ApplicationStarted.Register(async () =>
             app.Services.GetRequiredService<ILoggerFactory>().CreateLogger<FeatureFlagActor>()));
     var ffPid = actorSystem.Root.SpawnNamed(ffProps, "feature-flags");
     appLogger.LogInformation("RES-010: Feature flag service spawned at {Pid}", ffPid);
+
+    // Seed demo data (roles, users, simulated students)
+    var store = app.Services.GetRequiredService<IDocumentStore>();
+    await RoleSeedData.SeedRolesAsync(store, appLogger);
+    await UserSeedData.SeedUsersAsync(store, appLogger);
+    await UserSeedData.SeedSimulatedStudentsAsync(store, appLogger, totalStudents: 100);
 });
 
 lifetime.ApplicationStopping.Register(async () =>
