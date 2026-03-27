@@ -324,7 +324,44 @@ public sealed class FocusDegradationService : IFocusDegradationService
         // ── Is sentiment negative? ──
         bool sentimentNegative = input.AnnotationSentiment < 0.3;
 
-        // ── Classification ──
+        // ── FOC-005: Confusion-aware classification (checked first) ──
+        // D'Mello & Graesser (2014): confusion is beneficial IF it resolves.
+        if (input.ConfusionState.HasValue)
+        {
+            switch (input.ConfusionState.Value)
+            {
+                case ConfusionState.ConfusionResolving:
+                    // Student is confused but working through it — DO NOT intervene
+                    return new StruggleClassification(
+                        Type: StruggleType.ProductiveConfusion,
+                        Confidence: 0.85,
+                        Recommendation: "Student is confused but resolving. Provide NO hint. " +
+                                        "Wait for resolution window to expire. " +
+                                        "Confusion that resolves produces deep learning."
+                    );
+
+                case ConfusionState.ConfusionStuck:
+                    // Confusion persisted past patience window — scaffold, don't restart
+                    return new StruggleClassification(
+                        Type: StruggleType.UnproductiveFrustration,
+                        Confidence: 0.85,
+                        Recommendation: "Confusion persisted past patience window. " +
+                                        "Provide scaffolding hint, not methodology switch. " +
+                                        "Confusion needs a nudge, not a restart."
+                    );
+
+                case ConfusionState.Confused:
+                    // Fresh confusion — monitor, don't intervene yet
+                    return new StruggleClassification(
+                        Type: StruggleType.ProductiveConfusion,
+                        Confidence: 0.6,
+                        Recommendation: "Confusion just detected. Monitor for resolution. " +
+                                        "Do NOT intervene yet — give the student time to work through it."
+                    );
+            }
+        }
+
+        // ── Standard classification (no confusion data or NotConfused) ──
         if (accuracyImproving && !errorsRepetitive && rtStable)
         {
             return new StruggleClassification(
@@ -602,7 +639,9 @@ public record StruggleInput(
     int SameErrorTypeCount,
     double ResponseTimeMean,
     double ResponseTimeStdDev,
-    double AnnotationSentiment
+    double AnnotationSentiment,
+    // ── FOC-005: Confusion state (optional — null = no confusion detection available) ──
+    ConfusionState? ConfusionState = null
 );
 
 public record StruggleClassification(
@@ -614,6 +653,7 @@ public record StruggleClassification(
 public enum StruggleType
 {
     ProductiveStruggle,       // Learning from difficulty — DON'T intervene
+    ProductiveConfusion,      // FOC-005: Confused but resolving — provide NO hint, wait
     ModerateStruggle,         // Mixed signals — observe 2 more questions
     UnproductiveFrustration,  // Stuck — switch methodology or reduce difficulty
     Disengagement             // Lost attention — suggest break or gamified challenge
