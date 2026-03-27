@@ -227,7 +227,8 @@ builder.Services.AddOpenTelemetry()
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddProcessInstrumentation()
-        .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)));
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
+        .AddPrometheusExporter());
 
 // =============================================================================
 // 8. HEALTH CHECKS
@@ -242,6 +243,9 @@ builder.Services.AddHealthChecks()
 // =============================================================================
 
 var app = builder.Build();
+
+// ---- Prometheus metrics endpoint (RES-002) ----
+app.MapPrometheusScrapingEndpoint();
 
 // ---- Health check endpoints ----
 app.MapHealthChecks("/health/ready", new HealthCheckOptions

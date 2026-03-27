@@ -6,7 +6,7 @@
 | **Effort**    | Low (1-2 hours)                           |
 | **Impact**    | High -- prevents actor mailbox starvation |
 | **Origin**    | Fortnite Feb 2018 outage: 40s DB calls blocked MCP threads, cascaded system-wide |
-| **Status**    | TODO                                      |
+| **Status**    | DONE                                      |
 | **Execution** | See [EXECUTION.md](EXECUTION.md#res-001-marten-write-timeouts--p0) |
 
 ---

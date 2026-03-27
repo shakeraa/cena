@@ -76,6 +76,7 @@ public sealed partial class StudentActor : IActor
     // ---- Configuration ----
     private static readonly TimeSpan PassivationTimeout = TimeSpan.FromMinutes(30);
     private static readonly TimeSpan MemoryCheckInterval = TimeSpan.FromMinutes(5);
+    private static readonly TimeSpan EventPersistTimeout = TimeSpan.FromMilliseconds(2000);
 
     // ---- Telemetry (ACT-023: instance-based via IMeterFactory) ----
     private readonly ActivitySource _activitySource;
@@ -85,6 +86,7 @@ public sealed partial class StudentActor : IActor
     private readonly Histogram<long> _actorMemoryUsage;
     private readonly Counter<long> _activationCounter;
     private readonly Counter<long> _passivationCounter;
+    private readonly Counter<long> _persistTimeoutCounter;
 
     public StudentActor(
         IDocumentStore documentStore,
@@ -117,6 +119,8 @@ public sealed partial class StudentActor : IActor
             description: "Actor activations");
         _passivationCounter = _meter.CreateCounter<long>("cena.student.passivations_total",
             description: "Actor passivations");
+        _persistTimeoutCounter = _meter.CreateCounter<long>("cena.student.persist_timeout_total",
+            description: "Event persistence timeouts");
     }
 
     // =========================================================================
@@ -354,9 +358,25 @@ public sealed partial class StudentActor : IActor
         activity?.SetTag("event.count", _pendingEvents.Count);
 
         // Persist ALL events atomically with expected version
+        // RES-001: 2s timeout prevents actor mailbox starvation on slow DB
         await using var session = _documentStore.LightweightSession();
         session.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
-        await session.SaveChangesAsync();
+
+        using var cts = new CancellationTokenSource(EventPersistTimeout);
+        try
+        {
+            await session.SaveChangesAsync(cts.Token);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            _persistTimeoutCounter.Add(1,
+                new KeyValuePair<string, object?>("student.id", _studentId));
+            _logger.LogError(
+                "Event persist timed out for student {StudentId} after {Timeout}ms. " +
+                "Letting supervision restart the actor.",
+                _studentId, EventPersistTimeout.TotalMilliseconds);
+            throw; // Supervision strategy will restart the actor
+        }
 
         _eventsSinceSnapshot += _pendingEvents.Count;
         sw.Stop();
@@ -393,7 +413,21 @@ public sealed partial class StudentActor : IActor
             if (snapshot != null)
             {
                 session.Store(snapshot);
-                await session.SaveChangesAsync();
+                // RES-001: 2s timeout on snapshot writes too
+                using var snapshotCts = new CancellationTokenSource(EventPersistTimeout);
+                try
+                {
+                    await session.SaveChangesAsync(snapshotCts.Token);
+                }
+                catch (OperationCanceledException) when (snapshotCts.IsCancellationRequested)
+                {
+                    _persistTimeoutCounter.Add(1,
+                        new KeyValuePair<string, object?>("student.id", _studentId));
+                    _logger.LogError(
+                        "Snapshot persist timed out for student {StudentId} after {Timeout}ms",
+                        _studentId, EventPersistTimeout.TotalMilliseconds);
+                    throw;
+                }
             }
 
             _eventsSinceSnapshot = 0;
