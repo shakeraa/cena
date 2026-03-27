@@ -1810,18 +1810,33 @@ The base unit. Each concept node in the graph has a mastery state per student.
 
 ```
 ConceptMasteryState {
-  mastery_probability: Float      // 0.0-1.0, from BKT/MIRT
-  half_life_hours: Float          // from HLR, for spaced repetition
-  last_interaction: Timestamp     // for decay computation
-  bloom_level: Int                // 0-6, highest demonstrated level
-  confidence_self: Float          // 0.0-1.0, student self-assessment
-  error_pattern: ErrorType[]      // recent error classifications
-  attempt_count: Int              // total attempts
-  current_streak: Int             // consecutive correct
+  // Core mastery signals (Learner Context — StudentProfile actor, event-sourced)
+  mastery_probability: Float      // 0.0-1.0, from BKT (Phase 1) / MIRT theta (Phase 2)
+  half_life_hours: Float          // from HLR, for spaced repetition scheduling
+  last_interaction: Timestamp     // for decay computation via HLR
+  bloom_level: Int                // 0-6, highest demonstrated Bloom's level
+  confidence_self: Float          // 0.0-1.0, student self-assessment (calibration input)
+  error_pattern: ErrorType[]      // recent error classifications (conceptual, procedural, careless, systematic)
+  attempt_count: Int              // total attempts on this concept
+  correct_count: Int              // total correct responses (for Beta distribution CI)
+  current_streak: Int             // consecutive correct (gamification + simple mastery signal)
+  mastery_quality: Float          // 0.0-1.0, from Mastery Quality Matrix (Section 2.9)
+  storage_strength: Float         // Bjork's S_s — monotonically increasing with practice
+  methodology_history: String[]   // methodologies attempted for this concept (for MethodologySwitched cycling prevention)
 
-  // Computed properties
-  recall_probability: Float       // p(recall) = 2^(-delta/h), real-time
-  effective_mastery: Float        // min(mastery, prerequisite_support)
+  // Computed properties (derived in real-time by StudentProfile actor)
+  recall_probability: Float       // p(recall) = 2^(-delta/h), recomputed on access
+  effective_mastery: Float        // min(mastery, prerequisite_support) — graph-constrained
+  composite_mastery: Float        // weighted fusion of all signals (Section 5.3)
+  confidence_interval: [Float, Float]  // 95% CI from Beta(1+correct, 1+incorrect) or MIRT SE
+  mastery_quality_quadrant: String  // dominant quadrant from recent interactions
+
+  // Cross-context references
+  // Curriculum Context (Section 3.2.1): concept difficulty, prerequisite graph, MCM edges
+  //   → concept_difficulty and prerequisite_depth are read from Neo4j at actor startup
+  // Pedagogy Context (Section 3.2.3): LearningSession actor emits SessionStarted,
+  //   SessionEnded, ExerciseAttempted — these feed into the StudentProfile via NATS JetStream
+  // Delivery Context (Section 3.2.4): LLM-based ClassifyError responses populate error_pattern
 }
 ```
 
@@ -2262,6 +2277,32 @@ Train a meta-model on Phase 2 data to optimize weights. Use the meta-model's fea
 - The knowledge graph in Neo4j stores the prerequisite structure; the `StudentProfile` actor caches its local subgraph (concepts the student has encountered + their prerequisites) for fast `prerequisite_support(c)` computation without per-interaction Neo4j queries
 - Phase 3 meta-model weights are stored as A/B experiment cohort configuration in the `StudentProfile` — each student's experiment cohort assignment determines which weight vector is used for composite scoring
 - SignalR WebSocket push delivers real-time mastery updates to the React Native/React clients — when any concept's `effective_mastery` changes, the diff is pushed to the client's knowledge graph visualization
+
+**Bounded context alignment (architecture-design.md sections 3.2.1-3.2.3):**
+
+| Bounded Context | Role in Mastery Measurement | Domain Events Consumed/Produced |
+|----------------|---------------------------|-------------------------------|
+| **Curriculum Context** (3.2.1, upstream) | Provides concept metadata, difficulty ratings, prerequisite graph structure (Neo4j), MCM graph for methodology routing. Read-only by mastery models. | Produces: concept metadata updates (rare). Consumed by: all mastery models for concept difficulty and graph structure. |
+| **Learner Context** (3.2.2, core) | Owns the `StudentProfile` aggregate root with `ConceptMasteryState` per concept. Runs BKT/MIRT, HLR, composite scoring. Single source of truth for mastery. | Produces: `ConceptAttempted`, `ConceptMastered`, `MasteryDecayed`, `MethodologySwitched`, `StagnationDetected`, `AnnotationAdded`. Consumed by: Engagement, Outreach, Analytics, Pedagogy contexts. |
+| **Pedagogy Context** (3.2.3, core) | Owns the `LearningSession` actor. Controls item selection, interleaving ratio, difficulty calibration, scaffolding level, and methodology switching. Uses mastery signals to drive real-time adaptation. | Produces: `SessionStarted`, `SessionEnded`, `ExerciseAttempted`, `MethodologySwitched`. Consumed by: Learner Context (via `ConceptAttempted` mapping), Analytics Context. |
+
+**Domain event flow for mastery computation:**
+
+```
+[Student answers question]
+  → Pedagogy Context: LearningSession emits ExerciseAttempted
+  → Learner Context: StudentProfile receives ConceptAttempted (mapped from ExerciseAttempted)
+    → BKT update: P(L_t) → P(L_{t+1})
+    → HLR update: h_new, t_last_review = now
+    → Mastery Quality Matrix: classify quadrant (fast/slow × correct/incorrect)
+    → Composite scoring: weighted fusion of all signals
+    → Effective mastery: apply prerequisite floor from Neo4j graph
+    → If effective_mastery >= 0.90: emit ConceptMastered → Engagement Context (XP, badges)
+    → If recall_probability < 0.70: emit MasteryDecayed → Outreach Context (notifications)
+    → If stagnation_composite > 0.7 for 3 sessions: emit StagnationDetected → Pedagogy Context
+      → Pedagogy Context: MethodologySwitchService queries Curriculum Context MCM graph
+      → Pedagogy Context: emits MethodologySwitched → Learner Context (updates methodology_history)
+```
 
 ---
 
