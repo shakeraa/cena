@@ -102,6 +102,14 @@ P(L_{t+1}) = P(L_t | obs) + (1 - P(L_t | obs)) * P(T)
 - Graph prerequisites can be layered on top as business rules: "concept B cannot be marked mastered unless prerequisite A has P(L) > 0.85"
 - The mastery vector (one P(L) per concept) is the student's knowledge overlay on the graph
 
+**Cena implementation mapping:**
+- The `StudentProfile` virtual actor (Proto.Actor, event-sourced) maintains one BKT state per concept in its knowledge overlay
+- On each `ConceptAttempted` domain event: run BKT update, emit `ConceptMastered` if P(L) crosses 0.90 threshold, or emit `MasteryDecayed` if recall drops below 0.70
+- BKT parameters (P(L_0), P(T), P(S), P(G)) per knowledge component stored in Neo4j as concept node properties, trained offline via pyBKT on PostgreSQL/Marten event store replays
+- The `MethodologySwitched` event triggers a methodology-conditioned P(T) lookup — different teaching methods may have different transition probabilities for the same concept
+- Snapshot every 100 events: the full BKT state vector is serialized as part of the `StudentProfile` actor snapshot in PostgreSQL/Marten
+- NATS JetStream publishes `ConceptMastered` events for downstream consumption by the Engagement Context (XP/badges) and Analytics Context (dashboards)
+
 ---
 
 #### 1.1.2 Deep Knowledge Tracing (DKT)
@@ -614,6 +622,14 @@ where:
 - The MIRT theta vector provides the "zoomed out" mastery view; BKT provides the "zoomed in" per-concept view
 - Estimate MIRT parameters offline in batch; use the estimated theta vector as a prior that informs BKT updates
 
+**Cena implementation mapping:**
+- The Q-matrix is derived from Neo4j's concept graph: each item's concept tags define which MIRT dimensions it loads on. Cypher query: `MATCH (i:Item)-[:ASSESSES]->(c:Concept) RETURN i.id, collect(c.cluster_id)`
+- MIRT parameter estimation runs as an offline batch job (Python, `mirt` or `mirtjml` package) on the Analytics Context's read replica of the PostgreSQL/Marten event store
+- Estimated theta vectors are published back to the Learner Context via NATS JetStream `learner.mirt.updated` event
+- The `StudentProfile` virtual actor receives the MIRT theta update and uses it as a Bayesian prior for BKT: `P(L_0) = sigmoid(theta_k)` for concept k's cluster dimension
+- The `StagnationDetected` event can trigger a targeted MIRT re-estimation for the stagnated concept cluster — if the student's theta is misestimated, the MIRT update corrects the prior and unblocks progress
+- Confidence intervals from MIRT's Fisher information matrix determine whether `ConceptMastered` events should fire — the lower bound of the 95% CI must exceed the mastery threshold (0.90)
+
 ---
 
 ### 1.3 Spaced Repetition and Forgetting Curve Models
@@ -708,6 +724,15 @@ where:
 - Review scheduling: `p(recall) = 2^(-delta / h)`; when `p < 0.85`, schedule review
 - Concept difficulty and prerequisite depth from the graph are input features to the half-life regression
 - Cross-concept effects not modeled (see Section 3.6 for decay propagation)
+
+**Cena implementation mapping:**
+- The `StudentProfile` virtual actor stores `(h, t_last_review)` per concept as part of its event-sourced state
+- On each `ConceptAttempted` event: update half-life `h` using the HLR regression, update `t_last_review` to now
+- The `MasteryDecayed` domain event is emitted when a background timer in the `StudentProfile` actor detects `p(recall) < 0.70` — this actor uses Proto.Actor's `ReceiveTimeout` to periodically re-evaluate decay without external cron jobs
+- HLR feature vector for STEM includes: `attempt_count`, `correct_count`, `concept_difficulty` (from Neo4j node property), `prerequisite_depth` (graph distance to root), `bloom_level_achieved`, `days_since_first_encounter`
+- HLR theta weights trained offline via Python (scikit-learn logistic regression) on the Analytics Context's PostgreSQL/Marten event store replay
+- Review scheduling events published via NATS JetStream to the Outreach Context, which triggers WhatsApp/Telegram/push notifications: "Time to review [concept] — your recall is fading"
+- The `AnnotationAdded` event on a concept resets `t_last_review` (annotation counts as a retrieval opportunity, extending the half-life)
 
 ---
 
@@ -1092,6 +1117,13 @@ output: {
 - Misconceptions can be modeled as "anti-nodes" or negative edges in the concept graph: misconception M is associated with concept C and blocks mastery of C until resolved
 - The misconception library can be stored as metadata on concept nodes or as a separate overlay graph
 - When a misconception is detected, it effectively "locks" the concept node and its dependents until resolved
+
+**Cena implementation mapping:**
+- Error classification runs in the Pedagogy Context's `LearningSession` actor — each `ConceptAttempted` event includes the student's response, which is classified by the LLM tier (Kimi K2.5 for structured/MCQ responses, Claude Sonnet 4.6 for open-ended)
+- Classified error types are stored as part of the `ConceptAttempted` event payload in PostgreSQL/Marten
+- The `StagnationDetected` domain event fires when the error taxonomy shows systematic/repeated error patterns (3+ same error type across sessions) — this triggers the MCM graph lookup in the Pedagogy Context for methodology switching
+- Misconception nodes in Neo4j: `(:Misconception {id, description, subject})-[:BLOCKS]->(:Concept)` — when a misconception is detected, the `StudentProfile` actor adds a `(:Student)-[:HAS_MISCONCEPTION]->(:Misconception)` edge
+- The `MethodologySwitched` event is emitted when error classification triggers a switch from the current teaching method to one better suited to the error type (conceptual → Socratic, procedural → drill)
 
 ---
 
@@ -1783,6 +1815,17 @@ confidence_interval  = MIRT standard error + sample size adjustment
 **Phase 3 (Optimization — data-driven):**
 
 Train a meta-model on Phase 2 data to optimize weights. Use the meta-model's feature importance to validate or adjust the hand-tuned weights. Run A/B tests: composite mastery score vs. simple BKT mastery, measured against long-term retention and Bagrut exam correlation.
+
+**Cena implementation mapping across all phases:**
+- The `StudentProfile` virtual actor (Proto.Actor, event-sourced on PostgreSQL/Marten) is the single source of truth for all mastery computation — it holds the full `ConceptMasteryState` per concept
+- Phase 1 computation runs inline in the actor's `Handle(ConceptAttempted)` method — BKT update + HLR update + prerequisite propagation via Neo4j graph traversal (cached in-memory at actor startup)
+- `ConceptMastered` events are emitted when `effective_mastery(c) >= 0.90` — consumed by Engagement Context (XP, badges, streak) and Analytics Context (dashboards)
+- `MasteryDecayed` events are emitted by the actor's `ReceiveTimeout` handler when `recall_score(c)` drops below 0.70 — consumed by Outreach Context (push notifications, WhatsApp reminders)
+- `StagnationDetected` events trigger when the composite stagnation score (accuracy plateau + latency drift + session abandonment + error repetition + annotation sentiment) exceeds 0.7 for 3 consecutive sessions — consumed by Pedagogy Context for `MethodologySwitched`
+- Phase 2 MIRT theta vectors are computed offline (Python batch job on Analytics read replica) and published to the `StudentProfile` actor via NATS JetStream `learner.mirt.updated` — the actor integrates the theta vector as a prior for BKT
+- The knowledge graph in Neo4j stores the prerequisite structure; the `StudentProfile` actor caches its local subgraph (concepts the student has encountered + their prerequisites) for fast `prerequisite_support(c)` computation without per-interaction Neo4j queries
+- Phase 3 meta-model weights are stored as A/B experiment cohort configuration in the `StudentProfile` — each student's experiment cohort assignment determines which weight vector is used for composite scoring
+- SignalR WebSocket push delivers real-time mastery updates to the React Native/React clients — when any concept's `effective_mastery` changes, the diff is pushed to the client's knowledge graph visualization
 
 ---
 
