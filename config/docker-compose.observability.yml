@@ -1,0 +1,38 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — Observability Stack (RES-002)
+# Usage: docker compose -f docker-compose.yml -f config/docker-compose.observability.yml up
+# ═══════════════════════════════════════════════════════════════════════
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: cena-prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: cena-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=cena
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/cena-actors.json
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      prometheus:
+        condition: service_healthy
+
+volumes:
+  grafana_data:

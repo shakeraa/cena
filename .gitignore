@@ -30,10 +30,19 @@ credentials.json
 node_modules/
 build/
 dist/
+dist-ssr/
 bin/
 obj/
 *.dll
 *.exe
+
+# ── Admin dashboard (Vuexy) ──
+src/admin/full-version/dist/
+src/admin/full-version/dist-ssr/
+src/admin/full-version/node_modules/
+src/admin/full-version/*.local
+src/admin/full-version/.env*
+!src/admin/full-version/.env.example
 
 # ── .NET ──
 *.user
@@ -57,6 +66,8 @@ pubspec.lock
 # ── Firebase ──
 firebase-debug.log
 .firebase/
+**/service-account-key.json
+**/serviceAccountKey.json
 
 # ── Logs ──
 *.log

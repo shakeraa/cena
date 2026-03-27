@@ -1,0 +1,80 @@
+{
+  "Dashboards": "لوحات القيادة",
+  "Platform Overview": "نظرة عامة على المنصة",
+  "Focus & Attention": "التركيز والانتباه",
+  "Mastery Progress": "تقدّم الإتقان",
+  "Outreach & Engagement": "التواصل والمشاركة",
+  "Content": "المحتوى",
+  "Ingestion Pipeline": "خط الاستيعاب",
+  "Moderation Queue": "طابور المراجعة",
+  "Question Bank": "بنك الأسئلة",
+  "Users": "المستخدمون",
+  "All Users": "جميع المستخدمين",
+  "Roles & Permissions": "الأدوار والأذونات",
+  "Roles": "الأدوار",
+  "Permissions": "الأذونات",
+  "Pedagogy": "التربية",
+  "Methodology Analytics": "تحليل المنهجيات",
+  "Cultural Context": "السياق الثقافي",
+  "System": "النظام",
+  "Actor Health": "صحة الفاعلين",
+  "Event Stream": "تدفق الأحداث",
+  "Settings": "الإعدادات",
+  "Audit Log": "سجل التدقيق",
+  "Account Settings": "إعدادات الحساب",
+  "Dashboard": "لوحة القيادة",
+  "Login": "تسجيل الدخول",
+  "Forgot Password": "نسيت كلمة المرور",
+  "Reset Password": "إعادة تعيين كلمة المرور",
+  "Not Authorized": "غير مصرّح",
+  "List": "قائمة",
+  "View": "عرض",
+  "Add": "إضافة",
+  "Edit": "تعديل",
+  "Overview": "نظرة عامة",
+  "Security": "الأمان",
+  "Activity": "النشاط",
+  "Sessions": "الجلسات",
+  "Details": "التفاصيل",
+  "Analytics": "التحليلات",
+  "User": "المستخدم",
+  "Actions": "الإجراءات",
+  "Statistics": "الإحصائيات",
+  "$vuetify": {
+    "badge": "شارة",
+    "noDataText": "لا تتوافر بيانات",
+    "close": "إغلاق",
+    "open": "فتح",
+    "loading": "جارٍ التحميل",
+    "dataFooter": {
+      "itemsPerPageText": "عناصر في الصفحة:",
+      "itemsPerPageAll": "الكل",
+      "pageText": "{0}-{1} من {2}",
+      "firstPage": "الصفحة الأولى",
+      "prevPage": "الصفحة السابقة",
+      "nextPage": "الصفحة التالية",
+      "lastPage": "الصفحة الأخيرة"
+    },
+    "pagination": {
+      "ariaLabel": {
+        "root": "التنقل بين الصفحات",
+        "previous": "السابق",
+        "first": "الأول",
+        "last": "الأخير",
+        "next": "التالي",
+        "currentPage": "الصفحة الحالية",
+        "page": "صفحة"
+      }
+    },
+    "input": {
+      "clear": "مسح",
+      "appendAction": "إلحاق",
+      "prependAction": "إضافة قبل"
+    },
+    "rating": {
+      "ariaLabel": {
+        "item": "تقييم"
+      }
+    }
+  }
+}

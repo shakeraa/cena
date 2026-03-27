@@ -1,0 +1,80 @@
+{
+  "Dashboards": "Dashboards",
+  "Platform Overview": "Platform Overview",
+  "Focus & Attention": "Focus & Attention",
+  "Mastery Progress": "Mastery Progress",
+  "Outreach & Engagement": "Outreach & Engagement",
+  "Content": "Content",
+  "Ingestion Pipeline": "Ingestion Pipeline",
+  "Moderation Queue": "Moderation Queue",
+  "Question Bank": "Question Bank",
+  "Users": "Users",
+  "All Users": "All Users",
+  "Roles & Permissions": "Roles & Permissions",
+  "Roles": "Roles",
+  "Permissions": "Permissions",
+  "Pedagogy": "Pedagogy",
+  "Methodology Analytics": "Methodology Analytics",
+  "Cultural Context": "Cultural Context",
+  "System": "System",
+  "Actor Health": "Actor Health",
+  "Event Stream": "Event Stream",
+  "Settings": "Settings",
+  "Audit Log": "Audit Log",
+  "Account Settings": "Account Settings",
+  "Dashboard": "Dashboard",
+  "Login": "Login",
+  "Forgot Password": "Forgot Password",
+  "Reset Password": "Reset Password",
+  "Not Authorized": "Not Authorized",
+  "List": "List",
+  "View": "View",
+  "Add": "Add",
+  "Edit": "Edit",
+  "Overview": "Overview",
+  "Security": "Security",
+  "Activity": "Activity",
+  "Sessions": "Sessions",
+  "Details": "Details",
+  "Analytics": "Analytics",
+  "User": "User",
+  "Actions": "Actions",
+  "Statistics": "Statistics",
+  "$vuetify": {
+    "badge": "Badge",
+    "noDataText": "No data available",
+    "close": "Close",
+    "open": "Open",
+    "loading": "Loading",
+    "dataFooter": {
+      "itemsPerPageText": "Items per page:",
+      "itemsPerPageAll": "All",
+      "pageText": "{0}-{1} of {2}",
+      "firstPage": "First Page",
+      "prevPage": "Previous Page",
+      "nextPage": "Next Page",
+      "lastPage": "Last Page"
+    },
+    "pagination": {
+      "ariaLabel": {
+        "root": "Pagination",
+        "previous": "Previous",
+        "first": "First",
+        "last": "Last",
+        "next": "Next",
+        "currentPage": "Current Page",
+        "page": "Page"
+      }
+    },
+    "input": {
+      "clear": "Clear",
+      "appendAction": "Append",
+      "prependAction": "Prepend"
+    },
+    "rating": {
+      "ariaLabel": {
+        "item": "Rating"
+      }
+    }
+  }
+}

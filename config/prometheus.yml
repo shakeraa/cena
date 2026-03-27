@@ -1,0 +1,17 @@
+# Cena Platform — Prometheus Configuration (RES-002)
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: "cena-actors-host"
+    # Scrape the ASP.NET Core Prometheus endpoint
+    # Adjust target if running outside Docker (use host.docker.internal on macOS)
+    static_configs:
+      - targets: ["host.docker.internal:5000"]
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]

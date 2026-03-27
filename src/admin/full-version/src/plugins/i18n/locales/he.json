@@ -1,0 +1,80 @@
+{
+  "Dashboards": "לוחות בקרה",
+  "Platform Overview": "סקירת הפלטפורמה",
+  "Focus & Attention": "מיקוד וקשב",
+  "Mastery Progress": "התקדמות בשליטה",
+  "Outreach & Engagement": "פנייה ומעורבות",
+  "Content": "תוכן",
+  "Ingestion Pipeline": "צינור קליטה",
+  "Moderation Queue": "תור בדיקה",
+  "Question Bank": "בנק שאלות",
+  "Users": "משתמשים",
+  "All Users": "כל המשתמשים",
+  "Roles & Permissions": "תפקידים והרשאות",
+  "Roles": "תפקידים",
+  "Permissions": "הרשאות",
+  "Pedagogy": "פדגוגיה",
+  "Methodology Analytics": "ניתוח מתודולוגיות",
+  "Cultural Context": "הקשר תרבותי",
+  "System": "מערכת",
+  "Actor Health": "תקינות שחקנים",
+  "Event Stream": "זרם אירועים",
+  "Settings": "הגדרות",
+  "Audit Log": "יומן ביקורת",
+  "Account Settings": "הגדרות חשבון",
+  "Dashboard": "לוח בקרה",
+  "Login": "התחברות",
+  "Forgot Password": "שכחתי סיסמה",
+  "Reset Password": "איפוס סיסמה",
+  "Not Authorized": "אין הרשאה",
+  "List": "רשימה",
+  "View": "צפייה",
+  "Add": "הוספה",
+  "Edit": "עריכה",
+  "Overview": "סקירה",
+  "Security": "אבטחה",
+  "Activity": "פעילות",
+  "Sessions": "הפעלות",
+  "Details": "פרטים",
+  "Analytics": "ניתוח",
+  "User": "משתמש",
+  "Actions": "פעולות",
+  "Statistics": "סטטיסטיקות",
+  "$vuetify": {
+    "badge": "תג",
+    "noDataText": "אין נתונים זמינים",
+    "close": "סגור",
+    "open": "פתח",
+    "loading": "טוען",
+    "dataFooter": {
+      "itemsPerPageText": "פריטים בעמוד:",
+      "itemsPerPageAll": "הכל",
+      "pageText": "{0}-{1} מתוך {2}",
+      "firstPage": "עמוד ראשון",
+      "prevPage": "עמוד קודם",
+      "nextPage": "עמוד הבא",
+      "lastPage": "עמוד אחרון"
+    },
+    "pagination": {
+      "ariaLabel": {
+        "root": "ניווט עמודים",
+        "previous": "הקודם",
+        "first": "ראשון",
+        "last": "אחרון",
+        "next": "הבא",
+        "currentPage": "עמוד נוכחי",
+        "page": "עמוד"
+      }
+    },
+    "input": {
+      "clear": "נקה",
+      "appendAction": "הוסף",
+      "prependAction": "הקדם"
+    },
+    "rating": {
+      "ariaLabel": {
+        "item": "דירוג"
+      }
+    }
+  }
+}

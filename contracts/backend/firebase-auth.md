@@ -23,7 +23,7 @@ Custom claims are set server-side via Firebase Admin SDK on user creation and ro
 
 ```json
 {
-  "role": "STUDENT | TEACHER | PARENT | ADMIN",
+  "role": "STUDENT | TEACHER | PARENT | MODERATOR | ADMIN | SUPER_ADMIN",
   "school_id": "sch_abc123",
   "student_ids": ["stu_001", "stu_002"],
   "locale": "he | ar | en",
@@ -37,7 +37,7 @@ Custom claims are set server-side via Firebase Admin SDK on user creation and ro
 
 | Claim | Type | Required | Description |
 |-------|------|----------|-------------|
-| `role` | enum | Yes | One of: `STUDENT`, `TEACHER`, `PARENT`, `ADMIN` |
+| `role` | enum | Yes | One of: `STUDENT`, `TEACHER`, `PARENT`, `MODERATOR`, `ADMIN`, `SUPER_ADMIN` |
 | `school_id` | string | No | Set for teachers; links to school tenant |
 | `student_ids` | string[] | No | Set for parents; list of linked student accounts |
 | `locale` | string | Yes | UI language preference (he/ar/en) |
@@ -45,14 +45,19 @@ Custom claims are set server-side via Firebase Admin SDK on user creation and ro
 
 ### Role Permissions Matrix
 
-| Resource | STUDENT | PARENT | TEACHER | ADMIN |
-|----------|---------|--------|---------|-------|
-| Own session data | RW | R (linked children) | R (class) | RW |
-| Knowledge graph | R | R | R | RW |
-| LLM tutoring | RW | - | - | RW |
-| Analytics dashboard | - | R (children) | R (class) | RW |
-| Billing / subscription | - | RW | - | RW |
-| Admin panel | - | - | - | RW |
+| Resource | STUDENT | PARENT | TEACHER | MODERATOR | ADMIN | SUPER_ADMIN |
+|----------|---------|--------|---------|-----------|-------|-------------|
+| Own session data | RW | R (linked children) | R (class) | - | RW | RW |
+| Knowledge graph | R | R | R | R | RW | RW |
+| LLM tutoring | RW | - | - | - | RW | RW |
+| Analytics dashboard | - | R (children) | R (class) | R (content) | RW | RW |
+| Content moderation | - | - | - | RW | RW | RW |
+| Question bank | - | - | R | RW | RW | RW |
+| User management | - | - | - | - | RW (own org) | RW (all) |
+| Billing / subscription | - | RW | - | - | RW | RW |
+| Admin panel | - | - | - | R (content section) | RW (own org) | RW |
+| System settings | - | - | - | - | - | RW |
+| Audit log | - | - | - | - | R | RW |
 
 ---
 
@@ -104,11 +109,13 @@ Pipeline: HTTP Request -> JwtBearerMiddleware -> ClaimsTransformer -> Controller
 ### Authorization Policies (.NET)
 
 ```
-Policy "StudentOnly"   -> RequireClaim("role", "STUDENT")
-Policy "ParentOrAbove" -> RequireClaim("role", ["PARENT", "TEACHER", "ADMIN"])
-Policy "TeacherOrAbove"-> RequireClaim("role", ["TEACHER", "ADMIN"])
-Policy "AdminOnly"     -> RequireClaim("role", "ADMIN")
-Policy "OwnStudent"    -> Custom: token.student_ids contains route param {studentId}
+Policy "StudentOnly"      -> RequireClaim("role", "STUDENT")
+Policy "ParentOrAbove"    -> RequireClaim("role", ["PARENT", "TEACHER", "MODERATOR", "ADMIN", "SUPER_ADMIN"])
+Policy "TeacherOrAbove"   -> RequireClaim("role", ["TEACHER", "MODERATOR", "ADMIN", "SUPER_ADMIN"])
+Policy "ModeratorOrAbove" -> RequireClaim("role", ["MODERATOR", "ADMIN", "SUPER_ADMIN"])
+Policy "AdminOnly"        -> RequireClaim("role", ["ADMIN", "SUPER_ADMIN"])
+Policy "SuperAdminOnly"   -> RequireClaim("role", "SUPER_ADMIN")
+Policy "OwnStudent"       -> Custom: token.student_ids contains route param {studentId}
 ```
 
 ---
