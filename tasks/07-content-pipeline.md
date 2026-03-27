@@ -1,7 +1,7 @@
 # 07 — Content Pipeline Tasks
 
-**Technology:** Neo4j, Kimi K2.5 (batch), Remotion (Node.js), Expert Review Tool
-**Contract files:** `contracts/data/neo4j-schema.cypher`, `contracts/llm/diagram-generation-pipeline.py`, `docs/content-authoring.md`
+**Technology:** Neo4j, GPT-4o/Claude (batch), Gemini 2.5 Flash (OCR), Remotion (Node.js), Expert Review Tool
+**Contract files:** `contracts/data/neo4j-schema.cypher`, `contracts/llm/diagram-generation-pipeline.py`, `docs/content-authoring.md`, `docs/question-ingestion-specification.md`
 **Stage:** Foundation (Weeks 1-4) + ongoing
 
 ---
@@ -99,3 +99,52 @@ def test_question_generation_quality():
 - [ ] 12,000-22,500 questions
 - [ ] Expert review: 6-12 weeks
 - [ ] **Test:** Same QA pass as Math; advisor approval rate > 70%
+
+## CNT-007: Diagram Generation Scheduler
+
+**Priority:** P2 | **Blocked by:** CNT-002
+
+- See `tasks/content/CNT-007-diagram-scheduler.md`
+
+---
+
+## CNT-008: Question Ingestion Pipeline (Extract, OCR, Normalize, Classify, Dedup)
+
+**Priority:** P1 | **Blocked by:** DATA-003, INF-005, CNT-001 | **Effort:** 8 days
+
+- [ ] S3 file watcher + URL fetcher with idempotency (SHA-256 dedup)
+- [ ] OCR: Gemini 2.5 Flash primary, Mathpix fallback for complex equations
+- [ ] LLM-first question segmentation (multi-part chains preserved)
+- [ ] Normalize to Cena Item Schema (~30 fields, LaTeX math, bilingual locale map)
+- [ ] 5-stage quality classification: SymPy + SVM Bloom's + LLM difficulty/language/pedagogy
+- [ ] 3-level deduplication: exact hash → structural AST → semantic embedding
+- [ ] Re-creation engine: generate 3-5 original questions per extracted pattern
+- [ ] **Test:** Ingest 10 Bagrut PDF pages → extract ≥ 30 questions → classify all → 0 duplicates served
+- See `tasks/content/CNT-008-ingestion.md` for subtasks
+
+## CNT-009: Moderation & Expert Review Workflow
+
+**Priority:** P1 | **Blocked by:** CNT-008, CNT-003 | **Effort:** 5 days
+
+- [ ] Extended review queue (ingested + re-created + batch-generated items)
+- [ ] Review actions: approve, edit, reject, escalate, request re-generation
+- [ ] Auto-approval engine: quality > 0.95 AND SymPy verified → skip human review (10% spot-check)
+- [ ] Bias audit: representational, cultural, gender, stereotype detection
+- [ ] Rejection analytics + escalation (20% → alert, 40% → pause generation)
+- [ ] Moderator management: assignment by language/subject, inter-rater reliability tracking
+- [ ] **Test:** Auto-approval spot-check rejection < 5%; moderator throughput ≥ 12 items/hour
+- See `tasks/content/CNT-009-moderation.md` for subtasks
+
+## CNT-010: Adaptive Question Serving (Student-Personalized)
+
+**Priority:** P0 | **Blocked by:** CNT-009, ACT-001, DATA-003 | **Effort:** 6 days
+
+- [ ] Question Pool Actor: in-memory per-subject, hot-reload on publish events
+- [ ] Student context: BKT mastery, focus state, ZPD bounds, session history, language, depth unit
+- [ ] Multi-criteria selection: concept priority → Bloom's progression → ZPD difficulty → item freshness
+- [ ] Focus-aware adaptation: reduce difficulty on declining focus, suggest microbreaks on critical
+- [ ] Session goal modes: practice, review, challenge, diagnostic, exam prep
+- [ ] REST + SignalR delivery API with localized content (Hebrew or Arabic, shared math)
+- [ ] Serving quality gates: published + SymPy verified + 24h cool-off + no student reports
+- [ ] **Test:** Selection < 10ms; focus adaptation triggers at correct thresholds; no repeats within session
+- See `tasks/content/CNT-010-serving.md` for subtasks

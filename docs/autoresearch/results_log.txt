@@ -65,3 +65,27 @@ OUTPUTS:
   - docs/arabic-math-education-research.md (Arabic specifics, ~450 lines)
 
 SOURCES: 50+ citations across legal, technical, educational, and competitive domains
+
+==================================================
+AUTORESEARCH LOG — Question Ingestion & Normalization Pipeline
+Started: 2026-03-27
+Extends: docs/syllabus-corpus-strategy.md (gap: no interactive/on-demand ingestion flow)
+==================================================
+
+ITERATION 1-3 (parallel): 3 research agents launched simultaneously
+  1. Math OCR benchmarks (Mathpix, Gemini, Nougat, GOT-OCR, etc.) — COMPLETE
+  2. Question ingestion pipeline architecture (7 areas: OCR, extraction, schema, quality, dedup, watching, caching) — COMPLETE
+  3. Assessment item schemas (QTI 3.0, Khan Perseus, Learnosity, custom) — COMPLETE
+
+KEY FINDINGS:
+  - OCR: Gemini 2.5 Flash primary + Mathpix fallback. Tesseract/Nougat ruled out.
+  - Schema: QTI 3.0 is overkill (XML-only, no adaptive fields). Build Cena-specific JSON.
+  - Bloom's: SVM+TF-IDF outperforms LLMs (94% vs 72-73% zero-shot)
+  - Dedup: 3-level (exact SHA-256, structural math AST, semantic embedding)
+  - Cost: ~$25-50 one-time for full corpus, ~$30/month infra
+
+OUTPUTS:
+  - docs/autoresearch/question-ingestion-research.md (consolidated pipeline spec)
+  - docs/math-ocr-research.md (OCR tool comparison)
+  - docs/question-ingestion-pipeline-research.md (full architecture, 7 areas)
+  - docs/assessment-item-schema-research.md (schema design, 1,289 lines, 7 JSON blocks)

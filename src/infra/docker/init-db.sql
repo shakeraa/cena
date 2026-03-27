@@ -6,7 +6,8 @@ CREATE SCHEMA IF NOT EXISTS cena;
 
 -- Required by Marten for JSON operations
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-CREATE EXTENSION IF NOT EXISTS "plv8";
+-- NOTE: plv8 extension disabled - not available in postgres:alpine image
+-- CREATE EXTENSION IF NOT EXISTS "plv8";
 
 -- Grant permissions
 GRANT ALL ON SCHEMA cena TO cena;
