@@ -10,6 +10,7 @@ using System.Diagnostics.Metrics;
 using Cena.Actors.Api;
 using Cena.Admin.Api;
 using Cena.Actors.Configuration;
+using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
@@ -115,6 +116,11 @@ builder.Services.AddSingleton<INatsConnection>(sp =>
 // =============================================================================
 // 5. DOMAIN SERVICES
 // =============================================================================
+
+// Firebase Auth + Authorization (required by admin endpoints)
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddFirebaseAuth(builder.Configuration);
+builder.Services.AddCenaAuthorization();
 
 // Firebase Admin SDK (required by AdminUserService/AdminRoleService)
 builder.Services.AddSingleton<Cena.Infrastructure.Firebase.IFirebaseAdminService,
@@ -326,6 +332,10 @@ app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
         actors = actors
     });
 }).WithName("GetActorStats");
+
+// ---- Auth middleware (required by admin endpoints with RequireAuthorization) ----
+app.UseAuthentication();
+app.UseAuthorization();
 
 // ---- Mastery REST API endpoints (MST-017) ----
 app.MapMasteryEndpoints();
