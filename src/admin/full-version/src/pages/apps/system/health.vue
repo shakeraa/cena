@@ -9,6 +9,15 @@ interface HealthResponse {
   services: ServiceStatus[]
 }
 
+interface ActorNode {
+  nodeId: string
+  status: string
+  activeActors: number
+  totalMessages: number
+  cpuUsagePercent: number
+  memoryUsageBytes: number
+}
+
 interface SystemMetrics {
   errorRates: { timestamp: string; rate: number }[]
   activeActors: number
@@ -18,6 +27,7 @@ interface SystemMetrics {
 const loading = ref(true)
 const error = ref<string | null>(null)
 const services = ref<ServiceStatus[]>([])
+const actorNodes = ref<ActorNode[]>([])
 const metrics = ref<SystemMetrics>({
   errorRates: [],
   activeActors: 0,
@@ -115,9 +125,41 @@ const fetchMetrics = async () => {
   }
 }
 
+const fetchActorNodes = async () => {
+  try {
+    const data = await $api<ActorNode[]>('/admin/system/actors')
+
+    actorNodes.value = (data ?? []).map((n: any) => ({
+      nodeId: n.nodeId ?? 'unknown',
+      status: n.status ?? 'unknown',
+      activeActors: n.activeActors ?? 0,
+      totalMessages: n.totalMessages ?? 0,
+      cpuUsagePercent: n.cpuUsagePercent ?? 0,
+      memoryUsageBytes: n.memoryUsageBytes ?? 0,
+    }))
+  }
+  catch {
+    // Actor data unavailable
+  }
+}
+
+const totalMessages = computed(() => actorNodes.value.reduce((sum, n) => sum + n.totalMessages, 0))
+
+const formatBytes = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)} KB`
+  return `${(bytes / 1048576).toFixed(0)} MB`
+}
+
+const totalMemory = computed(() => formatBytes(actorNodes.value.reduce((sum, n) => sum + n.memoryUsageBytes, 0)))
+const avgCpu = computed(() => {
+  if (!actorNodes.value.length) return 0
+  return (actorNodes.value.reduce((sum, n) => sum + n.cpuUsagePercent, 0) / actorNodes.value.length).toFixed(1)
+})
+
 const fetchAll = async () => {
   loading.value = true
-  await Promise.all([fetchHealth(), fetchMetrics()])
+  await Promise.all([fetchHealth(), fetchMetrics(), fetchActorNodes()])
   loading.value = false
 }
 
@@ -226,7 +268,7 @@ onUnmounted(() => {
           class="mb-6"
         >
           <VCardText>
-            <div class="d-flex align-center gap-x-4 mb-1">
+            <div class="d-flex align-center gap-x-4 mb-2">
               <VAvatar
                 variant="tonal"
                 color="primary"
@@ -237,13 +279,81 @@ onUnmounted(() => {
                   size="28"
                 />
               </VAvatar>
-              <h4 class="text-h4">
-                {{ metrics.activeActors }}
-              </h4>
+              <div>
+                <h4 class="text-h4">
+                  {{ metrics.activeActors }}
+                </h4>
+                <div class="text-body-2 text-medium-emphasis">
+                  Active Actors
+                </div>
+              </div>
             </div>
-            <div class="text-body-1">
-              Active Actors
+
+            <VDivider class="my-3" />
+
+            <div class="d-flex flex-column gap-y-2">
+              <div class="d-flex justify-space-between text-body-2">
+                <span class="text-medium-emphasis">Messages Processed</span>
+                <span class="font-weight-medium">{{ totalMessages.toLocaleString() }}</span>
+              </div>
+              <div class="d-flex justify-space-between text-body-2">
+                <span class="text-medium-emphasis">Cluster Nodes</span>
+                <span class="font-weight-medium">{{ actorNodes.length }}</span>
+              </div>
+              <div class="d-flex justify-space-between text-body-2">
+                <span class="text-medium-emphasis">Avg CPU</span>
+                <span class="font-weight-medium">{{ avgCpu }}%</span>
+              </div>
+              <div class="d-flex justify-space-between text-body-2">
+                <span class="text-medium-emphasis">Memory</span>
+                <span class="font-weight-medium">{{ totalMemory }}</span>
+              </div>
             </div>
+
+            <VDivider class="my-3" />
+
+            <div
+              v-if="actorNodes.length"
+              class="d-flex flex-column gap-y-2"
+            >
+              <div
+                v-for="node in actorNodes"
+                :key="node.nodeId"
+                class="d-flex align-center gap-x-2"
+              >
+                <VIcon
+                  :icon="node.status === 'healthy' ? 'tabler-circle-check' : 'tabler-alert-circle'"
+                  :color="node.status === 'healthy' ? 'success' : 'warning'"
+                  size="16"
+                />
+                <span class="text-body-2 text-truncate flex-grow-1">{{ node.nodeId }}</span>
+                <VChip
+                  size="x-small"
+                  variant="tonal"
+                  color="primary"
+                >
+                  {{ node.activeActors }}
+                </VChip>
+              </div>
+            </div>
+
+            <div
+              v-else
+              class="text-body-2 text-disabled text-center py-2"
+            >
+              No cluster nodes detected
+            </div>
+
+            <VBtn
+              variant="tonal"
+              color="primary"
+              size="small"
+              block
+              class="mt-3"
+              :to="{ name: 'apps-system-actors' }"
+            >
+              View Actor Details
+            </VBtn>
           </VCardText>
         </VCard>
 
