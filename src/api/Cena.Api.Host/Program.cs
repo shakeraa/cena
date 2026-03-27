@@ -86,6 +86,7 @@ builder.Services.AddScoped<IFocusAnalyticsService, FocusAnalyticsService>();
 builder.Services.AddScoped<IMasteryTrackingService, MasteryTrackingService>();
 builder.Services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
 builder.Services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
+builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService, Cena.Admin.Api.QualityGate.QualityGateService>();
 builder.Services.AddScoped<IQuestionBankService, QuestionBankService>();
 builder.Services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();
 builder.Services.AddScoped<ICulturalContextService, CulturalContextService>();
@@ -129,9 +130,8 @@ var appLogger = app.Services.GetRequiredService<ILogger<Program>>();
 lifetime.ApplicationStarted.Register(async () =>
 {
     var store = app.Services.GetRequiredService<IDocumentStore>();
-    await RoleSeedData.SeedRolesAsync(store, appLogger);
-    await UserSeedData.SeedUsersAsync(store, appLogger);
-    await UserSeedData.SeedSimulatedStudentsAsync(store, appLogger, totalStudents: 100);
+    await DatabaseSeeder.SeedAllAsync(store, appLogger,
+        additionalSeeds: QuestionBankSeedData.SeedQuestionsAsync);
 });
 
 app.Run();

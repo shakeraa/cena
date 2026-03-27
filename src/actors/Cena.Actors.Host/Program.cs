@@ -139,6 +139,10 @@ builder.Services.AddHostedService<NatsOutboxPublisher>();
 builder.Services.AddSingleton<Cena.Actors.Bus.NatsBusRouter>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Cena.Actors.Bus.NatsBusRouter>());
 
+// Quality Gate service (needed by QuestionBankService)
+builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService,
+    Cena.Admin.Api.QualityGate.QualityGateService>();
+
 // ADM-004 through ADM-016: Register Admin API services
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
 builder.Services.AddScoped<IAdminUserService, AdminUserService>();
@@ -292,6 +296,37 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
     Predicate = check => check.Tags.Contains("live")
 });
 
+// ---- Actor stats endpoint (real-time from NatsBusRouter) ----
+app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
+{
+    var actors = router.ActiveActors.Values
+        .OrderByDescending(a => a.LastActivity)
+        .Select(a => new
+        {
+            studentId = a.StudentId,
+            sessionId = a.SessionId,
+            messagesProcessed = a.MessagesProcessed,
+            totalAttempts = a.TotalAttempts,
+            correctAttempts = a.CorrectAttempts,
+            accuracy = a.TotalAttempts > 0 ? Math.Round((double)a.CorrectAttempts / a.TotalAttempts * 100, 1) : 0,
+            lastActivity = a.LastActivity,
+            activatedAt = a.ActivatedAt,
+            uptimeSeconds = (DateTimeOffset.UtcNow - a.ActivatedAt).TotalSeconds,
+            status = a.Status
+        });
+
+    return Results.Ok(new
+    {
+        timestamp = DateTimeOffset.UtcNow,
+        commandsRouted = router.CommandsRouted,
+        eventsPublished = router.EventsPublished,
+        sessionsStarted = router.SessionsStarted,
+        errorsCount = router.ErrorsCount,
+        activeActorCount = router.ActiveActors.Count,
+        actors = actors
+    });
+}).WithName("GetActorStats");
+
 // ---- Mastery REST API endpoints (MST-017) ----
 app.MapMasteryEndpoints();
 
@@ -349,11 +384,9 @@ lifetime.ApplicationStarted.Register(async () =>
     var ffPid = actorSystem.Root.SpawnNamed(ffProps, "feature-flags");
     appLogger.LogInformation("RES-010: Feature flag service spawned at {Pid}", ffPid);
 
-    // Seed demo data (roles, users, simulated students)
+    // Seed all demo data via single entry point
     var store = app.Services.GetRequiredService<IDocumentStore>();
-    await RoleSeedData.SeedRolesAsync(store, appLogger);
-    await UserSeedData.SeedUsersAsync(store, appLogger);
-    await UserSeedData.SeedSimulatedStudentsAsync(store, appLogger, totalStudents: 100);
+    await DatabaseSeeder.SeedAllAsync(store, appLogger);
 });
 
 lifetime.ApplicationStopping.Register(async () =>
