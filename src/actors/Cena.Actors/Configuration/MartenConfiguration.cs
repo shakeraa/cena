@@ -7,6 +7,7 @@
 using JasperFx;
 using JasperFx.Events;
 using Marten;
+using Marten.Events.Projections;
 using Marten.Storage;
 using Weasel.Core;
 using Cena.Actors.Events;
@@ -43,13 +44,11 @@ public static class MartenConfiguration
         RegisterOutreachEvents(opts);
 
         // ── Snapshot Strategy: every 100 events per student ──
-        // Snapshot projection requires the aggregate type to be registered.
-        // The StudentProfileSnapshot type and inline/async projections will be
-        // registered once the projection classes are implemented in the
-        // Cena.Data.EventStore assembly. This configuration is kept here to
-        // show the intended wiring; uncomment when projection types are available:
-        //
-        // opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline, 100);
+        // ACT-026: Inline snapshot projection — Marten auto-creates/updates snapshot
+        // document on every SaveChangesAsync when event count crosses the threshold.
+        opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
+
+        // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<TeacherDashboardProjection>(ProjectionLifecycle.Async);

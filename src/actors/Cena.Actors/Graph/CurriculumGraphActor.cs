@@ -184,27 +184,32 @@ public sealed class CurriculumGraphActor : IActor
     private readonly INeo4jGraphRepository _repository;
     private readonly ILogger<CurriculumGraphActor> _logger;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly IMeterFactory _meterFactory;
 
     private CurriculumGraphSnapshot _graph = null!;
     private DateTimeOffset _lastLoadedAt;
     private PID? _mcmChild;
 
-    // ── Telemetry ──
-    private static readonly ActivitySource Activity = new("Cena.Actors.CurriculumGraph", "1.0.0");
-    private static readonly Meter Meter = new("Cena.Actors.CurriculumGraph", "1.0.0");
-    private static readonly Counter<long> ReloadCounter =
-        Meter.CreateCounter<long>("cena.graph.reloads_total", description: "Total graph reloads");
-    private static readonly Histogram<double> LoadDurationMs =
-        Meter.CreateHistogram<double>("cena.graph.load_duration_ms", description: "Graph load duration in ms");
+    // ── Telemetry (ACT-031: instance-based) ──
+    private readonly ActivitySource _activitySource;
+    private readonly Counter<long> _reloadCounter;
+    private readonly Histogram<double> _loadDurationMs;
 
     public CurriculumGraphActor(
         INeo4jGraphRepository repository,
         ILogger<CurriculumGraphActor> logger,
-        ILoggerFactory loggerFactory)
+        ILoggerFactory loggerFactory,
+        IMeterFactory meterFactory)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        _meterFactory = meterFactory;
+
+        _activitySource = new ActivitySource("Cena.Actors.CurriculumGraph", "1.0.0");
+        var meter = meterFactory.Create("Cena.Actors.CurriculumGraph", "1.0.0");
+        _reloadCounter = meter.CreateCounter<long>("cena.graph.reloads_total", description: "Total graph reloads");
+        _loadDurationMs = meter.CreateHistogram<double>("cena.graph.load_duration_ms", description: "Graph load duration in ms");
     }
 
     public Task ReceiveAsync(IContext context)
@@ -256,7 +261,7 @@ public sealed class CurriculumGraphActor : IActor
 
     private async Task LoadGraphFromRepository()
     {
-        using var activity = Activity.StartActivity("CurriculumGraph.Load");
+        using var activity = _activitySource.StartActivity("CurriculumGraph.Load");
         var sw = Stopwatch.StartNew();
 
         try
@@ -277,8 +282,8 @@ public sealed class CurriculumGraphActor : IActor
             _lastLoadedAt = DateTimeOffset.UtcNow;
 
             sw.Stop();
-            LoadDurationMs.Record(sw.ElapsedMilliseconds);
-            ReloadCounter.Add(1);
+            _loadDurationMs.Record(sw.ElapsedMilliseconds);
+            _reloadCounter.Add(1);
 
             activity?.SetTag("graph.concepts", newGraph.Concepts.Count);
             activity?.SetTag("graph.edges", newGraph.EdgeCount);

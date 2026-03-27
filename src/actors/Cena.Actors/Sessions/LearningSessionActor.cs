@@ -94,11 +94,9 @@ public sealed class LearningSessionActor : IActor
             "Session {SessionId} started for {StudentId}, subject={Subject}, methodology={Methodology}",
             _sessionId, _studentId, _subject, _methodology);
 
-        // Delegate SessionStarted event to parent
-        if (context.Parent != null)
-            context.Send(context.Parent, new DelegateEvent(new SessionStarted_V1(
-                _studentId, _sessionId, "mobile", "1.0.0", _methodology,
-                null, false, DateTimeOffset.UtcNow)));
+        // ACT-030: Do NOT delegate SessionStarted_V1 — the parent StudentActor already
+        // emits it in HandleStartSession. This actor only delegates events it owns:
+        // ConceptAttempted, HintRequested, QuestionSkipped, SessionEnded.
 
         return Task.CompletedTask;
     }

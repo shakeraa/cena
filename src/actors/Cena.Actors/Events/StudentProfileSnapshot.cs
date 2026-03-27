@@ -86,10 +86,11 @@ public class StudentProfileSnapshot
 
 public class ConceptMasteryState
 {
-    public double PKnown { get; internal set; }
-    public bool IsMastered { get; internal set; }
-    public int TotalAttempts { get; internal set; }
-    public DateTimeOffset? LastAttemptedAt { get; internal set; }
-    public DateTimeOffset? MasteredAt { get; internal set; }
-    public string? LastMethodology { get; internal set; }
+    // ACT-026: Use public setters for Marten STJ deserialization roundtrip
+    public double PKnown { get; set; }
+    public bool IsMastered { get; set; }
+    public int TotalAttempts { get; set; }
+    public DateTimeOffset? LastAttemptedAt { get; set; }
+    public DateTimeOffset? MasteredAt { get; set; }
+    public string? LastMethodology { get; set; }
 }

@@ -39,8 +39,8 @@ public sealed class DecayPropagationService : IDecayPropagationService
 {
     private readonly ILogger<DecayPropagationService> _logger;
 
-    private static readonly Counter<long> PropagationCounter =
-        new Meter("Cena.Actors.Decay").CreateCounter<long>("cena.decay.propagations_total");
+    // ACT-031: instance-based via IMeterFactory
+    private readonly Counter<long> _propagationCounter;
 
     // ── Propagation parameters ──
     // How much of the decay transfers to each downstream concept
@@ -53,9 +53,11 @@ public sealed class DecayPropagationService : IDecayPropagationService
     // Maximum depth to propagate (prevent infinite chains in deep graphs)
     private const int MaxPropagationDepth = 5;
 
-    public DecayPropagationService(ILogger<DecayPropagationService> logger)
+    public DecayPropagationService(ILogger<DecayPropagationService> logger, IMeterFactory meterFactory)
     {
         _logger = logger;
+        var meter = meterFactory.Create("Cena.Actors.Decay", "1.0.0");
+        _propagationCounter = meter.CreateCounter<long>("cena.decay.propagations_total");
     }
 
     /// <summary>
@@ -80,7 +82,7 @@ public sealed class DecayPropagationService : IDecayPropagationService
     /// </summary>
     public DecayPropagationResult PropagateDecay(DecayPropagationInput input)
     {
-        PropagationCounter.Add(1);
+        _propagationCounter.Add(1);
 
         var affected = new Dictionary<string, AffectedConcept>();
         var visited = new HashSet<string>();

@@ -23,11 +23,12 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
 {
     private readonly ILogger<MethodologySwitchService> _logger;
 
-    // ── All 8 methodologies in the system ──
+    // ── All 9 methodologies in the system (ACT-032: added drill_and_practice) ──
     public static readonly string[] AllMethodologies =
     {
         "socratic", "spaced_repetition", "feynman", "project_based",
-        "blooms_progression", "worked_example", "analogy", "retrieval_practice"
+        "blooms_progression", "worked_example", "analogy", "retrieval_practice",
+        "drill_and_practice"
     };
 
     // ── Error-type precedence (Step 1) ──

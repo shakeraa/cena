@@ -16,7 +16,7 @@ using Cena.Actors.Stagnation;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.JetStream;
+
 using Proto;
 using Proto.Cluster;
 using StackExchange.Redis;
@@ -72,7 +72,8 @@ public sealed partial class StudentActor
                 "stagnation_detected",
                 msg.CompositeScore,
                 dominantErrorType.ToString(),
-                decision.Confidence);
+                decision.Confidence,
+                DateTimeOffset.UtcNow);
 
             StageEvent(switchEvent);
         }
@@ -83,13 +84,23 @@ public sealed partial class StudentActor
                 "Escalation: {Action}",
                 _studentId, msg.ConceptId, decision.EscalationAction);
 
-            await PublishToNats("cena.student.escalation", new
+            // ACT-027: Fire-and-forget escalation notification (not a domain event).
+            // Published directly since this is an operational alert, not persisted in event stream.
+            try
             {
-                StudentId = _studentId,
-                ConceptId = msg.ConceptId,
-                Action = decision.EscalationAction,
-                Timestamp = DateTimeOffset.UtcNow
-            });
+                await _nats.PublishAsync("cena.student.escalation",
+                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+                    {
+                        StudentId = _studentId,
+                        ConceptId = msg.ConceptId,
+                        Action = decision.EscalationAction,
+                        Timestamp = DateTimeOffset.UtcNow
+                    }));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to publish escalation for student {StudentId}", _studentId);
+            }
         }
 
         await FlushEvents();
@@ -108,12 +119,31 @@ public sealed partial class StudentActor
         }
     }
 
-    private Task HandleDelegateEvent(DelegateEvent del)
+    // ACT-029: Flush immediately after staging to prevent data loss on passivation.
+    // Apply the event to local state after successful persistence.
+    private async Task HandleDelegateEvent(DelegateEvent del)
     {
-        // Delegated events from child actors (e.g., LearningSessionActor) are domain events
-        // that should be staged for persistence
         StageEvent(del.Event);
-        return Task.CompletedTask;
+        await FlushEvents();
+
+        // Apply to local state based on event type
+        switch (del.Event)
+        {
+            case ConceptAttempted_V1 e: _state.Apply(e); break;
+            case ConceptMastered_V1 e: _state.Apply(e); break;
+            case SessionStarted_V1 e: _state.Apply(e); break;
+            case SessionEnded_V1 e: _state.Apply(e); break;
+            case MethodologySwitched_V1 e: _state.Apply(e); break;
+            case XpAwarded_V1 e: _state.Apply(e); break;
+            case StreakUpdated_V1 e: _state.Apply(e); break;
+            case AnnotationAdded_V1 e: _state.Apply(e); break;
+            case StagnationDetected_V1 e: _state.Apply(e); break;
+            case HintRequested_V1: break; // No state mutation
+            case QuestionSkipped_V1: break; // No state mutation
+            default:
+                _logger.LogWarning("Unhandled delegate event type: {Type}", del.Event.GetType().Name);
+                break;
+        }
     }
 
     // =========================================================================

@@ -21,7 +21,7 @@ using Cena.Actors.Stagnation;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.JetStream;
+
 using Proto;
 using Proto.Cluster;
 using StackExchange.Redis;
@@ -363,12 +363,8 @@ public sealed partial class StudentActor : IActor
         _eventPersistLatency.Record(sw.Elapsed.TotalMilliseconds,
             new KeyValuePair<string, object?>("event.count", _pendingEvents.Count));
 
-        // OUTBOX: Publish to NATS AFTER Marten commit succeeds (best-effort)
-        foreach (var evt in _pendingEvents)
-        {
-            var subject = $"cena.student.events.{evt.GetType().Name.ToLowerInvariant()}";
-            await PublishToNats(subject, evt);
-        }
+        // ACT-027: Removed inline NATS publishing — outbox pattern (NatsOutboxPublisher)
+        // is the single source of NATS delivery to prevent duplicate downstream events.
 
         _pendingEvents.Clear();
 
@@ -376,23 +372,6 @@ public sealed partial class StudentActor : IActor
         if (_eventsSinceSnapshot >= StudentState.SnapshotInterval)
         {
             await ForceSnapshot();
-        }
-    }
-
-    private async Task PublishToNats<T>(string subject, T message) where T : class
-    {
-        try
-        {
-            var js = new NatsJSContext(_nats);
-            await js.PublishAsync(subject, message);
-        }
-        catch (Exception ex)
-        {
-            // NATS publish failure is non-fatal. Event is already in Marten.
-            _logger.LogWarning(ex,
-                "Failed to publish to NATS subject {Subject} for student {StudentId}. " +
-                "Event is persisted in Marten and will be replayed.",
-                subject, _studentId);
         }
     }
 
@@ -404,7 +383,18 @@ public sealed partial class StudentActor : IActor
         try
         {
             await using var session = _documentStore.LightweightSession();
-            // Marten inline snapshot is triggered automatically on SaveChanges
+
+            // ACT-026: Build and persist snapshot document explicitly.
+            // Marten's inline projection handles this automatically during event appends,
+            // but ForceSnapshot is called on passivation to ensure a checkpoint exists.
+            var snapshot = await session.Events.AggregateStreamAsync<StudentProfileSnapshot>(_studentId);
+
+            if (snapshot != null)
+            {
+                session.Store(snapshot);
+                await session.SaveChangesAsync();
+            }
+
             _eventsSinceSnapshot = 0;
             _state.LastSnapshotAt = DateTimeOffset.UtcNow;
 

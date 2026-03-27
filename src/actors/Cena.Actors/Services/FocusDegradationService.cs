@@ -369,7 +369,47 @@ public sealed class FocusDegradationService : IFocusDegradationService
     // 5. BREAK RECOMMENDATION
     // ═══════════════════════════════════════════════════════════════
 
+    /// <summary>
+    /// Two-tier break system (FOC-003.3):
+    ///   Tier 1 — Proactive microbreak: scheduled BEFORE focus drops (60-90s)
+    ///   Tier 2 — Reactive recovery break: triggered AFTER focus degrades (5-30 min)
+    ///
+    /// Microbreak decisions come from IMicrobreakScheduler.
+    /// This method handles reactive recovery breaks only.
+    /// Use RecommendBreakTwoTier() for the combined decision.
+    /// </summary>
     public BreakRecommendation RecommendBreak(FocusState state, TimeOfDayContext timeContext)
+    {
+        return RecommendRecoveryBreak(state, timeContext);
+    }
+
+    /// <summary>
+    /// Combined two-tier decision: checks microbreak first, then reactive.
+    /// </summary>
+    public BreakRecommendation RecommendBreakTwoTier(
+        FocusState state, TimeOfDayContext timeContext,
+        IMicrobreakScheduler microbreakScheduler, MicrobreakContext microbreakContext)
+    {
+        // ── Tier 1: Proactive microbreak (check first) ──
+        var microbreakDecision = microbreakScheduler.ShouldTrigger(microbreakContext);
+        if (microbreakDecision.ShouldBreak)
+        {
+            return new BreakRecommendation(
+                ShouldBreak: true,
+                Minutes: 0, // Microbreaks are measured in seconds
+                DurationSeconds: microbreakDecision.DurationSeconds,
+                Activity: BreakActivity.StretchOrWater, // Generic; actual activity in MicrobreakDecision
+                BreakType: BreakType.Microbreak,
+                MicrobreakActivity: microbreakDecision.Activity,
+                Message: microbreakDecision.Message
+            );
+        }
+
+        // ── Tier 2: Reactive recovery break (existing logic) ──
+        return RecommendRecoveryBreak(state, timeContext);
+    }
+
+    private BreakRecommendation RecommendRecoveryBreak(FocusState state, TimeOfDayContext timeContext)
     {
         // Base break duration from focus score
         int baseMinutes = state.Level switch
@@ -421,6 +461,7 @@ public sealed class FocusDegradationService : IFocusDegradationService
             ShouldBreak: true,
             Minutes: baseMinutes,
             Activity: activity,
+            BreakType: BreakType.RecoveryBreak,
             Message: message
         );
     }
@@ -582,8 +623,22 @@ public record BreakRecommendation(
     bool ShouldBreak,
     int Minutes,
     BreakActivity Activity,
-    string? Message
+    string? Message,
+    // ── FOC-003: Two-tier break system ──
+    BreakType BreakType = BreakType.RecoveryBreak,
+    int DurationSeconds = 0,                          // For microbreaks (60-90s)
+    MicrobreakActivity? MicrobreakActivity = null     // Specific microbreak activity
 );
+
+/// <summary>
+/// Proactive = scheduled microbreak BEFORE focus drops (Cohen's d = 1.784).
+/// Reactive  = recovery break AFTER focus has degraded (existing behavior).
+/// </summary>
+public enum BreakType
+{
+    RecoveryBreak,  // Reactive: 5-30 min, triggered by low focus score
+    Microbreak      // Proactive: 60-90s, scheduled by MicrobreakScheduler
+}
 
 public enum BreakActivity
 {

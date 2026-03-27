@@ -467,3 +467,17 @@ public async Task GracefulShutdown_CompletesWithin30Seconds()
     // Assert shutdown < 30s
 }
 ```
+
+---
+
+## Architect Review Tasks (2026-03-27) — COMPLETED
+
+| Task | Priority | Summary | Status |
+|------|----------|---------|--------|
+| [ACT-026](actors/done/ACT-026-snapshot-noop-fix.md) | P0 | ForceSnapshot is a no-op — enable Marten inline snapshots | DONE |
+| [ACT-027](actors/done/ACT-027-duplicate-nats-publish.md) | P0 | Remove duplicate NATS publishing — keep outbox only | DONE |
+| [ACT-028](actors/done/ACT-028-methodology-switch-timestamp.md) | P0 | MethodologySwitched_V1 uses wall clock in Apply — non-deterministic replay | DONE |
+| [ACT-029](actors/done/ACT-029-delegate-event-flush.md) | P1 | DelegateEvent staged but never flushed — events lost | DONE |
+| [ACT-030](actors/done/ACT-030-double-session-started.md) | P1 | Double SessionStarted events when child actors are wired | DONE |
+| [ACT-031](actors/done/ACT-031-telemetry-static-meter-cleanup.md) | P2 | Migrate remaining static Meters to IMeterFactory | DONE |
+| [ACT-032](actors/done/ACT-032-dead-code-and-wiring.md) | P2 | Dead code cleanup, DI wiring fixes, timezone alignment | DONE |

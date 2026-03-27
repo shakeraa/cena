@@ -10,6 +10,7 @@ using Cena.Actors.Configuration;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Services;
 using Cena.Actors.Students;
+using Cena.Actors.Sync;
 using Marten;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -109,7 +110,16 @@ builder.Services.AddSingleton<INatsConnection>(sp =>
 // 5. DOMAIN SERVICES
 // =============================================================================
 
+// ACT-032: Register all domain services for DI
 builder.Services.AddSingleton<IMethodologySwitchService, DefaultMethodologySwitchService>();
+builder.Services.AddSingleton<IBktService, BktService>();
+builder.Services.AddSingleton<IHlrService, HlrService>();
+builder.Services.AddSingleton<ICognitiveLoadService, CognitiveLoadService>();
+builder.Services.AddSingleton<IFocusDegradationService, FocusDegradationService>();
+builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnforcementService>();
+builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
+builder.Services.AddSingleton<OfflineSyncHandler>();
+builder.Services.AddHostedService<NatsOutboxPublisher>();
 
 // =============================================================================
 // 6. PROTO.ACTOR CLUSTER
@@ -207,6 +217,12 @@ builder.Services.AddOpenTelemetry()
     .WithMetrics(metrics => metrics
         .AddMeter("Cena.Actors.StudentActor")
         .AddMeter("Cena.Actors.LearningSessionActor")
+        .AddMeter("Cena.Actors.LlmCircuitBreaker")
+        .AddMeter("Cena.Actors.CurriculumGraph")
+        .AddMeter("Cena.Actors.DeadLetterWatcher")
+        .AddMeter("Cena.Infrastructure.NatsOutbox")
+        .AddMeter("Cena.Actors.Decay")
+        .AddMeter("Cena.Actors.Focus")
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddProcessInstrumentation()

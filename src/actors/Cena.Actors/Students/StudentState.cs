@@ -130,8 +130,9 @@ public sealed class StudentState
         if (!MethodAttemptHistory.ContainsKey(clusterKey))
             MethodAttemptHistory[clusterKey] = new();
 
+        // ACT-028: Use event timestamp for deterministic replay — never wall clock
         MethodAttemptHistory[clusterKey].Add(new MethodologyAttemptRecord(
-            e.NewMethodology, e.Trigger, e.StagnationScore, DateTimeOffset.UtcNow));
+            e.NewMethodology, e.Trigger, e.StagnationScore, e.Timestamp));
 
         EventVersion++;
     }

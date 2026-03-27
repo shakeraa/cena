@@ -66,15 +66,17 @@ public sealed class LlmGatewayActor : IActor
 {
     private readonly ILogger<LlmGatewayActor> _logger;
     private readonly ILoggerFactory _loggerFactory;
+    private readonly IMeterFactory _meterFactory;
     private readonly Dictionary<string, PID> _circuitBreakers = new(StringComparer.OrdinalIgnoreCase);
 
     // Default models to spawn circuit breakers for
     private static readonly string[] DefaultModels = { "kimi", "sonnet", "opus" };
 
-    public LlmGatewayActor(ILogger<LlmGatewayActor> logger, ILoggerFactory loggerFactory)
+    public LlmGatewayActor(ILogger<LlmGatewayActor> logger, ILoggerFactory loggerFactory, IMeterFactory meterFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
+        _meterFactory = meterFactory;
     }
 
     public Task ReceiveAsync(IContext context)
@@ -99,7 +101,8 @@ public sealed class LlmGatewayActor : IActor
         {
             var config = CircuitBreakerConfig.ForModel(modelName);
             var cbLogger = _loggerFactory.CreateLogger<LlmCircuitBreakerActor>();
-            var props = Props.FromProducer(() => new LlmCircuitBreakerActor(config, cbLogger));
+            var mf = _meterFactory;
+            var props = Props.FromProducer(() => new LlmCircuitBreakerActor(config, cbLogger, mf));
             var pid = context.SpawnNamed(props, $"cb-{modelName}");
             _circuitBreakers[modelName] = pid;
 
@@ -209,14 +212,18 @@ public sealed class ActorSystemManager : IActor
     private static readonly Histogram<double> BootDurationMs =
         Meter.CreateHistogram<double>("cena.topology.boot_duration_ms", description: "System boot duration");
 
+    private readonly IMeterFactory _meterFactory;
+
     public ActorSystemManager(
         INeo4jGraphRepository graphRepository,
         ILoggerFactory loggerFactory,
+        IMeterFactory meterFactory,
         GracefulShutdownCoordinator? shutdownCoordinator = null)
     {
         _graphRepository = graphRepository ?? throw new ArgumentNullException(nameof(graphRepository));
         _loggerFactory = loggerFactory ?? throw new ArgumentNullException(nameof(loggerFactory));
         _logger = loggerFactory.CreateLogger<ActorSystemManager>();
+        _meterFactory = meterFactory;
         _shutdownCoordinator = shutdownCoordinator;
     }
 
@@ -244,7 +251,7 @@ public sealed class ActorSystemManager : IActor
         _logger.LogInformation("[Boot 1/4] Spawning CurriculumGraphActor...");
         var graphLogger = _loggerFactory.CreateLogger<CurriculumGraphActor>();
         var graphProps = Props.FromProducer(() =>
-            new CurriculumGraphActor(_graphRepository, graphLogger, _loggerFactory));
+            new CurriculumGraphActor(_graphRepository, graphLogger, _loggerFactory, _meterFactory));
         _curriculumGraphPid = context.SpawnNamed(graphProps, "curriculum-graph");
         _logger.LogInformation(
             "[Boot 1/4] CurriculumGraphActor spawned. PID={Pid} (McmGraphActor spawns as child)",
@@ -254,7 +261,7 @@ public sealed class ActorSystemManager : IActor
         _logger.LogInformation("[Boot 2/4] Spawning LlmGatewayActor...");
         var gatewayLogger = _loggerFactory.CreateLogger<LlmGatewayActor>();
         var gatewayProps = Props.FromProducer(() =>
-            new LlmGatewayActor(gatewayLogger, _loggerFactory));
+            new LlmGatewayActor(gatewayLogger, _loggerFactory, _meterFactory));
         _llmGatewayPid = context.SpawnNamed(gatewayProps, "llm-gateway");
         _logger.LogInformation(
             "[Boot 2/4] LlmGatewayActor spawned. PID={Pid}",

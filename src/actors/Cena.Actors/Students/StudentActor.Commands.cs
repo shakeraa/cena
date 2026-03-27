@@ -16,7 +16,7 @@ using Cena.Actors.Stagnation;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
-using NATS.Client.JetStream;
+
 using Proto;
 using Proto.Cluster;
 using StackExchange.Redis;
@@ -410,7 +410,8 @@ public sealed partial class StudentActor
                 newMethodology.ToString(),
                 "student_requested", 0.0,
                 ErrorType.None.ToString(),
-                decision.Confidence);
+                decision.Confidence,
+                DateTimeOffset.UtcNow);
 
             StageEvent(@event);
             await FlushEvents();

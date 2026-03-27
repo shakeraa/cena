@@ -61,6 +61,8 @@ public record MasteryDecayed_V1(
 /// <summary>
 /// Emitted when the active pedagogy methodology changes for a concept.
 /// </summary>
+/// ACT-028: Added Timestamp field for deterministic event-sourced replay.
+/// Existing persisted events without this field deserialize with default (DateTimeOffset.MinValue).
 public record MethodologySwitched_V1(
     string StudentId,
     string ConceptId,
@@ -69,7 +71,8 @@ public record MethodologySwitched_V1(
     string Trigger,
     double StagnationScore,
     string DominantErrorType,
-    double McmConfidence
+    double McmConfidence,
+    DateTimeOffset Timestamp = default
 );
 
 /// <summary>

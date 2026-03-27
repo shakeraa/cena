@@ -67,26 +67,29 @@ public sealed class NatsOutboxPublisher : BackgroundService
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    // ── Telemetry ──
-    private static readonly ActivitySource ActivitySrc = new("Cena.Infrastructure.NatsOutbox", "1.0.0");
-    private static readonly Meter Meter = new("Cena.Infrastructure.NatsOutbox", "1.0.0");
-    private static readonly Counter<long> PublishedCounter =
-        Meter.CreateCounter<long>("cena.outbox.published_total", description: "Events published to NATS");
-    private static readonly Counter<long> CycleCounter =
-        Meter.CreateCounter<long>("cena.outbox.cycles_total", description: "Outbox poll cycles");
-    private static readonly Counter<long> ErrorCounter =
-        Meter.CreateCounter<long>("cena.outbox.errors_total", description: "Outbox publish errors");
-    private static readonly Histogram<double> CycleDurationMs =
-        Meter.CreateHistogram<double>("cena.outbox.cycle_duration_ms", description: "Outbox cycle duration");
+    // ── Telemetry (ACT-031: instance-based via IMeterFactory) ──
+    private readonly ActivitySource _activitySource;
+    private readonly Counter<long> _publishedCounter;
+    private readonly Counter<long> _cycleCounter;
+    private readonly Counter<long> _errorCounter;
+    private readonly Histogram<double> _cycleDurationMs;
 
     public NatsOutboxPublisher(
         IDocumentStore documentStore,
         INatsConnection nats,
-        ILogger<NatsOutboxPublisher> logger)
+        ILogger<NatsOutboxPublisher> logger,
+        IMeterFactory meterFactory)
     {
         _documentStore = documentStore ?? throw new ArgumentNullException(nameof(documentStore));
         _nats = nats ?? throw new ArgumentNullException(nameof(nats));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        _activitySource = new ActivitySource("Cena.Infrastructure.NatsOutbox", "1.0.0");
+        var meter = meterFactory.Create("Cena.Infrastructure.NatsOutbox", "1.0.0");
+        _publishedCounter = meter.CreateCounter<long>("cena.outbox.published_total", description: "Events published to NATS");
+        _cycleCounter = meter.CreateCounter<long>("cena.outbox.cycles_total", description: "Outbox poll cycles");
+        _errorCounter = meter.CreateCounter<long>("cena.outbox.errors_total", description: "Outbox publish errors");
+        _cycleDurationMs = meter.CreateHistogram<double>("cena.outbox.cycle_duration_ms", description: "Outbox cycle duration");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -110,7 +113,7 @@ public sealed class NatsOutboxPublisher : BackgroundService
             }
             catch (Exception ex)
             {
-                ErrorCounter.Add(1);
+                _errorCounter.Add(1);
                 _logger.LogError(ex, "NatsOutboxPublisher cycle failed. Will retry in {Interval}s.",
                     PollInterval.TotalSeconds);
             }
@@ -134,9 +137,9 @@ public sealed class NatsOutboxPublisher : BackgroundService
     /// </summary>
     private async Task PollAndPublishAsync(CancellationToken ct)
     {
-        using var activity = ActivitySrc.StartActivity("NatsOutbox.PollAndPublish");
+        using var activity = _activitySource.StartActivity("NatsOutbox.PollAndPublish");
         var sw = Stopwatch.StartNew();
-        CycleCounter.Add(1);
+        _cycleCounter.Add(1);
 
         await using var session = _documentStore.LightweightSession();
 
@@ -157,7 +160,7 @@ public sealed class NatsOutboxPublisher : BackgroundService
         if (pendingEvents.Count == 0)
         {
             sw.Stop();
-            CycleDurationMs.Record(sw.ElapsedMilliseconds);
+            _cycleDurationMs.Record(sw.ElapsedMilliseconds);
             return;
         }
 
@@ -182,11 +185,11 @@ public sealed class NatsOutboxPublisher : BackgroundService
 
                 highestSequence = eventWrapper.Sequence;
                 published++;
-                PublishedCounter.Add(1);
+                _publishedCounter.Add(1);
             }
             catch (Exception ex)
             {
-                ErrorCounter.Add(1);
+                _errorCounter.Add(1);
                 _logger.LogError(ex,
                     "Failed to publish event {Sequence} ({Type}) to NATS. Will retry next cycle.",
                     eventWrapper.Sequence, eventWrapper.EventTypeName);
@@ -224,7 +227,7 @@ public sealed class NatsOutboxPublisher : BackgroundService
         }
 
         sw.Stop();
-        CycleDurationMs.Record(sw.ElapsedMilliseconds);
+        _cycleDurationMs.Record(sw.ElapsedMilliseconds);
 
         activity?.SetTag("outbox.published", published);
         activity?.SetTag("outbox.hwm", highestSequence);

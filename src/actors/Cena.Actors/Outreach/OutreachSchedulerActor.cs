@@ -277,10 +277,12 @@ public sealed class OutreachSchedulerActor : IActor
         return hour >= QuietHourStart || hour < QuietHourEnd;
     }
 
+    // ACT-032: Use Israel timezone for daily throttle reset, matching quiet hours
     private void ResetDailyThrottleIfNeeded()
     {
-        var today = DateTimeOffset.UtcNow.Date;
-        if (_lastResetDate.Date != today)
+        var israelNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, IsraelTz);
+        var today = israelNow.Date;
+        if (TimeZoneInfo.ConvertTime(_lastResetDate, IsraelTz).Date != today)
         {
             _messagesSentToday = 0;
             _lastResetDate = DateTimeOffset.UtcNow;

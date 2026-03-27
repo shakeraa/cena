@@ -113,20 +113,23 @@ public sealed class LlmCircuitBreakerActor : IActor
     private bool _halfOpenProbeInFlight;
     private CancellationTokenSource? _timerCts;
 
-    // ── Metrics ──
-    private static readonly Meter Meter = new("Cena.Actors.LlmCircuitBreaker", "1.0.0");
-    private static readonly Counter<long> CircuitOpenedCounter =
-        Meter.CreateCounter<long>("cena.llm.circuit_opened_total", description: "Times circuit breaker opened");
-    private static readonly Counter<long> RequestsRejectedCounter =
-        Meter.CreateCounter<long>("cena.llm.requests_rejected_total", description: "Requests rejected by open circuit");
+    // ── Metrics (ACT-031: instance-based via IMeterFactory) ──
+    private readonly Counter<long> _circuitOpenedCounter;
+    private readonly Counter<long> _requestsRejectedCounter;
 
     private long _totalCircuitOpened;
     private long _totalRequestsRejected;
 
-    public LlmCircuitBreakerActor(CircuitBreakerConfig config, ILogger<LlmCircuitBreakerActor> logger)
+    public LlmCircuitBreakerActor(CircuitBreakerConfig config, ILogger<LlmCircuitBreakerActor> logger, IMeterFactory meterFactory)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        var meter = meterFactory.Create("Cena.Actors.LlmCircuitBreaker", "1.0.0");
+        _circuitOpenedCounter = meter.CreateCounter<long>("cena.llm.circuit_opened_total",
+            description: "Times circuit breaker opened");
+        _requestsRejectedCounter = meter.CreateCounter<long>("cena.llm.requests_rejected_total",
+            description: "Requests rejected by open circuit");
     }
 
     public Task ReceiveAsync(IContext context)
@@ -174,7 +177,7 @@ public sealed class LlmCircuitBreakerActor : IActor
 
             case CircuitState.Open:
                 _totalRequestsRejected++;
-                RequestsRejectedCounter.Add(1,
+                _requestsRejectedCounter.Add(1,
                     new KeyValuePair<string, object?>("model", _config.ModelName));
 
                 var retryAfter = _config.OpenDuration - (DateTimeOffset.UtcNow - _openedAt);
@@ -191,7 +194,7 @@ public sealed class LlmCircuitBreakerActor : IActor
                 {
                     // Only 1 probe at a time in HalfOpen
                     _totalRequestsRejected++;
-                    RequestsRejectedCounter.Add(1,
+                    _requestsRejectedCounter.Add(1,
                         new KeyValuePair<string, object?>("model", _config.ModelName));
 
                     context.Respond(new RejectRequest(
@@ -336,7 +339,7 @@ public sealed class LlmCircuitBreakerActor : IActor
                 _halfOpenSuccessCount = 0;
                 _halfOpenProbeInFlight = false;
                 _totalCircuitOpened++;
-                CircuitOpenedCounter.Add(1,
+                _circuitOpenedCounter.Add(1,
                     new KeyValuePair<string, object?>("model", _config.ModelName));
                 break;
 

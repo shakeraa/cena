@@ -67,16 +67,19 @@ public sealed class DeadLetterWatcher : IActor, IDisposable
     // ── Subscription ──
     private EventStreamSubscription<object>? _subscription;
 
-    // ── Telemetry ──
-    private static readonly Meter Meter = new("Cena.Actors.DeadLetterWatcher", "1.0.0");
-    private static readonly Counter<long> DeadLetterTotalCounter =
-        Meter.CreateCounter<long>("cena.dead_letter_total", description: "Total dead letters received");
-    private static readonly Histogram<int> PoisonMessagesGauge =
-        Meter.CreateHistogram<int>("cena.poison_messages", description: "Current quarantined poison message type count");
+    // ── Telemetry (ACT-031: instance-based via IMeterFactory) ──
+    private readonly Counter<long> _deadLetterTotalCounter;
+    private readonly Histogram<int> _poisonMessagesGauge;
 
-    public DeadLetterWatcher(ILogger<DeadLetterWatcher> logger)
+    public DeadLetterWatcher(ILogger<DeadLetterWatcher> logger, IMeterFactory meterFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        var meter = meterFactory.Create("Cena.Actors.DeadLetterWatcher", "1.0.0");
+        _deadLetterTotalCounter = meter.CreateCounter<long>("cena.dead_letter_total",
+            description: "Total dead letters received");
+        _poisonMessagesGauge = meter.CreateHistogram<int>("cena.poison_messages",
+            description: "Current quarantined poison message type count");
     }
 
     // =========================================================================
@@ -165,7 +168,7 @@ public sealed class DeadLetterWatcher : IActor, IDisposable
 
         // Increment total counter
         Interlocked.Increment(ref _totalDeadLetters);
-        DeadLetterTotalCounter.Add(1, new KeyValuePair<string, object?>("message_type", messageType));
+        _deadLetterTotalCounter.Add(1, new KeyValuePair<string, object?>("message_type", messageType));
 
         // Increment per-type counter
         _countsByType.AddOrUpdate(messageType, 1, (_, count) => count + 1);
@@ -182,7 +185,7 @@ public sealed class DeadLetterWatcher : IActor, IDisposable
         if (consecutiveFails >= PoisonThreshold && !_quarantinedTypes.ContainsKey(messageType))
         {
             _quarantinedTypes[messageType] = true;
-            PoisonMessagesGauge.Record(_quarantinedTypes.Count);
+            _poisonMessagesGauge.Record(_quarantinedTypes.Count);
 
             _logger.LogWarning(
                 "POISON MESSAGE DETECTED: type={MessageType} has failed {Count} times. " +
@@ -275,7 +278,7 @@ public sealed class DeadLetterWatcher : IActor, IDisposable
     {
         _consecutiveFailsByType.TryRemove(messageType, out _);
         _quarantinedTypes.TryRemove(messageType, out _);
-        PoisonMessagesGauge.Record(_quarantinedTypes.Count);
+        _poisonMessagesGauge.Record(_quarantinedTypes.Count);
 
         _logger.LogInformation(
             "DeadLetterWatcher: reset consecutive fails for type={MessageType}. " +
