@@ -174,6 +174,18 @@ public sealed class FocusDegradationService : IFocusDegradationService
 
         focusScore = Math.Clamp(focusScore, 0, 1);
 
+        // ── FOC-004: Mind-wandering adjustment ──
+        // AwareDrift: student self-corrected, reduce penalty by 50%
+        // UnawareDrift: full penalty (no adjustment — score already reflects degradation)
+        MindWanderingState? mindWanderingState = input.MindWanderingState;
+        if (mindWanderingState == MindWanderingState.AwareDrift && focusScore < 0.6)
+        {
+            // Student drifted but came back — soften the focus penalty
+            // Move score 50% of the way back toward 0.6 (Engaged threshold)
+            focusScore = focusScore + (0.6 - focusScore) * 0.5;
+            focusScore = Math.Clamp(focusScore, 0, 1);
+        }
+
         // Tag telemetry with sensor count for analysis
         int sensorCount = input.SensorSignalCount;
         _focusHistogram.Record(focusScore, new KeyValuePair<string, object?>("sensor_count", sensorCount));
@@ -202,7 +214,8 @@ public sealed class FocusDegradationService : IFocusDegradationService
             MinutesActive: minutesActive,
             QuestionsAttempted: input.QuestionsAttempted,
             SensorSignalCount: sensorCount,
-            SensorConfidenceBoost: confidenceBoost
+            SensorConfidenceBoost: confidenceBoost,
+            MindWandering: mindWanderingState
         );
     }
 
@@ -268,12 +281,22 @@ public sealed class FocusDegradationService : IFocusDegradationService
             ? Math.Clamp((double)input.CurrentStreak / input.LongestStreak, 0, 1)
             : 0;
 
+        // ── FOC-012: Culturally-adjusted resilience weights ──
+        // ArabicDominant students: higher Recovery weight (collectivist resilience
+        // manifests as returning after difficulty with peer support).
+        // HebrewDominant/default: existing individualist-calibrated weights.
+        var (wPersistence, wRecovery, wChallenge, wStreak) = input.CulturalContext switch
+        {
+            CulturalContext.ArabicDominant => (0.30, 0.30, 0.25, 0.15),
+            _ => (0.35, 0.25, 0.25, 0.15)
+        };
+
         // ── Composite resilience ──
         double score =
-            0.35 * persistence +
-            0.25 * recoveryRate +
-            0.25 * challengeRatio +
-            0.15 * streakScore;
+            wPersistence * persistence +
+            wRecovery * recoveryRate +
+            wChallenge * challengeRatio +
+            wStreak * streakScore;
 
         score = Math.Clamp(score, 0, 1);
 
@@ -362,12 +385,42 @@ public sealed class FocusDegradationService : IFocusDegradationService
             }
         }
 
-        // ── Standard classification (no confusion data or NotConfused) ──
-        if (accuracyImproving && !errorsRepetitive && rtStable)
+        // ── FOC-004: Mind-wandering-aware classification ──
+        // Only AwareDrift and UnawareDrift produce specific interventions.
+        // Focused/Ambiguous fall through to standard classification.
+        if (input.MindWanderingState is MindWanderingState.AwareDrift)
         {
             return new StruggleClassification(
+                Type: StruggleType.ModerateStruggle,
+                Confidence: 0.75,
+                Recommendation: FocusMessages.WelcomeBackNudge() +
+                                " Student self-corrected from mind-wandering. " +
+                                "Gentle nudge only — no methodology change needed."
+            );
+        }
+
+        if (input.MindWanderingState is MindWanderingState.UnawareDrift)
+        {
+            return new StruggleClassification(
+                Type: StruggleType.Disengagement,
+                Confidence: 0.8,
+                Recommendation: "Unaware mind-wandering detected. Change question type " +
+                                "or add visual stimulus to re-engage. If persistent, trigger microbreak."
+            );
+        }
+
+        // ── Standard classification (no confusion data or NotConfused) ──
+
+        // ── FOC-008: Solution diversity boosts productive struggle detection ──
+        int diversityCount = input.SolutionDiversityCount ?? 1;
+        bool diversityCompensates = diversityCount >= 3 && input.AccuracySlope > -0.05;
+
+        if ((accuracyImproving || diversityCompensates) && !errorsRepetitive && rtStable)
+        {
+            double confidence = 0.8 + (input.AccuracySlope * 2) + (diversityCount * 0.05);
+            return new StruggleClassification(
                 Type: StruggleType.ProductiveStruggle,
-                Confidence: 0.8 + (input.AccuracySlope * 2), // Higher slope = more confident
+                Confidence: Math.Clamp(confidence, 0.5, 0.99),
                 Recommendation: "Student is learning through difficulty. Maintain current approach. " +
                                 "Do NOT switch methodology or reduce difficulty — this is productive failure."
             );
@@ -456,7 +509,7 @@ public sealed class FocusDegradationService : IFocusDegradationService
                 ShouldBreak: false,
                 Minutes: 0,
                 Activity: BreakActivity.None,
-                Message: "מגיע לך אתגר! בוא ננסה משהו קשה יותר", // "You deserve a challenge! Let's try something harder"
+                Message: FocusMessages.BoredNeedsChallenge(),
                 AlternativeAction: AlternativeAction.IncreaseDifficulty
             );
         }
@@ -502,11 +555,11 @@ public sealed class FocusDegradationService : IFocusDegradationService
         // Hebrew message
         string message = state.Level switch
         {
-            FocusLevel.Drifting => "קצת הפסקה תעזור לך להתרכז טוב יותר", // "A short break will help you focus better"
-            FocusLevel.Fatigued => "עשית עבודה מעולה! זמן להפסקה", // "Great work! Time for a break"
-            FocusLevel.DisengagedExhausted => "עבדת קשה! זמן למנוחה אמיתית", // "You worked hard! Time for real rest"
-            FocusLevel.Disengaged => "בוא נחזור אחרי הפסקה עם אנרגיה חדשה", // "Let's come back after a break with fresh energy"
-            _ => "הפסקה קצרה?" // "Short break?"
+            FocusLevel.Drifting => FocusMessages.BreakDrifting(),
+            FocusLevel.Fatigued => FocusMessages.BreakFatigued(),
+            FocusLevel.DisengagedExhausted => FocusMessages.BreakExhausted(),
+            FocusLevel.Disengaged => FocusMessages.BreakDisengaged(),
+            _ => FocusMessages.BreakGeneric()
         };
 
         return new BreakRecommendation(
@@ -582,7 +635,9 @@ public record FocusInput(
     double? TouchPatternScore = null,      // 0-1: tap rhythm consistency (1 = consistent touch)
     double? EnvironmentScore = null,       // 0-1: ambient light/proximity stability (1 = stable)
     // ── Executive load (FOC-001.4) ──
-    double? ExecutiveLoadFactor = null      // 0-1: task complexity (recall=0, application=0.3, analysis=0.6, synthesis=0.8)
+    double? ExecutiveLoadFactor = null,     // 0-1: task complexity (recall=0, application=0.3, analysis=0.6, synthesis=0.8)
+    // ── Mind-wandering (FOC-004) ──
+    MindWanderingState? MindWanderingState = null  // Pre-computed by IMindWanderingDetector; null = not available
 )
 {
     /// <summary>True if any mobile sensor signal is available.</summary>
@@ -609,7 +664,9 @@ public record FocusState(
     int QuestionsAttempted,
     // ── Sensor enrichment (FOC-001.3) ──
     int SensorSignalCount = 0,           // 0-4: how many sensor signals contributed
-    double SensorConfidenceBoost = 0.0   // Higher signal count → higher confidence in assessment
+    double SensorConfidenceBoost = 0.0,  // Higher signal count → higher confidence in assessment
+    // ── Mind-wandering (FOC-004) ──
+    MindWanderingState? MindWandering = null  // null = detector not available
 );
 
 public enum FocusLevel
@@ -631,7 +688,9 @@ public record ResilienceInput(
     int TotalAttempts,
     int AttemptsAboveComfortZone,
     int CurrentStreak,
-    int LongestStreak
+    int LongestStreak,
+    // ── FOC-012: Cultural context for weight adjustment ──
+    CulturalContext CulturalContext = CulturalContext.Unknown
 );
 
 public record ResilienceScore(
@@ -658,7 +717,11 @@ public record StruggleInput(
     double ResponseTimeStdDev,
     double AnnotationSentiment,
     // ── FOC-005: Confusion state (optional — null = no confusion detection available) ──
-    ConfusionState? ConfusionState = null
+    ConfusionState? ConfusionState = null,
+    // ── FOC-004: Mind-wandering state (optional — null = detector not available) ──
+    MindWanderingState? MindWanderingState = null,
+    // ── FOC-008: Solution diversity (optional — null = tracker not available) ──
+    int? SolutionDiversityCount = null
 );
 
 public record StruggleClassification(

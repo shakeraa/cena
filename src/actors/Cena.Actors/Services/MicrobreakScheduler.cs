@@ -175,17 +175,12 @@ public sealed class MicrobreakScheduler : IMicrobreakScheduler
     {
         return activity switch
         {
-            MicrobreakActivity.StretchBreak =>
-                "קום/י למתיחה קצרה של 60 שניות", // "Stand up for a 60-second stretch"
-            MicrobreakActivity.BreathingExercise =>
-                "קח/י 5 נשימות עמוקות", // "Take 5 deep breaths"
-            MicrobreakActivity.LookAway =>
-                "הסתכל/י למרחק למשך 30 שניות", // "Look at something far away for 30 seconds" (20-20-20)
-            MicrobreakActivity.WaterBreak =>
-                "שתה/שתי כוס מים", // "Drink a glass of water"
-            MicrobreakActivity.MiniWalk =>
-                "לך/לכי למטבח וחזרה", // "Walk to the kitchen and back"
-            _ => "הפסקה קצרה!" // "Quick break!"
+            MicrobreakActivity.StretchBreak => FocusMessages.MicrobreakStretch(),
+            MicrobreakActivity.BreathingExercise => FocusMessages.MicrobreakBreathing(),
+            MicrobreakActivity.LookAway => FocusMessages.MicrobreakLookAway(),
+            MicrobreakActivity.WaterBreak => FocusMessages.MicrobreakWater(),
+            MicrobreakActivity.MiniWalk => FocusMessages.MicrobreakWalk(),
+            _ => FocusMessages.MicrobreakGeneric()
         };
     }
 }
