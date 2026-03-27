@@ -8,7 +8,7 @@
 
 using System.Diagnostics.Metrics;
 using Cena.Actors.Api;
-using Cena.Actors.Api.Admin;
+using Cena.Admin.Api;
 using Cena.Actors.Configuration;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
@@ -115,7 +115,7 @@ builder.Services.AddSingleton<INatsConnection>(sp =>
 // =============================================================================
 
 // ACT-032: Register all domain services for DI
-builder.Services.AddSingleton<IMethodologySwitchService, DefaultMethodologySwitchService>();
+builder.Services.AddSingleton<IMethodologySwitchService, MethodologySwitchService>();
 builder.Services.AddSingleton<IBktService, BktService>();
 builder.Services.AddSingleton<IHlrService, HlrService>();
 builder.Services.AddSingleton<ICognitiveLoadService, CognitiveLoadService>();
@@ -391,75 +391,3 @@ public sealed class ProtoActorHealthCheck : IHealthCheck
     }
 }
 
-// =============================================================================
-// DEFAULT METHODOLOGY SWITCH SERVICE (production implementation)
-// =============================================================================
-
-/// <summary>
-/// Methodology switch service using MCM graph error-type mapping.
-/// Maps error types to methodology recommendations with confidence scoring.
-/// </summary>
-public sealed class DefaultMethodologySwitchService : IMethodologySwitchService
-{
-    // MCM graph: error type -> ordered methodology preferences
-    private static readonly Dictionary<ErrorType, Methodology[]> ErrorToMethodologyMap = new()
-    {
-        [ErrorType.Conceptual] = [Methodology.Feynman, Methodology.Analogy, Methodology.Socratic, Methodology.WorkedExample],
-        [ErrorType.Procedural] = [Methodology.WorkedExample, Methodology.DrillAndPractice, Methodology.BloomsProgression],
-        [ErrorType.Motivational] = [Methodology.ProjectBased, Methodology.RetrievalPractice, Methodology.SpacedRepetition],
-        [ErrorType.None] = [Methodology.Socratic, Methodology.SpacedRepetition, Methodology.Feynman]
-    };
-
-    public Task<DecideSwitchResponse> DecideSwitch(DecideSwitchRequest request)
-    {
-        var candidateMethods = ErrorToMethodologyMap
-            .GetValueOrDefault(request.DominantErrorType, ErrorToMethodologyMap[ErrorType.None])!;
-
-        // Filter out previously attempted methodologies
-        var alreadyTried = new HashSet<string>(request.MethodAttemptHistory, StringComparer.OrdinalIgnoreCase);
-        alreadyTried.Add(request.CurrentMethodology.ToString());
-
-        var available = candidateMethods
-            .Where(m => !alreadyTried.Contains(m.ToString()))
-            .ToArray();
-
-        if (available.Length == 0)
-        {
-            // All methodologies exhausted -- try remaining enum values not yet attempted
-            available = Enum.GetValues<Methodology>()
-                .Where(m => !alreadyTried.Contains(m.ToString()))
-                .ToArray();
-        }
-
-        if (available.Length == 0)
-        {
-            return Task.FromResult(new DecideSwitchResponse(
-                ShouldSwitch: false,
-                RecommendedMethodology: request.CurrentMethodology,
-                Confidence: 0.0,
-                AllMethodologiesExhausted: true,
-                EscalationAction: "refer_to_human_tutor",
-                DecisionTrace: $"All {Enum.GetValues<Methodology>().Length} methodologies exhausted " +
-                    $"for concept {request.ConceptId}. Student needs human tutor intervention."));
-        }
-
-        // Confidence based on stagnation severity and position in preference list
-        double confidence = Math.Max(0.3, 1.0 - (request.StagnationScore * 0.5));
-        if (request.ConsecutiveStagnantSessions > 3)
-            confidence *= 0.8;
-
-        var recommended = available[0];
-
-        return Task.FromResult(new DecideSwitchResponse(
-            ShouldSwitch: true,
-            RecommendedMethodology: recommended,
-            Confidence: confidence,
-            AllMethodologiesExhausted: false,
-            EscalationAction: null,
-            DecisionTrace: $"Switching from {request.CurrentMethodology} to {recommended} " +
-                $"due to {request.DominantErrorType} errors. " +
-                $"Stagnation={request.StagnationScore:F3}, " +
-                $"Confidence={confidence:F3}, " +
-                $"Candidates=[{string.Join(", ", available.Select(m => m.ToString()))}]"));
-    }
-}

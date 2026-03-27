@@ -8,6 +8,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Cena.Actors\Cena.Actors.csproj" />
+    <ProjectReference Include="../../api/Cena.Admin.Api/Cena.Admin.Api.csproj" />
+    <ProjectReference Include="../../shared/Cena.Infrastructure/Cena.Infrastructure.csproj" />
   </ItemGroup>
 
   <ItemGroup>

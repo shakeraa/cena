@@ -11,7 +11,7 @@ using Marten.Events.Projections;
 using Marten.Storage;
 using Weasel.Core;
 using Cena.Actors.Events;
-using Cena.Actors.Infrastructure.Documents;
+using Cena.Infrastructure.Documents;
 
 namespace Cena.Actors.Configuration;
 
