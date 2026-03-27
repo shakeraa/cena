@@ -22,6 +22,9 @@
    - 2.3 Student Self-Assessment and Confidence Calibration
    - 2.4 Annotation and Reflection Analysis
    - 2.5 Explanation Quality (Feynman Technique Grading)
+   - 2.6 Interleaving and Desirable Difficulties
+   - 2.7 Cognitive Load Theory (CLT) and Zone of Proximal Development (ZPD)
+   - 2.8 Transfer Learning: Near and Far Transfer
 3. [Decay and Forgetting Models](#3-decay-and-forgetting-models)
    - 3.1 Ebbinghaus Forgetting Curve
    - 3.2 Half-Life Regression (HLR)
@@ -1393,6 +1396,108 @@ This implements Renkl & Atkinson's (2003, doi:10.1207/S15326985EP3801_3) fading 
 - `intrinsic_load` is a property on each concept node in Neo4j, calibrated from aggregate student performance data
 - ZPD is computed from the mastery overlay + prerequisite structure — it IS a graph computation
 - Scaffolding level per concept is derived from `mastery(c)` and `PSI(c)` — both graph-overlay properties
+
+---
+
+### 2.8 Transfer Learning: Near and Far Transfer
+
+**What it measures:** Whether a student can apply knowledge learned in one context to novel situations, and how the distance between the learning context and the application context affects success.
+
+**Theoretical foundation:**
+
+Barnett & Ceci (2002, doi:10.1037/0033-2909.128.4.612) proposed a comprehensive taxonomy for transfer along multiple dimensions:
+
+| Dimension | Near Transfer | Far Transfer |
+|-----------|--------------|--------------|
+| **Knowledge domain** | Same domain (algebra → algebra) | Cross-domain (algebra → physics) |
+| **Physical context** | Same setting (classroom → classroom) | Different setting (classroom → lab) |
+| **Temporal context** | Immediate (same session) | Delayed (weeks/months later) |
+| **Functional context** | Same task type (solve equation → solve equation) | Different task type (solve equation → model real-world) |
+| **Social context** | Same social setting | Different social setting |
+| **Modality** | Same representation (symbolic → symbolic) | Different representation (symbolic → graphical) |
+
+**Near transfer** occurs when the learning and application contexts share most dimensions — e.g., applying the quadratic formula to a new quadratic equation. Near transfer is relatively reliable when mastery is high (Thorndike & Woodworth 1901).
+
+**Far transfer** occurs when the contexts differ on multiple dimensions — e.g., using algebraic reasoning to solve a novel physics problem. Far transfer is rare, fragile, and requires deep structural understanding rather than procedural fluency (Perkins & Salomon 1992, doi:10.1016/B978-0-08-042620-0.50050-8).
+
+**Transfer distance formulation in a concept graph:**
+
+Given a concept graph `G = (V, E)` where edges represent prerequisite or relatedness relationships, the transfer distance between a source concept `s` and a target concept `t` can be quantified:
+
+```
+transfer_distance(s, t) = shortest_path_length(s, t, G)
+```
+
+For weighted graphs incorporating semantic similarity:
+
+```
+transfer_distance(s, t) = min_path(sum(1 - edge_similarity(e)) for e in path(s, t))
+```
+
+Where `edge_similarity(e)` captures how closely related adjacent concepts are (derived from co-occurrence in student performance data or embedding cosine similarity).
+
+**Transfer probability model:**
+
+```
+P(transfer | mastery_s, distance) = mastery_s^alpha * exp(-beta * distance)
+```
+
+Where:
+- `mastery_s` = mastery of the source concept (higher mastery → more transferable knowledge)
+- `alpha` = mastery exponent (typically > 1, reflecting that deep mastery transfers better than shallow)
+- `distance` = transfer distance in the concept graph
+- `beta` = decay rate for transfer probability with distance (domain-specific, learned from data)
+
+**Near vs. far transfer classification based on graph distance:**
+
+```
+if transfer_distance(s, t) <= 2:    "near transfer" (same cluster, shared prerequisites)
+if transfer_distance(s, t) <= 4:    "moderate transfer" (adjacent clusters)
+if transfer_distance(s, t) > 4:     "far transfer" (cross-domain or distant clusters)
+```
+
+**Measuring transfer in practice:**
+
+1. **Direct transfer assessment:** Present a problem that requires concept A but is framed in the context of concept B. If the student succeeds, transfer from A to B is demonstrated.
+
+2. **Transfer readiness score:**
+```
+transfer_readiness(s, t) = mastery(s) * structural_similarity(s, t) * (1 - transfer_distance(s, t) / max_distance)
+```
+
+Where `structural_similarity(s, t)` is computed from shared prerequisites:
+```
+structural_similarity(s, t) = |prerequisites(s) ∩ prerequisites(t)| / |prerequisites(s) ∪ prerequisites(t)|
+```
+
+This Jaccard similarity on prerequisite sets captures how structurally related two concepts are, independent of graph distance.
+
+3. **Transfer evidence accumulation:** Track cases where mastering concept A improves performance on concept B without direct instruction on B. This is observable in the event stream as accuracy improvements on B following `ConceptMastered` events for A.
+
+**Strengths:**
+- Distinguishes shallow memorization (no transfer) from deep understanding (transfers broadly)
+- Directly actionable: concepts with low transfer indicate rote learning — switch to deeper methodologies (Socratic, Feynman)
+- Aligns with Bloom's higher levels (Analyze, Evaluate, Create inherently require transfer)
+- Transfer evidence validates the concept graph structure — high transfer between two concepts suggests they should be closer in the graph
+
+**Weaknesses:**
+- Far transfer is difficult to measure reliably — requires carefully designed cross-domain items
+- The transfer distance metric depends on graph quality — errors in the graph distort distance estimates
+- Transfer probability parameters (alpha, beta) must be learned from data and may vary by domain
+- Confounding: apparent transfer may be explained by a hidden common prerequisite
+
+**Cena implementation mapping:**
+- The `LearningSession` actor in the Pedagogy Context periodically inserts **transfer probe items** — items tagged to concept B but solvable via concept A, where A is a recently mastered concept. The student's response reveals whether transfer from A to B has occurred.
+- Transfer events are logged as `ConceptAttempted` with a `transfer_source` metadata field — the Analytics Context can then compute per-edge transfer rates across the graph
+- The `StudentProfile` actor maintains a `transfer_profile` — a sparse matrix of observed transfer strengths between concept pairs, updated incrementally as transfer probes are answered
+- Neo4j stores `[:TRANSFERS_TO {strength, distance, observed_count}]` edges between concepts, populated from aggregate transfer probe data — these edges inform the Pedagogy Context's item selection (if transfer is weak between A and B, explicitly teach the connection)
+- The `StagnationDetected` event can be augmented with transfer failure signals — if a student masters individual concepts but fails transfer probes, the stagnation type is `transfer_failure`, triggering methodology switch to cross-concept integration exercises
+
+**Graph mapping:**
+- Transfer distance is computed directly from the Neo4j concept graph via shortest-path queries
+- Transfer readiness scores are per-(source, target) concept pairs, forming a second overlay on the graph
+- High transfer readiness between concepts that lack a direct edge suggests a missing prerequisite or relatedness edge — this feeds back into graph refinement
+- The prerequisite graph distance between source and target concepts predicts transfer likelihood: concepts within 2 hops show ~70% near-transfer success with high mastery, while concepts >4 hops show <20% far-transfer success (calibrated from aggregate student data)
 
 ---
 
