@@ -16,6 +16,7 @@ Tasks are ordered by dependency — later tasks depend on earlier ones.
 | `07-content-pipeline.md` | Content | Neo4j, Kimi batch, Expert review | 6 tasks |
 | `08-security-compliance.md` | Security | GDPR, Auth, PII, Pen testing | 8 tasks |
 | `09-mastery-engine.md` | Mastery | BKT, HLR, MIRT, Neo4j, Python trainers | 18 tasks |
+| `10-focus-engine.md` | Focus & Resilience | Mobile sensors, microbreaks, affect detection | 12 tasks |
 
 ## Stages
 1. **Foundation** (Weeks 1-4): Data layer + actor skeleton + LLM ACL
