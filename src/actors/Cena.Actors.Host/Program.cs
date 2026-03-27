@@ -29,6 +29,7 @@ using Proto.Cluster.Partition;
 using Proto.Cluster.Testing;
 using Proto.DependencyInjection;
 using Proto.Remote;
+using Proto.Remote.GrpcNet;
 using Serilog;
 using StackExchange.Redis;
 
@@ -114,6 +115,10 @@ builder.Services.AddSingleton<INatsConnection>(sp =>
 // =============================================================================
 // 5. DOMAIN SERVICES
 // =============================================================================
+
+// Firebase Admin SDK (required by AdminUserService/AdminRoleService)
+builder.Services.AddSingleton<Cena.Infrastructure.Firebase.IFirebaseAdminService,
+    Cena.Infrastructure.Firebase.FirebaseAdminService>();
 
 // ACT-032: Register all domain services for DI
 builder.Services.AddSingleton<IMethodologySwitchService, MethodologySwitchService>();
@@ -206,7 +211,9 @@ builder.Services.AddSingleton(provider =>
         .WithActorRequestTimeout(TimeSpan.FromSeconds(30))
         .WithHeartbeatExpiration(TimeSpan.FromSeconds(30));
 
+    // Remote serialization required by cluster, even in single-node dev.
     system
+        .WithRemote(RemoteConfig.BindToLocalhost())
         .WithCluster(clusterConfig);
 
     logger.LogInformation(

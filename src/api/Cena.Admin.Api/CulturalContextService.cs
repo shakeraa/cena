@@ -24,14 +24,7 @@ public sealed class CulturalContextService : ICulturalContextService
     public CulturalContextService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
-        ICulturalContextService logger)
-    {
-        _store = store;
-        _redis = redis;
-        _logger = (ILogger<CulturalContextService>)logger;
-    }
-
-    public CulturalContextService(IDocumentStore store, IConnectionMultiplexer redis, ILogger<CulturalContextService> logger)
+        ILogger<CulturalContextService> logger)
     {
         _store = store;
         _redis = redis;
