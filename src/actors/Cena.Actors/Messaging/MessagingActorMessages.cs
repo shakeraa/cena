@@ -13,8 +13,10 @@ namespace Cena.Actors.Messaging;
 public record SendMessage(
     string ThreadId,
     string SenderId,
+    string SenderName,
     MessageRole SenderRole,
     string? RecipientId,
+    string? RecipientName,
     MessageContent Content,
     MessageChannel Channel,
     string? ReplyToMessageId

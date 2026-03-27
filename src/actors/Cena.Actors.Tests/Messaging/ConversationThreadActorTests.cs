@@ -26,11 +26,13 @@ public sealed class ConversationThreadActorTests
         _actor = new ConversationThreadActor(
             _writer, _reader, _moderator, _throttler, _publisher, logger);
 
-        // Default: allow everything
+        // Default: allow everything, thread doesn't exist yet
         _moderator.Check(Arg.Any<string>()).Returns(new ModerationResult(true, null));
         _throttler.Check(Arg.Any<string>(), Arg.Any<MessageRole>()).Returns(new ThrottleResult(true));
         _writer.WriteMessageAsync(Arg.Any<string>(), Arg.Any<MessageEntry>(), Arg.Any<string[]>())
             .Returns("1234567890-0");
+        _reader.GetMessagesAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<int>())
+            .Returns(new MessagePage(Array.Empty<MessageView>(), null, false));
     }
 
     [Fact]
@@ -54,7 +56,8 @@ public sealed class ConversationThreadActorTests
     public async Task SendMessage_ExceedsMaxLength_ReturnsError()
     {
         var context = CreateMockContext(new SendMessage(
-            "t-1", "teacher-1", MessageRole.Teacher, "student-1",
+            "t-1", "teacher-1", "Mr. Levy", MessageRole.Teacher,
+            "student-1", "Alice",
             new MessageContent(new string('x', 2001), "text", null, null),
             MessageChannel.InApp, null));
 
@@ -73,7 +76,8 @@ public sealed class ConversationThreadActorTests
             .Returns(new ModerationResult(false, "phone_number_detected"));
 
         var context = CreateMockContext(new SendMessage(
-            "t-1", "parent-1", MessageRole.Parent, "student-1",
+            "t-1", "parent-1", "Mrs. Cohen", MessageRole.Parent,
+            "student-1", "Alice",
             new MessageContent("Call +972501234567", "text", null, null),
             MessageChannel.InApp, null));
 
@@ -155,7 +159,8 @@ public sealed class ConversationThreadActorTests
     // ── Helpers ──
 
     private SendMessage CreateSendMessage() => new(
-        "t-1", "teacher-1", MessageRole.Teacher, "student-1",
+        "t-1", "teacher-1", "Mr. Levy", MessageRole.Teacher,
+        "student-1", "Alice",
         new MessageContent("Great work on fractions!", "text", null, null),
         MessageChannel.InApp, null);
 

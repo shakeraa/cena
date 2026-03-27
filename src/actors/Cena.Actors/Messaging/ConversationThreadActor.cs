@@ -21,12 +21,13 @@ public sealed class ConversationThreadActor : IActor
     private readonly IMessagingEventPublisher _eventPublisher;
     private readonly ILogger<ConversationThreadActor> _logger;
 
-    // ── State (loaded from Redis on activation) ──
+    // ── State (loaded from Redis lazily on first command) ──
     private string _threadId = "";
     private string _threadType = "";
     private string[] _participantIds = Array.Empty<string>();
     private string[] _participantNames = Array.Empty<string>();
     private bool _threadExists;
+    private bool _threadChecked;
 
     // ── Telemetry ──
     private static readonly Meter Meter = new("Cena.Actors.Messaging", "1.0.0");
@@ -55,12 +56,21 @@ public sealed class ConversationThreadActor : IActor
     {
         return context.Message switch
         {
+            Started => HandleStarted(context),
             SendMessage msg => HandleSendMessage(msg, context),
             AcknowledgeMessage msg => HandleAcknowledge(msg, context),
             GetThreadHistory msg => HandleGetHistory(msg, context),
             MuteThread msg => HandleMuteThread(msg, context),
             _ => Task.CompletedTask
         };
+    }
+
+    private Task HandleStarted(IContext context)
+    {
+        // Thread ID is set on first command — no state to load at startup.
+        // The actor checks _threadExists lazily via Redis on first SendMessage.
+        _logger.LogDebug("ConversationThreadActor started");
+        return Task.CompletedTask;
     }
 
     private async Task HandleSendMessage(SendMessage msg, IContext context)
@@ -100,13 +110,22 @@ public sealed class ConversationThreadActor : IActor
             return;
         }
 
-        // 4. Generate message ID
-        var messageId = Guid.NewGuid().ToString("N");
+        // 4. Generate message ID (UUIDv7 — time-sortable, consistent with contracts)
+        var messageId = Guid.CreateVersion7().ToString("N");
 
         // 5. Determine recipients
         var recipientIds = ResolveRecipients(msg);
 
-        // 6. Create thread if it doesn't exist
+        // 6. Check Redis for existing thread (once per actor lifetime)
+        if (!_threadChecked)
+        {
+            _threadChecked = true;
+            var existing = await _reader.GetMessagesAsync(msg.ThreadId, null, 1);
+            if (existing.Messages.Length > 0)
+                _threadExists = true;
+        }
+
+        // Create thread if it doesn't exist
         if (!_threadExists)
         {
             var allParticipants = new HashSet<string> { msg.SenderId };
@@ -114,7 +133,7 @@ public sealed class ConversationThreadActor : IActor
             foreach (var r in recipientIds) allParticipants.Add(r);
 
             _participantIds = allParticipants.ToArray();
-            _participantNames = _participantIds; // Names resolved by caller
+            _participantNames = BuildParticipantNames(msg);
             _threadType = msg.RecipientId == null ? "ClassBroadcast" : "DirectMessage";
             if (msg.SenderRole == MessageRole.Parent) _threadType = "ParentThread";
 
@@ -128,7 +147,7 @@ public sealed class ConversationThreadActor : IActor
 
         // 7. Write to Redis Stream
         var entry = new MessageEntry(
-            messageId, msg.SenderId, msg.SenderRole, msg.SenderId,
+            messageId, msg.SenderId, msg.SenderRole, msg.SenderName,
             msg.Content.Text, msg.Content.ContentType,
             msg.Content.ResourceUrl, msg.ReplyToMessageId,
             msg.Channel, DateTimeOffset.UtcNow);
@@ -192,5 +211,13 @@ public sealed class ConversationThreadActor : IActor
 
         // Class broadcast: recipients resolved by the caller/hub
         return Array.Empty<string>();
+    }
+
+    private static string[] BuildParticipantNames(SendMessage msg)
+    {
+        var names = new List<string> { msg.SenderName };
+        if (msg.RecipientName != null)
+            names.Add(msg.RecipientName);
+        return names.ToArray();
     }
 }

@@ -1,11 +1,11 @@
 // ═══════════════════════════════════════════════════════════════════════
-// Cena Platform — Message Throttler
+// Cena Platform — Message Throttler (Redis-Backed)
 // Layer: Domain Service | Runtime: .NET 9
-// Per-role rate limiting for messaging. Uses in-memory tracking.
-// Production should use Redis counters (see MSG-005.4).
+// Per-role rate limiting using Redis INCR with automatic TTL expiry.
+// Horizontally scalable — state shared across all app instances.
 // ═══════════════════════════════════════════════════════════════════════
 
-using System.Collections.Concurrent;
+using StackExchange.Redis;
 
 namespace Cena.Actors.Messaging;
 
@@ -18,6 +18,8 @@ public interface IMessageThrottler
 
 public sealed class MessageThrottler : IMessageThrottler
 {
+    private readonly IConnectionMultiplexer _redis;
+
     // Per-role limits
     private static readonly Dictionary<MessageRole, (int Daily, int Hourly)> Limits = new()
     {
@@ -27,7 +29,12 @@ public sealed class MessageThrottler : IMessageThrottler
         [MessageRole.System] = (Daily: int.MaxValue, Hourly: int.MaxValue),
     };
 
-    private readonly ConcurrentDictionary<string, UserSendState> _state = new();
+    private const string KeyPrefix = "cena:throttle";
+
+    public MessageThrottler(IConnectionMultiplexer redis)
+    {
+        _redis = redis;
+    }
 
     public ThrottleResult Check(string userId, MessageRole role)
     {
@@ -38,20 +45,24 @@ public sealed class MessageThrottler : IMessageThrottler
             return new ThrottleResult(true);
 
         var limits = Limits[role];
-        var state = _state.GetOrAdd(userId, _ => new UserSendState());
+        var db = _redis.GetDatabase();
 
-        state.PruneExpired();
+        // Check hourly limit first (smaller window, more likely to trip)
+        var hourlyKey = $"{KeyPrefix}:{userId}:hourly";
+        var hourlyCount = (int)(db.StringGet(hourlyKey));
 
-        if (state.HourlySends >= limits.Hourly)
+        if (hourlyCount >= limits.Hourly)
         {
-            var oldest = state.HourlyOldestSendUtc;
-            int retryAfter = oldest.HasValue
-                ? Math.Max(1, (int)(oldest.Value.AddHours(1) - DateTimeOffset.UtcNow).TotalSeconds)
-                : 3600;
+            var ttl = db.KeyTimeToLive(hourlyKey);
+            int retryAfter = ttl.HasValue ? Math.Max(1, (int)ttl.Value.TotalSeconds) : 3600;
             return new ThrottleResult(false, retryAfter);
         }
 
-        if (state.DailySends >= limits.Daily)
+        // Check daily limit
+        var dailyKey = $"{KeyPrefix}:{userId}:daily";
+        var dailyCount = (int)(db.StringGet(dailyKey));
+
+        if (dailyCount >= limits.Daily)
         {
             var midnightUtc = DateTimeOffset.UtcNow.Date.AddDays(1);
             int retryAfter = Math.Max(1, (int)(midnightUtc - DateTimeOffset.UtcNow).TotalSeconds);
@@ -65,68 +76,30 @@ public sealed class MessageThrottler : IMessageThrottler
     {
         if (role == MessageRole.Student) return;
 
-        var state = _state.GetOrAdd(userId, _ => new UserSendState());
-        state.Record(DateTimeOffset.UtcNow);
+        var db = _redis.GetDatabase();
+
+        // INCR hourly counter with 1-hour TTL
+        var hourlyKey = $"{KeyPrefix}:{userId}:hourly";
+        db.StringIncrement(hourlyKey);
+        // Set TTL only if key is new (no existing TTL)
+        if (db.KeyTimeToLive(hourlyKey) is null or { TotalSeconds: < 0 })
+            db.KeyExpire(hourlyKey, TimeSpan.FromHours(1));
+
+        // INCR daily counter with TTL until midnight UTC
+        var dailyKey = $"{KeyPrefix}:{userId}:daily";
+        db.StringIncrement(dailyKey);
+        if (db.KeyTimeToLive(dailyKey) is null or { TotalSeconds: < 0 })
+        {
+            var midnightUtc = DateTimeOffset.UtcNow.Date.AddDays(1);
+            var ttl = midnightUtc - DateTimeOffset.UtcNow;
+            db.KeyExpire(dailyKey, ttl);
+        }
     }
 
     public void Reset(string userId)
     {
-        _state.TryRemove(userId, out _);
-    }
-
-    private sealed class UserSendState
-    {
-        private readonly List<DateTimeOffset> _sends = new();
-        private readonly object _lock = new();
-
-        public int DailySends
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    var today = DateTimeOffset.UtcNow.Date;
-                    return _sends.Count(s => s.Date == today);
-                }
-            }
-        }
-
-        public int HourlySends
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    var oneHourAgo = DateTimeOffset.UtcNow.AddHours(-1);
-                    return _sends.Count(s => s >= oneHourAgo);
-                }
-            }
-        }
-
-        public DateTimeOffset? HourlyOldestSendUtc
-        {
-            get
-            {
-                lock (_lock)
-                {
-                    var oneHourAgo = DateTimeOffset.UtcNow.AddHours(-1);
-                    return _sends.Where(s => s >= oneHourAgo).OrderBy(s => s).FirstOrDefault();
-                }
-            }
-        }
-
-        public void Record(DateTimeOffset timestamp)
-        {
-            lock (_lock) { _sends.Add(timestamp); }
-        }
-
-        public void PruneExpired()
-        {
-            lock (_lock)
-            {
-                var yesterday = DateTimeOffset.UtcNow.AddDays(-1);
-                _sends.RemoveAll(s => s < yesterday);
-            }
-        }
+        var db = _redis.GetDatabase();
+        db.KeyDelete($"{KeyPrefix}:{userId}:hourly");
+        db.KeyDelete($"{KeyPrefix}:{userId}:daily");
     }
 }

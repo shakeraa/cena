@@ -63,16 +63,20 @@ public sealed class RedisMessageReader : IMessageReader
         int fetchCount = limit + 1;
 
         // XREVRANGE key max min COUNT n
-        // max = beforeCursor (exclusive) or "+" (latest)
-        // We need exclusive "before", so we use the entry ID - 1
-        var max = string.IsNullOrEmpty(beforeCursor) ? "+" : $"({beforeCursor}";
-        var min = "-";
+        // beforeCursor is a stream entry ID. We need exclusive upper bound
+        // to avoid returning the last message from the previous page.
+        // Decrement the sequence number to make it exclusive.
+        string maxId = "+";
+        if (!string.IsNullOrEmpty(beforeCursor))
+        {
+            maxId = DecrementStreamId(beforeCursor);
+        }
 
         // StackExchange.Redis XREVRANGE: returns entries in reverse chronological order
         var entries = await db.StreamRangeAsync(
             streamKey,
-            minId: min,
-            maxId: beforeCursor ?? "+",
+            minId: "-",
+            maxId: maxId,
             count: fetchCount,
             messageOrder: Order.Descending);
 
@@ -133,6 +137,28 @@ public sealed class RedisMessageReader : IMessageReader
             order: Order.Descending);
 
         return entries.Select(e => e.ToString()).ToArray();
+    }
+
+    /// <summary>
+    /// Decrement a Redis Stream entry ID to make it exclusive.
+    /// "1234567890123-5" → "1234567890123-4"
+    /// "1234567890123-0" → "1234567890122-18446744073709551615" (previous ms, max seq)
+    /// </summary>
+    private static string DecrementStreamId(string entryId)
+    {
+        var parts = entryId.Split('-');
+        if (parts.Length != 2
+            || !long.TryParse(parts[0], out var timestamp)
+            || !long.TryParse(parts[1], out var seq))
+        {
+            return entryId; // Can't parse — return as-is (safe fallback)
+        }
+
+        if (seq > 0)
+            return $"{timestamp}-{seq - 1}";
+
+        // Sequence is 0 — roll back to previous millisecond
+        return timestamp > 0 ? $"{timestamp - 1}-{long.MaxValue}" : "0-0";
     }
 
     private static string? NullIfEmpty(string value)

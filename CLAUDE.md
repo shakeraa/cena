@@ -1,5 +1,9 @@
 # Claude Code Configuration - RuFlo V3
 
+## Session Start (Always Run First)
+
+At the start of every new conversation, read all memory files listed in `~/.claude/projects/-Users-shaker-edu-apps-cena/memory/MEMORY.md` before doing anything else. This ensures context about the user, prior decisions, and project state is loaded immediately.
+
 ## Behavioral Rules (Always Enforced)
 
 - Do what has been asked; nothing more, nothing less

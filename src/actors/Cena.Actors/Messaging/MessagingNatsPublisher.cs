@@ -6,6 +6,8 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 using System.Diagnostics.Metrics;
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using Cena.Actors.Events;
 using Microsoft.Extensions.Logging;
@@ -47,7 +49,8 @@ public sealed class MessagingNatsPublisher : IMessagingEventPublisher
 
     public Task PublishInboundReceivedAsync(string source, string externalId, string text) =>
         PublishSafe(MessagingNatsSubjects.InboundReceived,
-            new { Source = source, ExternalId = externalId, TextHash = text.GetHashCode().ToString() },
+            new { Source = source, ExternalId = externalId,
+                  TextSha256 = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant() },
             $"{source}:{externalId}");
 
     private async Task PublishSafe<T>(string subject, T payload, string deduplicationId)

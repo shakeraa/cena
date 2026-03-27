@@ -71,18 +71,21 @@ public sealed class RedisMessageWriter : IMessageWriter
             new("sentAt", message.SentAt.ToString("O")),
         };
 
-        // 1. XADD with approximate trimming
+        // 1. XADD must happen first (needs the entry ID)
         var entryId = await db.StreamAddAsync(
             streamKey, fields,
             maxLength: MessagingRedisKeys.MaxStreamLength,
             useApproximateMaxLength: true);
 
-        // 2. Refresh TTL
-        await db.KeyExpireAsync(streamKey, MessagingRedisKeys.MessageTtl);
+        // 2-5. Fire remaining operations concurrently (StackExchange.Redis
+        // multiplexes async calls over one connection — this IS pipelined).
+        var tasks = new List<Task>();
+        double score = message.SentAt.ToUnixTimeMilliseconds();
 
-        // 3. Increment unread counters for recipients (not the sender)
-        var tasks = new List<Task>(recipientIds.Length + recipientIds.Length + 1);
+        // Refresh TTL
+        tasks.Add(db.KeyExpireAsync(streamKey, MessagingRedisKeys.MessageTtl));
 
+        // Increment unread counters for recipients (not the sender)
         foreach (var recipientId in recipientIds)
         {
             if (recipientId != message.SenderId)
@@ -92,9 +95,7 @@ public sealed class RedisMessageWriter : IMessageWriter
             }
         }
 
-        // 4. Update user thread sorted sets (sender + all recipients)
-        double score = message.SentAt.ToUnixTimeMilliseconds();
-
+        // Update user thread sorted sets (sender + all recipients)
         tasks.Add(db.SortedSetAddAsync(
             MessagingRedisKeys.UserThreads(message.SenderId),
             threadId, score));
