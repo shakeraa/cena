@@ -15,7 +15,7 @@ public static class CenaSupervisionStrategies
     /// <summary>
     /// Supervision strategy for StudentActor children (LearningSession,
     /// StagnationDetector, OutreachScheduler).
-    /// Restarts child on failure. Stops child after 3 consecutive failures within 60s.
+    /// Restarts child on failure. After 3 restarts within 60s, escalates to parent supervisor.
     /// </summary>
     public static ISupervisorStrategy StudentChildStrategy()
     {

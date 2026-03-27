@@ -1,10 +1,1 @@
-﻿namespace Cena.Actors.Tests;
-
-public class UnitTest1
-{
-    [Fact]
-    public void Test1()
-    {
-
-    }
-}
+// Placeholder removed — see Services/, Students/, Events/, Sessions/, Outreach/ for tests

@@ -125,8 +125,15 @@ public sealed class BktService : IBktService
         // P(L_n) = P(L_n | obs) + (1 - P(L_n | obs)) * P(T)
         double posterior = pLearned + (1.0 - pLearned) * pLearn;
 
-        // Step 4: Apply forgetting factor
-        // This captures within-session micro-forgetting; long-term decay is HLR's job
+        // Step 4: Apply forgetting factor (INTENTIONAL DEVIATION from standard Corbett & Anderson)
+        //
+        // The standard BKT model does NOT include forgetting within the trial update.
+        // Long-term decay is HLR's responsibility. However, we apply a small within-session
+        // micro-forgetting factor (pForget=0.02 default) to prevent mastery from ratcheting up
+        // too aggressively on lucky-guess streaks.
+        //
+        // IMPACT: With pForget=0.02, students need ~6 more correct answers to reach 0.85
+        // mastery compared to the standard model. See ACT-024 for domain review.
         posterior = posterior * (1.0 - pForget);
 
         // Step 5: Clamp to valid range

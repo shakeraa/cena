@@ -8,6 +8,7 @@ using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
 using Proto;
 using Cena.Actors.Services;
+using System.Diagnostics;
 
 namespace Cena.Actors.Outreach;
 
@@ -47,21 +48,28 @@ public sealed class OutreachSchedulerActor : IActor
     // ── Outreach priorities ──
     private readonly SortedList<int, PendingOutreach> _pendingQueue = new();
 
-    // ── Telemetry ──
-    private static readonly Meter Meter = new("Cena.Actors.Outreach", "1.0.0");
-    private static readonly Counter<long> OutreachSent =
-        Meter.CreateCounter<long>("cena.outreach.sent_total");
+    // ── Timer Configuration ──
+    private const int CheckHlrTimersIntervalMinutes = 15;
+    private const int CheckStreakExpiryIntervalMinutes = 30;
+    private CancellationTokenSource? _timerCts;
 
-    public OutreachSchedulerActor(IHlrService hlr, ILogger<OutreachSchedulerActor> logger)
+    // ── Telemetry (ACT-023: instance-based via IMeterFactory) ──
+    private readonly Counter<long> _outreachSent;
+
+    public OutreachSchedulerActor(IHlrService hlr, ILogger<OutreachSchedulerActor> logger, IMeterFactory meterFactory)
     {
         _hlr = hlr;
         _logger = logger;
+        var meter = meterFactory.Create("Cena.Actors.Outreach", "1.0.0");
+        _outreachSent = meter.CreateCounter<long>("cena.outreach.sent_total");
     }
 
     public Task ReceiveAsync(IContext context)
     {
         return context.Message switch
         {
+            Started => OnStarted(context),
+            Stopping => OnStopping(),
             ConceptMasteredNotification msg => HandleConceptMastered(msg),
             CheckHlrTimers => HandleCheckTimers(context),
             CheckStreakExpiry => HandleCheckStreak(context),
@@ -69,6 +77,53 @@ public sealed class OutreachSchedulerActor : IActor
             UpdateContactPrefs msg => HandleContactPrefs(msg),
             _ => Task.CompletedTask
         };
+    }
+
+    // ── Lifecycle: start periodic timers ──
+    private Task OnStarted(IContext context)
+    {
+        _timerCts = new CancellationTokenSource();
+        var self = context.Self;
+        var system = context.System;
+        var token = _timerCts.Token;
+
+        // Schedule periodic HLR timer checks
+        _ = SchedulePeriodicAsync(system, self, new CheckHlrTimers(),
+            TimeSpan.FromMinutes(CheckHlrTimersIntervalMinutes), token);
+
+        // Schedule periodic streak expiry checks
+        _ = SchedulePeriodicAsync(system, self, new CheckStreakExpiry(),
+            TimeSpan.FromMinutes(CheckStreakExpiryIntervalMinutes), token);
+
+        _logger.LogInformation(
+            "OutreachSchedulerActor started. HLR check every {Hlr}min, streak check every {Streak}min",
+            CheckHlrTimersIntervalMinutes, CheckStreakExpiryIntervalMinutes);
+
+        return Task.CompletedTask;
+    }
+
+    private Task OnStopping()
+    {
+        _timerCts?.Cancel();
+        _timerCts?.Dispose();
+        _timerCts = null;
+        _logger.LogDebug("OutreachSchedulerActor stopping, timers cancelled");
+        return Task.CompletedTask;
+    }
+
+    private static async Task SchedulePeriodicAsync(
+        ActorSystem system, PID self, object message, TimeSpan interval, CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(interval, ct);
+                if (!ct.IsCancellationRequested)
+                    system.Root.Send(self, message);
+            }
+            catch (OperationCanceledException) { break; }
+        }
     }
 
     // ── When a concept is mastered, start tracking its HLR timer ──
@@ -200,7 +255,7 @@ public sealed class OutreachSchedulerActor : IActor
             ));
 
             _messagesSentToday++;
-            OutreachSent.Add(1, new KeyValuePair<string, object?>("type", outreach.Type));
+            _outreachSent.Add(1, new KeyValuePair<string, object?>("type", outreach.Type));
 
             _logger.LogInformation(
                 "Outreach dispatched: type={Type}, priority={Priority}, today={Count}/{Max}",

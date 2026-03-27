@@ -31,14 +31,14 @@ public sealed class StagnationDetectorActor : IActor
     private const int ConsecutiveSessionsRequired = 3;
     private const int CooldownSessions = 3;
 
-    // ── Telemetry ──
-    private static readonly Meter Meter = new("Cena.Actors.Stagnation", "1.0.0");
-    private static readonly Histogram<double> ScoreHistogram =
-        Meter.CreateHistogram<double>("cena.stagnation.composite_score");
+    // ── Telemetry (ACT-023: instance-based via IMeterFactory) ──
+    private readonly Histogram<double> _scoreHistogram;
 
-    public StagnationDetectorActor(ILogger<StagnationDetectorActor> logger)
+    public StagnationDetectorActor(ILogger<StagnationDetectorActor> logger, IMeterFactory meterFactory)
     {
         _logger = logger;
+        var meter = meterFactory.Create("Cena.Actors.Stagnation", "1.0.0");
+        _scoreHistogram = meter.CreateHistogram<double>("cena.stagnation.composite_score");
     }
 
     public Task ReceiveAsync(IContext context)
@@ -97,7 +97,7 @@ public sealed class StagnationDetectorActor : IActor
         }
 
         double compositeScore = ComputeCompositeScore(window);
-        ScoreHistogram.Record(compositeScore);
+        _scoreHistogram.Record(compositeScore);
 
         if (compositeScore > StagnationThreshold)
         {

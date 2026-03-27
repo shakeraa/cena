@@ -49,18 +49,19 @@ public sealed class LearningSessionActor : IActor
     private const int MaxSessionMinutes = 45;
     private const int DefaultSessionMinutes = 25;
 
-    // ── Telemetry ──
-    private static readonly ActivitySource Activity = new("Cena.Actors.LearningSession", "1.0.0");
-    private static readonly Meter Meter = new("Cena.Actors.LearningSession", "1.0.0");
-    private static readonly Histogram<double> FatigueHistogram =
-        Meter.CreateHistogram<double>("cena.session.fatigue_score");
-    private static readonly Counter<long> QuestionsCounter =
-        Meter.CreateCounter<long>("cena.session.questions_total");
+    // ── Telemetry (ACT-023: instance-based via IMeterFactory) ──
+    private readonly ActivitySource _activitySource;
+    private readonly Histogram<double> _fatigueHistogram;
+    private readonly Counter<long> _questionsCounter;
 
-    public LearningSessionActor(IBktService bkt, ILogger<LearningSessionActor> logger)
+    public LearningSessionActor(IBktService bkt, ILogger<LearningSessionActor> logger, IMeterFactory meterFactory)
     {
         _bkt = bkt;
         _logger = logger;
+        _activitySource = new ActivitySource("Cena.Actors.LearningSession", "1.0.0");
+        var meter = meterFactory.Create("Cena.Actors.LearningSession", "1.0.0");
+        _fatigueHistogram = meter.CreateHistogram<double>("cena.session.fatigue_score");
+        _questionsCounter = meter.CreateCounter<long>("cena.session.questions_total");
     }
 
     public Task ReceiveAsync(IContext context)
@@ -105,8 +106,8 @@ public sealed class LearningSessionActor : IActor
     // ── Answer Evaluation (REAL BKT) ──
     private Task HandleEvaluateAnswer(IContext context, EvaluateAnswerRequest req)
     {
-        using var span = Activity.StartActivity("EvaluateAnswer");
-        QuestionsCounter.Add(1);
+        using var span = _activitySource.StartActivity("EvaluateAnswer");
+        _questionsCounter.Add(1);
         _questionsAttempted++;
 
         // REAL BKT update — Corbett & Anderson formula, microsecond scale
@@ -127,7 +128,7 @@ public sealed class LearningSessionActor : IActor
 
         // REAL fatigue score computation
         _fatigueScore = ComputeFatigueScore();
-        FatigueHistogram.Record(_fatigueScore);
+        _fatigueHistogram.Record(_fatigueScore);
 
         // Check fatigue threshold
         bool shouldEndSession = false;
@@ -180,19 +181,43 @@ public sealed class LearningSessionActor : IActor
     // ── REAL Fatigue Score (5-factor weighted composite) ──
     private double ComputeFatigueScore()
     {
-        // Signal 1: Accuracy drop from baseline
-        double rollingAccuracy = _recentAccuracies.Count >= 5
-            ? _recentAccuracies.Skip(_recentAccuracies.Count - 5).Average()
-            : _recentAccuracies.DefaultIfEmpty(0.5).Average();
+        // Signal 1: Accuracy drop from baseline (zero-allocation rolling average)
+        double rollingAccuracy;
+        if (_recentAccuracies.Count >= 5)
+        {
+            double sum = 0;
+            int start = _recentAccuracies.Count - 5;
+            for (int i = start; i < _recentAccuracies.Count; i++)
+                sum += _recentAccuracies[i];
+            rollingAccuracy = sum / 5.0;
+        }
+        else
+        {
+            rollingAccuracy = _recentAccuracies.Count > 0
+                ? _recentAccuracies.Sum() / _recentAccuracies.Count
+                : 0.5;
+        }
         double accuracyDrop = _baselineAccuracy > 0.01
             ? Math.Max(0, (_baselineAccuracy - rollingAccuracy) / _baselineAccuracy)
             : 0;
         accuracyDrop = Math.Clamp(accuracyDrop, 0, 1);
 
-        // Signal 2: Response time increase from baseline
-        double rollingRt = _recentResponseTimes.Count >= 5
-            ? _recentResponseTimes.Skip(_recentResponseTimes.Count - 5).Average()
-            : _recentResponseTimes.DefaultIfEmpty(_baselineResponseTimeMs).Average();
+        // Signal 2: Response time increase from baseline (zero-allocation rolling average)
+        double rollingRt;
+        if (_recentResponseTimes.Count >= 5)
+        {
+            double sum = 0;
+            int start = _recentResponseTimes.Count - 5;
+            for (int i = start; i < _recentResponseTimes.Count; i++)
+                sum += _recentResponseTimes[i];
+            rollingRt = sum / 5.0;
+        }
+        else
+        {
+            rollingRt = _recentResponseTimes.Count > 0
+                ? _recentResponseTimes.Sum() / _recentResponseTimes.Count
+                : _baselineResponseTimeMs;
+        }
         double rtIncrease = _baselineResponseTimeMs > 0.01
             ? Math.Max(0, (rollingRt - _baselineResponseTimeMs) / _baselineResponseTimeMs)
             : 0;
