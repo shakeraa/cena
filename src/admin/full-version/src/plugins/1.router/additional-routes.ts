@@ -13,13 +13,9 @@ export const redirects: RouteRecordRaw[] = [
       const userData = useCookie<Record<string, unknown> | null | undefined>('userData')
       const userRole = userData.value?.role
 
-      // Cena admin roles → analytics dashboard
+      // Cena admin roles → admin dashboard
       if (userRole === 'SUPER_ADMIN' || userRole === 'ADMIN' || userRole === 'MODERATOR')
-        return { name: 'dashboards-analytics' }
-
-      // Fallback for Vuexy demo roles
-      if (userRole === 'admin')
-        return { name: 'dashboards-analytics' }
+        return { name: 'dashboards-admin' }
 
       return { name: 'login', query: to.query }
     },

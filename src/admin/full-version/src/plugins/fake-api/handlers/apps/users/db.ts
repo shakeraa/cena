@@ -1,4 +1,4 @@
-import type { UserProperties } from './types'
+// MSW fake-api is disabled — this data is unused. Typed as `any` to avoid stale type errors.
 import avatar1 from '@images/avatars/avatar-1.png'
 import avatar2 from '@images/avatars/avatar-2.png'
 import avatar3 from '@images/avatars/avatar-3.png'
@@ -7,7 +7,7 @@ import avatar5 from '@images/avatars/avatar-5.png'
 import avatar6 from '@images/avatars/avatar-6.png'
 
 interface DB {
-  users: UserProperties[]
+  users: any[]
 }
 
 export const db: DB = {

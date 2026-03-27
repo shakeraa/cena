@@ -99,12 +99,9 @@ export function useFirebaseAuth() {
           ability.update(abilities)
 
           // Store in cookies for Vuexy compatibility
-          useCookie('userData').value = JSON.stringify(user)
+          useCookie('userData').value = user as any
           useCookie('accessToken').value = tokenResult.token
-
-          const abilityRules = mapRoleToAbilities(role)
-
-          useCookie('userAbilityRules').value = JSON.stringify(abilityRules)
+          useCookie('userAbilityRules').value = abilities as any
 
           isLoading.value = false
           resolve(user)
@@ -198,7 +195,6 @@ export function useFirebaseAuth() {
 
       ability.update(abilities)
 
-      // Store as objects (Vuexy's useCookie handles serialization)
       useCookie('userData').value = user as any
       useCookie('accessToken').value = tokenResult.token
       useCookie('userAbilityRules').value = abilities as any

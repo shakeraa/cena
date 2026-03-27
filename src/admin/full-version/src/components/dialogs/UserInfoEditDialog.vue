@@ -1,24 +1,23 @@
 <script setup lang="ts">
+import type { CenaUserRole, CenaUserStatus } from '@db/apps/users/types'
+
 interface UserData {
-  id: number | null
+  id: string
+  uid: string
   fullName: string
-  company: string
-  username: string
-  role: string
-  country: string
-  contact: string | undefined
-  email: string | undefined
-  currentPlan: string
-  status: string | undefined
+  email: string
+  role: CenaUserRole
+  status: CenaUserStatus
+  school: string
+  grade: string
   avatar: string
-  taskDone: number | null
-  projectDone: number | null
-  taxId: string
-  language: string
+  locale: string
+  createdAt: string
+  lastLoginAt: string | null
 }
 
 interface Props {
-  userData?: UserData
+  userData?: any
   isDialogVisible: boolean
 }
 
@@ -29,31 +28,27 @@ interface Emit {
 
 const props = withDefaults(defineProps<Props>(), {
   userData: () => ({
-    id: 0,
+    id: '',
+    uid: '',
     fullName: '',
-    company: '',
-    role: '',
-    username: '',
-    country: '',
-    contact: '',
     email: '',
-    currentPlan: '',
-    status: '',
+    role: 'STUDENT' as CenaUserRole,
+    status: 'active' as CenaUserStatus,
+    school: '',
+    grade: '',
     avatar: '',
-    taskDone: null,
-    projectDone: null,
-    taxId: '',
-    language: '',
+    locale: 'en',
+    createdAt: '',
+    lastLoginAt: null,
   }),
 })
 
 const emit = defineEmits<Emit>()
 
-const userData = ref<UserData>(structuredClone(toRaw(props.userData)))
-const isUseAsBillingAddress = ref(false)
+const userData = ref<UserData>(structuredClone(toRaw(props.userData)) as UserData)
 
 watch(() => props, () => {
-  userData.value = structuredClone(toRaw(props.userData))
+  userData.value = structuredClone(toRaw(props.userData)) as UserData
 })
 
 const onFormSubmit = () => {
@@ -63,13 +58,20 @@ const onFormSubmit = () => {
 
 const onFormReset = () => {
   userData.value = structuredClone(toRaw(props.userData))
-
   emit('update:isDialogVisible', false)
 }
 
 const dialogModelValueUpdate = (val: boolean) => {
   emit('update:isDialogVisible', val)
 }
+
+const roles: CenaUserRole[] = ['STUDENT', 'TEACHER', 'PARENT', 'MODERATOR', 'ADMIN', 'SUPER_ADMIN']
+const statuses: CenaUserStatus[] = ['active', 'suspended', 'pending']
+const locales = [
+  { title: 'English', value: 'en' },
+  { title: 'עברית', value: 'he' },
+  { title: 'العربية', value: 'ar' },
+]
 </script>
 
 <template>
@@ -78,59 +80,33 @@ const dialogModelValueUpdate = (val: boolean) => {
     :model-value="props.isDialogVisible"
     @update:model-value="dialogModelValueUpdate"
   >
-    <!-- Dialog close btn -->
     <DialogCloseBtn @click="dialogModelValueUpdate(false)" />
 
     <VCard class="pa-sm-10 pa-2">
       <VCardText>
-        <!-- 👉 Title -->
         <h4 class="text-h4 text-center mb-2">
           Edit User Information
         </h4>
         <p class="text-body-1 text-center mb-6">
-          Updating user details will receive a privacy audit.
+          Update user details for the Cena platform.
         </p>
 
-        <!-- 👉 Form -->
         <VForm
           class="mt-6"
           @submit.prevent="onFormSubmit"
         >
           <VRow>
-            <!-- 👉 First Name -->
             <VCol
               cols="12"
               md="6"
             >
               <AppTextField
-                v-model="userData.fullName.split(' ')[0]"
-                label="First Name"
-                placeholder="John"
+                v-model="userData.fullName"
+                label="Full Name"
+                placeholder="Ahmad Khalil"
               />
             </VCol>
 
-            <!-- 👉 Last Name -->
-            <VCol
-              cols="12"
-              md="6"
-            >
-              <AppTextField
-                v-model="userData.fullName.split(' ')[1]"
-                label="Last Name"
-                placeholder="Doe"
-              />
-            </VCol>
-
-            <!-- 👉 Username -->
-            <VCol cols="12">
-              <AppTextField
-                v-model="userData.username"
-                label="Username"
-                placeholder="john.doe.007"
-              />
-            </VCol>
-
-            <!-- 👉 Billing Email -->
             <VCol
               cols="12"
               md="6"
@@ -138,11 +114,21 @@ const dialogModelValueUpdate = (val: boolean) => {
               <AppTextField
                 v-model="userData.email"
                 label="Email"
-                placeholder="johndoe@email.com"
+                placeholder="user@cena.edu"
               />
             </VCol>
 
-            <!-- 👉 Status -->
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="userData.role"
+                label="Role"
+                :items="roles"
+              />
+            </VCol>
+
             <VCol
               cols="12"
               md="6"
@@ -150,74 +136,44 @@ const dialogModelValueUpdate = (val: boolean) => {
               <AppSelect
                 v-model="userData.status"
                 label="Status"
-                placeholder="Active"
-                :items="['Active', 'Inactive', 'Pending']"
+                :items="statuses"
               />
             </VCol>
 
-            <!-- 👉 Tax Id -->
             <VCol
               cols="12"
               md="6"
             >
               <AppTextField
-                v-model="userData.taxId"
-                label="Tax ID"
-                placeholder="123456789"
+                v-model="userData.school"
+                label="School"
+                placeholder="Al-Quds Academy"
               />
             </VCol>
 
-            <!-- 👉 Contact -->
-            <VCol
-              cols="12"
-              md="6"
-            >
-              <AppTextField
-                v-model="userData.contact"
-                label="Phone Number"
-                placeholder="+1 9876543210"
-              />
-            </VCol>
-
-            <!-- 👉 Language -->
             <VCol
               cols="12"
               md="6"
             >
               <AppSelect
-                v-model="userData.language"
-                closable-chips
-                chips
-                multiple
+                v-model="userData.grade"
+                label="Grade"
+                :items="['1','2','3','4','5','6','7','8','9','10','11','12']"
+                clearable
+              />
+            </VCol>
+
+            <VCol
+              cols="12"
+              md="6"
+            >
+              <AppSelect
+                v-model="userData.locale"
                 label="Language"
-                placeholder="English"
-                :items="['English', 'Spanish', 'French']"
+                :items="locales"
               />
             </VCol>
 
-            <!-- 👉 Country -->
-            <VCol
-              cols="12"
-              md="6"
-            >
-              <AppSelect
-                v-model="userData.country"
-                label="Country"
-                placeholder="United States"
-                :items="['United States', 'United Kingdom', 'France']"
-              />
-            </VCol>
-
-            <!-- 👉 Switch -->
-            <VCol cols="12">
-              <VSwitch
-                v-model="isUseAsBillingAddress"
-                density="compact"
-                label="Use as a billing address?"
-              />
-            </VCol>
-
-            <!-- 👉 Submit and Cancel -->
             <VCol
               cols="12"
               class="d-flex flex-wrap justify-center gap-4"
