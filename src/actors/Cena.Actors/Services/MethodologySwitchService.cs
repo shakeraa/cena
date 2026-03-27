@@ -4,6 +4,7 @@
 // select best → fallback. Includes cycling prevention and escalation.
 // ═══════════════════════════════════════════════════════════════════════
 
+using Cena.Actors.Students;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Services;
@@ -15,7 +16,7 @@ namespace Cena.Actors.Services;
 /// </summary>
 public interface IMethodologySwitchService
 {
-    MethodologySwitchDecision DecideSwitch(MethodologySwitchInput input);
+    Task<DecideSwitchResponse> DecideSwitch(DecideSwitchRequest request);
 }
 
 public sealed class MethodologySwitchService : IMethodologySwitchService
@@ -52,63 +53,78 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
 
     /// <summary>
     /// 5-step methodology switching algorithm.
+    /// Adapts DecideSwitchRequest to internal types and returns DecideSwitchResponse.
     /// </summary>
-    public MethodologySwitchDecision DecideSwitch(MethodologySwitchInput input)
+    public Task<DecideSwitchResponse> DecideSwitch(DecideSwitchRequest request)
     {
-        // ═══ Step 1: Classify dominant error type (by precedence) ═══
-        string dominantError = ClassifyDominantError(input.ErrorDistribution);
+        // Adapt request to internal types
+        var errorDistribution = new Dictionary<string, int>();
+        if (request.DominantErrorType != ErrorType.None)
+            errorDistribution[request.DominantErrorType.ToString().ToLowerInvariant()] = 1;
+
+        var triedMethods = new HashSet<string>(
+            new HashSet<string>(request.MethodAttemptHistory ?? new List<string>()),
+            StringComparer.OrdinalIgnoreCase);
+
+        string dominantError = request.DominantErrorType != ErrorType.None
+            ? request.DominantErrorType.ToString().ToLowerInvariant()
+            : ClassifyDominantError(errorDistribution);
+
+        string conceptCategory = request.ConceptCategory ?? "procedural";
 
         // ═══ Step 2: MCM graph lookup ═══
-        var candidates = LookupMcm(dominantError, input.ConceptCategory, input.McmEntries);
+        var candidates = LookupMcm(dominantError, conceptCategory, null);
 
         // ═══ Step 3: Filter out already-tried methods ═══
         var filtered = candidates
-            .Where(c => !input.MethodAttemptHistory.Contains(c.Methodology))
+            .Where(c => !triedMethods.Contains(c.Methodology))
             .ToList();
 
         // ═══ Step 4: Select best remaining ═══
         if (filtered.Count > 0)
         {
-            // Pick first with confidence > 0.5, else best available
             var selected = filtered.FirstOrDefault(c => c.Confidence > 0.5)
                            ?? filtered[0];
 
             _logger.LogInformation(
                 "Methodology switch: {Error}+{Category} → {Method} (confidence={Confidence:F2}, tried={Tried}/{Total})",
-                dominantError, input.ConceptCategory, selected.Methodology,
-                selected.Confidence, input.MethodAttemptHistory.Count, AllMethodologies.Length);
+                dominantError, conceptCategory, selected.Methodology,
+                selected.Confidence, triedMethods.Count, AllMethodologies.Length);
 
-            return new MethodologySwitchDecision(
-                NewMethodology: selected.Methodology,
+            var recommended = Enum.TryParse<Methodology>(selected.Methodology, true, out var m)
+                ? m : Methodology.Socratic;
+
+            return Task.FromResult(new DecideSwitchResponse(
+                ShouldSwitch: true,
+                RecommendedMethodology: recommended,
                 Confidence: selected.Confidence,
-                DominantErrorType: dominantError,
-                IsEscalation: false,
-                Reason: $"MCM recommendation: {selected.Methodology} (confidence {selected.Confidence:F2})",
-                SuggestedAction: null
-            );
+                AllMethodologiesExhausted: false,
+                EscalationAction: null,
+                DecisionTrace: $"MCM recommendation: {selected.Methodology} (confidence {selected.Confidence:F2})"
+            ));
         }
 
         // ═══ Step 5: Escalation — all methods exhausted ═══
-        if (input.MethodAttemptHistory.Count >= AllMethodologies.Length)
+        if (triedMethods.Count >= AllMethodologies.Length)
         {
             _logger.LogWarning(
                 "All {Count} methodologies exhausted for concept cluster {Category} — escalating to mentor-resistant",
-                AllMethodologies.Length, input.ConceptCategory);
+                AllMethodologies.Length, conceptCategory);
 
-            return new MethodologySwitchDecision(
-                NewMethodology: input.CurrentMethodology, // Keep current
+            return Task.FromResult(new DecideSwitchResponse(
+                ShouldSwitch: false,
+                RecommendedMethodology: request.CurrentMethodology,
                 Confidence: 0,
-                DominantErrorType: dominantError,
-                IsEscalation: true,
-                Reason: $"All {AllMethodologies.Length} methodologies exhausted for this concept cluster",
-                SuggestedAction: "Flag as mentor-resistant. Suggest student skip to a related concept or seek human tutoring."
-            );
+                AllMethodologiesExhausted: true,
+                EscalationAction: "Flag as mentor-resistant. Suggest student skip to a related concept or seek human tutoring.",
+                DecisionTrace: $"All {AllMethodologies.Length} methodologies exhausted for this concept cluster"
+            ));
         }
 
         // Fallback: pick from defaults that haven't been tried
         var fallbackCandidates = ErrorTypeDefaults.GetValueOrDefault(dominantError)
             ?? ErrorTypeDefaults["procedural"];
-        var fallback = fallbackCandidates.FirstOrDefault(c => !input.MethodAttemptHistory.Contains(c.Methodology));
+        var fallback = fallbackCandidates.FirstOrDefault(c => !triedMethods.Contains(c.Methodology));
 
         if (fallback != null)
         {
@@ -116,25 +132,28 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
                 "Methodology switch (fallback): {Error} → {Method} (no MCM entry, using defaults)",
                 dominantError, fallback.Methodology);
 
-            return new MethodologySwitchDecision(
-                NewMethodology: fallback.Methodology,
-                Confidence: fallback.Confidence * 0.8, // Discount fallback confidence
-                DominantErrorType: dominantError,
-                IsEscalation: false,
-                Reason: $"Fallback default: {fallback.Methodology} (no MCM entry for {dominantError}+{input.ConceptCategory})",
-                SuggestedAction: null
-            );
+            var recommended = Enum.TryParse<Methodology>(fallback.Methodology, true, out var m)
+                ? m : Methodology.Socratic;
+
+            return Task.FromResult(new DecideSwitchResponse(
+                ShouldSwitch: true,
+                RecommendedMethodology: recommended,
+                Confidence: fallback.Confidence * 0.8,
+                AllMethodologiesExhausted: false,
+                EscalationAction: null,
+                DecisionTrace: $"Fallback default: {fallback.Methodology} (no MCM entry for {dominantError}+{conceptCategory})"
+            ));
         }
 
         // Truly exhausted — escalate
-        return new MethodologySwitchDecision(
-            NewMethodology: input.CurrentMethodology,
+        return Task.FromResult(new DecideSwitchResponse(
+            ShouldSwitch: false,
+            RecommendedMethodology: request.CurrentMethodology,
             Confidence: 0,
-            DominantErrorType: dominantError,
-            IsEscalation: true,
-            Reason: "All methodologies and fallbacks exhausted",
-            SuggestedAction: "Flag as mentor-resistant. Recommend human tutoring."
-        );
+            AllMethodologiesExhausted: true,
+            EscalationAction: "Flag as mentor-resistant. Recommend human tutoring.",
+            DecisionTrace: "All methodologies and fallbacks exhausted"
+        ));
     }
 
     // ── Step 1: Classify dominant error type by precedence ──
@@ -171,19 +190,24 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
 
 public record McmCandidate(string Methodology, double Confidence);
 
-public record MethodologySwitchInput(
-    string CurrentMethodology,
-    string ConceptCategory,
-    Dictionary<string, int> ErrorDistribution,  // errorType → count in last 3 sessions
-    HashSet<string> MethodAttemptHistory,        // methods already tried for this cluster
-    List<McmCandidate>? McmEntries              // from Neo4j cache, null if no entry
+public record DecideSwitchRequest(
+    string StudentId,
+    string ConceptId,
+    string? ConceptCategory,
+    ErrorType DominantErrorType,
+    Methodology CurrentMethodology,
+    List<string>? MethodAttemptHistory,
+    double StagnationScore,
+    int ConsecutiveStagnantSessions
 );
 
-public record MethodologySwitchDecision(
-    string NewMethodology,
+public record DecideSwitchResponse(
+    bool ShouldSwitch,
+    Methodology RecommendedMethodology,
     double Confidence,
-    string DominantErrorType,
-    bool IsEscalation,
-    string Reason,
-    string? SuggestedAction
+    bool AllMethodologiesExhausted,
+    string? EscalationAction,
+    string DecisionTrace
 );
+
+// ErrorType and Methodology enums are defined in Cena.Actors.Students namespace

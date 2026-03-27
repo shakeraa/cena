@@ -72,8 +72,8 @@ public sealed class CurriculumGraphSnapshot
 {
     public string Version { get; }
     public IReadOnlyDictionary<string, ConceptNode> Concepts { get; }
-    public IReadOnlyDictionary<string, List<PrerequisiteEdge>> PrerequisitesByTarget { get; }
-    public IReadOnlyDictionary<string, List<PrerequisiteEdge>> DependentsBySource { get; }
+    public IReadOnlyDictionary<string, IReadOnlyList<PrerequisiteEdge>> PrerequisitesByTarget { get; }
+    public IReadOnlyDictionary<string, IReadOnlyList<PrerequisiteEdge>> DependentsBySource { get; }
     public int EdgeCount { get; }
 
     public CurriculumGraphSnapshot(
@@ -108,8 +108,12 @@ public sealed class CurriculumGraphSnapshot
             sourceList.Add(edge);
         }
 
-        PrerequisitesByTarget = byTarget;
-        DependentsBySource = bySource;
+        PrerequisitesByTarget = byTarget.ToDictionary(
+            kv => kv.Key,
+            kv => (IReadOnlyList<PrerequisiteEdge>)kv.Value.AsReadOnly());
+        DependentsBySource = bySource.ToDictionary(
+            kv => kv.Key,
+            kv => (IReadOnlyList<PrerequisiteEdge>)kv.Value.AsReadOnly());
         EdgeCount = edges.Count;
     }
 }

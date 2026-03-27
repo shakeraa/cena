@@ -59,13 +59,13 @@ public sealed record CircuitBreakerConfig(
 // =============================================================================
 
 /// <summary>Request permission to call the LLM. Returns AllowRequest or RejectRequest.</summary>
-public sealed record RequestPermission(string RequestId);
+public sealed record RequestPermission(string RequestId, string ModelName = "sonnet");
 
 /// <summary>Report a successful LLM call.</summary>
-public sealed record ReportSuccess(string RequestId);
+public sealed record ReportSuccess(string RequestId, string ModelName);
 
 /// <summary>Report a failed LLM call.</summary>
-public sealed record ReportFailure(string RequestId, string Reason);
+public sealed record ReportFailure(string RequestId, string Reason, string ModelName);
 
 /// <summary>Query circuit breaker status.</summary>
 public sealed record GetCircuitStatus;

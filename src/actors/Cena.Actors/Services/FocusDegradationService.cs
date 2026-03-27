@@ -76,8 +76,9 @@ public interface IFocusDegradationService
 
 public sealed class FocusDegradationService : IFocusDegradationService
 {
+    private static readonly Meter Meter = new("Cena.Actors.Focus", "1.0.0");
     private static readonly Histogram<double> FocusHistogram =
-        new Meter("Cena.Actors.Focus").CreateHistogram<double>("cena.focus.score");
+        Meter.CreateHistogram<double>("cena.focus.score");
 
     // ═══════════════════════════════════════════════════════════════
     // 1. FOCUS STATE (within-session attention curve)

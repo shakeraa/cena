@@ -7,7 +7,6 @@
 // rate limiter at 200 activations/second (leaky bucket), DrainAll for shutdown.
 // =============================================================================
 
-using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
@@ -37,6 +36,9 @@ public sealed record DrainAll(TimeSpan Timeout);
 
 /// <summary>Query current manager metrics.</summary>
 public sealed record GetManagerMetrics;
+
+/// <summary>Internal tick message for non-blocking drain polling.</summary>
+internal sealed record DrainCheckTick;
 
 // ── Responses ──
 
@@ -139,11 +141,19 @@ public sealed class StudentActorManager : IActor
     private const double MaxActivationsPerSecond = 200.0;
 
     // ── State ──
-    private readonly ConcurrentDictionary<string, DateTimeOffset> _activeActors = new();
-    private readonly ConcurrentQueue<PendingActivation> _backPressureQueue = new();
+    // Actor mailbox guarantees sequential processing — no need for concurrent collections
+    private readonly Dictionary<string, DateTimeOffset> _activeActors = new();
+    private readonly Queue<PendingActivation> _backPressureQueue = new();
     private readonly LeakyBucketRateLimiter _rateLimiter = new(MaxActivationsPerSecond, MaxActivationsPerSecond);
     private bool _acceptingNew = true;
     private int _queueDepth;
+
+    // ── Drain state ──
+    private PID? _drainRequester;
+    private Stopwatch? _drainStopwatch;
+    private TimeSpan _drainTimeout;
+    private int _drainInitialCount;
+    private CancellationTokenSource? _drainTimerCts;
 
     // ── Telemetry ──
     private static readonly Meter Meter = new("Cena.Actors.StudentActorManager", "1.0.0");
@@ -168,14 +178,22 @@ public sealed class StudentActorManager : IActor
         return context.Message switch
         {
             Started                 => OnStarted(),
+            Stopping                => OnStopping(),
             ActivateStudent cmd     => HandleActivate(context, cmd),
             StudentDeactivated cmd  => HandleDeactivated(context, cmd),
             StopNewActivations      => HandleStopNew(context),
             ResumeActivations       => HandleResume(context),
             DrainAll cmd            => HandleDrainAll(context, cmd),
+            DrainCheckTick          => HandleDrainCheckTick(context),
             GetManagerMetrics       => HandleGetMetrics(context),
             _ => Task.CompletedTask
         };
+    }
+
+    private Task OnStopping()
+    {
+        CancelDrainTimer();
+        return Task.CompletedTask;
     }
 
     private Task OnStarted()
@@ -220,7 +238,7 @@ public sealed class StudentActorManager : IActor
             }
 
             _backPressureQueue.Enqueue(new PendingActivation(cmd.StudentId, cmd.CorrelationId, context.Sender!));
-            Interlocked.Increment(ref _queueDepth);
+            _queueDepth++;
             QueueGauge.Record(_queueDepth);
 
             _logger.LogDebug(
@@ -239,7 +257,7 @@ public sealed class StudentActorManager : IActor
             if (_queueDepth < MaxQueueDepth)
             {
                 _backPressureQueue.Enqueue(new PendingActivation(cmd.StudentId, cmd.CorrelationId, context.Sender!));
-                Interlocked.Increment(ref _queueDepth);
+                _queueDepth++;
                 QueueGauge.Record(_queueDepth);
 
                 context.Respond(new ActivateStudentResponse(
@@ -272,11 +290,16 @@ public sealed class StudentActorManager : IActor
 
     private Task HandleDeactivated(IContext context, StudentDeactivated cmd)
     {
-        _activeActors.TryRemove(cmd.StudentId, out _);
+        _activeActors.Remove(cmd.StudentId);
         ActiveGauge.Record(_activeActors.Count);
 
         // Process queue: activate next pending if available
         ProcessQueue(context);
+
+        // If a drain is in progress, check completion immediately
+        // (avoids waiting for the next tick when actors deactivate quickly)
+        if (_drainRequester is not null)
+            CheckDrainComplete(context);
 
         return Task.CompletedTask;
     }
@@ -285,7 +308,7 @@ public sealed class StudentActorManager : IActor
 
     private void ProcessQueue(IContext context)
     {
-        while (_backPressureQueue.TryPeek(out var pending))
+        while (_backPressureQueue.Count > 0)
         {
             if (_activeActors.Count >= MaxConcurrentActors)
                 break;
@@ -293,9 +316,9 @@ public sealed class StudentActorManager : IActor
             if (!_rateLimiter.TryConsume())
                 break;
 
-            if (_backPressureQueue.TryDequeue(out pending))
+            var pending = _backPressureQueue.Dequeue();
             {
-                Interlocked.Decrement(ref _queueDepth);
+                _queueDepth--;
                 QueueGauge.Record(_queueDepth);
 
                 if (!_activeActors.ContainsKey(pending.StudentId))
@@ -330,47 +353,114 @@ public sealed class StudentActorManager : IActor
         return Task.CompletedTask;
     }
 
-    // ── Drain All ──
+    // ── Drain All (non-blocking) ──
 
-    private async Task HandleDrainAll(IContext context, DrainAll cmd)
+    private Task HandleDrainAll(IContext context, DrainAll cmd)
     {
         _acceptingNew = false;
-        int initialCount = _activeActors.Count;
-        var sw = Stopwatch.StartNew();
+        _drainRequester = context.Sender;
+        _drainTimeout = cmd.Timeout;
+        _drainInitialCount = _activeActors.Count;
+        _drainStopwatch = Stopwatch.StartNew();
 
         _logger.LogInformation(
             "Draining all {Count} active StudentActors. Timeout={Timeout}s",
-            initialCount, cmd.Timeout.TotalSeconds);
+            _drainInitialCount, cmd.Timeout.TotalSeconds);
 
         // Clear the queue first
-        while (_backPressureQueue.TryDequeue(out _))
-            Interlocked.Decrement(ref _queueDepth);
+        _queueDepth -= _backPressureQueue.Count;
+        _backPressureQueue.Clear();
         QueueGauge.Record(0);
 
-        // Wait for active actors to drain (they passivate naturally or are poisoned)
-        using var cts = new CancellationTokenSource(cmd.Timeout);
-        try
+        // Check immediately -- might already be empty
+        CheckDrainComplete(context);
+
+        return Task.CompletedTask;
+    }
+
+    private Task HandleDrainCheckTick(IContext context)
+    {
+        // Only process if a drain is actually in progress
+        if (_drainRequester is not null)
+            CheckDrainComplete(context);
+
+        return Task.CompletedTask;
+    }
+
+    private void CheckDrainComplete(IContext context)
+    {
+        bool drained = _activeActors.Count == 0;
+        bool timedOut = _drainStopwatch is not null && _drainStopwatch.Elapsed >= _drainTimeout;
+
+        if (drained || timedOut)
         {
-            while (_activeActors.Count > 0 && !cts.Token.IsCancellationRequested)
+            // Drain finished (success or timeout)
+            var elapsed = _drainStopwatch?.Elapsed ?? TimeSpan.Zero;
+            _drainStopwatch?.Stop();
+            int remaining = _activeActors.Count;
+            int drainedCount = _drainInitialCount - remaining;
+
+            if (timedOut && remaining > 0)
             {
-                await Task.Delay(TimeSpan.FromMilliseconds(500), cts.Token);
+                _logger.LogWarning(
+                    "Drain timeout reached. {Remaining} actors still active.",
+                    remaining);
             }
+
+            _logger.LogInformation(
+                "Drain complete. Drained={Drained}, Remaining={Remaining}, Elapsed={Elapsed}ms",
+                drainedCount, remaining, elapsed.TotalMilliseconds);
+
+            // Respond to the original requester
+            if (_drainRequester is not null)
+            {
+                context.Send(_drainRequester, new DrainAllResponse(drainedCount, remaining, elapsed));
+            }
+
+            // Clean up drain state
+            CancelDrainTimer();
+            _drainRequester = null;
+            _drainStopwatch = null;
         }
-        catch (OperationCanceledException)
+        else
         {
-            _logger.LogWarning(
-                "Drain timeout reached. {Remaining} actors still active.",
-                _activeActors.Count);
+            // Not done yet -- schedule next check, yielding the mailbox so
+            // StudentDeactivated messages can be processed in between.
+            ScheduleDrainCheck(context);
         }
+    }
 
-        sw.Stop();
-        int drained = initialCount - _activeActors.Count;
+    private void ScheduleDrainCheck(IContext context)
+    {
+        CancelDrainTimer();
+        _drainTimerCts = new CancellationTokenSource();
+        var self = context.Self;
+        var system = context.System;
+        var token = _drainTimerCts.Token;
 
-        _logger.LogInformation(
-            "Drain complete. Drained={Drained}, Remaining={Remaining}, Elapsed={Elapsed}ms",
-            drained, _activeActors.Count, sw.ElapsedMilliseconds);
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(500), token);
+                if (!token.IsCancellationRequested)
+                    system.Root.Send(self, new DrainCheckTick());
+            }
+            catch (OperationCanceledException)
+            {
+                // Timer was cancelled -- expected during cleanup
+            }
+        }, token);
+    }
 
-        context.Respond(new DrainAllResponse(drained, _activeActors.Count, sw.Elapsed));
+    private void CancelDrainTimer()
+    {
+        if (_drainTimerCts is not null)
+        {
+            _drainTimerCts.Cancel();
+            _drainTimerCts.Dispose();
+            _drainTimerCts = null;
+        }
     }
 
     // ── Metrics ──

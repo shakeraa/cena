@@ -62,6 +62,10 @@ public sealed class NatsOutboxPublisher : BackgroundService
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
     private const int MaxEventsPerCycle = 100;
     private const string SubjectPrefix = "cena.events.";
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
 
     // ── Telemetry ──
     private static readonly ActivitySource ActivitySrc = new("Cena.Infrastructure.NatsOutbox", "1.0.0");
@@ -171,8 +175,7 @@ public sealed class NatsOutboxPublisher : BackgroundService
 
                 // Serialize event data to JSON
                 var payload = JsonSerializer.SerializeToUtf8Bytes(
-                    eventWrapper.Data,
-                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    eventWrapper.Data, JsonOptions);
 
                 // Publish to NATS and wait for confirmation
                 await _nats.PublishAsync(subject, payload, cancellationToken: ct);

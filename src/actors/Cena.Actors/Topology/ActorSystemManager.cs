@@ -128,9 +128,7 @@ public sealed class LlmGatewayActor : IActor
 
     private Task ForwardToModel(IContext context, RequestPermission q)
     {
-        // Route to the first available circuit breaker (default: "sonnet")
-        // In production, the model name would be part of the request
-        if (_circuitBreakers.TryGetValue("sonnet", out var pid))
+        if (_circuitBreakers.TryGetValue(q.ModelName, out var pid))
         {
             context.Forward(pid);
         }
@@ -147,16 +145,19 @@ public sealed class LlmGatewayActor : IActor
 
     private Task ForwardSuccessToModel(IContext context, ReportSuccess cmd)
     {
-        // Broadcast success to all circuit breakers (the relevant one will process)
-        foreach (var pid in _circuitBreakers.Values)
+        if (_circuitBreakers.TryGetValue(cmd.ModelName, out var pid))
             context.Send(pid, cmd);
+        else
+            _logger.LogWarning("No circuit breaker for model {Model} to report success", cmd.ModelName);
         return Task.CompletedTask;
     }
 
     private Task ForwardFailureToModel(IContext context, ReportFailure cmd)
     {
-        foreach (var pid in _circuitBreakers.Values)
+        if (_circuitBreakers.TryGetValue(cmd.ModelName, out var pid))
             context.Send(pid, cmd);
+        else
+            _logger.LogWarning("No circuit breaker for model {Model} to report failure", cmd.ModelName);
         return Task.CompletedTask;
     }
 

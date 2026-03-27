@@ -329,17 +329,8 @@ internal sealed record StagnationDetected(
     StagnationSignals Signals,
     int ConsecutiveStagnantSessions);
 
-/// <summary>Notification to outreach scheduler when a concept is mastered.</summary>
-internal sealed record ConceptMasteredNotification(
-    string StudentId,
-    string ConceptId,
-    double InitialHalfLifeHours);
-
-/// <summary>Notification to outreach scheduler about streak state.</summary>
-internal sealed record StreakStateUpdate(
-    string StudentId,
-    int CurrentStreak,
-    DateTimeOffset LastActivityDate);
+// ConceptMasteredNotification: use Cena.Actors.Outreach.ConceptMasteredNotification
+// Streak updates: use Cena.Actors.Outreach.UpdateActivity
 
 /// <summary>Request session summary before teardown.</summary>
 internal sealed record GetSessionSummary;
@@ -353,61 +344,9 @@ internal sealed record SessionSummary(
     double FatigueScore,
     string? LastConceptId);
 
-/// <summary>Update stagnation signals after each attempt.</summary>
-public sealed record UpdateSignals(
-    string StudentId,
-    string ConceptId,
-    string SessionId,
-    bool IsCorrect,
-    int ResponseTimeMs,
-    ErrorType ClassifiedErrorType,
-    int SessionDurationMinutes,
-    double? AnnotationSentiment,
-    double BaselineAccuracy,
-    double BaselineResponseTimeMs);
-
-/// <summary>Check stagnation state for a concept cluster.</summary>
-public sealed record CheckStagnation(
-    string StudentId,
-    string ConceptId);
-
-/// <summary>Reset stagnation tracking after a methodology switch.</summary>
-public sealed record ResetAfterSwitch(
-    string StudentId,
-    string ConceptId,
-    Methodology NewMethodology,
-    [property: Range(1, 10)]
-    int CooldownSessions = 3);
-
-// =============================================================================
-// METHODOLOGY SWITCH SERVICE
-// =============================================================================
-
-public sealed record DecideSwitchRequest(
-    string StudentId,
-    string ConceptId,
-    string ConceptCategory,
-    ErrorType DominantErrorType,
-    Methodology CurrentMethodology,
-    IReadOnlyList<string> MethodAttemptHistory,
-    double StagnationScore,
-    int ConsecutiveStagnantSessions);
-
-public sealed record DecideSwitchResponse(
-    bool ShouldSwitch,
-    Methodology? RecommendedMethodology,
-    double Confidence,
-    bool AllMethodologiesExhausted,
-    string? EscalationAction,
-    string DecisionTrace);
-
-/// <summary>
-/// Interface for the methodology switch service. Injected into StudentActor.
-/// </summary>
-public interface IMethodologySwitchService
-{
-    Task<DecideSwitchResponse> DecideSwitch(DecideSwitchRequest request);
-}
+// UpdateSignals: use Cena.Actors.Stagnation.UpdateStagnationSignals
+// CheckStagnation: use Cena.Actors.Stagnation.CheckStagnation
+// ResetAfterSwitch: use Cena.Actors.Stagnation.ResetAfterSwitch
 
 // =============================================================================
 // EVALUATE ANSWER (forwarded to session actor)

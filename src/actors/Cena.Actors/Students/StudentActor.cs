@@ -14,6 +14,10 @@ using System.Security.Cryptography;
 using System.Text;
 using Cena.Actors.Events;
 using Cena.Actors.Infrastructure;
+using Cena.Actors.Outreach;
+using Cena.Actors.Services;
+using Cena.Actors.Sessions;
+using Cena.Actors.Stagnation;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -127,6 +131,7 @@ public sealed class StudentActor : IActor
             // ---- Internal ----
             StagnationDetected msg => HandleStagnationDetected(context, msg),
             MemoryCheckTick      => HandleMemoryCheck(context),
+            DelegateEvent del    => HandleDelegateEvent(del),
 
             _ => Task.CompletedTask
         };
@@ -157,8 +162,10 @@ public sealed class StudentActor : IActor
         context.SetReceiveTimeout(PassivationTimeout);
 
         // Schedule periodic memory check
+        var self = context.Self;
+        var system = context.System;
         _ = Task.Delay(MemoryCheckInterval).ContinueWith(_ =>
-            context.Send(context.Self, new MemoryCheckTick()));
+            system.Root.Send(self, new MemoryCheckTick()));
 
         sw.Stop();
         ActivationCounter.Add(1, new KeyValuePair<string, object?>("student.id", _studentId));
@@ -418,18 +425,20 @@ public sealed class StudentActor : IActor
 
                 // ---- Award XP ----
                 int xpEarned = CalculateXpAward(isCorrect, cmd.HintCountUsed, isCorrect ? 1.0 : 0.0);
+                XpAwarded_V1? xpEvent = null;
                 if (xpEarned > 0)
                 {
-                    var xpEvent = new XpAwarded_V1(
+                    xpEvent = new XpAwarded_V1(
                         _studentId, xpEarned, "exercise_correct", _state.TotalXp + xpEarned,
                         "recall", 1);
                     StageEvent(xpEvent);
                 }
 
                 // ---- Check mastery threshold (0.85) ----
+                ConceptMastered_V1? masteredEvent = null;
                 if (updatedMastery >= 0.85 && priorMastery < 0.85)
                 {
-                    var masteredEvent = new ConceptMastered_V1(
+                    masteredEvent = new ConceptMastered_V1(
                         _studentId, cmd.ConceptId, cmd.SessionId,
                         updatedMastery,
                         _state.MasteryMap.Count,
@@ -443,31 +452,15 @@ public sealed class StudentActor : IActor
                 // ---- Flush all staged events atomically ----
                 await FlushEvents();
 
-                // ---- Apply to local state (after successful persist) ----
+                // ---- Apply SAME event instances to local state (after successful persist) ----
                 _state.Apply(@event);
-                if (xpEarned > 0)
-                {
-                    _state.Apply(new XpAwarded_V1(
-                        _studentId, xpEarned, "exercise_correct", _state.TotalXp + xpEarned,
-                        "recall", 1));
-                }
-                if (updatedMastery >= 0.85 && priorMastery < 0.85)
-                {
-                    _state.Apply(new ConceptMastered_V1(
-                        _studentId, cmd.ConceptId, cmd.SessionId,
-                        updatedMastery, _state.MasteryMap.Count, _state.SessionCount,
-                        GetActiveMethodology(cmd.ConceptId), 24.0, DateTimeOffset.UtcNow));
-                }
+                if (xpEvent != null)
+                    _state.Apply(xpEvent);
+                if (masteredEvent != null)
+                    _state.Apply(masteredEvent);
 
-                // ---- Update stagnation detector ----
-                if (_stagnationDetector != null)
-                {
-                    context.Send(_stagnationDetector, new UpdateSignals(
-                        _studentId, cmd.ConceptId, cmd.SessionId,
-                        isCorrect, cmd.ResponseTimeMs,
-                        ErrorType.None, 0, null,
-                        _state.BaselineAccuracy, _state.BaselineResponseTimeMs));
-                }
+                // TODO: Stagnation detector expects session-level UpdateStagnationSignals, not per-attempt signals.
+                // Accumulate signals within session and send summary in HandleEndSession.
 
                 // ---- Telemetry ----
                 AttemptCounter.Add(1,
@@ -515,51 +508,43 @@ public sealed class StudentActor : IActor
             StageEvent(attemptEvent);
 
             int xp = CalculateXpAward(eval.IsCorrect, cmd.HintCountUsed, eval.Score);
+            XpAwarded_V1? xpEvt = null;
             if (xp > 0)
             {
-                StageEvent(new XpAwarded_V1(
-                    _studentId, xp, "exercise_correct", _state.TotalXp + xp, "recall", 1));
+                xpEvt = new XpAwarded_V1(
+                    _studentId, xp, "exercise_correct", _state.TotalXp + xp, "recall", 1);
+                StageEvent(xpEvt);
             }
 
+            ConceptMastered_V1? masteredEvt = null;
             if (eval.UpdatedMastery >= 0.85 && prior < 0.85)
             {
-                StageEvent(new ConceptMastered_V1(
+                masteredEvt = new ConceptMastered_V1(
                     _studentId, cmd.ConceptId, cmd.SessionId,
                     eval.UpdatedMastery, _state.MasteryMap.Count, _state.SessionCount,
-                    GetActiveMethodology(cmd.ConceptId), 24.0, DateTimeOffset.UtcNow));
+                    GetActiveMethodology(cmd.ConceptId), 24.0, DateTimeOffset.UtcNow);
+                StageEvent(masteredEvt);
             }
 
             await FlushEvents();
 
-            // Apply all events to local state
+            // Apply SAME event instances to local state (after successful persist)
             _state.Apply(attemptEvent);
-            if (xp > 0)
+            if (xpEvt != null)
+                _state.Apply(xpEvt);
+            if (masteredEvt != null)
             {
-                _state.Apply(new XpAwarded_V1(
-                    _studentId, xp, "exercise_correct", _state.TotalXp + xp, "recall", 1));
-            }
-            if (eval.UpdatedMastery >= 0.85 && prior < 0.85)
-            {
-                _state.Apply(new ConceptMastered_V1(
-                    _studentId, cmd.ConceptId, cmd.SessionId,
-                    eval.UpdatedMastery, _state.MasteryMap.Count, _state.SessionCount,
-                    GetActiveMethodology(cmd.ConceptId), 24.0, DateTimeOffset.UtcNow));
+                _state.Apply(masteredEvt);
 
                 if (_outreachScheduler != null)
                 {
-                    context.Send(_outreachScheduler, new ConceptMasteredNotification(
-                        _studentId, cmd.ConceptId, 24.0));
+                    context.Send(_outreachScheduler, new Outreach.ConceptMasteredNotification(
+                        cmd.ConceptId, 24.0));
                 }
             }
 
-            if (_stagnationDetector != null)
-            {
-                context.Send(_stagnationDetector, new UpdateSignals(
-                    _studentId, cmd.ConceptId, cmd.SessionId,
-                    eval.IsCorrect, cmd.ResponseTimeMs,
-                    eval.ClassifiedErrorType, 0, null,
-                    _state.BaselineAccuracy, _state.BaselineResponseTimeMs));
-            }
+            // TODO: Stagnation detector expects session-level UpdateStagnationSignals, not per-attempt signals.
+            // Accumulate signals within session and send summary in HandleEndSession.
 
             AttemptCounter.Add(1,
                 new KeyValuePair<string, object?>("student.id", _studentId),
@@ -678,8 +663,8 @@ public sealed class StudentActor : IActor
             // Trigger stagnation check post-session
             if (_stagnationDetector != null && summary?.LastConceptId != null)
             {
-                context.Send(_stagnationDetector, new CheckStagnation(
-                    _studentId, summary.LastConceptId));
+                context.Send(_stagnationDetector, new Stagnation.CheckStagnation(
+                    summary.LastConceptId));
             }
 
             context.Respond(new ActorResult(true));
@@ -723,8 +708,7 @@ public sealed class StudentActor : IActor
                 return;
             }
 
-            var newMethodology = decision.RecommendedMethodology
-                ?? throw new InvalidOperationException("DecideSwitch returned ShouldSwitch=true but no methodology");
+            var newMethodology = decision.RecommendedMethodology;
 
             var @event = new MethodologySwitched_V1(
                 _studentId, cmd.ConceptId,
@@ -741,8 +725,8 @@ public sealed class StudentActor : IActor
             // Reset stagnation detector for this concept
             if (_stagnationDetector != null)
             {
-                context.Send(_stagnationDetector, new ResetAfterSwitch(
-                    _studentId, cmd.ConceptId, newMethodology));
+                context.Send(_stagnationDetector, new Stagnation.ResetAfterSwitch(
+                    cmd.ConceptId));
             }
 
             context.Respond(new ActorResult(true));
@@ -780,14 +764,8 @@ public sealed class StudentActor : IActor
             await FlushEvents();
             _state.Apply(@event);
 
-            // Update stagnation detector with sentiment
-            if (_stagnationDetector != null)
-            {
-                context.Send(_stagnationDetector, new UpdateSignals(
-                    _studentId, cmd.ConceptId, cmd.SessionId,
-                    false, 0, ErrorType.None, 0,
-                    sentimentScore, _state.BaselineAccuracy, _state.BaselineResponseTimeMs));
-            }
+            // TODO: Stagnation detector expects session-level UpdateStagnationSignals, not per-attempt signals.
+            // Accumulate signals within session and send summary in HandleEndSession.
 
             context.Respond(new ActorResult(true));
         }
@@ -912,12 +890,13 @@ public sealed class StudentActor : IActor
                     .Select(m => m.Methodology).ToList(),
                 msg.CompositeScore, msg.ConsecutiveStagnantSessions));
 
-        if (decision.ShouldSwitch && decision.RecommendedMethodology.HasValue)
+        MethodologySwitched_V1? switchEvent = null;
+        if (decision.ShouldSwitch)
         {
-            var switchEvent = new MethodologySwitched_V1(
+            switchEvent = new MethodologySwitched_V1(
                 _studentId, msg.ConceptId,
                 currentMethodology.ToString(),
-                decision.RecommendedMethodology.Value.ToString(),
+                decision.RecommendedMethodology.ToString(),
                 "stagnation_detected",
                 msg.CompositeScore,
                 dominantErrorType.ToString(),
@@ -943,26 +922,26 @@ public sealed class StudentActor : IActor
 
         await FlushEvents();
 
-        // Apply events to local state
+        // Apply SAME event instances to local state (after successful persist)
         _state.Apply(stagnationEvent);
-        if (decision.ShouldSwitch && decision.RecommendedMethodology.HasValue)
+        if (switchEvent != null)
         {
-            var switchEvent = new MethodologySwitched_V1(
-                _studentId, msg.ConceptId,
-                currentMethodology.ToString(),
-                decision.RecommendedMethodology.Value.ToString(),
-                "stagnation_detected",
-                msg.CompositeScore,
-                dominantErrorType.ToString(),
-                decision.Confidence);
             _state.Apply(switchEvent);
 
             if (_stagnationDetector != null)
             {
-                context.Send(_stagnationDetector, new ResetAfterSwitch(
-                    _studentId, msg.ConceptId, decision.RecommendedMethodology.Value));
+                context.Send(_stagnationDetector, new Stagnation.ResetAfterSwitch(
+                    msg.ConceptId));
             }
         }
+    }
+
+    private Task HandleDelegateEvent(DelegateEvent del)
+    {
+        // Delegated events from child actors (e.g., LearningSessionActor) are domain events
+        // that should be staged for persistence
+        StageEvent(del.Event);
+        return Task.CompletedTask;
     }
 
     // =========================================================================
@@ -1157,8 +1136,10 @@ public sealed class StudentActor : IActor
         }
 
         // Schedule next check
+        var self = context.Self;
+        var system = context.System;
         _ = Task.Delay(MemoryCheckInterval).ContinueWith(_ =>
-            context.Send(context.Self, new MemoryCheckTick()));
+            system.Root.Send(self, new MemoryCheckTick()));
 
         return Task.CompletedTask;
     }
@@ -1252,8 +1233,8 @@ public sealed class StudentActor : IActor
 
         if (_outreachScheduler != null)
         {
-            context.Send(_outreachScheduler, new StreakStateUpdate(
-                _studentId, newStreak, now));
+            context.Send(_outreachScheduler, new UpdateActivity(
+                now, newStreak, null, false, 0));
         }
     }
 

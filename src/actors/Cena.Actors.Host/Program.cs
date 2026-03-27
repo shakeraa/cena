@@ -8,6 +8,7 @@
 
 using Cena.Actors.Configuration;
 using Cena.Actors.Infrastructure;
+using Cena.Actors.Services;
 using Cena.Actors.Students;
 using Marten;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -348,7 +349,7 @@ public sealed class DefaultMethodologySwitchService : IMethodologySwitchService
         {
             return Task.FromResult(new DecideSwitchResponse(
                 ShouldSwitch: false,
-                RecommendedMethodology: null,
+                RecommendedMethodology: request.CurrentMethodology,
                 Confidence: 0.0,
                 AllMethodologiesExhausted: true,
                 EscalationAction: "refer_to_human_tutor",

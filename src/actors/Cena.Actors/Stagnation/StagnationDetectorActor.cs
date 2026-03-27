@@ -32,8 +32,9 @@ public sealed class StagnationDetectorActor : IActor
     private const int CooldownSessions = 3;
 
     // ── Telemetry ──
+    private static readonly Meter Meter = new("Cena.Actors.Stagnation", "1.0.0");
     private static readonly Histogram<double> ScoreHistogram =
-        new Meter("Cena.Actors.Stagnation").CreateHistogram<double>("cena.stagnation.composite_score");
+        Meter.CreateHistogram<double>("cena.stagnation.composite_score");
 
     public StagnationDetectorActor(ILogger<StagnationDetectorActor> logger)
     {

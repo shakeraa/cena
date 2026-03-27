@@ -25,9 +25,17 @@ public sealed class OutreachSchedulerActor : IActor
     private const int MaxMessagesPerDay = 3;
 
     // ── Quiet Hours (Israel time: UTC+2 or UTC+3 depending on DST) ──
-    private static readonly TimeZoneInfo IsraelTz =
-        TimeZoneInfo.FindSystemTimeZoneById("Israel") ??
-        TimeZoneInfo.FindSystemTimeZoneById("Asia/Jerusalem");
+    private static readonly TimeZoneInfo IsraelTz = ResolveIsraelTimeZone();
+
+    private static TimeZoneInfo ResolveIsraelTimeZone()
+    {
+        // Linux/macOS use IANA IDs; Windows uses "Israel"
+        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Jerusalem"); }
+        catch (TimeZoneNotFoundException)
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById("Israel");
+        }
+    }
     private const int QuietHourStart = 22; // 10 PM
     private const int QuietHourEnd = 7;     // 7 AM
 
@@ -40,8 +48,9 @@ public sealed class OutreachSchedulerActor : IActor
     private readonly SortedList<int, PendingOutreach> _pendingQueue = new();
 
     // ── Telemetry ──
+    private static readonly Meter Meter = new("Cena.Actors.Outreach", "1.0.0");
     private static readonly Counter<long> OutreachSent =
-        new Meter("Cena.Actors.Outreach").CreateCounter<long>("cena.outreach.sent_total");
+        Meter.CreateCounter<long>("cena.outreach.sent_total");
 
     public OutreachSchedulerActor(IHlrService hlr, ILogger<OutreachSchedulerActor> logger)
     {
@@ -157,10 +166,13 @@ public sealed class OutreachSchedulerActor : IActor
 
     // ── Throttle + Quiet Hours + Dispatch ──
 
+    // Monotonic counter for unique SortedList keys (prevents key collision after dispatch)
+    private int _enqueueCounter;
+
     private void EnqueueOutreach(PendingOutreach outreach)
     {
-        // Use negative priority for SortedList (lower number = higher priority)
-        var key = outreach.Priority * 1000 + _pendingQueue.Count;
+        // Use priority * large factor + monotonic counter for unique, priority-ordered keys
+        var key = outreach.Priority * 100_000 + _enqueueCounter++;
         _pendingQueue[key] = outreach;
     }
 

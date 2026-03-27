@@ -94,9 +94,10 @@ public sealed class LearningSessionActor : IActor
             _sessionId, _studentId, _subject, _methodology);
 
         // Delegate SessionStarted event to parent
-        context.Send(context.Parent!, new DelegateEvent(new SessionStarted_V1(
-            _studentId, _sessionId, "mobile", "1.0.0", _methodology,
-            null, false, DateTimeOffset.UtcNow)));
+        if (context.Parent != null)
+            context.Send(context.Parent, new DelegateEvent(new SessionStarted_V1(
+                _studentId, _sessionId, "mobile", "1.0.0", _methodology,
+                null, false, DateTimeOffset.UtcNow)));
 
         return Task.CompletedTask;
     }
@@ -155,15 +156,16 @@ public sealed class LearningSessionActor : IActor
         }
 
         // Delegate ConceptAttempted event to parent
-        context.Send(context.Parent!, new DelegateEvent(new ConceptAttempted_V1(
-            _studentId, req.ConceptId, _sessionId, req.IsCorrect,
-            (int)req.ResponseTimeMs, req.QuestionId, req.QuestionType,
-            _methodology, req.ErrorType, req.PriorMastery,
-            bktResult.PosteriorMastery, req.HintCountUsed, false,
-            req.AnswerHash, req.BackspaceCount, req.AnswerChangeCount,
-            false, DateTimeOffset.UtcNow)));
+        if (context.Parent != null)
+            context.Send(context.Parent, new DelegateEvent(new ConceptAttempted_V1(
+                _studentId, req.ConceptId, _sessionId, req.IsCorrect,
+                (int)req.ResponseTimeMs, req.QuestionId, req.QuestionType,
+                _methodology, req.ErrorType, req.PriorMastery,
+                bktResult.PosteriorMastery, req.HintCountUsed, false,
+                req.AnswerHash, req.BackspaceCount, req.AnswerChangeCount,
+                false, DateTimeOffset.UtcNow)));
 
-        context.Respond(new EvaluateAnswerResponse(
+        context.Respond(new SessionEvaluationResult(
             IsCorrect: req.IsCorrect,
             PosteriorMastery: bktResult.PosteriorMastery,
             CrossedProgressionThreshold: bktResult.CrossedProgressionThreshold,
@@ -246,8 +248,9 @@ public sealed class LearningSessionActor : IActor
     // ── Hint ──
     private Task HandleHint(IContext context, RequestHintMessage req)
     {
-        context.Send(context.Parent!, new DelegateEvent(new HintRequested_V1(
-            _studentId, _sessionId, req.ConceptId, req.QuestionId, req.HintLevel)));
+        if (context.Parent != null)
+            context.Send(context.Parent, new DelegateEvent(new HintRequested_V1(
+                _studentId, _sessionId, req.ConceptId, req.QuestionId, req.HintLevel)));
 
         context.Respond(new HintResponse(HintLevel: req.HintLevel, Delivered: true));
         return Task.CompletedTask;
@@ -256,8 +259,9 @@ public sealed class LearningSessionActor : IActor
     // ── Skip ──
     private Task HandleSkip(IContext context, SkipQuestionMessage req)
     {
-        context.Send(context.Parent!, new DelegateEvent(new QuestionSkipped_V1(
-            _studentId, _sessionId, req.ConceptId, req.QuestionId, req.TimeSpentMs)));
+        if (context.Parent != null)
+            context.Send(context.Parent, new DelegateEvent(new QuestionSkipped_V1(
+                _studentId, _sessionId, req.ConceptId, req.QuestionId, req.TimeSpentMs)));
 
         return Task.CompletedTask;
     }
@@ -270,9 +274,10 @@ public sealed class LearningSessionActor : IActor
             ? _recentResponseTimes.Average()
             : 0;
 
-        context.Send(context.Parent!, new DelegateEvent(new SessionEnded_V1(
-            _studentId, _sessionId, "completed", duration,
-            _questionsAttempted, _questionsCorrect, avgRt, _fatigueScore)));
+        if (context.Parent != null)
+            context.Send(context.Parent, new DelegateEvent(new SessionEnded_V1(
+                _studentId, _sessionId, "completed", duration,
+                _questionsAttempted, _questionsCorrect, avgRt, _fatigueScore)));
 
         _logger.LogInformation(
             "Session {SessionId} ended: {Questions} questions, {Correct} correct, fatigue={Fatigue:F2}",
@@ -301,7 +306,7 @@ public record EvaluateAnswerRequest(
     int HintCountUsed, string AnswerHash,
     int BackspaceCount, int AnswerChangeCount);
 
-public record EvaluateAnswerResponse(
+public record SessionEvaluationResult(
     bool IsCorrect, double PosteriorMastery, bool CrossedProgressionThreshold,
     double FatigueScore, bool ShouldEndSession, string ErrorType);
 
