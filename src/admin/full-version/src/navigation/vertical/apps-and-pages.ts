@@ -3,23 +3,23 @@ export default [
   {
     title: 'Ingestion Pipeline',
     icon: { icon: 'tabler-transfer-in' },
+    to: 'apps-ingestion-pipeline',
     action: 'read',
     subject: 'Content',
-    disabled: true,
   },
   {
     title: 'Moderation Queue',
     icon: { icon: 'tabler-checkbox' },
+    to: 'apps-moderation-queue',
     action: 'read',
     subject: 'Content',
-    disabled: true,
   },
   {
     title: 'Question Bank',
     icon: { icon: 'tabler-database' },
+    to: 'apps-questions-list',
     action: 'read',
     subject: 'Questions',
-    disabled: true,
   },
 
   { heading: 'Users' },

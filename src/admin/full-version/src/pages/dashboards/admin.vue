@@ -1,4 +1,9 @@
 <script setup lang="ts">
+import UserActivityChart from '@/views/admin/dashboard/UserActivityChart.vue'
+import ContentPipelineChart from '@/views/admin/dashboard/ContentPipelineChart.vue'
+import SystemAlerts from '@/views/admin/dashboard/SystemAlerts.vue'
+import RecentActivityTimeline from '@/views/admin/dashboard/RecentActivityTimeline.vue'
+
 definePage({
   meta: {
     action: 'read',
@@ -42,7 +47,7 @@ const widgetData = computed(() => {
       </div>
     </div>
 
-    <!-- Overview Widgets -->
+    <!-- Overview Widgets (visible to all admin roles) -->
     <VRow class="mb-6">
       <VCol
         v-for="(data, index) in widgetData"
@@ -91,31 +96,74 @@ const widgetData = computed(() => {
       </VCol>
     </VRow>
 
-    <!-- Placeholder sections for ADM-004 charts -->
-    <VRow>
+    <!-- User Activity Chart (SUPER_ADMIN / ADMIN only) -->
+    <VRow
+      v-if="$can('read', 'Analytics')"
+      class="mb-6"
+    >
       <VCol
         cols="12"
         md="8"
       >
-        <VCard>
+        <UserActivityChart />
+      </VCol>
+
+      <VCol
+        cols="12"
+        md="4"
+      >
+        <!-- System Alerts (SUPER_ADMIN / ADMIN only) -->
+        <SystemAlerts v-if="$can('read', 'System')" />
+
+        <!-- Quick Actions fallback when alerts not visible -->
+        <VCard v-else>
           <VCardItem>
-            <VCardTitle>User Activity</VCardTitle>
-            <VCardSubtitle>DAU / WAU / MAU over last 30 days</VCardSubtitle>
+            <VCardTitle>Quick Actions</VCardTitle>
           </VCardItem>
-          <VCardText class="d-flex align-center justify-center" style="min-height: 300px;">
-            <div class="text-center text-disabled">
-              <VIcon
-                icon="tabler-chart-line"
-                size="48"
-                class="mb-2"
-              />
-              <p>Connect .NET backend to populate charts</p>
+          <VCardText>
+            <div class="d-flex flex-column gap-4">
+              <VBtn
+                :to="{ name: 'apps-user-list' }"
+                variant="tonal"
+                block
+                prepend-icon="tabler-user-plus"
+              >
+                Manage Users
+              </VBtn>
+              <VBtn
+                :to="{ name: 'apps-roles' }"
+                variant="tonal"
+                block
+                prepend-icon="tabler-lock"
+              >
+                Roles & Permissions
+              </VBtn>
+              <VBtn
+                :to="{ name: 'pages-account-settings-tab', params: { tab: 'account' } }"
+                variant="tonal"
+                block
+                prepend-icon="tabler-settings"
+              >
+                Account Settings
+              </VBtn>
             </div>
           </VCardText>
         </VCard>
       </VCol>
+    </VRow>
 
+    <!-- Content Pipeline Chart (all admin roles including MODERATOR) -->
+    <VRow class="mb-6">
+      <VCol cols="12">
+        <ContentPipelineChart />
+      </VCol>
+    </VRow>
+
+    <!-- Bottom Row: Quick Actions + Recent Activity -->
+    <VRow>
+      <!-- Quick Actions (SUPER_ADMIN / ADMIN) -->
       <VCol
+        v-if="$can('read', 'System')"
         cols="12"
         md="4"
       >
@@ -152,6 +200,14 @@ const widgetData = computed(() => {
             </div>
           </VCardText>
         </VCard>
+      </VCol>
+
+      <!-- Recent Activity Timeline (all admin roles) -->
+      <VCol
+        cols="12"
+        :md="$can('read', 'System') ? 8 : 12"
+      >
+        <RecentActivityTimeline />
       </VCol>
     </VRow>
   </div>

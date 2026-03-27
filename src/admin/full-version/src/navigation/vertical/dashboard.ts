@@ -12,17 +12,17 @@ export default [
       },
       {
         title: 'Focus & Attention',
+        to: 'apps-focus-dashboard',
         icon: { icon: 'tabler-eye-check' },
         action: 'read',
         subject: 'Focus',
-        disabled: true,
       },
       {
         title: 'Mastery Progress',
+        to: 'apps-mastery-dashboard',
         icon: { icon: 'tabler-graph' },
         action: 'read',
         subject: 'Mastery',
-        disabled: true,
       },
       {
         title: 'Outreach & Engagement',
