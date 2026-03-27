@@ -10,7 +10,9 @@
 > **⛔ NO STUBS/MOCKS/FAKE CODE.** Every line must be real, working logic. See `tasks/00-master-plan.md` for the full rule. `throw UnimplementedError`, `// TODO: implement`, empty bodies, and mock returns are FORBIDDEN in source code. If you cannot implement it fully, file a blocking dependency instead.
 
 ## Context
-Cena's real-time learning loop depends on a persistent WebSocket connection to a .NET 9 SignalR hub. The service must handle automatic reconnection with exponential backoff + jitter, heartbeat ping/pong, message framing via `MessageEnvelope`, and offline command queuing. The `MessageRouter` dispatches incoming events by `target` name to typed handlers. All 7 client commands (`StartSession`, `AttemptConcept`, `EndSession`, `RequestHint`, `SkipQuestion`, `AddAnnotation`, `SwitchApproach`) and 9 server events (`QuestionPresented`, `AnswerEvaluated`, `MasteryUpdated`, `MethodologySwitched`, `SessionSummary`, `XpAwarded`, `StreakUpdated`, `KnowledgeGraphUpdated`, `CognitiveLoadWarning`) must be routed correctly.
+Cena's real-time learning loop depends on a persistent WebSocket connection to a .NET 9 SignalR hub. The service must handle automatic reconnection with exponential backoff + jitter, heartbeat ping/pong, message framing via `MessageEnvelope`, and offline command queuing. The `MessageRouter` dispatches incoming events by `target` name to typed handlers. All 8 client commands (`StartSession`, `AttemptConcept`, `EndSession`, `RequestHint`, `SkipQuestion`, `AddAnnotation`, `SwitchApproach`, `SensorUpdate`) and 10 server events (`QuestionPresented`, `AnswerEvaluated`, `MasteryUpdated`, `MethodologySwitched`, `SessionSummary`, `XpAwarded`, `StreakUpdated`, `KnowledgeGraphUpdated`, `CognitiveLoadWarning`, `FocusStateUpdated`) must be routed correctly.
+
+> **FOC-002 dependency:** The `SensorUpdate` command carries the `SensorSnapshot` from the mobile sensor layer (FOC-002) to the server's `FocusInput` (FOC-001). The `FocusStateUpdated` event returns the computed focus state. See [FOC-002](../focus/FOC-002-mobile-sensor-collection.md) for the field mapping.
 
 ## Subtasks
 
@@ -273,9 +275,9 @@ test('heartbeat sends SignalR ping format', () {
 - [ ] `dispatch()` looks up target in the map, deserializes `arguments[0]` via `fromJson`, calls handler
 - [ ] Unknown targets are logged as warnings but do not throw
 - [ ] `clear()` removes all registered handlers
-- [ ] All `CommandTargets` constants match contract: `StartSession`, `AttemptConcept`, `EndSession`, `RequestHint`, `SkipQuestion`, `AddAnnotation`, `SwitchApproach`
-- [ ] All `EventTargets` constants match contract: `QuestionPresented`, `AnswerEvaluated`, `MasteryUpdated`, `MethodologySwitched`, `SessionSummary`, `XpAwarded`, `StreakUpdated`, `KnowledgeGraphUpdated`, `CognitiveLoadWarning`
-- [ ] Convenience senders on `WebSocketServiceImpl`: `startSession(StartSession)`, `attemptConcept(AttemptConcept)`, `endSession(EndSession)`, `requestHint(RequestHint)`, `skipQuestion(SkipQuestion)`, `addAnnotation(AddAnnotation)`, `switchApproach(SwitchApproach)`
+- [ ] All `CommandTargets` constants match contract: `StartSession`, `AttemptConcept`, `EndSession`, `RequestHint`, `SkipQuestion`, `AddAnnotation`, `SwitchApproach`, `SensorUpdate`
+- [ ] All `EventTargets` constants match contract: `QuestionPresented`, `AnswerEvaluated`, `MasteryUpdated`, `MethodologySwitched`, `SessionSummary`, `XpAwarded`, `StreakUpdated`, `KnowledgeGraphUpdated`, `CognitiveLoadWarning`, `FocusStateUpdated`
+- [ ] Convenience senders on `WebSocketServiceImpl`: `startSession(StartSession)`, `attemptConcept(AttemptConcept)`, `endSession(EndSession)`, `requestHint(RequestHint)`, `skipQuestion(SkipQuestion)`, `addAnnotation(AddAnnotation)`, `switchApproach(SwitchApproach)`, `sensorUpdate(SensorUpdate)`
 - [ ] Each convenience sender calls `send()` with the correct `target` from `CommandTargets` and serialized payload
 
 **Test:**
@@ -352,6 +354,7 @@ test('all command targets match contract constants', () {
   expect(CommandTargets.skipQuestion, equals('SkipQuestion'));
   expect(CommandTargets.addAnnotation, equals('AddAnnotation'));
   expect(CommandTargets.switchApproach, equals('SwitchApproach'));
+  expect(CommandTargets.sensorUpdate, equals('SensorUpdate'));
 });
 
 test('all event targets match contract constants', () {
@@ -364,6 +367,7 @@ test('all event targets match contract constants', () {
   expect(EventTargets.streakUpdated, equals('StreakUpdated'));
   expect(EventTargets.knowledgeGraphUpdated, equals('KnowledgeGraphUpdated'));
   expect(EventTargets.cognitiveLoadWarning, equals('CognitiveLoadWarning'));
+  expect(EventTargets.focusStateUpdated, equals('FocusStateUpdated'));
 });
 
 test('router.clear removes all handlers', () {
@@ -479,7 +483,7 @@ void main() {
 - [ ] WebSocket connects to a local mock SignalR server and exchanges messages
 - [ ] Reconnection recovers from transient disconnects within 30 seconds
 - [ ] Heartbeat detects stale connections within 25 seconds
-- [ ] All 7 command senders and 9 event targets are wired and tested
+- [ ] All 8 command senders and 10 event targets are wired and tested
 - [ ] Message Router handles all event types without crashes
 - [ ] No memory leaks: `dispose()` cancels all subscriptions and timers
 - [ ] PR reviewed by mobile lead

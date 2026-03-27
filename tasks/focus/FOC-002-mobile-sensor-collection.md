@@ -167,6 +167,19 @@ test('fluctuating light scores low', () {
 - [ ] Handles sensor permission denials gracefully (score = null for denied sensors)
 - [ ] Includes `SensorHealth` diagnostic: which sensors are active, denied, unavailable
 
+## Server-Side Contract (FOC-001, implemented)
+
+`SensorSnapshot` fields map 1:1 to the nullable sensor fields on `FocusInput` (see `src/actors/Cena.Actors/Services/FocusDegradationService.cs`):
+
+| SensorSnapshot (Flutter) | FocusInput (C#) | Range | Null means |
+|--------------------------|-----------------|-------|------------|
+| `motionScore` | `MotionStabilityScore` | 0.0–1.0 | sensor unavailable |
+| `appFocusScore` | `AppFocusScore` | 0.0–1.0 | sensor unavailable |
+| `touchPatternScore` | `TouchPatternScore` | 0.0–1.0 | sensor unavailable |
+| `environmentScore` | `EnvironmentScore` | 0.0–1.0 | sensor unavailable |
+
+These scores are sent via the WebSocket (MOB-003) as part of the `AttemptConcept` command payload or as a standalone `SensorUpdate` message. The server's `FocusWeightCalculator` handles partial availability automatically — any combination of null/present scores works.
+
 ## Research References
 - ADHD study: smartwatch tools achieved 88.9% emotion recognition, 40% quiz improvement
 - Esterman (2013): RT variability validated against neural markers
