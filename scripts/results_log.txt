@@ -1,1 +1,11 @@
 [2026-03-26T00:00] Iteration #0 | Metric: 309 | Change: BASELINE | Result: baseline | Citations: 14 | DOIs: 0 | Math: 29 | Cena: 4 | Missing: 11
+[2026-03-26T00:01] Iteration #1 | Metric: 490 | Change: Add 20 DOIs + fill 11 missing method refs | Result: improved (+181) | Citations: 30 | DOIs: 20 | Math: 29 | Cena: 4 | Missing: 0
+[2026-03-26T00:02] Iteration #2 | Metric: 536 | Change: Add PFA, Elo, FSRS, Leitner sections | Result: improved (+46) | Citations: 33 | DOIs: 20 | Math: 34 | Cena: 4 | Missing: 0
+[2026-03-26T00:03] Iteration #3 | Metric: 604 | Change: Add Cena domain event + tech stack mappings (BKT, MIRT, HLR, errors, composite) | Result: improved (+68) | Citations: 33 | DOIs: 20 | Math: 34 | Cena: 19 | Missing: 0
+[2026-03-26T00:04] Iteration #4 | Metric: 660 | Change: Add interleaving, CLT, ZPD, scaffolding sections | Result: improved (+56) | Citations: 42 | DOIs: 23 | Math: 34 | Cena: 19 | Missing: 0
+[2026-03-26T00:05] Iteration #5 | Metric: 690 | Change: Add section 2.8 Transfer Learning (near/far transfer) | Result: improved (+30) | Citations: 45 | DOIs: 24 | Math: 35 | Cena: 19 | Missing: 0
+[2026-03-26T00:06] Iteration #6 | Metric: 711 | Change: Add Appendix B with 5 Neo4j Cypher queries | Result: improved (+21) | Citations: 45 | DOIs: 24 | Math: 38 | Cena: 19 | Missing: 0
+[2026-03-26T00:07] Iteration #7 | Metric: 771 | Change: Add inline DOIs + Sources DOIs (10+ new DOI refs) | Result: improved (+60) | Citations: 50 | DOIs: 33 | Math: 38 | Cena: 19 | Missing: 0
+[2026-03-26T00:08] Iteration #8 | Metric: 819 | Change: Add worked examples for BKT, HLR, composite scoring | Result: improved (+48) | Citations: 50 | DOIs: 33 | Math: 59 | Cena: 19 | Missing: 0
+[2026-03-26T00:09] Iteration #9 | Metric: 849 | Change: Add section 2.9 Mastery Quality Matrix (accuracy x latency 2x2) | Result: improved (+30) | Citations: 52 | DOIs: 35 | Math: 61 | Cena: 19 | Missing: 0
+[2026-03-26T00:10] Iteration #10 | Metric: 858 | Change: Align with architecture-design.md bounded contexts + update ConceptMasteryState | Result: improved (+9) | Citations: 52 | DOIs: 35 | Math: 64 | Cena: 19 | Missing: 0
