@@ -35,7 +35,7 @@ public sealed class ThreadSummary
 /// Marten single-stream projection that builds ThreadSummary from
 /// ThreadCreated_V1 and MessageSent_V1 domain events.
 /// </summary>
-public sealed class ThreadSummaryProjection : SingleStreamProjection<ThreadSummary>
+public sealed class ThreadSummaryProjection : SingleStreamProjection<ThreadSummary, string>
 {
     public ThreadSummary Create(ThreadCreated_V1 evt) => new()
     {
