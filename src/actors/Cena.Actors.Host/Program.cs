@@ -6,6 +6,7 @@
 //             Redis cache, NATS messaging, OpenTelemetry, Serilog, health checks.
 // =============================================================================
 
+using Cena.Actors.Api;
 using Cena.Actors.Configuration;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Services;
@@ -251,6 +252,9 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 {
     Predicate = check => check.Tags.Contains("live")
 });
+
+// ---- Mastery REST API endpoints (MST-017) ----
+app.MapMasteryEndpoints();
 
 // ---- Cluster lifecycle ----
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();

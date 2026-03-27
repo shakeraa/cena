@@ -262,6 +262,21 @@ public sealed record GetReviewSchedule(
     int MaxItems = 10);
 
 /// <summary>
+/// MST-017: Query the rich mastery overlay for API consumption.
+/// Returns the full MasteryOverlay dictionary from the StudentActor.
+/// </summary>
+public sealed record GetMasteryOverlayQuery(
+    [property: Required]
+    string StudentId,
+    string? SubjectFilter = null);
+
+/// <summary>
+/// MST-017: Response containing the rich mastery overlay.
+/// </summary>
+public sealed record MasteryOverlayResponse(
+    IReadOnlyDictionary<string, Mastery.ConceptMasteryState> Overlay);
+
+/// <summary>
 /// A single review item in the schedule.
 /// </summary>
 public sealed record ReviewItem(

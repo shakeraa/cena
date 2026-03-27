@@ -118,4 +118,16 @@ public sealed partial class StudentActor
     /// </summary>
     internal IReadOnlyDictionary<string, Mastery.ConceptMasteryState> GetMasteryOverlay() =>
         _state.MasteryOverlay;
+
+    // =========================================================================
+    // MST-017: QUERY HANDLER — Rich mastery overlay for REST API
+    // =========================================================================
+
+    private Task HandleGetMasteryOverlay(IContext context, GetMasteryOverlayQuery q)
+    {
+        context.Respond(new ActorResult<MasteryOverlayResponse>(
+            true,
+            new MasteryOverlayResponse(_state.MasteryOverlay)));
+        return Task.CompletedTask;
+    }
 }

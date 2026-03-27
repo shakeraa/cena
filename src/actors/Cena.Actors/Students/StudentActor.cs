@@ -145,6 +145,7 @@ public sealed partial class StudentActor : IActor
             // ---- Queries ----
             GetStudentProfile q  => HandleGetProfile(context, q),
             GetReviewSchedule q  => HandleGetReviewSchedule(context, q),
+            GetMasteryOverlayQuery q => HandleGetMasteryOverlay(context, q),
 
             // ---- Internal ----
             StagnationDetected msg => HandleStagnationDetected(context, msg),
