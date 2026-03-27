@@ -79,6 +79,43 @@ Learning transition after update:
 P(L_{t+1}) = P(L_t | obs) + (1 - P(L_t | obs)) * P(T)
 ```
 
+**Worked example — full BKT update cycle:**
+
+Parameters for concept "Quadratic Formula": `P(L_0) = 0.30, P(T) = 0.20, P(S) = 0.10, P(G) = 0.25`
+
+```
+Step 1: Student answers CORRECTLY at t=0
+  P(L_0) = 0.30  (prior)
+  P(correct | L) = 1 - P(S) = 0.90
+  P(correct | ~L) = P(G) = 0.25
+  P(correct) = 0.90 * 0.30 + 0.25 * 0.70 = 0.270 + 0.175 = 0.445
+  P(L_0 | correct) = 0.90 * 0.30 / 0.445 = 0.270 / 0.445 = 0.607
+
+Step 2: Apply learning transition
+  P(L_1) = 0.607 + (1 - 0.607) * 0.20 = 0.607 + 0.079 = 0.686
+
+Step 3: Student answers INCORRECTLY at t=1
+  P(incorrect | L) = P(S) = 0.10
+  P(incorrect | ~L) = 1 - P(G) = 0.75
+  P(incorrect) = 0.10 * 0.686 + 0.75 * 0.314 = 0.069 + 0.236 = 0.304
+  P(L_1 | incorrect) = 0.10 * 0.686 / 0.304 = 0.069 / 0.304 = 0.226
+
+Step 4: Apply learning transition
+  P(L_2) = 0.226 + (1 - 0.226) * 0.20 = 0.226 + 0.155 = 0.381
+
+Step 5: Student answers CORRECTLY at t=2
+  P(correct) = 0.90 * 0.381 + 0.25 * 0.619 = 0.343 + 0.155 = 0.498
+  P(L_2 | correct) = 0.90 * 0.381 / 0.498 = 0.343 / 0.498 = 0.689
+
+Step 6: Apply learning transition
+  P(L_3) = 0.689 + (1 - 0.689) * 0.20 = 0.689 + 0.062 = 0.751
+
+Summary: P(L) trajectory = [0.30, 0.686, 0.381, 0.751]
+  → One incorrect answer significantly drops mastery estimate
+  → Learning transition P(T)=0.20 provides gradual recovery
+  → After 2 correct + 1 incorrect, student is at 0.751 (Proficient, not yet Mastered)
+```
+
 **Strengths:**
 - Interpretable parameters with clear pedagogical meaning
 - Lightweight computation — update rule runs in microseconds, no library needed at runtime
@@ -703,6 +740,35 @@ where:
   - Lexeme-level features (word length, frequency, cognate status — or for Cena: concept difficulty, prerequisite depth, concept type)
 
 **Training objective:** Minimize the squared loss between predicted recall probability and observed binary correctness, weighted by time lag.
+
+**Worked example — HLR scheduling derivation:**
+
+```
+Given: Student has practiced "Chain Rule" 8 times, 6 correct, last reviewed 48 hours ago
+Feature vector x = [attempt_count=8, correct_count=6, concept_difficulty=0.7, prereq_depth=3]
+Learned theta = [0.35, 0.50, -0.80, -0.15]  (from offline training)
+
+Step 1: Compute half-life
+  theta^T * x = 0.35*8 + 0.50*6 + (-0.80)*0.7 + (-0.15)*3
+              = 2.80 + 3.00 - 0.56 - 0.45 = 4.79
+  h = 2^4.79 = 27.7 hours
+
+Step 2: Compute current recall probability
+  delta = 48 hours since last review
+  p(recall) = 2^(-48 / 27.7) = 2^(-1.733) = 0.300
+
+Step 3: Determine scheduling action
+  p(recall) = 0.300 < threshold (0.85) → SCHEDULE REVIEW NOW
+  The concept has decayed significantly — emit MasteryDecayed event
+
+Step 4: After successful review, update features
+  attempt_count = 9, correct_count = 7
+  h_new = 2^(0.35*9 + 0.50*7 - 0.80*0.7 - 0.15*3)
+        = 2^(3.15 + 3.50 - 0.56 - 0.45) = 2^5.64 = 49.9 hours
+  → Half-life nearly doubled (27.7 → 49.9 hours) from one successful retrieval
+  → Next review: when p(recall) drops to 0.85 again
+  → t_review = -h * log2(0.85) = -49.9 * (-0.234) = 11.7 hours from now
+```
 
 **Strengths:**
 - Trainable from data — hard concepts automatically get shorter half-lives
@@ -1970,6 +2036,42 @@ Where all signals are normalized to [0, 1] and weights sum to 1.
 **Prerequisite adjustment (applied after combination):**
 ```
 final_mastery(c) = composite_mastery(c) * prerequisite_support(c)
+```
+
+**Worked example — composite scoring with normalization:**
+
+```
+Student: Sarah, Concept: "Integration by Parts"
+Raw signals:
+  bkt_mastery      = 0.82  (BKT posterior after 15 interactions)
+  recall_prob      = 0.71  (HLR: reviewed 3 days ago, h=8.5 days → 2^(-3/8.5) = 0.784... ≈ 0.71 with rounding)
+  accuracy_10      = 0.80  (8/10 last attempts correct)
+  bloom_level      = 4     (Analyze — normalized: 4/6 = 0.667)
+  latency_score    = 0.65  (median response time is 1.5x baseline — moderately slow)
+  error_score      = 0.90  (no systematic errors, 1 procedural slip)
+  calibration      = 0.55  (student self-assessed 0.90, actual ≈ 0.80 → overconfident → penalty)
+
+Step 1: Weighted combination
+  composite = 0.35 * 0.82   // BKT
+            + 0.25 * 0.71   // HLR recall
+            + 0.15 * 0.80   // accuracy
+            + 0.10 * 0.667  // Bloom's
+            + 0.05 * 0.65   // latency
+            + 0.05 * 0.90   // error absence
+            + 0.05 * 0.55   // calibration
+  composite = 0.287 + 0.178 + 0.120 + 0.067 + 0.033 + 0.045 + 0.028
+  composite = 0.757
+
+Step 2: Prerequisite adjustment
+  prerequisites = ["Substitution Method" (mastery=0.95), "Product Rule" (mastery=0.88)]
+  prerequisite_support = min(0.95, 0.88) = 0.88
+  final_mastery = 0.757 * 0.88 = 0.666
+
+Step 3: Classification
+  final_mastery = 0.666 → "Developing" (0.40-0.70 range)
+  Action: Do NOT emit ConceptMastered. Schedule review for recall decay.
+  Note: BKT alone would say 0.82 (Proficient), but HLR decay + prereq floor
+        pulls the effective mastery down to 0.666 — the composite catches this.
 ```
 
 **Strengths:**
