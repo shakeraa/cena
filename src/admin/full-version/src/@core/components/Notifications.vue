@@ -201,6 +201,7 @@ const toggleReadUnread = (isSeen: boolean, Id: number) => {
           <VBtn
             block
             size="small"
+            :to="{ name: 'apps-system-events' }"
           >
             View All Notifications
           </VBtn>

@@ -1,77 +1,94 @@
 <script lang="ts" setup>
 import type { Notification } from '@layouts/types'
 
-import avatar3 from '@images/avatars/avatar-3.png'
-import avatar4 from '@images/avatars/avatar-4.png'
-import avatar5 from '@images/avatars/avatar-5.png'
-import paypal from '@images/cards/paypal-rounded.png'
+const notifications = ref<Notification[]>([])
+const readIds = ref<Set<number>>(new Set())
 
-const notifications = ref<Notification[]>([
-  {
-    id: 1,
-    img: avatar4,
-    title: 'Congratulation Flora! 🎉',
-    subtitle: 'Won the monthly best seller badge',
-    time: 'Today',
-    isSeen: true,
-  },
-  {
-    id: 2,
-    text: 'Tom Holland',
-    title: 'New user registered.',
-    subtitle: '5 hours ago',
-    time: 'Yesterday',
-    isSeen: false,
-  },
-  {
-    id: 3,
-    img: avatar5,
-    title: 'New message received 👋🏻',
-    subtitle: 'You have 10 unread messages',
-    time: '11 Aug',
-    isSeen: true,
-  },
-  {
-    id: 4,
-    img: paypal,
-    title: 'PayPal',
-    subtitle: 'Received Payment',
-    time: '25 May',
-    isSeen: false,
-    color: 'error',
-  },
-  {
-    id: 5,
-    img: avatar3,
-    title: 'Received Order 📦',
-    subtitle: 'New order received from john',
-    time: '19 Mar',
-    isSeen: true,
-  },
-])
+const eventMeta: Record<string, { icon: string; color: string; label: string }> = {
+  ConceptMastered: { icon: 'tabler-trophy', color: 'success', label: 'Concept Mastered' },
+  ConceptAttempted: { icon: 'tabler-pencil', color: 'info', label: 'Concept Attempted' },
+  StagnationDetected: { icon: 'tabler-alert-triangle', color: 'warning', label: 'Stagnation Detected' },
+  MethodologySwitched: { icon: 'tabler-switch-horizontal', color: 'primary', label: 'Methodology Switched' },
+  SessionStarted: { icon: 'tabler-player-play', color: 'info', label: 'Session Started' },
+  SessionEnded: { icon: 'tabler-player-stop', color: 'secondary', label: 'Session Ended' },
+  FocusAlert: { icon: 'tabler-eye-off', color: 'error', label: 'Focus Alert' },
+  MicrobreakTaken: { icon: 'tabler-coffee', color: 'success', label: 'Microbreak Taken' },
+}
+
+const defaultMeta = { icon: 'tabler-bell', color: 'primary', label: 'Event' }
+
+function formatTime(timestamp: string): string {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diffMs = now.getTime() - date.getTime()
+  const diffMin = Math.floor(diffMs / 60000)
+
+  if (diffMin < 1) return 'Just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+
+  const diffHours = Math.floor(diffMin / 60)
+  if (diffHours < 24) return `${diffHours}h ago`
+
+  return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+const fetchNotifications = async () => {
+  try {
+    const response = await $api<any>('/admin/events/recent')
+    const rawEvents = response?.events ?? response ?? []
+    const events: any[] = Array.isArray(rawEvents) ? rawEvents : []
+
+    notifications.value = events.slice(0, 8).map((e: any, i: number) => {
+      const type = e.type ?? e.eventType ?? e.EventType ?? 'Event'
+      const meta = eventMeta[type] ?? defaultMeta
+      const summary = e.summary ?? `${meta.label} on ${e.aggregateType ?? e.AggregateType ?? 'unknown'}`
+      const time = formatTime(e.timestamp ?? e.Timestamp ?? new Date().toISOString())
+      const id = i + 1
+
+      return {
+        id,
+        icon: meta.icon,
+        title: meta.label,
+        subtitle: summary,
+        time,
+        isSeen: readIds.value.has(id),
+        color: meta.color,
+      }
+    })
+  }
+  catch {
+    // API unavailable — show empty state
+  }
+}
+
+let pollInterval: ReturnType<typeof setInterval> | null = null
+
+onMounted(() => {
+  fetchNotifications()
+  pollInterval = setInterval(fetchNotifications, 15000)
+})
+
+onUnmounted(() => {
+  if (pollInterval) clearInterval(pollInterval)
+})
 
 const removeNotification = (notificationId: number) => {
-  notifications.value.forEach((item, index) => {
-    if (notificationId === item.id)
-      notifications.value.splice(index, 1)
-  })
+  notifications.value = notifications.value.filter(item => item.id !== notificationId)
 }
 
 const markRead = (notificationId: number[]) => {
+  notificationId.forEach(id => readIds.value.add(id))
   notifications.value.forEach(item => {
-    notificationId.forEach(id => {
-      if (id === item.id)
-        item.isSeen = true
-    })
+    if (notificationId.includes(item.id))
+      item.isSeen = true
   })
 }
 
 const markUnRead = (notificationId: number[]) => {
+  notificationId.forEach(id => readIds.value.delete(id))
   notifications.value.forEach(item => {
-    notificationId.forEach(id => {
-      if (id === item.id)
-        item.isSeen = false
-    })
+    if (notificationId.includes(item.id))
+      item.isSeen = false
   })
 }
 

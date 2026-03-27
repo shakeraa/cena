@@ -1,16 +1,16 @@
 <script setup lang="ts">
 const shortcuts = [
   {
-    icon: 'tabler-calendar',
-    title: 'Calendar',
-    subtitle: 'Appointments',
-    to: { name: 'apps-calendar' },
+    icon: 'tabler-chart-dots-3',
+    title: 'Mastery',
+    subtitle: 'Student Progress',
+    to: { name: 'apps-mastery-dashboard' },
   },
   {
-    icon: 'tabler-file-dollar',
-    title: 'Invoice App',
-    subtitle: 'Manage Accounts',
-    to: { name: 'apps-invoice-list' },
+    icon: 'tabler-help-hexagon',
+    title: 'Questions',
+    subtitle: 'Question Bank',
+    to: { name: 'apps-questions-list' },
   },
   {
     icon: 'tabler-user',
@@ -19,24 +19,23 @@ const shortcuts = [
     to: { name: 'apps-user-list' },
   },
   {
-    icon: 'tabler-users',
-    title: 'Role Management',
-    subtitle: 'Permission',
-    to: { name: 'apps-roles' },
+    icon: 'tabler-shield-lock',
+    title: 'Permissions',
+    subtitle: 'Access Control',
+    to: { name: 'apps-permissions' },
   },
   {
     icon: 'tabler-device-desktop-analytics',
     title: 'Dashboard',
-    subtitle: 'Dashboard Analytics',
-    to: { name: 'dashboards-analytics' },
+    subtitle: 'Admin Overview',
+    to: { name: 'dashboards-admin' },
   },
   {
     icon: 'tabler-settings',
     title: 'Settings',
-    subtitle: 'Account Settings',
-    to: { name: 'pages-account-settings-tab', params: { tab: 'account' } },
+    subtitle: 'System Settings',
+    to: { name: 'apps-system-settings' },
   },
-
 ]
 </script>
 
