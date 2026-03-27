@@ -386,7 +386,9 @@ lifetime.ApplicationStarted.Register(async () =>
 
     // Seed all demo data via single entry point
     var store = app.Services.GetRequiredService<IDocumentStore>();
-    await DatabaseSeeder.SeedAllAsync(store, appLogger);
+    await DatabaseSeeder.SeedAllAsync(store, appLogger, 100,
+        (s, l) => Cena.Admin.Api.SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
+        Cena.Admin.Api.QuestionBankSeedData.SeedQuestionsAsync);
 });
 
 lifetime.ApplicationStopping.Register(async () =>

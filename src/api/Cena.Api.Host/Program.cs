@@ -130,8 +130,9 @@ var appLogger = app.Services.GetRequiredService<ILogger<Program>>();
 lifetime.ApplicationStarted.Register(async () =>
 {
     var store = app.Services.GetRequiredService<IDocumentStore>();
-    await DatabaseSeeder.SeedAllAsync(store, appLogger,
-        additionalSeeds: QuestionBankSeedData.SeedQuestionsAsync);
+    await DatabaseSeeder.SeedAllAsync(store, appLogger, 100,
+        (s, l) => SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
+        QuestionBankSeedData.SeedQuestionsAsync);
 });
 
 app.Run();

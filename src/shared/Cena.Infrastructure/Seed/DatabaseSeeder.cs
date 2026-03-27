@@ -48,7 +48,7 @@ public static class DatabaseSeeder
         // 3. Simulated students (100 across 8 archetypes)
         await UserSeedData.SeedSimulatedStudentsAsync(store, logger, simulatedStudentCount);
 
-        // 4. Additional seeds (questions, etc.)
+        // 4. Additional seeds (simulation events, questions, etc.)
         foreach (var seed in additionalSeeds)
         {
             await seed(store, logger);

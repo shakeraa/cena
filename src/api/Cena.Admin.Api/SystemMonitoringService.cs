@@ -37,52 +37,89 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
     public async Task<SystemHealthResponse> GetHealthAsync()
     {
         var now = DateTimeOffset.UtcNow;
-        var random = new Random();
+        var process = System.Diagnostics.Process.GetCurrentProcess();
 
-        var services = new List<ServiceHealth>
+        // Real service health probes
+        var services = new List<ServiceHealth>();
+
+        // API (this process)
+        services.Add(new("API", "healthy", "1.0.0",
+            TimeSpan.FromMilliseconds(1), now, null));
+
+        // PostgreSQL — real probe via Marten
+        var pgLatency = System.Diagnostics.Stopwatch.StartNew();
+        try
         {
-            new("API", "healthy", "1.0.0", TimeSpan.FromMilliseconds(random.Next(5, 50)), now, null),
-            new("Actor System", "healthy", "1.0.0", TimeSpan.FromMilliseconds(random.Next(10, 100)), now, null),
-            new("PostgreSQL", "healthy", "15.0", TimeSpan.FromMilliseconds(random.Next(5, 30)), now, null),
-            new("Redis", "healthy", "7.0", TimeSpan.FromMilliseconds(random.Next(2, 10)), now, null),
-            new("S3", "healthy", null, TimeSpan.FromMilliseconds(random.Next(50, 200)), now, null)
-        };
+            await using var session = _store.QuerySession();
+            await session.Query<Cena.Infrastructure.Documents.AdminUser>().CountAsync();
+            pgLatency.Stop();
+            services.Add(new("PostgreSQL", "healthy", "16",
+                pgLatency.Elapsed, now, null));
+        }
+        catch (Exception ex)
+        {
+            pgLatency.Stop();
+            services.Add(new("PostgreSQL", "down", null,
+                pgLatency.Elapsed, now, ex.Message));
+        }
+
+        // Redis — real probe
+        var redisLatency = System.Diagnostics.Stopwatch.StartNew();
+        try
+        {
+            var db = _redis.GetDatabase();
+            await db.PingAsync();
+            redisLatency.Stop();
+            services.Add(new("Redis", "healthy", "7.0",
+                redisLatency.Elapsed, now, null));
+        }
+        catch (Exception ex)
+        {
+            redisLatency.Stop();
+            services.Add(new("Redis", "down", null,
+                redisLatency.Elapsed, now, ex.Message));
+        }
+
+        // Actor System — real process metrics
+        var memoryBytes = process.WorkingSet64;
+        var cpuTime = process.TotalProcessorTime;
+        var uptime = now - process.StartTime;
+        var cpuPercent = uptime.TotalSeconds > 0
+            ? (float)(cpuTime.TotalSeconds / uptime.TotalSeconds * 100 / Environment.ProcessorCount)
+            : 0f;
 
         var actors = new List<ActorSystemStatus>
         {
-            new("node-1", "active", random.Next(100, 500), random.Next(10000, 50000), random.NextSingle() * 30f, random.Next(100000000, 500000000)),
-            new("node-2", "active", random.Next(100, 500), random.Next(10000, 50000), random.NextSingle() * 30f, random.Next(100000000, 500000000))
+            new(Environment.MachineName, "active",
+                0, // Active actors — will be real when actor host reports
+                0, // Messages — needs Proto.Actor metrics
+                cpuPercent,
+                memoryBytes)
         };
+
+        // Real event stream metrics
+        await using var eventSession = _store.QuerySession();
+        var totalEvents = await eventSession.Events.QueryAllRawEvents().CountAsync();
 
         var queues = new List<QueueDepth>
         {
-            new("events.ingest", random.Next(0, 100), random.Next(100) > 80 ? "warning" : "normal", now),
-            new("events.process", random.Next(0, 50), "normal", now),
-            new("outreach.send", random.Next(0, 200), random.Next(200) > 150 ? "warning" : "normal", now),
-            new("nats.dlq", random.Next(0, 10), random.Next(10) > 5 ? "critical" : "normal", now)
+            new("marten.events", totalEvents, "normal", now),
         };
 
+        // Error rate — no real errors in dev, show zero
         var trend = new List<ErrorPoint>();
         for (int i = 23; i >= 0; i--)
         {
             trend.Add(new ErrorPoint(
-                now.AddHours(-i).ToString("yyyy-MM-dd HH:00"),
-                random.Next(0, 10),
-                random.Next(1000, 5000)));
+                now.AddHours(-i).ToString("yyyy-MM-dd HH:00"), 0, 100));
         }
-
-        var totalRequests = trend.Sum(t => t.RequestCount);
-        var totalErrors = trend.Sum(t => t.ErrorCount);
 
         return new SystemHealthResponse(
             Timestamp: now,
             Services: services,
             ActorSystems: actors,
             QueueDepths: queues,
-            ErrorRates: new ErrorRateMetrics(
-                totalErrors / 24f,
-                totalRequests > 0 ? totalErrors * 100f / totalRequests : 0f,
-                trend));
+            ErrorRates: new ErrorRateMetrics(0, 0, trend));
     }
 
     public async Task<PlatformSettingsResponse> GetSettingsAsync()
@@ -135,29 +172,31 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
 
     public async Task<AuditLogResponse> GetAuditLogAsync(AuditLogFilterRequest request, int page, int pageSize)
     {
-        var random = new Random();
-        var entries = new List<AuditLogEntry>();
-        var actions = new[] { "user.create", "user.update", "user.suspend", "role.assign", "settings.update", "content.approve", "content.reject" };
-        var targets = new[] { "User", "Role", "Settings", "Content" };
+        await using var session = _store.QuerySession();
 
-        for (int i = 0; i < pageSize; i++)
-        {
-            entries.Add(new AuditLogEntry(
-                Id: $"audit-{page}-{i}",
-                Timestamp: DateTimeOffset.UtcNow.AddHours(-random.Next(1, 168)),
-                UserId: $"admin-{random.Next(1, 5)}",
-                UserName: $"Admin {random.Next(1, 5)}",
-                Action: actions[random.Next(actions.Length)],
-                TargetType: targets[random.Next(targets.Length)],
-                TargetId: $"tgt-{random.Next(1000)}",
-                Details: $"Performed {actions[random.Next(actions.Length)]}",
-                IpAddress: $"192.168.1.{random.Next(1, 255)}"));
-        }
+        // Query real events from Marten event store as audit log entries
+        var query = session.Events.QueryAllRawEvents()
+            .OrderByDescending(e => e.Timestamp);
 
-        return new AuditLogResponse(
-            entries.OrderByDescending(e => e.Timestamp).ToList(),
-            1000,
-            page,
-            pageSize);
+        var totalCount = await query.CountAsync();
+
+        var rawEvents = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        var entries = rawEvents.Select(e => new AuditLogEntry(
+            Id: e.Id.ToString(),
+            Timestamp: e.Timestamp,
+            UserId: e.StreamKey ?? "system",
+            UserName: e.StreamKey ?? "System",
+            Action: e.EventTypeName ?? "unknown",
+            TargetType: "Event",
+            TargetId: e.StreamKey ?? "",
+            Details: $"{e.EventTypeName} on stream {e.StreamKey}",
+            IpAddress: "server"
+        )).ToList();
+
+        return new AuditLogResponse(entries, totalCount, page, pageSize);
     }
 }
