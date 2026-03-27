@@ -76,9 +76,14 @@ public interface IFocusDegradationService
 
 public sealed class FocusDegradationService : IFocusDegradationService
 {
-    private static readonly Meter Meter = new("Cena.Actors.Focus", "1.0.0");
-    private static readonly Histogram<double> FocusHistogram =
-        Meter.CreateHistogram<double>("cena.focus.score");
+    // ACT-031: instance-based via IMeterFactory
+    private readonly Histogram<double> _focusHistogram;
+
+    public FocusDegradationService(IMeterFactory meterFactory)
+    {
+        var meter = meterFactory.Create("Cena.Actors.Focus", "1.0.0");
+        _focusHistogram = meter.CreateHistogram<double>("cena.focus.score");
+    }
 
     // ═══════════════════════════════════════════════════════════════
     // 1. FOCUS STATE (within-session attention curve)
@@ -125,6 +130,12 @@ public sealed class FocusDegradationService : IFocusDegradationService
         double peakMinutes = input.PersonalPeakMinutes > 0
             ? input.PersonalPeakMinutes
             : 15.0; // Default peak attention at 15 minutes
+
+        // FOC-001.4: Executive load factor (Thomson 2022)
+        // Higher Bloom levels → steeper vigilance decay because executive control
+        // and vigilance decrements co-occur under cognitive load.
+        double executiveLoad = input.ExecutiveLoadFactor ?? 0.0;
+
         double vigilanceScore;
         if (minutesActive <= peakMinutes)
         {
@@ -134,20 +145,42 @@ public sealed class FocusDegradationService : IFocusDegradationService
         else
         {
             // Declining after peak (logarithmic decay)
-            double decayFactor = 1.0 - 0.3 * Math.Log(1.0 + (minutesActive - peakMinutes) / peakMinutes);
+            // Base decay coefficient: 0.3. Executive load adds up to 0.15 more.
+            double decayCoefficient = 0.3 + executiveLoad * 0.15;
+            double decayFactor = 1.0 - decayCoefficient * Math.Log(1.0 + (minutesActive - peakMinutes) / peakMinutes);
             vigilanceScore = Math.Clamp(decayFactor, 0.1, 1.0);
         }
 
+        // ── FOC-001.3: Sensor signal scores (default to 0 when absent) ──
+        double motionScore = input.MotionStabilityScore ?? 0;
+        double appFocusScoreVal = input.AppFocusScore ?? 0;
+        double touchScore = input.TouchPatternScore ?? 0;
+        double envScore = input.EnvironmentScore ?? 0;
+
+        // ── Adaptive weights (FOC-001.2) ──
+        var sensorAvailability = FocusWeightCalculator.FromInput(input);
+        var weights = FocusWeightCalculator.ComputeWeights(sensorAvailability);
+
         // ── Composite Focus Score ──
-        // Weighted blend: attention matters most, time decay is automatic
         double focusScore =
-            0.30 * attentionScore +
-            0.20 * engagementScore +
-            0.25 * trendScore +
-            0.25 * vigilanceScore;
+            weights.Attention * attentionScore +
+            weights.Engagement * engagementScore +
+            weights.Trend * trendScore +
+            weights.Vigilance * vigilanceScore +
+            weights.Motion * motionScore +
+            weights.AppFocus * appFocusScoreVal +
+            weights.TouchPattern * touchScore +
+            weights.Environment * envScore;
 
         focusScore = Math.Clamp(focusScore, 0, 1);
-        FocusHistogram.Record(focusScore);
+
+        // Tag telemetry with sensor count for analysis
+        int sensorCount = input.SensorSignalCount;
+        _focusHistogram.Record(focusScore, new KeyValuePair<string, object?>("sensor_count", sensorCount));
+
+        // Confidence boost: more signals → more reliable assessment
+        // Each sensor signal adds 5% confidence (max 20% boost with all 4)
+        double confidenceBoost = sensorCount * 0.05;
 
         // ── Classify focus level ──
         var level = focusScore switch
@@ -167,7 +200,9 @@ public sealed class FocusDegradationService : IFocusDegradationService
             TrendScore: trendScore,
             VigilanceScore: vigilanceScore,
             MinutesActive: minutesActive,
-            QuestionsAttempted: input.QuestionsAttempted
+            QuestionsAttempted: input.QuestionsAttempted,
+            SensorSignalCount: sensorCount,
+            SensorConfidenceBoost: confidenceBoost
         );
     }
 
@@ -445,8 +480,30 @@ public record FocusInput(
     int HintsRequested,
     int AnnotationsAdded,
     int ApproachChanges,
-    double PersonalPeakMinutes // 0 = use default (15 min)
-);
+    double PersonalPeakMinutes, // 0 = use default (15 min)
+    // ── Sensor signals (FOC-001.1) ──
+    // All nullable: absence means no sensor data available (web client, permissions denied).
+    // When null, the existing 4-signal model is used unchanged.
+    double? MotionStabilityScore = null,   // 0-1: accelerometer/gyroscope stability (1 = still/focused)
+    double? AppFocusScore = null,          // 0-1: app lifecycle continuity (1 = no backgrounding)
+    double? TouchPatternScore = null,      // 0-1: tap rhythm consistency (1 = consistent touch)
+    double? EnvironmentScore = null,       // 0-1: ambient light/proximity stability (1 = stable)
+    // ── Executive load (FOC-001.4) ──
+    double? ExecutiveLoadFactor = null      // 0-1: task complexity (recall=0, application=0.3, analysis=0.6, synthesis=0.8)
+)
+{
+    /// <summary>True if any mobile sensor signal is available.</summary>
+    public bool SensorDataAvailable =>
+        MotionStabilityScore.HasValue || AppFocusScore.HasValue ||
+        TouchPatternScore.HasValue || EnvironmentScore.HasValue;
+
+    /// <summary>Count of available sensor signals (0-4).</summary>
+    public int SensorSignalCount =>
+        (MotionStabilityScore.HasValue ? 1 : 0) +
+        (AppFocusScore.HasValue ? 1 : 0) +
+        (TouchPatternScore.HasValue ? 1 : 0) +
+        (EnvironmentScore.HasValue ? 1 : 0);
+}
 
 public record FocusState(
     double FocusScore,
@@ -456,7 +513,10 @@ public record FocusState(
     double TrendScore,
     double VigilanceScore,
     double MinutesActive,
-    int QuestionsAttempted
+    int QuestionsAttempted,
+    // ── Sensor enrichment (FOC-001.3) ──
+    int SensorSignalCount = 0,           // 0-4: how many sensor signals contributed
+    double SensorConfidenceBoost = 0.0   // Higher signal count → higher confidence in assessment
 );
 
 public enum FocusLevel
