@@ -4,6 +4,7 @@
 // select best → fallback. Includes cycling prevention and escalation.
 // ═══════════════════════════════════════════════════════════════════════
 
+using Cena.Actors.Mastery;
 using Cena.Actors.Students;
 using Microsoft.Extensions.Logging;
 

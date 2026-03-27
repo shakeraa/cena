@@ -1,3 +1,4 @@
+using Cena.Actors.Mastery;
 using Cena.Actors.Services;
 using Cena.Actors.Students;
 using Microsoft.Extensions.Logging;

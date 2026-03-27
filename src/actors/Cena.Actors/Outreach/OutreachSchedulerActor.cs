@@ -151,7 +151,7 @@ public sealed class OutreachSchedulerActor : IActor
             double hoursSinceReview = (DateTimeOffset.UtcNow - timer.LastReviewAt).TotalHours;
             double predictedRecall = _hlr.ComputeRecall(timer.HalfLifeHours, hoursSinceReview);
 
-            if (predictedRecall < 0.85)
+            if (predictedRecall < MasteryConstants.RecallReviewThreshold)
             {
                 EnqueueOutreach(new PendingOutreach(
                     Priority: 2, // ReviewDue priority

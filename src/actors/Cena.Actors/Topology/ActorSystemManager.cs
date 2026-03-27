@@ -205,12 +205,9 @@ public sealed class ActorSystemManager : IActor
     private DateTimeOffset _bootedAt;
     private bool _isBooted;
 
-    // ── Telemetry ──
-    private static readonly Meter Meter = new("Cena.Actors.Topology", "1.0.0");
-    private static readonly Counter<long> BootCounter =
-        Meter.CreateCounter<long>("cena.topology.boots_total", description: "Total system boots");
-    private static readonly Histogram<double> BootDurationMs =
-        Meter.CreateHistogram<double>("cena.topology.boot_duration_ms", description: "System boot duration");
+    // ── Telemetry (ACT-031: instance-based via IMeterFactory) ──
+    private readonly Counter<long> _bootCounter;
+    private readonly Histogram<double> _bootDurationMs;
 
     private readonly IMeterFactory _meterFactory;
 
@@ -225,6 +222,10 @@ public sealed class ActorSystemManager : IActor
         _logger = loggerFactory.CreateLogger<ActorSystemManager>();
         _meterFactory = meterFactory;
         _shutdownCoordinator = shutdownCoordinator;
+
+        var meter = meterFactory.Create("Cena.Actors.Topology", "1.0.0");
+        _bootCounter = meter.CreateCounter<long>("cena.topology.boots_total", description: "Total system boots");
+        _bootDurationMs = meter.CreateHistogram<double>("cena.topology.boot_duration_ms", description: "System boot duration");
     }
 
     public Task ReceiveAsync(IContext context)
@@ -271,7 +272,7 @@ public sealed class ActorSystemManager : IActor
         _logger.LogInformation("[Boot 3/4] Spawning StudentActorManager...");
         var managerLogger = _loggerFactory.CreateLogger<StudentActorManager>();
         var managerProps = Props.FromProducer(() =>
-            new StudentActorManager(managerLogger));
+            new StudentActorManager(managerLogger, _meterFactory));
         _studentActorManagerPid = context.SpawnNamed(managerProps, "student-manager");
         _logger.LogInformation(
             "[Boot 3/4] StudentActorManager spawned. PID={Pid}",
@@ -295,8 +296,8 @@ public sealed class ActorSystemManager : IActor
         sw.Stop();
         _bootedAt = DateTimeOffset.UtcNow;
         _isBooted = true;
-        BootCounter.Add(1);
-        BootDurationMs.Record(sw.ElapsedMilliseconds);
+        _bootCounter.Add(1);
+        _bootDurationMs.Record(sw.ElapsedMilliseconds);
 
         _logger.LogInformation(
             "=== ActorSystemManager boot complete. Duration={Duration}ms ===",

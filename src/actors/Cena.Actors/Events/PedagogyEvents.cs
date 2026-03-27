@@ -17,7 +17,7 @@ public record SessionStarted_V1(
     string? ExperimentCohort,
     bool IsOffline,
     DateTimeOffset ClientTimestamp
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when a session ends (completed, fatigue, abandoned, timeout, app_backgrounded).
@@ -31,7 +31,7 @@ public record SessionEnded_V1(
     int QuestionsCorrect,
     double AvgResponseTimeMs,
     double FatigueScoreAtEnd
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when an exercise/question is presented to the student.
@@ -56,7 +56,7 @@ public record HintRequested_V1(
     string ConceptId,
     string QuestionId,
     int HintLevel
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when a student skips a question without answering.
@@ -67,4 +67,4 @@ public record QuestionSkipped_V1(
     string ConceptId,
     string QuestionId,
     int TimeSpentBeforeSkipMs
-);
+) : IDelegatedEvent;

@@ -109,19 +109,20 @@ public sealed class McmGraphActor : IActor
         }
     };
 
-    // ── Telemetry ──
-    private static readonly Meter Meter = new("Cena.Actors.McmGraph", "1.0.0");
-    private static readonly Counter<long> LookupCounter =
-        Meter.CreateCounter<long>("cena.mcm.lookups_total", description: "Total MCM lookups");
-    private static readonly Counter<long> FallbackCounter =
-        Meter.CreateCounter<long>("cena.mcm.fallback_total", description: "MCM lookups using fallback defaults");
-    private static readonly Counter<long> ConfidenceUpdates =
-        Meter.CreateCounter<long>("cena.mcm.confidence_updates_total", description: "MCM confidence updates");
+    // ── Telemetry (ACT-031: instance-based via IMeterFactory) ──
+    private readonly Counter<long> _lookupCounter;
+    private readonly Counter<long> _fallbackCounter;
+    private readonly Counter<long> _confidenceUpdates;
 
-    public McmGraphActor(INeo4jGraphRepository repository, ILogger<McmGraphActor> logger)
+    public McmGraphActor(INeo4jGraphRepository repository, ILogger<McmGraphActor> logger, IMeterFactory meterFactory)
     {
         _repository = repository ?? throw new ArgumentNullException(nameof(repository));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        var meter = meterFactory.Create("Cena.Actors.McmGraph", "1.0.0");
+        _lookupCounter = meter.CreateCounter<long>("cena.mcm.lookups_total", description: "Total MCM lookups");
+        _fallbackCounter = meter.CreateCounter<long>("cena.mcm.fallback_total", description: "MCM lookups using fallback defaults");
+        _confidenceUpdates = meter.CreateCounter<long>("cena.mcm.confidence_updates_total", description: "MCM confidence updates");
     }
 
     public Task ReceiveAsync(IContext context)
@@ -184,7 +185,7 @@ public sealed class McmGraphActor : IActor
 
     private Task HandleLookup(IContext context, McmLookup q)
     {
-        LookupCounter.Add(1);
+        _lookupCounter.Add(1);
 
         var key = new McmKey(
             q.ErrorType.ToLowerInvariant(),
@@ -197,7 +198,7 @@ public sealed class McmGraphActor : IActor
         {
             // Try error-type-only fallback
             usedFallback = true;
-            FallbackCounter.Add(1);
+            _fallbackCounter.Add(1);
             candidates = FallbackDefaults.GetValueOrDefault(q.ErrorType.ToLowerInvariant())
                 ?? FallbackDefaults["procedural"];
         }
@@ -235,7 +236,7 @@ public sealed class McmGraphActor : IActor
 
     private Task HandleUpdateConfidence(UpdateMcmConfidence cmd)
     {
-        ConfidenceUpdates.Add(1);
+        _confidenceUpdates.Add(1);
 
         var key = new McmKey(
             cmd.ErrorType.ToLowerInvariant(),

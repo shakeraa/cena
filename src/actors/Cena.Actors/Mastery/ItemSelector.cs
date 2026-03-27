@@ -11,7 +11,7 @@ namespace Cena.Actors.Mastery;
 /// </summary>
 public static class ItemSelector
 {
-    private const float TargetCorrectness = 0.85f;
+    private const float TargetCorrectness = MasteryConstants.ProgressionThresholdF;
 
     /// <summary>
     /// Select the next item for the student.

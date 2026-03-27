@@ -12,7 +12,7 @@ namespace Cena.Actors.Mastery;
 /// </summary>
 public static class InitialStatePopulator
 {
-    private const float DefaultMastery = 0.85f;
+    private const float DefaultMastery = MasteryConstants.ProgressionThresholdF;
     private const float DefaultHalfLifeHours = 168f; // 1 week
     private const int DefaultBloomLevel = 3; // Apply level
     private const float HighConfidenceThreshold = 0.80f;

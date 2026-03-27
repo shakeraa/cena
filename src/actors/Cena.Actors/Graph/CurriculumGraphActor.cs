@@ -132,7 +132,7 @@ public sealed record GetPrerequisites(string ConceptId);
 /// Query for the learning frontier: concepts whose prerequisites are all mastered
 /// but which are not yet mastered themselves.
 /// </summary>
-public sealed record GetFrontier(IReadOnlyDictionary<string, double> MasteryMap, double MasteryThreshold = 0.85);
+public sealed record GetFrontier(IReadOnlyDictionary<string, double> MasteryMap, double MasteryThreshold = MasteryConstants.ProgressionThreshold);
 
 /// <summary>
 /// Query for concepts in the same cluster (category + subject).
@@ -241,7 +241,7 @@ public sealed class CurriculumGraphActor : IActor
 
         // Spawn McmGraphActor as child
         var mcmLogger = _loggerFactory.CreateLogger<McmGraphActor>();
-        var mcmProps = Props.FromProducer(() => new McmGraphActor(_repository, mcmLogger));
+        var mcmProps = Props.FromProducer(() => new McmGraphActor(_repository, mcmLogger, _meterFactory));
         _mcmChild = context.Spawn(mcmProps);
 
         _logger.LogInformation(
@@ -252,6 +252,7 @@ public sealed class CurriculumGraphActor : IActor
     private Task OnStopping(IContext context)
     {
         _logger.LogInformation("CurriculumGraphActor stopping.");
+        _activitySource.Dispose();
         if (_mcmChild != null)
             context.Stop(_mcmChild);
         return Task.CompletedTask;

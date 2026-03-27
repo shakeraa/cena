@@ -35,6 +35,7 @@ public class StudentProfileSnapshot
         var state = ConceptMastery[e.ConceptId];
         state.PKnown = e.PosteriorMastery;
         state.TotalAttempts++;
+        if (e.IsCorrect) state.CorrectCount++;
         state.LastAttemptedAt = e.Timestamp;
         state.LastMethodology = e.MethodologyActive;
     }
@@ -90,6 +91,7 @@ public class ConceptMasteryState
     public double PKnown { get; set; }
     public bool IsMastered { get; set; }
     public int TotalAttempts { get; set; }
+    public int CorrectCount { get; set; }
     public DateTimeOffset? LastAttemptedAt { get; set; }
     public DateTimeOffset? MasteredAt { get; set; }
     public string? LastMethodology { get; set; }

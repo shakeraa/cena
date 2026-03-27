@@ -119,14 +119,14 @@ public sealed class PrerequisiteEnforcementService : IPrerequisiteEnforcementSer
     /// Standard progression threshold: student has demonstrated sufficient mastery
     /// to proceed. Matches BktParameters.Default.ProgressionThreshold.
     /// </summary>
-    public const double ProgressionThreshold = 0.85;
+    public const double ProgressionThreshold = MasteryConstants.ProgressionThreshold;
 
     /// <summary>
     /// Strict prerequisite gate threshold: used for critical prerequisites (weight >= 0.9).
     /// Prevents premature progression on foundational concepts.
     /// Matches BktParameters.Default.PrerequisiteGateThreshold.
     /// </summary>
-    public const double PrerequisiteGateThreshold = 0.95;
+    public const double PrerequisiteGateThreshold = MasteryConstants.PrerequisiteGateThreshold;
 
     /// <summary>
     /// Edge weight threshold above which the stricter PrerequisiteGateThreshold applies.

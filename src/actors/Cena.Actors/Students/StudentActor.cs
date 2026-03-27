@@ -68,6 +68,9 @@ public sealed partial class StudentActor : IActor
     // ---- Staged events for atomic batch writes ----
     private readonly List<object> _pendingEvents = new();
 
+    // ---- Timer cancellation (MEDIUM-3: prevent ghost timers after passivation) ----
+    private CancellationTokenSource? _timerCts;
+
     // ---- Child Actor PIDs (placeholders -- children implemented separately) ----
     private PID? _sessionActor;
     private PID? _stagnationDetector;
@@ -187,11 +190,9 @@ public sealed partial class StudentActor : IActor
         // Set passivation timeout -- actor will receive ReceiveTimeout after 30 min idle
         context.SetReceiveTimeout(PassivationTimeout);
 
-        // Schedule periodic memory check
-        var self = context.Self;
-        var system = context.System;
-        _ = Task.Delay(MemoryCheckInterval).ContinueWith(_ =>
-            system.Root.Send(self, new MemoryCheckTick()));
+        // Schedule periodic memory check (with cancellation to prevent ghost timers)
+        _timerCts = new CancellationTokenSource();
+        ScheduleMemoryCheck(context);
 
         sw.Stop();
         _activationCounter.Add(1, new KeyValuePair<string, object?>("student.id", _studentId));
@@ -210,6 +211,11 @@ public sealed partial class StudentActor : IActor
 
         _logger.LogInformation(
             "StudentActor stopping for student {StudentId}. Persisting final state.", _studentId);
+
+        // Cancel periodic timers to prevent ghost messages to dead PID
+        _timerCts?.Cancel();
+        _timerCts?.Dispose();
+        _timerCts = null;
 
         // Stop child actors gracefully
         if (_sessionActor != null)
@@ -241,6 +247,7 @@ public sealed partial class StudentActor : IActor
     private Task OnStopped(IContext context)
     {
         _passivationCounter.Add(1, new KeyValuePair<string, object?>("student.id", _studentId));
+        _activitySource.Dispose();
         _logger.LogInformation("StudentActor stopped for student {StudentId}", _studentId);
         return Task.CompletedTask;
     }
@@ -318,10 +325,32 @@ public sealed partial class StudentActor : IActor
                 _state.HlrTimers[conceptId] = new HlrState(halfLife, lastReview);
             }
 
+            // MST-006: Rebuild MasteryOverlay from snapshot data.
+            // The snapshot stores PKnown, TotalAttempts, and HalfLife — enough to
+            // seed the rich mastery state. Error history, Bloom levels, and method
+            // tracking will be empty until new events arrive, but the critical
+            // mastery probability and HLR half-life are restored.
+            foreach (var (conceptId, masteryState) in snapshot.ConceptMastery)
+            {
+                var halfLife = snapshot.HalfLifeMap.GetValueOrDefault(conceptId, 0.0);
+                var lastInteraction = masteryState.LastAttemptedAt ?? snapshot.LastActivityDate;
+
+                _state.MasteryOverlay[conceptId] = new Mastery.ConceptMasteryState
+                {
+                    MasteryProbability = (float)masteryState.PKnown,
+                    HalfLifeHours = (float)halfLife,
+                    AttemptCount = masteryState.TotalAttempts,
+                    CorrectCount = masteryState.CorrectCount,
+                    LastInteraction = lastInteraction,
+                    FirstEncounter = lastInteraction
+                };
+            }
+
             _logger.LogDebug(
                 "Restored state for student {StudentId} from snapshot. " +
-                "Concepts={ConceptCount}, XP={XP}, Streak={Streak}",
-                _studentId, _state.MasteryMap.Count, _state.TotalXp, _state.CurrentStreak);
+                "Concepts={ConceptCount}, MasteryOverlay={OverlayCount}, XP={XP}, Streak={Streak}",
+                _studentId, _state.MasteryMap.Count, _state.MasteryOverlay.Count,
+                _state.TotalXp, _state.CurrentStreak);
         }
         else
         {

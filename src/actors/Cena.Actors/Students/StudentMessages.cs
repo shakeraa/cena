@@ -4,6 +4,7 @@
 // =============================================================================
 
 using System.ComponentModel.DataAnnotations;
+using Cena.Actors.Mastery;
 
 namespace Cena.Actors.Students;
 
@@ -24,13 +25,6 @@ public enum Methodology
     DrillAndPractice
 }
 
-public enum ErrorType
-{
-    None,
-    Conceptual,
-    Procedural,
-    Motivational
-}
 
 public enum SessionEndReason
 {

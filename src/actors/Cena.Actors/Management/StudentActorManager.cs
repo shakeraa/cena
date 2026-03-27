@@ -155,22 +155,23 @@ public sealed class StudentActorManager : IActor
     private int _drainInitialCount;
     private CancellationTokenSource? _drainTimerCts;
 
-    // ── Telemetry ──
-    private static readonly Meter Meter = new("Cena.Actors.StudentActorManager", "1.0.0");
-    private static readonly Counter<long> ActivationCounter =
-        Meter.CreateCounter<long>("cena.manager.activations_total");
-    private static readonly Counter<long> RejectionCounter =
-        Meter.CreateCounter<long>("cena.manager.rejections_total");
-    private static readonly Counter<long> RateLimitCounter =
-        Meter.CreateCounter<long>("cena.manager.rate_limited_total");
-    private static readonly Histogram<int> ActiveGauge =
-        Meter.CreateHistogram<int>("cena.manager.active_actors");
-    private static readonly Histogram<int> QueueGauge =
-        Meter.CreateHistogram<int>("cena.manager.queue_depth");
+    // ── Telemetry (ACT-031: instance-based via IMeterFactory) ──
+    private readonly Counter<long> _activationCounter;
+    private readonly Counter<long> _rejectionCounter;
+    private readonly Counter<long> _rateLimitCounter;
+    private readonly Histogram<int> _activeGauge;
+    private readonly Histogram<int> _queueGauge;
 
-    public StudentActorManager(ILogger<StudentActorManager> logger)
+    public StudentActorManager(ILogger<StudentActorManager> logger, IMeterFactory meterFactory)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+
+        var meter = meterFactory.Create("Cena.Actors.StudentActorManager", "1.0.0");
+        _activationCounter = meter.CreateCounter<long>("cena.manager.activations_total");
+        _rejectionCounter = meter.CreateCounter<long>("cena.manager.rejections_total");
+        _rateLimitCounter = meter.CreateCounter<long>("cena.manager.rate_limited_total");
+        _activeGauge = meter.CreateHistogram<int>("cena.manager.active_actors");
+        _queueGauge = meter.CreateHistogram<int>("cena.manager.queue_depth");
     }
 
     public Task ReceiveAsync(IContext context)
@@ -213,7 +214,7 @@ public sealed class StudentActorManager : IActor
         {
             context.Respond(new ActivateStudentResponse(
                 false, "SHUTDOWN_IN_PROGRESS", "Not accepting new activations during shutdown."));
-            RejectionCounter.Add(1, new KeyValuePair<string, object?>("reason", "shutdown"));
+            _rejectionCounter.Add(1, new KeyValuePair<string, object?>("reason", "shutdown"));
             return Task.CompletedTask;
         }
 
@@ -233,13 +234,13 @@ public sealed class StudentActorManager : IActor
                 context.Respond(new ActivateStudentResponse(
                     false, "QUEUE_FULL",
                     $"Back-pressure queue full ({MaxQueueDepth}). Cannot accept new activations."));
-                RejectionCounter.Add(1, new KeyValuePair<string, object?>("reason", "queue_full"));
+                _rejectionCounter.Add(1, new KeyValuePair<string, object?>("reason", "queue_full"));
                 return Task.CompletedTask;
             }
 
             _backPressureQueue.Enqueue(new PendingActivation(cmd.StudentId, cmd.CorrelationId, context.Sender!));
             _queueDepth++;
-            QueueGauge.Record(_queueDepth);
+            _queueGauge.Record(_queueDepth);
 
             _logger.LogDebug(
                 "StudentActor activation queued for {StudentId}. QueueDepth={Depth}",
@@ -258,25 +259,25 @@ public sealed class StudentActorManager : IActor
             {
                 _backPressureQueue.Enqueue(new PendingActivation(cmd.StudentId, cmd.CorrelationId, context.Sender!));
                 _queueDepth++;
-                QueueGauge.Record(_queueDepth);
+                _queueGauge.Record(_queueDepth);
 
                 context.Respond(new ActivateStudentResponse(
                     false, "RATE_LIMITED", "Activation rate exceeded. Queued for processing."));
-                RateLimitCounter.Add(1);
+                _rateLimitCounter.Add(1);
             }
             else
             {
                 context.Respond(new ActivateStudentResponse(
                     false, "RATE_LIMITED_QUEUE_FULL", "Rate limit exceeded and queue full."));
-                RejectionCounter.Add(1, new KeyValuePair<string, object?>("reason", "rate_queue_full"));
+                _rejectionCounter.Add(1, new KeyValuePair<string, object?>("reason", "rate_queue_full"));
             }
             return Task.CompletedTask;
         }
 
         // Activate
         _activeActors[cmd.StudentId] = DateTimeOffset.UtcNow;
-        ActivationCounter.Add(1);
-        ActiveGauge.Record(_activeActors.Count);
+        _activationCounter.Add(1);
+        _activeGauge.Record(_activeActors.Count);
 
         _logger.LogDebug(
             "StudentActor activated: {StudentId}. Active={Count}",
@@ -291,7 +292,7 @@ public sealed class StudentActorManager : IActor
     private Task HandleDeactivated(IContext context, StudentDeactivated cmd)
     {
         _activeActors.Remove(cmd.StudentId);
-        ActiveGauge.Record(_activeActors.Count);
+        _activeGauge.Record(_activeActors.Count);
 
         // Process queue: activate next pending if available
         ProcessQueue(context);
@@ -319,13 +320,13 @@ public sealed class StudentActorManager : IActor
             var pending = _backPressureQueue.Dequeue();
             {
                 _queueDepth--;
-                QueueGauge.Record(_queueDepth);
+                _queueGauge.Record(_queueDepth);
 
                 if (!_activeActors.ContainsKey(pending.StudentId))
                 {
                     _activeActors[pending.StudentId] = DateTimeOffset.UtcNow;
-                    ActivationCounter.Add(1);
-                    ActiveGauge.Record(_activeActors.Count);
+                    _activationCounter.Add(1);
+                    _activeGauge.Record(_activeActors.Count);
 
                     // Notify the original requester
                     context.Send(pending.Requester, new ActivateStudentResponse(true));
@@ -370,7 +371,7 @@ public sealed class StudentActorManager : IActor
         // Clear the queue first
         _queueDepth -= _backPressureQueue.Count;
         _backPressureQueue.Clear();
-        QueueGauge.Record(0);
+        _queueGauge.Record(0);
 
         // Check immediately -- might already be empty
         CheckDrainComplete(context);

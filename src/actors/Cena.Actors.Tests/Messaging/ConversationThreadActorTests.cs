@@ -1,3 +1,4 @@
+using System.Diagnostics.Metrics;
 using Cena.Actors.Events;
 using Cena.Actors.Messaging;
 using Microsoft.Extensions.Logging;
@@ -23,8 +24,10 @@ public sealed class ConversationThreadActorTests
         _publisher = Substitute.For<IMessagingEventPublisher>();
         var logger = Substitute.For<ILogger<ConversationThreadActor>>();
 
+        var meterFactory = Substitute.For<IMeterFactory>();
+        meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter("test"));
         _actor = new ConversationThreadActor(
-            _writer, _reader, _moderator, _throttler, _publisher, logger);
+            _writer, _reader, _moderator, _throttler, _publisher, logger, meterFactory);
 
         // Default: allow everything, thread doesn't exist yet
         _moderator.Check(Arg.Any<string>()).Returns(new ModerationResult(true, null));

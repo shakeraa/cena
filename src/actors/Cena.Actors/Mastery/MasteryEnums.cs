@@ -23,8 +23,10 @@ public enum MasteryQuality
 /// </summary>
 public enum ErrorType
 {
+    None,
     Procedural,
     Conceptual,
+    Motivational,
     Careless,
     Systematic,
     Transfer

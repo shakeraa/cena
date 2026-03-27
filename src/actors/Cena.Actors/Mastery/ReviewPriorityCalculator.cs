@@ -20,7 +20,7 @@ public sealed record ReviewPriorityItem(
 /// </summary>
 public static class ReviewPriorityCalculator
 {
-    private const float ReviewThreshold = 0.85f;
+    private const float ReviewThreshold = MasteryConstants.RecallReviewThresholdF;
     private const float MinMasteryForReview = 0.70f;
 
     /// <summary>

@@ -13,6 +13,7 @@ using Cena.Actors.Outreach;
 using Cena.Actors.Services;
 using Cena.Actors.Sessions;
 using Cena.Actors.Stagnation;
+using ErrorType = Cena.Actors.Mastery.ErrorType;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -108,9 +109,9 @@ public sealed partial class StudentActor
                     StageEvent(xpEvent);
                 }
 
-                // ---- Check mastery threshold (0.85) ----
+                // ---- Check mastery threshold ----
                 ConceptMastered_V1? masteredEvent = null;
-                if (updatedMastery >= 0.85 && priorMastery < 0.85)
+                if (updatedMastery >= MasteryConstants.ProgressionThreshold && priorMastery < MasteryConstants.ProgressionThreshold)
                 {
                     masteredEvent = new ConceptMastered_V1(
                         _studentId, cmd.ConceptId, cmd.SessionId,
@@ -195,7 +196,7 @@ public sealed partial class StudentActor
             }
 
             ConceptMastered_V1? masteredEvt = null;
-            if (eval.UpdatedMastery >= 0.85 && prior < 0.85)
+            if (eval.UpdatedMastery >= MasteryConstants.ProgressionThreshold && prior < MasteryConstants.ProgressionThreshold)
             {
                 masteredEvt = new ConceptMastered_V1(
                     _studentId, cmd.ConceptId, cmd.SessionId,
@@ -556,7 +557,7 @@ public sealed partial class StudentActor
     private string SelectNextConcept()
     {
         var candidate = _state.MasteryMap
-            .Where(kv => kv.Value < 0.85)
+            .Where(kv => kv.Value < MasteryConstants.ProgressionThreshold)
             .OrderBy(kv => kv.Value)
             .Select(kv => kv.Key)
             .FirstOrDefault();

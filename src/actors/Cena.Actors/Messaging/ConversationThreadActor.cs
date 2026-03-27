@@ -29,12 +29,9 @@ public sealed class ConversationThreadActor : IActor
     private bool _threadExists;
     private bool _threadChecked;
 
-    // ── Telemetry ──
-    private static readonly Meter Meter = new("Cena.Actors.Messaging", "1.0.0");
-    private static readonly Counter<long> MessagesSent =
-        Meter.CreateCounter<long>("cena.messaging.sent_total");
-    private static readonly Counter<long> MessagesBlocked =
-        Meter.CreateCounter<long>("cena.messaging.blocked_total");
+    // ── Telemetry (ACT-031: instance-based via IMeterFactory) ──
+    private readonly Counter<long> _messagesSent;
+    private readonly Counter<long> _messagesBlocked;
 
     public ConversationThreadActor(
         IMessageWriter writer,
@@ -42,7 +39,8 @@ public sealed class ConversationThreadActor : IActor
         IContentModerator moderator,
         IMessageThrottler throttler,
         IMessagingEventPublisher eventPublisher,
-        ILogger<ConversationThreadActor> logger)
+        ILogger<ConversationThreadActor> logger,
+        IMeterFactory meterFactory)
     {
         _writer = writer;
         _reader = reader;
@@ -50,6 +48,10 @@ public sealed class ConversationThreadActor : IActor
         _throttler = throttler;
         _eventPublisher = eventPublisher;
         _logger = logger;
+
+        var meter = meterFactory.Create("Cena.Actors.Messaging", "1.0.0");
+        _messagesSent = meter.CreateCounter<long>("cena.messaging.sent_total");
+        _messagesBlocked = meter.CreateCounter<long>("cena.messaging.blocked_total");
     }
 
     public Task ReceiveAsync(IContext context)
@@ -103,7 +105,7 @@ public sealed class ConversationThreadActor : IActor
                 new MessageBlocked_V1(msg.ThreadId, msg.SenderId,
                     modResult.Reason!, DateTimeOffset.UtcNow));
 
-            MessagesBlocked.Add(1, new KeyValuePair<string, object?>("reason", modResult.Reason));
+            _messagesBlocked.Add(1, new KeyValuePair<string, object?>("reason", modResult.Reason));
 
             context.Respond(new MessagingResult(false, "MESSAGE_BLOCKED",
                 $"Message blocked: {modResult.Reason}"));
@@ -165,7 +167,7 @@ public sealed class ConversationThreadActor : IActor
         // 9. Record send for throttling
         _throttler.RecordSend(msg.SenderId, msg.SenderRole);
 
-        MessagesSent.Add(1,
+        _messagesSent.Add(1,
             new KeyValuePair<string, object?>("role", msg.SenderRole.ToString()),
             new KeyValuePair<string, object?>("channel", msg.Channel.ToString()));
 

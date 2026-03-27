@@ -77,7 +77,7 @@ public static class LearningFrontierCalculator
             if (state != null && state.LastInteraction != default && state.HalfLifeHours > 0)
             {
                 float recall = state.RecallProbability(now);
-                reviewUrgency = Math.Max(0f, 0.85f - recall);
+                reviewUrgency = Math.Max(0f, MasteryConstants.RecallReviewThresholdF - recall);
             }
 
             float interleavingBonus = (lastTopicCluster != null && node.TopicCluster != lastTopicCluster)

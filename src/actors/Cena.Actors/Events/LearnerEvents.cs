@@ -7,6 +7,12 @@
 namespace Cena.Actors.Events;
 
 /// <summary>
+/// Marker interface for domain events that child actors delegate to the parent StudentActor.
+/// Enables compile-time exhaustive matching in DelegateEvent handlers.
+/// </summary>
+public interface IDelegatedEvent { }
+
+/// <summary>
 /// Emitted on every student answer attempt. Core event for BKT updates.
 /// 18 fields including explicit Timestamp for deterministic event-sourced replay.
 /// </summary>
@@ -29,7 +35,7 @@ public record ConceptAttempted_V1(
     int AnswerChangeCount,
     bool WasOffline,
     DateTimeOffset Timestamp
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when a concept crosses the mastery threshold (default 0.85).
@@ -45,7 +51,7 @@ public record ConceptMastered_V1(
     string MethodologyAtMastery,
     double InitialHalfLifeHours,
     DateTimeOffset Timestamp
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when predicted recall drops below threshold via HLR decay check.
@@ -73,7 +79,7 @@ public record MethodologySwitched_V1(
     string DominantErrorType,
     double McmConfidence,
     DateTimeOffset Timestamp = default
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when the stagnation detector identifies a learning plateau.
@@ -89,7 +95,7 @@ public record StagnationDetected_V1(
     double ErrorRepetition,
     double AnnotationSentiment,
     int ConsecutiveStagnantSessions
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when a student adds a text annotation (note, question, insight, confusion).
@@ -102,7 +108,7 @@ public record AnnotationAdded_V1(
     string ContentHash,
     double SentimentScore,
     string AnnotationType
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when a cognitive load cooldown period completes.

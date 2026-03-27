@@ -16,7 +16,7 @@ public record XpAwarded_V1(
     int TotalXp,
     string DifficultyLevel,
     int DifficultyMultiplier
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when the student's daily streak is updated.
@@ -26,7 +26,7 @@ public record StreakUpdated_V1(
     int CurrentStreak,
     int LongestStreak,
     DateTimeOffset LastActivityDate
-);
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted when a student earns a badge (mastery, streak, exploration, methodology).

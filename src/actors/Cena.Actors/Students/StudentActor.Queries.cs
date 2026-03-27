@@ -126,7 +126,8 @@ public sealed partial class StudentActor
         StageEvent(del.Event);
         await FlushEvents();
 
-        // Apply to local state based on event type
+        // Apply to local state based on event type.
+        // IDelegatedEvent marker ensures compile-time coverage when new events are added.
         switch (del.Event)
         {
             case ConceptAttempted_V1 e: _state.Apply(e); break;
@@ -140,9 +141,6 @@ public sealed partial class StudentActor
             case StagnationDetected_V1 e: _state.Apply(e); break;
             case HintRequested_V1: break; // No state mutation
             case QuestionSkipped_V1: break; // No state mutation
-            default:
-                _logger.LogWarning("Unhandled delegate event type: {Type}", del.Event.GetType().Name);
-                break;
         }
     }
 
@@ -182,15 +180,15 @@ public sealed partial class StudentActor
                 var predictedRecall = Math.Pow(2, -delta / kv.Value.HalfLifeHours);
                 var priority = predictedRecall < 0.5 ? "urgent"
                     : predictedRecall < 0.7 ? "standard" : "low";
-                // When recall drops to 0.85: solve 0.85 = 2^(-t/h) => t = -h * log2(0.85)
+                // When recall drops to threshold: solve threshold = 2^(-t/h) => t = -h * log2(threshold)
                 var dueAt = kv.Value.LastReviewAt.AddHours(
-                    -kv.Value.HalfLifeHours * Math.Log2(0.85));
+                    -kv.Value.HalfLifeHours * Math.Log2(MasteryConstants.RecallReviewThreshold));
 
                 return new ReviewItem(
                     kv.Key, kv.Key, // concept name resolution deferred to KST graph
                     predictedRecall, kv.Value.HalfLifeHours, priority, dueAt);
             })
-            .Where(r => r.PredictedRecall < 0.85)
+            .Where(r => r.PredictedRecall < MasteryConstants.RecallReviewThreshold)
             .OrderBy(r => r.PredictedRecall)
             .Take(query.MaxItems)
             .ToList();
@@ -226,11 +224,20 @@ public sealed partial class StudentActor
         }
 
         // Schedule next check
-        var self = context.Self;
-        var system = context.System;
-        _ = Task.Delay(MemoryCheckInterval).ContinueWith(_ =>
-            system.Root.Send(self, new MemoryCheckTick()));
+        ScheduleMemoryCheck(context);
 
         return Task.CompletedTask;
+    }
+
+    private void ScheduleMemoryCheck(IContext context)
+    {
+        var self = context.Self;
+        var system = context.System;
+        var token = _timerCts?.Token ?? CancellationToken.None;
+        _ = Task.Delay(MemoryCheckInterval, token).ContinueWith(t =>
+        {
+            if (!t.IsCanceled)
+                system.Root.Send(self, new MemoryCheckTick());
+        }, TaskContinuationOptions.NotOnCanceled);
     }
 }

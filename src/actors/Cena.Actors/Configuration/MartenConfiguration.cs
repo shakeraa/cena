@@ -11,6 +11,7 @@ using Marten.Events.Projections;
 using Marten.Storage;
 using Weasel.Core;
 using Cena.Actors.Events;
+using Cena.Actors.Infrastructure.Documents;
 
 namespace Cena.Actors.Configuration;
 
@@ -43,10 +44,22 @@ public static class MartenConfiguration
         RegisterEngagementEvents(opts);
         RegisterOutreachEvents(opts);
 
+        // ── Admin Document Types (BKD-002/003) ──
+        opts.Schema.For<AdminUser>()
+            .Identity(x => x.Id)
+            .Index(x => x.Email)
+            .Index(x => x.Role)
+            .Index(x => x.Status)
+            .Index(x => x.School);
+
+        opts.Schema.For<CenaRoleDefinition>()
+            .Identity(x => x.Id);
+
         // ── Snapshot Strategy: every 100 events per student ──
         // ACT-026: Inline snapshot projection — Marten auto-creates/updates snapshot
         // document on every SaveChangesAsync when event count crosses the threshold.
-        opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
+        // NOTE: Snapshot projection temporarily disabled - requires Id property matching StreamIdentity
+        // opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
 
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);

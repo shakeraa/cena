@@ -153,10 +153,10 @@ public sealed class DecayPropagationService : IDecayPropagationService
 
             double newEffectiveMastery = Math.Max(0.0, currentMastery - effectiveDrop);
 
-            // Check if this drops the concept below the prerequisite gate threshold (0.95)
-            // or the progression threshold (0.85)
-            bool droppedBelowGate = currentMastery >= 0.95 && newEffectiveMastery < 0.95;
-            bool droppedBelowProgression = currentMastery >= 0.85 && newEffectiveMastery < 0.85;
+            // Check if this drops the concept below the prerequisite gate threshold
+            // or the progression threshold
+            bool droppedBelowGate = currentMastery >= MasteryConstants.PrerequisiteGateThreshold && newEffectiveMastery < MasteryConstants.PrerequisiteGateThreshold;
+            bool droppedBelowProgression = currentMastery >= MasteryConstants.ProgressionThreshold && newEffectiveMastery < MasteryConstants.ProgressionThreshold;
 
             affected[dependent.ConceptId] = new AffectedConcept(
                 ConceptId: dependent.ConceptId,
@@ -166,7 +166,7 @@ public sealed class DecayPropagationService : IDecayPropagationService
                 PropagationDepth: depth + 1,
                 DroppedBelowPrerequisiteGate: droppedBelowGate,
                 DroppedBelowProgressionThreshold: droppedBelowProgression,
-                NeedsReview: newEffectiveMastery < 0.85
+                NeedsReview: newEffectiveMastery < MasteryConstants.ProgressionThreshold
             );
 
             // Recurse to propagate further downstream

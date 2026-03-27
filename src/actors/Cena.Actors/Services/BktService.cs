@@ -33,8 +33,8 @@ public readonly record struct BktParameters(
         PGuess: 0.20,
         PForget: 0.02,
         PInitial: 0.10,
-        ProgressionThreshold: 0.85,
-        PrerequisiteGateThreshold: 0.95
+        ProgressionThreshold: MasteryConstants.ProgressionThreshold,
+        PrerequisiteGateThreshold: MasteryConstants.PrerequisiteGateThreshold
     );
 }
 

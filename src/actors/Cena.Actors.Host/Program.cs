@@ -8,6 +8,7 @@
 
 using System.Diagnostics.Metrics;
 using Cena.Actors.Api;
+using Cena.Actors.Api.Admin;
 using Cena.Actors.Configuration;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
@@ -123,6 +124,21 @@ builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnfor
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
 builder.Services.AddSingleton<OfflineSyncHandler>();
 builder.Services.AddHostedService<NatsOutboxPublisher>();
+
+// ADM-004 through ADM-016: Register Admin API services
+builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
+builder.Services.AddScoped<IAdminUserService, AdminUserService>();
+builder.Services.AddScoped<IAdminRoleService, AdminRoleService>();
+builder.Services.AddScoped<IContentModerationService, ContentModerationService>();
+builder.Services.AddScoped<IFocusAnalyticsService, FocusAnalyticsService>();
+builder.Services.AddScoped<IMasteryTrackingService, MasteryTrackingService>();
+builder.Services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
+builder.Services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
+builder.Services.AddScoped<IQuestionBankService, QuestionBankService>();
+builder.Services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();
+builder.Services.AddScoped<ICulturalContextService, CulturalContextService>();
+builder.Services.AddScoped<IEventStreamService, EventStreamService>();
+builder.Services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
 
 // =============================================================================
 // 6. PROTO.ACTOR CLUSTER
@@ -262,6 +278,21 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 
 // ---- Mastery REST API endpoints (MST-017) ----
 app.MapMasteryEndpoints();
+
+// ---- Admin REST API endpoints (ADM-004 through ADM-016) ----
+app.MapAdminDashboardEndpoints();
+app.MapAdminUserEndpoints();
+app.MapAdminRoleEndpoints();
+app.MapContentModerationEndpoints();
+app.MapFocusAnalyticsEndpoints();
+app.MapMasteryTrackingEndpoints();
+app.MapSystemMonitoringEndpoints();
+app.MapIngestionPipelineEndpoints();
+app.MapQuestionBankEndpoints();
+app.MapMethodologyAnalyticsEndpoints();
+app.MapCulturalContextEndpoints();
+app.MapEventStreamEndpoints();
+app.MapOutreachEngagementEndpoints();
 
 // ---- Cluster lifecycle ----
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();

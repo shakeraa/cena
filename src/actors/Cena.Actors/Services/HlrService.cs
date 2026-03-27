@@ -27,9 +27,9 @@ public interface IHlrService
     /// Solving: threshold = 2^(-t/h) → t = -h * log2(threshold)
     /// </summary>
     /// <param name="halfLifeHours">Current half-life in hours.</param>
-    /// <param name="threshold">Recall threshold (default 0.85).</param>
+    /// <param name="threshold">Recall threshold (default <see cref="MasteryConstants.RecallReviewThreshold"/>).</param>
     /// <returns>Time until recall drops to threshold.</returns>
-    TimeSpan ComputeTimeToThreshold(double halfLifeHours, double threshold = 0.85);
+    TimeSpan ComputeTimeToThreshold(double halfLifeHours, double threshold = MasteryConstants.RecallReviewThreshold);
 
     /// <summary>
     /// Update half-life after a review event.
@@ -81,14 +81,14 @@ public sealed class HlrService : IHlrService
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public TimeSpan ComputeTimeToThreshold(double halfLifeHours, double threshold = 0.85)
+    public TimeSpan ComputeTimeToThreshold(double halfLifeHours, double threshold = MasteryConstants.RecallReviewThreshold)
     {
         if (halfLifeHours <= 0.0)
             return TimeSpan.Zero;
 
         // Clamp threshold to valid range
         if (threshold <= 0.0 || threshold >= 1.0)
-            threshold = 0.85;
+            threshold = MasteryConstants.RecallReviewThreshold;
 
         // Solve: threshold = 2^(-t/h)
         // log2(threshold) = -t/h

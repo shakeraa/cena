@@ -44,7 +44,7 @@ public static class HlrCalculator
     /// Formula: t = -h * log2(threshold).
     /// With threshold=0.85: review when recall drops to 85%.
     /// </summary>
-    public static TimeSpan ScheduleNextReview(float halfLifeHours, float threshold = 0.85f)
+    public static TimeSpan ScheduleNextReview(float halfLifeHours, float threshold = MasteryConstants.RecallReviewThresholdF)
     {
         if (halfLifeHours <= 0f || threshold <= 0f || threshold >= 1f)
             return TimeSpan.Zero;

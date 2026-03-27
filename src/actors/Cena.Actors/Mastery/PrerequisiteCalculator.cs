@@ -12,7 +12,7 @@ namespace Cena.Actors.Mastery;
 /// </summary>
 public static class PrerequisiteCalculator
 {
-    private const float PrereqGateThreshold = 0.85f;
+    private const float PrereqGateThreshold = MasteryConstants.ProgressionThresholdF;
 
     /// <summary>
     /// Primary formula: min(mastery(p) for p in prerequisites).

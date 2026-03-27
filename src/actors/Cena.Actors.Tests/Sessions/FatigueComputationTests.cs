@@ -18,10 +18,11 @@ public sealed class FatigueComputationTests
     public FatigueComputationTests()
     {
         var bkt = Substitute.For<IBktService>();
+        var cognitiveLoad = new CognitiveLoadService();
         var logger = Substitute.For<ILogger<LearningSessionActor>>();
         var meterFactory = Substitute.For<IMeterFactory>();
         meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter("test"));
-        _actor = new LearningSessionActor(bkt, logger, meterFactory);
+        _actor = new LearningSessionActor(bkt, cognitiveLoad, logger, meterFactory);
     }
 
     [Fact]
@@ -45,14 +46,14 @@ public sealed class FatigueComputationTests
         SetField("_startedAt", DateTimeOffset.UtcNow.AddMinutes(-10));
 
         // Add some data to simulate degrading performance
-        var accuracies = GetField<List<double>>("_recentAccuracies");
-        var responseTimes = GetField<List<double>>("_recentResponseTimes");
+        var accuracies = GetField<Queue<double>>("_recentAccuracies");
+        var responseTimes = GetField<Queue<double>>("_recentResponseTimes");
 
         // 8 attempts, declining accuracy
         for (int i = 0; i < 8; i++)
         {
-            accuracies.Add(i < 4 ? 1.0 : 0.0); // First 4 correct, last 4 wrong
-            responseTimes.Add(3000 + i * 500);    // Gradually slower
+            accuracies.Enqueue(i < 4 ? 1.0 : 0.0); // First 4 correct, last 4 wrong
+            responseTimes.Enqueue(3000 + i * 500);    // Gradually slower
         }
 
         double score = InvokeComputeFatigue();
@@ -69,11 +70,11 @@ public sealed class FatigueComputationTests
         SetField("_baselineResponseTimeMs", 5000.0);
         SetField("_startedAt", DateTimeOffset.UtcNow.AddMinutes(-5));
 
-        var accuracies = GetField<List<double>>("_recentAccuracies");
+        var accuracies = GetField<Queue<double>>("_recentAccuracies");
 
         // 10 attempts: first 5 correct, last 5 wrong
-        for (int i = 0; i < 5; i++) accuracies.Add(1.0);
-        for (int i = 0; i < 5; i++) accuracies.Add(0.0);
+        for (int i = 0; i < 5; i++) accuracies.Enqueue(1.0);
+        for (int i = 0; i < 5; i++) accuracies.Enqueue(0.0);
 
         // Rolling average of last 5 should be 0.0 (all wrong)
         // Accuracy drop from baseline 0.8 → rolling 0.0 = 100% drop
