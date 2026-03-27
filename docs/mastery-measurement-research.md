@@ -25,6 +25,7 @@
    - 2.6 Interleaving and Desirable Difficulties
    - 2.7 Cognitive Load Theory (CLT) and Zone of Proximal Development (ZPD)
    - 2.8 Transfer Learning: Near and Far Transfer
+   - 2.9 Mastery Quality Matrix
 3. [Decay and Forgetting Models](#3-decay-and-forgetting-models)
    - 3.1 Ebbinghaus Forgetting Curve
    - 3.2 Half-Life Regression (HLR)
@@ -1564,6 +1565,96 @@ This Jaccard similarity on prerequisite sets captures how structurally related t
 - Transfer readiness scores are per-(source, target) concept pairs, forming a second overlay on the graph
 - High transfer readiness between concepts that lack a direct edge suggests a missing prerequisite or relatedness edge — this feeds back into graph refinement
 - The prerequisite graph distance between source and target concepts predicts transfer likelihood: concepts within 2 hops show ~70% near-transfer success with high mastery, while concepts >4 hops show <20% far-transfer success (calibrated from aggregate student data)
+
+---
+
+### 2.9 Mastery Quality Matrix
+
+**What it measures:** A 2x2 classification combining accuracy and response latency to distinguish true mastery from superficial correctness, building on the latency-accuracy pairing introduced in Section 1.5.2.
+
+**Theoretical foundation:**
+
+Chi & VanLehn (2012, doi:10.1111/j.1551-6709.2012.01235.x) demonstrated that response latency captures cognitive processing demands that accuracy alone cannot. Anderson (1982, doi:10.1037/0033-295X.89.4.369) showed in ACT* theory that automaticity (fast, accurate retrieval) is the hallmark of procedural skill mastery, distinct from effortful but correct retrieval that indicates knowledge is present but not yet consolidated.
+
+**The 2x2 Mastery Quality Matrix:**
+
+| | Fast Response (< median) | Slow Response (> median) |
+|---|---|---|
+| **Correct** | **Mastery** (automatic retrieval) | **Effortful** (correct but still consolidating) |
+| **Incorrect** | **Careless** (slip / attention error) | **Genuine Difficulty** (concept not understood) |
+
+**Formulation:**
+
+Classification thresholds per concept:
+```
+latency_threshold(c) = median(response_times(c)) across all students
+accuracy_observed = correct / total for this student on concept c
+```
+
+Per-interaction classification:
+```
+if correct AND response_time < latency_threshold:   quality = "mastery"
+if correct AND response_time >= latency_threshold:   quality = "effortful"
+if incorrect AND response_time < latency_threshold:  quality = "careless"
+if incorrect AND response_time >= latency_threshold:  quality = "genuine_difficulty"
+```
+
+**Mastery quality score (continuous):**
+```
+mastery_quality(c) = (mastery_count * 1.0 + effortful_count * 0.6
+                    + careless_count * 0.3 + difficulty_count * 0.0)
+                    / max(total_count, 1)
+```
+
+This produces a [0, 1] score where:
+- 1.0 = all interactions are fast-correct (true automaticity)
+- 0.6 = all interactions are slow-correct (knowledge present but not fluent)
+- 0.3 = all interactions are fast-incorrect (knows the material but careless)
+- 0.0 = all interactions are slow-incorrect (genuine gap)
+
+**Normalized latency computation:**
+```
+normalized_latency(student, concept, item) =
+    response_time / (student_baseline_speed * item_expected_time)
+```
+
+Where:
+- `student_baseline_speed` = student's median response time across all concepts (controls for individual speed differences)
+- `item_expected_time` = median response time for this item across all students (controls for item complexity)
+- `normalized_latency > 1.0` means slower than expected; `< 1.0` means faster
+
+**Pedagogical implications per quadrant:**
+
+| Quadrant | Interpretation | Cena Action |
+|----------|---------------|-------------|
+| **Mastery** (fast-correct) | Automatic retrieval achieved | Increase review interval (HLR half-life boost), advance to higher Bloom's level items |
+| **Effortful** (slow-correct) | Knowledge present but not consolidated | Continue practice at same level, reduce extraneous cognitive load, consider worked examples |
+| **Careless** (fast-incorrect) | Attention/execution problem, not conceptual | Flag as slip in error classification, do NOT decrease mastery estimate, prompt student to slow down |
+| **Genuine Difficulty** (slow-incorrect) | Concept not understood | Check prerequisites, consider methodology switch, potentially trigger `StagnationDetected` |
+
+**Strengths:**
+- Captures the crucial distinction between "knows it" and "has mastered it" that accuracy alone misses
+- Directly actionable — each quadrant maps to a different pedagogical response
+- Compatible with BKT: careless errors should be classified as slips (P(S)), not as evidence against mastery
+- Cheap to compute — only requires response time data already captured by `ConceptAttempted` events
+
+**Weaknesses:**
+- Response time is noisy — affected by device type, distraction, reading speed, fatigue
+- The median threshold is a rough heuristic — mixture-of-Gaussians would be more principled but harder to implement
+- Cross-concept comparisons require careful normalization (a calculus problem naturally takes longer than an arithmetic problem)
+
+**Cena implementation mapping:**
+- The `LearningSession` actor classifies each `ConceptAttempted` event into one of the four quadrants using the normalized latency and correctness
+- The quadrant classification is stored as metadata on the `ConceptAttempted` event payload in PostgreSQL/Marten
+- The `StudentProfile` actor maintains a rolling distribution of quadrant frequencies per concept — this feeds into the composite mastery score via the `latency_score` signal
+- Careless errors (fast-incorrect) trigger a BKT update with `P(S)` instead of the standard incorrect update — preventing mastery regression from slips
+- The `StagnationDetected` event factors in the mastery quality distribution: if recent interactions are predominantly "genuine_difficulty", stagnation priority is elevated; if predominantly "effortful", stagnation is lower priority (student is progressing, just slowly)
+- The mastery quality score per concept is displayed in the student-facing knowledge graph visualization as a secondary indicator alongside the mastery probability
+
+**Graph mapping:**
+- One mastery quality score per concept node per student
+- Concepts with high mastery probability but low mastery quality (many "effortful" responses) need more practice at the same level, not advancement
+- Concepts with low mastery probability but high careless rate may be underestimated — the graph should not block downstream concepts if the failures are predominantly careless
 
 ---
 
