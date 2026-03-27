@@ -78,7 +78,7 @@ const drawDiagram = () => {
   const statusColor = (s: string) => s === 'healthy' ? '#28C76F' : s === 'degraded' ? '#FF9F43' : '#EA5455'
   const statusGlow = (s: string) => s === 'healthy' ? 'rgba(40,199,111,0.3)' : s === 'degraded' ? 'rgba(255,159,67,0.3)' : 'rgba(234,84,85,0.2)'
 
-  const nodes: ServiceNode[] = [
+  const nodes: (ServiceNode & { fx?: number | null; fy?: number | null })[] = [
     { id: 'frontend', label: 'Admin Dashboard', sublabel: 'Vite + Vue 3 + Vuetify', x: width * 0.5, y: 60, status: frontendStatus.value, icon: 'V', port: '5174' },
     { id: 'admin-api', label: 'Admin API', sublabel: '.NET 9 REST + Firebase Auth', x: width * 0.3, y: 220, status: adminApiStatus.value, icon: 'A', port: '5000' },
     { id: 'actor-host', label: 'Actor Host', sublabel: `Proto.Actor Cluster (${activeActors.value} actors)`, x: width * 0.7, y: 220, status: actorHostStatus.value, icon: 'P', port: '5001' },
@@ -104,110 +104,105 @@ const drawDiagram = () => {
 
   const nodeMap = new Map(nodes.map(n => [n.id, n]))
 
-  // Draw edges
+  // ── Edge elements (drawn first, below nodes) ──
   const edgeGroup = svg.append('g')
-  edges.forEach(edge => {
-    const from = nodeMap.get(edge.from)!
-    const to = nodeMap.get(edge.to)!
-    if (!from || !to) return
-
+  const edgeLines = edges.map(edge => {
     const line = edgeGroup.append('line')
-      .attr('x1', from.x)
-      .attr('y1', from.y + 30)
-      .attr('x2', to.x)
-      .attr('y2', to.y - 30)
       .attr('stroke', edge.active ? 'rgba(115,103,240,0.4)' : 'rgba(255,255,255,0.08)')
       .attr('stroke-width', edge.active ? 2 : 1)
       .attr('stroke-dasharray', edge.active ? 'none' : '4,4')
 
-    // Edge label
-    const mx = (from.x + to.x) / 2
-    const my = (from.y + to.y) / 2 + 5
-    edgeGroup.append('text')
-      .attr('x', mx)
-      .attr('y', my)
+    const labelText = edgeGroup.append('text')
       .attr('text-anchor', 'middle')
       .attr('font-size', '9px')
       .attr('fill', edge.active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)')
       .text(edge.label)
 
-    // Protocol badge
-    edgeGroup.append('text')
-      .attr('x', mx)
-      .attr('y', my + 12)
+    const protocolText = edgeGroup.append('text')
       .attr('text-anchor', 'middle')
       .attr('font-size', '8px')
       .attr('fill', 'rgba(115,103,240,0.6)')
       .text(edge.protocol)
+
+    return { edge, line, labelText, protocolText }
   })
 
-  // Draw nodes
+  // ── Node elements (draggable) ──
   const nodeGroup = svg.append('g')
-  nodes.forEach(node => {
+  const nodeElements = nodes.map(node => {
     const g = nodeGroup.append('g')
-      .attr('transform', `translate(${node.x}, ${node.y})`)
-      .style('cursor', 'pointer')
+      .style('cursor', 'grab')
+      .datum(node)
 
-    // Glow
-    g.append('circle')
-      .attr('r', 40)
-      .attr('fill', statusGlow(node.status))
-      .attr('opacity', 0.5)
+    g.append('circle').attr('r', 40).attr('fill', statusGlow(node.status)).attr('opacity', 0.5)
+    g.append('circle').attr('r', 32).attr('fill', 'rgba(40,42,54,0.9)').attr('stroke', statusColor(node.status)).attr('stroke-width', 2.5)
+    g.append('text').attr('text-anchor', 'middle').attr('dy', 5).attr('font-size', '14px').attr('font-weight', '700').attr('fill', statusColor(node.status)).text(node.icon)
+    g.append('text').attr('y', 48).attr('text-anchor', 'middle').attr('font-size', '12px').attr('font-weight', '600').attr('fill', 'rgba(255,255,255,0.9)').text(node.label)
+    g.append('text').attr('y', 62).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', 'rgba(255,255,255,0.5)').text(node.sublabel)
+    if (node.port) g.append('text').attr('y', -38).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', 'rgba(115,103,240,0.7)').text(`:${node.port}`)
+    g.append('circle').attr('cx', 24).attr('cy', -24).attr('r', 5).attr('fill', statusColor(node.status))
+    g.append('title').text(`${node.label}\n${node.sublabel}\nStatus: ${node.status}${node.port ? `\nPort: ${node.port}` : ''}`)
 
-    // Main circle
-    g.append('circle')
-      .attr('r', 32)
-      .attr('fill', 'rgba(40,42,54,0.9)')
-      .attr('stroke', statusColor(node.status))
-      .attr('stroke-width', 2.5)
-
-    // Icon
-    g.append('text')
-      .attr('text-anchor', 'middle')
-      .attr('dy', 5)
-      .attr('font-size', '14px')
-      .attr('font-weight', '700')
-      .attr('fill', statusColor(node.status))
-      .text(node.icon)
-
-    // Label
-    g.append('text')
-      .attr('y', 48)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '12px')
-      .attr('font-weight', '600')
-      .attr('fill', 'rgba(255,255,255,0.9)')
-      .text(node.label)
-
-    // Sublabel
-    g.append('text')
-      .attr('y', 62)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '9px')
-      .attr('fill', 'rgba(255,255,255,0.5)')
-      .text(node.sublabel)
-
-    // Port badge
-    if (node.port) {
-      g.append('text')
-        .attr('y', -38)
-        .attr('text-anchor', 'middle')
-        .attr('font-size', '9px')
-        .attr('fill', 'rgba(115,103,240,0.7)')
-        .text(`:${node.port}`)
-    }
-
-    // Status dot
-    g.append('circle')
-      .attr('cx', 24)
-      .attr('cy', -24)
-      .attr('r', 5)
-      .attr('fill', statusColor(node.status))
-
-    // Tooltip
-    g.append('title')
-      .text(`${node.label}\n${node.sublabel}\nStatus: ${node.status}${node.port ? `\nPort: ${node.port}` : ''}`)
+    return { node, g }
   })
+
+  // ── Update positions (called on every tick and drag) ──
+  const updatePositions = () => {
+    nodeElements.forEach(({ node, g }) => {
+      g.attr('transform', `translate(${node.x}, ${node.y})`)
+    })
+
+    edgeLines.forEach(({ edge, line, labelText, protocolText }) => {
+      const from = nodeMap.get(edge.from)!
+      const to = nodeMap.get(edge.to)!
+      line.attr('x1', from.x).attr('y1', from.y).attr('x2', to.x).attr('y2', to.y)
+      const mx = (from.x + to.x) / 2
+      const my = (from.y + to.y) / 2
+      labelText.attr('x', mx).attr('y', my - 4)
+      protocolText.attr('x', mx).attr('y', my + 8)
+    })
+  }
+
+  // ── D3 Force Simulation (gentle — keeps nodes near initial positions) ──
+  const simulation = d3.forceSimulation(nodes as any)
+    .force('charge', d3.forceManyBody().strength(-300))
+    .force('center', d3.forceCenter(width / 2, height / 2).strength(0.02))
+    .force('collision', d3.forceCollide(70))
+    .force('link', d3.forceLink(edges.map(e => ({
+      source: e.from,
+      target: e.to,
+    }))).id((d: any) => d.id).distance(180).strength(0.3))
+    .alphaDecay(0.05)
+    .on('tick', updatePositions)
+
+  // Let simulation settle quickly, then stop (nodes stay draggable)
+  simulation.alpha(0.3).restart()
+
+  // ── Drag behavior ──
+  const drag = d3.drag<SVGGElement, any>()
+    .on('start', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0.1).restart()
+      d.fx = d.x
+      d.fy = d.y
+      d3.select(event.sourceEvent.target.closest('g')).style('cursor', 'grabbing')
+    })
+    .on('drag', (event, d) => {
+      d.fx = event.x
+      d.fy = event.y
+    })
+    .on('end', (event, d) => {
+      if (!event.active) simulation.alphaTarget(0)
+      // Keep node pinned where user dropped it
+      d.fx = event.x
+      d.fy = event.y
+      d3.select(event.sourceEvent.target.closest('g')).style('cursor', 'grab')
+    })
+
+  nodeElements.forEach(({ g }) => {
+    g.call(drag as any)
+  })
+
+  updatePositions()
 }
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
