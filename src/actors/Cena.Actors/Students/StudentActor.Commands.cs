@@ -133,6 +133,10 @@ public sealed partial class StudentActor
                 if (masteredEvent != null)
                     _state.Apply(masteredEvent);
 
+                // MST-006: Mastery pipeline enrichment (HLR, quality, stagnation)
+                EnrichMasteryAfterAttempt(cmd.ConceptId, isCorrect, cmd.ResponseTimeMs,
+                    ErrorType.None.ToString(), DateTimeOffset.UtcNow);
+
                 // ACT-020: Accumulate session-level stagnation signals
                 AccumulateSessionSignals(cmd.ConceptId, isCorrect, cmd.ResponseTimeMs, ErrorType.None);
 
@@ -216,6 +220,10 @@ public sealed partial class StudentActor
                         cmd.ConceptId, 24.0));
                 }
             }
+
+            // MST-006: Mastery pipeline enrichment (HLR, quality, stagnation)
+            EnrichMasteryAfterAttempt(cmd.ConceptId, eval.IsCorrect, cmd.ResponseTimeMs,
+                eval.ClassifiedErrorType.ToString(), DateTimeOffset.UtcNow);
 
             // ACT-020: Accumulate session-level stagnation signals
             AccumulateSessionSignals(cmd.ConceptId, eval.IsCorrect, cmd.ResponseTimeMs, eval.ClassifiedErrorType);

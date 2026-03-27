@@ -8,6 +8,7 @@
 // =============================================================================
 
 using Cena.Actors.Events;
+using Cena.Actors.Mastery;
 
 namespace Cena.Actors.Students;
 
@@ -45,6 +46,21 @@ public sealed class StudentState
     // ---- Half-Life Regression Timers ----
     /// <summary>Concept ID -> HLR state (half-life in hours, last review time).</summary>
     public Dictionary<string, HlrState> HlrTimers { get; set; } = new();
+
+    // ---- Rich Mastery Overlay (MST-006) ----
+    /// <summary>
+    /// Per-concept rich mastery state from the mastery engine pipeline.
+    /// Includes BKT probability, HLR half-life, Bloom's level, error history,
+    /// quality quadrant, and method tracking. Updated additively after each
+    /// attempt alongside the existing MasteryMap.
+    /// </summary>
+    public Dictionary<string, Mastery.ConceptMasteryState> MasteryOverlay { get; set; } = new();
+
+    /// <summary>
+    /// Student's personal response time baseline for mastery quality classification.
+    /// Tracks median response time from a circular buffer of last 20 attempts.
+    /// </summary>
+    public ResponseTimeBaseline ResponseBaseline { get; set; } = ResponseTimeBaseline.Initial;
 
     // ---- Engagement ----
     public int TotalXp { get; set; }
@@ -98,15 +114,57 @@ public sealed class StudentState
             e.ConceptId, e.IsCorrect, e.ResponseTimeMs,
             e.ErrorType, e.MethodologyActive, e.Timestamp));
 
+        // MST-006: Update rich mastery overlay from event data
+        ApplyMasteryOverlay(e);
+
         LastActivityDate = e.Timestamp;
         RecalculateBaselines();
         EventVersion++;
+    }
+
+    /// <summary>
+    /// MST-006: Rebuild/update the rich mastery overlay from event data.
+    /// Deterministic for event replay — uses event fields only, no external services.
+    /// </summary>
+    private void ApplyMasteryOverlay(ConceptAttempted_V1 e)
+    {
+        if (!MasteryOverlay.TryGetValue(e.ConceptId, out var current))
+            current = new Mastery.ConceptMasteryState();
+
+        // Update attempt counters and streak
+        current = current.WithAttempt(e.IsCorrect, e.Timestamp);
+
+        // Update mastery probability from event (BKT was already computed)
+        current = current.WithBktUpdate((float)e.PosteriorMastery);
+
+        // Update HLR half-life from HlrTimers if available
+        if (HlrTimers.TryGetValue(e.ConceptId, out var hlr))
+            current = current.WithHalfLifeUpdate((float)hlr.HalfLifeHours);
+
+        // Track error type if present
+        if (e.ErrorType != "None" && Enum.TryParse<Mastery.ErrorType>(e.ErrorType, true, out var errorType))
+            current = current.WithRecentError(errorType);
+
+        // Update quality quadrant from response time baseline
+        var quality = MasteryQualityClassifier.Classify(
+            e.IsCorrect, e.ResponseTimeMs, ResponseBaseline.MedianResponseTimeMs);
+        current = current with { QualityQuadrant = quality };
+
+        // Update response time baseline
+        ResponseBaseline = ResponseBaseline.Update(e.ResponseTimeMs);
+
+        MasteryOverlay[e.ConceptId] = current;
     }
 
     public void Apply(ConceptMastered_V1 e)
     {
         MasteryMap[e.ConceptId] = e.MasteryLevel;
         HlrTimers[e.ConceptId] = new HlrState(e.InitialHalfLifeHours, e.Timestamp);
+
+        // MST-006: Update overlay with half-life on mastery
+        if (MasteryOverlay.TryGetValue(e.ConceptId, out var state))
+            MasteryOverlay[e.ConceptId] = state.WithHalfLifeUpdate((float)e.InitialHalfLifeHours);
+
         EventVersion++;
     }
 
@@ -117,6 +175,11 @@ public sealed class StudentState
 
         if (HlrTimers.TryGetValue(e.ConceptId, out var hlr))
             HlrTimers[e.ConceptId] = hlr with { HalfLifeHours = e.HalfLifeHours };
+
+        // MST-006: Update overlay mastery probability on decay
+        if (MasteryOverlay.TryGetValue(e.ConceptId, out var state))
+            MasteryOverlay[e.ConceptId] = state.WithBktUpdate((float)e.PredictedRecall)
+                .WithHalfLifeUpdate((float)e.HalfLifeHours);
 
         EventVersion++;
     }
@@ -225,11 +288,18 @@ public sealed class StudentState
         long methodHistoryBytes = MethodAttemptHistory.Sum(kv => 120L + kv.Value.Count * 80L);
         long methodMapBytes = MethodologyMap.Count * 56L;
 
+        // MST-006: MasteryOverlay — ConceptMasteryState record (~256 bytes) + arrays
+        long overlayBytes = MasteryOverlay.Sum(kv =>
+            96L + 256L + (kv.Value.RecentErrors.Length * 4L) + (kv.Value.MethodHistory.Length * 80L));
+        // ResponseBaseline: ~(20 * 4) + 16 overhead
+        long baselineBytes = 96L + (ResponseBaseline.ResponseTimes.Length * 4L);
+
         // Base object overhead: StudentState fields, string refs, DateTimeOffsets
         const long baseOverhead = 2048;
 
         return masteryBytes + attemptBytes + hlrBytes
-             + methodHistoryBytes + methodMapBytes + baseOverhead;
+             + methodHistoryBytes + methodMapBytes
+             + overlayBytes + baselineBytes + baseOverhead;
     }
 }
 
