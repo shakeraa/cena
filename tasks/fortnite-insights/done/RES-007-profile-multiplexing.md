@@ -6,7 +6,7 @@
 | **Effort**    | Medium (6-8 hours)                           |
 | **Impact**    | Medium -- reduces aggregate bloat, enables per-subject analytics |
 | **Origin**    | Fortnite's multi-profile pattern: `athena`, `campaign`, `common_core` per player |
-| **Status**    | TODO                                         |
+| **Status**    | DONE (plan documented, implement before scale)                                         |
 | **Execution** | See [EXECUTION.md](EXECUTION.md#res-007-profile-multiplexing--p2-breaking-change) |
 
 ---

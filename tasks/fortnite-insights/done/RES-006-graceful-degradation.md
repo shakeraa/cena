@@ -6,7 +6,7 @@
 | **Effort**    | Medium (6-8 hours)                           |
 | **Impact**    | High -- Fortnite was all-or-nothing, system either worked 100% or was fully down |
 | **Origin**    | Fortnite had zero degradation path at 3.4M CCU. When things failed, everything failed. |
-| **Status**    | TODO (depends on RES-005)                    |
+| **Status**    | DONE (depends on RES-005)                    |
 | **Execution** | See [EXECUTION.md](EXECUTION.md#res-006-graceful-degradation--p1-effort-underestimated) |
 
 ---

@@ -226,6 +226,7 @@ builder.Services.AddOpenTelemetry()
         .AddMeter("Cena.Infrastructure.NatsOutbox")
         .AddMeter("Cena.Actors.Decay")
         .AddMeter("Cena.Actors.Focus")
+        .AddMeter("Cena.Actors.HealthAggregator")
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddProcessInstrumentation()
@@ -281,6 +282,25 @@ lifetime.ApplicationStarted.Register(async () =>
             app.Services.GetRequiredService<IMeterFactory>()));
     var redisCbPid = actorSystem.Root.SpawnNamed(redisCbProps, "circuit-breaker-redis");
     appLogger.LogInformation("RES-003: Redis circuit breaker spawned at {Pid}", redisCbPid);
+
+    // RES-005: Spawn Health Aggregator singleton
+    var healthProps = Props.FromProducer(() =>
+        new HealthAggregatorActor(
+            app.Services.GetRequiredService<ILoggerFactory>().CreateLogger<HealthAggregatorActor>(),
+            app.Services.GetRequiredService<IMeterFactory>()));
+    var healthPid = actorSystem.Root.SpawnNamed(healthProps, "health-aggregator");
+    // Register the Redis CB for health polling
+    actorSystem.Root.Send(healthPid, new HealthAggregatorActor.RegisterHealthSources(
+        new Dictionary<string, PID> { ["redis"] = redisCbPid },
+        ManagerPid: null)); // Manager PID can be registered later when available
+    appLogger.LogInformation("RES-005: Health aggregator spawned at {Pid}", healthPid);
+
+    // RES-010: Spawn Feature Flag singleton
+    var ffProps = Props.FromProducer(() =>
+        new FeatureFlagActor(
+            app.Services.GetRequiredService<ILoggerFactory>().CreateLogger<FeatureFlagActor>()));
+    var ffPid = actorSystem.Root.SpawnNamed(ffProps, "feature-flags");
+    appLogger.LogInformation("RES-010: Feature flag service spawned at {Pid}", ffPid);
 });
 
 lifetime.ApplicationStopping.Register(async () =>

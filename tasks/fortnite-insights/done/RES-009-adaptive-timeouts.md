@@ -6,7 +6,7 @@
 | **Effort**    | Low (2-3 hours)                              |
 | **Impact**    | Low now, High at scale                       |
 | **Origin**    | Fortnite April 2018: 200ms socket timeout caused connection storms that amplified failure |
-| **Status**    | TODO                                         |
+| **Status**    | DONE                                         |
 | **Execution** | See [EXECUTION.md](EXECUTION.md#res-009-adaptive-timeouts--p3) |
 
 ---
