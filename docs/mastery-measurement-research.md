@@ -2089,6 +2089,141 @@ Train a meta-model on Phase 2 data to optimize weights. Use the meta-model's fea
 
 ---
 
+## Appendix B: Neo4j Cypher Queries for Graph Operations
+
+The following Cypher queries implement the key graph-based computations described in this document against Cena's Neo4j concept graph schema.
+
+### B.1 Computing prerequisite_support(c)
+
+Computes the minimum mastery of all direct prerequisites for a given concept and student. Returns the prerequisite floor that caps effective mastery.
+
+```cypher
+// prerequisite_support(c) = min(mastery(p) for p in prerequisites(c))
+MATCH (s:Student {id: $studentId})-[m:HAS_MASTERY]->(p:Concept)-[:IS_PREREQUISITE_OF]->(c:Concept {id: $conceptId})
+WITH c, collect(m.mastery_probability) AS prereq_masteries
+RETURN c.id AS concept_id,
+       CASE WHEN size(prereq_masteries) = 0 THEN 1.0
+            ELSE reduce(min_val = 1.0, x IN prereq_masteries | CASE WHEN x < min_val THEN x ELSE min_val END)
+       END AS prerequisite_support,
+       size(prereq_masteries) AS prerequisite_count
+```
+
+### B.2 Finding the Learning Frontier
+
+Identifies concepts whose prerequisites are all mastered (PSI = 1.0) but which the student has not yet mastered. These are the concepts the student is ready to learn next.
+
+```cypher
+// Learning frontier: concepts where all prereqs mastered but concept itself is not
+MATCH (c:Concept)
+WHERE c.subject = $subject
+// Count total prerequisites
+OPTIONAL MATCH (p:Concept)-[:IS_PREREQUISITE_OF]->(c)
+WITH c, collect(p) AS all_prereqs
+// Count mastered prerequisites for this student
+OPTIONAL MATCH (s:Student {id: $studentId})-[m:HAS_MASTERY]->(p:Concept)-[:IS_PREREQUISITE_OF]->(c)
+WHERE m.mastery_probability >= $masteryThreshold
+WITH c, all_prereqs, collect(p) AS mastered_prereqs
+WHERE size(all_prereqs) = size(mastered_prereqs)
+// Exclude already-mastered concepts
+OPTIONAL MATCH (s:Student {id: $studentId})-[m:HAS_MASTERY]->(c)
+WHERE m.mastery_probability < $masteryThreshold OR m IS NULL
+RETURN c.id AS concept_id,
+       c.name AS concept_name,
+       c.difficulty AS intrinsic_difficulty,
+       size(all_prereqs) AS prerequisite_count
+ORDER BY c.difficulty ASC
+```
+
+### B.3 Computing cluster_mastery
+
+Computes the weighted average mastery for a topic cluster, using concept importance (PageRank or exam weight) as weights.
+
+```cypher
+// cluster_mastery(T) = weighted_mean(mastery(c) for c in T, weights = importance(c))
+MATCH (c:Concept)-[:BELONGS_TO]->(t:TopicCluster {id: $clusterId})
+OPTIONAL MATCH (s:Student {id: $studentId})-[m:HAS_MASTERY]->(c)
+WITH t, c,
+     COALESCE(m.mastery_probability, 0.0) AS mastery,
+     COALESCE(c.importance_weight, 1.0) AS weight
+WITH t,
+     sum(mastery * weight) AS weighted_mastery_sum,
+     sum(weight) AS total_weight,
+     count(c) AS concept_count,
+     collect({id: c.id, mastery: mastery, weight: weight}) AS concepts
+RETURN t.id AS cluster_id,
+       t.name AS cluster_name,
+       weighted_mastery_sum / total_weight AS cluster_mastery,
+       concept_count,
+       concepts
+```
+
+### B.4 Finding Decay-Risk Concepts
+
+Identifies concepts that the student has previously mastered but whose predicted recall probability has dropped below a threshold, ordered by number of downstream dependents (highest impact first).
+
+```cypher
+// Decay-risk: mastered concepts where p(recall) = 2^(-delta/h) < threshold
+MATCH (s:Student {id: $studentId})-[m:HAS_MASTERY]->(c:Concept)
+WHERE m.mastery_probability >= 0.90
+  AND m.half_life_hours > 0
+WITH c, m,
+     duration.between(m.last_interaction, datetime()).hours AS hours_elapsed,
+     m.half_life_hours AS half_life
+WITH c, m, hours_elapsed, half_life,
+     // p(recall) = 2^(-delta/h)
+     2.0 ^ (-1.0 * hours_elapsed / half_life) AS recall_probability
+WHERE recall_probability < $recallThreshold
+// Count downstream dependents to prioritize foundational concepts
+OPTIONAL MATCH (c)-[:IS_PREREQUISITE_OF*1..]->(downstream:Concept)
+WITH c, m, recall_probability, hours_elapsed, half_life, count(DISTINCT downstream) AS dependent_count
+RETURN c.id AS concept_id,
+       c.name AS concept_name,
+       m.mastery_probability AS mastery,
+       recall_probability,
+       hours_elapsed,
+       half_life,
+       dependent_count,
+       // review_priority = (threshold - p(recall)) * (1 + log(dependents))
+       ($recallThreshold - recall_probability) * (1 + log(dependent_count + 1.0)) AS review_priority
+ORDER BY review_priority DESC
+LIMIT 10
+```
+
+### B.5 Computing effective_mastery with Prerequisite Floor
+
+Recursively computes effective mastery by propagating the prerequisite floor constraint through the graph. Uses the weighted prerequisite penalty approach (Approach 2 from Section 3.6).
+
+```cypher
+// effective_mastery(c) = measured_mastery(c) * product(max(mastery(p)/threshold, 1.0))
+MATCH (s:Student {id: $studentId})-[m:HAS_MASTERY]->(c:Concept {id: $conceptId})
+// Traverse all prerequisite ancestors (up to 5 levels deep to bound computation)
+OPTIONAL MATCH path = (ancestor:Concept)-[:IS_PREREQUISITE_OF*1..5]->(c)
+OPTIONAL MATCH (s)-[am:HAS_MASTERY]->(ancestor)
+WITH c, m,
+     collect(DISTINCT {
+       ancestor_id: ancestor.id,
+       ancestor_mastery: COALESCE(am.mastery_probability, 0.0),
+       distance: length(path)
+     }) AS ancestor_data
+WITH c, m, ancestor_data,
+     // Weighted prerequisite penalty with dampening by distance
+     reduce(penalty = 1.0, a IN ancestor_data |
+       penalty * CASE
+         WHEN a.ancestor_mastery >= $masteryThreshold THEN 1.0
+         ELSE (a.ancestor_mastery / $masteryThreshold) * (0.8 ^ (a.distance - 1))
+       END
+     ) AS prerequisite_penalty
+RETURN c.id AS concept_id,
+       m.mastery_probability AS measured_mastery,
+       prerequisite_penalty,
+       m.mastery_probability * prerequisite_penalty AS effective_mastery,
+       m.half_life_hours,
+       m.bloom_level,
+       m.attempt_count
+```
+
+---
+
 ## Sources and Key References
 
 **Knowledge Tracing:**
