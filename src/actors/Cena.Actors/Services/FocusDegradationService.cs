@@ -213,7 +213,8 @@ public sealed class FocusDegradationService : IFocusDegradationService
     public int PredictRemainingProductiveQuestions(FocusState state)
     {
         // Below engagement threshold — stop now
-        if (state.Level == FocusLevel.Disengaged) return 0;
+        if (state.Level is FocusLevel.Disengaged or FocusLevel.DisengagedExhausted or FocusLevel.DisengagedBored)
+            return 0;
         if (state.Level == FocusLevel.Fatigued) return 1; // One more, then break
 
         // Estimate based on vigilance decay rate
@@ -448,14 +449,27 @@ public sealed class FocusDegradationService : IFocusDegradationService
 
     private BreakRecommendation RecommendRecoveryBreak(FocusState state, TimeOfDayContext timeContext)
     {
+        // ── FOC-006: Bored students need challenge, NOT break ──
+        if (state.Level == FocusLevel.DisengagedBored)
+        {
+            return new BreakRecommendation(
+                ShouldBreak: false,
+                Minutes: 0,
+                Activity: BreakActivity.None,
+                Message: "מגיע לך אתגר! בוא ננסה משהו קשה יותר", // "You deserve a challenge! Let's try something harder"
+                AlternativeAction: AlternativeAction.IncreaseDifficulty
+            );
+        }
+
         // Base break duration from focus score
         int baseMinutes = state.Level switch
         {
-            FocusLevel.Flow => 0,           // Don't interrupt flow state!
-            FocusLevel.Engaged => 0,         // No break needed
-            FocusLevel.Drifting => 5,         // Short break to reset attention
-            FocusLevel.Fatigued => 15,        // Moderate break
-            FocusLevel.Disengaged => 30,      // Long break — student needs to step away
+            FocusLevel.Flow => 0,                   // Don't interrupt flow state!
+            FocusLevel.Engaged => 0,                 // No break needed
+            FocusLevel.Drifting => 5,                 // Short break to reset attention
+            FocusLevel.Fatigued => 15,                // Moderate break
+            FocusLevel.DisengagedExhausted => 30,     // Long break — exhausted
+            FocusLevel.Disengaged => 30,              // Long break — unclassified disengagement
             _ => 10
         };
 
@@ -485,11 +499,12 @@ public sealed class FocusDegradationService : IFocusDegradationService
             _ => BreakActivity.FullRest
         };
 
-        // Hebrew/Arabic/English message
+        // Hebrew message
         string message = state.Level switch
         {
             FocusLevel.Drifting => "קצת הפסקה תעזור לך להתרכז טוב יותר", // "A short break will help you focus better"
             FocusLevel.Fatigued => "עשית עבודה מעולה! זמן להפסקה", // "Great work! Time for a break"
+            FocusLevel.DisengagedExhausted => "עבדת קשה! זמן למנוחה אמיתית", // "You worked hard! Time for real rest"
             FocusLevel.Disengaged => "בוא נחזור אחרי הפסקה עם אנרגיה חדשה", // "Let's come back after a break with fresh energy"
             _ => "הפסקה קצרה?" // "Short break?"
         };
@@ -599,11 +614,13 @@ public record FocusState(
 
 public enum FocusLevel
 {
-    Flow,           // 0.8+ — in the zone, challenge appropriately
-    Engaged,        // 0.6-0.8 — good, maintain
-    Drifting,       // 0.4-0.6 — attention wavering, simplify or change
-    Fatigued,       // 0.2-0.4 — suggest break soon
-    Disengaged      // <0.2 — end session
+    Flow,                // 0.8+ — in the zone, challenge appropriately
+    Engaged,             // 0.6-0.8 — good, maintain
+    Drifting,            // 0.4-0.6 — attention wavering, simplify or change
+    Fatigued,            // 0.2-0.4 — cognitive/physical fatigue, suggest break soon
+    Disengaged,          // <0.2 — end session (unclassified disengagement)
+    DisengagedBored,     // FOC-006: <0.2 + boredom signals — increase challenge, NOT break
+    DisengagedExhausted  // FOC-006: <0.2 + fatigue signals — take break, rest
 }
 
 public record ResilienceInput(
@@ -667,7 +684,9 @@ public record BreakRecommendation(
     // ── FOC-003: Two-tier break system ──
     BreakType BreakType = BreakType.RecoveryBreak,
     int DurationSeconds = 0,                          // For microbreaks (60-90s)
-    MicrobreakActivity? MicrobreakActivity = null     // Specific microbreak activity
+    MicrobreakActivity? MicrobreakActivity = null,    // Specific microbreak activity
+    // ── FOC-006: Alternative actions for bored students (breaks won't help boredom) ──
+    AlternativeAction AlternativeAction = AlternativeAction.None
 );
 
 /// <summary>
