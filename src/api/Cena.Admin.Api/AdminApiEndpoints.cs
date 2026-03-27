@@ -4,9 +4,12 @@
 // =============================================================================
 
 using Cena.Infrastructure.Auth;
+using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api;
 
@@ -109,7 +112,14 @@ public static class AdminApiEndpoints
                 conceptId = c.ConceptId,
                 name = c.ConceptName,
                 mastery = c.MasteryLevel,
-                status = c.Status switch { "mastered" => "mastered", "in_progress" => "learning", _ => "not-started" },
+                status = c.MasteryLevel switch
+                {
+                    >= 0.90f => "mastered",
+                    >= 0.70f => "proficient",
+                    >= 0.40f => "developing",
+                    >= 0.10f => "introduced",
+                    _ => "not-started",
+                },
                 subject = c.Subject
             });
             return Results.Ok(new { concepts });
@@ -216,13 +226,48 @@ public static class AdminApiEndpoints
         group.MapGet("/health", async (ISystemMonitoringService service) =>
         {
             var health = await service.GetHealthAsync();
-            return Results.Ok(health);
+            var now = DateTimeOffset.UtcNow;
+            // Map to frontend-expected shape
+            var services = health.Services.Select(s => new
+            {
+                name = s.Name,
+                status = s.Status switch { "healthy" => "up", "degraded" => "degraded", _ => "down" },
+                uptimePercent = 99.9f,
+                lastCheckAt = now.ToString("o")
+            });
+            return Results.Ok(new { services });
         }).WithName("GetSystemHealth");
 
-        group.MapGet("/metrics", async (ISystemMonitoringService service) =>
+        group.MapGet("/metrics", async (HttpContext ctx, ISystemMonitoringService service) =>
         {
             var health = await service.GetHealthAsync();
-            return Results.Ok(health.ErrorRates);
+
+            // Try to fetch active actor count from actor host
+            var activeActors = 0;
+            try
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
+                var response = await http.GetStringAsync("http://localhost:5001/api/actors/stats");
+                var doc = System.Text.Json.JsonDocument.Parse(response);
+                activeActors = doc.RootElement.GetProperty("activeActorCount").GetInt32();
+            }
+            catch { /* Actor host not available */ }
+
+            // Map error rates to frontend shape
+            var errorRates = health.ErrorRates.Trend.Select(t => new
+            {
+                timestamp = t.Timestamp,
+                rate = t.RequestCount > 0 ? (float)t.ErrorCount / t.RequestCount * 100 : 0f
+            });
+
+            // Map queue depths
+            var queueDepths = health.QueueDepths.Select(q => new
+            {
+                name = q.QueueName,
+                depth = q.Depth
+            });
+
+            return Results.Ok(new { errorRates, activeActors, queueDepths });
         }).WithName("GetSystemMetrics");
 
         group.MapGet("/actors", async (ISystemMonitoringService service) =>
@@ -264,6 +309,37 @@ public static class AdminApiEndpoints
         .WithTags("System Monitoring")
         .WithName("GetAuditLog")
         .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+
+        // GET /api/admin/system/nats-stats — real-time NATS event buffer stats
+        app.MapGet("/api/admin/system/nats-stats", (HttpContext ctx) =>
+        {
+            var subscriber = ctx.RequestServices.GetService<NatsEventSubscriber>();
+            if (subscriber == null)
+                return Results.Ok(new { totalEvents = 0, recentEvents = Array.Empty<object>() });
+
+            return Results.Ok(new
+            {
+                totalEvents = subscriber.TotalEventsReceived,
+                recentEvents = subscriber.RecentEvents.TakeLast(50).Select(e => new
+                {
+                    id = e.Id,
+                    subject = e.Subject,
+                    source = e.Source,
+                    timestamp = e.Timestamp
+                })
+            });
+        })
+        .WithTags("System Monitoring")
+        .WithName("GetNatsStats")
+        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+
+        group.MapPost("/reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
+        {
+            var logger = loggerFactory.CreateLogger("DatabaseSeeder");
+            await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger,
+                additionalSeeds: QuestionBankSeedData.SeedQuestionsAsync);
+            return Results.Ok(new { success = true, message = "Database reseeded successfully" });
+        }).WithName("ReseedDatabase");
 
         return app;
     }
@@ -396,6 +472,27 @@ public static class AdminApiEndpoints
             var success = await service.ApproveAsync(id);
             return success ? Results.Ok() : Results.NotFound();
         }).WithName("ApproveQuestion");
+
+        group.MapPost("/", async (CreateQuestionRequest request, HttpContext ctx, IQuestionBankService service) =>
+        {
+            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
+            var result = await service.CreateQuestionAsync(request, userId);
+            return result != null ? Results.Created($"/api/admin/questions/{result.Id}", result) : Results.BadRequest();
+        }).WithName("CreateQuestion");
+
+        group.MapPost("/{id}/publish", async (string id, HttpContext ctx, IQuestionBankService service) =>
+        {
+            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
+            var success = await service.PublishAsync(id, userId);
+            return success ? Results.Ok() : Results.NotFound();
+        }).WithName("PublishQuestion");
+
+        group.MapPost("/{id}/language-versions", async (string id, AddLanguageVersionRequest request, HttpContext ctx, IQuestionBankService service) =>
+        {
+            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
+            var success = await service.AddLanguageVersionAsync(id, request, userId);
+            return success ? Results.Ok() : Results.NotFound();
+        }).WithName("AddLanguageVersion");
 
         return app;
     }

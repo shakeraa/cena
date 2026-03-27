@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import { $api } from '@/utils/api'
+import { useAbility } from '@casl/vue'
 
 definePage({ meta: { action: 'manage', subject: 'Settings' } })
+
+const { can } = useAbility()
+const isSuperAdmin = computed(() => can('manage', 'all'))
 
 interface FeatureFlag {
   key: string
@@ -42,6 +46,28 @@ const loading = ref(true)
 const saving = ref(false)
 const error = ref<string | null>(null)
 const saveSuccess = ref(false)
+
+// Reseed database (SUPER_ADMIN only)
+const reseeding = ref(false)
+const reseedSuccess = ref(false)
+const reseedConfirmDialog = ref(false)
+
+const reseedDatabase = async () => {
+  reseedConfirmDialog.value = false
+  reseeding.value = true
+  reseedSuccess.value = false
+  try {
+    await $api('/admin/system/reseed', { method: 'POST' })
+    reseedSuccess.value = true
+    setTimeout(() => { reseedSuccess.value = false }, 5000)
+  }
+  catch (err: any) {
+    error.value = err.message ?? 'Failed to reseed database'
+  }
+  finally {
+    reseeding.value = false
+  }
+}
 
 const organization = ref<OrgSettings>({
   organizationName: '',
@@ -481,5 +507,93 @@ onMounted(fetchSettings)
         </VCard>
       </VCol>
     </VRow>
+
+    <!-- Database Management (SUPER_ADMIN only) -->
+    <VRow
+      v-if="isSuperAdmin"
+      class="mt-6"
+    >
+      <VCol cols="12">
+        <VCard>
+          <VCardItem>
+            <template #prepend>
+              <VAvatar
+                color="error"
+                variant="tonal"
+                rounded
+              >
+                <VIcon icon="tabler-database-cog" />
+              </VAvatar>
+            </template>
+            <VCardTitle>Database Management</VCardTitle>
+            <VCardSubtitle>Seed and reset development data (Super Admin only)</VCardSubtitle>
+          </VCardItem>
+
+          <VCardText>
+            <VAlert
+              v-if="reseedSuccess"
+              type="success"
+              variant="tonal"
+              class="mb-4"
+            >
+              Database reseeded successfully. Roles, users, simulated students, and questions have been refreshed.
+            </VAlert>
+
+            <div class="d-flex align-center gap-4 flex-wrap">
+              <div class="flex-grow-1">
+                <div class="text-body-1 font-weight-medium mb-1">
+                  Reseed Database
+                </div>
+                <div class="text-body-2 text-medium-emphasis">
+                  Re-populate all demo data: 6 roles, 24 staff users, 100 simulated students (8 archetypes, 60-day history), and 15 Bagrut questions. This is idempotent and safe to run multiple times.
+                </div>
+              </div>
+
+              <VBtn
+                color="warning"
+                variant="elevated"
+                :loading="reseeding"
+                prepend-icon="tabler-database-import"
+                @click="reseedConfirmDialog = true"
+              >
+                Reseed Now
+              </VBtn>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Reseed Confirmation Dialog -->
+    <VDialog
+      v-model="reseedConfirmDialog"
+      max-width="450"
+    >
+      <VCard>
+        <VCardTitle class="text-h5 pa-6">
+          Confirm Database Reseed
+        </VCardTitle>
+        <VCardText>
+          This will re-run all seed data scripts. Existing demo data will be updated (upsert).
+          Real user data will not be affected.
+        </VCardText>
+        <VCardActions class="pa-6 pt-0">
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="reseedConfirmDialog = false"
+          >
+            Cancel
+          </VBtn>
+          <VBtn
+            color="warning"
+            variant="elevated"
+            @click="reseedDatabase"
+          >
+            Reseed
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
