@@ -40,7 +40,9 @@ const STAGES = [
   { name: 'Published', key: 'published' },
 ] as const
 
-const pipelineData = ref<PipelineStage[]>([])
+const pipelineData = ref<PipelineStage[]>(
+  STAGES.map(stage => ({ name: stage.name, key: stage.key, items: [] })),
+)
 const loading = ref(true)
 const selectedItemId = ref('')
 const isDetailOpen = ref(false)
