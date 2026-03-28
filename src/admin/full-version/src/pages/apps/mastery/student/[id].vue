@@ -182,7 +182,12 @@ const historyChartOptions = computed(() => {
       },
     },
     grid: { strokeDashArray: 8, borderColor },
-    legend: { position: 'bottom' as const, fontSize: '13px' },
+    legend: {
+      position: 'bottom' as const,
+      fontSize: '13px',
+      labels: { colors: labelColor },
+      itemMargin: { horizontal: 12, vertical: 4 },
+    },
     dataLabels: { enabled: false },
     tooltip: {
       y: { formatter(val: number) { return val.toFixed(3) } },
