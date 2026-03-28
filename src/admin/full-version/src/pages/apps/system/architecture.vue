@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import * as d3 from 'd3'
-import { $api } from '@/utils/api'
 
 definePage({ meta: { action: 'read', subject: 'System' } })
 
@@ -13,7 +12,77 @@ const pgStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const redisStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const frontendStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const activeActors = ref(0)
-const natsEvents = ref(0)
+
+const statusColor = (s: string) => s === 'healthy' ? '#28C76F' : s === 'degraded' ? '#FF9F43' : '#EA5455'
+const statusGlow = (s: string) => s === 'healthy' ? 'rgba(40,199,111,0.3)' : s === 'degraded' ? 'rgba(255,159,67,0.3)' : 'rgba(234,84,85,0.2)'
+
+interface ServiceNode {
+  id: string
+  label: string
+  sublabel: string
+  x: number
+  y: number
+  status: 'healthy' | 'degraded' | 'offline'
+  icon: string
+  port?: string
+  fx?: number | null
+  fy?: number | null
+}
+
+interface ServiceEdge {
+  from: string
+  to: string
+  label: string
+  protocol: string
+  active: boolean
+}
+
+// Persistent graph state — survives status refreshes
+let nodes: ServiceNode[] = []
+let edges: ServiceEdge[] = []
+let nodeMap = new Map<string, ServiceNode>()
+let simulation: d3.Simulation<any, any> | null = null
+let diagramDrawn = false
+
+// D3 element refs for in-place updates
+let nodeElements: { node: ServiceNode; g: d3.Selection<SVGGElement, any, any, any> }[] = []
+let edgeLines: { edge: ServiceEdge; line: d3.Selection<SVGLineElement, any, any, any>; labelText: d3.Selection<SVGTextElement, any, any, any>; protocolText: d3.Selection<SVGTextElement, any, any, any> }[] = []
+
+const getNodeStatus = (id: string): 'healthy' | 'degraded' | 'offline' => {
+  switch (id) {
+    case 'frontend': return frontendStatus.value
+    case 'admin-api': return adminApiStatus.value
+    case 'actor-host': return actorHostStatus.value
+    case 'nats': return natsStatus.value
+    case 'postgres': return pgStatus.value
+    case 'redis': return redisStatus.value
+    case 'firebase': return 'healthy'
+    case 'emulator': return activeActors.value > 0 ? 'healthy' : 'offline'
+    default: return 'offline'
+  }
+}
+
+const getEdgeActive = (edge: ServiceEdge): boolean => {
+  switch (`${edge.from}-${edge.to}`) {
+    case 'frontend-admin-api':
+    case 'frontend-actor-host':
+    case 'admin-api-firebase':
+      return true
+    case 'admin-api-nats':
+    case 'actor-host-nats':
+      return natsStatus.value === 'healthy'
+    case 'emulator-nats':
+      return activeActors.value > 0
+    case 'admin-api-postgres':
+    case 'actor-host-postgres':
+      return pgStatus.value === 'healthy'
+    case 'admin-api-redis':
+    case 'actor-host-redis':
+      return redisStatus.value === 'healthy'
+    default:
+      return false
+  }
+}
 
 const checkServices = async () => {
   // Check Actor Host
@@ -24,10 +93,10 @@ const checkServices = async () => {
   }
   catch { actorHostStatus.value = 'offline' }
 
-  // Check Admin API
+  // Check Admin API (health is now AllowAnonymous)
   try {
-    await fetch('/api/admin/system/health').then(r => { if (!r.ok && r.status !== 401) throw new Error() })
-    adminApiStatus.value = 'healthy'
+    const r = await fetch('/api/admin/system/health')
+    adminApiStatus.value = r.ok ? 'healthy' : 'offline'
   }
   catch { adminApiStatus.value = 'offline' }
 
@@ -42,26 +111,52 @@ const checkServices = async () => {
   redisStatus.value = adminApiStatus.value === 'healthy' ? 'healthy' : 'offline'
 
   loading.value = false
-  drawDiagram()
+
+  if (!diagramDrawn) {
+    drawDiagram()
+    diagramDrawn = true
+  }
+  else {
+    updateStatuses()
+  }
 }
 
-interface ServiceNode {
-  id: string
-  label: string
-  sublabel: string
-  x: number
-  y: number
-  status: 'healthy' | 'degraded' | 'offline'
-  icon: string
-  port?: string
-}
+const updateStatuses = () => {
+  // Update node colors/glows in-place without redrawing
+  nodeElements.forEach(({ node, g }) => {
+    const status = getNodeStatus(node.id)
+    node.status = status
 
-interface ServiceEdge {
-  from: string
-  to: string
-  label: string
-  protocol: string
-  active: boolean
+    const sublabel = node.id === 'actor-host'
+      ? `Proto.Actor Cluster (${activeActors.value} actors)`
+      : node.id === 'emulator'
+        ? (activeActors.value > 0 ? '100 students' : 'Idle')
+        : node.sublabel
+
+    node.sublabel = sublabel
+
+    g.select('circle:nth-child(1)').attr('fill', statusGlow(status))
+    g.select('circle:nth-child(2)').attr('stroke', statusColor(status))
+    g.select('text:nth-child(3)').attr('fill', statusColor(status))
+    g.select('text:nth-child(6)').text(sublabel)
+
+    // Status dot — last circle in the group
+    const circles = g.selectAll('circle')
+    circles.filter((_d: any, i: number) => i === 2).attr('fill', statusColor(status))
+
+    g.select('title').text(`${node.label}\n${sublabel}\nStatus: ${status}${node.port ? `\nPort: ${node.port}` : ''}`)
+  })
+
+  // Update edge styles in-place
+  edgeLines.forEach(({ edge, line, labelText }) => {
+    const active = getEdgeActive(edge)
+    edge.active = active
+    line
+      .attr('stroke', active ? 'rgba(115,103,240,0.4)' : 'rgba(255,255,255,0.08)')
+      .attr('stroke-width', active ? 2 : 1)
+      .attr('stroke-dasharray', active ? 'none' : '4,4')
+    labelText.attr('fill', active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)')
+  })
 }
 
 const drawDiagram = () => {
@@ -75,10 +170,7 @@ const drawDiagram = () => {
 
   svg.attr('viewBox', `0 0 ${width} ${height}`)
 
-  const statusColor = (s: string) => s === 'healthy' ? '#28C76F' : s === 'degraded' ? '#FF9F43' : '#EA5455'
-  const statusGlow = (s: string) => s === 'healthy' ? 'rgba(40,199,111,0.3)' : s === 'degraded' ? 'rgba(255,159,67,0.3)' : 'rgba(234,84,85,0.2)'
-
-  const nodes: (ServiceNode & { fx?: number | null; fy?: number | null })[] = [
+  nodes = [
     { id: 'frontend', label: 'Admin Dashboard', sublabel: 'Vite + Vue 3 + Vuetify', x: width * 0.5, y: 60, status: frontendStatus.value, icon: 'V', port: '5174' },
     { id: 'admin-api', label: 'Admin API', sublabel: '.NET 9 REST + Firebase Auth', x: width * 0.3, y: 220, status: adminApiStatus.value, icon: 'A', port: '5000' },
     { id: 'actor-host', label: 'Actor Host', sublabel: `Proto.Actor Cluster (${activeActors.value} actors)`, x: width * 0.7, y: 220, status: actorHostStatus.value, icon: 'P', port: '5001' },
@@ -89,7 +181,7 @@ const drawDiagram = () => {
     { id: 'emulator', label: 'Student Emulator', sublabel: `${activeActors.value > 0 ? '100 students' : 'Idle'}`, x: width * 0.85, y: 380, status: activeActors.value > 0 ? 'healthy' : 'offline', icon: 'E' },
   ]
 
-  const edges: ServiceEdge[] = [
+  edges = [
     { from: 'frontend', to: 'admin-api', label: 'REST /api/*', protocol: 'HTTP', active: true },
     { from: 'frontend', to: 'actor-host', label: '/api/actors/*', protocol: 'HTTP', active: true },
     { from: 'admin-api', to: 'nats', label: 'Subscribe events', protocol: 'NATS', active: natsStatus.value === 'healthy' },
@@ -102,11 +194,11 @@ const drawDiagram = () => {
     { from: 'admin-api', to: 'firebase', label: 'Token verify', protocol: 'HTTPS', active: true },
   ]
 
-  const nodeMap = new Map(nodes.map(n => [n.id, n]))
+  nodeMap = new Map(nodes.map(n => [n.id, n]))
 
   // ── Edge elements (drawn first, below nodes) ──
   const edgeGroup = svg.append('g')
-  const edgeLines = edges.map(edge => {
+  edgeLines = edges.map(edge => {
     const line = edgeGroup.append('line')
       .attr('stroke', edge.active ? 'rgba(115,103,240,0.4)' : 'rgba(255,255,255,0.08)')
       .attr('stroke-width', edge.active ? 2 : 1)
@@ -129,7 +221,7 @@ const drawDiagram = () => {
 
   // ── Node elements (draggable) ──
   const nodeGroup = svg.append('g')
-  const nodeElements = nodes.map(node => {
+  nodeElements = nodes.map(node => {
     const g = nodeGroup.append('g')
       .style('cursor', 'grab')
       .datum(node)
@@ -164,7 +256,7 @@ const drawDiagram = () => {
   }
 
   // ── D3 Force Simulation (gentle — keeps nodes near initial positions) ──
-  const simulation = d3.forceSimulation(nodes as any)
+  simulation = d3.forceSimulation(nodes as any)
     .force('charge', d3.forceManyBody().strength(-300))
     .force('center', d3.forceCenter(width / 2, height / 2).strength(0.02))
     .force('collision', d3.forceCollide(70))
@@ -181,7 +273,7 @@ const drawDiagram = () => {
   // ── Drag behavior ──
   const drag = d3.drag<SVGGElement, any>()
     .on('start', (event, d) => {
-      if (!event.active) simulation.alphaTarget(0.1).restart()
+      if (!event.active && simulation) simulation.alphaTarget(0.1).restart()
       d.fx = d.x
       d.fy = d.y
       d3.select(event.sourceEvent.target.closest('g')).style('cursor', 'grabbing')
@@ -191,8 +283,7 @@ const drawDiagram = () => {
       d.fy = event.y
     })
     .on('end', (event, d) => {
-      if (!event.active) simulation.alphaTarget(0)
-      // Keep node pinned where user dropped it
+      if (!event.active && simulation) simulation.alphaTarget(0)
       d.fx = event.x
       d.fy = event.y
       d3.select(event.sourceEvent.target.closest('g')).style('cursor', 'grab')
@@ -214,6 +305,8 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
+  if (simulation) simulation.stop()
+  diagramDrawn = false
 })
 </script>
 

@@ -157,11 +157,13 @@ public sealed partial class StudentActor : IActor
             SwitchMethodology cmd=> HandleSwitchMethodology(context, cmd),
             AddAnnotation cmd    => HandleAddAnnotation(context, cmd),
             SyncOfflineEvents cmd=> HandleSyncOfflineEvents(context, cmd),
+            TeacherMethodologyOverride cmd => HandleTeacherMethodologyOverride(context, cmd),
 
             // ---- Queries ----
             GetStudentProfile q  => HandleGetProfile(context, q),
             GetReviewSchedule q  => HandleGetReviewSchedule(context, q),
             GetMasteryOverlayQuery q => HandleGetMasteryOverlay(context, q),
+            GetMethodologyProfile q => HandleGetMethodologyProfile(context, q),
 
             // ---- Internal ----
             StagnationDetected msg => HandleStagnationDetected(context, msg),
@@ -303,6 +305,13 @@ public sealed partial class StudentActor : IActor
         // Marten AggregateStreamAsync handles snapshot + replay automatically.
         var snapshot = await session.Events.AggregateStreamAsync<StudentProfileSnapshot>(_studentId);
 
+        // Always fetch the true stream version from Marten for optimistic concurrency
+        var streamState = await session.Events.FetchStreamStateAsync(_studentId);
+        if (streamState != null)
+        {
+            _state.EventVersion = (int)streamState.Version;
+        }
+
         if (snapshot != null)
         {
             _state.StudentId = snapshot.StudentId;
@@ -404,7 +413,15 @@ public sealed partial class StudentActor : IActor
         // Persist ALL events atomically with expected version
         // RES-001: 2s timeout prevents actor mailbox starvation on slow DB
         await using var session = _documentStore.LightweightSession();
-        session.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
+        if (_state.EventVersion == 0)
+        {
+            // New stream — use StartStream for first-time persistence
+            session.Events.StartStream(_studentId, _pendingEvents.ToArray());
+        }
+        else
+        {
+            session.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
+        }
 
         using var cts = new CancellationTokenSource(EventPersistTimeout);
         try

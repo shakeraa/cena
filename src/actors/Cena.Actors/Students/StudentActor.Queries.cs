@@ -141,6 +141,9 @@ public sealed partial class StudentActor
             case StagnationDetected_V1 e: _state.Apply(e); break;
             case HintRequested_V1: break; // No state mutation
             case QuestionSkipped_V1: break; // No state mutation
+            case MethodologyConfidenceReached_V1 e: _state.Apply(e); break;
+            case MethodologySwitchDeferred_V1 e: _state.Apply(e); break;
+            case TeacherMethodologyOverride_V1 e: _state.Apply(e); break;
         }
     }
 

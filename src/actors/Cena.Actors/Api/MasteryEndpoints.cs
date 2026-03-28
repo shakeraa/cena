@@ -92,6 +92,44 @@ public static class MasteryEndpoints
         .WithName("GetDecayAlerts")
         .RequireAuthorization();
 
+        // GET /api/v1/mastery/{studentId}/methodology-profile
+        group.MapGet("/{studentId}/methodology-profile", async (string studentId, HttpContext ctx) =>
+        {
+            var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
+            var result = await QueryStudentActor<GetMethodologyProfile, ActorResult<MethodologyProfileResponse>>(
+                actorSystem, studentId, new GetMethodologyProfile(studentId));
+
+            if (result?.Success != true)
+                return Results.NotFound(new { error = "Student not found or actor unavailable" });
+
+            return Results.Ok(result.Data);
+        })
+        .WithName("GetMethodologyProfile")
+        .RequireAuthorization();
+
+        // POST /api/v1/mastery/{studentId}/methodology-override
+        group.MapPost("/{studentId}/methodology-override", async (
+            string studentId,
+            MethodologyOverrideRequest body,
+            HttpContext ctx) =>
+        {
+            var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
+            var teacherId = ctx.User.FindFirst("sub")?.Value ?? "unknown";
+
+            var cmd = new TeacherMethodologyOverride(
+                studentId, body.Level, body.LevelId, body.Methodology, teacherId);
+
+            var result = await QueryStudentActor<TeacherMethodologyOverride, ActorResult>(
+                actorSystem, studentId, cmd);
+
+            if (result?.Success != true)
+                return Results.BadRequest(new { error = result?.ErrorMessage ?? "Override failed" });
+
+            return Results.Ok(new { message = "Methodology override applied" });
+        })
+        .WithName("PostMethodologyOverride")
+        .RequireAuthorization();
+
         // GET /api/v1/mastery/{studentId}/review-schedule?maxItems=10
         group.MapGet("/{studentId}/review-schedule", async (string studentId, int? maxItems, HttpContext ctx) =>
         {
@@ -154,3 +192,11 @@ public static class MasteryEndpoints
         }
     }
 }
+
+/// <summary>
+/// Request body for teacher/admin methodology override.
+/// </summary>
+public sealed record MethodologyOverrideRequest(
+    string Level,       // "Subject", "Topic", "Concept"
+    string LevelId,
+    string Methodology);

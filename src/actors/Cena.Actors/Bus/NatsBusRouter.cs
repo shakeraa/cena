@@ -63,6 +63,13 @@ public sealed class NatsBusRouter : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Wait for Proto.Actor cluster to be fully started before processing messages
+        _logger.LogInformation("NatsBusRouter waiting for cluster to be ready...");
+        while (_actorSystem.Cluster()?.MemberList?.GetMembers()?.Count is null or 0)
+        {
+            if (stoppingToken.IsCancellationRequested) return;
+            await Task.Delay(250, stoppingToken);
+        }
         _logger.LogInformation("NatsBusRouter starting — subscribing to command subjects...");
 
         var tasks = new[]
@@ -120,13 +127,13 @@ public sealed class NatsBusRouter : BackgroundService
             p.StudentId, p.SubjectId, p.ConceptId,
             p.DeviceType, p.AppVersion, p.ClientTimestamp, IsOffline: false);
 
-        var response = await _actorSystem.Cluster()
-            .RequestAsync<StartSessionResponse>(p.StudentId, "student", cmd, ct);
+        var result = await _actorSystem.Cluster()
+            .RequestAsync<ActorResult<StartSessionResponse>>(p.StudentId, "student", cmd, ct);
 
-        Interlocked.Increment(ref _sessionsStarted);
-
-        if (response != null)
+        if (result?.Success == true && result.Data is { } response)
         {
+            Interlocked.Increment(ref _sessionsStarted);
+
             _actorStats.AddOrUpdate(p.StudentId,
                 new ActorLiveStats { StudentId = p.StudentId, SessionId = response.SessionId, MessagesProcessed = 1 },
                 (_, s) => { s.SessionId = response.SessionId; s.MessagesProcessed++; s.LastActivity = DateTimeOffset.UtcNow; s.Status = "active"; return s; });
@@ -136,6 +143,10 @@ public sealed class NatsBusRouter : BackgroundService
                     p.StudentId, response.SessionId, p.SubjectId,
                     response.StartingConceptId, response.ActiveMethodology.ToString(),
                     DateTimeOffset.UtcNow));
+        }
+        else
+        {
+            _logger.LogWarning("StartSession failed for {StudentId}: {Error}", p.StudentId, result?.ErrorMessage ?? "null response");
         }
     }
 
@@ -147,7 +158,14 @@ public sealed class NatsBusRouter : BackgroundService
         var cmd = new EndSession(p.StudentId, p.SessionId, reason);
 
         await _actorSystem.Cluster()
-            .RequestAsync<object>(p.StudentId, "student", cmd, ct);
+            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, ct);
+
+        // Mark actor as idle when session ends
+        if (_actorStats.TryGetValue(p.StudentId, out var stat))
+        {
+            stat.Status = "idle";
+            stat.LastActivity = DateTimeOffset.UtcNow;
+        }
 
         await PublishEventAsync(NatsSubjects.EventSessionEnded,
             new BusSessionEndedEvent(
@@ -166,8 +184,8 @@ public sealed class NatsBusRouter : BackgroundService
             qType, p.Answer, p.ResponseTimeMs, p.HintCountUsed,
             p.WasSkipped, p.BackspaceCount, p.AnswerChangeCount, WasOffline: false);
 
-        await _actorSystem.Cluster()
-            .RequestAsync<object>(p.StudentId, "student", cmd, ct);
+        var result = await _actorSystem.Cluster()
+            .RequestAsync<ActorResult<EvaluateAnswerResponse>>(p.StudentId, "student", cmd, ct);
 
         _actorStats.AddOrUpdate(p.StudentId,
             new ActorLiveStats { StudentId = p.StudentId, SessionId = p.SessionId, MessagesProcessed = 1, TotalAttempts = 1, CorrectAttempts = p.Answer == "correct" ? 1 : 0 },
@@ -187,7 +205,7 @@ public sealed class NatsBusRouter : BackgroundService
         var cmd = new SwitchMethodology(p.StudentId, p.StudentId, p.ToMethodology);
 
         await _actorSystem.Cluster()
-            .RequestAsync<object>(p.StudentId, "student", cmd, ct);
+            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, ct);
 
         await PublishEventAsync(NatsSubjects.EventMethodologySwitched,
             new { p.StudentId, p.SessionId, p.FromMethodology, p.ToMethodology, p.Reason,

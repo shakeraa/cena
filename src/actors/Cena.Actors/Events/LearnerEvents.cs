@@ -121,3 +121,52 @@ public record CognitiveLoadCooldownComplete_V1(
     int MinutesCooldown,
     int QuestionsCompleted
 );
+
+// =============================================================================
+// HIERARCHICAL METHODOLOGY EVENTS
+// =============================================================================
+
+/// <summary>
+/// Emitted when a methodology assignment at a hierarchy level crosses the confidence
+/// threshold (N >= 30 for topic/concept, N >= 50 for subject). Signals to admin
+/// that the level now has statistically meaningful data.
+/// </summary>
+public record MethodologyConfidenceReached_V1(
+    string StudentId,
+    string Level,       // "Subject", "Topic", "Concept"
+    string LevelId,     // The subject/topic/concept ID
+    string Methodology,
+    float Confidence,
+    int AttemptCount,
+    float SuccessRate,
+    DateTimeOffset Timestamp
+) : IDelegatedEvent;
+
+/// <summary>
+/// Emitted when a methodology switch was recommended (by MCM or stagnation) but
+/// deferred because the cooldown period is still active.
+/// </summary>
+public record MethodologySwitchDeferred_V1(
+    string StudentId,
+    string ConceptId,
+    string RecommendedMethodology,
+    string CurrentMethodology,
+    string Reason,
+    int CooldownSessionsRemaining,
+    double CooldownHoursRemaining,
+    DateTimeOffset Timestamp
+) : IDelegatedEvent;
+
+/// <summary>
+/// Emitted when a teacher/admin manually overrides the methodology at any
+/// hierarchy level. Takes immediate effect, bypasses cooldown.
+/// </summary>
+public record TeacherMethodologyOverride_V1(
+    string StudentId,
+    string Level,       // "Subject", "Topic", "Concept"
+    string LevelId,
+    string FromMethodology,
+    string ToMethodology,
+    string TeacherId,
+    DateTimeOffset Timestamp
+) : IDelegatedEvent;

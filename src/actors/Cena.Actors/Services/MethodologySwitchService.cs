@@ -5,6 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 using Cena.Actors.Mastery;
+using Cena.Actors.Methodology;
 using Cena.Actors.Students;
 using Microsoft.Extensions.Logging;
 
@@ -55,11 +56,38 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
     }
 
     /// <summary>
-    /// 5-step methodology switching algorithm.
-    /// Adapts DecideSwitchRequest to internal types and returns DecideSwitchResponse.
+    /// 5-step methodology switching algorithm with cooldown enforcement.
+    /// Step 0: Check cooldown. Steps 1-5: classify error → MCM lookup → filter → select → fallback.
     /// </summary>
     public Task<DecideSwitchResponse> DecideSwitch(DecideSwitchRequest request)
     {
+        // ═══ Step 0: Cooldown enforcement ═══
+        if (request.CurrentAssignment != null)
+        {
+            var cooldown = MethodologyResolver.CheckCooldown(
+                request.CurrentAssignment,
+                request.SessionsSinceLastSwitch,
+                DateTimeOffset.UtcNow);
+
+            if (!cooldown.IsAllowed)
+            {
+                _logger.LogInformation(
+                    "Methodology switch deferred for student {StudentId} concept {ConceptId}: {Reason}",
+                    request.StudentId, request.ConceptId, cooldown.Reason);
+
+                return Task.FromResult(new DecideSwitchResponse(
+                    ShouldSwitch: false,
+                    RecommendedMethodology: request.CurrentMethodology,
+                    Confidence: 0,
+                    AllMethodologiesExhausted: false,
+                    EscalationAction: null,
+                    DecisionTrace: $"Cooldown active: {cooldown.Reason}",
+                    DeferredByCooldown: true,
+                    CooldownSessionsRemaining: cooldown.SessionsRemaining,
+                    CooldownHoursRemaining: cooldown.TimeRemaining.TotalHours));
+            }
+        }
+
         // Adapt request to internal types
         var errorDistribution = new Dictionary<string, int>();
         if (request.DominantErrorType != ErrorType.None)
@@ -94,8 +122,8 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
                 dominantError, conceptCategory, selected.Methodology,
                 selected.Confidence, triedMethods.Count, AllMethodologies.Length);
 
-            var recommended = Enum.TryParse<Methodology>(selected.Methodology, true, out var m)
-                ? m : Methodology.Socratic;
+            var recommended = Enum.TryParse<Students.Methodology>(selected.Methodology, true, out var m)
+                ? m : Students.Methodology.Socratic;
 
             return Task.FromResult(new DecideSwitchResponse(
                 ShouldSwitch: true,
@@ -135,8 +163,8 @@ public sealed class MethodologySwitchService : IMethodologySwitchService
                 "Methodology switch (fallback): {Error} → {Method} (no MCM entry, using defaults)",
                 dominantError, fallback.Methodology);
 
-            var recommended = Enum.TryParse<Methodology>(fallback.Methodology, true, out var m)
-                ? m : Methodology.Socratic;
+            var recommended = Enum.TryParse<Students.Methodology>(fallback.Methodology, true, out var m)
+                ? m : Students.Methodology.Socratic;
 
             return Task.FromResult(new DecideSwitchResponse(
                 ShouldSwitch: true,
@@ -198,19 +226,24 @@ public record DecideSwitchRequest(
     string ConceptId,
     string? ConceptCategory,
     ErrorType DominantErrorType,
-    Methodology CurrentMethodology,
+    Students.Methodology CurrentMethodology,
     List<string>? MethodAttemptHistory,
     double StagnationScore,
-    int ConsecutiveStagnantSessions
+    int ConsecutiveStagnantSessions,
+    MethodologyAssignment? CurrentAssignment = null,
+    int SessionsSinceLastSwitch = int.MaxValue
 );
 
 public record DecideSwitchResponse(
     bool ShouldSwitch,
-    Methodology RecommendedMethodology,
+    Students.Methodology RecommendedMethodology,
     double Confidence,
     bool AllMethodologiesExhausted,
     string? EscalationAction,
-    string DecisionTrace
+    string DecisionTrace,
+    bool DeferredByCooldown = false,
+    int CooldownSessionsRemaining = 0,
+    double CooldownHoursRemaining = 0
 );
 
 // ErrorType and Methodology enums are defined in Cena.Actors.Students namespace

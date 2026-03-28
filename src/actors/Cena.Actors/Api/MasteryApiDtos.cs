@@ -22,7 +22,10 @@ public sealed record ConceptMasteryDto(
     DateTimeOffset LastInteraction,
     int AttemptCount,
     int CorrectCount,
-    int CurrentStreak);
+    int CurrentStreak,
+    string? ActiveMethodology = null,
+    string? MethodologySource = null,
+    string? MethodologyResolvedLevel = null);
 
 /// <summary>
 /// Aggregated progress for a topic cluster.
@@ -33,7 +36,11 @@ public sealed record TopicProgressDto(
     int ConceptCount,
     int MasteredCount,
     float AverageMastery,
-    ConceptMasteryDto? WeakestConcept);
+    ConceptMasteryDto? WeakestConcept,
+    string? TopicMethodology = null,
+    string? TopicMethodologySource = null,
+    bool TopicHasSufficientData = false,
+    int TopicMethodologyAttempts = 0);
 
 /// <summary>
 /// A concept on the learning frontier.

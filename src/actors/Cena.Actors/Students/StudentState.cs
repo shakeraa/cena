@@ -9,6 +9,7 @@
 
 using Cena.Actors.Events;
 using Cena.Actors.Mastery;
+using Cena.Actors.Methodology;
 
 namespace Cena.Actors.Students;
 
@@ -35,6 +36,19 @@ public sealed class StudentState
 
     /// <summary>Concept cluster -> ordered list of methodologies tried.</summary>
     public Dictionary<string, List<MethodologyAttemptRecord>> MethodAttemptHistory { get; set; } = new();
+
+    // ---- Hierarchical Methodology Maps (Subject → Topic → Concept cascade) ----
+    /// <summary>Subject ID → methodology assignment with confidence tracking.</summary>
+    public Dictionary<string, MethodologyAssignment> SubjectMethodologyMap { get; set; } = new();
+
+    /// <summary>Topic ID → methodology assignment with confidence tracking.</summary>
+    public Dictionary<string, MethodologyAssignment> TopicMethodologyMap { get; set; } = new();
+
+    /// <summary>Concept ID → methodology assignment with confidence tracking (Layer 5).</summary>
+    public Dictionary<string, MethodologyAssignment> ConceptMethodologyMap { get; set; } = new();
+
+    /// <summary>Sessions since last methodology switch, per level key (for cooldown tracking).</summary>
+    public Dictionary<string, int> SessionsSinceSwitch { get; set; } = new();
 
     // ---- Attempt History (sliding window for baselines) ----
     /// <summary>
@@ -205,6 +219,7 @@ public sealed class StudentState
         SessionCount++;
         ActiveSessionId = e.SessionId;
         ExperimentCohort ??= e.ExperimentCohort;
+        IncrementSessionsSinceSwitch();
         EventVersion++;
     }
 
@@ -238,6 +253,99 @@ public sealed class StudentState
     {
         // Stagnation events are informational -- state is updated via methodology switch
         EventVersion++;
+    }
+
+    public void Apply(MethodologyConfidenceReached_V1 e)
+    {
+        // Informational — confidence milestone logged in event stream
+        EventVersion++;
+    }
+
+    public void Apply(MethodologySwitchDeferred_V1 e)
+    {
+        // Informational — cooldown deferral logged in event stream
+        EventVersion++;
+    }
+
+    public void Apply(TeacherMethodologyOverride_V1 e)
+    {
+        var level = Enum.TryParse<MethodologyLevel>(e.Level, true, out var l)
+            ? l : MethodologyLevel.Concept;
+        var methodology = Enum.TryParse<Methodology>(e.ToMethodology, true, out var m)
+            ? m : Methodology.Socratic;
+
+        var assignment = MethodologyAssignment.Default(methodology, MethodologySource.TeacherOverride)
+            with { LastSwitchAt = e.Timestamp };
+
+        switch (level)
+        {
+            case MethodologyLevel.Subject:
+                SubjectMethodologyMap[e.LevelId] = assignment;
+                break;
+            case MethodologyLevel.Topic:
+                TopicMethodologyMap[e.LevelId] = assignment;
+                break;
+            case MethodologyLevel.Concept:
+                ConceptMethodologyMap[e.LevelId] = assignment;
+                // Keep existing flat map in sync
+                MethodologyMap[e.LevelId] = methodology;
+                break;
+        }
+        EventVersion++;
+    }
+
+    /// <summary>
+    /// Update hierarchical methodology tracking after a concept attempt.
+    /// Aggregates attempt data at concept, topic, and subject levels.
+    /// </summary>
+    public void UpdateMethodologyHierarchy(
+        string conceptId, string? topicId, string? subjectId,
+        bool isCorrect, string methodologyActive)
+    {
+        if (!Enum.TryParse<Methodology>(methodologyActive, true, out var methodology))
+            return;
+
+        // Update concept-level assignment
+        UpdateAssignmentAttempt(ConceptMethodologyMap, conceptId, methodology, isCorrect);
+
+        // Update topic-level assignment
+        if (topicId != null)
+            UpdateAssignmentAttempt(TopicMethodologyMap, topicId, methodology, isCorrect);
+
+        // Update subject-level assignment
+        if (subjectId != null)
+            UpdateAssignmentAttempt(SubjectMethodologyMap, subjectId, methodology, isCorrect);
+    }
+
+    private static void UpdateAssignmentAttempt(
+        Dictionary<string, MethodologyAssignment> map,
+        string key,
+        Methodology methodology,
+        bool isCorrect)
+    {
+        if (map.TryGetValue(key, out var existing) && existing.Methodology == methodology)
+        {
+            map[key] = existing.WithAttempt(isCorrect);
+        }
+        else if (!map.ContainsKey(key))
+        {
+            // First attempt at this level — seed with current methodology
+            map[key] = MethodologyAssignment.Default(methodology, MethodologySource.McmRouted)
+                .WithAttempt(isCorrect);
+        }
+        // If the methodology doesn't match the current assignment, don't update
+        // (the student is using a different method than what's assigned — could be a transition)
+    }
+
+    /// <summary>
+    /// Increment session counters for cooldown tracking across all levels.
+    /// Called on SessionStarted.
+    /// </summary>
+    public void IncrementSessionsSinceSwitch()
+    {
+        var keys = SessionsSinceSwitch.Keys.ToList();
+        foreach (var key in keys)
+            SessionsSinceSwitch[key] = SessionsSinceSwitch[key] + 1;
     }
 
     // =========================================================================
@@ -287,6 +395,9 @@ public sealed class StudentState
         long hlrBytes = HlrTimers.Count * 104L;
         long methodHistoryBytes = MethodAttemptHistory.Sum(kv => 120L + kv.Value.Count * 80L);
         long methodMapBytes = MethodologyMap.Count * 56L;
+        long hierarchyBytes = (SubjectMethodologyMap.Count + TopicMethodologyMap.Count
+            + ConceptMethodologyMap.Count) * 128L
+            + SessionsSinceSwitch.Count * 48L;
 
         // MST-006: MasteryOverlay — ConceptMasteryState record (~256 bytes) + arrays
         long overlayBytes = MasteryOverlay.Sum(kv =>
@@ -298,7 +409,7 @@ public sealed class StudentState
         const long baseOverhead = 2048;
 
         return masteryBytes + attemptBytes + hlrBytes
-             + methodHistoryBytes + methodMapBytes
+             + methodHistoryBytes + methodMapBytes + hierarchyBytes
              + overlayBytes + baselineBytes + baseOverhead;
     }
 }
