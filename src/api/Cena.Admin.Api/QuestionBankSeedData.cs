@@ -5,6 +5,7 @@
 // =============================================================================
 
 using Cena.Actors.Events;
+using Cena.Actors.Ingest;
 using Cena.Actors.Questions;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -17,9 +18,21 @@ public static class QuestionBankSeedData
     {
         await using var session = store.QuerySession();
         var existingCount = await session.Query<QuestionReadModel>().CountAsync();
+
+        // If questions exist but moderation audit docs don't, seed just the audit docs
         if (existingCount > 0)
         {
-            logger.LogInformation("Question bank already has {Count} questions, skipping seed", existingCount);
+            var auditCount = await session.Query<ModerationAuditDocument>().CountAsync();
+            if (auditCount == 0)
+            {
+                logger.LogInformation("Questions exist but no moderation audit docs — seeding audit trail...");
+                await SeedModerationAuditDocsAsync(store, logger);
+            }
+            else
+            {
+                logger.LogInformation("Question bank already has {Count} questions + {Audits} audit docs, skipping seed",
+                    existingCount, auditCount);
+            }
             return;
         }
 
@@ -58,11 +71,30 @@ public static class QuestionBankSeedData
             };
 
             writeSession.Events.StartStream<QuestionState>(id, creationEvent);
+
+            // Create matching ModerationAuditDocument for the moderation queue
+            var auditDoc = new ModerationAuditDocument
+            {
+                Id = id,
+                QuestionId = id,
+                Status = ModerationItemStatus.Pending,
+                SourceType = q.Source,
+                AiQualityScore = (int)(q.Difficulty * 100),
+                StemPreview = q.Stem.Length > 120 ? q.Stem[..120] + "..." : q.Stem,
+                Subject = q.Subject,
+                Grade = q.Grade,
+                Language = q.Language,
+                CreatedBy = q.Source == "ai-generated" ? "System" : SeedAuthor(seeded),
+                SubmittedAt = now.AddDays(-Random.Shared.Next(0, 7)).AddHours(-Random.Shared.Next(0, 24)),
+                UpdatedAt = now,
+            };
+            writeSession.Store(auditDoc);
+
             seeded++;
         }
 
         await writeSession.SaveChangesAsync();
-        logger.LogInformation("Seeded {Count} questions into event store", seeded);
+        logger.LogInformation("Seeded {Count} questions + moderation audit docs into event store", seeded);
     }
 
     // ── MATH (25 questions) ──────────────────────────────────────────────
@@ -413,6 +445,60 @@ public static class QuestionBankSeedData
         new(stem, subject, topic, grade, bloom, difficulty, concepts, language, source,
             new SeedOption(a.l, a.t, a.c, a.r), new SeedOption(b.l, b.t, b.c, b.r),
             new SeedOption(c2.l, c2.t, c2.c, c2.r), new SeedOption(d.l, d.t, d.c, d.r));
+
+    /// <summary>
+    /// Create ModerationAuditDocument for all existing questions that don't have one.
+    /// This handles the case where questions were seeded before the moderation system existed.
+    /// </summary>
+    private static async Task SeedModerationAuditDocsAsync(IDocumentStore store, ILogger logger)
+    {
+        await using var readSession = store.QuerySession();
+        var questions = await readSession.Query<QuestionReadModel>().ToListAsync();
+
+        await using var writeSession = store.LightweightSession();
+        var now = DateTimeOffset.UtcNow;
+        int created = 0;
+
+        foreach (var q in questions)
+        {
+            // Check if audit doc already exists
+            var existing = await readSession.LoadAsync<ModerationAuditDocument>(q.Id);
+            if (existing is not null) continue;
+
+            var auditDoc = new ModerationAuditDocument
+            {
+                Id = q.Id,
+                QuestionId = q.Id,
+                Status = ModerationItemStatus.Pending,
+                SourceType = q.SourceType ?? "authored",
+                AiQualityScore = q.QualityScore,
+                StemPreview = q.StemPreview.Length > 120 ? q.StemPreview[..120] + "..." : q.StemPreview,
+                Subject = q.Subject,
+                Grade = q.Grade ?? "",
+                Language = q.Language ?? "he",
+                CreatedBy = SeedAuthor(created),
+                SubmittedAt = q.CreatedAt != default ? q.CreatedAt : now.AddDays(-Random.Shared.Next(0, 7)),
+                UpdatedAt = now,
+            };
+            writeSession.Store(auditDoc);
+            created++;
+        }
+
+        if (created > 0)
+        {
+            await writeSession.SaveChangesAsync();
+            logger.LogInformation("Created {Count} moderation audit docs for existing questions", created);
+        }
+    }
+
+    private static string SeedAuthor(int index) => (index % 5) switch
+    {
+        0 => "Dr. Cohen",
+        1 => "Prof. Levi",
+        2 => "Sarah A.",
+        3 => "Ahmed K.",
+        _ => "System"
+    };
 
     private sealed record SeedQuestion(
         string Stem, string Subject, string Topic, string Grade,
