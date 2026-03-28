@@ -185,6 +185,9 @@ public static class SimulationEventSeeder
                     turnTime = turnTime.Add(turnInterval);
                 }
 
+                // ~15% of sessions are "active" (no EndedAt), biased toward recent dates
+                var isActive = dayOffset > simulationDays * 0.8 && rng.NextDouble() < 0.15;
+
                 var doc = new TutoringSessionDocument
                 {
                     Id = $"tutor-sim-{student.StudentId}-{index}",
@@ -195,8 +198,8 @@ public static class SimulationEventSeeder
                     Methodology = methodology,
                     Turns = turns,
                     TotalTurns = turnCount,
-                    StartedAt = startedAt,
-                    EndedAt = endedAt
+                    StartedAt = isActive ? DateTimeOffset.UtcNow.AddMinutes(-rng.Next(1, 30)) : startedAt,
+                    EndedAt = isActive ? null : endedAt
                 };
 
                 session.Store(doc);
