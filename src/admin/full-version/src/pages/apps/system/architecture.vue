@@ -14,7 +14,30 @@ const frontendStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const activeActors = ref(0)
 
 const statusColor = (s: string) => s === 'healthy' ? '#28C76F' : s === 'degraded' ? '#FF9F43' : '#EA5455'
-const statusGlow = (s: string) => s === 'healthy' ? 'rgba(40,199,111,0.3)' : s === 'degraded' ? 'rgba(255,159,67,0.3)' : 'rgba(234,84,85,0.2)'
+const statusGlow = (s: string) => s === 'healthy' ? 'rgba(40,199,111,0.4)' : s === 'degraded' ? 'rgba(255,159,67,0.4)' : 'rgba(234,84,85,0.25)'
+
+const protocolColor: Record<string, string> = {
+  HTTP: '#7367F0',
+  HTTPS: '#FF9F43',
+  NATS: '#00BCD4',
+  TCP: '#28C76F',
+}
+
+// Category colors for actor types
+const categoryColor: Record<string, string> = {
+  core: '#7367F0',
+  graph: '#00BCD4',
+  ai: '#FF9F43',
+  outreach: '#28C76F',
+  infra: '#EA5455',
+}
+
+interface ClusterChild {
+  id: string
+  label: string
+  icon: string
+  category: string
+}
 
 interface ServiceNode {
   id: string
@@ -25,8 +48,8 @@ interface ServiceNode {
   status: 'healthy' | 'degraded' | 'offline'
   icon: string
   port?: string
-  fx?: number | null
-  fy?: number | null
+  children?: ClusterChild[]
+  expanded?: boolean
 }
 
 interface ServiceEdge {
@@ -41,12 +64,29 @@ interface ServiceEdge {
 let nodes: ServiceNode[] = []
 let edges: ServiceEdge[] = []
 let nodeMap = new Map<string, ServiceNode>()
-let simulation: d3.Simulation<any, any> | null = null
 let diagramDrawn = false
 
 // D3 element refs for in-place updates
 let nodeElements: { node: ServiceNode; g: d3.Selection<SVGGElement, any, any, any> }[] = []
-let edgeLines: { edge: ServiceEdge; line: d3.Selection<SVGLineElement, any, any, any>; labelText: d3.Selection<SVGTextElement, any, any, any>; protocolText: d3.Selection<SVGTextElement, any, any, any> }[] = []
+let edgeLines: { edge: ServiceEdge; line: d3.Selection<SVGLineElement, any, any, any>; labelText: d3.Selection<SVGTextElement, any, any, any>; protocolText: d3.Selection<SVGTextElement, any, any, any>; labelBg?: d3.Selection<SVGRectElement, any, any, any> }[] = []
+
+// Cluster expand state — persists across redraws
+const expandedClusters = ref<Set<string>>(new Set())
+
+const actorChildren: ClusterChild[] = [
+  { id: 'student-actor', label: 'Student', icon: 'S', category: 'core' },
+  { id: 'session-actor', label: 'Session', icon: 'LS', category: 'core' },
+  { id: 'curriculum-actor', label: 'Curriculum', icon: 'CG', category: 'graph' },
+  { id: 'mcm-actor', label: 'MCM Graph', icon: 'M', category: 'graph' },
+  { id: 'llm-gateway', label: 'LLM Gateway', icon: 'LG', category: 'ai' },
+  { id: 'circuit-breaker', label: 'Circuit Breaker', icon: 'CB', category: 'ai' },
+  { id: 'outreach-actor', label: 'Outreach', icon: 'OR', category: 'outreach' },
+  { id: 'stagnation-actor', label: 'Stagnation', icon: 'SD', category: 'outreach' },
+  { id: 'health-actor', label: 'Health Agg', icon: 'HA', category: 'infra' },
+  { id: 'feature-flag', label: 'Feature Flag', icon: 'FF', category: 'infra' },
+  { id: 'conversation-actor', label: 'Messaging', icon: 'CT', category: 'infra' },
+  { id: 'analytics-actor', label: 'Analytics', icon: 'AN', category: 'infra' },
+]
 
 const getNodeStatus = (id: string): 'healthy' | 'degraded' | 'offline' => {
   switch (id) {
@@ -85,7 +125,6 @@ const getEdgeActive = (edge: ServiceEdge): boolean => {
 }
 
 const checkServices = async () => {
-  // Check Actor Host
   try {
     const data = await fetch('/api/actors/stats').then(r => r.json())
     actorHostStatus.value = 'healthy'
@@ -93,20 +132,14 @@ const checkServices = async () => {
   }
   catch { actorHostStatus.value = 'offline' }
 
-  // Check Admin API (health is now AllowAnonymous)
   try {
     const r = await fetch('/api/admin/system/health')
     adminApiStatus.value = r.ok ? 'healthy' : 'offline'
   }
   catch { adminApiStatus.value = 'offline' }
 
-  // Frontend is healthy if we're here
   frontendStatus.value = 'healthy'
-
-  // NATS — infer from actor host
   natsStatus.value = actorHostStatus.value === 'healthy' ? 'healthy' : 'offline'
-
-  // PG/Redis — infer from admin API
   pgStatus.value = adminApiStatus.value === 'healthy' ? 'healthy' : 'offline'
   redisStatus.value = adminApiStatus.value === 'healthy' ? 'healthy' : 'offline'
 
@@ -122,7 +155,6 @@ const checkServices = async () => {
 }
 
 const updateStatuses = () => {
-  // Update node colors/glows in-place without redrawing
   nodeElements.forEach(({ node, g }) => {
     const status = getNodeStatus(node.id)
     node.status = status
@@ -135,28 +167,49 @@ const updateStatuses = () => {
 
     node.sublabel = sublabel
 
-    g.select('circle:nth-child(1)').attr('fill', statusGlow(status))
-    g.select('circle:nth-child(2)').attr('stroke', statusColor(status))
-    g.select('text:nth-child(3)').attr('fill', statusColor(status))
-    g.select('text:nth-child(6)').text(sublabel)
-
-    // Status dot — last circle in the group
-    const circles = g.selectAll('circle')
-    circles.filter((_d: any, i: number) => i === 2).attr('fill', statusColor(status))
+    // Update colors on the collapsed node elements
+    if (!node.expanded) {
+      g.select('.node-glow').attr('fill', statusGlow(status))
+      g.select('.node-circle').attr('stroke', statusColor(status))
+      g.select('.node-icon').attr('fill', statusColor(status))
+      g.select('.node-sublabel').text(sublabel)
+      g.select('.node-status-dot').attr('fill', statusColor(status))
+    }
+    else {
+      // Update expanded cluster border
+      g.select('.cluster-border').attr('stroke', statusColor(status))
+      g.select('.cluster-title').attr('fill', statusColor(status))
+      g.select('.cluster-sublabel').text(sublabel)
+    }
 
     g.select('title').text(`${node.label}\n${sublabel}\nStatus: ${status}${node.port ? `\nPort: ${node.port}` : ''}`)
   })
 
-  // Update edge styles in-place
   edgeLines.forEach(({ edge, line, labelText }) => {
     const active = getEdgeActive(edge)
     edge.active = active
+    const color = protocolColor[edge.protocol] ?? '#7367F0'
     line
-      .attr('stroke', active ? 'rgba(115,103,240,0.4)' : 'rgba(255,255,255,0.08)')
-      .attr('stroke-width', active ? 2 : 1)
-      .attr('stroke-dasharray', active ? 'none' : '4,4')
-    labelText.attr('fill', active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)')
+      .attr('stroke', active ? color : 'rgba(200,200,220,0.35)')
+      .attr('stroke-width', active ? 2.5 : 2)
+      .attr('stroke-dasharray', active ? 'none' : '8,5')
+      .attr('opacity', active ? 0.9 : 0.7)
+    labelText.attr('fill', active ? 'rgba(255,255,255,0.95)' : 'rgba(220,220,230,0.7)')
   })
+}
+
+const toggleCluster = (node: ServiceNode) => {
+  if (!node.children?.length) return
+  if (expandedClusters.value.has(node.id)) {
+    expandedClusters.value.delete(node.id)
+  }
+  else {
+    expandedClusters.value.add(node.id)
+  }
+  // Full redraw to recalculate layout
+  diagramDrawn = false
+  drawDiagram()
+  diagramDrawn = true
 }
 
 const drawDiagram = () => {
@@ -165,20 +218,23 @@ const drawDiagram = () => {
   const svg = d3.select(svgRef.value)
   svg.selectAll('*').remove()
 
-  const width = svgRef.value.clientWidth || 1000
-  const height = 700
+  const width = Math.max(svgRef.value.clientWidth, 900)
+  const height = 750
 
   svg.attr('viewBox', `0 0 ${width} ${height}`)
 
+  const px = 100
+  const iw = width - px * 2
+
   nodes = [
-    { id: 'frontend', label: 'Admin Dashboard', sublabel: 'Vite + Vue 3 + Vuetify', x: width * 0.5, y: 60, status: frontendStatus.value, icon: 'V', port: '5174' },
-    { id: 'admin-api', label: 'Admin API', sublabel: '.NET 9 REST + Firebase Auth', x: width * 0.3, y: 220, status: adminApiStatus.value, icon: 'A', port: '5000' },
-    { id: 'actor-host', label: 'Actor Host', sublabel: `Proto.Actor Cluster (${activeActors.value} actors)`, x: width * 0.7, y: 220, status: actorHostStatus.value, icon: 'P', port: '5001' },
-    { id: 'nats', label: 'NATS JetStream', sublabel: 'Message Bus', x: width * 0.5, y: 380, status: natsStatus.value, icon: 'N', port: '4222' },
-    { id: 'postgres', label: 'PostgreSQL', sublabel: 'Marten Event Store', x: width * 0.2, y: 520, status: pgStatus.value, icon: 'PG', port: '5433' },
-    { id: 'redis', label: 'Redis', sublabel: 'Cache + Sessions', x: width * 0.5, y: 520, status: redisStatus.value, icon: 'R', port: '6379' },
-    { id: 'firebase', label: 'Firebase Auth', sublabel: 'Google OAuth + JWT', x: width * 0.15, y: 380, status: 'healthy', icon: 'F' },
-    { id: 'emulator', label: 'Student Emulator', sublabel: `${activeActors.value > 0 ? '100 students' : 'Idle'}`, x: width * 0.85, y: 380, status: activeActors.value > 0 ? 'healthy' : 'offline', icon: 'E' },
+    { id: 'frontend', label: 'Admin Dashboard', sublabel: 'Vite + Vue 3 + Vuetify', x: px + iw * 0.5, y: 70, status: frontendStatus.value, icon: 'V', port: '5174' },
+    { id: 'admin-api', label: 'Admin API', sublabel: '.NET 9 REST + Firebase Auth', x: px + iw * 0.25, y: 250, status: adminApiStatus.value, icon: 'A', port: '5000' },
+    { id: 'actor-host', label: 'Actor Host', sublabel: `Proto.Actor Cluster (${activeActors.value} actors)`, x: px + iw * 0.75, y: 250, status: actorHostStatus.value, icon: 'P', port: '5001', children: actorChildren, expanded: expandedClusters.value.has('actor-host') },
+    { id: 'nats', label: 'NATS JetStream', sublabel: 'Message Bus', x: px + iw * 0.5, y: 430, status: natsStatus.value, icon: 'N', port: '4222' },
+    { id: 'postgres', label: 'PostgreSQL', sublabel: 'Marten Event Store', x: px + iw * 0.15, y: 620, status: pgStatus.value, icon: 'PG', port: '5433' },
+    { id: 'redis', label: 'Redis', sublabel: 'Cache + Sessions', x: px + iw * 0.5, y: 620, status: redisStatus.value, icon: 'R', port: '6379' },
+    { id: 'firebase', label: 'Firebase Auth', sublabel: 'Google OAuth + JWT', x: px + iw * 0.0, y: 430, status: 'healthy', icon: 'F' },
+    { id: 'emulator', label: 'Student Emulator', sublabel: `${activeActors.value > 0 ? '100 students' : 'Idle'}`, x: px + iw * 1.0, y: 430, status: activeActors.value > 0 ? 'healthy' : 'offline', icon: 'E' },
   ]
 
   edges = [
@@ -196,97 +252,132 @@ const drawDiagram = () => {
 
   nodeMap = new Map(nodes.map(n => [n.id, n]))
 
-  // ── Edge elements (drawn first, below nodes) ──
+  // ── Arrow markers per protocol ──
+  const defs = svg.append('defs')
+  for (const [proto, color] of Object.entries(protocolColor)) {
+    defs.append('marker')
+      .attr('id', `arrow-${proto}`)
+      .attr('viewBox', '0 0 10 6')
+      .attr('refX', 10)
+      .attr('refY', 3)
+      .attr('markerWidth', 8)
+      .attr('markerHeight', 6)
+      .attr('orient', 'auto')
+      .append('path')
+      .attr('d', 'M0,0 L10,3 L0,6 Z')
+      .attr('fill', color)
+      .attr('opacity', 0.9)
+  }
+
+  // ── Edge elements ──
   const edgeGroup = svg.append('g')
   edgeLines = edges.map(edge => {
+    const color = protocolColor[edge.protocol] ?? '#7367F0'
     const line = edgeGroup.append('line')
-      .attr('stroke', edge.active ? 'rgba(115,103,240,0.4)' : 'rgba(255,255,255,0.08)')
-      .attr('stroke-width', edge.active ? 2 : 1)
-      .attr('stroke-dasharray', edge.active ? 'none' : '4,4')
+      .attr('stroke', edge.active ? color : 'rgba(200,200,220,0.35)')
+      .attr('stroke-width', edge.active ? 2.5 : 2)
+      .attr('stroke-dasharray', edge.active ? 'none' : '8,5')
+      .attr('opacity', edge.active ? 0.9 : 0.7)
+      .attr('marker-end', `url(#arrow-${edge.protocol})`)
+
+    const labelBg = edgeGroup.append('rect')
+      .attr('rx', 6).attr('ry', 6)
+      .attr('fill', 'rgba(22,24,36,0.92)')
+      .attr('stroke', color)
+      .attr('stroke-width', 1)
+      .attr('opacity', 1)
 
     const labelText = edgeGroup.append('text')
       .attr('text-anchor', 'middle')
-      .attr('font-size', '9px')
-      .attr('fill', edge.active ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.2)')
+      .attr('font-size', '11px')
+      .attr('font-weight', '600')
+      .attr('fill', edge.active ? 'rgba(255,255,255,0.95)' : 'rgba(220,220,230,0.7)')
       .text(edge.label)
 
     const protocolText = edgeGroup.append('text')
       .attr('text-anchor', 'middle')
-      .attr('font-size', '8px')
-      .attr('fill', 'rgba(115,103,240,0.6)')
+      .attr('font-size', '10px')
+      .attr('font-weight', '700')
+      .attr('fill', color)
+      .attr('opacity', 0.95)
       .text(edge.protocol)
 
-    return { edge, line, labelText, protocolText }
+    return { edge, line, labelText, protocolText, labelBg }
   })
 
-  // ── Node elements (draggable) ──
+  // ── Node elements ──
   const nodeGroup = svg.append('g')
   nodeElements = nodes.map(node => {
     const g = nodeGroup.append('g')
-      .style('cursor', 'grab')
+      .style('cursor', node.children?.length ? 'pointer' : 'grab')
       .datum(node)
 
-    g.append('circle').attr('r', 40).attr('fill', statusGlow(node.status)).attr('opacity', 0.5)
-    g.append('circle').attr('r', 32).attr('fill', 'rgba(40,42,54,0.9)').attr('stroke', statusColor(node.status)).attr('stroke-width', 2.5)
-    g.append('text').attr('text-anchor', 'middle').attr('dy', 5).attr('font-size', '14px').attr('font-weight', '700').attr('fill', statusColor(node.status)).text(node.icon)
-    g.append('text').attr('y', 48).attr('text-anchor', 'middle').attr('font-size', '12px').attr('font-weight', '600').attr('fill', 'rgba(255,255,255,0.9)').text(node.label)
-    g.append('text').attr('y', 62).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', 'rgba(255,255,255,0.5)').text(node.sublabel)
-    if (node.port) g.append('text').attr('y', -38).attr('text-anchor', 'middle').attr('font-size', '9px').attr('fill', 'rgba(115,103,240,0.7)').text(`:${node.port}`)
-    g.append('circle').attr('cx', 24).attr('cy', -24).attr('r', 5).attr('fill', statusColor(node.status))
-    g.append('title').text(`${node.label}\n${node.sublabel}\nStatus: ${node.status}${node.port ? `\nPort: ${node.port}` : ''}`)
+    if (node.expanded && node.children?.length) {
+      drawExpandedCluster(g, node)
+    }
+    else {
+      drawCollapsedNode(g, node)
+    }
+
+    g.append('title').text(`${node.label}\n${node.sublabel}\nStatus: ${node.status}${node.port ? `\nPort: ${node.port}` : ''}${node.children?.length ? '\nClick to expand cluster' : ''}`)
 
     return { node, g }
   })
 
-  // ── Update positions (called on every tick and drag) ──
+  // ── Click handler for clusters ──
+  nodeElements.forEach(({ node, g }) => {
+    if (node.children?.length) {
+      g.on('click', (event) => {
+        event.stopPropagation()
+        toggleCluster(node)
+      })
+    }
+  })
+
+  // ── Update positions ──
   const updatePositions = () => {
     nodeElements.forEach(({ node, g }) => {
       g.attr('transform', `translate(${node.x}, ${node.y})`)
     })
 
-    edgeLines.forEach(({ edge, line, labelText, protocolText }) => {
+    edgeLines.forEach(({ edge, line, labelText, protocolText, labelBg }) => {
       const from = nodeMap.get(edge.from)!
       const to = nodeMap.get(edge.to)!
-      line.attr('x1', from.x).attr('y1', from.y).attr('x2', to.x).attr('y2', to.y)
+      const dx = to.x - from.x
+      const dy = to.y - from.y
+      const dist = Math.sqrt(dx * dx + dy * dy) || 1
+      // Use larger offset for expanded clusters
+      const fromOffset = from.expanded ? 90 : 40
+      const toOffset = to.expanded ? 90 : 40
+      line
+        .attr('x1', from.x + (dx / dist) * fromOffset)
+        .attr('y1', from.y + (dy / dist) * fromOffset)
+        .attr('x2', to.x - (dx / dist) * toOffset)
+        .attr('y2', to.y - (dy / dist) * toOffset)
       const mx = (from.x + to.x) / 2
       const my = (from.y + to.y) / 2
-      labelText.attr('x', mx).attr('y', my - 4)
-      protocolText.attr('x', mx).attr('y', my + 8)
+      labelText.attr('x', mx).attr('y', my - 5)
+      protocolText.attr('x', mx).attr('y', my + 9)
+      if (labelBg) {
+        const textLen = Math.max((edge.label.length * 6) + 12, 50)
+        labelBg.attr('x', mx - textLen / 2).attr('y', my - 18).attr('width', textLen).attr('height', 30)
+      }
     })
   }
 
-  // ── D3 Force Simulation (gentle — keeps nodes near initial positions) ──
-  simulation = d3.forceSimulation(nodes as any)
-    .force('charge', d3.forceManyBody().strength(-300))
-    .force('center', d3.forceCenter(width / 2, height / 2).strength(0.02))
-    .force('collision', d3.forceCollide(70))
-    .force('link', d3.forceLink(edges.map(e => ({
-      source: e.from,
-      target: e.to,
-    }))).id((d: any) => d.id).distance(180).strength(0.3))
-    .alphaDecay(0.05)
-    .on('tick', updatePositions)
-
-  // Let simulation settle quickly, then stop (nodes stay draggable)
-  simulation.alpha(0.3).restart()
-
   // ── Drag behavior ──
   const drag = d3.drag<SVGGElement, any>()
-    .on('start', (event, d) => {
-      if (!event.active && simulation) simulation.alphaTarget(0.1).restart()
-      d.fx = d.x
-      d.fy = d.y
+    .on('start', (event, _d) => {
       d3.select(event.sourceEvent.target.closest('g')).style('cursor', 'grabbing')
     })
     .on('drag', (event, d) => {
-      d.fx = event.x
-      d.fy = event.y
+      d.x = event.x
+      d.y = event.y
+      updatePositions()
     })
     .on('end', (event, d) => {
-      if (!event.active && simulation) simulation.alphaTarget(0)
-      d.fx = event.x
-      d.fy = event.y
-      d3.select(event.sourceEvent.target.closest('g')).style('cursor', 'grab')
+      const el = d3.select(event.sourceEvent.target.closest('g'))
+      el.style('cursor', d.children?.length ? 'pointer' : 'grab')
     })
 
   nodeElements.forEach(({ g }) => {
@@ -294,6 +385,131 @@ const drawDiagram = () => {
   })
 
   updatePositions()
+}
+
+// ── Draw a collapsed (single circle) node ──
+const drawCollapsedNode = (g: d3.Selection<SVGGElement, any, any, any>, node: ServiceNode) => {
+  g.append('circle').attr('class', 'node-glow').attr('r', 44).attr('fill', statusGlow(node.status)).attr('opacity', 0.6)
+  g.append('circle').attr('class', 'node-circle').attr('r', 36).attr('fill', 'rgba(30,32,44,0.95)').attr('stroke', statusColor(node.status)).attr('stroke-width', 3)
+  g.append('text').attr('class', 'node-icon').attr('text-anchor', 'middle').attr('dy', 6).attr('font-size', '16px').attr('font-weight', '800').attr('fill', statusColor(node.status)).text(node.icon)
+  g.append('text').attr('class', 'node-label').attr('y', 52).attr('text-anchor', 'middle').attr('font-size', '13px').attr('font-weight', '600').attr('fill', 'rgba(255,255,255,0.95)').text(node.label)
+  g.append('text').attr('class', 'node-sublabel').attr('y', 68).attr('text-anchor', 'middle').attr('font-size', '10px').attr('fill', 'rgba(255,255,255,0.6)').text(node.sublabel)
+
+  if (node.port) {
+    g.append('rect').attr('x', -16).attr('y', -52).attr('width', 32).attr('height', 16).attr('rx', 8).attr('fill', 'rgba(115,103,240,0.15)').attr('stroke', 'rgba(115,103,240,0.4)').attr('stroke-width', 1)
+    g.append('text').attr('y', -40).attr('text-anchor', 'middle').attr('font-size', '9px').attr('font-weight', '600').attr('fill', 'rgba(115,103,240,0.9)').text(`:${node.port}`)
+  }
+
+  g.append('circle').attr('class', 'node-status-dot').attr('cx', 28).attr('cy', -28).attr('r', 6).attr('fill', statusColor(node.status)).attr('stroke', 'rgba(30,32,44,0.95)').attr('stroke-width', 2)
+
+  // Expand indicator for cluster nodes
+  if (node.children?.length) {
+    g.append('circle').attr('cx', -28).attr('cy', -28).attr('r', 10).attr('fill', 'rgba(115,103,240,0.2)').attr('stroke', 'rgba(115,103,240,0.5)').attr('stroke-width', 1)
+    g.append('text').attr('x', -28).attr('y', -24).attr('text-anchor', 'middle').attr('font-size', '11px').attr('font-weight', '700').attr('fill', 'rgba(115,103,240,0.9)').text('+')
+  }
+}
+
+// ── Draw an expanded cluster with child nodes ──
+const drawExpandedCluster = (g: d3.Selection<SVGGElement, any, any, any>, node: ServiceNode) => {
+  const children = node.children!
+  const cols = 4
+  const rows = Math.ceil(children.length / cols)
+  const cellW = 80
+  const cellH = 60
+  const padX = 20
+  const padTop = 50
+  const padBottom = 30
+  const clusterW = cols * cellW + padX * 2
+  const clusterH = rows * cellH + padTop + padBottom
+
+  // Cluster background
+  g.append('rect')
+    .attr('class', 'cluster-bg')
+    .attr('x', -clusterW / 2)
+    .attr('y', -clusterH / 2)
+    .attr('width', clusterW)
+    .attr('height', clusterH)
+    .attr('rx', 16)
+    .attr('fill', 'rgba(22,24,36,0.95)')
+    .attr('stroke', 'rgba(115,103,240,0.15)')
+    .attr('stroke-width', 1)
+
+  // Cluster border with status color
+  g.append('rect')
+    .attr('class', 'cluster-border')
+    .attr('x', -clusterW / 2)
+    .attr('y', -clusterH / 2)
+    .attr('width', clusterW)
+    .attr('height', clusterH)
+    .attr('rx', 16)
+    .attr('fill', 'none')
+    .attr('stroke', statusColor(node.status))
+    .attr('stroke-width', 2)
+    .attr('opacity', 0.6)
+
+  // Title
+  g.append('text')
+    .attr('class', 'cluster-title')
+    .attr('x', 0)
+    .attr('y', -clusterH / 2 + 22)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', '14px')
+    .attr('font-weight', '700')
+    .attr('fill', statusColor(node.status))
+    .text(node.label)
+
+  // Sublabel
+  g.append('text')
+    .attr('class', 'cluster-sublabel')
+    .attr('x', 0)
+    .attr('y', -clusterH / 2 + 38)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', '10px')
+    .attr('fill', 'rgba(255,255,255,0.6)')
+    .text(node.sublabel)
+
+  // Port badge
+  if (node.port) {
+    g.append('rect').attr('x', clusterW / 2 - 36).attr('y', -clusterH / 2 + 6).attr('width', 32).attr('height', 16).attr('rx', 8).attr('fill', 'rgba(115,103,240,0.15)').attr('stroke', 'rgba(115,103,240,0.4)').attr('stroke-width', 1)
+    g.append('text').attr('x', clusterW / 2 - 20).attr('y', -clusterH / 2 + 18).attr('text-anchor', 'middle').attr('font-size', '9px').attr('font-weight', '600').attr('fill', 'rgba(115,103,240,0.9)').text(`:${node.port}`)
+  }
+
+  // Collapse button (top-left)
+  g.append('circle').attr('cx', -clusterW / 2 + 16).attr('cy', -clusterH / 2 + 16).attr('r', 10).attr('fill', 'rgba(234,84,85,0.2)').attr('stroke', 'rgba(234,84,85,0.5)').attr('stroke-width', 1)
+  g.append('text').attr('x', -clusterW / 2 + 16).attr('y', -clusterH / 2 + 20).attr('text-anchor', 'middle').attr('font-size', '12px').attr('font-weight', '700').attr('fill', 'rgba(234,84,85,0.9)').text('−')
+
+  // Child nodes grid
+  const gridStartX = -clusterW / 2 + padX + cellW / 2
+  const gridStartY = -clusterH / 2 + padTop + cellH / 2
+
+  children.forEach((child, i) => {
+    const col = i % cols
+    const row = Math.floor(i / cols)
+    const cx = gridStartX + col * cellW
+    const cy = gridStartY + row * cellH
+    const catColor = categoryColor[child.category] ?? '#7367F0'
+
+    // Child glow
+    g.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 22).attr('fill', catColor).attr('opacity', 0.1)
+    // Child circle
+    g.append('circle').attr('cx', cx).attr('cy', cy).attr('r', 18).attr('fill', 'rgba(30,32,44,0.95)').attr('stroke', catColor).attr('stroke-width', 1.5)
+    // Child icon
+    g.append('text').attr('x', cx).attr('y', cy + 4).attr('text-anchor', 'middle').attr('font-size', '10px').attr('font-weight', '700').attr('fill', catColor).text(child.icon)
+    // Child label
+    g.append('text').attr('x', cx).attr('y', cy + 32).attr('text-anchor', 'middle').attr('font-size', '8px').attr('font-weight', '500').attr('fill', 'rgba(255,255,255,0.7)').text(child.label)
+  })
+
+  // Category legend inside cluster (bottom)
+  const categories = [...new Set(children.map(c => c.category))]
+  const legendY = clusterH / 2 - 14
+  const legendStartX = -(categories.length * 70) / 2
+
+  categories.forEach((cat, i) => {
+    const lx = legendStartX + i * 70
+    const color = categoryColor[cat] ?? '#7367F0'
+    g.append('circle').attr('cx', lx).attr('cy', legendY).attr('r', 4).attr('fill', color)
+    g.append('text').attr('x', lx + 8).attr('y', legendY + 3).attr('font-size', '8px').attr('fill', 'rgba(255,255,255,0.5)').text(cat)
+  })
 }
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
@@ -305,7 +521,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
-  if (simulation) simulation.stop()
   diagramDrawn = false
 })
 </script>
@@ -333,12 +548,12 @@ onUnmounted(() => {
       <VCardText class="pa-0">
         <div
           class="architecture-container"
-          style="min-height: 700px; background: rgb(var(--v-theme-surface));"
+          style="min-height: 750px; background: rgb(var(--v-theme-surface));"
         >
           <svg
             ref="svgRef"
             width="100%"
-            height="700"
+            height="750"
             style="display: block;"
           />
         </div>
@@ -348,27 +563,40 @@ onUnmounted(() => {
     <!-- Legend -->
     <VCard class="mt-4">
       <VCardText class="d-flex flex-wrap gap-6 align-center">
+        <span class="text-caption font-weight-bold text-medium-emphasis">STATUS</span>
         <div class="d-flex align-center gap-2">
-          <div
-            style="width: 12px; height: 12px; border-radius: 50%; background: #28C76F;"
-          />
+          <div style="width: 12px; height: 12px; border-radius: 50%; background: #28C76F;" />
           <span class="text-body-2">Healthy</span>
         </div>
         <div class="d-flex align-center gap-2">
-          <div
-            style="width: 12px; height: 12px; border-radius: 50%; background: #FF9F43;"
-          />
+          <div style="width: 12px; height: 12px; border-radius: 50%; background: #FF9F43;" />
           <span class="text-body-2">Degraded</span>
         </div>
         <div class="d-flex align-center gap-2">
-          <div
-            style="width: 12px; height: 12px; border-radius: 50%; background: #EA5455;"
-          />
+          <div style="width: 12px; height: 12px; border-radius: 50%; background: #EA5455;" />
           <span class="text-body-2">Offline</span>
         </div>
         <VDivider vertical />
+        <span class="text-caption font-weight-bold text-medium-emphasis">PROTOCOLS</span>
+        <div class="d-flex align-center gap-2">
+          <div style="width: 20px; height: 3px; background: #7367F0; border-radius: 2px;" />
+          <span class="text-body-2">HTTP</span>
+        </div>
+        <div class="d-flex align-center gap-2">
+          <div style="width: 20px; height: 3px; background: #FF9F43; border-radius: 2px;" />
+          <span class="text-body-2">HTTPS</span>
+        </div>
+        <div class="d-flex align-center gap-2">
+          <div style="width: 20px; height: 3px; background: #00BCD4; border-radius: 2px;" />
+          <span class="text-body-2">NATS</span>
+        </div>
+        <div class="d-flex align-center gap-2">
+          <div style="width: 20px; height: 3px; background: #28C76F; border-radius: 2px;" />
+          <span class="text-body-2">TCP</span>
+        </div>
+        <VDivider vertical />
         <span class="text-body-2 text-medium-emphasis">
-          Auto-refreshes every 5 seconds. Solid lines = active connection, dashed = disconnected.
+          Auto-refreshes every 5s. Click cluster nodes (+) to expand.
         </span>
       </VCardText>
     </VCard>
