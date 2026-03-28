@@ -35,9 +35,9 @@ const headers = [
 const fetchExperiments = async () => {
   loading.value = true
   try {
-    const data = await $api<Experiment[]>('/admin/experiments')
+    const data = await $api<{ experiments: Experiment[] }>('/admin/experiments')
 
-    experiments.value = (data ?? []).map(exp => ({
+    experiments.value = (data.experiments ?? []).map(exp => ({
       name: exp.name ?? '',
       description: exp.description ?? '',
       status: exp.status ?? 'unknown',

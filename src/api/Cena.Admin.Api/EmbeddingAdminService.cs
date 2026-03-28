@@ -37,8 +37,20 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
 
     public async Task<EmbeddingCorpusStatsResponse> GetCorpusStatsAsync()
     {
+        try
+        {
         await using var conn = new NpgsqlConnection(_connectionString);
         await conn.OpenAsync();
+
+        // Check if table exists
+        await using var checkCmd = new NpgsqlCommand(
+            "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema = 'cena' AND table_name = 'content_embeddings')", conn);
+        var tableExists = (bool)(await checkCmd.ExecuteScalarAsync() ?? false);
+        if (!tableExists)
+        {
+            _logger.LogWarning("content_embeddings table does not exist — pgvector may not be installed");
+            return new EmbeddingCorpusStatsResponse(0, new(), new(), new(), new(), 0f);
+        }
 
         // Total blocks
         await using var countCmd = new NpgsqlCommand(
@@ -107,6 +119,12 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
         return new EmbeddingCorpusStatsResponse(
             totalBlocks, subjectCounts, conceptCounts,
             contentTypeCounts, languageCounts, indexSizeMb);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to query corpus stats — table may not exist");
+            return new EmbeddingCorpusStatsResponse(0, new(), new(), new(), new(), 0f);
+        }
     }
 
     // ── Search ──

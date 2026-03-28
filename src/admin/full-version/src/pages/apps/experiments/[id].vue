@@ -88,9 +88,9 @@ const fetchExperiment = async () => {
 
 const fetchFunnel = async () => {
   try {
-    const data = await $api<FunnelStage[]>(`/admin/experiments/${experimentName.value}/funnel`)
+    const data = await $api<{ stages: FunnelStage[] }>(`/admin/experiments/${experimentName.value}/funnel`)
 
-    funnel.value = (data ?? []).map(s => ({
+    funnel.value = (data.stages ?? []).map(s => ({
       stage: s.stage ?? '',
       count: s.count ?? 0,
     }))

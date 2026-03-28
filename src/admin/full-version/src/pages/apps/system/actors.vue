@@ -137,7 +137,7 @@ const accuracyColor = (acc: number): string => {
       <template #title>
         Actor Host Unreachable
       </template>
-      The Actor Host (port 5001) is not running. Start it with:
+      The Actor Host (port 5119) is not running. Start it with:
       <code class="d-block mt-2">cd src/actors/Cena.Actors.Host && dotnet run</code>
     </VAlert>
 
