@@ -1,5 +1,6 @@
 using System.Diagnostics.Metrics;
 using System.Reflection;
+using Cena.Actors.Mastery;
 using Cena.Actors.Services;
 using Cena.Actors.Sessions;
 using Microsoft.Extensions.Logging;
@@ -18,12 +19,19 @@ public sealed class FatigueComputationTests
     public FatigueComputationTests()
     {
         var bkt = Substitute.For<IBktService>();
+        var hintAdjustedBkt = Substitute.For<IHintAdjustedBktService>();
         var cognitiveLoad = new CognitiveLoadService();
         var logger = Substitute.For<ILogger<LearningSessionActor>>();
         var meterFactory = Substitute.For<IMeterFactory>();
         meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter("test"));
         var hintGenerator = new HintGenerator();
-        _actor = new LearningSessionActor(bkt, cognitiveLoad, hintGenerator, logger, meterFactory);
+        var hintGenerationService = new HintGenerationService();
+        var confusionDetector = new ConfusionDetector();
+        var disengagementClassifier = new DisengagementClassifier();
+        var graphCache = Substitute.For<IConceptGraphCache>();
+        _actor = new LearningSessionActor(
+            bkt, hintAdjustedBkt, cognitiveLoad, hintGenerator, hintGenerationService,
+            confusionDetector, disengagementClassifier, graphCache, logger, meterFactory);
     }
 
     [Fact]

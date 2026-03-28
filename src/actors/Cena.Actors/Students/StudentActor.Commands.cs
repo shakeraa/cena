@@ -77,10 +77,16 @@ public sealed partial class StudentActor
                 var priorMastery = _state.MasteryMap.GetValueOrDefault(cmd.ConceptId, 0.3);
                 bool isCorrect = !cmd.WasSkipped; // conservative assumption without evaluator
 
-                var bktResult = _bktService.Update(new BktUpdateInput(
+                // SAI-002: Use hint-adjusted BKT when hints were used.
+                // Credit curve: 0 hints = 1.0x, 1 = 0.7x, 2 = 0.4x, 3+ = 0.1x.
+                var bktInput = new BktUpdateInput(
                     PriorMastery: priorMastery,
                     IsCorrect: isCorrect,
-                    Parameters: BktParameters.Default));
+                    Parameters: BktParameters.Default);
+
+                var bktResult = cmd.HintCountUsed > 0
+                    ? _hintAdjustedBktService.UpdateWithHints(bktInput, cmd.HintCountUsed)
+                    : _bktService.Update(bktInput);
 
                 double updatedMastery = bktResult.PosteriorMastery;
 
@@ -146,9 +152,23 @@ public sealed partial class StudentActor
                     new KeyValuePair<string, object?>("student.id", _studentId),
                     new KeyValuePair<string, object?>("correct", isCorrect));
 
+                // SAI-001: Look up persisted L1 explanation for this question
+                string explanation = "";
+                try
+                {
+                    await using var qs = _documentStore.QuerySession();
+                    var readModel = await qs.LoadAsync<Questions.QuestionReadModel>(cmd.QuestionId);
+                    explanation = readModel?.Explanation ?? "";
+                }
+                catch (Exception expl)
+                {
+                    _logger.LogWarning(expl,
+                        "Failed to load explanation for question {QuestionId}", cmd.QuestionId);
+                }
+
                 var evalResponse = new EvaluateAnswerResponse(
                     cmd.QuestionId, isCorrect, isCorrect ? 1.0 : 0.0,
-                    "Evaluated inline (session actor unavailable)",
+                    explanation,
                     ErrorType.None, updatedMastery, "continue", xpEarned);
 
                 context.Respond(new ActorResult<EvaluateAnswerResponse>(true, evalResponse));

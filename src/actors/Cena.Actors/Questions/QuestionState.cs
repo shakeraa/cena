@@ -31,7 +31,8 @@ public sealed record AiGenerationState(
     float ModelTemperature,
     string RawModelOutput,
     string RequestedBy,
-    DateTimeOffset GeneratedAt);
+    DateTimeOffset GeneratedAt,
+    string? Explanation);
 
 public sealed record LanguageVersionState(
     string Language,
@@ -129,6 +130,7 @@ public sealed class QuestionState
         SourceType = "authored";
         CreatedBy = e.AuthorId;
         CreatedAt = e.Timestamp;
+        Explanation = e.Explanation;
         Status = QuestionLifecycleStatus.Draft;
         EventVersion++;
     }
@@ -149,6 +151,7 @@ public sealed class QuestionState
         SourceType = "ingested";
         CreatedBy = e.ImportedBy;
         CreatedAt = e.Timestamp;
+        Explanation = e.Explanation;
         Status = QuestionLifecycleStatus.Draft;
         Provenance = new QuestionProvenanceState(
             e.SourceDocId, e.SourceUrl, e.SourceFilename,
@@ -175,7 +178,8 @@ public sealed class QuestionState
         Status = QuestionLifecycleStatus.Draft;
         AiProvenance = new AiGenerationState(
             e.PromptText, e.ModelId, e.ModelTemperature,
-            e.RawModelOutput, e.RequestedBy, e.Timestamp);
+            e.RawModelOutput, e.RequestedBy, e.Timestamp,
+            e.Explanation);
         Explanation = e.Explanation;
         EventVersion++;
     }
@@ -268,6 +272,13 @@ public sealed class QuestionState
     {
         Explanation = e.NewExplanation;
         UpdatedAt = e.Timestamp;
+        EventVersion++;
+    }
+
+    public void Apply(QuestionExplanationUpdated_V1 e)
+    {
+        Explanation = e.Explanation;
+        UpdatedAt = e.UpdatedAt;
         EventVersion++;
     }
 

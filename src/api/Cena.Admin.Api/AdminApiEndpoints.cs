@@ -540,6 +540,18 @@ public static class AdminApiEndpoints
             return result != null ? Results.Created($"/api/admin/questions/{result.Id}", result) : Results.BadRequest();
         }).WithName("CreateQuestion");
 
+        group.MapPatch("/{id}/explanation", async (string id, UpdateExplanationRequest request, HttpContext ctx, IQuestionBankService service) =>
+        {
+            if (string.IsNullOrWhiteSpace(request.Explanation))
+                return Results.BadRequest(new { error = "Explanation cannot be empty." });
+            if (request.Explanation.Length > 5000)
+                return Results.BadRequest(new { error = "Explanation must be 5000 characters or fewer." });
+
+            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
+            var result = await service.UpdateExplanationAsync(id, request.Explanation, userId);
+            return result != null ? Results.Ok(result) : Results.NotFound();
+        }).WithName("UpdateQuestionExplanation");
+
         group.MapPost("/{id}/publish", async (string id, HttpContext ctx, IQuestionBankService service) =>
         {
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";

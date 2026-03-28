@@ -174,6 +174,9 @@ public sealed record CreateOptionRequest(
     bool IsCorrect,
     string? DistractorRationale);
 
+// Update Explanation
+public sealed record UpdateExplanationRequest(string Explanation);
+
 // Publish Question
 public sealed record PublishQuestionRequest(string? Reason);
 

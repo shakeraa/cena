@@ -77,9 +77,11 @@ public sealed class StudentActorPersistTimeoutTests
             redis,
             Substitute.For<ILogger<Cena.Actors.Sync.OfflineSyncHandler>>());
 
+        var hintAdjustedBkt = Substitute.For<Cena.Actors.Services.IHintAdjustedBktService>();
+
         // Act
         var actor = new StudentActor(
-            store, nats, redis, logger, methodologySwitch, bkt, syncHandler, meterFactory);
+            store, nats, redis, logger, methodologySwitch, bkt, hintAdjustedBkt, syncHandler, meterFactory);
 
         // Assert: verify meter was created for StudentActor
         Assert.Contains("Cena.Actors.StudentActor", meterFactory.CreatedMeterNames);

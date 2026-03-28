@@ -87,6 +87,15 @@ public static class MartenConfiguration
             .Index(x => x.Subject)
             .Index(x => x.SubmittedAt);
 
+        // ── Content Document (SAI-06: Content Extraction Pipeline) ──
+        opts.Schema.For<ContentDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.PipelineItemId)
+            .Index(x => x.Subject)
+            .Index(x => x.Type)
+            .Index(x => x.Language)
+            .Index(x => x.AssociatedConceptId);
+
         // ── Register Ingestion Pipeline Events ──
         RegisterIngestionEvents(opts);
 
@@ -167,6 +176,8 @@ public static class MartenConfiguration
         opts.Events.AddEventType<QuestionPublished_V1>();
         opts.Events.AddEventType<QuestionDeprecated_V1>();
         opts.Events.AddEventType<QuestionForked_V1>();
+        opts.Events.AddEventType<ExplanationEdited_V1>();
+        opts.Events.AddEventType<QuestionExplanationUpdated_V1>();
         opts.Events.AddEventType<LanguageVersionAdded_V1>();
     }
 }

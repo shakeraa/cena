@@ -14,15 +14,25 @@ public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, 
 {
     // ── Creation Events → Create Read Model ──
 
-    public QuestionReadModel Create(QuestionAuthored_V1 e) => FromCreation(
-        e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
-        e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
-        "authored", e.AuthorId, e.Timestamp);
+    public QuestionReadModel Create(QuestionAuthored_V1 e)
+    {
+        var model = FromCreation(
+            e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
+            e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
+            "authored", e.AuthorId, e.Timestamp);
+        model.Explanation = e.Explanation;
+        return model;
+    }
 
-    public QuestionReadModel Create(QuestionIngested_V1 e) => FromCreation(
-        e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
-        e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
-        "ingested", e.ImportedBy, e.Timestamp);
+    public QuestionReadModel Create(QuestionIngested_V1 e)
+    {
+        var model = FromCreation(
+            e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
+            e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
+            "ingested", e.ImportedBy, e.Timestamp);
+        model.Explanation = e.Explanation;
+        return model;
+    }
 
     public QuestionReadModel Create(QuestionAiGenerated_V1 e)
     {
@@ -40,6 +50,12 @@ public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, 
     {
         model.Explanation = e.NewExplanation;
         model.UpdatedAt = e.Timestamp;
+    }
+
+    public void Apply(QuestionExplanationUpdated_V1 e, QuestionReadModel model)
+    {
+        model.Explanation = e.Explanation;
+        model.UpdatedAt = e.UpdatedAt;
     }
 
     // ── Edit Events → Update Read Model ──

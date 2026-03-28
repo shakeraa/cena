@@ -33,6 +33,7 @@ public interface IQuestionBankService
     Task<QuestionBankDetailResponse?> CreateQuestionAsync(CreateQuestionRequest request, string userId);
     Task<bool> PublishAsync(string id, string userId);
     Task<bool> AddLanguageVersionAsync(string id, AddLanguageVersionRequest request, string userId);
+    Task<QuestionBankDetailResponse?> UpdateExplanationAsync(string id, string explanation, string userId);
 }
 
 public sealed class QuestionBankService : IQuestionBankService
@@ -283,7 +284,7 @@ public sealed class QuestionBankService : IQuestionBankService
                 request.ConceptIds ?? new List<string>(), request.Language,
                 request.SourceDocId ?? "", request.SourceUrl ?? "",
                 request.SourceFilename ?? "", request.OriginalText,
-                userId, now),
+                userId, now, request.Explanation),
             "ai-generated" => new QuestionAiGenerated_V1(
                 id, request.Stem, request.StemHtml ?? $"<p>{request.Stem}</p>",
                 options, request.Subject, request.Topic ?? "", request.Grade ?? "",
@@ -297,22 +298,16 @@ public sealed class QuestionBankService : IQuestionBankService
                 options, request.Subject, request.Topic ?? "", request.Grade ?? "",
                 request.BloomsLevel, request.Difficulty,
                 request.ConceptIds ?? new List<string>(), request.Language,
-                userId, now)
+                userId, now, request.Explanation)
         };
 
         var events = new List<object> { creationEvent };
-
-        // For non-AI questions, persist explanation via separate event
-        if (request.SourceType != "ai-generated" && !string.IsNullOrEmpty(request.Explanation))
-        {
-            events.Add(new ExplanationEdited_V1(id, null, request.Explanation, userId, now));
-        }
 
         // Run quality gate
         var gateInput = BuildGateInput(id, request.Stem, request.Options,
             request.Subject, request.Language, request.BloomsLevel,
             request.Difficulty, request.Grade, request.ConceptIds);
-        var gateResult = _qualityGate.Evaluate(gateInput);
+        var gateResult = await _qualityGate.EvaluateAsync(gateInput);
         events.Add(MapGateEvent(id, gateResult, now));
 
         // Auto-approve if gate passes
@@ -366,9 +361,24 @@ public sealed class QuestionBankService : IQuestionBankService
         return true;
     }
 
+    public async Task<QuestionBankDetailResponse?> UpdateExplanationAsync(
+        string id, string explanation, string userId)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        if (state == null) return null;
+
+        var evt = new QuestionExplanationUpdated_V1(id, explanation, userId, DateTimeOffset.UtcNow);
+        session.Events.Append(id, state.EventVersion + 1, evt);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation("Updated explanation for question {QuestionId}", id);
+        return await GetQuestionAsync(id);
+    }
+
     // ── Private Helpers ──
 
-    private QualityGate.QualityGateResult EvaluateQualityGate(QuestionState state, string stem)
+    private async Task<QualityGate.QualityGateResult> EvaluateQualityGateAsync(QuestionState state, string stem)
     {
         var gateOptions = state.Options.Select(o =>
             new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale)).ToList();
@@ -379,7 +389,7 @@ public sealed class QuestionBankService : IQuestionBankService
             state.Subject, state.PrimaryLanguage, state.BloomsLevel,
             state.Difficulty, state.Grade, state.ConceptIds);
 
-        return _qualityGate.Evaluate(input);
+        return await _qualityGate.EvaluateAsync(input);
     }
 
     private static QualityGateInput BuildGateInput(

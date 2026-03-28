@@ -1,8 +1,7 @@
-// ═══════════════════════════════════════════════════════════════════════
 // Cena Platform — LearningSessionActor (Classic, Session-Scoped)
 // Created by StudentActor on StartSession, destroyed on EndSession.
-// Owns: current question, fatigue scoring, BKT updates, item selection.
-// ═══════════════════════════════════════════════════════════════════════
+// Owns: current question, fatigue scoring, BKT updates, item selection,
+// hint generation with confusion gating and disengagement suppression (SAI-01b).
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
@@ -25,8 +24,13 @@ namespace Cena.Actors.Sessions;
 public sealed class LearningSessionActor : IActor
 {
     private readonly IBktService _bkt;
+    private readonly IHintAdjustedBktService _hintAdjustedBkt;
     private readonly ICognitiveLoadService _cognitiveLoad;
     private readonly IHintGenerator _hintGenerator;
+    private readonly IHintGenerationService _hintGenerationService;
+    private readonly IConfusionDetector _confusionDetector;
+    private readonly IDisengagementClassifier _disengagementClassifier;
+    private readonly Mastery.IConceptGraphCache _graphCache;
     private readonly ILogger<LearningSessionActor> _logger;
 
     // ── Session State ──
@@ -34,6 +38,7 @@ public sealed class LearningSessionActor : IActor
     private string _studentId = "";
     private string _subject = "";
     private string _methodology = "socratic";
+    private string _language = "he";
     private DateTimeOffset _startedAt;
     private int _questionsAttempted;
     private int _questionsCorrect;
@@ -43,6 +48,19 @@ public sealed class LearningSessionActor : IActor
     private readonly Queue<double> _recentResponseTimes = new();
     private double _baselineAccuracy = 0.5;
     private double _baselineResponseTimeMs = 5000;
+
+    // ── Confusion tracking state (for ConfusionDetector input) ──
+    private int _confusionWindowQuestions;
+    private int _confusionWindowCorrect;
+    private bool _lastAnswerCorrect;
+    private int _lastAnswerChangeCount;
+    private bool _lastHintRequestedThenCancelled;
+    private bool _lastWrongOnMastered;
+    private double _lastResponseTimeRatio = 1.0;
+
+    // ── Disengagement tracking state ──
+    private int _hintRequestCount;
+    private double _minutesSinceLastBreak;
 
     // ── Fatigue Configuration ──
     private const double FatigueThreshold = 0.7;
@@ -57,14 +75,24 @@ public sealed class LearningSessionActor : IActor
 
     public LearningSessionActor(
         IBktService bkt,
+        IHintAdjustedBktService hintAdjustedBkt,
         ICognitiveLoadService cognitiveLoad,
         IHintGenerator hintGenerator,
+        IHintGenerationService hintGenerationService,
+        IConfusionDetector confusionDetector,
+        IDisengagementClassifier disengagementClassifier,
+        Mastery.IConceptGraphCache graphCache,
         ILogger<LearningSessionActor> logger,
         IMeterFactory meterFactory)
     {
         _bkt = bkt;
+        _hintAdjustedBkt = hintAdjustedBkt;
         _cognitiveLoad = cognitiveLoad;
         _hintGenerator = hintGenerator;
+        _hintGenerationService = hintGenerationService;
+        _confusionDetector = confusionDetector;
+        _disengagementClassifier = disengagementClassifier;
+        _graphCache = graphCache;
         _logger = logger;
         _activitySource = new ActivitySource("Cena.Actors.LearningSession", "1.0.0");
         var meter = meterFactory.Create("Cena.Actors.LearningSession", "1.0.0");
@@ -94,6 +122,7 @@ public sealed class LearningSessionActor : IActor
         _studentId = init.StudentId;
         _subject = init.Subject;
         _methodology = init.Methodology;
+        _language = init.Language ?? "he";
         _startedAt = DateTimeOffset.UtcNow;
         _baselineAccuracy = init.BaselineAccuracy;
         _baselineResponseTimeMs = init.BaselineResponseTimeMs;
@@ -109,21 +138,32 @@ public sealed class LearningSessionActor : IActor
         return Task.CompletedTask;
     }
 
-    // ── Answer Evaluation (REAL BKT) ──
+    // ── Answer Evaluation (REAL BKT with hint credit adjustment) ──
     private Task HandleEvaluateAnswer(IContext context, EvaluateAnswerRequest req)
     {
         using var span = _activitySource.StartActivity("EvaluateAnswer");
         _questionsCounter.Add(1);
         _questionsAttempted++;
 
-        // REAL BKT update — Corbett & Anderson formula, microsecond scale
-        var bktResult = _bkt.Update(new BktUpdateInput(
+        // SAI-01b: Hint-adjusted BKT — reduces P(T) credit based on hints used
+        var bktInput = new BktUpdateInput(
             PriorMastery: req.PriorMastery,
             IsCorrect: req.IsCorrect,
-            Parameters: req.BktParameters
-        ));
+            Parameters: req.BktParameters);
+
+        var bktResult = req.HintCountUsed > 0
+            ? _hintAdjustedBkt.UpdateWithHints(bktInput, req.HintCountUsed)
+            : _bkt.Update(bktInput);
 
         if (req.IsCorrect) _questionsCorrect++;
+
+        // SAI-01b: Track confusion signals for gating
+        _lastAnswerCorrect = req.IsCorrect;
+        _lastAnswerChangeCount = req.AnswerChangeCount;
+        _lastResponseTimeRatio = _baselineResponseTimeMs > 0
+            ? req.ResponseTimeMs / _baselineResponseTimeMs
+            : 1.0;
+        _lastWrongOnMastered = !req.IsCorrect && req.PriorMastery > 0.7;
 
         // Track for fatigue calculation (O(1) enqueue/dequeue)
         _recentAccuracies.Enqueue(req.IsCorrect ? 1.0 : 0.0);
@@ -247,13 +287,42 @@ public sealed class LearningSessionActor : IActor
         return Task.CompletedTask;
     }
 
-    // ── Hint ──
+    // ── Hint (SAI-01b: confusion gating + disengagement suppression) ──
     private Task HandleHint(IContext context, RequestHintMessage req)
     {
+        bool isExplicitStudentRequest = req.IsExplicitRequest;
+
+        // SAI-01b: Confusion-state gating — check before delivering any hint
+        var confusionState = _confusionDetector.Detect(BuildConfusionInput());
+
+        if (confusionState == ConfusionState.ConfusionResolving && !isExplicitStudentRequest)
+        {
+            // D'Mello & Graesser 2012: productive struggle — suppress auto-hints
+            _logger.LogDebug("Session {SessionId}: hint suppressed — ConfusionResolving", _sessionId);
+            context.Respond(new HintResponse(req.HintLevel, Delivered: false,
+                SuppressedReason: "confusion_resolving"));
+            return Task.CompletedTask;
+        }
+        if (confusionState == ConfusionState.ConfusionStuck)
+            _logger.LogInformation("Session {SessionId}: student stuck on {ConceptId}", _sessionId, req.ConceptId);
+
+        // SAI-01b: Disengagement suppression — boredom vs fatigue
+        var disengagement = _disengagementClassifier.Classify(BuildDisengagementInput());
+
+        if (disengagement == DisengagementType.Bored_TooEasy && !isExplicitStudentRequest)
+        {
+            _logger.LogDebug("Session {SessionId}: hint suppressed — Bored_TooEasy", _sessionId);
+            context.Respond(new HintResponse(req.HintLevel, Delivered: false,
+                SuppressedReason: "bored_too_easy"));
+            return Task.CompletedTask;
+        }
+        if (disengagement == DisengagementType.Fatigued_Cognitive)
+            _logger.LogDebug("Session {SessionId}: Fatigued_Cognitive — simplifying hint", _sessionId);
+
         // Scaffold level determines max hints allowed
-        var scaffoldMeta = ScaffoldingService.GetScaffoldingMetadata(
-            ScaffoldingService.DetermineLevel(
-                (float)req.CurrentMastery, (float)req.PrerequisiteSatisfaction));
+        var scaffoldLevel = ScaffoldingService.DetermineLevel(
+            (float)req.CurrentMastery, (float)req.PrerequisiteSatisfaction);
+        var scaffoldMeta = ScaffoldingService.GetScaffoldingMetadata(scaffoldLevel);
 
         if (req.HintLevel > scaffoldMeta.MaxHints)
         {
@@ -261,21 +330,91 @@ public sealed class LearningSessionActor : IActor
             return Task.CompletedTask;
         }
 
-        // Generate hint content from existing data
-        var hint = _hintGenerator.Generate(new HintRequest(
-            req.HintLevel, req.QuestionId, req.ConceptId,
-            req.PrerequisiteConceptNames,
-            req.QuestionOptions,
-            req.QuestionExplanation,
-            req.StudentAnswer));
+        // SAI-002: Resolve prerequisite edges from concept graph for richer hints
+        var prerequisites = _graphCache.GetPrerequisites(req.ConceptId);
+        var prereqNames = req.PrerequisiteConceptNames ?? BuildPrerequisiteNames(prerequisites);
+        var prereqIds = prerequisites.Select(e => e.SourceConceptId).ToList();
+
+        // SAI-01b: Determine effective hint level (fatigue simplification)
+        int effectiveHintLevel = req.HintLevel;
+        if (disengagement == DisengagementType.Fatigued_Cognitive && req.HintLevel > 1)
+            effectiveHintLevel = 1; // Simplify to nudge-level
+
+        // SAI-01b: Use new HintGenerationService for language-aware templates
+        var hintGenContent = _hintGenerationService.GenerateHint(new HintGenerationContext(
+            HintLevel: effectiveHintLevel,
+            ConceptId: req.ConceptId,
+            QuestionStem: "", // Stem not passed in current message shape
+            PrerequisiteConceptIds: prereqIds,
+            PrerequisiteNames: prereqNames,
+            DistractorRationale: req.QuestionOptions?.FirstOrDefault(o =>
+                !o.IsCorrect && !string.IsNullOrEmpty(o.DistractorRationale))?.DistractorRationale,
+            ScaffoldingLevel: scaffoldLevel,
+            Language: _language,
+            Options: req.QuestionOptions,
+            QuestionExplanation: req.QuestionExplanation,
+            StudentAnswer: req.StudentAnswer,
+            ConceptState: req.ConceptState));
+
+        _hintRequestCount++;
 
         // Emit event for analytics
         if (context.Parent != null)
             context.Send(context.Parent, new DelegateEvent(new HintRequested_V1(
                 _studentId, _sessionId, req.ConceptId, req.QuestionId, req.HintLevel)));
 
-        context.Respond(new HintResponse(req.HintLevel, Delivered: true, hint.Text, hint.HasMoreHints));
+        context.Respond(new HintResponse(req.HintLevel, Delivered: true,
+            hintGenContent.HintText, hintGenContent.HasMoreHints));
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Resolve prerequisite concept names from graph cache edges.
+    /// Sorted by Strength descending so the strongest prerequisite appears first.
+    /// </summary>
+    private IReadOnlyList<string> BuildPrerequisiteNames(
+        IReadOnlyList<MasteryPrerequisiteEdge> edges)
+    {
+        if (edges.Count == 0)
+            return Array.Empty<string>();
+
+        var names = new List<string>(edges.Count);
+        foreach (var edge in edges.OrderByDescending(e => e.Strength))
+        {
+            if (_graphCache.Concepts.TryGetValue(edge.SourceConceptId, out var node))
+                names.Add(node.Name);
+        }
+        return names;
+    }
+
+    // ── Confusion/Disengagement Input Builders (SAI-01b) ──
+
+    private ConfusionInput BuildConfusionInput() => new(
+        WrongOnMasteredConcept: _lastWrongOnMastered,
+        ResponseTimeRatio: _lastResponseTimeRatio,
+        LastAnswerCorrect: _lastAnswerCorrect,
+        AnswerChangedCount: _lastAnswerChangeCount,
+        HintRequestedThenCancelled: _lastHintRequestedThenCancelled,
+        QuestionsInConfusionWindow: _confusionWindowQuestions,
+        AccuracyInConfusionWindow: _confusionWindowQuestions > 0
+            ? (double)_confusionWindowCorrect / _confusionWindowQuestions : 0.5);
+
+    private DisengagementInput BuildDisengagementInput()
+    {
+        var mins = (DateTimeOffset.UtcNow - _startedAt).TotalMinutes;
+        return new DisengagementInput(
+            RecentAccuracy: _recentAccuracies.Count > 0
+                ? _recentAccuracies.TakeLast(10).Sum() / Math.Min(_recentAccuracies.Count, 10) : 0.5,
+            ResponseTimeRatio: _baselineResponseTimeMs > 0 && _recentResponseTimes.Count > 0
+                ? _recentResponseTimes.Last() / _baselineResponseTimeMs : 1.0,
+            EngagementTrend: 0.0,
+            HintRequestRate: _questionsAttempted > 0 ? (double)_hintRequestCount / _questionsAttempted : 0.0,
+            AppBackgroundingRate: 0.0,
+            MinutesSinceLastBreak: mins,
+            TouchPatternConsistencyDelta: 0.0,
+            SessionsToday: 1,
+            MinutesInSession: mins,
+            IsLateEvening: false);
     }
 
     // ── Skip ──
@@ -320,7 +459,8 @@ public sealed class LearningSessionActor : IActor
 
 public record InitSession(
     string SessionId, string StudentId, string Subject, string Methodology,
-    double BaselineAccuracy, double BaselineResponseTimeMs);
+    double BaselineAccuracy, double BaselineResponseTimeMs,
+    string? Language = "he");
 
 public record EvaluateAnswerRequest(
     string ConceptId, string QuestionId, string QuestionType,
@@ -347,9 +487,12 @@ public record RequestHintMessage(
     IReadOnlyList<string>? PrerequisiteConceptNames = null,
     IReadOnlyList<Cena.Actors.Questions.QuestionOptionState>? QuestionOptions = null,
     string? QuestionExplanation = null,
-    string? StudentAnswer = null);
+    string? StudentAnswer = null,
+    Cena.Actors.Mastery.ConceptMasteryState? ConceptState = null,
+    bool IsExplicitRequest = true);
 
-public record HintResponse(int HintLevel, bool Delivered, string? HintText = null, bool HasMoreHints = false);
+public record HintResponse(int HintLevel, bool Delivered, string? HintText = null,
+    bool HasMoreHints = false, string? SuppressedReason = null);
 public record SkipQuestionMessage(string ConceptId, string QuestionId, int TimeSpentMs);
 public record EndSessionRequest;
 

@@ -17,6 +17,7 @@ using Cena.Actors.Infrastructure;
 using Cena.Actors.Services;
 using Cena.Actors.Students;
 using Cena.Actors.Sync;
+using Cena.Actors.Tutoring;
 using Marten;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -137,11 +138,24 @@ builder.Services.AddSingleton<IHlrService, HlrService>();
 builder.Services.AddSingleton<ICognitiveLoadService, CognitiveLoadService>();
 builder.Services.AddSingleton<IHintGenerator, HintGenerator>();
 builder.Services.AddSingleton<IHintAdjustedBktService, HintAdjustedBktService>();
+builder.Services.AddSingleton<IHintGenerationService, HintGenerationService>();
+builder.Services.AddSingleton<IConfusionDetector, ConfusionDetector>();
+builder.Services.AddSingleton<IDisengagementClassifier, DisengagementClassifier>();
 builder.Services.AddSingleton<IFocusDegradationService, FocusDegradationService>();
 builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnforcementService>();
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
+builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>();
+builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
+builder.Services.AddSingleton<IExplanationOrchestrator, ExplanationOrchestrator>();
 builder.Services.AddSingleton<OfflineSyncHandler>();
 builder.Services.AddHostedService<NatsOutboxPublisher>();
+
+// SAI-05: A/B Experiment Service
+builder.Services.AddSingleton<IExperimentService, ExperimentService>();
+
+// SAI-08: Conversational Tutoring
+builder.Services.AddSingleton<ITutorPromptBuilder, TutorPromptBuilder>();
+builder.Services.AddSingleton<ITutorSafetyGuard, TutorSafetyGuard>();
 
 // NATS Bus Router: bridges NATS commands ↔ Proto.Actor virtual actors
 builder.Services.AddSingleton<Cena.Actors.Bus.NatsBusRouter>();
@@ -179,6 +193,16 @@ builder.Services.AddSingleton<Cena.Actors.Ingest.IQuestionSegmenter, Cena.Actors
 builder.Services.AddSingleton<Cena.Actors.Ingest.IDeduplicationService, Cena.Actors.Ingest.DeduplicationService>();
 builder.Services.AddScoped<Cena.Actors.Ingest.IIngestionOrchestrator, Cena.Actors.Ingest.IngestionOrchestrator>();
 builder.Services.AddSingleton<Cena.Actors.Serving.IQuestionSelector, Cena.Actors.Serving.QuestionSelector>();
+
+// SAI-06/07: Content extraction pipeline + embeddings
+builder.Services.AddSingleton<Cena.Actors.Ingest.IContentSegmenter, Cena.Actors.Ingest.ContentSegmenter>();
+builder.Services.AddSingleton<Cena.Actors.Services.IEmbeddingService, Cena.Actors.Services.EmbeddingService>();
+builder.Services.AddSingleton<Cena.Actors.Services.IContentRetriever, Cena.Actors.Services.ContentRetriever>();
+
+// SAI-000: LLM client abstraction and usage tracking
+builder.Services.AddSingleton<AnthropicLlmClient>();
+builder.Services.AddSingleton<ILlmClient, LlmClientRouter>();
+builder.Services.AddSingleton<LlmUsageTracker>();
 
 // =============================================================================
 // 6. PROTO.ACTOR CLUSTER

@@ -76,7 +76,8 @@ public class QuestionStateTests
             "Chemistry", "Acids", "5 Units", 4, 0.7f,
             new[] { "acids-bases" }, "ar",
             "Generate a question about acids", "claude-sonnet-4-6", 0.7f,
-            "Full LLM output here", "user-1", Now);
+            "Full LLM output here", "user-1",
+            "Acids donate protons (H+) to bases in solution.", Now);
 
         state.Apply(evt);
 
@@ -86,6 +87,8 @@ public class QuestionStateTests
         Assert.Equal("claude-sonnet-4-6", state.AiProvenance.ModelId);
         Assert.Equal(0.7f, state.AiProvenance.ModelTemperature);
         Assert.Equal("Full LLM output here", state.AiProvenance.RawModelOutput);
+        Assert.Equal("Acids donate protons (H+) to bases in solution.", state.AiProvenance.Explanation);
+        Assert.Equal("Acids donate protons (H+) to bases in solution.", state.Explanation);
     }
 
     [Fact]

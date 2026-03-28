@@ -25,4 +25,22 @@ public readonly record struct BktParameters(float P_L0, float P_T, float P_S, fl
         P_S is >= 0f and <= 1f &&
         P_G is >= 0f and <= 1f &&
         P_S + P_G < 1f;
+
+    /// <summary>
+    /// SAI-002: Reduce P_T (learning transition probability) based on hints used.
+    /// More hints = less credit for a correct answer. The student demonstrated less
+    /// independent mastery, so the learning transition is attenuated.
+    /// Credit curve: 0 hints = 1.0x, 1 = 0.7x, 2 = 0.4x, 3+ = 0.1x.
+    /// </summary>
+    public static BktParameters AdjustForHints(BktParameters baseParams, int hintsUsed)
+    {
+        float creditMultiplier = hintsUsed switch
+        {
+            0 => 1.0f,
+            1 => 0.7f,
+            2 => 0.4f,
+            _ => 0.1f
+        };
+        return baseParams with { P_T = baseParams.P_T * creditMultiplier };
+    }
 }
