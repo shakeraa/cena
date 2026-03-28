@@ -32,34 +32,44 @@ public static class SimulationEventSeeder
         int simulationDays = 60,
         int seed = 42)
     {
-        // Check if already seeded by looking for a known stream
-        await using var checkSession = store.QuerySession();
-        var existingStream = await checkSession.Events.FetchStreamStateAsync("sim-genius-001");
-        if (existingStream != null)
-        {
-            logger.LogInformation(
-                "Simulation events already seeded (stream sim-genius-001 exists with {Version} events). Skipping.",
-                existingStream.Version);
-            return;
-        }
-
         logger.LogInformation(
             "Generating {Students}-student simulation cohort ({Days} days)...",
             totalStudents, simulationDays);
 
         var cohort = MasterySimulator.GenerateRealisticCohort(totalStudents, simulationDays, seed);
 
+        // Pre-fetch existing student stream keys to skip already-seeded students
+        await using var checkSession = store.QuerySession();
+        var existingStreamKeys = (await checkSession.Events.QueryAllRawEvents()
+            .Where(e => e.StreamKey != null && e.StreamKey.StartsWith("sim-"))
+            .Select(e => e.StreamKey!)
+            .ToListAsync())
+            .ToHashSet();
+
+        var newStudents = cohort.Where(s => !existingStreamKeys.Contains(s.StudentId)).ToList();
+
+        if (newStudents.Count == 0)
+        {
+            logger.LogInformation(
+                "Simulation events already seeded for all {Count} students. Skipping.",
+                cohort.Count);
+            // Still check tutoring sessions
+            await SeedTutoringSessionDocumentsAsync(store, logger, cohort, simulationDays, seed);
+            return;
+        }
+
         logger.LogInformation(
-            "Simulation generated: {Students} students, {TotalAttempts} total attempts. Persisting to Marten...",
-            cohort.Count, cohort.Sum(s => s.AttemptHistory.Count));
+            "Seeding {New} new students ({Existing} already exist, {Total} total). {Attempts} attempts to persist...",
+            newStudents.Count, existingStreamKeys.Count, cohort.Count,
+            newStudents.Sum(s => s.AttemptHistory.Count));
 
         int totalEvents = 0;
-        int batchSize = 10; // Students per batch to avoid huge transactions
+        int batchSize = 10;
 
-        for (int i = 0; i < cohort.Count; i += batchSize)
+        for (int i = 0; i < newStudents.Count; i += batchSize)
         {
             await using var session = store.LightweightSession();
-            var batch = cohort.Skip(i).Take(batchSize);
+            var batch = newStudents.Skip(i).Take(batchSize);
 
             foreach (var student in batch)
             {
@@ -74,8 +84,8 @@ public static class SimulationEventSeeder
         }
 
         logger.LogInformation(
-            "Simulation events seeded: {Events} events across {Students} student streams",
-            totalEvents, cohort.Count);
+            "Simulation events seeded: {Events} events across {Students} new student streams",
+            totalEvents, newStudents.Count);
 
         // Seed tutoring session documents
         await SeedTutoringSessionDocumentsAsync(store, logger, cohort, simulationDays, seed);
