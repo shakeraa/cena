@@ -97,7 +97,11 @@ const fetchDegradationCurve = async () => {
   try {
     const data = await $api('/admin/focus/degradation-curve')
 
-    chartData.value = Array.isArray(data) ? data : (data.points ?? [])
+    const raw = Array.isArray(data) ? data : (data.curve ?? data.points ?? [])
+    chartData.value = raw.map((p: any) => ({
+      minute: p.minute ?? p.minutesIntoSession ?? 0,
+      avgFocusScore: p.avgFocusScore ?? 0,
+    }))
     error.value = null
   }
   catch (err: any) {

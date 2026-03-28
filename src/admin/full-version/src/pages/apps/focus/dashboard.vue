@@ -27,10 +27,10 @@ const fetchAlerts = async () => {
   try {
     const data = await $api('/admin/focus/alerts')
 
-    alerts.value = (Array.isArray(data) ? data : (data.students ?? [])).map((s: any) => ({
+    alerts.value = (Array.isArray(data) ? data : (data.alerts ?? data.students ?? [])).map((s: any) => ({
       studentId: s.studentId,
       studentName: s.studentName,
-      avgFocusScore: s.avgFocusScore ?? 0,
+      avgFocusScore: s.avgFocusScore ?? s.currentScore ?? 0,
       trend: s.trend ?? 0,
     }))
 
