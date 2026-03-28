@@ -24,6 +24,12 @@ const eventTypeConfig: Record<string, { color: string; icon: string }> = {
   SessionEnded: { color: 'secondary', icon: 'tabler-player-stop' },
   FocusAlert: { color: 'error', icon: 'tabler-eye-off' },
   MicrobreakTaken: { color: 'success', icon: 'tabler-coffee' },
+  Tutoring: { color: 'info', icon: 'tabler-messages' },
+  Explanation: { color: '#9C27B0', icon: 'tabler-bulb' },
+  Embedding: { color: 'teal', icon: 'tabler-vector' },
+  Experiment: { color: 'warning', icon: 'tabler-flask' },
+  Hint: { color: 'success', icon: 'tabler-help' },
+  Confusion: { color: 'error', icon: 'tabler-mood-confused' },
 }
 
 const config = computed(() => eventTypeConfig[props.event.type] ?? { color: 'default', icon: 'tabler-point' })

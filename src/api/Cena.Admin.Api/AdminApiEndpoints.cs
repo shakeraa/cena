@@ -335,24 +335,59 @@ public static class AdminApiEndpoints
         .WithName("GetAuditLog")
         .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
 
-        // GET /api/admin/system/nats-stats — real-time NATS event buffer stats
-        app.MapGet("/api/admin/system/nats-stats", (HttpContext ctx) =>
+        // GET /api/admin/system/nats-stats — real-time NATS JetStream stats (ADM-023)
+        app.MapGet("/api/admin/system/nats-stats", async (NATS.Client.Core.INatsConnection nats, ILoggerFactory lf) =>
         {
-            var subscriber = ctx.RequestServices.GetService<NatsEventSubscriber>();
-            if (subscriber == null)
-                return Results.Ok(new { totalEvents = 0, recentEvents = Array.Empty<object>() });
-
-            return Results.Ok(new
+            var logger = lf.CreateLogger("NatsStats");
+            try
             {
-                totalEvents = subscriber.TotalEventsReceived,
-                recentEvents = subscriber.RecentEvents.TakeLast(50).Select(e => new
+                // NATS JetStream management API
+                var js = new NATS.Client.JetStream.NatsJSContext(nats);
+                var streams = new List<object>();
+                long totalMessages = 0;
+                long totalBytes = 0;
+                int totalConsumers = 0;
+
+                await foreach (var stream in js.ListStreamsAsync())
                 {
-                    id = e.Id,
-                    subject = e.Subject,
-                    source = e.Source,
-                    timestamp = e.Timestamp
-                })
-            });
+                    var info = stream.Info;
+                    var consumers = new List<object>();
+
+                    await foreach (var consumer in stream.ListConsumersAsync())
+                    {
+                        consumers.Add(new
+                        {
+                            name = consumer.Info.Name,
+                            pendingCount = consumer.Info.NumPending,
+                            ackPending = consumer.Info.NumAckPending,
+                            deliveredCount = consumer.Info.Delivered.ConsumerSeq
+                        });
+                        totalConsumers++;
+                    }
+
+                    totalMessages += (long)info.State.Messages;
+                    totalBytes += (long)info.State.Bytes;
+
+                    streams.Add(new
+                    {
+                        name = info.Config.Name,
+                        messageCount = info.State.Messages,
+                        byteSize = info.State.Bytes,
+                        consumerCount = info.State.ConsumerCount,
+                        lastSequence = info.State.LastSeq,
+                        firstTimestamp = info.State.FirstTs,
+                        lastTimestamp = info.State.LastTs,
+                        consumers
+                    });
+                }
+
+                return Results.Ok(new { streams, totalMessages, totalBytes, totalConsumers });
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Failed to fetch NATS stats");
+                return Results.Ok(new { streams = Array.Empty<object>(), totalMessages = 0L, totalBytes = 0L, totalConsumers = 0, error = "NATS not available" });
+            }
         })
         .WithTags("System Monitoring")
         .WithName("GetNatsStats")

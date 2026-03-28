@@ -74,6 +74,22 @@ export default [
     subject: 'Pedagogy',
   },
 
+  { heading: 'AI Tutoring' },
+  {
+    title: 'Tutoring Sessions',
+    icon: { icon: 'tabler-messages' },
+    to: 'apps-tutoring-sessions',
+    action: 'read',
+    subject: 'Tutoring',
+  },
+  {
+    title: 'Experiments',
+    icon: { icon: 'tabler-flask' },
+    to: 'apps-experiments',
+    action: 'read',
+    subject: 'Pedagogy',
+  },
+
   { heading: 'System' },
   {
     title: 'AI Providers',
@@ -115,6 +131,27 @@ export default [
     icon: { icon: 'tabler-mail-off' },
     to: 'apps-system-dead-letters',
     action: 'read',
+    subject: 'System',
+  },
+  {
+    title: 'Explanation Cache',
+    icon: { icon: 'tabler-database-cog' },
+    to: 'apps-system-explanation-cache',
+    action: 'read',
+    subject: 'System',
+  },
+  {
+    title: 'Embeddings',
+    icon: { icon: 'tabler-vector' },
+    to: 'apps-system-embeddings',
+    action: 'manage',
+    subject: 'System',
+  },
+  {
+    title: 'Token Budget',
+    icon: { icon: 'tabler-coins' },
+    to: 'apps-system-token-budget',
+    action: 'manage',
     subject: 'System',
   },
   {

@@ -97,6 +97,13 @@ builder.Services.AddScoped<ICulturalContextService, CulturalContextService>();
 builder.Services.AddScoped<IEventStreamService, EventStreamService>();
 builder.Services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
 
+// ---- SAI Admin Services (ADM-017 through ADM-023) ----
+builder.Services.AddScoped<ITutoringAdminService, TutoringAdminService>();
+builder.Services.AddScoped<IExplanationCacheAdminService, ExplanationCacheAdminService>();
+builder.Services.AddScoped<IExperimentAdminService, ExperimentAdminService>();
+builder.Services.AddScoped<IEmbeddingAdminService, EmbeddingAdminService>();
+builder.Services.AddScoped<ITokenBudgetAdminService, TokenBudgetAdminService>();
+
 // =============================================================================
 // BUILD & PIPELINE
 // =============================================================================
@@ -127,6 +134,13 @@ app.MapCulturalContextEndpoints();
 app.MapEventStreamEndpoints();
 app.MapOutreachEngagementEndpoints();
 app.MapAiGenerationEndpoints();
+
+// ---- SAI Admin endpoints (ADM-017 through ADM-023) ----
+app.MapTutoringAdminEndpoints();
+app.MapExplanationCacheEndpoints();
+app.MapExperimentAdminEndpoints();
+app.MapEmbeddingAdminEndpoints();
+app.MapTokenBudgetEndpoints();
 
 // ---- Seed predefined roles on startup ----
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();

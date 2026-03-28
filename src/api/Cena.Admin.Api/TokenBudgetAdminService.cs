@@ -1,0 +1,164 @@
+// Cena Platform -- Token Budget Admin Service (ADM-023)
+
+using System.Text.Json;
+using Marten;
+using Microsoft.Extensions.Logging;
+
+namespace Cena.Admin.Api;
+
+public interface ITokenBudgetAdminService
+{
+    Task<TokenBudgetStatusResponse> GetBudgetStatusAsync(string? classId, DateTimeOffset? date);
+    Task<TokenBudgetTrendResponse> GetTrendAsync(int days);
+    Task<bool> UpdateLimitsAsync(UpdateBudgetLimitsRequest request);
+}
+
+public sealed class TokenBudgetAdminService : ITokenBudgetAdminService
+{
+    private const int DefaultDailyLimit = 25_000;
+    private const long DefaultMonthlyLimit = 500_000;
+    private const float CostPerToken = 0.000003f; // Claude Sonnet pricing estimate
+
+    private readonly IDocumentStore _store;
+    private readonly ILogger<TokenBudgetAdminService> _logger;
+
+    // In-memory overrides (production would use a system settings table)
+    private static int _dailyLimitOverride = DefaultDailyLimit;
+    private static long _monthlyLimitOverride = DefaultMonthlyLimit;
+
+    public TokenBudgetAdminService(IDocumentStore store, ILogger<TokenBudgetAdminService> logger)
+    {
+        _store = store;
+        _logger = logger;
+    }
+
+    public async Task<TokenBudgetStatusResponse> GetBudgetStatusAsync(string? classId, DateTimeOffset? date)
+    {
+        await using var session = _store.QuerySession();
+
+        var targetDate = (date ?? DateTimeOffset.UtcNow).Date;
+        var nextDay = targetDate.AddDays(1);
+
+        // Query Marten event stream for TutoringMessageSent_V1 events from the target day
+        var dayMessages = await session.Events.QueryAllRawEvents()
+            .Where(e => e.EventTypeName == "tutoring_message_sent_v1")
+            .Where(e => e.Timestamp >= targetDate && e.Timestamp < nextDay)
+            .ToListAsync();
+
+        var dailyLimit = _dailyLimitOverride;
+
+        var students = dayMessages
+            .GroupBy(e => ExtractString(e, "studentId"))
+            .Where(g => !string.IsNullOrEmpty(g.Key))
+            .Select(g =>
+            {
+                // Estimate tokens: MessagePreview.Length / 4 * 2 (input + output)
+                var tokensUsed = g.Sum(e =>
+                {
+                    var preview = ExtractString(e, "messagePreview");
+                    return preview.Length / 4 * 2;
+                });
+
+                var percentUsed = (float)tokensUsed / dailyLimit * 100f;
+                var estimatedCost = tokensUsed * CostPerToken;
+
+                return new StudentTokenUsageDto(
+                    StudentId: g.Key,
+                    TokensUsedToday: tokensUsed,
+                    DailyLimit: dailyLimit,
+                    PercentUsed: MathF.Round(percentUsed, 1),
+                    IsExhausted: tokensUsed >= dailyLimit,
+                    EstimatedCostUsd: MathF.Round(estimatedCost, 4));
+            })
+            .OrderByDescending(s => s.PercentUsed)
+            .ToList();
+
+        var totalTokensToday = students.Sum(s => (long)s.TokensUsedToday);
+        var nearLimitCount = students.Count(s => s.PercentUsed >= 80f);
+
+        return new TokenBudgetStatusResponse(
+            Students: students,
+            TotalTokensToday: totalTokensToday,
+            TotalStudentsNearLimit: nearLimitCount,
+            DailyLimitPerStudent: dailyLimit,
+            MonthlyLimitTotal: _monthlyLimitOverride);
+    }
+
+    public async Task<TokenBudgetTrendResponse> GetTrendAsync(int days)
+    {
+        await using var session = _store.QuerySession();
+
+        var endDate = DateTimeOffset.UtcNow.Date.AddDays(1);
+        var startDate = endDate.AddDays(-days);
+
+        var messages = await session.Events.QueryAllRawEvents()
+            .Where(e => e.EventTypeName == "tutoring_message_sent_v1")
+            .Where(e => e.Timestamp >= startDate && e.Timestamp < endDate)
+            .ToListAsync();
+
+        var dailyData = messages
+            .GroupBy(e => e.Timestamp.Date)
+            .OrderBy(g => g.Key)
+            .Select(g =>
+            {
+                var totalTokens = g.Sum(e =>
+                {
+                    var preview = ExtractString(e, "messagePreview");
+                    return (long)(preview.Length / 4 * 2);
+                });
+                var uniqueStudents = g.Select(e => ExtractString(e, "studentId"))
+                    .Where(id => !string.IsNullOrEmpty(id))
+                    .Distinct()
+                    .Count();
+                var estimatedCost = totalTokens * CostPerToken;
+
+                return new DailyTokenUsageDto(
+                    Date: g.Key.ToString("yyyy-MM-dd"),
+                    TotalTokens: totalTokens,
+                    UniqueStudents: uniqueStudents,
+                    EstimatedCostUsd: MathF.Round(estimatedCost, 4));
+            })
+            .ToList();
+
+        return new TokenBudgetTrendResponse(Days: dailyData);
+    }
+
+    public Task<bool> UpdateLimitsAsync(UpdateBudgetLimitsRequest request)
+    {
+        if (request.DailyLimitPerStudent.HasValue)
+        {
+            _dailyLimitOverride = request.DailyLimitPerStudent.Value;
+            _logger.LogInformation("Daily token limit updated to {Limit}", _dailyLimitOverride);
+        }
+
+        if (request.MonthlyLimitTotal.HasValue)
+        {
+            _monthlyLimitOverride = request.MonthlyLimitTotal.Value;
+            _logger.LogInformation("Monthly token limit updated to {Limit}", _monthlyLimitOverride);
+        }
+
+        return Task.FromResult(true);
+    }
+
+    private static string ExtractString(dynamic evt, string property)
+    {
+        try
+        {
+            object? data = evt.Data;
+            if (data is null) return "";
+            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
+            JsonElement prop;
+            if (json.RootElement.TryGetProperty(property, out prop) ||
+                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
+                return prop.GetString() ?? "";
+        }
+        catch { /* best-effort extraction */ }
+        return "";
+    }
+
+    private static string ToPascalCase(string camelCase)
+    {
+        if (string.IsNullOrEmpty(camelCase)) return camelCase;
+        return char.ToUpperInvariant(camelCase[0]) + camelCase[1..];
+    }
+}

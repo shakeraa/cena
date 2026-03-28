@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import MethodologyOverrideDialog from '@/views/apps/mastery/student/MethodologyOverrideDialog.vue'
 import ConceptCard from '@/views/apps/mastery/ConceptCard.vue'
 import ConceptGraph from '@/views/apps/mastery/ConceptGraph.vue'
 import MethodologyHierarchyPanel from '@/views/apps/pedagogy/MethodologyHierarchyPanel.vue'
@@ -30,6 +31,15 @@ interface StudentMastery {
 const loading = ref(true)
 const error = ref<string | null>(null)
 const student = ref<StudentMastery | null>(null)
+
+const showOverrideDialog = ref(false)
+const overrideSnackbar = ref(false)
+
+const onOverrideApplied = () => {
+  overrideSnackbar.value = true
+  // Refresh methodology data
+  fetchStudent()
+}
 
 const fetchStudent = async () => {
   loading.value = true
@@ -274,6 +284,18 @@ const decayColor = (risk: number): string => {
           &mdash; Avg mastery: {{ (student.avgMastery * 100).toFixed(0) }}%
         </p>
       </div>
+
+      <VBtn
+        color="warning"
+        variant="tonal"
+        @click="showOverrideDialog = true"
+      >
+        <VIcon
+          icon="tabler-switch-horizontal"
+          start
+        />
+        Override Methodology
+      </VBtn>
     </div>
 
     <VAlert
@@ -520,6 +542,21 @@ const decayColor = (risk: number): string => {
         </VList>
       </VCardText>
     </VCard>
+
+    <MethodologyOverrideDialog
+      v-model="showOverrideDialog"
+      :student-id="String(studentId)"
+      :student-name="student?.studentName ?? ''"
+      @override-applied="onOverrideApplied"
+    />
+
+    <VSnackbar
+      v-model="overrideSnackbar"
+      color="success"
+      :timeout="3000"
+    >
+      Methodology override applied successfully
+    </VSnackbar>
   </div>
 </template>
 

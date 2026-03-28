@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import ExplanationVersionHistory from '@/views/apps/questions/edit/ExplanationVersionHistory.vue'
+import QualityGateScores from '@/views/apps/questions/edit/QualityGateScores.vue'
+import LanguageVersionPanel from '@/views/apps/questions/edit/LanguageVersionPanel.vue'
+
 definePage({ meta: { action: 'read', subject: 'Questions' } })
 
 const route = useRoute('apps-questions-edit-id')
@@ -717,6 +721,28 @@ const shortId = (id: string) => id?.length > 10 ? `${id.slice(0, 10)}...` : id
           </VRow>
         </VWindowItem>
       </VWindow>
+
+      <!-- Quality Gate Scores -->
+      <QualityGateScores
+        :question="question"
+        class="mb-6 mt-6"
+      />
+
+      <!-- Language Versions -->
+      <LanguageVersionPanel
+        :question-id="questionId"
+        :question="question"
+        class="mb-6"
+        @version-added="fetchQuestion"
+      />
+
+      <!-- Explanation History -->
+      <ExplanationVersionHistory
+        :question-id="questionId"
+        :history="history"
+        class="mb-6"
+        @restored="fetchQuestion"
+      />
     </template>
 
     <!-- Not found -->

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { $api } from '@/utils/api'
 import UserActivityChart from '@/views/admin/dashboard/UserActivityChart.vue'
 import ContentPipelineChart from '@/views/admin/dashboard/ContentPipelineChart.vue'
 import SystemAlerts from '@/views/admin/dashboard/SystemAlerts.vue'
@@ -12,6 +13,34 @@ definePage({
 })
 
 const { data: overviewData, isFetching } = await useApi<any>('/admin/dashboard/overview')
+
+// SAI Feature Cards
+const aiSessionsToday = ref<number>(0)
+const corpusBlocks = ref<number>(0)
+const activeExperiments = ref<number>(0)
+const saiLoading = ref(true)
+
+const fetchSaiStats = async () => {
+  saiLoading.value = true
+  try {
+    const [tutoring, corpus, experiments] = await Promise.all([
+      $api<any>('/admin/tutoring/analytics').catch(() => null),
+      $api<any>('/admin/embeddings/corpus-stats').catch(() => null),
+      $api<any>('/admin/experiments').catch(() => null),
+    ])
+    aiSessionsToday.value = tutoring?.sessionsToday ?? tutoring?.totalSessions ?? 0
+    corpusBlocks.value = corpus?.totalBlocks ?? corpus?.blockCount ?? 0
+    activeExperiments.value = Array.isArray(experiments) ? experiments.length : (experiments?.count ?? 0)
+  }
+  catch {
+    // SAI data unavailable
+  }
+  finally {
+    saiLoading.value = false
+  }
+}
+
+onMounted(fetchSaiStats)
 
 const widgetData = computed(() => {
   if (!overviewData.value) {
@@ -146,6 +175,112 @@ const widgetData = computed(() => {
               >
                 Account Settings
               </VBtn>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- SAI Feature Cards -->
+    <VRow
+      v-if="$can('read', 'System')"
+      class="mb-6"
+    >
+      <VCol
+        cols="12"
+        sm="4"
+      >
+        <VCard :loading="saiLoading">
+          <VCardText>
+            <div class="d-flex justify-space-between align-center">
+              <div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  AI Activity
+                </div>
+                <h4 class="text-h4">
+                  {{ aiSessionsToday }}
+                </h4>
+                <div class="text-sm">
+                  Tutoring sessions today
+                </div>
+              </div>
+              <VAvatar
+                color="info"
+                variant="tonal"
+                rounded
+                size="42"
+              >
+                <VIcon
+                  icon="tabler-messages"
+                  size="26"
+                />
+              </VAvatar>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol
+        cols="12"
+        sm="4"
+      >
+        <VCard :loading="saiLoading">
+          <VCardText>
+            <div class="d-flex justify-space-between align-center">
+              <div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  Content Corpus
+                </div>
+                <h4 class="text-h4">
+                  {{ corpusBlocks.toLocaleString() }}
+                </h4>
+                <div class="text-sm">
+                  Total content blocks
+                </div>
+              </div>
+              <VAvatar
+                color="success"
+                variant="tonal"
+                rounded
+                size="42"
+              >
+                <VIcon
+                  icon="tabler-vector"
+                  size="26"
+                />
+              </VAvatar>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol
+        cols="12"
+        sm="4"
+      >
+        <VCard :loading="saiLoading">
+          <VCardText>
+            <div class="d-flex justify-space-between align-center">
+              <div>
+                <div class="text-body-2 text-medium-emphasis mb-1">
+                  Active Experiments
+                </div>
+                <h4 class="text-h4">
+                  {{ activeExperiments }}
+                </h4>
+                <div class="text-sm">
+                  Running A/B tests
+                </div>
+              </div>
+              <VAvatar
+                color="warning"
+                variant="tonal"
+                rounded
+                size="42"
+              >
+                <VIcon
+                  icon="tabler-flask"
+                  size="26"
+                />
+              </VAvatar>
             </div>
           </VCardText>
         </VCard>
