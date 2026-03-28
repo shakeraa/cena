@@ -78,10 +78,11 @@ public sealed class NatsBusRouter : BackgroundService
             SubscribeAndRoute<BusEndSession>(NatsSubjects.SessionEnd, HandleEndSession, stoppingToken),
             SubscribeAndRoute<BusConceptAttempt>(NatsSubjects.ConceptAttempt, HandleConceptAttempt, stoppingToken),
             SubscribeAndRoute<BusMethodologySwitch>(NatsSubjects.MethodologySwitch, HandleMethodologySwitch, stoppingToken),
+            SubscribeAndRoute<BusAddAnnotation>(NatsSubjects.Annotation, HandleAnnotation, stoppingToken),
             LogStats(stoppingToken)
         };
 
-        _logger.LogInformation("NatsBusRouter ready — listening on 4 command subjects");
+        _logger.LogInformation("NatsBusRouter ready — listening on 5 command subjects");
 
         await Task.WhenAll(tasks);
     }
@@ -197,6 +198,23 @@ public sealed class NatsBusRouter : BackgroundService
                 p.StudentId, p.SessionId, p.ConceptId,
                 p.Answer == "correct", 0, 0, // mastery levels filled by actor internally
                 p.ResponseTimeMs, null, DateTimeOffset.UtcNow));
+    }
+
+    private async Task HandleAnnotation(BusEnvelope<BusAddAnnotation> env, CancellationToken ct)
+    {
+        var p = env.Payload;
+        var kind = Enum.TryParse<AnnotationType>(p.Kind, true, out var at)
+            ? at : AnnotationType.Note;
+        var cmd = new AddAnnotation(p.StudentId, p.ConceptId, p.SessionId, p.Text, kind);
+
+        await _actorSystem.Cluster()
+            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, ct);
+
+        if (_actorStats.TryGetValue(p.StudentId, out var stat))
+        {
+            stat.MessagesProcessed++;
+            stat.LastActivity = DateTimeOffset.UtcNow;
+        }
     }
 
     private async Task HandleMethodologySwitch(BusEnvelope<BusMethodologySwitch> env, CancellationToken ct)

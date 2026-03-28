@@ -16,6 +16,7 @@ public static class NatsSubjects
     public const string SessionEnd    = "cena.session.end";       // → EndSession
     public const string ConceptAttempt = "cena.mastery.attempt";  // → AttemptConcept
     public const string MethodologySwitch = "cena.mastery.switch"; // → SwitchMethodology
+    public const string Annotation       = "cena.session.annotate"; // → AddAnnotation
 
     // ── Events (Actor Host → Subscribers) ──
     public const string EventConceptAttempted  = "cena.events.concept.attempted";

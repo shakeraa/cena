@@ -2,8 +2,9 @@
 // Cena Platform -- Student Emulator Service
 // Simulates 100 students interacting with the actor system via NATS.
 //
-// Phase 1: Publishes commands on NATS (session start, concept attempts, session end)
-// Phase 2: Actor Host subscribes, processes, and publishes events back
+// Publishes: session start/end, concept attempts, annotations, methodology switches.
+// Reflects SAI layer features: confusion annotations, question annotations,
+// hint usage patterns, and methodology switches on stagnation.
 //
 // Usage: dotnet run -- [--students 100] [--speed 10] [--nats nats://localhost:4222]
 // =============================================================================
@@ -47,11 +48,38 @@ var conceptNames = concepts.ToDictionary(c => c.Id, c => c.Name);
 // ── Emulation state ──
 
 var activeSessionIds = new Dictionary<string, string>(); // studentId → sessionId
+var studentMethodology = new Dictionary<string, string>(); // studentId → current methodology
+var consecutiveWrong = new Dictionary<string, int>(); // studentId → consecutive wrong count
 var rng = new Random(42);
 var jsonOpts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 var cts = new CancellationTokenSource();
 
 Console.CancelKeyPress += (_, e) => { e.Cancel = true; cts.Cancel(); };
+
+// ── Methodology pool (matches StudentMessages.Methodology enum) ──
+var methodologies = new[] { "Socratic", "SpacedRepetition", "Feynman", "WorkedExample", "DrillAndPractice", "BloomsProgression", "RetrievalPractice" };
+
+// ── Confusion annotation templates (Hebrew + English) ──
+var confusionTexts = new[]
+{
+    "I don't understand this step",
+    "Why does the formula work this way?",
+    "אני לא מבין למה זה עובד ככה",
+    "מה ההבדל בין זה לנוסחה הקודמת?",
+    "Can someone explain the connection to the previous topic?",
+    "Why do we need to use this approach?",
+    "אני מבולבל מהשלב הזה"
+};
+
+var questionTexts = new[]
+{
+    "Is there an easier way to solve this?",
+    "Can you show a worked example?",
+    "יש דרך יותר פשוטה?",
+    "אפשר דוגמה נוספת?",
+    "How is this related to the next topic?",
+    "What happens if the sign is negative?"
+};
 
 // ── Subscribe to events (to log what comes back) ──
 
@@ -77,6 +105,8 @@ Log.Information("Simulating {Days} days of student activity at {Speed}x speed", 
 
 var totalAttempts = 0;
 var totalSessions = 0;
+var totalAnnotations = 0;
+var totalMethodologySwitches = 0;
 var startTime = DateTimeOffset.UtcNow;
 
 try
@@ -110,6 +140,22 @@ try
         {
             var sessionId = $"sess-{Guid.NewGuid():N}"[..16];
             activeSessionIds[student.StudentId] = sessionId;
+            consecutiveWrong[student.StudentId] = 0;
+
+            // Assign initial methodology based on archetype
+            var methodology = student.ArchetypeName switch
+            {
+                "Genius" => "Socratic",
+                "HighAchiever" => "BloomsProgression",
+                "SteadyLearner" => "Socratic",
+                "Struggling" => "WorkedExample",
+                "FastCareless" => "DrillAndPractice",
+                "SlowThorough" => "Feynman",
+                "Inconsistent" => "SpacedRepetition",
+                "VeryLowCognitive" => "WorkedExample",
+                _ => "Socratic"
+            };
+            studentMethodology[student.StudentId] = methodology;
 
             var startMsg = BusEnvelope<BusStartSession>.Create(
                 NatsSubjects.SessionStart,
@@ -129,6 +175,16 @@ try
 
         // Publish concept attempt
         var sessionForStudent = activeSessionIds[student.StudentId];
+
+        // Simulate hint usage: struggling/VeryLowCognitive students use hints more often
+        var hintCountUsed = student.ArchetypeName switch
+        {
+            "Struggling" => attempt.IsCorrect ? rng.Next(0, 2) : rng.Next(1, 3),
+            "VeryLowCognitive" => rng.Next(1, 3),
+            "SlowThorough" => rng.Next(0, 2),
+            _ => rng.NextDouble() < 0.1 ? 1 : 0
+        };
+
         var attemptMsg = BusEnvelope<BusConceptAttempt>.Create(
             NatsSubjects.ConceptAttempt,
             new BusConceptAttempt(
@@ -139,7 +195,7 @@ try
                 "multiple_choice",
                 attempt.IsCorrect ? "correct" : "wrong",
                 attempt.ResponseTimeMs,
-                rng.Next(0, 2),
+                hintCountUsed,
                 false,
                 rng.Next(0, 10),
                 rng.Next(0, 3)),
@@ -148,6 +204,79 @@ try
         await nats.PublishAsync(NatsSubjects.ConceptAttempt,
             JsonSerializer.Serialize(attemptMsg, jsonOpts), cancellationToken: cts.Token);
         totalAttempts++;
+
+        // ── SAI: Track consecutive wrong answers for confusion/stagnation ──
+        if (!attempt.IsCorrect)
+        {
+            consecutiveWrong[student.StudentId] = consecutiveWrong.GetValueOrDefault(student.StudentId) + 1;
+        }
+        else
+        {
+            consecutiveWrong[student.StudentId] = 0;
+        }
+
+        // ── SAI: Publish confusion annotation after 3+ consecutive wrong answers ──
+        var wrongStreak = consecutiveWrong.GetValueOrDefault(student.StudentId);
+        if (wrongStreak >= 3 && rng.NextDouble() < 0.4)
+        {
+            var confusionText = confusionTexts[rng.Next(confusionTexts.Length)];
+            var annotationMsg = BusEnvelope<BusAddAnnotation>.Create(
+                NatsSubjects.Annotation,
+                new BusAddAnnotation(
+                    student.StudentId,
+                    sessionForStudent,
+                    attempt.ConceptId,
+                    confusionText,
+                    "confusion"),
+                "emulator");
+
+            await nats.PublishAsync(NatsSubjects.Annotation,
+                JsonSerializer.Serialize(annotationMsg, jsonOpts), cancellationToken: cts.Token);
+            totalAnnotations++;
+        }
+
+        // ── SAI: Publish question annotation occasionally (curious students) ──
+        if (attempt.IsCorrect && rng.NextDouble() < 0.03 &&
+            student.ArchetypeName is "Genius" or "HighAchiever" or "SteadyLearner")
+        {
+            var questionText = questionTexts[rng.Next(questionTexts.Length)];
+            var annotationMsg = BusEnvelope<BusAddAnnotation>.Create(
+                NatsSubjects.Annotation,
+                new BusAddAnnotation(
+                    student.StudentId,
+                    sessionForStudent,
+                    attempt.ConceptId,
+                    questionText,
+                    "question"),
+                "emulator");
+
+            await nats.PublishAsync(NatsSubjects.Annotation,
+                JsonSerializer.Serialize(annotationMsg, jsonOpts), cancellationToken: cts.Token);
+            totalAnnotations++;
+        }
+
+        // ── SAI: Methodology switch after sustained stagnation (5+ wrong in a row) ──
+        if (wrongStreak >= 5 && rng.NextDouble() < 0.5)
+        {
+            var currentMethodology = studentMethodology.GetValueOrDefault(student.StudentId, "Socratic");
+            var newMethodology = methodologies.Where(m => m != currentMethodology).ElementAt(rng.Next(methodologies.Length - 1));
+            studentMethodology[student.StudentId] = newMethodology;
+
+            var switchMsg = BusEnvelope<BusMethodologySwitch>.Create(
+                NatsSubjects.MethodologySwitch,
+                new BusMethodologySwitch(
+                    student.StudentId,
+                    sessionForStudent,
+                    currentMethodology,
+                    newMethodology,
+                    "stagnation_auto_switch"),
+                "emulator");
+
+            await nats.PublishAsync(NatsSubjects.MethodologySwitch,
+                JsonSerializer.Serialize(switchMsg, jsonOpts), cancellationToken: cts.Token);
+            totalMethodologySwitches++;
+            consecutiveWrong[student.StudentId] = 0; // reset after switch
+        }
 
         // End session randomly (after ~15 attempts per session)
         if (rng.NextDouble() < 0.07 && activeSessionIds.ContainsKey(student.StudentId))
@@ -163,14 +292,16 @@ try
             await nats.PublishAsync(NatsSubjects.SessionEnd,
                 JsonSerializer.Serialize(endMsg, jsonOpts), cancellationToken: cts.Token);
             activeSessionIds.Remove(student.StudentId);
+            studentMethodology.Remove(student.StudentId);
+            consecutiveWrong.Remove(student.StudentId);
         }
 
         // Progress logging
         if (totalAttempts % 500 == 0)
         {
             var elapsed = DateTimeOffset.UtcNow - startTime;
-            Log.Information("  → Published {Attempts} attempts, {Sessions} sessions ({Rate}/sec, {Events} events received)",
-                totalAttempts, totalSessions,
+            Log.Information("  → Published {Attempts} attempts, {Sessions} sessions, {Annotations} annotations, {Switches} switches ({Rate}/sec, {Events} events received)",
+                totalAttempts, totalSessions, totalAnnotations, totalMethodologySwitches,
                 (int)(totalAttempts / elapsed.TotalSeconds),
                 eventCount);
         }
@@ -197,6 +328,7 @@ var totalElapsed = DateTimeOffset.UtcNow - startTime;
 Log.Information("╔══════════════════════════════════════════════════╗");
 Log.Information("║  Emulation Complete                             ║");
 Log.Information("║  Attempts: {Attempts}, Sessions: {Sessions}", totalAttempts, totalSessions);
+Log.Information("║  Annotations: {Annotations}, Methodology switches: {Switches}", totalAnnotations, totalMethodologySwitches);
 Log.Information("║  Events received: {Events}", eventCount);
 Log.Information("║  Duration: {Duration:F1}s, Rate: {Rate}/sec", totalElapsed.TotalSeconds, (int)(totalAttempts / Math.Max(1, totalElapsed.TotalSeconds)));
 Log.Information("╚══════════════════════════════════════════════════╝");

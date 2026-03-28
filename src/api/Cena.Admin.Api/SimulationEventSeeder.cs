@@ -1,11 +1,13 @@
 // =============================================================================
 // Cena Platform -- Simulation Event Seeder
 // Persists MasterySimulator output as real Marten event streams.
-// ~25,000 events across 100 students, 60 days of learning history.
+// ~25,000+ events across 100 students, 60 days of learning history.
+// Includes SAI-layer events: HintRequested, AnnotationAdded, TutoringEpisodeCompleted.
 // =============================================================================
 
 using Cena.Actors.Events;
 using Cena.Actors.Simulation;
+using Cena.Actors.Tutoring;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -14,7 +16,8 @@ namespace Cena.Admin.Api;
 /// <summary>
 /// Converts simulated student data into real event-sourced streams in Marten.
 /// Each student gets a stream with SessionStarted, ConceptAttempted, SessionEnded,
-/// XpAwarded, and StreakUpdated events — the same events the live system produces.
+/// XpAwarded, StreakUpdated, HintRequested, AnnotationAdded, and TutoringEpisodeCompleted
+/// events — the same events the live system produces.
 /// </summary>
 public static class SimulationEventSeeder
 {
@@ -77,7 +80,8 @@ public static class SimulationEventSeeder
 
     /// <summary>
     /// Convert a SimulatedStudent into a chronological list of domain events.
-    /// Groups attempts into sessions, adds engagement events (XP, streaks).
+    /// Groups attempts into sessions, adds engagement events (XP, streaks),
+    /// SAI events (hints, annotations, tutoring episodes).
     /// </summary>
     private static List<object> BuildEventStream(SimulatedStudent student)
     {
@@ -119,11 +123,18 @@ public static class SimulationEventSeeder
             lastSessionDate = firstAttempt.Timestamp;
 
             // SessionStarted
-            var methodology = attempts
-                .Select(a => a.ClassifiedError?.ToString() ?? "Socratic")
-                .GroupBy(x => x)
-                .OrderByDescending(g => g.Count())
-                .First().Key;
+            var methodology = student.ArchetypeName switch
+            {
+                "Genius" => "Socratic",
+                "HighAchiever" => "BloomsProgression",
+                "SteadyLearner" => "Socratic",
+                "Struggling" => "WorkedExample",
+                "FastCareless" => "DrillAndPractice",
+                "SlowThorough" => "Feynman",
+                "Inconsistent" => "SpacedRepetition",
+                "VeryLowCognitive" => "WorkedExample",
+                _ => "Socratic"
+            };
 
             events.Add(new SessionStarted_V1(
                 student.StudentId,
@@ -140,11 +151,33 @@ public static class SimulationEventSeeder
                 false,
                 firstAttempt.Timestamp));
 
-            // ConceptAttempted events
+            // ConceptAttempted events + SAI events
             int sessionCorrect = 0;
+            int consecutiveWrong = 0;
+            bool tutoringTriggeredThisSession = false;
+
             foreach (var attempt in attempts)
             {
-                if (attempt.IsCorrect) sessionCorrect++;
+                if (attempt.IsCorrect)
+                {
+                    sessionCorrect++;
+                    consecutiveWrong = 0;
+                }
+                else
+                {
+                    consecutiveWrong++;
+                }
+
+                // Determine hint usage based on archetype
+                var hintCount = student.ArchetypeName switch
+                {
+                    "Struggling" => attempt.IsCorrect ? (rng.NextDouble() < 0.3 ? 1 : 0) : (rng.NextDouble() < 0.6 ? rng.Next(1, 3) : 0),
+                    "VeryLowCognitive" => rng.NextDouble() < 0.5 ? rng.Next(1, 3) : 0,
+                    "SlowThorough" => rng.NextDouble() < 0.2 ? 1 : 0,
+                    _ => rng.NextDouble() < 0.1 ? 1 : 0
+                };
+
+                var questionId = $"q-{rng.Next(1, 16):0000}";
 
                 events.Add(new ConceptAttempted_V1(
                     student.StudentId,
@@ -152,19 +185,58 @@ public static class SimulationEventSeeder
                     session.Key,
                     attempt.IsCorrect,
                     attempt.ResponseTimeMs,
-                    $"q-{rng.Next(1, 16):0000}", // Reference seeded questions
+                    questionId,
                     "multiple_choice",
                     methodology,
                     attempt.ClassifiedError?.ToString() ?? "None",
                     attempt.PriorMastery,
                     attempt.PosteriorMastery,
-                    rng.NextDouble() < 0.1 ? 1 : 0, // 10% use hints
+                    hintCount,
                     false,
                     $"h{rng.Next(100000):x5}",
                     rng.Next(0, 5),
                     rng.Next(0, 3),
                     false,
                     attempt.Timestamp));
+
+                // SAI: Emit HintRequested events for each hint level used
+                for (int h = 1; h <= hintCount; h++)
+                {
+                    events.Add(new HintRequested_V1(
+                        student.StudentId,
+                        session.Key,
+                        attempt.ConceptId,
+                        questionId,
+                        h));
+                }
+
+                // SAI: Confusion annotation after 3+ consecutive wrong answers
+                if (consecutiveWrong >= 3 && rng.NextDouble() < 0.35)
+                {
+                    var annotationId = $"ann-{Guid.NewGuid():N}"[..16];
+                    var sentiment = -0.2 - rng.NextDouble() * 0.5; // negative sentiment for confusion
+                    events.Add(new AnnotationAdded_V1(
+                        student.StudentId,
+                        attempt.ConceptId,
+                        annotationId,
+                        $"h{rng.Next(100000):x5}",
+                        sentiment,
+                        "confusion"));
+                }
+
+                // SAI: Question annotation from curious students after correct answers
+                if (attempt.IsCorrect && rng.NextDouble() < 0.02 &&
+                    student.ArchetypeName is "Genius" or "HighAchiever" or "SteadyLearner")
+                {
+                    var annotationId = $"ann-{Guid.NewGuid():N}"[..16];
+                    events.Add(new AnnotationAdded_V1(
+                        student.StudentId,
+                        attempt.ConceptId,
+                        annotationId,
+                        $"h{rng.Next(100000):x5}",
+                        0.3 + rng.NextDouble() * 0.4, // positive/neutral sentiment for questions
+                        "question"));
+                }
 
                 // XP for correct answers
                 if (attempt.IsCorrect)
@@ -189,6 +261,27 @@ public static class SimulationEventSeeder
                         methodology,
                         24.0,
                         attempt.Timestamp));
+                }
+
+                // SAI: Tutoring episode after sustained struggle (5+ wrong, once per session)
+                if (consecutiveWrong >= 5 && !tutoringTriggeredThisSession && rng.NextDouble() < 0.4)
+                {
+                    tutoringTriggeredThisSession = true;
+                    var tutoringDuration = TimeSpan.FromMinutes(2 + rng.NextDouble() * 6);
+                    var turnCount = 2 + rng.Next(0, 7); // 2-8 turns
+                    var triggerType = rng.NextDouble() < 0.5 ? "confusion_stuck" : "post_wrong_answer";
+                    var resolution = rng.NextDouble() < 0.6 ? "resolved" : "student_ended";
+
+                    events.Add(new TutoringEpisodeCompleted_V1(
+                        StudentId: student.StudentId,
+                        SessionId: session.Key,
+                        ConceptId: attempt.ConceptId,
+                        TriggerType: triggerType,
+                        Methodology: methodology,
+                        TurnCount: turnCount,
+                        Duration: tutoringDuration,
+                        ResolutionStatus: resolution,
+                        Timestamp: attempt.Timestamp.AddMinutes(1)));
                 }
             }
 

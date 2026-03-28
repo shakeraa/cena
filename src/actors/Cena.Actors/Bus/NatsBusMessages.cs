@@ -56,6 +56,13 @@ public sealed record BusMethodologySwitch(
     string ToMethodology,
     string Reason);
 
+public sealed record BusAddAnnotation(
+    string StudentId,
+    string SessionId,
+    string ConceptId,
+    string Text,
+    string Kind);   // "note", "question", "confusion", "insight"
+
 // ── Event payloads (published on cena.events.*) ──
 
 public sealed record BusConceptAttemptedEvent(
