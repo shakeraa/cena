@@ -8,6 +8,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
+using Cena.Actors.Services;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -37,18 +38,22 @@ public interface IDeduplicationService
 public sealed partial class DeduplicationService : IDeduplicationService
 {
     private readonly IConnectionMultiplexer _redis;
+    private readonly IEmbeddingService? _embeddingService;
     private readonly ILogger<DeduplicationService> _logger;
 
     private const string ExactHashSet = "ingest:dedup:exact";
     private const string StructuralHashSet = "ingest:dedup:structural";
     private const string HashToItemMap = "ingest:dedup:hash_to_item";
+    private const float SemanticDedupThreshold = 0.95f;
 
     public DeduplicationService(
         IConnectionMultiplexer redis,
-        ILogger<DeduplicationService> logger)
+        ILogger<DeduplicationService> logger,
+        IEmbeddingService? embeddingService = null)
     {
         _redis = redis;
         _logger = logger;
+        _embeddingService = embeddingService;
     }
 
     public async Task<DedupOutcome> CheckAsync(
@@ -81,9 +86,37 @@ public sealed partial class DeduplicationService : IDeduplicationService
             }
         }
 
-        // Level 3: Semantic embedding (placeholder — requires vector DB)
-        // TODO: Integrate mE5-large embeddings with pgvector or Redis VSS
-        // For now, skip semantic dedup until corpus > 10K items
+        // Level 3: Semantic embedding via pgvector (SAI-06)
+        if (_embeddingService is not null)
+        {
+            try
+            {
+                var similar = await _embeddingService.SearchSimilarAsync(
+                    stemText,
+                    subjectFilter: null,
+                    conceptFilter: null,
+                    limit: 1,
+                    minSimilarity: SemanticDedupThreshold,
+                    ct: ct);
+
+                if (similar.Count > 0)
+                {
+                    _logger.LogDebug(
+                        "Semantic near-duplicate found: {BlockId} (similarity={Similarity:F3})",
+                        similar[0].ContentBlockId, similar[0].Similarity);
+                    return new DedupOutcome(
+                        DedupResult.SemanticNearDuplicate,
+                        similar[0].ContentBlockId,
+                        similar[0].Similarity,
+                        exactHash,
+                        structuralHash);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Semantic dedup check failed, continuing as unique");
+            }
+        }
 
         return new DedupOutcome(DedupResult.Unique, null, null, exactHash, structuralHash);
     }

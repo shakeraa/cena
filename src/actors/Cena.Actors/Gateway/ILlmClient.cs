@@ -20,7 +20,10 @@ public sealed record LlmRequest(
     float Temperature = 0.7f,
     int MaxTokens = 4096,
     string? ModelId = null,
-    string? JsonSchema = null);
+    string? JsonSchema = null,
+    // SAI-004: Prompt caching -- when true, system prompt is sent with
+    // cache_control: { type: "ephemeral" } per routing-config.yaml section 6.
+    bool CacheSystemPrompt = false);
 
 public sealed record LlmResponse(
     string Content,

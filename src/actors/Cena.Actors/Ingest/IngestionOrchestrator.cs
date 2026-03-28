@@ -1,7 +1,9 @@
 // =============================================================================
 // Cena Platform — Ingestion Pipeline Orchestrator
-// Coordinates the full pipeline: File → OCR → Segment → Normalize → Classify →
-// Dedup → Store. Emits events at each stage for audit and monitoring.
+// Coordinates the full pipeline: File -> OCR -> Segment -> Normalize -> Classify ->
+// Dedup -> Store. Emits events at each stage for audit and monitoring.
+// SAI-07: Content extraction runs in parallel with question segmentation.
+//         Content extraction failure does NOT block question pipeline.
 // =============================================================================
 
 using System.Security.Cryptography;
@@ -34,13 +36,15 @@ public sealed record IngestionResult(
     int QuestionsDuplicate,
     float AvgQualityScore,
     bool Success,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    int ContentBlocksExtracted = 0);
 
 public sealed class IngestionOrchestrator : IIngestionOrchestrator
 {
     private readonly IOcrClient _ocrClient;
     private readonly IMathOcrClient _mathFallback;
     private readonly IQuestionSegmenter _segmenter;
+    private readonly IContentExtractorService _contentExtractor;
     private readonly IDeduplicationService _dedup;
     private readonly IDocumentStore _store;
     private readonly INatsConnection _nats;
@@ -50,6 +54,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
         IOcrClient ocrClient,
         IMathOcrClient mathFallback,
         IQuestionSegmenter segmenter,
+        IContentExtractorService contentExtractor,
         IDeduplicationService dedup,
         IDocumentStore store,
         INatsConnection nats,
@@ -58,6 +63,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
         _ocrClient = ocrClient;
         _mathFallback = mathFallback;
         _segmenter = segmenter;
+        _contentExtractor = contentExtractor;
         _dedup = dedup;
         _store = store;
         _nats = nats;
@@ -146,20 +152,99 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                 ocrResult.OverallConfidence, ocrResult.DetectedLanguage,
                 ocrResult.PageCount, ocrResult.EstimatedCostUsd, DateTimeOffset.UtcNow));
 
-            // ── Stage 3: Segment questions from each page ──
+            // ── Stage 3: Segment questions + Extract content (parallel) ──
+            // SAI-07: Both tasks read from the same OCR output. Content extraction
+            // failure does NOT block the question pipeline.
             AdvanceStage(pipelineItem, PipelineStage.Segmented);
 
-            var allQuestions = new List<SegmentedQuestion>();
-            foreach (var page in ocrResult.Pages)
-            {
-                var pageQuestions = await _segmenter.SegmentAsync(page, ct);
-                allQuestions.AddRange(pageQuestions);
-            }
+            var questionTask = SegmentQuestionsAsync(ocrResult.Pages, ct);
+            var contentTask = SafeExtractContentAsync(
+                ocrResult.Pages, "math", ocrResult.DetectedLanguage, ct);
+
+            await Task.WhenAll(questionTask, contentTask);
+
+            var allQuestions = questionTask.Result;
+            var contentBlocks = contentTask.Result;
 
             CompleteStage(pipelineItem, PipelineStage.Segmented);
 
-            _logger.LogInformation("Segmented {Count} questions from {File}",
-                allQuestions.Count, request.Filename);
+            _logger.LogInformation(
+                "Segmented {QuestionCount} questions and {ContentCount} content blocks from {File}",
+                allQuestions.Count, contentBlocks.Count, request.Filename);
+
+            // ── Stage 3b: Store content blocks as events + documents ──
+            if (contentBlocks.Count > 0)
+            {
+                AdvanceStage(pipelineItem, PipelineStage.ContentExtraction);
+
+                var contentBlockIds = new List<string>();
+                foreach (var block in contentBlocks)
+                {
+                    var blockId = $"cb-{Guid.NewGuid():N}";
+                    contentBlockIds.Add(blockId);
+
+                    var contentEvent = new ContentExtracted_V1(
+                        ContentBlockId: blockId,
+                        SourceDocId: pipelineItemId,
+                        ContentType: block.ContentType,
+                        RawText: block.RawText,
+                        ProcessedText: block.ProcessedText,
+                        ConceptIds: block.ConceptIds,
+                        Language: ocrResult.DetectedLanguage,
+                        PageRange: block.PageRange,
+                        Subject: "math",
+                        Topic: block.Topic,
+                        Timestamp: DateTimeOffset.UtcNow);
+
+                    session.Events.Append(pipelineItemId, contentEvent);
+
+                    session.Store(new ContentBlockDocument
+                    {
+                        Id = blockId,
+                        SourceDocId = pipelineItemId,
+                        ContentType = block.ContentType,
+                        RawText = block.RawText,
+                        ProcessedText = block.ProcessedText,
+                        ConceptIds = block.ConceptIds,
+                        Language = ocrResult.DetectedLanguage,
+                        PageRange = block.PageRange,
+                        Subject = "math",
+                        Topic = block.Topic,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    });
+                }
+
+                pipelineItem.ExtractedContentBlockIds = contentBlockIds;
+                pipelineItem.ExtractedContentBlockCount = contentBlockIds.Count;
+
+                // Aggregate content block type counts and linked concept IDs
+                var typeCounts = new Dictionary<string, int>();
+                var allLinkedConcepts = new HashSet<string>();
+                foreach (var block in contentBlocks)
+                {
+                    if (!typeCounts.TryAdd(block.ContentType, 1))
+                        typeCounts[block.ContentType]++;
+
+                    foreach (var cid in block.ConceptIds)
+                    {
+                        if (cid != "unlinked")
+                            allLinkedConcepts.Add(cid);
+                    }
+                }
+                pipelineItem.ContentBlockTypeCounts = typeCounts;
+                pipelineItem.LinkedConceptIds = allLinkedConcepts.ToList();
+
+                CompleteStage(pipelineItem, PipelineStage.ContentExtraction);
+
+                // SAI-06/SAI-07: Publish NATS events for async embedding (non-blocking)
+                foreach (var blockId in contentBlockIds)
+                {
+                    await _nats.PublishAsync("cena.ingest.content.extracted",
+                        System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
+                            new { ContentBlockId = blockId, PipelineItemId = pipelineItemId }),
+                        cancellationToken: ct);
+                }
+            }
 
             // ── Stage 4: Normalize + Dedup each question ──
             AdvanceStage(pipelineItem, PipelineStage.Normalized);
@@ -238,7 +323,8 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                     pipelineItemId,
                     questionsExtracted = allQuestions.Count,
                     questionsUnique = questionIds.Count,
-                    duplicates = duplicateCount
+                    duplicates = duplicateCount,
+                    contentBlocksExtracted = contentBlocks.Count
                 }), cancellationToken: ct);
 
             return new IngestionResult(
@@ -248,7 +334,8 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                 QuestionsDuplicate: duplicateCount,
                 AvgQualityScore: pipelineItem.AvgQualityScore ?? 0,
                 Success: true,
-                ErrorMessage: null);
+                ErrorMessage: null,
+                ContentBlocksExtracted: contentBlocks.Count);
         }
         catch (Exception ex)
         {
@@ -262,6 +349,39 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
 
             return new IngestionResult(pipelineItemId, 0, 0, 0, 0, false, ex.Message);
         }
+    }
+
+    /// <summary>
+    /// SAI-07: Fault-tolerant content extraction wrapper.
+    /// Content extraction failure is logged but does NOT propagate — returns empty list.
+    /// This ensures the question pipeline continues even if content extraction fails.
+    /// </summary>
+    private async Task<IReadOnlyList<ExtractedContentBlock>> SafeExtractContentAsync(
+        List<OcrPageOutput> pages, string subject, string language, CancellationToken ct)
+    {
+        try
+        {
+            return await _contentExtractor.ExtractAsync(pages, subject, language, ct);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "Content extraction failed for {PageCount} pages, continuing with question pipeline only",
+                pages.Count);
+            return [];
+        }
+    }
+
+    private async Task<List<SegmentedQuestion>> SegmentQuestionsAsync(
+        List<OcrPageOutput> pages, CancellationToken ct)
+    {
+        var allQuestions = new List<SegmentedQuestion>();
+        foreach (var page in pages)
+        {
+            var pageQuestions = await _segmenter.SegmentAsync(page, ct);
+            allQuestions.AddRange(pageQuestions);
+        }
+        return allQuestions;
     }
 
     private static void AdvanceStage(PipelineItemDocument item, PipelineStage stage)

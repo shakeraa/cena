@@ -65,6 +65,20 @@ public sealed record QuestionsRecreated_V1(
     IReadOnlyList<string> RecreatedQuestionIds,
     DateTimeOffset Timestamp);
 
+/// <summary>Semantic content block extracted from source document (non-question content).</summary>
+public sealed record ContentExtracted_V1(
+    string ContentBlockId,
+    string SourceDocId,
+    string ContentType,             // "definition", "theorem", "example", "explanation", "exercise_solution"
+    string RawText,
+    string ProcessedText,           // Cleaned, structured (Markdown)
+    IReadOnlyList<string> ConceptIds,
+    string Language,                // "he", "ar", "en"
+    string? PageRange,              // "12-13" from source doc
+    string Subject,
+    string Topic,
+    DateTimeOffset Timestamp);
+
 /// <summary>Pipeline processing failed at a stage.</summary>
 public sealed record PipelineStageFailed_V1(
     string PipelineItemId,

@@ -16,6 +16,7 @@ public enum PipelineStage
     Segmented,
     Normalized,
     Classified,
+    ContentExtraction,
     Deduplicated,
     ReCreated,
     InReview,
@@ -50,6 +51,12 @@ public sealed class PipelineItemDocument
     // Extracted questions (item IDs created in the Question aggregate)
     public List<string> ExtractedQuestionIds { get; set; } = new();
     public int ExtractedQuestionCount { get; set; }
+
+    // Extracted content blocks (SAI-05: definitions, theorems, examples, etc.)
+    public List<string> ExtractedContentBlockIds { get; set; } = new();
+    public int ExtractedContentBlockCount { get; set; }
+    public Dictionary<string, int> ContentBlockTypeCounts { get; set; } = new();
+    public List<string> LinkedConceptIds { get; set; } = new();
 
     // Quality summary across extracted questions
     public float? AvgQualityScore { get; set; }

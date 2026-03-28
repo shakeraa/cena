@@ -96,6 +96,15 @@ public static class MartenConfiguration
             .Index(x => x.Language)
             .Index(x => x.AssociatedConceptId);
 
+        // ── Content Block Document (SAI-05: Content Extraction Pipeline) ──
+        opts.Schema.For<ContentBlockDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SourceDocId)
+            .Index(x => x.ContentType)
+            .Index(x => x.Subject)
+            .Index(x => x.Language)
+            .Index(x => x.Topic);
+
         // ── Register Ingestion Pipeline Events ──
         RegisterIngestionEvents(opts);
 
@@ -160,6 +169,7 @@ public static class MartenConfiguration
         opts.Events.AddEventType<QuestionsRecreated_V1>();
         opts.Events.AddEventType<PipelineStageFailed_V1>();
         opts.Events.AddEventType<MovedToReview_V1>();
+        opts.Events.AddEventType<ContentExtracted_V1>();
         opts.Events.AddEventType<PipelineCompleted_V1>();
     }
 

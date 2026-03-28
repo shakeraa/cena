@@ -91,6 +91,11 @@ public sealed class FocusExperimentTests
         Assert.Contains("foc-peak-time", ids);
         Assert.Contains("foc-solution-diversity", ids);
         Assert.Contains("foc-sensor-enhanced", ids);
+
+        // 3 SAI-006 Student AI Interaction experiments
+        Assert.Contains(FocusExperimentService.SaiAdaptiveExplanations, ids);
+        Assert.Contains(FocusExperimentService.SaiHintBktWeighting, ids);
+        Assert.Contains(FocusExperimentService.SaiConfusionGating, ids);
     }
 
     [Fact]
