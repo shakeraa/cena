@@ -86,7 +86,10 @@ builder.Services.AddScoped<IFocusAnalyticsService, FocusAnalyticsService>();
 builder.Services.AddScoped<IMasteryTrackingService, MasteryTrackingService>();
 builder.Services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
 builder.Services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
-builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService, Cena.Admin.Api.QualityGate.QualityGateService>();
+builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService>(sp =>
+    new Cena.Admin.Api.QualityGate.QualityGateService(
+        configuration: sp.GetRequiredService<IConfiguration>(),
+        logger: sp.GetRequiredService<ILogger<Cena.Admin.Api.QualityGate.QualityGateService>>()));
 builder.Services.AddSingleton<IAiGenerationService, AiGenerationService>();
 builder.Services.AddScoped<IQuestionBankService, QuestionBankService>();
 builder.Services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();

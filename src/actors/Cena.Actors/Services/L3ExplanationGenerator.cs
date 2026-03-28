@@ -81,7 +81,8 @@ public sealed class L3ExplanationGenerator : IL3ExplanationGenerator
             SystemPrompt: systemPrompt,
             UserPrompt: userPrompt,
             Temperature: 0.3f,
-            MaxTokens: maxTokens);
+            MaxTokens: maxTokens,
+            CacheSystemPrompt: true);
 
         _logger.LogDebug(
             "L3 generating personalized explanation for question {QuestionId}, " +
@@ -246,6 +247,10 @@ public sealed class L3ExplanationGenerator : IL3ExplanationGenerator
             "feynman" =>
                 "Ask the student to explain their reasoning. Guide them to articulate " +
                 "why they chose their answer and where their understanding breaks down.",
+
+            "directinstruction" or "direct_instruction" or "direct-instruction" =>
+                "Explain the solution step-by-step, clearly showing each reasoning step. " +
+                "Be explicit about the logic at each transition.",
 
             "spacedrepetition" or "spaced_repetition" or "spaced-repetition" =>
                 "Provide a concise review-focused explanation. Highlight the key fact or rule " +

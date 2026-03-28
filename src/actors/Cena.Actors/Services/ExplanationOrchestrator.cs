@@ -91,8 +91,10 @@ public sealed class ExplanationOrchestrator : IExplanationOrchestrator
         var classifiedErrorType = await ClassifyErrorAsync(request, ct);
 
         // ── Determine if L3 escalation is warranted ──
-        bool highUncertainty = HasHighUncertaintySignals(request, classifiedErrorType);
         bool l3Available = request.L3Context is not null;
+        // Only check uncertainty when L3 context is available -- no point escalating
+        // if there's nothing to escalate to.
+        bool highUncertainty = l3Available && HasHighUncertaintySignals(request, classifiedErrorType);
 
         // ── L2: Try cache with classified error type + language ──
         var cached = await _cache.GetAsync(
@@ -284,8 +286,8 @@ public sealed class ExplanationOrchestrator : IExplanationOrchestrator
         if (request.AnswerChangeCount is > 2) return true;
 
         // Complex error types that benefit from personalized explanation
-        if (errorType is ExplanationErrorType.TransferError
-            or ExplanationErrorType.SystematicError)
+        if (errorType is ExplanationErrorType.ConceptualMisunderstanding
+            or ExplanationErrorType.Guessing)
             return true;
 
         return false;

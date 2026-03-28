@@ -171,6 +171,24 @@ public sealed class ExplanationGenerator : IExplanationGenerator
                 "Ask the student to explain their reasoning. Guide them to articulate " +
                 "why they chose their answer and where their understanding breaks down.",
 
+            "directinstruction" or "direct_instruction" or "direct-instruction" =>
+                "Explain the solution step-by-step, clearly showing each reasoning step. " +
+                "Be explicit about the logic at each transition.",
+
+            "spacedrepetition" or "spaced_repetition" or "spaced-repetition" =>
+                "Provide a concise review-focused explanation. Highlight the key fact or rule " +
+                "the student needs to recall.",
+
+            "retrievalpractice" or "retrieval_practice" or "retrieval-practice" =>
+                "Guide the student to retrieve the answer from memory. Provide a cue or prompt " +
+                "rather than the full explanation.",
+
+            "analogy" =>
+                "Explain the concept using a concrete analogy or real-world parallel.",
+
+            "bloomsprogression" or "blooms_progression" or "blooms-progression" =>
+                "Match explanation depth to the Bloom's level being tested.",
+
             _ =>
                 "Explain the correct approach clearly, addressing the specific error."
         };

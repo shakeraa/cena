@@ -216,6 +216,139 @@ public sealed class ExplanationOrchestratorTests
     }
 
     // =========================================================================
+    // SAI-004: L3 ESCALATION — high uncertainty triggers L3 over L2 cache
+    // =========================================================================
+
+    [Fact]
+    public async Task ResolveAsync_CacheHitWithHighUncertainty_EscalatesToL3()
+    {
+        _classifier.ClassifyAsync(Arg.Any<ErrorClassificationInput>(), Arg.Any<CancellationToken>())
+            .Returns(ExplanationErrorType.ProceduralError);
+
+        _cache.GetAsync("q1", ExplanationErrorType.ProceduralError, "he", Arg.Any<CancellationToken>())
+            .Returns(new CachedExplanation("Cached", "sonnet", 30, DateTimeOffset.UtcNow));
+
+        _l3Generator.GenerateAsync(Arg.Any<L3ExplanationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new GeneratedExplanation("Personalized L3", "sonnet", 120));
+
+        var l3Context = CreateL3Context() with { BackspaceCount = 8 };
+        var request = CreateRequest("q1") with { L3Context = l3Context };
+
+        var result = await _orchestrator.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Equal("Personalized L3", result);
+        await _l3Generator.Received(1).GenerateAsync(Arg.Any<L3ExplanationRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ResolveAsync_CacheHitNoUncertainty_ReturnsL2WithoutL3()
+    {
+        _classifier.ClassifyAsync(Arg.Any<ErrorClassificationInput>(), Arg.Any<CancellationToken>())
+            .Returns(ExplanationErrorType.ProceduralError);
+
+        _cache.GetAsync("q1", ExplanationErrorType.ProceduralError, "he", Arg.Any<CancellationToken>())
+            .Returns(new CachedExplanation("Cached", "sonnet", 30, DateTimeOffset.UtcNow));
+
+        var l3Context = CreateL3Context() with { BackspaceCount = 2, AnswerChangeCount = 0 };
+        var request = CreateRequest("q1") with { L3Context = l3Context };
+
+        var result = await _orchestrator.ResolveAsync(request, CancellationToken.None);
+
+        Assert.Equal("Cached", result);
+        await _l3Generator.DidNotReceive().GenerateAsync(Arg.Any<L3ExplanationRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    // =========================================================================
+    // SAI-004: L3 AFFECT GATE — ConfusionResolving suppresses L3
+    // =========================================================================
+
+    [Fact]
+    public async Task ResolveAsync_ConfusionResolving_L3Suppressed_FallsThrough()
+    {
+        _classifier.ClassifyAsync(Arg.Any<ErrorClassificationInput>(), Arg.Any<CancellationToken>())
+            .Returns(ExplanationErrorType.ProceduralError);
+
+        _cache.GetAsync("q1", ExplanationErrorType.ProceduralError, "he", Arg.Any<CancellationToken>())
+            .Returns((CachedExplanation?)null);
+        _cache.GetAsync("q1", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((CachedExplanation?)null);
+
+        // L3 generator returns null when affect gate fires (ConfusionResolving)
+        _l3Generator.GenerateAsync(Arg.Any<L3ExplanationRequest>(), Arg.Any<CancellationToken>())
+            .Returns((GeneratedExplanation?)null);
+
+        _generator.GenerateAsync(Arg.Any<ExplanationContext>(), Arg.Any<CancellationToken>())
+            .Returns(new GeneratedExplanation("L2 generated fallback", "sonnet", 50));
+
+        var l3Context = CreateL3Context() with
+        {
+            ConfusionState = ConfusionState.ConfusionResolving,
+            BackspaceCount = 10  // High uncertainty, but L3 returns null due to affect gate
+        };
+        var request = CreateRequest("q1") with { L3Context = l3Context };
+
+        var result = await _orchestrator.ResolveAsync(request, CancellationToken.None);
+
+        // Should fall through to L2-generate since L3 was suppressed
+        Assert.Equal("L2 generated fallback", result);
+    }
+
+    // =========================================================================
+    // SAI-004: L3 FAILURE → L2 CACHE FALLBACK
+    // =========================================================================
+
+    [Fact]
+    public async Task ResolveAsync_L3Fails_FallsBackToL2Cache()
+    {
+        _classifier.ClassifyAsync(Arg.Any<ErrorClassificationInput>(), Arg.Any<CancellationToken>())
+            .Returns(ExplanationErrorType.ProceduralError);
+
+        _cache.GetAsync("q1", ExplanationErrorType.ProceduralError, "he", Arg.Any<CancellationToken>())
+            .Returns(new CachedExplanation("Cached L2", "sonnet", 30, DateTimeOffset.UtcNow));
+
+        _l3Generator.GenerateAsync(Arg.Any<L3ExplanationRequest>(), Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("Circuit breaker open"));
+
+        var l3Context = CreateL3Context() with { BackspaceCount = 10 };
+        var request = CreateRequest("q1") with { L3Context = l3Context };
+
+        var result = await _orchestrator.ResolveAsync(request, CancellationToken.None);
+
+        // L3 failed, but we had a cached result → return it
+        Assert.Equal("Cached L2", result);
+    }
+
+    // =========================================================================
+    // SAI-004: L3 NOT CACHED BACK — ephemeral results
+    // =========================================================================
+
+    [Fact]
+    public async Task ResolveAsync_L3Success_DoesNotCacheResult()
+    {
+        _classifier.ClassifyAsync(Arg.Any<ErrorClassificationInput>(), Arg.Any<CancellationToken>())
+            .Returns(ExplanationErrorType.ProceduralError);
+
+        _cache.GetAsync("q1", ExplanationErrorType.ProceduralError, "he", Arg.Any<CancellationToken>())
+            .Returns((CachedExplanation?)null);
+        _cache.GetAsync("q1", Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns((CachedExplanation?)null);
+
+        _l3Generator.GenerateAsync(Arg.Any<L3ExplanationRequest>(), Arg.Any<CancellationToken>())
+            .Returns(new GeneratedExplanation("Personalized", "sonnet", 100));
+
+        var l3Context = CreateL3Context() with { BackspaceCount = 10 };
+        var request = CreateRequest("q1") with { L3Context = l3Context };
+
+        await _orchestrator.ResolveAsync(request, CancellationToken.None);
+
+        // L3 is ephemeral — should NOT be cached
+        await _cache.DidNotReceive().SetAsync(
+            Arg.Any<string>(), Arg.Any<ExplanationErrorType>(), Arg.Any<string>(),
+            Arg.Is<CachedExplanation>(c => c.Text == "Personalized"),
+            Arg.Any<CancellationToken>());
+    }
+
+    // =========================================================================
     // HELPERS
     // =========================================================================
 
@@ -233,5 +366,31 @@ public sealed class ExplanationOrchestratorTests
             BloomsLevel: 3,
             Subject: "Mathematics",
             Language: "he");
+    }
+
+    private static L3ExplanationRequest CreateL3Context()
+    {
+        return new L3ExplanationRequest
+        {
+            QuestionId = "q1",
+            QuestionStem = "What is 2+2?",
+            CorrectAnswer = "4",
+            StudentAnswer = "5",
+            ErrorType = "ProceduralError",
+            Subject = "Mathematics",
+            Language = "he",
+            MasteryProbability = 0.5,
+            RecallProbability = 0.5,
+            BloomLevel = 3,
+            Psi = 0.8,
+            ScaffoldingLevel = Cena.Actors.Mastery.ScaffoldingLevel.Partial,
+            Methodology = "socratic",
+            FocusLevel = FocusLevel.Engaged,
+            ConfusionState = ConfusionState.NotConfused,
+            BackspaceCount = 0,
+            AnswerChangeCount = 0,
+            ResponseTimeMs = 5000,
+            MedianResponseTimeMs = 4000
+        };
     }
 }

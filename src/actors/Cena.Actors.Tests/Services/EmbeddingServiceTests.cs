@@ -129,4 +129,93 @@ public class EmbeddingServiceTests
         var parts = formatted[1..^1].Split(',');
         Assert.Equal(1536, parts.Length);
     }
+
+    // ── EmbedBatchAsync tests (pseudo-embedding fallback path) ──
+
+    [Fact]
+    public void GeneratePseudoEmbedding_MultipleTexts_AllCorrectDimension()
+    {
+        var texts = new[] { "algebra", "geometry", "calculus" };
+        var embeddings = texts.Select(EmbeddingService.GeneratePseudoEmbedding).ToList();
+
+        Assert.Equal(3, embeddings.Count);
+        Assert.All(embeddings, e => Assert.Equal(1536, e.Length));
+    }
+
+    [Fact]
+    public void GeneratePseudoEmbedding_MultipleTexts_AllUnitNormalized()
+    {
+        var texts = new[] { "algebra", "geometry", "calculus" };
+        var embeddings = texts.Select(EmbeddingService.GeneratePseudoEmbedding).ToList();
+
+        foreach (var embedding in embeddings)
+        {
+            var magnitude = MathF.Sqrt(embedding.Sum(x => x * x));
+            Assert.InRange(magnitude, 0.99f, 1.01f);
+        }
+    }
+
+    [Fact]
+    public void GeneratePseudoEmbedding_MultilanguageSupport()
+    {
+        // Hebrew, Arabic, and English should all produce valid embeddings
+        var hebrewEmbedding = EmbeddingService.GeneratePseudoEmbedding("משוואה ריבועית");
+        var arabicEmbedding = EmbeddingService.GeneratePseudoEmbedding("المعادلة التربيعية");
+        var englishEmbedding = EmbeddingService.GeneratePseudoEmbedding("quadratic equation");
+
+        Assert.Equal(1536, hebrewEmbedding.Length);
+        Assert.Equal(1536, arabicEmbedding.Length);
+        Assert.Equal(1536, englishEmbedding.Length);
+
+        // All three should be different
+        Assert.NotEqual(hebrewEmbedding, arabicEmbedding);
+        Assert.NotEqual(hebrewEmbedding, englishEmbedding);
+        Assert.NotEqual(arabicEmbedding, englishEmbedding);
+    }
+
+    // ── SearchFilter record tests ──
+
+    [Fact]
+    public void SearchFilter_DefaultValues_AllNull()
+    {
+        var filter = new SearchFilter();
+
+        Assert.Null(filter.ConceptIds);
+        Assert.Null(filter.ContentType);
+        Assert.Null(filter.Language);
+    }
+
+    [Fact]
+    public void SearchFilter_WithValues_PropertiesSet()
+    {
+        var filter = new SearchFilter(
+            ConceptIds: new[] { "concept-1", "concept-2" },
+            ContentType: "definition",
+            Language: "he");
+
+        Assert.Equal(2, filter.ConceptIds!.Count);
+        Assert.Equal("definition", filter.ContentType);
+        Assert.Equal("he", filter.Language);
+    }
+
+    // ── ContentSearchResult record tests ──
+
+    [Fact]
+    public void ContentSearchResult_HasAllRequiredFields()
+    {
+        var result = new ContentSearchResult(
+            ContentBlockId: "cb-123",
+            PipelineItemId: "pi-456",
+            ContentType: "theorem",
+            ConceptIds: new[] { "concept-1" },
+            TextPreview: "For all x...",
+            Similarity: 0.85f);
+
+        Assert.Equal("cb-123", result.ContentBlockId);
+        Assert.Equal("pi-456", result.PipelineItemId);
+        Assert.Equal("theorem", result.ContentType);
+        Assert.Single(result.ConceptIds);
+        Assert.Equal("For all x...", result.TextPreview);
+        Assert.Equal(0.85f, result.Similarity);
+    }
 }
