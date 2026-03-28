@@ -120,8 +120,14 @@ const fetchAtRisk = async () => {
   atRiskLoading.value = true
   atRiskError.value = null
   try {
-    const data = await $api<{ students: AtRiskStudent[] }>('/admin/mastery/at-risk')
-    atRiskStudents.value = data.students ?? []
+    const data = await $api<{ students: any[] }>('/admin/mastery/at-risk')
+    atRiskStudents.value = (data.students ?? []).map(s => ({
+      studentId: s.studentId,
+      studentName: s.studentName,
+      avgMastery: s.avgMastery ?? s.currentAvgMastery ?? 0,
+      trend: (s.masteryDecline ?? 0) < 0 ? 'down' as const : (s.masteryDecline ?? 0) > 0 ? 'up' as const : 'flat' as const,
+      daysSinceImprovement: 0,
+    }))
   }
   catch (err: any) {
     atRiskError.value = err.message ?? 'Failed to load at-risk students'

@@ -454,7 +454,7 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
             .Where(e => e.Timestamp >= since7d)
             .ToListAsync();
 
-        // Group by studentId, find students with avg < 0.45
+        // Group by studentId, find students with avg focus below 65%
         var alerts = focusEvents
             .Select(e => new
             {
@@ -463,7 +463,7 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
             })
             .Where(x => !string.IsNullOrEmpty(x.StudentId) && x.FocusScore > 0)
             .GroupBy(x => x.StudentId)
-            .Where(g => g.Average(x => x.FocusScore) < 0.45)
+            .Where(g => g.Average(x => x.FocusScore) < 0.65)
             .Select(g =>
             {
                 var avgScore = (float)(g.Average(x => x.FocusScore) * 100);
