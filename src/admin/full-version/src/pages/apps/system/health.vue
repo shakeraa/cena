@@ -35,6 +35,10 @@ const actorNodes = ref<ActorNode[]>([])
 const metrics = ref<SystemMetrics>({
   errorRates: [],
   activeActors: 0,
+  messagesProcessed: 0,
+  sessionsStarted: 0,
+  eventsPublished: 0,
+  actorErrors: 0,
   queueDepths: [],
 })
 
