@@ -72,6 +72,13 @@ public sealed class NatsBusRouter : BackgroundService
         }
         _logger.LogInformation("NatsBusRouter starting — subscribing to command subjects...");
 
+        // Ensure NATS connection is fully established before subscribing
+        if (_nats is NATS.Client.Core.NatsConnection conn)
+        {
+            await conn.ConnectAsync();
+            _logger.LogInformation("NatsBusRouter NATS connection established");
+        }
+
         var tasks = new[]
         {
             SubscribeAndRoute<BusStartSession>(NatsSubjects.SessionStart, HandleStartSession, stoppingToken),
@@ -94,15 +101,27 @@ public sealed class NatsBusRouter : BackgroundService
     {
         try
         {
-            await foreach (var msg in _nats.SubscribeAsync<string>(subject, cancellationToken: ct))
+            _logger.LogInformation("NatsBusRouter subscribing to {Subject}...", subject);
+            await foreach (var msg in _nats.SubscribeAsync<byte[]>(subject, cancellationToken: ct))
             {
                 try
                 {
-                    var envelope = JsonSerializer.Deserialize<BusEnvelope<T>>(msg.Data!, _jsonOpts);
+                    var rawData = msg.Data;
+                    if (rawData is null || rawData.Length == 0)
+                    {
+                        _logger.LogWarning("Empty message on {Subject}", subject);
+                        continue;
+                    }
+                    var envelope = JsonSerializer.Deserialize<BusEnvelope<T>>(rawData, _jsonOpts);
                     if (envelope is not null && envelope.Payload is not null)
                     {
                         await handler(envelope, ct);
                         Interlocked.Increment(ref _commandsRouted);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Deserialization returned null for message on {Subject}: {Preview}",
+                            subject, System.Text.Encoding.UTF8.GetString(rawData[..Math.Min(200, rawData.Length)]));
                     }
                 }
                 catch (JsonException ex)

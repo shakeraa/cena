@@ -28,14 +28,14 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
 {
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
-    private readonly IIngestionOrchestrator _orchestrator;
+    private readonly IIngestionOrchestrator? _orchestrator;
     private readonly ILogger<IngestionPipelineService> _logger;
 
     public IngestionPipelineService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
-        IIngestionOrchestrator orchestrator,
-        ILogger<IngestionPipelineService> logger)
+        ILogger<IngestionPipelineService> logger,
+        IIngestionOrchestrator? orchestrator = null)
     {
         _store = store;
         _redis = redis;
@@ -206,6 +206,9 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
         var form = await request.ReadFormAsync();
         var file = form.Files.GetFile("file");
         if (file is null)
+            return new UploadFileResponse("", "error", null);
+
+        if (_orchestrator is null)
             return new UploadFileResponse("", "error", null);
 
         using var stream = file.OpenReadStream();

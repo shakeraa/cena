@@ -14,6 +14,7 @@ using Weasel.Core;
 using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Questions;
+using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Documents;
 
 namespace Cena.Actors.Configuration;
@@ -105,6 +106,16 @@ public static class MartenConfiguration
             .Index(x => x.Language)
             .Index(x => x.Topic);
 
+        // ── Tutoring Session Document (SAI-08) ──
+        opts.Schema.For<TutoringSessionDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.SessionId)
+            .Index(x => x.StartedAt);
+
+        // ── Register Tutoring Events (SAI-009) ──
+        RegisterTutoringEvents(opts);
+
         // ── Register Ingestion Pipeline Events ──
         RegisterIngestionEvents(opts);
 
@@ -171,6 +182,14 @@ public static class MartenConfiguration
         opts.Events.AddEventType<MovedToReview_V1>();
         opts.Events.AddEventType<ContentExtracted_V1>();
         opts.Events.AddEventType<PipelineCompleted_V1>();
+    }
+
+    private static void RegisterTutoringEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<TutoringSessionStarted_V1>();
+        opts.Events.AddEventType<TutoringMessageSent_V1>();
+        opts.Events.AddEventType<TutoringSessionEnded_V1>();
+        opts.Events.AddEventType<TutoringEpisodeCompleted_V1>();
     }
 
     private static void RegisterQuestionEvents(StoreOptions opts)

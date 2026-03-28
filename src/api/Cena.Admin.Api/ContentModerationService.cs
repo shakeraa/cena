@@ -354,7 +354,7 @@ public sealed class ContentModerationService : IContentModerationService
     public async Task<ModerationStatsResponse> GetStatsAsync()
     {
         await using var session = _store.QuerySession();
-        var today = DateTimeOffset.UtcNow.Date;
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var yesterday = today.AddDays(-1);
         var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
 

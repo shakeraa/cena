@@ -88,7 +88,7 @@ public sealed class TokenBudgetAdminService : ITokenBudgetAdminService
     {
         await using var session = _store.QuerySession();
 
-        var endDate = DateTimeOffset.UtcNow.Date.AddDays(1);
+        var endDate = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(1);
         var startDate = endDate.AddDays(-days);
 
         var messages = await session.Events.QueryAllRawEvents()

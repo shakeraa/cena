@@ -147,7 +147,7 @@ public sealed class TutoringAdminService : ITutoringAdminService
     {
         await using var session = _store.QuerySession();
 
-        var today = DateTimeOffset.UtcNow.Date;
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var tomorrow = today.AddDays(1);
 
         // Sum token usage from TutoringMessageSent_V1 events today, grouped by student
@@ -193,7 +193,7 @@ public sealed class TutoringAdminService : ITutoringAdminService
         await using var session = _store.QuerySession();
 
         var now = DateTimeOffset.UtcNow;
-        var todayStart = now.Date;
+        var todayStart = new DateTimeOffset(now.Date, TimeSpan.Zero);
         var weekStart = todayStart.AddDays(-(int)todayStart.DayOfWeek);
 
         // Count active sessions (started but not ended)
@@ -274,7 +274,7 @@ public sealed class TutoringAdminService : ITutoringAdminService
     private async Task<int> GetStudentBudgetRemainingAsync(
         Marten.IQuerySession querySession, string studentId)
     {
-        var today = DateTimeOffset.UtcNow.Date;
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var tomorrow = today.AddDays(1);
 
         var todayMessages = await querySession.Events.QueryAllRawEvents()

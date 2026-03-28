@@ -27,6 +27,7 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Proto;
 using Proto.Cluster;
+using Proto.Cluster.Identity;
 using Proto.Cluster.Partition;
 using Proto.Cluster.Testing;
 using Proto.DependencyInjection;
@@ -264,14 +265,10 @@ builder.Services.AddSingleton(provider =>
             "Set up AWS DynamoDB credentials for production.");
     }
 
-    // Partition Identity Lookup (consistent hashing on student ID)
-    var partitionIdentityLookup = new PartitionIdentityLookup(
-        new PartitionConfig
-        {
-            Mode = PartitionIdentityLookup.Mode.Pull,
-            RebalanceRequestTimeout = TimeSpan.FromSeconds(5),
-            GetPidTimeout = TimeSpan.FromSeconds(5)
-        });
+    // Identity Lookup — PartitionActivatorLookup for single-node dev, PartitionIdentityLookup for prod
+    var identityLookup = isDevelopment
+        ? (IIdentityLookup)new Proto.Cluster.PartitionActivator.PartitionActivatorLookup()
+        : new PartitionIdentityLookup();
 
     // Register Virtual Actor Kinds (Grains)
     var studentKind = new ClusterKind("student", Props.FromProducer(() =>
@@ -279,14 +276,14 @@ builder.Services.AddSingleton(provider =>
 
     // Cluster Configuration
     var clusterConfig = ClusterConfig
-        .Setup(clusterName, clusterProvider, partitionIdentityLookup)
+        .Setup(clusterName, clusterProvider, identityLookup)
         .WithClusterKind(studentKind)
         .WithGossipRequestTimeout(TimeSpan.FromSeconds(2))
         .WithActorActivationTimeout(TimeSpan.FromSeconds(10))
         .WithActorRequestTimeout(TimeSpan.FromSeconds(30))
         .WithHeartbeatExpiration(TimeSpan.FromSeconds(30));
 
-    // Remote serialization required by cluster, even in single-node dev.
+    // Remote config for cluster — gRPC transport for actor activation.
     system
         .WithRemote(RemoteConfig.BindToLocalhost())
         .WithCluster(clusterConfig);
@@ -389,6 +386,57 @@ app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
         actors = actors
     });
 }).WithName("GetActorStats");
+
+// ---- Cluster diagnostic endpoint ----
+app.MapGet("/api/actors/diag", async (ActorSystem system) =>
+{
+    var cluster = system.Cluster();
+    var members = cluster.MemberList.GetMembers();
+    var diag = new
+    {
+        systemId = system.Id,
+        address = system.Address,
+        memberCount = members?.Count ?? 0,
+        members = members?.ToArray(),
+        clusterKinds = cluster.GetClusterKinds()
+    };
+
+    // Test 1: Direct actor spawn (bypasses cluster serialization)
+    string spawnResult;
+    try
+    {
+        var provider = system.Root.Get<IServiceProvider>();
+        var props = Props.FromProducer(() =>
+            ActivatorUtilities.CreateInstance<Cena.Actors.Students.StudentActor>(
+                app.Services));
+        var pid = system.Root.SpawnNamed(props, "diag-student-001");
+        var resp = await system.Root.RequestAsync<object>(pid,
+            new Cena.Actors.Students.GetStudentProfile("diag-test-001"),
+            TimeSpan.FromSeconds(5));
+        spawnResult = resp != null ? $"OK: {resp.GetType().Name}" : "null response (actor might have no state)";
+        await system.Root.StopAsync(pid);
+    }
+    catch (Exception ex)
+    {
+        spawnResult = $"FAIL: {ex.GetType().Name}: {ex.Message}";
+    }
+
+    // Test 2: Cluster activation
+    string activationResult;
+    try
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        var identity = ClusterIdentity.Create("diag-test-002", "student");
+        var result = await cluster.RequestAsync<object>(identity, new Cena.Actors.Students.GetStudentProfile("diag-test-002"), cts.Token);
+        activationResult = result != null ? $"OK: {result.GetType().Name}" : "null response";
+    }
+    catch (Exception ex)
+    {
+        activationResult = $"FAIL: {ex.GetType().Name}: {ex.Message}";
+    }
+
+    return Results.Ok(new { diag, spawnResult, activationResult });
+}).WithName("ClusterDiagnostic");
 
 // ---- Auth middleware (required by admin endpoints with RequireAuthorization) ----
 app.UseAuthentication();

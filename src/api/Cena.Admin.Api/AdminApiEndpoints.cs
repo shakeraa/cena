@@ -272,7 +272,7 @@ public static class AdminApiEndpoints
             try
             {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-                var response = await http.GetStringAsync("http://localhost:5001/api/actors/stats");
+                var response = await http.GetStringAsync("http://localhost:5119/api/actors/stats");
                 var doc = System.Text.Json.JsonDocument.Parse(response);
                 activeActors = doc.RootElement.GetProperty("activeActorCount").GetInt32();
             }

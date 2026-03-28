@@ -346,7 +346,7 @@ public sealed class AdminUserService : IAdminUserService
         var users = await q.ToListAsync();
 
         var weekAgo = DateTimeOffset.UtcNow.AddDays(-7);
-        var todayStart = DateTimeOffset.UtcNow.Date;
+        var todayStart = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
 
         return new UserStatsResponse(
             TotalUsers: users.Count,

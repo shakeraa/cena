@@ -110,6 +110,9 @@ builder.Services.AddScoped<ITokenBudgetAdminService, TokenBudgetAdminService>();
 
 var app = builder.Build();
 
+if (app.Environment.IsDevelopment())
+    app.UseDeveloperExceptionPage();
+
 // Middleware order: CORS → Auth → Revocation → Endpoints
 app.UseCors();
 app.UseAuthentication();

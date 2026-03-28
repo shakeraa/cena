@@ -1,11 +1,12 @@
 // =============================================================================
 // Cena Platform — Anthropic LLM Client (Claude Sonnet/Haiku)
-// SAI-00: Real API calls via official Anthropic SDK
+// SAI-00: Real API calls via official Anthropic SDK v12.x
 // No retries, no streaming — circuit breaker handles resilience.
 // =============================================================================
 
 using System.Diagnostics;
 using Anthropic;
+using Anthropic.Models.Messages;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -13,7 +14,7 @@ namespace Cena.Actors.Gateway;
 
 public sealed class AnthropicLlmClient : ILlmClient, IDisposable
 {
-    private readonly AnthropicApi _api;
+    private readonly AnthropicClient _client;
     private readonly string _defaultModelId;
     private readonly ILogger<AnthropicLlmClient> _logger;
 
@@ -28,9 +29,8 @@ public sealed class AnthropicLlmClient : ILlmClient, IDisposable
             apiKey = "not-configured";
         }
 
-        _defaultModelId = configuration["LLM:Anthropic:ModelId"] ?? "claude-sonnet-4-6-20260215";
-        _api = new AnthropicApi();
-        _api.AuthorizeUsingApiKey(apiKey);
+        _defaultModelId = configuration["LLM:Anthropic:ModelId"] ?? "claude-sonnet-4-6";
+        _client = new AnthropicClient { ApiKey = apiKey };
     }
 
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct = default)
@@ -42,28 +42,22 @@ public sealed class AnthropicLlmClient : ILlmClient, IDisposable
 
         try
         {
-            var response = await _api.CreateMessageAsync(
-                model: modelId,
-                messages: [request.UserPrompt],
-                system: request.SystemPrompt,
-                maxTokens: request.MaxTokens,
-                temperature: temperature,
-                cancellationToken: ct);
+            var response = await _client.Messages.Create(new MessageCreateParams
+            {
+                Model = modelId,
+                MaxTokens = request.MaxTokens,
+                System = request.SystemPrompt,
+                Temperature = temperature,
+                Messages = [new() { Role = Role.User, Content = request.UserPrompt }],
+            }, ct);
 
             sw.Stop();
 
-            // Extract text from OneOf<string, IList<Block>> response
-            string text;
-            if (response.Content.IsValue1)
-            {
-                text = response.Content.Value1 ?? "";
-            }
-            else
-            {
-                text = string.Join("", response.Content.Value2!
-                    .Where(b => b.IsText)
-                    .Select(b => b.Text!.Text));
-            }
+            var text = string.Join("", response.Content
+                .Select(b => b.Value)
+                .OfType<TextBlock>()
+                .Select(b => b.Text));
+
             var inputTokens = response.Usage?.InputTokens ?? 0;
             var outputTokens = response.Usage?.OutputTokens ?? 0;
 
@@ -71,7 +65,7 @@ public sealed class AnthropicLlmClient : ILlmClient, IDisposable
                 "LLM call: Model={Model} InputTokens={Input} OutputTokens={Output} Latency={Latency:F0}ms",
                 modelId, inputTokens, outputTokens, sw.Elapsed.TotalMilliseconds);
 
-            return new LlmResponse(text, inputTokens, outputTokens, sw.Elapsed, modelId, FromCache: false);
+            return new LlmResponse(text, (int)inputTokens, (int)outputTokens, sw.Elapsed, modelId, FromCache: false);
         }
         catch (Exception ex)
         {
@@ -81,5 +75,5 @@ public sealed class AnthropicLlmClient : ILlmClient, IDisposable
         }
     }
 
-    public void Dispose() => _api.Dispose();
+    public void Dispose() => _client.Dispose();
 }

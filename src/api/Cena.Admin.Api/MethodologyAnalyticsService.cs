@@ -166,7 +166,7 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
         var trend = new List<StagnationTrendPoint>();
         for (int i = 6; i >= 0; i--)
         {
-            var day = DateTimeOffset.UtcNow.Date.AddDays(-i);
+            var day = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-i);
             var dayEnd = day.AddDays(1);
 
             var dayStagnation = stagnationEvents

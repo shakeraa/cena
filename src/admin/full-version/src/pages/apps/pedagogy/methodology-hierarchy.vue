@@ -52,13 +52,13 @@ const loadingRecent = ref(true)
 const fetchRecentStudents = async () => {
   loadingRecent.value = true
   try {
-    const data = await $api<{ students: { studentId: string; studentName: string; riskLevel: string; currentMastery: number }[] }>(
+    const data = await $api<{ students: { studentId: string; studentName: string; riskLevel: string; currentAvgMastery: number }[] }>(
       '/admin/mastery/at-risk',
     )
     recentStudents.value = (data.students ?? []).map(s => ({
       studentId: s.studentId,
       studentName: s.studentName,
-      avgMastery: s.currentMastery,
+      avgMastery: s.currentAvgMastery ?? 0,
       totalConcepts: 0,
       masteredCount: 0,
     }))
