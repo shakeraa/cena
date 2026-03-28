@@ -30,9 +30,12 @@ public sealed class FatigueComputationTests
         var disengagementClassifier = new DisengagementClassifier();
         var deliveryGate = Substitute.For<Cena.Actors.Hints.IDeliveryGate>();
         var graphCache = Substitute.For<IConceptGraphCache>();
+        var personalizedExplanation = Substitute.For<IPersonalizedExplanationService>();
+        Func<Cena.Actors.Tutoring.TutorActor> tutorFactory = () => throw new InvalidOperationException("TutorActor not expected in fatigue tests");
         _actor = new LearningSessionActor(
             bkt, hintAdjustedBkt, cognitiveLoad, hintGenerator, hintGenerationService,
-            confusionDetector, disengagementClassifier, deliveryGate, graphCache, logger, meterFactory);
+            confusionDetector, disengagementClassifier, deliveryGate, personalizedExplanation,
+            tutorFactory, graphCache, logger, meterFactory);
     }
 
     [Fact]

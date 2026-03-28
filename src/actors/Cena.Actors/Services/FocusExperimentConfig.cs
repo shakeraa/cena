@@ -5,7 +5,7 @@
 // focus engine research hypotheses with Cena's population
 // (Israeli 16-18 year olds, Hebrew/Arabic, Bagrut math).
 //
-// 6 predefined experiments cover all research-backed focus features.
+// 6 predefined focus experiments + 3 SAI student AI interaction experiments (opt-in).
 // ═══════════════════════════════════════════════════════════════════════
 
 namespace Cena.Actors.Services;
@@ -187,53 +187,88 @@ public sealed class FocusExperimentService : IFocusExperimentService
 
         // ═══════════════════════════════════════════════════════════
         // SAI-006: STUDENT AI INTERACTION EXPERIMENTS
+        //
+        // These 3 experiments are OPT-IN: StartDate is far future so
+        // they are NOT active by default. Activate by updating StartDate
+        // to the desired launch date via configuration or migration.
         // ═══════════════════════════════════════════════════════════
 
+        // ── Experiment 1: Explanation Tiers ──
+        // 4 arms: measure learning impact of L1 vs L2 vs L3 explanations.
+        // Control arm (no AI explanation) limited to 10% to minimise student impact.
         new FocusExperiment(
-            ExperimentId: SaiAdaptiveExplanations,
-            Name: "Adaptive Explanations",
-            Description: "L1 static explanation only vs full L2+L3 personalized pipeline",
-            PrimaryMetric: "next_concept_mastery_gain_1_week",
+            ExperimentId: SaiExplanationTiers,
+            Name: "Explanation Tiers",
+            Description: "4-arm comparison: no explanation vs L1 static vs L2 cached vs L3 personalized",
+            PrimaryMetric: "mastery_gain",
             Arms: new[]
             {
-                new ExperimentArmConfig(ExperimentArm.Control, 50, "L1 static explanation only"),
-                new ExperimentArmConfig(ExperimentArm.Treatment, 50, "Full L2 cache + L3 personalized pipeline")
+                new ExperimentArmConfig(ExperimentArm.Control, 10,
+                    "No AI explanation — generic 'Incorrect. Try again.'"),
+                new ExperimentArmConfig(ExperimentArm.Treatment, 30,
+                    "L1 static — AI-generated explanation from question aggregate"),
+                new ExperimentArmConfig(ExperimentArm.TreatmentB, 30,
+                    "L2 cached — error-type-specific cached explanation"),
+                new ExperimentArmConfig(ExperimentArm.TreatmentC, 30,
+                    "L3 personalized — full personalized explanation with student context")
             },
-            StartDate: DateTimeOffset.MinValue,
+            StartDate: SaiOptInStartDate,
             EndDate: DateTimeOffset.MaxValue
         ),
+
+        // ── Experiment 2: Hint BKT Credit Curve ──
+        // 3 arms: validate the BKT credit curve for hint usage.
+        // Each arm uses a different credit multiplier schedule (0/1/2/3 hints).
         new FocusExperiment(
-            ExperimentId: SaiHintBktWeighting,
-            Name: "Hint BKT Credit Weighting",
-            Description: "Hints with no BKT adjustment vs credit curve (1.0/0.7/0.4/0.1)",
-            PrimaryMetric: "mastery_retention_1_week",
+            ExperimentId: SaiHintBktCredit,
+            Name: "Hint BKT Credit Curve",
+            Description: "3-arm comparison of BKT credit curves: aggressive / moderate / lenient penalty for hint usage",
+            PrimaryMetric: "mastery_accuracy",
             Arms: new[]
             {
-                new ExperimentArmConfig(ExperimentArm.Control, 50, "Hints delivered, BKT P_T unchanged"),
-                new ExperimentArmConfig(ExperimentArm.Treatment, 50, "Hints with credit curve: 1.0/0.7/0.4/0.1 P_T scaling")
+                new ExperimentArmConfig(ExperimentArm.Control, 34,
+                    "Aggressive — credit curve 1.0 / 0.7 / 0.4 / 0.1 (strong hint penalty)"),
+                new ExperimentArmConfig(ExperimentArm.Treatment, 33,
+                    "Moderate — credit curve 1.0 / 0.8 / 0.5 / 0.2 (moderate hint penalty)"),
+                new ExperimentArmConfig(ExperimentArm.TreatmentB, 33,
+                    "Lenient — credit curve 1.0 / 0.9 / 0.7 / 0.4 (light hint penalty)")
             },
-            StartDate: DateTimeOffset.MinValue,
+            StartDate: SaiOptInStartDate,
             EndDate: DateTimeOffset.MaxValue
         ),
+
+        // ── Experiment 3: Confusion Gating ──
+        // 3 arms: validate whether respecting the confusion patience window improves learning.
         new FocusExperiment(
             ExperimentId: SaiConfusionGating,
             Name: "Confusion-Aware Delivery Gating",
-            Description: "Always deliver hints/explanations vs DeliveryGate confusion+boredom gating",
-            PrimaryMetric: "delayed_test_score_1_week",
+            Description: "3-arm comparison: respect patience window vs immediate delivery vs student choice",
+            PrimaryMetric: "confusion_resolution_rate",
             Arms: new[]
             {
-                new ExperimentArmConfig(ExperimentArm.Control, 50, "Always deliver immediately (no DeliveryGate)"),
-                new ExperimentArmConfig(ExperimentArm.Treatment, 50, "Full DeliveryGate: confusion-aware + boredom-aware gating")
+                new ExperimentArmConfig(ExperimentArm.Control, 34,
+                    "Patience — respect ConfusionDetector patience window, no hint during ConfusionResolving"),
+                new ExperimentArmConfig(ExperimentArm.Treatment, 33,
+                    "Immediate — always deliver hints immediately when confusion detected, ignore patience window"),
+                new ExperimentArmConfig(ExperimentArm.TreatmentB, 33,
+                    "Student choice — show 'Need a hint?' prompt during ConfusionResolving, let student decide")
             },
-            StartDate: DateTimeOffset.MinValue,
+            StartDate: SaiOptInStartDate,
             EndDate: DateTimeOffset.MaxValue
         )
     };
 
     // SAI-006 experiment ID constants
-    public const string SaiAdaptiveExplanations = "sai-adaptive-explanations";
-    public const string SaiHintBktWeighting = "sai-hint-bkt-weighting";
+    public const string SaiExplanationTiers = "sai-explanation-tiers";
+    public const string SaiHintBktCredit = "sai-hint-bkt-credit";
     public const string SaiConfusionGating = "sai-confusion-gating";
+
+    /// <summary>
+    /// SAI experiments are opt-in: this far-future start date ensures they are
+    /// NOT active by default. To activate, override via configuration or set
+    /// StartDate to the desired launch date in a Marten migration.
+    /// </summary>
+    internal static readonly DateTimeOffset SaiOptInStartDate = new(2099, 1, 1, 0, 0, 0, TimeSpan.Zero);
 }
 
 // ═══════════════════════════════════════════════════════════════
@@ -260,5 +295,6 @@ public enum ExperimentArm
 {
     Control,
     Treatment,
-    TreatmentB  // For multi-arm (A/B/C) experiments
+    TreatmentB,  // For multi-arm (A/B/C) experiments
+    TreatmentC   // For 4-arm experiments (e.g. explanation_tiers: control/l1/l2/l3)
 }

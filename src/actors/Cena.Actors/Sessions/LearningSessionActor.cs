@@ -13,6 +13,7 @@ using Cena.Actors.Mastery;
 using Cena.Actors.Questions;
 using Cena.Actors.Services;
 using Cena.Actors.Students;
+using Cena.Actors.Tutoring;
 
 namespace Cena.Actors.Sessions;
 
@@ -32,6 +33,8 @@ public sealed class LearningSessionActor : IActor
     private readonly IConfusionDetector _confusionDetector;
     private readonly IDisengagementClassifier _disengagementClassifier;
     private readonly IDeliveryGate _deliveryGate;
+    private readonly IPersonalizedExplanationService _personalizedExplanation;
+    private readonly Func<TutorActor> _tutorFactory;
     private readonly Mastery.IConceptGraphCache _graphCache;
     private readonly ILogger<LearningSessionActor> _logger;
 
@@ -64,6 +67,11 @@ public sealed class LearningSessionActor : IActor
     private bool _lastWrongOnMastered;
     private double _lastResponseTimeRatio = 1.0;
 
+    // ── Task 07: Tutor actor state (stubs until TutorActor is implemented) ──
+    private Proto.PID? _tutorPid;
+    private string _currentConceptId = "";
+    private double _currentConceptMastery;
+
     // ── Disengagement tracking state ──
     private int _hintRequestCount;
     private double _minutesSinceLastBreak;
@@ -88,6 +96,8 @@ public sealed class LearningSessionActor : IActor
         IConfusionDetector confusionDetector,
         IDisengagementClassifier disengagementClassifier,
         IDeliveryGate deliveryGate,
+        IPersonalizedExplanationService personalizedExplanation,
+        Func<TutorActor> tutorFactory,
         Mastery.IConceptGraphCache graphCache,
         ILogger<LearningSessionActor> logger,
         IMeterFactory meterFactory)
@@ -100,6 +110,8 @@ public sealed class LearningSessionActor : IActor
         _confusionDetector = confusionDetector;
         _disengagementClassifier = disengagementClassifier;
         _deliveryGate = deliveryGate;
+        _personalizedExplanation = personalizedExplanation;
+        _tutorFactory = tutorFactory;
         _graphCache = graphCache;
         _logger = logger;
         _activitySource = new ActivitySource("Cena.Actors.LearningSession", "1.0.0");
@@ -116,6 +128,10 @@ public sealed class LearningSessionActor : IActor
             EvaluateAnswerRequest req => HandleEvaluateAnswer(context, req),
             RequestNextQuestion req => HandleNextQuestion(context, req),
             RequestHintMessage req => HandleHint(context, req),
+            RequestPersonalizedExplanation req => HandlePersonalizedExplanation(context, req),
+            AddAnnotationMessage msg => HandleAnnotation(context, msg),
+            SessionTutorMessage msg => HandleTutorMessage(context, msg),
+            DelegateEvent del => HandleDelegateFromChild(context, del),
             SkipQuestionMessage req => HandleSkip(context, req),
             EndSessionRequest => HandleEndSession(context),
             Stopping => HandleStopping(context),
@@ -181,6 +197,10 @@ public sealed class LearningSessionActor : IActor
             if (req.IsCorrect) _confusionWindowCorrect++;
         }
 
+        // Track current concept for tutoring
+        _currentConceptId = req.ConceptId;
+        _currentConceptMastery = bktResult.PosteriorMastery;
+
         // SAI-005: Detect cognitive state for explanation delivery gating
         _lastConfusionState = _confusionDetector.Detect(BuildConfusionInput());
         _lastDisengagementType = _disengagementClassifier.Classify(BuildDisengagementInput());
@@ -190,6 +210,18 @@ public sealed class LearningSessionActor : IActor
         {
             _confusionWindowQuestions = 0;
             _confusionWindowCorrect = 0;
+        }
+
+        // SAI-07: Auto-trigger tutoring when ConfusionStuck and no active tutor
+        if (_lastConfusionState == ConfusionState.ConfusionStuck && _tutorPid == null)
+        {
+            _logger.LogInformation(
+                "Session {SessionId}: ConfusionStuck on concept {ConceptId} — auto-triggering tutoring",
+                _sessionId, req.ConceptId);
+            SpawnTutorActor(context);
+            context.Send(_tutorPid!, new StartTutoringFromConfusionStuck(
+                _studentId, _sessionId, req.ConceptId, _subject, _language,
+                _methodology, bktResult.PosteriorMastery, 3));
         }
 
         // Track for fatigue calculation (O(1) enqueue/dequeue)
@@ -462,6 +494,116 @@ public sealed class LearningSessionActor : IActor
             IsLateEvening: false);
     }
 
+    // ── Personalized Explanation (SAI-003 / Task 03) ──
+    private async Task HandlePersonalizedExplanation(
+        IContext context, RequestPersonalizedExplanation req)
+    {
+        var scaffolding = ScaffoldingService.DetermineLevel(
+            (float)req.CurrentMastery, (float)req.PrerequisiteSatisfaction);
+
+        var explCtx = new PersonalizedExplanationContext(
+            QuestionId: req.QuestionId,
+            QuestionStem: req.QuestionStem,
+            CorrectAnswer: req.CorrectAnswer,
+            StudentAnswer: req.StudentAnswer,
+            ErrorType: req.ErrorType,
+            Language: _language,
+            Subject: _subject,
+            StaticExplanation: req.StaticExplanation,
+            DistractorRationale: req.DistractorRationale,
+            MasteryProbability: (float)req.CurrentMastery,
+            BloomLevel: req.BloomLevel,
+            Scaffolding: scaffolding,
+            PrerequisiteSatisfactionIndex: (float)req.PrerequisiteSatisfaction,
+            ActiveMethodology: _methodology,
+            ConfusionState: _lastConfusionState,
+            DisengagementType: _lastDisengagementType?.ToString(),
+            BackspaceCount: req.BackspaceCount,
+            AnswerChangeCount: req.AnswerChangeCount,
+            HintsUsed: req.HintsUsed,
+            ResponseTimeMs: req.ResponseTimeMs,
+            MedianResponseTimeMs: _baselineResponseTimeMs,
+            StudentBudgetKey: _studentId);
+
+        var result = await _personalizedExplanation.ResolveAsync(explCtx, CancellationToken.None);
+
+        _logger.LogDebug(
+            "Session {SessionId}: personalized explanation resolved via {Tier} for question {QuestionId}",
+            _sessionId, result.Tier, req.QuestionId);
+
+        context.Respond(new PersonalizedExplanationResponse(
+            Text: result.Text,
+            Tier: result.Tier,
+            OutputTokens: result.OutputTokens));
+    }
+
+    // ── Annotation: triggers tutoring for confusion/question kinds (SAI-07) ──
+    private Task HandleAnnotation(IContext context, AddAnnotationMessage msg)
+    {
+        if (context.Parent != null)
+            context.Send(context.Parent, new DelegateEvent(new AnnotationAdded_V1(
+                _studentId, msg.ConceptId, Guid.NewGuid().ToString("N"),
+                msg.Text.GetHashCode().ToString("X8"), 0.0, msg.Kind)));
+
+        if (msg.Kind is not ("confusion" or "question"))
+            return Task.CompletedTask;
+
+        if (_tutorPid == null)
+            SpawnTutorActor(context);
+
+        if (msg.Kind == "confusion")
+        {
+            context.Send(_tutorPid!, new StartTutoringFromConfusion(
+                _studentId, _sessionId, msg.ConceptId, _subject, _language,
+                _methodology, _currentConceptMastery, 3));
+        }
+        else
+        {
+            context.Send(_tutorPid!, new StartTutoringFromQuestion(
+                _studentId, _sessionId, msg.ConceptId, _subject, _language,
+                _methodology, _currentConceptMastery, 3, msg.Text));
+        }
+
+        return Task.CompletedTask;
+    }
+
+    // ── Tutor Message: forward to child TutorActor (SAI-07) ──
+    private async Task HandleTutorMessage(IContext context, SessionTutorMessage msg)
+    {
+        if (_tutorPid == null)
+        {
+            _logger.LogWarning("Session {SessionId}: TutorMessage but no active tutor", _sessionId);
+            context.Respond(new TutorResponse(0, "No active tutoring session.", true, 0));
+            return;
+        }
+
+        var response = await context.RequestAsync<TutorResponse>(
+            _tutorPid, new TutorMessage(msg.Message));
+        context.Respond(response);
+
+        if (response.IsComplete)
+        {
+            context.Stop(_tutorPid);
+            _tutorPid = null;
+        }
+    }
+
+    // ── Delegate events from TutorActor child up to StudentActor parent ──
+    private Task HandleDelegateFromChild(IContext context, DelegateEvent del)
+    {
+        if (context.Parent != null)
+            context.Send(context.Parent, del);
+        return Task.CompletedTask;
+    }
+
+    private void SpawnTutorActor(IContext context)
+    {
+        if (_tutorPid != null) return;
+        var props = Props.FromProducer(() => _tutorFactory());
+        _tutorPid = context.Spawn(props);
+        _logger.LogDebug("Session {SessionId}: TutorActor spawned at {Pid}", _sessionId, _tutorPid);
+    }
+
     // ── Skip ──
     private Task HandleSkip(IContext context, SkipQuestionMessage req)
     {
@@ -475,6 +617,13 @@ public sealed class LearningSessionActor : IActor
     // ── End Session ──
     private Task HandleEndSession(IContext context)
     {
+        // SAI-07: End active tutoring session if any
+        if (_tutorPid != null)
+        {
+            context.Send(_tutorPid, new EndTutoring());
+            _tutorPid = null;
+        }
+
         var duration = (int)(DateTimeOffset.UtcNow - _startedAt).TotalMinutes;
         var avgRt = _recentResponseTimes.Count > 0
             ? _recentResponseTimes.Average()
@@ -543,5 +692,36 @@ public record HintResponse(int HintLevel, bool Delivered, string? HintText = nul
 public record SkipQuestionMessage(string ConceptId, string QuestionId, int TimeSpentMs);
 public record EndSessionRequest;
 
+// ── SAI-003: Personalized Explanation Messages ──
+
+public record RequestPersonalizedExplanation(
+    string QuestionId,
+    string QuestionStem,
+    string CorrectAnswer,
+    string StudentAnswer,
+    ExplanationErrorType ErrorType,
+    string? StaticExplanation,
+    string? DistractorRationale,
+    double CurrentMastery = 0.5,
+    double PrerequisiteSatisfaction = 1.0,
+    int BloomLevel = 3,
+    int BackspaceCount = 0,
+    int AnswerChangeCount = 0,
+    int HintsUsed = 0,
+    int ResponseTimeMs = 0);
+
+public record PersonalizedExplanationResponse(
+    string Text,
+    string Tier,      // "L3", "L2", "L1", "generic"
+    int OutputTokens);
+
 /// <summary>Wrapper for events delegated from child actors to parent StudentActor.</summary>
 public record DelegateEvent(Events.IDelegatedEvent Event);
+
+// ── Task 07 stubs (TutorActor entry points) ──
+
+/// <summary>Student annotation (confusion/question/note/insight) forwarded from StudentActor.</summary>
+public record AddAnnotationMessage(string ConceptId, string Text, string Kind);
+
+/// <summary>Student message within an active tutoring conversation.</summary>
+public record SessionTutorMessage(string Message);

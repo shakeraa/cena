@@ -462,41 +462,8 @@ public sealed class AiGenerationService : IAiGenerationService
     // ── Tool schema for structured output ──
 
     private static readonly InputSchema QuestionToolSchema = InputSchema.FromRawUnchecked(
-        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>("""
-        {
-            "type": "object",
-            "properties": {
-                "questions": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "stem": { "type": "string", "description": "The question text" },
-                            "options": {
-                                "type": "array",
-                                "items": {
-                                    "type": "object",
-                                    "properties": {
-                                        "label": { "type": "string" },
-                                        "text": { "type": "string" },
-                                        "isCorrect": { "type": "boolean" },
-                                        "distractorRationale": { "type": "string" }
-                                    },
-                                    "required": ["label", "text", "isCorrect"]
-                                }
-                            },
-                            "topic": { "type": "string" },
-                            "bloomsLevel": { "type": "integer" },
-                            "difficulty": { "type": "number" },
-                            "explanation": { "type": "string", "description": "Detailed explanation of the correct answer" }
-                        },
-                        "required": ["stem", "options", "bloomsLevel", "difficulty", "explanation"]
-                    }
-                }
-            },
-            "required": ["questions"]
-        }
-        """)!);
+        JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(
+            """{"type":"object","properties":{"questions":{"type":"array","items":{"type":"object","properties":{"stem":{"type":"string"},"options":{"type":"array","items":{"type":"object","properties":{"label":{"type":"string"},"text":{"type":"string"},"isCorrect":{"type":"boolean"},"distractorRationale":{"type":"string"}},"required":["label","text","isCorrect"]}},"topic":{"type":"string"},"bloomsLevel":{"type":"integer"},"difficulty":{"type":"number"},"explanation":{"type":"string"}},"required":["stem","options","bloomsLevel","difficulty","explanation"]}}},"required":["questions"]}""")!);
 
     // ── Provider Implementations ──
 

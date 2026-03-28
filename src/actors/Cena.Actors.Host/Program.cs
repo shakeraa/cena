@@ -150,15 +150,18 @@ builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
 builder.Services.AddSingleton<IL3ExplanationGenerator, L3ExplanationGenerator>();
 builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
 builder.Services.AddSingleton<IExplanationOrchestrator, ExplanationOrchestrator>();
+builder.Services.AddSingleton<IPersonalizedExplanationService, PersonalizedExplanationService>();
 builder.Services.AddSingleton<OfflineSyncHandler>();
 builder.Services.AddHostedService<NatsOutboxPublisher>();
 
 // SAI-05: A/B Experiment Service
 builder.Services.AddSingleton<IExperimentService, ExperimentService>();
 
-// SAI-08: Conversational Tutoring
+// SAI-07/08: Conversational Tutoring (TutorActor is transient — spawned per conversation)
 builder.Services.AddSingleton<ITutorPromptBuilder, TutorPromptBuilder>();
 builder.Services.AddSingleton<ITutorSafetyGuard, TutorSafetyGuard>();
+builder.Services.AddTransient<TutorActor>();
+builder.Services.AddSingleton<Func<TutorActor>>(sp => () => sp.GetRequiredService<TutorActor>());
 
 // NATS Bus Router: bridges NATS commands ↔ Proto.Actor virtual actors
 builder.Services.AddSingleton<Cena.Actors.Bus.NatsBusRouter>();

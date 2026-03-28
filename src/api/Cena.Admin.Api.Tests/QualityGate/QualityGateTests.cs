@@ -10,13 +10,14 @@ namespace Cena.Admin.Api.Tests.QualityGate;
 /// <summary>
 /// Core metric: F1 score of gate decisions against labeled test data.
 /// Each test case has an expected GateDecision (AutoApproved/NeedsReview/AutoRejected).
+/// Tests run without API key — LLM dimensions fall back to defaults (80/80/75).
 /// </summary>
 public class QualityGateTests
 {
     private readonly QualityGateService _service = new();
 
     [Fact]
-    public void QualityGate_F1Score_MeetsThreshold()
+    public async Task QualityGate_F1Score_MeetsThreshold()
     {
         var testCases = QualityGateTestData.GetAll().ToList();
         int correct = 0;
@@ -25,7 +26,7 @@ public class QualityGateTests
 
         foreach (var tc in testCases)
         {
-            var result = _service.Evaluate(tc.Input);
+            var result = await _service.EvaluateAsync(tc.Input);
             if (result.Decision == tc.ExpectedDecision)
             {
                 correct++;
@@ -40,8 +41,8 @@ public class QualityGateTests
         float accuracy = (float)correct / total;
 
         // Also compute per-category metrics
-        var (rejPrecision, rejRecall, rejF1) = ComputeF1(testCases, GateDecision.AutoRejected);
-        var (revPrecision, revRecall, revF1) = ComputeF1(testCases, GateDecision.NeedsReview);
+        var (rejPrecision, rejRecall, rejF1) = await ComputeF1(testCases, GateDecision.AutoRejected);
+        var (revPrecision, revRecall, revF1) = await ComputeF1(testCases, GateDecision.NeedsReview);
 
         // Output results for autoresearch logging
         var summary = $"\n=== QUALITY GATE METRICS ===\n" +
@@ -57,27 +58,27 @@ public class QualityGateTests
 
     [Theory]
     [MemberData(nameof(GetGoodQuestions))]
-    public void GoodQuestion_ShouldNotBeAutoRejected(LabeledTestCase tc)
+    public async Task GoodQuestion_ShouldNotBeAutoRejected(LabeledTestCase tc)
     {
-        var result = _service.Evaluate(tc.Input);
+        var result = await _service.EvaluateAsync(tc.Input);
         Assert.NotEqual(GateDecision.AutoRejected, result.Decision);
     }
 
     [Theory]
     [MemberData(nameof(GetBadQuestionsExpectingRejection))]
-    public void BadQuestion_WithCriticalDefect_ShouldBeAutoRejected(LabeledTestCase tc)
+    public async Task BadQuestion_WithCriticalDefect_ShouldBeAutoRejected(LabeledTestCase tc)
     {
-        var result = _service.Evaluate(tc.Input);
+        var result = await _service.EvaluateAsync(tc.Input);
         Assert.Equal(GateDecision.AutoRejected, result.Decision);
     }
 
     [Theory]
     [MemberData(nameof(GetAllTestCases))]
-    public void AllQuestions_ShouldDetectExpectedFlags(LabeledTestCase tc)
+    public async Task AllQuestions_ShouldDetectExpectedFlags(LabeledTestCase tc)
     {
         if (tc.ExpectedFlags == null || tc.ExpectedFlags.Length == 0) return;
 
-        var result = _service.Evaluate(tc.Input);
+        var result = await _service.EvaluateAsync(tc.Input);
         var violationRuleIds = result.Violations.Select(v => v.RuleId).ToHashSet();
 
         foreach (var flag in tc.ExpectedFlags)
@@ -133,13 +134,13 @@ public class QualityGateTests
     public static IEnumerable<object[]> GetAllTestCases() =>
         QualityGateTestData.GetAll().Select(tc => new object[] { tc });
 
-    private (float Precision, float Recall, float F1) ComputeF1(
+    private async Task<(float Precision, float Recall, float F1)> ComputeF1(
         List<LabeledTestCase> testCases, GateDecision targetClass)
     {
         int tp = 0, fp = 0, fn = 0;
         foreach (var tc in testCases)
         {
-            var result = _service.Evaluate(tc.Input);
+            var result = await _service.EvaluateAsync(tc.Input);
             bool predicted = result.Decision == targetClass;
             bool actual = tc.ExpectedDecision == targetClass;
 

@@ -1,7 +1,7 @@
 // =============================================================================
 // Cena Platform -- Quality Gate Service
 // Orchestrates Stage 1 (structural) + Stage 2 (LLM-based) scoring.
-// Stage 2 uses Anthropic Claude for FactualAccuracy, LanguageQuality,
+// Stage 2 uses Anthropic Haiku (cheaper assessment model) for FactualAccuracy, LanguageQuality,
 // and PedagogicalQuality dimensions. Falls back to defaults if LLM unavailable.
 // =============================================================================
 
@@ -152,7 +152,7 @@ public sealed class QualityGateService : IQualityGateService
 
             var response = await client.Messages.Create(new MessageCreateParams
             {
-                Model = "claude-sonnet-4-6-20260215",
+                Model = "claude-haiku-4-5-20260101",  // Haiku: cheaper model for assessment tasks (routing-config section 2)
                 MaxTokens = 1024,
                 Temperature = 0.1f, // Low temperature for consistent scoring (routing-config: answer_evaluation)
                 System = new List<TextBlockParam>

@@ -548,6 +548,87 @@ export interface StagnationDetectedPayload {
 
 export type StagnationDetectedEvent = MessageEnvelope<'StagnationDetected', StagnationDetectedPayload>;
 
+// ── TutoringStarted ───────────────────────────────────────────────────────
+
+/**
+ * Server signals that a tutoring conversation has begun for a concept.
+ * Sent once per tutoring episode when TutorActor is spawned and initialized.
+ *
+ * Triggers: AddAnnotation(kind: 'confusion' | 'question'), ConfusionStuck
+ * auto-detection, or post-wrong-answer follow-up.
+ *
+ * @see tasks/student-ai-interaction/07-tutor-actor.md
+ */
+export interface TutoringStartedPayload {
+  readonly sessionId: string;
+  /** Concept being tutored. */
+  readonly conceptId: string;
+  /** Opening message from the tutor. Supports Markdown and LaTeX ($...$). */
+  readonly openingMessage: string;
+  /** Active tutoring methodology for this episode. */
+  readonly methodology: string;
+}
+
+export type TutoringStartedEvent = MessageEnvelope<'TutoringStarted', TutoringStartedPayload>;
+
+// ── TutoringResponse ───────────────────────────────────────────────────────
+
+/**
+ * Server delivers a tutoring conversation turn in response to an annotation
+ * or ongoing tutoring dialogue. Supports Markdown + LaTeX content.
+ *
+ * Triggers: AddAnnotation(kind: 'confusion' | 'question'), ConfusionStuck
+ * auto-detection, post-wrong-answer follow-up, or ongoing TutorMessage.
+ *
+ * @see tasks/student-ai-interaction/07-tutor-actor.md
+ */
+export interface TutoringResponsePayload {
+  readonly sessionId: string;
+  /** Current turn number in the tutoring episode (1-based). */
+  readonly turnNumber: number;
+  /** Tutor response content. Supports Markdown and LaTeX ($...$). */
+  readonly response: string;
+  /** True when the tutoring episode has ended (max turns, budget, or student exit). */
+  readonly isComplete: boolean;
+  /** Number of turns remaining before the hard cap (max 10). */
+  readonly remainingTurns: number;
+}
+
+export type TutoringResponseEvent = MessageEnvelope<'TutoringResponse', TutoringResponsePayload>;
+
+// ── SendTutoringMessage ────────────────────────────────────────────────────
+
+/** Student sends a message in an active tutoring conversation. */
+export interface SendTutoringMessagePayload {
+  readonly sessionId: string;
+  /** Free-text message from the student. Supports Markdown. */
+  readonly message: string;
+}
+
+export type SendTutoringMessage = MessageEnvelope<'SendTutoringMessage', SendTutoringMessagePayload>;
+
+
+// ── TutoringEnded ─────────────────────────────────────────────────────────
+
+/**
+ * Server signals that a tutoring conversation has ended.
+ * Sent when the episode terminates (max turns, budget exhausted, student exit,
+ * or 5-minute inactivity timeout).
+ *
+ * @see tasks/student-ai-interaction/07-tutor-actor.md
+ */
+export interface TutoringEndedPayload {
+  readonly sessionId: string;
+  /** Concept that was being tutored. */
+  readonly conceptId: string;
+  /** Human-readable summary of what was covered. Localized. */
+  readonly summary: string;
+  /** Suggested next action for the client. */
+  readonly nextAction: 'next-question' | 'review-concept' | 'take-break' | 'end-session';
+}
+
+export type TutoringEndedEvent = MessageEnvelope<'TutoringEnded', TutoringEndedPayload>;
+
 // ── Error ───────────────────────────────────────────────────────────────────
 
 /**
@@ -590,7 +671,8 @@ export type ClientCommand =
   | AddAnnotation
   | SwitchApproach
   | RequestNextConcept
-  | UpdatePreferences;
+  | UpdatePreferences
+  | SendTutoringMessage;
 
 /** Union of all server -> client event messages. */
 export type ServerEvent =
@@ -606,6 +688,9 @@ export type ServerEvent =
   | CognitiveLoadWarningEvent
   | HintDeliveredEvent
   | StagnationDetectedEvent
+  | TutoringStartedEvent
+  | TutoringResponseEvent
+  | TutoringEndedEvent
   | ErrorEvent;
 
 /** Extract the `type` discriminator from a message union member. */

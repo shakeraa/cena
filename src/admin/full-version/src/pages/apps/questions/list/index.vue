@@ -223,6 +223,8 @@ const createForm = ref({
     { label: 'C', text: '', isCorrect: false, distractorRationale: '' },
     { label: 'D', text: '', isCorrect: false, distractorRationale: '' },
   ],
+  // Explanation (any source type)
+  explanation: '' as string | undefined,
   // AI fields
   promptText: '',
   modelId: 'claude-sonnet-4-6',
@@ -262,6 +264,7 @@ const resetCreateForm = () => {
       { label: 'C', text: '', isCorrect: false, distractorRationale: '' },
       { label: 'D', text: '', isCorrect: false, distractorRationale: '' },
     ],
+    explanation: undefined,
     promptText: '',
     modelId: 'claude-sonnet-4-6',
     modelTemperature: 0.7,
@@ -295,6 +298,9 @@ const submitCreateQuestion = async () => {
       conceptIds: createForm.value.conceptIds,
       options: createForm.value.options,
     }
+
+    if (createForm.value.explanation)
+      body.explanation = createForm.value.explanation
 
     if (createForm.value.sourceType === 'ai-generated') {
       body.promptText = createForm.value.promptText
@@ -441,6 +447,7 @@ const generateWithAi = async () => {
       createForm.value.modelId = result.modelUsed
       createForm.value.modelTemperature = result.temperatureUsed
       createForm.value.rawModelOutput = result.rawOutput || ''
+      createForm.value.explanation = q.explanation || undefined
 
       if (q.options?.length) {
         createForm.value.options = q.options.map((o: any) => ({

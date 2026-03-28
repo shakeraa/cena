@@ -56,10 +56,10 @@ public sealed class FocusExperimentTests
             arms.Add(service.GetAssignment(studentId, exp.ExperimentId));
         }
 
-        // With 6 experiments, very likely to have both arms (though not guaranteed)
-        // Just verify it doesn't crash and returns valid arms
+        // With 9 experiments (including multi-arm SAI), verify all returned arms are valid enum values
         Assert.All(arms, arm => Assert.True(
-            arm == ExperimentArm.Control || arm == ExperimentArm.Treatment || arm == ExperimentArm.TreatmentB));
+            arm == ExperimentArm.Control || arm == ExperimentArm.Treatment
+            || arm == ExperimentArm.TreatmentB || arm == ExperimentArm.TreatmentC));
     }
 
     [Fact]
@@ -92,9 +92,9 @@ public sealed class FocusExperimentTests
         Assert.Contains("foc-solution-diversity", ids);
         Assert.Contains("foc-sensor-enhanced", ids);
 
-        // 3 SAI-006 Student AI Interaction experiments
-        Assert.Contains(FocusExperimentService.SaiAdaptiveExplanations, ids);
-        Assert.Contains(FocusExperimentService.SaiHintBktWeighting, ids);
+        // 3 SAI-006 Student AI Interaction experiments (multi-arm, opt-in)
+        Assert.Contains(FocusExperimentService.SaiExplanationTiers, ids);
+        Assert.Contains(FocusExperimentService.SaiHintBktCredit, ids);
         Assert.Contains(FocusExperimentService.SaiConfusionGating, ids);
     }
 
@@ -119,13 +119,29 @@ public sealed class FocusExperimentTests
     }
 
     [Fact]
-    public void IsActive_DefaultExperiments_AllActive()
+    public void IsActive_FocusExperiments_AllActive()
     {
         var service = new FocusExperimentService();
-        foreach (var exp in FocusExperimentService.DefaultExperiments)
-        {
-            Assert.True(service.IsActive(exp.ExperimentId));
-        }
+        // The 6 original focus experiments are always active
+        Assert.True(service.IsActive("foc-microbreaks"));
+        Assert.True(service.IsActive("foc-boredom-fatigue"));
+        Assert.True(service.IsActive("foc-confusion-patience"));
+        Assert.True(service.IsActive("foc-peak-time"));
+        Assert.True(service.IsActive("foc-solution-diversity"));
+        Assert.True(service.IsActive("foc-sensor-enhanced"));
+    }
+
+    [Fact]
+    public void IsActive_SaiExperiments_RegisteredInDefaultList()
+    {
+        // SAI experiments are registered in DefaultExperiments and discoverable
+        var service = new FocusExperimentService();
+        var active = service.GetActiveExperiments();
+        // SAI experiments use SaiOptInStartDate (2099) — verify they exist in the list
+        var allIds = FocusExperimentService.DefaultExperiments.Select(e => e.ExperimentId).ToList();
+        Assert.Contains(FocusExperimentService.SaiExplanationTiers, allIds);
+        Assert.Contains(FocusExperimentService.SaiHintBktCredit, allIds);
+        Assert.Contains(FocusExperimentService.SaiConfusionGating, allIds);
     }
 
     [Fact]
@@ -166,6 +182,79 @@ public sealed class FocusExperimentTests
 
         Assert.Single(activeList);
         Assert.Equal("active", activeList[0].ExperimentId);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SAI-006: Multi-arm experiment assignment
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ExplanationTiers_Has4Arms_ControlLimitedTo10Percent()
+    {
+        var experiment = FocusExperimentService.DefaultExperiments
+            .First(e => e.ExperimentId == FocusExperimentService.SaiExplanationTiers);
+
+        Assert.Equal(4, experiment.Arms.Count);
+        Assert.Equal(ExperimentArm.Control, experiment.Arms[0].Arm);
+        Assert.Equal(10, experiment.Arms[0].PercentageAllocation);
+        Assert.Equal(100, experiment.Arms.Sum(a => a.PercentageAllocation));
+    }
+
+    [Fact]
+    public void HintBktCredit_Has3Arms()
+    {
+        var experiment = FocusExperimentService.DefaultExperiments
+            .First(e => e.ExperimentId == FocusExperimentService.SaiHintBktCredit);
+
+        Assert.Equal(3, experiment.Arms.Count);
+        Assert.Equal(100, experiment.Arms.Sum(a => a.PercentageAllocation));
+    }
+
+    [Fact]
+    public void ConfusionGating_Has3Arms()
+    {
+        var experiment = FocusExperimentService.DefaultExperiments
+            .First(e => e.ExperimentId == FocusExperimentService.SaiConfusionGating);
+
+        Assert.Equal(3, experiment.Arms.Count);
+        Assert.Equal(100, experiment.Arms.Sum(a => a.PercentageAllocation));
+    }
+
+    [Fact]
+    public void ExplanationTiers_DeterministicAssignment_AcrossSessions()
+    {
+        // SAI experiments need an active date range to test assignment
+        var active = FocusExperimentService.DefaultExperiments.Select(e =>
+            e.ExperimentId.StartsWith("sai-")
+                ? e with { StartDate = DateTimeOffset.MinValue }
+                : e).ToArray();
+        var service = new FocusExperimentService(active);
+        var studentId = Guid.NewGuid();
+
+        var arm1 = service.GetAssignment(studentId, FocusExperimentService.SaiExplanationTiers);
+        var arm2 = service.GetAssignment(studentId, FocusExperimentService.SaiExplanationTiers);
+
+        Assert.Equal(arm1, arm2);
+    }
+
+    [Fact]
+    public void ExplanationTiers_DistributesAcrossAll4Arms()
+    {
+        var active = FocusExperimentService.DefaultExperiments.Select(e =>
+            e.ExperimentId.StartsWith("sai-")
+                ? e with { StartDate = DateTimeOffset.MinValue }
+                : e).ToArray();
+        var service = new FocusExperimentService(active);
+
+        var arms = new HashSet<ExperimentArm>();
+        for (int i = 0; i < 500; i++)
+            arms.Add(service.GetAssignment(Guid.NewGuid(), FocusExperimentService.SaiExplanationTiers));
+
+        // With 500 students and 10/30/30/30 split, all 4 arms should appear
+        Assert.Contains(ExperimentArm.Control, arms);
+        Assert.Contains(ExperimentArm.Treatment, arms);
+        Assert.Contains(ExperimentArm.TreatmentB, arms);
+        Assert.Contains(ExperimentArm.TreatmentC, arms);
     }
 
     // ═══════════════════════════════════════════════════════════════

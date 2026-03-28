@@ -97,8 +97,25 @@ public record ExperimentSessionMetrics(
     string? ExplanationSource = null,          // "L1Static", "L2Cache", "L2Generated", "L3Personalized", "None"
     float? HintCreditMultiplier = null,        // Actual P_T multiplier used (1.0, 0.7, 0.4, 0.1)
     string? DeliveryGateAction = null,         // "Deliver", "Defer", "Suppress"
-    double? MasteryGainDelta = null,           // BKT delta on related concept (for adaptive_explanations experiment)
-    double? HintUsageRate = null,              // Hints requested / questions attempted (for hint_bkt experiment)
+    double? MasteryGainDelta = null,           // BKT delta on related concept (for explanation_tiers)
+    double? HintUsageRate = null,              // Hints requested / questions attempted (for hint_bkt_credit)
     double? ConfusionResolutionRate = null,    // Confusions resolved / confusions detected (for confusion_gating)
-    int? SelfReportedUnderstanding = null      // 1-5 scale: "How well did you understand the explanations?"
+    int? SelfReportedUnderstanding = null,     // 1-5 scale: "How well did you understand the explanations?"
+
+    // ── SAI-006 extended: explanation_tiers metrics ──
+    int? TimeToMastery = null,                 // Questions to reach P_L >= 0.85 threshold per concept
+    double? RetrySuccessRate = null,           // After seeing explanation, does next attempt on same concept succeed?
+    int? SessionLengthQuestions = null,         // Total questions before voluntary session end
+    double? EngagementScore = null,            // Composite focus score from FocusDegradationService
+    double? ExplanationViewRate = null,        // Fraction of explanations the student reads (needs frontend event)
+
+    // ── SAI-006 extended: hint_bkt_credit metrics ──
+    double? MasteryAccuracy = null,            // Does P_L predict actual performance on unseen questions? (0-1)
+    double? HintRequestRate = null,            // Hints requested per question (detect gaming on lenient curve)
+    double? IndependentSuccessRate = null,     // Success rate on questions where hints were NOT used
+
+    // ── SAI-006 extended: confusion_gating metrics ──
+    double? ConfusionToMasteryTime = null,     // Questions from confusion onset to concept mastery
+    double? FrustrationAbandonmentRate = null, // Sessions ended with reason 'tired' during confusion
+    int? MasteryDepth = null                   // Bloom taxonomy level achieved post-confusion (1-6)
 );

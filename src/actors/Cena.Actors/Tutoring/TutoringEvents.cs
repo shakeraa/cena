@@ -49,3 +49,19 @@ public sealed record TutoringSessionEnded_V1(
     int DurationSeconds,
     DateTimeOffset Timestamp
 ) : IDelegatedEvent;
+
+/// <summary>
+/// Summary event emitted when a tutoring episode completes. Contains metadata only --
+/// conversation text is NOT persisted (ephemeral). Used for analytics and A/B experiments.
+/// </summary>
+public sealed record TutoringEpisodeCompleted_V1(
+    string StudentId,
+    string SessionId,
+    string ConceptId,
+    string TriggerType,        // confusion_annotation, question_annotation, confusion_stuck, post_wrong_answer
+    string Methodology,
+    int TurnCount,
+    TimeSpan Duration,
+    string? ResolutionStatus,  // resolved, unresolved, student_ended, turn_limit, timeout
+    DateTimeOffset Timestamp
+) : IDelegatedEvent;
