@@ -37,22 +37,41 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
 
     public async Task<MethodologyEffectivenessResponse> GetEffectivenessAsync()
     {
-        await using var session = _store.LightweightSession();
+        await using var session = _store.QuerySession();
 
         // Query all methodology switch events from the last 90 days
         var since = DateTimeOffset.UtcNow.AddDays(-90);
 
-        var switchEvents = await session.Events
-            .QueryAllRawEvents()
-            .Where(e => e.Timestamp >= since)
-            .OfType<MethodologySwitched_V1>()
-            .ToListAsync();
+        IReadOnlyList<MethodologySwitched_V1> switchEvents;
+        IReadOnlyList<ConceptAttempted_V1> attemptEvents;
 
-        var attemptEvents = await session.Events
-            .QueryAllRawEvents()
-            .Where(e => e.Timestamp >= since)
-            .OfType<ConceptAttempted_V1>()
-            .ToListAsync();
+        try
+        {
+            switchEvents = await session.Events
+                .QueryAllRawEvents()
+                .Where(e => e.Timestamp >= since)
+                .OfType<MethodologySwitched_V1>()
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No MethodologySwitched events found — returning empty");
+            switchEvents = Array.Empty<MethodologySwitched_V1>();
+        }
+
+        try
+        {
+            attemptEvents = await session.Events
+                .QueryAllRawEvents()
+                .Where(e => e.Timestamp >= since)
+                .OfType<ConceptAttempted_V1>()
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No ConceptAttempted events found — returning empty");
+            attemptEvents = Array.Empty<ConceptAttempted_V1>();
+        }
 
         // Build methodology effectiveness by error type
         var methodologies = new[] { "Socratic", "WorkedExample", "Feynman", "RetrievalPractice", "SpacedRepetition",
@@ -129,11 +148,20 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
             .ToList();
 
         // Stagnation trend: group stagnation events by day over last 7 days
-        var stagnationEvents = await session.Events
-            .QueryAllRawEvents()
-            .Where(e => e.Timestamp >= DateTimeOffset.UtcNow.AddDays(-7))
-            .OfType<StagnationDetected_V1>()
-            .ToListAsync();
+        IReadOnlyList<StagnationDetected_V1> stagnationEvents;
+        try
+        {
+            stagnationEvents = await session.Events
+                .QueryAllRawEvents()
+                .Where(e => e.Timestamp >= DateTimeOffset.UtcNow.AddDays(-7))
+                .OfType<StagnationDetected_V1>()
+                .ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No StagnationDetected events found — returning empty");
+            stagnationEvents = Array.Empty<StagnationDetected_V1>();
+        }
 
         var trend = new List<StagnationTrendPoint>();
         for (int i = 6; i >= 0; i--)
@@ -160,11 +188,19 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
 
     public async Task<StagnationMonitorResponse> GetStagnationMonitorAsync()
     {
-        await using var session = _store.LightweightSession();
+        await using var session = _store.QuerySession();
 
         // Query snapshots to find students with stagnation patterns
-        var snapshots = await session.Query<StudentProfileSnapshot>()
-            .ToListAsync();
+        IReadOnlyList<StudentProfileSnapshot> snapshots;
+        try
+        {
+            snapshots = await session.Query<StudentProfileSnapshot>().ToListAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "No StudentProfileSnapshot data — returning empty");
+            snapshots = Array.Empty<StudentProfileSnapshot>();
+        }
 
         var stagnatingStudents = new List<StagnatingStudent>();
         var mentorResistant = new Dictionary<string, MentorResistantBuilder>();
@@ -232,22 +268,39 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
 
     public async Task<McmGraphResponse> GetMcmGraphAsync()
     {
-        await using var session = _store.LightweightSession();
+        await using var session = _store.QuerySession();
 
         // Build MCM graph from real switch event data
         var since = DateTimeOffset.UtcNow.AddDays(-90);
 
-        var switchEvents = await session.Events
-            .QueryAllRawEvents()
-            .Where(e => e.Timestamp >= since)
-            .OfType<MethodologySwitched_V1>()
-            .ToListAsync();
+        IReadOnlyList<MethodologySwitched_V1> switchEvents;
+        IReadOnlyList<ConceptAttempted_V1> attemptEvents;
 
-        var attemptEvents = await session.Events
-            .QueryAllRawEvents()
-            .Where(e => e.Timestamp >= since)
-            .OfType<ConceptAttempted_V1>()
-            .ToListAsync();
+        try
+        {
+            switchEvents = await session.Events
+                .QueryAllRawEvents()
+                .Where(e => e.Timestamp >= since)
+                .OfType<MethodologySwitched_V1>()
+                .ToListAsync();
+        }
+        catch
+        {
+            switchEvents = Array.Empty<MethodologySwitched_V1>();
+        }
+
+        try
+        {
+            attemptEvents = await session.Events
+                .QueryAllRawEvents()
+                .Where(e => e.Timestamp >= since)
+                .OfType<ConceptAttempted_V1>()
+                .ToListAsync();
+        }
+        catch
+        {
+            attemptEvents = Array.Empty<ConceptAttempted_V1>();
+        }
 
         // Build nodes from distinct error types and methodologies seen in data
         var errorTypes = switchEvents

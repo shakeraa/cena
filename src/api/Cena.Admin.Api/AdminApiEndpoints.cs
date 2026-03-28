@@ -366,6 +366,24 @@ public static class AdminApiEndpoints
             return Results.Ok(new { success = true, message = "Database reseeded successfully" });
         }).WithName("ReseedDatabase");
 
+        group.MapPost("/clean-reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
+        {
+            var logger = loggerFactory.CreateLogger("DatabaseSeeder");
+
+            // 1. Wipe all documents and event streams
+            logger.LogInformation("=== Cleaning ALL data (documents + event streams) ===");
+            await store.Advanced.Clean.DeleteAllDocumentsAsync();
+            await store.Advanced.Clean.DeleteAllEventDataAsync();
+            logger.LogInformation("All data cleaned.");
+
+            // 2. Re-seed everything from scratch
+            await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger, 100,
+                (s, l) => SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
+                QuestionBankSeedData.SeedQuestionsAsync);
+
+            return Results.Ok(new { success = true, message = "Database cleaned and reseeded successfully" });
+        }).WithName("CleanReseedDatabase");
+
         return app;
     }
 
@@ -586,36 +604,50 @@ public static class AdminApiEndpoints
             .WithTags("Methodology Analytics")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
 
-        group.MapGet("/methodology-effectiveness", async (IMethodologyAnalyticsService service) =>
+        group.MapGet("/methodology-effectiveness", async (IMethodologyAnalyticsService service, ILoggerFactory lf) =>
         {
-            var effectiveness = await service.GetEffectivenessAsync();
-            // Transform to frontend-expected shape: { rows: [{errorType, methodologies}], methodologies: [] }
-            var methodologyNames = effectiveness.Comparisons.Select(c => c.Methodology).ToList();
-            var errorTypes = effectiveness.Comparisons
-                .SelectMany(c => c.ByErrorType.Select(e => e.ErrorType))
-                .Distinct()
-                .ToList();
-            var rows = errorTypes.Select(et => new
+            try
             {
-                errorType = et,
-                methodologies = effectiveness.Comparisons.ToDictionary(
-                    c => c.Methodology,
-                    c => c.ByErrorType.FirstOrDefault(e => e.ErrorType == et)?.AvgTimeToMastery ?? 0f)
-            });
-            return Results.Ok(new { rows, methodologies = methodologyNames });
+                var effectiveness = await service.GetEffectivenessAsync();
+                var methodologyNames = effectiveness.Comparisons.Select(c => c.Methodology).ToList();
+                var errorTypes = effectiveness.Comparisons
+                    .SelectMany(c => c.ByErrorType.Select(e => e.ErrorType))
+                    .Distinct()
+                    .ToList();
+                var rows = errorTypes.Select(et => new
+                {
+                    errorType = et,
+                    methodologies = effectiveness.Comparisons.ToDictionary(
+                        c => c.Methodology,
+                        c => c.ByErrorType.FirstOrDefault(e => e.ErrorType == et)?.AvgTimeToMastery ?? 0f)
+                });
+                return Results.Ok(new { rows, methodologies = methodologyNames });
+            }
+            catch (Exception ex)
+            {
+                lf.CreateLogger("MethodologyEndpoints").LogWarning(ex, "Methodology effectiveness query failed — returning empty");
+                return Results.Ok(new { rows = Array.Empty<object>(), methodologies = Array.Empty<string>() });
+            }
         }).WithName("GetMethodologyEffectiveness");
 
-        group.MapGet("/stagnation-trend", async (IMethodologyAnalyticsService service) =>
+        group.MapGet("/stagnation-trend", async (IMethodologyAnalyticsService service, ILoggerFactory lf) =>
         {
-            var effectiveness = await service.GetEffectivenessAsync();
-            // Transform to: { points: [{week, events, escalated}], escalationRate }
-            var points = effectiveness.StagnationTrend.Select(p => new
+            try
             {
-                week = p.Date,
-                events = p.StagnationEvents,
-                escalated = p.ResolvedEvents
-            });
-            return Results.Ok(new { points, escalationRate = effectiveness.EscalationRate });
+                var effectiveness = await service.GetEffectivenessAsync();
+                var points = effectiveness.StagnationTrend.Select(p => new
+                {
+                    week = p.Date,
+                    events = p.StagnationEvents,
+                    escalated = p.ResolvedEvents
+                });
+                return Results.Ok(new { points, escalationRate = effectiveness.EscalationRate });
+            }
+            catch (Exception ex)
+            {
+                lf.CreateLogger("MethodologyEndpoints").LogWarning(ex, "Stagnation trend query failed — returning empty");
+                return Results.Ok(new { points = Array.Empty<object>(), escalationRate = 0f });
+            }
         }).WithName("GetStagnationTrend");
 
         group.MapGet("/switch-triggers", async (IMethodologyAnalyticsService service) =>
