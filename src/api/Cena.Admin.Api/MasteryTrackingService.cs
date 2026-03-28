@@ -2,6 +2,7 @@
 // Cena Platform -- Mastery Tracking Service
 // ADM-007: Mastery & learning progress implementation
 // =============================================================================
+#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using Marten;
 using Microsoft.Extensions.Logging;

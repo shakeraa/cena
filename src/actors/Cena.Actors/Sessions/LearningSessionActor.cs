@@ -63,7 +63,9 @@ public sealed class LearningSessionActor : IActor
     private int _confusionWindowCorrect;
     private bool _lastAnswerCorrect;
     private int _lastAnswerChangeCount;
+    #pragma warning disable CS0649 // Assigned by future confusion-tracking logic
     private bool _lastHintRequestedThenCancelled;
+    #pragma warning restore CS0649
     private bool _lastWrongOnMastered;
     private double _lastResponseTimeRatio = 1.0;
 
@@ -74,7 +76,9 @@ public sealed class LearningSessionActor : IActor
 
     // ── Disengagement tracking state ──
     private int _hintRequestCount;
+    #pragma warning disable CS0169 // Used by future microbreak scheduling
     private double _minutesSinceLastBreak;
+    #pragma warning restore CS0169
 
     // ── Fatigue Configuration ──
     private const double FatigueThreshold = 0.7;

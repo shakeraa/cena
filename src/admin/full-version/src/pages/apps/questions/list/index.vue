@@ -3,6 +3,19 @@ import QuestionDetail from '@/views/apps/questions/QuestionDetail.vue'
 
 definePage({ meta: { action: 'read', subject: 'Questions' } })
 
+interface QuestionRow {
+  id: string
+  stem: string
+  subject: string
+  concepts: string[]
+  bloomLevel: number
+  difficulty: string
+  status: string
+  qualityScore: number | null
+  usageCount: number
+  successRate: number | null
+}
+
 const router = useRouter()
 
 // Filters
@@ -41,7 +54,7 @@ const headers = [
 ]
 
 // Fetch questions via useApi + createUrl (reactive server-side query)
-const { data: questionsData, execute: fetchQuestions } = await useApi<any>(createUrl('/admin/questions', {
+const { data: questionsData, execute: fetchQuestions } = await useApi<{ questions: QuestionRow[]; total?: number; totalQuestions?: number }>(createUrl('/admin/questions', {
   query: {
     q: searchQuery,
     subject: selectedSubject,
@@ -57,7 +70,7 @@ const { data: questionsData, execute: fetchQuestions } = await useApi<any>(creat
   },
 }))
 
-const questions = computed(() => questionsData.value?.questions ?? [])
+const questions = computed<QuestionRow[]>(() => questionsData.value?.questions ?? [])
 const totalQuestions = computed(() => questionsData.value?.total ?? questionsData.value?.totalQuestions ?? 0)
 
 // Filter options
@@ -151,7 +164,9 @@ const resolveDifficultyPercent = (difficulty: string) => {
   return map[difficulty] ?? 50
 }
 
-const resolveQualityColor = (score: number) => {
+const resolveQualityColor = (score: number | null) => {
+  if (score == null)
+    return 'disabled'
   if (score >= 80)
     return 'success'
   if (score >= 60)
@@ -1215,7 +1230,7 @@ const exportCsv = () => {
                   label="Question Stem"
                   placeholder="Enter the question text..."
                   rows="3"
-                  :rules="[v => !!v || 'Stem is required']"
+                  :rules="[(v: string) => !!v || 'Stem is required']"
                 />
               </VCol>
 

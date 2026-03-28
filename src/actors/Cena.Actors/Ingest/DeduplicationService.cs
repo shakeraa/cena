@@ -127,13 +127,13 @@ public sealed partial class DeduplicationService : IDeduplicationService
         var db = _redis.GetDatabase();
         var batch = db.CreateBatch();
 
-        batch.SetAddAsync(ExactHashSet, exactHash);
-        batch.HashSetAsync(HashToItemMap, $"exact:{exactHash}", itemId);
+        _ = batch.SetAddAsync(ExactHashSet, exactHash);
+        _ = batch.HashSetAsync(HashToItemMap, $"exact:{exactHash}", itemId);
 
         if (structuralHash is not null)
         {
-            batch.SetAddAsync(StructuralHashSet, structuralHash);
-            batch.HashSetAsync(HashToItemMap, $"structural:{structuralHash}", itemId);
+            _ = batch.SetAddAsync(StructuralHashSet, structuralHash);
+            _ = batch.HashSetAsync(HashToItemMap, $"structural:{structuralHash}", itemId);
         }
 
         batch.Execute();

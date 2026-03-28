@@ -2,6 +2,7 @@
 // Cena Platform -- System Monitoring Service
 // ADM-008: System health, settings, and audit logging
 // =============================================================================
+#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using Marten;
 using Microsoft.Extensions.Logging;

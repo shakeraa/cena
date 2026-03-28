@@ -3,7 +3,7 @@ import type { RouteLocationNormalized } from 'vue-router'
 import { onAuthStateChanged } from 'firebase/auth'
 import { firebaseAuth } from '@/plugins/firebase'
 import { ability } from '@/plugins/casl/ability'
-import type { CenaRole } from '@/plugins/casl/ability'
+import type { Actions, CenaRole, Subjects } from '@/plugins/casl/ability'
 
 /**
  * Wait for Firebase Auth to finish restoring session from IndexedDB.
@@ -78,7 +78,7 @@ function canNavigateRoute(to: RouteLocationNormalized): boolean {
 
   // If route has explicit CASL meta, check it
   if (targetRoute?.meta?.action && targetRoute?.meta?.subject)
-    return ability.can(targetRoute.meta.action as string, targetRoute.meta.subject as string)
+    return ability.can(targetRoute.meta.action as Actions, targetRoute.meta.subject as Subjects)
 
   // Routes without CASL meta: allow if user has any abilities (is authenticated with a role)
   if (!targetRoute?.meta?.action && !targetRoute?.meta?.subject)
@@ -87,7 +87,7 @@ function canNavigateRoute(to: RouteLocationNormalized): boolean {
   // Fallback: check any matched route
   return to.matched.some(route => {
     if (route.meta.action && route.meta.subject)
-      return ability.can(route.meta.action as string, route.meta.subject as string)
+      return ability.can(route.meta.action as Actions, route.meta.subject as Subjects)
     return false
   })
 }

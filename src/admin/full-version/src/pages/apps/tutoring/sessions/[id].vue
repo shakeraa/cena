@@ -30,7 +30,7 @@ const loading = ref(true)
 const error = ref<string | null>(null)
 const session = ref<TutoringSessionDetail | null>(null)
 
-const sessionId = computed(() => route.params.id as string)
+const sessionId = computed(() => String((route.params as Record<string, string>).id ?? ''))
 
 const statusColor = (status: string): string => {
   switch (status) {

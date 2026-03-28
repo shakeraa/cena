@@ -31,7 +31,7 @@ const error = ref<string | null>(null)
 const experiment = ref<ExperimentDetail | null>(null)
 const funnel = ref<FunnelStage[]>([])
 
-const experimentName = computed(() => route.params.id as string)
+const experimentName = computed(() => String((route.params as Record<string, string>).id ?? ''))
 
 const statusColor = (status: string): string => {
   switch (status.toLowerCase()) {

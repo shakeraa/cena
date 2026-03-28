@@ -2,6 +2,7 @@
 // Cena Platform -- Event Stream & DLQ Service
 // ADM-013: Real-time event monitoring and dead letter queue
 // =============================================================================
+#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using Marten;
 using Microsoft.Extensions.Logging;

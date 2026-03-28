@@ -2,6 +2,7 @@
 // Cena Platform -- Outreach & Engagement Service
 // ADM-014: Re-engagement monitoring and analytics
 // =============================================================================
+#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using Marten;
 using Microsoft.Extensions.Logging;

@@ -2,6 +2,7 @@
 // Cena Platform -- Focus Analytics Service
 // ADM-006: Focus & attention analytics implementation
 // =============================================================================
+#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using System.Text.Json;
 using Marten;

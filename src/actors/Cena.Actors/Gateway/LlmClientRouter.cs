@@ -21,12 +21,12 @@ public sealed class LlmClientRouter : ILlmClient
     {
         ArgumentNullException.ThrowIfNull(request);
 
-        if (request.ModelId.StartsWith("claude-", StringComparison.OrdinalIgnoreCase))
+        if (request.ModelId?.StartsWith("claude-", StringComparison.OrdinalIgnoreCase) == true)
         {
             return _anthropic.CompleteAsync(request, ct);
         }
 
-        if (request.ModelId.StartsWith("kimi-", StringComparison.OrdinalIgnoreCase))
+        if (request.ModelId?.StartsWith("kimi-", StringComparison.OrdinalIgnoreCase) == true)
         {
             throw new NotImplementedException(
                 $"Moonshot provider not yet implemented. ModelId='{request.ModelId}'");

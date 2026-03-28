@@ -31,8 +31,8 @@ public sealed class MessagingNatsPublisherTests
         await _publisher.PublishMessageSentAsync(evt);
 
         // Verify PublishAsync was called (any overload)
-        await _nats.ReceivedWithAnyArgs(1).PublishAsync<byte[]>(
-            default!, default, default, default, default, default, default);
+        await _nats.ReceivedWithAnyArgs(1).PublishAsync(
+            default(string)!, default(byte[])!, default, default, default, default, default);
     }
 
     [Fact]
@@ -46,8 +46,8 @@ public sealed class MessagingNatsPublisherTests
 
         await _publisher.PublishThreadCreatedAsync(evt);
 
-        await _nats.ReceivedWithAnyArgs(1).PublishAsync<byte[]>(
-            default!, default, default, default, default, default, default);
+        await _nats.ReceivedWithAnyArgs(1).PublishAsync(
+            default(string)!, default(byte[])!, default, default, default, default, default);
     }
 
     [Fact]
@@ -58,15 +58,15 @@ public sealed class MessagingNatsPublisherTests
 
         await _publisher.PublishMessageBlockedAsync(evt);
 
-        await _nats.ReceivedWithAnyArgs(1).PublishAsync<byte[]>(
-            default!, default, default, default, default, default, default);
+        await _nats.ReceivedWithAnyArgs(1).PublishAsync(
+            default(string)!, default(byte[])!, default, default, default, default, default);
     }
 
     [Fact]
     public async Task PublishFailure_DoesNotThrow()
     {
-        _nats.WhenForAnyArgs(x => x.PublishAsync<byte[]>(
-            default!, default, default, default, default, default, default))
+        _nats.WhenForAnyArgs(x => x.PublishAsync(
+            default(string)!, default(byte[])!, default, default, default, default, default))
             .Throw(new Exception("NATS connection lost"));
 
         // Should NOT throw
@@ -84,7 +84,7 @@ public sealed class MessagingNatsPublisherTests
     {
         await _publisher.PublishInboundReceivedAsync("whatsapp", "SM001", "Hello!");
 
-        await _nats.ReceivedWithAnyArgs(1).PublishAsync<byte[]>(
-            default!, default, default, default, default, default, default);
+        await _nats.ReceivedWithAnyArgs(1).PublishAsync(
+            default(string)!, default(byte[])!, default, default, default, default, default);
     }
 }

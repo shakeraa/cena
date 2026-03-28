@@ -3,6 +3,7 @@
 // ADM-009: Pipeline dashboard and management
 // Production implementation backed by Marten event store + Redis.
 // =============================================================================
+#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using Cena.Actors.Ingest;
 using Marten;

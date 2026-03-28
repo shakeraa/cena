@@ -78,7 +78,9 @@ public sealed partial class StudentActor : IActor
 
     // ---- Staged events for atomic batch writes ----
     private readonly List<object> _pendingEvents = new();
+    #pragma warning disable CS0414 // Tracks Marten stream existence for first-write detection
     private bool _streamExists;
+    #pragma warning restore CS0414
 
     // ---- Timer cancellation (MEDIUM-3: prevent ghost timers after passivation) ----
     private CancellationTokenSource? _timerCts;
@@ -89,7 +91,9 @@ public sealed partial class StudentActor : IActor
     private PID? _outreachScheduler;
 
     // ---- RES-003: Redis circuit breaker PID (resolved from cluster root) ----
+    #pragma warning disable CS0649 // Resolved at runtime from cluster root when Redis CB is active
     private PID? _redisCbPid;
+    #pragma warning restore CS0649
 
     // ---- Pool governor PID (resolved from ActorSystemManager child) ----
     private PID? _managerPid;

@@ -2,6 +2,7 @@
 // Cena Platform -- Cultural Context Service
 // ADM-012: Cultural equity and inclusion monitoring
 // =============================================================================
+#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using Marten;
 using Microsoft.Extensions.Logging;

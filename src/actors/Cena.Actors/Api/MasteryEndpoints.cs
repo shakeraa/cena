@@ -184,7 +184,7 @@ public static class MasteryEndpoints
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
             return await actorSystem.Cluster()
-                .RequestAsync<TResult>(identity, query, cts.Token);
+                .RequestAsync<TResult>(identity, query!, cts.Token);
         }
         catch
         {
