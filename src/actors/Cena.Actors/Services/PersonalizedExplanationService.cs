@@ -72,8 +72,11 @@ public sealed record PersonalizedExplanationContext(
     int ResponseTimeMs,
     double MedianResponseTimeMs,
 
+    // Question difficulty (0.0-1.0 from PublishedQuestion.Difficulty)
+    float? QuestionDifficulty = null,
+
     // Student budget key (hashed, not PII)
-    string StudentBudgetKey);
+    string StudentBudgetKey = "");
 
 // =============================================================================
 // RESULT RECORD
@@ -382,6 +385,24 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
                 parts.Add("NOTE: Student took significantly longer than usual on this question.");
             else if (ratio < 0.5)
                 parts.Add("NOTE: Student answered very quickly (may not have fully engaged).");
+        }
+
+        // ── Difficulty-gap awareness: stretch challenge vs regression ──
+        if (ctx.QuestionDifficulty.HasValue)
+        {
+            var diffGap = ctx.QuestionDifficulty.Value - ctx.MasteryProbability;
+            if (diffGap > 0.25f)
+                parts.Add(
+                    $"CONTEXT: This was a stretch question (difficulty {ctx.QuestionDifficulty.Value:F1}, " +
+                    $"mastery {ctx.MasteryProbability:P0}). " +
+                    "Acknowledge that this was challenging. Be encouraging — " +
+                    "\"this was a hard one, let's break it down together.\"");
+            else if (diffGap < -0.20f)
+                parts.Add(
+                    $"CONTEXT: This question should have been within the student's ability " +
+                    $"(difficulty {ctx.QuestionDifficulty.Value:F1}, mastery {ctx.MasteryProbability:P0}). " +
+                    "Investigate what went wrong — this may indicate a gap " +
+                    "in foundational understanding rather than challenge level.");
         }
 
         // ── Low PSI: prerequisite gaps ──

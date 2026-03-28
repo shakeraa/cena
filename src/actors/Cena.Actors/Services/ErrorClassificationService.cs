@@ -30,7 +30,9 @@ public sealed record ErrorClassificationInput(
     string StudentAnswer,
     string? DistractorRationale,
     string Subject,
-    string Language);
+    string Language,
+    float? QuestionDifficulty = null,                 // 0.0-1.0 intrinsic difficulty
+    float? StudentMastery = null);                    // Current mastery for difficulty-gap context
 
 // =============================================================================
 // INTERFACE
@@ -148,7 +150,7 @@ public sealed class ErrorClassificationService : IErrorClassificationService
 
     private static string BuildUserPrompt(ErrorClassificationInput input)
     {
-        var parts = new List<string>(5)
+        var parts = new List<string>(7)
         {
             $"SUBJECT: {input.Subject}",
             $"QUESTION: {input.QuestionStem}",
@@ -158,6 +160,23 @@ public sealed class ErrorClassificationService : IErrorClassificationService
 
         if (!string.IsNullOrEmpty(input.DistractorRationale))
             parts.Add($"DISTRACTOR RATIONALE: {input.DistractorRationale}");
+
+        // Difficulty context helps the LLM distinguish stretch-challenge failures
+        // from regression failures. A 0.9-difficulty question wrong is different
+        // from a 0.3-difficulty question wrong.
+        if (input.QuestionDifficulty.HasValue)
+        {
+            parts.Add($"QUESTION DIFFICULTY: {input.QuestionDifficulty.Value:F2} (0=easy, 1=hard)");
+
+            if (input.StudentMastery.HasValue)
+            {
+                var gap = input.QuestionDifficulty.Value - input.StudentMastery.Value;
+                if (gap > 0.25f)
+                    parts.Add("NOTE: This question was significantly above the student's current mastery level (stretch challenge). Be lenient toward Guessing or PartialUnderstanding.");
+                else if (gap < -0.20f)
+                    parts.Add("NOTE: This question was well below the student's mastery level. Consider CarelessMistake or ConceptualMisunderstanding more strongly.");
+            }
+        }
 
         return string.Join("\n", parts);
     }

@@ -68,7 +68,8 @@ public sealed record StartTutoringPostWrongAnswer(
     double ConceptMastery,
     int BloomsLevel,
     string ErrorType,
-    string QuestionId);
+    string QuestionId,
+    float QuestionDifficulty = 0f);
 
 /// <summary>Student sends a message during tutoring dialogue.</summary>
 public sealed record TutorMessage(string StudentMessage);
@@ -139,6 +140,7 @@ public sealed class TutorActor : IActor
     private string _triggerType = "confusion";
     private string _errorType = "";
     private string _questionId = "";
+    private float _questionDifficulty;
     private readonly List<ConversationTurn> _history = new();
     private DateTimeOffset _startedAt;
     private bool _initialized;
@@ -284,6 +286,7 @@ public sealed class TutorActor : IActor
 
         _errorType = msg.ErrorType;
         _questionId = msg.QuestionId;
+        _questionDifficulty = msg.QuestionDifficulty;
 
         InitSession(context, msg.StudentId, msg.SessionId, msg.ConceptId, msg.Subject,
             msg.Language, msg.Methodology, msg.ConceptMastery, msg.BloomsLevel, "post_wrong_answer");
@@ -434,7 +437,8 @@ public sealed class TutorActor : IActor
             BloomsLevel: _bloomsLevel,
             StudentMessage: directive,
             History: [],
-            RetrievedPassages: passages);
+            RetrievedPassages: passages,
+            QuestionDifficulty: _questionDifficulty > 0f ? _questionDifficulty : null);
 
         var (systemPrompt, userPrompt) = _promptBuilder.Build(promptContext);
 
@@ -509,7 +513,8 @@ public sealed class TutorActor : IActor
             BloomsLevel: _bloomsLevel,
             StudentMessage: studentMessage,
             History: recentHistory,
-            RetrievedPassages: passages);
+            RetrievedPassages: passages,
+            QuestionDifficulty: _questionDifficulty > 0f ? _questionDifficulty : null);
 
         var (systemPrompt, userPrompt) = _promptBuilder.Build(promptContext);
 

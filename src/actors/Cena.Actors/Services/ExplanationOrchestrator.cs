@@ -42,6 +42,8 @@ public sealed record ExplanationRequest(
     int? AnswerChangeCount = null,
     IReadOnlyList<string>? RecentErrorTypes = null,
     IReadOnlyList<string>? PrerequisiteConceptNames = null,
+    // Question difficulty (0.0-1.0 from PublishedQuestion.Difficulty)
+    float? QuestionDifficulty = null,
     // SAI-004: Full L3 context (optional -- null = L2-only resolution)
     L3ExplanationRequest? L3Context = null);
 
@@ -333,7 +335,9 @@ public sealed class ExplanationOrchestrator : IExplanationOrchestrator
                 StudentAnswer: request.StudentAnswer,
                 DistractorRationale: request.DistractorRationale,
                 Subject: request.Subject,
-                Language: request.Language);
+                Language: request.Language,
+                QuestionDifficulty: request.QuestionDifficulty,
+                StudentMastery: request.ConceptMastery.HasValue ? (float)request.ConceptMastery.Value : null);
 
             return await _errorClassifier.ClassifyAsync(input, ct);
         }

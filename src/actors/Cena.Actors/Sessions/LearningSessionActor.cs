@@ -431,7 +431,9 @@ public sealed class LearningSessionActor : IActor
             Options: req.QuestionOptions,
             QuestionExplanation: req.QuestionExplanation,
             StudentAnswer: req.StudentAnswer,
-            ConceptState: req.ConceptState));
+            ConceptState: req.ConceptState,
+            QuestionDifficulty: req.QuestionDifficulty > 0f ? req.QuestionDifficulty : null,
+            StudentMastery: (float)req.CurrentMastery));
 
         _hintRequestCount++;
 
@@ -523,6 +525,7 @@ public sealed class LearningSessionActor : IActor
             HintsUsed: req.HintsUsed,
             ResponseTimeMs: req.ResponseTimeMs,
             MedianResponseTimeMs: _baselineResponseTimeMs,
+            QuestionDifficulty: req.QuestionDifficulty > 0f ? req.QuestionDifficulty : null,
             StudentBudgetKey: _studentId);
 
         var result = await _personalizedExplanation.ResolveAsync(explCtx, CancellationToken.None);
@@ -685,7 +688,8 @@ public record RequestHintMessage(
     string? QuestionExplanation = null,
     string? StudentAnswer = null,
     Cena.Actors.Mastery.ConceptMasteryState? ConceptState = null,
-    bool IsExplicitRequest = true);
+    bool IsExplicitRequest = true,
+    float QuestionDifficulty = 0f);
 
 public record HintResponse(int HintLevel, bool Delivered, string? HintText = null,
     bool HasMoreHints = false, string? SuppressedReason = null);
@@ -708,7 +712,8 @@ public record RequestPersonalizedExplanation(
     int BackspaceCount = 0,
     int AnswerChangeCount = 0,
     int HintsUsed = 0,
-    int ResponseTimeMs = 0);
+    int ResponseTimeMs = 0,
+    float QuestionDifficulty = 0f);
 
 public record PersonalizedExplanationResponse(
     string Text,

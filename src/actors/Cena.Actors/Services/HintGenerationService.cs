@@ -39,7 +39,9 @@ public sealed record HintGenerationContext(
     IReadOnlyList<QuestionOptionState>? Options = null,
     string? QuestionExplanation = null,               // L1 persisted explanation
     string? StudentAnswer = null,
-    ConceptMasteryState? ConceptState = null);
+    ConceptMasteryState? ConceptState = null,
+    float? QuestionDifficulty = null,                 // 0.0-1.0 intrinsic difficulty from PublishedQuestion
+    float? StudentMastery = null);                    // Current mastery for difficulty-gap computation
 
 /// <summary>
 /// Result of hint generation.
@@ -85,6 +87,15 @@ public sealed class HintGenerationService : IHintGenerationService
 
     private static string GenerateNudge(HintGenerationContext ctx)
     {
+        // Difficulty-aware nudge: when the question is a stretch challenge
+        // (difficulty well above mastery), provide a more encouraging nudge
+        if (IsStretchChallenge(ctx))
+        {
+            if (ctx.PrerequisiteNames.Count > 0)
+                return GetTemplate(ctx.Language, "nudge_stretch_prereq", ctx.PrerequisiteNames[0]);
+            return GetTemplate(ctx.Language, "nudge_stretch");
+        }
+
         if (ctx.PrerequisiteNames.Count > 0)
         {
             var prereq = ctx.PrerequisiteNames[0];
@@ -93,6 +104,14 @@ public sealed class HintGenerationService : IHintGenerationService
 
         return GetTemplate(ctx.Language, "nudge_generic");
     }
+
+    /// <summary>
+    /// Returns true when the question difficulty is significantly above the student's mastery,
+    /// indicating a stretch challenge where encouragement is more appropriate than investigation.
+    /// </summary>
+    private static bool IsStretchChallenge(HintGenerationContext ctx) =>
+        ctx.QuestionDifficulty.HasValue && ctx.StudentMastery.HasValue
+        && ctx.QuestionDifficulty.Value - ctx.StudentMastery.Value > 0.25f;
 
     // =========================================================================
     // LEVEL 2 -- Procedural Scaffold (from DistractorRationale or error type)
@@ -243,6 +262,8 @@ public sealed class HintGenerationService : IHintGenerationService
         var template = (language, key) switch
         {
             // ── English ──
+            ("en", "nudge_stretch_prereq") => "This is a challenging one! Start by reviewing **{0}** and build from there.",
+            ("en", "nudge_stretch") => "This is a tough question — take your time. Break it into smaller parts.",
             ("en", "nudge_prerequisite") => "Think about how **{0}** applies here.",
             ("en", "nudge_generic") => "Re-read the question carefully and consider what concept is being tested.",
             ("en", "scaffold_rationale") => "Consider this: {0}",
@@ -260,6 +281,8 @@ public sealed class HintGenerationService : IHintGenerationService
             ("en", "coaching_motivational") => "Take a breath and try again. You can do this.",
 
             // ── Hebrew ──
+            ("he", "nudge_stretch_prereq") => "\u202B\u05D6\u05D5 \u05E9\u05D0\u05DC\u05D4 \u05DE\u05D0\u05EA\u05D2\u05E8\u05EA! \u05D4\u05EA\u05D7\u05D9\u05DC\u05D5 \u05D1\u05DC\u05E2\u05D9\u05D9\u05DF \u05DE\u05D7\u05D3\u05E9 \u05D0\u05EA **{0}** \u05D5\u05D1\u05E0\u05D5 \u05DE\u05E9\u05DD.\u202C",
+            ("he", "nudge_stretch") => "\u202B\u05D6\u05D5 \u05E9\u05D0\u05DC\u05D4 \u05DE\u05D0\u05EA\u05D2\u05E8\u05EA \u2014 \u05E7\u05D7\u05D5 \u05D0\u05EA \u05D4\u05D6\u05DE\u05DF. \u05E0\u05E1\u05D5 \u05DC\u05E4\u05E8\u05E7 \u05D0\u05D5\u05EA\u05D4 \u05DC\u05D7\u05DC\u05E7\u05D9\u05DD \u05E7\u05D8\u05E0\u05D9\u05DD.\u202C",
             ("he", "nudge_prerequisite") => "\u202B\u05D7\u05E9\u05D1\u05D5 \u05D0\u05D9\u05DA **{0}** \u05E7\u05E9\u05D5\u05E8 \u05DC\u05DB\u05D0\u05DF.\u202C",
             ("he", "nudge_generic") => "\u202B\u05E7\u05E8\u05D0\u05D5 \u05E9\u05D5\u05D1 \u05D0\u05EA \u05D4\u05E9\u05D0\u05DC\u05D4 \u05D1\u05EA\u05E9\u05D5\u05DE\u05EA \u05DC\u05D1.\u202C",
             ("he", "scaffold_rationale") => "\u202B\u05D7\u05E9\u05D1\u05D5 \u05E2\u05DC \u05D6\u05D4: {0}\u202C",
@@ -277,6 +300,8 @@ public sealed class HintGenerationService : IHintGenerationService
             ("he", "coaching_motivational") => "\u202B\u05E7\u05D7\u05D5 \u05E0\u05E9\u05D9\u05DE\u05D4 \u05E2\u05DE\u05D5\u05E7\u05D4 \u05D5\u05E0\u05E1\u05D5 \u05E9\u05D5\u05D1. \u05D0\u05EA\u05DD \u05D9\u05DB\u05D5\u05DC\u05D9\u05DD.\u202C",
 
             // ── Arabic ──
+            ("ar", "nudge_stretch_prereq") => "\u202B\u0647\u0630\u0627 \u0633\u0624\u0627\u0644 \u0635\u0639\u0628! \u0627\u0628\u062F\u0623 \u0628\u0645\u0631\u0627\u062C\u0639\u0629 **{0}** \u0648\u0627\u0628\u0646\u0650 \u0645\u0646 \u0647\u0646\u0627\u0643.\u202C",
+            ("ar", "nudge_stretch") => "\u202B\u0647\u0630\u0627 \u0633\u0624\u0627\u0644 \u0635\u0639\u0628 \u2014 \u062E\u0630 \u0648\u0642\u062A\u0643. \u062D\u0627\u0648\u0644 \u062A\u0642\u0633\u064A\u0645\u0647 \u0625\u0644\u0649 \u0623\u062C\u0632\u0627\u0621 \u0623\u0635\u063A\u0631.\u202C",
             ("ar", "nudge_prerequisite") => "\u202B\u0641\u0643\u0651\u0631 \u0643\u064A\u0641 \u064A\u0631\u062A\u0628\u0637 **{0}** \u0628\u0647\u0630\u0627 \u0627\u0644\u0633\u0624\u0627\u0644.\u202C",
             ("ar", "nudge_generic") => "\u202B\u0623\u0639\u062F \u0642\u0631\u0627\u0621\u0629 \u0627\u0644\u0633\u0624\u0627\u0644 \u0628\u0639\u0646\u0627\u064A\u0629.\u202C",
             ("ar", "scaffold_rationale") => "\u202B\u0641\u0643\u0651\u0631 \u0641\u064A \u0647\u0630\u0627: {0}\u202C",
@@ -305,6 +330,8 @@ public sealed class HintGenerationService : IHintGenerationService
     /// </summary>
     private static string GetEnglishFallback(string key) => key switch
     {
+        "nudge_stretch_prereq" => "This is a challenging one! Start by reviewing **{0}** and build from there.",
+        "nudge_stretch" => "This is a tough question — take your time. Break it into smaller parts.",
         "nudge_prerequisite" => "Think about how **{0}** applies here.",
         "nudge_generic" => "Re-read the question carefully and consider what concept is being tested.",
         "scaffold_rationale" => "Consider this: {0}",

@@ -32,7 +32,8 @@ public sealed record TutorPromptContext(
     int BloomsLevel,
     string StudentMessage,
     IReadOnlyList<ConversationTurn> History,
-    IReadOnlyList<string> RetrievedPassages);
+    IReadOnlyList<string> RetrievedPassages,
+    float? QuestionDifficulty = null);
 
 /// <summary>
 /// A single turn in the tutoring conversation.
@@ -77,6 +78,8 @@ public sealed class TutorPromptBuilder : ITutorPromptBuilder
             _ => $"Respond in {context.Language}."
         };
 
+        var difficultyInstruction = BuildDifficultyInstruction(context);
+
         return $"""
             You are a tutor helping a student learn {context.Subject}, specifically the concept: {context.ConceptName}.
 
@@ -96,7 +99,7 @@ public sealed class TutorPromptBuilder : ITutorPromptBuilder
             - NEVER give personal advice, opinions on non-academic topics, or life guidance.
             - If the student asks for personal advice, deflect: "I can only help with learning. Let's get back to {context.ConceptName}."
             - ONLY provide educational content related to {context.Subject}.
-
+            {difficultyInstruction}
             METHODOLOGY: {context.Methodology}
             {methodologyRules}
             """;
@@ -134,6 +137,36 @@ public sealed class TutorPromptBuilder : ITutorPromptBuilder
         parts.Add("Respond according to the methodology rules above. Keep it concise.");
 
         return string.Join("\n", parts);
+    }
+
+    /// <summary>
+    /// Builds difficulty-aware instruction for the system prompt.
+    /// When a question's intrinsic difficulty is known, this helps the tutor
+    /// calibrate tone: stretch challenges need encouragement, easy misses need investigation.
+    /// </summary>
+    private static string BuildDifficultyInstruction(TutorPromptContext context)
+    {
+        if (!context.QuestionDifficulty.HasValue)
+            return "";
+
+        var gap = context.QuestionDifficulty.Value - (float)context.ConceptMastery;
+        if (gap > 0.25f)
+            return $"""
+
+            DIFFICULTY CONTEXT: The triggering question was a stretch challenge
+            (difficulty {context.QuestionDifficulty.Value:F1} vs mastery {context.ConceptMastery:P0}).
+            Be encouraging. Acknowledge the difficulty. Start from foundational steps.
+            """;
+
+        if (gap < -0.20f)
+            return $"""
+
+            DIFFICULTY CONTEXT: The triggering question should have been within the student's ability
+            (difficulty {context.QuestionDifficulty.Value:F1} vs mastery {context.ConceptMastery:P0}).
+            Probe for gaps in understanding. This may indicate a fragile mental model.
+            """;
+
+        return "";
     }
 
     /// <summary>

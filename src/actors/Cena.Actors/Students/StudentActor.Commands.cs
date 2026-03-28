@@ -784,6 +784,7 @@ public sealed partial class StudentActor
             Subject: readModel.Subject,
             Language: readModel.Language,
             ConceptMastery: conceptMastery,
+            QuestionDifficulty: readModel.Difficulty,
             L3Context: l3Context);
 
         // If rate limit exceeded, the orchestrator will still check L2 cache and L1 static.
@@ -920,7 +921,8 @@ public sealed partial class StudentActor
                 BackspaceCount = backspaceCount,
                 AnswerChangeCount = answerChangeCount,
                 ResponseTimeMs = responseTimeMs,
-                MedianResponseTimeMs = medianRtMs
+                MedianResponseTimeMs = medianRtMs,
+                QuestionDifficulty = readModel.Difficulty
             };
         }
         catch (Exception ex)

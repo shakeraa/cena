@@ -55,4 +55,7 @@ public sealed record L3ExplanationRequest
     public int AnswerChangeCount { get; init; }
     public int ResponseTimeMs { get; init; }
     public double MedianResponseTimeMs { get; init; }
+
+    // ── Question difficulty (from PublishedQuestion.Difficulty) ──
+    public float? QuestionDifficulty { get; init; }
 }
