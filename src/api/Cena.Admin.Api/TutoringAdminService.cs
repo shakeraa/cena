@@ -73,7 +73,7 @@ public sealed class TutoringAdminService : ITutoringAdminService
         await using var session = _store.QuerySession();
 
         var doc = await session.Query<TutoringSessionDocument>()
-            .FirstOrDefaultAsync(d => d.Id == sessionId);
+            .FirstOrDefaultAsync(d => d.Id == sessionId || d.SessionId == sessionId);
 
         if (doc is null)
             return null;
