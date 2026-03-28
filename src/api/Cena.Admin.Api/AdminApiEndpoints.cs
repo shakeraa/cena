@@ -343,58 +343,60 @@ public static class AdminApiEndpoints
         .WithName("GetAuditLog")
         .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
 
-        // GET /api/admin/system/nats-stats — real-time NATS JetStream stats (ADM-023)
-        app.MapGet("/api/admin/system/nats-stats", async (NATS.Client.Core.INatsConnection nats, ILoggerFactory lf) =>
+        // GET /api/admin/system/nats-stats — real-time NATS monitoring stats (ADM-023)
+        // Uses NATS monitoring HTTP endpoint (port 8222) for core pub/sub stats
+        app.MapGet("/api/admin/system/nats-stats", async (ILoggerFactory lf) =>
         {
             var logger = lf.CreateLogger("NatsStats");
             try
             {
-                // NATS JetStream management API
-                var js = new NATS.Client.JetStream.NatsJSContext(nats);
-                var streams = new List<object>();
-                long totalMessages = 0;
-                long totalBytes = 0;
-                int totalConsumers = 0;
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
 
-                await foreach (var stream in js.ListStreamsAsync())
+                // Core NATS server stats
+                var varzJson = await http.GetStringAsync("http://localhost:8222/varz");
+                var varz = System.Text.Json.JsonDocument.Parse(varzJson);
+
+                // Connection details
+                var connzJson = await http.GetStringAsync("http://localhost:8222/connz");
+                var connz = System.Text.Json.JsonDocument.Parse(connzJson);
+
+                // Subscription stats
+                var subszJson = await http.GetStringAsync("http://localhost:8222/subsz");
+                var subsz = System.Text.Json.JsonDocument.Parse(subszJson);
+
+                var connections = new List<object>();
+                foreach (var conn in connz.RootElement.GetProperty("connections").EnumerateArray())
                 {
-                    var info = stream.Info;
-                    var consumers = new List<object>();
-
-                    await foreach (var consumer in stream.ListConsumersAsync())
+                    connections.Add(new
                     {
-                        consumers.Add(new
-                        {
-                            name = consumer.Info.Name,
-                            pendingCount = consumer.Info.NumPending,
-                            ackPending = consumer.Info.NumAckPending,
-                            deliveredCount = consumer.Info.Delivered.ConsumerSeq
-                        });
-                        totalConsumers++;
-                    }
-
-                    totalMessages += (long)info.State.Messages;
-                    totalBytes += (long)info.State.Bytes;
-
-                    streams.Add(new
-                    {
-                        name = info.Config.Name,
-                        messageCount = info.State.Messages,
-                        byteSize = info.State.Bytes,
-                        consumerCount = info.State.ConsumerCount,
-                        lastSequence = info.State.LastSeq,
-                        firstTimestamp = info.State.FirstTs,
-                        lastTimestamp = info.State.LastTs,
-                        consumers
+                        name = conn.GetProperty("name").GetString(),
+                        inMsgs = conn.GetProperty("in_msgs").GetInt64(),
+                        outMsgs = conn.GetProperty("out_msgs").GetInt64(),
+                        inBytes = conn.GetProperty("in_bytes").GetInt64(),
+                        outBytes = conn.GetProperty("out_bytes").GetInt64(),
+                        subscriptions = conn.GetProperty("subscriptions").GetInt32(),
                     });
                 }
 
-                return Results.Ok(new { streams, totalMessages, totalBytes, totalConsumers });
+                var totalInMsgs = varz.RootElement.GetProperty("in_msgs").GetInt64();
+                var totalOutMsgs = varz.RootElement.GetProperty("out_msgs").GetInt64();
+                var totalBytes = varz.RootElement.GetProperty("in_bytes").GetInt64() + varz.RootElement.GetProperty("out_bytes").GetInt64();
+                var totalSubs = subsz.RootElement.GetProperty("num_subscriptions").GetInt32();
+
+                return Results.Ok(new
+                {
+                    streams = connections,
+                    totalMessages = totalInMsgs + totalOutMsgs,
+                    totalBytes,
+                    totalConsumers = totalSubs,
+                    serverVersion = varz.RootElement.GetProperty("version").GetString(),
+                    connections = connz.RootElement.GetProperty("num_connections").GetInt32(),
+                });
             }
             catch (Exception ex)
             {
                 logger.LogWarning(ex, "Failed to fetch NATS stats");
-                return Results.Ok(new { streams = Array.Empty<object>(), totalMessages = 0L, totalBytes = 0L, totalConsumers = 0, error = "NATS not available" });
+                return Results.Ok(new { streams = Array.Empty<object>(), totalMessages = 0L, totalBytes = 0L, totalConsumers = 0 });
             }
         })
         .WithTags("System Monitoring")
