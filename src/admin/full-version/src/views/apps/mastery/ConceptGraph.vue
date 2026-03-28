@@ -24,6 +24,10 @@ interface GraphEdge {
 const svgRef = ref<SVGSVGElement | null>(null)
 const loading = ref(true)
 const error = ref<string | null>(null)
+const allNodes = ref<GraphNode[]>([])
+const allEdges = ref<GraphEdge[]>([])
+const activeFilters = ref<Set<string>>(new Set())
+const searchQuery = ref('')
 
 const clusterColors: Record<string, string> = {
   // Math clusters
@@ -42,6 +46,28 @@ const clusterColors: Record<string, string> = {
   english: '#FFD54F',
 }
 
+const toggleFilter = (cluster: string) => {
+  if (activeFilters.value.has(cluster)) {
+    activeFilters.value.delete(cluster)
+  }
+  else {
+    activeFilters.value.add(cluster)
+  }
+  activeFilters.value = new Set(activeFilters.value) // trigger reactivity
+  renderGraph()
+}
+
+const clearFilters = () => {
+  activeFilters.value = new Set()
+  searchQuery.value = ''
+  renderGraph()
+}
+
+const availableClusters = computed(() => {
+  const clusters = new Set(allNodes.value.map(n => n.cluster))
+  return Object.entries(clusterColors).filter(([k]) => clusters.has(k))
+})
+
 const statusRadius = (status: string): number => {
   switch (status) {
     case 'mastered': return 18
@@ -51,218 +77,317 @@ const statusRadius = (status: string): number => {
   }
 }
 
-const buildGraph = async () => {
+const fetchData = async () => {
   loading.value = true
   error.value = null
-
   try {
     const data = await $api<{ nodes: GraphNode[]; edges: GraphEdge[] }>(
       `/admin/mastery/students/${props.studentId}/knowledge-map/graph`,
     )
-
-    if (!svgRef.value || !data.nodes?.length) return
-
-    const svg = d3.select(svgRef.value)
-    svg.selectAll('*').remove()
-
-    const width = svgRef.value.clientWidth || 900
-    const height = 500
-
-    svg.attr('viewBox', `0 0 ${width} ${height}`)
-
-    // Defs: arrow markers
-    svg.append('defs').append('marker')
-      .attr('id', 'arrowhead')
-      .attr('viewBox', '0 -5 10 10')
-      .attr('refX', 20)
-      .attr('refY', 0)
-      .attr('markerWidth', 6)
-      .attr('markerHeight', 6)
-      .attr('orient', 'auto')
-      .append('path')
-      .attr('d', 'M0,-4L8,0L0,4')
-      .attr('fill', 'rgba(255,255,255,0.2)')
-
-    const g = svg.append('g')
-
-    // Zoom
-    const zoom = d3.zoom<SVGSVGElement, unknown>()
-      .scaleExtent([0.3, 3])
-      .on('zoom', (event) => {
-        g.attr('transform', event.transform)
-      })
-    svg.call(zoom)
-
-    // Force simulation
-    const simulation = d3.forceSimulation<GraphNode>(data.nodes)
-      .force('link', d3.forceLink<GraphNode, GraphEdge>(data.edges)
-        .id((d: GraphNode) => d.id)
-        .distance(80))
-      .force('charge', d3.forceManyBody().strength(-300))
-      .force('center', d3.forceCenter(width / 2, height / 2))
-      .force('collision', d3.forceCollide().radius(25))
-      .force('x', d3.forceX(width / 2).strength(0.05))
-      .force('y', d3.forceY(height / 2).strength(0.05))
-
-    // Edges
-    const link = g.append('g')
-      .selectAll('line')
-      .data(data.edges)
-      .join('line')
-      .attr('stroke', 'rgba(255,255,255,0.12)')
-      .attr('stroke-width', 1.5)
-      .attr('marker-end', 'url(#arrowhead)')
-
-    // Nodes
-    const node = g.append('g')
-      .selectAll('g')
-      .data(data.nodes)
-      .join('g')
-      .call(d3.drag<SVGGElement, GraphNode>()
-        .on('start', (event, d) => {
-          if (!event.active) simulation.alphaTarget(0.3).restart()
-          d.fx = d.x
-          d.fy = d.y
-        })
-        .on('drag', (event, d) => {
-          d.fx = event.x
-          d.fy = event.y
-        })
-        .on('end', (event, d) => {
-          if (!event.active) simulation.alphaTarget(0)
-          d.fx = null
-          d.fy = null
-        }))
-
-    // Circle
-    node.append('circle')
-      .attr('r', d => statusRadius(d.status))
-      .attr('fill', d => {
-        const base = clusterColors[d.cluster] ?? '#666'
-        return d.status === 'locked' ? 'rgba(100,100,100,0.3)' : base
-      })
-      .attr('stroke', d => {
-        if (d.status === 'mastered') return '#28C76F'
-        if (d.status === 'in_progress') return '#FF9F43'
-        return 'rgba(255,255,255,0.1)'
-      })
-      .attr('stroke-width', d => d.status === 'mastered' ? 3 : d.status === 'in_progress' ? 2 : 1)
-      .attr('opacity', d => d.status === 'locked' ? 0.3 : 0.85 + d.mastery * 0.15)
-
-    // Mastery fill ring (inner arc showing mastery %)
-    node.filter(d => d.mastery > 0 && d.status !== 'locked')
-      .append('circle')
-      .attr('r', d => statusRadius(d.status) - 3)
-      .attr('fill', 'none')
-      .attr('stroke', '#28C76F')
-      .attr('stroke-width', 2)
-      .attr('stroke-dasharray', d => {
-        const r = statusRadius(d.status) - 3
-        const circumference = 2 * Math.PI * r
-        return `${circumference * d.mastery} ${circumference * (1 - d.mastery)}`
-      })
-      .attr('stroke-dashoffset', d => {
-        const r = statusRadius(d.status) - 3
-        return 2 * Math.PI * r * 0.25 // start from top
-      })
-
-    // Labels
-    node.append('text')
-      .text(d => d.name.length > 16 ? `${d.name.slice(0, 14)}...` : d.name)
-      .attr('dy', d => statusRadius(d.status) + 14)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '10px')
-      .attr('fill', 'rgba(255,255,255,0.7)')
-      .attr('pointer-events', 'none')
-
-    // Mastery % label inside node
-    node.filter(d => d.status !== 'locked' && statusRadius(d.status) >= 14)
-      .append('text')
-      .text(d => `${Math.round(d.mastery * 100)}`)
-      .attr('dy', 4)
-      .attr('text-anchor', 'middle')
-      .attr('font-size', '9px')
-      .attr('font-weight', '600')
-      .attr('fill', 'white')
-      .attr('pointer-events', 'none')
-
-    // Tooltip
-    node.append('title')
-      .text(d => `${d.name}\nCluster: ${d.cluster}\nMastery: ${(d.mastery * 100).toFixed(0)}%\nStatus: ${d.status}`)
-
-    // Tick
-    simulation.on('tick', () => {
-      link
-        .attr('x1', (d: any) => d.source.x)
-        .attr('y1', (d: any) => d.source.y)
-        .attr('x2', (d: any) => d.target.x)
-        .attr('y2', (d: any) => d.target.y)
-
-      node.attr('transform', (d: GraphNode) => `translate(${d.x},${d.y})`)
-    })
+    allNodes.value = data.nodes ?? []
+    allEdges.value = data.edges ?? []
+    renderGraph()
   }
   catch (err: any) {
     error.value = err.message ?? 'Failed to load concept graph'
-    console.error('Failed to build concept graph:', err)
   }
   finally {
     loading.value = false
   }
 }
 
-onMounted(buildGraph)
-watch(() => props.studentId, buildGraph)
+const renderGraph = () => {
+  if (!svgRef.value || !allNodes.value.length) return
 
-defineExpose({ refresh: buildGraph })
+  // Filter nodes
+  let nodes = [...allNodes.value]
+  let edges = [...allEdges.value]
+
+  if (activeFilters.value.size > 0) {
+    const filterSet = activeFilters.value
+    nodes = nodes.filter(n => filterSet.has(n.cluster))
+    const nodeIds = new Set(nodes.map(n => n.id))
+    edges = edges.filter(e => {
+      const srcId = typeof e.source === 'string' ? e.source : e.source.id
+      const tgtId = typeof e.target === 'string' ? e.target : e.target.id
+      return nodeIds.has(srcId) && nodeIds.has(tgtId)
+    })
+  }
+
+  if (searchQuery.value) {
+    const q = searchQuery.value.toLowerCase()
+    const matchIds = new Set(nodes.filter(n => n.name.toLowerCase().includes(q)).map(n => n.id))
+    // Keep matching nodes + their direct neighbors
+    const neighborIds = new Set(matchIds)
+    edges.forEach(e => {
+      const srcId = typeof e.source === 'string' ? e.source : e.source.id
+      const tgtId = typeof e.target === 'string' ? e.target : e.target.id
+      if (matchIds.has(srcId)) neighborIds.add(tgtId)
+      if (matchIds.has(tgtId)) neighborIds.add(srcId)
+    })
+    nodes = nodes.filter(n => neighborIds.has(n.id))
+    const nodeIds = new Set(nodes.map(n => n.id))
+    edges = edges.filter(e => {
+      const srcId = typeof e.source === 'string' ? e.source : e.source.id
+      const tgtId = typeof e.target === 'string' ? e.target : e.target.id
+      return nodeIds.has(srcId) && nodeIds.has(tgtId)
+    })
+  }
+
+  // Reset simulation positions
+  nodes.forEach(n => { n.x = undefined; n.y = undefined; n.fx = undefined; n.fy = undefined })
+
+  const svg = d3.select(svgRef.value)
+  svg.selectAll('*').remove()
+
+  const width = svgRef.value.clientWidth || 1000
+  const height = 560
+
+  svg.attr('viewBox', `0 0 ${width} ${height}`)
+
+  // Defs
+  const defs = svg.append('defs')
+  defs.append('marker')
+    .attr('id', 'arrowhead')
+    .attr('viewBox', '0 -5 10 10')
+    .attr('refX', 22)
+    .attr('refY', 0)
+    .attr('markerWidth', 5)
+    .attr('markerHeight', 5)
+    .attr('orient', 'auto')
+    .append('path')
+    .attr('d', 'M0,-3L7,0L0,3')
+    .attr('fill', 'rgba(255,255,255,0.15)')
+
+  // Drop shadow for nodes
+  const filter = defs.append('filter').attr('id', 'node-shadow')
+  filter.append('feDropShadow')
+    .attr('dx', 0).attr('dy', 1)
+    .attr('stdDeviation', 3)
+    .attr('flood-opacity', 0.3)
+
+  const g = svg.append('g')
+
+  // Zoom
+  const zoom = d3.zoom<SVGSVGElement, unknown>()
+    .scaleExtent([0.2, 4])
+    .on('zoom', event => g.attr('transform', event.transform))
+  svg.call(zoom)
+
+  // Force simulation — wider spacing, stronger repulsion
+  const simulation = d3.forceSimulation<GraphNode>(nodes)
+    .force('link', d3.forceLink<GraphNode, GraphEdge>(edges)
+      .id((d: GraphNode) => d.id)
+      .distance(120))
+    .force('charge', d3.forceManyBody().strength(-400))
+    .force('center', d3.forceCenter(width / 2, height / 2))
+    .force('collision', d3.forceCollide().radius(40))
+    .force('x', d3.forceX(width / 2).strength(0.04))
+    .force('y', d3.forceY(height / 2).strength(0.04))
+
+  // Edges
+  const link = g.append('g')
+    .selectAll('line')
+    .data(edges)
+    .join('line')
+    .attr('stroke', 'rgba(255,255,255,0.1)')
+    .attr('stroke-width', 1)
+    .attr('marker-end', 'url(#arrowhead)')
+
+  // Nodes
+  const node = g.append('g')
+    .selectAll('g')
+    .data(nodes)
+    .join('g')
+    .style('cursor', 'pointer')
+    .call(d3.drag<SVGGElement, GraphNode>()
+      .on('start', (event, d) => {
+        if (!event.active) simulation.alphaTarget(0.3).restart()
+        d.fx = d.x; d.fy = d.y
+      })
+      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y })
+      .on('end', (event, d) => {
+        if (!event.active) simulation.alphaTarget(0)
+        d.fx = null; d.fy = null
+      }))
+
+  // Background circle (glow for mastered)
+  node.filter(d => d.status === 'mastered')
+    .append('circle')
+    .attr('r', d => statusRadius(d.status) + 5)
+    .attr('fill', 'none')
+    .attr('stroke', '#28C76F')
+    .attr('stroke-width', 1)
+    .attr('opacity', 0.3)
+
+  // Main circle
+  node.append('circle')
+    .attr('r', d => statusRadius(d.status))
+    .attr('fill', d => {
+      const base = clusterColors[d.cluster] ?? '#666'
+      return d.status === 'locked' ? 'rgba(100,100,100,0.3)' : base
+    })
+    .attr('stroke', d => {
+      if (d.status === 'mastered') return '#28C76F'
+      if (d.status === 'in_progress') return '#FF9F43'
+      return 'rgba(255,255,255,0.15)'
+    })
+    .attr('stroke-width', d => d.status === 'mastered' ? 3 : d.status === 'in_progress' ? 2 : 1)
+    .attr('opacity', d => d.status === 'locked' ? 0.25 : 0.9)
+    .attr('filter', 'url(#node-shadow)')
+
+  // Mastery ring
+  node.filter(d => d.mastery > 0 && d.status !== 'locked')
+    .append('circle')
+    .attr('r', d => statusRadius(d.status) - 3)
+    .attr('fill', 'none')
+    .attr('stroke', '#28C76F')
+    .attr('stroke-width', 2)
+    .attr('stroke-dasharray', d => {
+      const r = statusRadius(d.status) - 3
+      const c = 2 * Math.PI * r
+      return `${c * d.mastery} ${c * (1 - d.mastery)}`
+    })
+    .attr('stroke-dashoffset', d => 2 * Math.PI * (statusRadius(d.status) - 3) * 0.25)
+
+  // Mastery % inside node
+  node.filter(d => d.status !== 'locked' && statusRadius(d.status) >= 14)
+    .append('text')
+    .text(d => `${Math.round(d.mastery * 100)}`)
+    .attr('dy', 4)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', '10px')
+    .attr('font-weight', '700')
+    .attr('fill', 'white')
+    .attr('pointer-events', 'none')
+
+  // Labels — full names, wrapping long text
+  node.each(function (d) {
+    const el = d3.select(this)
+    const name = d.name
+    const yOffset = statusRadius(d.status) + 14
+
+    if (name.length <= 20) {
+      el.append('text')
+        .text(name)
+        .attr('dy', yOffset)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '11px')
+        .attr('fill', 'rgba(255,255,255,0.8)')
+        .attr('pointer-events', 'none')
+    }
+    else {
+      // Split into two lines at the nearest space
+      const mid = name.lastIndexOf(' ', 20)
+      const split = mid > 5 ? mid : 20
+      el.append('text')
+        .text(name.slice(0, split))
+        .attr('dy', yOffset)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '10px')
+        .attr('fill', 'rgba(255,255,255,0.8)')
+        .attr('pointer-events', 'none')
+      el.append('text')
+        .text(name.slice(split).trim())
+        .attr('dy', yOffset + 12)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', '10px')
+        .attr('fill', 'rgba(255,255,255,0.6)')
+        .attr('pointer-events', 'none')
+    }
+  })
+
+  // Rich tooltip
+  node.append('title')
+    .text(d => `${d.name}\nCluster: ${d.cluster}\nMastery: ${(d.mastery * 100).toFixed(0)}%\nStatus: ${d.status}`)
+
+  // Tick
+  simulation.on('tick', () => {
+    link
+      .attr('x1', (d: any) => d.source.x)
+      .attr('y1', (d: any) => d.source.y)
+      .attr('x2', (d: any) => d.target.x)
+      .attr('y2', (d: any) => d.target.y)
+    node.attr('transform', (d: GraphNode) => `translate(${d.x},${d.y})`)
+  })
+}
+
+onMounted(fetchData)
+watch(() => props.studentId, fetchData)
+
+defineExpose({ refresh: fetchData })
 </script>
 
 <template>
   <VCard>
-    <VCardItem title="Concept Graph">
-      <template #subtitle>
-        Interactive prerequisite graph — node size = progress, color = topic cluster, green ring = mastery %
-      </template>
-      <template #append>
-        <div class="d-flex gap-2 flex-wrap">
+    <VCardItem>
+      <VCardTitle>Concept Graph</VCardTitle>
+      <VCardSubtitle>
+        Node size = progress, color = cluster, green ring = mastery %. Click clusters to filter.
+      </VCardSubtitle>
+    </VCardItem>
+
+    <!-- Filter bar -->
+    <VCardText class="pb-0 pt-2">
+      <div class="d-flex align-center gap-3 flex-wrap">
+        <AppTextField
+          v-model="searchQuery"
+          placeholder="Search concepts..."
+          density="compact"
+          prepend-inner-icon="tabler-search"
+          style="max-inline-size: 220px;"
+          clearable
+          @update:model-value="renderGraph"
+        />
+        <div class="d-flex gap-1 flex-wrap">
           <VChip
-            v-for="(color, cluster) in clusterColors"
+            v-for="[cluster, color] in availableClusters"
             :key="cluster"
-            size="x-small"
+            size="small"
             label
-            :style="{ backgroundColor: color, color: '#fff' }"
+            :variant="activeFilters.has(cluster) ? 'elevated' : 'tonal'"
+            :style="activeFilters.has(cluster)
+              ? { backgroundColor: color, color: '#fff' }
+              : { borderColor: color, color: color }"
+            class="cursor-pointer text-capitalize"
+            @click="toggleFilter(cluster)"
           >
             {{ cluster }}
           </VChip>
         </div>
-      </template>
-    </VCardItem>
+        <VBtn
+          v-if="activeFilters.size > 0 || searchQuery"
+          variant="text"
+          size="small"
+          color="secondary"
+          @click="clearFilters"
+        >
+          Clear filters
+        </VBtn>
+        <VSpacer />
+        <span class="text-caption text-disabled">
+          {{ allNodes.length }} concepts{{ activeFilters.size > 0 || searchQuery ? ` (filtered)` : '' }}
+        </span>
+      </div>
+    </VCardText>
 
-    <VDivider />
+    <VDivider class="mt-2" />
 
     <VCardText class="pa-0">
-      <VProgressLinear
-        v-if="loading"
-        indeterminate
-        color="primary"
-      />
+      <VProgressLinear v-if="loading" indeterminate color="primary" />
 
-      <VAlert
-        v-if="error"
-        type="error"
-        variant="tonal"
-        class="ma-4"
-      >
+      <VAlert v-if="error" type="error" variant="tonal" class="ma-4">
         {{ error }}
       </VAlert>
 
       <div
         class="concept-graph-container"
-        style="min-height: 500px; background: rgb(var(--v-theme-surface));"
+        style="min-height: 560px; background: rgb(var(--v-theme-surface));"
       >
         <svg
           ref="svgRef"
           width="100%"
-          height="500"
+          height="560"
           style="display: block;"
         />
       </div>
