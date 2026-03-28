@@ -12,6 +12,8 @@ namespace Cena.Actors.Events;
 /// </summary>
 public class StudentProfileSnapshot
 {
+    // Marten requires an Id property for document storage and Query<T>
+    public string Id { get => StudentId; set => StudentId = value; }
     public string StudentId { get; set; } = "";
     public Dictionary<string, ConceptMasteryState> ConceptMastery { get; set; } = new();
     public Dictionary<string, string> ActiveMethodologyMap { get; set; } = new();

@@ -72,8 +72,7 @@ public static class MartenConfiguration
         // ── Snapshot Strategy: every 100 events per student ──
         // ACT-026: Inline snapshot projection — Marten auto-creates/updates snapshot
         // document on every SaveChangesAsync when event count crosses the threshold.
-        // NOTE: Snapshot projection temporarily disabled - requires Id property matching StreamIdentity
-        // opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
+        opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
 
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
