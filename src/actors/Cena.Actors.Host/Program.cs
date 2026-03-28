@@ -50,9 +50,9 @@ builder.Host.UseSerilog((context, services, configuration) =>
 
 // ---- Read configuration ----
 var pgConnectionString = builder.Configuration.GetConnectionString("PostgreSQL")
-    ?? "Host=localhost;Port=5432;Database=cena;Username=cena;Password=;Include Error Detail=true";
+    ?? "Host=localhost;Port=5433;Database=cena;Username=cena;Password=cena_dev_password;Include Error Detail=true";
 var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
-    ?? "localhost:6379";
+    ?? "localhost:6380";
 var natsUrl = builder.Configuration.GetConnectionString("NATS")
     ?? "nats://localhost:4222";
 

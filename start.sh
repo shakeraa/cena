@@ -68,10 +68,10 @@ start_infra() {
     # Run NATS stream setup
     docker compose up nats-setup
 
-    ok "PostgreSQL:  localhost:5432 (cena/cena_dev_password)"
-    ok "Redis:       localhost:6379"
+    ok "PostgreSQL:  localhost:5433 (cena/cena_dev_password)"
+    ok "Redis:       localhost:6380"
     ok "NATS:        localhost:4222 (monitoring: localhost:8222)"
-    ok "Neo4j:       localhost:7474 (neo4j/cena_dev_password)"
+    ok "Neo4j:       localhost:7475 (neo4j/cena_dev_password)"
     ok "DynamoDB:    localhost:8000"
     echo ""
 }
@@ -81,10 +81,10 @@ start_actors() {
     log "Starting Actor Cluster (.NET 9)..."
     cd "$PROJECT_ROOT/src/actors/Cena.Actors.Host"
 
-    export ConnectionStrings__PostgreSQL="Host=localhost;Database=cena;Username=cena;Password=cena_dev_password"
-    export ConnectionStrings__Redis="localhost:6379"
+    export ConnectionStrings__PostgreSQL="Host=localhost;Port=5433;Database=cena;Username=cena;Password=cena_dev_password"
+    export ConnectionStrings__Redis="localhost:6380"
     export ConnectionStrings__NATS="nats://localhost:4222"
-    export ConnectionStrings__Neo4j="bolt://localhost:7687"
+    export ConnectionStrings__Neo4j="bolt://localhost:7688"
     export ConnectionStrings__DynamoDB="http://localhost:8000"
     export ASPNETCORE_ENVIRONMENT="Development"
     export PROTO_REMOTE_PORT="5001"
@@ -117,7 +117,7 @@ start_llm() {
         source .venv/bin/activate
     fi
 
-    export REDIS_URL="redis://localhost:6379"
+    export REDIS_URL="redis://localhost:6380"
     export NATS_URL="nats://localhost:4222"
     export ANTHROPIC_API_KEY="${ANTHROPIC_API_KEY:-not-set}"
     export MOONSHOT_API_KEY="${MOONSHOT_API_KEY:-not-set}"
