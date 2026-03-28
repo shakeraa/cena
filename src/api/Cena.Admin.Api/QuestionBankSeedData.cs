@@ -37,15 +37,32 @@ public static class QuestionBankSeedData
             return;
         }
 
-        logger.LogInformation("Seeding question bank with ~1000 Bagrut-aligned questions...");
+        logger.LogInformation("Seeding question bank — have {Existing}, targeting ~1000...", existingCount);
+
+        // Pre-fetch existing stream keys to avoid collision with concurrent seeding
+        await using var querySession = store.QuerySession();
+        var existingStreamKeys = (await querySession.Events.QueryAllRawEvents()
+            .Where(e => e.StreamKey != null && e.StreamKey.StartsWith("q-"))
+            .Select(e => e.StreamKey!)
+            .ToListAsync())
+            .ToHashSet();
+        logger.LogInformation("Found {Count} existing question streams", existingStreamKeys.Count);
+
         await using var writeSession = store.LightweightSession();
         var now = DateTimeOffset.UtcNow;
         var auditRng = new Random(Seed); // seeded for reproducible audit data
         int seeded = 0;
+        int skipped = 0;
 
         foreach (var q in GetSeedQuestions())
         {
-            var id = $"q-{seeded + 1:D4}";
+            var id = $"q-{seeded + skipped + 1:D4}";
+
+            if (existingStreamKeys.Contains(id))
+            {
+                skipped++;
+                continue;
+            }
             var options = q.Options.Select(o => new QuestionOptionData(
                 o.Label, o.Text, $"<p>{o.Text}</p>", o.IsCorrect, o.Rationale)).ToList();
 
@@ -107,7 +124,8 @@ public static class QuestionBankSeedData
         }
 
         await writeSession.SaveChangesAsync();
-        logger.LogInformation("Seeded {Count} questions + moderation audit docs into event store", seeded);
+        logger.LogInformation("Seeded {Count} new questions (skipped {Skipped} existing), total now ~{Total}",
+            seeded, skipped, seeded + skipped);
     }
 
     // ── MATH (25 questions) ──────────────────────────────────────────────
