@@ -12,6 +12,7 @@ export type Subjects =
   | 'Mastery'
   | 'Outreach'
   | 'Pedagogy'
+  | 'Tutoring'
   | 'System'
   | 'AuditLog'
   | 'Settings'

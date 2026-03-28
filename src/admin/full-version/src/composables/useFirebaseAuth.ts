@@ -38,14 +38,19 @@ function mapRoleToAbilities(role: CenaRole) {
         { action: 'manage' as const, subject: 'Focus' as const },
         { action: 'manage' as const, subject: 'Mastery' as const },
         { action: 'manage' as const, subject: 'Outreach' as const },
+        { action: 'manage' as const, subject: 'Pedagogy' as const },
+        { action: 'manage' as const, subject: 'Tutoring' as const },
         { action: 'read' as const, subject: 'System' as const },
         { action: 'read' as const, subject: 'AuditLog' as const },
+        { action: 'manage' as const, subject: 'Settings' as const },
       ]
     case 'MODERATOR':
       return [
         { action: 'manage' as const, subject: 'Content' as const },
         { action: 'manage' as const, subject: 'Questions' as const },
         { action: 'read' as const, subject: 'Analytics' as const },
+        { action: 'read' as const, subject: 'Pedagogy' as const },
+        { action: 'read' as const, subject: 'Tutoring' as const },
       ]
     default:
       return []

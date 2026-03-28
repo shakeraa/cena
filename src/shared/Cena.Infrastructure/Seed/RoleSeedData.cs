@@ -22,6 +22,8 @@ public static class RoleSeedData
         ["Mastery Data"] = ["view-own", "view-class", "view-school", "configure-thresholds"],
         ["Settings"] = ["view", "edit-own", "edit-org", "edit-platform"],
         ["System"] = ["view-health", "manage-actors", "view-logs", "manage-config"],
+        ["Pedagogy"] = ["view", "edit", "manage-experiments"],
+        ["Tutoring"] = ["view-sessions", "view-analytics", "manage-budget", "view-transcripts"],
     };
 
     private static readonly CenaRoleDefinition[] PredefinedRoles =
@@ -48,6 +50,8 @@ public static class RoleSeedData
                 ["Analytics"] = ["view-own", "view-class", "view-school", "export"],
                 ["Focus Data"] = ["view-own", "view-class", "view-aggregated", "configure-alerts"],
                 ["Mastery Data"] = ["view-own", "view-class", "view-school", "configure-thresholds"],
+                ["Pedagogy"] = ["view", "edit", "manage-experiments"],
+                ["Tutoring"] = ["view-sessions", "view-analytics", "manage-budget", "view-transcripts"],
                 ["Settings"] = ["view", "edit-own", "edit-org"],
                 ["System"] = ["view-health", "view-logs"],
             }
@@ -66,6 +70,8 @@ public static class RoleSeedData
                 ["Analytics"] = ["view-own", "view-class"],
                 ["Focus Data"] = ["view-own", "view-class"],
                 ["Mastery Data"] = ["view-own", "view-class"],
+                ["Pedagogy"] = ["view"],
+                ["Tutoring"] = ["view-sessions", "view-analytics"],
                 ["Settings"] = ["view", "edit-own"],
             }
         },
@@ -82,6 +88,8 @@ public static class RoleSeedData
                 ["Analytics"] = ["view-own", "view-class"],
                 ["Focus Data"] = ["view-own", "view-class"],
                 ["Mastery Data"] = ["view-own", "view-class"],
+                ["Pedagogy"] = ["view"],
+                ["Tutoring"] = ["view-sessions", "view-analytics"],
                 ["Settings"] = ["view", "edit-own"],
             }
         },
