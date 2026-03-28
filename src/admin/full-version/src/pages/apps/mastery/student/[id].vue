@@ -4,6 +4,8 @@ import ConceptGraph from '@/views/apps/mastery/ConceptGraph.vue'
 import MethodologyHierarchyPanel from '@/views/apps/pedagogy/MethodologyHierarchyPanel.vue'
 import { $api } from '@/utils/api'
 
+const router = useRouter()
+
 definePage({
   meta: {
     action: 'read',
@@ -256,7 +258,7 @@ const decayColor = (risk: number): string => {
             icon
             variant="text"
             size="small"
-            :to="{ path: '/apps/mastery/dashboard' }"
+            @click="router.back()"
           >
             <VIcon icon="tabler-arrow-left" />
           </VBtn>
