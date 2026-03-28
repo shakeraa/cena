@@ -1021,19 +1021,18 @@ const exportCsv = () => {
                   mandatory
                   color="primary"
                   variant="outlined"
-                  density="compact"
-                  class="mb-3"
+                  class="mb-3 d-flex flex-wrap"
                 >
-                  <VBtn value="text">
-                    <VIcon icon="tabler-text-size" class="me-1" />
+                  <VBtn value="text" size="small" class="px-4">
+                    <VIcon icon="tabler-text-size" size="18" class="me-2" />
                     Text Prompt
                   </VBtn>
-                  <VBtn value="photo">
-                    <VIcon icon="tabler-camera" class="me-1" />
+                  <VBtn value="photo" size="small" class="px-4">
+                    <VIcon icon="tabler-camera" size="18" class="me-2" />
                     Photo / Image
                   </VBtn>
-                  <VBtn value="file">
-                    <VIcon icon="tabler-file-upload" class="me-1" />
+                  <VBtn value="file" size="small" class="px-4">
+                    <VIcon icon="tabler-file-upload" size="18" class="me-2" />
                     Document
                   </VBtn>
                 </VBtnToggle>
