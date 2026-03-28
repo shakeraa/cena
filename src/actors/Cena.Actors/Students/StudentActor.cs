@@ -425,43 +425,17 @@ public sealed partial class StudentActor : IActor
         using var activity = _activitySource.StartActivity("StudentActor.FlushEvents");
         activity?.SetTag("event.count", _pendingEvents.Count);
 
-        // Persist ALL events atomically with expected version
+        // Persist ALL events atomically.
+        // Use Append without expected version — lets Marten handle stream creation
+        // and avoids race conditions with concurrent seed data.
         // RES-001: 2s timeout prevents actor mailbox starvation on slow DB
+        await using var session = _documentStore.LightweightSession();
+        session.Events.Append(_studentId, _pendingEvents.ToArray());
+
         using var cts = new CancellationTokenSource(EventPersistTimeout);
         try
         {
-            await using var session = _documentStore.LightweightSession();
-            if (!_streamExists)
-            {
-                session.Events.StartStream(_studentId, _pendingEvents.ToArray());
-                _streamExists = true;
-            }
-            else
-            {
-                session.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
-            }
             await session.SaveChangesAsync(cts.Token);
-        }
-        catch (Exception) when (!_streamExists || _state.EventVersion == 0)
-        {
-            // Stream may have been created concurrently (e.g. by seed data).
-            // Re-fetch version and retry with Append.
-            await using var retrySession = _documentStore.LightweightSession();
-            var streamState = await retrySession.Events.FetchStreamStateAsync(_studentId);
-            if (streamState != null)
-            {
-                _state.EventVersion = (int)streamState.Version;
-                _streamExists = true;
-                retrySession.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
-                await retrySession.SaveChangesAsync(cts.Token);
-            }
-            else
-            {
-                // Truly new stream — retry StartStream
-                retrySession.Events.StartStream(_studentId, _pendingEvents.ToArray());
-                _streamExists = true;
-                await retrySession.SaveChangesAsync(cts.Token);
-            }
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
