@@ -41,12 +41,25 @@
   "User": "User",
   "Actions": "Actions",
   "Statistics": "Statistics",
+  "Methodology Hierarchy": "Methodology Hierarchy",
+  "AI Tutoring": "AI Tutoring",
+  "Tutoring Sessions": "Tutoring Sessions",
+  "Experiments": "Experiments",
+  "AI Providers": "AI Providers",
+  "Actor Dashboard": "Actor Dashboard",
+  "Architecture": "Architecture",
+  "Explanation Cache": "Explanation Cache",
+  "Embeddings": "Embeddings",
+  "Token Budget": "Token Budget",
   "$vuetify": {
     "badge": "Badge",
     "noDataText": "No data available",
     "close": "Close",
     "open": "Open",
     "loading": "Loading",
+    "dataIterator": {
+      "loadingText": "Loading items..."
+    },
     "dataFooter": {
       "itemsPerPageText": "Items per page:",
       "itemsPerPageAll": "All",
