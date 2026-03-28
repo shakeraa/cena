@@ -200,13 +200,13 @@ const renderGraph = () => {
     .data(nodes)
     .join('g')
     .style('cursor', 'pointer')
-    .call(d3.drag<SVGGElement, GraphNode>()
-      .on('start', (event, d) => {
+    .call((d3.drag() as any)
+      .on('start', (event: any, d: any) => {
         if (!event.active) simulation.alphaTarget(0.3).restart()
         d.fx = d.x; d.fy = d.y
       })
-      .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y })
-      .on('end', (event, d) => {
+      .on('drag', (event: any, d: any) => { d.fx = event.x; d.fy = event.y })
+      .on('end', (event: any, d: any) => {
         if (!event.active) simulation.alphaTarget(0)
         d.fx = null; d.fy = null
       }))
