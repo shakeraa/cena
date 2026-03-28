@@ -234,6 +234,15 @@ const createForm = ref({
 })
 
 const resetCreateForm = () => {
+  wizardStep.value = 1
+  aiGeneratedPreview.value = null
+  aiGeneratedQuestions.value = []
+  aiPromptInput.value = ''
+  aiQuestionFile.value = null
+  aiQuestionPreviewUrl.value = null
+  aiStyleFile.value = null
+  aiStylePreviewUrl.value = null
+  aiStyleText.value = ''
   createForm.value = {
     sourceType: 'authored',
     stem: '',
@@ -479,6 +488,22 @@ const selectGeneratedQuestion = (idx: number) => {
     }))
   }
 }
+
+// Wizard step
+const wizardStep = ref(1)
+
+const canAdvanceToStep2 = computed(() =>
+  !!createForm.value.subject && !!createForm.value.grade && !!createForm.value.language)
+
+const canAdvanceToStep3 = computed(() => {
+  if (createForm.value.sourceType === 'authored')
+    return !!createForm.value.stem && createForm.value.options.some(o => !!o.text)
+  // AI: must have generated something OR provided source input
+  if (createForm.value.sourceType === 'ai-generated')
+    return aiInputMode.value === 'text' ? !!aiPromptInput.value : !!aiQuestionFile.value
+  // Ingested
+  return !!createForm.value.sourceDocId
+})
 
 const sourceTypes = [
   { title: 'Authored (Manual)', value: 'authored' },
@@ -862,10 +887,10 @@ const exportCsv = () => {
       @updated="fetchQuestions"
     />
 
-    <!-- Create Question Dialog -->
+    <!-- Create Question Wizard Dialog -->
     <VDialog
       v-model="isCreateDialogOpen"
-      max-width="720"
+      max-width="900"
       persistent
     >
       <VCard>
@@ -876,14 +901,53 @@ const exportCsv = () => {
             icon
             variant="text"
             size="small"
-            @click="isCreateDialogOpen = false"
+            @click="isCreateDialogOpen = false; resetCreateForm()"
           >
             <VIcon icon="tabler-x" />
           </VBtn>
         </VCardTitle>
 
-        <VCardText class="pa-6">
-          <VRow>
+        <!-- Stepper header -->
+        <VCardText class="pa-6 pb-2">
+          <div class="d-flex align-center gap-2 mb-4">
+            <VChip
+              :color="wizardStep >= 1 ? 'primary' : 'default'"
+              :variant="wizardStep === 1 ? 'elevated' : 'tonal'"
+              label
+              size="small"
+              @click="wizardStep = 1"
+            >
+              1. Setup
+            </VChip>
+            <VIcon icon="tabler-chevron-right" size="16" color="disabled" />
+            <VChip
+              :color="wizardStep >= 2 ? 'primary' : 'default'"
+              :variant="wizardStep === 2 ? 'elevated' : 'tonal'"
+              label
+              size="small"
+              :disabled="!canAdvanceToStep2"
+              @click="canAdvanceToStep2 && (wizardStep = 2)"
+            >
+              2. Source
+            </VChip>
+            <VIcon icon="tabler-chevron-right" size="16" color="disabled" />
+            <VChip
+              :color="wizardStep >= 3 ? 'primary' : 'default'"
+              :variant="wizardStep === 3 ? 'elevated' : 'tonal'"
+              label
+              size="small"
+              :disabled="!canAdvanceToStep3"
+              @click="canAdvanceToStep3 && (wizardStep = 3)"
+            >
+              3. Review & Save
+            </VChip>
+          </div>
+          <VDivider />
+        </VCardText>
+
+        <VCardText class="pa-6 pt-2">
+          <!-- ═══════════════ STEP 1: Setup ═══════════════ -->
+          <VRow v-show="wizardStep === 1">
             <!-- Source type -->
             <VCol cols="12" sm="6">
               <AppSelect
@@ -954,64 +1018,26 @@ const exportCsv = () => {
               />
             </VCol>
 
-            <!-- Question stem -->
-            <VCol cols="12">
-              <AppTextarea
-                v-model="createForm.stem"
-                label="Question Stem"
-                placeholder="Enter the question text..."
-                rows="3"
-                :rules="[v => !!v || 'Stem is required']"
+            <!-- Count (for AI mode) -->
+            <VCol v-if="createForm.sourceType === 'ai-generated'" cols="12" sm="4">
+              <AppSelect
+                v-model="createForm.count"
+                label="Number of Questions"
+                :items="[
+                  { title: '1', value: 1 },
+                  { title: '3', value: 3 },
+                  { title: '5', value: 5 },
+                  { title: '10', value: 10 },
+                ]"
               />
             </VCol>
+          </VRow>
 
-            <!-- Answer options -->
-            <VCol cols="12">
-              <label class="text-body-2 text-medium-emphasis d-block mb-2">
-                Answer Options (select the correct one)
-              </label>
-              <div
-                v-for="(opt, idx) in createForm.options"
-                :key="opt.label"
-                class="d-flex align-center gap-3 mb-3"
-              >
-                <VRadio
-                  :model-value="opt.isCorrect"
-                  :value="true"
-                  color="success"
-                  @click="setCorrectOption(idx)"
-                />
-                <VChip
-                  size="small"
-                  :color="opt.isCorrect ? 'success' : 'default'"
-                  label
-                >
-                  {{ opt.label }}
-                </VChip>
-                <AppTextField
-                  v-model="opt.text"
-                  :placeholder="`Option ${opt.label} text`"
-                  density="compact"
-                  class="flex-grow-1"
-                />
-                <AppTextField
-                  v-if="!opt.isCorrect"
-                  v-model="opt.distractorRationale"
-                  placeholder="Why wrong?"
-                  density="compact"
-                  style="max-inline-size: 180px;"
-                />
-              </div>
-            </VCol>
-
-            <!-- AI Generation Panel -->
+          <!-- ═══════════════ STEP 2: Source ═══════════════ -->
+          <VRow v-show="wizardStep === 2">
+            <!-- ── AI Generated path ── -->
             <template v-if="createForm.sourceType === 'ai-generated'">
-              <VCol cols="12">
-                <VDivider class="mb-2" />
-                <span class="text-body-2 font-weight-medium text-primary">AI Generation</span>
-              </VCol>
-
-              <!-- Question source: how to provide the question content -->
+              <!-- Question source tabs -->
               <VCol cols="12">
                 <label class="text-body-2 text-medium-emphasis d-block mb-2">
                   Question Source
@@ -1038,11 +1064,8 @@ const exportCsv = () => {
                 </VBtnToggle>
               </VCol>
 
-              <!-- Text prompt input -->
-              <VCol
-                v-if="aiInputMode === 'text'"
-                cols="12"
-              >
+              <!-- Text prompt -->
+              <VCol v-if="aiInputMode === 'text'" cols="12">
                 <AppTextarea
                   v-model="aiPromptInput"
                   label="Describe the question or topic"
@@ -1051,11 +1074,8 @@ const exportCsv = () => {
                 />
               </VCol>
 
-              <!-- Photo upload with preview -->
-              <VCol
-                v-if="aiInputMode === 'photo'"
-                cols="12"
-              >
+              <!-- Photo upload -->
+              <VCol v-if="aiInputMode === 'photo'" cols="12">
                 <VFileInput
                   label="Upload exam photo or textbook screenshot"
                   accept="image/*"
@@ -1064,7 +1084,7 @@ const exportCsv = () => {
                   @change="handleQuestionFileUpload"
                 />
                 <span class="text-caption text-disabled">
-                  Supports JPG, PNG, HEIC. The image will be sent to the vision model for question extraction.
+                  Supports JPG, PNG, HEIC. Sent to vision model for extraction.
                 </span>
                 <VImg
                   v-if="aiQuestionPreviewUrl"
@@ -1076,10 +1096,7 @@ const exportCsv = () => {
               </VCol>
 
               <!-- File upload -->
-              <VCol
-                v-if="aiInputMode === 'file'"
-                cols="12"
-              >
+              <VCol v-if="aiInputMode === 'file'" cols="12">
                 <VFileInput
                   label="Upload document (PDF, Word, Excel)"
                   accept=".pdf,.doc,.docx,.xls,.xlsx,.txt"
@@ -1088,11 +1105,11 @@ const exportCsv = () => {
                   @change="handleQuestionFileUpload"
                 />
                 <span class="text-caption text-disabled">
-                  Supports PDF, Word, Excel, plain text. Questions will be extracted and AI-enhanced.
+                  Supports PDF, Word, Excel, plain text.
                 </span>
               </VCol>
 
-              <!-- Style Reference (optional) -->
+              <!-- Style Reference -->
               <VCol cols="12">
                 <VDivider class="mb-2" />
                 <label class="text-body-2 text-medium-emphasis d-block mb-2">
@@ -1100,7 +1117,7 @@ const exportCsv = () => {
                   <VChip size="x-small" variant="tonal" color="secondary" class="ms-2">Optional</VChip>
                 </label>
                 <span class="text-caption text-disabled d-block mb-2">
-                  Upload an example question or describe the style you want the generated questions to follow.
+                  Upload an example question or describe the style to match.
                 </span>
               </VCol>
 
@@ -1131,25 +1148,10 @@ const exportCsv = () => {
                 />
               </VCol>
 
-              <!-- Count -->
-              <VCol cols="12" sm="4">
-                <AppSelect
-                  v-model="createForm.count"
-                  label="Number of Questions"
-                  :items="[
-                    { title: '1', value: 1 },
-                    { title: '3', value: 3 },
-                    { title: '5', value: 5 },
-                    { title: '10', value: 10 },
-                  ]"
-                />
-              </VCol>
-
               <!-- Generate button -->
               <VCol cols="12">
                 <VBtn
                   color="primary"
-                  variant="tonal"
                   prepend-icon="tabler-sparkles"
                   :loading="isGenerating"
                   :disabled="aiInputMode === 'text' ? !aiPromptInput : !aiQuestionFile"
@@ -1159,11 +1161,8 @@ const exportCsv = () => {
                 </VBtn>
               </VCol>
 
-              <!-- AI preview result -->
-              <VCol
-                v-if="aiGeneratedPreview"
-                cols="12"
-              >
+              <!-- AI result alert -->
+              <VCol v-if="aiGeneratedPreview" cols="12">
                 <VAlert
                   :color="aiGeneratedPreview.status === 'error' ? 'error' : 'success'"
                   variant="tonal"
@@ -1173,13 +1172,10 @@ const exportCsv = () => {
                 </VAlert>
               </VCol>
 
-              <!-- Generated questions list (pick one to fill the form) -->
-              <VCol
-                v-if="aiGeneratedQuestions.length > 1"
-                cols="12"
-              >
+              <!-- Generated questions pick list -->
+              <VCol v-if="aiGeneratedQuestions.length > 1" cols="12">
                 <label class="text-body-2 text-medium-emphasis d-block mb-2">
-                  Generated Questions — click to load into the form
+                  Generated Questions — click to select for review
                 </label>
                 <VList density="compact" class="rounded border">
                   <VListItem
@@ -1187,84 +1183,196 @@ const exportCsv = () => {
                     :key="idx"
                     :title="`#${idx + 1} — Difficulty ${gq.difficulty?.toFixed(2) ?? '?'}`"
                     :subtitle="gq.stem?.slice(0, 120)"
-                    @click="selectGeneratedQuestion(idx)"
+                    @click="selectGeneratedQuestion(idx); wizardStep = 3"
                   >
                     <template #prepend>
                       <VAvatar color="primary" variant="tonal" size="32">
                         {{ idx + 1 }}
                       </VAvatar>
                     </template>
+                    <template #append>
+                      <VIcon icon="tabler-chevron-right" size="18" />
+                    </template>
                   </VListItem>
                 </VList>
               </VCol>
+            </template>
 
-              <VCol cols="12">
-                <VDivider class="mb-1" />
-                <span class="text-caption text-disabled">
-                  AI details (stored for reproducibility)
-                </span>
-              </VCol>
+            <!-- ── Authored (manual) path ── -->
+            <template v-if="createForm.sourceType === 'authored'">
               <VCol cols="12">
                 <AppTextarea
-                  v-model="createForm.promptText"
-                  label="Full Prompt"
-                  rows="2"
+                  v-model="createForm.stem"
+                  label="Question Stem"
+                  placeholder="Enter the question text..."
+                  rows="3"
+                  :rules="[v => !!v || 'Stem is required']"
                 />
               </VCol>
-              <VCol cols="6">
-                <AppTextField
-                  v-model="createForm.modelId"
-                  label="Model"
-                />
-              </VCol>
-              <VCol cols="6">
-                <AppTextField
-                  v-model.number="createForm.modelTemperature"
-                  label="Temperature"
-                  type="number"
-                  :step="0.1"
-                />
+
+              <VCol cols="12">
+                <label class="text-body-2 text-medium-emphasis d-block mb-2">
+                  Answer Options (select the correct one)
+                </label>
+                <div
+                  v-for="(opt, idx) in createForm.options"
+                  :key="opt.label"
+                  class="d-flex align-center gap-3 mb-3"
+                >
+                  <VRadio
+                    :model-value="opt.isCorrect"
+                    :value="true"
+                    color="success"
+                    @click="setCorrectOption(idx)"
+                  />
+                  <VChip size="small" :color="opt.isCorrect ? 'success' : 'default'" label>
+                    {{ opt.label }}
+                  </VChip>
+                  <AppTextField
+                    v-model="opt.text"
+                    :placeholder="`Option ${opt.label} text`"
+                    density="compact"
+                    class="flex-grow-1"
+                  />
+                  <AppTextField
+                    v-if="!opt.isCorrect"
+                    v-model="opt.distractorRationale"
+                    placeholder="Why wrong?"
+                    density="compact"
+                    style="max-inline-size: 180px;"
+                  />
+                </div>
               </VCol>
             </template>
 
-            <!-- Ingestion-specific fields -->
+            <!-- ── Ingested path ── -->
             <template v-if="createForm.sourceType === 'ingested'">
-              <VCol cols="12">
-                <VDivider class="mb-2" />
-                <span class="text-body-2 font-weight-medium text-primary">Ingestion Source</span>
+              <VCol cols="6">
+                <AppTextField v-model="createForm.sourceDocId" label="Source Document ID" />
               </VCol>
               <VCol cols="6">
-                <AppTextField
-                  v-model="createForm.sourceDocId"
-                  label="Source Document ID"
-                />
-              </VCol>
-              <VCol cols="6">
-                <AppTextField
-                  v-model="createForm.sourceFilename"
-                  label="Source Filename"
-                />
+                <AppTextField v-model="createForm.sourceFilename" label="Source Filename" />
               </VCol>
               <VCol cols="12">
-                <AppTextField
-                  v-model="createForm.sourceUrl"
-                  label="Source URL"
-                />
+                <AppTextField v-model="createForm.sourceUrl" label="Source URL" />
               </VCol>
               <VCol cols="12">
-                <AppTextarea
-                  v-model="createForm.originalText"
-                  label="Original Text (OCR)"
-                  rows="2"
-                />
+                <AppTextarea v-model="createForm.originalText" label="Original Text (OCR)" rows="2" />
               </VCol>
             </template>
+          </VRow>
+
+          <!-- ═══════════════ STEP 3: Review & Save ═══════════════ -->
+          <VRow v-show="wizardStep === 3">
+            <!-- Editable stem -->
+            <VCol cols="12">
+              <AppTextarea
+                v-model="createForm.stem"
+                label="Question Stem"
+                placeholder="Enter or edit the question text..."
+                rows="3"
+              />
+            </VCol>
+
+            <!-- Editable answer options -->
+            <VCol cols="12">
+              <label class="text-body-2 text-medium-emphasis d-block mb-2">
+                Answer Options (select the correct one)
+              </label>
+              <div
+                v-for="(opt, idx) in createForm.options"
+                :key="opt.label"
+                class="d-flex align-center gap-3 mb-3"
+              >
+                <VRadio
+                  :model-value="opt.isCorrect"
+                  :value="true"
+                  color="success"
+                  @click="setCorrectOption(idx)"
+                />
+                <VChip size="small" :color="opt.isCorrect ? 'success' : 'default'" label>
+                  {{ opt.label }}
+                </VChip>
+                <AppTextField
+                  v-model="opt.text"
+                  :placeholder="`Option ${opt.label} text`"
+                  density="compact"
+                  class="flex-grow-1"
+                />
+                <AppTextField
+                  v-if="!opt.isCorrect"
+                  v-model="opt.distractorRationale"
+                  placeholder="Why wrong?"
+                  density="compact"
+                  style="max-inline-size: 180px;"
+                />
+              </div>
+            </VCol>
+
+            <!-- AI provenance (collapsed by default) -->
+            <template v-if="createForm.sourceType === 'ai-generated'">
+              <VCol cols="12">
+                <VExpansionPanels variant="accordion">
+                  <VExpansionPanel title="AI Details (stored for reproducibility)">
+                    <VExpansionPanelText>
+                      <VRow>
+                        <VCol cols="12">
+                          <AppTextarea v-model="createForm.promptText" label="Full Prompt" rows="2" />
+                        </VCol>
+                        <VCol cols="6">
+                          <AppTextField v-model="createForm.modelId" label="Model" />
+                        </VCol>
+                        <VCol cols="6">
+                          <AppTextField
+                            v-model.number="createForm.modelTemperature"
+                            label="Temperature"
+                            type="number"
+                            :step="0.1"
+                          />
+                        </VCol>
+                      </VRow>
+                    </VExpansionPanelText>
+                  </VExpansionPanel>
+                </VExpansionPanels>
+              </VCol>
+            </template>
+
+            <!-- Summary chips -->
+            <VCol cols="12">
+              <div class="d-flex flex-wrap gap-2">
+                <VChip size="small" variant="tonal" color="primary" label>
+                  {{ createForm.subject }}
+                </VChip>
+                <VChip size="small" variant="tonal" color="secondary" label>
+                  {{ createForm.grade }}
+                </VChip>
+                <VChip size="small" variant="tonal" color="info" label>
+                  Bloom {{ createForm.bloomsLevel }}
+                </VChip>
+                <VChip size="small" variant="tonal" color="warning" label>
+                  Difficulty {{ createForm.difficultyRange[0].toFixed(2) }}–{{ createForm.difficultyRange[1].toFixed(2) }}
+                </VChip>
+                <VChip size="small" variant="tonal" label>
+                  {{ createForm.language === 'he' ? 'Hebrew' : createForm.language === 'ar' ? 'Arabic' : 'English' }}
+                </VChip>
+              </div>
+            </VCol>
           </VRow>
         </VCardText>
 
         <VDivider />
 
+        <!-- Wizard navigation -->
         <VCardActions class="pa-6">
+          <VBtn
+            v-if="wizardStep > 1"
+            variant="tonal"
+            color="secondary"
+            prepend-icon="tabler-arrow-left"
+            @click="wizardStep--"
+          >
+            Back
+          </VBtn>
           <VSpacer />
           <VBtn
             variant="tonal"
@@ -1274,7 +1382,18 @@ const exportCsv = () => {
             Cancel
           </VBtn>
           <VBtn
+            v-if="wizardStep < 3"
             color="primary"
+            append-icon="tabler-arrow-right"
+            :disabled="wizardStep === 1 ? !canAdvanceToStep2 : !canAdvanceToStep3"
+            @click="wizardStep++"
+          >
+            Next
+          </VBtn>
+          <VBtn
+            v-if="wizardStep === 3"
+            color="primary"
+            prepend-icon="tabler-check"
             :loading="isCreating"
             :disabled="!createForm.stem || createForm.options.every(o => !o.text)"
             @click="submitCreateQuestion"
