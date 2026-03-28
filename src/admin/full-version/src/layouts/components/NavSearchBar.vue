@@ -30,39 +30,39 @@ const isLoading = ref(false)
 
 const suggestionGroups: SuggestionGroup[] = [
   {
-    title: 'Popular Searches',
+    title: 'Dashboards',
     content: [
-      { icon: 'tabler-chart-bar', title: 'Analytics', url: { name: 'dashboards-analytics' } },
-      { icon: 'tabler-chart-donut-3', title: 'CRM', url: { name: 'dashboards-crm' } },
-      { icon: 'tabler-shopping-cart', title: 'eCommerce', url: { name: 'dashboards-ecommerce' } },
-      { icon: 'tabler-truck', title: 'Logistics', url: { name: 'dashboards-logistics' } },
+      { icon: 'tabler-layout-dashboard', title: 'Platform Overview', url: { name: 'dashboards-admin' } },
+      { icon: 'tabler-brain', title: 'Mastery Tracking', url: { name: 'apps-mastery-dashboard' } },
+      { icon: 'tabler-focus-2', title: 'Focus & Engagement', url: { name: 'apps-focus-dashboard' } },
+      { icon: 'tabler-heart-handshake', title: 'Cultural Responsiveness', url: { name: 'apps-cultural-dashboard' } },
     ],
   },
   {
-    title: 'Apps & Pages',
+    title: 'Content & Pedagogy',
     content: [
-      { icon: 'tabler-calendar', title: 'Calendar', url: { name: 'apps-calendar' } },
-      { icon: 'tabler-lock', title: 'Roles & Permissions', url: { name: 'apps-roles' } },
-      { icon: 'tabler-settings', title: 'Account Settings', url: { name: 'pages-account-settings-tab', params: { tab: 'account' } } },
-      { icon: 'tabler-copy', title: 'Dialog Examples', url: { name: 'pages-dialog-examples' } },
+      { icon: 'tabler-list-check', title: 'Question Bank', url: { name: 'apps-questions-list' } },
+      { icon: 'tabler-upload', title: 'Ingestion Pipeline', url: { name: 'apps-ingestion-pipeline' } },
+      { icon: 'tabler-git-merge', title: 'Concept Graph (MCM)', url: { name: 'apps-pedagogy-mcm-graph' } },
+      { icon: 'tabler-route', title: 'Methodology', url: { name: 'apps-pedagogy-methodology' } },
     ],
   },
   {
-    title: 'User Interface',
+    title: 'Student AI',
     content: [
-      { icon: 'tabler-typography', title: 'Typography', url: { name: 'pages-typography' } },
-      { icon: 'tabler-menu-2', title: 'Accordion', url: { name: 'components-expansion-panel' } },
-      { icon: 'tabler-info-triangle', title: 'Alert', url: { name: 'components-alert' } },
-      { icon: 'tabler-checkbox', title: 'Cards', url: { name: 'pages-cards-card-basic' } },
+      { icon: 'tabler-message-chatbot', title: 'Tutoring Sessions', url: { name: 'apps-tutoring-sessions' } },
+      { icon: 'tabler-flask', title: 'A/B Experiments', url: { name: 'apps-experiments' } },
+      { icon: 'tabler-shield-check', title: 'Moderation Queue', url: { name: 'apps-moderation-queue' } },
+      { icon: 'tabler-megaphone', title: 'Parent Outreach', url: { name: 'apps-outreach-dashboard' } },
     ],
   },
   {
-    title: 'Forms & Tables',
+    title: 'System',
     content: [
-      { icon: 'tabler-circle-dot', title: 'Radio', url: { name: 'forms-radio' } },
-      { icon: 'tabler-file-invoice', title: 'Form Layouts', url: { name: 'forms-form-layouts' } },
-      { icon: 'tabler-table', title: 'Table', url: { name: 'tables-data-table' } },
-      { icon: 'tabler-edit', title: 'Editor', url: { name: 'forms-editors' } },
+      { icon: 'tabler-heart-rate-monitor', title: 'System Health', url: { name: 'apps-system-health' } },
+      { icon: 'tabler-cpu', title: 'Actor Explorer', url: { name: 'apps-system-actors' } },
+      { icon: 'tabler-database', title: 'Event Store', url: { name: 'apps-system-events' } },
+      { icon: 'tabler-robot', title: 'AI Settings', url: { name: 'apps-system-ai-settings' } },
     ],
   },
 ]
@@ -70,19 +70,19 @@ const suggestionGroups: SuggestionGroup[] = [
 // 👉 No Data suggestion
 const noDataSuggestions: Suggestion[] = [
   {
-    title: 'Analytics',
-    icon: 'tabler-chart-bar',
-    url: { name: 'dashboards-analytics' },
+    title: 'Platform Overview',
+    icon: 'tabler-layout-dashboard',
+    url: { name: 'dashboards-admin' },
   },
   {
-    title: 'CRM',
-    icon: 'tabler-chart-donut-3',
-    url: { name: 'dashboards-crm' },
+    title: 'Question Bank',
+    icon: 'tabler-list-check',
+    url: { name: 'apps-questions-list' },
   },
   {
-    title: 'eCommerce',
-    icon: 'tabler-shopping-cart',
-    url: { name: 'dashboards-ecommerce' },
+    title: 'System Health',
+    icon: 'tabler-heart-rate-monitor',
+    url: { name: 'apps-system-health' },
   },
 ]
 
