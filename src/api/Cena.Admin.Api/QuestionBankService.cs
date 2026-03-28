@@ -291,7 +291,7 @@ public sealed class QuestionBankService : IQuestionBankService
                 request.ConceptIds ?? new List<string>(), request.Language,
                 request.PromptText ?? "", request.ModelId ?? "",
                 request.ModelTemperature ?? 0.7f, request.RawModelOutput ?? "",
-                userId, now),
+                userId, request.Explanation, now),
             _ => new QuestionAuthored_V1(
                 id, request.Stem, request.StemHtml ?? $"<p>{request.Stem}</p>",
                 options, request.Subject, request.Topic ?? "", request.Grade ?? "",
@@ -301,6 +301,12 @@ public sealed class QuestionBankService : IQuestionBankService
         };
 
         var events = new List<object> { creationEvent };
+
+        // For non-AI questions, persist explanation via separate event
+        if (request.SourceType != "ai-generated" && !string.IsNullOrEmpty(request.Explanation))
+        {
+            events.Add(new ExplanationEdited_V1(id, null, request.Explanation, userId, now));
+        }
 
         // Run quality gate
         var gateInput = BuildGateInput(id, request.Stem, request.Options,
@@ -421,6 +427,7 @@ public sealed class QuestionBankService : IQuestionBankService
             CreatedAt: s.CreatedAt,
             UpdatedAt: s.UpdatedAt,
             CreatedBy: s.CreatedBy,
+            Explanation: s.Explanation,
             Performance: null,  // Populated later from student analytics
             Provenance: s.Provenance != null ? new QuestionProvenance(
                 s.Provenance.SourceDocId, s.Provenance.SourceUrl,

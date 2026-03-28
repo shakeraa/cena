@@ -65,6 +65,7 @@ public sealed record QuestionBankDetailResponse(
     DateTimeOffset CreatedAt,
     DateTimeOffset? UpdatedAt,
     string CreatedBy,
+    string? Explanation,
     QuestionStats? Performance,
     QuestionProvenance? Provenance,
     QualityGateDetail? QualityGate = null);
@@ -162,7 +163,9 @@ public sealed record CreateQuestionRequest(
     string? PromptText,
     string? ModelId,
     float? ModelTemperature,
-    string? RawModelOutput);
+    string? RawModelOutput,
+    // Explanation (any source type)
+    string? Explanation);
 
 public sealed record CreateOptionRequest(
     string Label,

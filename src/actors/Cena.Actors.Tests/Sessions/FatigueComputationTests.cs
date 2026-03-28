@@ -22,7 +22,8 @@ public sealed class FatigueComputationTests
         var logger = Substitute.For<ILogger<LearningSessionActor>>();
         var meterFactory = Substitute.For<IMeterFactory>();
         meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter("test"));
-        _actor = new LearningSessionActor(bkt, cognitiveLoad, logger, meterFactory);
+        var hintGenerator = new HintGenerator();
+        _actor = new LearningSessionActor(bkt, cognitiveLoad, hintGenerator, logger, meterFactory);
     }
 
     [Fact]

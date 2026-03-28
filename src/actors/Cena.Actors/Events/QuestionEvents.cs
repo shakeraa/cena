@@ -71,6 +71,7 @@ public sealed record QuestionAiGenerated_V1(
     float ModelTemperature,
     string RawModelOutput,
     string RequestedBy,
+    string? Explanation,
     DateTimeOffset Timestamp);
 
 // ── Edit Events ──
@@ -143,6 +144,16 @@ public sealed record QuestionForked_V1(
     string NewQuestionId,
     string SourceQuestionId,
     string ForkedBy,
+    DateTimeOffset Timestamp);
+
+// ── Explanation ──
+
+/// <summary>Adds or edits an explanation on any question (any creation path).</summary>
+public sealed record ExplanationEdited_V1(
+    string QuestionId,
+    string? PreviousExplanation,
+    string NewExplanation,
+    string EditedBy,
     DateTimeOffset Timestamp);
 
 // ── Multi-Language ──

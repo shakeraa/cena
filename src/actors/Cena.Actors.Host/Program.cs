@@ -135,6 +135,8 @@ builder.Services.AddSingleton<IMethodologySwitchService, MethodologySwitchServic
 builder.Services.AddSingleton<IBktService, BktService>();
 builder.Services.AddSingleton<IHlrService, HlrService>();
 builder.Services.AddSingleton<ICognitiveLoadService, CognitiveLoadService>();
+builder.Services.AddSingleton<IHintGenerator, HintGenerator>();
+builder.Services.AddSingleton<IHintAdjustedBktService, HintAdjustedBktService>();
 builder.Services.AddSingleton<IFocusDegradationService, FocusDegradationService>();
 builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnforcementService>();
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();

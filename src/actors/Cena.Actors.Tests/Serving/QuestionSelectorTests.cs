@@ -206,7 +206,8 @@ public class QuestionSelectorTests
             Language: "he",
             StemPreview: $"Test question {id}",
             SourceType: "authored",
-            PublishedAt: DateTimeOffset.UtcNow.AddDays(-7));
+            PublishedAt: DateTimeOffset.UtcNow.AddDays(-7),
+            Explanation: null);
 
     private static StudentContext MakeContext(
         Dictionary<string, double>? mastery = null,

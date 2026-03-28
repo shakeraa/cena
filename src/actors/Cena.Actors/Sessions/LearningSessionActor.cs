@@ -9,6 +9,8 @@ using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
 using Proto;
 using Cena.Actors.Events;
+using Cena.Actors.Mastery;
+using Cena.Actors.Questions;
 using Cena.Actors.Services;
 using Cena.Actors.Students;
 
@@ -24,6 +26,7 @@ public sealed class LearningSessionActor : IActor
 {
     private readonly IBktService _bkt;
     private readonly ICognitiveLoadService _cognitiveLoad;
+    private readonly IHintGenerator _hintGenerator;
     private readonly ILogger<LearningSessionActor> _logger;
 
     // ── Session State ──
@@ -55,11 +58,13 @@ public sealed class LearningSessionActor : IActor
     public LearningSessionActor(
         IBktService bkt,
         ICognitiveLoadService cognitiveLoad,
+        IHintGenerator hintGenerator,
         ILogger<LearningSessionActor> logger,
         IMeterFactory meterFactory)
     {
         _bkt = bkt;
         _cognitiveLoad = cognitiveLoad;
+        _hintGenerator = hintGenerator;
         _logger = logger;
         _activitySource = new ActivitySource("Cena.Actors.LearningSession", "1.0.0");
         var meter = meterFactory.Create("Cena.Actors.LearningSession", "1.0.0");
@@ -245,11 +250,31 @@ public sealed class LearningSessionActor : IActor
     // ── Hint ──
     private Task HandleHint(IContext context, RequestHintMessage req)
     {
+        // Scaffold level determines max hints allowed
+        var scaffoldMeta = ScaffoldingService.GetScaffoldingMetadata(
+            ScaffoldingService.DetermineLevel(
+                (float)req.CurrentMastery, (float)req.PrerequisiteSatisfaction));
+
+        if (req.HintLevel > scaffoldMeta.MaxHints)
+        {
+            context.Respond(new HintResponse(req.HintLevel, Delivered: false, HintText: null, HasMoreHints: false));
+            return Task.CompletedTask;
+        }
+
+        // Generate hint content from existing data
+        var hint = _hintGenerator.Generate(new HintRequest(
+            req.HintLevel, req.QuestionId, req.ConceptId,
+            req.PrerequisiteConceptNames,
+            req.QuestionOptions,
+            req.QuestionExplanation,
+            req.StudentAnswer));
+
+        // Emit event for analytics
         if (context.Parent != null)
             context.Send(context.Parent, new DelegateEvent(new HintRequested_V1(
                 _studentId, _sessionId, req.ConceptId, req.QuestionId, req.HintLevel)));
 
-        context.Respond(new HintResponse(HintLevel: req.HintLevel, Delivered: true));
+        context.Respond(new HintResponse(req.HintLevel, Delivered: true, hint.Text, hint.HasMoreHints));
         return Task.CompletedTask;
     }
 
@@ -300,7 +325,7 @@ public record InitSession(
 public record EvaluateAnswerRequest(
     string ConceptId, string QuestionId, string QuestionType,
     bool IsCorrect, double ResponseTimeMs, string ErrorType,
-    double PriorMastery, BktParameters BktParameters,
+    double PriorMastery, Services.BktParameters BktParameters,
     int HintCountUsed, string AnswerHash,
     int BackspaceCount, int AnswerChangeCount);
 
@@ -313,8 +338,18 @@ public record RequestNextQuestion(
     HashSet<string> ReviewDueConcepts);
 
 public record NextQuestionResponse(string? ConceptId, string Methodology, double FatigueScore);
-public record RequestHintMessage(string ConceptId, string QuestionId, int HintLevel);
-public record HintResponse(int HintLevel, bool Delivered);
+public record RequestHintMessage(
+    string ConceptId,
+    string QuestionId,
+    int HintLevel,
+    double CurrentMastery = 0.5,
+    double PrerequisiteSatisfaction = 1.0,
+    IReadOnlyList<string>? PrerequisiteConceptNames = null,
+    IReadOnlyList<Cena.Actors.Questions.QuestionOptionState>? QuestionOptions = null,
+    string? QuestionExplanation = null,
+    string? StudentAnswer = null);
+
+public record HintResponse(int HintLevel, bool Delivered, string? HintText = null, bool HasMoreHints = false);
 public record SkipQuestionMessage(string ConceptId, string QuestionId, int TimeSpentMs);
 public record EndSessionRequest;
 

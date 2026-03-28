@@ -99,6 +99,9 @@ public sealed class QuestionState
     public string PrimaryLanguage { get; set; } = "he";
     public Dictionary<string, LanguageVersionState> LanguageVersions { get; set; } = new();
 
+    // Explanation (L1 — static, per-question)
+    public string? Explanation { get; set; }
+
     // Quality gate
     public QualityEvaluationState? LastQualityEvaluation { get; set; }
 
@@ -173,6 +176,7 @@ public sealed class QuestionState
         AiProvenance = new AiGenerationState(
             e.PromptText, e.ModelId, e.ModelTemperature,
             e.RawModelOutput, e.RequestedBy, e.Timestamp);
+        Explanation = e.Explanation;
         EventVersion++;
     }
 
@@ -256,6 +260,13 @@ public sealed class QuestionState
     public void Apply(QuestionDeprecated_V1 e)
     {
         Status = QuestionLifecycleStatus.Deprecated;
+        UpdatedAt = e.Timestamp;
+        EventVersion++;
+    }
+
+    public void Apply(ExplanationEdited_V1 e)
+    {
+        Explanation = e.NewExplanation;
         UpdatedAt = e.Timestamp;
         EventVersion++;
     }

@@ -24,10 +24,23 @@ public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, 
         e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
         "ingested", e.ImportedBy, e.Timestamp);
 
-    public QuestionReadModel Create(QuestionAiGenerated_V1 e) => FromCreation(
-        e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
-        e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
-        "ai-generated", e.RequestedBy, e.Timestamp);
+    public QuestionReadModel Create(QuestionAiGenerated_V1 e)
+    {
+        var model = FromCreation(
+            e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
+            e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
+            "ai-generated", e.RequestedBy, e.Timestamp);
+        model.Explanation = e.Explanation;
+        return model;
+    }
+
+    // ── Explanation Events ──
+
+    public void Apply(ExplanationEdited_V1 e, QuestionReadModel model)
+    {
+        model.Explanation = e.NewExplanation;
+        model.UpdatedAt = e.Timestamp;
+    }
 
     // ── Edit Events → Update Read Model ──
 

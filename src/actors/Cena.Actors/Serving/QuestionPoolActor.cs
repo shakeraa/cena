@@ -74,7 +74,8 @@ public sealed class QuestionPoolActor : IQuestionPool, IAsyncDisposable
                 Language: q.Language,
                 StemPreview: q.StemPreview,
                 SourceType: q.SourceType,
-                PublishedAt: q.UpdatedAt ?? q.CreatedAt);
+                PublishedAt: q.UpdatedAt ?? q.CreatedAt,
+                Explanation: q.Explanation);
 
             foreach (var conceptId in q.Concepts)
             {
@@ -164,4 +165,5 @@ public sealed record PublishedQuestion(
     string Language,
     string StemPreview,
     string SourceType,
-    DateTimeOffset PublishedAt);
+    DateTimeOffset PublishedAt,
+    string? Explanation);

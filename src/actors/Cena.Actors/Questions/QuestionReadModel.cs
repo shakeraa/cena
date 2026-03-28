@@ -30,4 +30,5 @@ public class QuestionReadModel
     public string CreatedBy { get; set; } = "";
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
+    public string? Explanation { get; set; }
 }

@@ -56,7 +56,9 @@ public static class QuestionBankSeedData
                     $"Generate a {q.Subject} question about {q.Topic} at Bloom level {q.Bloom}",
                     "claude-sonnet-4-6", 0.7f,
                     $"AI output for: {q.Stem}",
-                    "seed-script", now),
+                    "seed-script",
+                    q.Explanation,
+                    now),
                 "ingested" => new QuestionIngested_V1(
                     id, q.Stem, $"<p>{q.Stem}</p>", options,
                     q.Subject, q.Topic, q.Grade, q.Bloom, q.Difficulty,
@@ -503,7 +505,10 @@ public static class QuestionBankSeedData
     private sealed record SeedQuestion(
         string Stem, string Subject, string Topic, string Grade,
         int Bloom, float Difficulty, string[] Concepts,
-        string Language, string Source, params SeedOption[] Options);
+        string Language, string Source, params SeedOption[] Options)
+    {
+        public string? Explanation { get; init; }
+    };
 
     private sealed record SeedOption(string Label, string Text, bool IsCorrect, string? Rationale);
 }
