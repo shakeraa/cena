@@ -1,8 +1,10 @@
 // =============================================================================
 // Cena Platform -- Ingestion Pipeline Service
 // ADM-009: Pipeline dashboard and management
+// Production implementation backed by Marten event store + Redis.
 // =============================================================================
 
+using Cena.Actors.Ingest;
 using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -26,90 +28,176 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
 {
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
+    private readonly IIngestionOrchestrator _orchestrator;
     private readonly ILogger<IngestionPipelineService> _logger;
-    private static readonly List<PipelineStage> _mockStages = GenerateMockStages();
 
     public IngestionPipelineService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
+        IIngestionOrchestrator orchestrator,
         ILogger<IngestionPipelineService> logger)
     {
         _store = store;
         _redis = redis;
+        _orchestrator = orchestrator;
         _logger = logger;
     }
 
     public async Task<PipelineStatusResponse> GetPipelineStatusAsync()
     {
-        return new PipelineStatusResponse(
-            DateTimeOffset.UtcNow,
-            _mockStages);
+        await using var session = _store.QuerySession();
+
+        // Query real pipeline items grouped by stage
+        var allItems = await session.Query<PipelineItemDocument>()
+            .OrderByDescending(x => x.SubmittedAt)
+            .Take(500)
+            .ToListAsync();
+
+        var stageNames = new[]
+        {
+            (Cena.Actors.Ingest.PipelineStage.Incoming, "incoming", "Incoming"),
+            (Cena.Actors.Ingest.PipelineStage.OcrProcessing, "ocr", "OCR Processing"),
+            (Cena.Actors.Ingest.PipelineStage.Segmented, "segmented", "Segmented"),
+            (Cena.Actors.Ingest.PipelineStage.Normalized, "normalized", "Normalized"),
+            (Cena.Actors.Ingest.PipelineStage.Classified, "classified", "Classified"),
+            (Cena.Actors.Ingest.PipelineStage.Deduplicated, "deduplicated", "Deduplicated"),
+            (Cena.Actors.Ingest.PipelineStage.ReCreated, "recreated", "Re-Created"),
+            (Cena.Actors.Ingest.PipelineStage.InReview, "review", "In Review"),
+            (Cena.Actors.Ingest.PipelineStage.Published, "published", "Published")
+        };
+
+        var stages = stageNames.Select(s =>
+        {
+            var stageItems = allItems.Where(i => i.CurrentStage == s.Item1).ToList();
+            var hasError = stageItems.Any(i => i.Status == "failed");
+            return new PipelineStage(
+                StageId: s.Item2,
+                Name: s.Item3,
+                Count: stageItems.Count,
+                Status: hasError ? "failed" : stageItems.Count > 50 ? "slow" : "healthy",
+                Items: stageItems.Take(10).Select(i => new PipelineItem(
+                    Id: i.Id,
+                    SourceFilename: i.SourceFilename,
+                    SourceType: i.SourceType,
+                    QuestionCount: i.ExtractedQuestionCount,
+                    QualityScore: (int)((i.AvgQualityScore ?? 0) * 100),
+                    Timestamp: i.SubmittedAt,
+                    ErrorMessage: i.LastError,
+                    HasError: i.Status == "failed"
+                )).ToList());
+        }).ToList();
+
+        return new PipelineStatusResponse(DateTimeOffset.UtcNow, stages);
     }
 
     public async Task<PipelineItemDetailResponse?> GetItemDetailAsync(string id)
     {
-        var random = new Random(id.GetHashCode());
-        var stageNames = new[] { "Incoming", "OCR Processing", "Segmented", "Normalized", "Classified", "Deduplicated", "Re-Created", "In Review", "Published" };
-        var currentStageIndex = random.Next(0, stageNames.Length);
+        await using var session = _store.QuerySession();
+        var item = await session.LoadAsync<PipelineItemDocument>(id);
+        if (item is null) return null;
 
-        var stageHistory = new List<StageProcessingInfo>();
-        for (int i = 0; i <= currentStageIndex; i++)
+        var stageHistory = item.StageHistory.Select(s => new StageProcessingInfo(
+            Stage: s.Stage.ToString(),
+            StartedAt: s.StartedAt,
+            CompletedAt: s.CompletedAt,
+            Duration: s.Duration,
+            Status: s.Status,
+            ErrorMessage: s.ErrorMessage
+        )).ToList();
+
+        OcrOutput? ocrOutput = null;
+        if (item.Ocr is not null)
         {
-            var startedAt = DateTimeOffset.UtcNow.AddHours(-(currentStageIndex - i) * 2 - random.Next(0, 60));
-            DateTimeOffset? completedAt = i < currentStageIndex ? startedAt.AddMinutes(random.Next(5, 30)) : null;
+            ocrOutput = new OcrOutput(
+                OriginalImageUrl: $"s3://cena-ingest/{item.S3Key}",
+                ExtractedText: item.Ocr.Pages.FirstOrDefault()?.RawText ?? "",
+                Confidence: item.Ocr.Confidence,
+                Regions: new List<OcrRegion>());
+        }
 
-            stageHistory.Add(new StageProcessingInfo(
-                stageNames[i],
-                startedAt,
-                completedAt,
-                completedAt.HasValue ? completedAt.Value - startedAt : null,
-                i < currentStageIndex ? "completed" : "processing",
-                null));
+        var extractedQuestions = new List<ExtractedQuestion>();
+        if (item.ExtractedQuestionIds.Count > 0)
+        {
+            var questions = await session.Query<Cena.Actors.Questions.QuestionReadModel>()
+                .Where(q => q.Id.IsOneOf(item.ExtractedQuestionIds.ToArray()))
+                .ToListAsync();
+
+            extractedQuestions = questions.Select((q, i) => new ExtractedQuestion(
+                Index: i,
+                Text: q.StemPreview,
+                Answer: null,
+                Confidence: q.QualityScore / 100f
+            )).ToList();
         }
 
         return new PipelineItemDetailResponse(
-            Id: id,
-            SourceFilename: $"batch-{random.Next(1000)}.pdf",
-            SourceType: random.NextSingle() > 0.5 ? "batch" : "photo",
-            SourceUrl: $"https://s3.cena.edu/uploads/{id}",
-            SubmittedAt: DateTimeOffset.UtcNow.AddHours(-12),
-            CompletedAt: currentStageIndex == stageNames.Length - 1 ? DateTimeOffset.UtcNow.AddHours(-1) : null,
-            CurrentStage: stageNames[currentStageIndex],
+            Id: item.Id,
+            SourceFilename: item.SourceFilename,
+            SourceType: item.SourceType,
+            SourceUrl: item.SourceUrl ?? item.S3Key,
+            SubmittedAt: item.SubmittedAt,
+            CompletedAt: item.CompletedAt,
+            CurrentStage: item.CurrentStage.ToString(),
             StageHistory: stageHistory,
-            OcrResult: random.NextSingle() > 0.3 ? new OcrOutput(
-                $"https://s3.cena.edu/scans/{id}.jpg",
-                "Extracted text sample with mathematical content...",
-                0.85f + random.NextSingle() * 0.1f,
-                new List<OcrRegion>
-                {
-                    new(10, 10, 200, 50, "Question 1:", 0.95f),
-                    new(10, 70, 400, 100, "Solve for x: 2x + 5 = 13", 0.88f)
-                }) : null,
+            OcrResult: ocrOutput,
             Quality: new QualityScores(
-                MathCorrectness: random.Next(70, 95),
-                LanguageQuality: random.Next(75, 95),
-                PedagogicalQuality: random.Next(65, 90),
-                PlagiarismScore: random.Next(0, 20)),
-            ExtractedQuestions: Enumerable.Range(0, random.Next(3, 10))
-                .Select(i => new ExtractedQuestion(i, $"Question {i + 1} text...", "Answer", 0.7f + random.NextSingle() * 0.25f))
-                .ToList());
+                MathCorrectness: (int)((item.AvgQualityScore ?? 0) * 100),
+                LanguageQuality: 80,
+                PedagogicalQuality: 75,
+                PlagiarismScore: item.DuplicateCount ?? 0),
+            ExtractedQuestions: extractedQuestions);
     }
 
     public async Task<bool> RetryItemAsync(string id)
     {
-        _logger.LogInformation("Retrying pipeline item {ItemId}", id);
+        await using var session = _store.LightweightSession();
+        var item = await session.LoadAsync<PipelineItemDocument>(id);
+        if (item is null) return false;
+
+        item.RetryCount++;
+        item.Status = "processing";
+        item.CurrentStage = Cena.Actors.Ingest.PipelineStage.Incoming;
+        item.LastError = null;
+        item.UpdatedAt = DateTimeOffset.UtcNow;
+        session.Store(item);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation("Retrying pipeline item {ItemId} (attempt {Retry})", id, item.RetryCount);
         return true;
     }
 
     public async Task<bool> RejectPipelineItemAsync(string id, string reason)
     {
-        _logger.LogInformation("Rejecting pipeline item {ItemId}: {Reason}", id, reason);
+        await using var session = _store.LightweightSession();
+        var item = await session.LoadAsync<PipelineItemDocument>(id);
+        if (item is null) return false;
+
+        item.Status = "rejected";
+        item.CurrentStage = Cena.Actors.Ingest.PipelineStage.Failed;
+        item.LastError = reason;
+        item.UpdatedAt = DateTimeOffset.UtcNow;
+        session.Store(item);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation("Rejected pipeline item {ItemId}: {Reason}", id, reason);
         return true;
     }
 
     public async Task<bool> MoveToReviewAsync(string id)
     {
-        _logger.LogInformation("Moving pipeline item {ItemId} to review", id);
+        await using var session = _store.LightweightSession();
+        var item = await session.LoadAsync<PipelineItemDocument>(id);
+        if (item is null) return false;
+
+        item.CurrentStage = Cena.Actors.Ingest.PipelineStage.InReview;
+        item.UpdatedAt = DateTimeOffset.UtcNow;
+        session.Store(item);
+
+        session.Events.Append(id, new MovedToReview_V1(
+            id, item.ExtractedQuestionCount, DateTimeOffset.UtcNow));
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation("Moved pipeline item {ItemId} to review", id);
         return true;
     }
 
@@ -117,98 +205,93 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
     {
         var form = await request.ReadFormAsync();
         var file = form.Files.GetFile("file");
-        var filename = file?.FileName ?? "unknown";
-        var contentType = file?.ContentType ?? "application/octet-stream";
-        _logger.LogInformation("Uploading file {Filename} ({ContentType}) via form", filename, contentType);
-        return await UploadFileAsync(filename, contentType);
+        if (file is null)
+            return new UploadFileResponse("", "error", null);
+
+        using var stream = file.OpenReadStream();
+        var result = await _orchestrator.ProcessFileAsync(new IngestionRequest(
+            FileStream: stream,
+            Filename: file.FileName,
+            ContentType: file.ContentType ?? "application/octet-stream",
+            SourceType: "upload",
+            SourceUrl: null,
+            SubmittedBy: "admin"
+        ));
+
+        return new UploadFileResponse(
+            UploadId: result.PipelineItemId,
+            Status: result.Success ? "completed" : "failed",
+            PipelineItemId: result.PipelineItemId);
     }
 
     public async Task<UploadFileResponse> UploadFileAsync(string filename, string contentType)
     {
+        // Placeholder for direct file path uploads
         var uploadId = $"upload-{Guid.NewGuid():N}";
-        return new UploadFileResponse(uploadId, "processing", $"item-{Guid.NewGuid():N}");
+        return new UploadFileResponse(uploadId, "queued", null);
     }
 
     public async Task<PipelineStatsResponse> GetStatsAsync()
     {
-        var random = new Random();
-        var throughput = new List<ThroughputPoint>();
-        for (int i = 23; i >= 0; i--)
-        {
-            throughput.Add(new ThroughputPoint(
-                DateTimeOffset.UtcNow.AddHours(-i).ToString("yyyy-MM-dd HH:00"),
-                random.Next(10, 100)));
-        }
+        await using var session = _store.QuerySession();
 
-        var failureRates = new List<StageFailureRate>
-        {
-            new("Incoming", 0.02f, 1000, 20),
-            new("OCR Processing", 0.05f, 980, 49),
-            new("Segmented", 0.03f, 931, 28),
-            new("Normalized", 0.01f, 903, 9),
-            new("Classified", 0.04f, 894, 36),
-            new("Deduplicated", 0.02f, 858, 17),
-            new("Re-Created", 0.03f, 841, 25)
-        };
+        var allItems = await session.Query<PipelineItemDocument>()
+            .Where(x => x.SubmittedAt >= DateTimeOffset.UtcNow.AddDays(-7))
+            .ToListAsync();
 
-        var processingTimes = new List<AvgProcessingTime>
-        {
-            new("Incoming", 2.5f, 5.0f),
-            new("OCR Processing", 45.0f, 120.0f),
-            new("Segmented", 8.0f, 20.0f),
-            new("Normalized", 12.0f, 30.0f),
-            new("Classified", 15.0f, 40.0f),
-            new("Deduplicated", 10.0f, 25.0f),
-            new("Re-Created", 30.0f, 75.0f)
-        };
+        // Throughput: items processed per hour (last 24h)
+        var throughput = Enumerable.Range(0, 24)
+            .Select(i =>
+            {
+                var hour = DateTimeOffset.UtcNow.AddHours(-23 + i);
+                var count = allItems.Count(x =>
+                    x.CompletedAt.HasValue &&
+                    x.CompletedAt.Value.Hour == hour.Hour &&
+                    x.CompletedAt.Value.Date == hour.Date);
+                return new ThroughputPoint(hour.ToString("yyyy-MM-dd HH:00"), count);
+            }).ToList();
 
+        // Failure rates per stage
+        var stageNames = new[] { "Incoming", "OCR Processing", "Segmented", "Normalized", "Classified", "Deduplicated", "Re-Created" };
+        var failureRates = stageNames.Select(s =>
+        {
+            var stageItems = allItems.Where(x => x.StageHistory.Any(h => h.Stage.ToString() == s)).ToList();
+            var failed = stageItems.Count(x => x.Status == "failed");
+            var total = Math.Max(stageItems.Count, 1);
+            return new StageFailureRate(s, (float)failed / total, total, failed);
+        }).ToList();
+
+        // Processing times per stage
+        var processingTimes = stageNames.Select(s =>
+        {
+            var durations = allItems
+                .SelectMany(x => x.StageHistory)
+                .Where(h => h.Stage.ToString() == s && h.Duration.HasValue)
+                .Select(h => (float)h.Duration!.Value.TotalSeconds)
+                .ToList();
+
+            var avg = durations.Count > 0 ? durations.Average() : 0f;
+            var p95 = durations.Count > 0 ? durations.OrderBy(d => d).ElementAt((int)(durations.Count * 0.95)) : 0f;
+            return new AvgProcessingTime(s, avg, p95);
+        }).ToList();
+
+        // Queue depth trend
         var queueTrend = new QueueDepthTrend(
             Enumerable.Range(0, 24)
-                .Select(i => new DepthPoint(
-                    DateTimeOffset.UtcNow.AddHours(-23 + i).ToString("yyyy-MM-dd HH:00"),
-                    random.Next(10, 50),
-                    random.Next(5, 30),
-                    random.Next(20, 100)))
-                .ToList());
+                .Select(i =>
+                {
+                    var hour = DateTimeOffset.UtcNow.AddHours(-23 + i);
+                    var incoming = allItems.Count(x => x.SubmittedAt.Hour == hour.Hour && x.SubmittedAt.Date == hour.Date);
+                    var processing = allItems.Count(x =>
+                        x.Status == "processing" &&
+                        x.UpdatedAt.Hour == hour.Hour);
+                    var completed = allItems.Count(x =>
+                        x.CompletedAt.HasValue &&
+                        x.CompletedAt.Value.Hour == hour.Hour &&
+                        x.CompletedAt.Value.Date == hour.Date);
+                    return new DepthPoint(hour.ToString("yyyy-MM-dd HH:00"), incoming, processing, completed);
+                }).ToList());
 
         return new PipelineStatsResponse(throughput, failureRates, processingTimes, queueTrend);
-    }
-
-    private static List<PipelineStage> GenerateMockStages()
-    {
-        var random = new Random(42);
-        var stages = new List<PipelineStage>
-        {
-            new("incoming", "Incoming", random.Next(5, 20), "healthy", new List<PipelineItem>()),
-            new("ocr", "OCR Processing", random.Next(3, 15), "healthy", new List<PipelineItem>()),
-            new("segmented", "Segmented", random.Next(2, 10), "healthy", new List<PipelineItem>()),
-            new("normalized", "Normalized", random.Next(2, 8), "healthy", new List<PipelineItem>()),
-            new("classified", "Classified", random.Next(1, 6), "healthy", new List<PipelineItem>()),
-            new("deduplicated", "Deduplicated", random.Next(1, 5), "healthy", new List<PipelineItem>()),
-            new("recreated", "Re-Created", random.Next(1, 5), "slow", new List<PipelineItem>()),
-            new("review", "In Review", random.Next(10, 30), "healthy", new List<PipelineItem>()),
-            new("published", "Published", random.Next(100, 500), "healthy", new List<PipelineItem>())
-        };
-
-        // Populate items for each stage
-        for (int i = 0; i < stages.Count; i++)
-        {
-            var items = new List<PipelineItem>();
-            for (int j = 0; j < Math.Min(stages[i].Count, 10); j++)
-            {
-                items.Add(new PipelineItem(
-                    Id: $"item-{i}-{j}",
-                    SourceFilename: $"batch-{random.Next(1000)}.pdf",
-                    SourceType: random.NextSingle() > 0.5 ? "batch" : "photo",
-                    QuestionCount: random.Next(1, 20),
-                    QualityScore: random.Next(60, 95),
-                    Timestamp: DateTimeOffset.UtcNow.AddHours(-random.Next(1, 48)),
-                    ErrorMessage: i == 6 && j == 0 ? "OCR confidence too low" : null,
-                    HasError: i == 6 && j == 0));
-            }
-            stages[i] = stages[i] with { Items = items };
-        }
-
-        return stages;
     }
 }

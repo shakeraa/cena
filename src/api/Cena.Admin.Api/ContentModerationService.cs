@@ -1,11 +1,16 @@
 // =============================================================================
-// Cena Platform -- Content Moderation Service
-// ADM-005: Moderation queue management and review workflows
+// Cena Platform -- Content Moderation Service (Production)
+// ADM-005: Real event-sourced moderation backed by Marten + Redis.
+// Replaces mock data with real queries against ModerationAuditDocument
+// and QuestionState event streams.
 // =============================================================================
 
-using System.Text.Json;
+using Cena.Actors.Events;
+using Cena.Actors.Ingest;
+using Cena.Actors.Questions;
 using Marten;
 using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
 using StackExchange.Redis;
 
 namespace Cena.Admin.Api;
@@ -13,13 +18,7 @@ namespace Cena.Admin.Api;
 public interface IContentModerationService
 {
     Task<ModerationQueueResponse> GetQueueAsync(
-        string? status,
-        string? search,
-        int page,
-        int pageSize,
-        string sortBy,
-        string orderBy);
-
+        string? status, string? search, int page, int pageSize, string sortBy, string orderBy);
     Task<QuestionDetailResponse?> GetItemDetailAsync(string id);
     Task<bool> ClaimItemAsync(string id, string moderatorId);
     Task<bool> ApproveItemAsync(string id, string moderatorId);
@@ -36,222 +35,295 @@ public sealed class ContentModerationService : IContentModerationService
 {
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
+    private readonly INatsConnection _nats;
     private readonly ILogger<ContentModerationService> _logger;
-    private static readonly List<ModerationQueueItem> _mockItems = GenerateMockItems();
-    private static readonly Dictionary<string, QuestionDetailResponse> _mockDetails = GenerateMockDetails();
-    private static readonly List<ModerationComment> _mockComments = new();
-    private static readonly List<ModerationHistory> _mockHistory = new();
+
+    private const int ClaimTimeoutMinutes = 30;
 
     public ContentModerationService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
+        INatsConnection nats,
         ILogger<ContentModerationService> logger)
     {
         _store = store;
         _redis = redis;
+        _nats = nats;
         _logger = logger;
     }
 
     public async Task<ModerationQueueResponse> GetQueueAsync(
-        string? status,
-        string? search,
-        int page,
-        int pageSize,
-        string sortBy,
-        string orderBy)
+        string? status, string? search, int page, int pageSize, string sortBy, string orderBy)
     {
-        var items = _mockItems.AsEnumerable();
+        await using var session = _store.QuerySession();
 
-        // Apply status filter
+        var query = session.Query<ModerationAuditDocument>().AsQueryable();
+
+        // Filter by status
         if (!string.IsNullOrEmpty(status) && status != "all")
         {
-            if (Enum.TryParse<ModerationStatus>(status, true, out var statusEnum))
+            if (Enum.TryParse<ModerationItemStatus>(status, true, out var statusEnum))
             {
-                items = items.Where(i => i.Status == statusEnum);
+                query = query.Where(i => i.Status == statusEnum);
             }
         }
 
-        // Apply search filter
+        // Search filter
         if (!string.IsNullOrEmpty(search))
         {
-            var searchLower = search.ToLowerInvariant();
-            items = items.Where(i =>
-                i.QuestionText.ToLowerInvariant().Contains(searchLower) ||
-                i.Subject.ToLowerInvariant().Contains(searchLower) ||
-                i.Author.ToLowerInvariant().Contains(searchLower));
+            var s = search.ToLowerInvariant();
+            query = query.Where(i =>
+                i.StemPreview.Contains(s) ||
+                i.Subject.Contains(s) ||
+                i.CreatedBy.Contains(s));
         }
 
-        // Apply sorting
-        items = sortBy?.ToLowerInvariant() switch
+        // Get total before pagination
+        var total = await query.CountAsync();
+
+        // Sort
+        query = (sortBy?.ToLowerInvariant(), orderBy?.ToLowerInvariant()) switch
         {
-            "submittedat" => orderBy?.ToLowerInvariant() == "desc"
-                ? items.OrderByDescending(i => i.SubmittedAt)
-                : items.OrderBy(i => i.SubmittedAt),
-            "subject" => orderBy?.ToLowerInvariant() == "desc"
-                ? items.OrderByDescending(i => i.Subject)
-                : items.OrderBy(i => i.Subject),
-            "grade" => orderBy?.ToLowerInvariant() == "desc"
-                ? items.OrderByDescending(i => i.Grade)
-                : items.OrderBy(i => i.Grade),
-            _ => orderBy?.ToLowerInvariant() == "desc"
-                ? items.OrderByDescending(i => i.SubmittedAt)
-                : items.OrderBy(i => i.SubmittedAt)
+            ("subject", "desc") => query.OrderByDescending(i => i.Subject),
+            ("subject", _) => query.OrderBy(i => i.Subject),
+            ("grade", "desc") => query.OrderByDescending(i => i.Grade),
+            ("grade", _) => query.OrderBy(i => i.Grade),
+            ("quality", "desc") => query.OrderByDescending(i => i.AiQualityScore),
+            ("quality", _) => query.OrderBy(i => i.AiQualityScore),
+            (_, "desc") => query.OrderByDescending(i => i.SubmittedAt),
+            _ => query.OrderBy(i => i.SubmittedAt)
         };
 
-        // Priority: flagged items first, then oldest first
-        items = items
-            .OrderByDescending(i => i.Status == ModerationStatus.Flagged)
-            .ThenBy(i => i.SubmittedAt);
-
-        var total = items.Count();
-        var pagedItems = items
+        var items = await query
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
-        return new ModerationQueueResponse(pagedItems, total, page, pageSize);
+        var mapped = items.Select(i => new ModerationQueueItem(
+            Id: i.QuestionId,
+            QuestionText: i.StemPreview,
+            Subject: i.Subject,
+            Grade: i.Grade,
+            Author: i.CreatedBy,
+            SubmittedAt: i.SubmittedAt,
+            Status: MapStatus(i.Status),
+            AssignedTo: i.AssignedTo,
+            AiQualityScore: i.AiQualityScore,
+            SourceType: i.SourceType
+        )).ToList();
+
+        return new ModerationQueueResponse(mapped, total, page, pageSize);
     }
 
     public async Task<QuestionDetailResponse?> GetItemDetailAsync(string id)
     {
-        if (_mockDetails.TryGetValue(id, out var detail))
-        {
-            // Add dynamic comments and history
-            var comments = _mockComments.Where(c => c.Id.StartsWith(id)).ToList();
-            var history = _mockHistory.Where(h => h.User.Contains(id) || h.Action.Contains(id)).ToList();
+        await using var session = _store.QuerySession();
 
-            return detail with
-            {
-                Comments = comments,
-                History = history
-            };
-        }
+        // Load the question aggregate state
+        var questionState = await session.Events.AggregateStreamAsync<QuestionState>(id);
+        if (questionState is null) return null;
 
-        return null;
+        // Load the moderation audit
+        var audit = await session.LoadAsync<ModerationAuditDocument>(id);
+
+        var options = questionState.Options.Select(o =>
+            new AnswerOption(o.Label, o.Text, o.IsCorrect)).ToList();
+
+        var correctAnswer = options.FirstOrDefault(o => o.IsCorrect)?.Label ?? "";
+
+        var comments = audit?.Comments.Select(c =>
+            new ModerationComment(c.Id, c.AuthorId, c.Text, c.CreatedAt)).ToList()
+            ?? new List<ModerationComment>();
+
+        var history = audit?.Actions.Select(a =>
+            new ModerationHistory(a.Timestamp, a.ModeratorId, a.Action, a.Reason)).ToList()
+            ?? new List<ModerationHistory>();
+
+        var qualityEval = questionState.LastQualityEvaluation;
+
+        return new QuestionDetailResponse(
+            Id: questionState.Id,
+            QuestionText: questionState.Stem,
+            Options: options,
+            CorrectAnswer: correctAnswer,
+            Subject: questionState.Subject,
+            Topic: questionState.Topic,
+            Grade: questionState.Grade,
+            Difficulty: questionState.Difficulty.ToString("F2"),
+            ConceptTags: questionState.ConceptIds,
+            AiQualityScore: questionState.QualityScore,
+            QualityScores: new QualityBreakdown(
+                MathCorrectness: qualityEval?.FactualAccuracy ?? 0,
+                LanguageQuality: qualityEval?.LanguageQuality ?? 0,
+                PedagogicalQuality: qualityEval?.PedagogicalQuality ?? 0,
+                PlagiarismScore: 0),
+            OriginalSource: questionState.Provenance?.SourceUrl,
+            NormalizedVersion: questionState.Provenance?.OriginalText,
+            Status: MapStatus(audit?.Status ?? ModerationItemStatus.Pending),
+            AssignedTo: audit?.AssignedTo,
+            SubmittedAt: questionState.CreatedAt,
+            Comments: comments,
+            History: history);
     }
 
     public async Task<bool> ClaimItemAsync(string id, string moderatorId)
     {
-        var item = _mockItems.FirstOrDefault(i => i.Id == id);
-        if (item == null) return false;
+        await using var session = _store.LightweightSession();
+        var audit = await session.LoadAsync<ModerationAuditDocument>(id);
+        if (audit is null) return false;
 
-        // Check if already claimed by someone else
-        if (!string.IsNullOrEmpty(item.AssignedTo) && item.AssignedTo != moderatorId)
-            return false;
-
-        var index = _mockItems.IndexOf(item);
-        _mockItems[index] = item with
+        // Check if already claimed by someone else and not expired
+        if (!string.IsNullOrEmpty(audit.AssignedTo) &&
+            audit.AssignedTo != moderatorId &&
+            audit.ClaimExpiresAt.HasValue &&
+            audit.ClaimExpiresAt > DateTimeOffset.UtcNow)
         {
-            Status = ModerationStatus.InReview,
-            AssignedTo = moderatorId
-        };
+            _logger.LogWarning("Item {Id} already claimed by {Moderator} until {Expires}",
+                id, audit.AssignedTo, audit.ClaimExpiresAt);
+            return false;
+        }
 
-        _mockHistory.Add(new ModerationHistory(
-            DateTimeOffset.UtcNow,
-            moderatorId,
-            "claim",
-            null));
+        var now = DateTimeOffset.UtcNow;
+        audit.Status = ModerationItemStatus.InReview;
+        audit.AssignedTo = moderatorId;
+        audit.AssignedAt = now;
+        audit.ClaimExpiresAt = now.AddMinutes(ClaimTimeoutMinutes);
+        audit.UpdatedAt = now;
+        audit.Actions.Add(new ModerationActionRecord
+        {
+            Action = "claim", ModeratorId = moderatorId, Timestamp = now
+        });
 
-        _logger.LogInformation(
-            "[AUDIT] Moderation CLAIM: item={ItemId}, moderator={ModeratorId}",
-            id, moderatorId);
+        session.Store(audit);
+        await session.SaveChangesAsync();
 
+        _logger.LogInformation("[AUDIT] Moderation CLAIM: question={Id} moderator={Moderator}", id, moderatorId);
         return true;
     }
 
     public async Task<bool> ApproveItemAsync(string id, string moderatorId)
     {
-        var item = _mockItems.FirstOrDefault(i => i.Id == id);
-        if (item == null) return false;
+        await using var session = _store.LightweightSession();
+        var audit = await session.LoadAsync<ModerationAuditDocument>(id);
+        if (audit is null) return false;
 
-        var index = _mockItems.IndexOf(item);
-        _mockItems[index] = item with
+        var now = DateTimeOffset.UtcNow;
+        audit.Status = ModerationItemStatus.Approved;
+        audit.UpdatedAt = now;
+        audit.Actions.Add(new ModerationActionRecord
         {
-            Status = ModerationStatus.Approved,
-            AssignedTo = moderatorId
-        };
+            Action = "approve", ModeratorId = moderatorId, Timestamp = now
+        });
+        session.Store(audit);
 
-        _mockHistory.Add(new ModerationHistory(
-            DateTimeOffset.UtcNow,
-            moderatorId,
-            "approve",
-            null));
+        // Emit domain event on the question stream
+        session.Events.Append(id, new QuestionApproved_V1(id, moderatorId, now));
+        await session.SaveChangesAsync();
 
-        _logger.LogInformation(
-            "[AUDIT] Moderation APPROVE: item={ItemId}, moderator={ModeratorId}, subject={Subject}",
-            id, moderatorId, item.Subject);
+        // Publish NATS event for downstream consumers
+        await _nats.PublishAsync("cena.review.item.approved",
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { questionId = id, moderatorId }));
 
+        _logger.LogInformation("[AUDIT] Moderation APPROVE: question={Id} moderator={Moderator}", id, moderatorId);
         return true;
     }
 
     public async Task<bool> RejectItemAsync(string id, string moderatorId, string reason)
     {
-        var item = _mockItems.FirstOrDefault(i => i.Id == id);
-        if (item == null) return false;
-
-        var index = _mockItems.IndexOf(item);
-        _mockItems[index] = item with
+        if (string.IsNullOrWhiteSpace(reason))
         {
-            Status = ModerationStatus.Rejected,
-            AssignedTo = moderatorId
-        };
+            _logger.LogWarning("Rejection requires a reason: question={Id}", id);
+            return false;
+        }
 
-        _mockHistory.Add(new ModerationHistory(
-            DateTimeOffset.UtcNow,
-            moderatorId,
-            "reject",
-            reason));
+        await using var session = _store.LightweightSession();
+        var audit = await session.LoadAsync<ModerationAuditDocument>(id);
+        if (audit is null) return false;
 
-        _logger.LogInformation(
-            "[AUDIT] Moderation REJECT: item={ItemId}, moderator={ModeratorId}, reason={Reason}",
+        var now = DateTimeOffset.UtcNow;
+        audit.Status = ModerationItemStatus.Rejected;
+        audit.RejectionReason = reason;
+        audit.RejectionCount++;
+        audit.UpdatedAt = now;
+        audit.Actions.Add(new ModerationActionRecord
+        {
+            Action = "reject", ModeratorId = moderatorId, Reason = reason, Timestamp = now
+        });
+        session.Store(audit);
+
+        // Deprecate the question in the event stream
+        session.Events.Append(id, new QuestionDeprecated_V1(
+            id, $"Rejected by moderator: {reason}", true, moderatorId, now));
+        await session.SaveChangesAsync();
+
+        await _nats.PublishAsync("cena.review.item.rejected",
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { questionId = id, moderatorId, reason }));
+
+        _logger.LogInformation("[AUDIT] Moderation REJECT: question={Id} moderator={Moderator} reason={Reason}",
             id, moderatorId, reason);
-
         return true;
     }
 
     public async Task<bool> FlagItemAsync(string id, string moderatorId, string reason)
     {
-        var item = _mockItems.FirstOrDefault(i => i.Id == id);
-        if (item == null) return false;
+        await using var session = _store.LightweightSession();
+        var audit = await session.LoadAsync<ModerationAuditDocument>(id);
+        if (audit is null) return false;
 
-        var index = _mockItems.IndexOf(item);
-        _mockItems[index] = item with
+        var now = DateTimeOffset.UtcNow;
+        audit.Status = ModerationItemStatus.Flagged;
+        audit.UpdatedAt = now;
+        audit.Actions.Add(new ModerationActionRecord
         {
-            Status = ModerationStatus.Flagged,
-            AssignedTo = moderatorId
-        };
+            Action = "flag", ModeratorId = moderatorId, Reason = reason, Timestamp = now
+        });
+        session.Store(audit);
+        await session.SaveChangesAsync();
 
-        _mockHistory.Add(new ModerationHistory(
-            DateTimeOffset.UtcNow,
-            moderatorId,
-            "flag",
-            reason));
-
-        _logger.LogInformation(
-            "[AUDIT] Moderation FLAG: item={ItemId}, moderator={ModeratorId}, reason={Reason}",
+        _logger.LogInformation("[AUDIT] Moderation FLAG: question={Id} moderator={Moderator} reason={Reason}",
             id, moderatorId, reason);
-
         return true;
     }
 
     public async Task<bool> RequestChangesAsync(string id, string moderatorId, string feedback)
     {
-        _mockHistory.Add(new ModerationHistory(
-            DateTimeOffset.UtcNow,
-            moderatorId,
-            "request-changes",
-            feedback));
+        await using var session = _store.LightweightSession();
+        var audit = await session.LoadAsync<ModerationAuditDocument>(id);
+        if (audit is null) return false;
 
+        var now = DateTimeOffset.UtcNow;
+        audit.Status = ModerationItemStatus.Pending; // Return to pending for re-work
+        audit.AssignedTo = null;
+        audit.ClaimExpiresAt = null;
+        audit.UpdatedAt = now;
+        audit.Actions.Add(new ModerationActionRecord
+        {
+            Action = "request_changes", ModeratorId = moderatorId, Reason = feedback, Timestamp = now
+        });
+        session.Store(audit);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation("[AUDIT] Moderation REQUEST_CHANGES: question={Id} moderator={Moderator}",
+            id, moderatorId);
         return true;
     }
 
     public async Task<bool> AddCommentAsync(string id, string moderatorId, string text)
     {
-        _mockComments.Add(new ModerationComment(
-            $"{id}-{_mockComments.Count}",
-            moderatorId,
-            text,
-            DateTimeOffset.UtcNow));
+        await using var session = _store.LightweightSession();
+        var audit = await session.LoadAsync<ModerationAuditDocument>(id);
+        if (audit is null) return false;
+
+        audit.Comments.Add(new ModerationCommentRecord
+        {
+            Id = $"cmt-{Guid.NewGuid():N}",
+            AuthorId = moderatorId,
+            Text = text,
+            CreatedAt = DateTimeOffset.UtcNow
+        });
+        audit.UpdatedAt = DateTimeOffset.UtcNow;
+        session.Store(audit);
+        await session.SaveChangesAsync();
 
         return true;
     }
@@ -259,23 +331,21 @@ public sealed class ContentModerationService : IContentModerationService
     public async Task<bool> BulkActionAsync(string action, IReadOnlyList<string> itemIds, string moderatorId)
     {
         _logger.LogInformation(
-            "[AUDIT] Moderation BULK {Action}: {Count} items by moderator={ModeratorId}, ids=[{Ids}]",
-            action, itemIds.Count, moderatorId, string.Join(",", itemIds));
+            "[AUDIT] Moderation BULK {Action}: {Count} items by moderator={ModeratorId}",
+            action, itemIds.Count, moderatorId);
 
         foreach (var id in itemIds)
         {
-            switch (action.ToLowerInvariant())
+            var success = action.ToLowerInvariant() switch
             {
-                case "approve":
-                    await ApproveItemAsync(id, moderatorId);
-                    break;
-                case "reject":
-                    await RejectItemAsync(id, moderatorId, "Bulk rejection");
-                    break;
-                case "flag":
-                    await FlagItemAsync(id, moderatorId, "Bulk flag");
-                    break;
-            }
+                "approve" => await ApproveItemAsync(id, moderatorId),
+                "reject" => await RejectItemAsync(id, moderatorId, "Bulk rejection"),
+                "flag" => await FlagItemAsync(id, moderatorId, "Bulk flag"),
+                _ => false
+            };
+
+            if (!success)
+                _logger.LogWarning("Bulk action {Action} failed for item {Id}", action, id);
         }
 
         return true;
@@ -283,168 +353,143 @@ public sealed class ContentModerationService : IContentModerationService
 
     public async Task<ModerationStatsResponse> GetStatsAsync()
     {
+        await using var session = _store.QuerySession();
         var today = DateTimeOffset.UtcNow.Date;
         var yesterday = today.AddDays(-1);
         var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
 
-        // Card counts
-        var pending = _mockItems.Count(i => i.Status == ModerationStatus.Pending);
-        var inReview = _mockItems.Count(i => i.Status == ModerationStatus.InReview);
-        var approvedToday = _mockHistory.Count(h => h.Timestamp.Date == today && h.Action == "approve");
-        var rejectedToday = _mockHistory.Count(h => h.Timestamp.Date == today && h.Action == "reject");
+        var allAudits = await session.Query<ModerationAuditDocument>()
+            .Where(x => x.SubmittedAt >= startOfWeek.AddDays(-7))
+            .ToListAsync();
 
-        // Yesterday counts for % change
-        var approvedYesterday = _mockHistory.Count(h => h.Timestamp.Date == yesterday && h.Action == "approve");
-        var rejectedYesterday = _mockHistory.Count(h => h.Timestamp.Date == yesterday && h.Action == "reject");
+        var pending = allAudits.Count(i => i.Status == ModerationItemStatus.Pending);
+        var inReview = allAudits.Count(i => i.Status == ModerationItemStatus.InReview);
 
-        float pctChange(int current, int prev) =>
+        // Today's approvals and rejections
+        var approvedToday = allAudits
+            .SelectMany(a => a.Actions)
+            .Count(a => a.Action == "approve" && a.Timestamp.Date == today);
+        var rejectedToday = allAudits
+            .SelectMany(a => a.Actions)
+            .Count(a => a.Action == "reject" && a.Timestamp.Date == today);
+
+        // Yesterday for % change
+        var approvedYesterday = allAudits
+            .SelectMany(a => a.Actions)
+            .Count(a => a.Action == "approve" && a.Timestamp.Date == yesterday);
+        var rejectedYesterday = allAudits
+            .SelectMany(a => a.Actions)
+            .Count(a => a.Action == "reject" && a.Timestamp.Date == yesterday);
+
+        float PctChange(int current, int prev) =>
             prev == 0 ? (current > 0 ? 100f : 0f) : (float)(current - prev) / prev * 100f;
 
-        var reviewedThisWeek = _mockHistory.Count(h =>
-            h.Timestamp >= startOfWeek &&
-            (h.Action == "approve" || h.Action == "reject"));
+        // Week aggregate
+        var allActions = allAudits.SelectMany(a => a.Actions).ToList();
+        var weekActions = allActions.Where(a => a.Timestamp >= startOfWeek).ToList();
+        var reviewedThisWeek = weekActions.Count(a => a.Action is "approve" or "reject");
 
-        var totalDecisions = _mockHistory.Count(h => h.Action == "approve" || h.Action == "reject");
-        var approvedTotal = _mockHistory.Count(h => h.Action == "approve");
-        var approvalRate = totalDecisions > 0 ? (float)approvedTotal / totalDecisions * 100 : 0f;
+        var totalDecisions = allActions.Count(a => a.Action is "approve" or "reject");
+        var totalApproved = allActions.Count(a => a.Action == "approve");
+        var approvalRate = totalDecisions > 0 ? (float)totalApproved / totalDecisions * 100f : 0f;
+
+        // Average review time (claim → approve/reject)
+        var reviewTimes = new List<double>();
+        foreach (var audit in allAudits)
+        {
+            var claim = audit.Actions.FirstOrDefault(a => a.Action == "claim");
+            var decision = audit.Actions.LastOrDefault(a => a.Action is "approve" or "reject");
+            if (claim is not null && decision is not null && decision.Timestamp > claim.Timestamp)
+            {
+                reviewTimes.Add((decision.Timestamp - claim.Timestamp).TotalMinutes);
+            }
+        }
+        var avgReviewTime = reviewTimes.Count > 0 ? (float)reviewTimes.Average() : 0f;
 
         // Per-moderator stats
-        var moderatorStats = _mockHistory
-            .Where(h => h.Action == "approve" || h.Action == "reject")
-            .GroupBy(h => h.User)
-            .Select(g => new PerModeratorStats(
-                g.Key, g.Key, g.Count(),
-                g.Count(h => h.Action == "approve"),
-                g.Count(h => h.Action == "reject"),
-                5.2f))
-            .ToList();
+        var moderatorStats = allActions
+            .Where(a => a.Action is "approve" or "reject")
+            .GroupBy(a => a.ModeratorId)
+            .Select(g =>
+            {
+                var modReviewTimes = new List<double>();
+                foreach (var audit in allAudits.Where(au => au.Actions.Any(ac => ac.ModeratorId == g.Key)))
+                {
+                    var claim = audit.Actions.FirstOrDefault(a => a.Action == "claim" && a.ModeratorId == g.Key);
+                    var decision = audit.Actions.LastOrDefault(a => a.Action is "approve" or "reject" && a.ModeratorId == g.Key);
+                    if (claim is not null && decision is not null && decision.Timestamp > claim.Timestamp)
+                        modReviewTimes.Add((decision.Timestamp - claim.Timestamp).TotalMinutes);
+                }
+
+                return new PerModeratorStats(
+                    g.Key, g.Key,
+                    g.Count(),
+                    g.Count(a => a.Action == "approve"),
+                    g.Count(a => a.Action == "reject"),
+                    modReviewTimes.Count > 0 ? (float)modReviewTimes.Average() : 0f);
+            }).ToList();
 
         // Daily trend (last 7 days)
-        var trend = new List<DailyModerationStats>();
-        for (int i = 6; i >= 0; i--)
+        var trend = Enumerable.Range(0, 7).Select(i =>
         {
-            var date = today.AddDays(-i);
-            trend.Add(new DailyModerationStats(
+            var date = today.AddDays(-6 + i);
+            var dayActions = allActions.Where(a => a.Timestamp.Date == date).ToList();
+            var dayAudits = allAudits.Where(a => a.SubmittedAt.Date == date).ToList();
+            return new DailyModerationStats(
                 date.ToString("yyyy-MM-dd"),
-                _mockItems.Count(x => x.SubmittedAt.Date == date),
-                _mockHistory.Count(h => h.Timestamp.Date == date && (h.Action == "approve" || h.Action == "reject")),
-                _mockHistory.Count(h => h.Timestamp.Date == date && h.Action == "approve"),
-                _mockHistory.Count(h => h.Timestamp.Date == date && h.Action == "reject")));
-        }
+                dayAudits.Count,
+                dayActions.Count(a => a.Action is "approve" or "reject"),
+                dayActions.Count(a => a.Action == "approve"),
+                dayActions.Count(a => a.Action == "reject"));
+        }).ToList();
 
         return new ModerationStatsResponse(
             pending, inReview, approvedToday, rejectedToday,
-            pctChange(pending, pending), // pending doesn't have a meaningful yesterday comparison
-            0f, // inReview change
-            pctChange(approvedToday, approvedYesterday),
-            pctChange(rejectedToday, rejectedYesterday),
-            reviewedThisWeek, approvalRate, 5.2f,
+            PctChange(pending, pending),
+            0f,
+            PctChange(approvedToday, approvedYesterday),
+            PctChange(rejectedToday, rejectedYesterday),
+            reviewedThisWeek, approvalRate, avgReviewTime,
             moderatorStats, trend);
     }
 
     public async Task<QueueSummary> GetQueueSummaryAsync()
     {
-        var pending = _mockItems.Where(i => i.Status == ModerationStatus.Pending).ToList();
-        var inReview = _mockItems.Count(i => i.Status == ModerationStatus.InReview);
-        var flagged = _mockItems.Count(i => i.Status == ModerationStatus.Flagged);
+        await using var session = _store.QuerySession();
 
-        var oldest = pending.OrderBy(i => i.SubmittedAt).FirstOrDefault();
-        var oldestHours = oldest != null
+        var pending = await session.Query<ModerationAuditDocument>()
+            .Where(i => i.Status == ModerationItemStatus.Pending)
+            .CountAsync();
+
+        var inReview = await session.Query<ModerationAuditDocument>()
+            .Where(i => i.Status == ModerationItemStatus.InReview)
+            .CountAsync();
+
+        var flagged = await session.Query<ModerationAuditDocument>()
+            .Where(i => i.Status == ModerationItemStatus.Flagged)
+            .CountAsync();
+
+        var oldest = await session.Query<ModerationAuditDocument>()
+            .Where(i => i.Status == ModerationItemStatus.Pending)
+            .OrderBy(i => i.SubmittedAt)
+            .FirstOrDefaultAsync();
+
+        var oldestHours = oldest is not null
             ? (int)(DateTimeOffset.UtcNow - oldest.SubmittedAt).TotalHours
             : 0;
 
-        return new QueueSummary(pending.Count, inReview, flagged, oldestHours);
+        return new QueueSummary(pending, inReview, flagged, oldestHours);
     }
 
-    // ---- Mock Data Generation ----
-
-    private static List<ModerationQueueItem> GenerateMockItems()
+    private static ModerationStatus MapStatus(ModerationItemStatus status) => status switch
     {
-        var items = new List<ModerationQueueItem>();
-        var subjects = new[] { "Math", "Physics" };
-        var grades = new[] { "3 Units", "4 Units", "5 Units" };
-        var authors = new[] { "Dr. Cohen", "Prof. Levi", "Sarah A.", "Ahmed K.", "System" };
-        var statuses = new[] { ModerationStatus.Pending, ModerationStatus.InReview, ModerationStatus.Flagged };
-
-        var sampleQuestions = new[]
-        {
-            "Solve for x: 2x² + 5x - 3 = 0",
-            "Find the derivative of f(x) = x³ - 3x² + 2x - 1",
-            "A ball is thrown upward with initial velocity 20 m/s. Calculate the maximum height reached.",
-            "Prove that the sum of angles in a triangle equals 180°",
-            "Calculate the electric field at a distance r from a point charge q",
-            "Solve the integral ∫(3x² + 2x)dx",
-            "Find the equation of the line passing through points (2,3) and (4,7)",
-            "What is the momentum of a 5kg object moving at 10m/s?",
-            "Simplify: (x² - 9)/(x² + 6x + 9)",
-            "Calculate the work done by a force F = 10N over distance d = 5m at 30° angle",
-            "Find the domain of f(x) = √(x² - 4)",
-            "A wave has frequency 50Hz and wavelength 2m. What is its velocity?",
-        };
-
-        var random = new Random(123);
-        for (int i = 0; i < 45; i++)
-        {
-            var submittedAt = DateTimeOffset.UtcNow.AddHours(-random.Next(1, 168));
-            items.Add(new ModerationQueueItem(
-                Id: $"q-{i + 1:0000}",
-                QuestionText: sampleQuestions[i % sampleQuestions.Length],
-                Subject: subjects[i % subjects.Length],
-                Grade: grades[i % grades.Length],
-                Author: authors[i % authors.Length],
-                SubmittedAt: submittedAt,
-                Status: i < 15 ? statuses[i % statuses.Length] : (i < 35 ? ModerationStatus.Pending : ModerationStatus.InReview),
-                AssignedTo: i >= 35 ? $"moderator-{i % 3 + 1}" : null,
-                AiQualityScore: random.Next(65, 95),
-                SourceType: i % 3 == 0 ? "ingested" : "authored"
-            ));
-        }
-
-        return items;
-    }
-
-    private static Dictionary<string, QuestionDetailResponse> GenerateMockDetails()
-    {
-        var details = new Dictionary<string, QuestionDetailResponse>();
-
-        foreach (var item in _mockItems)
-        {
-            var options = new List<AnswerOption>
-            {
-                new("A", "First answer option", item.Id.EndsWith("1") || item.Id.EndsWith("5")),
-                new("B", "Second answer option", item.Id.EndsWith("2") || item.Id.EndsWith("6")),
-                new("C", "Third answer option", item.Id.EndsWith("3") || item.Id.EndsWith("7")),
-                new("D", "Fourth answer option", item.Id.EndsWith("4") || item.Id.EndsWith("8") || item.Id.EndsWith("9") || item.Id.EndsWith("0"))
-            };
-
-            var correct = options.First(o => o.IsCorrect);
-
-            details[item.Id] = new QuestionDetailResponse(
-                Id: item.Id,
-                QuestionText: item.QuestionText,
-                Options: options,
-                CorrectAnswer: correct.Label,
-                Subject: item.Subject,
-                Topic: $"{item.Subject} Fundamentals",
-                Grade: item.Grade,
-                Difficulty: "Medium",
-                ConceptTags: new[] { "algebra", "equations", "solving" },
-                AiQualityScore: item.AiQualityScore,
-                QualityScores: new QualityBreakdown(
-                    MathCorrectness: item.AiQualityScore + 3,
-                    LanguageQuality: item.AiQualityScore - 2,
-                    PedagogicalQuality: item.AiQualityScore,
-                    PlagiarismScore: 5),
-                OriginalSource: item.SourceType == "ingested" ? "Imported from exam database" : null,
-                NormalizedVersion: item.SourceType == "ingested" ? item.QuestionText : null,
-                Status: item.Status,
-                AssignedTo: item.AssignedTo,
-                SubmittedAt: item.SubmittedAt,
-                Comments: new List<ModerationComment>(),
-                History: new List<ModerationHistory>()
-            );
-        }
-
-        return details;
-    }
+        ModerationItemStatus.Pending => ModerationStatus.Pending,
+        ModerationItemStatus.InReview => ModerationStatus.InReview,
+        ModerationItemStatus.Approved => ModerationStatus.Approved,
+        ModerationItemStatus.ApprovedWithEdits => ModerationStatus.Approved,
+        ModerationItemStatus.AutoApproved => ModerationStatus.Approved,
+        ModerationItemStatus.Rejected => ModerationStatus.Rejected,
+        ModerationItemStatus.Flagged => ModerationStatus.Flagged,
+        _ => ModerationStatus.Pending
+    };
 }

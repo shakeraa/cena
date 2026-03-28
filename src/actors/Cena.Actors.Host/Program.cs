@@ -164,6 +164,20 @@ builder.Services.AddScoped<Cena.Admin.Api.ICulturalContextService, Cena.Admin.Ap
 builder.Services.AddScoped<IEventStreamService, EventStreamService>();
 builder.Services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
 
+// CNT-008/009/010: Ingestion Pipeline, Moderation, Serving
+builder.Services.Configure<Cena.Actors.Ingest.GeminiOcrOptions>(
+    builder.Configuration.GetSection("Ingestion:Gemini"));
+builder.Services.Configure<Cena.Actors.Ingest.MathpixOptions>(
+    builder.Configuration.GetSection("Ingestion:Mathpix"));
+builder.Services.AddHttpClient<Cena.Actors.Ingest.GeminiOcrClient>();
+builder.Services.AddHttpClient<Cena.Actors.Ingest.MathpixClient>();
+builder.Services.AddSingleton<Cena.Actors.Ingest.IOcrClient, Cena.Actors.Ingest.GeminiOcrClient>();
+builder.Services.AddSingleton<Cena.Actors.Ingest.IMathOcrClient, Cena.Actors.Ingest.MathpixClient>();
+builder.Services.AddSingleton<Cena.Actors.Ingest.IQuestionSegmenter, Cena.Actors.Ingest.GeminiQuestionSegmenter>();
+builder.Services.AddSingleton<Cena.Actors.Ingest.IDeduplicationService, Cena.Actors.Ingest.DeduplicationService>();
+builder.Services.AddScoped<Cena.Actors.Ingest.IIngestionOrchestrator, Cena.Actors.Ingest.IngestionOrchestrator>();
+builder.Services.AddSingleton<Cena.Actors.Serving.IQuestionSelector, Cena.Actors.Serving.QuestionSelector>();
+
 // =============================================================================
 // 6. PROTO.ACTOR CLUSTER
 // =============================================================================

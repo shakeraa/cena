@@ -12,6 +12,7 @@ using Marten.Events.Projections;
 using Marten.Storage;
 using Weasel.Core;
 using Cena.Actors.Events;
+using Cena.Actors.Ingest;
 using Cena.Actors.Questions;
 using Cena.Infrastructure.Documents;
 
@@ -69,6 +70,26 @@ public static class MartenConfiguration
             .Index(x => x.QualityScore)
             .Index(x => x.Grade);
 
+        // ── Pipeline Item Document (CNT-008: Ingestion Pipeline) ──
+        opts.Schema.For<PipelineItemDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.CurrentStage)
+            .Index(x => x.Status)
+            .Index(x => x.ContentHash)
+            .Index(x => x.SubmittedAt);
+
+        // ── Moderation Audit Document (CNT-009: Moderation) ──
+        opts.Schema.For<ModerationAuditDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.Status)
+            .Index(x => x.AssignedTo)
+            .Index(x => x.Priority)
+            .Index(x => x.Subject)
+            .Index(x => x.SubmittedAt);
+
+        // ── Register Ingestion Pipeline Events ──
+        RegisterIngestionEvents(opts);
+
         // ── Snapshot Strategy: every 100 events per student ──
         // ACT-026: Inline snapshot projection — Marten auto-creates/updates snapshot
         // document on every SaveChangesAsync when event count crosses the threshold.
@@ -117,6 +138,20 @@ public static class MartenConfiguration
         opts.Events.AddEventType<OutreachMessageSent_V1>();
         opts.Events.AddEventType<OutreachMessageDelivered_V1>();
         opts.Events.AddEventType<OutreachResponseReceived_V1>();
+    }
+
+    private static void RegisterIngestionEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<FileReceived_V1>();
+        opts.Events.AddEventType<OcrCompleted_V1>();
+        opts.Events.AddEventType<QuestionsSegmented_V1>();
+        opts.Events.AddEventType<QuestionsNormalized_V1>();
+        opts.Events.AddEventType<QuestionsClassified_V1>();
+        opts.Events.AddEventType<DeduplicationCompleted_V1>();
+        opts.Events.AddEventType<QuestionsRecreated_V1>();
+        opts.Events.AddEventType<PipelineStageFailed_V1>();
+        opts.Events.AddEventType<MovedToReview_V1>();
+        opts.Events.AddEventType<PipelineCompleted_V1>();
     }
 
     private static void RegisterQuestionEvents(StoreOptions opts)
