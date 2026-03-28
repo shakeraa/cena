@@ -4,7 +4,7 @@
 // (Subject → Topic → Concept cascade)
 // =============================================================================
 
-namespace Cena.Actors.Methodology;
+namespace Cena.Actors.MethodologyHierarchy;
 
 /// <summary>
 /// The level at which a methodology assignment is made.

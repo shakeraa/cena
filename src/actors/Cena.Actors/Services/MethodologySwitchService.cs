@@ -5,7 +5,7 @@
 // ═══════════════════════════════════════════════════════════════════════
 
 using Cena.Actors.Mastery;
-using Cena.Actors.Methodology;
+using Cena.Actors.MethodologyHierarchy;
 using Cena.Actors.Students;
 using Microsoft.Extensions.Logging;
 

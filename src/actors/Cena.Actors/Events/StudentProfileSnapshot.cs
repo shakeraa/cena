@@ -2,6 +2,8 @@
 // Cena Platform -- Student Profile Snapshot (Marten inline projection)
 // =============================================================================
 
+using Cena.Actors.MethodologyHierarchy;
+
 namespace Cena.Actors.Events;
 
 /// <summary>
@@ -24,6 +26,12 @@ public class StudentProfileSnapshot
     public double BaselineResponseTimeMs { get; set; }
     public int SessionCount { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
+
+    // ── Hierarchical Methodology Maps ──
+    public Dictionary<string, MethodologyAssignment> SubjectMethodologyMap { get; set; } = new();
+    public Dictionary<string, MethodologyAssignment> TopicMethodologyMap { get; set; } = new();
+    public Dictionary<string, MethodologyAssignment> ConceptMethodologyMap { get; set; } = new();
+    public Dictionary<string, int> SessionsSinceSwitch { get; set; } = new();
 
     // ── Apply methods (event -> state mutation) ──
 
@@ -82,6 +90,61 @@ public class StudentProfileSnapshot
     {
         SessionCount++;
         ExperimentCohort ??= e.ExperimentCohort;
+
+        // Increment cooldown counters for all tracked levels
+        var keys = SessionsSinceSwitch.Keys.ToList();
+        foreach (var key in keys)
+            SessionsSinceSwitch[key] = SessionsSinceSwitch[key] + 1;
+    }
+
+    public void Apply(MethodologyConfidenceReached_V1 e)
+    {
+        // Update the assignment at the reached level to DataDriven
+        var map = e.Level switch
+        {
+            "Subject" => SubjectMethodologyMap,
+            "Topic" => TopicMethodologyMap,
+            _ => ConceptMethodologyMap
+        };
+
+        if (map.TryGetValue(e.LevelId, out var existing))
+        {
+            map[e.LevelId] = existing with
+            {
+                Source = MethodologySource.DataDriven,
+                ConfidenceReachedAt = e.Timestamp
+            };
+        }
+    }
+
+    public void Apply(MethodologySwitchDeferred_V1 e)
+    {
+        // Informational — no state mutation needed in snapshot
+    }
+
+    public void Apply(TeacherMethodologyOverride_V1 e)
+    {
+        if (!Enum.TryParse<Students.Methodology>(e.ToMethodology, true, out var methodology))
+            return;
+
+        var assignment = MethodologyAssignment.Default(methodology, MethodologySource.TeacherOverride)
+            with { LastSwitchAt = e.Timestamp };
+
+        switch (e.Level)
+        {
+            case "Subject":
+                SubjectMethodologyMap[e.LevelId] = assignment;
+                break;
+            case "Topic":
+                TopicMethodologyMap[e.LevelId] = assignment;
+                break;
+            default:
+                ConceptMethodologyMap[e.LevelId] = assignment;
+                ActiveMethodologyMap[e.LevelId] = e.ToMethodology;
+                break;
+        }
+
+        SessionsSinceSwitch[e.LevelId] = 0;
     }
 }
 

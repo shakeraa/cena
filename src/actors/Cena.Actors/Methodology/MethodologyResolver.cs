@@ -5,7 +5,7 @@
 
 using Cena.Actors.Students;
 
-namespace Cena.Actors.Methodology;
+namespace Cena.Actors.MethodologyHierarchy;
 
 /// <summary>
 /// Resolves the active methodology for a concept by cascading through the hierarchy.

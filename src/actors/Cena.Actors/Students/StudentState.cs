@@ -9,7 +9,7 @@
 
 using Cena.Actors.Events;
 using Cena.Actors.Mastery;
-using Cena.Actors.Methodology;
+using Cena.Actors.MethodologyHierarchy;
 
 namespace Cena.Actors.Students;
 

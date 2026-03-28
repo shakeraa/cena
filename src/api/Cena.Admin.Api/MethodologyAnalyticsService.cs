@@ -1,8 +1,10 @@
 // =============================================================================
 // Cena Platform -- Methodology Analytics Service
-// ADM-011: Methodology effectiveness and stagnation monitoring
+// ADM-011: Real Marten event-stream queries for methodology effectiveness
+// and stagnation monitoring. No mock data.
 // =============================================================================
 
+using Cena.Actors.Events;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -35,111 +37,310 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
 
     public async Task<MethodologyEffectivenessResponse> GetEffectivenessAsync()
     {
-        var random = new Random(42);
-        var methodologies = new[] { "Socratic", "WorkedExample", "Feynman", "RetrievalPractice", "SpacedRepetition" };
+        await using var session = _store.LightweightSession();
+
+        // Query all methodology switch events from the last 90 days
+        var since = DateTimeOffset.UtcNow.AddDays(-90);
+
+        var switchEvents = await session.Events
+            .QueryAllRawEvents()
+            .Where(e => e.Timestamp >= since)
+            .OfType<MethodologySwitched_V1>()
+            .ToListAsync();
+
+        var attemptEvents = await session.Events
+            .QueryAllRawEvents()
+            .Where(e => e.Timestamp >= since)
+            .OfType<ConceptAttempted_V1>()
+            .ToListAsync();
+
+        // Build methodology effectiveness by error type
+        var methodologies = new[] { "Socratic", "WorkedExample", "Feynman", "RetrievalPractice", "SpacedRepetition",
+            "BloomsProgression", "Analogy", "ProjectBased", "DrillAndPractice" };
         var errorTypes = new[] { "Conceptual", "Procedural", "Motivational" };
 
         var comparisons = new List<MethodologyComparison>();
+
         foreach (var method in methodologies)
         {
-            var byErrorType = errorTypes.Select(et => new ErrorTypeEffectiveness(
-                et,
-                random.Next(3, 15) + random.NextSingle() * 2f,
-                0.4f + random.NextSingle() * 0.5f,
-                random.Next(50, 500))).ToList();
+            var methodAttempts = attemptEvents
+                .Where(a => string.Equals(a.MethodologyActive, method, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (methodAttempts.Count == 0) continue;
+
+            var byErrorType = new List<ErrorTypeEffectiveness>();
+            foreach (var et in errorTypes)
+            {
+                var etAttempts = methodAttempts
+                    .Where(a => string.Equals(a.ErrorType, et, StringComparison.OrdinalIgnoreCase)
+                                || (et == "Conceptual" && a.ErrorType == "None" && !a.IsCorrect))
+                    .ToList();
+
+                if (etAttempts.Count == 0)
+                {
+                    byErrorType.Add(new ErrorTypeEffectiveness(et, 0f, 0f, 0));
+                    continue;
+                }
+
+                // Success rate: % of attempts that are correct under this method+error combo
+                float successRate = etAttempts.Count(a => a.IsCorrect) / (float)etAttempts.Count;
+
+                // Average time to mastery: avg sessions from first attempt to mastery threshold
+                // Approximated by grouping per student-concept and counting attempts to reach 0.85
+                var studentConcepts = etAttempts
+                    .GroupBy(a => (a.StudentId, a.ConceptId))
+                    .ToList();
+
+                float avgTimeToMastery = 0f;
+                int masteredCount = 0;
+                foreach (var sc in studentConcepts)
+                {
+                    var ordered = sc.OrderBy(a => a.Timestamp).ToList();
+                    var mastered = ordered.FirstOrDefault(a => a.PosteriorMastery >= 0.85);
+                    if (mastered != null)
+                    {
+                        var index = ordered.IndexOf(mastered) + 1;
+                        avgTimeToMastery += index;
+                        masteredCount++;
+                    }
+                }
+
+                avgTimeToMastery = masteredCount > 0 ? avgTimeToMastery / masteredCount : 0f;
+
+                byErrorType.Add(new ErrorTypeEffectiveness(et, avgTimeToMastery, successRate, etAttempts.Count));
+            }
 
             comparisons.Add(new MethodologyComparison(method, byErrorType));
         }
 
-        var switchTriggers = new List<SwitchTriggerBreakdown>
-        {
-            new("stagnation", random.Next(200, 500), 0),
-            new("student_requested", random.Next(50, 150), 0),
-            new("mcm_recommendation", random.Next(100, 300), 0)
-        };
-        var totalTriggers = switchTriggers.Sum(t => t.Count);
-        switchTriggers = switchTriggers.Select(t => t with { Percentage = (float)Math.Round(t.Count * 100f / totalTriggers, 1) }).ToList();
+        // Switch trigger breakdown
+        var triggerGroups = switchEvents
+            .GroupBy(e => e.Trigger.ToLowerInvariant())
+            .Select(g => new { Trigger = g.Key, Count = g.Count() })
+            .ToList();
+        int totalTriggers = triggerGroups.Sum(g => g.Count);
+
+        var switchTriggers = triggerGroups
+            .Select(g => new SwitchTriggerBreakdown(
+                g.Trigger,
+                g.Count,
+                totalTriggers > 0 ? (float)Math.Round(g.Count * 100f / totalTriggers, 1) : 0f))
+            .ToList();
+
+        // Stagnation trend: group stagnation events by day over last 7 days
+        var stagnationEvents = await session.Events
+            .QueryAllRawEvents()
+            .Where(e => e.Timestamp >= DateTimeOffset.UtcNow.AddDays(-7))
+            .OfType<StagnationDetected_V1>()
+            .ToListAsync();
 
         var trend = new List<StagnationTrendPoint>();
         for (int i = 6; i >= 0; i--)
         {
+            var day = DateTimeOffset.UtcNow.Date.AddDays(-i);
+            var dayEnd = day.AddDays(1);
+
+            var dayStagnation = stagnationEvents
+                .Count(e => e.ConsecutiveStagnantSessions >= 3); // True stagnation events
+            var dayResolved = switchEvents
+                .Count(e => e.Timestamp >= day && e.Timestamp < dayEnd);
+
             trend.Add(new StagnationTrendPoint(
-                DateTimeOffset.UtcNow.AddDays(-i).ToString("yyyy-MM-dd"),
-                random.Next(10, 50),
-                random.Next(5, 30)));
+                day.ToString("yyyy-MM-dd"), dayStagnation, dayResolved));
         }
 
-        return new MethodologyEffectivenessResponse(
-            comparisons,
-            switchTriggers,
-            trend,
-            0.05f + random.NextSingle() * 0.05f);
+        // Escalation rate: switches marked as exhausted / total switches
+        float escalationRate = switchEvents.Count > 0
+            ? switchEvents.Count(e => e.Trigger == "escalation") / (float)switchEvents.Count
+            : 0f;
+
+        return new MethodologyEffectivenessResponse(comparisons, switchTriggers, trend, escalationRate);
     }
 
     public async Task<StagnationMonitorResponse> GetStagnationMonitorAsync()
     {
-        var random = new Random(42);
-        var students = new List<StagnatingStudent>();
+        await using var session = _store.LightweightSession();
 
-        for (int i = 0; i < 10; i++)
+        // Query snapshots to find students with stagnation patterns
+        var snapshots = await session.Query<StudentProfileSnapshot>()
+            .ToListAsync();
+
+        var stagnatingStudents = new List<StagnatingStudent>();
+        var mentorResistant = new Dictionary<string, MentorResistantBuilder>();
+
+        foreach (var snapshot in snapshots)
         {
-            students.Add(new StagnatingStudent(
-                $"stu-stag-{i}",
-                $"Student {i + 1}",
-                $"class-{i % 3 + 1}",
-                $"Concept Cluster {i % 5 + 1}",
-                0.6f + random.NextSingle() * 0.3f,
-                random.Next(5, 20),
-                random.Next(2, 10),
-                new[] { "Socratic", "WorkedExample" }.ToList()));
+            foreach (var (conceptId, mastery) in snapshot.ConceptMastery)
+            {
+                // Student is stagnating if: many attempts, low mastery, not mastered
+                if (mastery.TotalAttempts >= 10 && mastery.PKnown < 0.7 && !mastery.IsMastered)
+                {
+                    var triedMethods = snapshot.MethodAttemptHistory
+                        .GetValueOrDefault(conceptId, new List<string>());
+
+                    int daysStuck = mastery.LastAttemptedAt.HasValue
+                        ? (int)(DateTimeOffset.UtcNow - mastery.LastAttemptedAt.Value).TotalDays
+                        : 0;
+
+                    // Composite stagnation score based on attempt count and mastery plateau
+                    float compositeScore = Math.Min(1f,
+                        (mastery.TotalAttempts / 30f) * 0.5f +
+                        (float)(1.0 - mastery.PKnown) * 0.5f);
+
+                    if (compositeScore >= 0.5f)
+                    {
+                        stagnatingStudents.Add(new StagnatingStudent(
+                            snapshot.StudentId,
+                            snapshot.StudentId, // Name resolution deferred to user service
+                            "", // ClassId resolution deferred
+                            conceptId,
+                            compositeScore,
+                            mastery.TotalAttempts,
+                            daysStuck,
+                            triedMethods.Distinct().ToList()));
+
+                        // Track mentor-resistant concepts (all 9 methodologies exhausted)
+                        if (triedMethods.Distinct().Count() >= 7) // Most methodologies tried
+                        {
+                            if (!mentorResistant.TryGetValue(conceptId, out var builder))
+                            {
+                                builder = new MentorResistantBuilder { ConceptId = conceptId };
+                                mentorResistant[conceptId] = builder;
+                            }
+                            builder.StuckStudentCount++;
+                            foreach (var m in triedMethods.Distinct())
+                                builder.ExhaustedMethods.Add(m);
+                        }
+                    }
+                }
+            }
         }
 
-        var resistant = new List<MentorResistantConcept>
-        {
-            new("calc-003", "Advanced Integration", "Math", 12, new[] { "Socratic", "WorkedExample", "Feynman", "RetrievalPractice" }.ToList()),
-            new("phy-004", "Electromagnetic Induction", "Physics", 8, new[] { "Socratic", "WorkedExample", "Feynman" }.ToList())
-        };
+        var resistantConcepts = mentorResistant.Values
+            .Select(b => new MentorResistantConcept(
+                b.ConceptId, b.ConceptId, "", // Name/subject resolution deferred
+                b.StuckStudentCount,
+                b.ExhaustedMethods.ToList()))
+            .OrderByDescending(c => c.StuckStudentCount)
+            .ToList();
 
-        return new StagnationMonitorResponse(students, resistant);
+        return new StagnationMonitorResponse(
+            stagnatingStudents.OrderByDescending(s => s.CompositeScore).Take(50).ToList(),
+            resistantConcepts);
     }
 
     public async Task<McmGraphResponse> GetMcmGraphAsync()
     {
-        var nodes = new List<McmNode>
-        {
-            // Error types
-            new("error-conceptual", "error_type", "Conceptual", null),
-            new("error-procedural", "error_type", "Procedural", null),
-            new("error-motivational", "error_type", "Motivational", null),
-            // Concept categories
-            new("cat-algebra", "concept_category", "Algebra", "Math"),
-            new("cat-calculus", "concept_category", "Calculus", "Math"),
-            new("cat-kinematics", "concept_category", "Kinematics", "Physics"),
-            // Methodologies
-            new("method-socratic", "methodology", "Socratic", null),
-            new("method-worked", "methodology", "Worked Example", null),
-            new("method-feynman", "methodology", "Feynman", null),
-            new("method-retrieval", "methodology", "Retrieval Practice", null)
-        };
+        await using var session = _store.LightweightSession();
 
-        var edges = new List<McmEdge>
+        // Build MCM graph from real switch event data
+        var since = DateTimeOffset.UtcNow.AddDays(-90);
+
+        var switchEvents = await session.Events
+            .QueryAllRawEvents()
+            .Where(e => e.Timestamp >= since)
+            .OfType<MethodologySwitched_V1>()
+            .ToListAsync();
+
+        var attemptEvents = await session.Events
+            .QueryAllRawEvents()
+            .Where(e => e.Timestamp >= since)
+            .OfType<ConceptAttempted_V1>()
+            .ToListAsync();
+
+        // Build nodes from distinct error types and methodologies seen in data
+        var errorTypes = switchEvents
+            .Select(e => e.DominantErrorType)
+            .Where(et => !string.IsNullOrEmpty(et) && et != "None")
+            .Distinct()
+            .ToList();
+
+        var methodologiesUsed = attemptEvents
+            .Select(a => a.MethodologyActive)
+            .Where(m => !string.IsNullOrEmpty(m))
+            .Distinct()
+            .ToList();
+
+        var nodes = new List<McmNode>();
+        foreach (var et in errorTypes)
+            nodes.Add(new McmNode($"error-{et.ToLowerInvariant()}", "error_type", et, null));
+        foreach (var m in methodologiesUsed)
+            nodes.Add(new McmNode($"method-{m.ToLowerInvariant()}", "methodology", m, null));
+
+        // Build edges: error type → methodology with real confidence (success rate after switch)
+        var edges = new List<McmEdge>();
+
+        foreach (var et in errorTypes)
         {
-            new("error-conceptual", "method-feynman", 0.85f, 450, true),
-            new("error-conceptual", "method-socratic", 0.75f, 380, true),
-            new("error-procedural", "method-worked", 0.90f, 520, true),
-            new("error-procedural", "method-retrieval", 0.70f, 340, true),
-            new("error-motivational", "method-retrieval", 0.80f, 290, true),
-            new("cat-algebra", "method-worked", 0.78f, 410, true),
-            new("cat-calculus", "method-socratic", 0.82f, 350, true),
-            new("cat-kinematics", "method-feynman", 0.88f, 280, true)
-        };
+            // Find switches triggered by this error type
+            var switches = switchEvents
+                .Where(s => string.Equals(s.DominantErrorType, et, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            // Group by target methodology
+            var byMethod = switches.GroupBy(s => s.NewMethodology);
+            foreach (var methodGroup in byMethod)
+            {
+                // Compute post-switch success rate for this error→method pair
+                int postSwitchCorrect = 0;
+                int postSwitchTotal = 0;
+
+                foreach (var sw in methodGroup)
+                {
+                    var postAttempts = attemptEvents
+                        .Where(a => a.StudentId == sw.StudentId
+                                    && a.ConceptId == sw.ConceptId
+                                    && a.Timestamp > sw.Timestamp
+                                    && string.Equals(a.MethodologyActive, sw.NewMethodology, StringComparison.OrdinalIgnoreCase))
+                        .Take(10) // Look at first 10 attempts after switch
+                        .ToList();
+
+                    postSwitchTotal += postAttempts.Count;
+                    postSwitchCorrect += postAttempts.Count(a => a.IsCorrect);
+                }
+
+                float confidence = postSwitchTotal > 0
+                    ? postSwitchCorrect / (float)postSwitchTotal
+                    : 0f;
+
+                edges.Add(new McmEdge(
+                    $"error-{et.ToLowerInvariant()}",
+                    $"method-{methodGroup.Key.ToLowerInvariant()}",
+                    confidence,
+                    postSwitchTotal,
+                    true));
+            }
+        }
 
         return new McmGraphResponse(nodes, edges);
     }
 
     public async Task<bool> UpdateMcmEdgeAsync(string source, string target, float confidence)
     {
-        _logger.LogInformation("Updating MCM edge {Source} -> {Target} to confidence {Confidence}", source, target, confidence);
-        return true;
+        // Store MCM edge override in Redis for runtime use
+        try
+        {
+            var db = _redis.GetDatabase();
+            var key = $"mcm:edge:{source}:{target}";
+            await db.StringSetAsync(key, confidence.ToString("F4"), TimeSpan.FromDays(365));
+
+            _logger.LogInformation(
+                "MCM edge updated: {Source} -> {Target} confidence={Confidence:F2}",
+                source, target, confidence);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to update MCM edge {Source} -> {Target}", source, target);
+            return false;
+        }
+    }
+
+    private sealed class MentorResistantBuilder
+    {
+        public string ConceptId { get; set; } = "";
+        public int StuckStudentCount { get; set; }
+        public HashSet<string> ExhaustedMethods { get; set; } = new();
     }
 }

@@ -5,7 +5,7 @@
 // =============================================================================
 
 using Cena.Actors.Events;
-using Cena.Actors.Methodology;
+using Cena.Actors.MethodologyHierarchy;
 using Cena.Actors.Services;
 using Microsoft.Extensions.Logging;
 using Proto;

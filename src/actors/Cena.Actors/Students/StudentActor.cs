@@ -68,6 +68,7 @@ public sealed partial class StudentActor : IActor
 
     // ---- Staged events for atomic batch writes ----
     private readonly List<object> _pendingEvents = new();
+    private bool _streamExists;
 
     // ---- Timer cancellation (MEDIUM-3: prevent ghost timers after passivation) ----
     private CancellationTokenSource? _timerCts;
@@ -310,6 +311,7 @@ public sealed partial class StudentActor : IActor
         if (streamState != null)
         {
             _state.EventVersion = (int)streamState.Version;
+            _streamExists = true;
         }
 
         if (snapshot != null)
@@ -367,11 +369,24 @@ public sealed partial class StudentActor : IActor
                 };
             }
 
+            // Restore hierarchical methodology maps
+            foreach (var (key, assignment) in snapshot.SubjectMethodologyMap)
+                _state.SubjectMethodologyMap[key] = assignment;
+            foreach (var (key, assignment) in snapshot.TopicMethodologyMap)
+                _state.TopicMethodologyMap[key] = assignment;
+            foreach (var (key, assignment) in snapshot.ConceptMethodologyMap)
+                _state.ConceptMethodologyMap[key] = assignment;
+            foreach (var (key, count) in snapshot.SessionsSinceSwitch)
+                _state.SessionsSinceSwitch[key] = count;
+
             _logger.LogDebug(
                 "Restored state for student {StudentId} from snapshot. " +
-                "Concepts={ConceptCount}, MasteryOverlay={OverlayCount}, XP={XP}, Streak={Streak}",
+                "Concepts={ConceptCount}, MasteryOverlay={OverlayCount}, XP={XP}, Streak={Streak}, " +
+                "SubjectMethods={SubjectCount}, TopicMethods={TopicCount}, ConceptMethods={ConceptMethodCount}",
                 _studentId, _state.MasteryMap.Count, _state.MasteryOverlay.Count,
-                _state.TotalXp, _state.CurrentStreak);
+                _state.TotalXp, _state.CurrentStreak,
+                _state.SubjectMethodologyMap.Count, _state.TopicMethodologyMap.Count,
+                _state.ConceptMethodologyMap.Count);
         }
         else
         {
@@ -412,21 +427,41 @@ public sealed partial class StudentActor : IActor
 
         // Persist ALL events atomically with expected version
         // RES-001: 2s timeout prevents actor mailbox starvation on slow DB
-        await using var session = _documentStore.LightweightSession();
-        if (_state.EventVersion == 0)
-        {
-            // New stream — use StartStream for first-time persistence
-            session.Events.StartStream(_studentId, _pendingEvents.ToArray());
-        }
-        else
-        {
-            session.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
-        }
-
         using var cts = new CancellationTokenSource(EventPersistTimeout);
         try
         {
+            await using var session = _documentStore.LightweightSession();
+            if (!_streamExists)
+            {
+                session.Events.StartStream(_studentId, _pendingEvents.ToArray());
+                _streamExists = true;
+            }
+            else
+            {
+                session.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
+            }
             await session.SaveChangesAsync(cts.Token);
+        }
+        catch (Exception) when (!_streamExists || _state.EventVersion == 0)
+        {
+            // Stream may have been created concurrently (e.g. by seed data).
+            // Re-fetch version and retry with Append.
+            await using var retrySession = _documentStore.LightweightSession();
+            var streamState = await retrySession.Events.FetchStreamStateAsync(_studentId);
+            if (streamState != null)
+            {
+                _state.EventVersion = (int)streamState.Version;
+                _streamExists = true;
+                retrySession.Events.Append(_studentId, _state.EventVersion, _pendingEvents.ToArray());
+                await retrySession.SaveChangesAsync(cts.Token);
+            }
+            else
+            {
+                // Truly new stream — retry StartStream
+                retrySession.Events.StartStream(_studentId, _pendingEvents.ToArray());
+                _streamExists = true;
+                await retrySession.SaveChangesAsync(cts.Token);
+            }
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
