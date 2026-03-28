@@ -60,6 +60,13 @@ export default [
     subject: 'Pedagogy',
   },
   {
+    title: 'Methodology Hierarchy',
+    icon: { icon: 'tabler-hierarchy-3' },
+    to: 'apps-pedagogy-methodology-hierarchy',
+    action: 'read',
+    subject: 'Pedagogy',
+  },
+  {
     title: 'Cultural Context',
     icon: { icon: 'tabler-world' },
     to: 'apps-cultural-dashboard',

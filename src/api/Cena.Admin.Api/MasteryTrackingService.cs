@@ -15,6 +15,8 @@ public interface IMasteryTrackingService
     Task<StudentMasteryDetailResponse?> GetStudentMasteryAsync(string studentId);
     Task<ClassMasteryResponse?> GetClassMasteryAsync(string classId);
     Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync();
+    Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId);
+    Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId);
 }
 
 public sealed class MasteryTrackingService : IMasteryTrackingService
@@ -454,4 +456,99 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
 
         return new AtRiskStudentsResponse(students);
     }
+
+    public async Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId)
+    {
+        await using var session = _store.LightweightSession();
+        var snapshot = await session.LoadAsync<Cena.Actors.Events.StudentProfileSnapshot>(studentId);
+        if (snapshot == null) return null;
+
+        var subjects = snapshot.SubjectMethodologyMap.Select(kv => new MethodologyLevelEntry(
+            kv.Key, "Subject", kv.Value.Methodology.ToString(), kv.Value.Source.ToString(),
+            kv.Value.AttemptCount, kv.Value.SuccessRate, kv.Value.Confidence,
+            kv.Value.HasSufficientData(50), kv.Value.ConfidenceReachedAt != null)).ToList();
+
+        var topics = snapshot.TopicMethodologyMap.Select(kv => new MethodologyLevelEntry(
+            kv.Key, "Topic", kv.Value.Methodology.ToString(), kv.Value.Source.ToString(),
+            kv.Value.AttemptCount, kv.Value.SuccessRate, kv.Value.Confidence,
+            kv.Value.HasSufficientData(30), kv.Value.ConfidenceReachedAt != null)).ToList();
+
+        var concepts = snapshot.ConceptMethodologyMap.Select(kv => new MethodologyLevelEntry(
+            kv.Key, "Concept", kv.Value.Methodology.ToString(), kv.Value.Source.ToString(),
+            kv.Value.AttemptCount, kv.Value.SuccessRate, kv.Value.Confidence,
+            kv.Value.HasSufficientData(30), kv.Value.ConfidenceReachedAt != null)).ToList();
+
+        // Also include flat methodology map for concepts without hierarchy entries
+        foreach (var (conceptId, methodology) in snapshot.ActiveMethodologyMap)
+        {
+            if (!concepts.Any(c => c.Id == conceptId))
+            {
+                var mastery = snapshot.ConceptMastery.GetValueOrDefault(conceptId);
+                concepts.Add(new MethodologyLevelEntry(
+                    conceptId, "Concept", methodology, "McmRouted",
+                    mastery?.TotalAttempts ?? 0,
+                    mastery != null && mastery.TotalAttempts > 0 ? mastery.CorrectCount / (float)mastery.TotalAttempts : 0f,
+                    0f, false, false));
+            }
+        }
+
+        return new MethodologyProfileAdminResponse(studentId, subjects, topics, concepts);
+    }
+
+    public async Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId)
+    {
+        // Store the override in Marten as a document for now.
+        // The actual actor-level override happens when the actor reactivates and reads this.
+        await using var session = _store.LightweightSession();
+
+        var overrideDoc = new MethodologyOverrideDocument
+        {
+            Id = $"{studentId}:{level}:{levelId}",
+            StudentId = studentId,
+            Level = level,
+            LevelId = levelId,
+            Methodology = methodology,
+            TeacherId = teacherId,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        session.Store(overrideDoc);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Teacher {TeacherId} overrode methodology for student {StudentId} at {Level}/{LevelId} to {Methodology}",
+            teacherId, studentId, level, levelId, methodology);
+
+        return true;
+    }
+}
+
+// ── Methodology Profile Response DTOs ──
+
+public sealed record MethodologyProfileAdminResponse(
+    string StudentId,
+    IReadOnlyList<MethodologyLevelEntry> Subjects,
+    IReadOnlyList<MethodologyLevelEntry> Topics,
+    IReadOnlyList<MethodologyLevelEntry> Concepts);
+
+public sealed record MethodologyLevelEntry(
+    string Id,
+    string Level,
+    string Methodology,
+    string Source,
+    int AttemptCount,
+    float SuccessRate,
+    float Confidence,
+    bool HasSufficientData,
+    bool ConfidenceReached);
+
+public class MethodologyOverrideDocument
+{
+    public string Id { get; set; } = "";
+    public string StudentId { get; set; } = "";
+    public string Level { get; set; } = "";
+    public string LevelId { get; set; } = "";
+    public string Methodology { get; set; } = "";
+    public string TeacherId { get; set; } = "";
+    public DateTimeOffset CreatedAt { get; set; }
 }

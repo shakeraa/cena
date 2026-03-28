@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ConceptCard from '@/views/apps/mastery/ConceptCard.vue'
 import ConceptGraph from '@/views/apps/mastery/ConceptGraph.vue'
+import MethodologyHierarchyPanel from '@/views/apps/pedagogy/MethodologyHierarchyPanel.vue'
 import { $api } from '@/utils/api'
 
 definePage({
@@ -439,6 +440,11 @@ const decayColor = (risk: number): string => {
         </div>
       </VCardText>
     </VCard>
+
+    <!-- Methodology Hierarchy -->
+    <div class="mb-6">
+      <MethodologyHierarchyPanel :student-id="String(studentId)" />
+    </div>
 
     <!-- Review Priority -->
     <VCard>

@@ -214,8 +214,33 @@ public static class AdminApiEndpoints
             return Results.Ok(atRisk);
         }).WithName("GetAtRiskStudents");
 
+        // GET /api/admin/mastery/students/{studentId}/methodology-profile
+        group.MapGet("/students/{studentId}/methodology-profile", async (string studentId, IMasteryTrackingService service) =>
+        {
+            var detail = await service.GetStudentMasteryAsync(studentId);
+            if (detail == null) return Results.NotFound();
+
+            // Build methodology hierarchy from snapshot data
+            var profile = await service.GetMethodologyProfileAsync(studentId);
+            return Results.Ok(profile);
+        }).WithName("GetStudentMethodologyProfile");
+
+        // POST /api/admin/mastery/students/{studentId}/methodology-override
+        group.MapPost("/students/{studentId}/methodology-override", async (
+            string studentId,
+            MethodologyOverrideAdminRequest body,
+            HttpContext ctx,
+            IMasteryTrackingService service) =>
+        {
+            var teacherId = ctx.User.FindFirst("sub")?.Value ?? "unknown";
+            var result = await service.OverrideMethodologyAsync(studentId, body.Level, body.LevelId, body.Methodology, teacherId);
+            return result ? Results.Ok(new { message = "Override applied" }) : Results.BadRequest(new { error = "Override failed" });
+        }).WithName("PostStudentMethodologyOverride");
+
         return app;
     }
+
+    public sealed record MethodologyOverrideAdminRequest(string Level, string LevelId, string Methodology);
 
     public static IEndpointRouteBuilder MapSystemMonitoringEndpoints(this IEndpointRouteBuilder app)
     {
@@ -466,6 +491,23 @@ public static class AdminApiEndpoints
             var perf = await service.GetPerformanceAsync(id);
             return perf != null ? Results.Ok(perf) : Results.NotFound();
         }).WithName("GetQuestionPerformance");
+
+        group.MapGet("/{id}/history", async (string id, Marten.IDocumentStore store) =>
+        {
+            await using var session = store.QuerySession();
+            var events = await session.Events.FetchStreamAsync(id);
+            if (events == null || events.Count == 0) return Results.NotFound();
+
+            var history = events.Select(e => new
+            {
+                sequence = e.Sequence,
+                eventType = e.EventTypeName,
+                timestamp = e.Timestamp,
+                data = e.Data,
+            }).OrderByDescending(e => e.timestamp).ToList();
+
+            return Results.Ok(history);
+        }).WithName("GetQuestionHistory");
 
         group.MapPost("/{id}/approve", async (string id, IQuestionBankService service) =>
         {

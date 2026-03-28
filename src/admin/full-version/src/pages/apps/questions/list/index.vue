@@ -3,6 +3,8 @@ import QuestionDetail from '@/views/apps/questions/QuestionDetail.vue'
 
 definePage({ meta: { action: 'read', subject: 'Questions' } })
 
+const router = useRouter()
+
 // Filters
 const searchQuery = ref('')
 const selectedSubject = ref<string>()
@@ -743,7 +745,7 @@ const exportCsv = () => {
         class="text-no-wrap"
         show-select
         @update:options="updateOptions"
-        @click:row="(_event: Event, { item }: any) => openDetail(item.id)"
+        @click:row="(_event: Event, { item }: any) => router.push(`/apps/questions/edit/${item.id}`)"
       >
         <!-- ID -->
         <template #item.id="{ item }">
