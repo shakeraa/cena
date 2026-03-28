@@ -169,20 +169,22 @@ const avgCpu = computed(() => {
   return (actorNodes.value.reduce((sum, n) => sum + n.cpuUsagePercent, 0) / actorNodes.value.length).toFixed(1)
 })
 
-interface NatsStream {
+interface NatsConnection {
   name: string
-  messageCount: number
-  byteSize: number
-  consumerCount: number
-  lastSequence: number
-  consumers: { name: string; pendingCount: number; ackPending: number; deliveredCount: number }[]
+  inMsgs: number
+  outMsgs: number
+  inBytes: number
+  outBytes: number
+  subscriptions: number
 }
 
 interface NatsStats {
-  streams: NatsStream[]
+  streams: NatsConnection[]
   totalMessages: number
   totalBytes: number
   totalConsumers: number
+  serverVersion?: string
+  connections?: number
 }
 
 const natsLoading = ref(true)
@@ -515,121 +517,50 @@ onUnmounted(() => {
           </VCol>
         </VRow>
 
-        <!-- Stream Panels -->
-        <VExpansionPanels
+        <!-- NATS Connection Panels -->
+        <VTable
           v-if="natsStats.streams.length"
-          variant="accordion"
+          density="compact"
+          class="mt-4"
         >
-          <VExpansionPanel
-            v-for="stream in natsStats.streams"
-            :key="stream.name"
-          >
-            <VExpansionPanelTitle>
-              <div class="d-flex align-center gap-3 w-100">
-                <VIcon
-                  icon="tabler-database"
-                  size="20"
-                />
-                <span class="font-weight-medium">{{ stream.name }}</span>
-                <VSpacer />
+          <thead>
+            <tr>
+              <th>Connection</th>
+              <th>In Messages</th>
+              <th>Out Messages</th>
+              <th>In Bytes</th>
+              <th>Out Bytes</th>
+              <th>Subscriptions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="conn in natsStats.streams"
+              :key="conn.name"
+            >
+              <td class="font-weight-medium">{{ conn.name }}</td>
+              <td>{{ (conn.inMsgs ?? 0).toLocaleString() }}</td>
+              <td>{{ (conn.outMsgs ?? 0).toLocaleString() }}</td>
+              <td>{{ formatNatsBytes(conn.inBytes ?? 0) }}</td>
+              <td>{{ formatNatsBytes(conn.outBytes ?? 0) }}</td>
+              <td>
                 <VChip
                   size="x-small"
                   color="primary"
                   variant="tonal"
-                  class="me-2"
                 >
-                  {{ stream.messageCount.toLocaleString() }} msgs
+                  {{ conn.subscriptions ?? 0 }}
                 </VChip>
-                <VChip
-                  size="x-small"
-                  color="secondary"
-                  variant="tonal"
-                  class="me-2"
-                >
-                  {{ stream.consumerCount }} consumers
-                </VChip>
-              </div>
-            </VExpansionPanelTitle>
-            <VExpansionPanelText>
-              <div class="d-flex flex-wrap gap-4 mb-3">
-                <div>
-                  <span class="text-body-2 text-medium-emphasis">Messages:</span>
-                  <span class="text-body-2 font-weight-medium ms-1">{{ stream.messageCount.toLocaleString() }}</span>
-                </div>
-                <div>
-                  <span class="text-body-2 text-medium-emphasis">Size:</span>
-                  <span class="text-body-2 font-weight-medium ms-1">{{ formatNatsBytes(stream.byteSize) }}</span>
-                </div>
-                <div>
-                  <span class="text-body-2 text-medium-emphasis">Consumers:</span>
-                  <span class="text-body-2 font-weight-medium ms-1">{{ stream.consumerCount }}</span>
-                </div>
-                <div>
-                  <span class="text-body-2 text-medium-emphasis">Last Sequence:</span>
-                  <span class="text-body-2 font-weight-medium ms-1">{{ stream.lastSequence }}</span>
-                </div>
-              </div>
-
-              <VAlert
-                v-for="consumer in stream.consumers.filter(c => c.pendingCount > 1000)"
-                :key="consumer.name"
-                type="warning"
-                variant="tonal"
-                density="compact"
-                class="mb-2"
-              >
-                Consumer <strong>{{ consumer.name }}</strong> has {{ consumer.pendingCount.toLocaleString() }} pending messages
-              </VAlert>
-
-              <VTable
-                v-if="stream.consumers.length"
-                density="compact"
-                class="mt-2"
-              >
-                <thead>
-                  <tr>
-                    <th>Consumer</th>
-                    <th>Pending</th>
-                    <th>Ack Pending</th>
-                    <th>Delivered</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr
-                    v-for="consumer in stream.consumers"
-                    :key="consumer.name"
-                  >
-                    <td>{{ consumer.name }}</td>
-                    <td>
-                      <VChip
-                        :color="consumer.pendingCount > 1000 ? 'error' : consumer.pendingCount > 100 ? 'warning' : 'success'"
-                        size="x-small"
-                        label
-                      >
-                        {{ consumer.pendingCount.toLocaleString() }}
-                      </VChip>
-                    </td>
-                    <td>{{ consumer.ackPending.toLocaleString() }}</td>
-                    <td>{{ consumer.deliveredCount.toLocaleString() }}</td>
-                  </tr>
-                </tbody>
-              </VTable>
-
-              <div
-                v-else
-                class="text-body-2 text-disabled text-center py-2"
-              >
-                No consumers on this stream
-              </div>
-            </VExpansionPanelText>
-          </VExpansionPanel>
-        </VExpansionPanels>
+              </td>
+            </tr>
+          </tbody>
+        </VTable>
 
         <div
           v-else-if="!natsLoading"
           class="text-body-2 text-disabled text-center py-4"
         >
-          No NATS streams available
+          No NATS connections available
         </div>
       </VCardText>
     </VCard>
