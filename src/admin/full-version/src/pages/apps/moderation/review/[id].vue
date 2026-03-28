@@ -66,6 +66,7 @@ const item = ref<ModerationItemDetail | null>(null)
 const loading = ref(true)
 const actionLoading = ref(false)
 
+const isApproveDialogVisible = ref(false)
 const isRejectDialogVisible = ref(false)
 const rejectReason = ref('')
 
@@ -263,7 +264,7 @@ onMounted(fetchItem)
           prepend-icon="tabler-check"
           :loading="actionLoading"
           :disabled="item.status === 'approved'"
-          @click="approveItem"
+          @click="isApproveDialogVisible = true"
         >
           Approve
         </VBtn>
@@ -612,6 +613,28 @@ onMounted(fetchItem)
         </VCard>
       </VCol>
     </VRow>
+
+    <!-- Approve Confirmation Dialog -->
+    <VDialog v-model="isApproveDialogVisible" max-width="480">
+      <VCard>
+        <VCardTitle>Confirm Approval</VCardTitle>
+        <VCardText>
+          <p class="text-body-1">
+            Are you sure you want to <strong>approve</strong> this question?
+          </p>
+          <p class="text-body-2 text-disabled">
+            The question will be eligible for publishing and student delivery.
+          </p>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="isApproveDialogVisible = false">Cancel</VBtn>
+          <VBtn color="success" :loading="actionLoading" @click="isApproveDialogVisible = false; approveItem()">
+            Approve
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
 
     <!-- Reject Reason Dialog -->
     <VDialog

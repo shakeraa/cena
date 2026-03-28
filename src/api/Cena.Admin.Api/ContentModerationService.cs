@@ -152,6 +152,10 @@ public sealed class ContentModerationService : IContentModerationService
             "claim",
             null));
 
+        _logger.LogInformation(
+            "[AUDIT] Moderation CLAIM: item={ItemId}, moderator={ModeratorId}",
+            id, moderatorId);
+
         return true;
     }
 
@@ -172,6 +176,10 @@ public sealed class ContentModerationService : IContentModerationService
             moderatorId,
             "approve",
             null));
+
+        _logger.LogInformation(
+            "[AUDIT] Moderation APPROVE: item={ItemId}, moderator={ModeratorId}, subject={Subject}",
+            id, moderatorId, item.Subject);
 
         return true;
     }
@@ -194,6 +202,10 @@ public sealed class ContentModerationService : IContentModerationService
             "reject",
             reason));
 
+        _logger.LogInformation(
+            "[AUDIT] Moderation REJECT: item={ItemId}, moderator={ModeratorId}, reason={Reason}",
+            id, moderatorId, reason);
+
         return true;
     }
 
@@ -214,6 +226,10 @@ public sealed class ContentModerationService : IContentModerationService
             moderatorId,
             "flag",
             reason));
+
+        _logger.LogInformation(
+            "[AUDIT] Moderation FLAG: item={ItemId}, moderator={ModeratorId}, reason={Reason}",
+            id, moderatorId, reason);
 
         return true;
     }
@@ -242,6 +258,10 @@ public sealed class ContentModerationService : IContentModerationService
 
     public async Task<bool> BulkActionAsync(string action, IReadOnlyList<string> itemIds, string moderatorId)
     {
+        _logger.LogInformation(
+            "[AUDIT] Moderation BULK {Action}: {Count} items by moderator={ModeratorId}, ids=[{Ids}]",
+            action, itemIds.Count, moderatorId, string.Join(",", itemIds));
+
         foreach (var id in itemIds)
         {
             switch (action.ToLowerInvariant())
@@ -264,31 +284,39 @@ public sealed class ContentModerationService : IContentModerationService
     public async Task<ModerationStatsResponse> GetStatsAsync()
     {
         var today = DateTimeOffset.UtcNow.Date;
+        var yesterday = today.AddDays(-1);
         var startOfWeek = today.AddDays(-(int)today.DayOfWeek);
 
-        var reviewedToday = _mockHistory.Count(h =>
-            h.Timestamp.Date == today &&
-            (h.Action == "approve" || h.Action == "reject"));
+        // Card counts
+        var pending = _mockItems.Count(i => i.Status == ModerationStatus.Pending);
+        var inReview = _mockItems.Count(i => i.Status == ModerationStatus.InReview);
+        var approvedToday = _mockHistory.Count(h => h.Timestamp.Date == today && h.Action == "approve");
+        var rejectedToday = _mockHistory.Count(h => h.Timestamp.Date == today && h.Action == "reject");
+
+        // Yesterday counts for % change
+        var approvedYesterday = _mockHistory.Count(h => h.Timestamp.Date == yesterday && h.Action == "approve");
+        var rejectedYesterday = _mockHistory.Count(h => h.Timestamp.Date == yesterday && h.Action == "reject");
+
+        float pctChange(int current, int prev) =>
+            prev == 0 ? (current > 0 ? 100f : 0f) : (float)(current - prev) / prev * 100f;
 
         var reviewedThisWeek = _mockHistory.Count(h =>
             h.Timestamp >= startOfWeek &&
             (h.Action == "approve" || h.Action == "reject"));
 
         var totalDecisions = _mockHistory.Count(h => h.Action == "approve" || h.Action == "reject");
-        var approvedCount = _mockHistory.Count(h => h.Action == "approve");
-        var approvalRate = totalDecisions > 0 ? (float)approvedCount / totalDecisions * 100 : 0f;
+        var approvedTotal = _mockHistory.Count(h => h.Action == "approve");
+        var approvalRate = totalDecisions > 0 ? (float)approvedTotal / totalDecisions * 100 : 0f;
 
         // Per-moderator stats
         var moderatorStats = _mockHistory
             .Where(h => h.Action == "approve" || h.Action == "reject")
             .GroupBy(h => h.User)
             .Select(g => new PerModeratorStats(
-                g.Key,
-                g.Key,
-                g.Count(),
+                g.Key, g.Key, g.Count(),
                 g.Count(h => h.Action == "approve"),
                 g.Count(h => h.Action == "reject"),
-                5.2f)) // Mock average review time
+                5.2f))
             .ToList();
 
         // Daily trend (last 7 days)
@@ -305,12 +333,13 @@ public sealed class ContentModerationService : IContentModerationService
         }
 
         return new ModerationStatsResponse(
-            reviewedToday,
-            reviewedThisWeek,
-            approvalRate,
-            5.2f,
-            moderatorStats,
-            trend);
+            pending, inReview, approvedToday, rejectedToday,
+            pctChange(pending, pending), // pending doesn't have a meaningful yesterday comparison
+            0f, // inReview change
+            pctChange(approvedToday, approvedYesterday),
+            pctChange(rejectedToday, rejectedYesterday),
+            reviewedThisWeek, approvalRate, 5.2f,
+            moderatorStats, trend);
     }
 
     public async Task<QueueSummary> GetQueueSummaryAsync()

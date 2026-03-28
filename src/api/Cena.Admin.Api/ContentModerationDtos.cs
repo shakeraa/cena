@@ -88,7 +88,14 @@ public sealed record BulkModerationRequest(string Action, IReadOnlyList<string> 
 
 // Moderation Statistics
 public sealed record ModerationStatsResponse(
-    int ReviewedToday,
+    int Pending,
+    int InReview,
+    int ApprovedToday,
+    int RejectedToday,
+    float PendingChange,      // % change vs yesterday
+    float InReviewChange,
+    float ApprovedTodayChange,
+    float RejectedTodayChange,
     int ReviewedThisWeek,
     float ApprovalRate,
     float AvgReviewTimeMinutes,

@@ -36,6 +36,11 @@ const items = ref<ModerationItem[]>([])
 const totalItems = ref(0)
 const statsRef = ref<InstanceType<typeof ModerationStats> | null>(null)
 
+// Confirmation dialogs
+const showApproveConfirm = ref(false)
+const showRejectConfirm = ref(false)
+const bulkRejectReason = ref('')
+
 const statusOptions = [
   { title: 'All', value: 'all' },
   { title: 'Pending', value: 'pending' },
@@ -143,7 +148,7 @@ const claimItem = async (id: string) => {
   }
 }
 
-const bulkApprove = async () => {
+const confirmBulkApprove = async () => {
   if (!selectedRows.value.length)
     return
 
@@ -153,6 +158,7 @@ const bulkApprove = async () => {
       body: { action: 'approve', itemIds: selectedRows.value },
     })
 
+    showApproveConfirm.value = false
     selectedRows.value = []
     await fetchQueue()
     statsRef.value?.refresh()
@@ -162,7 +168,7 @@ const bulkApprove = async () => {
   }
 }
 
-const bulkReject = async () => {
+const confirmBulkReject = async () => {
   if (!selectedRows.value.length)
     return
 
@@ -172,6 +178,8 @@ const bulkReject = async () => {
       body: { action: 'reject', itemIds: selectedRows.value },
     })
 
+    showRejectConfirm.value = false
+    bulkRejectReason.value = ''
     selectedRows.value = []
     await fetchQueue()
     statsRef.value?.refresh()
@@ -224,7 +232,7 @@ onMounted(fetchQueue)
               color="success"
               variant="tonal"
               prepend-icon="tabler-checks"
-              @click="bulkApprove"
+              @click="showApproveConfirm = true"
             >
               Approve ({{ selectedRows.length }})
             </VBtn>
@@ -233,7 +241,7 @@ onMounted(fetchQueue)
               color="error"
               variant="tonal"
               prepend-icon="tabler-x"
-              @click="bulkReject"
+              @click="showRejectConfirm = true"
             >
               Reject ({{ selectedRows.length }})
             </VBtn>
@@ -337,5 +345,48 @@ onMounted(fetchQueue)
         </template>
       </VDataTableServer>
     </VCard>
+
+    <!-- Approve Confirmation Dialog -->
+    <VDialog v-model="showApproveConfirm" max-width="480">
+      <VCard>
+        <VCardTitle>Confirm Approval</VCardTitle>
+        <VCardText>
+          <p class="text-body-1">
+            Are you sure you want to <strong>approve {{ selectedRows.length }} question{{ selectedRows.length > 1 ? 's' : '' }}</strong>?
+          </p>
+          <p class="text-body-2 text-disabled">
+            Approved questions will be eligible for publishing and student delivery.
+          </p>
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="showApproveConfirm = false">Cancel</VBtn>
+          <VBtn color="success" @click="confirmBulkApprove">Approve</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
+
+    <!-- Reject Confirmation Dialog -->
+    <VDialog v-model="showRejectConfirm" max-width="480">
+      <VCard>
+        <VCardTitle>Confirm Rejection</VCardTitle>
+        <VCardText>
+          <p class="text-body-1 mb-4">
+            Are you sure you want to <strong>reject {{ selectedRows.length }} question{{ selectedRows.length > 1 ? 's' : '' }}</strong>?
+          </p>
+          <AppTextarea
+            v-model="bulkRejectReason"
+            label="Rejection Reason"
+            placeholder="Explain why these items are being rejected..."
+            rows="3"
+          />
+        </VCardText>
+        <VCardActions>
+          <VSpacer />
+          <VBtn variant="tonal" @click="showRejectConfirm = false">Cancel</VBtn>
+          <VBtn color="error" @click="confirmBulkReject">Reject</VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
   </div>
 </template>
