@@ -21,6 +21,10 @@ interface ActorNode {
 interface SystemMetrics {
   errorRates: { timestamp: string; rate: number }[]
   activeActors: number
+  messagesProcessed: number
+  sessionsStarted: number
+  eventsPublished: number
+  actorErrors: number
   queueDepths: { name: string; depth: number }[]
 }
 
@@ -116,6 +120,10 @@ const fetchMetrics = async () => {
     metrics.value = {
       errorRates: data.errorRates ?? [],
       activeActors: data.activeActors ?? 0,
+      messagesProcessed: data.messagesProcessed ?? 0,
+      sessionsStarted: data.sessionsStarted ?? 0,
+      eventsPublished: data.eventsPublished ?? 0,
+      actorErrors: data.actorErrors ?? 0,
       queueDepths: data.queueDepths ?? [],
     }
   }
@@ -334,7 +342,7 @@ onUnmounted(() => {
             <div class="d-flex flex-column gap-y-2">
               <div class="d-flex justify-space-between text-body-2">
                 <span class="text-medium-emphasis">Messages Processed</span>
-                <span class="font-weight-medium">{{ totalMessages.toLocaleString() }}</span>
+                <span class="font-weight-medium">{{ metrics.messagesProcessed.toLocaleString() }}</span>
               </div>
               <div class="d-flex justify-space-between text-body-2">
                 <span class="text-medium-emphasis">Cluster Nodes</span>

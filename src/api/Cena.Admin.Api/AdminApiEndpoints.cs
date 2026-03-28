@@ -267,14 +267,22 @@ public static class AdminApiEndpoints
         {
             var health = await service.GetHealthAsync();
 
-            // Try to fetch active actor count from actor host
+            // Fetch live stats from actor host
             var activeActors = 0;
+            var messagesProcessed = 0L;
+            var sessionsStarted = 0L;
+            var eventsPublished = 0L;
+            var actorErrors = 0L;
             try
             {
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
                 var response = await http.GetStringAsync("http://localhost:5119/api/actors/stats");
                 var doc = System.Text.Json.JsonDocument.Parse(response);
                 activeActors = doc.RootElement.GetProperty("activeActorCount").GetInt32();
+                messagesProcessed = doc.RootElement.GetProperty("commandsRouted").GetInt64();
+                sessionsStarted = doc.RootElement.GetProperty("sessionsStarted").GetInt64();
+                eventsPublished = doc.RootElement.GetProperty("eventsPublished").GetInt64();
+                actorErrors = doc.RootElement.GetProperty("errorsCount").GetInt64();
             }
             catch { /* Actor host not available */ }
 
@@ -292,7 +300,7 @@ public static class AdminApiEndpoints
                 depth = q.Depth
             });
 
-            return Results.Ok(new { errorRates, activeActors, queueDepths });
+            return Results.Ok(new { errorRates, activeActors, messagesProcessed, sessionsStarted, eventsPublished, actorErrors, queueDepths });
         }).WithName("GetSystemMetrics");
 
         group.MapGet("/actors", async (ISystemMonitoringService service) =>
