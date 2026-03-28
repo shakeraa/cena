@@ -179,7 +179,7 @@ public sealed class QuestionBankService : IQuestionBankService
         if (events.Count > 0)
         {
             // Re-run quality gate after edits
-            var gateResult = EvaluateQualityGate(state, request.Stem ?? state.Stem);
+            var gateResult = await EvaluateQualityGateAsync(state, request.Stem ?? state.Stem);
             events.Add(MapGateEvent(id, gateResult, now));
 
             session.Events.Append(id, state.EventVersion + events.Count, events.ToArray());
