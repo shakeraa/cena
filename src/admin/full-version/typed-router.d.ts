@@ -60,6 +60,7 @@ declare module 'vue-router/auto-routes' {
     'apps-questions-list': RouteRecordInfo<'apps-questions-list', '/apps/questions/list', Record<never, never>, Record<never, never>>,
     'apps-roles': RouteRecordInfo<'apps-roles', '/apps/roles', Record<never, never>, Record<never, never>>,
     'apps-system-actors': RouteRecordInfo<'apps-system-actors', '/apps/system/actors', Record<never, never>, Record<never, never>>,
+    'apps-system-ai-settings': RouteRecordInfo<'apps-system-ai-settings', '/apps/system/ai-settings', Record<never, never>, Record<never, never>>,
     'apps-system-architecture': RouteRecordInfo<'apps-system-architecture', '/apps/system/architecture', Record<never, never>, Record<never, never>>,
     'apps-system-audit-log': RouteRecordInfo<'apps-system-audit-log', '/apps/system/audit-log', Record<never, never>, Record<never, never>>,
     'apps-system-dead-letters': RouteRecordInfo<'apps-system-dead-letters', '/apps/system/dead-letters', Record<never, never>, Record<never, never>>,

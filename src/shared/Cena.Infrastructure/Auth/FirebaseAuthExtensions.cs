@@ -34,6 +34,8 @@ public static class FirebaseAuthExtensions
                     ValidAudience = projectId,
                     ValidateLifetime = true,
                     ClockSkew = TimeSpan.FromSeconds(30),
+                    RoleClaimType = System.Security.Claims.ClaimTypes.Role,
+                    NameClaimType = System.Security.Claims.ClaimTypes.Name,
                 };
             });
 

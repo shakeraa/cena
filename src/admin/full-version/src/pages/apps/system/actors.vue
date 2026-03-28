@@ -97,13 +97,20 @@ const accuracyColor = (acc: number): string => {
 <template>
   <div>
     <div class="d-flex justify-space-between align-center flex-wrap gap-y-4 mb-6">
-      <div>
-        <h4 class="text-h4 mb-1">
-          Actor Dashboard
-        </h4>
-        <p class="text-body-1 text-medium-emphasis mb-0">
-          Real-time view of active Proto.Actor virtual actors and NATS bus throughput
-        </p>
+      <div class="d-flex align-center gap-4">
+        <VBtn
+          icon="tabler-arrow-left"
+          variant="text"
+          @click="$router.back()"
+        />
+        <div>
+          <h4 class="text-h4 mb-1">
+            Actor Dashboard
+          </h4>
+          <p class="text-body-1 text-medium-emphasis mb-0">
+            Real-time view of active Proto.Actor virtual actors and NATS bus throughput
+          </p>
+        </div>
       </div>
       <div class="d-flex align-center gap-4">
         <VSwitch
@@ -127,7 +134,11 @@ const accuracyColor = (acc: number): string => {
       variant="tonal"
       class="mb-6"
     >
-      {{ error }}
+      <template #title>
+        Actor Host Unreachable
+      </template>
+      The Actor Host (port 5001) is not running. Start it with:
+      <code class="d-block mt-2">cd src/actors/Cena.Actors.Host && dotnet run</code>
     </VAlert>
 
     <!-- Summary cards -->

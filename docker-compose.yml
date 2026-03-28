@@ -13,7 +13,7 @@ services:
       POSTGRES_USER: cena
       POSTGRES_PASSWORD: cena_dev_password
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./src/infra/docker/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
@@ -28,7 +28,7 @@ services:
     image: redis:7-alpine
     container_name: cena-redis
     ports:
-      - "6379:6379"
+      - "6380:6379"
     command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -47,7 +47,6 @@ services:
       -js
       -m 8222
       --store_dir /data
-      --max_payload 4MB
     volumes:
       - nats_data:/data
     healthcheck:
@@ -63,9 +62,12 @@ services:
     environment:
       NEO4J_AUTH: neo4j/cena_dev_password
       NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 128m
     ports:
-      - "7474:7474"   # Browser
-      - "7687:7687"   # Bolt
+      - "7475:7474"   # Browser
+      - "7688:7687"   # Bolt
     volumes:
       - neo4j_data:/data
     healthcheck:

@@ -30,14 +30,21 @@ public static class CenaAuthPolicies
         {
             options.AddPolicy(ModeratorOrAbove, policy =>
                 policy.RequireAssertion(ctx =>
-                    ModeratorRoles.Any(r => ctx.User.IsInRole(r))));
+                    ModeratorRoles.Any(r => ctx.User.IsInRole(r))
+                    || ModeratorRoles.Any(r => ctx.User.HasClaim("role", r))
+                    || ModeratorRoles.Any(r => ctx.User.HasClaim(ClaimTypes.Role, r))));
 
             options.AddPolicy(AdminOnly, policy =>
                 policy.RequireAssertion(ctx =>
-                    AdminRoles.Any(r => ctx.User.IsInRole(r))));
+                    AdminRoles.Any(r => ctx.User.IsInRole(r))
+                    || AdminRoles.Any(r => ctx.User.HasClaim("role", r))
+                    || AdminRoles.Any(r => ctx.User.HasClaim(ClaimTypes.Role, r))));
 
             options.AddPolicy(SuperAdminOnly, policy =>
-                policy.RequireRole("SUPER_ADMIN"));
+                policy.RequireAssertion(ctx =>
+                    ctx.User.IsInRole("SUPER_ADMIN")
+                    || ctx.User.HasClaim("role", "SUPER_ADMIN")
+                    || ctx.User.HasClaim(ClaimTypes.Role, "SUPER_ADMIN")));
 
             options.AddPolicy(SameOrg, policy =>
                 policy.AddRequirements(new SameOrgRequirement()));

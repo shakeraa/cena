@@ -87,6 +87,7 @@ builder.Services.AddScoped<IMasteryTrackingService, MasteryTrackingService>();
 builder.Services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
 builder.Services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
 builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService, Cena.Admin.Api.QualityGate.QualityGateService>();
+builder.Services.AddSingleton<IAiGenerationService, AiGenerationService>();
 builder.Services.AddScoped<IQuestionBankService, QuestionBankService>();
 builder.Services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();
 builder.Services.AddScoped<ICulturalContextService, CulturalContextService>();
@@ -122,6 +123,7 @@ app.MapMethodologyAnalyticsEndpoints();
 app.MapCulturalContextEndpoints();
 app.MapEventStreamEndpoints();
 app.MapOutreachEngagementEndpoints();
+app.MapAiGenerationEndpoints();
 
 // ---- Seed predefined roles on startup ----
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();

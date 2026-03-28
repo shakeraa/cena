@@ -69,6 +69,13 @@ export default [
 
   { heading: 'System' },
   {
+    title: 'AI Providers',
+    icon: { icon: 'tabler-sparkles' },
+    to: 'apps-system-ai-settings',
+    action: 'manage',
+    subject: 'Settings',
+  },
+  {
     title: 'Actor Health',
     icon: { icon: 'tabler-heartbeat' },
     to: 'apps-system-health',

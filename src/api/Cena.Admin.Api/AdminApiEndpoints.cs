@@ -497,6 +497,47 @@ public static class AdminApiEndpoints
         return app;
     }
 
+    public static IEndpointRouteBuilder MapAiGenerationEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/admin/ai")
+            .WithTags("AI Generation")
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+
+        // Accepts JSON body. Images are sent as base64 strings from the frontend.
+        group.MapPost("/generate", async (AiGenerateRequest request, IAiGenerationService service) =>
+        {
+            // Clamp difficulty range
+            var min = Math.Clamp(request.MinDifficulty, 0f, 1f);
+            var max = Math.Clamp(request.MaxDifficulty, 0f, 1f);
+            if (max < min) (min, max) = (max, min);
+
+            var clamped = request with { MinDifficulty = min, MaxDifficulty = max };
+            var result = await service.GenerateQuestionsAsync(clamped);
+            return Results.Ok(result);
+        }).WithName("AiGenerateQuestions");
+
+        group.MapGet("/settings", async (IAiGenerationService service) =>
+        {
+            var settings = await service.GetSettingsAsync();
+            return Results.Ok(settings);
+        }).WithName("GetAiSettings");
+
+        group.MapPut("/settings", async (UpdateAiSettingsRequest request, HttpContext ctx, IAiGenerationService service) =>
+        {
+            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
+            var success = await service.UpdateSettingsAsync(request, userId);
+            return success ? Results.Ok() : Results.BadRequest();
+        }).WithName("UpdateAiSettings");
+
+        group.MapPost("/test-connection", async (AiProvider provider, IAiGenerationService service) =>
+        {
+            var ok = await service.TestConnectionAsync(provider);
+            return Results.Ok(new { connected = ok });
+        }).WithName("TestAiConnection");
+
+        return app;
+    }
+
     public static IEndpointRouteBuilder MapMethodologyAnalyticsEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/admin/pedagogy")

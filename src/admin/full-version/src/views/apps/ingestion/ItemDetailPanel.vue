@@ -17,6 +17,20 @@ interface QualityScores {
   plagiarismScore: number
 }
 
+interface QualityGateScores {
+  compositeScore: number
+  gateDecision: string
+  factualAccuracy: number
+  languageQuality: number
+  pedagogicalQuality: number
+  distractorQuality: number
+  stemClarity: number
+  bloomAlignment: number
+  structuralValidity: number
+  culturalSensitivity: number
+  violationCount: number
+}
+
 interface ItemDetail {
   id: string
   originalFilename: string
@@ -24,6 +38,7 @@ interface ItemDetail {
   currentStage: string
   questionCount: number
   qualityScores: QualityScores | null
+  qualityGate: QualityGateScores | null
   stages: ProcessingStage[]
   errors: string[]
   createdAt: string
@@ -265,8 +280,54 @@ const moveToReview = async () => {
 
           <VDivider class="mb-4" />
 
-          <!-- Quality Scores -->
-          <template v-if="item.qualityScores">
+          <!-- Quality Gate (8-dimension) -->
+          <template v-if="item.qualityGate">
+            <div class="d-flex align-center gap-2 mb-3">
+              <h6 class="text-h6">Quality Gate</h6>
+              <VChip
+                size="x-small"
+                :color="item.qualityGate.gateDecision === 'AutoApproved' ? 'success' : item.qualityGate.gateDecision === 'AutoRejected' ? 'error' : 'warning'"
+                label
+              >
+                {{ item.qualityGate.gateDecision }}
+              </VChip>
+            </div>
+            <div class="mb-4">
+              <div class="d-flex align-center gap-2 mb-3">
+                <span class="text-h5 font-weight-bold">{{ Math.round(item.qualityGate.compositeScore) }}</span>
+                <span class="text-body-2 text-disabled">/ 100</span>
+              </div>
+              <div
+                v-for="dim in [
+                  { key: 'structuralValidity', label: 'Structural' },
+                  { key: 'stemClarity', label: 'Stem Clarity' },
+                  { key: 'distractorQuality', label: 'Distractors' },
+                  { key: 'bloomAlignment', label: 'Bloom\'s' },
+                  { key: 'factualAccuracy', label: 'Factual' },
+                  { key: 'languageQuality', label: 'Language' },
+                  { key: 'pedagogicalQuality', label: 'Pedagogy' },
+                  { key: 'culturalSensitivity', label: 'Cultural' },
+                ]"
+                :key="dim.key"
+                class="mb-2"
+              >
+                <div class="d-flex justify-space-between mb-1">
+                  <span class="text-body-2">{{ dim.label }}</span>
+                  <span class="text-body-2 font-weight-medium">{{ (item.qualityGate as any)[dim.key] }}</span>
+                </div>
+                <VProgressLinear
+                  :model-value="(item.qualityGate as any)[dim.key]"
+                  :color="(item.qualityGate as any)[dim.key] >= 80 ? 'success' : (item.qualityGate as any)[dim.key] >= 60 ? 'info' : (item.qualityGate as any)[dim.key] >= 40 ? 'warning' : 'error'"
+                  rounded
+                  height="6"
+                />
+              </div>
+            </div>
+            <VDivider class="mb-4" />
+          </template>
+
+          <!-- Legacy Quality Scores (shown when quality gate data unavailable) -->
+          <template v-if="item.qualityScores && !item.qualityGate">
             <h6 class="text-h6 mb-3">
               Quality Scores
             </h6>

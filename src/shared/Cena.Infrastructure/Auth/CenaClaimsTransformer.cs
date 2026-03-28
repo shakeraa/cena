@@ -59,7 +59,25 @@ public sealed class CenaClaimsTransformer : IClaimsTransformation
         if (identity.HasClaim(c => c.Type == targetClaim))
             return;
 
+        // Try direct claim first
         var existing = identity.FindFirst(sourceClaim);
+
+        // Firebase may also put custom claims under a JSON claim type path
+        // e.g., the JWT may have "role" as a direct claim, or nested under another claim
+        if (existing == null)
+        {
+            // Try common Firebase JWT claim patterns
+            foreach (var claim in identity.Claims)
+            {
+                // Some Firebase SDKs serialize custom claims with full URI type names
+                if (claim.Type.EndsWith($"/{sourceClaim}", StringComparison.OrdinalIgnoreCase))
+                {
+                    existing = claim;
+                    break;
+                }
+            }
+        }
+
         if (existing != null)
         {
             if (sourceClaim != targetClaim)

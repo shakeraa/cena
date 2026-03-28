@@ -38,6 +38,20 @@ interface ModerationItemDetail {
   gradeLevel: string
   conceptTags: string[]
   aiQualityScore: number
+  qualityGate?: {
+    compositeScore: number
+    gateDecision: string
+    factualAccuracy: number
+    languageQuality: number
+    pedagogicalQuality: number
+    distractorQuality: number
+    stemClarity: number
+    bloomAlignment: number
+    structuralValidity: number
+    culturalSensitivity: number
+    violationCount: number
+    evaluatedAt?: string
+  }
   status: string
   author: string
   submittedAt: string
@@ -485,24 +499,76 @@ onMounted(fetchItem)
           </VCardText>
         </VCard>
 
-        <!-- AI Quality Score Card -->
+        <!-- Quality Gate Card (8-dimension breakdown) -->
         <VCard class="mb-6">
           <VCardText>
-            <h5 class="text-h5 mb-4">
-              AI Quality Score
-            </h5>
+            <div class="d-flex align-center gap-2 mb-4">
+              <h5 class="text-h5">
+                Quality Gate
+              </h5>
+              <VChip
+                v-if="item.qualityGate?.gateDecision"
+                size="x-small"
+                :color="item.qualityGate.gateDecision === 'AutoApproved' ? 'success' : item.qualityGate.gateDecision === 'AutoRejected' ? 'error' : 'warning'"
+                label
+              >
+                {{ item.qualityGate.gateDecision }}
+              </VChip>
+            </div>
+
+            <!-- Composite score -->
             <div class="d-flex align-center gap-x-4 mb-2">
               <h3 class="text-h3">
-                {{ item.aiQualityScore }}
+                {{ item.qualityGate ? Math.round(item.qualityGate.compositeScore) : item.aiQualityScore }}
               </h3>
               <span class="text-body-1 text-disabled">/ 100</span>
+              <VSpacer />
+              <span
+                v-if="item.qualityGate?.violationCount"
+                class="text-body-2 text-error"
+              >
+                {{ item.qualityGate.violationCount }} violation{{ item.qualityGate.violationCount !== 1 ? 's' : '' }}
+              </span>
             </div>
             <VProgressLinear
-              :model-value="item.aiQualityScore"
-              :color="resolveQualityScoreColor(item.aiQualityScore)"
+              :model-value="item.qualityGate ? item.qualityGate.compositeScore : item.aiQualityScore"
+              :color="resolveQualityScoreColor(item.qualityGate ? Math.round(item.qualityGate.compositeScore) : item.aiQualityScore)"
               height="10"
               rounded
+              class="mb-4"
             />
+
+            <!-- 8-dimension bars (only when quality gate data available) -->
+            <template v-if="item.qualityGate">
+              <div class="d-flex flex-column gap-2">
+                <div
+                  v-for="dim in [
+                    { key: 'structuralValidity', label: 'Structural' },
+                    { key: 'stemClarity', label: 'Stem Clarity' },
+                    { key: 'distractorQuality', label: 'Distractors' },
+                    { key: 'bloomAlignment', label: 'Bloom\'s' },
+                    { key: 'factualAccuracy', label: 'Factual' },
+                    { key: 'languageQuality', label: 'Language' },
+                    { key: 'pedagogicalQuality', label: 'Pedagogy' },
+                    { key: 'culturalSensitivity', label: 'Cultural' },
+                  ]"
+                  :key="dim.key"
+                  class="d-flex align-center gap-2"
+                >
+                  <span class="text-body-2 text-medium-emphasis" style="min-inline-size: 90px;">{{ dim.label }}</span>
+                  <VProgressLinear
+                    :model-value="(item.qualityGate as any)[dim.key]"
+                    :color="resolveQualityScoreColor((item.qualityGate as any)[dim.key])"
+                    height="6"
+                    rounded
+                    style="max-inline-size: 120px;"
+                  />
+                  <span class="text-body-2 font-weight-medium" style="min-inline-size: 28px;">
+                    {{ (item.qualityGate as any)[dim.key] }}
+                  </span>
+                </div>
+              </div>
+            </template>
           </VCardText>
         </VCard>
 
