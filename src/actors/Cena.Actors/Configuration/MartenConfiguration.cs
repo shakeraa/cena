@@ -48,6 +48,7 @@ public static class MartenConfiguration
         RegisterEngagementEvents(opts);
         RegisterOutreachEvents(opts);
         RegisterQuestionEvents(opts);
+        RegisterFocusEvents(opts);
 
         // ── Admin Document Types (BKD-002/003) ──
         opts.Schema.For<AdminUser>()
@@ -190,6 +191,15 @@ public static class MartenConfiguration
         opts.Events.AddEventType<TutoringMessageSent_V1>();
         opts.Events.AddEventType<TutoringSessionEnded_V1>();
         opts.Events.AddEventType<TutoringEpisodeCompleted_V1>();
+    }
+
+    private static void RegisterFocusEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<FocusScoreUpdated_V1>();
+        opts.Events.AddEventType<MindWanderingDetected_V1>();
+        opts.Events.AddEventType<MicrobreakSuggested_V1>();
+        opts.Events.AddEventType<MicrobreakTaken_V1>();
+        opts.Events.AddEventType<MicrobreakSkipped_V1>();
     }
 
     private static void RegisterQuestionEvents(StoreOptions opts)

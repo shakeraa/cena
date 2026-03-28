@@ -295,10 +295,26 @@ public static class SimulationEventSeeder
                 false,
                 firstAttempt.Timestamp));
 
-            // ConceptAttempted events + SAI events
+            // ConceptAttempted events + SAI events + Focus events
             int sessionCorrect = 0;
             int consecutiveWrong = 0;
             bool tutoringTriggeredThisSession = false;
+            var sessionStart = firstAttempt.Timestamp;
+            int questionIndex = 0;
+
+            // Archetype-based focus bonus
+            var archetypeBonus = student.ArchetypeName switch
+            {
+                "Genius" => 0.1,
+                "HighAchiever" => 0.05,
+                "SteadyLearner" => 0.0,
+                "Struggling" => -0.1,
+                "FastCareless" => -0.05,
+                "SlowThorough" => 0.05,
+                "Inconsistent" => -0.15 + (rng.NextDouble() - 0.5) * 0.1,
+                "VeryLowCognitive" => -0.2,
+                _ => 0.0
+            };
 
             foreach (var attempt in attempts)
             {
@@ -342,6 +358,65 @@ public static class SimulationEventSeeder
                     rng.Next(0, 3),
                     false,
                     attempt.Timestamp));
+
+                // ── Focus Analytics Events ──
+                var minutesIntoSession = (attempt.Timestamp - sessionStart).TotalMinutes;
+                var baseFocus = Math.Max(0.3, 0.85 - (minutesIntoSession / 60.0) * 0.4);
+                var focusNoise = (rng.NextDouble() - 0.5) * 0.15;
+                var focusScore = Math.Clamp(baseFocus + focusNoise + archetypeBonus, 0.0, 1.0);
+                var focusLevel = focusScore switch
+                {
+                    >= 0.8 => "Flow",
+                    >= 0.6 => "Engaged",
+                    >= 0.4 => "Drifting",
+                    >= 0.2 => "Fatigued",
+                    _ => "Disengaged"
+                };
+
+                events.Add(new FocusScoreUpdated_V1(
+                    student.StudentId, session.Key, questionIndex,
+                    Math.Round(focusScore, 3), focusLevel, attempt.Timestamp));
+
+                // Mind wandering check every 7 questions
+                if (questionIndex % 7 == 0 && focusScore < 0.55 && rng.NextDouble() < 0.6)
+                {
+                    var driftType = focusScore < 0.35 ? "UnawareDrift" : "AwareDrift";
+                    events.Add(new MindWanderingDetected_V1(
+                        student.StudentId, session.Key, driftType,
+                        0.6 + rng.NextDouble() * 0.3,
+                        focusScore < 0.4 ? "sustained_slow_rt" : "erratic_pattern",
+                        attempt.Timestamp));
+                }
+
+                // Microbreak suggestion every 8 questions
+                if (questionIndex > 0 && questionIndex % 8 == 0)
+                {
+                    var activities = new[] { "StretchBreak", "BreathingExercise", "LookAway", "WaterBreak", "MiniWalk" };
+                    var activity = activities[rng.Next(activities.Length)];
+                    var duration = focusScore < 0.5 ? 90 : 60;
+
+                    events.Add(new MicrobreakSuggested_V1(
+                        student.StudentId, session.Key, 8,
+                        minutesIntoSession, activity, duration,
+                        $"Reached {questionIndex} questions",
+                        attempt.Timestamp.AddSeconds(1)));
+
+                    if (rng.NextDouble() < 0.68) // 68% compliance
+                    {
+                        events.Add(new MicrobreakTaken_V1(
+                            student.StudentId, session.Key, activity, duration,
+                            attempt.Timestamp.AddSeconds(duration + 2)));
+                    }
+                    else
+                    {
+                        events.Add(new MicrobreakSkipped_V1(
+                            student.StudentId, session.Key, activity,
+                            rng.NextDouble() < 0.5 ? "too_busy" : "in_flow",
+                            attempt.Timestamp.AddSeconds(2)));
+                    }
+                }
+
+                questionIndex++;
 
                 // SAI: Emit HintRequested events for each hint level used
                 for (int h = 1; h <= hintCount; h++)

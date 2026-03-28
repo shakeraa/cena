@@ -50,6 +50,8 @@ var conceptNames = concepts.ToDictionary(c => c.Id, c => c.Name);
 var activeSessionIds = new Dictionary<string, string>(); // studentId → sessionId
 var studentMethodology = new Dictionary<string, string>(); // studentId → current methodology
 var consecutiveWrong = new Dictionary<string, int>(); // studentId → consecutive wrong count
+var studentQuestionIndex = new Dictionary<string, int>(); // studentId → questions answered this session
+var studentSessionStart = new Dictionary<string, DateTimeOffset>(); // studentId → session start time
 var rng = new Random(42);
 var jsonOpts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 var cts = new CancellationTokenSource();
@@ -107,6 +109,7 @@ var totalAttempts = 0;
 var totalSessions = 0;
 var totalAnnotations = 0;
 var totalMethodologySwitches = 0;
+var totalFocusEvents = 0;
 var startTime = DateTimeOffset.UtcNow;
 
 try
@@ -141,6 +144,8 @@ try
             var sessionId = $"sess-{Guid.NewGuid():N}"[..16];
             activeSessionIds[student.StudentId] = sessionId;
             consecutiveWrong[student.StudentId] = 0;
+            studentQuestionIndex[student.StudentId] = 0;
+            studentSessionStart[student.StudentId] = DateTimeOffset.UtcNow;
 
             // Assign initial methodology based on archetype
             var methodology = student.ArchetypeName switch
@@ -204,6 +209,68 @@ try
         await nats.PublishAsync(NatsSubjects.ConceptAttempt,
             JsonSerializer.Serialize(attemptMsg, jsonOpts), cancellationToken: cts.Token);
         totalAttempts++;
+
+        // ── Focus Analytics: Compute and publish focus score ──
+        var qIdx = studentQuestionIndex.GetValueOrDefault(student.StudentId);
+        var sessStart = studentSessionStart.GetValueOrDefault(student.StudentId, DateTimeOffset.UtcNow);
+        var minutesActive = (DateTimeOffset.UtcNow - sessStart).TotalMinutes;
+        var baseFocus = Math.Max(0.3, 0.85 - (minutesActive / 120.0) * 0.3);
+        var focusScore = Math.Clamp(baseFocus + (rng.NextDouble() - 0.5) * 0.1, 0.0, 1.0);
+        var focusLevel = focusScore >= 0.8 ? "Flow" : focusScore >= 0.6 ? "Engaged" : focusScore >= 0.4 ? "Drifting" : "Fatigued";
+
+        await nats.PublishAsync(NatsSubjects.EventFocusUpdated,
+            JsonSerializer.Serialize(new
+            {
+                studentId = student.StudentId,
+                sessionId = sessionForStudent,
+                questionNumber = qIdx,
+                focusScore = Math.Round(focusScore, 3),
+                focusLevel,
+                timestamp = DateTimeOffset.UtcNow
+            }, jsonOpts), cancellationToken: cts.Token);
+        totalFocusEvents++;
+
+        // Mind wandering detection every 7 questions
+        if (qIdx % 7 == 0 && focusScore < 0.55 && rng.NextDouble() < 0.6)
+        {
+            var driftType = focusScore < 0.35 ? "UnawareDrift" : "AwareDrift";
+            await nats.PublishAsync(NatsSubjects.EventMindWandering,
+                JsonSerializer.Serialize(new
+                {
+                    studentId = student.StudentId,
+                    sessionId = sessionForStudent,
+                    driftType,
+                    confidence = Math.Round(0.6 + rng.NextDouble() * 0.3, 3),
+                    context = focusScore < 0.4 ? "sustained_slow_rt" : "erratic_pattern",
+                    timestamp = DateTimeOffset.UtcNow
+                }, jsonOpts), cancellationToken: cts.Token);
+            totalFocusEvents++;
+        }
+
+        // Microbreak suggestion every 8 questions
+        if (qIdx > 0 && qIdx % 8 == 0)
+        {
+            var activities = new[] { "StretchBreak", "BreathingExercise", "LookAway", "WaterBreak", "MiniWalk" };
+            var activity = activities[rng.Next(activities.Length)];
+            var duration = focusScore < 0.5 ? 90 : 60;
+
+            await nats.PublishAsync(NatsSubjects.EventMicrobreakSuggested,
+                JsonSerializer.Serialize(new
+                {
+                    studentId = student.StudentId,
+                    sessionId = sessionForStudent,
+                    questionsSinceBreak = 8,
+                    elapsedMinutes = Math.Round(minutesActive, 1),
+                    activity,
+                    durationSeconds = duration,
+                    reason = $"Reached {qIdx} questions",
+                    taken = rng.NextDouble() < 0.68,
+                    timestamp = DateTimeOffset.UtcNow
+                }, jsonOpts), cancellationToken: cts.Token);
+            totalFocusEvents++;
+        }
+
+        studentQuestionIndex[student.StudentId] = qIdx + 1;
 
         // ── SAI: Track consecutive wrong answers for confusion/stagnation ──
         if (!attempt.IsCorrect)
@@ -294,14 +361,16 @@ try
             activeSessionIds.Remove(student.StudentId);
             studentMethodology.Remove(student.StudentId);
             consecutiveWrong.Remove(student.StudentId);
+            studentQuestionIndex.Remove(student.StudentId);
+            studentSessionStart.Remove(student.StudentId);
         }
 
         // Progress logging
         if (totalAttempts % 500 == 0)
         {
             var elapsed = DateTimeOffset.UtcNow - startTime;
-            Log.Information("  → Published {Attempts} attempts, {Sessions} sessions, {Annotations} annotations, {Switches} switches ({Rate}/sec, {Events} events received)",
-                totalAttempts, totalSessions, totalAnnotations, totalMethodologySwitches,
+            Log.Information("  → Published {Attempts} attempts, {Sessions} sessions, {Annotations} annotations, {Switches} switches, {Focus} focus ({Rate}/sec, {Events} events received)",
+                totalAttempts, totalSessions, totalAnnotations, totalMethodologySwitches, totalFocusEvents,
                 (int)(totalAttempts / elapsed.TotalSeconds),
                 eventCount);
         }
@@ -329,6 +398,7 @@ Log.Information("╔════════════════════
 Log.Information("║  Emulation Complete                             ║");
 Log.Information("║  Attempts: {Attempts}, Sessions: {Sessions}", totalAttempts, totalSessions);
 Log.Information("║  Annotations: {Annotations}, Methodology switches: {Switches}", totalAnnotations, totalMethodologySwitches);
+Log.Information("║  Focus events: {Focus}", totalFocusEvents);
 Log.Information("║  Events received: {Events}", eventCount);
 Log.Information("║  Duration: {Duration:F1}s, Rate: {Rate}/sec", totalElapsed.TotalSeconds, (int)(totalAttempts / Math.Max(1, totalElapsed.TotalSeconds)));
 Log.Information("╚══════════════════════════════════════════════════╝");

@@ -26,6 +26,9 @@ public static class NatsSubjects
     public const string EventStagnationDetected = "cena.events.stagnation.detected";
     public const string EventMethodologySwitched = "cena.events.methodology.switched";
     public const string EventFocusAlert        = "cena.events.focus.alert";
+    public const string EventFocusUpdated      = "cena.events.focus.updated";
+    public const string EventMindWandering     = "cena.events.focus.mind_wandering";
+    public const string EventMicrobreakSuggested = "cena.events.focus.microbreak_suggested";
 
     // ── Wildcard subscriptions ──
     public const string AllEvents   = "cena.events.>";
