@@ -382,6 +382,15 @@ app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
         eventsPublished = router.EventsPublished,
         sessionsStarted = router.SessionsStarted,
         errorsCount = router.ErrorsCount,
+        errorsByCategory = router.ErrorsByCategory,
+        recentErrors = router.RecentErrors.Take(20).Select(e => new
+        {
+            e.Timestamp,
+            e.Category,
+            e.Subject,
+            e.Message,
+            e.StudentId
+        }),
         activeActorCount = router.ActiveActors.Count,
         actors = actors
     });
@@ -501,7 +510,7 @@ lifetime.ApplicationStarted.Register(async () =>
 
     // Seed all demo data via single entry point
     var store = app.Services.GetRequiredService<IDocumentStore>();
-    await DatabaseSeeder.SeedAllAsync(store, appLogger, 100,
+    await DatabaseSeeder.SeedAllAsync(store, appLogger, 300,
         (s, l) => Cena.Admin.Api.SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
         Cena.Admin.Api.QuestionBankSeedData.SeedQuestionsAsync);
 });

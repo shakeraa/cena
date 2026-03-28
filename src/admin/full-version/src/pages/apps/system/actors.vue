@@ -16,12 +16,22 @@ interface ActorInfo {
   status: string
 }
 
+interface ErrorEntry {
+  timestamp: string
+  category: string
+  subject: string
+  message: string
+  studentId: string | null
+}
+
 interface ActorStats {
   timestamp: string
   commandsRouted: number
   eventsPublished: number
   sessionsStarted: number
   errorsCount: number
+  errorsByCategory: Record<string, number>
+  recentErrors: ErrorEntry[]
   activeActorCount: number
   actors: ActorInfo[]
 }
@@ -92,6 +102,36 @@ const accuracyColor = (acc: number): string => {
   if (acc >= 40) return 'warning'
   return 'error'
 }
+
+const showErrors = ref(false)
+
+const errorCategoryColor = (cat: string): string => {
+  switch (cat) {
+    case 'timeout': return 'warning'
+    case 'deserialization': return 'error'
+    case 'activation': return 'error'
+    case 'cancelled': return 'secondary'
+    default: return 'info'
+  }
+}
+
+const errorCategoryIcon = (cat: string): string => {
+  switch (cat) {
+    case 'timeout': return 'tabler-clock-x'
+    case 'deserialization': return 'tabler-file-broken'
+    case 'activation': return 'tabler-plug-off'
+    case 'cancelled': return 'tabler-x'
+    default: return 'tabler-alert-triangle'
+  }
+}
+
+const errorHeaders = [
+  { title: 'Time', key: 'timestamp' },
+  { title: 'Category', key: 'category' },
+  { title: 'Subject', key: 'subject' },
+  { title: 'Message', key: 'message' },
+  { title: 'Student', key: 'studentId' },
+]
 </script>
 
 <template>
@@ -207,13 +247,21 @@ const accuracyColor = (acc: number): string => {
         cols="6"
         md="2"
       >
-        <VCard>
+        <VCard
+          :class="{ 'cursor-pointer': (stats?.errorsCount ?? 0) > 0 }"
+          @click="(stats?.errorsCount ?? 0) > 0 && (showErrors = !showErrors)"
+        >
           <VCardText class="text-center">
             <div class="text-h4 text-error">
               {{ stats?.errorsCount ?? 0 }}
             </div>
             <div class="text-body-2 text-medium-emphasis">
               Errors
+              <VIcon
+                v-if="(stats?.errorsCount ?? 0) > 0"
+                :icon="showErrors ? 'tabler-chevron-up' : 'tabler-chevron-down'"
+                size="14"
+              />
             </div>
           </VCardText>
         </VCard>
@@ -234,6 +282,124 @@ const accuracyColor = (acc: number): string => {
         </VCard>
       </VCol>
     </VRow>
+
+    <!-- Error Breakdown Panel -->
+    <VExpandTransition>
+      <VRow
+        v-if="showErrors && stats && stats.errorsCount > 0"
+        class="mb-6"
+      >
+        <!-- Error Categories -->
+        <VCol
+          cols="12"
+          md="4"
+        >
+          <VCard>
+            <VCardItem title="Error Categories" />
+            <VDivider />
+            <VCardText>
+              <div
+                v-if="stats.errorsByCategory && Object.keys(stats.errorsByCategory).length"
+                class="d-flex flex-column gap-3"
+              >
+                <div
+                  v-for="(count, category) in stats.errorsByCategory"
+                  :key="category"
+                  class="d-flex align-center justify-space-between"
+                >
+                  <div class="d-flex align-center gap-2">
+                    <VAvatar
+                      :color="errorCategoryColor(String(category))"
+                      variant="tonal"
+                      size="32"
+                      rounded
+                    >
+                      <VIcon
+                        :icon="errorCategoryIcon(String(category))"
+                        size="18"
+                      />
+                    </VAvatar>
+                    <div>
+                      <div class="text-body-2 font-weight-medium text-capitalize">
+                        {{ category }}
+                      </div>
+                      <div class="text-caption text-medium-emphasis">
+                        {{ category === 'timeout' ? 'Actor cold-start exceeded timeout' : category === 'deserialization' ? 'Invalid message format' : category === 'activation' ? 'Actor DI/constructor failure' : category === 'cancelled' ? 'Request cancelled' : 'Unexpected error' }}
+                      </div>
+                    </div>
+                  </div>
+                  <VChip
+                    :color="errorCategoryColor(String(category))"
+                    label
+                    size="small"
+                  >
+                    {{ count }}
+                  </VChip>
+                </div>
+              </div>
+              <div
+                v-else
+                class="text-center text-medium-emphasis pa-4"
+              >
+                No categorized errors
+              </div>
+            </VCardText>
+          </VCard>
+        </VCol>
+
+        <!-- Recent Errors Table -->
+        <VCol
+          cols="12"
+          md="8"
+        >
+          <VCard>
+            <VCardItem title="Recent Errors">
+              <template #subtitle>
+                Last 20 errors with full context
+              </template>
+            </VCardItem>
+            <VDivider />
+            <VDataTable
+              :headers="errorHeaders"
+              :items="stats.recentErrors ?? []"
+              density="compact"
+              :items-per-page="10"
+              class="text-no-wrap"
+            >
+              <template #item.timestamp="{ item }">
+                <span class="text-caption">{{ formatTime(item.timestamp) }}</span>
+              </template>
+              <template #item.category="{ item }">
+                <VChip
+                  :color="errorCategoryColor(item.category)"
+                  label
+                  size="x-small"
+                >
+                  <VIcon
+                    :icon="errorCategoryIcon(item.category)"
+                    size="14"
+                    start
+                  />
+                  {{ item.category }}
+                </VChip>
+              </template>
+              <template #item.subject="{ item }">
+                <code class="text-caption">{{ item.subject }}</code>
+              </template>
+              <template #item.message="{ item }">
+                <span class="text-caption text-truncate d-inline-block" style="max-inline-size: 300px;">
+                  {{ item.message }}
+                </span>
+              </template>
+              <template #item.studentId="{ item }">
+                <code v-if="item.studentId" class="text-caption">{{ item.studentId }}</code>
+                <span v-else class="text-disabled">--</span>
+              </template>
+            </VDataTable>
+          </VCard>
+        </VCol>
+      </VRow>
+    </VExpandTransition>
 
     <!-- Actor table -->
     <VCard>

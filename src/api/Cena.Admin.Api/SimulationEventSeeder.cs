@@ -1,7 +1,7 @@
 // =============================================================================
 // Cena Platform -- Simulation Event Seeder
 // Persists MasterySimulator output as real Marten event streams.
-// ~25,000+ events across 100 students, 60 days of learning history.
+// ~75,000+ events across 300 students, 60 days of learning history.
 // Includes SAI-layer events: HintRequested, AnnotationAdded, TutoringEpisodeCompleted.
 // =============================================================================
 
@@ -28,7 +28,7 @@ public static class SimulationEventSeeder
     public static async Task SeedSimulationEventsAsync(
         IDocumentStore store,
         ILogger logger,
-        int totalStudents = 100,
+        int totalStudents = 300,
         int simulationDays = 60,
         int seed = 42)
     {
@@ -76,6 +76,140 @@ public static class SimulationEventSeeder
         logger.LogInformation(
             "Simulation events seeded: {Events} events across {Students} student streams",
             totalEvents, cohort.Count);
+
+        // Seed tutoring session documents
+        await SeedTutoringSessionDocumentsAsync(store, logger, cohort, simulationDays, seed);
+    }
+
+    /// <summary>
+    /// Seed TutoringSessionDocument records — one per student on average (300 total),
+    /// with normally-distributed turn counts and durations.
+    /// Idempotent: skips if documents already exist.
+    /// </summary>
+    private static async Task SeedTutoringSessionDocumentsAsync(
+        IDocumentStore store,
+        ILogger logger,
+        IReadOnlyList<SimulatedStudent> cohort,
+        int simulationDays,
+        int seed)
+    {
+        await using var checkSession = store.QuerySession();
+        var existingCount = await checkSession.Query<TutoringSessionDocument>().CountAsync();
+        if (existingCount > 0)
+        {
+            logger.LogInformation(
+                "Tutoring session documents already seeded ({Count} exist). Skipping.",
+                existingCount);
+            return;
+        }
+
+        var rng = new Random(seed + 7); // offset seed to avoid correlation with event seeder
+        var startDate = DateTimeOffset.Parse("2025-09-01T08:00:00+03:00");
+
+        var conceptIds = new[]
+        {
+            "ALG-001", "ALG-002", "ALG-003", "ALG-004", "ALG-005", "ALG-006", "ALG-007", "ALG-008",
+            "FUN-001", "FUN-002", "FUN-003", "FUN-004", "FUN-005", "FUN-006", "FUN-007",
+            "GEO-001", "GEO-002", "GEO-003", "GEO-004", "GEO-005", "GEO-006", "GEO-007",
+            "TRG-001", "TRG-002", "TRG-003", "TRG-004",
+            "CAL-001", "CAL-002", "CAL-003", "CAL-004", "CAL-005", "CAL-006",
+            "PRB-001", "PRB-002", "PRB-003", "PRB-004", "PRB-005", "PRB-006",
+            "VEC-001", "VEC-002", "VEC-003", "VEC-004"
+        };
+
+        var methodologies = new[] { "Socratic", "SpacedRepetition", "Feynman", "WorkedExample", "DrillAndPractice" };
+
+        int totalDocs = 0;
+        int batchSize = 20;
+
+        // Create ~300 tutoring sessions distributed across students
+        // Use a round-robin with some randomness so each student gets ~1 session on average
+        var sessionAssignments = new List<(SimulatedStudent Student, int Index)>();
+        for (int i = 0; i < cohort.Count; i++)
+        {
+            sessionAssignments.Add((cohort[i], 0));
+        }
+
+        for (int i = 0; i < sessionAssignments.Count; i += batchSize)
+        {
+            await using var session = store.LightweightSession();
+            var batch = sessionAssignments.Skip(i).Take(batchSize);
+
+            foreach (var (student, index) in batch)
+            {
+                var conceptId = conceptIds[rng.Next(conceptIds.Length)];
+                var methodology = methodologies[rng.Next(methodologies.Length)];
+
+                // Normally distributed turn count: mean=6, stddev=2, clamped to 3-12
+                var turnCount = Math.Clamp((int)Math.Round(NormalSample(rng, 6.0, 2.0)), 3, 12);
+
+                // Normally distributed start time within the simulation window
+                var dayOffset = Math.Clamp(
+                    (int)Math.Round(NormalSample(rng, simulationDays / 2.0, simulationDays / 4.0)),
+                    0, simulationDays - 1);
+                var hourOffset = 8 + rng.Next(0, 10); // school hours 8:00-18:00
+                var minuteOffset = rng.Next(0, 60);
+                var startedAt = startDate.AddDays(dayOffset).AddHours(hourOffset).AddMinutes(minuteOffset);
+
+                // Normally distributed duration: mean=12min, stddev=5min, clamped to 5-30
+                var durationMinutes = Math.Clamp(NormalSample(rng, 12.0, 5.0), 5.0, 30.0);
+                var endedAt = startedAt.AddMinutes(durationMinutes);
+
+                // Find a matching session ID from the student's attempt history
+                var sessionId = student.AttemptHistory.Count > 0
+                    ? student.AttemptHistory[rng.Next(student.AttemptHistory.Count)].SessionId
+                    : $"{student.StudentId}-session-001";
+
+                // Build conversation turns
+                var turns = new List<ConversationTurn>();
+                var turnTime = startedAt;
+                var turnInterval = TimeSpan.FromMinutes(durationMinutes / turnCount);
+
+                for (int t = 0; t < turnCount; t++)
+                {
+                    var role = t % 2 == 0 ? "student" : "tutor";
+                    var content = role == "student"
+                        ? $"[simulated student message #{t + 1} about {conceptId}]"
+                        : $"[simulated tutor response #{t + 1} for {conceptId} using {methodology}]";
+                    turns.Add(new ConversationTurn(role, content, turnTime));
+                    turnTime = turnTime.Add(turnInterval);
+                }
+
+                var doc = new TutoringSessionDocument
+                {
+                    Id = $"tutor-sim-{student.StudentId}-{index}",
+                    StudentId = student.StudentId,
+                    SessionId = sessionId,
+                    ConceptId = conceptId,
+                    Subject = "math",
+                    Methodology = methodology,
+                    Turns = turns,
+                    TotalTurns = turnCount,
+                    StartedAt = startedAt,
+                    EndedAt = endedAt
+                };
+
+                session.Store(doc);
+                totalDocs++;
+            }
+
+            await session.SaveChangesAsync();
+        }
+
+        logger.LogInformation(
+            "Tutoring session documents seeded: {Count} documents across {Students} students",
+            totalDocs, cohort.Count);
+    }
+
+    /// <summary>
+    /// Box-Muller transform for normally-distributed random values.
+    /// </summary>
+    private static double NormalSample(Random rng, double mean, double stddev)
+    {
+        var u1 = 1.0 - rng.NextDouble();
+        var u2 = rng.NextDouble();
+        var z = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Cos(2.0 * Math.PI * u2);
+        return mean + stddev * z;
     }
 
     /// <summary>

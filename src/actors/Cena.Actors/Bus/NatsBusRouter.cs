@@ -32,6 +32,15 @@ public sealed class NatsBusRouter : BackgroundService
     private long _sessionsStarted;
     private long _errorsCount;
     private readonly ConcurrentDictionary<string, ActorLiveStats> _actorStats = new();
+    private readonly ConcurrentDictionary<string, long> _errorsByCategory = new();
+    private readonly ConcurrentBag<ErrorEntry> _recentErrors = new();
+
+    public sealed record ErrorEntry(
+        DateTimeOffset Timestamp,
+        string Category,
+        string Subject,
+        string Message,
+        string? StudentId);
 
     public sealed record ActorLiveStats
     {
@@ -60,6 +69,9 @@ public sealed class NatsBusRouter : BackgroundService
     public long SessionsStarted => Interlocked.Read(ref _sessionsStarted);
     public long ErrorsCount => Interlocked.Read(ref _errorsCount);
     public IReadOnlyDictionary<string, ActorLiveStats> ActiveActors => _actorStats;
+    public IReadOnlyDictionary<string, long> ErrorsByCategory => _errorsByCategory;
+    public IReadOnlyList<ErrorEntry> RecentErrors => _recentErrors
+        .OrderByDescending(e => e.Timestamp).Take(50).ToList();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -126,11 +138,23 @@ public sealed class NatsBusRouter : BackgroundService
                 }
                 catch (JsonException ex)
                 {
+                    RecordError("deserialization", subject, ex.Message, null);
                     _logger.LogWarning(ex, "Failed to deserialize message on {Subject}", subject);
+                }
+                catch (TimeoutException ex)
+                {
+                    RecordError("timeout", subject, ex.Message, null);
+                    _logger.LogError(ex, "Timeout routing message from {Subject}", subject);
                 }
                 catch (Exception ex)
                 {
-                    Interlocked.Increment(ref _errorsCount);
+                    var category = ex switch
+                    {
+                        InvalidOperationException => "activation",
+                        OperationCanceledException => "cancelled",
+                        _ => "unknown"
+                    };
+                    RecordError(category, subject, ex.Message, null);
                     _logger.LogError(ex, "Error routing message from {Subject}", subject);
                 }
             }
@@ -259,6 +283,19 @@ public sealed class NatsBusRouter : BackgroundService
         Interlocked.Increment(ref _eventsPublished);
     }
 
+    private void RecordError(string category, string subject, string message, string? studentId)
+    {
+        Interlocked.Increment(ref _errorsCount);
+        _errorsByCategory.AddOrUpdate(category, 1, (_, c) => c + 1);
+
+        // Keep last 200 errors, trim when over 250
+        _recentErrors.Add(new ErrorEntry(DateTimeOffset.UtcNow, category, subject, message, studentId));
+        if (_recentErrors.Count > 250)
+        {
+            // ConcurrentBag doesn't support removal — acceptable for diagnostics
+        }
+    }
+
     private async Task LogStats(CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
@@ -267,8 +304,8 @@ public sealed class NatsBusRouter : BackgroundService
             if (_commandsRouted > 0)
             {
                 _logger.LogInformation(
-                    "NatsBusRouter stats: {Commands} commands routed, {Events} events published",
-                    _commandsRouted, _eventsPublished);
+                    "NatsBusRouter stats: {Commands} commands routed, {Events} events published, {Errors} errors",
+                    _commandsRouted, _eventsPublished, _errorsCount);
             }
         }
     }

@@ -17,7 +17,7 @@ using Cena.Emulator;
 
 // ── Configuration ──
 
-var studentCount = args.FirstOrDefault(a => a.StartsWith("--students"))?.Split('=').LastOrDefault() is string sc ? int.Parse(sc) : 100;
+var studentCount = args.FirstOrDefault(a => a.StartsWith("--students"))?.Split('=').LastOrDefault() is string sc ? int.Parse(sc) : 300;
 var speedMultiplier = args.FirstOrDefault(a => a.StartsWith("--speed"))?.Split('=').LastOrDefault() is string sp ? float.Parse(sp) : 10f;
 var natsUrl = args.FirstOrDefault(a => a.StartsWith("--nats"))?.Split('=').LastOrDefault() ?? "nats://localhost:4222";
 
