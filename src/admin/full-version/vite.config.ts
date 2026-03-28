@@ -113,7 +113,7 @@ export default defineConfig({
     // Only needed for SharedArrayBuffer/WASM which Cena doesn't use
     proxy: {
       '/api/actors': {
-        target: 'http://localhost:5001',
+        target: 'http://localhost:5119',
         changeOrigin: true,
       },
       '/api': {

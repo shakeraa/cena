@@ -39,7 +39,7 @@ const chartOptions = computed(() => ({
     parentHeightOffset: 0,
     toolbar: { show: false },
   },
-  colors: ['rgb(var(--v-theme-primary))'],
+  colors: ['#7367F0'],
   fill: {
     opacity: 0.2,
   },
