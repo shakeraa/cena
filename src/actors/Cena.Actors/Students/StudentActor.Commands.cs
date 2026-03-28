@@ -8,6 +8,7 @@ using System.Diagnostics.Metrics;
 using System.Security.Cryptography;
 using System.Text;
 using Cena.Actors.Events;
+using Cena.Actors.Hints;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Outreach;
 using Cena.Actors.Services;
@@ -152,18 +153,47 @@ public sealed partial class StudentActor
                     new KeyValuePair<string, object?>("student.id", _studentId),
                     new KeyValuePair<string, object?>("correct", isCorrect));
 
-                // SAI-001: Look up persisted L1 explanation for this question
+                // SAI-003: Resolve explanation via L2 cache → L1 static → L3 LLM pipeline
                 string explanation = "";
                 try
                 {
                     await using var qs = _documentStore.QuerySession();
                     var readModel = await qs.LoadAsync<Questions.QuestionReadModel>(cmd.QuestionId);
-                    explanation = readModel?.Explanation ?? "";
+
+                    if (!isCorrect && readModel != null)
+                    {
+                        explanation = await ResolveExplanationAsync(
+                            readModel, cmd.Answer, ErrorType.None.ToString(),
+                            GetActiveMethodology(cmd.ConceptId),
+                            priorMastery, CancellationToken.None);
+                    }
+                    else
+                    {
+                        explanation = readModel?.Explanation ?? "";
+                    }
                 }
                 catch (Exception expl)
                 {
                     _logger.LogWarning(expl,
-                        "Failed to load explanation for question {QuestionId}", cmd.QuestionId);
+                        "Failed to resolve explanation for question {QuestionId}", cmd.QuestionId);
+                }
+
+                // SAI-005: Gate explanation delivery via DeliveryGate
+                // Explanations are system-initiated (IsStudentInitiated = false).
+                // ConfusionDetector needs signal tracking that only the session actor has,
+                // so for the inline fallback path we use NotConfused (conservative default).
+                var explGateDecision = _deliveryGate.Evaluate(new DeliveryContext(
+                    ConfusionState: ConfusionState.NotConfused,
+                    DisengagementType: null,
+                    FocusLevel: FocusLevel.Engaged,
+                    IsStudentInitiated: false,
+                    QuestionsUntilPatience: 5));
+
+                if (explGateDecision.Action != DeliveryAction.Deliver)
+                {
+                    explanation = "";
+                    _logger.LogDebug("Inline path: explanation {Action} — {Reason}",
+                        explGateDecision.Action, explGateDecision.Reason);
                 }
 
                 var evalResponse = new EvaluateAnswerResponse(
@@ -253,7 +283,33 @@ public sealed partial class StudentActor
                 new KeyValuePair<string, object?>("student.id", _studentId),
                 new KeyValuePair<string, object?>("correct", eval.IsCorrect));
 
-            context.Respond(new ActorResult<EvaluateAnswerResponse>(true, eval));
+            // SAI-003: Enrich explanation via L2 cache → L1 static → L3 LLM pipeline
+            var enrichedEval = eval;
+            if (!eval.IsCorrect && string.IsNullOrWhiteSpace(eval.Explanation))
+            {
+                try
+                {
+                    await using var qs = _documentStore.QuerySession();
+                    var readModel = await qs.LoadAsync<Questions.QuestionReadModel>(cmd.QuestionId);
+
+                    if (readModel != null)
+                    {
+                        var explanation = await ResolveExplanationAsync(
+                            readModel, cmd.Answer, eval.ClassifiedErrorType.ToString(),
+                            GetActiveMethodology(cmd.ConceptId),
+                            prior, CancellationToken.None);
+
+                        enrichedEval = eval with { Explanation = explanation };
+                    }
+                }
+                catch (Exception expl)
+                {
+                    _logger.LogWarning(expl,
+                        "SAI-003: Failed to enrich explanation for question {QuestionId}", cmd.QuestionId);
+                }
+            }
+
+            context.Respond(new ActorResult<EvaluateAnswerResponse>(true, enrichedEval));
         }
         catch (Exception ex)
         {
@@ -668,5 +724,65 @@ public sealed partial class StudentActor
         _sessionPrimaryConceptId = null;
         _sessionAnnotationSentimentSum = 0;
         _sessionAnnotationCount = 0;
+    }
+
+    // =========================================================================
+    // SAI-003: Explanation resolution via L2 cache → L1 static → L3 LLM
+    // =========================================================================
+
+    /// <summary>
+    /// Resolves the best explanation using the ExplanationOrchestrator pipeline.
+    /// Applies rate limiting: max 3 LLM generation calls per student per minute.
+    /// If rate limit is hit, falls back to L1 static or empty string.
+    /// </summary>
+    private async Task<string> ResolveExplanationAsync(
+        Questions.QuestionReadModel readModel,
+        string studentAnswer,
+        string errorType,
+        string methodology,
+        double conceptMastery,
+        CancellationToken ct)
+    {
+        // Rate limit check: prune timestamps older than 1 minute
+        var cutoff = DateTimeOffset.UtcNow.AddMinutes(-1);
+        while (_llmExplanationTimestamps.Count > 0 && _llmExplanationTimestamps.Peek() < cutoff)
+            _llmExplanationTimestamps.Dequeue();
+
+        var request = new ExplanationRequest(
+            QuestionId: readModel.Id,
+            StaticExplanation: readModel.Explanation,
+            QuestionStem: readModel.StemPreview,
+            CorrectAnswer: "", // QuestionReadModel doesn't carry full options
+            StudentAnswer: studentAnswer,
+            ErrorType: errorType,
+            Methodology: methodology,
+            DistractorRationale: null,
+            BloomsLevel: readModel.BloomsLevel,
+            Subject: readModel.Subject,
+            Language: readModel.Language,
+            ConceptMastery: conceptMastery);
+
+        // If rate limit exceeded, the orchestrator will still check L2 cache and L1 static.
+        // Only L3 LLM generation needs gating. The orchestrator's try-catch on LLM failure
+        // naturally falls back, but we should skip if we know we're rate-limited.
+        if (_llmExplanationTimestamps.Count >= MaxLlmExplanationsPerMinute)
+        {
+            _logger.LogDebug(
+                "SAI-003: LLM rate limit ({Max}/min) reached for student {StudentId}. " +
+                "Using cache/static only.",
+                MaxLlmExplanationsPerMinute, _studentId);
+
+            // Try L2 cache only (orchestrator still checks cache first, but this avoids
+            // the LLM attempt entirely by returning static fallback)
+            return readModel.Explanation ?? "";
+        }
+
+        var explanation = await _explanationOrchestrator.ResolveAsync(request, ct);
+
+        // Track the LLM call timestamp (the orchestrator may or may not have hit L3,
+        // but we count each resolution attempt toward the rate limit for safety)
+        _llmExplanationTimestamps.Enqueue(DateTimeOffset.UtcNow);
+
+        return explanation;
     }
 }

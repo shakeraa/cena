@@ -13,6 +13,7 @@ using System.Diagnostics.Metrics;
 using System.Security.Cryptography;
 using System.Text;
 using Cena.Actors.Events;
+using Cena.Actors.Hints;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Outreach;
 using Cena.Actors.Services;
@@ -52,6 +53,10 @@ public sealed partial class StudentActor : IActor
     private readonly IHintAdjustedBktService _hintAdjustedBktService;
     private readonly Sync.OfflineSyncHandler _offlineSyncHandler;
     private readonly Infrastructure.GracefulShutdownCoordinator? _shutdownCoordinator;
+    private readonly IExplanationOrchestrator _explanationOrchestrator;
+    private readonly IDeliveryGate _deliveryGate;
+    private readonly IConfusionDetector _confusionDetector;
+    private readonly IDisengagementClassifier _disengagementClassifier;
 
     // ---- Actor State ----
     private StudentState _state = new();
@@ -66,6 +71,10 @@ public sealed partial class StudentActor : IActor
     private string? _sessionPrimaryConceptId;
     private double _sessionAnnotationSentimentSum;
     private int _sessionAnnotationCount;
+
+    // ---- SAI-003: LLM explanation rate limiting (max 3/min per student) ----
+    private readonly Queue<DateTimeOffset> _llmExplanationTimestamps = new();
+    private const int MaxLlmExplanationsPerMinute = 3;
 
     // ---- Staged events for atomic batch writes ----
     private readonly List<object> _pendingEvents = new();
@@ -109,6 +118,10 @@ public sealed partial class StudentActor : IActor
         IBktService bktService,
         IHintAdjustedBktService hintAdjustedBktService,
         Sync.OfflineSyncHandler offlineSyncHandler,
+        IExplanationOrchestrator explanationOrchestrator,
+        IDeliveryGate deliveryGate,
+        IConfusionDetector confusionDetector,
+        IDisengagementClassifier disengagementClassifier,
         IMeterFactory meterFactory,
         Infrastructure.GracefulShutdownCoordinator? shutdownCoordinator = null)
     {
@@ -121,6 +134,10 @@ public sealed partial class StudentActor : IActor
         _hintAdjustedBktService = hintAdjustedBktService ?? throw new ArgumentNullException(nameof(hintAdjustedBktService));
         _shutdownCoordinator = shutdownCoordinator;
         _offlineSyncHandler = offlineSyncHandler ?? throw new ArgumentNullException(nameof(offlineSyncHandler));
+        _explanationOrchestrator = explanationOrchestrator ?? throw new ArgumentNullException(nameof(explanationOrchestrator));
+        _deliveryGate = deliveryGate ?? throw new ArgumentNullException(nameof(deliveryGate));
+        _confusionDetector = confusionDetector ?? throw new ArgumentNullException(nameof(confusionDetector));
+        _disengagementClassifier = disengagementClassifier ?? throw new ArgumentNullException(nameof(disengagementClassifier));
 
         // ACT-023: Instance-based telemetry via IMeterFactory
         _activitySource = new ActivitySource("Cena.Actors.StudentActor", "1.0.0");

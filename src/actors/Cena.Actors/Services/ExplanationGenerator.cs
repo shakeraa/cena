@@ -32,7 +32,9 @@ public sealed record ExplanationContext(
     int? BackspaceCount,
     int? AnswerChangeCount,
     IReadOnlyList<string>? RecentErrorTypes,
-    IReadOnlyList<string>? PrerequisiteConceptNames);
+    IReadOnlyList<string>? PrerequisiteConceptNames,
+    // SAI-003: Scaffolding depth for prompt calibration
+    string? ScaffoldingLevel = null);
 
 /// <summary>
 /// The LLM-generated explanation with model metadata.
@@ -89,12 +91,14 @@ public sealed class ExplanationGenerator : IExplanationGenerator
         var lang = MapLanguage(ctx.Language);
         var methodology = MapMethodology(ctx.Methodology);
         var depth = MapBloomsDepth(ctx.BloomsLevel);
+        var scaffolding = MapScaffoldingDepth(ctx.ScaffoldingLevel);
 
         return $"""
             You are an expert {ctx.Subject} tutor. Respond ONLY in {lang}.
 
             METHODOLOGY: {methodology}
             DEPTH: {depth}
+            SCAFFOLDING: {scaffolding}
 
             RULES:
             - Address the specific misconception revealed by the student's answer.
@@ -163,8 +167,40 @@ public sealed class ExplanationGenerator : IExplanationGenerator
                 "Provide a brief, direct correction. State what went wrong and the correct approach " +
                 "in 1-2 concise sentences. No lengthy elaboration.",
 
+            "feynman" =>
+                "Ask the student to explain their reasoning. Guide them to articulate " +
+                "why they chose their answer and where their understanding breaks down.",
+
             _ =>
                 "Explain the correct approach clearly, addressing the specific error."
+        };
+    }
+
+    // =========================================================================
+    // SAI-003: SCAFFOLDING DEPTH MAPPING
+    // =========================================================================
+
+    private static string MapScaffoldingDepth(string? scaffoldingLevel)
+    {
+        return (scaffoldingLevel?.ToLowerInvariant()) switch
+        {
+            "full" =>
+                "Provide a COMPLETE worked example. Show every step from start to finish " +
+                "with clear reasoning at each transition.",
+
+            "partial" =>
+                "Point out the specific step where the error occurred. Show the correct " +
+                "approach for that step, but let the student complete the rest.",
+
+            "hintsonly" =>
+                "Give ONE concise sentence pointing toward the correct approach. " +
+                "Do not reveal the full solution.",
+
+            "none" =>
+                "The student is at an independent level. Provide minimal feedback only.",
+
+            _ =>
+                "Adjust explanation depth to match the student's level."
         };
     }
 

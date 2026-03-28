@@ -8,6 +8,7 @@ using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
 using Proto;
 using Cena.Actors.Events;
+using Cena.Actors.Hints;
 using Cena.Actors.Mastery;
 using Cena.Actors.Questions;
 using Cena.Actors.Services;
@@ -30,6 +31,7 @@ public sealed class LearningSessionActor : IActor
     private readonly IHintGenerationService _hintGenerationService;
     private readonly IConfusionDetector _confusionDetector;
     private readonly IDisengagementClassifier _disengagementClassifier;
+    private readonly IDeliveryGate _deliveryGate;
     private readonly Mastery.IConceptGraphCache _graphCache;
     private readonly ILogger<LearningSessionActor> _logger;
 
@@ -46,6 +48,10 @@ public sealed class LearningSessionActor : IActor
     private int _consecutiveHighFatigue;
     private readonly Queue<double> _recentAccuracies = new();
     private readonly Queue<double> _recentResponseTimes = new();
+
+    // ── Cached cognitive state (SAI-005: reused by DeliveryGate in both hint and explanation paths) ──
+    private ConfusionState _lastConfusionState = ConfusionState.NotConfused;
+    private DisengagementType? _lastDisengagementType;
     private double _baselineAccuracy = 0.5;
     private double _baselineResponseTimeMs = 5000;
 
@@ -81,6 +87,7 @@ public sealed class LearningSessionActor : IActor
         IHintGenerationService hintGenerationService,
         IConfusionDetector confusionDetector,
         IDisengagementClassifier disengagementClassifier,
+        IDeliveryGate deliveryGate,
         Mastery.IConceptGraphCache graphCache,
         ILogger<LearningSessionActor> logger,
         IMeterFactory meterFactory)
@@ -92,6 +99,7 @@ public sealed class LearningSessionActor : IActor
         _hintGenerationService = hintGenerationService;
         _confusionDetector = confusionDetector;
         _disengagementClassifier = disengagementClassifier;
+        _deliveryGate = deliveryGate;
         _graphCache = graphCache;
         _logger = logger;
         _activitySource = new ActivitySource("Cena.Actors.LearningSession", "1.0.0");
@@ -157,13 +165,17 @@ public sealed class LearningSessionActor : IActor
 
         if (req.IsCorrect) _questionsCorrect++;
 
-        // SAI-01b: Track confusion signals for gating
+        // SAI-005: Track confusion signals for gating
         _lastAnswerCorrect = req.IsCorrect;
         _lastAnswerChangeCount = req.AnswerChangeCount;
         _lastResponseTimeRatio = _baselineResponseTimeMs > 0
             ? req.ResponseTimeMs / _baselineResponseTimeMs
             : 1.0;
         _lastWrongOnMastered = !req.IsCorrect && req.PriorMastery > 0.7;
+
+        // SAI-005: Detect cognitive state for explanation delivery gating
+        _lastConfusionState = _confusionDetector.Detect(BuildConfusionInput());
+        _lastDisengagementType = _disengagementClassifier.Classify(BuildDisengagementInput());
 
         // Track for fatigue calculation (O(1) enqueue/dequeue)
         _recentAccuracies.Enqueue(req.IsCorrect ? 1.0 : 0.0);
@@ -212,13 +224,29 @@ public sealed class LearningSessionActor : IActor
                 req.AnswerHash, req.BackspaceCount, req.AnswerChangeCount,
                 false, DateTimeOffset.UtcNow)));
 
+        // SAI-005: Gate explanation delivery (explanations are NOT student-initiated)
+        var explanationGateCtx = new DeliveryContext(
+            ConfusionState: _lastConfusionState,
+            DisengagementType: _lastDisengagementType,
+            FocusLevel: FocusLevel.Engaged,
+            IsStudentInitiated: false,
+            QuestionsUntilPatience: Math.Max(0, 5 - _confusionWindowQuestions));
+        var explanationDecision = _deliveryGate.Evaluate(explanationGateCtx);
+        bool suppressExplanation = explanationDecision.Action != DeliveryAction.Deliver;
+
+        if (suppressExplanation)
+            _logger.LogDebug("Session {SessionId}: explanation {Action} — {Reason}",
+                _sessionId, explanationDecision.Action, explanationDecision.Reason);
+
         context.Respond(new SessionEvaluationResult(
             IsCorrect: req.IsCorrect,
             PosteriorMastery: bktResult.PosteriorMastery,
             CrossedProgressionThreshold: bktResult.CrossedProgressionThreshold,
             FatigueScore: _fatigueScore,
             ShouldEndSession: shouldEndSession,
-            ErrorType: req.ErrorType
+            ErrorType: req.ErrorType,
+            SuppressExplanation: suppressExplanation,
+            ExplanationSuppressedReason: explanationDecision.Reason
         ));
 
         return Task.CompletedTask;
@@ -287,35 +315,37 @@ public sealed class LearningSessionActor : IActor
         return Task.CompletedTask;
     }
 
-    // ── Hint (SAI-01b: confusion gating + disengagement suppression) ──
+    // ── Hint (SAI-005: DeliveryGate gating + disengagement-aware simplification) ──
     private Task HandleHint(IContext context, RequestHintMessage req)
     {
-        bool isExplicitStudentRequest = req.IsExplicitRequest;
-
-        // SAI-01b: Confusion-state gating — check before delivering any hint
+        // SAI-005: Detect cognitive state and evaluate via DeliveryGate
         var confusionState = _confusionDetector.Detect(BuildConfusionInput());
-
-        if (confusionState == ConfusionState.ConfusionResolving && !isExplicitStudentRequest)
-        {
-            // D'Mello & Graesser 2012: productive struggle — suppress auto-hints
-            _logger.LogDebug("Session {SessionId}: hint suppressed — ConfusionResolving", _sessionId);
-            context.Respond(new HintResponse(req.HintLevel, Delivered: false,
-                SuppressedReason: "confusion_resolving"));
-            return Task.CompletedTask;
-        }
-        if (confusionState == ConfusionState.ConfusionStuck)
-            _logger.LogInformation("Session {SessionId}: student stuck on {ConceptId}", _sessionId, req.ConceptId);
-
-        // SAI-01b: Disengagement suppression — boredom vs fatigue
         var disengagement = _disengagementClassifier.Classify(BuildDisengagementInput());
 
-        if (disengagement == DisengagementType.Bored_TooEasy && !isExplicitStudentRequest)
+        // Cache for reuse in explanation path
+        _lastConfusionState = confusionState;
+        _lastDisengagementType = disengagement;
+
+        var deliveryContext = new DeliveryContext(
+            ConfusionState: confusionState,
+            DisengagementType: disengagement,
+            FocusLevel: FocusLevel.Engaged, // Focus not computed per-hint; default Engaged
+            IsStudentInitiated: req.IsExplicitRequest,
+            QuestionsUntilPatience: Math.Max(0, 5 - _confusionWindowQuestions));
+
+        var decision = _deliveryGate.Evaluate(deliveryContext);
+
+        if (decision.Action != DeliveryAction.Deliver)
         {
-            _logger.LogDebug("Session {SessionId}: hint suppressed — Bored_TooEasy", _sessionId);
+            _logger.LogDebug("Session {SessionId}: hint {Action} — {Reason}",
+                _sessionId, decision.Action, decision.Reason);
             context.Respond(new HintResponse(req.HintLevel, Delivered: false,
-                SuppressedReason: "bored_too_easy"));
+                SuppressedReason: decision.Reason));
             return Task.CompletedTask;
         }
+
+        if (confusionState == ConfusionState.ConfusionStuck)
+            _logger.LogInformation("Session {SessionId}: student stuck on {ConceptId}", _sessionId, req.ConceptId);
         if (disengagement == DisengagementType.Fatigued_Cognitive)
             _logger.LogDebug("Session {SessionId}: Fatigued_Cognitive — simplifying hint", _sessionId);
 
@@ -471,7 +501,9 @@ public record EvaluateAnswerRequest(
 
 public record SessionEvaluationResult(
     bool IsCorrect, double PosteriorMastery, bool CrossedProgressionThreshold,
-    double FatigueScore, bool ShouldEndSession, string ErrorType);
+    double FatigueScore, bool ShouldEndSession, string ErrorType,
+    // SAI-005: Explanation delivery gating
+    bool SuppressExplanation = false, string? ExplanationSuppressedReason = null);
 
 public record RequestNextQuestion(
     Dictionary<string, double> MasteryMap,

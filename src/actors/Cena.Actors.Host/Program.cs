@@ -141,11 +141,13 @@ builder.Services.AddSingleton<IHintAdjustedBktService, HintAdjustedBktService>()
 builder.Services.AddSingleton<IHintGenerationService, HintGenerationService>();
 builder.Services.AddSingleton<IConfusionDetector, ConfusionDetector>();
 builder.Services.AddSingleton<IDisengagementClassifier, DisengagementClassifier>();
+builder.Services.AddSingleton<Cena.Actors.Hints.IDeliveryGate, Cena.Actors.Hints.DeliveryGate>();
 builder.Services.AddSingleton<IFocusDegradationService, FocusDegradationService>();
 builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnforcementService>();
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
 builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>();
 builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
+builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
 builder.Services.AddSingleton<IExplanationOrchestrator, ExplanationOrchestrator>();
 builder.Services.AddSingleton<OfflineSyncHandler>();
 builder.Services.AddHostedService<NatsOutboxPublisher>();
@@ -161,9 +163,14 @@ builder.Services.AddSingleton<ITutorSafetyGuard, TutorSafetyGuard>();
 builder.Services.AddSingleton<Cena.Actors.Bus.NatsBusRouter>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Cena.Actors.Bus.NatsBusRouter>());
 
+// SAI-003: Explanation cache invalidation on question edits via NATS
+builder.Services.AddHostedService<Cena.Actors.Explanations.ExplanationCacheInvalidator>();
+
 // Quality Gate service (needed by QuestionBankService)
-builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService,
-    Cena.Admin.Api.QualityGate.QualityGateService>();
+builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService>(sp =>
+    new Cena.Admin.Api.QualityGate.QualityGateService(
+        configuration: sp.GetRequiredService<IConfiguration>(),
+        logger: sp.GetRequiredService<ILogger<Cena.Admin.Api.QualityGate.QualityGateService>>()));
 
 // ADM-004 through ADM-016: Register Admin API services
 builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
@@ -191,13 +198,19 @@ builder.Services.AddSingleton<Cena.Actors.Ingest.IOcrClient, Cena.Actors.Ingest.
 builder.Services.AddSingleton<Cena.Actors.Ingest.IMathOcrClient, Cena.Actors.Ingest.MathpixClient>();
 builder.Services.AddSingleton<Cena.Actors.Ingest.IQuestionSegmenter, Cena.Actors.Ingest.GeminiQuestionSegmenter>();
 builder.Services.AddSingleton<Cena.Actors.Ingest.IDeduplicationService, Cena.Actors.Ingest.DeduplicationService>();
+builder.Services.AddSingleton<Cena.Actors.Ingest.IContentExtractorService, Cena.Actors.Ingest.ContentExtractorService>();
 builder.Services.AddScoped<Cena.Actors.Ingest.IIngestionOrchestrator, Cena.Actors.Ingest.IngestionOrchestrator>();
 builder.Services.AddSingleton<Cena.Actors.Serving.IQuestionSelector, Cena.Actors.Serving.QuestionSelector>();
 
-// SAI-06/07: Content extraction pipeline + embeddings
+// SAI-06/07: Content extraction pipeline + embeddings + pgvector
 builder.Services.AddSingleton<Cena.Actors.Ingest.IContentSegmenter, Cena.Actors.Ingest.ContentSegmenter>();
+builder.Services.AddHttpClient<Cena.Actors.Services.EmbeddingService>();
 builder.Services.AddSingleton<Cena.Actors.Services.IEmbeddingService, Cena.Actors.Services.EmbeddingService>();
 builder.Services.AddSingleton<Cena.Actors.Services.IContentRetriever, Cena.Actors.Services.ContentRetriever>();
+
+// SAI-06: pgvector migration + async embedding ingestion handler
+builder.Services.AddHostedService<Cena.Actors.Services.PgVectorMigrationService>();
+builder.Services.AddHostedService<Cena.Actors.Services.EmbeddingIngestionHandler>();
 
 // SAI-000: LLM client abstraction and usage tracking
 builder.Services.AddSingleton<AnthropicLlmClient>();

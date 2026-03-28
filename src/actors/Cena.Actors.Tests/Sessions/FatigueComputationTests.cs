@@ -28,10 +28,11 @@ public sealed class FatigueComputationTests
         var hintGenerationService = new HintGenerationService();
         var confusionDetector = new ConfusionDetector();
         var disengagementClassifier = new DisengagementClassifier();
+        var deliveryGate = Substitute.For<Cena.Actors.Hints.IDeliveryGate>();
         var graphCache = Substitute.For<IConceptGraphCache>();
         _actor = new LearningSessionActor(
             bkt, hintAdjustedBkt, cognitiveLoad, hintGenerator, hintGenerationService,
-            confusionDetector, disengagementClassifier, graphCache, logger, meterFactory);
+            confusionDetector, disengagementClassifier, deliveryGate, graphCache, logger, meterFactory);
     }
 
     [Fact]
