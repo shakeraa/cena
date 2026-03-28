@@ -147,6 +147,7 @@ builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnfor
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
 builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>();
 builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
+builder.Services.AddSingleton<IL3ExplanationGenerator, L3ExplanationGenerator>();
 builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
 builder.Services.AddSingleton<IExplanationOrchestrator, ExplanationOrchestrator>();
 builder.Services.AddSingleton<OfflineSyncHandler>();

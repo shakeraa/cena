@@ -4,7 +4,9 @@
 // =============================================================================
 
 using Cena.Actors.Ingest;
+using Cena.Actors.Services;
 using NSubstitute;
+using NSubstitute.ExceptionExtensions;
 using StackExchange.Redis;
 
 namespace Cena.Actors.Tests.Ingest;
@@ -64,7 +66,7 @@ public class DeduplicationServiceTests
             });
 
         var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<DeduplicationService>>();
-        _service = new DeduplicationService(_redis, logger);
+        _service = new DeduplicationService(_redis, logger, embeddingService: null);
     }
 
     [Fact]
@@ -121,6 +123,92 @@ public class DeduplicationServiceTests
         var hash2 = ComputeTestHash("חשב: 2x + 3 = 7", new() { ["eq_1"] = "2x + 3 = 7" });
 
         Assert.Equal(hash1, hash2);
+    }
+
+    [Fact]
+    public async Task CheckAsync_WithEmbeddingService_NearDuplicate_ReturnsSemanticNearDuplicate()
+    {
+        var embeddingService = Substitute.For<IEmbeddingService>();
+        embeddingService.SearchSimilarAsync(
+            Arg.Any<string>(),
+            subjectFilter: Arg.Any<string?>(),
+            conceptFilter: Arg.Any<string[]?>(),
+            limit: Arg.Any<int>(),
+            minSimilarity: Arg.Any<float>(),
+            ct: Arg.Any<CancellationToken>())
+            .Returns(new List<SimilarContent>
+            {
+                new("cb-existing", "Similar content", "definition", 0.97f)
+            });
+
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<DeduplicationService>>();
+        var serviceWithEmbeddings = new DeduplicationService(_redis, logger, embeddingService);
+
+        var result = await serviceWithEmbeddings.CheckAsync(
+            "A unique stem text for testing",
+            new Dictionary<string, string>());
+
+        Assert.Equal(DedupResult.SemanticNearDuplicate, result.Result);
+        Assert.Equal("cb-existing", result.MatchedItemId);
+        Assert.Equal(0.97f, result.SimilarityScore);
+    }
+
+    [Fact]
+    public async Task CheckAsync_WithEmbeddingService_NoMatch_ReturnsUnique()
+    {
+        var embeddingService = Substitute.For<IEmbeddingService>();
+        embeddingService.SearchSimilarAsync(
+            Arg.Any<string>(),
+            subjectFilter: Arg.Any<string?>(),
+            conceptFilter: Arg.Any<string[]?>(),
+            limit: Arg.Any<int>(),
+            minSimilarity: Arg.Any<float>(),
+            ct: Arg.Any<CancellationToken>())
+            .Returns(new List<SimilarContent>());
+
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<DeduplicationService>>();
+        var serviceWithEmbeddings = new DeduplicationService(_redis, logger, embeddingService);
+
+        var result = await serviceWithEmbeddings.CheckAsync(
+            "Completely unique content",
+            new Dictionary<string, string>());
+
+        Assert.Equal(DedupResult.Unique, result.Result);
+        Assert.Null(result.MatchedItemId);
+    }
+
+    [Fact]
+    public async Task CheckAsync_WithEmbeddingService_ExceptionSwallowed_ReturnsUnique()
+    {
+        var embeddingService = Substitute.For<IEmbeddingService>();
+        embeddingService.SearchSimilarAsync(
+            Arg.Any<string>(),
+            subjectFilter: Arg.Any<string?>(),
+            conceptFilter: Arg.Any<string[]?>(),
+            limit: Arg.Any<int>(),
+            minSimilarity: Arg.Any<float>(),
+            ct: Arg.Any<CancellationToken>())
+            .ThrowsAsync(new InvalidOperationException("pgvector not available"));
+
+        var logger = Substitute.For<Microsoft.Extensions.Logging.ILogger<DeduplicationService>>();
+        var serviceWithEmbeddings = new DeduplicationService(_redis, logger, embeddingService);
+
+        var result = await serviceWithEmbeddings.CheckAsync(
+            "Some content",
+            new Dictionary<string, string>());
+
+        Assert.Equal(DedupResult.Unique, result.Result);
+    }
+
+    [Fact]
+    public async Task CheckAsync_WithoutEmbeddingService_SkipsLevel3()
+    {
+        // Using the default _service which has no embedding service
+        var result = await _service.CheckAsync(
+            "Some novel content",
+            new Dictionary<string, string>());
+
+        Assert.Equal(DedupResult.Unique, result.Result);
     }
 
     private static string ComputeTestHash(string stem, Dictionary<string, string> math)

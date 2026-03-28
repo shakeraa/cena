@@ -71,9 +71,9 @@ public sealed class FocusExperimentTests
     }
 
     [Fact]
-    public void SixPredefinedExperiments_Exist()
+    public void PredefinedExperiments_Exist()
     {
-        Assert.Equal(6, FocusExperimentService.DefaultExperiments.Count);
+        Assert.Equal(9, FocusExperimentService.DefaultExperiments.Count);
 
         var ids = new HashSet<string>();
         foreach (var exp in FocusExperimentService.DefaultExperiments)
@@ -186,7 +186,14 @@ public sealed class FocusExperimentTests
             NextSessionPerformanceDelta: 0.05,
             ProductiveStrugglePrecision: 0.9,
             SelfReportedFocus: 4,
-            SelfReportLanguage: "he"
+            SelfReportLanguage: "he",
+            ExplanationSource: null,
+            HintCreditMultiplier: null,
+            DeliveryGateAction: null,
+            MasteryGainDelta: null,
+            HintUsageRate: null,
+            ConfusionResolutionRate: null,
+            SelfReportedUnderstanding: null
         );
 
         collector.RecordSessionMetrics(metrics);
@@ -208,11 +215,13 @@ public sealed class FocusExperimentTests
 
         collector.RecordSessionMetrics(new ExperimentSessionMetrics(
             studentId, Guid.NewGuid(), "foc-microbreaks", ExperimentArm.Control,
-            DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null));
+            DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null));
 
         collector.RecordSessionMetrics(new ExperimentSessionMetrics(
             studentId, Guid.NewGuid(), "foc-boredom-fatigue", ExperimentArm.Treatment,
-            DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null));
+            DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null));
 
         Assert.Single(collector.GetMetrics("foc-microbreaks"));
         Assert.Single(collector.GetMetrics("foc-boredom-fatigue"));
@@ -227,12 +236,16 @@ public sealed class FocusExperimentTests
         collector.RecordSessionMetrics(new ExperimentSessionMetrics(
             Guid.NewGuid(), Guid.NewGuid(), "foc-microbreaks", ExperimentArm.Control,
             DateTimeOffset.UtcNow, null, null, null, null, null, null,
-            SelfReportedFocus: 3, SelfReportLanguage: "he"));
+            SelfReportedFocus: 3, SelfReportLanguage: "he",
+            ExplanationSource: null, HintCreditMultiplier: null, DeliveryGateAction: null,
+            MasteryGainDelta: null, HintUsageRate: null, ConfusionResolutionRate: null, SelfReportedUnderstanding: null));
 
         collector.RecordSessionMetrics(new ExperimentSessionMetrics(
             Guid.NewGuid(), Guid.NewGuid(), "foc-microbreaks", ExperimentArm.Treatment,
             DateTimeOffset.UtcNow, null, null, null, null, null, null,
-            SelfReportedFocus: 4, SelfReportLanguage: "ar"));
+            SelfReportedFocus: 4, SelfReportLanguage: "ar",
+            ExplanationSource: null, HintCreditMultiplier: null, DeliveryGateAction: null,
+            MasteryGainDelta: null, HintUsageRate: null, ConfusionResolutionRate: null, SelfReportedUnderstanding: null));
 
         var metrics = collector.GetMetrics("foc-microbreaks");
         Assert.Equal(2, metrics.Count);

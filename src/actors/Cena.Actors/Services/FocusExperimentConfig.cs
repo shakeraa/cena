@@ -183,8 +183,57 @@ public sealed class FocusExperimentService : IFocusExperimentService
             },
             StartDate: DateTimeOffset.MinValue,
             EndDate: DateTimeOffset.MaxValue
+        ),
+
+        // ═══════════════════════════════════════════════════════════
+        // SAI-006: STUDENT AI INTERACTION EXPERIMENTS
+        // ═══════════════════════════════════════════════════════════
+
+        new FocusExperiment(
+            ExperimentId: SaiAdaptiveExplanations,
+            Name: "Adaptive Explanations",
+            Description: "L1 static explanation only vs full L2+L3 personalized pipeline",
+            PrimaryMetric: "next_concept_mastery_gain_1_week",
+            Arms: new[]
+            {
+                new ExperimentArmConfig(ExperimentArm.Control, 50, "L1 static explanation only"),
+                new ExperimentArmConfig(ExperimentArm.Treatment, 50, "Full L2 cache + L3 personalized pipeline")
+            },
+            StartDate: DateTimeOffset.MinValue,
+            EndDate: DateTimeOffset.MaxValue
+        ),
+        new FocusExperiment(
+            ExperimentId: SaiHintBktWeighting,
+            Name: "Hint BKT Credit Weighting",
+            Description: "Hints with no BKT adjustment vs credit curve (1.0/0.7/0.4/0.1)",
+            PrimaryMetric: "mastery_retention_1_week",
+            Arms: new[]
+            {
+                new ExperimentArmConfig(ExperimentArm.Control, 50, "Hints delivered, BKT P_T unchanged"),
+                new ExperimentArmConfig(ExperimentArm.Treatment, 50, "Hints with credit curve: 1.0/0.7/0.4/0.1 P_T scaling")
+            },
+            StartDate: DateTimeOffset.MinValue,
+            EndDate: DateTimeOffset.MaxValue
+        ),
+        new FocusExperiment(
+            ExperimentId: SaiConfusionGating,
+            Name: "Confusion-Aware Delivery Gating",
+            Description: "Always deliver hints/explanations vs DeliveryGate confusion+boredom gating",
+            PrimaryMetric: "delayed_test_score_1_week",
+            Arms: new[]
+            {
+                new ExperimentArmConfig(ExperimentArm.Control, 50, "Always deliver immediately (no DeliveryGate)"),
+                new ExperimentArmConfig(ExperimentArm.Treatment, 50, "Full DeliveryGate: confusion-aware + boredom-aware gating")
+            },
+            StartDate: DateTimeOffset.MinValue,
+            EndDate: DateTimeOffset.MaxValue
         )
     };
+
+    // SAI-006 experiment ID constants
+    public const string SaiAdaptiveExplanations = "sai-adaptive-explanations";
+    public const string SaiHintBktWeighting = "sai-hint-bkt-weighting";
+    public const string SaiConfusionGating = "sai-confusion-gating";
 }
 
 // ═══════════════════════════════════════════════════════════════

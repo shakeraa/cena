@@ -173,9 +173,24 @@ public sealed class LearningSessionActor : IActor
             : 1.0;
         _lastWrongOnMastered = !req.IsCorrect && req.PriorMastery > 0.7;
 
+        // SAI-005: Update confusion window counters BEFORE detection
+        // The window tracks questions since confusion was first detected.
+        if (_lastConfusionState != ConfusionState.NotConfused)
+        {
+            _confusionWindowQuestions++;
+            if (req.IsCorrect) _confusionWindowCorrect++;
+        }
+
         // SAI-005: Detect cognitive state for explanation delivery gating
         _lastConfusionState = _confusionDetector.Detect(BuildConfusionInput());
         _lastDisengagementType = _disengagementClassifier.Classify(BuildDisengagementInput());
+
+        // Reset confusion window when confusion resolves
+        if (_lastConfusionState == ConfusionState.NotConfused)
+        {
+            _confusionWindowQuestions = 0;
+            _confusionWindowCorrect = 0;
+        }
 
         // Track for fatigue calculation (O(1) enqueue/dequeue)
         _recentAccuracies.Enqueue(req.IsCorrect ? 1.0 : 0.0);

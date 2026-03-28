@@ -165,7 +165,11 @@ public sealed partial class StudentActor
                         explanation = await ResolveExplanationAsync(
                             readModel, cmd.Answer, ErrorType.None.ToString(),
                             GetActiveMethodology(cmd.ConceptId),
-                            priorMastery, CancellationToken.None);
+                            priorMastery, CancellationToken.None,
+                            conceptId: cmd.ConceptId,
+                            backspaceCount: cmd.BackspaceCount,
+                            answerChangeCount: cmd.AnswerChangeCount,
+                            responseTimeMs: cmd.ResponseTimeMs);
                     }
                     else
                     {
@@ -297,7 +301,11 @@ public sealed partial class StudentActor
                         var explanation = await ResolveExplanationAsync(
                             readModel, cmd.Answer, eval.ClassifiedErrorType.ToString(),
                             GetActiveMethodology(cmd.ConceptId),
-                            prior, CancellationToken.None);
+                            prior, CancellationToken.None,
+                            conceptId: cmd.ConceptId,
+                            backspaceCount: cmd.BackspaceCount,
+                            answerChangeCount: cmd.AnswerChangeCount,
+                            responseTimeMs: cmd.ResponseTimeMs);
 
                         enrichedEval = eval with { Explanation = explanation };
                     }
@@ -734,6 +742,7 @@ public sealed partial class StudentActor
     /// Resolves the best explanation using the ExplanationOrchestrator pipeline.
     /// Applies rate limiting: max 3 LLM generation calls per student per minute.
     /// If rate limit is hit, falls back to L1 static or empty string.
+    /// SAI-004: Builds L3 context from available student signals for personalized explanations.
     /// </summary>
     private async Task<string> ResolveExplanationAsync(
         Questions.QuestionReadModel readModel,
@@ -741,12 +750,26 @@ public sealed partial class StudentActor
         string errorType,
         string methodology,
         double conceptMastery,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? conceptId = null,
+        int backspaceCount = 0,
+        int answerChangeCount = 0,
+        int responseTimeMs = 0)
     {
         // Rate limit check: prune timestamps older than 1 minute
         var cutoff = DateTimeOffset.UtcNow.AddMinutes(-1);
         while (_llmExplanationTimestamps.Count > 0 && _llmExplanationTimestamps.Peek() < cutoff)
             _llmExplanationTimestamps.Dequeue();
+
+        // SAI-004: Build L3 context from available student signals
+        L3ExplanationRequest? l3Context = null;
+        if (conceptId is not null)
+        {
+            l3Context = BuildL3Context(
+                readModel, studentAnswer, errorType, methodology,
+                conceptMastery, conceptId,
+                backspaceCount, answerChangeCount, responseTimeMs);
+        }
 
         var request = new ExplanationRequest(
             QuestionId: readModel.Id,
@@ -760,7 +783,8 @@ public sealed partial class StudentActor
             BloomsLevel: readModel.BloomsLevel,
             Subject: readModel.Subject,
             Language: readModel.Language,
-            ConceptMastery: conceptMastery);
+            ConceptMastery: conceptMastery,
+            L3Context: l3Context);
 
         // If rate limit exceeded, the orchestrator will still check L2 cache and L1 static.
         // Only L3 LLM generation needs gating. The orchestrator's try-catch on LLM failure
@@ -784,5 +808,128 @@ public sealed partial class StudentActor
         _llmExplanationTimestamps.Enqueue(DateTimeOffset.UtcNow);
 
         return explanation;
+    }
+
+    // =========================================================================
+    // SAI-004: L3 Context Builder
+    // =========================================================================
+
+    /// <summary>
+    /// Builds L3ExplanationRequest from available student state signals.
+    /// Collects mastery, affect, behavioral, and instructional context.
+    /// Never includes student ID or PII.
+    /// </summary>
+    private L3ExplanationRequest? BuildL3Context(
+        Questions.QuestionReadModel readModel,
+        string studentAnswer,
+        string errorType,
+        string methodology,
+        double conceptMastery,
+        string conceptId,
+        int backspaceCount,
+        int answerChangeCount,
+        int responseTimeMs)
+    {
+        try
+        {
+            // ── Mastery context ──
+            var masteryState = _state.MasteryOverlay.GetValueOrDefault(conceptId);
+            var now = DateTimeOffset.UtcNow;
+            double recallProbability = masteryState?.RecallProbability(now) ?? 0.0;
+            int bloomLevel = masteryState?.BloomLevel ?? readModel.BloomsLevel;
+            var recentErrors = masteryState?.RecentErrors
+                .Select(e => e.ToString())
+                .ToList() as IReadOnlyList<string> ?? Array.Empty<string>();
+            var qualityQuadrant = masteryState?.QualityQuadrant ?? Cena.Actors.Mastery.MasteryQuality.Struggling;
+            var methodHistory = _state.MethodAttemptHistory
+                .GetValueOrDefault(conceptId, new())
+                .Select(m => m.Methodology)
+                .ToList() as IReadOnlyList<string> ?? Array.Empty<string>();
+
+            // ── Scaffolding ──
+            float effectiveMastery = (float)conceptMastery;
+            // PSI: use 1.0 (always ready) as default when no graph cache is available
+            float psi = 1.0f;
+            var scaffoldingLevel = Cena.Actors.Mastery.ScaffoldingService.DetermineLevel(effectiveMastery, psi);
+
+            // ── Affect context (SAI-004: use real detectors instead of hardcoded defaults) ──
+            double medianRtMs = _state.ResponseBaseline.MedianResponseTimeMs;
+            double rtRatio = medianRtMs > 0 ? responseTimeMs / medianRtMs : 1.0;
+            bool wrongOnMastered = conceptMastery >= 0.7;
+            var recentAttempts = _state.RecentAttempts;
+            double recentAccuracy = recentAttempts.Count >= 5
+                ? recentAttempts.TakeLast(5).Count(a => a.IsCorrect) / 5.0
+                : recentAttempts.Count > 0
+                    ? recentAttempts.Count(a => a.IsCorrect) / (double)recentAttempts.Count
+                    : 0.5;
+
+            var confusionState = _confusionDetector.Detect(new ConfusionInput(
+                WrongOnMasteredConcept: wrongOnMastered,
+                ResponseTimeRatio: rtRatio,
+                LastAnswerCorrect: recentAttempts.Count > 0 && recentAttempts[^1].IsCorrect,
+                AnswerChangedCount: answerChangeCount,
+                HintRequestedThenCancelled: false,
+                QuestionsInConfusionWindow: 0,
+                AccuracyInConfusionWindow: recentAccuracy));
+
+            var disengagementType = _disengagementClassifier.Classify(new DisengagementInput(
+                RecentAccuracy: recentAccuracy,
+                ResponseTimeRatio: rtRatio,
+                EngagementTrend: 0.0,
+                HintRequestRate: 0.0,
+                AppBackgroundingRate: 0.0,
+                MinutesSinceLastBreak: 10,
+                TouchPatternConsistencyDelta: 0.0,
+                SessionsToday: 1,
+                MinutesInSession: 10,
+                IsLateEvening: false));
+
+            var focusLevel = disengagementType switch
+            {
+                Services.DisengagementType.Fatigued_Cognitive
+                    or Services.DisengagementType.Fatigued_Motor => FocusLevel.Fatigued,
+                Services.DisengagementType.Bored_TooEasy
+                    or Services.DisengagementType.Bored_NoValue => FocusLevel.DisengagedBored,
+                Services.DisengagementType.Mixed => FocusLevel.Drifting,
+                _ => FocusLevel.Engaged
+            };
+
+            return new L3ExplanationRequest
+            {
+                QuestionId = readModel.Id,
+                QuestionStem = readModel.StemPreview,
+                CorrectAnswer = "",
+                StudentAnswer = studentAnswer,
+                ErrorType = errorType,
+                Subject = readModel.Subject,
+                Language = readModel.Language,
+                StaticExplanation = readModel.Explanation,
+                DistractorRationale = null,
+                MasteryProbability = conceptMastery,
+                RecallProbability = recallProbability,
+                BloomLevel = bloomLevel,
+                Psi = psi,
+                RecentErrorTypes = recentErrors,
+                QualityQuadrant = qualityQuadrant,
+                ScaffoldingLevel = scaffoldingLevel,
+                Methodology = methodology,
+                MethodHistory = methodHistory,
+                FocusLevel = focusLevel,
+                DisengagementType = disengagementType,
+                ConfusionState = confusionState,
+                BackspaceCount = backspaceCount,
+                AnswerChangeCount = answerChangeCount,
+                ResponseTimeMs = responseTimeMs,
+                MedianResponseTimeMs = medianRtMs
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex,
+                "SAI-004: Failed to build L3 context for concept {ConceptId}. " +
+                "Falling back to L2-only resolution.",
+                conceptId);
+            return null;
+        }
     }
 }

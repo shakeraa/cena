@@ -91,5 +91,14 @@ public record ExperimentSessionMetrics(
 
     // ── Self-report (post-session) ──
     int? SelfReportedFocus,             // 1-5 scale: "How focused were you?" (Hebrew/Arabic)
-    string? SelfReportLanguage          // "he" or "ar" — for bilingual analysis
+    string? SelfReportLanguage,         // "he" or "ar" — for bilingual analysis
+
+    // ── SAI-006: Student AI Interaction metrics ──
+    string? ExplanationSource = null,          // "L1Static", "L2Cache", "L2Generated", "L3Personalized", "None"
+    float? HintCreditMultiplier = null,        // Actual P_T multiplier used (1.0, 0.7, 0.4, 0.1)
+    string? DeliveryGateAction = null,         // "Deliver", "Defer", "Suppress"
+    double? MasteryGainDelta = null,           // BKT delta on related concept (for adaptive_explanations experiment)
+    double? HintUsageRate = null,              // Hints requested / questions attempted (for hint_bkt experiment)
+    double? ConfusionResolutionRate = null,    // Confusions resolved / confusions detected (for confusion_gating)
+    int? SelfReportedUnderstanding = null      // 1-5 scale: "How well did you understand the explanations?"
 );
