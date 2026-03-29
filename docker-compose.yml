@@ -29,9 +29,13 @@ services:
     container_name: cena-redis
     ports:
       - "6380:6379"
-    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:-cena_dev_redis}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-cena_dev_redis}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -100,6 +104,28 @@ services:
       - ./src/infra/docker/nats-setup.sh:/setup.sh
     entrypoint: ["/bin/sh", "/setup.sh"]
     restart: "no"
+
+  # ── PostgreSQL Backup Sidecar (pg_dump every 6 hours) ──
+  postgres-backup:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./config/backup:/scripts:ro
+      - postgres_backups:/backups
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-cena_dev_password}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Backup scheduler started. First backup in 10s, then every 6 hours."
+        sleep 10
+        while true; do
+          /scripts/backup.sh
+          sleep 21600
+        done
+    restart: unless-stopped
 
 volumes:
   postgres_data:

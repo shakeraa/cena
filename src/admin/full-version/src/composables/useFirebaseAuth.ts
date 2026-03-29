@@ -11,6 +11,7 @@ import type { User as FirebaseUser } from 'firebase/auth'
 import { firebaseAuth } from '@/plugins/firebase'
 import { ability } from '@/plugins/casl/ability'
 import type { CenaRole } from '@/plugins/casl/ability'
+import { mapRoleToAbilities } from '@/plugins/casl/role-abilities'
 
 export interface CenaUser {
   uid: string
@@ -24,38 +25,6 @@ export interface CenaUser {
 }
 
 const ADMIN_ROLES: CenaRole[] = ['MODERATOR', 'ADMIN', 'SUPER_ADMIN']
-
-function mapRoleToAbilities(role: CenaRole) {
-  switch (role) {
-    case 'SUPER_ADMIN':
-      return [{ action: 'manage' as const, subject: 'all' as const }]
-    case 'ADMIN':
-      return [
-        { action: 'manage' as const, subject: 'Users' as const },
-        { action: 'manage' as const, subject: 'Content' as const },
-        { action: 'manage' as const, subject: 'Questions' as const },
-        { action: 'manage' as const, subject: 'Analytics' as const },
-        { action: 'manage' as const, subject: 'Focus' as const },
-        { action: 'manage' as const, subject: 'Mastery' as const },
-        { action: 'manage' as const, subject: 'Outreach' as const },
-        { action: 'manage' as const, subject: 'Pedagogy' as const },
-        { action: 'manage' as const, subject: 'Tutoring' as const },
-        { action: 'read' as const, subject: 'System' as const },
-        { action: 'read' as const, subject: 'AuditLog' as const },
-        { action: 'manage' as const, subject: 'Settings' as const },
-      ]
-    case 'MODERATOR':
-      return [
-        { action: 'manage' as const, subject: 'Content' as const },
-        { action: 'manage' as const, subject: 'Questions' as const },
-        { action: 'read' as const, subject: 'Analytics' as const },
-        { action: 'read' as const, subject: 'Pedagogy' as const },
-        { action: 'read' as const, subject: 'Tutoring' as const },
-      ]
-    default:
-      return []
-  }
-}
 
 function extractCenaUser(firebaseUser: FirebaseUser, claims: Record<string, unknown>): CenaUser {
   return {

@@ -2,8 +2,8 @@
 // Cena Platform -- Event Stream & DLQ Service
 // ADM-013: Real-time event monitoring and dead letter queue
 // =============================================================================
-#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
+using Cena.Actors.Infrastructure;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -27,8 +27,6 @@ public sealed class EventStreamService : IEventStreamService
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<EventStreamService> _logger;
-    private static readonly List<DomainEvent> _mockEvents = GenerateMockEvents();
-    private static readonly List<DeadLetterMessage> _mockDlq = GenerateMockDlq();
 
     public EventStreamService(
         IDocumentStore store,
@@ -42,127 +40,134 @@ public sealed class EventStreamService : IEventStreamService
 
     public async Task<EventStreamResponse> GetRecentEventsAsync(int count, string? continuationToken)
     {
-        var events = _mockEvents
+        await using var session = _store.QuerySession();
+        var rawEvents = await session.Events
+            .QueryAllRawEvents()
             .OrderByDescending(e => e.Timestamp)
             .Take(count)
-            .ToList();
+            .ToListAsync();
+
+        var events = rawEvents.Select(e => new DomainEvent(
+            Id: e.Id.ToString(),
+            EventType: e.EventTypeName,
+            AggregateType: e.StreamKey != null ? "Keyed" : "Guid",
+            AggregateId: e.StreamKey ?? e.StreamId.ToString(),
+            Timestamp: e.Timestamp,
+            PayloadJson: e.Data?.ToString() ?? "{}",
+            Version: (int)e.Version,
+            CorrelationId: e.CausationId?.ToString()
+        )).ToList();
 
         return new EventStreamResponse(events, null);
     }
 
     public async Task<EventRateResponse> GetEventRatesAsync()
     {
-        var random = new Random();
-        var types = new[] { "ConceptAttempted", "ConceptMastered", "SessionStarted", "SessionEnded", "StagnationDetected", "MethodologySwitched" };
+        await using var session = _store.QuerySession();
+        var since = DateTimeOffset.UtcNow.AddMinutes(-5);
 
-        var byType = types.Select(t => new EventTypeCount(t, random.Next(100, 1000), 0)).ToList();
+        var recentEvents = await session.Events
+            .QueryAllRawEvents()
+            .Where(e => e.Timestamp >= since)
+            .ToListAsync();
+
+        var byType = recentEvents
+            .GroupBy(e => e.EventTypeName)
+            .Select(g => new EventTypeCount(g.Key, g.Count(), 0))
+            .ToList();
+
         var total = byType.Sum(t => t.Count);
-        byType = byType.Select(t => t with { Percentage = (float)Math.Round(t.Count * 100f / total, 1) }).ToList();
+        byType = byType.Select(t => t with
+        {
+            Percentage = total > 0 ? (float)System.Math.Round(t.Count * 100f / total, 1) : 0f
+        }).ToList();
 
-        return new EventRateResponse(total / 60f, byType);
+        var elapsedSeconds = (float)(DateTimeOffset.UtcNow - since).TotalSeconds;
+        var eventsPerSecond = elapsedSeconds > 0 ? total / elapsedSeconds : 0f;
+
+        return new EventRateResponse(eventsPerSecond, byType);
     }
 
     public async Task<DeadLetterQueueResponse> GetDeadLetterQueueAsync(int page, int pageSize)
     {
-        var items = _mockDlq
+        await using var session = _store.QuerySession();
+        var totalCount = await session.Query<NatsOutboxDeadLetter>().CountAsync();
+
+        var items = await session.Query<NatsOutboxDeadLetter>()
+            .OrderByDescending(d => d.DeadLetteredAt)
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToList();
+            .ToListAsync();
 
-        return new DeadLetterQueueResponse(items, _mockDlq.Count, _mockDlq.Count > page * pageSize);
+        var messages = items.Select(d => new DeadLetterMessage(
+            Id: d.Id.ToString(),
+            FailedAt: d.DeadLetteredAt,
+            Source: $"outbox.stream.{d.StreamId}",
+            EventType: d.EventType,
+            ErrorMessage: $"Dead-lettered after {d.RetryCount} retries (seq {d.EventSequence})",
+            RetryCount: d.RetryCount,
+            PayloadPreview: null
+        )).ToList();
+
+        return new DeadLetterQueueResponse(messages, totalCount, totalCount > page * pageSize);
     }
 
     public async Task<DeadLetterDetailResponse?> GetDeadLetterDetailAsync(string id)
     {
-        var msg = _mockDlq.FirstOrDefault(m => m.Id == id);
-        if (msg == null) return null;
+        if (!Guid.TryParse(id, out var guid)) return null;
+
+        await using var session = _store.QuerySession();
+        var dlq = await session.LoadAsync<NatsOutboxDeadLetter>(guid);
+        if (dlq == null) return null;
 
         return new DeadLetterDetailResponse(
-            msg.Id,
-            msg.FailedAt,
-            msg.Source,
-            msg.EventType,
-            msg.ErrorMessage,
-            "{ \"full\": \"payload\", \"data\": { \"id\": \"123\", \"value\": 456 } }",
-            "System.Exception: Processing failed\n   at Cena.Actors.ProcessEvent...",
-            msg.RetryCount,
-            new List<RetryAttempt>
-            {
-                new(1, msg.FailedAt.AddMinutes(-30), "Connection timeout"),
-                new(2, msg.FailedAt.AddMinutes(-15), "Serialization error")
-            });
+            dlq.Id.ToString(),
+            dlq.DeadLetteredAt,
+            $"outbox.stream.{dlq.StreamId}",
+            dlq.EventType,
+            $"Dead-lettered after {dlq.RetryCount} retries (seq {dlq.EventSequence})",
+            $"{{ \"eventSequence\": {dlq.EventSequence}, \"streamId\": \"{dlq.StreamId}\" }}",
+            null,
+            dlq.RetryCount,
+            new List<RetryAttempt>());
     }
 
-    public async Task<RetryMessageResponse> RetryMessageAsync(string id)
+    public Task<RetryMessageResponse> RetryMessageAsync(string id)
     {
         _logger.LogInformation("Retrying DLQ message {MessageId}", id);
-        return new RetryMessageResponse(id, true, null);
+        // Real retry would re-enqueue to outbox; for now acknowledge the request
+        return Task.FromResult(new RetryMessageResponse(id, true, null));
     }
 
-    public async Task<BulkRetryResponse> BulkRetryAsync(IReadOnlyList<string> ids)
+    public Task<BulkRetryResponse> BulkRetryAsync(IReadOnlyList<string> ids)
     {
         _logger.LogInformation("Bulk retrying {Count} DLQ messages", ids.Count);
-        return new BulkRetryResponse(ids.Count, 0, new List<string>());
+        return Task.FromResult(new BulkRetryResponse(ids.Count, 0, new List<string>()));
     }
 
     public async Task<bool> DiscardDeadLetterAsync(string id)
     {
-        var exists = _mockDlq.Any(m => m.Id == id);
-        if (exists)
-            _logger.LogInformation("Discarding DLQ message {MessageId}", id);
-        return exists;
+        if (!Guid.TryParse(id, out var guid)) return false;
+
+        await using var session = _store.LightweightSession();
+        var exists = await session.LoadAsync<NatsOutboxDeadLetter>(guid);
+        if (exists == null) return false;
+
+        session.Delete(exists);
+        await session.SaveChangesAsync();
+        _logger.LogInformation("Discarded DLQ message {MessageId}", id);
+        return true;
     }
 
     public async Task<DlqDepthAlert> CheckDlqDepthAsync()
     {
-        var depth = _mockDlq.Count;
+        await using var session = _store.QuerySession();
+        var depth = await session.Query<NatsOutboxDeadLetter>().CountAsync();
+
         return new DlqDepthAlert(
             depth > 10,
             depth,
             10,
             depth > 50 ? "critical" : (depth > 20 ? "warning" : "info"));
-    }
-
-    private static List<DomainEvent> GenerateMockEvents()
-    {
-        var events = new List<DomainEvent>();
-        var random = new Random(42);
-        var types = new[] { "ConceptAttempted", "ConceptMastered", "SessionStarted", "SessionEnded", "StagnationDetected", "MethodologySwitched" };
-        var aggregates = new[] { "Student", "Session", "Concept" };
-
-        for (int i = 0; i < 100; i++)
-        {
-            events.Add(new DomainEvent(
-                Id: $"evt-{i}",
-                EventType: types[random.Next(types.Length)],
-                AggregateType: aggregates[random.Next(aggregates.Length)],
-                AggregateId: $"agg-{random.Next(1000)}",
-                Timestamp: DateTimeOffset.UtcNow.AddSeconds(-random.Next(1, 3600)),
-                PayloadJson: "{ \"data\": \"sample\" }",
-                Version: random.Next(1, 10),
-                CorrelationId: $"corr-{random.Next(100)}"));
-        }
-
-        return events;
-    }
-
-    private static List<DeadLetterMessage> GenerateMockDlq()
-    {
-        var messages = new List<DeadLetterMessage>();
-        var random = new Random(42);
-
-        for (int i = 0; i < 15; i++)
-        {
-            messages.Add(new DeadLetterMessage(
-                Id: $"dlq-{i}",
-                FailedAt: DateTimeOffset.UtcNow.AddHours(-random.Next(1, 48)),
-                Source: $"nats.consumer.{random.Next(1, 5)}",
-                EventType: random.NextSingle() > 0.5 ? "ConceptAttempted" : "SessionEnded",
-                ErrorMessage: random.NextSingle() > 0.5 ? "Deserialization failed" : "Processing timeout",
-                RetryCount: random.Next(1, 5),
-                PayloadPreview: "{ \"id\": \"..."));
-        }
-
-        return messages;
     }
 }

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtml } from '@/utils/sanitize'
 import ExplanationVersionHistory from '@/views/apps/questions/edit/ExplanationVersionHistory.vue'
 import QualityGateScores from '@/views/apps/questions/edit/QualityGateScores.vue'
 import LanguageVersionPanel from '@/views/apps/questions/edit/LanguageVersionPanel.vue'
@@ -274,7 +275,7 @@ const shortId = (id: string) => id?.length > 10 ? `${id.slice(0, 10)}...` : id
                   <VCardTitle class="text-body-1 font-weight-medium">Question Stem</VCardTitle>
                 </VCardItem>
                 <VCardText>
-                  <div class="text-body-1" v-html="question.stemHtml || question.stem" />
+                  <div class="text-body-1" v-html="sanitizeHtml((question.stemHtml || question.stem) ?? '')" />
                 </VCardText>
               </VCard>
 
@@ -297,7 +298,7 @@ const shortId = (id: string) => id?.length > 10 ? `${id.slice(0, 10)}...` : id
                     >
                       {{ opt.label }}
                     </VChip>
-                    <span class="text-body-1 flex-grow-1" v-html="opt.textHtml || opt.text" />
+                    <span class="text-body-1 flex-grow-1" v-html="sanitizeHtml((opt.textHtml || opt.text) ?? '')" />
                     <VIcon v-if="opt.isCorrect" icon="tabler-check" color="success" size="20" />
                     <VTooltip v-if="opt.distractorRationale" location="start">
                       <template #activator="{ props: tp }">

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtml } from '@/utils/sanitize'
 import usFlag from '@images/icons/countries/us.png'
 import americanExpress from '@images/icons/payments/img/american-express.png'
 import mastercard from '@images/icons/payments/img/mastercard.png'
@@ -197,7 +198,7 @@ const paymentData = [
                 </h6>
                 <div
                   class="text-body-1"
-                  v-html="address.address"
+                  v-html="sanitizeHtml(address.address ?? '')"
                 />
               </div>
             </div>

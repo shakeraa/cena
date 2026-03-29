@@ -5,7 +5,9 @@
 // =============================================================================
 
 using System.Diagnostics;
+using Cena.Infrastructure.Configuration;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -26,10 +28,10 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
 
     public EmbeddingAdminService(
         IConfiguration configuration,
+        IHostEnvironment environment,
         ILogger<EmbeddingAdminService> logger)
     {
-        _connectionString = configuration.GetConnectionString("PostgreSQL")
-            ?? "Host=localhost;Port=5433;Database=cena;Username=cena;Password=cena_dev_password;Include Error Detail=true";
+        _connectionString = CenaConnectionStrings.GetPostgres(configuration, environment);
         _logger = logger;
     }
 

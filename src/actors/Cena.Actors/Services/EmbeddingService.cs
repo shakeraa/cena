@@ -8,7 +8,9 @@
 using System.Text;
 using System.Text.Json;
 using Cena.Actors.Ingest;
+using Cena.Infrastructure.Configuration;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Npgsql;
 
@@ -130,11 +132,11 @@ public sealed class EmbeddingService : IEmbeddingService, IDisposable
 
     public EmbeddingService(
         IConfiguration configuration,
+        IHostEnvironment environment,
         HttpClient httpClient,
         ILogger<EmbeddingService> logger)
     {
-        _connectionString = configuration.GetConnectionString("PostgreSQL")
-            ?? "Host=localhost;Port=5433;Database=cena;Username=cena;Password=cena_dev_password;Include Error Detail=true";
+        _connectionString = CenaConnectionStrings.GetPostgres(configuration, environment);
         _httpClient = httpClient;
         _logger = logger;
 

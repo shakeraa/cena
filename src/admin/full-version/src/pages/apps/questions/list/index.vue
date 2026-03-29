@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtml } from '@/utils/sanitize'
 import QuestionDetail from '@/views/apps/questions/QuestionDetail.vue'
 
 definePage({ meta: { action: 'read', subject: 'Questions' } })
@@ -779,7 +780,7 @@ const exportCsv = () => {
           <div
             class="text-body-2 text-truncate"
             style="max-inline-size: 280px;"
-            v-html="truncateStem(item.stem)"
+            v-html="sanitizeHtml(truncateStem(item.stem))"
           />
         </template>
 

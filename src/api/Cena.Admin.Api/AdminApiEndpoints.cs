@@ -261,7 +261,7 @@ public static class AdminApiEndpoints
                 lastCheckAt = now.ToString("o")
             });
             return Results.Ok(new { services });
-        }).AllowAnonymous().WithName("GetSystemHealth");
+        }).WithName("GetSystemHealth");
 
         group.MapGet("/metrics", async (HttpContext ctx, ISystemMonitoringService service) =>
         {

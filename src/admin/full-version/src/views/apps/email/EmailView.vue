@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
+import { sanitizeHtml } from '@/utils/sanitize'
 import type { MoveEmailToAction } from '@/views/apps/email/useEmail'
 import { useEmail } from '@/views/apps/email/useEmail'
 import type { Email } from '@db/apps/email/types'
@@ -303,7 +304,7 @@ const updateMailLabel = async (label: Email['labels'][number]) => {
             </div>
             <div
               class="text-base"
-              v-html="props.email.message"
+              v-html="sanitizeHtml(props.email.message ?? '')"
             />
             <!-- eslint-enable -->
           </VCardText>

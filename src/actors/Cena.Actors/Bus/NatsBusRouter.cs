@@ -27,13 +27,26 @@ public sealed class NatsBusRouter : BackgroundService
     private readonly ILogger<NatsBusRouter> _logger;
     private readonly JsonSerializerOptions _jsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
+    private const int MaxConcurrentActivations = 50;
+    private const int MaxRetryAttempts = 3;
+    private static readonly TimeSpan[] RetryDelays = [
+        TimeSpan.FromSeconds(1),
+        TimeSpan.FromSeconds(2),
+        TimeSpan.FromSeconds(4)
+    ];
+
+    private readonly SemaphoreSlim _activationGate = new(MaxConcurrentActivations, MaxConcurrentActivations);
+
     private long _commandsRouted;
     private long _eventsPublished;
     private long _sessionsStarted;
     private long _errorsCount;
+    private long _retriesAttempted;
+    private long _deadLettered;
     private readonly ConcurrentDictionary<string, ActorLiveStats> _actorStats = new();
     private readonly ConcurrentDictionary<string, long> _errorsByCategory = new();
-    private readonly ConcurrentBag<ErrorEntry> _recentErrors = new();
+    private readonly ConcurrentQueue<ErrorEntry> _recentErrors = new();
+    private const int MaxRecentErrors = 250;
 
     public sealed record ErrorEntry(
         DateTimeOffset Timestamp,
@@ -68,10 +81,12 @@ public sealed class NatsBusRouter : BackgroundService
     public long EventsPublished => Interlocked.Read(ref _eventsPublished);
     public long SessionsStarted => Interlocked.Read(ref _sessionsStarted);
     public long ErrorsCount => Interlocked.Read(ref _errorsCount);
+    public long RetriesAttempted => Interlocked.Read(ref _retriesAttempted);
+    public long DeadLettered => Interlocked.Read(ref _deadLettered);
     public IReadOnlyDictionary<string, ActorLiveStats> ActiveActors => _actorStats;
     public IReadOnlyDictionary<string, long> ErrorsByCategory => _errorsByCategory;
     public IReadOnlyList<ErrorEntry> RecentErrors => _recentErrors
-        .OrderByDescending(e => e.Timestamp).Take(50).ToList();
+        .Reverse().Take(50).ToList();
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -127,8 +142,7 @@ public sealed class NatsBusRouter : BackgroundService
                     var envelope = JsonSerializer.Deserialize<BusEnvelope<T>>(rawData, _jsonOpts);
                     if (envelope is not null && envelope.Payload is not null)
                     {
-                        await handler(envelope, ct);
-                        Interlocked.Increment(ref _commandsRouted);
+                        await RouteWithRetry(subject, envelope, rawData, handler, ct);
                     }
                     else
                     {
@@ -141,17 +155,15 @@ public sealed class NatsBusRouter : BackgroundService
                     RecordError("deserialization", subject, ex.Message, null);
                     _logger.LogWarning(ex, "Failed to deserialize message on {Subject}", subject);
                 }
-                catch (TimeoutException ex)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    RecordError("timeout", subject, ex.Message, null);
-                    _logger.LogError(ex, "Timeout routing message from {Subject}", subject);
+                    break;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not TimeoutException)
                 {
                     var category = ex switch
                     {
                         InvalidOperationException => "activation",
-                        OperationCanceledException => "cancelled",
                         _ => "unknown"
                     };
                     RecordError(category, subject, ex.Message, null);
@@ -160,6 +172,71 @@ public sealed class NatsBusRouter : BackgroundService
             }
         }
         catch (OperationCanceledException) { }
+    }
+
+    private async Task RouteWithRetry<T>(
+        string subject,
+        BusEnvelope<T> envelope,
+        byte[] rawData,
+        Func<BusEnvelope<T>, CancellationToken, Task> handler,
+        CancellationToken ct)
+    {
+        await _activationGate.WaitAsync(ct);
+        try
+        {
+            for (var attempt = 0; attempt <= MaxRetryAttempts; attempt++)
+            {
+                try
+                {
+                    await handler(envelope, ct);
+                    Interlocked.Increment(ref _commandsRouted);
+                    return;
+                }
+                catch (TimeoutException) when (attempt < MaxRetryAttempts)
+                {
+                    Interlocked.Increment(ref _retriesAttempted);
+                    _logger.LogWarning(
+                        "Timeout on {Subject} (attempt {Attempt}/{Max}), retrying in {Delay}s...",
+                        subject, attempt + 1, MaxRetryAttempts, RetryDelays[attempt].TotalSeconds);
+                    await Task.Delay(RetryDelays[attempt], ct);
+                }
+                catch (TimeoutException ex)
+                {
+                    // All retries exhausted — send to dead-letter
+                    Interlocked.Increment(ref _deadLettered);
+                    RecordError("timeout", subject, $"Exhausted {MaxRetryAttempts} retries: {ex.Message}", null);
+                    _logger.LogError(
+                        "Dead-lettering message on {Subject} after {Max} retries (msgId={MsgId})",
+                        subject, MaxRetryAttempts, envelope.MessageId);
+
+                    await PublishDeadLetterAsync(subject, rawData);
+                }
+            }
+        }
+        finally
+        {
+            _activationGate.Release();
+        }
+    }
+
+    private async Task PublishDeadLetterAsync(string originalSubject, byte[] rawData)
+    {
+        try
+        {
+            var dlEnvelope = new
+            {
+                OriginalSubject = originalSubject,
+                FailedAt = DateTimeOffset.UtcNow,
+                Retries = MaxRetryAttempts,
+                Payload = Convert.ToBase64String(rawData)
+            };
+            var json = JsonSerializer.Serialize(dlEnvelope, _jsonOpts);
+            await _nats.PublishAsync(NatsSubjects.DeadLetter, json);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to publish dead-letter for {Subject}", originalSubject);
+        }
     }
 
     // ── Command Handlers — route to Proto.Actor virtual actors ──
@@ -288,12 +365,8 @@ public sealed class NatsBusRouter : BackgroundService
         Interlocked.Increment(ref _errorsCount);
         _errorsByCategory.AddOrUpdate(category, 1, (_, c) => c + 1);
 
-        // Keep last 200 errors, trim when over 250
-        _recentErrors.Add(new ErrorEntry(DateTimeOffset.UtcNow, category, subject, message, studentId));
-        if (_recentErrors.Count > 250)
-        {
-            // ConcurrentBag doesn't support removal — acceptable for diagnostics
-        }
+        _recentErrors.Enqueue(new ErrorEntry(DateTimeOffset.UtcNow, category, subject, message, studentId));
+        while (_recentErrors.Count > MaxRecentErrors && _recentErrors.TryDequeue(out _)) { }
     }
 
     private async Task LogStats(CancellationToken ct)
@@ -304,8 +377,10 @@ public sealed class NatsBusRouter : BackgroundService
             if (_commandsRouted > 0)
             {
                 _logger.LogInformation(
-                    "NatsBusRouter stats: {Commands} commands routed, {Events} events published, {Errors} errors",
-                    _commandsRouted, _eventsPublished, _errorsCount);
+                    "NatsBusRouter stats: {Commands} routed, {Events} events, {Errors} errors, {Retries} retries, {DeadLettered} dead-lettered, {Gate}/{Max} gate slots free",
+                    _commandsRouted, _eventsPublished, _errorsCount,
+                    _retriesAttempted, _deadLettered,
+                    _activationGate.CurrentCount, MaxConcurrentActivations);
             }
         }
     }

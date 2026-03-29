@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtml } from '@/utils/sanitize'
 import Footer from '@/views/front-pages/front-page-footer.vue'
 import Navbar from '@/views/front-pages/front-page-navbar.vue'
 import { useConfigStore } from '@core/stores/config'
@@ -58,7 +59,7 @@ setTimeout(async () => {
             <!-- eslint-disable vue/no-v-html -->
             <div
               class="mb-6 text-body-1"
-              v-html="articleData?.productContent"
+              v-html="sanitizeHtml(articleData?.productContent ?? '')"
             />
             <VImg
               class="rounded-lg"

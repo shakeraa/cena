@@ -8,6 +8,7 @@
 using Cena.Actors.Configuration;
 using Cena.Admin.Api;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Seed;
 using Marten;
@@ -23,10 +24,8 @@ builder.Host.UseSerilog((context, services, configuration) =>
 });
 
 // ---- Configuration ----
-var pgConnectionString = builder.Configuration.GetConnectionString("PostgreSQL")
-    ?? "Host=localhost;Port=5433;Database=cena;Username=cena;Password=cena_dev_password;Include Error Detail=true";
-var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
-    ?? "localhost:6380";
+var pgConnectionString = CenaConnectionStrings.GetPostgres(builder.Configuration, builder.Environment);
+var redisConnectionString = CenaConnectionStrings.GetRedis(builder.Configuration, builder.Environment);
 
 // ---- Marten (PostgreSQL) — same DB as actor host ----
 builder.Services.AddMarten(opts =>
@@ -38,6 +37,9 @@ builder.Services.AddMarten(opts =>
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
     var options = ConfigurationOptions.Parse(redisConnectionString);
+    options.Password = builder.Configuration["Redis:Password"]
+        ?? Environment.GetEnvironmentVariable("REDIS_PASSWORD")
+        ?? (builder.Environment.IsDevelopment() ? "cena_dev_redis" : null);
     options.AbortOnConnectFail = false;
     options.ConnectRetry = 3;
     options.ConnectTimeout = 5000;
@@ -70,8 +72,8 @@ builder.Services.AddCors(options =>
     options.AddDefaultPolicy(policy =>
     {
         policy.WithOrigins(allowedOrigins)
-            .AllowAnyHeader()
-            .AllowAnyMethod()
+            .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
+            .WithHeaders("Authorization", "Content-Type", "Accept", "X-Requested-With")
             .AllowCredentials();
     });
 });
@@ -112,6 +114,27 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
     app.UseDeveloperExceptionPage();
+
+// ---- REV-004: Security response headers ----
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["X-XSS-Protection"] = "0"; // Disabled per OWASP (modern browsers handle CSP)
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    headers["Content-Security-Policy"] =
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';";
+
+    if (!context.Request.Path.StartsWithSegments("/health"))
+    {
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    }
+
+    await next();
+});
 
 // Middleware order: CORS → Auth → Revocation → Endpoints
 app.UseCors();

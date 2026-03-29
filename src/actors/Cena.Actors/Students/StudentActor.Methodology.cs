@@ -88,33 +88,31 @@ public sealed partial class StudentActor
                 _studentId, level, levelId, assignment.Methodology,
                 assignment.AttemptCount, assignment.Confidence, assignment.SuccessRate);
 
-            // Fire-and-forget NATS admin alert
-            PublishMethodologyAlert(level, levelId, assignment);
+            // Fire-and-forget NATS admin alert with explicit error handling
+            _ = PublishMethodologyAlert(level, levelId, assignment)
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                        _logger.LogError(t.Exception, "Failed to publish methodology alert for {Level}", level);
+                }, TaskContinuationOptions.OnlyOnFaulted);
         }
     }
 
-    private async void PublishMethodologyAlert(
+    private async Task PublishMethodologyAlert(
         MethodologyLevel level, string levelId, MethodologyAssignment assignment)
     {
-        try
-        {
-            await _nats.PublishAsync("cena.admin.methodology.confidence-reached",
-                System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-                {
-                    StudentId = _studentId,
-                    Level = level.ToString(),
-                    LevelId = levelId,
-                    Methodology = assignment.Methodology.ToString(),
-                    Confidence = assignment.Confidence,
-                    AttemptCount = assignment.AttemptCount,
-                    SuccessRate = assignment.SuccessRate,
-                    Timestamp = DateTimeOffset.UtcNow
-                }));
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to publish methodology confidence alert");
-        }
+        await _nats.PublishAsync("cena.admin.methodology.confidence-reached",
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
+            {
+                StudentId = _studentId,
+                Level = level.ToString(),
+                LevelId = levelId,
+                Methodology = assignment.Methodology.ToString(),
+                Confidence = assignment.Confidence,
+                AttemptCount = assignment.AttemptCount,
+                SuccessRate = assignment.SuccessRate,
+                Timestamp = DateTimeOffset.UtcNow
+            }));
     }
 
     // =========================================================================

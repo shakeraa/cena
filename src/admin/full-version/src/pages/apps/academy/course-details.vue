@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtml } from '@/utils/sanitize'
 import type { CourseDetails } from '@db/apps/academy/types'
 import InstructorPoster from '@images/pages/instructor-poster.png'
 
@@ -151,7 +152,7 @@ const panelStatus = ref(0)
                 Description
               </h5>
               <!-- eslint-disable-next-line vue/no-v-html -->
-              <div v-html="courseDetails?.description" />
+              <div v-html="sanitizeHtml(courseDetails?.description ?? '')" />
 
               <VDivider class="my-6" />
 

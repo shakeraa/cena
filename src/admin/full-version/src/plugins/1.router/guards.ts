@@ -4,6 +4,7 @@ import { onAuthStateChanged } from 'firebase/auth'
 import { firebaseAuth } from '@/plugins/firebase'
 import { ability } from '@/plugins/casl/ability'
 import type { Actions, CenaRole, Subjects } from '@/plugins/casl/ability'
+import { mapRoleToAbilities } from '@/plugins/casl/role-abilities'
 
 /**
  * Wait for Firebase Auth to finish restoring session from IndexedDB.
@@ -39,34 +40,6 @@ function waitForAuthReady(): Promise<void> {
     })
   }
   return _authReady
-}
-
-function mapRoleToAbilities(role: CenaRole) {
-  switch (role) {
-    case 'SUPER_ADMIN':
-      return [{ action: 'manage' as const, subject: 'all' as const }]
-    case 'ADMIN':
-      return [
-        { action: 'manage' as const, subject: 'Users' as const },
-        { action: 'manage' as const, subject: 'Content' as const },
-        { action: 'manage' as const, subject: 'Questions' as const },
-        { action: 'manage' as const, subject: 'Analytics' as const },
-        { action: 'manage' as const, subject: 'Focus' as const },
-        { action: 'manage' as const, subject: 'Mastery' as const },
-        { action: 'manage' as const, subject: 'Pedagogy' as const },
-        { action: 'manage' as const, subject: 'Outreach' as const },
-        { action: 'read' as const, subject: 'System' as const },
-        { action: 'read' as const, subject: 'AuditLog' as const },
-      ]
-    case 'MODERATOR':
-      return [
-        { action: 'manage' as const, subject: 'Content' as const },
-        { action: 'manage' as const, subject: 'Questions' as const },
-        { action: 'read' as const, subject: 'Analytics' as const },
-      ]
-    default:
-      return []
-  }
 }
 
 /**

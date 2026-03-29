@@ -11,6 +11,7 @@ using Cena.Actors.Api;
 using Cena.Admin.Api;
 using Cena.Actors.Configuration;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
@@ -51,10 +52,8 @@ builder.Host.UseSerilog((context, services, configuration) =>
 });
 
 // ---- Read configuration ----
-var pgConnectionString = builder.Configuration.GetConnectionString("PostgreSQL")
-    ?? "Host=localhost;Port=5433;Database=cena;Username=cena;Password=cena_dev_password;Include Error Detail=true";
-var redisConnectionString = builder.Configuration.GetConnectionString("Redis")
-    ?? "localhost:6380";
+var pgConnectionString = CenaConnectionStrings.GetPostgres(builder.Configuration, builder.Environment);
+var redisConnectionString = CenaConnectionStrings.GetRedis(builder.Configuration, builder.Environment);
 var natsUrl = builder.Configuration.GetConnectionString("NATS")
     ?? "nats://localhost:4222";
 
@@ -80,22 +79,17 @@ builder.Services.AddMarten(opts =>
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<IConnectionMultiplexer>>();
-    try
-    {
-        var multiplexer = ConnectionMultiplexer.Connect(redisConnectionString);
-        logger.LogInformation("Connected to Redis at {RedisConnection}", redisConnectionString);
-        return multiplexer;
-    }
-    catch (Exception ex)
-    {
-        logger.LogWarning(ex, "Failed to connect to Redis at {RedisConnection}. Using in-memory fallback.", redisConnectionString);
-        // Return a connection that will retry -- ConnectionMultiplexer handles reconnection
-        var options = ConfigurationOptions.Parse(redisConnectionString);
-        options.AbortOnConnectFail = false;
-        options.ConnectRetry = 3;
-        options.ConnectTimeout = 5000;
-        return ConnectionMultiplexer.Connect(options);
-    }
+    var options = ConfigurationOptions.Parse(redisConnectionString);
+    options.Password = builder.Configuration["Redis:Password"]
+        ?? Environment.GetEnvironmentVariable("REDIS_PASSWORD")
+        ?? (builder.Environment.IsDevelopment() ? "cena_dev_redis" : null);
+    options.AbortOnConnectFail = false;
+    options.ConnectRetry = 3;
+    options.ConnectTimeout = 5000;
+    options.SyncTimeout = 3000;
+    var multiplexer = ConnectionMultiplexer.Connect(options);
+    logger.LogInformation("Connected to Redis at {RedisConnection}", redisConnectionString);
+    return multiplexer;
 });
 
 // =============================================================================
@@ -248,22 +242,39 @@ builder.Services.AddSingleton(provider =>
     // In dev: TestProvider handles local clustering without explicit remote config
     // In prod: will use GrpcNet remote (configured via Kubernetes/ECS service discovery)
 
-    // Cluster provider: in-memory for dev, DynamoDB for prod
-    IClusterProvider clusterProvider;
-    if (isDevelopment)
+    // REV-005: Configuration-driven cluster provider selection
+    var clusterProviderType = provider.GetRequiredService<IConfiguration>()["Cluster:Provider"] ?? "test";
+    var hostEnv = provider.GetRequiredService<IHostEnvironment>();
+
+    IClusterProvider clusterProvider = clusterProviderType.ToLowerInvariant() switch
     {
-        clusterProvider = new TestProvider(new TestProviderOptions(), new InMemAgent());
-        logger.LogInformation("Using in-memory TestProvider for development cluster");
-    }
-    else
-    {
-        // Production: DynamoDB cluster provider configured externally
-        // For now, use TestProvider until DynamoDB SDK is wired in
-        clusterProvider = new TestProvider(new TestProviderOptions(), new InMemAgent());
-        logger.LogWarning(
-            "DynamoDB cluster provider not configured. Using in-memory TestProvider. " +
-            "Set up AWS DynamoDB credentials for production.");
-    }
+        "test" when hostEnv.IsDevelopment() =>
+            new TestProvider(new TestProviderOptions(), new InMemAgent()),
+
+        "test" =>
+            throw new InvalidOperationException(
+                "TestProvider is not allowed outside Development. " +
+                "Set Cluster:Provider to 'kubernetes' or 'consul'."),
+
+        "kubernetes" =>
+            throw new InvalidOperationException(
+                "Kubernetes cluster provider selected but Proto.Cluster.Kubernetes " +
+                "NuGet package is not installed. Install it and wire up " +
+                "KubernetesProvider to enable Kubernetes-based service discovery."),
+
+        "consul" =>
+            throw new InvalidOperationException(
+                "Consul cluster provider selected but Proto.Cluster.Consul " +
+                "NuGet package is not installed. Install it and wire up " +
+                "ConsulProvider with Cluster:ConsulAddress to enable Consul-based discovery."),
+
+        _ => throw new InvalidOperationException(
+            $"Unknown cluster provider: '{clusterProviderType}'. " +
+            "Valid values: test (dev only), kubernetes, consul.")
+    };
+
+    logger.LogInformation("Cluster provider: {Provider} (environment: {Env})",
+        clusterProviderType, hostEnv.EnvironmentName);
 
     // Identity Lookup — PartitionActivatorLookup for single-node dev, PartitionIdentityLookup for prod
     var identityLookup = isDevelopment
@@ -343,6 +354,27 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// ---- REV-004: Security response headers ----
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["X-XSS-Protection"] = "0"; // Disabled per OWASP (modern browsers handle CSP)
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    headers["Content-Security-Policy"] =
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';";
+
+    if (!context.Request.Path.StartsWithSegments("/health"))
+    {
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    }
+
+    await next();
+});
+
 // ---- Prometheus metrics endpoint (RES-002) ----
 app.MapPrometheusScrapingEndpoint();
 
@@ -382,6 +414,8 @@ app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
         eventsPublished = router.EventsPublished,
         sessionsStarted = router.SessionsStarted,
         errorsCount = router.ErrorsCount,
+        retriesAttempted = router.RetriesAttempted,
+        deadLettered = router.DeadLettered,
         errorsByCategory = router.ErrorsByCategory,
         recentErrors = router.RecentErrors.Take(20).Select(e => new
         {
@@ -394,58 +428,24 @@ app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
         activeActorCount = router.ActiveActors.Count,
         actors = actors
     });
-}).WithName("GetActorStats");
+}).RequireAuthorization(CenaAuthPolicies.SuperAdminOnly).WithName("GetActorStats");
 
-// ---- Cluster diagnostic endpoint ----
-app.MapGet("/api/actors/diag", async (ActorSystem system) =>
+// ---- Cluster diagnostic endpoint (read-only, REV-004) ----
+app.MapGet("/api/actors/diag", (ActorSystem system) =>
 {
     var cluster = system.Cluster();
-    var members = cluster.MemberList.GetMembers();
-    var diag = new
+    return Results.Ok(new
     {
-        systemId = system.Id,
-        address = system.Address,
-        memberCount = members?.Count ?? 0,
-        members = members?.ToArray(),
-        clusterKinds = cluster.GetClusterKinds()
-    };
-
-    // Test 1: Direct actor spawn (bypasses cluster serialization)
-    string spawnResult;
-    try
-    {
-        var provider = system.Root.Get<IServiceProvider>();
-        var props = Props.FromProducer(() =>
-            ActivatorUtilities.CreateInstance<Cena.Actors.Students.StudentActor>(
-                app.Services));
-        var pid = system.Root.SpawnNamed(props, "diag-student-001");
-        var resp = await system.Root.RequestAsync<object>(pid,
-            new Cena.Actors.Students.GetStudentProfile("diag-test-001"),
-            TimeSpan.FromSeconds(5));
-        spawnResult = resp != null ? $"OK: {resp.GetType().Name}" : "null response (actor might have no state)";
-        await system.Root.StopAsync(pid);
-    }
-    catch (Exception ex)
-    {
-        spawnResult = $"FAIL: {ex.GetType().Name}: {ex.Message}";
-    }
-
-    // Test 2: Cluster activation
-    string activationResult;
-    try
-    {
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        var identity = ClusterIdentity.Create("diag-test-002", "student");
-        var result = await cluster.RequestAsync<object>(identity, new Cena.Actors.Students.GetStudentProfile("diag-test-002"), cts.Token);
-        activationResult = result != null ? $"OK: {result.GetType().Name}" : "null response";
-    }
-    catch (Exception ex)
-    {
-        activationResult = $"FAIL: {ex.GetType().Name}: {ex.Message}";
-    }
-
-    return Results.Ok(new { diag, spawnResult, activationResult });
-}).WithName("ClusterDiagnostic");
+        ClusterId = cluster.Config.ClusterName,
+        MemberCount = cluster.MemberList.GetAllMembers().Length,
+        Members = cluster.MemberList.GetAllMembers().Select(m => new
+        {
+            m.Address, m.Kinds, m.Id
+        }),
+        SystemId = system.Id,
+        Address = system.Address,
+    });
+}).RequireAuthorization(CenaAuthPolicies.SuperAdminOnly).WithName("ClusterDiagnostic");
 
 // ---- Auth middleware (required by admin endpoints with RequireAuthorization) ----
 app.UseAuthentication();

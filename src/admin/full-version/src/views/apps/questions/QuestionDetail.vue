@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtml } from '@/utils/sanitize'
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 
 interface Props {
@@ -196,7 +197,7 @@ const closeDrawer = () => {
               <VCardText>
                 <div
                   class="text-body-1"
-                  v-html="question.stem"
+                  v-html="sanitizeHtml(question.stem ?? '')"
                 />
               </VCardText>
             </VCard>

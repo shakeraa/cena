@@ -262,11 +262,10 @@ public sealed class AdminDashboardService : IAdminDashboardService
                 ? Math.Min(95f, (float)cumulativeMastered / (totalAttempts * 0.01f + 1) * 10f)
                 : 0f;
 
-            // Split into subjects (simulation is all math, but show trend)
             dataPoints.Add(new SubjectMasteryPoint(
                 Date: date.ToString("yyyy-MM-dd"),
                 Math: MathF.Round(masteryPct, 1),
-                Physics: MathF.Round(masteryPct * 0.7f, 1))); // Physics tracks lower
+                Physics: 0f)); // Physics curriculum not yet implemented
         }
 
         var response = new MasteryProgressResponse(period, dataPoints);

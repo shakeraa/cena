@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { sanitizeHtml } from '@/utils/sanitize'
 import { $api } from '@/utils/api'
 
 definePage({
@@ -309,7 +310,7 @@ onMounted(fetchItem)
             <!-- eslint-disable vue/no-v-html -->
             <div
               class="text-body-1 question-content"
-              v-html="item.questionText"
+              v-html="sanitizeHtml(item.questionText ?? '')"
             />
             <!-- eslint-enable vue/no-v-html -->
           </VCardText>

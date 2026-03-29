@@ -5,6 +5,7 @@
 // Idempotent: safe to run repeatedly.
 // =============================================================================
 
+using Cena.Infrastructure.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -23,10 +24,10 @@ public sealed class PgVectorMigrationService : IHostedService
 
     public PgVectorMigrationService(
         IConfiguration configuration,
+        IHostEnvironment environment,
         ILogger<PgVectorMigrationService> logger)
     {
-        _connectionString = configuration.GetConnectionString("PostgreSQL")
-            ?? "Host=localhost;Port=5433;Database=cena;Username=cena;Password=cena_dev_password;Include Error Detail=true";
+        _connectionString = CenaConnectionStrings.GetPostgres(configuration, environment);
         _logger = logger;
     }
 
