@@ -3,6 +3,7 @@
 // BKD-002: Minimal API endpoint registration for user CRUD
 // =============================================================================
 
+using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -16,7 +17,8 @@ public static class AdminUserEndpoints
     {
         var group = app.MapGroup("/api/admin/users")
             .WithTags("Admin Users")
-            .RequireAuthorization(CenaAuthPolicies.AdminOnly);
+            .RequireAuthorization(CenaAuthPolicies.AdminOnly)
+            .RequireRateLimiting("api");
 
         // GET /api/admin/users
         group.MapGet("/", async (
@@ -24,9 +26,11 @@ public static class AdminUserEndpoints
             int? page, int? itemsPerPage, string? sortBy, string? orderBy,
             IAdminUserService service, HttpContext ctx) =>
         {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(itemsPerPage);
             var result = await service.ListUsersAsync(
                 q, role, status, school, grade,
-                page ?? 1, itemsPerPage ?? 10, sortBy, orderBy, ctx.User);
+                validPage, validPageSize, sortBy, orderBy, ctx.User);
             return Results.Ok(result);
         }).WithName("ListUsers");
 
@@ -140,6 +144,22 @@ public static class AdminUserEndpoints
             var file = form.Files.GetFile("file");
             if (file == null)
                 return Results.BadRequest(new { error = "No file uploaded" });
+
+            // REV-011.3: Restrict bulk-invite to CSV only
+            var contentType = file.ContentType ?? "";
+            if (!contentType.Equals("text/csv", StringComparison.OrdinalIgnoreCase)
+                && !contentType.Equals("application/vnd.ms-excel", StringComparison.OrdinalIgnoreCase))
+                return Results.BadRequest(new { error = "Only CSV files are accepted for bulk invite" });
+
+            const long maxBulkInviteSize = 5 * 1024 * 1024; // 5MB for CSV
+            if (file.Length > maxBulkInviteSize)
+                return Results.BadRequest(new { error = $"File exceeds maximum size of {maxBulkInviteSize / (1024 * 1024)}MB" });
+
+            // Sanitize filename
+            var safeName = Path.GetFileName(file.FileName)
+                .Replace("..", "")
+                .Replace("/", "")
+                .Replace("\\", "");
 
             using var stream = file.OpenReadStream();
             var result = await service.BulkInviteAsync(stream);

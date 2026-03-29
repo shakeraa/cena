@@ -2,6 +2,7 @@
 // Cena Platform -- Explanation Cache Admin Endpoints (ADM-018)
 // =============================================================================
 
+using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -15,7 +16,8 @@ public static class ExplanationCacheAdminEndpoints
     {
         var group = app.MapGroup("/api/admin/explanations")
             .WithTags("Explanation Cache Admin")
-            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+            .RequireRateLimiting("api");
 
         // GET /api/admin/explanations/cache-stats
         group.MapGet("/cache-stats", async (IExplanationCacheAdminService service) =>
@@ -50,11 +52,13 @@ public static class ExplanationCacheAdminEndpoints
             int? pageSize,
             IExplanationCacheAdminService service) =>
         {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
             var result = await service.GetQualityScoresAsync(
                 minScore ?? 0f,
                 maxScore ?? 1f,
-                page ?? 1,
-                pageSize ?? 20);
+                validPage,
+                validPageSize);
             return Results.Ok(result);
         }).WithName("GetExplanationQualityScores");
 

@@ -129,5 +129,6 @@ services:
 
 volumes:
   postgres_data:
+  postgres_backups:
   nats_data:
   neo4j_data:

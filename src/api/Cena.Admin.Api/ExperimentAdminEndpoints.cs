@@ -13,7 +13,8 @@ public static class ExperimentAdminEndpoints
     {
         var group = app.MapGroup("/api/admin/experiments")
             .WithTags("Experiment Admin")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         group.MapGet("/", async (IExperimentAdminService service) =>
         {

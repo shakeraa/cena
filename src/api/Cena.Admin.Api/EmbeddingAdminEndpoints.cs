@@ -3,6 +3,7 @@
 // Corpus stats, text search, duplicate detection, reindex trigger
 // =============================================================================
 
+using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -16,7 +17,8 @@ public static class EmbeddingAdminEndpoints
     {
         var group = app.MapGroup("/api/admin/embeddings")
             .WithTags("Embedding Admin")
-            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+            .RequireRateLimiting("api");
 
         // GET /api/admin/embeddings/corpus-stats
         group.MapGet("/corpus-stats", async (IEmbeddingAdminService service) =>
@@ -41,10 +43,12 @@ public static class EmbeddingAdminEndpoints
             int? pageSize,
             IEmbeddingAdminService service) =>
         {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
             var result = await service.GetDuplicatesAsync(
                 threshold ?? 0.95f,
-                page ?? 1,
-                pageSize ?? 20);
+                validPage,
+                validPageSize);
             return Results.Ok(result);
         }).WithName("GetEmbeddingDuplicates");
 

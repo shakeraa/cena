@@ -8,7 +8,17 @@ scrape_configs:
     # Scrape the ASP.NET Core Prometheus endpoint
     # Adjust target if running outside Docker (use host.docker.internal on macOS)
     static_configs:
-      - targets: ["host.docker.internal:5000"]
+      - targets: ["host.docker.internal:5119"]
+        labels:
+          service: "actor-host"
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: "cena-admin-api"
+    static_configs:
+      - targets: ["host.docker.internal:5050"]
+        labels:
+          service: "admin-api"
     metrics_path: /metrics
     scrape_interval: 15s
 

@@ -3,6 +3,7 @@
 // ADM-017: REST endpoints for tutoring session dashboard
 // =============================================================================
 
+using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -16,7 +17,8 @@ public static class TutoringAdminEndpoints
     {
         var group = app.MapGroup("/api/admin/tutoring")
             .WithTags("Tutoring Admin")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         group.MapGet("/sessions", async (
             string? studentId,
@@ -25,8 +27,10 @@ public static class TutoringAdminEndpoints
             int? pageSize,
             ITutoringAdminService service) =>
         {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
             var result = await service.GetSessionsAsync(
-                studentId, status, page ?? 1, pageSize ?? 20);
+                studentId, status, validPage, validPageSize);
             return Results.Ok(result);
         }).WithName("GetTutoringSessions");
 

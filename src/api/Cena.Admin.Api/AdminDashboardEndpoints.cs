@@ -3,6 +3,7 @@
 // BKD-004: Minimal API endpoints for dashboard overview, activity, charts, alerts
 // =============================================================================
 
+using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -16,7 +17,8 @@ public static class AdminDashboardEndpoints
     {
         var group = app.MapGroup("/api/admin/dashboard")
             .WithTags("Admin Dashboard")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         // GET /api/admin/dashboard/home - Combined dashboard data
         group.MapGet("/home", async (IAdminDashboardService service) =>
@@ -35,14 +37,16 @@ public static class AdminDashboardEndpoints
         // GET /api/admin/dashboard/activity?period=30d
         group.MapGet("/activity", async (string? period, IAdminDashboardService service) =>
         {
-            var activity = await service.GetActivityAsync(period ?? "30d");
+            var validPeriod = ParameterValidator.ValidatePeriod(period);
+            var activity = await service.GetActivityAsync(validPeriod);
             return Results.Ok(activity);
         }).WithName("GetDashboardActivity");
 
         // GET /api/admin/dashboard/content-pipeline?period=30d
         group.MapGet("/content-pipeline", async (string? period, IAdminDashboardService service) =>
         {
-            var pipeline = await service.GetContentPipelineAsync(period ?? "30d");
+            var validPeriod = ParameterValidator.ValidatePeriod(period);
+            var pipeline = await service.GetContentPipelineAsync(validPeriod);
             return Results.Ok(pipeline);
         }).WithName("GetContentPipeline");
 
@@ -56,7 +60,8 @@ public static class AdminDashboardEndpoints
         // GET /api/admin/dashboard/mastery-progress?period=30d
         group.MapGet("/mastery-progress", async (string? period, IAdminDashboardService service) =>
         {
-            var progress = await service.GetMasteryProgressAsync(period ?? "30d");
+            var validPeriod = ParameterValidator.ValidatePeriod(period);
+            var progress = await service.GetMasteryProgressAsync(validPeriod);
             return Results.Ok(progress);
         }).WithName("GetMasteryProgress");
 
@@ -70,7 +75,8 @@ public static class AdminDashboardEndpoints
         // GET /api/admin/dashboard/recent-activity?limit=20
         group.MapGet("/recent-activity", async (int? limit, IAdminDashboardService service) =>
         {
-            var activity = await service.GetRecentActivityAsync(limit ?? 20);
+            var validLimit = ParameterValidator.ValidateLimit(limit);
+            var activity = await service.GetRecentActivityAsync(validLimit);
             return Results.Ok(activity);
         }).WithName("GetRecentAdminActivity");
 

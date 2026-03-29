@@ -13,7 +13,8 @@ public static class TokenBudgetAdminEndpoints
     {
         var group = app.MapGroup("/api/admin/system/token-budget")
             .WithTags("Token Budget")
-            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+            .RequireRateLimiting("api");
 
         group.MapGet("/", async (
             string? classId,

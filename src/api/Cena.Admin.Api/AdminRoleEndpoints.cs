@@ -15,7 +15,8 @@ public static class AdminRoleEndpoints
     public static IEndpointRouteBuilder MapAdminRoleEndpoints(this IEndpointRouteBuilder app)
     {
         var rolesGroup = app.MapGroup("/api/admin/roles")
-            .WithTags("Admin Roles");
+            .WithTags("Admin Roles")
+            .RequireRateLimiting("api");
 
         // GET /api/admin/roles — ModeratorOrAbove
         rolesGroup.MapGet("/", async (IAdminRoleService service) =>

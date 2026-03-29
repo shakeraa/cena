@@ -3,6 +3,7 @@
 // ADM-005: Moderation queue and review API
 // =============================================================================
 
+using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -17,7 +18,8 @@ public static class ContentModerationEndpoints
     {
         var group = app.MapGroup("/api/admin/moderation")
             .WithTags("Content Moderation")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         // GET /api/admin/moderation/queue - List moderation queue
         group.MapGet("/queue", async (
@@ -29,11 +31,13 @@ public static class ContentModerationEndpoints
             string? orderBy,
             IContentModerationService service) =>
         {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(itemsPerPage);
             var result = await service.GetQueueAsync(
                 status,
                 q,
-                page ?? 1,
-                itemsPerPage ?? 10,
+                validPage,
+                validPageSize,
                 sortBy ?? "submittedAt",
                 orderBy ?? "asc");
             return Results.Ok(result);

@@ -3,12 +3,14 @@
 // Consolidated endpoint registration for remaining admin features
 // =============================================================================
 
+using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api;
@@ -19,7 +21,8 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/focus")
             .WithTags("Focus Analytics")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         group.MapGet("/overview", async (string? classId, IFocusAnalyticsService service) =>
         {
@@ -59,7 +62,8 @@ public static class AdminApiEndpoints
 
         group.MapGet("/students/{studentId}/timeline", async (string studentId, string? period, IFocusAnalyticsService service) =>
         {
-            var timeline = await service.GetStudentTimelineAsync(studentId, period ?? "7d");
+            var validPeriod = ParameterValidator.ValidatePeriod(period);
+            var timeline = await service.GetStudentTimelineAsync(studentId, validPeriod);
             return Results.Ok(timeline);
         }).WithName("GetStudentFocusTimeline");
 
@@ -76,7 +80,8 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/mastery")
             .WithTags("Mastery Tracking")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         group.MapGet("/overview", async (string? classId, IMasteryTrackingService service) =>
         {
@@ -244,9 +249,12 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapSystemMonitoringEndpoints(this IEndpointRouteBuilder app)
     {
+        var env = app.ServiceProvider.GetRequiredService<IHostEnvironment>();
+
         var group = app.MapGroup("/api/admin/system")
             .WithTags("System Monitoring")
-            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+            .RequireRateLimiting("api");
 
         group.MapGet("/health", async (ISystemMonitoringService service) =>
         {
@@ -324,7 +332,9 @@ public static class AdminApiEndpoints
 
         group.MapPost("/audit-log/query", async (AuditLogFilterRequest request, int? page, int? pageSize, ISystemMonitoringService service) =>
         {
-            var result = await service.GetAuditLogAsync(request, page ?? 1, pageSize ?? 20);
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
+            var result = await service.GetAuditLogAsync(request, validPage, validPageSize);
             return Results.Ok(result);
         }).WithName("QueryAuditLog");
 
@@ -336,7 +346,9 @@ public static class AdminApiEndpoints
             DateTimeOffset? start = string.IsNullOrEmpty(startDate) ? null : DateTimeOffset.Parse(startDate);
             DateTimeOffset? end = string.IsNullOrEmpty(endDate) ? null : DateTimeOffset.Parse(endDate);
             var filter = new AuditLogFilterRequest(start, end, user, action, null);
-            var result = await service.GetAuditLogAsync(filter, page ?? 1, itemsPerPage ?? 20);
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(itemsPerPage);
+            var result = await service.GetAuditLogAsync(filter, validPage, validPageSize);
             return Results.Ok(new { entries = result.Entries, total = result.TotalCount, page = result.Page, pageSize = result.PageSize });
         })
         .WithTags("System Monitoring")
@@ -403,31 +415,35 @@ public static class AdminApiEndpoints
         .WithName("GetNatsStats")
         .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
 
-        group.MapPost("/reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
+        // REV-011.4: Only register destructive seeding endpoints in Development
+        if (env.IsDevelopment())
         {
-            var logger = loggerFactory.CreateLogger("DatabaseSeeder");
-            await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger,
-                additionalSeeds: QuestionBankSeedData.SeedQuestionsAsync);
-            return Results.Ok(new { success = true, message = "Database reseeded successfully" });
-        }).WithName("ReseedDatabase");
+            group.MapPost("/reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
+            {
+                var logger = loggerFactory.CreateLogger("DatabaseSeeder");
+                await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger,
+                    additionalSeeds: QuestionBankSeedData.SeedQuestionsAsync);
+                return Results.Ok(new { success = true, message = "Database reseeded successfully" });
+            }).WithName("ReseedDatabase").RequireRateLimiting("destructive");
 
-        group.MapPost("/clean-reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
-        {
-            var logger = loggerFactory.CreateLogger("DatabaseSeeder");
+            group.MapPost("/clean-reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
+            {
+                var logger = loggerFactory.CreateLogger("DatabaseSeeder");
 
-            // 1. Wipe all documents and event streams
-            logger.LogInformation("=== Cleaning ALL data (documents + event streams) ===");
-            await store.Advanced.Clean.DeleteAllDocumentsAsync();
-            await store.Advanced.Clean.DeleteAllEventDataAsync();
-            logger.LogInformation("All data cleaned.");
+                // 1. Wipe all documents and event streams
+                logger.LogInformation("=== Cleaning ALL data (documents + event streams) ===");
+                await store.Advanced.Clean.DeleteAllDocumentsAsync();
+                await store.Advanced.Clean.DeleteAllEventDataAsync();
+                logger.LogInformation("All data cleaned.");
 
-            // 2. Re-seed everything from scratch
-            await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger, 100,
-                (s, l) => SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
-                QuestionBankSeedData.SeedQuestionsAsync);
+                // 2. Re-seed everything from scratch
+                await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger, 100,
+                    (s, l) => SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
+                    QuestionBankSeedData.SeedQuestionsAsync);
 
-            return Results.Ok(new { success = true, message = "Database cleaned and reseeded successfully" });
-        }).WithName("CleanReseedDatabase");
+                return Results.Ok(new { success = true, message = "Database cleaned and reseeded successfully" });
+            }).WithName("CleanReseedDatabase").RequireRateLimiting("destructive");
+        }
 
         return app;
     }
@@ -436,7 +452,8 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/ingestion")
             .WithTags("Ingestion Pipeline")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         group.MapGet("/pipeline-status", async (IIngestionPipelineService service) =>
         {
@@ -446,6 +463,8 @@ public static class AdminApiEndpoints
 
         group.MapGet("/items", async (string? stage, int? page, int? pageSize, IIngestionPipelineService service) =>
         {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
             var status = await service.GetPipelineStatusAsync();
             var items = stage != null
                 ? status.Stages.FirstOrDefault(s => s.StageId == stage)?.Items ?? new List<PipelineItem>()
@@ -485,6 +504,27 @@ public static class AdminApiEndpoints
 
         group.MapPost("/upload", async (HttpRequest request, IIngestionPipelineService service) =>
         {
+            // REV-011.3: File upload validation
+            if (!request.HasFormContentType)
+                return Results.BadRequest(new { error = "Expected multipart/form-data" });
+
+            var form = await request.ReadFormAsync();
+            var file = form.Files.GetFile("file");
+            if (file is null)
+                return Results.BadRequest(new { error = "No file uploaded" });
+
+            const long maxFileSize = 20 * 1024 * 1024; // 20MB per file
+            if (file.Length > maxFileSize)
+                return Results.BadRequest(new { error = $"File exceeds maximum size of {maxFileSize / (1024 * 1024)}MB" });
+
+            var allowedContentTypes = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "application/pdf", "image/png", "image/jpeg", "image/webp",
+                "text/csv", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            };
+            if (!allowedContentTypes.Contains(file.ContentType ?? ""))
+                return Results.BadRequest(new { error = $"File type '{file.ContentType}' not allowed. Accepted: PDF, PNG, JPEG, WebP, CSV, XLSX" });
+
             var result = await service.UploadFromRequestAsync(request);
             return Results.Ok(result);
         }).WithName("UploadPipelineFile").DisableAntiforgery();
@@ -496,7 +536,8 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/questions")
             .WithTags("Question Bank")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         group.MapGet("/", async (
             string? subject,
@@ -513,9 +554,11 @@ public static class AdminApiEndpoints
             string? orderBy,
             IQuestionBankService service) =>
         {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(itemsPerPage);
             var result = await service.GetQuestionsAsync(
                 subject, bloomsLevel, minDifficulty, maxDifficulty, status, language, conceptId, q,
-                page ?? 1, itemsPerPage ?? 20, sortBy ?? "qualityScore", orderBy ?? "desc");
+                validPage, validPageSize, sortBy ?? "qualityScore", orderBy ?? "desc");
             return Results.Ok(result);
         }).WithName("GetQuestions");
 
@@ -618,7 +661,8 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/ai")
             .WithTags("AI Generation")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("ai");
 
         // Accepts JSON body. Images are sent as base64 strings from the frontend.
         group.MapPost("/generate", async (AiGenerateRequest request, IAiGenerationService service) =>
@@ -659,7 +703,8 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/pedagogy")
             .WithTags("Methodology Analytics")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         group.MapGet("/methodology-effectiveness", async (IMethodologyAnalyticsService service, ILoggerFactory lf) =>
         {
@@ -777,7 +822,8 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/cultural")
             .WithTags("Cultural Context")
-            .RequireAuthorization(CenaAuthPolicies.AdminOnly);
+            .RequireAuthorization(CenaAuthPolicies.AdminOnly)
+            .RequireRateLimiting("api");
 
         group.MapGet("/distribution", async (ICulturalContextService service) =>
         {
@@ -835,11 +881,13 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/events")
             .WithTags("Event Stream")
-            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+            .RequireRateLimiting("api");
 
         group.MapGet("/recent", async (int? count, string? continuationToken, IEventStreamService service) =>
         {
-            var events = await service.GetRecentEventsAsync(count ?? 50, continuationToken);
+            var validCount = ParameterValidator.ValidateLimit(count);
+            var events = await service.GetRecentEventsAsync(validCount, continuationToken);
             return Results.Ok(events);
         }).WithName("GetRecentEvents");
 
@@ -851,7 +899,9 @@ public static class AdminApiEndpoints
 
         group.MapGet("/dead-letters", async (int? page, int? pageSize, IEventStreamService service) =>
         {
-            var dlq = await service.GetDeadLetterQueueAsync(page ?? 1, pageSize ?? 20);
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
+            var dlq = await service.GetDeadLetterQueueAsync(validPage, validPageSize);
             return Results.Ok(dlq);
         }).WithName("GetDeadLetterQueue");
 
@@ -892,7 +942,8 @@ public static class AdminApiEndpoints
     {
         var group = app.MapGroup("/api/admin/outreach")
             .WithTags("Outreach & Engagement")
-            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
 
         group.MapGet("/summary", async (IOutreachEngagementService service) =>
         {

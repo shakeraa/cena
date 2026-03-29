@@ -59,10 +59,9 @@ done
 
 stop_services() {
   echo -e "${YELLOW}Stopping services...${NC}"
-  kill $(lsof -ti:5000 2>/dev/null) 2>/dev/null && echo "  Stopped Admin API (5000)" || true
-  kill $(lsof -ti:5001 2>/dev/null) 2>/dev/null && echo "  Stopped Actor Host (5001)" || true
+  kill $(lsof -ti:5050 2>/dev/null) 2>/dev/null && echo "  Stopped Admin API (5050)" || true
+  kill $(lsof -ti:5119 2>/dev/null) 2>/dev/null && echo "  Stopped Actor Host (5119)" || true
   kill $(lsof -ti:5174 2>/dev/null) 2>/dev/null && echo "  Stopped Frontend (5174)" || true
-  kill $(lsof -ti:5119 2>/dev/null) 2>/dev/null && echo "  Stopped Actor Host alt port" || true
   # Don't kill NATS — it may be shared
   echo -e "${GREEN}All services stopped.${NC}"
 }
@@ -146,14 +145,14 @@ if ! $EMULATOR_ONLY; then
 
   # Actor Host
   if $START_ACTORS; then
-    echo -e "  Starting ${CYAN}Actor Host${NC} on port 5001..."
-    (cd "$PROJECT_ROOT/src/actors/Cena.Actors.Host" && dotnet run --no-build --urls "http://localhost:5001" > /tmp/cena-actors.log 2>&1) &
+    echo -e "  Starting ${CYAN}Actor Host${NC} on port 5119..."
+    (cd "$PROJECT_ROOT/src/actors/Cena.Actors.Host" && dotnet run --no-build > /tmp/cena-actors.log 2>&1) &
     ACTOR_PID=$!
     echo "    PID=$ACTOR_PID → /tmp/cena-actors.log"
   fi
 
   # Admin API
-  echo -e "  Starting ${CYAN}Admin API${NC} on port 5000..."
+  echo -e "  Starting ${CYAN}Admin API${NC} on port 5050..."
   (cd "$PROJECT_ROOT/src/api/Cena.Api.Host" && dotnet run --no-build > /tmp/cena-api.log 2>&1) &
   API_PID=$!
   echo "    PID=$API_PID → /tmp/cena-api.log"
@@ -170,10 +169,10 @@ if ! $EMULATOR_ONLY; then
   echo -e "\n${BLUE}Waiting for services to be ready...${NC}"
   for i in {1..20}; do
     sleep 1
-    API_OK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5000/health 2>/dev/null)
+    API_OK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5050/health 2>/dev/null)
     ACTOR_OK="000"
     if $START_ACTORS; then
-      ACTOR_OK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/health/live 2>/dev/null)
+      ACTOR_OK=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:5119/health/live 2>/dev/null)
     fi
     if [[ "$API_OK" == "200" ]] && { ! $START_ACTORS || [[ "$ACTOR_OK" == "200" ]]; }; then
       break
@@ -200,9 +199,9 @@ check_service() {
 
 check_service "NATS (4222)" "http://localhost:8222/varz"
 if ! $EMULATOR_ONLY; then
-  check_service "Admin API (5000)" "http://localhost:5000/health"
+  check_service "Admin API (5050)" "http://localhost:5050/health"
   if $START_ACTORS; then
-    check_service "Actor Host (5001)" "http://localhost:5001/health/live"
+    check_service "Actor Host (5119)" "http://localhost:5119/health/live"
   fi
   if $START_FRONTEND; then
     check_service "Frontend (5174)" "http://localhost:5174/"
@@ -220,9 +219,9 @@ else
   echo -e "\n${GREEN}All services running.${NC} Emulator skipped (use --emulator-only to run later)."
   echo -e "\n${CYAN}URLs:${NC}"
   echo "  Admin Dashboard: http://localhost:5174"
-  echo "  Admin API:       http://localhost:5000/health"
+  echo "  Admin API:       http://localhost:5050/health"
   if $START_ACTORS; then
-    echo "  Actor Host:      http://localhost:5001/health/live"
+    echo "  Actor Host:      http://localhost:5119/health/live"
   fi
   echo "  NATS Monitor:    http://localhost:8222"
   echo ""
