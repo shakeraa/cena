@@ -454,6 +454,137 @@ onUnmounted(() => {
       </VCol>
     </VRow>
 
+    <!-- Backup Status & Observability -->
+    <VRow class="mt-6">
+      <!-- Backup Status -->
+      <VCol
+        cols="12"
+        md="6"
+      >
+        <VCard>
+          <VCardTitle class="d-flex align-center gap-2">
+            <VIcon icon="tabler-database" />
+            Database Backup
+          </VCardTitle>
+          <VCardText>
+            <VList density="compact">
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    icon="tabler-clock"
+                    color="success"
+                  />
+                </template>
+                <VListItemTitle>Schedule</VListItemTitle>
+                <VListItemSubtitle>Every 6 hours (pg_dump custom format)</VListItemSubtitle>
+              </VListItem>
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    icon="tabler-trash"
+                    color="info"
+                  />
+                </template>
+                <VListItemTitle>Retention</VListItemTitle>
+                <VListItemSubtitle>7 days automatic rotation</VListItemSubtitle>
+              </VListItem>
+              <VListItem>
+                <template #prepend>
+                  <VIcon
+                    icon="tabler-shield-check"
+                    color="success"
+                  />
+                </template>
+                <VListItemTitle>Recovery</VListItemTitle>
+                <VListItemSubtitle>Transactional restore (--single-transaction)</VListItemSubtitle>
+              </VListItem>
+            </VList>
+            <VAlert
+              type="info"
+              variant="tonal"
+              density="compact"
+              class="mt-3"
+            >
+              Backups stored in <code>postgres_backups</code> Docker volume. Use <code>config/backup/restore.sh</code> to restore.
+            </VAlert>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Observability Tools -->
+      <VCol
+        cols="12"
+        md="6"
+      >
+        <VCard>
+          <VCardTitle class="d-flex align-center gap-2">
+            <VIcon icon="tabler-chart-line" />
+            Observability
+          </VCardTitle>
+          <VCardText>
+            <div class="d-flex flex-column gap-3">
+              <VBtn
+                href="http://localhost:3000"
+                target="_blank"
+                color="primary"
+                variant="outlined"
+                prepend-icon="tabler-layout-dashboard"
+                block
+              >
+                Grafana Dashboards
+                <template #append>
+                  <VIcon
+                    icon="tabler-external-link"
+                    size="14"
+                  />
+                </template>
+              </VBtn>
+              <VBtn
+                href="http://localhost:16686"
+                target="_blank"
+                color="secondary"
+                variant="outlined"
+                prepend-icon="tabler-route"
+                block
+              >
+                Jaeger Traces
+                <template #append>
+                  <VIcon
+                    icon="tabler-external-link"
+                    size="14"
+                  />
+                </template>
+              </VBtn>
+              <VBtn
+                href="http://localhost:9090"
+                target="_blank"
+                color="info"
+                variant="outlined"
+                prepend-icon="tabler-chart-bar"
+                block
+              >
+                Prometheus
+                <template #append>
+                  <VIcon
+                    icon="tabler-external-link"
+                    size="14"
+                  />
+                </template>
+              </VBtn>
+            </div>
+            <VAlert
+              type="warning"
+              variant="tonal"
+              density="compact"
+              class="mt-3"
+            >
+              Links point to local development. Update for production deployment.
+            </VAlert>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
     <!-- NATS JetStream Health -->
     <VCard
       :loading="natsLoading"

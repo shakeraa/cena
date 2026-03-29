@@ -99,7 +99,11 @@ const { data: userData, execute: refetchUser } = await useApi<any>(`/admin/users
         </VWindowItem>
 
         <VWindowItem>
-          <UserTabSecurity :user-id="String(route.params.id)" />
+          <UserTabSecurity
+            :user-id="String(route.params.id)"
+            :user-status="userData.status"
+            @user-updated="refetchUser"
+          />
         </VWindowItem>
 
         <VWindowItem>
