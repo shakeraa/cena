@@ -232,7 +232,7 @@ const toggleSuspend = async () => {
         </VCardText>
 
         <!-- Edit and Suspend button -->
-        <VCardText class="d-flex justify-center gap-x-4">
+        <VCardText class="d-flex justify-center flex-wrap gap-4">
           <VBtn
             variant="elevated"
             @click="isUserInfoEditDialogVisible = true"
