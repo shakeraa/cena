@@ -246,7 +246,8 @@ public sealed class NatsBusRouter : BackgroundService
         var p = env.Payload;
         var cmd = new StartSession(
             p.StudentId, p.SubjectId, p.ConceptId,
-            p.DeviceType, p.AppVersion, p.ClientTimestamp, IsOffline: false);
+            p.DeviceType, p.AppVersion, p.ClientTimestamp, IsOffline: false,
+            SchoolId: p.SchoolId ?? env.SchoolId); // REV-014: prefer payload field, fall back to envelope
 
         var result = await _actorSystem.Cluster()
             .RequestAsync<ActorResult<StartSessionResponse>>(p.StudentId, "student", cmd, ct);
@@ -360,7 +361,7 @@ public sealed class NatsBusRouter : BackgroundService
         Interlocked.Increment(ref _eventsPublished);
     }
 
-    private void RecordError(string category, string subject, string message, string? studentId)
+    internal void RecordError(string category, string subject, string message, string? studentId)
     {
         Interlocked.Increment(ref _errorsCount);
         _errorsByCategory.AddOrUpdate(category, 1, (_, c) => c + 1);

@@ -36,21 +36,44 @@ watch([isFallbackStateActive, refLoadingIndicator], () => {
     v-bind="layoutAttrs"
     :is="configStore.appContentLayoutNav === AppContentLayoutNav.Vertical ? DefaultLayoutWithVerticalNav : DefaultLayoutWithHorizontalNav"
   >
+    <a
+      href="#main-content"
+      class="skip-link"
+    >Skip to main content</a>
+
     <AppLoadingIndicator ref="refLoadingIndicator" />
 
-    <RouterView v-slot="{ Component }">
-      <Suspense
-        :timeout="0"
-        @fallback="isFallbackStateActive = true"
-        @resolve="isFallbackStateActive = false"
-      >
-        <Component :is="Component" />
-      </Suspense>
-    </RouterView>
+    <main id="main-content">
+      <RouterView v-slot="{ Component }">
+        <Suspense
+          :timeout="0"
+          @fallback="isFallbackStateActive = true"
+          @resolve="isFallbackStateActive = false"
+        >
+          <Component :is="Component" />
+        </Suspense>
+      </RouterView>
+    </main>
   </Component>
 </template>
 
 <style lang="scss">
 // As we are using `layouts` plugin we need its styles to be imported
 @use "@layouts/styles/default-layout";
+
+.skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  z-index: 9999;
+  padding: 8px 16px;
+  background: #1e1e1e;
+  color: white;
+  text-decoration: none;
+  font-size: 14px;
+}
+
+.skip-link:focus {
+  top: 0;
+}
 </style>

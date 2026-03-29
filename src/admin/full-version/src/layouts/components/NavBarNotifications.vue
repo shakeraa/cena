@@ -99,11 +99,16 @@ const handleNotificationClick = (notification: Notification) => {
 </script>
 
 <template>
-  <Notifications
-    :notifications="notifications"
-    @remove="removeNotification"
-    @read="markRead"
-    @unread="markUnRead"
-    @click:notification="handleNotificationClick"
-  />
+  <div
+    role="region"
+    aria-label="Notifications"
+  >
+    <Notifications
+      :notifications="notifications"
+      @remove="removeNotification"
+      @read="markRead"
+      @unread="markUnRead"
+      @click:notification="handleNotificationClick"
+    />
+  </div>
 </template>

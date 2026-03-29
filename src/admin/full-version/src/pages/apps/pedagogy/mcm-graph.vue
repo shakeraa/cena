@@ -200,6 +200,7 @@ const saveEdit = async (cell: CellData) => {
           <VTable
             density="comfortable"
             class="text-no-wrap"
+            role="grid"
           >
             <thead>
               <tr>
@@ -228,7 +229,11 @@ const saveEdit = async (cell: CellData) => {
                   :key="cat"
                   class="text-center mcm-cell"
                   :class="{ 'mcm-cell--editable': canManage && getCell(et, cat) }"
+                  role="gridcell"
+                  :tabindex="getCell(et, cat) ? 0 : undefined"
+                  :aria-label="getCell(et, cat) ? `${et} to ${cat}: ${getCell(et, cat)!.methodology}, confidence ${(getCell(et, cat)!.confidence * 100).toFixed(0)}%` : `${et} to ${cat}: no mapping`"
                   @click="canManage && getCell(et, cat) && !getCell(et, cat)!.editing ? startEdit(getCell(et, cat)!) : undefined"
+                  @keydown.enter="canManage && getCell(et, cat) && !getCell(et, cat)!.editing ? startEdit(getCell(et, cat)!) : undefined"
                 >
                   <template v-if="getCell(et, cat)">
                     <!-- Editing mode -->
