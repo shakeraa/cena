@@ -300,12 +300,13 @@ const decayColor = (risk: number): string => {
           variant="tonal"
           @click="showOverrideDialog = true"
         >
-        <VIcon
-          icon="tabler-switch-horizontal"
-          start
-        />
-        Override Methodology
-      </VBtn>
+          <VIcon
+            icon="tabler-switch-horizontal"
+            start
+          />
+          Override Methodology
+        </VBtn>
+      </div>
     </div>
 
     <VAlert

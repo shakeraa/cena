@@ -15,15 +15,24 @@ definePage({
 
 const route = useRoute('apps-user-view-id')
 
-const userTab = ref(null)
-
 const tabs = [
-  { icon: 'tabler-user', title: 'Overview' },
-  { icon: 'tabler-brain', title: 'Insights' },
-  { icon: 'tabler-lock', title: 'Security' },
-  { icon: 'tabler-activity', title: 'Activity' },
-  { icon: 'tabler-devices', title: 'Sessions' },
+  { icon: 'tabler-user', title: 'Overview', key: 'overview' },
+  { icon: 'tabler-brain', title: 'Insights', key: 'insights' },
+  { icon: 'tabler-lock', title: 'Security', key: 'security' },
+  { icon: 'tabler-activity', title: 'Activity', key: 'activity' },
+  { icon: 'tabler-devices', title: 'Sessions', key: 'sessions' },
 ]
+
+const initialTab = (() => {
+  const tabQuery = route.query.tab as string | undefined
+  if (tabQuery) {
+    const idx = tabs.findIndex(t => t.key === tabQuery)
+    if (idx >= 0) return idx
+  }
+  return 0
+})()
+
+const userTab = ref(initialTab)
 
 const { data: userData, execute: refetchUser } = await useApi<any>(`/admin/users/${route.params.id}`)
 </script>
