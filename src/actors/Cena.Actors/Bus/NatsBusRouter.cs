@@ -30,13 +30,13 @@ public sealed class NatsBusRouter : BackgroundService
     private readonly ILogger<NatsBusRouter> _logger;
     private readonly JsonSerializerOptions _jsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    private const int MaxConcurrentActivations = 50;
+    private const int MaxConcurrentActivations = 30;
     private const int MaxRetryAttempts = 3;
-    private static readonly TimeSpan ActorRequestTimeout = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan ActorRequestTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan[] RetryDelays = [
-        TimeSpan.FromSeconds(1),
         TimeSpan.FromSeconds(2),
-        TimeSpan.FromSeconds(4)
+        TimeSpan.FromSeconds(4),
+        TimeSpan.FromSeconds(8)
     ];
 
     private readonly SemaphoreSlim _activationGate = new(MaxConcurrentActivations, MaxConcurrentActivations);
@@ -272,6 +272,29 @@ public sealed class NatsBusRouter : BackgroundService
 
     // ── Command Handlers — route to Proto.Actor virtual actors ──
 
+    /// <summary>
+    /// Calculates an adaptive timeout based on current error rate.
+    /// When errors are high, cold-start contention is likely — extend timeouts
+    /// to avoid churn (Fortnite RES-009 pattern).
+    /// </summary>
+    private TimeSpan GetAdaptiveTimeout()
+    {
+        var errors = Interlocked.Read(ref _errorsCount);
+        var routed = Interlocked.Read(ref _commandsRouted);
+        var total = errors + routed;
+        if (total < 10) return ActorRequestTimeout;
+
+        var errorRate = (double)errors / total;
+        var health = errorRate switch
+        {
+            < 0.05 => SystemHealthLevel.Healthy,
+            < 0.15 => SystemHealthLevel.Degraded,
+            < 0.30 => SystemHealthLevel.Critical,
+            _      => SystemHealthLevel.Emergency
+        };
+        return AdaptiveTimeout.Calculate(ActorRequestTimeout, health);
+    }
+
     private async Task HandleStartSession(BusEnvelope<BusStartSession> env, CancellationToken ct)
     {
         var p = env.Payload;
@@ -281,7 +304,7 @@ public sealed class NatsBusRouter : BackgroundService
             SchoolId: p.SchoolId ?? env.SchoolId); // REV-014: prefer payload field, fall back to envelope
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(ActorRequestTimeout);
+        cts.CancelAfter(GetAdaptiveTimeout());
         var result = await _actorSystem.Cluster()
             .RequestAsync<ActorResult<StartSessionResponse>>(p.StudentId, "student", cmd, cts.Token);
 

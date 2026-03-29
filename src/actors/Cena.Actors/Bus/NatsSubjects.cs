@@ -58,6 +58,9 @@ public static class NatsSubjects
     /// </summary>
     public const string AllPerStudentEvents = "cena.events.student.>";
 
+    // ── Actor Pre-warm (Admin API → Actor Host) ──
+    public const string WarmUpRequest = "cena.actors.warmup";
+
     // ── Dead-letter (messages that exhausted retries → DEAD_LETTER JetStream stream) ──
     public const string DeadLetter = "cena.durable.dlq.commands";
 

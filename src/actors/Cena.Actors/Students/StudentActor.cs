@@ -179,6 +179,9 @@ public sealed partial class StudentActor : IActor
             Restarting           => OnRestarting(context),
             ReceiveTimeout       => OnPassivation(context),
 
+            // ---- Pre-warm (no-op after activation) ----
+            WarmUp               => HandleWarmUp(context),
+
             // ---- Commands ----
             AttemptConcept cmd   => HandleAttemptConcept(context, cmd),
             StartSession cmd     => HandleStartSession(context, cmd),
@@ -305,6 +308,16 @@ public sealed partial class StudentActor : IActor
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// No-op handler. By the time this runs, OnStarted has already restored state.
+    /// Responds immediately so the pre-warmer knows the actor is alive.
+    /// </summary>
+    private Task HandleWarmUp(IContext context)
+    {
+        context.Respond(new ActorResult(true));
+        return Task.CompletedTask;
+    }
+
     private Task OnPassivation(IContext context)
     {
         _logger.LogInformation(
@@ -331,15 +344,17 @@ public sealed partial class StudentActor : IActor
 
         await using var session = _documentStore.LightweightSession();
 
-        // Marten AggregateStreamAsync handles snapshot + replay automatically.
-        var snapshot = await session.Events.AggregateStreamAsync<StudentProfileSnapshot>(_studentId);
-
-        // Always fetch the true stream version from Marten for optimistic concurrency
+        // Fetch stream state first — if null, this is a brand-new student
+        // and we can skip the heavier AggregateStreamAsync call entirely.
+        // Saves one PG round-trip per new student cold-start.
         var streamState = await session.Events.FetchStreamStateAsync(_studentId);
+        StudentProfileSnapshot? snapshot = null;
+
         if (streamState != null)
         {
             _state.EventVersion = (int)streamState.Version;
             _streamExists = true;
+            snapshot = await session.Events.AggregateStreamAsync<StudentProfileSnapshot>(_studentId);
         }
 
         if (snapshot != null)

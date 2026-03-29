@@ -330,6 +330,12 @@ public sealed record StagnationSignals(
 // INTERNAL MESSAGES (actor-to-actor, not part of public contract)
 // =============================================================================
 
+/// <summary>
+/// Lightweight activation probe. Triggers actor cold-start (state restore)
+/// without starting a session. Used by pre-warmer before peak load windows.
+/// </summary>
+public sealed record WarmUp;
+
 /// <summary>Timer tick for periodic memory budget checks.</summary>
 internal sealed record MemoryCheckTick;
 

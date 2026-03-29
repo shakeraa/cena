@@ -197,6 +197,10 @@ try
             await nats.PublishAsync(NatsSubjects.SessionStart,
                 JsonSerializer.Serialize(startMsg, jsonOpts), cancellationToken: cts.Token);
             totalSessions++;
+
+            // Stagger session starts to avoid thundering herd on actor cold-starts.
+            // 50ms jitter per new session ≈ 15s to ramp up 300 students.
+            await Task.Delay(rng.Next(30, 70), cts.Token);
         }
 
         // Publish concept attempt

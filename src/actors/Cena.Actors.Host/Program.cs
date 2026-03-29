@@ -187,6 +187,9 @@ builder.Services.AddSingleton<Cena.Actors.Sessions.ISessionEventPublisher, Cena.
 builder.Services.AddSingleton<Cena.Actors.Bus.NatsBusRouter>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<Cena.Actors.Bus.NatsBusRouter>());
 
+// RES-010: Actor pre-warmer — activates actors in batches before peak load
+builder.Services.AddHostedService<Cena.Actors.Infrastructure.ActorPreWarmer>();
+
 // SAI-003: Explanation cache invalidation on question edits via NATS
 builder.Services.AddHostedService<Cena.Actors.Explanations.ExplanationCacheInvalidator>();
 
@@ -457,6 +460,28 @@ app.MapGet("/api/actors/diag", (ActorSystem system) =>
         Address = system.Address,
     });
 }).RequireAuthorization(CenaAuthPolicies.SuperAdminOnly).WithName("ClusterDiagnostic");
+
+// ---- RES-010: Actor pre-warm endpoint (Admin API → NATS → ActorPreWarmer) ----
+app.MapPost("/api/actors/warmup", async (
+    INatsConnection nats,
+    Cena.Actors.Infrastructure.WarmUpRequest request) =>
+{
+    if (request.StudentIds is not { Count: > 0 })
+        return Results.BadRequest(new { error = "StudentIds list is required" });
+
+    if (request.StudentIds.Count > 1000)
+        return Results.BadRequest(new { error = "Maximum 1000 students per warm-up request" });
+
+    var json = System.Text.Json.JsonSerializer.Serialize(request,
+        new System.Text.Json.JsonSerializerOptions { PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase });
+    await nats.PublishAsync(Cena.Actors.Bus.NatsSubjects.WarmUpRequest, json);
+
+    return Results.Accepted(value: new
+    {
+        message = $"Pre-warming {request.StudentIds.Count} actors",
+        studentCount = request.StudentIds.Count
+    });
+}).RequireAuthorization(CenaAuthPolicies.SuperAdminOnly).WithName("WarmUpActors");
 
 // ---- Auth middleware (required by admin endpoints with RequireAuthorization) ----
 app.UseAuthentication();
