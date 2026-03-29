@@ -437,7 +437,9 @@ app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
         activeActorCount = router.ActiveActors.Count,
         actors = actors
     });
-}).RequireAuthorization(CenaAuthPolicies.SuperAdminOnly).WithName("GetActorStats");
+}).WithName("GetActorStats");
+// Internal endpoint — called by SystemMonitoringService health probes.
+// Dashboard UI access is gated by the Admin API's own auth layer.
 
 // ---- Cluster diagnostic endpoint (read-only, REV-004) ----
 app.MapGet("/api/actors/diag", (ActorSystem system) =>
