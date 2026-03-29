@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import UserBioPanel from '@/views/apps/user/view/UserBioPanel.vue'
 import UserTabAccount from '@/views/apps/user/view/UserTabAccount.vue'
+import UserTabInsights from '@/views/apps/user/view/UserTabInsights.vue'
 import UserTabSecurity from '@/views/apps/user/view/UserTabSecurity.vue'
 import UserTabActivity from '@/views/apps/user/view/UserTabActivity.vue'
 import UserTabSessions from '@/views/apps/user/view/UserTabSessions.vue'
@@ -18,6 +19,7 @@ const userTab = ref(null)
 
 const tabs = [
   { icon: 'tabler-user', title: 'Overview' },
+  { icon: 'tabler-brain', title: 'Insights' },
   { icon: 'tabler-lock', title: 'Security' },
   { icon: 'tabler-activity', title: 'Activity' },
   { icon: 'tabler-devices', title: 'Sessions' },
@@ -86,6 +88,13 @@ const { data: userData, execute: refetchUser } = await useApi<any>(`/admin/users
           <UserTabAccount
             :user-data="userData"
             @user-updated="refetchUser"
+          />
+        </VWindowItem>
+
+        <VWindowItem>
+          <UserTabInsights
+            :user-id="String(route.params.id)"
+            :user-role="userData.role"
           />
         </VWindowItem>
 
