@@ -55,7 +55,6 @@ builder.Host.UseSerilog((context, services, configuration) =>
 });
 
 // ---- Read configuration ----
-var pgConnectionString = CenaConnectionStrings.GetPostgres(builder.Configuration, builder.Environment);
 var redisConnectionString = CenaConnectionStrings.GetRedis(builder.Configuration, builder.Environment);
 var natsUrl = builder.Configuration.GetConnectionString("NATS")
     ?? "nats://localhost:4222";
@@ -67,13 +66,23 @@ var otlpEndpoint = builder.Configuration.GetValue<string>("Cluster:OtlpEndpoint"
 var enableDevLogging = builder.Configuration.GetValue<bool>("Cluster:EnableDevSupervisionLogging", true);
 
 // =============================================================================
-// 2. MARTEN (PostgreSQL event store)
+// 2. PostgreSQL: Shared NpgsqlDataSource + Marten Event Store
 // =============================================================================
+
+// Single connection pool shared by Marten, pgvector, and all raw queries.
+// Actor Host: max 50 connections (actor activations + event flush + background).
+// Prevents thundering herd on school-start peak (200+ students at 8am).
+var pgMaxPool = builder.Configuration.GetValue<int>("PostgreSQL:MaxPoolSize", 50);
+var pgMinPool = builder.Configuration.GetValue<int>("PostgreSQL:MinPoolSize", 5);
+builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, pgMaxPool, pgMinPool);
 
 builder.Services.AddMarten(opts =>
 {
+    // Marten uses the NpgsqlDataSource registered above via DI.
+    // Connection string fallback for Marten's internal pool init.
+    var pgConnectionString = CenaConnectionStrings.GetPostgres(builder.Configuration, builder.Environment);
     opts.ConfigureCenaEventStore(pgConnectionString);
-});
+}).UseNpgsqlDataSource();
 
 // =============================================================================
 // 3. REDIS
@@ -151,6 +160,8 @@ builder.Services.AddSingleton<Cena.Actors.Hints.IDeliveryGate, Cena.Actors.Hints
 builder.Services.AddSingleton<IFocusDegradationService, FocusDegradationService>();
 builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnforcementService>();
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
+// INF-019: Redis circuit breaker — protects explanation cache and messaging from Redis outages
+builder.Services.AddSingleton<Cena.Actors.Infrastructure.IRedisCircuitBreaker, Cena.Actors.Infrastructure.RedisCircuitBreaker>();
 builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>();
 builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
 builder.Services.AddSingleton<IL3ExplanationGenerator, L3ExplanationGenerator>();
@@ -168,6 +179,9 @@ builder.Services.AddSingleton<ITutorPromptBuilder, TutorPromptBuilder>();
 builder.Services.AddSingleton<ITutorSafetyGuard, TutorSafetyGuard>();
 builder.Services.AddTransient<TutorActor>();
 builder.Services.AddSingleton<Func<TutorActor>>(sp => () => sp.GetRequiredService<TutorActor>());
+
+// ACT-010: Session event publisher — per-student NATS subjects for SignalR bridge
+builder.Services.AddSingleton<Cena.Actors.Sessions.ISessionEventPublisher, Cena.Actors.Sessions.SessionNatsPublisher>();
 
 // NATS Bus Router: bridges NATS commands ↔ Proto.Actor virtual actors
 builder.Services.AddSingleton<Cena.Actors.Bus.NatsBusRouter>();
@@ -327,6 +341,8 @@ builder.Services.AddOpenTelemetry()
         .AddMeter("Cena.Actors.Decay")
         .AddMeter("Cena.Actors.Focus")
         .AddMeter("Cena.Actors.HealthAggregator")
+        .AddMeter("Cena.Session.Nats")
+        .AddMeter("Npgsql")
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddProcessInstrumentation()

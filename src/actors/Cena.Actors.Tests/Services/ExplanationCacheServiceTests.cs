@@ -23,8 +23,11 @@ public sealed class ExplanationCacheServiceTests : IDisposable
     public ExplanationCacheServiceTests()
     {
         _redis.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(_db);
+        var circuitBreaker = Substitute.For<Cena.Actors.Infrastructure.IRedisCircuitBreaker>();
+        circuitBreaker.IsAvailable.Returns(true);
         _service = new ExplanationCacheService(
             _redis,
+            circuitBreaker,
             NullLogger<ExplanationCacheService>.Instance,
             _meterFactory);
     }

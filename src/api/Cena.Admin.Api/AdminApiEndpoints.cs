@@ -1009,4 +1009,66 @@ public static class AdminApiEndpoints
 
         return app;
     }
+
+    // ═════════════════════════════════════════════════════════════════
+    // Student Insights Endpoints (per-student cross-cutting analytics)
+    // ═════════════════════════════════════════════════════════════════
+
+    public static IEndpointRouteBuilder MapStudentInsightsEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/admin/insights")
+            .WithTags("Student Insights")
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
+
+        group.MapGet("/students/{studentId}/focus-heatmap", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
+        {
+            var result = await service.GetFocusHeatmapAsync(studentId, user);
+            return Results.Ok(result);
+        }).WithName("GetStudentFocusHeatmap");
+
+        group.MapGet("/students/{studentId}/degradation", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
+        {
+            var result = await service.GetDegradationCurveAsync(studentId, user);
+            return Results.Ok(result);
+        }).WithName("GetStudentDegradation");
+
+        group.MapGet("/students/{studentId}/engagement", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
+        {
+            var result = await service.GetEngagementAsync(studentId, user);
+            return Results.Ok(result);
+        }).WithName("GetStudentEngagement");
+
+        group.MapGet("/students/{studentId}/error-types", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
+        {
+            var result = await service.GetErrorTypesAsync(studentId, user);
+            return Results.Ok(result);
+        }).WithName("GetStudentErrorTypes");
+
+        group.MapGet("/students/{studentId}/hint-usage", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
+        {
+            var result = await service.GetHintUsageAsync(studentId, user);
+            return Results.Ok(result);
+        }).WithName("GetStudentHintUsage");
+
+        group.MapGet("/students/{studentId}/stagnation", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
+        {
+            var result = await service.GetStagnationAsync(studentId, user);
+            return Results.Ok(result);
+        }).WithName("GetStudentStagnation");
+
+        group.MapGet("/students/{studentId}/session-patterns", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
+        {
+            var result = await service.GetSessionPatternsAsync(studentId, user);
+            return Results.Ok(result);
+        }).WithName("GetStudentSessionPatterns");
+
+        group.MapGet("/students/{studentId}/response-times", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
+        {
+            var result = await service.GetResponseTimesAsync(studentId, user);
+            return Results.Ok(result);
+        }).WithName("GetStudentResponseTimes");
+
+        return app;
+    }
 }

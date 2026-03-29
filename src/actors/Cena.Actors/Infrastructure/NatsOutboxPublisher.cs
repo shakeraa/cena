@@ -62,7 +62,8 @@ public sealed class NatsOutboxPublisher : BackgroundService
     private static readonly TimeSpan PollInterval = TimeSpan.FromSeconds(5);
     private const int MaxEventsPerCycle = 100;
     private const int MaxRetries = 10; // RES-008: dead-letter after 10 retries
-    private const string SubjectPrefix = "cena.events.";
+    // Subject prefix for real-time bus events (NatsBusRouter) remains "cena.events.*".
+    // The outbox publisher uses "cena.durable.{category}.{eventType}" for JetStream durability.
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -208,8 +209,8 @@ public sealed class NatsOutboxPublisher : BackgroundService
 
             try
             {
-                // Determine NATS subject from event type
-                string subject = $"{SubjectPrefix}{eventWrapper.EventTypeName}";
+                // Determine NATS subject from event type (routed to durable stream category)
+                string subject = GetDurableSubject(eventWrapper.EventTypeName);
 
                 // Serialize event data to JSON
                 var payload = JsonSerializer.SerializeToUtf8Bytes(
@@ -279,6 +280,33 @@ public sealed class NatsOutboxPublisher : BackgroundService
         activity?.SetTag("outbox.hwm", highestSequence);
         activity?.SetTag("outbox.duration_ms", sw.ElapsedMilliseconds);
     }
+
+    /// <summary>
+    /// Maps an event type name to a durable NATS subject categorised by bounded context.
+    /// JetStream streams subscribe to <c>cena.durable.{category}.></c> wildcards,
+    /// so each event lands in the correct stream for replay and durability.
+    /// </summary>
+    private static string GetDurableSubject(string eventTypeName) => eventTypeName switch
+    {
+        var e when e.StartsWith("Concept") || e.StartsWith("Mastery") || e.StartsWith("Stagnation")
+            || e.StartsWith("Methodology") || e.StartsWith("Annotation") || e.StartsWith("CognitiveLoad")
+            => $"cena.durable.learner.{eventTypeName}",
+        var e when e.StartsWith("Session") || e.StartsWith("Exercise") || e.StartsWith("Hint")
+            || (e.StartsWith("Question") && e.Contains("Skipped"))
+            => $"cena.durable.pedagogy.{eventTypeName}",
+        var e when e.StartsWith("Xp") || e.StartsWith("Streak") || e.StartsWith("Badge")
+            || e.StartsWith("Review")
+            => $"cena.durable.engagement.{eventTypeName}",
+        var e when e.StartsWith("Outreach")
+            => $"cena.durable.outreach.{eventTypeName}",
+        var e when e.StartsWith("Focus") || e.StartsWith("MindWandering") || e.StartsWith("Microbreak")
+            => $"cena.durable.learner.{eventTypeName}",
+        var e when e.StartsWith("Tutoring")
+            => $"cena.durable.pedagogy.{eventTypeName}",
+        var e when e.StartsWith("Question") || e.StartsWith("Pipeline") || e.StartsWith("File")
+            => $"cena.durable.curriculum.{eventTypeName}",
+        _ => $"cena.durable.system.{eventTypeName}"
+    };
 }
 
 // =============================================================================

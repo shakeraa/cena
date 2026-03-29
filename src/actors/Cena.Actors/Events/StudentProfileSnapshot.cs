@@ -15,6 +15,7 @@ public class StudentProfileSnapshot
     // Marten requires an Id property for document storage and Query<T>
     public string Id { get => StudentId; set => StudentId = value; }
     public string StudentId { get; set; } = "";
+    public string? SchoolId { get; set; }
     public Dictionary<string, ConceptMasteryState> ConceptMastery { get; set; } = new();
     public Dictionary<string, string> ActiveMethodologyMap { get; set; } = new();
     public Dictionary<string, List<string>> MethodAttemptHistory { get; set; } = new();
@@ -92,6 +93,7 @@ public class StudentProfileSnapshot
     {
         SessionCount++;
         ExperimentCohort ??= e.ExperimentCohort;
+        SchoolId ??= e.SchoolId; // REV-014: capture tenant once; school never changes
 
         // Increment cooldown counters for all tracked levels
         var keys = SessionsSinceSwitch.Keys.ToList();

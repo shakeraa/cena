@@ -73,7 +73,7 @@ public static class ComplianceEndpoints
                 items
             });
         })
-        .WithName("QueryAuditLog");
+        .WithName("QueryComplianceAuditLog");
 
         // GET /api/admin/compliance/audit-log/summary
         group.MapGet("/audit-log/summary", async (

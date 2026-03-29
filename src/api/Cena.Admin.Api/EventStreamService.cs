@@ -99,15 +99,20 @@ public sealed class EventStreamService : IEventStreamService
             .Take(pageSize)
             .ToListAsync();
 
-        var messages = items.Select(d => new DeadLetterMessage(
-            Id: d.Id.ToString(),
-            FailedAt: d.DeadLetteredAt,
-            Source: $"outbox.stream.{d.StreamId}",
-            EventType: d.EventType,
-            ErrorMessage: $"Dead-lettered after {d.RetryCount} retries (seq {d.EventSequence})",
-            RetryCount: d.RetryCount,
-            PayloadPreview: null
-        )).ToList();
+        var messages = items.Select(d =>
+        {
+            var isBusRouter = d.EventSequence == -1;
+            return new DeadLetterMessage(
+                Id: d.Id.ToString(),
+                FailedAt: d.DeadLetteredAt,
+                Source: isBusRouter ? "bus-router" : $"outbox.stream.{d.StreamId}",
+                EventType: isBusRouter ? d.StreamId : d.EventType,
+                ErrorMessage: isBusRouter
+                    ? $"Actor timeout after {d.RetryCount} retries on {d.StreamId}"
+                    : $"Dead-lettered after {d.RetryCount} retries (seq {d.EventSequence})",
+                RetryCount: d.RetryCount,
+                PayloadPreview: null);
+        }).ToList();
 
         return new DeadLetterQueueResponse(messages, totalCount, totalCount > page * pageSize);
     }
@@ -120,13 +125,18 @@ public sealed class EventStreamService : IEventStreamService
         var dlq = await session.LoadAsync<NatsOutboxDeadLetter>(guid);
         if (dlq == null) return null;
 
+        var isBusRouter = dlq.EventSequence == -1;
         return new DeadLetterDetailResponse(
             dlq.Id.ToString(),
             dlq.DeadLetteredAt,
-            $"outbox.stream.{dlq.StreamId}",
-            dlq.EventType,
-            $"Dead-lettered after {dlq.RetryCount} retries (seq {dlq.EventSequence})",
-            $"{{ \"eventSequence\": {dlq.EventSequence}, \"streamId\": \"{dlq.StreamId}\" }}",
+            isBusRouter ? "bus-router" : $"outbox.stream.{dlq.StreamId}",
+            isBusRouter ? dlq.StreamId : dlq.EventType,
+            isBusRouter
+                ? $"Actor timeout after {dlq.RetryCount} retries on {dlq.StreamId}"
+                : $"Dead-lettered after {dlq.RetryCount} retries (seq {dlq.EventSequence})",
+            isBusRouter
+                ? $"{{ \"originalSubject\": \"{dlq.StreamId}\", \"source\": \"bus-router\", \"retries\": {dlq.RetryCount} }}"
+                : $"{{ \"eventSequence\": {dlq.EventSequence}, \"streamId\": \"{dlq.StreamId}\" }}",
             null,
             dlq.RetryCount,
             new List<RetryAttempt>());

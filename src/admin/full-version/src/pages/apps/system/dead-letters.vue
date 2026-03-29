@@ -132,16 +132,16 @@ const formatDate = (ts: string) => new Date(ts).toLocaleString('en-US', {
         <AppSelect
           v-model="filterSource"
           placeholder="Source"
-          :items="['nats', 'marten', 'actor-system', 'ingestion']"
+          :items="['bus-router', 'outbox', 'nats', 'marten', 'actor-system']"
           clearable
           style="inline-size: 10rem;"
         />
         <AppSelect
           v-model="filterType"
           placeholder="Event Type"
-          :items="['ConceptAttempted', 'ConceptMastered', 'StagnationDetected', 'MethodologySwitched']"
+          :items="['cena.session.start', 'cena.session.end', 'cena.mastery.attempt', 'cena.mastery.switch', 'cena.session.annotate', 'ConceptAttempted', 'ConceptMastered', 'StagnationDetected', 'MethodologySwitched']"
           clearable
-          style="inline-size: 12rem;"
+          style="inline-size: 14rem;"
         />
         <VSpacer />
         <VBtn
@@ -177,6 +177,7 @@ const formatDate = (ts: string) => new Date(ts).toLocaleString('en-US', {
           <VChip
             size="x-small"
             label
+            :color="item.source === 'bus-router' ? 'warning' : 'secondary'"
           >
             {{ item.source }}
           </VChip>

@@ -48,6 +48,12 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<IEmbeddingAdminService, EmbeddingAdminService>();
         services.AddScoped<ITokenBudgetAdminService, TokenBudgetAdminService>();
 
+        // ADM-025: Messaging admin service
+        services.AddScoped<IMessagingAdminService, MessagingAdminService>();
+
+        // Student Insights (per-student cross-cutting analytics)
+        services.AddScoped<IStudentInsightsService, StudentInsightsService>();
+
         return services;
     }
 
@@ -78,6 +84,12 @@ public static class CenaAdminServiceRegistration
         app.MapExperimentAdminEndpoints();
         app.MapEmbeddingAdminEndpoints();
         app.MapTokenBudgetEndpoints();
+
+        // ADM-025: Messaging admin endpoints
+        app.MapMessagingAdminEndpoints();
+
+        // Student Insights endpoints
+        app.MapStudentInsightsEndpoints();
 
         return app;
     }

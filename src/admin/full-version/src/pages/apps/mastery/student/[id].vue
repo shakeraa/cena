@@ -285,11 +285,21 @@ const decayColor = (risk: number): string => {
         </p>
       </div>
 
-      <VBtn
-        color="warning"
-        variant="tonal"
-        @click="showOverrideDialog = true"
-      >
+      <div class="d-flex gap-x-3">
+        <VBtn
+          variant="tonal"
+          color="primary"
+          prepend-icon="tabler-brain"
+          :to="{ name: 'apps-user-view-id', params: { id: studentId }, query: { tab: 'insights' } }"
+        >
+          Full Insights
+        </VBtn>
+
+        <VBtn
+          color="warning"
+          variant="tonal"
+          @click="showOverrideDialog = true"
+        >
         <VIcon
           icon="tabler-switch-horizontal"
           start

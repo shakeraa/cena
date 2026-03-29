@@ -361,7 +361,8 @@ public sealed partial class StudentActor
             var @event = new SessionStarted_V1(
                 _studentId, sessionId, cmd.DeviceType, cmd.AppVersion,
                 methodology.ToString(), _state.ExperimentCohort,
-                cmd.IsOffline, cmd.ClientTimestamp);
+                cmd.IsOffline, cmd.ClientTimestamp,
+                SchoolId: cmd.SchoolId); // REV-014: carry tenant context into event
 
             StageEvent(@event);
             await FlushEvents();

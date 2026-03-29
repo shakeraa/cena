@@ -6,7 +6,7 @@
 services:
   # ── PostgreSQL 16 (Marten Event Store) ──
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     container_name: cena-postgres
     environment:
       POSTGRES_DB: cena

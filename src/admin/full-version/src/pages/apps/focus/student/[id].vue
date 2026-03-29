@@ -231,6 +231,15 @@ const focusScoreColor = (score: number): string => {
           Individual focus & attention detail
         </div>
       </div>
+
+      <VBtn
+        variant="tonal"
+        color="primary"
+        prepend-icon="tabler-brain"
+        :to="{ name: 'apps-user-view-id', params: { id: studentId }, query: { tab: 'insights' } }"
+      >
+        Full Insights
+      </VBtn>
     </div>
 
     <VAlert

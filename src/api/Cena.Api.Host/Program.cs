@@ -38,14 +38,19 @@ builder.Host.UseSerilog((context, services, configuration) =>
 });
 
 // ---- Configuration ----
-var pgConnectionString = CenaConnectionStrings.GetPostgres(builder.Configuration, builder.Environment);
 var redisConnectionString = CenaConnectionStrings.GetRedis(builder.Configuration, builder.Environment);
 
-// ---- Marten (PostgreSQL) — same DB as actor host ----
+// ---- PostgreSQL: Shared NpgsqlDataSource + Marten ----
+// API Host: max 30 connections (admin queries + pgvector search).
+var pgMaxPool = builder.Configuration.GetValue<int>("PostgreSQL:MaxPoolSize", 30);
+var pgMinPool = builder.Configuration.GetValue<int>("PostgreSQL:MinPoolSize", 3);
+builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, pgMaxPool, pgMinPool);
+
 builder.Services.AddMarten(opts =>
 {
+    var pgConnectionString = CenaConnectionStrings.GetPostgres(builder.Configuration, builder.Environment);
     opts.ConfigureCenaEventStore(pgConnectionString);
-});
+}).UseNpgsqlDataSource();
 
 // ---- Redis ----
 builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>

@@ -152,7 +152,9 @@ public sealed record StartSession(
 
     DateTimeOffset ClientTimestamp,
 
-    bool IsOffline)
+    bool IsOffline,
+
+    string? SchoolId = null) // REV-014: tenant context
 {
     public string CorrelationId { get; init; } = "";
 }

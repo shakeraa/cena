@@ -1,0 +1,160 @@
+// =============================================================================
+// Cena Platform -- Messaging Admin Endpoints
+// ADM-025: REST endpoints for admin messaging/chat
+// =============================================================================
+
+using Cena.Admin.Api.Validation;
+using Cena.Actors.Messaging;
+using Cena.Infrastructure.Auth;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Routing;
+using NATS.Client.Core;
+using System.Text.Json;
+
+namespace Cena.Admin.Api;
+
+public static class MessagingAdminEndpoints
+{
+    private static readonly JsonSerializerOptions JsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+    };
+
+    public static IEndpointRouteBuilder MapMessagingAdminEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/admin/messaging")
+            .WithTags("Messaging Admin")
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
+
+        group.MapGet("/threads", async (
+            string? type,
+            string? participantId,
+            string? search,
+            int? page,
+            int? pageSize,
+            IMessagingAdminService service) =>
+        {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
+            var result = await service.GetThreadsAsync(
+                type, participantId, search, validPage, validPageSize);
+            return Results.Ok(result);
+        }).WithName("GetMessagingThreads");
+
+        group.MapGet("/threads/{threadId}", async (
+            string threadId,
+            string? before,
+            int? limit,
+            IMessagingAdminService service) =>
+        {
+            var validLimit = Math.Clamp(limit ?? 50, 1, 100);
+            var detail = await service.GetThreadDetailAsync(threadId, before, validLimit);
+            return detail != null ? Results.Ok(detail) : Results.NotFound();
+        }).WithName("GetMessagingThreadDetail");
+
+        group.MapPost("/threads", async (
+            CreateThreadRequest request,
+            HttpContext httpContext,
+            INatsConnection nats) =>
+        {
+            var userId = httpContext.User.FindFirst("user_id")?.Value
+                ?? httpContext.User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var userName = httpContext.User.FindFirst("name")?.Value ?? "Admin";
+
+            // Route to ConversationThreadActor via NATS
+            var threadId = $"thread-{Guid.NewGuid():N}";
+            var createCmd = new
+            {
+                ThreadId = threadId,
+                request.ThreadType,
+                ParticipantIds = request.ParticipantIds.Append(userId).Distinct().ToArray(),
+                CreatedById = userId,
+                CreatedByName = userName
+            };
+
+            await nats.PublishAsync(
+                MessagingNatsSubjects.CmdBroadcastToClass,
+                JsonSerializer.SerializeToUtf8Bytes(createCmd, JsonOpts));
+
+            // If there's an initial message, send it
+            if (!string.IsNullOrEmpty(request.InitialMessage))
+            {
+                var sendCmd = new SendMessage(
+                    threadId, userId, userName, MessageRole.Teacher,
+                    null, null,
+                    new MessageContent(request.InitialMessage, "text", null, null),
+                    MessageChannel.InApp, null);
+
+                await nats.PublishAsync(
+                    MessagingNatsSubjects.CmdSendMessage,
+                    JsonSerializer.SerializeToUtf8Bytes(sendCmd, JsonOpts));
+            }
+
+            return Results.Created($"/api/admin/messaging/threads/{threadId}",
+                new { ThreadId = threadId });
+        }).WithName("CreateMessagingThread");
+
+        group.MapPost("/threads/{threadId}/messages", async (
+            string threadId,
+            SendMessageRequest request,
+            HttpContext httpContext,
+            INatsConnection nats) =>
+        {
+            var userId = httpContext.User.FindFirst("user_id")?.Value
+                ?? httpContext.User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var userName = httpContext.User.FindFirst("name")?.Value ?? "Admin";
+
+            var sendCmd = new SendMessage(
+                threadId, userId, userName, MessageRole.Teacher,
+                null, null,
+                new MessageContent(
+                    request.Text,
+                    request.ContentType ?? "text",
+                    request.ResourceUrl, null),
+                MessageChannel.InApp,
+                request.ReplyToMessageId);
+
+            await nats.PublishAsync(
+                MessagingNatsSubjects.CmdSendMessage,
+                JsonSerializer.SerializeToUtf8Bytes(sendCmd, JsonOpts));
+
+            return Results.Accepted();
+        }).WithName("SendMessageInThread");
+
+        group.MapPut("/threads/{threadId}/mute", async (
+            string threadId,
+            HttpContext httpContext,
+            INatsConnection nats) =>
+        {
+            var userId = httpContext.User.FindFirst("user_id")?.Value
+                ?? httpContext.User.FindFirst("sub")?.Value;
+            if (string.IsNullOrEmpty(userId))
+                return Results.Unauthorized();
+
+            var muteCmd = new MuteThread(threadId, userId, DateTimeOffset.MaxValue);
+            await nats.PublishAsync(
+                $"cena.messaging.commands.MuteThread",
+                JsonSerializer.SerializeToUtf8Bytes(muteCmd, JsonOpts));
+
+            return Results.Ok();
+        }).WithName("MuteMessagingThread");
+
+        group.MapGet("/contacts", async (
+            string? search,
+            IMessagingAdminService service) =>
+        {
+            var result = await service.GetContactsAsync(search);
+            return Results.Ok(result);
+        }).WithName("GetMessagingContacts");
+
+        return app;
+    }
+}

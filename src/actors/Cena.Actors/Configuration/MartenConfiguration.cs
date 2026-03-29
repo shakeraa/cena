@@ -10,6 +10,7 @@ using Marten;
 using JasperFx.Events.Projections;
 using Marten.Events.Projections;
 using Marten.Storage;
+using Npgsql;
 using Weasel.Core;
 using Cena.Actors.Events;
 using Cena.Actors.Ingest;
@@ -23,12 +24,27 @@ namespace Cena.Actors.Configuration;
 public static class MartenConfiguration
 {
     /// <summary>
-    /// Configures Marten as the event store for the Cena platform.
-    /// Call this from Program.cs / Startup via services.AddMarten(opts => opts.ConfigureCenaEventStore(connStr)).
+    /// Configures Marten using a shared NpgsqlDataSource (preferred).
+    /// Ensures Marten shares the same connection pool as pgvector and other services.
+    /// </summary>
+    public static void ConfigureCenaEventStore(this StoreOptions opts, NpgsqlDataSource dataSource)
+    {
+        opts.Connection(dataSource);
+        ConfigureCommon(opts);
+    }
+
+    /// <summary>
+    /// Configures Marten with a raw connection string (legacy fallback).
+    /// Marten creates its own internal pool — use NpgsqlDataSource overload when possible.
     /// </summary>
     public static void ConfigureCenaEventStore(this StoreOptions opts, string connectionString)
     {
         opts.Connection(connectionString);
+        ConfigureCommon(opts);
+    }
+
+    private static void ConfigureCommon(StoreOptions opts)
+    {
         opts.AutoCreateSchemaObjects = JasperFx.AutoCreate.CreateOrUpdate;
         opts.DatabaseSchemaName = "cena";
 
@@ -132,6 +148,9 @@ public static class MartenConfiguration
         // ACT-026: Inline snapshot projection — Marten auto-creates/updates snapshot
         // document on every SaveChangesAsync when event count crosses the threshold.
         opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
+
+        // REV-014: Index SchoolId for efficient tenant-scoped queries
+        opts.Schema.For<StudentProfileSnapshot>().Index(x => x.SchoolId);
 
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);

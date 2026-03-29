@@ -110,16 +110,20 @@ public sealed class ExplanationCacheService : IExplanationCacheService
     };
 
     private readonly IConnectionMultiplexer _redis;
+    private readonly Infrastructure.IRedisCircuitBreaker _circuitBreaker;
     private readonly ILogger<ExplanationCacheService> _logger;
     private readonly Counter<long> _cacheHitCounter;
     private readonly Counter<long> _cacheMissCounter;
+    private readonly Counter<long> _cbBypassCounter;
 
     public ExplanationCacheService(
         IConnectionMultiplexer redis,
+        Infrastructure.IRedisCircuitBreaker circuitBreaker,
         ILogger<ExplanationCacheService> logger,
         IMeterFactory meterFactory)
     {
         _redis = redis;
+        _circuitBreaker = circuitBreaker;
         _logger = logger;
 
         var meter = meterFactory.Create("Cena.Actors.ExplanationCache", "1.0.0");
@@ -129,6 +133,9 @@ public sealed class ExplanationCacheService : IExplanationCacheService
         _cacheMissCounter = meter.CreateCounter<long>(
             "cena.explanation_cache.misses_total",
             description: "Explanation cache misses (requires LLM generation)");
+        _cbBypassCounter = meter.CreateCounter<long>(
+            "cena.explanation_cache.circuit_breaker_bypass_total",
+            description: "Cache operations skipped due to Redis circuit breaker open");
     }
 
     // ── Primary API: ExplanationErrorType + language ──
@@ -136,6 +143,15 @@ public sealed class ExplanationCacheService : IExplanationCacheService
     public async Task<CachedExplanation?> GetAsync(
         string questionId, ExplanationErrorType errorType, string language, CancellationToken ct)
     {
+        // INF-019: Skip Redis when circuit breaker is open to prevent
+        // cache miss → L3 LLM cascade that burns daily token budget.
+        if (!_circuitBreaker.IsAvailable)
+        {
+            _cbBypassCounter.Add(1);
+            _logger.LogDebug("Explanation cache GET bypassed — Redis circuit breaker {State}", _circuitBreaker.State);
+            return null;
+        }
+
         try
         {
             var db = _redis.GetDatabase();
@@ -154,10 +170,12 @@ public sealed class ExplanationCacheService : IExplanationCacheService
                 new KeyValuePair<string, object?>("error_type", errorType.ToString()),
                 new KeyValuePair<string, object?>("language", language));
 
+            _circuitBreaker.RecordSuccess();
             return JsonSerializer.Deserialize<CachedExplanation>(value!, JsonOptions);
         }
         catch (Exception ex)
         {
+            _circuitBreaker.RecordFailure();
             _logger.LogWarning(ex,
                 "Redis cache GET failed for question {QuestionId}, error {ErrorType}, language {Language}. Treating as cache miss.",
                 questionId, errorType, language);
@@ -169,6 +187,13 @@ public sealed class ExplanationCacheService : IExplanationCacheService
         string questionId, ExplanationErrorType errorType, string language,
         CachedExplanation explanation, CancellationToken ct)
     {
+        // INF-019: Skip write when Redis is down
+        if (!_circuitBreaker.IsAvailable)
+        {
+            _logger.LogDebug("Explanation cache SET skipped — Redis circuit breaker {State}", _circuitBreaker.State);
+            return;
+        }
+
         try
         {
             var db = _redis.GetDatabase();
@@ -182,6 +207,7 @@ public sealed class ExplanationCacheService : IExplanationCacheService
         }
         catch (Exception ex)
         {
+            _circuitBreaker.RecordFailure();
             _logger.LogWarning(ex,
                 "Redis cache SET failed for question {QuestionId}, error {ErrorType}. Explanation not cached.",
                 questionId, errorType);
@@ -193,6 +219,8 @@ public sealed class ExplanationCacheService : IExplanationCacheService
     public async Task<CachedExplanation?> GetAsync(
         string questionId, string errorType, string methodology, CancellationToken ct)
     {
+        if (!_circuitBreaker.IsAvailable) return null;
+
         try
         {
             var db = _redis.GetDatabase();
@@ -206,6 +234,7 @@ public sealed class ExplanationCacheService : IExplanationCacheService
         }
         catch (Exception ex)
         {
+            _circuitBreaker.RecordFailure();
             _logger.LogWarning(ex,
                 "Redis cache GET failed for question {QuestionId}, error {ErrorType}. Treating as cache miss.",
                 questionId, errorType);
@@ -217,6 +246,8 @@ public sealed class ExplanationCacheService : IExplanationCacheService
         string questionId, string errorType, string methodology,
         CachedExplanation explanation, CancellationToken ct)
     {
+        if (!_circuitBreaker.IsAvailable) return;
+
         try
         {
             var db = _redis.GetDatabase();

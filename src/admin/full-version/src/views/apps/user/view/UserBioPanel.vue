@@ -242,6 +242,15 @@ const toggleSuspend = async () => {
 
           <VBtn
             variant="tonal"
+            color="primary"
+            prepend-icon="tabler-brain"
+            :to="{ name: 'apps-user-view-id', params: { id: props.userData.id }, query: { tab: 'insights' } }"
+          >
+            Insights
+          </VBtn>
+
+          <VBtn
+            variant="tonal"
             color="info"
             prepend-icon="tabler-chart-dots-3"
             :to="{ path: `/apps/mastery/student/${props.userData.id}` }"

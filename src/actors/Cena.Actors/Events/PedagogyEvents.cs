@@ -16,7 +16,8 @@ public record SessionStarted_V1(
     string Methodology,
     string? ExperimentCohort,
     bool IsOffline,
-    DateTimeOffset ClientTimestamp
+    DateTimeOffset ClientTimestamp,
+    string? SchoolId = null // REV-014: tenant context; null for events stored before this field was added
 ) : IDelegatedEvent;
 
 /// <summary>

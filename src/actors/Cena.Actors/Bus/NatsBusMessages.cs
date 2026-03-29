@@ -15,10 +15,11 @@ public sealed record BusEnvelope<T>(
     string Subject,
     DateTimeOffset Timestamp,
     string Source,   // "emulator", "actor-host", "admin-api"
+    string? SchoolId, // REV-014: tenant context -- school the message originates from
     T Payload)
 {
-    public static BusEnvelope<T> Create(string subject, T payload, string source)
-        => new(Guid.NewGuid().ToString("N"), subject, DateTimeOffset.UtcNow, source, payload);
+    public static BusEnvelope<T> Create(string subject, T payload, string source, string? schoolId = null)
+        => new(Guid.NewGuid().ToString("N"), subject, DateTimeOffset.UtcNow, source, schoolId, payload);
 }
 
 // ── Command payloads (sent on cena.session.* and cena.mastery.*) ──
@@ -29,7 +30,8 @@ public sealed record BusStartSession(
     string? ConceptId,
     string DeviceType,
     string AppVersion,
-    DateTimeOffset ClientTimestamp);
+    DateTimeOffset ClientTimestamp,
+    string? SchoolId = null); // REV-014: tenant context
 
 public sealed record BusEndSession(
     string StudentId,

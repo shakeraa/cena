@@ -62,6 +62,15 @@ var consecutiveWrong = new Dictionary<string, int>(); // studentId → consecuti
 var studentQuestionIndex = new Dictionary<string, int>(); // studentId → questions answered this session
 var studentSessionStart = new Dictionary<string, DateTimeOffset>(); // studentId → session start time
 var rng = new Random(42);
+
+// REV-014: Assign each student to one of 3 simulated schools for tenant isolation testing.
+// Assignment is deterministic so the same student always lands in the same school.
+var simulatedSchools = new[] { "school-alpha", "school-beta", "school-gamma" };
+string GetStudentSchoolId(string studentId)
+{
+    var hash = Math.Abs(studentId.GetHashCode());
+    return simulatedSchools[hash % simulatedSchools.Length];
+}
 var jsonOpts = new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 var cts = new CancellationTokenSource();
 
@@ -171,6 +180,7 @@ try
             };
             studentMethodology[student.StudentId] = methodology;
 
+            var studentSchoolId = GetStudentSchoolId(student.StudentId);
             var startMsg = BusEnvelope<BusStartSession>.Create(
                 NatsSubjects.SessionStart,
                 new BusStartSession(
@@ -179,8 +189,10 @@ try
                     attempt.ConceptId,
                     rng.NextDouble() > 0.3 ? "mobile" : "desktop",
                     "1.0.0",
-                    attempt.Timestamp),
-                "emulator");
+                    attempt.Timestamp,
+                    SchoolId: studentSchoolId), // REV-014: tenant context
+                "emulator",
+                schoolId: studentSchoolId); // REV-014: also set on envelope
 
             await nats.PublishAsync(NatsSubjects.SessionStart,
                 JsonSerializer.Serialize(startMsg, jsonOpts), cancellationToken: cts.Token);

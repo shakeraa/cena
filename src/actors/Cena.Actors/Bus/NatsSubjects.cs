@@ -30,8 +30,36 @@ public static class NatsSubjects
     public const string EventMindWandering     = "cena.events.focus.mind_wandering";
     public const string EventMicrobreakSuggested = "cena.events.focus.microbreak_suggested";
 
-    // ── Dead-letter (messages that exhausted retries) ──
-    public const string DeadLetter = "cena.deadletter";
+    // ── Per-Student Events (Actor Host → SignalR Bridge, SES-001) ──
+    // Pattern: cena.events.student.{studentId}.{event_type}
+    // Used by NatsSignalRBridge to push real-time updates to browser clients.
+    public const string StudentSessionStarted     = "session_started";
+    public const string StudentSessionEnded        = "session_ended";
+    public const string StudentAnswerEvaluated     = "answer_evaluated";
+    public const string StudentMasteryUpdated      = "mastery_updated";
+    public const string StudentHintDelivered       = "hint_delivered";
+    public const string StudentXpAwarded           = "xp_awarded";
+    public const string StudentStreakUpdated        = "streak_updated";
+    public const string StudentStagnationDetected  = "stagnation_detected";
+    public const string StudentMethodologySwitched = "methodology_switched";
+    public const string StudentTutoringStarted     = "tutoring_started";
+    public const string StudentTutorMessage        = "tutor_message";
+    public const string StudentTutoringEnded       = "tutoring_ended";
+
+    /// <summary>
+    /// Wildcard subscription for all events of a specific student.
+    /// </summary>
+    public static string AllStudentEvents(string studentId)
+        => $"cena.events.student.{studentId}.>";
+
+    /// <summary>
+    /// Wildcard subscription for all per-student events across all students.
+    /// Used by admin SSE bridge (ADM-026).
+    /// </summary>
+    public const string AllPerStudentEvents = "cena.events.student.>";
+
+    // ── Dead-letter (messages that exhausted retries → DEAD_LETTER JetStream stream) ──
+    public const string DeadLetter = "cena.durable.dlq.commands";
 
     // ── Wildcard subscriptions ──
     public const string AllEvents   = "cena.events.>";

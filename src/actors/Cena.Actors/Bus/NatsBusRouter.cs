@@ -6,7 +6,9 @@
 
 using System.Collections.Concurrent;
 using System.Text.Json;
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Students;
+using Marten;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -24,6 +26,7 @@ public sealed class NatsBusRouter : BackgroundService
 {
     private readonly INatsConnection _nats;
     private readonly ActorSystem _actorSystem;
+    private readonly IDocumentStore _documentStore;
     private readonly ILogger<NatsBusRouter> _logger;
     private readonly JsonSerializerOptions _jsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -70,10 +73,12 @@ public sealed class NatsBusRouter : BackgroundService
     public NatsBusRouter(
         INatsConnection nats,
         ActorSystem actorSystem,
+        IDocumentStore documentStore,
         ILogger<NatsBusRouter> logger)
     {
         _nats = nats;
         _actorSystem = actorSystem;
+        _documentStore = documentStore;
         _logger = logger;
     }
 
@@ -129,6 +134,11 @@ public sealed class NatsBusRouter : BackgroundService
         try
         {
             _logger.LogInformation("NatsBusRouter subscribing to {Subject}...", subject);
+
+            // INF-018: Backpressure is enforced by the _activationGate semaphore (MaxConcurrentActivations=50).
+            // If the gate is full, SubscribeAndRoute blocks on _activationGate.WaitAsync, which naturally
+            // applies backpressure to the async enumerable — NATS.Net 2.x pauses reading from the socket
+            // when the consumer is slower than the producer. No explicit buffer limit needed.
             await foreach (var msg in _nats.SubscribeAsync<byte[]>(subject, cancellationToken: ct))
             {
                 try
@@ -221,6 +231,26 @@ public sealed class NatsBusRouter : BackgroundService
 
     private async Task PublishDeadLetterAsync(string originalSubject, byte[] rawData)
     {
+        // 1. Persist to Marten so it appears in the Admin DLQ UI
+        try
+        {
+            await using var session = _documentStore.LightweightSession();
+            session.Store(new NatsOutboxDeadLetter
+            {
+                EventSequence = -1, // Not from Marten event store
+                StreamId = originalSubject,
+                EventType = originalSubject,
+                RetryCount = MaxRetryAttempts,
+                DeadLetteredAt = DateTimeOffset.UtcNow,
+            });
+            await session.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to persist dead-letter to Marten for {Subject}", originalSubject);
+        }
+
+        // 2. Publish to JetStream DEAD_LETTER stream for durable replay
         try
         {
             var dlEnvelope = new
@@ -235,7 +265,7 @@ public sealed class NatsBusRouter : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Failed to publish dead-letter for {Subject}", originalSubject);
+            _logger.LogError(ex, "Failed to publish dead-letter to NATS for {Subject}", originalSubject);
         }
     }
 

@@ -167,14 +167,24 @@ defineExpose({ refresh: fetchStagnatingStudents })
       </template>
 
       <template #item.action="{ item }">
-        <VBtn
-          variant="text"
-          color="primary"
-          size="small"
-          :to="{ path: `/apps/mastery/student/${item.studentId}` }"
-        >
-          View Detail
-        </VBtn>
+        <div class="d-flex gap-x-1">
+          <VBtn
+            variant="text"
+            color="primary"
+            size="small"
+            :to="{ name: 'apps-user-view-id', params: { id: item.studentId }, query: { tab: 'insights' } }"
+          >
+            Insights
+          </VBtn>
+          <VBtn
+            variant="text"
+            color="default"
+            size="small"
+            :to="{ path: `/apps/mastery/student/${item.studentId}` }"
+          >
+            Mastery
+          </VBtn>
+        </div>
       </template>
 
       <template #no-data>

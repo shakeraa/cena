@@ -23,15 +23,14 @@ public interface IEmbeddingAdminService
 
 public sealed class EmbeddingAdminService : IEmbeddingAdminService
 {
-    private readonly string _connectionString;
+    private readonly NpgsqlDataSource _dataSource;
     private readonly ILogger<EmbeddingAdminService> _logger;
 
     public EmbeddingAdminService(
-        IConfiguration configuration,
-        IHostEnvironment environment,
+        NpgsqlDataSource dataSource,
         ILogger<EmbeddingAdminService> logger)
     {
-        _connectionString = CenaConnectionStrings.GetPostgres(configuration, environment);
+        _dataSource = dataSource;
         _logger = logger;
     }
 
@@ -41,8 +40,7 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
     {
         try
         {
-        await using var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync();
+        await using var conn = await _dataSource.OpenConnectionAsync();
 
         // Check if table exists
         await using var checkCmd = new NpgsqlCommand(
@@ -138,8 +136,7 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
     {
         var sw = Stopwatch.StartNew();
 
-        await using var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync();
+        await using var conn = await _dataSource.OpenConnectionAsync();
 
         var topK = request.TopK > 0 ? request.TopK : 20;
 
@@ -191,8 +188,7 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
     {
         var offset = (page - 1) * pageSize;
 
-        await using var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync();
+        await using var conn = await _dataSource.OpenConnectionAsync();
 
         try
         {
@@ -263,8 +259,7 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
 
     public async Task<ReindexResponse> RequestReindexAsync(ReindexRequest request)
     {
-        await using var conn = new NpgsqlConnection(_connectionString);
-        await conn.OpenAsync();
+        await using var conn = await _dataSource.OpenConnectionAsync();
 
         // Count blocks matching scope
         var countSql = request.Scope.ToLowerInvariant() switch

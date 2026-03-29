@@ -74,6 +74,15 @@ export default [
     subject: 'Pedagogy',
   },
 
+  { heading: 'Communication' },
+  {
+    title: 'Messaging',
+    icon: { icon: 'tabler-message-circle' },
+    to: 'apps-messaging',
+    action: 'read',
+    subject: 'Messaging',
+  },
+
   { heading: 'AI Tutoring' },
   {
     title: 'Tutoring Sessions',

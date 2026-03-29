@@ -19,6 +19,7 @@ using Cena.Actors.Outreach;
 using Cena.Actors.Services;
 using Cena.Actors.Sessions;
 using Cena.Actors.Stagnation;
+using Cena.Actors.Tutoring;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -57,6 +58,7 @@ public sealed partial class StudentActor : IActor
     private readonly IDeliveryGate _deliveryGate;
     private readonly IConfusionDetector _confusionDetector;
     private readonly IDisengagementClassifier _disengagementClassifier;
+    private readonly ISessionEventPublisher _sessionEventPublisher;
 
     // ---- Actor State ----
     private StudentState _state = new();
@@ -126,6 +128,7 @@ public sealed partial class StudentActor : IActor
         IDeliveryGate deliveryGate,
         IConfusionDetector confusionDetector,
         IDisengagementClassifier disengagementClassifier,
+        ISessionEventPublisher sessionEventPublisher,
         IMeterFactory meterFactory,
         Infrastructure.GracefulShutdownCoordinator? shutdownCoordinator = null)
     {
@@ -142,6 +145,7 @@ public sealed partial class StudentActor : IActor
         _deliveryGate = deliveryGate ?? throw new ArgumentNullException(nameof(deliveryGate));
         _confusionDetector = confusionDetector ?? throw new ArgumentNullException(nameof(confusionDetector));
         _disengagementClassifier = disengagementClassifier ?? throw new ArgumentNullException(nameof(disengagementClassifier));
+        _sessionEventPublisher = sessionEventPublisher ?? throw new ArgumentNullException(nameof(sessionEventPublisher));
 
         // ACT-023: Instance-based telemetry via IMeterFactory
         _activitySource = new ActivitySource("Cena.Actors.StudentActor", "1.0.0");
@@ -346,6 +350,7 @@ public sealed partial class StudentActor : IActor
             _state.LongestStreak = snapshot.LongestStreak;
             _state.LastActivityDate = snapshot.LastActivityDate;
             _state.ExperimentCohort = snapshot.ExperimentCohort;
+            _state.SchoolId = snapshot.SchoolId; // REV-014: restore tenant scope
             _state.BaselineAccuracy = snapshot.BaselineAccuracy;
             _state.BaselineResponseTimeMs = snapshot.BaselineResponseTimeMs;
             _state.SessionCount = snapshot.SessionCount;

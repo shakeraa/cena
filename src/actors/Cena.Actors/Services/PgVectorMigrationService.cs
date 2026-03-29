@@ -19,15 +19,14 @@ namespace Cena.Actors.Services;
 /// </summary>
 public sealed class PgVectorMigrationService : IHostedService
 {
-    private readonly string _connectionString;
+    private readonly NpgsqlDataSource _dataSource;
     private readonly ILogger<PgVectorMigrationService> _logger;
 
     public PgVectorMigrationService(
-        IConfiguration configuration,
-        IHostEnvironment environment,
+        NpgsqlDataSource dataSource,
         ILogger<PgVectorMigrationService> logger)
     {
-        _connectionString = CenaConnectionStrings.GetPostgres(configuration, environment);
+        _dataSource = dataSource;
         _logger = logger;
     }
 
@@ -35,8 +34,7 @@ public sealed class PgVectorMigrationService : IHostedService
     {
         try
         {
-            await using var conn = new NpgsqlConnection(_connectionString);
-            await conn.OpenAsync(ct);
+            await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
             // Step 1: Enable pgvector extension
             await ExecuteNonQueryAsync(conn, "CREATE EXTENSION IF NOT EXISTS vector", ct);

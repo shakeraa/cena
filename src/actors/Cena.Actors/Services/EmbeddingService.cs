@@ -116,7 +116,7 @@ public sealed record ContentSearchResult(
 /// </summary>
 public sealed class EmbeddingService : IEmbeddingService, IDisposable
 {
-    private readonly string _connectionString;
+    private readonly NpgsqlDataSource _dataSource;
     private readonly HttpClient _httpClient;
     private readonly ILogger<EmbeddingService> _logger;
     private readonly string? _apiKey;
@@ -131,12 +131,12 @@ public sealed class EmbeddingService : IEmbeddingService, IDisposable
     private const string DefaultEndpoint = "https://api.openai.com/v1/embeddings";
 
     public EmbeddingService(
-        IConfiguration configuration,
-        IHostEnvironment environment,
+        NpgsqlDataSource dataSource,
         HttpClient httpClient,
-        ILogger<EmbeddingService> logger)
+        ILogger<EmbeddingService> logger,
+        IConfiguration configuration)
     {
-        _connectionString = CenaConnectionStrings.GetPostgres(configuration, environment);
+        _dataSource = dataSource;
         _httpClient = httpClient;
         _logger = logger;
 
@@ -321,8 +321,7 @@ public sealed class EmbeddingService : IEmbeddingService, IDisposable
 
         try
         {
-            await using var conn = new NpgsqlConnection(_connectionString);
-            await conn.OpenAsync(ct);
+            await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = sql.ToString();
@@ -405,8 +404,7 @@ public sealed class EmbeddingService : IEmbeddingService, IDisposable
 
         try
         {
-            await using var conn = new NpgsqlConnection(_connectionString);
-            await conn.OpenAsync(ct);
+            await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = sql.ToString();
@@ -481,8 +479,7 @@ public sealed class EmbeddingService : IEmbeddingService, IDisposable
 
         try
         {
-            await using var conn = new NpgsqlConnection(_connectionString);
-            await conn.OpenAsync(ct);
+            await using var conn = await _dataSource.OpenConnectionAsync(ct);
 
             await using var cmd = conn.CreateCommand();
             cmd.CommandText = sql;

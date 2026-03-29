@@ -196,6 +196,179 @@ const historyChartSeries = computed(() => {
   ]
 })
 
+// ═══════════════════════════════════════════════════════════════
+// ROW 6-9 DATA
+// ═══════════════════════════════════════════════════════════════
+
+// ── Session Patterns ──
+interface SessionPatterns {
+  totalSessions: number
+  avgDurationMinutes: number
+  avgQuestionsPerSession: number
+  abandonmentRate: number
+  byHour: { timeSlot: string; sessionCount: number }[]
+  byDay: { day: string; sessionCount: number }[]
+  endReasons: { reason: string; count: number; percentage: number }[]
+}
+
+const sessionPatternsLoading = ref(true)
+const sessionPatterns = ref<SessionPatterns | null>(null)
+
+// ── Focus Heatmap (per-student) ──
+interface HeatmapCellData { day: string; hour: string; avgFocusScore: number; studentCount: number }
+const heatmapLoading = ref(true)
+const heatmapCells = ref<HeatmapCellData[]>([])
+
+// ── Focus Degradation (per-student) ──
+interface DegradationPt { minutesIntoSession: number; avgFocusScore: number; sampleSize: number }
+const degradationLoading = ref(true)
+const degradationCurve = ref<DegradationPt[]>([])
+
+// ── Engagement ──
+interface EngagementData {
+  currentStreak: number
+  longestStreak: number
+  lastActivityDate: string | null
+  totalXp: number
+  xpByDifficulty: { difficultyLevel: string; totalXp: number; attemptCount: number }[]
+  badges: { badgeId: string; badgeName: string; badgeCategory: string; earnedAt: string }[]
+}
+
+const engagementLoading = ref(true)
+const engagement = ref<EngagementData | null>(null)
+
+// ── Error Types ──
+interface ErrorTypesData {
+  totalAttempts: number
+  totalErrors: number
+  errorRate: number
+  byErrorType: { errorType: string; count: number; percentage: number }[]
+  byConceptTopErrors: { conceptId: string; errorCount: number; dominantErrorType: string }[]
+}
+
+const errorTypesLoading = ref(true)
+const errorTypes = ref<ErrorTypesData | null>(null)
+
+// ── Hint Usage ──
+interface HintUsageData {
+  totalHintRequests: number
+  byLevel: { level: number; label: string; count: number }[]
+  byConcept: { conceptId: string; hintCount: number }[]
+  hintEffectivenessPercent: number
+}
+
+const hintUsageLoading = ref(true)
+const hintUsage = ref<HintUsageData | null>(null)
+
+// ── Stagnation ──
+interface StagnationData {
+  stagnatingConcepts: { conceptId: string; compositeScore: number; consecutiveStagnantSessions: number; attemptedMethodologies: string[]; lastDetected: string }[]
+  totalStagnationEvents: number
+}
+
+const stagnationLoading = ref(true)
+const stagnation = ref<StagnationData | null>(null)
+
+// ── Response Times ──
+interface ResponseTimeData {
+  medianRtMs: number
+  meanRtMs: number
+  stdDevMs: number
+  trend: { date: string; avgRtMs: number; attemptCount: number }[]
+  anomalies: { timestamp: string; responseTimeMs: number; conceptId: string; expectedRangeMs: string }[]
+}
+
+const rtLoading = ref(true)
+const rtData = ref<ResponseTimeData | null>(null)
+
+// ── Outreach History ──
+interface OutreachEvent {
+  messageId: string
+  channel: string
+  sentAt: string
+  deliveredAt: string | null
+  openedAt: string | null
+  reEngagedAt: string | null
+}
+
+const outreachLoading = ref(true)
+const outreachEvents = ref<OutreachEvent[]>([])
+
+// ── Computed: Session time chart ──
+const sessionTimeChartOptions = computed(() => ({
+  chart: { type: 'bar' as const, parentHeightOffset: 0, toolbar: { show: false } },
+  plotOptions: { bar: { borderRadius: 3, columnWidth: '60%' } },
+  colors: ['#FFB400'],
+  dataLabels: { enabled: false },
+  xaxis: {
+    categories: (sessionPatterns.value?.byHour ?? []).map(h => h.timeSlot),
+    labels: { style: { colors: labelColor, fontSize: '11px' }, rotateAlways: true },
+    axisBorder: { show: false },
+    axisTicks: { show: false },
+  },
+  yaxis: { labels: { style: { colors: labelColor } } },
+  grid: { strokeDashArray: 8, borderColor },
+  tooltip: { y: { formatter: (v: number) => `${v} sessions` } },
+}))
+
+const sessionTimeSeries = computed(() => [{
+  name: 'Sessions',
+  data: (sessionPatterns.value?.byHour ?? []).map(h => h.sessionCount),
+}])
+
+// ── Computed: Error type donut ──
+const errorDonutOptions = computed(() => ({
+  chart: { type: 'donut' as const },
+  labels: (errorTypes.value?.byErrorType ?? []).map(e => e.errorType),
+  colors: ['#FF4C51', '#FFB400', '#56CA00', '#16B1FF', '#9055FD', '#8A8D93'],
+  legend: { position: 'bottom' as const, labels: { colors: labelColor } },
+  plotOptions: { pie: { donut: { labels: { show: true, total: { show: true, label: 'Total Errors' } } } } },
+}))
+
+const errorDonutSeries = computed(() => (errorTypes.value?.byErrorType ?? []).map(e => e.count))
+
+// ── Computed: RT trend ──
+const rtTrendOptions = computed(() => ({
+  chart: { type: 'line' as const, parentHeightOffset: 0, toolbar: { show: false }, zoom: { enabled: false } },
+  stroke: { curve: 'smooth' as const, width: 2 },
+  colors: ['#FF4C51'],
+  grid: { strokeDashArray: 8, borderColor },
+  xaxis: {
+    categories: (rtData.value?.trend ?? []).map(t => t.date),
+    labels: { style: { colors: labelColor, fontSize: '10px' }, rotateAlways: true },
+    axisBorder: { show: false },
+    axisTicks: { show: false },
+  },
+  yaxis: { labels: { style: { colors: labelColor }, formatter: (v: number) => `${Math.round(v)}ms` } },
+  tooltip: { y: { formatter: (v: number) => `${Math.round(v)} ms` } },
+}))
+
+const rtTrendSeries = computed(() => [{
+  name: 'Avg RT',
+  data: (rtData.value?.trend ?? []).map(t => t.avgRtMs),
+}])
+
+// ── Computed: Degradation curve chart ──
+const degradationChartOptions = computed(() => ({
+  chart: { type: 'area' as const, parentHeightOffset: 0, toolbar: { show: false }, zoom: { enabled: false } },
+  stroke: { curve: 'smooth' as const, width: 2 },
+  colors: ['#16B1FF'],
+  grid: { strokeDashArray: 8, borderColor },
+  xaxis: {
+    categories: degradationCurve.value.map(p => `${p.minutesIntoSession}m`),
+    labels: { style: { colors: labelColor, fontSize: '11px' } },
+    axisBorder: { show: false },
+    axisTicks: { show: false },
+  },
+  yaxis: { min: 0, max: 100, labels: { style: { colors: labelColor }, formatter: (v: number) => `${Math.round(v)}` } },
+  tooltip: { y: { formatter: (v: number) => `${Math.round(v)} / 100` } },
+}))
+
+const degradationSeries = computed(() => [{
+  name: 'Focus Score',
+  data: degradationCurve.value.map(p => Math.round(p.avgFocusScore)),
+}])
+
 // ── Helpers ──
 const focusScoreColor = (score: number) => score >= 70 ? 'success' : score >= 40 ? 'warning' : 'error'
 const masteryColor = (level: number) => level >= 80 ? 'success' : level >= 50 ? 'info' : level >= 30 ? 'warning' : 'error'
@@ -255,11 +428,113 @@ const fetchMethodology = async () => {
   }
 }
 
+// ── ROW 6-9 Fetches ──
+const fetchSessionPatterns = async () => {
+  sessionPatternsLoading.value = true
+  try {
+    const data = await $api(`/admin/insights/students/${props.userId}/session-patterns`)
+    sessionPatterns.value = data as SessionPatterns
+  }
+  catch { /* non-critical */ }
+  finally { sessionPatternsLoading.value = false }
+}
+
+const fetchHeatmap = async () => {
+  heatmapLoading.value = true
+  try {
+    const data = await $api(`/admin/insights/students/${props.userId}/focus-heatmap`)
+    heatmapCells.value = (data as any).cells ?? []
+  }
+  catch { /* non-critical */ }
+  finally { heatmapLoading.value = false }
+}
+
+const fetchDegradation = async () => {
+  degradationLoading.value = true
+  try {
+    const data = await $api(`/admin/insights/students/${props.userId}/degradation`)
+    degradationCurve.value = (data as any).curve ?? []
+  }
+  catch { /* non-critical */ }
+  finally { degradationLoading.value = false }
+}
+
+const fetchEngagement = async () => {
+  engagementLoading.value = true
+  try {
+    const data = await $api(`/admin/insights/students/${props.userId}/engagement`)
+    engagement.value = data as EngagementData
+  }
+  catch { /* non-critical */ }
+  finally { engagementLoading.value = false }
+}
+
+const fetchErrorTypes = async () => {
+  errorTypesLoading.value = true
+  try {
+    const data = await $api(`/admin/insights/students/${props.userId}/error-types`)
+    errorTypes.value = data as ErrorTypesData
+  }
+  catch { /* non-critical */ }
+  finally { errorTypesLoading.value = false }
+}
+
+const fetchHintUsage = async () => {
+  hintUsageLoading.value = true
+  try {
+    const data = await $api(`/admin/insights/students/${props.userId}/hint-usage`)
+    hintUsage.value = data as HintUsageData
+  }
+  catch { /* non-critical */ }
+  finally { hintUsageLoading.value = false }
+}
+
+const fetchStagnation = async () => {
+  stagnationLoading.value = true
+  try {
+    const data = await $api(`/admin/insights/students/${props.userId}/stagnation`)
+    stagnation.value = data as StagnationData
+  }
+  catch { /* non-critical */ }
+  finally { stagnationLoading.value = false }
+}
+
+const fetchResponseTimes = async () => {
+  rtLoading.value = true
+  try {
+    const data = await $api(`/admin/insights/students/${props.userId}/response-times`)
+    rtData.value = data as ResponseTimeData
+  }
+  catch { /* non-critical */ }
+  finally { rtLoading.value = false }
+}
+
+const fetchOutreach = async () => {
+  outreachLoading.value = true
+  try {
+    const data = await $api(`/admin/outreach/students/${props.userId}/history`)
+    outreachEvents.value = (data as any).events ?? []
+  }
+  catch { /* non-critical */ }
+  finally { outreachLoading.value = false }
+}
+
 onMounted(() => {
   if (isStudent.value) {
+    // ROW 1-5 (existing)
     fetchFocus()
     fetchMastery()
     fetchMethodology()
+    // ROW 6-9 (new)
+    fetchSessionPatterns()
+    fetchHeatmap()
+    fetchDegradation()
+    fetchEngagement()
+    fetchErrorTypes()
+    fetchHintUsage()
+    fetchStagnation()
+    fetchResponseTimes()
+    fetchOutreach()
   }
 })
 </script>
@@ -568,6 +843,290 @@ onMounted(() => {
                     </VChip>
                   </td>
                   <td class="text-body-2 text-medium-emphasis">{{ s.rationale }}</td>
+                </tr>
+              </tbody>
+            </VTable>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- ═══ ROW 6: Session Patterns ═══ -->
+    <VRow class="match-height mb-2">
+      <!-- Study Time Distribution -->
+      <VCol cols="12" md="4">
+        <VCard :loading="sessionPatternsLoading">
+          <VCardItem title="Study Time Distribution" />
+          <VCardText>
+            <VueApexCharts
+              v-if="(sessionPatterns?.byHour ?? []).length > 0"
+              type="bar"
+              height="220"
+              :options="sessionTimeChartOptions"
+              :series="sessionTimeSeries"
+            />
+            <div v-else-if="!sessionPatternsLoading" class="d-flex justify-center py-6">
+              <span class="text-body-1 text-disabled">No session data</span>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Focus Degradation Curve (per student) -->
+      <VCol cols="12" md="4">
+        <VCard :loading="degradationLoading">
+          <VCardItem title="Focus Degradation Curve">
+            <template #subtitle>How focus drops during sessions</template>
+          </VCardItem>
+          <VCardText>
+            <VueApexCharts
+              v-if="degradationCurve.length > 0"
+              type="area"
+              height="220"
+              :options="degradationChartOptions"
+              :series="degradationSeries"
+            />
+            <div v-else-if="!degradationLoading" class="d-flex justify-center py-6">
+              <span class="text-body-1 text-disabled">Not enough data</span>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Session Stats Cards -->
+      <VCol cols="12" md="4">
+        <VCard :loading="sessionPatternsLoading">
+          <VCardItem title="Session Overview" />
+          <VCardText>
+            <VList density="compact">
+              <VListItem>
+                <template #prepend><VIcon icon="tabler-player-play" color="primary" size="20" class="me-2" /></template>
+                <VListItemTitle>Total Sessions: <strong>{{ sessionPatterns?.totalSessions ?? 0 }}</strong></VListItemTitle>
+              </VListItem>
+              <VListItem>
+                <template #prepend><VIcon icon="tabler-clock" color="info" size="20" class="me-2" /></template>
+                <VListItemTitle>Avg Duration: <strong>{{ sessionPatterns?.avgDurationMinutes ?? 0 }} min</strong></VListItemTitle>
+              </VListItem>
+              <VListItem>
+                <template #prepend><VIcon icon="tabler-help" color="warning" size="20" class="me-2" /></template>
+                <VListItemTitle>Avg Questions/Session: <strong>{{ sessionPatterns?.avgQuestionsPerSession ?? 0 }}</strong></VListItemTitle>
+              </VListItem>
+              <VListItem>
+                <template #prepend><VIcon icon="tabler-door-exit" :color="(sessionPatterns?.abandonmentRate ?? 0) > 20 ? 'error' : 'success'" size="20" class="me-2" /></template>
+                <VListItemTitle>Abandonment Rate: <strong :class="(sessionPatterns?.abandonmentRate ?? 0) > 20 ? 'text-error' : 'text-success'">{{ sessionPatterns?.abandonmentRate ?? 0 }}%</strong></VListItemTitle>
+              </VListItem>
+            </VList>
+
+            <!-- End Reasons -->
+            <div v-if="(sessionPatterns?.endReasons ?? []).length > 0" class="mt-4">
+              <div class="text-caption text-medium-emphasis mb-2">End Reasons</div>
+              <div class="d-flex flex-wrap gap-2">
+                <VChip
+                  v-for="r in sessionPatterns!.endReasons"
+                  :key="r.reason"
+                  :color="r.reason === 'completed' ? 'success' : r.reason === 'abandoned' ? 'error' : 'warning'"
+                  label
+                  size="small"
+                >
+                  {{ r.reason }}: {{ r.count }}
+                </VChip>
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- ═══ ROW 7: Engagement & Motivation ═══ -->
+    <VRow class="match-height mb-2">
+      <VCol cols="6" sm="3">
+        <VCard :loading="engagementLoading">
+          <VCardText class="text-center">
+            <div class="text-caption text-medium-emphasis mb-1">Current Streak</div>
+            <div class="text-h4 font-weight-bold text-primary">
+              {{ engagement?.currentStreak ?? 0 }}
+            </div>
+            <div class="text-caption text-medium-emphasis">
+              Best: {{ engagement?.longestStreak ?? 0 }}
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <VCol cols="6" sm="3">
+        <VCard :loading="engagementLoading">
+          <VCardText class="text-center">
+            <div class="text-caption text-medium-emphasis mb-1">Total XP</div>
+            <div class="text-h4 font-weight-bold text-warning">
+              {{ (engagement?.totalXp ?? 0).toLocaleString() }}
+            </div>
+            <div class="text-caption text-medium-emphasis">experience points</div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <VCol cols="12" sm="6">
+        <VCard :loading="engagementLoading">
+          <VCardItem title="Badges Earned" />
+          <VCardText>
+            <div v-if="(engagement?.badges ?? []).length > 0" class="d-flex flex-wrap gap-2">
+              <VChip
+                v-for="b in engagement!.badges"
+                :key="b.badgeId"
+                :color="b.badgeCategory === 'mastery' ? 'success' : b.badgeCategory === 'streak' ? 'warning' : 'info'"
+                label
+                size="small"
+              >
+                <VIcon start icon="tabler-award" size="14" />
+                {{ b.badgeName }}
+              </VChip>
+            </div>
+            <div v-else-if="!engagementLoading" class="text-body-2 text-disabled">No badges yet</div>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- ═══ ROW 8: Learning Irregularities ═══ -->
+    <VRow class="match-height mb-2">
+      <!-- Error Type Distribution -->
+      <VCol cols="12" md="4">
+        <VCard :loading="errorTypesLoading">
+          <VCardItem title="Error Types">
+            <template #subtitle>{{ errorTypes?.totalErrors ?? 0 }} errors in {{ errorTypes?.totalAttempts ?? 0 }} attempts ({{ errorTypes?.errorRate?.toFixed(1) ?? 0 }}%)</template>
+          </VCardItem>
+          <VCardText>
+            <VueApexCharts
+              v-if="(errorTypes?.byErrorType ?? []).length > 0"
+              type="donut"
+              height="250"
+              :options="errorDonutOptions"
+              :series="errorDonutSeries"
+            />
+            <div v-else-if="!errorTypesLoading" class="d-flex justify-center py-6">
+              <span class="text-body-1 text-disabled">No error data</span>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Hint Usage -->
+      <VCol cols="12" md="4">
+        <VCard :loading="hintUsageLoading">
+          <VCardItem title="Hint Usage">
+            <template #subtitle>Effectiveness: {{ hintUsage?.hintEffectivenessPercent ?? 0 }}%</template>
+          </VCardItem>
+          <VCardText>
+            <VList v-if="(hintUsage?.byLevel ?? []).length > 0" density="compact">
+              <VListItem v-for="h in hintUsage!.byLevel" :key="h.level">
+                <template #prepend>
+                  <VAvatar :color="h.level === 1 ? 'success' : h.level === 2 ? 'warning' : 'error'" variant="tonal" size="32">
+                    <span class="text-caption font-weight-bold">{{ h.level }}</span>
+                  </VAvatar>
+                </template>
+                <VListItemTitle>{{ h.label }}</VListItemTitle>
+                <VListItemSubtitle>{{ h.count }} requests</VListItemSubtitle>
+              </VListItem>
+            </VList>
+            <div v-else-if="!hintUsageLoading" class="d-flex justify-center py-6">
+              <span class="text-body-1 text-disabled">No hint data</span>
+            </div>
+
+            <!-- Top concepts needing hints -->
+            <div v-if="(hintUsage?.byConcept ?? []).length > 0" class="mt-4">
+              <div class="text-caption text-medium-emphasis mb-2">Most-Hinted Concepts</div>
+              <div class="d-flex flex-wrap gap-1">
+                <VChip v-for="c in hintUsage!.byConcept.slice(0, 5)" :key="c.conceptId" size="small" label color="warning" variant="tonal">
+                  {{ c.conceptId }}: {{ c.hintCount }}
+                </VChip>
+              </div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+
+      <!-- Response Time + Stagnation -->
+      <VCol cols="12" md="4">
+        <VCard :loading="rtLoading">
+          <VCardItem title="Response Time Trend">
+            <template #subtitle>Median: {{ rtData?.medianRtMs ?? 0 }}ms | Anomalies: {{ rtData?.anomalies?.length ?? 0 }}</template>
+          </VCardItem>
+          <VCardText>
+            <VueApexCharts
+              v-if="(rtData?.trend ?? []).length > 0"
+              type="line"
+              height="180"
+              :options="rtTrendOptions"
+              :series="rtTrendSeries"
+            />
+            <div v-else-if="!rtLoading" class="d-flex justify-center py-4">
+              <span class="text-body-1 text-disabled">Not enough RT data</span>
+            </div>
+          </VCardText>
+        </VCard>
+
+        <!-- Stagnation Alerts -->
+        <VCard v-if="(stagnation?.stagnatingConcepts ?? []).length > 0" :loading="stagnationLoading" class="mt-4">
+          <VCardItem title="Stagnation Alerts">
+            <template #subtitle>{{ stagnation!.stagnatingConcepts.length }} concepts stuck</template>
+          </VCardItem>
+          <VCardText>
+            <VList density="compact">
+              <VListItem v-for="s in stagnation!.stagnatingConcepts.slice(0, 5)" :key="s.conceptId">
+                <template #prepend>
+                  <VAvatar color="error" variant="tonal" size="32">
+                    <VIcon icon="tabler-alert-triangle" size="16" />
+                  </VAvatar>
+                </template>
+                <VListItemTitle class="text-body-2 font-weight-medium">{{ s.conceptId }}</VListItemTitle>
+                <VListItemSubtitle>
+                  {{ s.consecutiveStagnantSessions }} sessions stuck | Tried: {{ s.attemptedMethodologies?.join(', ') || 'none' }}
+                </VListItemSubtitle>
+              </VListItem>
+            </VList>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- ═══ ROW 9: Tutoring & Outreach ═══ -->
+    <VRow v-if="outreachEvents.length > 0" class="mb-2">
+      <VCol cols="12">
+        <VCard :loading="outreachLoading">
+          <VCardItem title="Outreach & Re-engagement History">
+            <template #subtitle>Messages sent to bring student back</template>
+          </VCardItem>
+          <VCardText>
+            <VTable density="compact">
+              <thead>
+                <tr>
+                  <th>Channel</th>
+                  <th>Sent</th>
+                  <th>Delivered</th>
+                  <th>Opened</th>
+                  <th>Re-engaged</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="e in outreachEvents.slice(0, 10)" :key="e.messageId">
+                  <td>
+                    <VChip :color="e.channel === 'WhatsApp' ? 'success' : e.channel === 'Push' ? 'info' : 'warning'" label size="small">
+                      {{ e.channel }}
+                    </VChip>
+                  </td>
+                  <td class="text-body-2">{{ formatDate(e.sentAt) }}</td>
+                  <td>
+                    <VIcon v-if="e.deliveredAt" icon="tabler-check" color="success" size="18" />
+                    <VIcon v-else icon="tabler-x" color="error" size="18" />
+                  </td>
+                  <td>
+                    <VIcon v-if="e.openedAt" icon="tabler-check" color="success" size="18" />
+                    <VIcon v-else icon="tabler-x" color="disabled" size="18" />
+                  </td>
+                  <td>
+                    <VChip v-if="e.reEngagedAt" color="success" label size="small">Yes</VChip>
+                    <span v-else class="text-disabled">--</span>
+                  </td>
                 </tr>
               </tbody>
             </VTable>

@@ -90,6 +90,7 @@ public sealed class StudentState
 
     // ---- Metadata ----
     public string? ExperimentCohort { get; set; }
+    public string? SchoolId { get; set; } // REV-014: tenant identifier; set on first session
     public int SessionCount { get; set; }
     public int EventVersion { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
@@ -219,6 +220,7 @@ public sealed class StudentState
         SessionCount++;
         ActiveSessionId = e.SessionId;
         ExperimentCohort ??= e.ExperimentCohort;
+        SchoolId ??= e.SchoolId; // REV-014: capture once; school never changes
         IncrementSessionsSinceSwitch();
         EventVersion++;
     }

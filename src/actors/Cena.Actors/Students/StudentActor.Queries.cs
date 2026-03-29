@@ -13,6 +13,7 @@ using Cena.Actors.Outreach;
 using Cena.Actors.Services;
 using Cena.Actors.Sessions;
 using Cena.Actors.Stagnation;
+using Cena.Actors.Tutoring;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -121,6 +122,7 @@ public sealed partial class StudentActor
 
     // ACT-029: Flush immediately after staging to prevent data loss on passivation.
     // Apply the event to local state after successful persistence.
+    // ACT-010: After flush, publish to per-student NATS subjects for SignalR bridge.
     private async Task HandleDelegateEvent(DelegateEvent del)
     {
         StageEvent(del.Event);
@@ -144,7 +146,39 @@ public sealed partial class StudentActor
             case MethodologyConfidenceReached_V1 e: _state.Apply(e); break;
             case MethodologySwitchDeferred_V1 e: _state.Apply(e); break;
             case TeacherMethodologyOverride_V1 e: _state.Apply(e); break;
+            // ACT-010: Tutoring events — no state mutation, persisted by StageEvent
+            case TutoringSessionStarted_V1: break;
+            case TutoringMessageSent_V1: break;
+            case TutoringSessionEnded_V1: break;
+            case TutoringEpisodeCompleted_V1: break;
         }
+
+        // ACT-010: Publish to per-student NATS subjects (fire-and-forget, no await blocking)
+        _ = PublishEventToNatsAsync(del.Event);
+    }
+
+    /// <summary>
+    /// ACT-010: Routes persisted events to per-student NATS subjects for the SignalR bridge.
+    /// Fire-and-forget — Marten is the source of truth. NATS is best-effort.
+    /// </summary>
+    private Task PublishEventToNatsAsync(IDelegatedEvent evt)
+    {
+        return evt switch
+        {
+            SessionStarted_V1 e => _sessionEventPublisher.PublishSessionStartedAsync(_studentId, e),
+            SessionEnded_V1 e => _sessionEventPublisher.PublishSessionEndedAsync(_studentId, e),
+            ConceptAttempted_V1 e => _sessionEventPublisher.PublishConceptAttemptedAsync(_studentId, e),
+            ConceptMastered_V1 e => _sessionEventPublisher.PublishMasteryUpdatedAsync(_studentId, e),
+            HintRequested_V1 e => _sessionEventPublisher.PublishHintDeliveredAsync(_studentId, e),
+            XpAwarded_V1 e => _sessionEventPublisher.PublishXpAwardedAsync(_studentId, e),
+            StreakUpdated_V1 e => _sessionEventPublisher.PublishStreakUpdatedAsync(_studentId, e),
+            StagnationDetected_V1 e => _sessionEventPublisher.PublishStagnationDetectedAsync(_studentId, e),
+            MethodologySwitched_V1 e => _sessionEventPublisher.PublishMethodologySwitchedAsync(_studentId, e),
+            TutoringSessionStarted_V1 e => _sessionEventPublisher.PublishTutoringStartedAsync(_studentId, e),
+            TutoringMessageSent_V1 e => _sessionEventPublisher.PublishTutoringMessageAsync(_studentId, e),
+            TutoringSessionEnded_V1 e => _sessionEventPublisher.PublishTutoringEndedAsync(_studentId, e),
+            _ => Task.CompletedTask // AnnotationAdded, QuestionSkipped, etc. — no real-time need
+        };
     }
 
     // =========================================================================
