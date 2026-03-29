@@ -297,7 +297,7 @@ builder.Services.AddSingleton(provider =>
         .Setup(clusterName, clusterProvider, identityLookup)
         .WithClusterKind(studentKind)
         .WithGossipRequestTimeout(TimeSpan.FromSeconds(2))
-        .WithActorActivationTimeout(TimeSpan.FromSeconds(10))
+        .WithActorActivationTimeout(TimeSpan.FromSeconds(30))
         .WithActorRequestTimeout(TimeSpan.FromSeconds(30))
         .WithHeartbeatExpiration(TimeSpan.FromSeconds(30));
 

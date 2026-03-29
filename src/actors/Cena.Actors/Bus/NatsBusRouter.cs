@@ -32,6 +32,7 @@ public sealed class NatsBusRouter : BackgroundService
 
     private const int MaxConcurrentActivations = 50;
     private const int MaxRetryAttempts = 3;
+    private static readonly TimeSpan ActorRequestTimeout = TimeSpan.FromSeconds(15);
     private static readonly TimeSpan[] RetryDelays = [
         TimeSpan.FromSeconds(1),
         TimeSpan.FromSeconds(2),
@@ -202,7 +203,7 @@ public sealed class NatsBusRouter : BackgroundService
                     Interlocked.Increment(ref _commandsRouted);
                     return;
                 }
-                catch (TimeoutException) when (attempt < MaxRetryAttempts)
+                catch (Exception ex) when (IsRetryableTimeout(ex, ct) && attempt < MaxRetryAttempts)
                 {
                     Interlocked.Increment(ref _retriesAttempted);
                     _logger.LogWarning(
@@ -210,7 +211,7 @@ public sealed class NatsBusRouter : BackgroundService
                         subject, attempt + 1, MaxRetryAttempts, RetryDelays[attempt].TotalSeconds);
                     await Task.Delay(RetryDelays[attempt], ct);
                 }
-                catch (TimeoutException ex)
+                catch (Exception ex) when (IsRetryableTimeout(ex, ct))
                 {
                     // All retries exhausted — send to dead-letter
                     Interlocked.Increment(ref _deadLettered);
@@ -279,8 +280,10 @@ public sealed class NatsBusRouter : BackgroundService
             p.DeviceType, p.AppVersion, p.ClientTimestamp, IsOffline: false,
             SchoolId: p.SchoolId ?? env.SchoolId); // REV-014: prefer payload field, fall back to envelope
 
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(ActorRequestTimeout);
         var result = await _actorSystem.Cluster()
-            .RequestAsync<ActorResult<StartSessionResponse>>(p.StudentId, "student", cmd, ct);
+            .RequestAsync<ActorResult<StartSessionResponse>>(p.StudentId, "student", cmd, cts.Token);
 
         if (result?.Success == true && result.Data is { } response)
         {
@@ -309,8 +312,10 @@ public sealed class NatsBusRouter : BackgroundService
             ? r : SessionEndReason.Completed;
         var cmd = new EndSession(p.StudentId, p.SessionId, reason);
 
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(ActorRequestTimeout);
         await _actorSystem.Cluster()
-            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, ct);
+            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, cts.Token);
 
         // Mark actor as idle when session ends
         if (_actorStats.TryGetValue(p.StudentId, out var stat))
@@ -336,8 +341,10 @@ public sealed class NatsBusRouter : BackgroundService
             qType, p.Answer, p.ResponseTimeMs, p.HintCountUsed,
             p.WasSkipped, p.BackspaceCount, p.AnswerChangeCount, WasOffline: false);
 
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(ActorRequestTimeout);
         var result = await _actorSystem.Cluster()
-            .RequestAsync<ActorResult<EvaluateAnswerResponse>>(p.StudentId, "student", cmd, ct);
+            .RequestAsync<ActorResult<EvaluateAnswerResponse>>(p.StudentId, "student", cmd, cts.Token);
 
         _actorStats.AddOrUpdate(p.StudentId,
             new ActorLiveStats { StudentId = p.StudentId, SessionId = p.SessionId, MessagesProcessed = 1, TotalAttempts = 1, CorrectAttempts = p.Answer == "correct" ? 1 : 0 },
@@ -358,8 +365,10 @@ public sealed class NatsBusRouter : BackgroundService
             ? at : AnnotationType.Note;
         var cmd = new AddAnnotation(p.StudentId, p.ConceptId, p.SessionId, p.Text, kind);
 
+        using var cts1 = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts1.CancelAfter(ActorRequestTimeout);
         await _actorSystem.Cluster()
-            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, ct);
+            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, cts1.Token);
 
         if (_actorStats.TryGetValue(p.StudentId, out var stat))
         {
@@ -373,8 +382,10 @@ public sealed class NatsBusRouter : BackgroundService
         var p = env.Payload;
         var cmd = new SwitchMethodology(p.StudentId, p.StudentId, p.ToMethodology);
 
+        using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts2.CancelAfter(ActorRequestTimeout);
         await _actorSystem.Cluster()
-            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, ct);
+            .RequestAsync<ActorResult>(p.StudentId, "student", cmd, cts2.Token);
 
         await PublishEventAsync(NatsSubjects.EventMethodologySwitched,
             new { p.StudentId, p.SessionId, p.FromMethodology, p.ToMethodology, p.Reason,
@@ -389,6 +400,19 @@ public sealed class NatsBusRouter : BackgroundService
         var json = JsonSerializer.Serialize(envelope, _jsonOpts);
         await _nats.PublishAsync(subject, json);
         Interlocked.Increment(ref _eventsPublished);
+    }
+
+    /// <summary>
+    /// Returns true if the exception is a retryable timeout — either a TimeoutException
+    /// or an OperationCanceledException from our per-request CTS (not the global shutdown CT).
+    /// </summary>
+    private static bool IsRetryableTimeout(Exception ex, CancellationToken globalCt)
+    {
+        if (ex is TimeoutException) return true;
+        // OperationCanceledException from our per-request CancellationTokenSource timeout,
+        // NOT from the global shutdown token. Proto.Actor wraps timeouts as OCE.
+        if (ex is OperationCanceledException && !globalCt.IsCancellationRequested) return true;
+        return false;
     }
 
     internal void RecordError(string category, string subject, string message, string? studentId)
