@@ -4,7 +4,9 @@
 // and stagnation monitoring. No mock data.
 // =============================================================================
 
+using System.Security.Claims;
 using Cena.Actors.Events;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -13,8 +15,8 @@ namespace Cena.Admin.Api;
 
 public interface IMethodologyAnalyticsService
 {
-    Task<MethodologyEffectivenessResponse> GetEffectivenessAsync();
-    Task<StagnationMonitorResponse> GetStagnationMonitorAsync();
+    Task<MethodologyEffectivenessResponse> GetEffectivenessAsync(ClaimsPrincipal user);
+    Task<StagnationMonitorResponse> GetStagnationMonitorAsync(ClaimsPrincipal user);
     Task<McmGraphResponse> GetMcmGraphAsync();
     Task<bool> UpdateMcmEdgeAsync(string source, string target, float confidence);
 }
@@ -35,9 +37,23 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
         _logger = logger;
     }
 
-    public async Task<MethodologyEffectivenessResponse> GetEffectivenessAsync()
+    public async Task<MethodologyEffectivenessResponse> GetEffectivenessAsync(ClaimsPrincipal user)
     {
+        // REV-014: Derive school filter — null means SUPER_ADMIN (no restriction)
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
+
+        // REV-014: When scoped to a school, pre-load the eligible student IDs
+        HashSet<string>? scopedStudentIds = null;
+        if (schoolId is not null)
+        {
+            var scopedSnapshots = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.SchoolId == schoolId)
+                .Select(s => s.StudentId)
+                .ToListAsync();
+            scopedStudentIds = new HashSet<string>(scopedSnapshots);
+        }
 
         // Query all methodology switch events from the last 90 days
         var since = DateTimeOffset.UtcNow.AddDays(-90);
@@ -47,11 +63,15 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
 
         try
         {
-            switchEvents = await session.Events
+            var rawSwitch = await session.Events
                 .QueryAllRawEvents()
                 .Where(e => e.Timestamp >= since)
                 .OfType<MethodologySwitched_V1>()
                 .ToListAsync();
+
+            switchEvents = scopedStudentIds is null
+                ? rawSwitch
+                : rawSwitch.Where(e => scopedStudentIds.Contains(e.StudentId)).ToList();
         }
         catch (Exception ex)
         {
@@ -61,11 +81,15 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
 
         try
         {
-            attemptEvents = await session.Events
+            var rawAttempts = await session.Events
                 .QueryAllRawEvents()
                 .Where(e => e.Timestamp >= since)
                 .OfType<ConceptAttempted_V1>()
                 .ToListAsync();
+
+            attemptEvents = scopedStudentIds is null
+                ? rawAttempts
+                : rawAttempts.Where(e => scopedStudentIds.Contains(e.StudentId)).ToList();
         }
         catch (Exception ex)
         {
@@ -186,15 +210,21 @@ public sealed class MethodologyAnalyticsService : IMethodologyAnalyticsService
         return new MethodologyEffectivenessResponse(comparisons, switchTriggers, trend, escalationRate);
     }
 
-    public async Task<StagnationMonitorResponse> GetStagnationMonitorAsync()
+    public async Task<StagnationMonitorResponse> GetStagnationMonitorAsync(ClaimsPrincipal user)
     {
+        // REV-014: Derive school filter — null means SUPER_ADMIN (no restriction)
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
 
         // Query snapshots to find students with stagnation patterns
         IReadOnlyList<StudentProfileSnapshot> snapshots;
         try
         {
-            snapshots = await session.Query<StudentProfileSnapshot>().ToListAsync();
+            var query = session.Query<StudentProfileSnapshot>().AsQueryable();
+            if (schoolId is not null)
+                query = query.Where(s => s.SchoolId == schoolId); // REV-014: tenant filter
+            snapshots = await query.ToListAsync();
         }
         catch (Exception ex)
         {

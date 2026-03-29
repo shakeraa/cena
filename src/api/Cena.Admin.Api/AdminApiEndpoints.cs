@@ -3,6 +3,7 @@
 // Consolidated endpoint registration for remaining admin features
 // =============================================================================
 
+using System.Security.Claims;
 using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Marten;
@@ -24,15 +25,15 @@ public static class AdminApiEndpoints
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
 
-        group.MapGet("/overview", async (string? classId, IFocusAnalyticsService service) =>
+        group.MapGet("/overview", async (string? classId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
-            var overview = await service.GetOverviewAsync(classId);
+            var overview = await service.GetOverviewAsync(classId, user);
             return Results.Ok(overview);
         }).WithName("GetFocusOverview");
 
-        group.MapGet("/students/{studentId}", async (string studentId, IFocusAnalyticsService service) =>
+        group.MapGet("/students/{studentId}", async (string studentId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
-            var detail = await service.GetStudentFocusAsync(studentId);
+            var detail = await service.GetStudentFocusAsync(studentId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
         }).WithName("GetStudentFocus");
 
@@ -54,16 +55,16 @@ public static class AdminApiEndpoints
             return Results.Ok(experiments);
         }).WithName("GetFocusExperiments");
 
-        group.MapGet("/alerts", async (IFocusAnalyticsService service) =>
+        group.MapGet("/alerts", async (ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
-            var alerts = await service.GetStudentsNeedingAttentionAsync();
+            var alerts = await service.GetStudentsNeedingAttentionAsync(user);
             return Results.Ok(alerts);
         }).WithName("GetFocusAlerts");
 
-        group.MapGet("/students/{studentId}/timeline", async (string studentId, string? period, IFocusAnalyticsService service) =>
+        group.MapGet("/students/{studentId}/timeline", async (string studentId, string? period, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
             var validPeriod = ParameterValidator.ValidatePeriod(period);
-            var timeline = await service.GetStudentTimelineAsync(studentId, validPeriod);
+            var timeline = await service.GetStudentTimelineAsync(studentId, validPeriod, user);
             return Results.Ok(timeline);
         }).WithName("GetStudentFocusTimeline");
 
@@ -83,33 +84,33 @@ public static class AdminApiEndpoints
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
 
-        group.MapGet("/overview", async (string? classId, IMasteryTrackingService service) =>
+        group.MapGet("/overview", async (string? classId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var overview = await service.GetOverviewAsync(classId);
+            var overview = await service.GetOverviewAsync(classId, user);
             return Results.Ok(overview);
         }).WithName("GetMasteryOverview");
 
-        group.MapGet("/overview/distribution", async (string? classId, IMasteryTrackingService service) =>
+        group.MapGet("/overview/distribution", async (string? classId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var overview = await service.GetOverviewAsync(classId);
+            var overview = await service.GetOverviewAsync(classId, user);
             return Results.Ok(new { bands = overview.Distribution.Select(d => new { label = d.Level, count = d.Count }) });
         }).WithName("GetMasteryDistribution");
 
-        group.MapGet("/overview/subjects", async (string? classId, IMasteryTrackingService service) =>
+        group.MapGet("/overview/subjects", async (string? classId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var overview = await service.GetOverviewAsync(classId);
+            var overview = await service.GetOverviewAsync(classId, user);
             return Results.Ok(new { subjects = overview.SubjectBreakdown.Select(s => new { name = s.Subject, avgMastery = s.AvgMasteryLevel }) });
         }).WithName("GetMasterySubjects");
 
-        group.MapGet("/students/{studentId}", async (string studentId, IMasteryTrackingService service) =>
+        group.MapGet("/students/{studentId}", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var detail = await service.GetStudentMasteryAsync(studentId);
+            var detail = await service.GetStudentMasteryAsync(studentId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
         }).WithName("GetStudentMastery");
 
-        group.MapGet("/students/{studentId}/knowledge-map", async (string studentId, IMasteryTrackingService service) =>
+        group.MapGet("/students/{studentId}/knowledge-map", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var detail = await service.GetStudentMasteryAsync(studentId);
+            var detail = await service.GetStudentMasteryAsync(studentId, user);
             if (detail == null) return Results.NotFound();
             // Return as { concepts: [...] } to match frontend KnowledgeMapData interface
             var concepts = detail.KnowledgeMap.Select(c => new
@@ -130,9 +131,9 @@ public static class AdminApiEndpoints
             return Results.Ok(new { concepts });
         }).WithName("GetStudentKnowledgeMap");
 
-        group.MapGet("/students/{studentId}/knowledge-map/graph", async (string studentId, IMasteryTrackingService service) =>
+        group.MapGet("/students/{studentId}/knowledge-map/graph", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var detail = await service.GetStudentMasteryAsync(studentId);
+            var detail = await service.GetStudentMasteryAsync(studentId, user);
             if (detail == null) return Results.NotFound();
             var nodes = detail.KnowledgeMap.Select(c => new
             {
@@ -158,9 +159,9 @@ public static class AdminApiEndpoints
             return Results.Ok(new { nodes, edges });
         }).WithName("GetStudentKnowledgeGraph");
 
-        group.MapGet("/students/{studentId}/frontier", async (string studentId, IMasteryTrackingService service) =>
+        group.MapGet("/students/{studentId}/frontier", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var detail = await service.GetStudentMasteryAsync(studentId);
+            var detail = await service.GetStudentMasteryAsync(studentId, user);
             if (detail == null) return Results.NotFound();
             var concepts = detail.LearningFrontier.Select(f => new
             {
@@ -172,9 +173,9 @@ public static class AdminApiEndpoints
             return Results.Ok(new { concepts });
         }).WithName("GetStudentFrontier");
 
-        group.MapGet("/students/{studentId}/history", async (string studentId, IMasteryTrackingService service) =>
+        group.MapGet("/students/{studentId}/history", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var detail = await service.GetStudentMasteryAsync(studentId);
+            var detail = await service.GetStudentMasteryAsync(studentId, user);
             if (detail == null) return Results.NotFound();
             // Build per-concept history series from the top 5 concepts
             var topConcepts = detail.KnowledgeMap.Where(c => c.Status == "mastered" || c.Status == "in_progress")
@@ -192,9 +193,9 @@ public static class AdminApiEndpoints
             return Results.Ok(new { series });
         }).WithName("GetStudentHistory");
 
-        group.MapGet("/students/{studentId}/review-priority", async (string studentId, IMasteryTrackingService service) =>
+        group.MapGet("/students/{studentId}/review-priority", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var detail = await service.GetStudentMasteryAsync(studentId);
+            var detail = await service.GetStudentMasteryAsync(studentId, user);
             if (detail == null) return Results.NotFound();
             var items = detail.ReviewQueue.Select(r => new
             {
@@ -213,20 +214,20 @@ public static class AdminApiEndpoints
             return detail != null ? Results.Ok(detail) : Results.NotFound();
         }).WithName("GetClassMastery");
 
-        group.MapGet("/at-risk", async (IMasteryTrackingService service) =>
+        group.MapGet("/at-risk", async (ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var atRisk = await service.GetAtRiskStudentsAsync();
+            var atRisk = await service.GetAtRiskStudentsAsync(user);
             return Results.Ok(atRisk);
         }).WithName("GetAtRiskStudents");
 
         // GET /api/admin/mastery/students/{studentId}/methodology-profile
-        group.MapGet("/students/{studentId}/methodology-profile", async (string studentId, IMasteryTrackingService service) =>
+        group.MapGet("/students/{studentId}/methodology-profile", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var detail = await service.GetStudentMasteryAsync(studentId);
+            var detail = await service.GetStudentMasteryAsync(studentId, user);
             if (detail == null) return Results.NotFound();
 
             // Build methodology hierarchy from snapshot data
-            var profile = await service.GetMethodologyProfileAsync(studentId);
+            var profile = await service.GetMethodologyProfileAsync(studentId, user);
             return Results.Ok(profile);
         }).WithName("GetStudentMethodologyProfile");
 
@@ -706,11 +707,11 @@ public static class AdminApiEndpoints
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
 
-        group.MapGet("/methodology-effectiveness", async (IMethodologyAnalyticsService service, ILoggerFactory lf) =>
+        group.MapGet("/methodology-effectiveness", async (IMethodologyAnalyticsService service, ClaimsPrincipal user, ILoggerFactory lf) =>
         {
             try
             {
-                var effectiveness = await service.GetEffectivenessAsync();
+                var effectiveness = await service.GetEffectivenessAsync(user);
                 var methodologyNames = effectiveness.Comparisons.Select(c => c.Methodology).ToList();
                 var errorTypes = effectiveness.Comparisons
                     .SelectMany(c => c.ByErrorType.Select(e => e.ErrorType))
@@ -732,11 +733,11 @@ public static class AdminApiEndpoints
             }
         }).WithName("GetMethodologyEffectiveness");
 
-        group.MapGet("/stagnation-trend", async (IMethodologyAnalyticsService service, ILoggerFactory lf) =>
+        group.MapGet("/stagnation-trend", async (IMethodologyAnalyticsService service, ClaimsPrincipal user, ILoggerFactory lf) =>
         {
             try
             {
-                var effectiveness = await service.GetEffectivenessAsync();
+                var effectiveness = await service.GetEffectivenessAsync(user);
                 var points = effectiveness.StagnationTrend.Select(p => new
                 {
                     week = p.Date,
@@ -752,9 +753,9 @@ public static class AdminApiEndpoints
             }
         }).WithName("GetStagnationTrend");
 
-        group.MapGet("/switch-triggers", async (IMethodologyAnalyticsService service) =>
+        group.MapGet("/switch-triggers", async (IMethodologyAnalyticsService service, ClaimsPrincipal user) =>
         {
-            var effectiveness = await service.GetEffectivenessAsync();
+            var effectiveness = await service.GetEffectivenessAsync(user);
             // Transform to: { rows: [{week, triggers}], reasons: [] }
             var reasons = effectiveness.SwitchTriggers.Select(s => s.TriggerType).ToList();
             // Group by week — since backend has flat trigger counts, create weekly rows
@@ -773,9 +774,9 @@ public static class AdminApiEndpoints
             return Results.Ok(new { rows, reasons });
         }).WithName("GetSwitchTriggers");
 
-        group.MapGet("/mentor-resistant", async (IMethodologyAnalyticsService service) =>
+        group.MapGet("/mentor-resistant", async (IMethodologyAnalyticsService service, ClaimsPrincipal user) =>
         {
-            var monitor = await service.GetStagnationMonitorAsync();
+            var monitor = await service.GetStagnationMonitorAsync(user);
             var resistantConceptIds = new HashSet<string>(monitor.MentorResistantConcepts.Select(c => c.ConceptId));
             // Return stagnating students with mentor-resistant flag
             var students = monitor.CurrentlyStagnating.Select(s => new
@@ -791,9 +792,9 @@ public static class AdminApiEndpoints
             return Results.Ok(new { students });
         }).WithName("GetMentorResistantConcepts");
 
-        group.MapGet("/stagnation-monitor", async (IMethodologyAnalyticsService service) =>
+        group.MapGet("/stagnation-monitor", async (IMethodologyAnalyticsService service, ClaimsPrincipal user) =>
         {
-            var monitor = await service.GetStagnationMonitorAsync();
+            var monitor = await service.GetStagnationMonitorAsync(user);
             return Results.Ok(monitor);
         }).WithName("GetStagnationMonitor");
 
@@ -825,23 +826,23 @@ public static class AdminApiEndpoints
             .RequireAuthorization(CenaAuthPolicies.AdminOnly)
             .RequireRateLimiting("api");
 
-        group.MapGet("/distribution", async (ICulturalContextService service) =>
+        group.MapGet("/distribution", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
-            var distribution = await service.GetDistributionAsync();
+            var distribution = await service.GetDistributionAsync(user);
             var items = distribution.Groups.Select(g => new { context = g.Context, count = g.StudentCount, percentage = g.Percentage });
             return Results.Ok(new { items });
         }).WithName("GetCulturalDistribution");
 
-        group.MapGet("/resilience", async (ICulturalContextService service) =>
+        group.MapGet("/resilience", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
-            var distribution = await service.GetDistributionAsync();
+            var distribution = await service.GetDistributionAsync(user);
             var items = distribution.ResilienceByGroup.Select(r => new { context = r.CulturalContext, avgScore = Math.Round(r.AvgResilienceScore * 100, 1) });
             return Results.Ok(new { items });
         }).WithName("GetResilienceComparison");
 
-        group.MapGet("/method-effectiveness", async (ICulturalContextService service) =>
+        group.MapGet("/method-effectiveness", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
-            var distribution = await service.GetDistributionAsync();
+            var distribution = await service.GetDistributionAsync(user);
             var methods = distribution.MethodologyEffectiveness.Select(m => new
             {
                 method = m.Methodology,
@@ -850,16 +851,16 @@ public static class AdminApiEndpoints
             return Results.Ok(new { methods });
         }).WithName("GetMethodologyByContext");
 
-        group.MapGet("/focus-patterns", async (ICulturalContextService service) =>
+        group.MapGet("/focus-patterns", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
-            var distribution = await service.GetDistributionAsync();
+            var distribution = await service.GetDistributionAsync(user);
             var items = distribution.FocusPatterns.Select(f => new { context = f.CulturalContext, avgFocusScore = f.AvgFocusScore, avgSessionMinutes = f.AvgSessionDuration });
             return Results.Ok(new { items });
         }).WithName("GetFocusPatterns");
 
-        group.MapGet("/equity-alerts", async (ICulturalContextService service) =>
+        group.MapGet("/equity-alerts", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
-            var response = await service.GetEquityAlertsAsync();
+            var response = await service.GetEquityAlertsAsync(user);
             var alerts = response.ActiveAlerts.Select(a => new
             {
                 id = a.Id,
@@ -994,9 +995,9 @@ public static class AdminApiEndpoints
             return Results.Ok(summary.ReEngagementRate);
         }).WithName("GetReEngagementRate");
 
-        group.MapGet("/students/{studentId}/history", async (string studentId, IOutreachEngagementService service) =>
+        group.MapGet("/students/{studentId}/history", async (string studentId, IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
-            var history = await service.GetStudentHistoryAsync(studentId);
+            var history = await service.GetStudentHistoryAsync(studentId, user);
             return history != null ? Results.Ok(history) : Results.NotFound();
         }).WithName("GetStudentOutreachHistory");
 

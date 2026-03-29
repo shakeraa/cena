@@ -3,9 +3,12 @@
 // ADM-017: Queries for tutoring session dashboard, budget status, analytics
 // =============================================================================
 
+using System.Security.Claims;
 using System.Text.Json;
+using Cena.Actors.Events;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Documents;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -14,10 +17,10 @@ namespace Cena.Admin.Api;
 
 public interface ITutoringAdminService
 {
-    Task<TutoringSessionListResponse> GetSessionsAsync(string? studentId, string? status, int page, int pageSize);
-    Task<TutoringSessionDetailDto?> GetSessionDetailAsync(string sessionId);
-    Task<TutoringBudgetStatusResponse> GetBudgetStatusAsync(string? classId);
-    Task<TutoringAnalyticsDto> GetAnalyticsAsync();
+    Task<TutoringSessionListResponse> GetSessionsAsync(string? studentId, string? status, int page, int pageSize, ClaimsPrincipal user);
+    Task<TutoringSessionDetailDto?> GetSessionDetailAsync(string sessionId, ClaimsPrincipal user);
+    Task<TutoringBudgetStatusResponse> GetBudgetStatusAsync(string? classId, ClaimsPrincipal user);
+    Task<TutoringAnalyticsDto> GetAnalyticsAsync(ClaimsPrincipal user);
 }
 
 public sealed class TutoringAdminService : ITutoringAdminService
@@ -41,9 +44,23 @@ public sealed class TutoringAdminService : ITutoringAdminService
     // ── Sessions List ──
 
     public async Task<TutoringSessionListResponse> GetSessionsAsync(
-        string? studentId, string? status, int page, int pageSize)
+        string? studentId, string? status, int page, int pageSize, ClaimsPrincipal user)
     {
+        // REV-014: Determine school scope for this caller
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
+
+        // REV-014: When scoped, restrict to students in the caller's school
+        HashSet<string>? scopedStudentIds = null;
+        if (schoolId is not null)
+        {
+            var scopedIds = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.SchoolId == schoolId)
+                .Select(s => s.StudentId)
+                .ToListAsync();
+            scopedStudentIds = new HashSet<string>(scopedIds);
+        }
 
         // Query TutoringSessionDocument directly (shared Marten store with Actors)
         var query = session.Query<TutoringSessionDocument>().AsQueryable();
@@ -53,6 +70,10 @@ public sealed class TutoringAdminService : ITutoringAdminService
 
         // Materialise so we can derive status in memory
         var allDocs = await query.OrderByDescending(d => d.StartedAt).ToListAsync();
+
+        // REV-014: Apply school filter if scoped
+        if (scopedStudentIds is not null)
+            allDocs = allDocs.Where(d => scopedStudentIds.Contains(d.StudentId)).ToList();
 
         // Derive status from document state
         var mapped = allDocs.Select(d => MapToSummary(d)).ToList();
@@ -68,8 +89,11 @@ public sealed class TutoringAdminService : ITutoringAdminService
 
     // ── Session Detail ──
 
-    public async Task<TutoringSessionDetailDto?> GetSessionDetailAsync(string sessionId)
+    public async Task<TutoringSessionDetailDto?> GetSessionDetailAsync(string sessionId, ClaimsPrincipal user)
     {
+        // REV-014: Determine school scope for this caller
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
 
         var doc = await session.Query<TutoringSessionDocument>()
@@ -77,6 +101,16 @@ public sealed class TutoringAdminService : ITutoringAdminService
 
         if (doc is null)
             return null;
+
+        // REV-014: Verify the session's student belongs to the caller's school
+        if (schoolId is not null)
+        {
+            var snapshot = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.StudentId == doc.StudentId)
+                .FirstOrDefaultAsync();
+            if (snapshot?.SchoolId != schoolId)
+                return null; // Not in caller's school — treat as not found
+        }
 
         // Build conversation turns from the document's persisted turns list
         var turns = doc.Turns.Select(t => new ConversationTurnDto(
@@ -143,9 +177,23 @@ public sealed class TutoringAdminService : ITutoringAdminService
 
     // ── Budget Status ──
 
-    public async Task<TutoringBudgetStatusResponse> GetBudgetStatusAsync(string? classId)
+    public async Task<TutoringBudgetStatusResponse> GetBudgetStatusAsync(string? classId, ClaimsPrincipal user)
     {
+        // REV-014: Determine school scope for this caller
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
+
+        // REV-014: When scoped, restrict budget view to students in the caller's school
+        HashSet<string>? scopedStudentIds = null;
+        if (schoolId is not null)
+        {
+            var scopedIds = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.SchoolId == schoolId)
+                .Select(s => s.StudentId)
+                .ToListAsync();
+            scopedStudentIds = new HashSet<string>(scopedIds);
+        }
 
         var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var tomorrow = today.AddDays(1);
@@ -158,7 +206,8 @@ public sealed class TutoringAdminService : ITutoringAdminService
 
         var studentTokens = todayMessages
             .GroupBy(e => ExtractString(e, "studentId"))
-            .Where(g => !string.IsNullOrEmpty(g.Key))
+            .Where(g => !string.IsNullOrEmpty(g.Key)
+                && (scopedStudentIds is null || scopedStudentIds.Contains(g.Key))) // REV-014
             .Select(g =>
             {
                 var tokensUsed = g.Sum(e =>
@@ -188,28 +237,36 @@ public sealed class TutoringAdminService : ITutoringAdminService
 
     // ── Analytics ──
 
-    public async Task<TutoringAnalyticsDto> GetAnalyticsAsync()
+    public async Task<TutoringAnalyticsDto> GetAnalyticsAsync(ClaimsPrincipal user)
     {
+        // REV-014: Determine school scope for this caller
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
 
         var now = DateTimeOffset.UtcNow;
         var todayStart = new DateTimeOffset(now.Date, TimeSpan.Zero);
         var weekStart = todayStart.AddDays(-(int)todayStart.DayOfWeek);
 
-        // Count active sessions (started but not ended)
-        var activeSessions = await session.Query<TutoringSessionDocument>()
-            .Where(d => d.EndedAt == null)
-            .CountAsync();
+        // REV-014: When scoped, restrict analytics to students in the caller's school
+        HashSet<string>? scopedStudentIds = null;
+        if (schoolId is not null)
+        {
+            var scopedIds = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.SchoolId == schoolId)
+                .Select(s => s.StudentId)
+                .ToListAsync();
+            scopedStudentIds = new HashSet<string>(scopedIds);
+        }
 
-        // Sessions started today
-        var sessionsToday = await session.Query<TutoringSessionDocument>()
-            .Where(d => d.StartedAt >= todayStart)
-            .CountAsync();
+        // Count active sessions (started but not ended) — filtered by school if scoped
+        var sessionQuery = session.Query<TutoringSessionDocument>().AsQueryable();
+        if (scopedStudentIds is not null)
+            sessionQuery = sessionQuery.Where(d => scopedStudentIds.Contains(d.StudentId));
 
-        // Sessions started this week
-        var sessionsThisWeek = await session.Query<TutoringSessionDocument>()
-            .Where(d => d.StartedAt >= weekStart)
-            .CountAsync();
+        var activeSessions = await sessionQuery.Where(d => d.EndedAt == null).CountAsync();
+        var sessionsToday = await sessionQuery.Where(d => d.StartedAt >= todayStart).CountAsync();
+        var sessionsThisWeek = await sessionQuery.Where(d => d.StartedAt >= weekStart).CountAsync();
 
         // Query TutoringSessionEnded_V1 events for averages and resolution rate
         var endedEvents = await session.Events.QueryAllRawEvents()
@@ -228,8 +285,8 @@ public sealed class TutoringAdminService : ITutoringAdminService
             ? (double)nonTimeoutCount / totalEndedCount
             : 0;
 
-        // Average budget usage across students today
-        var budgetStatus = await GetBudgetStatusAsync(null);
+        // Average budget usage across students today (scoped to same school as caller)
+        var budgetStatus = await GetBudgetStatusAsync(null, user);
         var avgBudgetUsage = budgetStatus.Students.Count > 0
             ? budgetStatus.Students.Average(s => s.PercentUsed)
             : 0;

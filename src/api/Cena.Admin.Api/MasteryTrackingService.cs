@@ -4,6 +4,9 @@
 // =============================================================================
 #pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
+using System.Security.Claims;
+using Cena.Actors.Events;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -12,11 +15,11 @@ namespace Cena.Admin.Api;
 
 public interface IMasteryTrackingService
 {
-    Task<MasteryOverviewResponse> GetOverviewAsync(string? classId);
-    Task<StudentMasteryDetailResponse?> GetStudentMasteryAsync(string studentId);
+    Task<MasteryOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user);
+    Task<StudentMasteryDetailResponse?> GetStudentMasteryAsync(string studentId, ClaimsPrincipal user);
     Task<ClassMasteryResponse?> GetClassMasteryAsync(string classId);
-    Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync();
-    Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId);
+    Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync(ClaimsPrincipal user);
+    Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId, ClaimsPrincipal user);
     Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId);
 }
 
@@ -36,8 +39,11 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         _logger = logger;
     }
 
-    public async Task<MasteryOverviewResponse> GetOverviewAsync(string? classId)
+    public async Task<MasteryOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user)
     {
+        // REV-014: Validate caller has a school scope (throws for non-SUPER_ADMIN without school_id)
+        _ = TenantScope.GetSchoolFilter(user);
+
         var random = new Random(classId?.GetHashCode() ?? 42);
 
         var distribution = new List<MasteryDistributionPoint>
@@ -321,8 +327,20 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         ("E-SPK-01","Oral Presentation","English","speaking",new[]{"E-WRT-01"},Array.Empty<string>()),
     };
 
-    public async Task<StudentMasteryDetailResponse?> GetStudentMasteryAsync(string studentId)
+    public async Task<StudentMasteryDetailResponse?> GetStudentMasteryAsync(string studentId, ClaimsPrincipal user)
     {
+        // REV-014: Verify this student belongs to the caller's school
+        var schoolId = TenantScope.GetSchoolFilter(user);
+        if (schoolId is not null)
+        {
+            await using var checkSession = _store.QuerySession();
+            var snapshot = await checkSession.Query<StudentProfileSnapshot>()
+                .Where(s => s.StudentId == studentId)
+                .FirstOrDefaultAsync();
+            if (snapshot?.SchoolId != schoolId)
+                return null; // Not in caller's school
+        }
+
         var random = new Random(studentId.GetHashCode());
 
         // Generate mastery for all 42 concepts with realistic progression
@@ -446,8 +464,11 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
                 ConceptsReadyToIntroduce: new[] { "phy-002" }));
     }
 
-    public async Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync()
+    public async Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync(ClaimsPrincipal user)
     {
+        // REV-014: Validate caller has a school scope (throws for non-SUPER_ADMIN without school_id)
+        _ = TenantScope.GetSchoolFilter(user);
+
         var students = new List<AtRiskStudent>
         {
             new("stu-risk-1", "Student X", "class-1", "high", 0.42f, -0.15f, "Extra scaffolding on prerequisites"),
@@ -458,11 +479,18 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         return new AtRiskStudentsResponse(students);
     }
 
-    public async Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId)
+    public async Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId, ClaimsPrincipal user)
     {
+        // REV-014: Verify this student belongs to the caller's school
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.LightweightSession();
-        var snapshot = await session.LoadAsync<Cena.Actors.Events.StudentProfileSnapshot>(studentId);
+        var snapshot = await session.LoadAsync<StudentProfileSnapshot>(studentId);
         if (snapshot == null) return null;
+
+        // REV-014: Block cross-school access
+        if (schoolId is not null && snapshot.SchoolId != schoolId)
+            return null;
 
         var subjects = snapshot.SubjectMethodologyMap.Select(kv => new MethodologyLevelEntry(
             kv.Key, "Subject", kv.Value.Methodology.ToString(), kv.Value.Source.ToString(),

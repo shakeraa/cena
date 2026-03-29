@@ -4,6 +4,9 @@
 // =============================================================================
 #pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
+using System.Security.Claims;
+using Cena.Actors.Events;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -12,8 +15,8 @@ namespace Cena.Admin.Api;
 
 public interface ICulturalContextService
 {
-    Task<CulturalDistributionResponse> GetDistributionAsync();
-    Task<EquityAlertsResponse> GetEquityAlertsAsync();
+    Task<CulturalDistributionResponse> GetDistributionAsync(ClaimsPrincipal user);
+    Task<EquityAlertsResponse> GetEquityAlertsAsync(ClaimsPrincipal user);
 }
 
 public sealed class CulturalContextService : ICulturalContextService
@@ -32,8 +35,12 @@ public sealed class CulturalContextService : ICulturalContextService
         _logger = logger;
     }
 
-    public async Task<CulturalDistributionResponse> GetDistributionAsync()
+    public async Task<CulturalDistributionResponse> GetDistributionAsync(ClaimsPrincipal user)
     {
+        // REV-014: Validate caller scope. When wired to real data, filter snapshots by school_id.
+        // For now, mock data serves all callers within their allowed school.
+        _ = TenantScope.GetSchoolFilter(user);
+
         var random = new Random(42);
 
         var groups = new List<CulturalGroup>
@@ -74,8 +81,11 @@ public sealed class CulturalContextService : ICulturalContextService
         return new CulturalDistributionResponse(groups, resilience, methodEffectiveness, focusPatterns);
     }
 
-    public async Task<EquityAlertsResponse> GetEquityAlertsAsync()
+    public async Task<EquityAlertsResponse> GetEquityAlertsAsync(ClaimsPrincipal user)
     {
+        // REV-014: Validate caller scope. When wired to real data, filter by school_id.
+        _ = TenantScope.GetSchoolFilter(user);
+
         var alerts = new List<EquityAlert>
         {
             new("alert-1", "warning", "mastery_gap", "ArabicDominant students showing 8% lower mastery in Physics", "ArabicDominant", 8f, DateTimeOffset.UtcNow.AddDays(-2)),

@@ -3,6 +3,7 @@
 // ADM-017: REST endpoints for tutoring session dashboard
 // =============================================================================
 
+using System.Security.Claims;
 using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
@@ -25,34 +26,37 @@ public static class TutoringAdminEndpoints
             string? status,
             int? page,
             int? pageSize,
+            ClaimsPrincipal user,
             ITutoringAdminService service) =>
         {
             var validPage = ParameterValidator.ValidatePage(page);
             var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
             var result = await service.GetSessionsAsync(
-                studentId, status, validPage, validPageSize);
+                studentId, status, validPage, validPageSize, user);
             return Results.Ok(result);
         }).WithName("GetTutoringSessions");
 
         group.MapGet("/sessions/{sessionId}", async (
             string sessionId,
+            ClaimsPrincipal user,
             ITutoringAdminService service) =>
         {
-            var detail = await service.GetSessionDetailAsync(sessionId);
+            var detail = await service.GetSessionDetailAsync(sessionId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
         }).WithName("GetTutoringSessionDetail");
 
         group.MapGet("/budget-status", async (
             string? classId,
+            ClaimsPrincipal user,
             ITutoringAdminService service) =>
         {
-            var result = await service.GetBudgetStatusAsync(classId);
+            var result = await service.GetBudgetStatusAsync(classId, user);
             return Results.Ok(result);
         }).WithName("GetTutoringBudgetStatus");
 
-        group.MapGet("/analytics", async (ITutoringAdminService service) =>
+        group.MapGet("/analytics", async (ClaimsPrincipal user, ITutoringAdminService service) =>
         {
-            var result = await service.GetAnalyticsAsync();
+            var result = await service.GetAnalyticsAsync(user);
             return Results.Ok(result);
         }).WithName("GetTutoringAnalytics");
 

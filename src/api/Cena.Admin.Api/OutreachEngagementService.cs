@@ -4,6 +4,9 @@
 // =============================================================================
 #pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
+using System.Security.Claims;
+using Cena.Actors.Events;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -14,7 +17,7 @@ public interface IOutreachEngagementService
 {
     Task<OutreachSummaryResponse> GetSummaryAsync();
     Task<ChannelEffectivenessResponse> GetChannelEffectivenessAsync();
-    Task<StudentOutreachHistoryResponse?> GetStudentHistoryAsync(string studentId);
+    Task<StudentOutreachHistoryResponse?> GetStudentHistoryAsync(string studentId, ClaimsPrincipal user);
     Task<BudgetAlertResponse> GetBudgetAlertAsync();
 }
 
@@ -106,8 +109,20 @@ public sealed class OutreachEngagementService : IOutreachEngagementService
         return new ChannelEffectivenessResponse(volumeByTrigger, channelComparison, mergeStats, heatmap);
     }
 
-    public async Task<StudentOutreachHistoryResponse?> GetStudentHistoryAsync(string studentId)
+    public async Task<StudentOutreachHistoryResponse?> GetStudentHistoryAsync(string studentId, ClaimsPrincipal user)
     {
+        // REV-014: Verify this student belongs to the caller's school
+        var schoolId = TenantScope.GetSchoolFilter(user);
+        if (schoolId is not null)
+        {
+            await using var checkSession = _store.QuerySession();
+            var snapshot = await checkSession.Query<StudentProfileSnapshot>()
+                .Where(s => s.StudentId == studentId)
+                .FirstOrDefaultAsync();
+            if (snapshot?.SchoolId != schoolId)
+                return null; // Not in caller's school
+        }
+
         var random = new Random(studentId.GetHashCode());
         var channels = new[] { "WhatsApp", "Push", "Telegram" };
         var reasons = new[] { "disengagement", "stagnation", "reminder" };

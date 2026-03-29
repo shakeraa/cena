@@ -4,7 +4,10 @@
 // =============================================================================
 #pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
+using System.Security.Claims;
 using System.Text.Json;
+using Cena.Actors.Events;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -13,13 +16,13 @@ namespace Cena.Admin.Api;
 
 public interface IFocusAnalyticsService
 {
-    Task<FocusOverviewResponse> GetOverviewAsync(string? classId);
-    Task<StudentFocusDetailResponse?> GetStudentFocusAsync(string studentId);
+    Task<FocusOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user);
+    Task<StudentFocusDetailResponse?> GetStudentFocusAsync(string studentId, ClaimsPrincipal user);
     Task<ClassFocusResponse?> GetClassFocusAsync(string classId);
     Task<FocusDegradationResponse> GetDegradationCurveAsync();
     Task<FocusExperimentsResponse> GetExperimentsAsync();
-    Task<StudentsNeedingAttentionResponse> GetStudentsNeedingAttentionAsync();
-    Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period);
+    Task<StudentsNeedingAttentionResponse> GetStudentsNeedingAttentionAsync(ClaimsPrincipal user);
+    Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period, ClaimsPrincipal user);
     Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId);
 }
 
@@ -39,9 +42,23 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
         _logger = logger;
     }
 
-    public async Task<FocusOverviewResponse> GetOverviewAsync(string? classId)
+    public async Task<FocusOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user)
     {
+        // REV-014: Determine school scope for this caller
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
+
+        // REV-014: Load scoped student IDs when not SUPER_ADMIN
+        HashSet<string>? scopedStudentIds = null;
+        if (schoolId is not null)
+        {
+            var ids = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.SchoolId == schoolId)
+                .Select(s => s.StudentId)
+                .ToListAsync();
+            scopedStudentIds = new HashSet<string>(ids);
+        }
 
         var now = DateTimeOffset.UtcNow;
         var today = new DateTimeOffset(now.Date, TimeSpan.Zero);
@@ -51,31 +68,48 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
         var since1h = now.AddHours(-1);
 
         // Query focus score events from last 30 days
-        var focusEvents = await session.Events.QueryAllRawEvents()
+        var allFocusRaw = await session.Events.QueryAllRawEvents()
             .Where(e => e.EventTypeName == "focus_score_updated__v1")
             .Where(e => e.Timestamp >= since30d)
             .ToListAsync();
 
-        var mindWanderingEvents = await session.Events.QueryAllRawEvents()
+        // REV-014: Filter events to scoped students if caller is not SUPER_ADMIN
+        var focusEvents = scopedStudentIds is null
+            ? allFocusRaw
+            : allFocusRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
+
+        var allMWRaw = await session.Events.QueryAllRawEvents()
             .Where(e => e.EventTypeName == "mind_wandering_detected__v1")
             .Where(e => e.Timestamp >= since30d)
             .ToListAsync();
+        var mindWanderingEvents = scopedStudentIds is null
+            ? allMWRaw
+            : allMWRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
 
-        var microbreaksTaken = await session.Events.QueryAllRawEvents()
+        var allBreaksTakenRaw = await session.Events.QueryAllRawEvents()
             .Where(e => e.EventTypeName == "microbreak_taken__v1")
             .Where(e => e.Timestamp >= since30d)
             .ToListAsync();
+        var microbreaksTaken = scopedStudentIds is null
+            ? allBreaksTakenRaw
+            : allBreaksTakenRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
 
-        var microbreaksSkipped = await session.Events.QueryAllRawEvents()
+        var allBreaksSkippedRaw = await session.Events.QueryAllRawEvents()
             .Where(e => e.EventTypeName == "microbreak_skipped__v1")
             .Where(e => e.Timestamp >= since30d)
             .ToListAsync();
+        var microbreaksSkipped = scopedStudentIds is null
+            ? allBreaksSkippedRaw
+            : allBreaksSkippedRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
 
         // Active sessions: sessions started in the last hour
-        var recentSessionsStarted = await session.Events.QueryAllRawEvents()
+        var allRecentStartedRaw = await session.Events.QueryAllRawEvents()
             .Where(e => e.EventTypeName == "session_started__v1")
             .Where(e => e.Timestamp >= since1h)
             .ToListAsync();
+        var recentSessionsStarted = scopedStudentIds is null
+            ? allRecentStartedRaw
+            : allRecentStartedRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
 
         // Calculate overview metrics
         var focusScores = focusEvents
@@ -140,9 +174,21 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
             Trend: trend);
     }
 
-    public async Task<StudentFocusDetailResponse?> GetStudentFocusAsync(string studentId)
+    public async Task<StudentFocusDetailResponse?> GetStudentFocusAsync(string studentId, ClaimsPrincipal user)
     {
+        // REV-014: Verify this student belongs to the caller's school
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
+
+        if (schoolId is not null)
+        {
+            var snapshot = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.StudentId == studentId)
+                .FirstOrDefaultAsync();
+            if (snapshot?.SchoolId != schoolId)
+                return null; // Not in caller's school
+        }
 
         var now = DateTimeOffset.UtcNow;
         var today = new DateTimeOffset(now.Date, TimeSpan.Zero);
@@ -444,16 +490,35 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
         return new FocusExperimentsResponse(experiments);
     }
 
-    public async Task<StudentsNeedingAttentionResponse> GetStudentsNeedingAttentionAsync()
+    public async Task<StudentsNeedingAttentionResponse> GetStudentsNeedingAttentionAsync(ClaimsPrincipal user)
     {
+        // REV-014: Determine school scope for this caller
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
+
+        // REV-014: Pre-load scoped student IDs
+        HashSet<string>? scopedStudentIds = null;
+        if (schoolId is not null)
+        {
+            var ids = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.SchoolId == schoolId)
+                .Select(s => s.StudentId)
+                .ToListAsync();
+            scopedStudentIds = new HashSet<string>(ids);
+        }
 
         var since7d = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-7);
 
-        var focusEvents = await session.Events.QueryAllRawEvents()
+        var allFocusRaw = await session.Events.QueryAllRawEvents()
             .Where(e => e.EventTypeName == "focus_score_updated__v1")
             .Where(e => e.Timestamp >= since7d)
             .ToListAsync();
+
+        // REV-014: Filter to scoped students
+        var focusEvents = scopedStudentIds is null
+            ? allFocusRaw
+            : allFocusRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
 
         // Group by studentId, find students with avg focus below 65%
         var alerts = focusEvents
@@ -485,9 +550,21 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
         return new StudentsNeedingAttentionResponse(alerts);
     }
 
-    public async Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period)
+    public async Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period, ClaimsPrincipal user)
     {
+        // REV-014: Verify this student belongs to the caller's school
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
+
+        if (schoolId is not null)
+        {
+            var snapshot = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.StudentId == studentId)
+                .FirstOrDefaultAsync();
+            if (snapshot?.SchoolId != schoolId)
+                return new FocusTimelineResponse(studentId, period, new List<FocusTimelinePoint>());
+        }
 
         var days = period switch { "30d" => 30, "14d" => 14, _ => 7 };
         var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);

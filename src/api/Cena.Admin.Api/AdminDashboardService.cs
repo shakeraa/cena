@@ -3,8 +3,10 @@
 // BKD-004: Aggregation + caching for dashboard widgets
 // =============================================================================
 
+using System.Security.Claims;
 using System.Text.Json;
 using Cena.Infrastructure.Documents;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -13,15 +15,15 @@ namespace Cena.Admin.Api;
 
 public interface IAdminDashboardService
 {
-    Task<DashboardOverviewResponse> GetOverviewAsync();
-    Task<ActivityTimeSeriesResponse> GetActivityAsync(string period);
+    Task<DashboardOverviewResponse> GetOverviewAsync(ClaimsPrincipal user);
+    Task<ActivityTimeSeriesResponse> GetActivityAsync(string period, ClaimsPrincipal user);
     Task<ContentPipelineResponse> GetContentPipelineAsync(string period);
     Task<FocusDistributionResponse> GetFocusDistributionAsync();
     Task<MasteryProgressResponse> GetMasteryProgressAsync(string period);
-    Task<IReadOnlyList<SystemAlert>> GetAlertsAsync();
-    Task<IReadOnlyList<RecentAdminAction>> GetRecentActivityAsync(int limit);
-    Task<PendingReviewSummary> GetPendingReviewSummaryAsync();
-    Task<DashboardHomeResponse> GetDashboardHomeAsync();
+    Task<IReadOnlyList<SystemAlert>> GetAlertsAsync(ClaimsPrincipal user);
+    Task<IReadOnlyList<RecentAdminAction>> GetRecentActivityAsync(int limit, ClaimsPrincipal user);
+    Task<PendingReviewSummary> GetPendingReviewSummaryAsync(ClaimsPrincipal user);
+    Task<DashboardHomeResponse> GetDashboardHomeAsync(ClaimsPrincipal user);
 }
 
 public sealed class AdminDashboardService : IAdminDashboardService
@@ -40,13 +42,18 @@ public sealed class AdminDashboardService : IAdminDashboardService
         _logger = logger;
     }
 
-    public async Task<DashboardOverviewResponse> GetOverviewAsync()
+    public async Task<DashboardOverviewResponse> GetOverviewAsync(ClaimsPrincipal user)
     {
-        var cached = await TryGetCachedAsync<DashboardOverviewResponse>("dashboard:overview");
+        var schoolId = TenantScope.GetSchoolFilter(user);
+        var cacheKey = schoolId is null ? "dashboard:overview" : $"dashboard:overview:{schoolId}";
+        var cached = await TryGetCachedAsync<DashboardOverviewResponse>(cacheKey);
         if (cached != null) return cached;
 
         await using var session = _store.QuerySession();
-        var users = await session.Query<AdminUser>().Where(u => !u.SoftDeleted).ToListAsync();
+        var q = session.Query<AdminUser>().Where(u => !u.SoftDeleted);
+        if (schoolId is not null)
+            q = q.Where(u => u.School == schoolId); // REV-014: tenant filter
+        var users = await q.ToListAsync();
 
         var now = DateTimeOffset.UtcNow;
         var weekAgo = now.AddDays(-7);
@@ -81,13 +88,16 @@ public sealed class AdminDashboardService : IAdminDashboardService
             AvgFocusScore: avgFocusScore,
             AvgFocusScoreChange: avgFocusScoreChange);
 
-        await SetCacheAsync("dashboard:overview", response, TimeSpan.FromSeconds(60));
+        await SetCacheAsync(cacheKey, response, TimeSpan.FromSeconds(60));
         return response;
     }
 
-    public async Task<ActivityTimeSeriesResponse> GetActivityAsync(string period)
+    public async Task<ActivityTimeSeriesResponse> GetActivityAsync(string period, ClaimsPrincipal user)
     {
-        var cacheKey = $"dashboard:activity:{period}";
+        var schoolId = TenantScope.GetSchoolFilter(user);
+        var cacheKey = schoolId is null
+            ? $"dashboard:activity:{period}"
+            : $"dashboard:activity:{period}:{schoolId}";
         var cached = await TryGetCachedAsync<ActivityTimeSeriesResponse>(cacheKey);
         if (cached != null) return cached;
 
@@ -100,9 +110,10 @@ public sealed class AdminDashboardService : IAdminDashboardService
         };
 
         await using var session = _store.QuerySession();
-        var users = await session.Query<AdminUser>()
-            .Where(u => !u.SoftDeleted && u.LastLoginAt != null)
-            .ToListAsync();
+        var q = session.Query<AdminUser>().Where(u => !u.SoftDeleted && u.LastLoginAt != null);
+        if (schoolId is not null)
+            q = q.Where(u => u.School == schoolId); // REV-014: tenant filter
+        var users = await q.ToListAsync();
 
         var now = DateTimeOffset.UtcNow;
         var dataPoints = new List<ActivityDataPoint>();
@@ -273,17 +284,19 @@ public sealed class AdminDashboardService : IAdminDashboardService
         return response;
     }
 
-    public async Task<IReadOnlyList<SystemAlert>> GetAlertsAsync()
+    public async Task<IReadOnlyList<SystemAlert>> GetAlertsAsync(ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         var alerts = new List<SystemAlert>();
         var now = DateTimeOffset.UtcNow;
 
         await using var session = _store.QuerySession();
 
-        // Check pending moderation queue depth
-        var pendingCount = await session.Query<AdminUser>()
-            .Where(u => u.Status == UserStatus.Pending)
-            .CountAsync();
+        // Check pending moderation queue depth (scoped to school if applicable)
+        var pendingQuery = session.Query<AdminUser>().Where(u => u.Status == UserStatus.Pending);
+        if (schoolId is not null)
+            pendingQuery = pendingQuery.Where(u => u.School == schoolId); // REV-014
+        var pendingCount = await pendingQuery.CountAsync();
 
         if (pendingCount > 10)
         {
@@ -296,7 +309,10 @@ public sealed class AdminDashboardService : IAdminDashboardService
         }
 
         // Check for stale data (no new users in 24h — potential pipeline issue)
-        var latestUser = await session.Query<AdminUser>()
+        var latestUserQuery = session.Query<AdminUser>().AsQueryable();
+        if (schoolId is not null)
+            latestUserQuery = latestUserQuery.Where(u => u.School == schoolId); // REV-014
+        var latestUser = await latestUserQuery
             .OrderByDescending(u => u.CreatedAt)
             .FirstOrDefaultAsync();
 
@@ -313,13 +329,18 @@ public sealed class AdminDashboardService : IAdminDashboardService
         return alerts;
     }
 
-    public async Task<IReadOnlyList<RecentAdminAction>> GetRecentActivityAsync(int limit)
+    public async Task<IReadOnlyList<RecentAdminAction>> GetRecentActivityAsync(int limit, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
 
         // Query recent admin user mutations (created/suspended/activated)
-        var recentUsers = await session.Query<AdminUser>()
-            .Where(u => u.SuspendedAt != null || u.CreatedAt > DateTimeOffset.UtcNow.AddDays(-7))
+        var recentQuery = session.Query<AdminUser>()
+            .Where(u => u.SuspendedAt != null || u.CreatedAt > DateTimeOffset.UtcNow.AddDays(-7));
+        if (schoolId is not null)
+            recentQuery = recentQuery.Where(u => u.School == schoolId); // REV-014
+        var recentUsers = await recentQuery
             .OrderByDescending(u => u.CreatedAt)
             .Take(limit)
             .ToListAsync();
@@ -346,16 +367,19 @@ public sealed class AdminDashboardService : IAdminDashboardService
         return actions.OrderByDescending(a => a.Timestamp).Take(limit).ToList();
     }
 
-    public async Task<PendingReviewSummary> GetPendingReviewSummaryAsync()
+    public async Task<PendingReviewSummary> GetPendingReviewSummaryAsync(ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         await using var session = _store.QuerySession();
 
-        var pendingCount = await session.Query<AdminUser>()
-            .Where(u => u.Status == UserStatus.Pending)
-            .CountAsync();
+        var pendingQuery = session.Query<AdminUser>().Where(u => u.Status == UserStatus.Pending);
+        if (schoolId is not null)
+            pendingQuery = pendingQuery.Where(u => u.School == schoolId); // REV-014
 
-        var oldestPending = await session.Query<AdminUser>()
-            .Where(u => u.Status == UserStatus.Pending)
+        var pendingCount = await pendingQuery.CountAsync();
+
+        var oldestPending = await pendingQuery
             .OrderBy(u => u.CreatedAt)
             .FirstOrDefaultAsync();
 
@@ -374,15 +398,17 @@ public sealed class AdminDashboardService : IAdminDashboardService
         return new PendingReviewSummary(pendingCount, oldestHours, priority);
     }
 
-    public async Task<DashboardHomeResponse> GetDashboardHomeAsync()
+    public async Task<DashboardHomeResponse> GetDashboardHomeAsync(ClaimsPrincipal user)
     {
-        var cached = await TryGetCachedAsync<DashboardHomeResponse>("dashboard:home");
+        var schoolId = TenantScope.GetSchoolFilter(user);
+        var cacheKey = schoolId is null ? "dashboard:home" : $"dashboard:home:{schoolId}";
+        var cached = await TryGetCachedAsync<DashboardHomeResponse>(cacheKey);
         if (cached != null) return cached;
 
-        var overview = await GetOverviewAsync();
-        var alerts = await GetAlertsAsync();
-        var pendingReview = await GetPendingReviewSummaryAsync();
-        var recentActivity = await GetRecentActivityAsync(20);
+        var overview = await GetOverviewAsync(user);
+        var alerts = await GetAlertsAsync(user);
+        var pendingReview = await GetPendingReviewSummaryAsync(user);
+        var recentActivity = await GetRecentActivityAsync(20, user);
 
         var response = new DashboardHomeResponse(
             Overview: overview,
@@ -390,7 +416,7 @@ public sealed class AdminDashboardService : IAdminDashboardService
             PendingReview: pendingReview,
             RecentActivity: recentActivity);
 
-        await SetCacheAsync("dashboard:home", response, TimeSpan.FromSeconds(30));
+        await SetCacheAsync(cacheKey, response, TimeSpan.FromSeconds(30));
         return response;
     }
 
