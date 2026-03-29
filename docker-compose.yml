@@ -41,18 +41,21 @@ services:
       retries: 5
 
   # ── NATS JetStream (Event Backbone) ──
+  # REV-002: Auth via nats-dev.conf, monitoring port internal-only
   nats:
     image: nats:2.10-alpine
     container_name: cena-nats
+    command: ["-c", "/etc/nats/nats-dev.conf"]
     ports:
       - "4222:4222"   # Client
-      - "8222:8222"   # Monitoring
-    command: >
-      -js
-      -m 8222
-      --store_dir /data
     volumes:
+      - ./config/nats/nats-dev.conf:/etc/nats/nats-dev.conf:ro
       - nats_data:/data
+    environment:
+      - NATS_ACTOR_PASSWORD=${NATS_ACTOR_PASSWORD:-dev_actor_pass}
+      - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
+      - NATS_EMU_PASSWORD=${NATS_EMU_PASSWORD:-dev_emu_pass}
+      - NATS_SETUP_PASSWORD=${NATS_SETUP_PASSWORD:-dev_setup_pass}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
       interval: 5s
@@ -102,6 +105,8 @@ services:
         condition: service_healthy
     volumes:
       - ./src/infra/docker/nats-setup.sh:/setup.sh
+    environment:
+      - NATS_SETUP_PASSWORD=${NATS_SETUP_PASSWORD:-dev_setup_pass}
     entrypoint: ["/bin/sh", "/setup.sh"]
     restart: "no"
 

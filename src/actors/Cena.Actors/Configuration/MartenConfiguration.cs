@@ -15,6 +15,7 @@ using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Questions;
 using Cena.Actors.Tutoring;
+using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Documents;
 
 namespace Cena.Actors.Configuration;
@@ -106,6 +107,13 @@ public static class MartenConfiguration
             .Index(x => x.Subject)
             .Index(x => x.Language)
             .Index(x => x.Topic);
+
+        // ── Student Record Access Log (REV-013: FERPA compliance) ──
+        opts.Schema.For<StudentRecordAccessLog>()
+            .Identity(x => x.Id)
+            .Index(x => x.AccessedBy)
+            .Index(x => x.StudentId)
+            .Index(x => x.AccessedAt);
 
         // ── Tutoring Session Document (SAI-08) ──
         opts.Schema.For<TutoringSessionDocument>()

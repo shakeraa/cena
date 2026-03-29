@@ -28,10 +28,19 @@ Log.Information("╚════════════════════
 
 // ── Connect to NATS ──
 
-var natsOpts = new NatsOpts { Url = natsUrl, Name = "cena-emulator" };
+// REV-002: NATS authentication — emulator user with subject ACLs
+var natsUser = Environment.GetEnvironmentVariable("NATS_EMU_USER") ?? "emulator";
+var natsPass = Environment.GetEnvironmentVariable("NATS_EMU_PASSWORD") ?? "dev_emu_pass";
+
+var natsOpts = new NatsOpts
+{
+    Url = natsUrl,
+    Name = "cena-emulator",
+    AuthOpts = new NatsAuthOpts { Username = natsUser, Password = natsPass },
+};
 await using var nats = new NatsConnection(natsOpts);
 await nats.ConnectAsync();
-Log.Information("Connected to NATS at {Url}", natsUrl);
+Log.Information("Connected to NATS at {Url} as {User}", natsUrl, natsUser);
 
 // ── Generate student cohort using simulation engine ──
 

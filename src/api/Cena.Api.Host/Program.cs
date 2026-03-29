@@ -9,7 +9,10 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Cena.Actors.Configuration;
 using Cena.Admin.Api;
+using Cena.Admin.Api.Registration;
 using Cena.Infrastructure.Auth;
+using Microsoft.AspNetCore.Diagnostics;
+using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Seed;
@@ -62,8 +65,20 @@ var natsUrl = builder.Configuration.GetConnectionString("NATS") ?? "nats://local
 builder.Services.AddSingleton<NATS.Client.Core.INatsConnection>(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<NATS.Client.Core.INatsConnection>>();
-    var opts = new NATS.Client.Core.NatsOpts { Url = natsUrl, Name = "cena-admin-api" };
-    logger.LogInformation("Configuring NATS connection to {NatsUrl}", natsUrl);
+
+    // REV-002: NATS authentication — admin-api user (subscribe-only)
+    var natsUser = builder.Configuration["Nats:User"] ?? "admin-api";
+    var natsPass = builder.Configuration["Nats:Password"]
+        ?? Environment.GetEnvironmentVariable("NATS_API_PASSWORD")
+        ?? "dev_api_pass";
+
+    var opts = new NATS.Client.Core.NatsOpts
+    {
+        Url = natsUrl,
+        Name = "cena-admin-api",
+        AuthOpts = new NATS.Client.Core.NatsAuthOpts { Username = natsUser, Password = natsPass },
+    };
+    logger.LogInformation("Configuring NATS connection to {NatsUrl} as {NatsUser}", natsUrl, natsUser);
     return new NATS.Client.Core.NatsConnection(opts);
 });
 builder.Services.AddSingleton<NatsEventSubscriber>();
@@ -129,33 +144,9 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// ---- Admin Services (ADM-004 through ADM-016) ----
+// ---- Admin Services (ADM-004 through ADM-023, REV-016.2) ----
 builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminService>();
-builder.Services.AddScoped<IAdminUserService, AdminUserService>();
-builder.Services.AddScoped<IAdminRoleService, AdminRoleService>();
-builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
-builder.Services.AddScoped<IContentModerationService, ContentModerationService>();
-builder.Services.AddScoped<IFocusAnalyticsService, FocusAnalyticsService>();
-builder.Services.AddScoped<IMasteryTrackingService, MasteryTrackingService>();
-builder.Services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
-builder.Services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
-builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService>(sp =>
-    new Cena.Admin.Api.QualityGate.QualityGateService(
-        configuration: sp.GetRequiredService<IConfiguration>(),
-        logger: sp.GetRequiredService<ILogger<Cena.Admin.Api.QualityGate.QualityGateService>>()));
-builder.Services.AddSingleton<IAiGenerationService, AiGenerationService>();
-builder.Services.AddScoped<IQuestionBankService, QuestionBankService>();
-builder.Services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();
-builder.Services.AddScoped<ICulturalContextService, CulturalContextService>();
-builder.Services.AddScoped<IEventStreamService, EventStreamService>();
-builder.Services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
-
-// ---- SAI Admin Services (ADM-017 through ADM-023) ----
-builder.Services.AddScoped<ITutoringAdminService, TutoringAdminService>();
-builder.Services.AddScoped<IExplanationCacheAdminService, ExplanationCacheAdminService>();
-builder.Services.AddScoped<IExperimentAdminService, ExperimentAdminService>();
-builder.Services.AddScoped<IEmbeddingAdminService, EmbeddingAdminService>();
-builder.Services.AddScoped<ITokenBudgetAdminService, TokenBudgetAdminService>();
+builder.Services.AddCenaAdminServices();
 
 // =============================================================================
 // OPENTELEMETRY (REV-018.3)
@@ -187,8 +178,26 @@ builder.Services.AddOpenTelemetry()
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
-    app.UseDeveloperExceptionPage();
+// ---- REV-016.3: Global exception handler (structured JSON, no stack trace leaks) ----
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.ContentType = "application/json";
+        var error = context.Features.Get<IExceptionHandlerFeature>();
+        var (statusCode, message) = error?.Error switch
+        {
+            BadHttpRequestException e => (400, e.Message),
+            UnauthorizedAccessException => (401, "Unauthorized"),
+            KeyNotFoundException => (404, "Resource not found"),
+            _ => (500, app.Environment.IsDevelopment()
+                ? error?.Error?.Message ?? "Internal server error"
+                : "Internal server error")
+        };
+        context.Response.StatusCode = statusCode;
+        await context.Response.WriteAsJsonAsync(new { error = message, status = statusCode });
+    });
+});
 
 // ---- REV-004: Security response headers ----
 app.Use(async (context, next) =>
@@ -211,11 +220,12 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// Middleware order: CORS → Auth → Revocation → RateLimiter → Endpoints
+// Middleware order: CORS → Auth → Revocation → FERPA Audit → RateLimiter → Endpoints
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<TokenRevocationMiddleware>();
+app.UseMiddleware<StudentDataAuditMiddleware>();
 app.UseRateLimiter();
 
 // ---- Prometheus metrics endpoint (REV-018.3) ----
@@ -224,28 +234,11 @@ app.MapPrometheusScrapingEndpoint();
 // ---- Health check ----
 app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "cena-admin-api" }));
 
-// ---- Admin REST API endpoints (ADM-004 through ADM-016) ----
-app.MapAdminUserEndpoints();
-app.MapAdminRoleEndpoints();
-app.MapAdminDashboardEndpoints();
-app.MapContentModerationEndpoints();
-app.MapFocusAnalyticsEndpoints();
-app.MapMasteryTrackingEndpoints();
-app.MapSystemMonitoringEndpoints();
-app.MapIngestionPipelineEndpoints();
-app.MapQuestionBankEndpoints();
-app.MapMethodologyAnalyticsEndpoints();
-app.MapCulturalContextEndpoints();
-app.MapEventStreamEndpoints();
-app.MapOutreachEngagementEndpoints();
-app.MapAiGenerationEndpoints();
+// ---- Admin REST API endpoints (ADM-004 through ADM-023, REV-016.2) ----
+app.MapCenaAdminEndpoints();
 
-// ---- SAI Admin endpoints (ADM-017 through ADM-023) ----
-app.MapTutoringAdminEndpoints();
-app.MapExplanationCacheEndpoints();
-app.MapExperimentAdminEndpoints();
-app.MapEmbeddingAdminEndpoints();
-app.MapTokenBudgetEndpoints();
+// ---- REV-013: FERPA Compliance endpoints ----
+app.MapComplianceEndpoints();
 
 // ---- Seed predefined roles on startup ----
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();

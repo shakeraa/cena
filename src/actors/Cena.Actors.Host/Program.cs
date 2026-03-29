@@ -9,8 +9,10 @@
 using System.Diagnostics.Metrics;
 using Cena.Actors.Api;
 using Cena.Admin.Api;
+using Cena.Admin.Api.Registration;
 using Cena.Actors.Configuration;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
@@ -20,6 +22,7 @@ using Cena.Actors.Students;
 using Cena.Actors.Sync;
 using Cena.Actors.Tutoring;
 using Marten;
+using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using NATS.Client.Core;
@@ -99,13 +102,21 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
 builder.Services.AddSingleton<INatsConnection>(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<INatsConnection>>();
+
+    // REV-002: NATS authentication — actor-host user with subject ACLs
+    var natsUser = builder.Configuration["Nats:User"] ?? "actor-host";
+    var natsPass = builder.Configuration["Nats:Password"]
+        ?? Environment.GetEnvironmentVariable("NATS_ACTOR_PASSWORD")
+        ?? "dev_actor_pass";
+
     var opts = new NatsOpts
     {
         Url = natsUrl,
-        Name = "cena-actors-host"
+        Name = "cena-actors-host",
+        AuthOpts = new NatsAuthOpts { Username = natsUser, Password = natsPass },
     };
 
-    logger.LogInformation("Configuring NATS connection to {NatsUrl}", natsUrl);
+    logger.LogInformation("Configuring NATS connection to {NatsUrl} as {NatsUser}", natsUrl, natsUser);
     return new NatsConnection(opts);
 });
 
@@ -165,26 +176,8 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<Cena.Actors.Bus.Na
 // SAI-003: Explanation cache invalidation on question edits via NATS
 builder.Services.AddHostedService<Cena.Actors.Explanations.ExplanationCacheInvalidator>();
 
-// Quality Gate service (needed by QuestionBankService)
-builder.Services.AddSingleton<Cena.Admin.Api.QualityGate.IQualityGateService>(sp =>
-    new Cena.Admin.Api.QualityGate.QualityGateService(
-        configuration: sp.GetRequiredService<IConfiguration>(),
-        logger: sp.GetRequiredService<ILogger<Cena.Admin.Api.QualityGate.QualityGateService>>()));
-
-// ADM-004 through ADM-016: Register Admin API services
-builder.Services.AddScoped<IAdminDashboardService, AdminDashboardService>();
-builder.Services.AddScoped<IAdminUserService, AdminUserService>();
-builder.Services.AddScoped<IAdminRoleService, AdminRoleService>();
-builder.Services.AddScoped<IContentModerationService, ContentModerationService>();
-builder.Services.AddScoped<IFocusAnalyticsService, FocusAnalyticsService>();
-builder.Services.AddScoped<IMasteryTrackingService, MasteryTrackingService>();
-builder.Services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
-builder.Services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
-builder.Services.AddScoped<IQuestionBankService, QuestionBankService>();
-builder.Services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();
-builder.Services.AddScoped<Cena.Admin.Api.ICulturalContextService, Cena.Admin.Api.CulturalContextService>();
-builder.Services.AddScoped<IEventStreamService, EventStreamService>();
-builder.Services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
+// ADM-004 through ADM-016: Shared admin service registrations (REV-016.2)
+builder.Services.AddCenaAdminServices();
 
 // CNT-008/009/010: Ingestion Pipeline, Moderation, Serving
 builder.Services.Configure<Cena.Actors.Ingest.GeminiOcrOptions>(
@@ -451,23 +444,38 @@ app.MapGet("/api/actors/diag", (ActorSystem system) =>
 app.UseAuthentication();
 app.UseAuthorization();
 
+// ---- REV-013: FERPA audit middleware (logs every student data endpoint access) ----
+app.UseMiddleware<StudentDataAuditMiddleware>();
+
+// ---- REV-016.3: Global exception handler (structured JSON, no stack trace leaks) ----
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.ContentType = "application/json";
+        var error = context.Features.Get<IExceptionHandlerFeature>();
+        var (statusCode, message) = error?.Error switch
+        {
+            BadHttpRequestException e => (400, e.Message),
+            UnauthorizedAccessException => (401, "Unauthorized"),
+            KeyNotFoundException => (404, "Resource not found"),
+            _ => (500, app.Environment.IsDevelopment()
+                ? error?.Error?.Message ?? "Internal server error"
+                : "Internal server error")
+        };
+        context.Response.StatusCode = statusCode;
+        await context.Response.WriteAsJsonAsync(new { error = message, status = statusCode });
+    });
+});
+
 // ---- Mastery REST API endpoints (MST-017) ----
 app.MapMasteryEndpoints();
 
-// ---- Admin REST API endpoints (ADM-004 through ADM-016) ----
-app.MapAdminDashboardEndpoints();
-app.MapAdminUserEndpoints();
-app.MapAdminRoleEndpoints();
-app.MapContentModerationEndpoints();
-app.MapFocusAnalyticsEndpoints();
-app.MapMasteryTrackingEndpoints();
-app.MapSystemMonitoringEndpoints();
-app.MapIngestionPipelineEndpoints();
-app.MapQuestionBankEndpoints();
-app.MapMethodologyAnalyticsEndpoints();
-app.MapCulturalContextEndpoints();
-app.MapEventStreamEndpoints();
-app.MapOutreachEngagementEndpoints();
+// ---- Admin REST API endpoints (ADM-004 through ADM-016, REV-016.2) ----
+app.MapCenaAdminEndpoints();
+
+// ---- REV-013: FERPA Compliance endpoints ----
+app.MapComplianceEndpoints();
 
 // ---- Cluster lifecycle ----
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();

@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { VForm } from 'vuetify/components/VForm'
 
-import AuthProvider from '@/views/pages/authentication/AuthProvider.vue'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
 import { themeConfig } from '@themeConfig'
 
@@ -183,13 +182,6 @@ const isPasswordVisible = ref(false)
                 <VDivider />
               </VCol>
 
-              <!-- auth providers -->
-              <VCol
-                cols="12"
-                class="text-center"
-              >
-                <AuthProvider />
-              </VCol>
             </VRow>
           </VForm>
         </VCardText>
