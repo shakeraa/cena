@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Cena.Admin.Api\Cena.Admin.Api.csproj" />
+    <ProjectReference Include="..\..\shared\Cena.Infrastructure\Cena.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

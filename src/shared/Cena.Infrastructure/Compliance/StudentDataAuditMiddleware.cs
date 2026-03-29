@@ -49,8 +49,8 @@ public sealed class StudentDataAuditMiddleware
         // Extract accessor identity from claims (set by Firebase auth + CenaClaimsTransformer)
         var uid = context.User.FindFirstValue("user_id")
                ?? context.User.FindFirstValue(ClaimTypes.NameIdentifier);
-        var role = context.User.FindFirstValue("cena_role")
-                ?? context.User.FindFirstValue(ClaimTypes.Role);
+        var role = context.User.FindFirstValue(ClaimTypes.Role)
+                ?? context.User.FindFirstValue("role");
         var school = context.User.FindFirstValue("school_id");
 
         // Extract student ID from route or query string if present

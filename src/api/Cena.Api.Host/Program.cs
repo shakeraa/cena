@@ -193,7 +193,7 @@ app.UseExceptionHandler(errorApp =>
         var (statusCode, message) = error?.Error switch
         {
             BadHttpRequestException e => (400, e.Message),
-            UnauthorizedAccessException => (401, "Unauthorized"),
+            UnauthorizedAccessException e => (403, e.Message),
             KeyNotFoundException => (404, "Resource not found"),
             _ => (500, app.Environment.IsDevelopment()
                 ? error?.Error?.Message ?? "Internal server error"
@@ -255,6 +255,10 @@ lifetime.ApplicationStarted.Register(async () =>
     await DatabaseSeeder.SeedAllAsync(store, appLogger, 300,
         (s, l) => SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
         QuestionBankSeedData.SeedQuestionsAsync);
+
+    // Ensure Firebase Admin SDK is initialized, then sync claims for demo users
+    _ = app.Services.GetRequiredService<IFirebaseAdminService>();
+    await FirebaseClaimsSeeder.SyncAdminClaimsAsync(appLogger);
 });
 
 app.Run();

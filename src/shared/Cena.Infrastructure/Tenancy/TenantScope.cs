@@ -21,7 +21,9 @@ public static class TenantScope
     /// </summary>
     public static string? GetSchoolFilter(ClaimsPrincipal user)
     {
-        var role = user.FindFirstValue("cena_role");
+        // Check both the direct Firebase "role" claim and the mapped ClaimTypes.Role
+        var role = user.FindFirstValue(ClaimTypes.Role)
+                ?? user.FindFirstValue("role");
         if (role == "SUPER_ADMIN") return null; // No filter -- sees everything
 
         var schoolId = user.FindFirstValue("school_id");
