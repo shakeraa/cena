@@ -30,6 +30,9 @@ public static class NatsSubjects
     public const string EventMindWandering     = "cena.events.focus.mind_wandering";
     public const string EventMicrobreakSuggested = "cena.events.focus.microbreak_suggested";
 
+    // ── Dead-letter (messages that exhausted retries) ──
+    public const string DeadLetter = "cena.deadletter";
+
     // ── Wildcard subscriptions ──
     public const string AllEvents   = "cena.events.>";
     public const string AllCommands = "cena.session.>"; // + cena.mastery.>

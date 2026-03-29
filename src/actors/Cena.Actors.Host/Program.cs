@@ -545,8 +545,13 @@ app.Run();
 public sealed class ProtoActorHealthCheck : IHealthCheck
 {
     private readonly ActorSystem _system;
+    private readonly int _minNodes;
 
-    public ProtoActorHealthCheck(ActorSystem system) => _system = system;
+    public ProtoActorHealthCheck(ActorSystem system, IConfiguration configuration)
+    {
+        _system = system;
+        _minNodes = configuration.GetValue<int>("Cluster:MinNodes", 1);
+    }
 
     public Task<HealthCheckResult> CheckHealthAsync(
         HealthCheckContext context,
@@ -561,8 +566,14 @@ public sealed class ProtoActorHealthCheck : IHealthCheck
                     "No cluster members found. Cluster may not be formed."));
             }
 
+            if (members.Length < _minNodes)
+            {
+                return Task.FromResult(HealthCheckResult.Degraded(
+                    $"Cluster has {members.Length} member(s), minimum is {_minNodes}"));
+            }
+
             return Task.FromResult(HealthCheckResult.Healthy(
-                $"Cluster active. Members: {members.Length}, NodeId: {_system.Id}"));
+                $"Cluster healthy: {members.Length} member(s), NodeId: {_system.Id}"));
         }
         catch (Exception ex)
         {
