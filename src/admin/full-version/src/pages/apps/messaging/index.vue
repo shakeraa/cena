@@ -13,6 +13,26 @@ const newThreadType = ref('DirectMessage')
 const newThreadParticipants = ref<string[]>([])
 const newThreadMessage = ref('')
 const contactSearch = ref('')
+let contactSearchTimeout: ReturnType<typeof setTimeout> | null = null
+
+const onContactSearch = (val: string) => {
+  if (contactSearchTimeout) clearTimeout(contactSearchTimeout)
+  contactSearchTimeout = setTimeout(() => {
+    store.fetchContacts(val || undefined)
+  }, 300)
+}
+
+const roleColor = (role: string): string => {
+  switch (role) {
+    case 'STUDENT': return 'info'
+    case 'TEACHER': return 'success'
+    case 'PARENT': return 'warning'
+    case 'ADMIN': return 'error'
+    case 'SUPER_ADMIN': return 'error'
+    case 'MODERATOR': return 'primary'
+    default: return 'default'
+  }
+}
 
 const typeOptions = [
   { title: 'All', value: null },
@@ -205,15 +225,30 @@ onMounted(fetchThreads)
           />
           <VAutocomplete
             v-model="newThreadParticipants"
+            v-model:search="contactSearch"
             :items="store.contacts"
             item-title="displayName"
             item-value="userId"
             label="Participants"
+            placeholder="Search by name or email..."
             multiple
             chips
             closable-chips
+            :loading="store.loading"
+            no-data-text="Type to search for students, teachers, or parents"
             class="mb-4"
-          />
+            @update:search="onContactSearch"
+          >
+            <template #item="{ props: itemProps, item }">
+              <VListItem v-bind="itemProps">
+                <template #append>
+                  <VChip size="x-small" variant="tonal" :color="roleColor(item.raw.role)">
+                    {{ item.raw.role }}
+                  </VChip>
+                </template>
+              </VListItem>
+            </template>
+          </VAutocomplete>
           <VTextarea
             v-model="newThreadMessage"
             label="Initial Message (optional)"

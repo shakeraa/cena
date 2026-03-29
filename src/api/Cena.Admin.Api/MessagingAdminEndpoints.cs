@@ -6,6 +6,8 @@
 using Cena.Admin.Api.Validation;
 using Cena.Actors.Messaging;
 using Cena.Infrastructure.Auth;
+using Marten;
+using Marten.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -57,22 +59,61 @@ public static class MessagingAdminEndpoints
         group.MapPost("/threads", async (
             CreateThreadRequest request,
             HttpContext httpContext,
-            INatsConnection nats) =>
+            INatsConnection nats,
+            IDocumentStore store) =>
         {
             var userId = httpContext.User.FindFirst("user_id")?.Value
+                ?? httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
                 ?? httpContext.User.FindFirst("sub")?.Value;
             if (string.IsNullOrEmpty(userId))
                 return Results.Unauthorized();
 
-            var userName = httpContext.User.FindFirst("name")?.Value ?? "Admin";
+            var userName = httpContext.User.FindFirst("name")?.Value
+                ?? httpContext.User.FindFirst(System.Security.Claims.ClaimTypes.Name)?.Value
+                ?? "Admin";
 
-            // Route to ConversationThreadActor via NATS
             var threadId = $"thread-{Guid.NewGuid():N}";
+            var allParticipantIds = request.ParticipantIds.Append(userId).Distinct().ToArray();
+
+            // Resolve participant names from AdminUser documents
+            await using var session = store.LightweightSession();
+            var users = await session.Query<Cena.Infrastructure.Documents.AdminUser>()
+                .Where(u => u.Id.IsOneOf(allParticipantIds))
+                .ToListAsync();
+
+            var nameMap = users.ToDictionary(u => u.Id, u => u.FullName);
+            var participantNames = allParticipantIds
+                .Select(id => nameMap.GetValueOrDefault(id, id == userId ? userName : id))
+                .ToArray();
+
+            // Store ThreadSummary directly in Marten (immediate consistency)
+            var summary = new Cena.Actors.Messaging.ThreadSummary
+            {
+                Id = threadId,
+                ThreadType = request.ThreadType,
+                ParticipantIds = allParticipantIds,
+                ParticipantNames = participantNames,
+                ClassRoomId = request.ClassRoomId,
+                CreatedById = userId,
+                CreatedAt = DateTimeOffset.UtcNow,
+                LastMessageAt = DateTimeOffset.UtcNow,
+                MessageCount = 0,
+                LastMessagePreview = request.InitialMessage ?? "",
+            };
+
+            if (!string.IsNullOrEmpty(request.InitialMessage))
+                summary.MessageCount = 1;
+
+            session.Store(summary);
+            await session.SaveChangesAsync();
+
+            // Also publish to NATS for Actor Host event sourcing
             var createCmd = new
             {
                 ThreadId = threadId,
                 request.ThreadType,
-                ParticipantIds = request.ParticipantIds.Append(userId).Distinct().ToArray(),
+                ParticipantIds = allParticipantIds,
+                ParticipantNames = participantNames,
                 CreatedById = userId,
                 CreatedByName = userName
             };
@@ -81,7 +122,6 @@ public static class MessagingAdminEndpoints
                 MessagingNatsSubjects.CmdBroadcastToClass,
                 JsonSerializer.SerializeToUtf8Bytes(createCmd, JsonOpts));
 
-            // If there's an initial message, send it
             if (!string.IsNullOrEmpty(request.InitialMessage))
             {
                 var sendCmd = new SendMessage(

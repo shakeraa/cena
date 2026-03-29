@@ -132,32 +132,34 @@ public sealed class MessagingAdminService : IMessagingAdminService
 
     public async Task<MessagingContactListResponse> GetContactsAsync(string? search)
     {
-        // For now, return admin users from Marten. Full Firebase user list
-        // integration requires AdminUserService — reuse its data.
         await using var session = _store.QuerySession();
 
-        // Query ThreadSummary for unique participants as a lightweight contact list
-        var summaries = await session.Query<ThreadSummary>()
-            .Take(100)
-            .ToListAsync();
+        var query = session.Query<Cena.Infrastructure.Documents.AdminUser>()
+            .Where(u => !u.SoftDeleted && u.Status == Cena.Infrastructure.Documents.UserStatus.Active);
 
-        var contacts = new Dictionary<string, MessagingContactDto>();
-        foreach (var s in summaries)
+        // Marten translates string.Contains(term) to PostgreSQL ILIKE
+        // but doesn't support the StringComparison overload — use plain Contains
+        if (!string.IsNullOrEmpty(search))
         {
-            for (var i = 0; i < s.ParticipantIds.Length; i++)
-            {
-                var id = s.ParticipantIds[i];
-                if (contacts.ContainsKey(id)) continue;
-
-                var name = i < s.ParticipantNames.Length ? s.ParticipantNames[i] : id;
-                if (!string.IsNullOrEmpty(search) &&
-                    !name.Contains(search, StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                contacts[id] = new MessagingContactDto(id, name, "Student", null, null);
-            }
+            var term = search.Trim().ToLowerInvariant();
+            query = query.Where(u =>
+                u.FullName.ToLower().Contains(term) ||
+                u.Email.ToLower().Contains(term));
         }
 
-        return new MessagingContactListResponse(contacts.Values.ToList());
+        var users = await query
+            .OrderBy(u => u.FullName)
+            .Take(50)
+            .ToListAsync();
+
+        var contacts = users.Select(u => new MessagingContactDto(
+            u.Id,
+            u.FullName,
+            u.Role.ToString(),
+            u.Email,
+            u.AvatarUrl
+        )).ToList();
+
+        return new MessagingContactListResponse(contacts);
     }
 }
