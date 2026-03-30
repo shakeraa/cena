@@ -113,12 +113,26 @@ public sealed class HintGenerationService : IHintGenerationService
         ctx.QuestionDifficulty.HasValue && ctx.StudentMastery.HasValue
         && ctx.QuestionDifficulty.Value - ctx.StudentMastery.Value > 0.25f;
 
+    /// <summary>
+    /// Returns true when the question difficulty is well below the student's mastery,
+    /// indicating a regression where diagnostic framing is more appropriate than full scaffolding.
+    /// </summary>
+    private static bool IsRegressionError(HintGenerationContext ctx) =>
+        ctx.QuestionDifficulty.HasValue && ctx.StudentMastery.HasValue
+        && ctx.QuestionDifficulty.Value - ctx.StudentMastery.Value < -0.25f;
+
     // =========================================================================
     // LEVEL 2 -- Procedural Scaffold (from DistractorRationale or error type)
     // =========================================================================
 
     private static string GenerateScaffold(HintGenerationContext ctx)
     {
+        // Difficulty-aware scaffolding: regression questions need diagnostic framing
+        if (IsRegressionError(ctx))
+        {
+            return GetTemplate(ctx.Language, "coaching_careless");
+        }
+
         // Error-type-based coaching when ConceptState has error history
         if (ctx.ConceptState is { RecentErrors.Length: > 0 })
         {
@@ -151,6 +165,14 @@ public sealed class HintGenerationService : IHintGenerationService
 
     private static string GenerateReveal(HintGenerationContext ctx)
     {
+        // Stretch questions: provide full worked example (justified — student is learning)
+        if (IsStretchChallenge(ctx) && !string.IsNullOrEmpty(ctx.QuestionExplanation))
+            return ctx.QuestionExplanation;
+
+        // Regression: abbreviated reveal — student knows this, just needs a reminder
+        if (IsRegressionError(ctx) && ctx.PrerequisiteNames.Count > 0)
+            return GetTemplate(ctx.Language, "reveal_fallback_concept", ctx.PrerequisiteNames[0]);
+
         // Prefer the persisted explanation (from Task 01a or question authoring)
         if (!string.IsNullOrEmpty(ctx.QuestionExplanation))
             return ctx.QuestionExplanation;
