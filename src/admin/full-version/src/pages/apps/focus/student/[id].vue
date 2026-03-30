@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import StagnationInsightsPanel from '@/views/apps/pedagogy/StagnationInsightsPanel.vue'
 import { $api } from '@/utils/api'
 
 definePage({ meta: { action: 'read', subject: 'Focus' } })
 
 const route = useRoute('apps-focus-student-id')
 const studentId = computed(() => route.params.id)
+
+// Focus-stagnation correlation analysis
+const focusStagnationConceptId = ref('')
+const showFocusStagnation = ref(false)
 
 // --- Student profile data ---
 interface StudentFocusProfile {
@@ -409,6 +414,47 @@ const focusScoreColor = (score: number): string => {
                 </VChip>
               </template>
             </VDataTable>
+          </VCardText>
+        </VCard>
+      </VCol>
+    </VRow>
+
+    <!-- Focus-Correlated Stagnation Analysis -->
+    <VRow class="mt-4">
+      <VCol cols="12">
+        <VCard>
+          <VCardItem title="Focus-Correlated Stagnation Analysis">
+            <template #subtitle>
+              Analyze whether focus degradation is causing learning stagnation on a specific concept
+            </template>
+          </VCardItem>
+          <VCardText>
+            <VTextField
+              v-model="focusStagnationConceptId"
+              label="Enter concept ID to analyze"
+              density="compact"
+              class="mb-4"
+              hint="e.g. derivatives_chain_rule"
+              persistent-hint
+              @keyup.enter="focusStagnationConceptId && (showFocusStagnation = true)"
+            >
+              <template #append-inner>
+                <VBtn
+                  size="small"
+                  variant="text"
+                  color="primary"
+                  :disabled="!focusStagnationConceptId"
+                  @click="showFocusStagnation = true"
+                >
+                  Analyze
+                </VBtn>
+              </template>
+            </VTextField>
+            <StagnationInsightsPanel
+              v-if="showFocusStagnation && focusStagnationConceptId"
+              :student-id="String(studentId)"
+              :concept-id="focusStagnationConceptId"
+            />
           </VCardText>
         </VCard>
       </VCol>

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StagnationInsightsPanel from '@/views/apps/pedagogy/StagnationInsightsPanel.vue'
 import { $api } from '@/utils/api'
 
 interface Props {
@@ -268,6 +269,7 @@ interface StagnationData {
 
 const stagnationLoading = ref(true)
 const stagnation = ref<StagnationData | null>(null)
+const expandedStagnationConcept = ref<string | null>(null)
 
 // ── Response Times ──
 interface ResponseTimeData {
@@ -1065,24 +1067,46 @@ onMounted(() => {
           </VCardText>
         </VCard>
 
-        <!-- Stagnation Alerts -->
+        <!-- Stagnation Alerts with Root-Cause Drill-Down -->
         <VCard v-if="(stagnation?.stagnatingConcepts ?? []).length > 0" :loading="stagnationLoading" class="mt-4">
           <VCardItem title="Stagnation Alerts">
-            <template #subtitle>{{ stagnation!.stagnatingConcepts.length }} concepts stuck</template>
+            <template #subtitle>{{ stagnation!.stagnatingConcepts.length }} concepts stuck — click Analyze for root cause</template>
           </VCardItem>
           <VCardText>
             <VList density="compact">
-              <VListItem v-for="s in stagnation!.stagnatingConcepts.slice(0, 5)" :key="s.conceptId">
-                <template #prepend>
-                  <VAvatar color="error" variant="tonal" size="32">
-                    <VIcon icon="tabler-alert-triangle" size="16" />
-                  </VAvatar>
-                </template>
-                <VListItemTitle class="text-body-2 font-weight-medium">{{ s.conceptId }}</VListItemTitle>
-                <VListItemSubtitle>
-                  {{ s.consecutiveStagnantSessions }} sessions stuck | Tried: {{ s.attemptedMethodologies?.join(', ') || 'none' }}
-                </VListItemSubtitle>
-              </VListItem>
+              <template v-for="s in stagnation!.stagnatingConcepts.slice(0, 5)" :key="s.conceptId">
+                <VListItem>
+                  <template #prepend>
+                    <VAvatar color="error" variant="tonal" size="32">
+                      <VIcon icon="tabler-alert-triangle" size="16" />
+                    </VAvatar>
+                  </template>
+                  <VListItemTitle class="text-body-2 font-weight-medium">
+                    {{ s.conceptId }}
+                  </VListItemTitle>
+                  <VListItemSubtitle>
+                    {{ s.consecutiveStagnantSessions }} sessions stuck | Tried: {{ s.attemptedMethodologies?.join(', ') || 'none' }}
+                  </VListItemSubtitle>
+                  <template #append>
+                    <VBtn
+                      variant="text"
+                      color="primary"
+                      size="small"
+                      @click="expandedStagnationConcept = expandedStagnationConcept === s.conceptId ? null : s.conceptId"
+                    >
+                      <VIcon :icon="expandedStagnationConcept === s.conceptId ? 'ri-arrow-up-s-line' : 'ri-search-eye-line'" class="me-1" />
+                      {{ expandedStagnationConcept === s.conceptId ? 'Hide' : 'Analyze' }}
+                    </VBtn>
+                  </template>
+                </VListItem>
+                <!-- Inline root-cause analysis panel -->
+                <div v-if="expandedStagnationConcept === s.conceptId" class="pa-4">
+                  <StagnationInsightsPanel
+                    :student-id="props.userId"
+                    :concept-id="s.conceptId"
+                  />
+                </div>
+              </template>
             </VList>
           </VCardText>
         </VCard>

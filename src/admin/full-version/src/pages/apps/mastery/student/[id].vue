@@ -3,6 +3,7 @@ import MethodologyOverrideDialog from '@/views/apps/mastery/student/MethodologyO
 import ConceptCard from '@/views/apps/mastery/ConceptCard.vue'
 import ConceptGraph from '@/views/apps/mastery/ConceptGraph.vue'
 import MethodologyHierarchyPanel from '@/views/apps/pedagogy/MethodologyHierarchyPanel.vue'
+import StagnationInsightsPanel from '@/views/apps/pedagogy/StagnationInsightsPanel.vue'
 import { $api } from '@/utils/api'
 import { useAbility } from '@casl/vue'
 
@@ -160,6 +161,24 @@ const fetchKnowledgeMap = async () => {
 }
 
 onMounted(fetchKnowledgeMap)
+
+// --- Stagnation Root-Cause Analysis ---
+const selectedStagnationConcept = ref<string | null>(null)
+const allConceptIds = computed(() => {
+  const ids: string[] = []
+  for (const concepts of Object.values(conceptsBySubject.value))
+    for (const c of concepts)
+      if (c.mastery > 0 && c.mastery < 0.7) ids.push(c.conceptId)
+  return ids
+})
+const allConceptNames = computed(() => {
+  const map: Record<string, string> = {}
+  for (const concepts of Object.values(conceptsBySubject.value))
+    for (const c of concepts) map[c.conceptId] = c.name
+  return map
+})
+const conceptSelectItems = computed(() =>
+  allConceptIds.value.map(id => ({ title: allConceptNames.value[id] ?? id, value: id })))
 
 // --- Learning Frontier ---
 interface FrontierConcept {
@@ -585,6 +604,30 @@ const decayColor = (risk: number): string => {
         >
           <span class="text-disabled">No history data available</span>
         </div>
+      </VCardText>
+    </VCard>
+
+    <!-- Stagnation Root-Cause Analysis -->
+    <VCard v-if="allConceptIds.length > 0" class="mb-6">
+      <VCardItem title="Stagnation Root-Cause Analysis">
+        <template #subtitle>
+          Select a struggling concept to analyze why the student is stuck
+        </template>
+      </VCardItem>
+      <VCardText>
+        <VSelect
+          v-model="selectedStagnationConcept"
+          :items="conceptSelectItems"
+          label="Select concept to analyze"
+          density="compact"
+          class="mb-4"
+          clearable
+        />
+        <StagnationInsightsPanel
+          v-if="selectedStagnationConcept"
+          :student-id="String(studentId)"
+          :concept-id="selectedStagnationConcept"
+        />
       </VCardText>
     </VCard>
 
