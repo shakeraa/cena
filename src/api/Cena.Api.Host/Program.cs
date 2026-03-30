@@ -10,10 +10,12 @@ using Microsoft.AspNetCore.RateLimiting;
 using Cena.Actors.Configuration;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
+using Cena.Api.Host.Hubs;
 using Cena.Infrastructure.Auth;
-using Microsoft.AspNetCore.Diagnostics;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
+using Cena.Infrastructure.Correlation;
+using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Seed;
 using Marten;
@@ -94,6 +96,10 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);
 builder.Services.AddCenaAuthorization();
 
+// ---- SignalR Real-Time Hub (SES-001) ----
+builder.Services.AddCenaSignalR();
+builder.Services.AddSignalRTokenExtraction();
+
 // ---- CORS (BKD-001.4) ----
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
     ?? ["http://localhost:5174"];
@@ -104,7 +110,8 @@ builder.Services.AddCors(options =>
     {
         policy.WithOrigins(allowedOrigins)
             .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
-            .WithHeaders("Authorization", "Content-Type", "Accept", "X-Requested-With")
+            .WithHeaders("Authorization", "Content-Type", "Accept", "X-Requested-With",
+                "X-SignalR-User-Agent") // SES-001: SignalR negotiation header
             .AllowCredentials();
     });
 });
@@ -183,26 +190,11 @@ builder.Services.AddOpenTelemetry()
 
 var app = builder.Build();
 
-// ---- REV-016.3: Global exception handler (structured JSON, no stack trace leaks) ----
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.ContentType = "application/json";
-        var error = context.Features.Get<IExceptionHandlerFeature>();
-        var (statusCode, message) = error?.Error switch
-        {
-            BadHttpRequestException e => (400, e.Message),
-            UnauthorizedAccessException e => (403, e.Message),
-            KeyNotFoundException => (404, "Resource not found"),
-            _ => (500, app.Environment.IsDevelopment()
-                ? error?.Error?.Message ?? "Internal server error"
-                : "Internal server error")
-        };
-        context.Response.StatusCode = statusCode;
-        await context.Response.WriteAsJsonAsync(new { error = message, status = statusCode });
-    });
-});
+// ---- ERR-001.4: Correlation ID middleware (first — sets CorrelationContext for all downstream) ----
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// ---- ERR-001.2: Global exception handler (structured CenaError JSON, no stack trace leaks) ----
+app.UseMiddleware<GlobalExceptionMiddleware>();
 
 // ---- REV-004: Security response headers ----
 app.Use(async (context, next) =>
@@ -241,6 +233,9 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "cena
 
 // ---- Admin REST API endpoints (ADM-004 through ADM-023, REV-016.2) ----
 app.MapCenaAdminEndpoints();
+
+// ---- SignalR Hub (SES-001) ----
+app.MapCenaHub();
 
 // ---- REV-013: FERPA Compliance endpoints ----
 app.MapComplianceEndpoints();

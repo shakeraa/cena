@@ -3,24 +3,31 @@ import { $api } from '@/utils/api'
 
 definePage({ meta: { action: 'read', subject: 'Tutoring' } })
 
-interface TutoringMessage {
+interface ConversationTurn {
   role: string
-  text: string
+  messagePreview: string
   timestamp: string
+  ragSourceCount: number
 }
 
 interface TutoringSessionDetail {
+  id: string
   sessionId: string
   studentId: string
+  studentName: string
   status: string
   methodology: string
-  concept: string
+  conceptId: string
+  subject: string
   durationSeconds: number
   startedAt: string
   endedAt: string | null
+  turnCount: number
   tokensUsed: number
-  dailyTokenLimit: number
-  messages: TutoringMessage[]
+  budgetRemaining: number
+  turns: ConversationTurn[]
+  ragSourcesUsed: number
+  safetyEventsCount: number
 }
 
 const route = useRoute()
@@ -29,6 +36,7 @@ const router = useRouter()
 const loading = ref(true)
 const error = ref<string | null>(null)
 const session = ref<TutoringSessionDetail | null>(null)
+const contextPanelOpen = ref(false)
 
 const sessionId = computed(() => String((route.params as Record<string, string>).id ?? ''))
 
@@ -37,6 +45,7 @@ const statusColor = (status: string): string => {
     case 'active': return 'info'
     case 'completed': return 'success'
     case 'budget_exhausted': return 'warning'
+    case 'safety_blocked': return 'error'
     case 'timeout': return 'secondary'
     default: return 'default'
   }
@@ -62,10 +71,17 @@ const formatDate = (iso: string): string => {
   })
 }
 
-const budgetPercent = computed(() => {
-  if (!session.value || !session.value.dailyTokenLimit) return 0
+const dailyTokenLimit = computed(() => {
+  if (!session.value) return 0
 
-  return Math.min(100, (session.value.tokensUsed / session.value.dailyTokenLimit) * 100)
+  return session.value.tokensUsed + session.value.budgetRemaining
+})
+
+const budgetPercent = computed(() => {
+  const limit = dailyTokenLimit.value
+  if (!session.value || !limit) return 0
+
+  return Math.min(100, (session.value.tokensUsed / limit) * 100)
 })
 
 const budgetColor = computed(() => {
@@ -76,23 +92,43 @@ const budgetColor = computed(() => {
   return 'success'
 })
 
+// Turns with student messages on the left, tutor on the right
+const studentTurns = computed(() =>
+  session.value?.turns.filter(t => t.role === 'student') ?? [],
+)
+
+const tutorTurns = computed(() =>
+  session.value?.turns.filter(t => t.role === 'tutor' || t.role === 'assistant') ?? [],
+)
+
+// RAG source turns for context panel
+const turnsWithRagSources = computed(() =>
+  session.value?.turns.filter(t => t.ragSourceCount > 0) ?? [],
+)
+
 const fetchSession = async () => {
   loading.value = true
   try {
     const data = await $api<TutoringSessionDetail>(`/admin/tutoring/sessions/${sessionId.value}`)
 
     session.value = {
+      id: data.id ?? sessionId.value,
       sessionId: data.sessionId ?? sessionId.value,
       studentId: data.studentId ?? '',
+      studentName: data.studentName || data.studentId || '',
       status: data.status ?? 'unknown',
       methodology: data.methodology ?? '-',
-      concept: data.concept ?? '-',
+      conceptId: data.conceptId ?? '-',
+      subject: data.subject ?? '-',
       durationSeconds: data.durationSeconds ?? 0,
       startedAt: data.startedAt ?? '',
       endedAt: data.endedAt ?? null,
+      turnCount: data.turnCount ?? 0,
       tokensUsed: data.tokensUsed ?? 0,
-      dailyTokenLimit: data.dailyTokenLimit ?? 0,
-      messages: data.messages ?? [],
+      budgetRemaining: data.budgetRemaining ?? 0,
+      turns: data.turns ?? [],
+      ragSourcesUsed: data.ragSourcesUsed ?? 0,
+      safetyEventsCount: data.safetyEventsCount ?? 0,
     }
   }
   catch (err: any) {
@@ -145,11 +181,11 @@ onMounted(fetchSession)
               md="8"
             >
               <h4 class="text-h4 mb-2">
-                Session {{ session.sessionId }}
+                {{ session.studentName || session.studentId }}
               </h4>
               <div class="d-flex flex-wrap gap-x-6 gap-y-2 text-body-2">
                 <div>
-                  <span class="text-medium-emphasis">Student:</span>
+                  <span class="text-medium-emphasis">Student ID:</span>
                   <span class="font-weight-medium ms-1">{{ session.studentId }}</span>
                 </div>
                 <div>
@@ -157,8 +193,16 @@ onMounted(fetchSession)
                   <span class="font-weight-medium ms-1">{{ session.methodology }}</span>
                 </div>
                 <div>
+                  <span class="text-medium-emphasis">Subject:</span>
+                  <span class="font-weight-medium ms-1">{{ session.subject }}</span>
+                </div>
+                <div>
                   <span class="text-medium-emphasis">Concept:</span>
-                  <span class="font-weight-medium ms-1">{{ session.concept }}</span>
+                  <span class="font-weight-medium ms-1">{{ session.conceptId }}</span>
+                </div>
+                <div>
+                  <span class="text-medium-emphasis">Turns:</span>
+                  <span class="font-weight-medium ms-1">{{ session.turnCount }}</span>
                 </div>
                 <div>
                   <span class="text-medium-emphasis">Duration:</span>
@@ -168,20 +212,41 @@ onMounted(fetchSession)
                   <span class="text-medium-emphasis">Started:</span>
                   <span class="font-weight-medium ms-1">{{ formatDate(session.startedAt) }}</span>
                 </div>
+                <div v-if="session.endedAt">
+                  <span class="text-medium-emphasis">Ended:</span>
+                  <span class="font-weight-medium ms-1">{{ formatDate(session.endedAt) }}</span>
+                </div>
               </div>
             </VCol>
             <VCol
               cols="12"
               md="4"
-              class="d-flex align-center justify-end"
+              class="d-flex flex-column align-end gap-y-2"
             >
               <VChip
                 :color="statusColor(session.status)"
                 label
                 size="large"
               >
-                {{ session.status.replace('_', ' ') }}
+                {{ session.status.replace(/_/g, ' ') }}
               </VChip>
+
+              <VChip
+                v-if="session.safetyEventsCount > 0"
+                color="error"
+                label
+                size="small"
+                prepend-icon="tabler-shield-exclamation"
+              >
+                {{ session.safetyEventsCount }} safety event{{ session.safetyEventsCount !== 1 ? 's' : '' }}
+              </VChip>
+
+              <div
+                v-if="session.ragSourcesUsed > 0"
+                class="text-caption text-medium-emphasis"
+              >
+                {{ session.ragSourcesUsed }} RAG source{{ session.ragSourcesUsed !== 1 ? 's' : '' }} used
+              </div>
             </VCol>
           </VRow>
         </VCardText>
@@ -192,8 +257,8 @@ onMounted(fetchSession)
         <VCardItem title="Token Budget" />
         <VCardText>
           <div class="d-flex justify-space-between text-body-2 mb-2">
-            <span>{{ session.tokensUsed.toLocaleString() }} used</span>
-            <span>{{ session.dailyTokenLimit.toLocaleString() }} daily limit</span>
+            <span>{{ session.tokensUsed.toLocaleString() }} tokens used</span>
+            <span>{{ dailyTokenLimit.toLocaleString() }} daily limit</span>
           </div>
           <VProgressLinear
             :model-value="budgetPercent"
@@ -201,10 +266,45 @@ onMounted(fetchSession)
             height="12"
             rounded
           />
-          <div class="text-body-2 text-medium-emphasis mt-1">
-            {{ budgetPercent.toFixed(1) }}% of daily budget consumed
+          <div class="d-flex justify-space-between text-body-2 mt-1">
+            <span class="text-medium-emphasis">{{ budgetPercent.toFixed(1) }}% consumed</span>
+            <span class="text-medium-emphasis">{{ session.budgetRemaining.toLocaleString() }} remaining</span>
           </div>
         </VCardText>
+      </VCard>
+
+      <!-- Context Panel (collapsible RAG blocks) -->
+      <VCard
+        v-if="turnsWithRagSources.length > 0"
+        class="mb-6"
+      >
+        <VCardItem>
+          <VCardTitle>RAG Context Sources</VCardTitle>
+          <template #append>
+            <VBtn
+              :icon="contextPanelOpen ? 'tabler-chevron-up' : 'tabler-chevron-down'"
+              variant="text"
+              size="small"
+              @click="contextPanelOpen = !contextPanelOpen"
+            />
+          </template>
+        </VCardItem>
+
+        <VExpandTransition>
+          <div v-show="contextPanelOpen">
+            <VCardText>
+              <VList density="compact">
+                <VListItem
+                  v-for="(turn, idx) in turnsWithRagSources"
+                  :key="idx"
+                  :subtitle="`${turn.ragSourceCount} source${turn.ragSourceCount !== 1 ? 's' : ''} retrieved at ${formatDate(turn.timestamp)}`"
+                  :title="`Turn ${idx + 1} (${turn.role})`"
+                  prepend-icon="tabler-database-search"
+                />
+              </VList>
+            </VCardText>
+          </div>
+        </VExpandTransition>
       </VCard>
 
       <!-- Chat Transcript -->
@@ -212,35 +312,60 @@ onMounted(fetchSession)
         <VCardItem title="Conversation Transcript" />
         <VCardText>
           <div
-            v-if="session.messages.length"
+            v-if="session.turns.length"
             class="d-flex flex-column gap-y-4"
           >
             <div
-              v-for="(msg, idx) in session.messages"
+              v-for="(turn, idx) in session.turns"
               :key="idx"
               class="d-flex"
-              :class="msg.role === 'student' ? 'justify-start' : 'justify-end'"
+              :class="(turn.role === 'student') ? 'justify-start' : 'justify-end'"
             >
               <VCard
-                :color="msg.role === 'student' ? 'primary' : 'secondary'"
+                :color="turn.role === 'student' ? 'primary' : 'secondary'"
                 variant="tonal"
                 class="pa-3"
-                :style="{ maxWidth: '70%' }"
+                :style="{ maxWidth: '72%' }"
+                :class="{ 'border border-error': turn.role === 'safety' }"
               >
-                <div class="d-flex align-center gap-x-2 mb-1">
+                <div class="d-flex align-center gap-x-2 mb-1 flex-wrap">
                   <VChip
                     size="x-small"
-                    :color="msg.role === 'student' ? 'primary' : 'secondary'"
+                    :color="turn.role === 'student' ? 'primary' : turn.role === 'safety' ? 'error' : 'secondary'"
                     label
                   >
-                    {{ msg.role }}
+                    {{ turn.role }}
                   </VChip>
+
                   <span class="text-caption text-medium-emphasis">
-                    {{ formatDate(msg.timestamp) }}
+                    {{ formatDate(turn.timestamp) }}
                   </span>
+
+                  <VChip
+                    v-if="turn.role !== 'student' && turn.role !== 'safety' && session.methodology"
+                    size="x-small"
+                    color="info"
+                    variant="text"
+                  >
+                    {{ session.methodology }}
+                  </VChip>
+
+                  <VChip
+                    v-if="turn.ragSourceCount > 0"
+                    size="x-small"
+                    color="success"
+                    variant="text"
+                    prepend-icon="tabler-database"
+                  >
+                    {{ turn.ragSourceCount }} source{{ turn.ragSourceCount !== 1 ? 's' : '' }}
+                  </VChip>
                 </div>
-                <div class="text-body-2">
-                  {{ msg.text }}
+
+                <div
+                  class="text-body-2"
+                  :class="{ 'text-error': turn.role === 'safety' }"
+                >
+                  {{ turn.messagePreview }}
                 </div>
               </VCard>
             </div>

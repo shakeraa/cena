@@ -4,6 +4,7 @@ import UserActivityChart from '@/views/admin/dashboard/UserActivityChart.vue'
 import ContentPipelineChart from '@/views/admin/dashboard/ContentPipelineChart.vue'
 import SystemAlerts from '@/views/admin/dashboard/SystemAlerts.vue'
 import RecentActivityTimeline from '@/views/admin/dashboard/RecentActivityTimeline.vue'
+import TutoringBudgetCard from '@/views/admin/dashboard/TutoringBudgetCard.vue'
 
 definePage({
   meta: {
@@ -14,8 +15,7 @@ definePage({
 
 const { data: overviewData, isFetching } = await useApi<any>('/admin/dashboard/overview')
 
-// SAI Feature Cards
-const aiSessionsToday = ref<number>(0)
+// SAI Feature Cards (corpus and experiments only; tutoring handled by TutoringBudgetCard)
 const corpusBlocks = ref<number>(0)
 const activeExperiments = ref<number>(0)
 const saiLoading = ref(true)
@@ -23,12 +23,10 @@ const saiLoading = ref(true)
 const fetchSaiStats = async () => {
   saiLoading.value = true
   try {
-    const [tutoring, corpus, experiments] = await Promise.all([
-      $api<any>('/admin/tutoring/analytics').catch(() => null),
+    const [corpus, experiments] = await Promise.all([
       $api<any>('/admin/embeddings/corpus-stats').catch(() => null),
       $api<any>('/admin/experiments').catch(() => null),
     ])
-    aiSessionsToday.value = tutoring?.sessionsToday ?? tutoring?.totalSessions ?? 0
     corpusBlocks.value = corpus?.totalBlocks ?? corpus?.blockCount ?? 0
     activeExperiments.value = Array.isArray(experiments) ? experiments.length : (experiments?.count ?? 0)
   }
@@ -190,34 +188,7 @@ const widgetData = computed(() => {
         cols="12"
         sm="4"
       >
-        <VCard :loading="saiLoading">
-          <VCardText>
-            <div class="d-flex justify-space-between align-center">
-              <div>
-                <div class="text-body-2 text-medium-emphasis mb-1">
-                  AI Activity
-                </div>
-                <h4 class="text-h4">
-                  {{ aiSessionsToday }}
-                </h4>
-                <div class="text-sm">
-                  Tutoring sessions today
-                </div>
-              </div>
-              <VAvatar
-                color="info"
-                variant="tonal"
-                rounded
-                size="42"
-              >
-                <VIcon
-                  icon="tabler-messages"
-                  size="26"
-                />
-              </VAvatar>
-            </div>
-          </VCardText>
-        </VCard>
+        <TutoringBudgetCard />
       </VCol>
       <VCol
         cols="12"

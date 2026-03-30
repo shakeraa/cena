@@ -4,24 +4,33 @@ import { $api } from '@/utils/api'
 definePage({ meta: { action: 'read', subject: 'Tutoring' } })
 
 interface TutoringSession {
+  id: string
   sessionId: string
   studentId: string
+  studentName: string
   status: string
+  methodology: string
   turnCount: number
   durationSeconds: number
+  tokensUsed: number
   startedAt: string
+  endedAt: string | null
 }
 
 interface SessionListResponse {
   items: TutoringSession[]
   totalCount: number
+  page: number
+  pageSize: number
 }
 
 interface TutoringAnalytics {
-  activeSessions: number
+  activeSessionCount: number
   avgTurnsPerSession: number
   resolutionRate: number
   sessionsToday: number
+  sessionsThisWeek: number
+  avgBudgetUsagePercent: number
 }
 
 const loading = ref(true)
@@ -29,16 +38,20 @@ const error = ref<string | null>(null)
 const sessions = ref<TutoringSession[]>([])
 const totalCount = ref(0)
 const analytics = ref<TutoringAnalytics>({
-  activeSessions: 0,
+  activeSessionCount: 0,
   avgTurnsPerSession: 0,
   resolutionRate: 0,
   sessionsToday: 0,
+  sessionsThisWeek: 0,
+  avgBudgetUsagePercent: 0,
 })
 
 const page = ref(1)
 const pageSize = ref(20)
 const studentSearch = ref('')
 const statusFilter = ref<string | null>(null)
+const dateFrom = ref('')
+const dateTo = ref('')
 const autoRefresh = ref(false)
 
 let refreshTimer: ReturnType<typeof setInterval> | null = null
@@ -50,6 +63,7 @@ const statusOptions = [
   { title: 'Active', value: 'active' },
   { title: 'Completed', value: 'completed' },
   { title: 'Budget Exhausted', value: 'budget_exhausted' },
+  { title: 'Safety Blocked', value: 'safety_blocked' },
   { title: 'Timeout', value: 'timeout' },
 ]
 
@@ -58,16 +72,19 @@ const statusColor = (status: string): string => {
     case 'active': return 'info'
     case 'completed': return 'success'
     case 'budget_exhausted': return 'warning'
+    case 'safety_blocked': return 'error'
     case 'timeout': return 'secondary'
     default: return 'default'
   }
 }
 
 const headers = [
-  { title: 'Student ID', key: 'studentId', sortable: true },
+  { title: 'Student', key: 'studentName', sortable: true },
   { title: 'Status', key: 'status', sortable: true },
+  { title: 'Methodology', key: 'methodology', sortable: false },
   { title: 'Turns', key: 'turnCount', sortable: true },
   { title: 'Duration', key: 'durationSeconds', sortable: true },
+  { title: 'Budget Used', key: 'tokensUsed', sortable: true },
   { title: 'Started At', key: 'startedAt', sortable: true },
 ]
 
@@ -101,6 +118,10 @@ const fetchSessions = async () => {
       params.set('studentId', studentSearch.value)
     if (statusFilter.value)
       params.set('status', statusFilter.value)
+    if (dateFrom.value)
+      params.set('from', dateFrom.value)
+    if (dateTo.value)
+      params.set('to', dateTo.value)
 
     const data = await $api<SessionListResponse>(`/admin/tutoring/sessions?${params}`)
 
@@ -118,10 +139,12 @@ const fetchAnalytics = async () => {
     const data = await $api<TutoringAnalytics>('/admin/tutoring/analytics')
 
     analytics.value = {
-      activeSessions: data.activeSessions ?? 0,
+      activeSessionCount: data.activeSessionCount ?? 0,
       avgTurnsPerSession: data.avgTurnsPerSession ?? 0,
       resolutionRate: data.resolutionRate ?? 0,
       sessionsToday: data.sessionsToday ?? 0,
+      sessionsThisWeek: data.sessionsThisWeek ?? 0,
+      avgBudgetUsagePercent: data.avgBudgetUsagePercent ?? 0,
     }
   }
   catch (err: any) {
@@ -142,7 +165,7 @@ const onPageUpdate = async (options: { page: number; itemsPerPage: number }) => 
 }
 
 const onRowClick = (_event: Event, row: { item: TutoringSession }) => {
-  router.push({ name: 'apps-tutoring-sessions-id', params: { id: row.item.sessionId } })
+  router.push({ name: 'apps-tutoring-sessions-id', params: { id: row.item.sessionId || row.item.id } })
 }
 
 watch(autoRefresh, val => {
@@ -154,7 +177,7 @@ watch(autoRefresh, val => {
     refreshTimer = setInterval(fetchAll, 30000)
 })
 
-watch([studentSearch, statusFilter], () => {
+watch([studentSearch, statusFilter, dateFrom, dateTo], () => {
   page.value = 1
   fetchSessions()
 })
@@ -169,7 +192,7 @@ onUnmounted(() => {
 })
 
 const statCards = computed(() => [
-  { title: 'Active Sessions', value: analytics.value.activeSessions, icon: 'tabler-player-play', color: 'info' },
+  { title: 'Active Sessions', value: analytics.value.activeSessionCount, icon: 'tabler-player-play', color: 'info' },
   { title: 'Avg Turns/Session', value: analytics.value.avgTurnsPerSession.toFixed(1), icon: 'tabler-arrows-exchange', color: 'primary' },
   { title: 'Resolution Rate', value: `${(analytics.value.resolutionRate * 100).toFixed(1)}%`, icon: 'tabler-target', color: 'success' },
   { title: 'Sessions Today', value: analytics.value.sessionsToday, icon: 'tabler-calendar-event', color: 'warning' },
@@ -246,7 +269,7 @@ const statCards = computed(() => [
         <VRow>
           <VCol
             cols="12"
-            md="6"
+            md="4"
           >
             <VTextField
               v-model="studentSearch"
@@ -258,12 +281,36 @@ const statCards = computed(() => [
           </VCol>
           <VCol
             cols="12"
-            md="6"
+            md="2"
           >
             <VSelect
               v-model="statusFilter"
               :items="statusOptions"
               label="Status"
+              density="compact"
+              clearable
+            />
+          </VCol>
+          <VCol
+            cols="12"
+            md="3"
+          >
+            <VTextField
+              v-model="dateFrom"
+              label="From Date"
+              type="date"
+              density="compact"
+              clearable
+            />
+          </VCol>
+          <VCol
+            cols="12"
+            md="3"
+          >
+            <VTextField
+              v-model="dateTo"
+              label="To Date"
+              type="date"
               density="compact"
               clearable
             />
@@ -292,18 +339,38 @@ const statCards = computed(() => [
           @update:options="onPageUpdate"
           @click:row="onRowClick"
         >
+          <template #item.studentName="{ item }">
+            <div class="font-weight-medium">
+              {{ item.studentName || item.studentId }}
+            </div>
+            <div
+              v-if="item.studentName && item.studentName !== item.studentId"
+              class="text-caption text-medium-emphasis"
+            >
+              {{ item.studentId }}
+            </div>
+          </template>
+
           <template #item.status="{ item }">
             <VChip
               :color="statusColor(item.status)"
               label
               size="small"
             >
-              {{ item.status.replace('_', ' ') }}
+              {{ item.status.replace(/_/g, ' ') }}
             </VChip>
+          </template>
+
+          <template #item.methodology="{ item }">
+            <span class="text-body-2">{{ item.methodology || '-' }}</span>
           </template>
 
           <template #item.durationSeconds="{ item }">
             {{ formatDuration(item.durationSeconds) }}
+          </template>
+
+          <template #item.tokensUsed="{ item }">
+            {{ item.tokensUsed > 0 ? item.tokensUsed.toLocaleString() : '-' }}
           </template>
 
           <template #item.startedAt="{ item }">

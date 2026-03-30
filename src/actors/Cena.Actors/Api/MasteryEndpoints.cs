@@ -5,6 +5,7 @@
 
 using Cena.Actors.Mastery;
 using Cena.Actors.Students;
+using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -31,6 +32,7 @@ public static class MasteryEndpoints
         // GET /api/v1/mastery/{studentId}?subject=math
         group.MapGet("/{studentId}", async (string studentId, string? subject, HttpContext ctx) =>
         {
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
             var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
             var graphCache = ctx.RequestServices.GetService<IConceptGraphCache>();
             var overlay = await GetMasteryOverlay(actorSystem, studentId);
@@ -47,6 +49,7 @@ public static class MasteryEndpoints
         // GET /api/v1/mastery/{studentId}/topics/{topicClusterId}
         group.MapGet("/{studentId}/topics/{topicClusterId}", async (string studentId, string topicClusterId, HttpContext ctx) =>
         {
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
             var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
             var graphCache = ctx.RequestServices.GetRequiredService<IConceptGraphCache>();
             var overlay = await GetMasteryOverlay(actorSystem, studentId);
@@ -63,6 +66,7 @@ public static class MasteryEndpoints
         // GET /api/v1/mastery/{studentId}/frontier?maxResults=10
         group.MapGet("/{studentId}/frontier", async (string studentId, int? maxResults, HttpContext ctx) =>
         {
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
             var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
             var graphCache = ctx.RequestServices.GetRequiredService<IConceptGraphCache>();
             var overlay = await GetMasteryOverlay(actorSystem, studentId);
@@ -79,6 +83,7 @@ public static class MasteryEndpoints
         // GET /api/v1/mastery/{studentId}/decay-alerts
         group.MapGet("/{studentId}/decay-alerts", async (string studentId, HttpContext ctx) =>
         {
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
             var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
             var graphCache = ctx.RequestServices.GetRequiredService<IConceptGraphCache>();
             var overlay = await GetMasteryOverlay(actorSystem, studentId);
@@ -95,6 +100,7 @@ public static class MasteryEndpoints
         // GET /api/v1/mastery/{studentId}/methodology-profile
         group.MapGet("/{studentId}/methodology-profile", async (string studentId, HttpContext ctx) =>
         {
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
             var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
             var result = await QueryStudentActor<GetMethodologyProfile, ActorResult<MethodologyProfileResponse>>(
                 actorSystem, studentId, new GetMethodologyProfile(studentId));
@@ -113,6 +119,9 @@ public static class MasteryEndpoints
             MethodologyOverrideRequest body,
             HttpContext ctx) =>
         {
+            // Only ADMIN/MODERATOR/SUPER_ADMIN may override another student's methodology.
+            // Students may not override their own methodology (teacher intent).
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
             var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
             var teacherId = ctx.User.FindFirst("sub")?.Value ?? "unknown";
 
@@ -133,6 +142,7 @@ public static class MasteryEndpoints
         // GET /api/v1/mastery/{studentId}/review-schedule?maxItems=10
         group.MapGet("/{studentId}/review-schedule", async (string studentId, int? maxItems, HttpContext ctx) =>
         {
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
             var actorSystem = ctx.RequestServices.GetRequiredService<ActorSystem>();
             var result = await QueryStudentActor<GetReviewSchedule, ActorResult<IReadOnlyList<ReviewItem>>>(
                 actorSystem, studentId, new GetReviewSchedule(studentId, maxItems ?? 10));

@@ -14,6 +14,8 @@ using Cena.Actors.Configuration;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
+using Cena.Infrastructure.Correlation;
+using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
@@ -22,7 +24,6 @@ using Cena.Actors.Students;
 using Cena.Actors.Sync;
 using Cena.Actors.Tutoring;
 using Marten;
-using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using NATS.Client.Core;
@@ -366,6 +367,12 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// ---- ERR-001.4: Correlation ID middleware (first — sets CorrelationContext for all downstream) ----
+app.UseMiddleware<CorrelationIdMiddleware>();
+
+// ---- ERR-001.2: Global exception handler (structured CenaError JSON, no stack trace leaks) ----
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
 // ---- REV-004: Security response headers ----
 app.Use(async (context, next) =>
 {
@@ -489,27 +496,6 @@ app.UseAuthorization();
 
 // ---- REV-013: FERPA audit middleware (logs every student data endpoint access) ----
 app.UseMiddleware<StudentDataAuditMiddleware>();
-
-// ---- REV-016.3: Global exception handler (structured JSON, no stack trace leaks) ----
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.ContentType = "application/json";
-        var error = context.Features.Get<IExceptionHandlerFeature>();
-        var (statusCode, message) = error?.Error switch
-        {
-            BadHttpRequestException e => (400, e.Message),
-            UnauthorizedAccessException => (401, "Unauthorized"),
-            KeyNotFoundException => (404, "Resource not found"),
-            _ => (500, app.Environment.IsDevelopment()
-                ? error?.Error?.Message ?? "Internal server error"
-                : "Internal server error")
-        };
-        context.Response.StatusCode = statusCode;
-        await context.Response.WriteAsJsonAsync(new { error = message, status = statusCode });
-    });
-});
 
 // ---- Mastery REST API endpoints (MST-017) ----
 app.MapMasteryEndpoints();
