@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Cena.Actors.Configuration;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
+using Cena.Api.Host.Endpoints;
 using Cena.Api.Host.Hubs;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
@@ -233,6 +234,10 @@ app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "cena
 
 // ---- Admin REST API endpoints (ADM-004 through ADM-023, REV-016.2) ----
 app.MapCenaAdminEndpoints();
+
+// ---- Session Lifecycle REST endpoints (SES-002) ----
+app.MapSessionEndpoints();
+app.MapStudentAnalyticsEndpoints();
 
 // ---- SignalR Hub (SES-001) ----
 app.MapCenaHub();

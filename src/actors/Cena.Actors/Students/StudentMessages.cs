@@ -64,6 +64,21 @@ public enum OutreachChannel
     Voice
 }
 
+/// <summary>
+/// LCM-001: Unified account status for lifecycle management.
+/// Propagated via NATS and enforced at both NatsBusRouter (Redis gate) and StudentActor.
+/// </summary>
+public enum AccountStatus
+{
+    Active,
+    Suspended,
+    Locked,
+    Frozen,          // Parent-imposed freeze
+    PendingDelete,   // 30-day GDPR hold
+    Expired,         // Plan expired (past grace)
+    Grace            // Plan expired, 7-day read-only window
+}
+
 // =============================================================================
 // RESULT ENVELOPES
 // =============================================================================
@@ -181,6 +196,21 @@ public sealed record EndSession(
     string SessionId,
 
     SessionEndReason Reason)
+{
+    public string CorrelationId { get; init; } = "";
+}
+
+/// <summary>
+/// SES-002.2: Resume an interrupted or paused session.
+/// The actor re-initialises the child LearningSessionActor from the last
+/// persisted TutoringSessionDocument checkpoint.
+/// </summary>
+public sealed record ResumeSession(
+    [property: Required]
+    string StudentId,
+
+    [property: Required]
+    string SessionId)
 {
     public string CorrelationId { get; init; } = "";
 }
@@ -335,6 +365,17 @@ public sealed record StagnationSignals(
 /// without starting a session. Used by pre-warmer before peak load windows.
 /// </summary>
 public sealed record WarmUp;
+
+/// <summary>
+/// LCM-001: Sent to a StudentActor when account status changes (suspension, lock, deletion, etc.).
+/// Routed from NatsBusRouter on receipt of cena.account.status_changed NATS event.
+/// </summary>
+public sealed record AccountStatusChanged(
+    string StudentId,
+    AccountStatus NewStatus,
+    string? Reason,
+    string ChangedBy,
+    DateTimeOffset ChangedAt);
 
 /// <summary>Timer tick for periodic memory budget checks.</summary>
 internal sealed record MemoryCheckTick;

@@ -182,14 +182,18 @@ public sealed partial class StudentActor : IActor
             // ---- Pre-warm (no-op after activation) ----
             WarmUp               => HandleWarmUp(context),
 
-            // ---- Commands ----
-            AttemptConcept cmd   => HandleAttemptConcept(context, cmd),
-            StartSession cmd     => HandleStartSession(context, cmd),
-            EndSession cmd       => HandleEndSession(context, cmd),
-            SwitchMethodology cmd=> HandleSwitchMethodology(context, cmd),
-            AddAnnotation cmd    => HandleAddAnnotation(context, cmd),
-            SyncOfflineEvents cmd=> HandleSyncOfflineEvents(context, cmd),
-            TeacherMethodologyOverride cmd => HandleTeacherMethodologyOverride(context, cmd),
+            // ---- Account Lifecycle (LCM-001) ----
+            AccountStatusChanged cmd => HandleAccountStatusChanged(context, cmd),
+
+            // ---- Commands (guarded by account status check) ----
+            AttemptConcept cmd   => GuardAccountStatus(context) ?? HandleAttemptConcept(context, cmd),
+            StartSession cmd     => GuardAccountStatus(context) ?? HandleStartSession(context, cmd),
+            EndSession cmd       => HandleEndSession(context, cmd), // Always allow session end
+            ResumeSession cmd    => GuardAccountStatus(context) ?? HandleResumeSession(context, cmd),
+            SwitchMethodology cmd=> GuardAccountStatus(context) ?? HandleSwitchMethodology(context, cmd),
+            AddAnnotation cmd    => GuardAccountStatus(context) ?? HandleAddAnnotation(context, cmd),
+            SyncOfflineEvents cmd=> GuardAccountStatus(context) ?? HandleSyncOfflineEvents(context, cmd),
+            TeacherMethodologyOverride cmd => HandleTeacherMethodologyOverride(context, cmd), // Admin always allowed
 
             // ---- Queries ----
             GetStudentProfile q  => HandleGetProfile(context, q),
@@ -318,6 +322,74 @@ public sealed partial class StudentActor : IActor
         return Task.CompletedTask;
     }
 
+    // =========================================================================
+    // LCM-001: ACCOUNT LIFECYCLE
+    // =========================================================================
+
+    /// <summary>
+    /// Guards commands against non-active account status. Returns a completed Task
+    /// with an error response if blocked, or null to allow the command through.
+    /// Used with null-coalescing: GuardAccountStatus(ctx) ?? HandleCommand(ctx, cmd)
+    /// </summary>
+    private Task? GuardAccountStatus(IContext context)
+    {
+        if (_state.AccountStatus == AccountStatus.Active)
+            return null; // Allow through
+
+        _logger.LogWarning(
+            "Command rejected for student {StudentId}: account status is {Status}",
+            _studentId, _state.AccountStatus);
+
+        context.Respond(new ActorResult(false,
+            ErrorCode: "ACCOUNT_BLOCKED",
+            ErrorMessage: $"Account is {_state.AccountStatus}"));
+        return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Handles account status changes (suspension, lock, freeze, deletion).
+    /// Updates in-memory state, ends active session if needed, passivates on deletion.
+    /// </summary>
+    private async Task HandleAccountStatusChanged(IContext context, AccountStatusChanged cmd)
+    {
+        var previousStatus = _state.AccountStatus;
+        _state.AccountStatus = cmd.NewStatus;
+
+        _logger.LogInformation(
+            "StudentActor {StudentId}: account status {PreviousStatus} → {NewStatus} (by {ChangedBy}: {Reason})",
+            _studentId, previousStatus, cmd.NewStatus, cmd.ChangedBy, cmd.Reason ?? "no reason");
+
+        // Persist the status change event
+        StageEvent(new AccountStatusChanged_V1(
+            _studentId, cmd.NewStatus.ToString(), cmd.Reason, cmd.ChangedBy, cmd.ChangedAt));
+        await FlushEvents();
+
+        // End active session for blocking statuses
+        if (cmd.NewStatus is AccountStatus.Suspended or AccountStatus.Locked
+            or AccountStatus.Frozen or AccountStatus.PendingDelete)
+        {
+            if (_sessionActor != null)
+            {
+                _logger.LogInformation(
+                    "Ending active session for student {StudentId} due to account {Status}",
+                    _studentId, cmd.NewStatus);
+                await context.StopAsync(_sessionActor);
+                _sessionActor = null;
+                _state.ActiveSessionId = null;
+            }
+        }
+
+        // Passivate on pending deletion — actor should not remain in memory
+        if (cmd.NewStatus == AccountStatus.PendingDelete)
+        {
+            context.Respond(new ActorResult(true));
+            context.Poison(context.Self);
+            return;
+        }
+
+        context.Respond(new ActorResult(true));
+    }
+
     private Task OnPassivation(IContext context)
     {
         _logger.LogInformation(
@@ -412,6 +484,10 @@ public sealed partial class StudentActor : IActor
                     FirstEncounter = lastInteraction
                 };
             }
+
+            // LCM-001: Restore account status from snapshot
+            if (Enum.TryParse<AccountStatus>(snapshot.AccountStatus, true, out var acctStatus))
+                _state.AccountStatus = acctStatus;
 
             // Restore hierarchical methodology maps
             foreach (var (key, assignment) in snapshot.SubjectMethodologyMap)

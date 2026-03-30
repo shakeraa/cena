@@ -129,6 +129,7 @@ public sealed class LearningSessionActor : IActor
         return context.Message switch
         {
             InitSession init => HandleInit(context, init),
+            ResumeSessionRequest req => HandleResumeSession(context, req),
             EvaluateAnswerRequest req => HandleEvaluateAnswer(context, req),
             RequestNextQuestion req => HandleNextQuestion(context, req),
             RequestHintMessage req => HandleHint(context, req),
@@ -621,6 +622,38 @@ public sealed class LearningSessionActor : IActor
         return Task.CompletedTask;
     }
 
+    // ── Resume Session ──
+    // SES-002.2: Restore actor state from the last checkpoint persisted in the
+    // TutoringSessionDocument / StudentProfileSnapshot. Because the actor is being
+    // re-initialised after an interruption, we rebuild running counters from the
+    // Marten document that was already loaded by the parent StudentActor, so we
+    // only need the fields that arrived in the ResumeSessionRequest.
+    private Task HandleResumeSession(IContext context, ResumeSessionRequest req)
+    {
+        _sessionId  = req.SessionId;
+        _studentId  = req.StudentId;
+        _subject    = req.Subject;
+        _methodology = req.Methodology;
+        _startedAt  = req.OriginalStartedAt;
+        _questionsAttempted = req.QuestionsAttempted;
+        _questionsCorrect   = req.QuestionsCorrect;
+        _fatigueScore       = req.FatigueScoreAtCheckpoint;
+
+        _logger.LogInformation(
+            "Session {SessionId} resumed for {StudentId}, questions so far={Questions}, fatigue={Fatigue:F2}",
+            _sessionId, _studentId, _questionsAttempted, _fatigueScore);
+
+        context.Respond(new ResumeSessionResponse(
+            SessionId: _sessionId,
+            Subject: _subject,
+            Methodology: _methodology,
+            QuestionsAttempted: _questionsAttempted,
+            FatigueScore: _fatigueScore,
+            ResumedAt: DateTimeOffset.UtcNow));
+
+        return Task.CompletedTask;
+    }
+
     // ── End Session ──
     private Task HandleEndSession(IContext context)
     {
@@ -699,6 +732,27 @@ public record HintResponse(int HintLevel, bool Delivered, string? HintText = nul
     bool HasMoreHints = false, string? SuppressedReason = null);
 public record SkipQuestionMessage(string ConceptId, string QuestionId, int TimeSpentMs);
 public record EndSessionRequest;
+
+// SES-002.2: Resume an interrupted or paused session.
+// The parent StudentActor loads these values from the last persisted
+// TutoringSessionDocument snapshot before forwarding this message.
+public record ResumeSessionRequest(
+    string SessionId,
+    string StudentId,
+    string Subject,
+    string Methodology,
+    DateTimeOffset OriginalStartedAt,
+    int QuestionsAttempted,
+    int QuestionsCorrect,
+    double FatigueScoreAtCheckpoint);
+
+public record ResumeSessionResponse(
+    string SessionId,
+    string Subject,
+    string Methodology,
+    int QuestionsAttempted,
+    double FatigueScore,
+    DateTimeOffset ResumedAt);
 
 // ── SAI-003: Personalized Explanation Messages ──
 

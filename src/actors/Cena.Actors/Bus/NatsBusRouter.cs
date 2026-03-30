@@ -7,6 +7,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Cena.Actors.Infrastructure;
+using Cena.Actors.Sessions;
 using Cena.Actors.Students;
 using Marten;
 using Microsoft.Extensions.Hosting;
@@ -14,6 +15,7 @@ using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 using Proto;
 using Proto.Cluster;
+using StackExchange.Redis;
 
 namespace Cena.Actors.Bus;
 
@@ -27,6 +29,7 @@ public sealed class NatsBusRouter : BackgroundService
     private readonly INatsConnection _nats;
     private readonly ActorSystem _actorSystem;
     private readonly IDocumentStore _documentStore;
+    private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<NatsBusRouter> _logger;
     private readonly JsonSerializerOptions _jsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
@@ -47,6 +50,7 @@ public sealed class NatsBusRouter : BackgroundService
     private long _errorsCount;
     private long _retriesAttempted;
     private long _deadLettered;
+    private long _accountBlocked; // LCM-001: commands rejected by Redis status gate
     private readonly ConcurrentDictionary<string, ActorLiveStats> _actorStats = new();
     private readonly ConcurrentDictionary<string, long> _errorsByCategory = new();
     private readonly ConcurrentQueue<ErrorEntry> _recentErrors = new();
@@ -75,11 +79,13 @@ public sealed class NatsBusRouter : BackgroundService
         INatsConnection nats,
         ActorSystem actorSystem,
         IDocumentStore documentStore,
+        IConnectionMultiplexer redis,
         ILogger<NatsBusRouter> logger)
     {
         _nats = nats;
         _actorSystem = actorSystem;
         _documentStore = documentStore;
+        _redis = redis;
         _logger = logger;
     }
 
@@ -89,6 +95,7 @@ public sealed class NatsBusRouter : BackgroundService
     public long ErrorsCount => Interlocked.Read(ref _errorsCount);
     public long RetriesAttempted => Interlocked.Read(ref _retriesAttempted);
     public long DeadLettered => Interlocked.Read(ref _deadLettered);
+    public long AccountBlocked => Interlocked.Read(ref _accountBlocked);
     public IReadOnlyDictionary<string, ActorLiveStats> ActiveActors => _actorStats;
     public IReadOnlyDictionary<string, long> ErrorsByCategory => _errorsByCategory;
     public IReadOnlyList<ErrorEntry> RecentErrors => _recentErrors
@@ -116,13 +123,15 @@ public sealed class NatsBusRouter : BackgroundService
         {
             SubscribeAndRoute<BusStartSession>(NatsSubjects.SessionStart, HandleStartSession, stoppingToken),
             SubscribeAndRoute<BusEndSession>(NatsSubjects.SessionEnd, HandleEndSession, stoppingToken),
+            SubscribeAndRoute<BusResumeSession>(NatsSubjects.SessionResume, HandleResumeSession, stoppingToken),
             SubscribeAndRoute<BusConceptAttempt>(NatsSubjects.ConceptAttempt, HandleConceptAttempt, stoppingToken),
             SubscribeAndRoute<BusMethodologySwitch>(NatsSubjects.MethodologySwitch, HandleMethodologySwitch, stoppingToken),
             SubscribeAndRoute<BusAddAnnotation>(NatsSubjects.Annotation, HandleAnnotation, stoppingToken),
+            SubscribeAccountStatusChanges(stoppingToken),
             LogStats(stoppingToken)
         };
 
-        _logger.LogInformation("NatsBusRouter ready — listening on 5 command subjects");
+        _logger.LogInformation("NatsBusRouter ready — listening on 6 command subjects + account status");
 
         await Task.WhenAll(tasks);
     }
@@ -270,6 +279,85 @@ public sealed class NatsBusRouter : BackgroundService
         }
     }
 
+    // ── LCM-001: Account Status Gate ──
+
+    /// <summary>
+    /// Checks Redis for account status before routing a command.
+    /// Returns true if the student is blocked (suspended, locked, frozen, pending_delete).
+    /// Redis miss = assume active (fail-open at gate; actor is the backstop).
+    /// </summary>
+    private async Task<bool> IsAccountBlocked(string studentId)
+    {
+        try
+        {
+            var db = _redis.GetDatabase();
+            var status = await db.StringGetAsync($"account_status:{studentId}");
+            if (status.IsNullOrEmpty) return false;
+
+            var statusStr = status.ToString();
+            return statusStr is "suspended" or "locked" or "frozen" or "pending_delete";
+        }
+        catch (Exception ex)
+        {
+            // Redis failure = fail-open at gate layer (actor is the backstop)
+            _logger.LogWarning(ex, "Redis status gate check failed for {StudentId}, allowing through", studentId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Subscribes to account status change events and forwards to the affected StudentActor.
+    /// This ensures warm actors receive status updates even though the Redis gate catches new commands.
+    /// </summary>
+    private async Task SubscribeAccountStatusChanges(CancellationToken ct)
+    {
+        try
+        {
+            await foreach (var msg in _nats.SubscribeAsync<byte[]>(NatsSubjects.AccountStatusChanged, cancellationToken: ct))
+            {
+                try
+                {
+                    var rawData = msg.Data;
+                    if (rawData is null || rawData.Length == 0) continue;
+
+                    var envelope = JsonSerializer.Deserialize<BusEnvelope<BusAccountStatusChanged>>(rawData, _jsonOpts);
+                    if (envelope?.Payload is not { } payload) continue;
+
+                    if (!Enum.TryParse<AccountStatus>(payload.NewStatus, true, out var status))
+                    {
+                        _logger.LogWarning("Unknown account status: {Status}", payload.NewStatus);
+                        continue;
+                    }
+
+                    // Forward to the StudentActor so it can update in-memory state
+                    var actorMsg = new AccountStatusChanged(
+                        payload.StudentId, status, payload.Reason, payload.ChangedBy, payload.ChangedAt);
+
+                    try
+                    {
+                        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                        cts.CancelAfter(TimeSpan.FromSeconds(10));
+                        await _actorSystem.Cluster()
+                            .RequestAsync<ActorResult>(payload.StudentId, "student", actorMsg, cts.Token);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Non-fatal: actor may not be active (which is fine — Redis gate handles it)
+                        _logger.LogDebug(ex, "Could not deliver AccountStatusChanged to actor {StudentId}", payload.StudentId);
+                    }
+
+                    _logger.LogInformation("Account status changed: {StudentId} → {Status} by {ChangedBy}",
+                        payload.StudentId, payload.NewStatus, payload.ChangedBy);
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deserialize account status change event");
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
     // ── Command Handlers — route to Proto.Actor virtual actors ──
 
     /// <summary>
@@ -298,6 +386,15 @@ public sealed class NatsBusRouter : BackgroundService
     private async Task HandleStartSession(BusEnvelope<BusStartSession> env, CancellationToken ct)
     {
         var p = env.Payload;
+
+        // LCM-001: Redis status gate — reject commands for blocked accounts
+        if (await IsAccountBlocked(p.StudentId))
+        {
+            Interlocked.Increment(ref _accountBlocked);
+            RecordError("account_blocked", NatsSubjects.SessionStart, "Account is not active", p.StudentId);
+            return;
+        }
+
         var cmd = new StartSession(
             p.StudentId, p.SubjectId, p.ConceptId,
             p.DeviceType, p.AppVersion, p.ClientTimestamp, IsOffline: false,
@@ -353,9 +450,41 @@ public sealed class NatsBusRouter : BackgroundService
                 0, 0, TimeSpan.Zero, DateTimeOffset.UtcNow));
     }
 
+    private async Task HandleResumeSession(BusEnvelope<BusResumeSession> env, CancellationToken ct)
+    {
+        var p = env.Payload;
+        var cmd = new ResumeSession(p.StudentId, p.SessionId);
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(GetAdaptiveTimeout());
+        var result = await _actorSystem.Cluster()
+            .RequestAsync<ActorResult<ResumeSessionResponse>>(p.StudentId, "student", cmd, cts.Token);
+
+        if (result?.Success == true)
+        {
+            _actorStats.AddOrUpdate(p.StudentId,
+                new ActorLiveStats { StudentId = p.StudentId, SessionId = p.SessionId, MessagesProcessed = 1 },
+                (_, s) => { s.SessionId = p.SessionId; s.MessagesProcessed++; s.LastActivity = DateTimeOffset.UtcNow; s.Status = "active"; return s; });
+            _logger.LogInformation("ResumeSession succeeded for {StudentId}, session {SessionId}", p.StudentId, p.SessionId);
+        }
+        else
+        {
+            _logger.LogWarning("ResumeSession failed for {StudentId}/{SessionId}: {Error}", p.StudentId, p.SessionId, result?.ErrorMessage ?? "null response");
+        }
+    }
+
     private async Task HandleConceptAttempt(BusEnvelope<BusConceptAttempt> env, CancellationToken ct)
     {
         var p = env.Payload;
+
+        // LCM-001: Redis status gate
+        if (await IsAccountBlocked(p.StudentId))
+        {
+            Interlocked.Increment(ref _accountBlocked);
+            RecordError("account_blocked", NatsSubjects.ConceptAttempt, "Account is not active", p.StudentId);
+            return;
+        }
+
         var qType = Enum.TryParse<QuestionType>(p.QuestionType, true, out var qt)
             ? qt : QuestionType.MultipleChoice;
 

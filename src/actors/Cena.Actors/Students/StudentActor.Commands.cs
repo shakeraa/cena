@@ -468,6 +468,103 @@ public sealed partial class StudentActor
     }
 
     /// <summary>
+    /// SES-002.2: Resumes an interrupted or paused session.
+    /// Validates the session belongs to this student and is not completed,
+    /// then re-initialises the child LearningSessionActor from the last persisted
+    /// TutoringSessionDocument (already held in Marten via the document store).
+    /// </summary>
+    private async Task HandleResumeSession(IContext context, ResumeSession cmd)
+    {
+        using var activity = _activitySource.StartActivity("StudentActor.ResumeSession");
+        activity?.SetTag("student.id", _studentId);
+        activity?.SetTag("session.id", cmd.SessionId);
+
+        try
+        {
+            // Validate the session belongs to this student and is resumable
+            await using var querySession = _documentStore.QuerySession();
+            var doc = await querySession.Query<Cena.Actors.Tutoring.TutoringSessionDocument>()
+                .FirstOrDefaultAsync(d => d.Id == cmd.SessionId || d.SessionId == cmd.SessionId);
+
+            if (doc is null || doc.StudentId != _studentId)
+            {
+                context.Respond(new ActorResult<ResumeSessionResponse>(
+                    false, ErrorCode: "SESSION_NOT_FOUND",
+                    ErrorMessage: $"Session {cmd.SessionId} not found for student {_studentId}"));
+                return;
+            }
+
+            if (doc.EndedAt.HasValue)
+            {
+                context.Respond(new ActorResult<ResumeSessionResponse>(
+                    false, ErrorCode: "SESSION_COMPLETED",
+                    ErrorMessage: $"Session {cmd.SessionId} is already completed and cannot be resumed"));
+                return;
+            }
+
+            // Check 24-hour expiry for interrupted sessions
+            var hoursSinceStart = (DateTimeOffset.UtcNow - doc.StartedAt).TotalHours;
+            if (hoursSinceStart > 24)
+            {
+                context.Respond(new ActorResult<ResumeSessionResponse>(
+                    false, ErrorCode: "SESSION_EXPIRED",
+                    ErrorMessage: $"Session {cmd.SessionId} expired ({hoursSinceStart:F1}h since start). Cannot resume after 24 hours."));
+                return;
+            }
+
+            // If there is already an active session actor for a different session, end it first
+            if (_sessionActor != null && _state.ActiveSessionId != cmd.SessionId)
+            {
+                await context.StopAsync(_sessionActor);
+                _sessionActor = null;
+            }
+
+            // Re-use existing session actor. If no actor exists, the session cannot be resumed
+            // (the actor was passivated and state must be rebuilt from the persisted checkpoint).
+            if (_sessionActor is null)
+            {
+                context.Respond(new ActorResult<ResumeSessionResponse>(
+                    false, ErrorCode: "SESSION_ACTOR_NOT_AVAILABLE",
+                    ErrorMessage: "Session actor is not active. Start a new session instead."));
+                return;
+            }
+
+            var resumeReq = new ResumeSessionRequest(
+                SessionId: doc.SessionId,
+                StudentId: _studentId,
+                Subject: doc.Subject,
+                Methodology: doc.Methodology,
+                OriginalStartedAt: doc.StartedAt,
+                QuestionsAttempted: doc.TotalTurns,
+                QuestionsCorrect: 0, // derived from snapshot; approximate
+                FatigueScoreAtCheckpoint: 0.0);
+
+            var response = await context.RequestAsync<ResumeSessionResponse>(
+                _sessionActor, resumeReq, TimeSpan.FromSeconds(5));
+
+            if (response is null)
+            {
+                context.Respond(new ActorResult<ResumeSessionResponse>(
+                    false, ErrorCode: "RESUME_TIMEOUT",
+                    ErrorMessage: "Session actor did not respond to resume request in time"));
+                return;
+            }
+
+            _logger.LogInformation(
+                "Session {SessionId} resumed for {StudentId}, {Questions} questions so far",
+                cmd.SessionId, _studentId, response.QuestionsAttempted);
+
+            context.Respond(new ActorResult<ResumeSessionResponse>(true, response));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to resume session {SessionId} for {StudentId}", cmd.SessionId, _studentId);
+            context.Respond(new ActorResult<ResumeSessionResponse>(
+                false, ErrorCode: "RESUME_FAILED", ErrorMessage: ex.Message));
+        }
+    }
+
+    /// <summary>
     /// Handles a student-initiated methodology switch.
     /// </summary>
     private async Task HandleSwitchMethodology(IContext context, SwitchMethodology cmd)

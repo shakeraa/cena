@@ -65,6 +65,19 @@ public sealed record BusAddAnnotation(
     string Text,
     string Kind);   // "note", "question", "confusion", "insight"
 
+public sealed record BusResumeSession(
+    string StudentId,
+    string SessionId);
+
+// ── Account Lifecycle (LCM-001) ──
+
+public sealed record BusAccountStatusChanged(
+    string StudentId,
+    string NewStatus,      // "suspended", "active", "locked", "frozen", "pending_delete", "expired", "grace"
+    string? Reason,
+    string ChangedBy,      // UID of admin/parent/system who triggered the change
+    DateTimeOffset ChangedAt);
+
 // ── Event payloads (published on cena.events.*) ──
 
 public sealed record BusConceptAttemptedEvent(

@@ -14,6 +14,7 @@ public static class NatsSubjects
     // ── Commands (Emulator/Client → Actor Host) ──
     public const string SessionStart  = "cena.session.start";     // → StartSession
     public const string SessionEnd    = "cena.session.end";       // → EndSession
+    public const string SessionResume = "cena.session.resume";    // → ResumeSession
     public const string ConceptAttempt = "cena.mastery.attempt";  // → AttemptConcept
     public const string MethodologySwitch = "cena.mastery.switch"; // → SwitchMethodology
     public const string Annotation       = "cena.session.annotate"; // → AddAnnotation
@@ -57,6 +58,9 @@ public static class NatsSubjects
     /// Used by admin SSE bridge (ADM-026).
     /// </summary>
     public const string AllPerStudentEvents = "cena.events.student.>";
+
+    // ── Account Lifecycle (LCM-001: Admin API → Actor Host) ──
+    public const string AccountStatusChanged = "cena.account.status_changed";
 
     // ── Actor Pre-warm (Admin API → Actor Host) ──
     public const string WarmUpRequest = "cena.actors.warmup";
