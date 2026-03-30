@@ -1,0 +1,87 @@
+{
+  "@@locale": "he",
+  "appTitle": "סנה",
+  "@appTitle": {
+    "description": "The application title"
+  },
+  "greeting": "שלום",
+  "@greeting": {
+    "description": "Generic greeting"
+  },
+  "goodMorning": "בוקר טוב",
+  "@goodMorning": {
+    "description": "Morning greeting"
+  },
+  "goodAfternoon": "צהריים טובים",
+  "@goodAfternoon": {
+    "description": "Afternoon greeting"
+  },
+  "goodEvening": "ערב טוב",
+  "@goodEvening": {
+    "description": "Evening greeting"
+  },
+  "startSession": "התחל שיעור",
+  "@startSession": {
+    "description": "Start session button label"
+  },
+  "home": "בית",
+  "@home": {
+    "description": "Home tab label"
+  },
+  "sessions": "שיעורים",
+  "@sessions": {
+    "description": "Sessions tab label"
+  },
+  "progress": "התקדמות",
+  "@progress": {
+    "description": "Progress tab label"
+  },
+  "settings": "הגדרות",
+  "@settings": {
+    "description": "Settings tab label"
+  },
+  "login": "כניסה",
+  "@login": {
+    "description": "Login button label"
+  },
+  "phoneNumber": "מספר טלפון",
+  "@phoneNumber": {
+    "description": "Phone number input label"
+  },
+  "sendCode": "שלח קוד",
+  "@sendCode": {
+    "description": "Send verification code button"
+  },
+  "verificationCode": "קוד אימות",
+  "@verificationCode": {
+    "description": "Verification code input label"
+  },
+  "verify": "אמת",
+  "@verify": {
+    "description": "Verify button label"
+  },
+  "studyEnergy": "אנרגיית למידה",
+  "@studyEnergy": {
+    "description": "LLM budget label shown to students"
+  },
+  "math": "מתמטיקה",
+  "@math": {
+    "description": "Mathematics subject name"
+  },
+  "physics": "פיזיקה",
+  "@physics": {
+    "description": "Physics subject name"
+  },
+  "chemistry": "כימיה",
+  "@chemistry": {
+    "description": "Chemistry subject name"
+  },
+  "biology": "ביולוגיה",
+  "@biology": {
+    "description": "Biology subject name"
+  },
+  "computerScience": "מדעי המחשב",
+  "@computerScience": {
+    "description": "Computer Science subject name"
+  }
+}
