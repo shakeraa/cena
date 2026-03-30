@@ -34,7 +34,12 @@ public record ConceptAttempted_V1(
     int BackspaceCount,
     int AnswerChangeCount,
     bool WasOffline,
-    DateTimeOffset Timestamp
+    DateTimeOffset Timestamp,
+    // Difficulty-aware tracing (added for stagnation root-cause analysis)
+    float QuestionDifficulty = 0f,
+    float DifficultyGap = 0f,           // question difficulty - prior mastery
+    string? DifficultyFrame = null,     // Stretch/Challenge/Appropriate/Expected/Regression
+    string? FocusState = null           // Strong/Stable/Declining/Degrading/Critical at time of attempt
 ) : IDelegatedEvent;
 
 /// <summary>

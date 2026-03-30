@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import StagnationInsightsPanel from './StagnationInsightsPanel.vue'
 import { $api } from '@/utils/api'
 
 interface StagnatingStudent {
@@ -50,6 +51,16 @@ const headers = [
   { title: 'Action', key: 'action', sortable: false },
 ]
 
+const expandedRows = ref<string[]>([])
+
+const toggleRow = (studentId: string) => {
+  const idx = expandedRows.value.indexOf(studentId)
+  if (idx >= 0)
+    expandedRows.value.splice(idx, 1)
+  else
+    expandedRows.value.push(studentId)
+}
+
 const scoreColor = (score: number): string => {
   if (score >= 0.7) return 'success'
   if (score >= 0.4) return 'warning'
@@ -85,10 +96,12 @@ defineExpose({ refresh: fetchStagnatingStudents })
     </VAlert>
 
     <VDataTable
+      v-model:expanded="expandedRows"
       :headers="headers"
       :items="students"
       :loading="loading"
       item-value="studentId"
+      show-expand
       class="text-no-wrap"
     >
       <template #item.studentName="{ item }">
@@ -172,9 +185,10 @@ defineExpose({ refresh: fetchStagnatingStudents })
             variant="text"
             color="primary"
             size="small"
-            :to="{ name: 'apps-user-view-id', params: { id: item.studentId }, query: { tab: 'insights' } }"
+            @click="toggleRow(item.studentId)"
           >
-            Insights
+            <VIcon :icon="expandedRows.includes(item.studentId) ? 'ri-arrow-up-s-line' : 'ri-search-eye-line'" class="me-1" />
+            {{ expandedRows.includes(item.studentId) ? 'Hide' : 'Analyze' }}
           </VBtn>
           <VBtn
             variant="text"
@@ -185,6 +199,16 @@ defineExpose({ refresh: fetchStagnatingStudents })
             Mastery
           </VBtn>
         </div>
+      </template>
+
+      <!-- Expanded row: stagnation root-cause analysis panel -->
+      <template #expanded-row="{ item }">
+        <td :colspan="headers.length" class="pa-4">
+          <StagnationInsightsPanel
+            :student-id="item.studentId"
+            :concept-id="item.conceptCluster"
+          />
+        </td>
       </template>
 
       <template #no-data>
