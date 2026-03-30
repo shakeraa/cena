@@ -7,6 +7,13 @@ interface Props {
   modelValue: boolean
 }
 
+interface ConceptOption {
+  title: string
+  value: string
+  conceptId: string
+  level: string
+}
+
 const props = defineProps<Props>()
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
@@ -33,25 +40,65 @@ const durations = [
   { title: 'Permanent', value: -1 },
 ]
 
-const form = ref({
+// Concept levels loaded from the student's knowledge map
+const conceptOptions = ref<ConceptOption[]>([])
+const conceptsLoading = ref(false)
+
+const loadConcepts = async () => {
+  if (!props.studentId) return
+  conceptsLoading.value = true
+  try {
+    const data = await $api<{ concepts: { conceptId: string; name: string; subject: string }[] }>(
+      `/admin/mastery/students/${props.studentId}/knowledge-map`,
+    )
+    conceptOptions.value = (data.concepts ?? []).map(c => ({
+      title: `${c.name} (${c.subject})`,
+      value: c.conceptId,
+      conceptId: c.conceptId,
+      level: c.name,
+    }))
+  }
+  catch (err: any) {
+    console.error('Failed to load knowledge map concepts:', err)
+  }
+  finally {
+    conceptsLoading.value = false
+  }
+}
+
+interface FormState {
+  methodology: string
+  conceptId: string
+  durationDays: number
+  reason: string
+}
+
+const form = ref<FormState>({
   methodology: '',
-  level: '',
-  reason: '',
+  conceptId: '',
   durationDays: 0,
+  reason: '',
 })
 
 const isSubmitting = ref(false)
 const errorMsg = ref<string | null>(null)
 
 const isValid = computed(() =>
-  form.value.methodology && form.value.reason.length >= 20,
+  !!form.value.methodology && form.value.reason.trim().length >= 20,
+)
+
+const selectedConcept = computed(() =>
+  conceptOptions.value.find(c => c.value === form.value.conceptId) ?? null,
+)
+
+const durationLabel = computed(() =>
+  durations.find(d => d.value === form.value.durationDays)?.title ?? '',
 )
 
 const previewText = computed(() => {
   if (!form.value.methodology) return ''
-  const dur = durations.find(d => d.value === form.value.durationDays)?.title ?? ''
-
-  return `${props.studentName} will use ${form.value.methodology} ${form.value.level ? `for ${form.value.level} ` : ''}for ${dur}`
+  const conceptPart = selectedConcept.value ? ` for ${selectedConcept.value.level}` : ''
+  return `${props.studentName} will use ${form.value.methodology}${conceptPart} (${durationLabel.value})`
 })
 
 const submit = async () => {
@@ -59,13 +106,13 @@ const submit = async () => {
   isSubmitting.value = true
   errorMsg.value = null
   try {
+    const concept = selectedConcept.value
     await $api(`/admin/mastery/students/${props.studentId}/methodology-override`, {
       method: 'POST',
       body: {
-        methodology: form.value.methodology,
-        level: form.value.level || null,
-        reason: form.value.reason,
-        durationDays: form.value.durationDays === -1 ? null : form.value.durationDays || null,
+        Level: concept?.level ?? '',
+        LevelId: concept?.conceptId ?? '',
+        Methodology: form.value.methodology,
       },
     })
     isOpen.value = false
@@ -80,11 +127,16 @@ const submit = async () => {
 }
 
 const reset = () => {
-  form.value = { methodology: '', level: '', reason: '', durationDays: 0 }
+  form.value = { methodology: '', conceptId: '', durationDays: 0, reason: '' }
   errorMsg.value = null
 }
 
-watch(isOpen, val => { if (val) reset() })
+watch(isOpen, val => {
+  if (val) {
+    reset()
+    loadConcepts()
+  }
+})
 </script>
 
 <template>
@@ -110,23 +162,13 @@ watch(isOpen, val => { if (val) reset() })
             class="mb-4"
           />
 
-          <VTextField
-            v-model="form.level"
-            label="Level (optional)"
-            placeholder="e.g. Algebra, Grade 5"
-            hint="Scope the override to a specific level or subject"
-            persistent-hint
-            class="mb-4"
-          />
-
-          <VTextarea
-            v-model="form.reason"
-            label="Reason"
-            placeholder="Explain why this override is needed..."
-            :counter="200"
-            hint="Minimum 20 characters"
-            persistent-hint
-            rows="3"
+          <VAutocomplete
+            v-model="form.conceptId"
+            :items="conceptOptions"
+            :loading="conceptsLoading"
+            label="Concept / Level (optional)"
+            placeholder="Search concepts from student's knowledge map"
+            clearable
             class="mb-4"
           />
 
@@ -134,6 +176,17 @@ watch(isOpen, val => { if (val) reset() })
             v-model="form.durationDays"
             :items="durations"
             label="Duration"
+            class="mb-4"
+          />
+
+          <VTextarea
+            v-model="form.reason"
+            label="Reason"
+            placeholder="Explain why this override is needed (min 20 characters)..."
+            :counter="200"
+            hint="Minimum 20 characters — recorded in the audit trail"
+            persistent-hint
+            rows="3"
             class="mb-4"
           />
 

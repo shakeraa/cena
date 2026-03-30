@@ -243,6 +243,35 @@ public static class AdminApiEndpoints
             return result ? Results.Ok(new { message = "Override applied" }) : Results.BadRequest(new { error = "Override failed" });
         }).WithName("PostStudentMethodologyOverride");
 
+        // GET /api/admin/mastery/students/{studentId}/methodology-overrides
+        group.MapGet("/students/{studentId}/methodology-overrides", async (
+            string studentId,
+            IMasteryTrackingService service) =>
+        {
+            var overrides = await service.GetStudentOverridesAsync(studentId);
+            var result = overrides.Select(o => new
+            {
+                id = o.Id,
+                studentId = o.StudentId,
+                level = o.Level,
+                levelId = o.LevelId,
+                methodology = o.Methodology,
+                teacherId = o.TeacherId,
+                createdAt = o.CreatedAt.ToString("o"),
+            });
+            return Results.Ok(new { overrides = result });
+        }).WithName("GetStudentMethodologyOverrides");
+
+        // DELETE /api/admin/mastery/students/{studentId}/methodology-overrides/{overrideId}
+        group.MapDelete("/students/{studentId}/methodology-overrides/{overrideId}", async (
+            string studentId,
+            string overrideId,
+            IMasteryTrackingService service) =>
+        {
+            var removed = await service.RemoveOverrideAsync(studentId, Uri.UnescapeDataString(overrideId));
+            return removed ? Results.Ok(new { message = "Override removed" }) : Results.NotFound(new { error = "Override not found" });
+        }).WithName("DeleteStudentMethodologyOverride");
+
         return app;
     }
 

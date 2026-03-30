@@ -67,6 +67,13 @@ export default [
     subject: 'Pedagogy',
   },
   {
+    title: 'Methodology Overrides',
+    icon: { icon: 'tabler-switch-horizontal' },
+    to: 'apps-mastery-dashboard',
+    action: 'manage',
+    subject: 'Pedagogy',
+  },
+  {
     title: 'Cultural Context',
     icon: { icon: 'tabler-world' },
     to: 'apps-cultural-dashboard',

@@ -5,10 +5,26 @@
 // =============================================================================
 
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:json_annotation/json_annotation.dart';
 
 part 'domain_models.freezed.dart';
 part 'domain_models.g.dart';
+
+// ---------------------------------------------------------------------------
+// Custom JSON Converters
+// ---------------------------------------------------------------------------
+
+/// Serializes [Duration] as integer milliseconds.
+/// The .NET backend represents TimeSpan as ISO-8601 string (e.g., "00:22:00")
+/// but for mobile round-trip storage we use milliseconds for simplicity.
+class DurationConverter extends JsonConverter<Duration, int> {
+  const DurationConverter();
+
+  @override
+  Duration fromJson(int json) => Duration(milliseconds: json);
+
+  @override
+  int toJson(Duration duration) => duration.inMilliseconds;
+}
 
 // ---------------------------------------------------------------------------
 // Enums
@@ -492,7 +508,7 @@ class SessionSummary with _$SessionSummary {
     required int questionsAttempted,
     required int correctAnswers,
     required int xpEarned,
-    required Duration duration,
+    @DurationConverter() required Duration duration,
     required List<String> conceptsMastered,
     required List<String> conceptsImproved,
     Badge? badgeEarned,

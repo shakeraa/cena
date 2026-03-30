@@ -4,8 +4,10 @@ import ConceptCard from '@/views/apps/mastery/ConceptCard.vue'
 import ConceptGraph from '@/views/apps/mastery/ConceptGraph.vue'
 import MethodologyHierarchyPanel from '@/views/apps/pedagogy/MethodologyHierarchyPanel.vue'
 import { $api } from '@/utils/api'
+import { useAbility } from '@casl/vue'
 
 const router = useRouter()
+const { can } = useAbility()
 
 definePage({
   meta: {
@@ -37,8 +39,8 @@ const overrideSnackbar = ref(false)
 
 const onOverrideApplied = () => {
   overrideSnackbar.value = true
-  // Refresh methodology data
   fetchStudent()
+  fetchOverrides()
 }
 
 const fetchStudent = async () => {
@@ -55,6 +57,67 @@ const fetchStudent = async () => {
     loading.value = false
   }
 }
+
+// --- Methodology Overrides ---
+interface MethodologyOverride {
+  id: string
+  studentId: string
+  level: string
+  levelId: string
+  methodology: string
+  teacherId: string
+  createdAt: string
+}
+
+const overridesLoading = ref(false)
+const overrides = ref<MethodologyOverride[]>([])
+const removingOverrideId = ref<string | null>(null)
+const removeErrorMsg = ref<string | null>(null)
+
+const fetchOverrides = async () => {
+  overridesLoading.value = true
+  try {
+    const data = await $api<{ overrides: MethodologyOverride[] }>(
+      `/admin/mastery/students/${studentId.value}/methodology-overrides`,
+    )
+    overrides.value = data.overrides ?? []
+  }
+  catch (err: any) {
+    console.error('Failed to fetch methodology overrides:', err)
+  }
+  finally {
+    overridesLoading.value = false
+  }
+}
+
+const removeOverride = async (override: MethodologyOverride) => {
+  removingOverrideId.value = override.id
+  removeErrorMsg.value = null
+  try {
+    await $api(
+      `/admin/mastery/students/${studentId.value}/methodology-overrides/${encodeURIComponent(override.id)}`,
+      { method: 'DELETE' },
+    )
+    await fetchOverrides()
+  }
+  catch (err: any) {
+    removeErrorMsg.value = err.data?.message ?? err.message ?? 'Failed to remove override'
+  }
+  finally {
+    removingOverrideId.value = null
+  }
+}
+
+const formatDate = (iso: string) => {
+  try {
+    return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
+  }
+  catch {
+    return iso
+  }
+}
+
+onMounted(fetchOverrides)
 
 onMounted(fetchStudent)
 
@@ -296,6 +359,7 @@ const decayColor = (risk: number): string => {
         </VBtn>
 
         <VBtn
+          v-if="can('manage', 'Pedagogy')"
           color="warning"
           variant="tonal"
           @click="showOverrideDialog = true"
@@ -317,6 +381,49 @@ const decayColor = (risk: number): string => {
     >
       {{ error }}
     </VAlert>
+
+    <!-- Active override banners -->
+    <template v-if="overrides.length">
+      <VAlert
+        v-for="ov in overrides"
+        :key="ov.id"
+        type="warning"
+        variant="tonal"
+        class="mb-4"
+        border="start"
+      >
+        <div class="d-flex align-center justify-space-between flex-wrap gap-2">
+          <span>
+            <strong>Active override:</strong>
+            {{ ov.methodology }}
+            <template v-if="ov.level">
+              for <em>{{ ov.level }}</em>
+            </template>
+            &mdash; set by {{ ov.teacherId }} on {{ formatDate(ov.createdAt) }}
+          </span>
+          <VBtn
+            v-if="can('manage', 'Pedagogy')"
+            size="small"
+            color="warning"
+            variant="tonal"
+            :loading="removingOverrideId === ov.id"
+            @click="removeOverride(ov)"
+          >
+            Remove Override
+          </VBtn>
+        </div>
+      </VAlert>
+      <VAlert
+        v-if="removeErrorMsg"
+        type="error"
+        variant="tonal"
+        class="mb-4"
+        closable
+        @click:close="removeErrorMsg = null"
+      >
+        {{ removeErrorMsg }}
+      </VAlert>
+    </template>
 
     <VProgressLinear
       v-if="loading"
@@ -551,6 +658,81 @@ const decayColor = (risk: number): string => {
             </template>
           </VListItem>
         </VList>
+      </VCardText>
+    </VCard>
+
+    <!-- Override History -->
+    <VCard class="mb-6">
+      <VCardItem title="Methodology Override History">
+        <template #subtitle>
+          Active and past overrides for this student
+        </template>
+        <template #append>
+          <VProgressCircular
+            v-if="overridesLoading"
+            indeterminate
+            size="20"
+            width="2"
+            color="primary"
+          />
+        </template>
+      </VCardItem>
+
+      <VDivider />
+
+      <VCardText>
+        <div
+          v-if="!overridesLoading && !overrides.length"
+          class="text-disabled"
+        >
+          No methodology overrides have been set for this student
+        </div>
+
+        <VTable v-else-if="overrides.length">
+          <thead>
+            <tr>
+              <th>Methodology</th>
+              <th>Concept / Level</th>
+              <th>Set By</th>
+              <th>Date</th>
+              <th v-if="can('manage', 'Pedagogy')" />
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="ov in overrides"
+              :key="ov.id"
+            >
+              <td>
+                <VChip
+                  color="warning"
+                  label
+                  size="small"
+                >
+                  {{ ov.methodology }}
+                </VChip>
+              </td>
+              <td>{{ ov.level || '—' }}</td>
+              <td>{{ ov.teacherId }}</td>
+              <td>{{ formatDate(ov.createdAt) }}</td>
+              <td v-if="can('manage', 'Pedagogy')">
+                <VBtn
+                  icon
+                  variant="text"
+                  size="small"
+                  color="error"
+                  :loading="removingOverrideId === ov.id"
+                  @click="removeOverride(ov)"
+                >
+                  <VIcon icon="tabler-trash" />
+                  <VTooltip activator="parent">
+                    Remove override
+                  </VTooltip>
+                </VBtn>
+              </td>
+            </tr>
+          </tbody>
+        </VTable>
       </VCardText>
     </VCard>
 

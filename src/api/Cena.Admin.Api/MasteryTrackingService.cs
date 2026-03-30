@@ -21,6 +21,8 @@ public interface IMasteryTrackingService
     Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync(ClaimsPrincipal user);
     Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId, ClaimsPrincipal user);
     Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId);
+    Task<IReadOnlyList<MethodologyOverrideDocument>> GetStudentOverridesAsync(string studentId);
+    Task<bool> RemoveOverrideAsync(string studentId, string overrideId);
 }
 
 public sealed class MasteryTrackingService : IMasteryTrackingService
@@ -547,6 +549,31 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         _logger.LogInformation(
             "Teacher {TeacherId} overrode methodology for student {StudentId} at {Level}/{LevelId} to {Methodology}",
             teacherId, studentId, level, levelId, methodology);
+
+        return true;
+    }
+
+    public async Task<IReadOnlyList<MethodologyOverrideDocument>> GetStudentOverridesAsync(string studentId)
+    {
+        await using var session = _store.QuerySession();
+        var overrides = await session.Query<MethodologyOverrideDocument>()
+            .Where(o => o.StudentId == studentId)
+            .OrderByDescending(o => o.CreatedAt)
+            .ToListAsync();
+        return overrides;
+    }
+
+    public async Task<bool> RemoveOverrideAsync(string studentId, string overrideId)
+    {
+        await using var session = _store.LightweightSession();
+        var existing = await session.LoadAsync<MethodologyOverrideDocument>(overrideId);
+        if (existing == null || existing.StudentId != studentId) return false;
+        session.Delete<MethodologyOverrideDocument>(overrideId);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Methodology override {OverrideId} removed for student {StudentId}",
+            overrideId, studentId);
 
         return true;
     }
