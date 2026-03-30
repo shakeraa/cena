@@ -13,6 +13,8 @@
 // =============================================================================
 
 using Cena.Actors.Bus;
+using Cena.Emulator.Population;
+using Cena.Emulator.Scheduler;
 using Cena.Emulator.Simulation;
 using NATS.Client.Core;
 
@@ -81,16 +83,22 @@ public static class EmulatorEngine
 
         CohortGenerator.LogDistribution(cohort);
 
-        // ── Run simulation ────────────────────────────────────────────────────
-        Log.Information("Starting emulation at {Speed}x speed... (Ctrl+C to stop)", config.SpeedMultiplier);
+        // ── Run simulation (arrival-scheduled dispatch) ──────────────────────
+        Log.Information("Starting emulation at {Speed}x speed with arrival scheduler... (Ctrl+C to stop)",
+            config.SpeedMultiplier);
         var startTime = DateTimeOffset.UtcNow;
 
-        var simulator = new SessionSimulator(nats, config.SpeedMultiplier, config.Seed);
+        // Hard cap: 30% of total students may be active concurrently
+        var maxConcurrent = Math.Max(1, (int)(config.StudentCount * 0.30));
+        using var limiter  = new ConcurrencyLimiter(maxConcurrent, backpressureThreshold: 50);
+        var scheduleModel  = new DailyScheduleModel();
+        var simulator      = new SessionSimulator(nats, config.SpeedMultiplier, config.Seed);
         EmulationStats stats;
 
         try
         {
-            stats = await simulator.RunAsync(cohort, cts.Token);
+            stats = await RunScheduledAsync(
+                cohort, config, simulator, limiter, scheduleModel, cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -107,6 +115,143 @@ public static class EmulatorEngine
         var elapsed = DateTimeOffset.UtcNow - startTime;
         PrintSummary(stats, elapsed);
         PrintRoundTripReport(stats.TotalAttempts + stats.TotalSessions);
+    }
+
+    // ── Arrival-scheduled simulation dispatch ─────────────────────────────────
+
+    /// <summary>
+    /// Dispatches student sessions according to a realistic arrival schedule.
+    /// Concurrency is gated by <paramref name="limiter"/> (max 30% active).
+    /// Each student's attempts are replayed via <paramref name="simulator"/> once
+    /// their arrival slot is reached in time-compressed wall-clock terms.
+    /// </summary>
+    private static async Task<EmulationStats> RunScheduledAsync(
+        IReadOnlyList<CohortMember>  cohort,
+        EmulatorConfig               config,
+        SessionSimulator             simulator,
+        ConcurrencyLimiter           limiter,
+        DailyScheduleModel           scheduleModel,
+        CancellationToken            cancellationToken)
+    {
+        var stats      = new EmulationStats();
+        var rng        = new Random(config.Seed + 9999);
+        var simStart   = DateOnly.FromDateTime(DateTime.UtcNow);
+        var msPerSimDay = (24.0 * 60.0 * 60.0 * 1000.0) / config.SpeedMultiplier;
+
+        // Build a per-student lookup of their attempt history
+        var attemptsByStudent = cohort.ToDictionary(
+            m => m.Profile.StudentId,
+            m => m.Simulation.AttemptHistory
+                    .OrderBy(a => a.Timestamp)
+                    .ToList());
+
+        // Work through each simulated day
+        for (int day = 0; day < config.SimulationDays; day++)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            var dayDate   = simStart.AddDays(day);
+            var dayKind   = DailyScheduleModel.KindFor(dayDate);
+
+            // Generate arrival offsets (in minutes from start of day) using the schedule model
+            var dayArrivals = scheduleModel.GenerateDayArrivals(
+                day, simStart, config.StudentCount, rng);
+
+            if (dayArrivals.Count == 0) continue;
+
+            Log.Information("  Day {Day} ({Kind}): {Arrivals} scheduled arrivals, concurrency cap={Cap}",
+                day + 1, dayKind, dayArrivals.Count, limiter.MaxConcurrency);
+
+            // Assign arrivals round-robin to students (multiple per student is fine — they queue)
+            // Each arrival index maps to a student via modulo so distribution is uniform
+            var arrivalTasks = new List<Task>();
+
+            for (int arrIdx = 0; arrIdx < dayArrivals.Count; arrIdx++)
+            {
+                if (cancellationToken.IsCancellationRequested) break;
+
+                var arrivalMinute = dayArrivals[arrIdx];
+                var studentIdx    = arrIdx % cohort.Count;
+                var member        = cohort[studentIdx];
+
+                // Backpressure: when queue > threshold, slow arrival dispatch
+                if (limiter.BackpressureActive)
+                    await Task.Delay(200, cancellationToken);
+
+                var capturedMember  = member;
+                var capturedMinute  = arrivalMinute;
+                var capturedDay     = day;
+
+                var t = Task.Run(async () =>
+                {
+                    // Time-compress: wait until this arrival's simulated minute
+                    var delayMs = (int)(capturedMinute * 60_000.0 / config.SpeedMultiplier);
+                    if (delayMs > 0)
+                        await Task.Delay(Math.Min(delayMs, 5_000), cancellationToken);
+
+                    await limiter.AcquireAsync(cancellationToken);
+                    var sessionStart = DateTimeOffset.UtcNow;
+                    try
+                    {
+                        var studentId = capturedMember.Profile.StudentId;
+                        if (!attemptsByStudent.TryGetValue(studentId, out var attempts)
+                            || attempts.Count == 0)
+                            return;
+
+                        // Slice attempts for this simulated day
+                        var dayAttempts = attempts
+                            .Skip(capturedDay * (attempts.Count / Math.Max(1, config.SimulationDays)))
+                            .Take(Math.Max(1, attempts.Count / Math.Max(1, config.SimulationDays)))
+                            .ToList();
+
+                        if (dayAttempts.Count == 0)
+                            dayAttempts = attempts.Take(3).ToList();
+
+                        var singleStudentStats = await simulator.RunSingleStudentAsync(
+                            capturedMember, dayAttempts, cancellationToken);
+
+                        // Accumulate stats (interlocked for thread safety)
+                        Interlocked.Add(ref stats.TotalAttemptsRef,   singleStudentStats.TotalAttempts);
+                        Interlocked.Add(ref stats.TotalSessionsRef,   singleStudentStats.TotalSessions);
+                        Interlocked.Add(ref stats.TotalAnnotationsRef, singleStudentStats.TotalAnnotations);
+                        Interlocked.Add(ref stats.TotalMethodologySwitchesRef, singleStudentStats.TotalMethodologySwitches);
+                        Interlocked.Add(ref stats.TotalFocusEventsRef, singleStudentStats.TotalFocusEvents);
+                        Interlocked.Add(ref stats.TotalErrorsRef,     singleStudentStats.TotalErrors);
+                    }
+                    finally
+                    {
+                        var durationMs = (long)(DateTimeOffset.UtcNow - sessionStart).TotalMilliseconds;
+                        limiter.Release(durationMs);
+                    }
+                }, cancellationToken);
+
+                arrivalTasks.Add(t);
+
+                // Log concurrency metrics every 100 dispatches
+                if (arrIdx % 100 == 0)
+                {
+                    var metrics = limiter.GetMetrics();
+                    Log.Information("  Concurrency — active: {Active}/{Cap}  queue: {Q}  peak: {Peak}  backpressure: {BP}",
+                        metrics.CurrentActive, limiter.MaxConcurrency,
+                        metrics.QueueDepth, metrics.PeakConcurrency,
+                        metrics.BackpressureActive);
+                }
+            }
+
+            // Wait for all of this day's sessions to complete before advancing
+            await Task.WhenAll(arrivalTasks);
+
+            // Brief real-time pause between simulated days
+            if (day < config.SimulationDays - 1)
+                await Task.Delay(50, cancellationToken);
+        }
+
+        var finalMetrics = limiter.GetMetrics();
+        Log.Information("  Peak concurrency observed: {Peak}/{Cap}  avg session: {Avg:F0}ms",
+            finalMetrics.PeakConcurrency, limiter.MaxConcurrency,
+            finalMetrics.AvgSessionDurationMs);
+
+        return stats;
     }
 
     // ── Round-trip event subscriber ───────────────────────────────────────────

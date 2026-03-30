@@ -20,21 +20,34 @@ internal sealed class StudentSessionState
     public string  Methodology         { get; set; } = "Socratic";
     public int     ConsecutiveWrong    { get; set; }
     public int     QuestionIndex       { get; set; }
-    public DateTimeOffset SessionStart { get; set; }
+    public DateTimeOffset SessionStart    { get; set; }
+    /// <summary>How many more questions remain in the current confusion episode (0 = not confused).</summary>
+    public int     ConfusionQuestionsLeft { get; set; }
+    /// <summary>True once the student has abandoned the session; prevents further event publishing.</summary>
+    public bool    DroppedOut             { get; set; }
 }
 
 /// <summary>
-/// Holds emulation-wide counters updated from the session loop.
-/// All fields are accessed from a single thread — no locking needed.
+/// Holds emulation-wide counters. Supports both single-threaded (property set)
+/// and multi-threaded (Interlocked on the backing ref fields) access patterns.
 /// </summary>
 public sealed class EmulationStats
 {
-    public int TotalAttempts          { get; set; }
-    public int TotalSessions          { get; set; }
-    public int TotalAnnotations       { get; set; }
-    public int TotalMethodologySwitches { get; set; }
-    public int TotalFocusEvents       { get; set; }
-    public int TotalErrors            { get; set; }
+    // Backing fields exposed for Interlocked operations in concurrent contexts
+    internal int TotalAttemptsRef;
+    internal int TotalSessionsRef;
+    internal int TotalAnnotationsRef;
+    internal int TotalMethodologySwitchesRef;
+    internal int TotalFocusEventsRef;
+    internal int TotalErrorsRef;
+
+    public int TotalAttempts           { get => TotalAttemptsRef;           set => TotalAttemptsRef = value; }
+    public int TotalSessions           { get => TotalSessionsRef;           set => TotalSessionsRef = value; }
+    public int TotalAnnotations        { get => TotalAnnotationsRef;        set => TotalAnnotationsRef = value; }
+    public int TotalMethodologySwitches{ get => TotalMethodologySwitchesRef;set => TotalMethodologySwitchesRef = value; }
+    public int TotalFocusEvents        { get => TotalFocusEventsRef;        set => TotalFocusEventsRef = value; }
+    public int TotalErrors             { get => TotalErrorsRef;             set => TotalErrorsRef = value; }
+    public int TotalDropouts          { get; set; }
 }
 
 /// <summary>
@@ -95,6 +108,28 @@ public sealed class SessionSimulator
             ? p.FocusDegradationRate
             : 0.005f;
 
+    // ── Confusion threshold: consecutive wrong answers before confusion fires ─
+
+    private static int ConfusionThreshold(string archetype) => archetype switch
+    {
+        "Genius"           => 5,
+        "HighAchiever"     => 4,
+        "Struggling"       => 2,
+        "VeryLowCognitive" => 2,
+        _                  => 3
+    };
+
+    // ── Dropout profile: (abandonRate, minQuestionsBeforeEligible) ───────────
+
+    private static (double Rate, int MinQuestion) DropoutProfile(string archetype) => archetype switch
+    {
+        "Struggling"       => (0.15, 5),
+        "VeryLowCognitive" => (0.25, 3),
+        "Genius"           => (0.02, 8),  // boredom dropout
+        "Inconsistent"     => (0.10, 4),
+        _                  => (0.0,  int.MaxValue)
+    };
+
     // ── Fields ───────────────────────────────────────────────────────────────
 
     private readonly NatsConnection _nats;
@@ -146,6 +181,10 @@ public sealed class SessionSimulator
         {
             if (cancellationToken.IsCancellationRequested) break;
 
+            // Skip attempts for students who already abandoned their session
+            if (_sessions.TryGetValue(member.Profile.StudentId, out var dropState) && dropState.DroppedOut)
+                continue;
+
             // Time-compressed gap simulation
             if (lastTimestamp.HasValue)
             {
@@ -174,6 +213,55 @@ public sealed class SessionSimulator
 
         // End all remaining open sessions
         await CloseAllSessionsAsync(cancellationToken);
+
+        return stats;
+    }
+
+    /// <summary>
+    /// Replay a specific student's attempt slice in chronological order.
+    /// Used by the arrival scheduler to process one student session at a time.
+    /// Returns a stats object for this student's contribution.
+    /// </summary>
+    public async Task<EmulationStats> RunSingleStudentAsync(
+        CohortMember  member,
+        IReadOnlyList<Cena.Actors.Simulation.SimulatedAttempt> attempts,
+        CancellationToken cancellationToken)
+    {
+        var stats = new EmulationStats();
+
+        DateTimeOffset? lastTimestamp = null;
+
+        foreach (var attempt in attempts)
+        {
+            if (cancellationToken.IsCancellationRequested) break;
+
+            if (lastTimestamp.HasValue)
+            {
+                var gap     = attempt.Timestamp - lastTimestamp.Value;
+                var sleepMs = (int)(gap.TotalMilliseconds / _speedMultiplier);
+                if (sleepMs > 0)
+                    await Task.Delay(Math.Min(sleepMs, 100), cancellationToken);
+            }
+            lastTimestamp = attempt.Timestamp;
+
+            try
+            {
+                await ProcessAttemptAsync(member, attempt, stats, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+            catch (Exception ex)
+            {
+                stats.TotalErrors++;
+                Log.Warning("Error processing attempt for {StudentId}: {Error}",
+                    member.Profile.StudentId, ex.Message);
+            }
+        }
+
+        // Close this student's session when their attempt slice ends
+        await CloseSessionAsync(member.Profile.StudentId, "session_complete", cancellationToken);
 
         return stats;
     }
@@ -224,7 +312,12 @@ public sealed class SessionSimulator
         var sessionId = state.SessionId!;
 
         // ── Concept attempt ───────────────────────────────────────────────────
-        var hintCount = SimulateHintUsage(archetype, attempt.IsCorrect);
+        // Difficulty proxy: lower prior mastery means the concept is harder for this student.
+        var difficultyProxy   = Math.Clamp(1.0f - attempt.PriorMastery, 0.0f, 1.0f);
+        var responseTimeMs    = SimulateResponseTimeMs(archetype, difficultyProxy, state.QuestionIndex);
+        var backspaceCount    = SimulateBackspaceCount(archetype);
+        var answerChangeCount = SimulateAnswerChangeCount(archetype);
+        var hintCount         = SimulateHintUsage(archetype, attempt.IsCorrect);
 
         var attemptMsg = BusEnvelope<BusConceptAttempt>.Create(
             NatsSubjects.ConceptAttempt,
@@ -235,11 +328,11 @@ public sealed class SessionSimulator
                 $"q-{_rng.Next(1, 1500):D4}",
                 "multiple_choice",
                 attempt.IsCorrect ? "correct" : "wrong",
-                attempt.ResponseTimeMs,
+                responseTimeMs,
                 hintCount,
                 false,
-                _rng.Next(0, 10),
-                _rng.Next(0, 3)),
+                backspaceCount,
+                answerChangeCount),
             "emulator");
 
         await PublishAsync(NatsSubjects.ConceptAttempt, attemptMsg, cancellationToken);
@@ -257,14 +350,9 @@ public sealed class SessionSimulator
         else
             state.ConsecutiveWrong = 0;
 
-        // ── SAI: Confusion annotation (3+ wrong in a row) ────────────────────
-        if (state.ConsecutiveWrong >= 3 && _rng.NextDouble() < 0.4)
-        {
-            var text = ConfusionTexts[_rng.Next(ConfusionTexts.Length)];
-            await PublishAnnotationAsync(
-                studentId, sessionId, attempt.ConceptId, text, "confusion", cancellationToken);
-            stats.TotalAnnotations++;
-        }
+        // ── SAI: Confusion annotation (archetype-specific threshold + episode tracking) ─
+        await ProcessConfusionAsync(
+            studentId, sessionId, archetype, attempt, state, stats, cancellationToken);
 
         // ── SAI: Question annotation (curious archetypes, on correct answers) ─
         if (attempt.IsCorrect && _rng.NextDouble() < 0.03 &&
@@ -297,10 +385,132 @@ public sealed class SessionSimulator
             state.ConsecutiveWrong = 0;
         }
 
+        // ── Session dropout simulation (archetype-specific abandonment) ─────────
+        if (await TryDropoutAsync(studentId, archetype, state, stats, cancellationToken))
+            return;
+
         // ── Probabilistic session end (~7% chance per attempt ≈ 15 att/sess) ──
         if (_rng.NextDouble() < 0.07)
             await CloseSessionAsync(studentId, "completed", cancellationToken);
     }
+
+    // ── Confusion escalation ─────────────────────────────────────────────────
+
+    private async Task ProcessConfusionAsync(
+        string studentId,
+        string sessionId,
+        string archetype,
+        Cena.Actors.Simulation.SimulatedAttempt attempt,
+        StudentSessionState state,
+        EmulationStats stats,
+        CancellationToken cancellationToken)
+    {
+        // Decrement confusion duration if still inside an episode — no new annotation
+        if (state.ConfusionQuestionsLeft > 0)
+        {
+            state.ConfusionQuestionsLeft--;
+            return;
+        }
+
+        if (attempt.IsCorrect) return;
+        if (state.ConsecutiveWrong < ConfusionThreshold(archetype)) return;
+
+        // Struggling/VeryLowCognitive emit confusion annotations more often
+        var confusionProb = archetype is "Struggling" or "VeryLowCognitive" ? 0.4 : 0.25;
+        if (_rng.NextDouble() >= confusionProb) return;
+
+        var text = ConfusionTexts[_rng.Next(ConfusionTexts.Length)];
+        await PublishAnnotationAsync(
+            studentId, sessionId, attempt.ConceptId, text, "confusion", cancellationToken);
+        stats.TotalAnnotations++;
+
+        // 30% chance of a paired question annotation during confusion
+        if (_rng.NextDouble() < 0.30)
+        {
+            var qtext = QuestionTexts[_rng.Next(QuestionTexts.Length)];
+            await PublishAnnotationAsync(
+                studentId, sessionId, attempt.ConceptId, qtext, "question", cancellationToken);
+            stats.TotalAnnotations++;
+        }
+
+        // Set confusion duration: 1-3 more questions before the episode resolves
+        state.ConfusionQuestionsLeft = _rng.Next(1, 4);
+    }
+
+    // ── Dropout simulation ────────────────────────────────────────────────────
+
+    /// <summary>Returns true if the student abandoned the session this turn.</summary>
+    private async Task<bool> TryDropoutAsync(
+        string studentId,
+        string archetype,
+        StudentSessionState state,
+        EmulationStats stats,
+        CancellationToken cancellationToken)
+    {
+        var (rate, minQuestion) = DropoutProfile(archetype);
+        if (rate <= 0.0 || state.QuestionIndex < minQuestion) return false;
+        if (_rng.NextDouble() >= rate) return false;
+
+        state.DroppedOut = true;
+        await CloseSessionAsync(studentId, "abandoned", cancellationToken);
+        stats.TotalDropouts++;
+        Log.Information("Student {StudentId} ({Archetype}) abandoned session at question {Q}",
+            studentId, archetype, state.QuestionIndex);
+        return true;
+    }
+
+    // ── Realistic response time simulation ───────────────────────────────────
+
+    /// <summary>
+    /// Computes a realistic response time in milliseconds.
+    /// difficulty is in [0.0, 1.0] where 1.0 is hardest (derived from inverse prior mastery).
+    /// Base: 5s + difficulty * 20s, then modulated by archetype speed and fatigue.
+    /// </summary>
+    private int SimulateResponseTimeMs(string archetype, float difficulty, int questionIndex)
+    {
+        var baseMs = 5_000.0 + difficulty * 20_000.0;
+
+        double speedFactor = archetype switch
+        {
+            "FastCareless"     => 0.5,
+            "SlowThorough"     => 2.0,
+            "VeryLowCognitive" => 1.8,
+            "Genius"           => 0.7,
+            _                  => 1.0
+        };
+
+        // Each question adds 2% to response time (fatigue accumulation)
+        var fatigueFactor = 1.0 + questionIndex * 0.02;
+
+        // ±15% random jitter (total spread: ±30%)
+        var jitter = 1.0 + (_rng.NextDouble() - 0.5) * 0.30;
+
+        return (int)Math.Clamp(baseMs * speedFactor * fatigueFactor * jitter, 500, 120_000);
+    }
+
+    // ── Backspace count simulation ────────────────────────────────────────────
+
+    private int SimulateBackspaceCount(string archetype) => archetype switch
+    {
+        "FastCareless"     => _rng.Next(3, 9),   // impulsive: 3-8 backspaces
+        "SlowThorough"     => _rng.Next(0, 2),   // deliberate: 0-1
+        "Genius"           => _rng.Next(0, 3),
+        "Struggling"       => _rng.Next(1, 6),
+        "VeryLowCognitive" => _rng.Next(2, 7),
+        "Inconsistent"     => _rng.Next(0, 8),   // high variance
+        _                  => _rng.Next(0, 4)
+    };
+
+    // ── Answer-change count simulation ───────────────────────────────────────
+
+    private int SimulateAnswerChangeCount(string archetype) => archetype switch
+    {
+        "Inconsistent" => _rng.Next(1, 4),           // 1-3 changes
+        "FastCareless"  => _rng.Next(0, 3),
+        "SlowThorough"  => 0,                        // commits to first answer
+        "Genius"        => _rng.NextDouble() < 0.05 ? 1 : 0,
+        _              => _rng.NextDouble() < 0.15 ? 1 : 0
+    };
 
     // ── Focus events ─────────────────────────────────────────────────────────
 
@@ -439,11 +649,20 @@ public sealed class SessionSimulator
 
     // ── Hint simulation ───────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Simulates hint requests per archetype and outcome.
+    /// Struggling: 60% of wrong answers trigger at least 1 hint.
+    /// HighAchiever: only 10% of wrong answers use a hint.
+    /// SlowThorough: always at least 1 hint before answering wrong.
+    /// </summary>
     private int SimulateHintUsage(string archetype, bool isCorrect) => archetype switch
     {
-        "Struggling"       => isCorrect ? _rng.Next(0, 2) : _rng.Next(1, 3),
-        "VeryLowCognitive" => _rng.Next(1, 3),
-        "SlowThorough"     => _rng.Next(0, 2),
-        _                  => _rng.NextDouble() < 0.1 ? 1 : 0
+        "Struggling"       => isCorrect ? _rng.Next(0, 2)
+                                        : (_rng.NextDouble() < 0.60 ? _rng.Next(1, 3) : 0),
+        "VeryLowCognitive" => _rng.Next(1, 4),
+        "SlowThorough"     => isCorrect ? _rng.Next(0, 2) : _rng.Next(1, 3),
+        "HighAchiever"     => isCorrect ? 0 : (_rng.NextDouble() < 0.10 ? 1 : 0),
+        "Genius"           => _rng.NextDouble() < 0.05 ? 1 : 0,
+        _                  => _rng.NextDouble() < 0.10 ? 1 : 0
     };
 }

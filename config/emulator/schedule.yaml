@@ -1,0 +1,84 @@
+# Emulator arrival schedule configuration
+# Defines the arrival rate curve for simulated students across a 24-hour day.
+# Rates are in students-per-minute and are used as the peak of a sine-based
+# interpolation curve. The actual rate at any minute is smoothed between
+# adjacent window values.
+
+weekday:
+  windows:
+    - hour: 0   # 00:00-06:00 night owls
+      rateMin: 0
+      rateMax: 1
+    - hour: 6   # 06:00-08:00 early birds
+      rateMin: 2
+      rateMax: 5
+    - hour: 8   # 08:00-10:00 morning wave
+      rateMin: 5
+      rateMax: 10
+    - hour: 10  # 10:00-14:00 school hours low
+      rateMin: 3
+      rateMax: 6
+    - hour: 14  # 14:00-16:00 after-school peak
+      rateMin: 10
+      rateMax: 20
+    - hour: 16  # 16:00-18:00 evening peak (max concurrency zone)
+      rateMin: 15
+      rateMax: 25
+    - hour: 18  # 18:00-20:00 dinner dip + evening
+      rateMin: 8
+      rateMax: 15
+    - hour: 20  # 20:00-22:00 evening
+      rateMin: 5
+      rateMax: 10
+    - hour: 22  # 22:00-00:00 taper
+      rateMin: 2
+      rateMax: 4
+
+weekend:
+  volumeFactor: 0.60   # 60% of weekday volume overall
+  windows:
+    - hour: 0
+      rateMin: 0
+      rateMax: 1
+    - hour: 8
+      rateMin: 2
+      rateMax: 4
+    - hour: 11  # weekend peak 11:00-14:00
+      rateMin: 8
+      rateMax: 15
+    - hour: 14
+      rateMin: 5
+      rateMax: 10
+    - hour: 17
+      rateMin: 4
+      rateMax: 8
+    - hour: 20
+      rateMin: 2
+      rateMax: 5
+    - hour: 22
+      rateMin: 0
+      rateMax: 2
+
+friday:
+  # Israel: Friday is an early shutdown day (Shabbat eve)
+  shutdownHour: 14   # No arrivals after 14:00
+  windows:
+    - hour: 0
+      rateMin: 0
+      rateMax: 1
+    - hour: 7
+      rateMin: 3
+      rateMax: 7
+    - hour: 9
+      rateMin: 5
+      rateMax: 10
+    - hour: 12
+      rateMin: 3
+      rateMax: 6
+    - hour: 14
+      rateMin: 0
+      rateMax: 0
+
+concurrency:
+  maxConcurrentPercent: 0.30   # Hard cap: 30% of total students
+  queueBackpressureThreshold: 50  # Slow arrivals if queue depth exceeds this
