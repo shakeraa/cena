@@ -11,6 +11,7 @@ using System.Text.Json;
 using Cena.Actors.Bus;
 using Cena.Actors.Events;
 using Cena.Actors.Tutoring;
+using Cena.Infrastructure.Tracing;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 
@@ -93,6 +94,9 @@ public sealed class SessionNatsPublisher : ISessionEventPublisher
                 ["Nats-Msg-Id"] = deduplicationId,
                 ["Cena-Schema-Version"] = "1",
             };
+
+            // INF-020: Propagate W3C trace context through NATS messages
+            NatsTracePropagation.InjectTraceContext(headers);
 
             await _nats.PublishAsync(subject, data, headers: headers);
 

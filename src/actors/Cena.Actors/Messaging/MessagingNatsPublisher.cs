@@ -10,6 +10,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Cena.Actors.Events;
+using Cena.Infrastructure.Tracing;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
 
@@ -65,6 +66,9 @@ public sealed class MessagingNatsPublisher : IMessagingEventPublisher
                 ["Cena-Correlation-Id"] = Guid.NewGuid().ToString("N"),
                 ["Cena-Schema-Version"] = "1",
             };
+
+            // INF-020: Propagate W3C trace context through NATS messages
+            NatsTracePropagation.InjectTraceContext(headers);
 
             await _nats.PublishAsync(subject, data, headers: headers);
 

@@ -6,6 +6,7 @@
 
 using System.Text.Json;
 using Cena.Actors.Bus;
+using Cena.Infrastructure.Tracing;
 using Microsoft.AspNetCore.SignalR;
 using NATS.Client.Core;
 
@@ -82,6 +83,13 @@ public sealed class NatsSignalRBridge : BackgroundService
         {
             try
             {
+                // INF-020: Extract W3C trace context from NATS headers so the
+                // SignalR push becomes a child span of the publishing actor's trace.
+                using var traceActivity = NatsTracePropagation.ExtractTraceContext(
+                    msg.Headers, $"NatsSignalRBridge.RouteEvent {msg.Subject}");
+                traceActivity?.SetTag("messaging.system", "nats");
+                traceActivity?.SetTag("messaging.destination", msg.Subject);
+
                 await RouteEvent(msg.Subject, msg.Data ?? "{}");
             }
             catch (Exception ex)

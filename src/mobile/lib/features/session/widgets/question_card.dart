@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/models/domain_models.dart';
+import 'math_text.dart';
 
 /// Renders the current [exercise] and dispatches selection events for MCQ.
 ///
@@ -86,11 +87,12 @@ class QuestionCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Question text — renders content with styled LaTeX-style inline notation.
+// Question text — renders content with LaTeX math via flutter_math_fork.
 // ---------------------------------------------------------------------------
 
-/// Renders question text. Inline LaTeX delimited by \$...\$ is displayed with
-/// monospace styling until flutter_math is integrated as a dependency.
+/// Renders question text with proper LaTeX math rendering.
+/// Delegates to [MathText] which handles `$...$` (inline) and `$$...$$`
+/// (display) math delimiters using flutter_math_fork.
 class _QuestionText extends StatelessWidget {
   const _QuestionText({required this.content});
 
@@ -98,51 +100,12 @@ class _QuestionText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isRtl = Directionality.of(context) == TextDirection.rtl;
-
-    return Directionality(
-      textDirection: isRtl ? TextDirection.rtl : TextDirection.ltr,
-      child: SelectableText.rich(
-        _buildSpans(content, theme),
-        textAlign: isRtl ? TextAlign.right : TextAlign.left,
-      ),
+    return MathText(
+      content: content,
+      textStyle: Theme.of(context).textTheme.bodyLarge,
+      mathColor: SubjectColorTokens.mathPrimary,
+      mathBackground: SubjectColorTokens.mathBackground,
     );
-  }
-
-  /// Parses content and wraps \$...\$ segments in monospace style.
-  TextSpan _buildSpans(String content, ThemeData theme) {
-    final spans = <InlineSpan>[];
-    final regex = RegExp(r'\$(.*?)\$');
-    int lastEnd = 0;
-
-    for (final match in regex.allMatches(content)) {
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(
-          text: content.substring(lastEnd, match.start),
-          style: theme.textTheme.bodyLarge,
-        ));
-      }
-      spans.add(TextSpan(
-        text: match.group(1) ?? '',
-        style: theme.textTheme.bodyLarge?.copyWith(
-          fontFamily: TypographyTokens.monoFontFamily,
-          backgroundColor:
-              theme.colorScheme.surfaceContainerHighest,
-          color: theme.colorScheme.primary,
-        ),
-      ));
-      lastEnd = match.end;
-    }
-
-    if (lastEnd < content.length) {
-      spans.add(TextSpan(
-        text: content.substring(lastEnd),
-        style: theme.textTheme.bodyLarge,
-      ));
-    }
-
-    return TextSpan(children: spans);
   }
 }
 

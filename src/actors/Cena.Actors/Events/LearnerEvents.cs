@@ -43,6 +43,43 @@ public record ConceptAttempted_V1(
 ) : IDelegatedEvent;
 
 /// <summary>
+/// V2 of ConceptAttempted — adds Duration field for time-on-task analytics.
+/// Upcasted from V1 with Duration defaulting to TimeSpan.Zero when unknown.
+///
+/// DATA-009: Example of event schema evolution via upcasting.
+/// Old V1 events in the store are transparently transformed to V2 on read.
+/// </summary>
+public record ConceptAttempted_V2(
+    string StudentId,
+    string ConceptId,
+    string SessionId,
+    bool IsCorrect,
+    int ResponseTimeMs,
+    string QuestionId,
+    string QuestionType,
+    string MethodologyActive,
+    string ErrorType,
+    double PriorMastery,
+    double PosteriorMastery,
+    int HintCountUsed,
+    bool WasSkipped,
+    string AnswerHash,
+    int BackspaceCount,
+    int AnswerChangeCount,
+    bool WasOffline,
+    DateTimeOffset Timestamp,
+    /// <summary>
+    /// Wall-clock duration the student spent on this question.
+    /// Defaults to TimeSpan.Zero for events upcasted from V1.
+    /// </summary>
+    TimeSpan Duration,
+    float QuestionDifficulty = 0f,
+    float DifficultyGap = 0f,
+    string? DifficultyFrame = null,
+    string? FocusState = null
+) : IDelegatedEvent;
+
+/// <summary>
 /// Emitted when a concept crosses the mastery threshold (default 0.85).
 /// Includes InitialHalfLifeHours for HLR-based spaced repetition scheduling.
 /// </summary>

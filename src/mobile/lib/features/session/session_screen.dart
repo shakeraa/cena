@@ -12,6 +12,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/domain_models.dart';
 import '../../core/router.dart';
+import '../../core/services/analytics_service.dart';
 import '../../core/state/session_notifier.dart';
 import 'widgets/action_buttons.dart';
 import 'widgets/answer_input.dart';
@@ -301,6 +302,13 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
       subject: subject,
       durationMinutes: _selectedDuration,
     );
+
+    // Log session start to analytics
+    final analytics = ref.read(analyticsServiceProvider);
+    final sessionState = ref.read(sessionProvider);
+    final sessionId = sessionState.currentSession?.id ?? 'unknown';
+    final subjectName = subject?.name ?? 'unspecified';
+    analytics.logSessionStart(sessionId, subjectName);
   }
 
   // ---------------------------------------------------------------------------
@@ -433,7 +441,29 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   void _submitAnswer(String answer, int _) {
     final timeSpentMs =
         DateTime.now().difference(_questionDisplayedAt).inMilliseconds;
+    final state = ref.read(sessionProvider);
     ref.read(sessionProvider.notifier).submitAnswer(answer, timeSpentMs);
+
+    // Log question attempt to analytics after submission
+    final exercise = state.currentExercise;
+    if (exercise != null) {
+      final analytics = ref.read(analyticsServiceProvider);
+      // We check the latest history entry after submission for correctness.
+      // Since submitAnswer is async internally, we use a post-frame callback
+      // to read the updated state.
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        final updated = ref.read(sessionProvider);
+        final lastResult = updated.sessionHistory.isNotEmpty
+            ? updated.sessionHistory.last
+            : null;
+        analytics.logQuestionAttempt(
+          exercise.id,
+          correct: lastResult?.isCorrect ?? false,
+          methodology: state.methodology?.name ?? 'unknown',
+        );
+      });
+    }
   }
 
   void _skipQuestion(String? reason) {

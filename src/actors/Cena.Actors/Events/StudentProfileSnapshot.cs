@@ -62,6 +62,23 @@ public class StudentProfileSnapshot
         state.LastMethodology = e.MethodologyActive;
     }
 
+    /// <summary>
+    /// DATA-009: Apply handler for V2 events (upcasted from V1 or natively appended).
+    /// After upcasters are active, Marten delivers V2 instances to projections.
+    /// </summary>
+    public void Apply(ConceptAttempted_V2 e)
+    {
+        if (!ConceptMastery.ContainsKey(e.ConceptId))
+            ConceptMastery[e.ConceptId] = new ConceptMasteryState();
+
+        var state = ConceptMastery[e.ConceptId];
+        state.PKnown = e.PosteriorMastery;
+        state.TotalAttempts++;
+        if (e.IsCorrect) state.CorrectCount++;
+        state.LastAttemptedAt = e.Timestamp;
+        state.LastMethodology = e.MethodologyActive;
+    }
+
     public void Apply(ConceptMastered_V1 e)
     {
         if (!ConceptMastery.ContainsKey(e.ConceptId))

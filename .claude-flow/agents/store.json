@@ -168,6 +168,146 @@
       "createdAt": "2026-03-26T14:58:55.915Z",
       "model": "opus",
       "modelRoutedBy": "default"
+    },
+    "lead-architect": {
+      "agentId": "lead-architect",
+      "agentType": "system-architect",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:11:40.883Z",
+      "domain": "architecture",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "solution-architect": {
+      "agentId": "solution-architect",
+      "agentType": "architecture",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:11:43.521Z",
+      "domain": "architecture",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "cyber-officer-1": {
+      "agentId": "cyber-officer-1",
+      "agentType": "security-architect",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:11:46.228Z",
+      "domain": "security",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "cyber-officer-2": {
+      "agentId": "cyber-officer-2",
+      "agentType": "security-auditor",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:11:48.518Z",
+      "domain": "security",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "pedagogy-professor-1": {
+      "agentId": "pedagogy-professor-1",
+      "agentType": "researcher",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:11:51.160Z",
+      "domain": "research",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "pedagogy-professor-2": {
+      "agentId": "pedagogy-professor-2",
+      "agentType": "researcher",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:11:54.346Z",
+      "domain": "research",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "backend-senior": {
+      "agentId": "backend-senior",
+      "agentType": "backend-dev",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:11:57.610Z",
+      "domain": "backend",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "frontend-senior": {
+      "agentId": "frontend-senior",
+      "agentType": "reviewer",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:11:59.862Z",
+      "domain": "frontend",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "devops-engineer": {
+      "agentId": "devops-engineer",
+      "agentType": "reviewer",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:12:02.329Z",
+      "domain": "devops",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
+    },
+    "qa-lead": {
+      "agentId": "qa-lead",
+      "agentType": "tester",
+      "status": "idle",
+      "health": 1,
+      "taskCount": 0,
+      "config": {
+        "model": "opus"
+      },
+      "createdAt": "2026-03-28T19:12:04.986Z",
+      "domain": "testing",
+      "model": "opus",
+      "modelRoutedBy": "explicit"
     }
   },
   "version": "3.0.0"

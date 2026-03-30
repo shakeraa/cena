@@ -42,6 +42,10 @@ public static class ErrorCodes
     public const string CENA_PAYMENT_FAILED             = "CENA_PAYMENT_FAILED";
     public const string CENA_PAYMENT_REFUND_FAILED      = "CENA_PAYMENT_REFUND_FAILED";
 
+    // ---- Event Store (DATA-010) ----
+    /// <summary>Optimistic concurrency conflict on event stream append.</summary>
+    public const string CENA_EVENTSTORE_CONCURRENCY     = "CENA_EVENTSTORE_CONCURRENCY";
+
     // ---- Internal ----
     public const string CENA_INTERNAL_ERROR             = "CENA_INTERNAL_ERROR";
     public const string CENA_INTERNAL_VALIDATION        = "CENA_INTERNAL_VALIDATION";
@@ -63,6 +67,7 @@ public static class ErrorCodes
         CENA_LLM_TIMEOUT              => "INTERNAL_ERROR",
         CENA_LLM_CONTENT_FILTER       => "CONTENT_FILTERED",
         CENA_ACTOR_VERSION_CONFLICT   => "CONFLICT",
+        CENA_EVENTSTORE_CONCURRENCY   => "CONFLICT",
         CENA_ACTOR_ACTIVATION_FAILED  => "INTERNAL_ERROR",
         CENA_ACTOR_PASSIVATED         => "INTERNAL_ERROR",
         CENA_NATS_PUBLISH_FAILED      => "INTERNAL_ERROR",

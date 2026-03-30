@@ -12,6 +12,7 @@ import 'package:intl/intl.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/models/domain_models.dart';
+import '../../core/services/analytics_service.dart';
 import '../../core/state/gamification_state.dart';
 import 'badge_detail_dialog.dart';
 import 'streak_widget.dart';

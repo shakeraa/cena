@@ -5,10 +5,12 @@
 // =============================================================================
 
 using System.Collections.Concurrent;
+using System.Diagnostics;
 using System.Text.Json;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Sessions;
 using Cena.Actors.Students;
+using Cena.Infrastructure.Tracing;
 using Marten;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -162,6 +164,13 @@ public sealed class NatsBusRouter : BackgroundService
                     var envelope = JsonSerializer.Deserialize<BusEnvelope<T>>(rawData, _jsonOpts);
                     if (envelope is not null && envelope.Payload is not null)
                     {
+                        // INF-020: Extract W3C trace context from NATS headers so the
+                        // processing span becomes a child of the publisher's trace.
+                        using var traceActivity = NatsTracePropagation.ExtractTraceContext(
+                            msg.Headers, $"NatsBusRouter.Receive {subject}");
+                        traceActivity?.SetTag("messaging.system", "nats");
+                        traceActivity?.SetTag("messaging.destination", subject);
+
                         await RouteWithRetry(subject, envelope, rawData, handler, ct);
                     }
                     else
@@ -596,7 +605,11 @@ public sealed class NatsBusRouter : BackgroundService
     {
         var envelope = BusEnvelope<T>.Create(subject, payload, "actor-host");
         var json = JsonSerializer.Serialize(envelope, _jsonOpts);
-        await _nats.PublishAsync(subject, json);
+
+        // INF-020: Propagate W3C trace context on outgoing events
+        var headers = NatsTracePropagation.InjectTraceContext();
+
+        await _nats.PublishAsync(subject, json, headers: headers);
         Interlocked.Increment(ref _eventsPublished);
     }
 

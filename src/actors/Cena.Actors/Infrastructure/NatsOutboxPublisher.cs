@@ -11,6 +11,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
+using Cena.Infrastructure.Tracing;
 using Marten;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -216,8 +217,12 @@ public sealed class NatsOutboxPublisher : BackgroundService
                 var payload = JsonSerializer.SerializeToUtf8Bytes(
                     eventWrapper.Data, JsonOptions);
 
+                // INF-020: Inject W3C trace context so downstream consumers
+                // (NatsBusRouter, NatsSignalRBridge) can link their spans to this publish.
+                var headers = NatsTracePropagation.InjectTraceContext();
+
                 // Publish to NATS and wait for confirmation
-                await _nats.PublishAsync(subject, payload, cancellationToken: ct);
+                await _nats.PublishAsync(subject, payload, headers: headers, cancellationToken: ct);
 
                 highestSequence = eventWrapper.Sequence;
                 published++;

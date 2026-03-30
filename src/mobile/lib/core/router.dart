@@ -2,6 +2,7 @@
 // Cena Adaptive Learning Platform — Application Router
 // =============================================================================
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -10,6 +11,8 @@ import '../features/auth/auth_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/session/session_screen.dart';
+import 'services/analytics_service.dart';
+import 'services/deep_link_service.dart';
 
 /// Named route constants for type-safe navigation.
 abstract class CenaRoutes {
@@ -17,27 +20,78 @@ abstract class CenaRoutes {
   static const String onboarding = '/onboarding';
   static const String home = '/home';
   static const String session = '/session';
+  static const String sessionById = '/session/:id';
+  static const String graph = '/graph';
+  static const String profile = '/profile';
+
+  /// Routes that require authentication.
+  static const Set<String> authenticated = {
+    home,
+    session,
+    graph,
+    profile,
+  };
+
+  /// Returns `true` if the given [path] requires an authenticated user.
+  static bool requiresAuth(String path) {
+    return authenticated.any(
+      (route) => path == route || path.startsWith('$route/'),
+    );
+  }
 }
 
 /// SharedPreferences key that marks onboarding as complete.
 const String _kOnboardingComplete = 'onboarding_complete';
 
-/// Application router using go_router.
+/// Creates the application router, optionally injecting [observers] for
+/// analytics screen tracking.
 ///
-/// Redirects first-time users to [CenaRoutes.onboarding] before they can
-/// reach any authenticated screen. The flag is persisted via
-/// SharedPreferences and written by [OnboardingNotifier.completeOnboarding].
-final GoRouter cenaRouter = GoRouter(
-  initialLocation: CenaRoutes.home,
-  debugLogDiagnostics: true,
+/// Deep link redirect logic:
+///   1. Onboarding gate — first-time users always see onboarding first.
+///   2. Auth gate — protected routes redirect to login; the intended path is
+///      stored in [DeferredDeepLink] and replayed after successful login.
+///   3. Deferred replay — on returning to home after login, any stored deep
+///      link is consumed and navigated to.
+GoRouter buildCenaRouter({
+  List<NavigatorObserver>? observers,
+}) {
+  return GoRouter(
+    initialLocation: CenaRoutes.home,
+    debugLogDiagnostics: true,
+    observers: observers ?? const [],
   redirect: (BuildContext context, GoRouterState state) async {
-    // Never redirect if the user is already on the onboarding flow.
-    if (state.matchedLocation == CenaRoutes.onboarding) return null;
+    final location = state.matchedLocation;
+
+    // Never redirect if the user is already on the onboarding or login flow.
+    if (location == CenaRoutes.onboarding || location == CenaRoutes.login) {
+      return null;
+    }
 
     final prefs = await SharedPreferences.getInstance();
     final onboardingDone = prefs.getBool(_kOnboardingComplete) ?? false;
 
-    if (!onboardingDone) return CenaRoutes.onboarding;
+    // Gate 1: Onboarding — first-time users always see onboarding first.
+    if (!onboardingDone) {
+      if (location != CenaRoutes.home) {
+        DeferredDeepLink.instance.store(location);
+      }
+      return CenaRoutes.onboarding;
+    }
+
+    // Gate 2: Authentication — protected routes require a logged-in user.
+    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+
+    if (!isLoggedIn && CenaRoutes.requiresAuth(location)) {
+      DeferredDeepLink.instance.store(location);
+      return CenaRoutes.login;
+    }
+
+    // Gate 3: Replay deferred deep link after successful login.
+    if (isLoggedIn && location == CenaRoutes.home) {
+      final deferred = DeferredDeepLink.instance.consume();
+      if (deferred != null) return deferred;
+    }
+
     return null;
   },
   routes: [
@@ -69,6 +123,27 @@ final GoRouter cenaRouter = GoRouter(
         return const SessionScreen();
       },
     ),
+    GoRoute(
+      path: CenaRoutes.sessionById,
+      name: 'sessionById',
+      builder: (BuildContext context, GoRouterState state) {
+        return const SessionScreen();
+      },
+    ),
+    GoRoute(
+      path: CenaRoutes.graph,
+      name: 'graph',
+      builder: (BuildContext context, GoRouterState state) {
+        return const HomeScreen(); // Graph tab within home — placeholder
+      },
+    ),
+    GoRoute(
+      path: CenaRoutes.profile,
+      name: 'profile',
+      builder: (BuildContext context, GoRouterState state) {
+        return const HomeScreen(); // Profile tab within home — placeholder
+      },
+    ),
   ],
   errorBuilder: (BuildContext context, GoRouterState state) {
     return Scaffold(
@@ -98,4 +173,9 @@ final GoRouter cenaRouter = GoRouter(
       ),
     );
   },
-);
+  );
+}
+
+/// Default router instance (no analytics observer).
+/// Kept for backward compatibility with code that references [cenaRouter].
+final GoRouter cenaRouter = buildCenaRouter();

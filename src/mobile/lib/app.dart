@@ -5,11 +5,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'core/config/app_config.dart';
 import 'core/router.dart';
+import 'core/services/analytics_service.dart';
 import 'core/state/app_state.dart';
 import 'core/theme/cena_theme.dart';
+
+/// Riverpod provider that builds the router once, injecting the analytics
+/// observer so all screen transitions are tracked automatically.
+final cenaRouterProvider = Provider<GoRouter>((ref) {
+  final analytics = ref.watch(analyticsServiceProvider);
+  return buildCenaRouter(observers: [analytics.observer]);
+});
 
 /// Riverpod provider for the current locale.
 /// Defaults to Hebrew (primary locale).
@@ -31,6 +40,7 @@ class CenaApp extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final locale = ref.watch(currentLocaleProvider);
     final isRtl = AppLocales.isRtl(locale);
+    final router = ref.watch(cenaRouterProvider);
 
     return MaterialApp.router(
       title: 'Cena',
@@ -42,7 +52,7 @@ class CenaApp extends ConsumerWidget {
       themeMode: ThemeMode.system,
 
       // Routing
-      routerConfig: cenaRouter,
+      routerConfig: router,
 
       // Localization
       locale: locale,
