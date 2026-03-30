@@ -27,7 +27,9 @@ const eventTypes = [
   'ConceptAttempted', 'ConceptMastered', 'StagnationDetected',
   'MethodologySwitched', 'SessionStarted', 'SessionEnded',
   'FocusAlert', 'MicrobreakTaken',
-  'Tutoring', 'Explanation', 'Embedding', 'Experiment', 'Hint', 'Confusion',
+  'TutoringSessionStarted', 'TutoringMessageSent', 'TutoringSessionEnded',
+  'ExplanationGenerated', 'ErrorClassified', 'HintDelivered',
+  'Embedding', 'Experiment', 'Confusion',
 ]
 
 const fetchEvents = async () => {

@@ -78,6 +78,7 @@ const actorChildren: ClusterChild[] = [
   { id: 'session-actor', label: 'Session', icon: 'LS', category: 'core' },
   { id: 'curriculum-actor', label: 'Curriculum', icon: 'CG', category: 'graph' },
   { id: 'mcm-actor', label: 'MCM Graph', icon: 'M', category: 'graph' },
+  { id: 'tutor-actor', label: 'Tutor', icon: 'TA', category: 'ai' },
   { id: 'llm-gateway', label: 'LLM Gateway', icon: 'LG', category: 'ai' },
   { id: 'circuit-breaker', label: 'Circuit Breaker', icon: 'CB', category: 'ai' },
   { id: 'outreach-actor', label: 'Outreach', icon: 'OR', category: 'outreach' },

@@ -12,6 +12,7 @@ interface QuestionRow {
   bloomLevel: number
   difficulty: string
   status: string
+  source: string | null
   qualityScore: number | null
   usageCount: number
   successRate: number | null
@@ -49,6 +50,7 @@ const headers = [
   { title: 'Bloom\'s', key: 'bloomLevel', width: 100 },
   { title: 'Difficulty', key: 'difficulty', width: 130 },
   { title: 'Status', key: 'status', width: 110 },
+  { title: 'Source', key: 'source', width: 90 },
   { title: 'Quality', key: 'qualityScore', width: 90 },
   { title: 'Usage', key: 'usageCount', width: 80 },
   { title: 'Success %', key: 'successRate', width: 100 },
@@ -862,6 +864,17 @@ const exportCsv = () => {
             class="text-capitalize"
           >
             {{ item.status }}
+          </VChip>
+        </template>
+
+        <!-- Source -->
+        <template #item.source="{ item }">
+          <VChip
+            :color="item.source === 'ai' ? 'info' : item.source === 'ocr' ? 'warning' : 'default'"
+            size="small"
+            variant="tonal"
+          >
+            {{ (item.source ?? 'manual').toUpperCase() }}
           </VChip>
         </template>
 

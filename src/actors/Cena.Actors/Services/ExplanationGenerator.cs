@@ -34,7 +34,9 @@ public sealed record ExplanationContext(
     IReadOnlyList<string>? RecentErrorTypes,
     IReadOnlyList<string>? PrerequisiteConceptNames,
     // SAI-003: Scaffolding depth for prompt calibration
-    string? ScaffoldingLevel = null);
+    string? ScaffoldingLevel = null,
+    // SAI-008: Question difficulty for difficulty-aware framing
+    float? QuestionDifficulty = null);
 
 /// <summary>
 /// The LLM-generated explanation with model metadata.
@@ -141,6 +143,16 @@ public sealed class ExplanationGenerator : IExplanationGenerator
         // Fatigue adjustment instruction
         if (ctx.FatigueLevel is "high" or "critical")
             parts.Add("IMPORTANT: Student is fatigued. Keep explanation BRIEF (2-3 sentences max).");
+
+        // SAI-008: Difficulty-aware framing for L2 generation
+        if (ctx.QuestionDifficulty.HasValue && ctx.ConceptMastery.HasValue)
+        {
+            var gap = DifficultyGap.Compute(ctx.QuestionDifficulty.Value, (float)ctx.ConceptMastery.Value);
+            var frame = DifficultyGap.Classify(gap);
+            var promptFrame = DifficultyGap.ToPromptFrame(frame);
+            if (!string.IsNullOrEmpty(promptFrame))
+                parts.Add($"DIFFICULTY CONTEXT: {promptFrame}");
+        }
 
         parts.Add("Generate the explanation now.");
 

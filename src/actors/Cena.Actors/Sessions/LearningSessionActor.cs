@@ -73,6 +73,7 @@ public sealed class LearningSessionActor : IActor
     private Proto.PID? _tutorPid;
     private string _currentConceptId = "";
     private double _currentConceptMastery;
+    private float _currentQuestionDifficulty;
 
     // ── Disengagement tracking state ──
     private int _hintRequestCount;
@@ -226,7 +227,8 @@ public sealed class LearningSessionActor : IActor
             SpawnTutorActor(context);
             context.Send(_tutorPid!, new StartTutoringFromConfusionStuck(
                 _studentId, _sessionId, req.ConceptId, _subject, _language,
-                _methodology, bktResult.PosteriorMastery, 3));
+                _methodology, bktResult.PosteriorMastery, 3,
+                _currentQuestionDifficulty));
         }
 
         // Track for fatigue calculation (O(1) enqueue/dequeue)
@@ -422,6 +424,10 @@ public sealed class LearningSessionActor : IActor
         if (disengagement == DisengagementType.Fatigued_Cognitive && req.HintLevel > 1)
             effectiveHintLevel = 1; // Simplify to nudge-level
 
+        // Track difficulty for tutoring entry points
+        if (req.QuestionDifficulty > 0f)
+            _currentQuestionDifficulty = req.QuestionDifficulty;
+
         // SAI-01b: Use new HintGenerationService for language-aware templates
         var hintGenContent = _hintGenerationService.GenerateHint(new HintGenerationContext(
             HintLevel: effectiveHintLevel,
@@ -505,6 +511,10 @@ public sealed class LearningSessionActor : IActor
     private async Task HandlePersonalizedExplanation(
         IContext context, RequestPersonalizedExplanation req)
     {
+        // Track difficulty for tutoring entry points
+        if (req.QuestionDifficulty > 0f)
+            _currentQuestionDifficulty = req.QuestionDifficulty;
+
         var scaffolding = ScaffoldingService.DetermineLevel(
             (float)req.CurrentMastery, (float)req.PrerequisiteSatisfaction);
 
@@ -563,13 +573,15 @@ public sealed class LearningSessionActor : IActor
         {
             context.Send(_tutorPid!, new StartTutoringFromConfusion(
                 _studentId, _sessionId, msg.ConceptId, _subject, _language,
-                _methodology, _currentConceptMastery, 3));
+                _methodology, _currentConceptMastery, 3,
+                _currentQuestionDifficulty));
         }
         else
         {
             context.Send(_tutorPid!, new StartTutoringFromQuestion(
                 _studentId, _sessionId, msg.ConceptId, _subject, _language,
-                _methodology, _currentConceptMastery, 3, msg.Text));
+                _methodology, _currentConceptMastery, 3, msg.Text,
+                _currentQuestionDifficulty));
         }
 
         return Task.CompletedTask;

@@ -217,7 +217,8 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
         {
             var systemPrompt = BuildSystemPrompt(ctx, effectiveScaffolding);
             var userPrompt = BuildUserPrompt(ctx, effectiveScaffolding);
-            var maxTokens = DetermineMaxTokens(effectiveScaffolding, ctx.BloomLevel);
+            var maxTokens = DetermineMaxTokens(
+                effectiveScaffolding, ctx.BloomLevel, ctx.QuestionDifficulty, ctx.MasteryProbability);
 
             var llmRequest = new LlmRequest(
                 SystemPrompt: systemPrompt,
@@ -543,8 +544,10 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
     /// <summary>
     /// Scaffolding-based max tokens: Full=600, Partial=400, HintsOnly=200.
     /// Bloom's level can increase the cap for analytical questions.
+    /// Difficulty frame adjusts: stretch +50%, regression -30%.
     /// </summary>
-    private static int DetermineMaxTokens(ScaffoldingLevel scaffolding, int bloomsLevel)
+    internal static int DetermineMaxTokens(
+        ScaffoldingLevel scaffolding, int bloomsLevel, float? questionDifficulty = null, float masteryProbability = 0.5f)
     {
         var baseTokens = scaffolding switch
         {
@@ -557,6 +560,15 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
         // Higher Bloom's levels get more room for analytical depth
         if (bloomsLevel >= 5)
             baseTokens = (int)(baseTokens * 1.3);
+
+        // Difficulty-aware scaling: stretch questions deserve longer explanations,
+        // regression questions need shorter, more targeted responses.
+        if (questionDifficulty.HasValue)
+        {
+            var gap = DifficultyGap.Compute(questionDifficulty.Value, masteryProbability);
+            var frame = DifficultyGap.Classify(gap);
+            baseTokens = DifficultyGap.AdjustMaxTokens(baseTokens, frame);
+        }
 
         return baseTokens;
     }

@@ -165,7 +165,8 @@ public sealed class ExplanationOrchestrator : IExplanationOrchestrator
                 BackspaceCount: request.BackspaceCount,
                 AnswerChangeCount: request.AnswerChangeCount,
                 RecentErrorTypes: request.RecentErrorTypes,
-                PrerequisiteConceptNames: request.PrerequisiteConceptNames);
+                PrerequisiteConceptNames: request.PrerequisiteConceptNames,
+                QuestionDifficulty: request.QuestionDifficulty);
 
             var generated = await _generator.GenerateAsync(context, ct);
 

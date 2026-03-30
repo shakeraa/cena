@@ -32,7 +32,8 @@ public sealed record StartTutoringFromConfusion(
     string Language,
     string Methodology,
     double ConceptMastery,
-    int BloomsLevel);
+    int BloomsLevel,
+    float QuestionDifficulty = 0f);
 
 /// <summary>Start tutoring from a question annotation (kind='question').</summary>
 public sealed record StartTutoringFromQuestion(
@@ -44,7 +45,8 @@ public sealed record StartTutoringFromQuestion(
     string Methodology,
     double ConceptMastery,
     int BloomsLevel,
-    string StudentQuestion);
+    string StudentQuestion,
+    float QuestionDifficulty = 0f);
 
 /// <summary>Auto-triggered tutoring from ConfusionStuck detection.</summary>
 public sealed record StartTutoringFromConfusionStuck(
@@ -55,7 +57,8 @@ public sealed record StartTutoringFromConfusionStuck(
     string Language,
     string Methodology,
     double ConceptMastery,
-    int BloomsLevel);
+    int BloomsLevel,
+    float QuestionDifficulty = 0f);
 
 /// <summary>Post-wrong-answer follow-up: offer "want to discuss further?".</summary>
 public sealed record StartTutoringPostWrongAnswer(
@@ -93,7 +96,8 @@ public sealed record StartTutoring(
     string Language,
     string Methodology,
     double ConceptMastery,
-    int BloomsLevel);
+    int BloomsLevel,
+    float QuestionDifficulty = 0f);
 
 /// <summary>Sent by TutorActor to parent when methodology rejects tutoring.</summary>
 public sealed record TutoringRejected(string Methodology, string Reason);
@@ -212,6 +216,8 @@ public sealed class TutorActor : IActor
         if (ShouldRejectMethodology(context, msg.Methodology))
             return;
 
+        _questionDifficulty = msg.QuestionDifficulty;
+
         InitSession(context, msg.StudentId, msg.SessionId, msg.ConceptId, msg.Subject,
             msg.Language, msg.Methodology, msg.ConceptMastery, msg.BloomsLevel, "confusion_annotation");
 
@@ -234,6 +240,8 @@ public sealed class TutorActor : IActor
     {
         if (ShouldRejectMethodology(context, msg.Methodology))
             return;
+
+        _questionDifficulty = msg.QuestionDifficulty;
 
         InitSession(context, msg.StudentId, msg.SessionId, msg.ConceptId, msg.Subject,
             msg.Language, msg.Methodology, msg.ConceptMastery, msg.BloomsLevel, "question_annotation");
@@ -259,6 +267,8 @@ public sealed class TutorActor : IActor
     {
         if (ShouldRejectMethodology(context, msg.Methodology))
             return;
+
+        _questionDifficulty = msg.QuestionDifficulty;
 
         InitSession(context, msg.StudentId, msg.SessionId, msg.ConceptId, msg.Subject,
             msg.Language, msg.Methodology, msg.ConceptMastery, msg.BloomsLevel, "confusion_stuck");
