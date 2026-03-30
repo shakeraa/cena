@@ -74,6 +74,17 @@ export const db: DB = {
       ],
     },
     {
+      title: 'Communication',
+      category: 'communication',
+      children: [
+        {
+          url: { name: 'apps-messaging' },
+          icon: 'tabler-message-circle',
+          title: 'Messaging',
+        },
+      ],
+    },
+    {
       title: 'Student AI',
       category: 'studentAi',
       children: [

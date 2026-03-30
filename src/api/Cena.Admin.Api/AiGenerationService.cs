@@ -112,6 +112,64 @@ public sealed record AiGenerateResponse(
     string? RawOutput,
     string? Error);
 
+// ── Batch Generation Request/Response (CNT-002) ──
+
+/// <summary>
+/// Generate N questions that share the same subject/topic/grade/Bloom/difficulty parameters.
+/// count is clamped to 1-20 per call.
+/// </summary>
+public sealed record BatchGenerateRequest(
+    int Count,                     // 1-20 questions
+    string Subject,
+    string? Topic,
+    string Grade,
+    int BloomsLevel,
+    float MinDifficulty,
+    float MaxDifficulty,
+    string Language);
+
+public sealed record BatchGenerateResult(
+    AiGeneratedQuestion Question,
+    QualityGate.QualityGateResult QualityGate,
+    bool PassedQualityGate);
+
+public sealed record BatchGenerateResponse(
+    bool Success,
+    IReadOnlyList<BatchGenerateResult> Results,
+    int TotalGenerated,
+    int PassedQualityGate,
+    int NeedsReview,
+    int AutoRejected,
+    string ModelUsed,
+    string? Error);
+
+// ── Template (OCR) Generation Request/Response (CNT-002) ──
+
+/// <summary>
+/// Generate questions that match the style and format of an exam paper captured via OCR.
+/// The ocrText is used as both context and style reference.
+/// </summary>
+public sealed record TemplateGenerateRequest(
+    string OcrText,               // OCR-extracted text from exam paper
+    int Count,                    // 1-20 questions
+    string Subject,
+    string? Topic,
+    string Grade,
+    int BloomsLevel,
+    float MinDifficulty,
+    float MaxDifficulty,
+    string Language);
+
+public sealed record TemplateGenerateResponse(
+    bool Success,
+    IReadOnlyList<BatchGenerateResult> Results,
+    int TotalGenerated,
+    int PassedQualityGate,
+    int NeedsReview,
+    int AutoRejected,
+    string ModelUsed,
+    string? Error);
+
 // ── Circuit Breaker (in-process, mirrors LlmCircuitBreakerActor thresholds) ──
 
 public sealed class CircuitOpenException : Exception
@@ -127,6 +185,8 @@ public interface IAiGenerationService
     Task<AiSettingsResponse> GetSettingsAsync();
     Task<bool> UpdateSettingsAsync(UpdateAiSettingsRequest request, string userId);
     Task<bool> TestConnectionAsync(AiProvider provider);
+    Task<BatchGenerateResponse> BatchGenerateAsync(BatchGenerateRequest request, QualityGate.IQualityGateService qualityGate);
+    Task<TemplateGenerateResponse> GenerateFromTemplateAsync(TemplateGenerateRequest request, QualityGate.IQualityGateService qualityGate);
 }
 
 // ── Implementation ──
@@ -675,5 +735,181 @@ public sealed class AiGenerationService : IAiGenerationService
             "LLM call completed: model={Model}, task={Task}, duration={DurationMs}ms, " +
             "input_tokens={InputTokens}, output_tokens={OutputTokens}, cost_usd={Cost:F6}",
             model, taskType, durationMs, inputTokens, outputTokens, cost);
+    }
+
+    // ── Batch Generation (CNT-002) ──
+
+    public async Task<BatchGenerateResponse> BatchGenerateAsync(
+        BatchGenerateRequest req, QualityGate.IQualityGateService qualityGate)
+    {
+        var count = Math.Clamp(req.Count, 1, 20);
+        var min   = Math.Clamp(req.MinDifficulty, 0f, 1f);
+        var max   = Math.Clamp(req.MaxDifficulty, 0f, 1f);
+        if (max < min) (min, max) = (max, min);
+
+        var generateReq = new AiGenerateRequest(
+            Subject:          req.Subject,
+            Topic:            req.Topic,
+            Grade:            req.Grade,
+            BloomsLevel:      req.BloomsLevel,
+            MinDifficulty:    min,
+            MaxDifficulty:    max,
+            Language:         req.Language,
+            Context:          null,
+            ImageBase64:      null,
+            FileName:         null,
+            StyleContext:     null,
+            StyleImageBase64: null,
+            StyleFileName:    null,
+            Count:            count);
+
+        var generateResponse = await GenerateQuestionsAsync(generateReq);
+
+        if (!generateResponse.Success)
+        {
+            return new BatchGenerateResponse(
+                Success: false,
+                Results: Array.Empty<BatchGenerateResult>(),
+                TotalGenerated: 0,
+                PassedQualityGate: 0,
+                NeedsReview: 0,
+                AutoRejected: 0,
+                ModelUsed: generateResponse.ModelUsed,
+                Error: generateResponse.Error);
+        }
+
+        var results = new List<BatchGenerateResult>();
+
+        foreach (var question in generateResponse.Questions)
+        {
+            var questionId = Guid.NewGuid().ToString();
+            var correctIndex = question.Options
+                .Select((o, i) => (o, i))
+                .FirstOrDefault(x => x.o.IsCorrect).i;
+
+            var gateInput = new QualityGate.QualityGateInput(
+                QuestionId:       questionId,
+                Stem:             question.Stem,
+                Options:          question.Options.Select(o =>
+                    new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale))
+                    .ToList(),
+                CorrectOptionIndex: correctIndex,
+                Subject:          req.Subject,
+                Language:         req.Language,
+                ClaimedBloomLevel: question.BloomsLevel,
+                ClaimedDifficulty: question.Difficulty,
+                Grade:            req.Grade,
+                ConceptIds:       null);
+
+            var gateResult = await qualityGate.EvaluateAsync(gateInput);
+            var passed = gateResult.Decision != QualityGate.GateDecision.AutoRejected;
+
+            results.Add(new BatchGenerateResult(question, gateResult, passed));
+        }
+
+        return new BatchGenerateResponse(
+            Success:           true,
+            Results:           results,
+            TotalGenerated:    results.Count,
+            PassedQualityGate: results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.AutoApproved),
+            NeedsReview:       results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.NeedsReview),
+            AutoRejected:      results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.AutoRejected),
+            ModelUsed:         generateResponse.ModelUsed,
+            Error:             null);
+    }
+
+    // ── Template (OCR) Generation (CNT-002) ──
+
+    public async Task<TemplateGenerateResponse> GenerateFromTemplateAsync(
+        TemplateGenerateRequest req, QualityGate.IQualityGateService qualityGate)
+    {
+        if (string.IsNullOrWhiteSpace(req.OcrText))
+        {
+            return new TemplateGenerateResponse(
+                Success: false,
+                Results: Array.Empty<BatchGenerateResult>(),
+                TotalGenerated: 0,
+                PassedQualityGate: 0,
+                NeedsReview: 0,
+                AutoRejected: 0,
+                ModelUsed: _providers[_activeProvider].ModelId,
+                Error: "OcrText is required for template-based generation.");
+        }
+
+        var count = Math.Clamp(req.Count, 1, 20);
+        var min   = Math.Clamp(req.MinDifficulty, 0f, 1f);
+        var max   = Math.Clamp(req.MaxDifficulty, 0f, 1f);
+        if (max < min) (min, max) = (max, min);
+
+        // The OCR text serves as both context (source material) and style reference
+        var generateReq = new AiGenerateRequest(
+            Subject:          req.Subject,
+            Topic:            req.Topic,
+            Grade:            req.Grade,
+            BloomsLevel:      req.BloomsLevel,
+            MinDifficulty:    min,
+            MaxDifficulty:    max,
+            Language:         req.Language,
+            Context:          req.OcrText,
+            ImageBase64:      null,
+            FileName:         null,
+            StyleContext:     $"Match the style, difficulty, and format of the following exam paper content:\n{req.OcrText}",
+            StyleImageBase64: null,
+            StyleFileName:    null,
+            Count:            count);
+
+        var generateResponse = await GenerateQuestionsAsync(generateReq);
+
+        if (!generateResponse.Success)
+        {
+            return new TemplateGenerateResponse(
+                Success: false,
+                Results: Array.Empty<BatchGenerateResult>(),
+                TotalGenerated: 0,
+                PassedQualityGate: 0,
+                NeedsReview: 0,
+                AutoRejected: 0,
+                ModelUsed: generateResponse.ModelUsed,
+                Error: generateResponse.Error);
+        }
+
+        var results = new List<BatchGenerateResult>();
+
+        foreach (var question in generateResponse.Questions)
+        {
+            var questionId = Guid.NewGuid().ToString();
+            var correctIndex = question.Options
+                .Select((o, i) => (o, i))
+                .FirstOrDefault(x => x.o.IsCorrect).i;
+
+            var gateInput = new QualityGate.QualityGateInput(
+                QuestionId:       questionId,
+                Stem:             question.Stem,
+                Options:          question.Options.Select(o =>
+                    new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale))
+                    .ToList(),
+                CorrectOptionIndex: correctIndex,
+                Subject:          req.Subject,
+                Language:         req.Language,
+                ClaimedBloomLevel: question.BloomsLevel,
+                ClaimedDifficulty: question.Difficulty,
+                Grade:            req.Grade,
+                ConceptIds:       null);
+
+            var gateResult = await qualityGate.EvaluateAsync(gateInput);
+            var passed = gateResult.Decision != QualityGate.GateDecision.AutoRejected;
+
+            results.Add(new BatchGenerateResult(question, gateResult, passed));
+        }
+
+        return new TemplateGenerateResponse(
+            Success:           true,
+            Results:           results,
+            TotalGenerated:    results.Count,
+            PassedQualityGate: results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.AutoApproved),
+            NeedsReview:       results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.NeedsReview),
+            AutoRejected:      results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.AutoRejected),
+            ModelUsed:         generateResponse.ModelUsed,
+            Error:             null);
     }
 }

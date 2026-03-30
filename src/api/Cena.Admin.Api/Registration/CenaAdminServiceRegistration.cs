@@ -41,6 +41,9 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
         services.AddSingleton<IAiGenerationService, AiGenerationService>();
 
+        // CNT-002: Question pipeline orchestration
+        services.AddScoped<IQuestionPipelineService, QuestionPipelineService>();
+
         // SAI Admin Services (ADM-017 through ADM-023)
         services.AddScoped<ITutoringAdminService, TutoringAdminService>();
         services.AddScoped<IExplanationCacheAdminService, ExplanationCacheAdminService>();
@@ -77,6 +80,7 @@ public static class CenaAdminServiceRegistration
         app.MapEventStreamEndpoints();
         app.MapOutreachEngagementEndpoints();
         app.MapAiGenerationEndpoints();
+        app.MapQuestionPipelineEndpoints();
 
         // SAI Admin endpoints (ADM-017 through ADM-023)
         app.MapTutoringAdminEndpoints();

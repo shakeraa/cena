@@ -21,6 +21,13 @@ export default [
     action: 'read',
     subject: 'Questions',
   },
+  {
+    title: 'Language Versions',
+    icon: { icon: 'tabler-language' },
+    to: 'apps-questions-languages',
+    action: 'read',
+    subject: 'Questions',
+  },
 
   { heading: 'Users' },
   {

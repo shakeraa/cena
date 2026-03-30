@@ -36,12 +36,17 @@ public static class MessagingAdminEndpoints
             string? search,
             int? page,
             int? pageSize,
+            string? since,
             IMessagingAdminService service) =>
         {
             var validPage = ParameterValidator.ValidatePage(page);
             var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
+            DateTimeOffset? sinceTime = null;
+            if (!string.IsNullOrEmpty(since)
+                && DateTimeOffset.TryParse(since, out var parsed))
+                sinceTime = parsed;
             var result = await service.GetThreadsAsync(
-                type, participantId, search, validPage, validPageSize);
+                type, participantId, search, validPage, validPageSize, sinceTime);
             return Results.Ok(result);
         }).WithName("GetMessagingThreads");
 

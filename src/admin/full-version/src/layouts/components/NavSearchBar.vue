@@ -48,9 +48,14 @@ const suggestionGroups: SuggestionGroup[] = [
     ],
   },
   {
-    title: 'Student AI',
+    title: 'Communication',
     content: [
       { icon: 'tabler-message-circle', title: 'Messaging', url: { name: 'apps-messaging' } },
+    ],
+  },
+  {
+    title: 'Student AI',
+    content: [
       { icon: 'tabler-message-chatbot', title: 'Tutoring Sessions', url: { name: 'apps-tutoring-sessions' } },
       { icon: 'tabler-flask', title: 'A/B Experiments', url: { name: 'apps-experiments' } },
       { icon: 'tabler-shield-check', title: 'Moderation Queue', url: { name: 'apps-moderation-queue' } },

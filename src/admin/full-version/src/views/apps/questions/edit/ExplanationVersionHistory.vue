@@ -10,6 +10,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<{ restored: [] }>()
 
 const showRestoreDialog = ref(false)
+const showViewDialog = ref(false)
 const selectedVersion = ref<any>(null)
 const isRestoring = ref(false)
 
@@ -22,8 +23,26 @@ const explanationEvents = computed(() =>
   ),
 )
 
+const getExplanationText = (evt: any): string => {
+  return evt.data?.NewExplanation ?? evt.explanation ?? evt.details ?? ''
+}
+
+const formatDate = (timestamp: string | undefined): string => {
+  if (!timestamp) return ''
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  })
+}
+
+const openView = (version: any) => {
+  selectedVersion.value = version
+  showViewDialog.value = true
+}
+
 const openRestore = (version: any) => {
   selectedVersion.value = version
+  showViewDialog.value = false
   showRestoreDialog.value = true
 }
 
@@ -33,7 +52,7 @@ const confirmRestore = async () => {
   try {
     await $api(`/admin/questions/${props.questionId}/explanation`, {
       method: 'PATCH',
-      body: { text: selectedVersion.value.explanation ?? selectedVersion.value.details },
+      body: { explanation: getExplanationText(selectedVersion.value) },
     })
     showRestoreDialog.value = false
     emit('restored')
@@ -55,6 +74,14 @@ const resolveEventColor = (evt: any): string => {
   if (type.includes('restored'))
     return 'success'
   return 'secondary'
+}
+
+const resolveChangeType = (evt: any): string => {
+  const type = evt.eventType?.toLowerCase() ?? ''
+  if (type.includes('edited') || type.includes('updated')) return 'Updated'
+  if (type.includes('created') || type.includes('authored') || type.includes('generated') || type.includes('ingested')) return 'Created'
+  if (type.includes('restored')) return 'Restored'
+  return evt.eventType?.replace(/_V\d+$/, '') ?? 'Change'
 }
 
 const truncate = (text: string | undefined, max: number): string => {
@@ -100,36 +127,43 @@ const truncate = (text: string | undefined, max: number): string => {
                 :color="resolveEventColor(evt)"
                 label
               >
-                {{ evt.eventType ?? evt.action ?? 'Explanation Change' }}
+                {{ resolveChangeType(evt) }}
               </VChip>
               <span class="text-caption text-disabled">
-                {{ evt.timestamp ? new Date(evt.timestamp).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '' }}
+                {{ formatDate(evt.timestamp) }}
+              </span>
+              <span v-if="evt.data?.Editor || evt.data?.UserId" class="text-caption text-disabled">
+                by {{ evt.data.Editor || evt.data.UserId }}
               </span>
             </div>
 
             <div
-              v-if="evt.explanation || evt.details"
+              v-if="getExplanationText(evt)"
               class="text-body-2 text-medium-emphasis mt-1"
             >
-              {{ truncate(evt.explanation ?? evt.details, 200) }}
+              {{ truncate(getExplanationText(evt), 200) }}
             </div>
 
-            <div
-              v-if="evt.data?.NewExplanation"
-              class="text-body-2 text-medium-emphasis mt-1"
-            >
-              {{ truncate(evt.data.NewExplanation, 200) }}
+            <div class="d-flex gap-2 mt-2">
+              <VBtn
+                size="small"
+                variant="tonal"
+                color="secondary"
+                prepend-icon="tabler-eye"
+                @click="openView(evt)"
+              >
+                View
+              </VBtn>
+              <VBtn
+                size="small"
+                variant="tonal"
+                color="primary"
+                prepend-icon="tabler-restore"
+                @click="openRestore(evt)"
+              >
+                Restore
+              </VBtn>
             </div>
-
-            <VBtn
-              size="small"
-              variant="tonal"
-              color="primary"
-              class="mt-2"
-              @click="openRestore(evt)"
-            >
-              Restore
-            </VBtn>
           </VTimelineItem>
         </VTimeline>
 
@@ -143,6 +177,38 @@ const truncate = (text: string | undefined, max: number): string => {
     </VExpansionPanel>
   </VExpansionPanels>
 
+  <!-- View full text dialog -->
+  <VDialog
+    v-model="showViewDialog"
+    max-width="640"
+  >
+    <VCard>
+      <VCardTitle class="d-flex align-center gap-2">
+        <VIcon icon="tabler-file-text" size="20" />
+        Explanation — {{ formatDate(selectedVersion?.timestamp) }}
+      </VCardTitle>
+      <VCardText>
+        <div class="pa-4 rounded bg-surface-variant text-body-1" style="white-space: pre-wrap; max-block-size: 400px; overflow-y: auto;">
+          {{ getExplanationText(selectedVersion) || 'No explanation text available' }}
+        </div>
+      </VCardText>
+      <VCardActions>
+        <VBtn
+          variant="tonal"
+          color="primary"
+          prepend-icon="tabler-restore"
+          @click="openRestore(selectedVersion)"
+        >
+          Restore This Version
+        </VBtn>
+        <VSpacer />
+        <VBtn variant="tonal" @click="showViewDialog = false">
+          Close
+        </VBtn>
+      </VCardActions>
+    </VCard>
+  </VDialog>
+
   <!-- Restore confirmation dialog -->
   <VDialog
     v-model="showRestoreDialog"
@@ -152,13 +218,13 @@ const truncate = (text: string | undefined, max: number): string => {
       <VCardTitle>Restore Explanation</VCardTitle>
       <VCardText>
         <p class="text-body-1 mb-3">
-          Are you sure you want to restore this explanation version? This will replace the current explanation text.
+          Restore explanation from {{ formatDate(selectedVersion?.timestamp) }}?
         </p>
         <div
           v-if="selectedVersion"
           class="pa-3 rounded bg-surface-variant text-body-2"
         >
-          {{ truncate(selectedVersion.explanation ?? selectedVersion.details ?? selectedVersion.data?.NewExplanation, 300) }}
+          {{ truncate(getExplanationText(selectedVersion), 300) }}
         </div>
       </VCardText>
       <VCardActions>

@@ -1,5 +1,7 @@
 import { $api } from '@/utils/api'
 
+const POLL_INTERVAL_MS = 5000
+
 export interface MessagingThread {
   threadId: string
   threadType: string
@@ -64,6 +66,8 @@ export const useMessagingStore = defineStore('messaging', {
     activeThread: null as ThreadDetailResponse | null,
     loading: false,
     error: null as string | null,
+    _pollTimer: null as ReturnType<typeof setInterval> | null,
+    _lastPollAt: null as string | null,
   }),
 
   getters: {
@@ -166,6 +170,57 @@ export const useMessagingStore = defineStore('messaging', {
       }
       catch (err: any) {
         this.error = err?.message || 'Failed to load contacts'
+      }
+    },
+
+    async pollForUpdates() {
+      const since = this._lastPollAt
+      this._lastPollAt = new Date().toISOString()
+      try {
+        const query = new URLSearchParams()
+        if (since)
+          query.set('since', since)
+
+        const url = query.toString()
+          ? `/admin/messaging/threads?${query.toString()}`
+          : '/admin/messaging/threads'
+
+        const result = await $api<ThreadListResponse>(url)
+
+        if (result.items.length === 0)
+          return
+
+        // Merge updated/new threads into the existing list
+        const updatedMap = new Map(result.items.map(t => [t.threadId, t]))
+        const merged = this.threads.map(t =>
+          updatedMap.has(t.threadId) ? updatedMap.get(t.threadId)! : t,
+        )
+        const existingIds = new Set(this.threads.map(t => t.threadId))
+        for (const t of result.items) {
+          if (!existingIds.has(t.threadId))
+            merged.push(t)
+        }
+        this.threads = merged
+        this.totalThreads = result.totalCount
+      }
+      catch {
+        // Polling errors are silent — main load errors are surfaced via fetchThreads
+      }
+    },
+
+    startPolling() {
+      if (this._pollTimer !== null)
+        return
+      this._lastPollAt = new Date().toISOString()
+      this._pollTimer = setInterval(() => {
+        this.pollForUpdates()
+      }, POLL_INTERVAL_MS)
+    },
+
+    stopPolling() {
+      if (this._pollTimer !== null) {
+        clearInterval(this._pollTimer)
+        this._pollTimer = null
       }
     },
   },

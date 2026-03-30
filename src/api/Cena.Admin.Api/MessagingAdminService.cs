@@ -13,7 +13,8 @@ namespace Cena.Admin.Api;
 public interface IMessagingAdminService
 {
     Task<MessagingThreadListResponse> GetThreadsAsync(
-        string? threadType, string? participantId, string? search, int page, int pageSize);
+        string? threadType, string? participantId, string? search, int page, int pageSize,
+        DateTimeOffset? since = null);
     Task<MessagingThreadDetailDto?> GetThreadDetailAsync(
         string threadId, string? beforeCursor, int limit);
     Task<MessagingContactListResponse> GetContactsAsync(string? search);
@@ -31,7 +32,8 @@ public sealed class MessagingAdminService : IMessagingAdminService
     }
 
     public async Task<MessagingThreadListResponse> GetThreadsAsync(
-        string? threadType, string? participantId, string? search, int page, int pageSize)
+        string? threadType, string? participantId, string? search, int page, int pageSize,
+        DateTimeOffset? since = null)
     {
         await using var session = _store.QuerySession();
 
@@ -47,6 +49,9 @@ public sealed class MessagingAdminService : IMessagingAdminService
             query = query.Where(t =>
                 t.LastMessagePreview.Contains(search) ||
                 t.ParticipantNames.Any(n => n.Contains(search)));
+
+        if (since.HasValue)
+            query = query.Where(t => t.LastMessageAt > since.Value);
 
         var totalCount = await query.CountAsync();
 

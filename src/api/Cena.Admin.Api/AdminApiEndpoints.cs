@@ -726,6 +726,83 @@ public static class AdminApiEndpoints
             return Results.Ok(new { connected = ok });
         }).WithName("TestAiConnection");
 
+        // POST /api/admin/ai/generate-batch (CNT-002)
+        group.MapPost("/generate-batch", async (
+            BatchGenerateRequest req,
+            IAiGenerationService aiService,
+            QualityGate.IQualityGateService qualityGate) =>
+        {
+            if (req.Count < 1 || req.Count > 20)
+                return Results.BadRequest(new { error = "count must be between 1 and 20." });
+
+            var result = await aiService.BatchGenerateAsync(req, qualityGate);
+            return Results.Ok(result);
+        }).WithName("AiBatchGenerateQuestions");
+
+        // POST /api/admin/ai/generate-from-template (CNT-002)
+        group.MapPost("/generate-from-template", async (
+            TemplateGenerateRequest req,
+            IAiGenerationService aiService,
+            QualityGate.IQualityGateService qualityGate) =>
+        {
+            if (string.IsNullOrWhiteSpace(req.OcrText))
+                return Results.BadRequest(new { error = "ocrText is required." });
+
+            if (req.Count < 1 || req.Count > 20)
+                return Results.BadRequest(new { error = "count must be between 1 and 20." });
+
+            var result = await aiService.GenerateFromTemplateAsync(req, qualityGate);
+            return Results.Ok(result);
+        }).WithName("AiGenerateFromTemplate");
+
+        return app;
+    }
+
+    public static IEndpointRouteBuilder MapQuestionPipelineEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/admin/questions/pipeline")
+            .WithTags("Question Pipeline")
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
+
+        // GET /api/admin/questions/pipeline/status
+        group.MapGet("/status", async (IQuestionPipelineService service) =>
+        {
+            var status = await service.GetStatusAsync();
+            return Results.Ok(status);
+        }).WithName("GetQuestionPipelineStatus");
+
+        // POST /api/admin/questions/pipeline/bulk-approve
+        group.MapPost("/bulk-approve", async (
+            BulkApproveRequest request,
+            HttpContext ctx,
+            IQuestionPipelineService service) =>
+        {
+            if (request.QuestionIds == null || request.QuestionIds.Count == 0)
+                return Results.BadRequest(new { error = "questionIds must not be empty." });
+
+            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
+            var result = await service.BulkApproveAsync(request, userId);
+            return Results.Ok(result);
+        }).WithName("BulkApproveQuestions");
+
+        // POST /api/admin/questions/pipeline/bulk-reject
+        group.MapPost("/bulk-reject", async (
+            BulkRejectRequest request,
+            HttpContext ctx,
+            IQuestionPipelineService service) =>
+        {
+            if (request.QuestionIds == null || request.QuestionIds.Count == 0)
+                return Results.BadRequest(new { error = "questionIds must not be empty." });
+
+            if (string.IsNullOrWhiteSpace(request.Reason))
+                return Results.BadRequest(new { error = "reason is required." });
+
+            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
+            var result = await service.BulkRejectAsync(request, userId);
+            return Results.Ok(result);
+        }).WithName("BulkRejectQuestions");
+
         return app;
     }
 

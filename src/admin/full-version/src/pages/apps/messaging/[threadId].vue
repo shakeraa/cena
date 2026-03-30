@@ -7,6 +7,8 @@ const route = useRoute()
 const router = useRouter()
 const store = useMessagingStore()
 
+let threadPollTimer: ReturnType<typeof setInterval> | null = null
+
 const threadId = computed(() => (route.params as Record<string, string>).threadId)
 const messageInput = ref('')
 const messagesContainer = ref<HTMLElement>()
@@ -63,6 +65,20 @@ onMounted(async () => {
     if (messagesContainer.value)
       messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   })
+
+  // Poll thread detail every 5s for new messages
+  threadPollTimer = setInterval(async () => {
+    await store.fetchThreadDetail(threadId.value)
+    nextTick(() => {
+      if (messagesContainer.value)
+        messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
+    })
+  }, 5000)
+})
+
+onUnmounted(() => {
+  if (threadPollTimer !== null)
+    clearInterval(threadPollTimer)
 })
 </script>
 

@@ -17,6 +17,7 @@ export function mapRoleToAbilities(role: string): AbilityRule[] {
         { action: 'manage', subject: 'Analytics' },
         { action: 'manage', subject: 'Focus' },
         { action: 'manage', subject: 'Mastery' },
+        { action: 'manage', subject: 'Messaging' },
         { action: 'manage', subject: 'Outreach' },
         { action: 'manage', subject: 'Pedagogy' },
         { action: 'manage', subject: 'Tutoring' },
@@ -28,6 +29,7 @@ export function mapRoleToAbilities(role: string): AbilityRule[] {
       return [
         { action: 'manage', subject: 'Content' },
         { action: 'manage', subject: 'Questions' },
+        { action: 'manage', subject: 'Messaging' },
         { action: 'read', subject: 'Analytics' },
         { action: 'read', subject: 'Pedagogy' },
         { action: 'read', subject: 'Tutoring' },

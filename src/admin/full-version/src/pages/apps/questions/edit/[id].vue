@@ -727,6 +727,7 @@ const shortId = (id: string) => id?.length > 10 ? `${id.slice(0, 10)}...` : id
       <QualityGateScores
         :question="question"
         class="mb-6 mt-6"
+        @refreshed="fetchQuestion"
       />
 
       <!-- Language Versions -->

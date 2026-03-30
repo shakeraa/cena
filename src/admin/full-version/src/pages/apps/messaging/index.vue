@@ -107,7 +107,15 @@ const createThread = async () => {
 }
 
 watch([searchQuery, typeFilter], fetchThreads, { immediate: false })
-onMounted(fetchThreads)
+
+onMounted(async () => {
+  await fetchThreads()
+  store.startPolling()
+})
+
+onUnmounted(() => {
+  store.stopPolling()
+})
 </script>
 
 <template>

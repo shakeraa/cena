@@ -23,16 +23,19 @@ const tabs = [
   { icon: 'tabler-devices', title: 'Sessions', key: 'sessions' },
 ]
 
-const initialTab = (() => {
-  const tabQuery = route.query.tab as string | undefined
-  if (tabQuery) {
-    const idx = tabs.findIndex(t => t.key === tabQuery)
+function resolveTabIndex(tabKey: string | undefined): number {
+  if (tabKey) {
+    const idx = tabs.findIndex(t => t.key === tabKey)
     if (idx >= 0) return idx
   }
   return 0
-})()
+}
 
-const userTab = ref(initialTab)
+const userTab = ref(resolveTabIndex(route.query.tab as string | undefined))
+
+watch(() => route.query.tab, (newTab) => {
+  userTab.value = resolveTabIndex(newTab as string | undefined)
+})
 
 const { data: userData, execute: refetchUser } = await useApi<any>(`/admin/users/${route.params.id}`)
 </script>
