@@ -18,6 +18,7 @@ using Cena.Actors.Questions;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Documents;
+using Cena.Infrastructure.EventStore;
 
 namespace Cena.Actors.Configuration;
 
@@ -53,6 +54,11 @@ public static class MartenConfiguration
         opts.Events.MetadataConfig.EnableAll();
         opts.Events.TenancyStyle = Marten.Storage.TenancyStyle.Single;
 
+        // DATA-010: Optimistic concurrency — Marten uses Quick append mode
+        // which checks stream version on append. Concurrent writes to the same
+        // stream will raise ConcurrencyException, caught by middleware/retry.
+        opts.Events.AppendMode = Marten.Events.EventAppendMode.Quick;
+
         // ── Serialization: System.Text.Json with camelCase ──
         opts.UseSystemTextJsonForSerialization(
             enumStorage: Weasel.Core.EnumStorage.AsString,
@@ -66,6 +72,9 @@ public static class MartenConfiguration
         RegisterOutreachEvents(opts);
         RegisterQuestionEvents(opts);
         RegisterFocusEvents(opts);
+
+        // ── Register Upcasters (V(N) -> V(N+1) schema evolution, DATA-009) ──
+        RegisterUpcasters(opts);
 
         // ── Admin Document Types (BKD-002/003) ──
         opts.Schema.For<AdminUser>()
@@ -147,7 +156,9 @@ public static class MartenConfiguration
         // ── Snapshot Strategy: every 100 events per student ──
         // ACT-026: Inline snapshot projection — Marten auto-creates/updates snapshot
         // document on every SaveChangesAsync when event count crosses the threshold.
-        opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
+        // DATA-010: UseOptimisticConcurrency on snapshot to detect stale writes.
+        opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline)
+            .UseOptimisticConcurrency = true;
 
         // REV-014: Index SchoolId for efficient tenant-scoped queries
         opts.Schema.For<StudentProfileSnapshot>().Index(x => x.SchoolId);
@@ -164,6 +175,7 @@ public static class MartenConfiguration
     private static void RegisterLearnerEvents(StoreOptions opts)
     {
         opts.Events.AddEventType<ConceptAttempted_V1>();
+        opts.Events.AddEventType<ConceptAttempted_V2>(); // DATA-009: V2 with Duration field
         opts.Events.AddEventType<ConceptMastered_V1>();
         opts.Events.AddEventType<MasteryDecayed_V1>();
         opts.Events.AddEventType<MethodologySwitched_V1>();
@@ -245,5 +257,16 @@ public static class MartenConfiguration
         opts.Events.AddEventType<ExplanationEdited_V1>();
         opts.Events.AddEventType<QuestionExplanationUpdated_V1>();
         opts.Events.AddEventType<LanguageVersionAdded_V1>();
+    }
+
+    /// <summary>
+    /// DATA-009: Registers all event upcasters for schema evolution.
+    /// Each upcaster transforms V(N) events to V(N+1) in-memory during stream reads.
+    /// Add new upcasters here as event schemas evolve.
+    /// </summary>
+    private static void RegisterUpcasters(StoreOptions opts)
+    {
+        // ConceptAttempted: V1 -> V2 (adds Duration field, defaults to TimeSpan.Zero)
+        opts.RegisterUpcaster(ConceptAttemptedV1ToV2Upcaster.Instance);
     }
 }

@@ -199,6 +199,9 @@ app.UseMiddleware<CorrelationIdMiddleware>();
 // ---- ERR-001.2: Global exception handler (structured CenaError JSON, no stack trace leaks) ----
 app.UseMiddleware<GlobalExceptionMiddleware>();
 
+// ---- DATA-010: Concurrency conflict handler (Marten ConcurrencyException → 409) ----
+app.UseMiddleware<Cena.Infrastructure.EventStore.ConcurrencyConflictMiddleware>();
+
 // ---- REV-004: Security response headers ----
 app.Use(async (context, next) =>
 {
