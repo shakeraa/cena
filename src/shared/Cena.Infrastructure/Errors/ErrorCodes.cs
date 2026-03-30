@@ -46,6 +46,11 @@ public static class ErrorCodes
     /// <summary>Optimistic concurrency conflict on event stream append.</summary>
     public const string CENA_EVENTSTORE_CONCURRENCY     = "CENA_EVENTSTORE_CONCURRENCY";
 
+    // ---- Tamper Detection (SEC-006) ----
+    public const string CENA_SEC_TAMPER_TIMESTAMP  = "CENA_SEC_TAMPER_TIMESTAMP";
+    public const string CENA_SEC_TAMPER_NONCE      = "CENA_SEC_TAMPER_NONCE";
+    public const string CENA_SEC_TAMPER_SIGNATURE  = "CENA_SEC_TAMPER_SIGNATURE";
+
     // ---- Internal ----
     public const string CENA_INTERNAL_ERROR             = "CENA_INTERNAL_ERROR";
     public const string CENA_INTERNAL_VALIDATION        = "CENA_INTERNAL_VALIDATION";
@@ -76,6 +81,9 @@ public static class ErrorCodes
         CENA_CONTENT_QUESTION_RETIRED  => "NOT_FOUND",
         CENA_PAYMENT_FAILED           => "PAYMENT_FAILED",
         CENA_PAYMENT_REFUND_FAILED    => "PAYMENT_FAILED",
+        CENA_SEC_TAMPER_TIMESTAMP      => "FORBIDDEN",
+        CENA_SEC_TAMPER_NONCE          => "FORBIDDEN",
+        CENA_SEC_TAMPER_SIGNATURE      => "FORBIDDEN",
         _                             => "INTERNAL_ERROR"
     };
 }

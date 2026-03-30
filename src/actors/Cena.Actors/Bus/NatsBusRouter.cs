@@ -35,7 +35,8 @@ public sealed class NatsBusRouter : BackgroundService
     private readonly ILogger<NatsBusRouter> _logger;
     private readonly JsonSerializerOptions _jsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
-    private const int MaxConcurrentActivations = 30;
+    // INF-018: Backpressure controls
+    private const int MaxConcurrentActivations = 50;
     private const int MaxRetryAttempts = 3;
     private static readonly TimeSpan ActorRequestTimeout = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan[] RetryDelays = [
@@ -642,11 +643,13 @@ public sealed class NatsBusRouter : BackgroundService
             await Task.Delay(TimeSpan.FromSeconds(10), ct).ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
             if (_commandsRouted > 0)
             {
+                var gateSlots = _activationGate.CurrentCount;
+                var backpressureEngaged = gateSlots == 0;
                 _logger.LogInformation(
-                    "NatsBusRouter stats: {Commands} routed, {Events} events, {Errors} errors, {Retries} retries, {DeadLettered} dead-lettered, {Gate}/{Max} gate slots free",
+                    "NatsBusRouter stats: {Commands} routed, {Events} events, {Errors} errors, {Retries} retries, {DeadLettered} dead-lettered, {Gate}/{Max} gate slots free, backpressure={Backpressure}",
                     _commandsRouted, _eventsPublished, _errorsCount,
                     _retriesAttempted, _deadLettered,
-                    _activationGate.CurrentCount, MaxConcurrentActivations);
+                    gateSlots, MaxConcurrentActivations, backpressureEngaged);
             }
         }
     }

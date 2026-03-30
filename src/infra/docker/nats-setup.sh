@@ -78,30 +78,36 @@ echo ""
 echo "Creating consumers..."
 
 # Engagement context consumers
+# INF-018: Backpressure settings per consumer type:
+#   --max-pending: max unacknowledged messages (backpressure trigger)
+#   --max-deliver: dead-letter after N retries
+#   --ack-wait:    time before redelivery (30s commands, 60s events)
+
+# Engagement context consumers
 nats -s $NATS_URL consumer add LEARNER_EVENTS engagement-xp \
   --filter "cena.durable.learner.>" \
-  --ack explicit --max-deliver 5 --max-pending 1000 \
-  --deliver all --replay instant \
+  --ack explicit --max-deliver 5 --max-pending 500 \
+  --ack-wait 60s --deliver all --replay instant \
   2>/dev/null || echo "engagement-xp exists"
 
 nats -s $NATS_URL consumer add PEDAGOGY_EVENTS engagement-session \
   --filter "cena.durable.pedagogy.>" \
-  --ack explicit --max-deliver 5 --max-pending 1000 \
-  --deliver all --replay instant \
+  --ack explicit --max-deliver 5 --max-pending 500 \
+  --ack-wait 60s --deliver all --replay instant \
   2>/dev/null || echo "engagement-session exists"
 
-# Outreach consumers
+# Outreach consumers (lower throughput, tighter limits)
 nats -s $NATS_URL consumer add LEARNER_EVENTS outreach-triggers \
   --filter "cena.durable.learner.>" \
-  --ack explicit --max-deliver 3 --max-pending 500 \
-  --deliver all --replay instant \
+  --ack explicit --max-deliver 3 --max-pending 100 \
+  --ack-wait 30s --deliver all --replay instant \
   2>/dev/null || echo "outreach-triggers exists"
 
-# Analytics consumer (all events)
+# Analytics consumer (high throughput, relaxed limits)
 nats -s $NATS_URL consumer add LEARNER_EVENTS analytics-all \
   --filter "cena.durable.learner.>" \
-  --ack explicit --max-deliver 10 --max-pending 5000 \
-  --deliver all --replay instant \
+  --ack explicit --max-deliver 10 --max-pending 1000 \
+  --ack-wait 60s --deliver all --replay instant \
   2>/dev/null || echo "analytics-all exists"
 
 echo ""
