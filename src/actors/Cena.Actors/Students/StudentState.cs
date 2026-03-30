@@ -88,6 +88,13 @@ public sealed class StudentState
     public double BaselineAccuracy { get; set; }
     public double BaselineResponseTimeMs { get; set; }
 
+    // ---- Account Lifecycle (LCM-001) ----
+    /// <summary>
+    /// Current account status. Synced from NATS cena.account.status_changed events.
+    /// Commands are rejected when status != Active.
+    /// </summary>
+    public AccountStatus AccountStatus { get; set; } = AccountStatus.Active;
+
     // ---- Metadata ----
     public string? ExperimentCohort { get; set; }
     public string? SchoolId { get; set; } // REV-014: tenant identifier; set on first session
@@ -266,6 +273,13 @@ public sealed class StudentState
     public void Apply(MethodologySwitchDeferred_V1 e)
     {
         // Informational — cooldown deferral logged in event stream
+        EventVersion++;
+    }
+
+    public void Apply(AccountStatusChanged_V1 e)
+    {
+        if (Enum.TryParse<AccountStatus>(e.NewStatus, true, out var status))
+            AccountStatus = status;
         EventVersion++;
     }
 

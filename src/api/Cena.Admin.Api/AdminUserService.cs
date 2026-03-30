@@ -5,11 +5,14 @@
 
 using System.Globalization;
 using System.Security.Claims;
+using System.Text.Json;
+using Cena.Actors.Bus;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Firebase;
 using Marten;
 using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
 using StackExchange.Redis;
 
 namespace Cena.Admin.Api;
@@ -41,17 +44,21 @@ public sealed class AdminUserService : IAdminUserService
     private readonly IDocumentStore _store;
     private readonly IFirebaseAdminService _firebase;
     private readonly IConnectionMultiplexer _redis;
+    private readonly INatsConnection _nats;
     private readonly ILogger<AdminUserService> _logger;
+    private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public AdminUserService(
         IDocumentStore store,
         IFirebaseAdminService firebase,
         IConnectionMultiplexer redis,
+        INatsConnection nats,
         ILogger<AdminUserService> logger)
     {
         _store = store;
         _firebase = firebase;
         _redis = redis;
+        _nats = nats;
         _logger = logger;
     }
 
@@ -219,6 +226,9 @@ public sealed class AdminUserService : IAdminUserService
 
         await _firebase.DisableUserAsync(id);
         await TokenRevocationMiddleware.RevokeUserAsync(_redis, id);
+
+        // LCM-001: Propagate to actor system via NATS + Redis status gate
+        await SetAccountStatusAsync(id, "pending_delete", "Account deleted by admin", "system");
     }
 
     public async Task SuspendUserAsync(string id, string reason)
@@ -239,6 +249,9 @@ public sealed class AdminUserService : IAdminUserService
 
         await _firebase.DisableUserAsync(id);
         await TokenRevocationMiddleware.RevokeUserAsync(_redis, id);
+
+        // LCM-001: Propagate to actor system via NATS + Redis status gate
+        await SetAccountStatusAsync(id, "suspended", reason, "admin");
         _logger.LogInformation("Suspended user {Uid}: {Reason}", id, reason);
     }
 
@@ -259,6 +272,34 @@ public sealed class AdminUserService : IAdminUserService
         await session.SaveChangesAsync();
 
         await _firebase.EnableUserAsync(id);
+
+        // LCM-001: Clear actor system block via NATS + Redis status gate
+        await ClearAccountStatusAsync(id, "admin");
+    }
+
+    // =========================================================================
+    // LCM-001: Account Status Propagation (NATS event + Redis gate key)
+    // =========================================================================
+
+    private async Task SetAccountStatusAsync(string studentId, string status, string? reason, string changedBy)
+    {
+        var db = _redis.GetDatabase();
+        var ttl = status == "pending_delete" ? TimeSpan.FromDays(30) : TimeSpan.FromHours(24);
+        await db.StringSetAsync($"account_status:{studentId}", status, ttl);
+
+        var msg = new BusAccountStatusChanged(studentId, status, reason, changedBy, DateTimeOffset.UtcNow);
+        var envelope = BusEnvelope<BusAccountStatusChanged>.Create(NatsSubjects.AccountStatusChanged, msg, "admin-api");
+        await _nats.PublishAsync(NatsSubjects.AccountStatusChanged, JsonSerializer.Serialize(envelope, JsonOpts));
+    }
+
+    private async Task ClearAccountStatusAsync(string studentId, string changedBy)
+    {
+        var db = _redis.GetDatabase();
+        await db.KeyDeleteAsync($"account_status:{studentId}");
+
+        var msg = new BusAccountStatusChanged(studentId, "active", null, changedBy, DateTimeOffset.UtcNow);
+        var envelope = BusEnvelope<BusAccountStatusChanged>.Create(NatsSubjects.AccountStatusChanged, msg, "admin-api");
+        await _nats.PublishAsync(NatsSubjects.AccountStatusChanged, JsonSerializer.Serialize(envelope, JsonOpts));
     }
 
     public async Task<AdminUserDto> InviteUserAsync(InviteUserRequest request)

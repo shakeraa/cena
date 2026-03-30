@@ -158,6 +158,18 @@ public record MethodologySwitchDeferred_V1(
 ) : IDelegatedEvent;
 
 /// <summary>
+/// LCM-001: Emitted when account status changes (suspension, lock, freeze, deletion request).
+/// Persisted in the student's Marten event stream for audit trail.
+/// </summary>
+public record AccountStatusChanged_V1(
+    string StudentId,
+    string NewStatus,
+    string? Reason,
+    string ChangedBy,
+    DateTimeOffset Timestamp
+);
+
+/// <summary>
 /// Emitted when a teacher/admin manually overrides the methodology at any
 /// hierarchy level. Takes immediate effect, bypasses cooldown.
 /// </summary>

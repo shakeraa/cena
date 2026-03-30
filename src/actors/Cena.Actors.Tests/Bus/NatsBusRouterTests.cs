@@ -23,7 +23,8 @@ public sealed class NatsBusRouterTests : IDisposable
         _actorSystem = new ActorSystem();
         _logger = Substitute.For<ILogger<NatsBusRouter>>();
         var documentStore = Substitute.For<Marten.IDocumentStore>();
-        _sut = new NatsBusRouter(_nats, _actorSystem, documentStore, _logger);
+        var redis = Substitute.For<StackExchange.Redis.IConnectionMultiplexer>();
+        _sut = new NatsBusRouter(_nats, _actorSystem, documentStore, redis, _logger);
     }
 
     // ── Initial state ──

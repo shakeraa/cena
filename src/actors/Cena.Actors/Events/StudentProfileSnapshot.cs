@@ -30,6 +30,9 @@ public class StudentProfileSnapshot
     public int SessionCount { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    // ── Account Lifecycle (LCM-001) ──
+    public string AccountStatus { get; set; } = "Active";
+
     // ── Hierarchical Methodology Maps ──
     public Dictionary<string, MethodologyAssignment> SubjectMethodologyMap { get; set; } = new();
     public Dictionary<string, MethodologyAssignment> TopicMethodologyMap { get; set; } = new();
@@ -124,6 +127,11 @@ public class StudentProfileSnapshot
     public void Apply(MethodologySwitchDeferred_V1 e)
     {
         // Informational — no state mutation needed in snapshot
+    }
+
+    public void Apply(AccountStatusChanged_V1 e)
+    {
+        AccountStatus = e.NewStatus;
     }
 
     public void Apply(TeacherMethodologyOverride_V1 e)
