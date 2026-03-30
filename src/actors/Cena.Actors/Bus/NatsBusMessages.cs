@@ -4,6 +4,7 @@
 // =============================================================================
 
 using System.Text.Json.Serialization;
+using Cena.Infrastructure.Compliance;
 
 namespace Cena.Actors.Bus;
 
@@ -25,7 +26,7 @@ public sealed record BusEnvelope<T>(
 // ── Command payloads (sent on cena.session.* and cena.mastery.*) ──
 
 public sealed record BusStartSession(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SubjectId,
     string? ConceptId,
     string DeviceType,
@@ -34,12 +35,12 @@ public sealed record BusStartSession(
     string? SchoolId = null); // REV-014: tenant context
 
 public sealed record BusEndSession(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId,
     string Reason);  // "completed", "timeout", "user_exit"
 
 public sealed record BusConceptAttempt(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId,
     string ConceptId,
     string QuestionId,
@@ -52,27 +53,27 @@ public sealed record BusConceptAttempt(
     int AnswerChangeCount);
 
 public sealed record BusMethodologySwitch(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId,
     string FromMethodology,
     string ToMethodology,
     string Reason);
 
 public sealed record BusAddAnnotation(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId,
     string ConceptId,
     string Text,
     string Kind);   // "note", "question", "confusion", "insight"
 
 public sealed record BusResumeSession(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId);
 
 // ── Account Lifecycle (LCM-001) ──
 
 public sealed record BusAccountStatusChanged(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string NewStatus,      // "suspended", "active", "locked", "frozen", "pending_delete", "expired", "grace"
     string? Reason,
     string ChangedBy,      // UID of admin/parent/system who triggered the change
@@ -81,7 +82,7 @@ public sealed record BusAccountStatusChanged(
 // ── Event payloads (published on cena.events.*) ──
 
 public sealed record BusConceptAttemptedEvent(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId,
     string ConceptId,
     bool IsCorrect,
@@ -92,13 +93,13 @@ public sealed record BusConceptAttemptedEvent(
     DateTimeOffset Timestamp);
 
 public sealed record BusConceptMasteredEvent(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string ConceptId,
     float MasteryLevel,
     DateTimeOffset Timestamp);
 
 public sealed record BusSessionStartedEvent(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId,
     string SubjectId,
     string StartingConceptId,
@@ -106,7 +107,7 @@ public sealed record BusSessionStartedEvent(
     DateTimeOffset Timestamp);
 
 public sealed record BusSessionEndedEvent(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId,
     string Reason,
     int ConceptsAttempted,
@@ -115,7 +116,7 @@ public sealed record BusSessionEndedEvent(
     DateTimeOffset Timestamp);
 
 public sealed record BusStagnationDetectedEvent(
-    string StudentId,
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string ConceptId,
     int AttemptCount,
     float CompositeScore,

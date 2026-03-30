@@ -4,6 +4,7 @@
 // =============================================================================
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:uuid/uuid.dart';
@@ -137,21 +138,66 @@ class SessionNotifier extends StateNotifier<SessionState> {
   }
 
   /// Submit a student answer for the current exercise.
+  ///
+  /// When the WebSocket is disconnected the answer is queued via [SyncManager]
+  /// so it is never lost. The queue is flushed automatically when connectivity
+  /// is restored (see [OfflineNotifier]).
   Future<void> submitAnswer(String answer, int timeSpentMs) async {
     final exercise = state.currentExercise;
     final session = state.currentSession;
     if (exercise == null || session == null) return;
 
-    await webSocketService.attemptConcept(
-      AttemptConcept(
-        sessionId: session.id,
-        exerciseId: exercise.id,
-        conceptId: exercise.conceptId,
-        answer: answer,
-        timeSpentMs: timeSpentMs,
-        idempotencyKey: _uuid.v4(),
-      ),
-    );
+    final idempotencyKey = _uuid.v4();
+    final isConnected = webSocketService.currentConnectionState ==
+        ConnectionState.connected;
+
+    if (isConnected) {
+      await webSocketService.attemptConcept(
+        AttemptConcept(
+          sessionId: session.id,
+          exerciseId: exercise.id,
+          conceptId: exercise.conceptId,
+          answer: answer,
+          timeSpentMs: timeSpentMs,
+          idempotencyKey: idempotencyKey,
+        ),
+      );
+    } else {
+      // Offline path: queue the event for later sync.
+      await syncManager.enqueue(
+        OfflineEvent(
+          idempotencyKey: idempotencyKey,
+          clientTimestamp: DateTime.now(),
+          eventType: 'AttemptConcept',
+          payload: _encodeAttempt(
+            session: session,
+            exercise: exercise,
+            answer: answer,
+            timeSpentMs: timeSpentMs,
+            idempotencyKey: idempotencyKey,
+          ),
+          classification: EventClassification.conditional,
+          sequenceNumber: 0, // assigned by the queue
+        ),
+      );
+    }
+  }
+
+  static String _encodeAttempt({
+    required Session session,
+    required Exercise exercise,
+    required String answer,
+    required int timeSpentMs,
+    required String idempotencyKey,
+  }) {
+    return jsonEncode({
+      'sessionId': session.id,
+      'exerciseId': exercise.id,
+      'conceptId': exercise.conceptId,
+      'answer': answer,
+      'timeSpentMs': timeSpentMs,
+      'idempotencyKey': idempotencyKey,
+    });
   }
 
   /// Request the next hint for the current exercise.

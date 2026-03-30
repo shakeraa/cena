@@ -37,7 +37,9 @@ builder.WebHost.ConfigureKestrel(options =>
 // ---- Serilog ----
 builder.Host.UseSerilog((context, services, configuration) =>
 {
-    configuration.ReadFrom.Configuration(context.Configuration);
+    configuration
+        .ReadFrom.Configuration(context.Configuration)
+        .Destructure.With<Cena.Infrastructure.Compliance.PiiDestructuringPolicy>();
 });
 
 // ---- Configuration ----

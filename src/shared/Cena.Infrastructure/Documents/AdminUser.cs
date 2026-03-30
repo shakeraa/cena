@@ -3,6 +3,8 @@
 // BKD-002: User management data model stored in PostgreSQL via Marten
 // =============================================================================
 
+using Cena.Infrastructure.Compliance;
+
 namespace Cena.Infrastructure.Documents;
 
 public enum CenaRole
@@ -29,8 +31,13 @@ public enum UserStatus
 public record AdminUser
 {
     public string Id { get; init; } = string.Empty;     // Firebase UID
+
+    [Pii(PiiLevel.High, "contact")]
     public string Email { get; init; } = string.Empty;
+
+    [Pii(PiiLevel.Medium, "identity")]
     public string FullName { get; init; } = string.Empty;
+
     public CenaRole Role { get; init; }
     public UserStatus Status { get; init; } = UserStatus.Active;
     public string? School { get; init; }

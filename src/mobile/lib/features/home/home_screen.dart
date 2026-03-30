@@ -8,16 +8,16 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/router.dart';
+import '../gamification/gamification_screen.dart';
 
 /// Navigation tab indices for the home screen bottom bar.
 enum HomeTab {
-  home(0, 'Home', Icons.home_rounded),
-  sessions(1, 'Sessions', Icons.play_circle_outline_rounded),
-  progress(2, 'Progress', Icons.bar_chart_rounded),
-  settings(3, 'Settings', Icons.settings_outlined);
+  home('Home', Icons.home_rounded),
+  sessions('Sessions', Icons.play_circle_outline_rounded),
+  progress('Progress', Icons.bar_chart_rounded),
+  settings('Settings', Icons.settings_outlined);
 
-  const HomeTab(this.index, this.label, this.icon);
-  final int index;
+  const HomeTab(this.label, this.icon);
   final String label;
   final IconData icon;
 }
@@ -308,44 +308,13 @@ class _SessionsTabContent extends StatelessWidget {
   }
 }
 
-/// Progress tab: shows mastery overview and charts.
+/// Progress tab: gamification screen (XP, streak, badges, recent activity).
 class _ProgressTabContent extends StatelessWidget {
   const _ProgressTabContent();
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(SpacingTokens.lg),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.bar_chart_rounded,
-              size: 64,
-              color: theme.colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-            ),
-            const SizedBox(height: SpacingTokens.md),
-            Text(
-              'Track Your Progress',
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: SpacingTokens.sm),
-            Text(
-              'Complete sessions to see your mastery progress and learning analytics.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-      ),
-    );
+    return const GamificationScreen();
   }
 }
 

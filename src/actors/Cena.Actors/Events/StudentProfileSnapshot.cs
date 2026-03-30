@@ -3,6 +3,7 @@
 // =============================================================================
 
 using Cena.Actors.MethodologyHierarchy;
+using Cena.Infrastructure.Compliance;
 
 namespace Cena.Actors.Events;
 
@@ -14,8 +15,14 @@ public class StudentProfileSnapshot
 {
     // Marten requires an Id property for document storage and Query<T>
     public string Id { get => StudentId; set => StudentId = value; }
+
+    [Pii(PiiLevel.Low, "identity")]
     public string StudentId { get; set; } = "";
+
+    [Pii(PiiLevel.Medium, "identity")]
     public string? FullName { get; set; }
+
+    [Pii(PiiLevel.Low, "identity")]
     public string? SchoolId { get; set; }
     public Dictionary<string, ConceptMasteryState> ConceptMastery { get; set; } = new();
     public Dictionary<string, string> ActiveMethodologyMap { get; set; } = new();
