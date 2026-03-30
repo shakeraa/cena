@@ -54,6 +54,10 @@ public static class CenaAdminServiceRegistration
         // ADM-025: Messaging admin service
         services.AddScoped<IMessagingAdminService, MessagingAdminService>();
 
+        // ADM-026: Live session monitor (SSE background service)
+        services.AddSingleton<ILiveMonitorService, LiveMonitorService>();
+        services.AddHostedService(sp => (LiveMonitorService)sp.GetRequiredService<ILiveMonitorService>());
+
         // Student Insights (per-student cross-cutting analytics)
         services.AddScoped<IStudentInsightsService, StudentInsightsService>();
 
@@ -91,6 +95,9 @@ public static class CenaAdminServiceRegistration
 
         // ADM-025: Messaging admin endpoints
         app.MapMessagingAdminEndpoints();
+
+        // ADM-026: Live monitor endpoints
+        app.MapLiveMonitorEndpoints();
 
         // Student Insights endpoints
         app.MapStudentInsightsEndpoints();

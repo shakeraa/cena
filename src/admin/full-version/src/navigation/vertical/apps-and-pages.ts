@@ -106,6 +106,13 @@ export default [
     subject: 'Tutoring',
   },
   {
+    title: 'Live Monitor',
+    icon: { icon: 'tabler-live-photo' },
+    to: 'apps-sessions-monitor',
+    action: 'read',
+    subject: 'Tutoring',
+  },
+  {
     title: 'Experiments',
     icon: { icon: 'tabler-flask' },
     to: 'apps-experiments',
