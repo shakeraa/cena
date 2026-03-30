@@ -281,14 +281,30 @@ public sealed class FocusDegradationService : IFocusDegradationService
             ? Math.Clamp((double)input.CurrentStreak / input.LongestStreak, 0, 1)
             : 0;
 
-        // ── FOC-012: Culturally-adjusted resilience weights ──
-        // ArabicDominant students: higher Recovery weight (collectivist resilience
-        // manifests as returning after difficulty with peer support).
-        // HebrewDominant/default: existing individualist-calibrated weights.
+        // ── FOC-011.3 + FOC-012: Tenure-adjusted and culturally-adjusted weights ──
+        // Streak weight fades with tenure (novelty wears off after 1 semester).
+        // Freed weight redistributed to challengeSeeking (most behaviorally robust).
+        double baseStreakWeight = input.CulturalContext switch
+        {
+            CulturalContext.ArabicDominant => 0.15,
+            _ => 0.15
+        };
+
+        // FOC-011.3: Reduce streak weight by student tenure
+        double tenureAdjustedStreak = input.StudentTenureDays switch
+        {
+            < 90 => baseStreakWeight,          // Month 1-3: full weight
+            < 180 => baseStreakWeight - 0.05,  // Month 3-6: reduced
+            _ => baseStreakWeight - 0.10       // Month 6+: minimal
+        };
+        tenureAdjustedStreak = Math.Max(tenureAdjustedStreak, 0.05);
+
+        double freedWeight = baseStreakWeight - tenureAdjustedStreak;
+
         var (wPersistence, wRecovery, wChallenge, wStreak) = input.CulturalContext switch
         {
-            CulturalContext.ArabicDominant => (0.30, 0.30, 0.25, 0.15),
-            _ => (0.35, 0.25, 0.25, 0.15)
+            CulturalContext.ArabicDominant => (0.30, 0.30, 0.25 + freedWeight, tenureAdjustedStreak),
+            _ => (0.35, 0.25, 0.25 + freedWeight, tenureAdjustedStreak)
         };
 
         // ── Composite resilience ──
@@ -690,7 +706,9 @@ public record ResilienceInput(
     int CurrentStreak,
     int LongestStreak,
     // ── FOC-012: Cultural context for weight adjustment ──
-    CulturalContext CulturalContext = CulturalContext.Unknown
+    CulturalContext CulturalContext = CulturalContext.Unknown,
+    // ── FOC-011.3: Student tenure for gamification novelty decay ──
+    int StudentTenureDays = 0
 );
 
 public record ResilienceScore(
