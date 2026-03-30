@@ -6,6 +6,7 @@
 
 using System.Diagnostics;
 using Cena.Infrastructure.Configuration;
+using Cena.Infrastructure.Security;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -140,6 +141,11 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
 
         var topK = request.TopK > 0 ? request.TopK : 20;
 
+        // SEC-004: Sanitize query string before embedding it in the parameterized ILIKE pattern.
+        // The query is already bound as $1 (safe from SQL injection), but stripping control
+        // characters prevents malformed bytes reaching the Postgres text-matching engine.
+        var sanitizedQuery = InputSanitizer.SanitizeSearchQuery(request.Query);
+
         const string sql = """
             SELECT content_block_id, text_preview, subject, content_type,
                    concept_ids, language, 1.0 AS similarity
@@ -151,7 +157,7 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
             """;
 
         await using var cmd = new NpgsqlCommand(sql, conn);
-        cmd.Parameters.AddWithValue(request.Query);
+        cmd.Parameters.AddWithValue(sanitizedQuery);
         cmd.Parameters.AddWithValue((object?)request.SubjectFilter ?? DBNull.Value);
         cmd.Parameters.AddWithValue((object?)request.ConceptFilter ?? DBNull.Value);
         cmd.Parameters.AddWithValue(topK);

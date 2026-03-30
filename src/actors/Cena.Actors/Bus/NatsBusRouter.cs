@@ -323,6 +323,12 @@ public sealed class NatsBusRouter : BackgroundService
                     var envelope = JsonSerializer.Deserialize<BusEnvelope<BusAccountStatusChanged>>(rawData, _jsonOpts);
                     if (envelope?.Payload is not { } payload) continue;
 
+                    // SEC-004: Validate before forwarding to actor
+                    if (!BusMessageValidator.ValidateEnvelope(envelope).LogIfRejected(_logger, NatsSubjects.AccountStatusChanged, envelope.MessageId))
+                        continue;
+                    if (!BusMessageValidator.Validate(payload).LogIfRejected(_logger, NatsSubjects.AccountStatusChanged, envelope.MessageId))
+                        continue;
+
                     if (!Enum.TryParse<AccountStatus>(payload.NewStatus, true, out var status))
                     {
                         _logger.LogWarning("Unknown account status: {Status}", payload.NewStatus);
@@ -387,6 +393,12 @@ public sealed class NatsBusRouter : BackgroundService
     {
         var p = env.Payload;
 
+        // SEC-004: Validate envelope and payload before processing
+        if (!BusMessageValidator.ValidateEnvelope(env).LogIfRejected(_logger, NatsSubjects.SessionStart, env.MessageId))
+        { RecordError("validation", NatsSubjects.SessionStart, "Invalid envelope", null); return; }
+        if (!BusMessageValidator.Validate(p).LogIfRejected(_logger, NatsSubjects.SessionStart, env.MessageId))
+        { RecordError("validation", NatsSubjects.SessionStart, "Invalid payload", p.StudentId); return; }
+
         // LCM-001: Redis status gate — reject commands for blocked accounts
         if (await IsAccountBlocked(p.StudentId))
         {
@@ -428,6 +440,13 @@ public sealed class NatsBusRouter : BackgroundService
     private async Task HandleEndSession(BusEnvelope<BusEndSession> env, CancellationToken ct)
     {
         var p = env.Payload;
+
+        // SEC-004: Validate before routing
+        if (!BusMessageValidator.ValidateEnvelope(env).LogIfRejected(_logger, NatsSubjects.SessionEnd, env.MessageId))
+        { RecordError("validation", NatsSubjects.SessionEnd, "Invalid envelope", null); return; }
+        if (!BusMessageValidator.Validate(p).LogIfRejected(_logger, NatsSubjects.SessionEnd, env.MessageId))
+        { RecordError("validation", NatsSubjects.SessionEnd, "Invalid payload", p.StudentId); return; }
+
         var reason = Enum.TryParse<SessionEndReason>(p.Reason, true, out var r)
             ? r : SessionEndReason.Completed;
         var cmd = new EndSession(p.StudentId, p.SessionId, reason);
@@ -453,6 +472,13 @@ public sealed class NatsBusRouter : BackgroundService
     private async Task HandleResumeSession(BusEnvelope<BusResumeSession> env, CancellationToken ct)
     {
         var p = env.Payload;
+
+        // SEC-004: Validate before routing
+        if (!BusMessageValidator.ValidateEnvelope(env).LogIfRejected(_logger, NatsSubjects.SessionResume, env.MessageId))
+        { RecordError("validation", NatsSubjects.SessionResume, "Invalid envelope", null); return; }
+        if (!BusMessageValidator.Validate(p).LogIfRejected(_logger, NatsSubjects.SessionResume, env.MessageId))
+        { RecordError("validation", NatsSubjects.SessionResume, "Invalid payload", p.StudentId); return; }
+
         var cmd = new ResumeSession(p.StudentId, p.SessionId);
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -476,6 +502,12 @@ public sealed class NatsBusRouter : BackgroundService
     private async Task HandleConceptAttempt(BusEnvelope<BusConceptAttempt> env, CancellationToken ct)
     {
         var p = env.Payload;
+
+        // SEC-004: Validate before routing
+        if (!BusMessageValidator.ValidateEnvelope(env).LogIfRejected(_logger, NatsSubjects.ConceptAttempt, env.MessageId))
+        { RecordError("validation", NatsSubjects.ConceptAttempt, "Invalid envelope", null); return; }
+        if (!BusMessageValidator.Validate(p).LogIfRejected(_logger, NatsSubjects.ConceptAttempt, env.MessageId))
+        { RecordError("validation", NatsSubjects.ConceptAttempt, "Invalid payload", p.StudentId); return; }
 
         // LCM-001: Redis status gate
         if (await IsAccountBlocked(p.StudentId))
@@ -513,6 +545,13 @@ public sealed class NatsBusRouter : BackgroundService
     private async Task HandleAnnotation(BusEnvelope<BusAddAnnotation> env, CancellationToken ct)
     {
         var p = env.Payload;
+
+        // SEC-004: Validate before routing
+        if (!BusMessageValidator.ValidateEnvelope(env).LogIfRejected(_logger, NatsSubjects.Annotation, env.MessageId))
+        { RecordError("validation", NatsSubjects.Annotation, "Invalid envelope", null); return; }
+        if (!BusMessageValidator.Validate(p).LogIfRejected(_logger, NatsSubjects.Annotation, env.MessageId))
+        { RecordError("validation", NatsSubjects.Annotation, "Invalid payload", p.StudentId); return; }
+
         var kind = Enum.TryParse<AnnotationType>(p.Kind, true, out var at)
             ? at : AnnotationType.Note;
         var cmd = new AddAnnotation(p.StudentId, p.ConceptId, p.SessionId, p.Text, kind);
@@ -532,6 +571,13 @@ public sealed class NatsBusRouter : BackgroundService
     private async Task HandleMethodologySwitch(BusEnvelope<BusMethodologySwitch> env, CancellationToken ct)
     {
         var p = env.Payload;
+
+        // SEC-004: Validate before routing
+        if (!BusMessageValidator.ValidateEnvelope(env).LogIfRejected(_logger, NatsSubjects.MethodologySwitch, env.MessageId))
+        { RecordError("validation", NatsSubjects.MethodologySwitch, "Invalid envelope", null); return; }
+        if (!BusMessageValidator.Validate(p).LogIfRejected(_logger, NatsSubjects.MethodologySwitch, env.MessageId))
+        { RecordError("validation", NatsSubjects.MethodologySwitch, "Invalid payload", p.StudentId); return; }
+
         var cmd = new SwitchMethodology(p.StudentId, p.StudentId, p.ToMethodology);
 
         using var cts2 = CancellationTokenSource.CreateLinkedTokenSource(ct);

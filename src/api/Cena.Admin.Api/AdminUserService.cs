@@ -10,6 +10,7 @@ using Cena.Actors.Bus;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Firebase;
+using Cena.Infrastructure.Security;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -80,10 +81,14 @@ public sealed class AdminUserService : IAdminUserService
 
         if (!string.IsNullOrWhiteSpace(query))
         {
-            var search = query.Trim();
-            q = q.Where(u =>
-                u.FullName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
-                u.Email.Contains(search, StringComparison.OrdinalIgnoreCase));
+            // SEC-004: Sanitize search query before use in LINQ expressions
+            var search = InputSanitizer.SanitizeSearchQuery(query);
+            if (!string.IsNullOrEmpty(search))
+            {
+                q = q.Where(u =>
+                    u.FullName.Contains(search, StringComparison.OrdinalIgnoreCase) ||
+                    u.Email.Contains(search, StringComparison.OrdinalIgnoreCase));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(role) && Enum.TryParse<CenaRole>(role, true, out var roleEnum))
