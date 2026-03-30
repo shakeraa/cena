@@ -61,7 +61,7 @@ public static class CenaAdminServiceRegistration
         // Student Insights (per-student cross-cutting analytics)
         services.AddScoped<IStudentInsightsService, StudentInsightsService>();
 
-        // Stagnation Insights (causal factor analysis)
+        // Stagnation Insights (job-based causal factor analysis)
         services.AddScoped<IStagnationInsightsService, StagnationInsightsService>();
 
         return services;

@@ -113,22 +113,109 @@ const focusColors: Record<string, string> = {
   Critical: 'error',
 }
 
+const jobStatus = ref<string>('idle') // idle, queued, processing, completed, rate_limited, failed
+
 const fetchInsights = async () => {
   loading.value = true
   error.value = null
+  jobStatus.value = 'queued'
+
   try {
-    const [insightsData, timelineData] = await Promise.all([
-      $api<StagnationInsights>(`/admin/stagnation/${props.studentId}/${props.conceptId}/insights`),
-      $api<{ timeline: TimelineEntry[] }>(`/admin/stagnation/${props.studentId}/${props.conceptId}/timeline?limit=30`),
-    ])
-    insights.value = insightsData
-    timeline.value = timelineData.timeline ?? []
+    // Step 1: Submit the analysis job
+    const submitResult = await $api<{ jobId: string; status: string; resultJson?: string }>('/admin/stagnation/analyze', {
+      method: 'POST',
+      body: { studentId: props.studentId, conceptId: props.conceptId, type: 'insights' },
+    })
+
+    if (submitResult.status === 'rate_limited') {
+      error.value = 'Too many analysis requests. Please wait a moment before trying again.'
+      jobStatus.value = 'rate_limited'
+      loading.value = false
+      return
+    }
+
+    // If cached, use immediately
+    if (submitResult.status === 'cached' && submitResult.resultJson) {
+      insights.value = JSON.parse(submitResult.resultJson)
+      jobStatus.value = 'completed'
+      await fetchTimeline()
+      loading.value = false
+      return
+    }
+
+    // Step 2: Poll for result
+    const jobId = submitResult.jobId
+    jobStatus.value = submitResult.status
+
+    let attempts = 0
+    const maxAttempts = 30 // 30 × 1s = 30s max wait
+    while (attempts < maxAttempts) {
+      await new Promise(r => setTimeout(r, 1000))
+      attempts++
+
+      const poll = await $api<{ status: string; resultJson?: string; errorMessage?: string }>(
+        `/admin/stagnation/jobs/${jobId}`,
+      )
+
+      jobStatus.value = poll.status
+
+      if (poll.status === 'completed' && poll.resultJson) {
+        insights.value = JSON.parse(poll.resultJson)
+        await fetchTimeline()
+        loading.value = false
+        return
+      }
+
+      if (poll.status === 'failed') {
+        error.value = poll.errorMessage ?? 'Analysis failed'
+        loading.value = false
+        return
+      }
+    }
+
+    error.value = 'Analysis timed out. Please try again.'
+    jobStatus.value = 'failed'
   }
   catch (err: any) {
-    error.value = err.message ?? 'Failed to load stagnation insights'
+    error.value = err.message ?? 'Failed to submit analysis job'
+    jobStatus.value = 'failed'
   }
   finally {
     loading.value = false
+  }
+}
+
+const fetchTimeline = async () => {
+  try {
+    const submitResult = await $api<{ jobId: string; status: string; resultJson?: string }>('/admin/stagnation/analyze', {
+      method: 'POST',
+      body: { studentId: props.studentId, conceptId: props.conceptId, type: 'timeline' },
+    })
+
+    if (submitResult.status === 'cached' && submitResult.resultJson) {
+      const data = JSON.parse(submitResult.resultJson)
+      timeline.value = data.timeline ?? []
+      return
+    }
+
+    if (submitResult.jobId) {
+      // Poll for timeline result
+      let attempts = 0
+      while (attempts < 20) {
+        await new Promise(r => setTimeout(r, 1000))
+        attempts++
+        const poll = await $api<{ status: string; resultJson?: string }>(`/admin/stagnation/jobs/${submitResult.jobId}`)
+        if (poll.status === 'completed' && poll.resultJson) {
+          const data = JSON.parse(poll.resultJson)
+          timeline.value = data.timeline ?? []
+          return
+        }
+        if (poll.status === 'failed') return
+      }
+    }
+  }
+  catch {
+    // Timeline is optional — don't block insights display
   }
 }
 
@@ -171,10 +258,25 @@ function formatTime(ts: string) {
       Stagnation Root-Cause Analysis
     </VCardTitle>
 
-    <VCardText v-if="error">
+    <VCardText v-if="jobStatus === 'rate_limited'">
+      <VAlert type="warning" variant="tonal" icon="ri-timer-line">
+        Too many analysis requests. Please wait a moment before trying again.
+      </VAlert>
+    </VCardText>
+
+    <VCardText v-else-if="error">
       <VAlert type="error" variant="tonal">
         {{ error }}
       </VAlert>
+    </VCardText>
+
+    <VCardText v-else-if="loading && !insights">
+      <div class="d-flex align-center gap-3 pa-4">
+        <VProgressCircular indeterminate size="24" />
+        <span class="text-body-1">
+          {{ jobStatus === 'queued' ? 'Analysis queued...' : jobStatus === 'processing' ? 'Analyzing stagnation factors...' : 'Loading...' }}
+        </span>
+      </div>
     </VCardText>
 
     <VCardText v-else-if="insights">

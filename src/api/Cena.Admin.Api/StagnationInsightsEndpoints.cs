@@ -1,8 +1,10 @@
 // =============================================================================
-// Cena Platform -- Stagnation Insights Endpoints
-// Provides drill-down analysis for why a student is stagnating on a concept.
+// Cena Platform -- Stagnation Insights Endpoints (Job-Based)
+// POST to submit → GET to poll. Rate-limited, deduped, cached.
 // =============================================================================
 
+using System.Security.Claims;
+using Cena.Actors.Ingest;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -19,29 +21,49 @@ public static class StagnationInsightsEndpoints
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
 
-        // GET /api/admin/stagnation/{studentId}/{conceptId}/insights
-        // Returns causal factor analysis: difficulty, focus, prerequisites, methodology, errors
-        group.MapGet("/{studentId}/{conceptId}/insights", async (
-            string studentId,
-            string conceptId,
+        // POST /api/admin/stagnation/analyze — submit an analysis job
+        group.MapPost("/analyze", async (
+            AnalyzeRequest request,
+            HttpContext http,
             IStagnationInsightsService service) =>
         {
-            var result = await service.GetInsightsAsync(studentId, conceptId);
-            return Results.Ok(result);
-        }).WithName("GetStagnationInsights");
+            var userId = http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
+            var jobType = request.Type?.ToLowerInvariant() switch
+            {
+                "timeline" => AnalysisJobType.StagnationTimeline,
+                _ => AnalysisJobType.StagnationInsights
+            };
 
-        // GET /api/admin/stagnation/{studentId}/{conceptId}/timeline
-        // Returns per-attempt timeline with difficulty gap, focus state, methodology
-        group.MapGet("/{studentId}/{conceptId}/timeline", async (
-            string studentId,
-            string conceptId,
-            int? limit,
+            var result = await service.SubmitAsync(jobType, request.StudentId, request.ConceptId, userId);
+
+            return result.Status switch
+            {
+                "rate_limited" => Results.StatusCode(429),
+                "cached" => Results.Ok(result),
+                _ => Results.Accepted($"/api/admin/stagnation/jobs/{result.JobId}", result)
+            };
+        }).WithName("SubmitStagnationAnalysis");
+
+        // GET /api/admin/stagnation/jobs/{jobId} — poll job status + result
+        group.MapGet("/jobs/{jobId}", async (
+            string jobId,
             IStagnationInsightsService service) =>
         {
-            var result = await service.GetTimelineAsync(studentId, conceptId, limit ?? 50);
-            return Results.Ok(result);
-        }).WithName("GetStagnationTimeline");
+            var result = await service.PollAsync(jobId);
+            return result.Status switch
+            {
+                "not_found" => Results.NotFound(result),
+                "completed" => Results.Ok(result),
+                "failed" => Results.Ok(result),
+                _ => Results.Ok(result) // queued or processing
+            };
+        }).WithName("PollStagnationJob");
 
         return app;
     }
 }
+
+public sealed record AnalyzeRequest(
+    string StudentId,
+    string ConceptId,
+    string? Type = "insights");  // "insights" or "timeline"

@@ -174,6 +174,9 @@ builder.Services.AddSingleton<IPersonalizedExplanationService, PersonalizedExpla
 builder.Services.AddSingleton<OfflineSyncHandler>();
 builder.Services.AddHostedService<NatsOutboxPublisher>();
 
+// Analysis Job Processor (background worker for stagnation analysis jobs)
+builder.Services.AddHostedService<Cena.Actors.Services.AnalysisJobProcessor>();
+
 // SAI-05: A/B Experiment Service
 builder.Services.AddSingleton<IExperimentService, ExperimentService>();
 

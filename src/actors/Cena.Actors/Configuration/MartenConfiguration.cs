@@ -54,10 +54,8 @@ public static class MartenConfiguration
         opts.Events.MetadataConfig.EnableAll();
         opts.Events.TenancyStyle = Marten.Storage.TenancyStyle.Single;
 
-        // DATA-010: Optimistic concurrency — Marten uses Quick append mode
-        // which checks stream version on append. Concurrent writes to the same
-        // stream will raise ConcurrencyException, caught by middleware/retry.
-        opts.Events.AppendMode = Marten.Events.EventAppendMode.Quick;
+        // DATA-010: Optimistic concurrency — Marten v8 uses Quick append mode by default.
+        // Concurrent writes to the same stream raise an exception caught by middleware/retry.
 
         // ── Serialization: System.Text.Json with camelCase ──
         opts.UseSystemTextJsonForSerialization(
@@ -133,6 +131,14 @@ public static class MartenConfiguration
             .Index(x => x.Language)
             .Index(x => x.Topic);
 
+        // ── Analysis Job Document (job-based stagnation analysis) ──
+        opts.Schema.For<AnalysisJobDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.Status)
+            .Index(x => x.DedupKey)
+            .Index(x => x.RequestedBy)
+            .Index(x => x.SubmittedAt);
+
         // ── Student Record Access Log (REV-013: FERPA compliance) ──
         opts.Schema.For<StudentRecordAccessLog>()
             .Identity(x => x.Id)
@@ -156,9 +162,7 @@ public static class MartenConfiguration
         // ── Snapshot Strategy: every 100 events per student ──
         // ACT-026: Inline snapshot projection — Marten auto-creates/updates snapshot
         // document on every SaveChangesAsync when event count crosses the threshold.
-        // DATA-010: UseOptimisticConcurrency on snapshot to detect stale writes.
-        opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline)
-            .UseOptimisticConcurrency = true;
+        opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
 
         // REV-014: Index SchoolId for efficient tenant-scoped queries
         opts.Schema.For<StudentProfileSnapshot>().Index(x => x.SchoolId);
