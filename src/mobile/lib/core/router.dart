@@ -12,7 +12,9 @@ import '../features/home/home_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/notifications/notification_center_screen.dart';
 import '../features/profile/profile_screen.dart';
+import '../features/auth/try_question_screen.dart';
 import '../features/session/session_screen.dart';
+import '../features/tutor/tutor_chat_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/deep_link_service.dart';
 
@@ -26,6 +28,8 @@ abstract class CenaRoutes {
   static const String graph = '/graph';
   static const String profile = '/profile';
   static const String notifications = '/notifications';
+  static const String tutor = '/tutor';
+  static const String tryQuestion = '/try';
 
   /// Routes that require authentication.
   static const Set<String> authenticated = {
@@ -34,6 +38,7 @@ abstract class CenaRoutes {
     graph,
     profile,
     notifications,
+    tutor,
   };
 
   /// Returns `true` if the given [path] requires an authenticated user.
@@ -66,16 +71,26 @@ GoRouter buildCenaRouter({
     redirect: (BuildContext context, GoRouterState state) async {
       final location = state.matchedLocation;
 
-      // Never redirect if the user is already on the onboarding or login flow.
-      if (location == CenaRoutes.onboarding || location == CenaRoutes.login) {
+      // Never redirect if the user is already on the onboarding, login, or try flow.
+      if (location == CenaRoutes.onboarding ||
+          location == CenaRoutes.login ||
+          location == CenaRoutes.tryQuestion) {
         return null;
       }
 
       final prefs = await SharedPreferences.getInstance();
       final onboardingDone = prefs.getBool(_kOnboardingComplete) ?? false;
 
-      // Gate 1: Onboarding — first-time users always see onboarding first.
+      // Gate 1: Try-question → Onboarding for first-time users.
+      // Time-to-value < 30s: show one question before any forms.
       if (!onboardingDone) {
+        final triedQuestion = prefs.getBool('try_question_done') ?? false;
+        if (!triedQuestion) {
+          if (location != CenaRoutes.home) {
+            DeferredDeepLink.instance.store(location);
+          }
+          return CenaRoutes.tryQuestion;
+        }
         if (location != CenaRoutes.home) {
           DeferredDeepLink.instance.store(location);
         }
@@ -99,6 +114,13 @@ GoRouter buildCenaRouter({
       return null;
     },
     routes: [
+      GoRoute(
+        path: CenaRoutes.tryQuestion,
+        name: 'tryQuestion',
+        builder: (BuildContext context, GoRouterState state) {
+          return const TryQuestionScreen();
+        },
+      ),
       GoRoute(
         path: CenaRoutes.onboarding,
         name: 'onboarding',
@@ -153,6 +175,13 @@ GoRouter buildCenaRouter({
         name: 'notifications',
         builder: (BuildContext context, GoRouterState state) {
           return const NotificationCenterScreen();
+        },
+      ),
+      GoRoute(
+        path: CenaRoutes.tutor,
+        name: 'tutor',
+        builder: (BuildContext context, GoRouterState state) {
+          return const TutorChatScreen();
         },
       ),
     ],
