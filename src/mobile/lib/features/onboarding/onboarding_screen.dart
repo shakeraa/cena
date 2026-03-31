@@ -1,13 +1,19 @@
 // =============================================================================
-// Cena Adaptive Learning Platform — Onboarding Flow (MOB-013)
+// Cena Adaptive Learning Platform — Onboarding Flow V2 (MOB-013 + MOB-033)
 // =============================================================================
 //
-// Five-page onboarding experience:
-//   Page 1 — Welcome (branding, language selector)
-//   Page 2 — Subject Selection (Mathematics only available; others coming soon)
-//   Page 3 — Grade & Bagrut Track
-//   Page 4 — Optional Diagnostic Quiz (5 questions)
-//   Page 5 — Ready (summary + "Start Learning")
+// Role-based onboarding experience:
+//   Student (8 pages):
+//     Page 1 — Welcome (branding, language selector)
+//     Page 2 — Role Selection (student / teacher / parent)
+//     Page 3 — Subject Selection
+//     Page 4 — Grade & Bagrut Track
+//     Page 5 — Goal Setting (Bagrut prep, homework help, get ahead, review)
+//     Page 6 — Time Commitment (5/10/15/20 min)
+//     Page 7 — Discovery Tour (diagnostic, reframed as exploration)
+//     Page 8 — Ready (summary + "Start Learning")
+//   Teacher (4 pages): Welcome, Role, Subjects, Ready
+//   Parent  (4 pages): Welcome, Role, Child Info, Ready
 //
 // Persists completion via SharedPreferences so the router can redirect
 // first-time users automatically.
@@ -23,6 +29,8 @@ import '../../core/router.dart';
 import '../../core/state/app_state.dart';
 import '../../l10n/app_localizations.dart';
 import 'onboarding_state.dart';
+import 'widgets/goal_setting_card.dart';
+import 'widgets/role_selector.dart';
 
 // ---------------------------------------------------------------------------
 // Diagnostic question data (5 fixed seed questions for onboarding only)
@@ -140,8 +148,11 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
   final _pageController = PageController();
   int _currentPage = 0;
 
-  // Total pages: welcome, subjects, grade, diagnostic, ready.
-  static const int _totalPages = 5;
+  /// Total pages varies by role. Default 8 for student until role is selected.
+  int get _totalPages {
+    final sel = ref.read(onboardingProvider);
+    return sel.totalPages;
+  }
 
   void _goToPage(int page) {
     _pageController.animateToPage(
@@ -176,9 +187,100 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
     super.dispose();
   }
 
+  /// Build the pages list based on the current role.
+  List<Widget> _buildPages(OnboardingSelections selections) {
+    final role = selections.role;
+
+    if (role == OnboardingRole.teacher) {
+      // Teacher: welcome, role, subjects, ready (4 pages)
+      return [
+        _WelcomePage(onNext: _nextPage),
+        _RolePage(
+          selections: selections,
+          onNext: _nextPage,
+          onBack: _prevPage,
+        ),
+        _SubjectsPage(
+          selections: selections,
+          onNext: _nextPage,
+          onBack: _prevPage,
+        ),
+        _ReadyPage(
+          selections: selections,
+          onFinish: _finish,
+          onBack: _prevPage,
+        ),
+      ];
+    }
+
+    if (role == OnboardingRole.parent) {
+      // Parent: welcome, role, subjects (to know child's subjects), ready (4 pages)
+      return [
+        _WelcomePage(onNext: _nextPage),
+        _RolePage(
+          selections: selections,
+          onNext: _nextPage,
+          onBack: _prevPage,
+        ),
+        _SubjectsPage(
+          selections: selections,
+          onNext: _nextPage,
+          onBack: _prevPage,
+        ),
+        _ReadyPage(
+          selections: selections,
+          onFinish: _finish,
+          onBack: _prevPage,
+        ),
+      ];
+    }
+
+    // Student (default): 8 pages
+    return [
+      _WelcomePage(onNext: _nextPage),
+      _RolePage(
+        selections: selections,
+        onNext: _nextPage,
+        onBack: _prevPage,
+      ),
+      _SubjectsPage(
+        selections: selections,
+        onNext: _nextPage,
+        onBack: _prevPage,
+      ),
+      _GradePage(
+        selections: selections,
+        onNext: _nextPage,
+        onBack: _prevPage,
+      ),
+      _GoalPage(
+        selections: selections,
+        onNext: _nextPage,
+        onBack: _prevPage,
+      ),
+      _TimePage(
+        selections: selections,
+        onNext: _nextPage,
+        onBack: _prevPage,
+      ),
+      _DiagnosticPage(
+        selections: selections,
+        onNext: _nextPage,
+        onBack: _prevPage,
+      ),
+      _ReadyPage(
+        selections: selections,
+        onFinish: _finish,
+        onBack: _prevPage,
+      ),
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final selections = ref.watch(onboardingProvider);
+    final pages = _buildPages(selections);
+    final pageCount = pages.length;
 
     return Scaffold(
       body: SafeArea(
@@ -192,7 +294,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
               ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(_totalPages, (index) {
+                children: List.generate(pageCount, (index) {
                   return AnimatedContainer(
                     duration: AnimationTokens.fast,
                     margin: const EdgeInsets.symmetric(
@@ -222,29 +324,7 @@ class _OnboardingScreenState extends ConsumerState<OnboardingScreen> {
                 onPageChanged: (page) {
                   setState(() => _currentPage = page);
                 },
-                children: [
-                  _WelcomePage(onNext: _nextPage),
-                  _SubjectsPage(
-                    selections: selections,
-                    onNext: _nextPage,
-                    onBack: _prevPage,
-                  ),
-                  _GradePage(
-                    selections: selections,
-                    onNext: _nextPage,
-                    onBack: _prevPage,
-                  ),
-                  _DiagnosticPage(
-                    selections: selections,
-                    onNext: _nextPage,
-                    onBack: _prevPage,
-                  ),
-                  _ReadyPage(
-                    selections: selections,
-                    onFinish: _finish,
-                    onBack: _prevPage,
-                  ),
-                ],
+                children: pages,
               ),
             ),
           ],
@@ -390,7 +470,84 @@ class _WelcomePageState extends ConsumerState<_WelcomePage> {
 }
 
 // ---------------------------------------------------------------------------
-// Page 2 — Subject Selection
+// Page 2 — Role Selection
+// ---------------------------------------------------------------------------
+
+class _RolePage extends ConsumerWidget {
+  const _RolePage({
+    required this.selections,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  final OnboardingSelections selections;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l = AppLocalizations.of(context);
+    final notifier = ref.read(onboardingProvider.notifier);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: SpacingTokens.lg),
+            Text(
+              l.whoAreYou,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontFamily: TypographyTokens.hebrewFontFamily,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              l.selectYourRole,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpacingTokens.xl),
+
+            Expanded(
+              child: ListView(
+                children: OnboardingRole.values.map((role) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+                    child: RoleSelectorCard(
+                      role: role,
+                      isSelected: selections.role == role,
+                      onTap: () => notifier.setRole(role),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: SpacingTokens.md),
+            _NavButtons(
+              onBack: onBack,
+              onNext: selections.canProceedFromRole ? onNext : null,
+              nextLabel: l.next,
+            ),
+            const SizedBox(height: SpacingTokens.md),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Page 3 — Subject Selection
 // ---------------------------------------------------------------------------
 
 class _SubjectsPage extends ConsumerWidget {
@@ -792,7 +949,167 @@ class _BagrutCard extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Page 4 — Diagnostic Quiz (optional)
+// Page 5 — Goal Setting (student only)
+// ---------------------------------------------------------------------------
+
+class _GoalPage extends ConsumerWidget {
+  const _GoalPage({
+    required this.selections,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  final OnboardingSelections selections;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l = AppLocalizations.of(context);
+    final notifier = ref.read(onboardingProvider.notifier);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: SpacingTokens.lg),
+            Text(
+              l.whatDoYouWantToAchieve,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontFamily: TypographyTokens.hebrewFontFamily,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              l.chooseYourGoal,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpacingTokens.lg),
+
+            Expanded(
+              child: ListView(
+                children: GoalType.values.map((goal) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+                    child: GoalSettingCard(
+                      goalType: goal,
+                      isSelected: selections.goalType == goal,
+                      onTap: () => notifier.setGoalType(goal),
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+
+            const SizedBox(height: SpacingTokens.md),
+            _NavButtons(
+              onBack: onBack,
+              onNext: selections.canProceedFromGoal ? onNext : null,
+              nextLabel: l.next,
+            ),
+            const SizedBox(height: SpacingTokens.md),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Page 6 — Time Commitment (student only)
+// ---------------------------------------------------------------------------
+
+class _TimePage extends ConsumerWidget {
+  const _TimePage({
+    required this.selections,
+    required this.onNext,
+    required this.onBack,
+  });
+
+  final OnboardingSelections selections;
+  final VoidCallback onNext;
+  final VoidCallback onBack;
+
+  static const List<int> _options = [5, 10, 15, 20];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final l = AppLocalizations.of(context);
+    final notifier = ref.read(onboardingProvider.notifier);
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.lg),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const SizedBox(height: SpacingTokens.lg),
+            Text(
+              l.howMuchTimePerDay,
+              style: theme.textTheme.headlineMedium?.copyWith(
+                fontFamily: TypographyTokens.hebrewFontFamily,
+                fontWeight: FontWeight.w700,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+            Text(
+              l.youCanChangeThisLater,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: SpacingTokens.xl),
+
+            Expanded(
+              child: Center(
+                child: GridView.count(
+                  crossAxisCount: 2,
+                  mainAxisSpacing: SpacingTokens.md,
+                  crossAxisSpacing: SpacingTokens.md,
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  children: _options.map((minutes) {
+                    return TimeCommitmentCard(
+                      minutes: minutes,
+                      isSelected: selections.dailyMinutes == minutes,
+                      onTap: () => notifier.setDailyMinutes(minutes),
+                    );
+                  }).toList(),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: SpacingTokens.md),
+            _NavButtons(
+              onBack: onBack,
+              onNext: selections.canProceedFromTime ? onNext : null,
+              nextLabel: l.next,
+            ),
+            const SizedBox(height: SpacingTokens.md),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Page 7 — Discovery Tour (diagnostic, reframed as exploration)
 // ---------------------------------------------------------------------------
 
 class _DiagnosticPage extends ConsumerStatefulWidget {
@@ -858,13 +1175,13 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
           children: [
             const Spacer(),
             Icon(
-              Icons.quiz_outlined,
+              Icons.explore_rounded,
               size: 72,
               color: cs.primary,
             ),
             const SizedBox(height: SpacingTokens.lg),
             Text(
-              l.testYourLevel,
+              l.discoveryTour,
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 fontWeight: FontWeight.w700,
@@ -873,7 +1190,7 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
             ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
-              l.diagnosticDesc,
+              l.discoveryTourDesc,
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 color: cs.onSurfaceVariant,
@@ -881,9 +1198,10 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
               textAlign: TextAlign.center,
             ),
             const Spacer(),
-            FilledButton(
+            FilledButton.icon(
               onPressed: _startQuiz,
-              child: Text(l.takeTheQuiz),
+              icon: const Icon(Icons.explore_rounded),
+              label: Text(l.startDiscovery),
             ),
             const SizedBox(height: SpacingTokens.sm),
             OutlinedButton(
@@ -1031,7 +1349,7 @@ class _AnswerButton extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------------------
-// Page 5 — Ready
+// Page 8 — Ready
 // ---------------------------------------------------------------------------
 
 class _ReadyPage extends ConsumerStatefulWidget {
@@ -1146,6 +1464,14 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    if (selections.role != null) ...[
+                      _SummaryRow(
+                        icon: selections.role!.icon,
+                        label: l.roleLabel,
+                        value: selections.role!.label('he'),
+                      ),
+                      const Divider(height: SpacingTokens.lg),
+                    ],
                     _SummaryRow(
                       icon: Icons.subject_rounded,
                       label: l.subjectsLabel,
@@ -1169,16 +1495,34 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
                         value: selections.bagrutUnits!.label,
                       ),
                     ],
-                    const Divider(height: SpacingTokens.lg),
-                    _SummaryRow(
-                      icon: selections.skipDiagnostic
-                          ? Icons.skip_next_rounded
-                          : Icons.quiz_rounded,
-                      label: l.diagnosticLabel,
-                      value: selections.skipDiagnostic
-                          ? l.skipped
-                          : l.nAnswersRecorded(selections.diagnosticAnswers.length),
-                    ),
+                    if (selections.goalType != null) ...[
+                      const Divider(height: SpacingTokens.lg),
+                      _SummaryRow(
+                        icon: selections.goalType!.icon,
+                        label: l.goalLabel,
+                        value: selections.goalType!.label('he'),
+                      ),
+                    ],
+                    if (selections.dailyMinutes != null) ...[
+                      const Divider(height: SpacingTokens.lg),
+                      _SummaryRow(
+                        icon: Icons.timer_rounded,
+                        label: l.dailyTimeLabel,
+                        value: '${selections.dailyMinutes} ${l.minutesShort}',
+                      ),
+                    ],
+                    if (selections.isStudent) ...[
+                      const Divider(height: SpacingTokens.lg),
+                      _SummaryRow(
+                        icon: selections.skipDiagnostic
+                            ? Icons.skip_next_rounded
+                            : Icons.explore_rounded,
+                        label: l.discoveryLabel,
+                        value: selections.skipDiagnostic
+                            ? l.skipped
+                            : l.nAnswersRecorded(selections.diagnosticAnswers.length),
+                      ),
+                    ],
                   ],
                 ),
               ),

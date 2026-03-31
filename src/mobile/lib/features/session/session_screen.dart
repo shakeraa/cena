@@ -105,7 +105,35 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final sessionState = ref.watch(sessionProvider);
+    // -----------------------------------------------------------------------
+    // MOB-058: Granular Riverpod .select() optimization.
+    //
+    // Instead of watching the entire SessionState (which rebuilds this widget
+    // on every field change), we select only the fields that drive top-level
+    // branching: isActive, isBreakSuggested, currentSession, and
+    // currentExercise. This avoids unnecessary rebuilds when only fatigue,
+    // accuracy, or history changes (those are consumed by child widgets that
+    // do their own selects).
+    //
+    // Side-effects (celebrations, analytics, feature discovery) remain in
+    // ref.listen which does NOT trigger rebuilds.
+    // -----------------------------------------------------------------------
+    final isActive = ref.watch(
+      sessionProvider.select((s) => s.isActive),
+    );
+    final isBreakSuggested = ref.watch(
+      sessionProvider.select((s) => s.isBreakSuggested),
+    );
+    final currentSession = ref.watch(
+      sessionProvider.select((s) => s.currentSession),
+    );
+    final currentExercise = ref.watch(
+      sessionProvider.select((s) => s.currentExercise),
+    );
+
+    // Read the full state only when needed for passing to child builders.
+    // This read does NOT subscribe — it is a one-shot snapshot.
+    final sessionState = ref.read(sessionProvider);
 
     // Track when a new exercise arrives so we can measure time spent
     ref.listen<SessionState>(sessionProvider, (prev, next) {
@@ -142,8 +170,10 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
         }
       }
 
-      // Start/stop the elapsed timer with session lifecycle
-      if (!sessionState.isActive) {
+      // Start/stop the elapsed timer with session lifecycle.
+      // MOB-058: Use next.isActive (from the listener), not the ref.read
+      // snapshot, since the listener fires after state has changed.
+      if (!next.isActive) {
         _stopElapsedTimer();
         _restoreSystemChrome();
       } else if (prev?.isActive != true && next.isActive) {
@@ -167,18 +197,21 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
       }
     });
 
+    // MOB-058: Branching uses the .select()-watched values so only
+    // the relevant state transitions trigger a rebuild of this widget.
+
     // Cognitive load break takes priority over everything else
-    if (sessionState.isBreakSuggested && sessionState.isActive) {
+    if (isBreakSuggested && isActive) {
       return _buildBreakScreen(sessionState);
     }
 
     // Session ended → summary (navigate to home with summary data)
-    if (sessionState.currentSession != null && !sessionState.isActive) {
+    if (currentSession != null && !isActive) {
       return _buildSessionEndedView(context, sessionState);
     }
 
     // Active session
-    if (sessionState.isActive) {
+    if (isActive) {
       return _buildActiveSession(context, sessionState);
     }
 

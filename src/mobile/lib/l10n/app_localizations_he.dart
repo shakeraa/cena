@@ -483,6 +483,49 @@ class AppLocalizationsHe extends AppLocalizations {
   String get diagnosticLabel => 'אבחון';
 
   @override
+  String get whoAreYou => 'מי את/ה?';
+
+  @override
+  String get selectYourRole => 'בחר/י את התפקיד שלך';
+
+  @override
+  String get roleLabel => 'תפקיד';
+
+  @override
+  String get whatDoYouWantToAchieve => 'מה אתם רוצים להשיג?';
+
+  @override
+  String get chooseYourGoal => 'בחרו את מטרת הלמידה שלכם';
+
+  @override
+  String get goalLabel => 'מטרה';
+
+  @override
+  String get howMuchTimePerDay => 'כמה זמן ביום?';
+
+  @override
+  String get youCanChangeThisLater => 'אפשר לשנות את זה אחר כך';
+
+  @override
+  String get dailyTimeLabel => 'זמן יומי';
+
+  @override
+  String get minutesShort => 'דק\'';
+
+  @override
+  String get discoveryTour => 'סיור גילוי';
+
+  @override
+  String get discoveryTourDesc =>
+      'בואו נגלה מה אתם כבר יודעים.\nענו על כמה שאלות קצרות כדי שנוכל להתאים את המסע שלכם.';
+
+  @override
+  String get startDiscovery => 'בואו נגלה';
+
+  @override
+  String get discoveryLabel => 'סיור גילוי';
+
+  @override
   String get skipped => 'דולג';
 
   @override

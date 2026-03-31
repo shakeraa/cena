@@ -988,6 +988,90 @@ abstract class AppLocalizations {
   /// **'Diagnostic'**
   String get diagnosticLabel;
 
+  /// Role selection page title
+  ///
+  /// In en, this message translates to:
+  /// **'Who are you?'**
+  String get whoAreYou;
+
+  /// Role selection page subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Select your role'**
+  String get selectYourRole;
+
+  /// Summary row label for role
+  ///
+  /// In en, this message translates to:
+  /// **'Role'**
+  String get roleLabel;
+
+  /// Goal setting page title
+  ///
+  /// In en, this message translates to:
+  /// **'What do you want to achieve?'**
+  String get whatDoYouWantToAchieve;
+
+  /// Goal setting page subtitle
+  ///
+  /// In en, this message translates to:
+  /// **'Choose your learning goal'**
+  String get chooseYourGoal;
+
+  /// Summary row label for goal
+  ///
+  /// In en, this message translates to:
+  /// **'Goal'**
+  String get goalLabel;
+
+  /// Time commitment page title
+  ///
+  /// In en, this message translates to:
+  /// **'How much time per day?'**
+  String get howMuchTimePerDay;
+
+  /// Time commitment note
+  ///
+  /// In en, this message translates to:
+  /// **'You can change this later'**
+  String get youCanChangeThisLater;
+
+  /// Summary row label for daily time
+  ///
+  /// In en, this message translates to:
+  /// **'Daily Time'**
+  String get dailyTimeLabel;
+
+  /// Minutes abbreviation
+  ///
+  /// In en, this message translates to:
+  /// **'min'**
+  String get minutesShort;
+
+  /// Discovery Tour page title (replaces "Test Your Level")
+  ///
+  /// In en, this message translates to:
+  /// **'Discovery Tour'**
+  String get discoveryTour;
+
+  /// Discovery Tour description (replaces diagnosticDesc)
+  ///
+  /// In en, this message translates to:
+  /// **'Let\'s discover what you already know.\nAnswer a few quick questions so we can personalize your journey.'**
+  String get discoveryTourDesc;
+
+  /// Start Discovery button (replaces "Take the Quiz")
+  ///
+  /// In en, this message translates to:
+  /// **'Start Exploring'**
+  String get startDiscovery;
+
+  /// Summary row label for discovery tour (replaces diagnosticLabel)
+  ///
+  /// In en, this message translates to:
+  /// **'Discovery Tour'**
+  String get discoveryLabel;
+
   /// Diagnostic skipped value
   ///
   /// In en, this message translates to:

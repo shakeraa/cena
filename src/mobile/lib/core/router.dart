@@ -148,8 +148,14 @@ GoRouter buildCenaRouter({
       GoRoute(
         path: CenaRoutes.session,
         name: 'session',
-        builder: (BuildContext context, GoRouterState state) {
-          return const SessionScreen();
+        // MOB-032: Push as fullscreenDialog for immersive session mode.
+        // This gives a close button instead of a back arrow on iOS, and
+        // presents a modal-style transition that signals "focused activity".
+        pageBuilder: (BuildContext context, GoRouterState state) {
+          return const MaterialPage<void>(
+            fullscreenDialog: true,
+            child: SessionScreen(),
+          );
         },
       ),
       GoRoute(

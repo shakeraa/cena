@@ -486,6 +486,49 @@ class AppLocalizationsEn extends AppLocalizations {
   String get diagnosticLabel => 'Diagnostic';
 
   @override
+  String get whoAreYou => 'Who are you?';
+
+  @override
+  String get selectYourRole => 'Select your role';
+
+  @override
+  String get roleLabel => 'Role';
+
+  @override
+  String get whatDoYouWantToAchieve => 'What do you want to achieve?';
+
+  @override
+  String get chooseYourGoal => 'Choose your learning goal';
+
+  @override
+  String get goalLabel => 'Goal';
+
+  @override
+  String get howMuchTimePerDay => 'How much time per day?';
+
+  @override
+  String get youCanChangeThisLater => 'You can change this later';
+
+  @override
+  String get dailyTimeLabel => 'Daily Time';
+
+  @override
+  String get minutesShort => 'min';
+
+  @override
+  String get discoveryTour => 'Discovery Tour';
+
+  @override
+  String get discoveryTourDesc =>
+      'Let\'s discover what you already know.\nAnswer a few quick questions so we can personalize your journey.';
+
+  @override
+  String get startDiscovery => 'Start Exploring';
+
+  @override
+  String get discoveryLabel => 'Discovery Tour';
+
+  @override
   String get skipped => 'Skipped';
 
   @override

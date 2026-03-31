@@ -482,6 +482,49 @@ class AppLocalizationsAr extends AppLocalizations {
   String get diagnosticLabel => 'التشخيص';
 
   @override
+  String get whoAreYou => 'من أنت؟';
+
+  @override
+  String get selectYourRole => 'اختر دورك';
+
+  @override
+  String get roleLabel => 'الدور';
+
+  @override
+  String get whatDoYouWantToAchieve => 'ماذا تريد أن تحقق؟';
+
+  @override
+  String get chooseYourGoal => 'اختر هدف التعلم الخاص بك';
+
+  @override
+  String get goalLabel => 'الهدف';
+
+  @override
+  String get howMuchTimePerDay => 'كم من الوقت في اليوم؟';
+
+  @override
+  String get youCanChangeThisLater => 'يمكنك تغيير هذا لاحقاً';
+
+  @override
+  String get dailyTimeLabel => 'الوقت اليومي';
+
+  @override
+  String get minutesShort => 'دق';
+
+  @override
+  String get discoveryTour => 'جولة اكتشاف';
+
+  @override
+  String get discoveryTourDesc =>
+      'دعنا نكتشف ما تعرفه بالفعل.\nأجب عن بعض الأسئلة السريعة حتى نتمكن من تخصيص رحلتك.';
+
+  @override
+  String get startDiscovery => 'ابدأ الاستكشاف';
+
+  @override
+  String get discoveryLabel => 'جولة اكتشاف';
+
+  @override
   String get skipped => 'تم التخطي';
 
   @override
