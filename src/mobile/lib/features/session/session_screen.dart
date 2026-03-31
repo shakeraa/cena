@@ -6,6 +6,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,7 +14,11 @@ import '../../core/config/app_config.dart';
 import '../../core/models/domain_models.dart';
 import '../../core/router.dart';
 import '../../core/services/analytics_service.dart';
+import '../../core/state/feature_discovery_state.dart';
+import '../../core/state/momentum_state.dart';
 import '../../core/state/session_notifier.dart';
+import '../gamification/celebration_overlay.dart';
+import '../gamification/celebration_service.dart';
 import 'widgets/action_buttons.dart';
 import 'widgets/answer_input.dart';
 import 'widgets/cognitive_load_break.dart';
@@ -49,8 +54,14 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   int? _selectedOptionIndex;
   AnswerResult? _pendingFeedback;
 
+  // Celebration system — tiered celebrations for achievements
+  final CelebrationController _celebrationController = CelebrationController();
+
   // Timer for periodic rebuild to update the elapsed clock
   Timer? _elapsedTimer;
+
+  // Prevents double-counting the same session completion.
+  String? _lastTrackedCompletedSessionId;
 
   // Tracks when the current question was displayed so _submitAnswer
   // can compute timeSpentMs without delegating to AnswerInput internals.
@@ -59,7 +70,24 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   @override
   void dispose() {
     _elapsedTimer?.cancel();
+    _restoreSystemChrome();
     super.dispose();
+  }
+
+  /// Enter immersive mode — hide status bar for distraction-free learning.
+  void _enterImmersiveMode() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.immersiveSticky,
+      overlays: [],
+    );
+  }
+
+  /// Restore system chrome when leaving the active session.
+  void _restoreSystemChrome() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.edgeToEdge,
+      overlays: SystemUiOverlay.values,
+    );
   }
 
   void _startElapsedTimer() {
@@ -94,16 +122,47 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
       final prevHistory = prev?.sessionHistory.length ?? 0;
       final nextHistory = next.sessionHistory.length;
       if (nextHistory > prevHistory) {
+        final latestResult = next.sessionHistory.last;
         setState(() {
-          _pendingFeedback = next.sessionHistory.last;
+          _pendingFeedback = latestResult;
         });
+
+        // Trigger tiered celebration for correct answers
+        if (latestResult.isCorrect) {
+          final xp = latestResult.xpEarned;
+          // Don't interrupt flow state with XP celebrations during immersion
+          if (!next.isInFlowState || xp >= 26) {
+            final tier = CelebrationService.classify(
+              event: CelebrationEvent.correctAnswer,
+              xpDelta: xp,
+            );
+            _celebrationController.celebrate(tier: tier, xp: xp);
+          }
+        }
       }
 
       // Start/stop the elapsed timer with session lifecycle
       if (!sessionState.isActive) {
         _stopElapsedTimer();
+        _restoreSystemChrome();
       } else if (prev?.isActive != true && next.isActive) {
         _startElapsedTimer();
+        _enterImmersiveMode();
+      }
+
+      // Progressive feature discovery: count completed sessions once.
+      final transitionedToEnded = prev?.isActive == true && !next.isActive;
+      final completedSessionId = next.currentSession?.id;
+      if (transitionedToEnded && completedSessionId != null) {
+        if (_lastTrackedCompletedSessionId != completedSessionId) {
+          _lastTrackedCompletedSessionId = completedSessionId;
+          ref.read(featureDiscoveryProvider.notifier).recordSessionCompleted();
+          ref.read(streakAnxietyProvider.notifier).recordSessionOutcome(
+                duration: next.elapsed,
+                accuracy: next.accuracy,
+                endedAt: DateTime.now(),
+              );
+        }
       }
     });
 
@@ -149,9 +208,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
           : ListView(
               padding: const EdgeInsets.all(SpacingTokens.md),
               children: [
-                if (state.error != null)
-                  _ErrorBanner(message: state.error!),
-
+                if (state.error != null) _ErrorBanner(message: state.error!),
                 Text('בחר נושא', style: theme.textTheme.titleLarge),
                 const SizedBox(height: SpacingTokens.sm),
                 Wrap(
@@ -173,9 +230,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                     );
                   }).toList(),
                 ),
-
                 const SizedBox(height: SpacingTokens.xl),
-
                 Text('משך השיעור', style: theme.textTheme.titleLarge),
                 const SizedBox(height: SpacingTokens.sm),
                 Text(
@@ -214,9 +269,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                     ),
                   ],
                 ),
-
                 const SizedBox(height: SpacingTokens.xl),
-
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(SpacingTokens.md),
@@ -235,8 +288,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                         const SizedBox(height: SpacingTokens.sm),
                         const _InfoRow(
                             label: 'שאלות מקסימום',
-                            value:
-                                '${SessionDefaults.maxQuestionsPerSession}'),
+                            value: '${SessionDefaults.maxQuestionsPerSession}'),
                         _InfoRow(
                             label: 'סף שליטה',
                             value:
@@ -248,9 +300,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: SpacingTokens.xl),
-
                 FilledButton.icon(
                   onPressed: _startSession,
                   icon: const Icon(Icons.play_arrow_rounded),
@@ -317,6 +367,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
 
   Widget _buildActiveSession(BuildContext context, SessionState state) {
     final exercise = state.currentExercise;
+    final isFlowState = state.isInFlowState;
 
     return Scaffold(
       body: Stack(
@@ -325,7 +376,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Progress header
+                // Progress header — ambient-only in flow state
                 ProgressBar(
                   questionsAttempted: state.questionsAttempted,
                   accuracy: state.accuracy,
@@ -334,10 +385,12 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                   targetDurationMinutes:
                       state.currentSession?.targetDurationMinutes ??
                           _selectedDuration,
+                  isImmersive: isFlowState,
+                  onPause: _confirmEndSession,
                 ),
 
-                // Methodology indicator
-                if (state.methodology != null)
+                // Methodology indicator — hidden in flow state
+                if (state.methodology != null && !isFlowState)
                   _MethodologyBadge(methodology: state.methodology!),
 
                 // Question + answer area
@@ -356,6 +409,9 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               result: _pendingFeedback!,
               onDismiss: _dismissFeedback,
             ),
+
+          // Tiered celebration overlay — above feedback
+          CelebrationOverlay(controller: _celebrationController),
         ],
       ),
     );
@@ -364,13 +420,14 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   Widget _buildQuestionArea(
       BuildContext context, SessionState state, Exercise exercise) {
     final theme = Theme.of(context);
+    final isFlowState = state.isInFlowState;
     return CustomScrollView(
       slivers: [
         SliverPadding(
           padding: const EdgeInsets.all(SpacingTokens.md),
           sliver: SliverList(
             delegate: SliverChildListDelegate([
-              // Question number + end session
+              // Question number + end/pause — simplified in flow state
               Row(
                 children: [
                   Text(
@@ -380,15 +437,28 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                     ),
                   ),
                   const Spacer(),
-                  TextButton.icon(
-                    onPressed: _confirmEndSession,
-                    icon: const Icon(Icons.stop_rounded, size: 16),
-                    label: const Text('סיים'),
-                    style: TextButton.styleFrom(
-                      foregroundColor:
-                          Theme.of(context).colorScheme.error,
+                  // Flow state: show subtle pause icon only; normal: full button
+                  if (isFlowState)
+                    IconButton(
+                      onPressed: _confirmEndSession,
+                      icon: const Icon(Icons.pause_rounded, size: 18),
+                      tooltip: 'סיים שיעור',
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(
+                        minWidth: 32,
+                        minHeight: 32,
+                      ),
+                    )
+                  else
+                    TextButton.icon(
+                      onPressed: _confirmEndSession,
+                      icon: const Icon(Icons.stop_rounded, size: 16),
+                      label: const Text('סיים'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Theme.of(context).colorScheme.error,
+                      ),
                     ),
-                  ),
                 ],
               ),
 
@@ -418,11 +488,13 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               const SizedBox(height: SpacingTokens.md),
 
               // Hint / approach actions
-              ActionButtons(isDisabled: state.isLoading),
+              ActionButtons(
+                isDisabled: state.isLoading,
+                questionInteracted: _selectedOptionIndex != null,
+              ),
 
               // Hint text display
-              if (state.hintsUsed > 0 &&
-                  exercise.hints.isNotEmpty)
+              if (state.hintsUsed > 0 && exercise.hints.isNotEmpty)
                 _HintDisplay(
                   hints: exercise.hints,
                   revealedCount: state.hintsUsed,
@@ -636,7 +708,8 @@ class _HintDisplay extends StatelessWidget {
       decoration: BoxDecoration(
         color: const Color(0xFFFFF8E1),
         borderRadius: BorderRadius.circular(RadiusTokens.lg),
-        border: Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.4)),
+        border:
+            Border.all(color: const Color(0xFFFF9800).withValues(alpha: 0.4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -700,8 +773,8 @@ class _InfoRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Text(label,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant)),
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
           Text(value,
               style: theme.textTheme.bodyMedium
                   ?.copyWith(fontWeight: FontWeight.w600)),

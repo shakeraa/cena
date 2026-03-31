@@ -8,14 +8,22 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/router.dart';
+import '../../core/services/auth_service.dart';
+import '../../core/state/feature_discovery_state.dart';
+import '../../core/state/interaction_feedback_state.dart';
+import '../../core/state/momentum_state.dart';
 import '../gamification/gamification_screen.dart';
+import '../knowledge_graph/knowledge_graph_screen.dart';
 
 /// Navigation tab indices for the home screen bottom bar.
+/// Order: Home | Learn | Map (center) | Progress | Profile
+/// Map in center = easiest thumb reach (Cowan's 4±1, Doc 3).
 enum HomeTab {
   home('Home', Icons.home_rounded),
-  sessions('Sessions', Icons.play_circle_outline_rounded),
+  learn('Learn', Icons.play_circle_outline_rounded),
+  map('Map', Icons.hub_rounded),
   progress('Progress', Icons.bar_chart_rounded),
-  settings('Settings', Icons.settings_outlined);
+  profile('Profile', Icons.person_outline_rounded);
 
   const HomeTab(this.label, this.icon);
   final String label;
@@ -24,9 +32,8 @@ enum HomeTab {
 
 /// Home screen with bottom navigation bar.
 ///
-/// Displays a greeting card, subject quick-start buttons, and recent
-/// session history. The bottom navigation provides access to Sessions,
-/// Progress, and Settings tabs.
+/// 5-tab layout: Home | Learn | Map | Progress | Profile
+/// Map tab surfaces Knowledge Graph as first-class hero differentiator.
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
 
@@ -37,8 +44,51 @@ class HomeScreen extends ConsumerStatefulWidget {
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   HomeTab _currentTab = HomeTab.home;
 
+  void _onDestinationSelected(int index, FeatureDiscoveryState discovery) {
+    final selected = HomeTab.values[index];
+    setState(() {
+      _currentTab = selected;
+    });
+
+    // Mark the Knowledge Graph "NEW" badge as seen on first map visit.
+    if (selected == HomeTab.map && discovery.showKnowledgeGraphNewBadge) {
+      ref.read(featureDiscoveryProvider.notifier).markKnowledgeGraphNewSeen();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final discovery = ref.watch(featureDiscoveryProvider);
+
+    ref.listen<FeatureDiscoveryState>(featureDiscoveryProvider, (prev, next) {
+      // Session 5: introduce streak mechanic with lightweight celebration.
+      final unlockedStreak =
+          (prev?.streakUnlocked ?? false) == false && next.streakUnlocked;
+      if (unlockedStreak && !next.streakUnlockCelebrated && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('חדש: רצף לימוד נפתח!')),
+        );
+        ref
+            .read(featureDiscoveryProvider.notifier)
+            .markStreakUnlockCelebrated();
+      }
+
+      // Session 10: social feature unlock notification when enabled.
+      final unlockedStudyGroups =
+          (prev?.studyGroupsUnlocked ?? false) == false &&
+              next.studyGroupsUnlocked;
+      if (unlockedStudyGroups &&
+          !next.studyGroupsUnlockNotified &&
+          context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('חדש: קבוצות לימוד זמינות עבורך')),
+        );
+        ref
+            .read(featureDiscoveryProvider.notifier)
+            .markStudyGroupsUnlockNotified();
+      }
+    });
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cena'),
@@ -51,17 +101,14 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           ),
         ],
       ),
-      body: _buildTabContent(),
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentTab.index,
-        onTap: (index) {
-          setState(() {
-            _currentTab = HomeTab.values[index];
-          });
-        },
-        items: HomeTab.values.map((tab) {
-          return BottomNavigationBarItem(
-            icon: Icon(tab.icon),
+      body: _buildTabContent(discovery),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _currentTab.index,
+        onDestinationSelected: (index) =>
+            _onDestinationSelected(index, discovery),
+        destinations: HomeTab.values.map((tab) {
+          return NavigationDestination(
+            icon: _DestinationIcon(tab: tab, discovery: discovery),
             label: tab.label,
           );
         }).toList(),
@@ -69,23 +116,71 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     );
   }
 
-  Widget _buildTabContent() {
+  Widget _buildTabContent(FeatureDiscoveryState discovery) {
     switch (_currentTab) {
       case HomeTab.home:
-        return const _HomeTabContent();
-      case HomeTab.sessions:
+        return _HomeTabContent(discovery: discovery);
+      case HomeTab.learn:
         return const _SessionsTabContent();
+      case HomeTab.map:
+        return _MapTabContent(discovery: discovery);
       case HomeTab.progress:
         return const _ProgressTabContent();
-      case HomeTab.settings:
+      case HomeTab.profile:
         return const _SettingsTabContent();
     }
   }
 }
 
+class _DestinationIcon extends StatelessWidget {
+  const _DestinationIcon({
+    required this.tab,
+    required this.discovery,
+  });
+
+  final HomeTab tab;
+  final FeatureDiscoveryState discovery;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = Icon(tab.icon);
+    if (tab != HomeTab.map || !discovery.showKnowledgeGraphNewBadge) {
+      return base;
+    }
+
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        base,
+        Positioned(
+          top: -6,
+          right: -10,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.tertiary,
+              borderRadius: BorderRadius.circular(RadiusTokens.full),
+            ),
+            child: Text(
+              'NEW',
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onTertiary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 9,
+                  ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 /// Home tab: greeting card, subject buttons, and recent activity.
 class _HomeTabContent extends ConsumerWidget {
-  const _HomeTabContent();
+  const _HomeTabContent({required this.discovery});
+
+  final FeatureDiscoveryState discovery;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -115,23 +210,24 @@ class _HomeTabContent extends ConsumerWidget {
                 ),
                 const SizedBox(height: SpacingTokens.md),
                 // Streak indicator
-                Row(
-                  children: [
-                    Icon(
-                      Icons.local_fire_department_rounded,
-                      color: colorScheme.secondary,
-                      size: 20,
-                    ),
-                    const SizedBox(width: SpacingTokens.xs),
-                    Text(
-                      '0 day streak',
-                      style: theme.textTheme.labelLarge?.copyWith(
+                if (discovery.streakUnlocked)
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.local_fire_department_rounded,
                         color: colorScheme.secondary,
-                        fontWeight: FontWeight.w600,
+                        size: 20,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: SpacingTokens.xs),
+                      Text(
+                        '0 day streak',
+                        style: theme.textTheme.labelLarge?.copyWith(
+                          color: colorScheme.secondary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -233,9 +329,9 @@ class _SubjectGrid extends StatelessWidget {
                 Text(
                   subject.name,
                   style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: subject.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
+                        color: subject.primary,
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
               ],
             ),
@@ -308,6 +404,57 @@ class _SessionsTabContent extends StatelessWidget {
   }
 }
 
+/// Map tab: Knowledge Graph — hero differentiator.
+/// Renders inline without its own AppBar (home screen provides it).
+class _MapTabContent extends StatelessWidget {
+  const _MapTabContent({required this.discovery});
+
+  final FeatureDiscoveryState discovery;
+
+  @override
+  Widget build(BuildContext context) {
+    if (discovery.knowledgeGraphFullAccess) {
+      return const KnowledgeGraphScreen();
+    }
+
+    final theme = Theme.of(context);
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(SpacingTokens.lg),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(SpacingTokens.lg),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  Icons.hub_rounded,
+                  size: 56,
+                  color: theme.colorScheme.primary,
+                ),
+                const SizedBox(height: SpacingTokens.md),
+                Text(
+                  'מפת הידע שלך נבנית',
+                  style: theme.textTheme.titleMedium,
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: SpacingTokens.sm),
+                Text(
+                  'ככל שתפתור/י יותר שאלות, נראה כאן חיבורים בין נושאים.',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 /// Progress tab: gamification screen (XP, streak, badges, recent activity).
 class _ProgressTabContent extends StatelessWidget {
   const _ProgressTabContent();
@@ -319,12 +466,14 @@ class _ProgressTabContent extends StatelessWidget {
 }
 
 /// Settings tab: app preferences and account management.
-class _SettingsTabContent extends StatelessWidget {
+class _SettingsTabContent extends ConsumerWidget {
   const _SettingsTabContent();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final useMomentum = ref.watch(useMomentumMeterProvider);
+    final feedbackPrefs = ref.watch(interactionFeedbackProvider);
 
     return ListView(
       padding: const EdgeInsets.all(SpacingTokens.md),
@@ -374,6 +523,89 @@ class _SettingsTabContent extends StatelessWidget {
 
         const SizedBox(height: SpacingTokens.md),
 
+        // Learning feedback style (streak vs momentum)
+        Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SpacingTokens.md,
+                  SpacingTokens.md,
+                  SpacingTokens.md,
+                  SpacingTokens.sm,
+                ),
+                child: Text(
+                  'Learning Style',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              SwitchListTile(
+                value: useMomentum,
+                onChanged: (value) {
+                  ref
+                      .read(useMomentumMeterProvider.notifier)
+                      .setUseMomentum(value);
+                },
+                title: const Text('Use Momentum Meter'),
+                subtitle: Text(
+                  useMomentum
+                      ? '7-day rolling progress (no streak reset pressure)'
+                      : 'Daily streak mode',
+                ),
+                secondary: const Icon(Icons.insights_rounded),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: SpacingTokens.md),
+
+        // Haptic & sound feedback
+        Card(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  SpacingTokens.md,
+                  SpacingTokens.md,
+                  SpacingTokens.md,
+                  SpacingTokens.sm,
+                ),
+                child: Text(
+                  'Feedback',
+                  style: theme.textTheme.titleMedium,
+                ),
+              ),
+              SwitchListTile(
+                value: feedbackPrefs.hapticsEnabled,
+                onChanged: (enabled) {
+                  ref
+                      .read(interactionFeedbackProvider.notifier)
+                      .setHapticsEnabled(enabled);
+                },
+                title: const Text('Haptics'),
+                subtitle: const Text('Tap and success vibration feedback'),
+                secondary: const Icon(Icons.vibration_rounded),
+              ),
+              SwitchListTile(
+                value: feedbackPrefs.soundsEnabled,
+                onChanged: (enabled) {
+                  ref
+                      .read(interactionFeedbackProvider.notifier)
+                      .setSoundsEnabled(enabled);
+                },
+                title: const Text('Sound Effects'),
+                subtitle: const Text('Off by default'),
+                secondary: const Icon(Icons.volume_up_outlined),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: SpacingTokens.md),
+
         // Account Section
         Card(
           child: Column(
@@ -408,8 +640,28 @@ class _SettingsTabContent extends StatelessWidget {
                   'Sign Out',
                   style: TextStyle(color: theme.colorScheme.error),
                 ),
-                onTap: () {
-                  // Sign out — wired in MOB-002 (auth)
+                onTap: () async {
+                  final confirmed = await showDialog<bool>(
+                    context: context,
+                    builder: (ctx) => AlertDialog(
+                      title: const Text('Sign Out'),
+                      content: const Text('Are you sure you want to sign out?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text('Cancel'),
+                        ),
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text('Sign Out'),
+                        ),
+                      ],
+                    ),
+                  );
+                  if (confirmed == true && context.mounted) {
+                    await ref.read(authNotifierProvider.notifier).signOut();
+                    if (context.mounted) context.go(CenaRoutes.login);
+                  }
                 },
               ),
             ],

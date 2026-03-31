@@ -12,7 +12,8 @@ import 'package:uuid/uuid.dart';
 import '../models/domain_models.dart';
 import '../services/offline_sync_service.dart';
 import '../services/websocket_service.dart';
-import 'derived_providers.dart' show webSocketServiceProvider, syncManagerProvider;
+import 'derived_providers.dart'
+    show webSocketServiceProvider, syncManagerProvider;
 
 // ---------------------------------------------------------------------------
 // State
@@ -32,6 +33,7 @@ class SessionState {
     this.isBreakSuggested = false,
     this.hintsUsed = 0,
     this.sessionHistory = const [],
+    this.consecutiveCorrect = 0,
   });
 
   final Session? currentSession;
@@ -47,6 +49,14 @@ class SessionState {
 
   /// Ordered list of answer results for the in-session progress display.
   final List<AnswerResult> sessionHistory;
+
+  /// Number of consecutive correct answers — drives flow state detection.
+  final int consecutiveCorrect;
+
+  /// True when the student is in a flow state (3+ consecutive correct).
+  /// During flow: skip micro-breaks, defer XP popups, deepen immersive mode.
+  static const int flowThreshold = 3;
+  bool get isInFlowState => consecutiveCorrect >= flowThreshold;
 
   /// True while a session is running (started and not yet ended).
   bool get isActive =>
@@ -75,11 +85,13 @@ class SessionState {
     List<AnswerResult>? sessionHistory,
     bool clearError = false,
     bool clearCurrentExercise = false,
+    int? consecutiveCorrect,
   }) {
     return SessionState(
       currentSession: currentSession ?? this.currentSession,
-      currentExercise:
-          clearCurrentExercise ? null : (currentExercise ?? this.currentExercise),
+      currentExercise: clearCurrentExercise
+          ? null
+          : (currentExercise ?? this.currentExercise),
       methodology: methodology ?? this.methodology,
       fatigueScore: fatigueScore ?? this.fatigueScore,
       questionsAttempted: questionsAttempted ?? this.questionsAttempted,
@@ -89,6 +101,7 @@ class SessionState {
       isBreakSuggested: isBreakSuggested ?? this.isBreakSuggested,
       hintsUsed: hintsUsed ?? this.hintsUsed,
       sessionHistory: sessionHistory ?? this.sessionHistory,
+      consecutiveCorrect: consecutiveCorrect ?? this.consecutiveCorrect,
     );
   }
 }
@@ -121,7 +134,8 @@ class SessionNotifier extends StateNotifier<SessionState> {
   // ---- Public API ----
 
   /// Start a new learning session.
-  Future<void> startSession({Subject? subject, int durationMinutes = 25}) async {
+  Future<void> startSession(
+      {Subject? subject, int durationMinutes = 25}) async {
     state = state.copyWith(isLoading: true, clearError: true);
     try {
       await webSocketService.startSession(
@@ -148,8 +162,8 @@ class SessionNotifier extends StateNotifier<SessionState> {
     if (exercise == null || session == null) return;
 
     final idempotencyKey = _uuid.v4();
-    final isConnected = webSocketService.currentConnectionState ==
-        ConnectionState.connected;
+    final isConnected =
+        webSocketService.currentConnectionState == ConnectionState.connected;
 
     if (isConnected) {
       await webSocketService.attemptConcept(
@@ -286,7 +300,8 @@ class SessionNotifier extends StateNotifier<SessionState> {
   }
 
   void _onSessionStarted(Map<String, dynamic> payload) {
-    final session = Session.fromJson(payload['session'] as Map<String, dynamic>);
+    final session =
+        Session.fromJson(payload['session'] as Map<String, dynamic>);
     state = state.copyWith(
       currentSession: session,
       isLoading: false,
@@ -295,6 +310,7 @@ class SessionNotifier extends StateNotifier<SessionState> {
       hintsUsed: 0,
       fatigueScore: 0.0,
       sessionHistory: [],
+      consecutiveCorrect: 0,
     );
   }
 
@@ -312,11 +328,14 @@ class SessionNotifier extends StateNotifier<SessionState> {
     final result =
         AnswerResult.fromJson(payload['result'] as Map<String, dynamic>);
     final newHistory = [...state.sessionHistory, result];
+    final newConsecutive = result.isCorrect ? state.consecutiveCorrect + 1 : 0;
     state = state.copyWith(
       questionsAttempted: state.questionsAttempted + 1,
-      questionsCorrect:
-          result.isCorrect ? state.questionsCorrect + 1 : state.questionsCorrect,
+      questionsCorrect: result.isCorrect
+          ? state.questionsCorrect + 1
+          : state.questionsCorrect,
       sessionHistory: newHistory,
+      consecutiveCorrect: newConsecutive,
     );
   }
 
@@ -333,9 +352,11 @@ class SessionNotifier extends StateNotifier<SessionState> {
 
   void _onCognitiveLoadWarning(Map<String, dynamic> payload) {
     final fatigue = (payload['fatigueScore'] as num?)?.toDouble() ?? 0.0;
+    // During flow state, raise the break threshold to avoid interrupting flow.
+    final breakThreshold = state.isInFlowState ? 0.85 : 0.7;
     state = state.copyWith(
       fatigueScore: fatigue,
-      isBreakSuggested: fatigue >= 0.7,
+      isBreakSuggested: fatigue >= breakThreshold,
     );
   }
 

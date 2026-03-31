@@ -63,6 +63,8 @@ dependencies:
   firebase_core: ^3.13.0            # Firebase core SDK
   firebase_auth: ^5.5.3             # Firebase Authentication
   firebase_analytics: ^11.4.2       # Firebase Analytics
+  google_sign_in: ^6.2.2            # Google Sign-In (Android + iOS)
+  sign_in_with_apple: ^6.1.4        # Apple Sign-In (iOS required, Android optional)
 
   # ---------------------------------------------------------------------------
   # Push Notifications
@@ -71,7 +73,7 @@ dependencies:
   # ---------------------------------------------------------------------------
   # Internationalization (Hebrew + Arabic + English)
   # ---------------------------------------------------------------------------
-  intl: ^0.19.0                     # pinned to 0.19.0 by flutter_localizations SDK
+  intl: ^0.20.2                     # pinned by flutter_localizations SDK
 
   # ---------------------------------------------------------------------------
   # Utilities

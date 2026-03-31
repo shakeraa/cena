@@ -6,10 +6,10 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/models/domain_models.dart';
+import '../../../core/services/interaction_feedback_service.dart';
 
 /// Full-screen overlay displayed after the server returns an [AnswerResult].
 ///
@@ -60,8 +60,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
     _controller.forward();
     _triggerHaptic();
 
-    _dismissTimer =
-        Timer(widget.autoDismissDelay, widget.onDismiss);
+    _dismissTimer = Timer(widget.autoDismissDelay, widget.onDismiss);
   }
 
   @override
@@ -73,9 +72,9 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
 
   void _triggerHaptic() {
     if (widget.result.isCorrect) {
-      HapticFeedback.heavyImpact();
+      InteractionFeedbackService.correctAnswer();
     } else {
-      HapticFeedback.lightImpact();
+      InteractionFeedbackService.incorrectAnswer();
     }
   }
 
@@ -162,8 +161,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
                       padding: const EdgeInsets.all(SpacingTokens.md),
                       decoration: BoxDecoration(
                         color: Colors.white.withValues(alpha: 0.2),
-                        borderRadius:
-                            BorderRadius.circular(RadiusTokens.xl),
+                        borderRadius: BorderRadius.circular(RadiusTokens.xl),
                       ),
                       child: Text(
                         widget.result.feedback,
@@ -175,8 +173,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
                     ),
 
                   // Worked solution for wrong answers
-                  if (!isCorrect &&
-                      widget.result.workedSolution != null) ...[
+                  if (!isCorrect && widget.result.workedSolution != null) ...[
                     const SizedBox(height: SpacingTokens.md),
                     _WorkedSolutionCard(
                         solution: widget.result.workedSolution!),

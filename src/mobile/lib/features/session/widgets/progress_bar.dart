@@ -10,8 +10,9 @@ import '../../../core/config/app_config.dart';
 /// Displays session progress: questions attempted, accuracy rate, and a
 /// fatigue-aware color gradient (green -> yellow -> red).
 ///
-/// The progress track shifts color as [fatigueScore] approaches 1.0, giving
-/// the student a visual cue that a break may be coming.
+/// When [isImmersive] is true (flow state), hides timer digits and stat chips,
+/// showing only the ambient progress bar and a compact pause button. This keeps
+/// the student focused on the question, not the clock.
 class ProgressBar extends StatelessWidget {
   const ProgressBar({
     super.key,
@@ -20,6 +21,8 @@ class ProgressBar extends StatelessWidget {
     required this.fatigueScore,
     required this.elapsed,
     required this.targetDurationMinutes,
+    this.isImmersive = false,
+    this.onPause,
   });
 
   final int questionsAttempted;
@@ -32,6 +35,12 @@ class ProgressBar extends StatelessWidget {
 
   final Duration elapsed;
   final int targetDurationMinutes;
+
+  /// When true, hides timer/stats and shows only the ambient progress bar.
+  final bool isImmersive;
+
+  /// Callback for the pause/menu button.
+  final VoidCallback? onPause;
 
   @override
   Widget build(BuildContext context) {
@@ -60,29 +69,52 @@ class ProgressBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Stats row
-          Row(
-            children: [
-              _StatChip(
-                icon: Icons.help_outline_rounded,
-                label: '$questionsAttempted',
-                tooltip: 'Questions answered',
-                color: colorScheme.primary,
-              ),
-              const SizedBox(width: SpacingTokens.sm),
-              _StatChip(
-                icon: Icons.check_circle_outline_rounded,
-                label: '$accuracyPct%',
-                tooltip: 'Accuracy',
-                color: _accuracyColor(accuracy),
-              ),
-              const Spacer(),
-              _FatigueIndicator(fatigueScore: fatigueScore),
-              const SizedBox(width: SpacingTokens.sm),
-              _TimerDisplay(elapsed: elapsed),
-            ],
-          ),
-          const SizedBox(height: SpacingTokens.xs),
+          // Stats row — hidden in immersive mode to reduce distraction
+          if (!isImmersive) ...[
+            Row(
+              children: [
+                _StatChip(
+                  icon: Icons.help_outline_rounded,
+                  label: '$questionsAttempted',
+                  tooltip: 'Questions answered',
+                  color: colorScheme.primary,
+                ),
+                const SizedBox(width: SpacingTokens.sm),
+                _StatChip(
+                  icon: Icons.check_circle_outline_rounded,
+                  label: '$accuracyPct%',
+                  tooltip: 'Accuracy',
+                  color: _accuracyColor(accuracy),
+                ),
+                const Spacer(),
+                _FatigueIndicator(fatigueScore: fatigueScore),
+                const SizedBox(width: SpacingTokens.sm),
+                _TimerDisplay(elapsed: elapsed),
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+          ],
+          if (isImmersive) ...[
+            Row(
+              children: [
+                Expanded(
+                  child: _FatigueIndicator(fatigueScore: fatigueScore),
+                ),
+                IconButton(
+                  onPressed: onPause,
+                  icon: const Icon(Icons.pause_circle_outlined, size: 20),
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(
+                    minWidth: 32,
+                    minHeight: 32,
+                  ),
+                  tooltip: 'Pause session',
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ],
+            ),
+            const SizedBox(height: SpacingTokens.xs),
+          ],
           // Progress track
           ClipRRect(
             borderRadius: BorderRadius.circular(RadiusTokens.full),

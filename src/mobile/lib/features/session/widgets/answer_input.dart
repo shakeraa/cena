@@ -3,11 +3,14 @@
 // Adaptive input control for MCQ, free-text, numeric, and proof questions.
 // =============================================================================
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/models/domain_models.dart';
+import '../../../core/services/interaction_feedback_service.dart';
 
 /// Provides the submit and skip controls for the active question.
 ///
@@ -106,6 +109,7 @@ class _AnswerInputState extends State<AnswerInput> {
 
   void _submit() {
     if (!_canSubmit) return;
+    unawaited(InteractionFeedbackService.submitTap());
     widget.onSubmit(_answerString, _timeSpentMs);
   }
 
@@ -196,10 +200,8 @@ class _AnswerInputState extends State<AnswerInput> {
       maxLines: isProof ? null : 4,
       minLines: isProof ? 5 : 2,
       textDirection: Directionality.of(context),
-      keyboardType:
-          isProof ? TextInputType.multiline : TextInputType.text,
-      textInputAction:
-          isProof ? TextInputAction.newline : TextInputAction.done,
+      keyboardType: isProof ? TextInputType.multiline : TextInputType.text,
+      textInputAction: isProof ? TextInputAction.newline : TextInputAction.done,
       decoration: InputDecoration(
         hintText: isProof ? 'כתוב את הוכחתך כאן...' : 'כתוב את תשובתך כאן...',
         border: OutlineInputBorder(
@@ -262,8 +264,8 @@ class _NumericInput extends StatelessWidget {
           child: TextField(
             controller: controller,
             enabled: isEnabled,
-            keyboardType:
-                const TextInputType.numberWithOptions(decimal: true, signed: true),
+            keyboardType: const TextInputType.numberWithOptions(
+                decimal: true, signed: true),
             inputFormatters: [
               FilteringTextInputFormatter.allow(
                 RegExp(r'^-?\d*\.?\d*$'),
@@ -300,9 +302,7 @@ class _NumericInput extends StatelessWidget {
                       child: Text(u.isEmpty ? 'ללא' : u),
                     ))
                 .toList(),
-            onChanged: isEnabled
-                ? (v) => onUnitChanged(v ?? '')
-                : null,
+            onChanged: isEnabled ? (v) => onUnitChanged(v ?? '') : null,
           ),
         ),
       ],

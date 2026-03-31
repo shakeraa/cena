@@ -59,120 +59,120 @@ GoRouter buildCenaRouter({
     initialLocation: CenaRoutes.home,
     debugLogDiagnostics: true,
     observers: observers ?? const [],
-  redirect: (BuildContext context, GoRouterState state) async {
-    final location = state.matchedLocation;
+    redirect: (BuildContext context, GoRouterState state) async {
+      final location = state.matchedLocation;
 
-    // Never redirect if the user is already on the onboarding or login flow.
-    if (location == CenaRoutes.onboarding || location == CenaRoutes.login) {
-      return null;
-    }
-
-    final prefs = await SharedPreferences.getInstance();
-    final onboardingDone = prefs.getBool(_kOnboardingComplete) ?? false;
-
-    // Gate 1: Onboarding — first-time users always see onboarding first.
-    if (!onboardingDone) {
-      if (location != CenaRoutes.home) {
-        DeferredDeepLink.instance.store(location);
+      // Never redirect if the user is already on the onboarding or login flow.
+      if (location == CenaRoutes.onboarding || location == CenaRoutes.login) {
+        return null;
       }
-      return CenaRoutes.onboarding;
-    }
 
-    // Gate 2: Authentication — protected routes require a logged-in user.
-    final isLoggedIn = FirebaseAuth.instance.currentUser != null;
+      final prefs = await SharedPreferences.getInstance();
+      final onboardingDone = prefs.getBool(_kOnboardingComplete) ?? false;
 
-    if (!isLoggedIn && CenaRoutes.requiresAuth(location)) {
-      DeferredDeepLink.instance.store(location);
-      return CenaRoutes.login;
-    }
+      // Gate 1: Onboarding — first-time users always see onboarding first.
+      if (!onboardingDone) {
+        if (location != CenaRoutes.home) {
+          DeferredDeepLink.instance.store(location);
+        }
+        return CenaRoutes.onboarding;
+      }
 
-    // Gate 3: Replay deferred deep link after successful login.
-    if (isLoggedIn && location == CenaRoutes.home) {
-      final deferred = DeferredDeepLink.instance.consume();
-      if (deferred != null) return deferred;
-    }
+      // Gate 2: Authentication — protected routes require a logged-in user.
+      final isLoggedIn = FirebaseAuth.instance.currentUser != null;
 
-    return null;
-  },
-  routes: [
-    GoRoute(
-      path: CenaRoutes.onboarding,
-      name: 'onboarding',
-      builder: (BuildContext context, GoRouterState state) {
-        return const OnboardingScreen();
-      },
-    ),
-    GoRoute(
-      path: CenaRoutes.login,
-      name: 'login',
-      builder: (BuildContext context, GoRouterState state) {
-        return const AuthScreen();
-      },
-    ),
-    GoRoute(
-      path: CenaRoutes.home,
-      name: 'home',
-      builder: (BuildContext context, GoRouterState state) {
-        return const HomeScreen();
-      },
-    ),
-    GoRoute(
-      path: CenaRoutes.session,
-      name: 'session',
-      builder: (BuildContext context, GoRouterState state) {
-        return const SessionScreen();
-      },
-    ),
-    GoRoute(
-      path: CenaRoutes.sessionById,
-      name: 'sessionById',
-      builder: (BuildContext context, GoRouterState state) {
-        return const SessionScreen();
-      },
-    ),
-    GoRoute(
-      path: CenaRoutes.graph,
-      name: 'graph',
-      builder: (BuildContext context, GoRouterState state) {
-        return const HomeScreen(); // Graph tab within home — placeholder
-      },
-    ),
-    GoRoute(
-      path: CenaRoutes.profile,
-      name: 'profile',
-      builder: (BuildContext context, GoRouterState state) {
-        return const HomeScreen(); // Profile tab within home — placeholder
-      },
-    ),
-  ],
-  errorBuilder: (BuildContext context, GoRouterState state) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Page Not Found')),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 64,
-              color: Theme.of(context).colorScheme.error,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Route not found: ${state.uri}',
-              style: Theme.of(context).textTheme.bodyLarge,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 24),
-            FilledButton(
-              onPressed: () => context.go(CenaRoutes.home),
-              child: const Text('Go Home'),
-            ),
-          ],
-        ),
+      if (!isLoggedIn && CenaRoutes.requiresAuth(location)) {
+        DeferredDeepLink.instance.store(location);
+        return CenaRoutes.login;
+      }
+
+      // Gate 3: Replay deferred deep link after successful login.
+      if (isLoggedIn && location == CenaRoutes.home) {
+        final deferred = DeferredDeepLink.instance.consume();
+        if (deferred != null) return deferred;
+      }
+
+      return null;
+    },
+    routes: [
+      GoRoute(
+        path: CenaRoutes.onboarding,
+        name: 'onboarding',
+        builder: (BuildContext context, GoRouterState state) {
+          return const OnboardingScreen();
+        },
       ),
-    );
-  },
+      GoRoute(
+        path: CenaRoutes.login,
+        name: 'login',
+        builder: (BuildContext context, GoRouterState state) {
+          return const AuthScreen();
+        },
+      ),
+      GoRoute(
+        path: CenaRoutes.home,
+        name: 'home',
+        builder: (BuildContext context, GoRouterState state) {
+          return const HomeScreen();
+        },
+      ),
+      GoRoute(
+        path: CenaRoutes.session,
+        name: 'session',
+        builder: (BuildContext context, GoRouterState state) {
+          return const SessionScreen();
+        },
+      ),
+      GoRoute(
+        path: CenaRoutes.sessionById,
+        name: 'sessionById',
+        builder: (BuildContext context, GoRouterState state) {
+          return const SessionScreen();
+        },
+      ),
+      GoRoute(
+        path: CenaRoutes.graph,
+        name: 'graph',
+        builder: (BuildContext context, GoRouterState state) {
+          return const HomeScreen(); // Graph tab within home — placeholder
+        },
+      ),
+      GoRoute(
+        path: CenaRoutes.profile,
+        name: 'profile',
+        builder: (BuildContext context, GoRouterState state) {
+          return const HomeScreen(); // Profile tab within home — placeholder
+        },
+      ),
+    ],
+    errorBuilder: (BuildContext context, GoRouterState state) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Page Not Found')),
+        body: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.error_outline,
+                size: 64,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Route not found: ${state.uri}',
+                style: Theme.of(context).textTheme.bodyLarge,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 24),
+              FilledButton(
+                onPressed: () => context.go(CenaRoutes.home),
+                child: const Text('Go Home'),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
   );
 }
 

@@ -9,12 +9,15 @@
 import 'package:flutter/material.dart' hide Badge;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 
 import '../../core/config/app_config.dart';
 import '../../core/models/domain_models.dart';
-import '../../core/services/analytics_service.dart';
+import '../../core/services/interaction_feedback_service.dart';
 import '../../core/state/gamification_state.dart';
+import '../../core/state/momentum_state.dart';
 import 'badge_detail_dialog.dart';
+import 'momentum_meter.dart';
 import 'streak_widget.dart';
 
 /// Full gamification progress screen, shown in the "Progress" bottom nav tab.
@@ -23,18 +26,78 @@ class GamificationScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final useMomentum = ref.watch(useMomentumMeterProvider);
+    final momentumPct = ref.watch(momentumPercentageProvider);
+    final momentumDays = ref.watch(momentumDaysStudiedProvider);
+    final anxiety = ref.watch(streakAnxietyProvider);
+
     return ListView(
       padding: const EdgeInsets.all(SpacingTokens.md),
-      children: const [
-        _XpLevelCard(),
-        SizedBox(height: SpacingTokens.md),
-        StreakWidget(),
-        SizedBox(height: SpacingTokens.md),
-        _BadgeGrid(),
-        SizedBox(height: SpacingTokens.md),
-        _RecentAchievements(),
-        SizedBox(height: SpacingTokens.lg),
+      children: [
+        const _XpLevelCard(),
+        const SizedBox(height: SpacingTokens.md),
+        if (useMomentum)
+          MomentumMeter(
+            percentage: momentumPct,
+            daysStudied: momentumDays,
+          )
+        else
+          const StreakWidget(),
+        if (!useMomentum && anxiety.suggestSwitch) ...[
+          const SizedBox(height: SpacingTokens.sm),
+          const _MomentumSuggestionCard(),
+        ],
+        const SizedBox(height: SpacingTokens.md),
+        const _BadgeGrid(),
+        const SizedBox(height: SpacingTokens.md),
+        const _RecentAchievements(),
+        const SizedBox(height: SpacingTokens.lg),
       ],
+    );
+  }
+}
+
+class _MomentumSuggestionCard extends ConsumerWidget {
+  const _MomentumSuggestionCard();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(SpacingTokens.md),
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.45),
+        borderRadius: BorderRadius.circular(RadiusTokens.lg),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.favorite_outline_rounded, color: colorScheme.primary),
+          const SizedBox(width: SpacingTokens.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'נראה שרצף יומי מוסיף לחץ. לעבור ל-Momentum?',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
+                const SizedBox(height: SpacingTokens.xs),
+                TextButton(
+                  onPressed: () {
+                    ref
+                        .read(useMomentumMeterProvider.notifier)
+                        .setUseMomentum(true);
+                  },
+                  child: const Text('כן, לעבור למצב Momentum'),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -43,11 +106,22 @@ class GamificationScreen extends ConsumerWidget {
 // XP & Level Card
 // ---------------------------------------------------------------------------
 
-class _XpLevelCard extends ConsumerWidget {
+class _XpLevelCard extends ConsumerStatefulWidget {
   const _XpLevelCard();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_XpLevelCard> createState() => _XpLevelCardState();
+}
+
+class _XpLevelCardState extends ConsumerState<_XpLevelCard> {
+  @override
+  Widget build(BuildContext context) {
+    ref.listen<int>(levelProvider, (prev, next) {
+      if (prev != null && next > prev) {
+        unawaited(InteractionFeedbackService.levelUp());
+      }
+    });
+
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
@@ -307,8 +381,7 @@ class _BadgeCell extends StatelessWidget {
                   size: 26,
                   color: isEarned
                       ? Colors.white
-                      : colorScheme.onSurfaceVariant
-                          .withValues(alpha: 0.3),
+                      : colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                 ),
                 if (!isEarned)
                   Positioned(
@@ -342,8 +415,7 @@ class _BadgeCell extends StatelessWidget {
               color: isEarned
                   ? colorScheme.onSurface
                   : colorScheme.onSurfaceVariant.withValues(alpha: 0.6),
-              fontWeight:
-                  isEarned ? FontWeight.w600 : FontWeight.w400,
+              fontWeight: isEarned ? FontWeight.w600 : FontWeight.w400,
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,

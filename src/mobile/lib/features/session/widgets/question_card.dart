@@ -3,11 +3,14 @@
 // Renders an Exercise for MCQ, free-text, numeric, proof, and diagram types.
 // =============================================================================
 
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/config/app_config.dart';
 import '../../../core/models/domain_models.dart';
+import '../../../core/services/interaction_feedback_service.dart';
 import 'math_text.dart';
 
 /// Renders the current [exercise] and dispatches selection events for MCQ.
@@ -137,7 +140,12 @@ class _OptionList extends StatelessWidget {
             text: entry.value,
             isSelected: selectedIndex == entry.key,
             isEnabled: onSelected != null,
-            onTap: onSelected == null ? null : () => onSelected!(entry.key),
+            onTap: onSelected == null
+                ? null
+                : () {
+                    unawaited(InteractionFeedbackService.selectionClick());
+                    onSelected!(entry.key);
+                  },
             colorScheme: colorScheme,
           ),
         );
@@ -167,8 +175,7 @@ class OptionTile extends StatelessWidget {
 
   static const List<String> _labels = ['א', 'ב', 'ג', 'ד'];
 
-  String get _label =>
-      index < _labels.length ? _labels[index] : '${index + 1}';
+  String get _label => index < _labels.length ? _labels[index] : '${index + 1}';
 
   @override
   Widget build(BuildContext context) {
@@ -234,8 +241,7 @@ class OptionTile extends StatelessWidget {
                   ),
                 ),
                 if (isSelected)
-                  Icon(Icons.check_circle_rounded,
-                      size: 20, color: labelColor),
+                  Icon(Icons.check_circle_rounded, size: 20, color: labelColor),
               ],
             ),
           ),

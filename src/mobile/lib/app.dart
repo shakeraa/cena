@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 import 'core/config/app_config.dart';
 import 'core/router.dart';
 import 'core/services/analytics_service.dart';
+import 'core/services/auth_service.dart';
 import 'core/state/app_state.dart';
 import 'core/theme/cena_theme.dart';
 
@@ -41,6 +42,18 @@ class CenaApp extends ConsumerWidget {
     final locale = ref.watch(currentLocaleProvider);
     final isRtl = AppLocales.isRtl(locale);
     final router = ref.watch(cenaRouterProvider);
+
+    // Sync Firebase auth token → API client for Bearer token injection.
+    ref.listen<AuthState>(authNotifierProvider, (previous, next) {
+      final apiClient = ref.read(apiClientProvider);
+      if (next is AuthAuthenticated) {
+        next.user.getIdToken().then((token) {
+          if (token != null) apiClient.setAuthToken(token);
+        });
+      } else if (next is AuthInitial) {
+        apiClient.clearAuthToken();
+      }
+    });
 
     return MaterialApp.router(
       title: 'Cena',
