@@ -5,8 +5,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../app.dart' show currentLocaleProvider;
 import '../../core/config/app_config.dart';
+import '../../core/state/app_state.dart' show apiClientProvider;
 import '../../core/router.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/state/feature_discovery_state.dart';
@@ -358,13 +361,50 @@ class _SubjectItem {
 }
 
 /// Sessions tab: shows history and active sessions.
-class _SessionsTabContent extends StatelessWidget {
+/// Fetches from REST /api/sessions; falls back to empty state.
+class _SessionsTabContent extends ConsumerWidget {
   const _SessionsTabContent();
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final sessionHistory = ref.watch(_sessionHistoryProvider);
+
+    return sessionHistory.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (_, __) => _SessionsEmptyState(),
+      data: (sessions) {
+        if (sessions.isEmpty) return _SessionsEmptyState();
+        return ListView.builder(
+          padding: const EdgeInsets.all(SpacingTokens.md),
+          itemCount: sessions.length + 1, // +1 for the start button header
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: SpacingTokens.md),
+                child: FilledButton.icon(
+                  onPressed: () => context.go(CenaRoutes.session),
+                  icon: const Icon(Icons.play_arrow_rounded),
+                  label: const Text('Start New Session'),
+                  style: FilledButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 48),
+                  ),
+                ),
+              );
+            }
+            final session = sessions[index - 1];
+            return _SessionHistoryCard(session: session);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SessionsEmptyState extends StatelessWidget {
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -401,6 +441,102 @@ class _SessionsTabContent extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _SessionHistoryCard extends StatelessWidget {
+  const _SessionHistoryCard({required this.session});
+
+  final _SessionSummaryDto session;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final accuracy = (session.accuracy * 100).toInt();
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: SpacingTokens.sm),
+      child: ListTile(
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: _subjectColor(session.subject).withValues(alpha: 0.15),
+          ),
+          child: Icon(
+            _subjectIcon(session.subject),
+            size: 20,
+            color: _subjectColor(session.subject),
+          ),
+        ),
+        title: Text(
+          session.subject.isNotEmpty ? session.subject : 'Practice Session',
+          style: theme.textTheme.bodyMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          '$accuracy% accuracy \u00b7 ${session.questionsAttempted} questions \u00b7 ${session.durationMinutes}m',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+        trailing: Text(
+          _formatDate(session.startedAt),
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Color _subjectColor(String subject) {
+    switch (subject.toLowerCase()) {
+      case 'math':
+      case 'mathematics':
+        return SubjectColorTokens.mathPrimary;
+      case 'physics':
+        return SubjectColorTokens.physicsPrimary;
+      case 'chemistry':
+        return SubjectColorTokens.chemistryPrimary;
+      case 'biology':
+        return SubjectColorTokens.biologyPrimary;
+      case 'cs':
+        return SubjectColorTokens.csPrimary;
+      default:
+        return const Color(0xFF607D8B);
+    }
+  }
+
+  IconData _subjectIcon(String subject) {
+    switch (subject.toLowerCase()) {
+      case 'math':
+      case 'mathematics':
+        return Icons.functions_rounded;
+      case 'physics':
+        return Icons.speed_rounded;
+      case 'chemistry':
+        return Icons.science_rounded;
+      case 'biology':
+        return Icons.biotech_rounded;
+      case 'cs':
+        return Icons.computer_rounded;
+      default:
+        return Icons.school_rounded;
+    }
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    final diff = now.difference(dt);
+    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+    if (diff.inHours < 24) return '${diff.inHours}h ago';
+    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    return '${dt.day}/${dt.month}';
   }
 }
 
@@ -479,47 +615,7 @@ class _SettingsTabContent extends ConsumerWidget {
       padding: const EdgeInsets.all(SpacingTokens.md),
       children: [
         // Language Selection
-        Card(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.fromLTRB(
-                  SpacingTokens.md,
-                  SpacingTokens.md,
-                  SpacingTokens.md,
-                  SpacingTokens.sm,
-                ),
-                child: Text(
-                  'Language',
-                  style: theme.textTheme.titleMedium,
-                ),
-              ),
-              ListTile(
-                leading: const Icon(Icons.language_rounded),
-                title: const Text('Hebrew'),
-                trailing: const Icon(Icons.check_rounded),
-                onTap: () {
-                  // Language switching — wired via currentLocaleProvider
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.language_rounded),
-                title: const Text('Arabic'),
-                onTap: () {
-                  // Language switching
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.language_rounded),
-                title: const Text('English'),
-                onTap: () {
-                  // Language switching
-                },
-              ),
-            ],
-          ),
-        ),
+        _LanguageCard(),
 
         const SizedBox(height: SpacingTokens.md),
 
@@ -627,9 +723,7 @@ class _SettingsTabContent extends ConsumerWidget {
                 leading: const Icon(Icons.person_outline_rounded),
                 title: const Text('Profile'),
                 trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  // Profile screen — future task
-                },
+                onTap: () => context.push(CenaRoutes.profile),
               ),
               ListTile(
                 leading: Icon(
@@ -671,3 +765,119 @@ class _SettingsTabContent extends ConsumerWidget {
     );
   }
 }
+
+// =============================================================================
+// Language switcher card (MOB-CORE-001)
+// =============================================================================
+
+/// SharedPreferences key for persisted locale.
+const String _kLocaleKey = 'app_locale';
+
+class _LanguageCard extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final currentLocale = ref.watch(currentLocaleProvider);
+
+    return Card(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(
+              SpacingTokens.md,
+              SpacingTokens.md,
+              SpacingTokens.md,
+              SpacingTokens.sm,
+            ),
+            child: Text(
+              'Language',
+              style: theme.textTheme.titleMedium,
+            ),
+          ),
+          for (final entry in _supportedLocales)
+            ListTile(
+              leading: const Icon(Icons.language_rounded),
+              title: Text(entry.label),
+              trailing: currentLocale.languageCode == entry.locale.languageCode
+                  ? Icon(Icons.check_rounded, color: theme.colorScheme.primary)
+                  : null,
+              onTap: () async {
+                ref.read(currentLocaleProvider.notifier).state = entry.locale;
+                final prefs = await SharedPreferences.getInstance();
+                await prefs.setString(_kLocaleKey, entry.locale.languageCode);
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocaleEntry {
+  const _LocaleEntry({required this.label, required this.locale});
+  final String label;
+  final Locale locale;
+}
+
+const List<_LocaleEntry> _supportedLocales = [
+  _LocaleEntry(label: 'עברית (Hebrew)', locale: AppLocales.hebrew),
+  _LocaleEntry(label: 'العربية (Arabic)', locale: AppLocales.arabic),
+  _LocaleEntry(label: 'English', locale: AppLocales.english),
+];
+
+// =============================================================================
+// Session history provider + DTO (MOB-CORE-002)
+// =============================================================================
+
+class _SessionSummaryDto {
+  const _SessionSummaryDto({
+    required this.id,
+    required this.subject,
+    required this.accuracy,
+    required this.questionsAttempted,
+    required this.durationMinutes,
+    required this.startedAt,
+  });
+
+  final String id;
+  final String subject;
+  final double accuracy;
+  final int questionsAttempted;
+  final int durationMinutes;
+  final DateTime startedAt;
+
+  factory _SessionSummaryDto.fromJson(Map<String, dynamic> json) {
+    return _SessionSummaryDto(
+      id: json['id'] as String? ?? '',
+      subject: json['subject'] as String? ?? '',
+      accuracy: (json['accuracy'] as num?)?.toDouble() ?? 0.0,
+      questionsAttempted: (json['questionsAttempted'] as num?)?.toInt() ?? 0,
+      durationMinutes: (json['durationMinutes'] as num?)?.toInt() ?? 0,
+      startedAt: json['startedAt'] != null
+          ? DateTime.parse(json['startedAt'] as String)
+          : DateTime.now(),
+    );
+  }
+}
+
+/// Fetches session history from REST API.
+/// Auto-refreshes when the provider is re-watched (e.g., returning to Learn tab).
+final _sessionHistoryProvider =
+    FutureProvider.autoDispose<List<_SessionSummaryDto>>((ref) async {
+  try {
+    final apiClient = ref.watch(apiClientProvider);
+    final response = await apiClient.get<Map<String, dynamic>>(
+      '/sessions',
+      queryParameters: {'limit': '20', 'sort': 'startedAt:desc'},
+    );
+    final data = response.data;
+    if (data == null) return [];
+    final items = data['items'] as List<dynamic>? ?? [];
+    return items
+        .map((e) => _SessionSummaryDto.fromJson(e as Map<String, dynamic>))
+        .toList();
+  } catch (_) {
+    return [];
+  }
+});

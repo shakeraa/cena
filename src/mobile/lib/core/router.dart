@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../features/auth/auth_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
+import '../features/profile/profile_screen.dart';
 import '../features/session/session_screen.dart';
 import 'services/analytics_service.dart';
 import 'services/deep_link_service.dart';
@@ -141,7 +142,7 @@ GoRouter buildCenaRouter({
         path: CenaRoutes.profile,
         name: 'profile',
         builder: (BuildContext context, GoRouterState state) {
-          return const HomeScreen(); // Profile tab within home — placeholder
+          return const ProfileScreen();
         },
       ),
     ],
