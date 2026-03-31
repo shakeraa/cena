@@ -15,6 +15,7 @@ import '../../core/services/auth_service.dart';
 import '../../core/state/feature_discovery_state.dart';
 import '../../core/state/interaction_feedback_state.dart';
 import '../../core/state/momentum_state.dart';
+import '../../core/state/outreach_notifier.dart';
 import '../gamification/gamification_screen.dart';
 import '../knowledge_graph/knowledge_graph_screen.dart';
 
@@ -96,12 +97,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       appBar: AppBar(
         title: const Text('Cena'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // Notification center — wired in MOB-008 (push notifications)
-            },
-          ),
+          _NotificationBellButton(),
         ],
       ),
       body: _buildTabContent(discovery),
@@ -367,7 +363,6 @@ class _SessionsTabContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final theme = Theme.of(context);
     final sessionHistory = ref.watch(_sessionHistoryProvider);
 
     return sessionHistory.when(
@@ -762,6 +757,28 @@ class _SettingsTabContent extends ConsumerWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+// =============================================================================
+// Notification bell with unread badge (MOB-CORE-007)
+// =============================================================================
+
+class _NotificationBellButton extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final unreadCount = ref.watch(
+      outreachProvider.select((s) => s.unreadCount),
+    );
+
+    return IconButton(
+      icon: Badge(
+        isLabelVisible: unreadCount > 0,
+        label: Text('$unreadCount'),
+        child: const Icon(Icons.notifications_outlined),
+      ),
+      onPressed: () => context.push(CenaRoutes.notifications),
     );
   }
 }

@@ -10,6 +10,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../features/auth/auth_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
+import '../features/notifications/notification_center_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/session/session_screen.dart';
 import 'services/analytics_service.dart';
@@ -24,6 +25,7 @@ abstract class CenaRoutes {
   static const String sessionById = '/session/:id';
   static const String graph = '/graph';
   static const String profile = '/profile';
+  static const String notifications = '/notifications';
 
   /// Routes that require authentication.
   static const Set<String> authenticated = {
@@ -31,6 +33,7 @@ abstract class CenaRoutes {
     session,
     graph,
     profile,
+    notifications,
   };
 
   /// Returns `true` if the given [path] requires an authenticated user.
@@ -143,6 +146,13 @@ GoRouter buildCenaRouter({
         name: 'profile',
         builder: (BuildContext context, GoRouterState state) {
           return const ProfileScreen();
+        },
+      ),
+      GoRoute(
+        path: CenaRoutes.notifications,
+        name: 'notifications',
+        builder: (BuildContext context, GoRouterState state) {
+          return const NotificationCenterScreen();
         },
       ),
     ],
