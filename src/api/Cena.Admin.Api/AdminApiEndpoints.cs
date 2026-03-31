@@ -559,6 +559,20 @@ public static class AdminApiEndpoints
             return Results.Ok(result);
         }).WithName("UploadPipelineFile").DisableAntiforgery();
 
+        // Cloud directory listing
+        group.MapPost("/cloud-dir/list", async (CloudDirListRequest request, IIngestionPipelineService service) =>
+        {
+            var items = await service.ListCloudDirectoryAsync(request);
+            return Results.Ok(items);
+        }).WithName("ListCloudDirectory");
+
+        // Cloud directory batch ingest
+        group.MapPost("/cloud-dir/ingest", async (CloudDirIngestRequest request, IIngestionPipelineService service) =>
+        {
+            var result = await service.IngestCloudDirectoryAsync(request);
+            return Results.Ok(result);
+        }).WithName("IngestCloudDirectory");
+
         return app;
     }
 

@@ -5,9 +5,11 @@
 // =============================================================================
 #pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
+using System.Security.Cryptography;
 using Cena.Actors.Ingest;
 using Marten;
 using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -23,6 +25,8 @@ public interface IIngestionPipelineService
     Task<bool> MoveToReviewAsync(string id);
     Task<UploadFileResponse> UploadFromRequestAsync(HttpRequest request);
     Task<PipelineStatsResponse> GetStatsAsync();
+    Task<CloudDirListResponse> ListCloudDirectoryAsync(CloudDirListRequest request);
+    Task<CloudDirIngestResponse> IngestCloudDirectoryAsync(CloudDirIngestRequest request);
 }
 
 public sealed class IngestionPipelineService : IIngestionPipelineService
@@ -31,17 +35,21 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
     private readonly IConnectionMultiplexer _redis;
     private readonly IIngestionOrchestrator? _orchestrator;
     private readonly ILogger<IngestionPipelineService> _logger;
+    private readonly IReadOnlyList<string> _allowedCloudDirs;
 
     public IngestionPipelineService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
         ILogger<IngestionPipelineService> logger,
+        IConfiguration configuration,
         IIngestionOrchestrator? orchestrator = null)
     {
         _store = store;
         _redis = redis;
         _orchestrator = orchestrator;
         _logger = logger;
+        _allowedCloudDirs = configuration.GetSection("Ingestion:CloudWatchDirs")
+            .Get<string[]>() ?? Array.Empty<string>();
     }
 
     public async Task<PipelineStatusResponse> GetPipelineStatusAsync()
@@ -297,5 +305,191 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
                 }).ToList());
 
         return new PipelineStatsResponse(throughput, failureRates, processingTimes, queueTrend);
+    }
+
+    // ── Cloud Directory: List files ──────────────────────────────────────────
+
+    private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf", ".png", ".jpg", ".jpeg", ".webp", ".csv", ".xlsx"
+    };
+
+    private static readonly Dictionary<string, string> ExtensionToContentType = new(StringComparer.OrdinalIgnoreCase)
+    {
+        [".pdf"] = "application/pdf",
+        [".png"] = "image/png",
+        [".jpg"] = "image/jpeg",
+        [".jpeg"] = "image/jpeg",
+        [".webp"] = "image/webp",
+        [".csv"] = "text/csv",
+        [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    };
+
+    public async Task<CloudDirListResponse> ListCloudDirectoryAsync(CloudDirListRequest request)
+    {
+        if (string.Equals(request.Provider, "s3", StringComparison.OrdinalIgnoreCase))
+        {
+            // S3 provider: placeholder — requires AWS SDK integration
+            return new CloudDirListResponse(
+                Files: new List<CloudFileEntry>(),
+                TotalCount: 0,
+                ContinuationToken: null);
+        }
+
+        if (!string.Equals(request.Provider, "local", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Unsupported cloud directory provider: {request.Provider}");
+
+        // Security: validate path is under an allowed base directory
+        var resolvedPath = Path.GetFullPath(request.BucketOrPath);
+        if (!_allowedCloudDirs.Any(d => resolvedPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
+        {
+            _logger.LogWarning("Cloud dir path rejected (directory traversal prevention): {Path}", request.BucketOrPath);
+            throw new UnauthorizedAccessException(
+                $"Path '{request.BucketOrPath}' is not under an allowed ingest directory. " +
+                "Configure Ingestion:CloudWatchDirs in appsettings.json.");
+        }
+
+        var searchPath = string.IsNullOrEmpty(request.Prefix)
+            ? resolvedPath
+            : Path.Combine(resolvedPath, request.Prefix);
+
+        if (!Directory.Exists(searchPath))
+            return new CloudDirListResponse(new List<CloudFileEntry>(), 0, null);
+
+        // Gather already-ingested content hashes
+        await using var session = _store.QuerySession();
+        var ingestedHashes = (await session.Query<PipelineItemDocument>()
+            .Select(x => new { x.ContentHash })
+            .ToListAsync())
+            .Select(x => x.ContentHash)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var files = Directory.EnumerateFiles(searchPath, "*.*", SearchOption.AllDirectories)
+            .Where(f => AllowedExtensions.Contains(Path.GetExtension(f)))
+            .Select(f =>
+            {
+                var info = new FileInfo(f);
+                var ext = Path.GetExtension(f);
+                var key = Path.GetRelativePath(resolvedPath, f);
+
+                // Compute hash to check against ingested set
+                using var stream = File.OpenRead(f);
+                var hash = Convert.ToHexStringLower(SHA256.HashData(stream));
+
+                return new CloudFileEntry(
+                    Key: key,
+                    Filename: info.Name,
+                    SizeBytes: info.Length,
+                    ContentType: ExtensionToContentType.GetValueOrDefault(ext, "application/octet-stream"),
+                    LastModified: info.LastWriteTimeUtc,
+                    AlreadyIngested: ingestedHashes.Contains(hash));
+            })
+            .OrderByDescending(f => f.LastModified)
+            .ToList();
+
+        return new CloudDirListResponse(files, files.Count, null);
+    }
+
+    // ── Cloud Directory: Batch ingest selected files ─────────────────────────
+
+    public async Task<CloudDirIngestResponse> IngestCloudDirectoryAsync(CloudDirIngestRequest request)
+    {
+        if (!string.Equals(request.Provider, "local", StringComparison.OrdinalIgnoreCase))
+            throw new InvalidOperationException($"Unsupported cloud directory provider for ingest: {request.Provider}");
+
+        if (_orchestrator is null)
+            throw new InvalidOperationException("Ingestion orchestrator is not available");
+
+        // Security: validate path
+        var resolvedPath = Path.GetFullPath(request.BucketOrPath);
+        if (!_allowedCloudDirs.Any(d => resolvedPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
+        {
+            _logger.LogWarning("Cloud dir ingest path rejected (directory traversal prevention): {Path}", request.BucketOrPath);
+            throw new UnauthorizedAccessException(
+                $"Path '{request.BucketOrPath}' is not under an allowed ingest directory.");
+        }
+
+        var batchId = $"batch-{Guid.NewGuid():N}";
+        var filesQueued = 0;
+        var filesSkipped = 0;
+
+        // Determine which files to process
+        IEnumerable<string> filePaths;
+        if (request.FileKeys.Count > 0)
+        {
+            filePaths = request.FileKeys.Select(key => Path.Combine(resolvedPath, key));
+        }
+        else
+        {
+            var searchPath = string.IsNullOrEmpty(request.Prefix)
+                ? resolvedPath
+                : Path.Combine(resolvedPath, request.Prefix);
+            filePaths = Directory.EnumerateFiles(searchPath, "*.*", SearchOption.AllDirectories)
+                .Where(f => AllowedExtensions.Contains(Path.GetExtension(f)));
+        }
+
+        // Get already-ingested hashes
+        await using var session = _store.QuerySession();
+        var ingestedHashes = (await session.Query<PipelineItemDocument>()
+            .Select(x => new { x.ContentHash })
+            .ToListAsync())
+            .Select(x => x.ContentHash)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var filePath in filePaths)
+        {
+            // Validate each file path stays within allowed dirs
+            var fullPath = Path.GetFullPath(filePath);
+            if (!_allowedCloudDirs.Any(d => fullPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
+            {
+                _logger.LogWarning("Skipping file outside allowed dirs: {Path}", filePath);
+                filesSkipped++;
+                continue;
+            }
+
+            if (!File.Exists(fullPath))
+            {
+                filesSkipped++;
+                continue;
+            }
+
+            // Check if already ingested
+            using var hashStream = File.OpenRead(fullPath);
+            var hash = Convert.ToHexStringLower(SHA256.HashData(hashStream));
+            if (ingestedHashes.Contains(hash))
+            {
+                filesSkipped++;
+                continue;
+            }
+
+            var ext = Path.GetExtension(fullPath);
+            var contentType = ExtensionToContentType.GetValueOrDefault(ext, "application/octet-stream");
+
+            using var fileStream = File.OpenRead(fullPath);
+            var ingestionRequest = new IngestionRequest(
+                FileStream: fileStream,
+                Filename: Path.GetFileName(fullPath),
+                ContentType: contentType,
+                SourceType: "batch",
+                SourceUrl: fullPath,
+                SubmittedBy: "admin-cloud-dir");
+
+            try
+            {
+                await _orchestrator.ProcessFileAsync(ingestionRequest);
+                filesQueued++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to ingest file from cloud dir: {Path}", fullPath);
+                filesSkipped++;
+            }
+        }
+
+        _logger.LogInformation(
+            "Cloud dir batch {BatchId}: queued={Queued}, skipped={Skipped}",
+            batchId, filesQueued, filesSkipped);
+
+        return new CloudDirIngestResponse(filesQueued, filesSkipped, batchId);
     }
 }

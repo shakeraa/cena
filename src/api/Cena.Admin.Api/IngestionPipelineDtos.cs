@@ -113,3 +113,34 @@ public sealed record DepthPoint(
     int Incoming,
     int Processing,
     int Completed);
+
+// Cloud Directory
+public sealed record CloudDirListRequest(
+    string Provider,        // "s3", "gcs", "azure", "local"
+    string BucketOrPath,    // bucket name or local path
+    string? Prefix,         // optional prefix/folder path
+    string? ContinuationToken);
+
+public sealed record CloudDirListResponse(
+    IReadOnlyList<CloudFileEntry> Files,
+    int TotalCount,
+    string? ContinuationToken);
+
+public sealed record CloudFileEntry(
+    string Key,
+    string Filename,
+    long SizeBytes,
+    string ContentType,
+    DateTimeOffset LastModified,
+    bool AlreadyIngested);
+
+public sealed record CloudDirIngestRequest(
+    string Provider,
+    string BucketOrPath,
+    IReadOnlyList<string> FileKeys,   // specific files to ingest, empty = all
+    string? Prefix);
+
+public sealed record CloudDirIngestResponse(
+    int FilesQueued,
+    int FilesSkipped,
+    string BatchId);
