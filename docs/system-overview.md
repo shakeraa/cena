@@ -29,11 +29,21 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - High-grade students seeking structured personal mentorship
 - Students who want to organize and retain their learning effectively
 
+### Initial Target: Bagrut (Israeli Matriculation)
+- First deployment targets students preparing for **Bagrut** exams
+- Syllabus follows the Israeli Ministry of Education curriculum
+- STEM subjects: Mathematics, Physics, Chemistry, Biology, Computer Science
+- Depth levels align with the Bagrut study units system (3/4/5 units per subject)
+
+### Expansion Path
+- After Israel: AP exams (US), A-Levels (UK), JEE/NEET (India), Gaokao (China)
+- Each market is large and already supports expensive tutoring alternatives
+
 ## Methodology Approach
 
 ### Adaptive Methodology Selection
 - The system selects the best methodology per student automatically
-- Supported methods include: Socratic method (2024 UK RCT: AI Socratic tutors matched human tutors, +5.5pp on novel problems — arxiv.org/html/2512.23633v1), spaced repetition (Cepeda et al., 2006, Psychological Bulletin: 839 assessments confirming spacing effect), project-based learning (Chen & Yang, 2019 meta-analysis: d=0.71 across 12,585 students), Bloom's taxonomy progression (Anderson & Krathwohl, 2001 revised taxonomy), Feynman technique (elaborative interrogation — Pressley et al., 1987), worked examples with fading (Renkl & Atkinson, 2003, Educational Psychologist: fading triggers self-explanation), analogy-based instruction (Gentner, 1983 structure-mapping theory, Cognitive Science 7(2)), and retrieval practice (Roediger & Karpicke, 2006: testing > restudying for long-term retention)
+- Supported methods include: Socratic method (2024 UK RCT: AI Socratic tutors matched human tutors, +5.5pp on novel problems — arxiv.org/html/2512.23633v1), spaced repetition (Cepeda et al., 2006, Psychological Bulletin: 839 assessments confirming spacing effect), project-based learning (Chen & Yang, 2019 meta-analysis: d=0.71 across 12,585 students), Bloom's taxonomy progression (Anderson & Krathwohl, 2001 revised taxonomy), Feynman technique (elaborative interrogation — Pressley et al., 1987), worked examples with fading (Renkl & Atkinson, 2003, Educational Psychologist: fading triggers self-explanation), analogy-based instruction (Gentner, 1983 structure-mapping theory, Cognitive Science 7(2)), retrieval practice (Roediger & Karpicke, 2006: testing > restudying for long-term retention), and challenge-based / scenario learning for motivation recovery and real-world transfer
 - The system profiles each student to determine which method is most effective for them
 - Tracks per-student method effectiveness over time
 
@@ -83,7 +93,7 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 
 ### Knowledge Graph
 - Student knowledge is stored as a **knowledge graph** (systematic review of KG applications in education: Heliyon 2024, S2405-8440(24)01414-2 — five primary domains including adaptive learning, concept mapping, and learning path recommendation)
-- Concepts are nodes, relationships are edges (prerequisite, builds-on, related-to)
+- Concepts are nodes, relationships are edges (prerequisite, builds-on, related-to, conflicts-with for common misconceptions)
 - Each node tracks: mastery level, date learned, review history, method effectiveness
 - The graph powers gap detection, learning path suggestions, and concept connections
 
@@ -155,8 +165,10 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 
 ### Graphic Style
 - **Flat illustration style** for concept diagrams — clean, clear layouts with arrows and graphic elements showing processes and relationships (similar to FigureLabs scientific figures)
+- **Concept cards with formulas** — each concept can pair a visual illustration with its key formula or equation for quick recognition and review
 - **Colorful icon cards** for topic navigation — each concept/topic gets a distinct colored card with a simple illustrative icon and label (similar to smartyme_physics grid style)
 - **Tech-inspired visuals** for the knowledge graph and brand — glowing network nodes, interconnected data points, dark backgrounds with vibrant highlights (similar to Technion/HUJI AI course visuals)
+- **Skill proficiency meters** — clean icon + percentage summaries per domain for fast progress scanning
 - White/clean backgrounds for learning content; dark/immersive backgrounds for the knowledge graph visualization
 
 ### Dynamic Diagram Generation
@@ -171,6 +183,7 @@ Cena is a personal mentor system designed for high-grade students. It serves as 
 - Visuals should make complex concepts feel approachable and clear — measured by A/B testing diagram comprehension rates (target: >80% of students correctly interpret a diagram's key relationship on first exposure)
 - Every diagram, figure, and concept card follows a single illustrative style guide: flat vector style, 4-color palette per subject (e.g., Math = blue/teal, Physics = orange/amber, Chemistry = green/emerald, Biology = purple/violet, CS = gray/slate), consistent stroke width (2px), rounded corners (8px radius), and Hebrew-first text with LTR fallback for formulas
 - The overall aesthetic targets the visual language of apps that Israeli teens already use (Duolingo, Instagram, TikTok) — high contrast, generous whitespace, micro-animations on state transitions, dark mode support from launch
+- Concept visuals should be self-contained enough that a student can glance at one card and recover the core relationship without needing surrounding context
 
 ## Gamification
 

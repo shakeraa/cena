@@ -86,6 +86,8 @@
 - **Progress visualization** (XP bars, leveling, unlocking) — courses under 5 min had 74% completion vs 36% for 15+ min (Userpilot, EdTech Onboarding Report, 2024)
 - **Milestone celebrations** — Duolingo's animations increased learning time by 17% (Lenny's Newsletter interview with Duolingo Growth PM, 2023)
 - **Leagues/leaderboards** — +25% lesson completion, but must be optional (Duolingo product blog, "How Duolingo Reignited User Growth," 2023)
+- **Skill proficiency meters** — clean at-a-glance mastery percentages per domain, complementing the deeper graph view (Nibble model)
+- **"Addictive" framing** — positioning learning as a game or doomscrolling replacement increases curiosity-driven installs (SmartyMe and Nibble patterns)
 
 ### Risks
 - **Extrinsic crowding out intrinsic**: Extrinsic rewards harm academic performance in highly intrinsically motivated students while helping low-motivation students (Deci, Koestner & Ryan, 1999 meta-analysis, Psychological Bulletin; confirmed for gamification specifically by Sailer & Homner, 2020, Educational Psychology Review)
@@ -130,6 +132,7 @@
 ### Methodology Switching Principles
 - **Seamlessness matters** — the student should not feel a jarring switch. The transition is implemented as a natural shift in question style and interaction pattern (e.g., from direct explanation to Socratic questioning), not an announced mode change. UI elements (question format, hint style, explanation tone) shift gradually over 2–3 interactions, not instantaneously.
 - **Multi-modal error analysis**: The MCM (Mode x Capability x Methodology) graph maps error types to recommended methods: rule-based/procedural errors -> drill-and-practice or spaced repetition; conceptual misunderstanding -> Socratic dialogue or Feynman technique; motivational stagnation (session abandonment, frustration signals) -> project-based learning or real-world application contexts.
+- **Engagement-drop fallback**: When the dominant signal is not misunderstanding but energy loss, the system can pivot toward challenge-based scenarios to restore momentum without abandoning the concept cluster.
 - **Effectiveness logging**: Every `MethodologySwitched` event records the from/to methodology, triggering stagnation signal, and affected concepts. Post-switch learning velocity (concepts mastered per session) is tracked for the next 5 sessions and compared to the pre-switch baseline. This data feeds the MCM graph retraining flywheel (see `intelligence-layer.md` Flywheel 1).
 - **Cooldown period**: After a methodology switch, the system waits a minimum of 3 sessions before considering another switch for the same concept cluster. This prevents oscillation between methods before the new method has had time to take effect.
 
@@ -197,10 +200,12 @@
 1. **Daily habit loop**: Streak + notification + short session + reward
 2. **Early wins**: First session must demonstrate value — diagnostic -> "here's your knowledge map" -> first micro-lesson -> graph grows
 3. **Visible progress**: Knowledge graph growing is Cena's secret weapon — every session should end with new nodes/connections
-4. **Personalized timeline**: "You're 67% of the way to mastering 5-unit Math" with date estimate
-5. **Social proof**: "3 students in your class also mastered this today" (cohort models see 2-3x higher retention)
-6. **Proactive re-engagement**: Detect declining engagement and intervene before student disappears
-7. **Emotional design**: Celebrations, encouragement, personality in the mentor
+4. **Skill proficiency meters**: Quick "how am I doing" checks without forcing the student into the full graph view
+5. **Personalized timeline**: "You're 67% of the way to mastering 5-unit Math" with date estimate
+6. **Social proof**: "3 students in your class also mastered this today" (cohort models see 2-3x higher retention)
+7. **Proactive re-engagement**: Detect declining engagement and intervene before student disappears
+8. **Emotional design**: Celebrations, encouragement, personality in the mentor
+9. **"Replace scrolling" positioning**: Frame Cena as a productive alternative to social media, not extra homework
 
 ### Common Drop-Off Points
 - After diagnostic/onboarding (if too long or no immediate value)
