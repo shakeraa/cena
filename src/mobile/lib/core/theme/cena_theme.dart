@@ -60,21 +60,43 @@ class CenaTheme {
   // Dark Theme
   // ---------------------------------------------------------------------------
 
-  /// Dark theme for [locale]. Same font/locale logic, dark color scheme.
+  /// Dark theme for [locale]. Curated OLED-friendly palette per UX research:
+  /// - Background: #0F172A (Slate 900) for true-dark OLED savings
+  /// - Surface: #1E293B (Slate 800) for elevated cards
+  /// - Text: #F1F5F9 primary, #94A3B8 secondary
+  /// - Accents: bright primary/secondary for contrast on dark surfaces
   static ThemeData dark(Locale locale) {
     final fontFamily = TypographyTokens.fontFamilyForLocale(
       locale.languageCode,
     );
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: _primarySeed,
-      secondary: _secondarySeed,
-      error: _errorColor,
-      surfaceTint: _surfaceTint,
-      brightness: Brightness.dark,
+
+    // Curated dark palette — not auto-generated from seed.
+    // Research: CENA_UI_UX_Design_Strategy_2026.md §1.8
+    const darkColorScheme = ColorScheme.dark(
+      primary: Color(0xFF4DD0E1),       // Bright teal on dark
+      onPrimary: Color(0xFF003738),
+      primaryContainer: Color(0xFF004F50),
+      onPrimaryContainer: Color(0xFF97F0FF),
+      secondary: Color(0xFFFFB74D),     // Warm amber
+      onSecondary: Color(0xFF462A00),
+      secondaryContainer: Color(0xFF633E00),
+      onSecondaryContainer: Color(0xFFFFDDB3),
+      tertiary: Color(0xFFCE93D8),      // Purple for achievements
+      onTertiary: Color(0xFF3A0044),
+      tertiaryContainer: Color(0xFF531A60),
+      onTertiaryContainer: Color(0xFFF3E5F5),
+      error: Color(0xFFFFB4AB),
+      onError: Color(0xFF690005),
+      surface: Color(0xFF0F172A),       // Slate 900 — OLED black
+      onSurface: Color(0xFFF1F5F9),     // Slate 100
+      onSurfaceVariant: Color(0xFF94A3B8), // Slate 400
+      surfaceContainerHighest: Color(0xFF1E293B), // Slate 800
+      outline: Color(0xFF475569),       // Slate 600
+      outlineVariant: Color(0xFF334155), // Slate 700
     );
 
     return _buildTheme(
-      colorScheme: colorScheme,
+      colorScheme: darkColorScheme,
       fontFamily: fontFamily,
       locale: locale,
       brightness: Brightness.dark,

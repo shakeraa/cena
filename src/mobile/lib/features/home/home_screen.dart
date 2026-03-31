@@ -10,6 +10,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app.dart' show currentLocaleProvider;
 import '../../core/config/app_config.dart';
 import '../../core/state/app_state.dart' show apiClientProvider;
+import '../../core/state/gamification_state.dart';
+import '../../core/theme/glass_widgets.dart';
 import '../../core/router.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/state/feature_discovery_state.dart';
@@ -175,7 +177,20 @@ class _DestinationIcon extends StatelessWidget {
   }
 }
 
-/// Home tab: greeting card, subject buttons, and recent activity.
+/// Home tab: Bento grid dashboard with 6 modules (MOB-VIS-002).
+///
+/// Layout:
+/// ┌───────────────────────────────────────┐
+/// │  GREETING + STREAK (full width)       │
+/// ├───────────────┬───────────────────────┤
+/// │  PROGRESS     │  DAILY CHALLENGE      │
+/// │  RING         │  / QUICK START        │
+/// ├───────────────┴───────────────────────┤
+/// │  CONTINUE LEARNING (Hero CTA)         │
+/// ├───────────────┬───────────────────────┤
+/// │  BADGES       │  SUBJECT GRID         │
+/// │  PREVIEW      │                       │
+/// └───────────────┴───────────────────────┘
 class _HomeTabContent extends ConsumerWidget {
   const _HomeTabContent({required this.discovery});
 
@@ -185,76 +200,262 @@ class _HomeTabContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final xpProgress = ref.watch(xpProgressProvider);
+    final level = ref.watch(levelProvider);
+    final streak = ref.watch(streakProvider);
+    final badges = ref.watch(badgesProvider);
 
     return ListView(
       padding: const EdgeInsets.all(SpacingTokens.md),
       children: [
-        // Greeting Card
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(SpacingTokens.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _greetingForTimeOfDay(),
-                  style: theme.textTheme.headlineMedium,
-                ),
-                const SizedBox(height: SpacingTokens.xs),
-                Text(
-                  'Ready to learn?',
-                  style: theme.textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
+        // Row 1: Greeting + streak (full width glass card)
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _greetingForTimeOfDay(),
+                          style: theme.textTheme.headlineMedium,
+                        ),
+                        const SizedBox(height: SpacingTokens.xs),
+                        Text(
+                          'Ready to learn?',
+                          style: theme.textTheme.bodyLarge?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: SpacingTokens.md),
-                // Streak indicator
-                if (discovery.streakUnlocked)
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.local_fire_department_rounded,
-                        color: colorScheme.secondary,
-                        size: 20,
+                  // Streak badge (if unlocked)
+                  if (discovery.streakUnlocked)
+                    GlassChip(
+                      icon: Icons.local_fire_department_rounded,
+                      label: '$streak day streak',
+                      color: colorScheme.secondary,
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: SpacingTokens.sm),
+
+        // Row 2: Progress ring + daily challenge (2-column)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Progress ring
+            Expanded(
+              child: GlassCard(
+                child: Column(
+                  children: [
+                    GlassProgressRing(
+                      progress: xpProgress,
+                      label: 'Lv $level',
+                      size: 72,
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      'Level $level',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
                       ),
-                      const SizedBox(width: SpacingTokens.xs),
+                    ),
+                    Text(
+                      '${(xpProgress * 100).toInt()}% to next',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            // Daily challenge / quick start
+            Expanded(
+              child: GlassCard(
+                child: Column(
+                  children: [
+                    Icon(Icons.bolt_rounded,
+                        size: 32, color: const Color(0xFFFFD700)),
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      'Quick Practice',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    FilledButton(
+                      onPressed: () => context.go(CenaRoutes.session),
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: const Text('Start'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+
+        const SizedBox(height: SpacingTokens.sm),
+
+        // Row 3: Continue Learning hero CTA (full width)
+        GlassCard(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
+          child: InkWell(
+            onTap: () => context.go(CenaRoutes.session),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: colorScheme.primary.withValues(alpha: 0.15),
+                  ),
+                  child: Icon(Icons.play_arrow_rounded,
+                      color: colorScheme.primary, size: 28),
+                ),
+                const SizedBox(width: SpacingTokens.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                       Text(
-                        '0 day streak',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: colorScheme.secondary,
-                          fontWeight: FontWeight.w600,
+                        'Continue Learning',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      Text(
+                        'Pick up where you left off',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
                         ),
                       ),
                     ],
                   ),
+                ),
+                Icon(Icons.arrow_forward_rounded,
+                    color: colorScheme.onSurfaceVariant),
               ],
             ),
           ),
+        ),
+
+        const SizedBox(height: SpacingTokens.sm),
+
+        // Row 4: Badges preview + subject grid (2-column)
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Badge preview
+            Expanded(
+              child: GlassCard(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.emoji_events_rounded,
+                            size: 18, color: colorScheme.tertiary),
+                        const SizedBox(width: SpacingTokens.xs),
+                        Text(
+                          'Badges',
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    if (badges.isEmpty)
+                      Text(
+                        'Complete sessions to earn badges',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 4,
+                        children: badges.take(4).map((b) {
+                          return Container(
+                            width: 28,
+                            height: 28,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: colorScheme.tertiary
+                                  .withValues(alpha: 0.15),
+                            ),
+                            child: Icon(Icons.star_rounded,
+                                size: 16, color: colorScheme.tertiary),
+                          );
+                        }).toList(),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(width: SpacingTokens.sm),
+            // AI Tutor shortcut
+            Expanded(
+              child: GlassCard(
+                child: Column(
+                  children: [
+                    Icon(Icons.psychology_rounded,
+                        size: 32, color: colorScheme.primary),
+                    const SizedBox(height: SpacingTokens.sm),
+                    Text(
+                      'AI Tutor',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: SpacingTokens.sm),
+                    OutlinedButton(
+                      onPressed: () => context.push(CenaRoutes.tutor),
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 36),
+                        padding: EdgeInsets.zero,
+                      ),
+                      child: const Text('Chat'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
 
         const SizedBox(height: SpacingTokens.lg),
 
         // Subject Quick Start
         Text(
-          'Start a Session',
+          'Subjects',
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: SpacingTokens.sm),
         _SubjectGrid(),
 
         const SizedBox(height: SpacingTokens.lg),
-
-        // Quick Action Button
-        FilledButton.icon(
-          onPressed: () => context.go(CenaRoutes.session),
-          icon: const Icon(Icons.play_arrow_rounded),
-          label: const Text('Start Learning'),
-        ),
       ],
     );
   }
 
-  /// Returns a time-appropriate greeting.
   static String _greetingForTimeOfDay() {
     final hour = DateTime.now().hour;
     if (hour < 12) return 'Good morning';
