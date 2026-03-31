@@ -17,7 +17,7 @@ import '../config/app_config.dart';
 ///
 /// WebSocket (SignalR) is handled separately by the websocket_service.
 class ApiClient {
-  ApiClient({required AppConfig config}) : _config = config {
+  ApiClient({required AppConfig config}) {
     _dio = Dio(
       BaseOptions(
         baseUrl: config.endpoints.restBaseUrl,
@@ -41,7 +41,6 @@ class ApiClient {
     }
   }
 
-  final AppConfig _config;
   late final Dio _dio;
   final _logger = Logger(
     printer: PrettyPrinter(methodCount: 0, printTime: true),

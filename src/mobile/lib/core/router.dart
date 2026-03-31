@@ -15,7 +15,6 @@ import '../features/profile/profile_screen.dart';
 import '../features/auth/try_question_screen.dart';
 import '../features/session/session_screen.dart';
 import '../features/tutor/tutor_chat_screen.dart';
-import 'services/analytics_service.dart';
 import 'services/deep_link_service.dart';
 
 /// Named route constants for type-safe navigation.

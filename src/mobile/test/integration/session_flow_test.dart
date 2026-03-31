@@ -38,15 +38,17 @@ class MockWebSocketService implements WebSocketService {
 
   @override
   Future<void> startSession(StartSession command) async {
-    // Simulate server response: SessionStarted + first QuestionPresented
+    // Simulate server response: SessionStarted
+    // Note: Freezed generates snake_case JSON keys (started_at, not startedAt)
     _messageController.add(MessageEnvelope(
       type: 'SessionStarted',
       payload: {
         'session': {
           'id': 'test-session-1',
-          'studentId': 'student-1',
-          'startedAt': DateTime.now().toIso8601String(),
-          'targetDurationMinutes': command.durationMinutes,
+          'student_id': 'student-1',
+          'started_at': DateTime.now().toIso8601String(),
+          'target_duration_minutes': command.durationMinutes,
+          'methodology': 'adaptive_difficulty',
         },
       },
       receivedAt: DateTime.now(),

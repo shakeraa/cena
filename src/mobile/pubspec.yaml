@@ -51,6 +51,7 @@ dependencies:
   # ---------------------------------------------------------------------------
   # UI & Animation
   # ---------------------------------------------------------------------------
+  google_fonts: ^6.2.1               # Runtime font loading (Heebo, Noto Sans Arabic, Inter)
   fl_chart: ^0.36.1                 # Charts (progress, analytics)
   flutter_svg: ^2.0.7               # SVG rendering for diagrams
   cached_network_image: ^3.4.1      # Cached image loading
@@ -73,7 +74,7 @@ dependencies:
   # ---------------------------------------------------------------------------
   # Internationalization (Hebrew + Arabic + English)
   # ---------------------------------------------------------------------------
-  intl: ^0.20.2                     # pinned by flutter_localizations SDK
+  intl: ^0.19.0                     # must match flutter_localizations SDK pin
 
   # ---------------------------------------------------------------------------
   # Utilities
@@ -117,46 +118,46 @@ flutter:
     - assets/animations/
     - assets/fonts/
 
-  fonts:
-    # Hebrew primary font
-    - family: Heebo
-      fonts:
-        - asset: assets/fonts/Heebo-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Heebo-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Heebo-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/Heebo-ExtraBold.ttf
-          weight: 800
-
-    # Arabic font — Noto Sans Arabic (Google Fonts, supports all Arabic diacritics)
-    - family: Noto Sans Arabic
-      fonts:
-        - asset: assets/fonts/NotoSansArabic-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/NotoSansArabic-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/NotoSansArabic-Bold.ttf
-          weight: 700
-        - asset: assets/fonts/NotoSansArabic-ExtraBold.ttf
-          weight: 800
-
-    # Latin font (English fallback + formulas)
-    - family: Inter
-      fonts:
-        - asset: assets/fonts/Inter-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/Inter-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/Inter-SemiBold.ttf
-          weight: 600
-        - asset: assets/fonts/Inter-Bold.ttf
-          weight: 700
-
-    - family: JetBrains Mono
-      fonts:
-        - asset: assets/fonts/JetBrainsMono-Regular.ttf
-          weight: 400
-        - asset: assets/fonts/JetBrainsMono-Medium.ttf
-          weight: 500
+  # Fonts loaded at runtime via google_fonts package.
+  # Family names (Heebo, Noto Sans Arabic, Inter, JetBrains Mono) are
+  # referenced in TypographyTokens and resolved by the theme system.
+  # To bundle fonts for offline use, download TTFs from fonts.google.com
+  # and uncomment the font asset declarations below.
+  #
+  # fonts:
+  #   - family: Heebo
+  #     fonts:
+  #       - asset: assets/fonts/Heebo-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/Heebo-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Heebo-Bold.ttf
+  #         weight: 700
+  #       - asset: assets/fonts/Heebo-ExtraBold.ttf
+  #         weight: 800
+  #   - family: Noto Sans Arabic
+  #     fonts:
+  #       - asset: assets/fonts/NotoSansArabic-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/NotoSansArabic-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/NotoSansArabic-Bold.ttf
+  #         weight: 700
+  #       - asset: assets/fonts/NotoSansArabic-ExtraBold.ttf
+  #         weight: 800
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Inter-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Inter-Bold.ttf
+  #         weight: 700
+  #   - family: JetBrains Mono
+  #     fonts:
+  #       - asset: assets/fonts/JetBrainsMono-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/JetBrainsMono-Medium.ttf
+  #         weight: 500

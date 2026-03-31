@@ -3,6 +3,7 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
+import 'package:google_fonts/google_fonts.dart';
 
 import '../config/app_config.dart';
 
@@ -231,79 +232,81 @@ class CenaTheme {
     );
   }
 
-  /// Build a locale-aware text theme using the specified [fontFamily].
+  /// Build a locale-aware text theme using Google Fonts for runtime loading.
+  /// Falls back to system fonts if offline on first launch.
   static TextTheme _buildTextTheme(String fontFamily) {
-    return TextTheme(
-      displayLarge: TextStyle(
-        fontFamily: fontFamily,
+    // Use GoogleFonts to resolve the font at runtime (downloaded & cached).
+    // This avoids bundling 1MB+ of TTF files in the APK.
+    TextTheme baseTheme;
+    switch (fontFamily) {
+      case TypographyTokens.hebrewFontFamily:
+        baseTheme = GoogleFonts.heeboTextTheme();
+      case TypographyTokens.arabicFontFamily:
+        baseTheme = GoogleFonts.notoSansArabicTextTheme();
+      default:
+        baseTheme = GoogleFonts.interTextTheme();
+    }
+
+    // Apply CENA sizing overrides on top of GoogleFonts base.
+    return baseTheme.copyWith(
+      displayLarge: baseTheme.displayLarge?.copyWith(
         fontSize: TypographyTokens.displayLarge,
         fontWeight: FontWeight.w800,
         letterSpacing: -0.5,
         height: 1.2,
       ),
-      displayMedium: TextStyle(
-        fontFamily: fontFamily,
+      displayMedium: baseTheme.displayMedium?.copyWith(
         fontSize: TypographyTokens.displayMedium,
         fontWeight: FontWeight.w700,
         letterSpacing: -0.25,
         height: 1.2,
       ),
-      headlineLarge: TextStyle(
-        fontFamily: fontFamily,
+      headlineLarge: baseTheme.headlineLarge?.copyWith(
         fontSize: TypographyTokens.headlineLarge,
         fontWeight: FontWeight.w700,
         height: 1.3,
       ),
-      headlineMedium: TextStyle(
-        fontFamily: fontFamily,
+      headlineMedium: baseTheme.headlineMedium?.copyWith(
         fontSize: TypographyTokens.headlineMedium,
         fontWeight: FontWeight.w600,
         height: 1.3,
       ),
-      titleLarge: TextStyle(
-        fontFamily: fontFamily,
+      titleLarge: baseTheme.titleLarge?.copyWith(
         fontSize: TypographyTokens.titleLarge,
         fontWeight: FontWeight.w600,
         height: 1.4,
       ),
-      titleMedium: TextStyle(
-        fontFamily: fontFamily,
+      titleMedium: baseTheme.titleMedium?.copyWith(
         fontSize: TypographyTokens.titleMedium,
         fontWeight: FontWeight.w500,
         height: 1.4,
       ),
-      bodyLarge: TextStyle(
-        fontFamily: fontFamily,
+      bodyLarge: baseTheme.bodyLarge?.copyWith(
         fontSize: TypographyTokens.bodyLarge,
         fontWeight: FontWeight.w400,
         height: 1.5,
       ),
-      bodyMedium: TextStyle(
-        fontFamily: fontFamily,
+      bodyMedium: baseTheme.bodyMedium?.copyWith(
         fontSize: TypographyTokens.bodyMedium,
         fontWeight: FontWeight.w400,
         height: 1.5,
       ),
-      bodySmall: TextStyle(
-        fontFamily: fontFamily,
+      bodySmall: baseTheme.bodySmall?.copyWith(
         fontSize: TypographyTokens.bodySmall,
         fontWeight: FontWeight.w400,
         height: 1.5,
       ),
-      labelLarge: TextStyle(
-        fontFamily: fontFamily,
+      labelLarge: baseTheme.labelLarge?.copyWith(
         fontSize: TypographyTokens.labelLarge,
         fontWeight: FontWeight.w500,
         height: 1.4,
       ),
-      labelMedium: TextStyle(
-        fontFamily: fontFamily,
+      labelMedium: baseTheme.labelMedium?.copyWith(
         fontSize: TypographyTokens.labelMedium,
         fontWeight: FontWeight.w500,
         height: 1.4,
       ),
-      labelSmall: TextStyle(
-        fontFamily: fontFamily,
+      labelSmall: baseTheme.labelSmall?.copyWith(
         fontSize: TypographyTokens.labelSmall,
         fontWeight: FontWeight.w500,
         letterSpacing: 0.5,
