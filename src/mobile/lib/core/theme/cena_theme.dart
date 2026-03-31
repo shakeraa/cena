@@ -92,7 +92,6 @@ class CenaTheme {
     required Brightness brightness,
   }) {
     final textTheme = _buildTextTheme(fontFamily);
-    final isRtl = AppLocales.isRtl(locale);
 
     return ThemeData(
       useMaterial3: true,
@@ -115,7 +114,7 @@ class CenaTheme {
       ),
 
       // Cards
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(RadiusTokens.lg),

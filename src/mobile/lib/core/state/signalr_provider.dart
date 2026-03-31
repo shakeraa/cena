@@ -13,7 +13,7 @@ import 'app_state.dart';
 final signalRProvider = Provider<SignalRWebSocketService>((ref) {
   final config = ref.watch(appConfigProvider);
   final service = SignalRWebSocketService(
-    hubUrl: '${config.apiBaseUrl.replaceFirst("http", "ws")}/hub/cena',
+    hubUrl: config.endpoints.webSocketUrl,
     tokenProvider: () async {
       // TODO(auth): replace with Firebase ID token once auth is wired.
       // return await FirebaseAuth.instance.currentUser?.getIdToken() ?? '';
