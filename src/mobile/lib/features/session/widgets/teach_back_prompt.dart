@@ -238,24 +238,15 @@ class _TeachBackPromptState extends ConsumerState<TeachBackPrompt>
                   ),
                   const SizedBox(height: SpacingTokens.sm),
 
-                  // XP bonus badge
-                  _buildXpBadge(theme, colorScheme),
+                  _buildXpBadge(theme),
                   const SizedBox(height: SpacingTokens.md),
-
-                  // Text input
                   _buildTextInput(theme, colorScheme),
                   const SizedBox(height: SpacingTokens.sm),
-
-                  // Word count indicator
                   _buildWordCount(theme, colorScheme),
                   const SizedBox(height: SpacingTokens.md),
-
-                  // Evaluation result
                   if (_evaluation != null)
                     _buildEvaluationResult(theme, colorScheme),
-
-                  // Action buttons
-                  _buildActions(theme, colorScheme),
+                  _buildActions(theme),
                   const SizedBox(height: SpacingTokens.md),
                 ],
               ),
@@ -308,31 +299,22 @@ class _TeachBackPromptState extends ConsumerState<TeachBackPrompt>
     );
   }
 
-  Widget _buildXpBadge(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildXpBadge(ThemeData theme) {
     return Container(
       padding: const EdgeInsets.symmetric(
-        horizontal: SpacingTokens.sm,
-        vertical: SpacingTokens.xs,
-      ),
+          horizontal: SpacingTokens.sm, vertical: SpacingTokens.xs),
       decoration: BoxDecoration(
         color: Colors.amber.shade100,
         borderRadius: BorderRadius.circular(RadiusTokens.full),
         border: Border.all(color: Colors.amber.shade300),
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.star_rounded, size: 16, color: Colors.amber.shade700),
-          const SizedBox(width: SpacingTokens.xs),
-          Text(
-            '2.5x XP Bonus (+$_bonusXp XP)',
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(Icons.star_rounded, size: 16, color: Colors.amber.shade700),
+        const SizedBox(width: SpacingTokens.xs),
+        Text('2.5x XP Bonus (+$_bonusXp XP)',
             style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: Colors.amber.shade800,
-            ),
-          ),
-        ],
-      ),
+                fontWeight: FontWeight.w700, color: Colors.amber.shade800)),
+      ]),
     );
   }
 
@@ -448,33 +430,23 @@ class _TeachBackPromptState extends ConsumerState<TeachBackPrompt>
     );
   }
 
-  Widget _buildActions(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildActions(ThemeData theme) {
     if (_evaluation != null) {
       return FilledButton(
-        onPressed: widget.onSkip, // Continue to next question
-        child: const Text('Continue'),
-      );
+          onPressed: widget.onSkip, child: const Text('Continue'));
     }
-
-    return Row(
-      children: [
-        Expanded(
-          child: FilledButton(
-            onPressed: _isValidLength && !_isSubmitting ? _handleSubmit : null,
-            child: _isSubmitting
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Submit Explanation'),
-          ),
+    return Row(children: [
+      Expanded(
+        child: FilledButton(
+          onPressed: _isValidLength && !_isSubmitting ? _handleSubmit : null,
+          child: _isSubmitting
+              ? const SizedBox(width: 18, height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2,
+                      color: Colors.white))
+              : const Text('Submit Explanation'),
         ),
-      ],
-    );
+      ),
+    ]);
   }
 
   /// Voice-to-text integration point. Uses speech_to_text in production.
