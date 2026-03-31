@@ -58,6 +58,9 @@ public static class CenaAdminServiceRegistration
         services.AddSingleton<ILiveMonitorService, LiveMonitorService>();
         services.AddHostedService(sp => (LiveMonitorService)sp.GetRequiredService<ILiveMonitorService>());
 
+        // Ingestion Settings (cloud dirs, email, messaging channels, pipeline config)
+        services.AddScoped<IIngestionSettingsService, IngestionSettingsService>();
+
         // Student Insights (per-student cross-cutting analytics)
         services.AddScoped<IStudentInsightsService, StudentInsightsService>();
 
@@ -101,6 +104,9 @@ public static class CenaAdminServiceRegistration
 
         // ADM-026: Live monitor endpoints
         app.MapLiveMonitorEndpoints();
+
+        // Ingestion Settings endpoints
+        app.MapIngestionSettingsEndpoints();
 
         // Student Insights endpoints
         app.MapStudentInsightsEndpoints();

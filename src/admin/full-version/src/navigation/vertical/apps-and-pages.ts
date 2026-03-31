@@ -8,6 +8,13 @@ export default [
     subject: 'Content',
   },
   {
+    title: 'Ingestion Settings',
+    icon: { icon: 'tabler-settings-automation' },
+    to: 'apps-ingestion-settings',
+    action: 'manage',
+    subject: 'Content',
+  },
+  {
     title: 'Moderation Queue',
     icon: { icon: 'tabler-checkbox' },
     to: 'apps-moderation-queue',
