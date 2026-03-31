@@ -19,6 +19,9 @@
 .DS_Store
 Thumbs.db
 
+# ── Docs assets (large/binary) ──
+docs/example-images/
+
 # ── Secrets (NEVER commit) ──
 .env
 .env.*

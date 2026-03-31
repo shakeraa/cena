@@ -1,9 +1,7 @@
 // =============================================================================
-// Cena Adaptive Learning Platform — Teach-Back Prompt Widget (MOB-048)
-// =============================================================================
+// Cena — Teach-Back Prompt Widget (MOB-048)
 // After mastering a concept (P(known) > 0.85), prompts the student to
-// explain the concept in their own words. Skippable, 2.5x XP bonus.
-// Appears at most 2x per session.
+// explain it in their own words. Skippable, 2.5x XP bonus. Max 2x/session.
 // =============================================================================
 
 import 'package:flutter/material.dart';
@@ -14,10 +12,9 @@ import '../../../core/state/app_state.dart';
 import '../models/teach_back_models.dart';
 
 // ---------------------------------------------------------------------------
-// State provider
+// Session tracker
 // ---------------------------------------------------------------------------
 
-/// Tracks teach-back prompts shown in the current session.
 class _TeachBackSessionTracker {
   _TeachBackSessionTracker();
 
@@ -92,11 +89,7 @@ class _TeachBackCheck {
 // Widget
 // ---------------------------------------------------------------------------
 
-/// Teach-back prompt overlay shown after mastering a concept.
-///
-/// Presents a text input area (with voice-to-text option) where the student
-/// can explain the concept in their own words. Skippable with no penalty.
-/// Awards 2.5x XP bonus on completion.
+/// Teach-back prompt: text input with voice option, skippable, 2.5x XP bonus.
 class TeachBackPrompt extends ConsumerStatefulWidget {
   const TeachBackPrompt({
     super.key,
@@ -441,14 +434,13 @@ class _TeachBackPromptState extends ConsumerState<TeachBackPrompt>
             ),
           ],
           const SizedBox(height: SpacingTokens.sm),
-          // Score breakdown
           Row(
             children: [
-              _ScoreChip(label: 'Completeness', score: eval.completenessScore),
+              _scoreColumn('Completeness', eval.completenessScore, theme),
               const SizedBox(width: SpacingTokens.sm),
-              _ScoreChip(label: 'Accuracy', score: eval.accuracyScore),
+              _scoreColumn('Accuracy', eval.accuracyScore, theme),
               const SizedBox(width: SpacingTokens.sm),
-              _ScoreChip(label: 'Clarity', score: eval.clarityScore),
+              _scoreColumn('Clarity', eval.clarityScore, theme),
             ],
           ),
         ],
@@ -485,14 +477,8 @@ class _TeachBackPromptState extends ConsumerState<TeachBackPrompt>
     );
   }
 
-  /// Placeholder for voice-to-text input. In production this would use
-  /// the speech_to_text package to transcribe the student's voice.
+  /// Voice-to-text integration point. Uses speech_to_text in production.
   void _handleVoiceInput() {
-    // Voice-to-text integration point.
-    // The actual implementation would use speech_to_text package:
-    // final stt = SpeechToText();
-    // await stt.listen(onResult: (result) { ... });
-    // For now, we show a snackbar indicating the feature.
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text('Voice input: Tap and hold to speak'),
@@ -521,39 +507,15 @@ class _TeachBackPromptState extends ConsumerState<TeachBackPrompt>
       ),
     );
   }
-}
-
-// ---------------------------------------------------------------------------
-// Supporting widgets
-// ---------------------------------------------------------------------------
-
-class _ScoreChip extends StatelessWidget {
-  const _ScoreChip({required this.label, required this.score});
-
-  final String label;
-  final double score;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final percentage = (score * 100).round();
-
+  Widget _scoreColumn(String label, double score, ThemeData theme) {
     return Column(
       children: [
-        Text(
-          '$percentage%',
-          style: theme.textTheme.labelMedium?.copyWith(
-            fontWeight: FontWeight.w700,
-            color: Colors.green.shade800,
-          ),
-        ),
-        Text(
-          label,
-          style: theme.textTheme.labelSmall?.copyWith(
-            color: Colors.green.shade600,
-            fontSize: 9,
-          ),
-        ),
+        Text('${(score * 100).round()}%',
+            style: theme.textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700, color: Colors.green.shade800)),
+        Text(label,
+            style: theme.textTheme.labelSmall
+                ?.copyWith(color: Colors.green.shade600, fontSize: 9)),
       ],
     );
   }
