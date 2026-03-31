@@ -248,16 +248,12 @@ void main() {
         ApiEndpoints.dev.restBaseUrl,
         startsWith('https://dev-api.cena.education'),
       );
-      expect(
-        ApiEndpoints.dev.graphqlEndpoint,
-        startsWith('https://dev-api.cena.education'),
-      );
     });
 
     test('prod endpoints use api.cena.education', () {
       expect(
         ApiEndpoints.prod.webSocketUrl,
-        equals('wss://api.cena.education/hub/learning'),
+        equals('wss://api.cena.education/hub/cena'),
       );
       expect(
         ApiEndpoints.prod.restBaseUrl,

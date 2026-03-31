@@ -2,22 +2,21 @@
 // Cena Adaptive Learning Platform — SignalR Riverpod Providers (MOB-003)
 // =============================================================================
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../services/websocket_service.dart';
 import '../services/websocket_service_impl.dart';
 import 'app_state.dart';
 
 /// Provides a lazily-initialised [SignalRWebSocketService] scoped to the
-/// current [ProviderScope].  The hub URL is derived from [appConfigProvider]
-/// with the scheme rewritten to `ws`/`wss` as required by WebSocket.
+/// current [ProviderScope].  The hub URL is derived from [appConfigProvider].
 final signalRProvider = Provider<SignalRWebSocketService>((ref) {
   final config = ref.watch(appConfigProvider);
   final service = SignalRWebSocketService(
     hubUrl: config.endpoints.webSocketUrl,
     tokenProvider: () async {
-      // TODO(auth): replace with Firebase ID token once auth is wired.
-      // return await FirebaseAuth.instance.currentUser?.getIdToken() ?? '';
-      return '';
+      final user = FirebaseAuth.instance.currentUser;
+      return await user?.getIdToken() ?? '';
     },
   );
   ref.onDispose(() => service.dispose());

@@ -12,6 +12,7 @@ import 'package:uuid/uuid.dart';
 import '../models/domain_models.dart';
 import '../services/offline_sync_service.dart';
 import '../services/websocket_service.dart';
+import 'app_state.dart' show currentStudentProvider;
 import 'derived_providers.dart'
     show webSocketServiceProvider, syncManagerProvider;
 
@@ -117,17 +118,19 @@ class SessionState {
 /// - `AnswerEvaluated`   → records result, updates accuracy
 /// - `MethodologySwitched` → updates active methodology
 /// - `CognitiveLoadWarning` → raises break suggestion when fatigue threshold hit
-/// - `SessionSummary`    → marks session as ended
+/// - `SessionEnded`      → marks session as ended
 class SessionNotifier extends StateNotifier<SessionState> {
   SessionNotifier({
     required this.webSocketService,
     required this.syncManager,
+    required this.studentId,
   }) : super(const SessionState()) {
     _subscribeToEvents();
   }
 
   final WebSocketService webSocketService;
   final SyncManager syncManager;
+  final String studentId;
   final List<StreamSubscription<dynamic>> _subscriptions = [];
   final _uuid = const Uuid();
 
@@ -140,7 +143,7 @@ class SessionNotifier extends StateNotifier<SessionState> {
     try {
       await webSocketService.startSession(
         StartSession(
-          studentId: '', // UserNotifier provides this at the call site
+          studentId: studentId,
           subject: subject,
           durationMinutes: durationMinutes,
         ),
@@ -284,18 +287,34 @@ class SessionNotifier extends StateNotifier<SessionState> {
 
   void _handleMessage(MessageEnvelope envelope) {
     switch (envelope.type) {
+      // Events that match backend ICenaClient contract:
+      case 'SessionStarted':
+        _onSessionStarted(envelope.payload);
       case 'QuestionPresented':
         _onQuestionPresented(envelope.payload);
       case 'AnswerEvaluated':
         _onAnswerEvaluated(envelope.payload);
       case 'MethodologySwitched':
         _onMethodologySwitched(envelope.payload);
+      case 'HintDelivered':
+        _onHintDelivered(envelope.payload);
+      case 'SessionEnded':
+        _onSessionEnded(envelope.payload);
+      // Backend sends StagnationDetected instead of CognitiveLoadWarning.
+      // MicrobreakSuggested is defined in NATS subjects but not yet wired
+      // through NatsSignalRBridge; handle it here when it is.
+      case 'StagnationDetected':
       case 'CognitiveLoadWarning':
         _onCognitiveLoadWarning(envelope.payload);
-      case 'SessionSummary':
-        _onSessionSummary(envelope.payload);
-      case 'SessionStarted':
-        _onSessionStarted(envelope.payload);
+      // Gamification events — forwarded to _onXpAwarded / _onStreakUpdated
+      // so the session notifier can trigger celebrations; the actual state
+      // update happens via the gamification providers that also listen.
+      case 'XpAwarded':
+        _onXpAwarded(envelope.payload);
+      case 'StreakUpdated':
+        _onStreakUpdated(envelope.payload);
+      case 'Error':
+        _onHubError(envelope.payload);
     }
   }
 
@@ -360,7 +379,7 @@ class SessionNotifier extends StateNotifier<SessionState> {
     );
   }
 
-  void _onSessionSummary(Map<String, dynamic> payload) {
+  void _onSessionEnded(Map<String, dynamic> payload) {
     final session = state.currentSession;
     if (session == null) return;
 
@@ -371,6 +390,45 @@ class SessionNotifier extends StateNotifier<SessionState> {
       isLoading: false,
       clearCurrentExercise: true,
     );
+  }
+
+  void _onHintDelivered(Map<String, dynamic> payload) {
+    // Backend sends the hint text; append it to the current exercise hints.
+    final hintText = payload['text'] as String?;
+    final exercise = state.currentExercise;
+    if (hintText == null || exercise == null) return;
+
+    final updatedHints = [...exercise.hints, hintText];
+    final updatedExercise = exercise.copyWith(hints: updatedHints);
+    state = state.copyWith(
+      currentExercise: updatedExercise,
+      hintsUsed: state.hintsUsed + 1,
+    );
+  }
+
+  void _onXpAwarded(Map<String, dynamic> payload) {
+    // XP awarded events are informational for the session notifier.
+    // The actual XP state update is handled by gamification_state providers
+    // that also subscribe to the message stream. Here we just note the delta
+    // so the session screen can trigger celebrations.
+    final xp = (payload['amount'] as num?)?.toInt() ?? 0;
+    if (xp > 0 && state.sessionHistory.isNotEmpty) {
+      final last = state.sessionHistory.last;
+      final updated = last.copyWith(xpEarned: xp);
+      final newHistory = [...state.sessionHistory];
+      newHistory[newHistory.length - 1] = updated;
+      state = state.copyWith(sessionHistory: newHistory);
+    }
+  }
+
+  void _onStreakUpdated(Map<String, dynamic> payload) {
+    // Streak updates are handled by gamification_state providers.
+    // No session-level state change needed.
+  }
+
+  void _onHubError(Map<String, dynamic> payload) {
+    final message = payload['message'] as String? ?? 'Unknown server error';
+    state = state.copyWith(error: message, isLoading: false);
   }
 
   @override
@@ -392,8 +450,10 @@ class SessionNotifier extends StateNotifier<SessionState> {
 /// be overridden in the root ProviderScope at app startup.
 final sessionProvider =
     StateNotifierProvider.autoDispose<SessionNotifier, SessionState>((ref) {
+  final student = ref.watch(currentStudentProvider);
   return SessionNotifier(
     webSocketService: ref.watch(webSocketServiceProvider),
     syncManager: ref.watch(syncManagerProvider) as SyncManager,
+    studentId: student?.id ?? '',
   );
 });

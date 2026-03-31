@@ -26,37 +26,30 @@ class ApiEndpoints {
   const ApiEndpoints({
     required this.webSocketUrl,
     required this.restBaseUrl,
-    required this.graphqlEndpoint,
   });
 
-  /// SignalR WebSocket hub URL.
+  /// SignalR WebSocket hub URL (maps to CenaHub on backend).
   final String webSocketUrl;
 
   /// REST API base URL for auth, sync, and admin operations.
   final String restBaseUrl;
 
-  /// GraphQL endpoint for complex queries (knowledge graph, analytics).
-  final String graphqlEndpoint;
-
   /// Development environment endpoints.
   static const dev = ApiEndpoints(
-    webSocketUrl: 'wss://dev-api.cena.education/hub/learning',
+    webSocketUrl: 'wss://dev-api.cena.education/hub/cena',
     restBaseUrl: 'https://dev-api.cena.education/api/v1',
-    graphqlEndpoint: 'https://dev-api.cena.education/graphql',
   );
 
   /// Staging environment endpoints.
   static const staging = ApiEndpoints(
-    webSocketUrl: 'wss://staging-api.cena.education/hub/learning',
+    webSocketUrl: 'wss://staging-api.cena.education/hub/cena',
     restBaseUrl: 'https://staging-api.cena.education/api/v1',
-    graphqlEndpoint: 'https://staging-api.cena.education/graphql',
   );
 
   /// Production environment endpoints.
   static const prod = ApiEndpoints(
-    webSocketUrl: 'wss://api.cena.education/hub/learning',
+    webSocketUrl: 'wss://api.cena.education/hub/cena',
     restBaseUrl: 'https://api.cena.education/api/v1',
-    graphqlEndpoint: 'https://api.cena.education/graphql',
   );
 
   /// Get endpoints for a specific environment.

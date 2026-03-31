@@ -13,6 +13,8 @@ import 'core/config/app_config.dart';
 import 'core/router.dart';
 import 'core/services/analytics_service.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/state/derived_providers.dart';
+import 'core/state/signalr_provider.dart';
 
 final _logger = Logger(
   printer: PrettyPrinter(methodCount: 0, printTime: true),
@@ -60,6 +62,10 @@ void main() async {
       overrides: [
         if (analyticsService != null)
           analyticsServiceProvider.overrideWithValue(analyticsService),
+        // Wire SignalR as the canonical WebSocket service (MOB-INT-003).
+        webSocketServiceProvider.overrideWith(
+          (ref) => ref.watch(signalRProvider),
+        ),
       ],
       child: CenaApp(config: config),
     ),
