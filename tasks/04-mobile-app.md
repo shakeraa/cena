@@ -1126,3 +1126,65 @@ Runs as CI gate — any dark pattern detection blocks release.
 - [ ] Lint rule or test: scan all strings for shame/guilt language patterns
 - [ ] Accessibility audit: no dark patterns in accessibility flows
 - [ ] Quarterly manual review checklist signed off by team lead
+
+---
+
+## UX Psychology Tasks (MOB-030 — MOB-058)
+
+> Tasks generated from 10 deep research documents synthesized into the [CENA Mobile UX Psychology Blueprint](../docs/mobile-research/CENA_Mobile_UX_Psychology_Blueprint.md).
+
+### Phase 1: Foundation (Months 1-3)
+
+| Task | Description | Effort | Impact | File |
+|------|-------------|--------|--------|------|
+| MOB-030 | Session Flow Arc (Warm-Up/Core/Cool-Down) | M | Critical | [MOB-030](mobile/MOB-030-session-flow-arc.md) |
+| MOB-031 | FlowMonitorActor — Flow-Aware Dynamic Difficulty | L | Critical | [MOB-031](mobile/MOB-031-flow-monitor-actor.md) |
+| MOB-032 | Immersive Session Mode (hide nav, DND) | S | High | [MOB-032](mobile/MOB-032-immersive-session-mode.md) |
+| MOB-033 | Onboarding V2 — Try Before Signup | M | Critical | [MOB-033](mobile/MOB-033-onboarding-v2.md) |
+| MOB-034 | Progressive Disclosure — 4 Levels | M | High | [MOB-034](mobile/MOB-034-progressive-disclosure.md) |
+| MOB-035 | Training Wheels Mode (Sessions 1-3) | S | High | [MOB-035](mobile/MOB-035-training-wheels.md) |
+| MOB-036 | SRSActor — FSRS Spaced Repetition | L | Critical | [MOB-036](mobile/MOB-036-srs-actor.md) |
+| MOB-037 | Review Due Badge + Daily Review Session | M | High | [MOB-037](mobile/MOB-037-review-due-badge.md) |
+| MOB-038 | Thumb Zone Audit + StatefulShellRoute | S | Medium | [MOB-038](mobile/MOB-038-thumb-zone-audit.md) |
+| MOB-039 | Skeleton Screens Replacing Spinners | S | Medium | [MOB-039](mobile/MOB-039-skeleton-screens.md) |
+| MOB-058 | Riverpod .select() Optimization | S | High | [MOB-058](mobile/MOB-058-riverpod-select-optimization.md) |
+
+### Phase 2: Engagement Layer (Months 3-5)
+
+| Task | Description | Effort | Impact | File |
+|------|-------------|--------|--------|------|
+| MOB-040 | Quality-Gated Streaks | M | Critical | [MOB-040](mobile/MOB-040-quality-gated-streaks.md) |
+| MOB-041 | Habit Stacking — Context-Aware Sessions | L | High | [MOB-041](mobile/MOB-041-habit-stacking.md) |
+| MOB-042* | Quest System — Daily/Weekly/Monthly | L | High | [MOB-042q](mobile/MOB-042-quest-system.md) |
+| MOB-043 | Badge Expansion (10 → 30+) | M | Medium | [MOB-043](mobile/MOB-043-badge-expansion.md) |
+| MOB-057 | Smart Notification Suppression | M | High | [MOB-057](mobile/MOB-057-notification-intelligence.md) |
+
+*\*MOB-042 quest system is separate from the existing MOB-042 dark pattern audit above.*
+
+### Phase 3: Social Layer (Months 5-8)
+
+| Task | Description | Effort | Impact | File |
+|------|-------------|--------|--------|------|
+| MOB-044 | Class Achievement Feed + ClassActor | L | High | [MOB-044](mobile/MOB-044-class-social-feed.md) |
+| MOB-045 | Age-Tiered Social Safety + ComplianceActor | L | Critical | [MOB-045](mobile/MOB-045-age-tiered-safety.md) |
+| MOB-046 | Moderation Pipeline (AI + Community + Teacher) | L | Critical | [MOB-046](mobile/MOB-046-moderation-pipeline.md) |
+| MOB-052 | WellbeingActor — Digital Wellbeing | M | High | [MOB-052](mobile/MOB-052-wellbeing-actor.md) |
+| MOB-053 | Peer Solution Replays | L | High | [MOB-053](mobile/MOB-053-peer-solutions.md) |
+
+### Phase 4: Advanced Intelligence (Months 8-12)
+
+| Task | Description | Effort | Impact | File |
+|------|-------------|--------|--------|------|
+| MOB-047 | Confidence Calibration + MetacognitionActor | M | High | [MOB-047](mobile/MOB-047-confidence-calibration.md) |
+| MOB-048 | Teach-Back Mode (Student Explanations) | L | High | [MOB-048](mobile/MOB-048-teach-back-mode.md) |
+| MOB-049 | Adaptive Interleaving Probability | M | High | [MOB-049](mobile/MOB-049-adaptive-interleaving.md) |
+| MOB-054 | Deep Study Mode (45-90 min blocks) | M | Medium | [MOB-054](mobile/MOB-054-deep-study-mode.md) |
+| MOB-055 | Boss Battles — Narrative Assessments | L | Medium | [MOB-055](mobile/MOB-055-boss-battles.md) |
+
+### Phase 5: Polish & Delight (Months 12-15)
+
+| Task | Description | Effort | Impact | File |
+|------|-------------|--------|--------|------|
+| MOB-050 | Five-Tier Celebration System | L | Medium | [MOB-050](mobile/MOB-050-celebration-system.md) |
+| MOB-051 | Sound Design System (12 effects + ambient) | M | Medium | [MOB-051](mobile/MOB-051-sound-design.md) |
+| MOB-056 | Haptic Feedback Audit | S | Medium | [MOB-056](mobile/MOB-056-haptic-audit.md) |
