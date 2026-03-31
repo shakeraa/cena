@@ -179,17 +179,17 @@ void main() {
 
     test('supported locales are in correct order', () {
       expect(AppLocales.supported.length, equals(3));
-      expect(AppLocales.supported[0], equals(const Locale('he', 'IL')));
+      expect(AppLocales.supported[0], equals(const Locale('en', 'US')));
       expect(AppLocales.supported[1], equals(const Locale('ar')));
-      expect(AppLocales.supported[2], equals(const Locale('en', 'US')));
+      expect(AppLocales.supported[2], equals(const Locale('he', 'IL')));
     });
 
-    test('primary locale is Hebrew', () {
-      expect(AppLocales.primary, equals(const Locale('he', 'IL')));
+    test('primary locale is English', () {
+      expect(AppLocales.primary, equals(const Locale('en', 'US')));
     });
 
-    test('primaryDirection is RTL', () {
-      expect(AppLocales.primaryDirection, equals(TextDirection.rtl));
+    test('primaryDirection is LTR', () {
+      expect(AppLocales.primaryDirection, equals(TextDirection.ltr));
     });
   });
 

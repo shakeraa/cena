@@ -26,6 +26,7 @@ declare module 'vue-router/auto-routes' {
     'apps-focus-dashboard': RouteRecordInfo<'apps-focus-dashboard', '/apps/focus/dashboard', Record<never, never>, Record<never, never>>,
     'apps-focus-student-id': RouteRecordInfo<'apps-focus-student-id', '/apps/focus/student/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'apps-ingestion-pipeline': RouteRecordInfo<'apps-ingestion-pipeline', '/apps/ingestion/pipeline', Record<never, never>, Record<never, never>>,
+    'apps-ingestion-settings': RouteRecordInfo<'apps-ingestion-settings', '/apps/ingestion/settings', Record<never, never>, Record<never, never>>,
     'apps-mastery-class-id': RouteRecordInfo<'apps-mastery-class-id', '/apps/mastery/class/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'apps-mastery-dashboard': RouteRecordInfo<'apps-mastery-dashboard', '/apps/mastery/dashboard', Record<never, never>, Record<never, never>>,
     'apps-mastery-student-id': RouteRecordInfo<'apps-mastery-student-id', '/apps/mastery/student/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,

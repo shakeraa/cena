@@ -21,6 +21,9 @@ import '../../core/theme/glass_widgets.dart';
 import '../../l10n/app_localizations.dart';
 import '../gamification/gamification_screen.dart';
 import '../knowledge_graph/knowledge_graph_screen.dart';
+import '../progress/learning_time_card.dart';
+import '../progress/mastery_list_widget.dart';
+import '../session/quick_review_button.dart';
 
 /// Navigation tab indices for the home screen bottom bar.
 /// Order: Home | Learn | Map (center) | Progress | Profile
@@ -375,6 +378,11 @@ class _HomeTabContent extends ConsumerWidget {
             ),
           ),
         ),
+
+        const SizedBox(height: SpacingTokens.sm),
+
+        // PAR-004: Quick Review button with SRS overdue count.
+        const QuickReviewButton(),
 
         const SizedBox(height: SpacingTokens.sm),
 
@@ -818,7 +826,25 @@ class _ProgressTabContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const GamificationScreen();
+    return ListView(
+      children: [
+        // PAR-002: Learning time card with 7-day bar chart.
+        const Padding(
+          padding: EdgeInsets.fromLTRB(
+            SpacingTokens.md,
+            SpacingTokens.md,
+            SpacingTokens.md,
+            SpacingTokens.sm,
+          ),
+          child: LearningTimeCard(),
+        ),
+        // PAR-001: Mastery list with sort/filter.
+        const MasteryListWidget(),
+        // Existing gamification content below mastery list.
+        const SizedBox(height: SpacingTokens.md),
+        const GamificationScreen(),
+      ],
+    );
   }
 }
 

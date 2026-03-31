@@ -224,7 +224,7 @@ const confusedCount = computed(() => sessions.value.filter(s => s.status === 'co
               size="small"
               variant="text"
               color="primary"
-              :to="{ name: 'apps-tutoring-sessions-id', params: { id: session.sessionId } }"
+              :to="session.sessionId ? { name: 'apps-tutoring-sessions-id', params: { id: session.sessionId } } : undefined"
             >
               View Detail
             </VBtn>
