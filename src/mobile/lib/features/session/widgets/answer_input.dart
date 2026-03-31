@@ -11,6 +11,7 @@ import 'package:flutter/services.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/models/domain_models.dart';
 import '../../../core/services/interaction_feedback_service.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Provides the submit and skip controls for the active question.
 ///
@@ -128,6 +129,7 @@ class _AnswerInputState extends State<AnswerInput> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
     final isMcq = widget.questionType == QuestionType.multipleChoice;
 
     return Column(
@@ -135,7 +137,7 @@ class _AnswerInputState extends State<AnswerInput> {
       children: [
         // Text input — shown for non-MCQ types
         if (!isMcq) ...[
-          _buildTextInput(theme, colorScheme),
+          _buildTextInput(theme, colorScheme, l),
           const SizedBox(height: SpacingTokens.md),
         ],
 
@@ -145,7 +147,7 @@ class _AnswerInputState extends State<AnswerInput> {
             OutlinedButton.icon(
               onPressed: widget.isSubmitting ? null : _confirmSkip,
               icon: const Icon(Icons.skip_next_rounded, size: 18),
-              label: const Text('דלג'),
+              label: Text(l.skipQuestion),
               style: OutlinedButton.styleFrom(
                 foregroundColor: colorScheme.onSurfaceVariant,
                 padding: const EdgeInsets.symmetric(
@@ -168,7 +170,7 @@ class _AnswerInputState extends State<AnswerInput> {
                         ),
                       )
                     : const Icon(Icons.send_rounded, size: 18),
-                label: Text(widget.isSubmitting ? 'בודק...' : 'שלח תשובה'),
+                label: Text(widget.isSubmitting ? l.checking : l.submitAnswer),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(
                     vertical: SpacingTokens.sm,
@@ -182,7 +184,8 @@ class _AnswerInputState extends State<AnswerInput> {
     );
   }
 
-  Widget _buildTextInput(ThemeData theme, ColorScheme colorScheme) {
+  Widget _buildTextInput(
+      ThemeData theme, ColorScheme colorScheme, AppLocalizations l) {
     if (widget.questionType == QuestionType.numeric) {
       return _NumericInput(
         controller: _numericController,
@@ -203,7 +206,7 @@ class _AnswerInputState extends State<AnswerInput> {
       keyboardType: isProof ? TextInputType.multiline : TextInputType.text,
       textInputAction: isProof ? TextInputAction.newline : TextInputAction.done,
       decoration: InputDecoration(
-        hintText: isProof ? 'כתוב את הוכחתך כאן...' : 'כתוב את תשובתך כאן...',
+        hintText: isProof ? l.writeProofHere : l.writeAnswerHere,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(RadiusTokens.lg),
         ),
@@ -256,6 +259,7 @@ class _NumericInput extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l = AppLocalizations.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -289,7 +293,7 @@ class _NumericInput extends StatelessWidget {
             value: selectedUnit,
             isExpanded: true,
             decoration: InputDecoration(
-              labelText: 'יחידה',
+              labelText: l.unit,
               border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(RadiusTokens.lg),
               ),
@@ -299,7 +303,7 @@ class _NumericInput extends StatelessWidget {
             items: _units
                 .map((u) => DropdownMenuItem(
                       value: u,
-                      child: Text(u.isEmpty ? 'ללא' : u),
+                      child: Text(u.isEmpty ? l.noUnit : u),
                     ))
                 .toList(),
             onChanged: isEnabled ? (v) => onUnitChanged(v ?? '') : null,
@@ -321,22 +325,21 @@ class _SkipDialog extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('דלג על שאלה?'),
-      content: const Text(
-        'דילוג על שאלה לא ייחשב כטעות, אך גם לא יתרום לשיפור השליטה שלך.',
-      ),
+      title: Text(l.skipQuestionTitle),
+      content: Text(l.skipQuestionBody),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(null),
-          child: const Text('ביטול'),
+          child: Text(l.cancel),
         ),
         FilledButton(
           style: FilledButton.styleFrom(
             backgroundColor: colorScheme.secondary,
           ),
           onPressed: () => Navigator.of(context).pop('skip'),
-          child: const Text('דלג'),
+          child: Text(l.skipQuestion),
         ),
       ],
     );

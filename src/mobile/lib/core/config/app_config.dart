@@ -83,6 +83,7 @@ class FeatureFlags {
     this.proofBuilderEnabled = false,
     this.cohortOverride,
     this.debugOverlayEnabled = false,
+    this.hebrewLocaleVisible = true,
   });
 
   /// How aggressively to show gamification elements.
@@ -117,6 +118,10 @@ class FeatureFlags {
 
   /// Show debug overlay with frame rate, sync status, etc.
   final bool debugOverlayEnabled;
+
+  /// Whether Hebrew appears in the language picker.
+  /// Set to false for non-Israeli markets.
+  final bool hebrewLocaleVisible;
 
   /// Default flags for each environment.
   static const dev = FeatureFlags(
@@ -202,25 +207,27 @@ abstract class LlmBudget {
 // Localization
 // ---------------------------------------------------------------------------
 
-/// Supported locales — Hebrew (primary), Arabic, English (fallback).
+/// Supported locales — English (primary), Arabic, Hebrew.
 /// Both Hebrew and Arabic are RTL. Arabic support enables expansion to:
 /// - Israeli Arab students (~30% of Israeli student population)
 /// - Future Gulf/MENA markets (UAE, Saudi Arabia, Jordan, Egypt)
+/// Hebrew visibility is controlled by [FeatureFlags.hebrewLocaleVisible]
+/// so it can be hidden in non-Israeli markets.
 abstract class AppLocales {
-  /// Primary locale: Hebrew (Israel).
+  /// Hebrew locale (Israel).
   static const Locale hebrew = Locale('he', 'IL');
 
   /// Arabic locale — Israeli Arab students + future MENA expansion.
   static const Locale arabic = Locale('ar');
 
-  /// Fallback locale: English (US).
+  /// Primary locale: English (US).
   static const Locale english = Locale('en', 'US');
 
   /// Primary locale (default for new users, overridden by device locale detection).
-  static const Locale primary = hebrew;
+  static const Locale primary = english;
 
   /// All supported locales (order matters — first match wins in locale resolution).
-  static const List<Locale> supported = [hebrew, arabic, english];
+  static const List<Locale> supported = [english, arabic, hebrew];
 
   /// RTL locales — both Hebrew and Arabic are right-to-left.
   static const Set<String> rtlLanguages = {'he', 'ar'};
@@ -230,7 +237,14 @@ abstract class AppLocales {
       rtlLanguages.contains(locale.languageCode);
 
   /// Default text direction for primary locale.
-  static const TextDirection primaryDirection = TextDirection.rtl;
+  static const TextDirection primaryDirection = TextDirection.ltr;
+
+  /// Returns the list of locales visible in the language picker,
+  /// filtering Hebrew when [hebrewVisible] is false.
+  static List<Locale> visibleLocales({bool hebrewVisible = true}) {
+    if (hebrewVisible) return supported;
+    return supported.where((l) => l.languageCode != 'he').toList();
+  }
 }
 
 // ---------------------------------------------------------------------------

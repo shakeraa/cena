@@ -11,6 +11,7 @@ import '../../core/config/app_config.dart';
 import '../../core/router.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/state/app_state.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Profile screen showing user info, school/grade details, and account actions.
 class ProfileScreen extends ConsumerWidget {
@@ -28,8 +29,10 @@ class ProfileScreen extends ConsumerWidget {
     final email = firebaseUser?.email ?? '';
     final photoUrl = firebaseUser?.photoURL;
 
+    final l = AppLocalizations.of(context);
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text(l.profile)),
       body: ListView(
         padding: const EdgeInsets.all(SpacingTokens.md),
         children: [
@@ -86,28 +89,28 @@ class ProfileScreen extends ConsumerWidget {
                     SpacingTokens.sm,
                   ),
                   child: Text(
-                    'Academic Info',
+                    l.academicInfo,
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 _InfoTile(
                   icon: Icons.local_fire_department_rounded,
-                  label: 'Streak',
-                  value: '${student?.streak ?? 0} days',
+                  label: l.streak,
+                  value: l.nDays(student?.streak ?? 0),
                 ),
                 _InfoTile(
                   icon: Icons.star_rounded,
-                  label: 'XP',
+                  label: l.xp,
                   value: '${student?.xp ?? 0}',
                 ),
                 _InfoTile(
                   icon: Icons.emoji_events_rounded,
-                  label: 'Level',
+                  label: l.level,
                   value: '${student?.level ?? 1}',
                 ),
                 _InfoTile(
                   icon: Icons.fingerprint_rounded,
-                  label: 'User ID',
+                  label: l.userId,
                   value: firebaseUser?.uid.substring(0, 8) ?? '—',
                 ),
               ],
@@ -129,13 +132,13 @@ class ProfileScreen extends ConsumerWidget {
                     SpacingTokens.sm,
                   ),
                   child: Text(
-                    'Account',
+                    l.account,
                     style: theme.textTheme.titleMedium,
                   ),
                 ),
                 ListTile(
                   leading: const Icon(Icons.edit_rounded),
-                  title: const Text('Edit Display Name'),
+                  title: Text(l.editDisplayName),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => _editDisplayName(context, firebaseUser),
                 ),
@@ -145,27 +148,29 @@ class ProfileScreen extends ConsumerWidget {
                     color: colorScheme.error,
                   ),
                   title: Text(
-                    'Sign Out',
+                    l.signOut,
                     style: TextStyle(color: colorScheme.error),
                   ),
                   onTap: () async {
                     final confirmed = await showDialog<bool>(
                       context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Sign Out'),
-                        content:
-                            const Text('Are you sure you want to sign out?'),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, false),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.pop(ctx, true),
-                            child: const Text('Sign Out'),
-                          ),
-                        ],
-                      ),
+                      builder: (ctx) {
+                        final dl = AppLocalizations.of(ctx);
+                        return AlertDialog(
+                          title: Text(dl.signOut),
+                          content: Text(dl.signOutConfirm),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, false),
+                              child: Text(dl.cancel),
+                            ),
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx, true),
+                              child: Text(dl.signOut),
+                            ),
+                          ],
+                        );
+                      },
                     );
                     if (confirmed == true && context.mounted) {
                       await ref.read(authNotifierProvider.notifier).signOut();
@@ -182,7 +187,7 @@ class ProfileScreen extends ConsumerWidget {
           // App version
           Center(
             child: Text(
-              'Cena v0.1.0',
+              l.appVersion,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -200,27 +205,30 @@ class ProfileScreen extends ConsumerWidget {
         TextEditingController(text: firebaseUser.displayName ?? '');
     final result = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Edit Display Name'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Display Name',
-            hintText: 'Enter your name',
+      builder: (ctx) {
+        final dl = AppLocalizations.of(ctx);
+        return AlertDialog(
+          title: Text(dl.editDisplayName),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: InputDecoration(
+              labelText: dl.displayName,
+              hintText: dl.enterYourName,
+            ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(dl.cancel),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+              child: Text(dl.save),
+            ),
+          ],
+        );
+      },
     );
     if (result != null && result.isNotEmpty) {
       await firebaseUser.updateDisplayName(result);

@@ -14,6 +14,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/app_config.dart';
+import '../../l10n/app_localizations.dart';
+import '../session/widgets/math_text.dart';
 import 'tutor_state.dart';
 
 /// AI Tutor chat screen — accessible from session or as standalone.
@@ -89,21 +91,24 @@ class _TutorChatScreenState extends ConsumerState<TutorChatScreen> {
               ),
             ),
             const SizedBox(width: SpacingTokens.sm),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('CENA Tutor',
-                    style: theme.textTheme.titleMedium
-                        ?.copyWith(fontWeight: FontWeight.w600)),
-                if (chatState.isTutorTyping)
-                  Text(
-                    'typing...',
-                    style: theme.textTheme.labelSmall?.copyWith(
-                      color: colorScheme.primary,
+            Builder(builder: (context) {
+              final l = AppLocalizations.of(context);
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(l.tutorName,
+                      style: theme.textTheme.titleMedium
+                          ?.copyWith(fontWeight: FontWeight.w600)),
+                  if (chatState.isTutorTyping)
+                    Text(
+                      l.typing,
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
                     ),
-                  ),
-              ],
-            ),
+                ],
+              );
+            }),
           ],
         ),
       ),
@@ -185,7 +190,7 @@ class _WelcomeState extends StatelessWidget {
             ),
             const SizedBox(height: SpacingTokens.lg),
             Text(
-              'Hi! I\'m your CENA tutor',
+              AppLocalizations.of(context).tutorWelcome,
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w700,
               ),
@@ -193,7 +198,7 @@ class _WelcomeState extends StatelessWidget {
             ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
-              'Ask me anything about math, or tap a suggestion below to get started.',
+              AppLocalizations.of(context).tutorWelcomeDesc,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -271,11 +276,13 @@ class _MessageBubble extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    message.text,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: textColor,
-                    ),
+                  MathText(
+                    content: message.text,
+                    textStyle: theme.textTheme.bodyMedium?.copyWith(color: textColor),
+                    mathColor: isStudent ? colorScheme.onPrimary : colorScheme.primary,
+                    mathBackground: isStudent
+                      ? Colors.white.withValues(alpha: 0.1)
+                      : colorScheme.primary.withValues(alpha: 0.08),
                   ),
                   if (message.isStreaming)
                     Padding(
@@ -394,25 +401,26 @@ class _QuickReplyChips extends StatelessWidget {
 
   final void Function(String action) onTap;
 
-  static const _suggestions = [
-    'Explain this concept',
-    'Give me a simpler example',
-    'Show me step by step',
-    'What did I get wrong?',
-    'Try a different approach',
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
+    final suggestions = [
+      l.explainConcept,
+      l.simplerExample,
+      l.stepByStep,
+      l.whatDidIGetWrong,
+      l.differentApproach,
+    ];
+
     return SizedBox(
       height: 44,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
-        itemCount: _suggestions.length,
+        itemCount: suggestions.length,
         separatorBuilder: (_, __) => const SizedBox(width: SpacingTokens.sm),
         itemBuilder: (context, index) {
-          final suggestion = _suggestions[index];
+          final suggestion = suggestions[index];
           return ActionChip(
             label: Text(suggestion),
             onPressed: () => onTap(suggestion),
@@ -470,7 +478,7 @@ class _ChatInputBar extends StatelessWidget {
               minLines: 1,
               maxLines: 4,
               decoration: InputDecoration(
-                hintText: 'Ask CENA anything...',
+                hintText: AppLocalizations.of(context).askCenaAnything,
                 filled: true,
                 fillColor: colorScheme.surfaceContainerHighest,
                 border: OutlineInputBorder(

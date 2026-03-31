@@ -11,6 +11,9 @@ import 'package:flutter/material.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/models/domain_models.dart';
 import '../../../core/services/interaction_feedback_service.dart';
+import '../../../l10n/app_localizations.dart';
+import '../../diagrams/diagram_viewer.dart';
+import '../../diagrams/models/diagram_models.dart';
 import 'math_text.dart';
 
 /// Renders the current [exercise] and dispatches selection events for MCQ.
@@ -24,6 +27,7 @@ class QuestionCard extends StatelessWidget {
     this.selectedOption,
     this.onOptionSelected,
     this.isSubmitting = false,
+    this.interactiveDiagram,
   });
 
   final Exercise exercise;
@@ -36,6 +40,11 @@ class QuestionCard extends StatelessWidget {
 
   /// When true, option tiles are non-interactive (answer being evaluated).
   final bool isSubmitting;
+
+  /// Optional interactive SVG diagram (from the generation pipeline).
+  /// When provided, renders [InteractiveDiagramViewer] instead of the
+  /// flat image fallback [_DiagramView].
+  final ConceptDiagram? interactiveDiagram;
 
   @override
   Widget build(BuildContext context) {
@@ -65,8 +74,12 @@ class QuestionCard extends StatelessWidget {
             // Question content (supports inline LaTeX notation)
             _QuestionText(content: exercise.content),
 
-            // Diagram image, if provided
-            if (exercise.diagram != null) ...[
+            // Interactive diagram (ConceptDiagram) takes priority over
+            // flat URL-based diagram image for backward compatibility.
+            if (interactiveDiagram != null) ...[
+              const SizedBox(height: SpacingTokens.md),
+              InteractiveDiagramViewer(diagram: interactiveDiagram!),
+            ] else if (exercise.diagram != null) ...[
               const SizedBox(height: SpacingTokens.md),
               _DiagramView(diagramUrl: exercise.diagram!),
             ],
@@ -266,15 +279,16 @@ class _DifficultyBadge extends StatelessWidget {
     return const Color(0xFFF44336);
   }
 
-  String _label(int d) {
-    if (d <= 3) return 'קל';
-    if (d <= 6) return 'בינוני';
-    return 'קשה';
+  String _label(int d, AppLocalizations l) {
+    if (d <= 3) return l.easy;
+    if (d <= 6) return l.medium;
+    return l.hard;
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final color = _color(difficulty);
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -285,7 +299,7 @@ class _DifficultyBadge extends StatelessWidget {
         border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Text(
-        '${_label(difficulty)} $difficulty/10',
+        '${_label(difficulty, l)} $difficulty/10',
         style: theme.textTheme.labelSmall?.copyWith(
           color: color,
           fontWeight: FontWeight.w600,
@@ -300,18 +314,18 @@ class _TypePill extends StatelessWidget {
 
   final QuestionType questionType;
 
-  String _label(QuestionType t) {
+  String _label(QuestionType t, AppLocalizations l) {
     switch (t) {
       case QuestionType.multipleChoice:
-        return 'בחירה מרובה';
+        return l.multipleChoice;
       case QuestionType.freeText:
-        return 'תשובה חופשית';
+        return l.freeText;
       case QuestionType.numeric:
-        return 'מספרי';
+        return l.numeric;
       case QuestionType.proof:
-        return 'הוכחה';
+        return l.proof;
       case QuestionType.diagram:
-        return 'דיאגרמה';
+        return l.diagram;
     }
   }
 
@@ -333,6 +347,7 @@ class _TypePill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final color = theme.colorScheme.secondary;
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -340,7 +355,7 @@ class _TypePill extends StatelessWidget {
         Icon(_icon(questionType), size: 12, color: color),
         const SizedBox(width: SpacingTokens.xxs),
         Text(
-          _label(questionType),
+          _label(questionType, l),
           style: theme.textTheme.labelSmall?.copyWith(color: color),
         ),
       ],

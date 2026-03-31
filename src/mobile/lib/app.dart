@@ -3,7 +3,6 @@
 // =============================================================================
 
 import 'package:flutter/material.dart';
-import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,6 +12,7 @@ import 'core/services/analytics_service.dart';
 import 'core/services/auth_service.dart';
 import 'core/state/app_state.dart';
 import 'core/theme/cena_theme.dart';
+import 'l10n/app_localizations.dart';
 
 /// Riverpod provider that builds the router once, injecting the analytics
 /// observer so all screen transitions are tracked automatically.
@@ -22,7 +22,7 @@ final cenaRouterProvider = Provider<GoRouter>((ref) {
 });
 
 /// Riverpod provider for the current locale.
-/// Defaults to Hebrew (primary locale).
+/// Defaults to English (primary locale).
 final currentLocaleProvider = StateProvider<Locale>((ref) {
   return AppLocales.primary;
 });
@@ -69,12 +69,8 @@ class CenaApp extends ConsumerWidget {
 
       // Localization
       locale: locale,
-      supportedLocales: AppLocales.supported,
-      localizationsDelegates: const [
-        GlobalMaterialLocalizations.delegate,
-        GlobalWidgetsLocalizations.delegate,
-        GlobalCupertinoLocalizations.delegate,
-      ],
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
 
       // Force text direction based on locale for the entire widget tree
       builder: (context, child) {

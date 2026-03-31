@@ -11,6 +11,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/config/app_config.dart';
 import '../../core/router.dart';
 import '../../core/services/auth_service.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Authentication step for phone flow.
 enum PhoneAuthStep { enterPhone, enterCode }
@@ -82,8 +83,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     if (!_isValidIsraeliPhone(phone)) {
       ref.read(authNotifierProvider.notifier).clearError();
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-            content: Text('Please enter a valid Israeli phone number')),
+        SnackBar(
+            content: Text(AppLocalizations.of(context).invalidPhone)),
       );
       return;
     }
@@ -111,7 +112,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     final code = _codeController.text.trim();
     if (code.length != 6 || !RegExp(r'^\d{6}$').hasMatch(code)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter the 6-digit code')),
+        SnackBar(content: Text(AppLocalizations.of(context).enterSixDigitCode)),
       );
       return;
     }
@@ -149,6 +150,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
     final authState = ref.watch(authNotifierProvider);
     final isLoading = authState is AuthLoading;
+    final l = AppLocalizations.of(context);
 
     return Scaffold(
       body: SafeArea(
@@ -167,7 +169,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ),
               const SizedBox(height: SpacingTokens.md),
               Text(
-                'Cena',
+                l.appTitle,
                 style: theme.textTheme.displayMedium?.copyWith(
                   color: colorScheme.primary,
                   fontWeight: FontWeight.w800,
@@ -176,7 +178,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ),
               const SizedBox(height: SpacingTokens.sm),
               Text(
-                'Your personal AI learning mentor',
+                l.yourPersonalMentor,
                 style: theme.textTheme.bodyLarge?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -208,6 +210,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   // ---------- Social Auth UI ----------
 
   Widget _buildSocialAuthSection(ThemeData theme, ColorScheme colorScheme) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -215,7 +218,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         _SocialSignInButton(
           onPressed: _signInWithGoogle,
           icon: Icons.g_mobiledata_rounded,
-          label: 'Continue with Google',
+          label: l.continueWithGoogle,
           backgroundColor: Colors.white,
           foregroundColor: Colors.black87,
         ),
@@ -225,7 +228,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         _SocialSignInButton(
           onPressed: _signInWithApple,
           icon: Icons.apple_rounded,
-          label: 'Continue with Apple',
+          label: l.continueWithApple,
           backgroundColor: Colors.black,
           foregroundColor: Colors.white,
         ),
@@ -239,7 +242,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: SpacingTokens.md),
               child: Text(
-                'or',
+                l.or,
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -255,7 +258,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
         OutlinedButton.icon(
           onPressed: () => setState(() => _showPhoneAuth = true),
           icon: const Icon(Icons.phone_outlined),
-          label: const Text('Continue with Phone'),
+          label: Text(l.continueWithPhone),
         ),
       ],
     );
@@ -264,6 +267,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   // ---------- Phone Auth UI ----------
 
   Widget _buildPhoneAuthSection(ThemeData theme, ColorScheme colorScheme) {
+    final l = AppLocalizations.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -276,13 +280,13 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           const SizedBox(height: SpacingTokens.md),
           FilledButton(
             onPressed: _requestSmsCode,
-            child: const Text('Send Code'),
+            child: Text(l.sendCode),
           ),
         ],
 
         if (_phoneStep == PhoneAuthStep.enterCode) ...[
           Text(
-            'Enter the 6-digit code sent to ${_phoneController.text}',
+            l.enterCodeSent(_phoneController.text),
             style: theme.textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -297,7 +301,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           const SizedBox(height: SpacingTokens.md),
           FilledButton(
             onPressed: _verifySmsCode,
-            child: const Text('Verify'),
+            child: Text(l.verify),
           ),
           const SizedBox(height: SpacingTokens.sm),
           TextButton(
@@ -307,7 +311,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 _codeController.clear();
               });
             },
-            child: const Text('Change phone number'),
+            child: Text(l.changePhoneNumber),
           ),
         ],
 
@@ -322,7 +326,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             _codeController.clear();
           }),
           icon: const Icon(Icons.arrow_back, size: 16),
-          label: const Text('Other sign-in options'),
+          label: Text(l.otherSignInOptions),
         ),
       ],
     );
@@ -387,16 +391,17 @@ class _PhoneInputField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return TextField(
       controller: controller,
       focusNode: focusNode,
       keyboardType: TextInputType.phone,
       textDirection: TextDirection.ltr,
-      decoration: const InputDecoration(
-        labelText: 'Phone Number',
-        hintText: '05X-XXX-XXXX',
+      decoration: InputDecoration(
+        labelText: l.phoneNumber,
+        hintText: l.phoneHint,
         prefixText: '+972 ',
-        prefixIcon: Icon(Icons.phone_outlined),
+        prefixIcon: const Icon(Icons.phone_outlined),
       ),
       onSubmitted: onSubmitted,
     );
@@ -431,8 +436,8 @@ class _CodeInputField extends StatelessWidget {
             letterSpacing: 8,
             fontFamily: TypographyTokens.monoFontFamily,
           ),
-      decoration: const InputDecoration(
-        labelText: 'Verification Code',
+      decoration: InputDecoration(
+        labelText: AppLocalizations.of(context).verificationCode,
         hintText: '000000',
         counterText: '',
       ),

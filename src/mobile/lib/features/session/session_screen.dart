@@ -17,6 +17,7 @@ import '../../core/services/analytics_service.dart';
 import '../../core/state/feature_discovery_state.dart';
 import '../../core/state/momentum_state.dart';
 import '../../core/state/session_notifier.dart';
+import '../../l10n/app_localizations.dart';
 import '../gamification/celebration_overlay.dart';
 import '../gamification/celebration_service.dart';
 import 'widgets/action_buttons.dart';
@@ -192,12 +193,13 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   Widget _buildConfigScreen(BuildContext context, SessionState state) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
 
-    const subjects = _subjects;
+    final subjects = _getSubjects(l);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('שיעור חדש'),
+        title: Text(l.newLesson),
         leading: IconButton(
           icon: const Icon(Icons.close_rounded),
           onPressed: () => context.go(CenaRoutes.home),
@@ -209,7 +211,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               padding: const EdgeInsets.all(SpacingTokens.md),
               children: [
                 if (state.error != null) _ErrorBanner(message: state.error!),
-                Text('בחר נושא', style: theme.textTheme.titleLarge),
+                Text(l.selectSubject, style: theme.textTheme.titleLarge),
                 const SizedBox(height: SpacingTokens.sm),
                 Wrap(
                   spacing: SpacingTokens.sm,
@@ -231,10 +233,10 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                   }).toList(),
                 ),
                 const SizedBox(height: SpacingTokens.xl),
-                Text('משך השיעור', style: theme.textTheme.titleLarge),
+                Text(l.sessionDuration, style: theme.textTheme.titleLarge),
                 const SizedBox(height: SpacingTokens.sm),
                 Text(
-                  '$_selectedDuration דקות',
+                  l.nMinutes(_selectedDuration),
                   style: theme.textTheme.headlineLarge?.copyWith(
                     color: colorScheme.primary,
                     fontWeight: FontWeight.w700,
@@ -247,7 +249,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                   max: SessionDefaults.maxDurationMinutes.toDouble(),
                   divisions: SessionDefaults.maxDurationMinutes -
                       SessionDefaults.minDurationMinutes,
-                  label: '$_selectedDuration דק׳',
+                  label: l.nMinShort(_selectedDuration),
                   onChanged: (v) => setState(() {
                     _selectedDuration = v.round();
                   }),
@@ -256,13 +258,13 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '${SessionDefaults.minDurationMinutes} דק׳',
+                      l.nMinShort(SessionDefaults.minDurationMinutes),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                     Text(
-                      '${SessionDefaults.maxDurationMinutes} דק׳',
+                      l.nMinShort(SessionDefaults.maxDurationMinutes),
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -281,21 +283,21 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                             Icon(Icons.info_outline_rounded,
                                 size: 20, color: colorScheme.primary),
                             const SizedBox(width: SpacingTokens.sm),
-                            Text('פרטי השיעור',
+                            Text(l.sessionDetails,
                                 style: theme.textTheme.titleMedium),
                           ],
                         ),
                         const SizedBox(height: SpacingTokens.sm),
-                        const _InfoRow(
-                            label: 'שאלות מקסימום',
+                        _InfoRow(
+                            label: l.maxQuestions,
                             value: '${SessionDefaults.maxQuestionsPerSession}'),
                         _InfoRow(
-                            label: 'סף שליטה',
+                            label: l.masteryThreshold,
                             value:
                                 '${(SessionDefaults.masteryThreshold * 100).toInt()}%'),
-                        const _InfoRow(
-                            label: LlmBudget.labelHe,
-                            value: '${LlmBudget.dailyCap} נותרו'),
+                        _InfoRow(
+                            label: l.studyEnergy,
+                            value: l.remaining(LlmBudget.dailyCap)),
                       ],
                     ),
                   ),
@@ -304,7 +306,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                 FilledButton.icon(
                   onPressed: _startSession,
                   icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('התחל שיעור'),
+                  label: Text(l.startLesson),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
                   ),
@@ -314,33 +316,36 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
     );
   }
 
-  static const List<({String name, IconData icon, Color color})> _subjects = [
-    (
-      name: 'מתמטיקה',
-      icon: Icons.functions_rounded,
-      color: SubjectColorTokens.mathPrimary,
-    ),
-    (
-      name: 'פיזיקה',
-      icon: Icons.speed_rounded,
-      color: SubjectColorTokens.physicsPrimary,
-    ),
-    (
-      name: 'כימיה',
-      icon: Icons.science_rounded,
-      color: SubjectColorTokens.chemistryPrimary,
-    ),
-    (
-      name: 'ביולוגיה',
-      icon: Icons.biotech_rounded,
-      color: SubjectColorTokens.biologyPrimary,
-    ),
-    (
-      name: 'מדעי המחשב',
-      icon: Icons.computer_rounded,
-      color: SubjectColorTokens.csPrimary,
-    ),
-  ];
+  static List<({String name, IconData icon, Color color})> _getSubjects(
+      AppLocalizations l) {
+    return [
+      (
+        name: l.math,
+        icon: Icons.functions_rounded,
+        color: SubjectColorTokens.mathPrimary,
+      ),
+      (
+        name: l.physics,
+        icon: Icons.speed_rounded,
+        color: SubjectColorTokens.physicsPrimary,
+      ),
+      (
+        name: l.chemistry,
+        icon: Icons.science_rounded,
+        color: SubjectColorTokens.chemistryPrimary,
+      ),
+      (
+        name: l.biology,
+        icon: Icons.biotech_rounded,
+        color: SubjectColorTokens.biologyPrimary,
+      ),
+      (
+        name: l.computerScience,
+        icon: Icons.computer_rounded,
+        color: SubjectColorTokens.csPrimary,
+      ),
+    ];
+  }
 
   void _startSession() {
     final notifier = ref.read(sessionProvider.notifier);
@@ -420,6 +425,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
   Widget _buildQuestionArea(
       BuildContext context, SessionState state, Exercise exercise) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final isFlowState = state.isInFlowState;
     return CustomScrollView(
       slivers: [
@@ -431,7 +437,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               Row(
                 children: [
                   Text(
-                    'שאלה ${state.questionsAttempted + 1}',
+                    l.questionN(state.questionsAttempted + 1),
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -442,7 +448,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                     IconButton(
                       onPressed: _confirmEndSession,
                       icon: const Icon(Icons.pause_rounded, size: 18),
-                      tooltip: 'סיים שיעור',
+                      tooltip: l.endSession,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       padding: EdgeInsets.zero,
                       constraints: const BoxConstraints(
@@ -454,7 +460,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                     TextButton.icon(
                       onPressed: _confirmEndSession,
                       icon: const Icon(Icons.stop_rounded, size: 16),
-                      label: const Text('סיים'),
+                      label: Text(l.endSession),
                       style: TextButton.styleFrom(
                         foregroundColor: Theme.of(context).colorScheme.error,
                       ),
@@ -581,7 +587,8 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
 
   Widget _buildSessionEndedView(BuildContext context, SessionState state) {
     final theme = Theme.of(context);
-    final accuracy = (state.accuracy * 100).toInt();
+    final l = AppLocalizations.of(context);
+    final accuracyPct = (state.accuracy * 100).toInt();
 
     return Scaffold(
       body: SafeArea(
@@ -594,7 +601,7 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
                   size: 80, color: Color(0xFFFFB300)),
               const SizedBox(height: SpacingTokens.lg),
               Text(
-                'השיעור הסתיים!',
+                l.lessonComplete,
                 style: theme.textTheme.headlineLarge?.copyWith(
                   fontWeight: FontWeight.w800,
                 ),
@@ -603,24 +610,24 @@ class _SessionScreenState extends ConsumerState<SessionScreen> {
               const SizedBox(height: SpacingTokens.xl),
               _SummaryTile(
                 icon: Icons.help_outline_rounded,
-                label: 'שאלות',
+                label: l.questions,
                 value: '${state.questionsAttempted}',
               ),
               _SummaryTile(
                 icon: Icons.check_circle_outline_rounded,
-                label: 'דיוק',
-                value: '$accuracy%',
+                label: l.accuracy,
+                value: '$accuracyPct%',
               ),
               _SummaryTile(
                 icon: Icons.timer_outlined,
-                label: 'זמן',
+                label: l.time,
                 value: _formatDuration(state.elapsed),
               ),
               const SizedBox(height: SpacingTokens.xxl),
               FilledButton.icon(
                 onPressed: () => context.go(CenaRoutes.home),
                 icon: const Icon(Icons.home_rounded),
-                label: const Text('חזור לדף הבית'),
+                label: Text(l.backToHome),
                 style: FilledButton.styleFrom(
                   minimumSize: const Size(double.infinity, 48),
                 ),
@@ -648,24 +655,25 @@ class _MethodologyBadge extends StatelessWidget {
 
   final Methodology methodology;
 
-  String _label(Methodology m) {
+  String _label(Methodology m, AppLocalizations l) {
     switch (m) {
       case Methodology.spacedRepetition:
-        return 'חזרה מרווחת';
+        return l.spacedRepetition;
       case Methodology.interleaved:
-        return 'למידה מעורבת';
+        return l.interleaved;
       case Methodology.blocked:
-        return 'למידה ממוקדת';
+        return l.blocked;
       case Methodology.adaptiveDifficulty:
-        return 'קושי מותאם';
+        return l.adaptiveDifficulty;
       case Methodology.socratic:
-        return 'שיטה סוקרטית';
+        return l.socratic;
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final color = theme.colorScheme.tertiary;
     return Container(
       padding: const EdgeInsets.symmetric(
@@ -677,7 +685,7 @@ class _MethodologyBadge extends StatelessWidget {
           Icon(Icons.psychology_rounded, size: 14, color: color),
           const SizedBox(width: SpacingTokens.xs),
           Text(
-            _label(methodology),
+            _label(methodology, l),
             style: theme.textTheme.labelSmall?.copyWith(color: color),
           ),
         ],
@@ -720,7 +728,7 @@ class _HintDisplay extends StatelessWidget {
                   size: 16, color: Color(0xFFFF9800)),
               const SizedBox(width: SpacingTokens.xs),
               Text(
-                'רמזים',
+                AppLocalizations.of(context).hints,
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: const Color(0xFFE65100),
                   fontWeight: FontWeight.w700,
@@ -851,18 +859,19 @@ class _EndSessionDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final l = AppLocalizations.of(context);
     return AlertDialog(
-      title: const Text('לסיים את השיעור?'),
-      content: const Text('ההתקדמות שלך תישמר. תוכל להמשיך מאוחר יותר.'),
+      title: Text(l.endSessionTitle),
+      content: Text(l.endSessionBody),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(false),
-          child: const Text('המשך שיעור'),
+          child: Text(l.continueLesson),
         ),
         FilledButton(
           style: FilledButton.styleFrom(backgroundColor: colorScheme.error),
           onPressed: () => Navigator.of(context).pop(true),
-          child: const Text('סיים'),
+          child: Text(l.endLessonConfirm),
         ),
       ],
     );

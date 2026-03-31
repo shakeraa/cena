@@ -108,6 +108,13 @@ class ConceptDiagram with _$ConceptDiagram {
     /// Thumbnail URL (for knowledge graph node previews)
     required String thumbnailUrl,
 
+    /// Real-world photo URL showing the concept physically (e.g., actual breadboard for circuits).
+    /// Used by ChallengeCardWidget as background and Browse Challenges grid as preview.
+    String? realWorldImageUrl,
+
+    /// Thumbnail of the real-world image for grid previews.
+    String? realWorldThumbnailUrl,
+
     /// Inline SVG content (if format=svg and size < 50KB, embedded for offline)
     String? inlineSvg,
 

@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/config/app_config.dart';
+import '../../l10n/app_localizations.dart';
 
 /// Interactive knowledge graph visualization screen.
 ///
@@ -22,10 +23,11 @@ class KnowledgeGraphScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Knowledge Map'),
+        title: Text(l.knowledgeMap),
         actions: [
           // Subject filter chips
           PopupMenuButton<String>(
@@ -34,12 +36,12 @@ class KnowledgeGraphScreen extends ConsumerWidget {
               // Subject filtering — wired in MOB-005
             },
             itemBuilder: (context) => [
-              const PopupMenuItem(value: 'all', child: Text('All Subjects')),
-              const PopupMenuItem(value: 'math', child: Text('Math')),
-              const PopupMenuItem(value: 'physics', child: Text('Physics')),
-              const PopupMenuItem(value: 'chemistry', child: Text('Chemistry')),
-              const PopupMenuItem(value: 'biology', child: Text('Biology')),
-              const PopupMenuItem(value: 'cs', child: Text('CS')),
+              PopupMenuItem(value: 'all', child: Text(l.allSubjects)),
+              PopupMenuItem(value: 'math', child: Text(l.math)),
+              PopupMenuItem(value: 'physics', child: Text(l.physics)),
+              PopupMenuItem(value: 'chemistry', child: Text(l.chemistry)),
+              PopupMenuItem(value: 'biology', child: Text(l.biology)),
+              PopupMenuItem(value: 'cs', child: Text(l.cs)),
             ],
           ),
         ],
@@ -55,7 +57,7 @@ class KnowledgeGraphScreen extends ConsumerWidget {
             ),
             const SizedBox(height: SpacingTokens.md),
             Text(
-              'Knowledge Graph',
+              l.knowledgeMap,
               style: theme.textTheme.titleLarge?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -66,8 +68,7 @@ class KnowledgeGraphScreen extends ConsumerWidget {
                 horizontal: SpacingTokens.xl,
               ),
               child: Text(
-                'The interactive concept map will appear here as you '
-                'progress through your learning sessions.',
+                l.knowledgeGraphPlaceholder,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),

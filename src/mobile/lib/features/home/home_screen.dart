@@ -9,15 +9,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app.dart' show currentLocaleProvider;
 import '../../core/config/app_config.dart';
-import '../../core/state/app_state.dart' show apiClientProvider;
-import '../../core/state/gamification_state.dart';
-import '../../core/theme/glass_widgets.dart';
 import '../../core/router.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/state/app_state.dart' show apiClientProvider, appConfigProvider;
 import '../../core/state/feature_discovery_state.dart';
+import '../../core/state/gamification_state.dart';
 import '../../core/state/interaction_feedback_state.dart';
 import '../../core/state/momentum_state.dart';
 import '../../core/state/outreach_notifier.dart';
+import '../../core/theme/glass_widgets.dart';
+import '../../l10n/app_localizations.dart';
 import '../gamification/gamification_screen.dart';
 import '../knowledge_graph/knowledge_graph_screen.dart';
 
@@ -25,15 +26,30 @@ import '../knowledge_graph/knowledge_graph_screen.dart';
 /// Order: Home | Learn | Map (center) | Progress | Profile
 /// Map in center = easiest thumb reach (Cowan's 4±1, Doc 3).
 enum HomeTab {
-  home('Home', Icons.home_rounded),
-  learn('Learn', Icons.play_circle_outline_rounded),
-  map('Map', Icons.hub_rounded),
-  progress('Progress', Icons.bar_chart_rounded),
-  profile('Profile', Icons.person_outline_rounded);
+  home(Icons.home_rounded),
+  learn(Icons.play_circle_outline_rounded),
+  map(Icons.hub_rounded),
+  progress(Icons.bar_chart_rounded),
+  profile(Icons.person_outline_rounded);
 
-  const HomeTab(this.label, this.icon);
-  final String label;
+  const HomeTab(this.icon);
   final IconData icon;
+}
+
+/// Returns the localized label for each [HomeTab].
+String _tabLabel(HomeTab tab, AppLocalizations l) {
+  switch (tab) {
+    case HomeTab.home:
+      return l.tabHome;
+    case HomeTab.learn:
+      return l.tabLearn;
+    case HomeTab.map:
+      return l.tabMap;
+    case HomeTab.progress:
+      return l.tabProgress;
+    case HomeTab.profile:
+      return l.tabProfile;
+  }
 }
 
 /// Home screen with bottom navigation bar.
@@ -65,14 +81,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final discovery = ref.watch(featureDiscoveryProvider);
+    final l = AppLocalizations.of(context);
 
     ref.listen<FeatureDiscoveryState>(featureDiscoveryProvider, (prev, next) {
       // Session 5: introduce streak mechanic with lightweight celebration.
       final unlockedStreak =
           (prev?.streakUnlocked ?? false) == false && next.streakUnlocked;
       if (unlockedStreak && !next.streakUnlockCelebrated && context.mounted) {
+        final ll = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('חדש: רצף לימוד נפתח!')),
+          SnackBar(content: Text(ll.newStreakUnlocked)),
         );
         ref
             .read(featureDiscoveryProvider.notifier)
@@ -86,8 +104,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       if (unlockedStudyGroups &&
           !next.studyGroupsUnlockNotified &&
           context.mounted) {
+        final ll = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('חדש: קבוצות לימוד זמינות עבורך')),
+          SnackBar(content: Text(ll.newStudyGroups)),
         );
         ref
             .read(featureDiscoveryProvider.notifier)
@@ -97,7 +116,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Cena'),
+        title: Text(l.appTitle),
         actions: [
           _NotificationBellButton(),
         ],
@@ -110,7 +129,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
         destinations: HomeTab.values.map((tab) {
           return NavigationDestination(
             icon: _DestinationIcon(tab: tab, discovery: discovery),
-            label: tab.label,
+            label: _tabLabel(tab, l),
           );
         }).toList(),
       ),
@@ -163,7 +182,7 @@ class _DestinationIcon extends StatelessWidget {
               borderRadius: BorderRadius.circular(RadiusTokens.full),
             ),
             child: Text(
-              'NEW',
+              AppLocalizations.of(context).newLabel,
               style: Theme.of(context).textTheme.labelSmall?.copyWith(
                     color: Theme.of(context).colorScheme.onTertiary,
                     fontWeight: FontWeight.w700,
@@ -200,6 +219,7 @@ class _HomeTabContent extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
     final xpProgress = ref.watch(xpProgressProvider);
     final level = ref.watch(levelProvider);
     final streak = ref.watch(streakProvider);
@@ -220,12 +240,12 @@ class _HomeTabContent extends ConsumerWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          _greetingForTimeOfDay(),
+                          _greetingForTimeOfDay(l),
                           style: theme.textTheme.headlineMedium,
                         ),
                         const SizedBox(height: SpacingTokens.xs),
                         Text(
-                          'Ready to learn?',
+                          l.readyToLearn,
                           style: theme.textTheme.bodyLarge?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -237,7 +257,7 @@ class _HomeTabContent extends ConsumerWidget {
                   if (discovery.streakUnlocked)
                     GlassChip(
                       icon: Icons.local_fire_department_rounded,
-                      label: '$streak day streak',
+                      label: l.dayStreak(streak),
                       color: colorScheme.secondary,
                     ),
                 ],
@@ -264,13 +284,13 @@ class _HomeTabContent extends ConsumerWidget {
                     ),
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
-                      'Level $level',
+                      l.levelN(level),
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     Text(
-                      '${(xpProgress * 100).toInt()}% to next',
+                      l.percentToNext((xpProgress * 100).toInt()),
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -289,7 +309,7 @@ class _HomeTabContent extends ConsumerWidget {
                         size: 32, color: const Color(0xFFFFD700)),
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
-                      'Quick Practice',
+                      l.quickPractice,
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -301,7 +321,7 @@ class _HomeTabContent extends ConsumerWidget {
                         minimumSize: const Size(double.infinity, 36),
                         padding: EdgeInsets.zero,
                       ),
-                      child: const Text('Start'),
+                      child: Text(l.start),
                     ),
                   ],
                 ),
@@ -335,13 +355,13 @@ class _HomeTabContent extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Continue Learning',
+                        l.continueLearning,
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
-                        'Pick up where you left off',
+                        l.pickUpWhereYouLeftOff,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -374,7 +394,7 @@ class _HomeTabContent extends ConsumerWidget {
                             size: 18, color: colorScheme.tertiary),
                         const SizedBox(width: SpacingTokens.xs),
                         Text(
-                          'Badges',
+                          l.badges,
                           style: theme.textTheme.labelLarge?.copyWith(
                             fontWeight: FontWeight.w700,
                           ),
@@ -384,7 +404,7 @@ class _HomeTabContent extends ConsumerWidget {
                     const SizedBox(height: SpacingTokens.sm),
                     if (badges.isEmpty)
                       Text(
-                        'Complete sessions to earn badges',
+                        l.completeSessions,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -420,7 +440,7 @@ class _HomeTabContent extends ConsumerWidget {
                         size: 32, color: colorScheme.primary),
                     const SizedBox(height: SpacingTokens.sm),
                     Text(
-                      'AI Tutor',
+                      l.aiTutor,
                       style: theme.textTheme.labelLarge?.copyWith(
                         fontWeight: FontWeight.w700,
                       ),
@@ -432,7 +452,7 @@ class _HomeTabContent extends ConsumerWidget {
                         minimumSize: const Size(double.infinity, 36),
                         padding: EdgeInsets.zero,
                       ),
-                      child: const Text('Chat'),
+                      child: Text(l.chat),
                     ),
                   ],
                 ),
@@ -445,7 +465,7 @@ class _HomeTabContent extends ConsumerWidget {
 
         // Subject Quick Start
         Text(
-          'Subjects',
+          l.subjects,
           style: theme.textTheme.titleLarge,
         ),
         const SizedBox(height: SpacingTokens.sm),
@@ -456,11 +476,11 @@ class _HomeTabContent extends ConsumerWidget {
     );
   }
 
-  static String _greetingForTimeOfDay() {
+  static String _greetingForTimeOfDay(AppLocalizations l) {
     final hour = DateTime.now().hour;
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
+    if (hour < 12) return l.goodMorning;
+    if (hour < 17) return l.goodAfternoon;
+    return l.goodEvening;
   }
 }
 
@@ -564,6 +584,7 @@ class _SessionsTabContent extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l = AppLocalizations.of(context);
     final sessionHistory = ref.watch(_sessionHistoryProvider);
 
     return sessionHistory.when(
@@ -581,7 +602,7 @@ class _SessionsTabContent extends ConsumerWidget {
                 child: FilledButton.icon(
                   onPressed: () => context.go(CenaRoutes.session),
                   icon: const Icon(Icons.play_arrow_rounded),
-                  label: const Text('Start New Session'),
+                  label: Text(l.startNewSession),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
                   ),
@@ -601,6 +622,7 @@ class _SessionsEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -614,14 +636,14 @@ class _SessionsEmptyState extends StatelessWidget {
             ),
             const SizedBox(height: SpacingTokens.md),
             Text(
-              'No sessions yet',
+              l.noSessionsYet,
               style: theme.textTheme.titleMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
-              'Start your first learning session to see your history here.',
+              l.startFirstSession,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
@@ -631,7 +653,7 @@ class _SessionsEmptyState extends StatelessWidget {
             FilledButton.icon(
               onPressed: () => context.go(CenaRoutes.session),
               icon: const Icon(Icons.play_arrow_rounded),
-              label: const Text('Start Session'),
+              label: Text(l.startSession),
             ),
           ],
         ),
@@ -649,6 +671,7 @@ class _SessionHistoryCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
     final accuracy = (session.accuracy * 100).toInt();
 
     return Card(
@@ -668,19 +691,20 @@ class _SessionHistoryCard extends StatelessWidget {
           ),
         ),
         title: Text(
-          session.subject.isNotEmpty ? session.subject : 'Practice Session',
+          session.subject.isNotEmpty ? session.subject : l.practiceSession,
           style: theme.textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w600,
           ),
         ),
         subtitle: Text(
-          '$accuracy% accuracy \u00b7 ${session.questionsAttempted} questions \u00b7 ${session.durationMinutes}m',
+          l.accuracyStats(accuracy, session.questionsAttempted,
+              session.durationMinutes),
           style: theme.textTheme.bodySmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
         ),
         trailing: Text(
-          _formatDate(session.startedAt),
+          _formatDate(session.startedAt, l),
           style: theme.textTheme.labelSmall?.copyWith(
             color: colorScheme.onSurfaceVariant,
           ),
@@ -725,13 +749,13 @@ class _SessionHistoryCard extends StatelessWidget {
     }
   }
 
-  String _formatDate(DateTime dt) {
+  String _formatDate(DateTime dt, AppLocalizations l) {
     final now = DateTime.now();
     final diff = now.difference(dt);
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inMinutes < 60) return l.minutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return l.hoursAgo(diff.inHours);
+    if (diff.inDays == 1) return l.yesterday;
+    if (diff.inDays < 7) return l.daysAgo(diff.inDays);
     return '${dt.day}/${dt.month}';
   }
 }
@@ -750,6 +774,7 @@ class _MapTabContent extends StatelessWidget {
     }
 
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(SpacingTokens.lg),
@@ -766,13 +791,13 @@ class _MapTabContent extends StatelessWidget {
                 ),
                 const SizedBox(height: SpacingTokens.md),
                 Text(
-                  'מפת הידע שלך נבנית',
+                  l.knowledgeMapBuilding,
                   style: theme.textTheme.titleMedium,
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: SpacingTokens.sm),
                 Text(
-                  'ככל שתפתור/י יותר שאלות, נראה כאן חיבורים בין נושאים.',
+                  l.knowledgeMapBuildingDesc,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -804,6 +829,7 @@ class _SettingsTabContent extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final useMomentum = ref.watch(useMomentumMeterProvider);
     final feedbackPrefs = ref.watch(interactionFeedbackProvider);
 
@@ -828,7 +854,7 @@ class _SettingsTabContent extends ConsumerWidget {
                   SpacingTokens.sm,
                 ),
                 child: Text(
-                  'Learning Style',
+                  l.learningStyle,
                   style: theme.textTheme.titleMedium,
                 ),
               ),
@@ -839,11 +865,9 @@ class _SettingsTabContent extends ConsumerWidget {
                       .read(useMomentumMeterProvider.notifier)
                       .setUseMomentum(value);
                 },
-                title: const Text('Use Momentum Meter'),
+                title: Text(l.useMomentumMeter),
                 subtitle: Text(
-                  useMomentum
-                      ? '7-day rolling progress (no streak reset pressure)'
-                      : 'Daily streak mode',
+                  useMomentum ? l.momentumDesc : l.streakDesc,
                 ),
                 secondary: const Icon(Icons.insights_rounded),
               ),
@@ -866,7 +890,7 @@ class _SettingsTabContent extends ConsumerWidget {
                   SpacingTokens.sm,
                 ),
                 child: Text(
-                  'Feedback',
+                  l.feedback,
                   style: theme.textTheme.titleMedium,
                 ),
               ),
@@ -877,8 +901,8 @@ class _SettingsTabContent extends ConsumerWidget {
                       .read(interactionFeedbackProvider.notifier)
                       .setHapticsEnabled(enabled);
                 },
-                title: const Text('Haptics'),
-                subtitle: const Text('Tap and success vibration feedback'),
+                title: Text(l.haptics),
+                subtitle: Text(l.hapticsDesc),
                 secondary: const Icon(Icons.vibration_rounded),
               ),
               SwitchListTile(
@@ -888,8 +912,8 @@ class _SettingsTabContent extends ConsumerWidget {
                       .read(interactionFeedbackProvider.notifier)
                       .setSoundsEnabled(enabled);
                 },
-                title: const Text('Sound Effects'),
-                subtitle: const Text('Off by default'),
+                title: Text(l.soundEffects),
+                subtitle: Text(l.soundsOffByDefault),
                 secondary: const Icon(Icons.volume_up_outlined),
               ),
             ],
@@ -911,13 +935,13 @@ class _SettingsTabContent extends ConsumerWidget {
                   SpacingTokens.sm,
                 ),
                 child: Text(
-                  'Account',
+                  l.account,
                   style: theme.textTheme.titleMedium,
                 ),
               ),
               ListTile(
                 leading: const Icon(Icons.person_outline_rounded),
-                title: const Text('Profile'),
+                title: Text(l.profile),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => context.push(CenaRoutes.profile),
               ),
@@ -927,23 +951,24 @@ class _SettingsTabContent extends ConsumerWidget {
                   color: theme.colorScheme.error,
                 ),
                 title: Text(
-                  'Sign Out',
+                  l.signOut,
                   style: TextStyle(color: theme.colorScheme.error),
                 ),
                 onTap: () async {
+                  final ll = AppLocalizations.of(context);
                   final confirmed = await showDialog<bool>(
                     context: context,
                     builder: (ctx) => AlertDialog(
-                      title: const Text('Sign Out'),
-                      content: const Text('Are you sure you want to sign out?'),
+                      title: Text(ll.signOut),
+                      content: Text(ll.signOutConfirm),
                       actions: [
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, false),
-                          child: const Text('Cancel'),
+                          child: Text(ll.cancel),
                         ),
                         TextButton(
                           onPressed: () => Navigator.pop(ctx, true),
-                          child: const Text('Sign Out'),
+                          child: Text(ll.signOut),
                         ),
                       ],
                     ),
@@ -995,7 +1020,12 @@ class _LanguageCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final currentLocale = ref.watch(currentLocaleProvider);
+    final config = ref.watch(appConfigProvider);
+    final visibleLocales = AppLocales.visibleLocales(
+      hebrewVisible: config.featureFlags.hebrewLocaleVisible,
+    );
 
     return Card(
       child: Column(
@@ -1009,40 +1039,42 @@ class _LanguageCard extends ConsumerWidget {
               SpacingTokens.sm,
             ),
             child: Text(
-              'Language',
+              l.language,
               style: theme.textTheme.titleMedium,
             ),
           ),
-          for (final entry in _supportedLocales)
+          for (final locale in visibleLocales)
             ListTile(
               leading: const Icon(Icons.language_rounded),
-              title: Text(entry.label),
-              trailing: currentLocale.languageCode == entry.locale.languageCode
+              title: Text(_localeLabelFor(locale)),
+              trailing: currentLocale.languageCode == locale.languageCode
                   ? Icon(Icons.check_rounded, color: theme.colorScheme.primary)
                   : null,
               onTap: () async {
-                ref.read(currentLocaleProvider.notifier).state = entry.locale;
+                ref.read(currentLocaleProvider.notifier).state = locale;
                 final prefs = await SharedPreferences.getInstance();
-                await prefs.setString(_kLocaleKey, entry.locale.languageCode);
+                await prefs.setString(_kLocaleKey, locale.languageCode);
               },
             ),
         ],
       ),
     );
   }
-}
 
-class _LocaleEntry {
-  const _LocaleEntry({required this.label, required this.locale});
-  final String label;
-  final Locale locale;
+  /// Returns a human-readable label for the given locale.
+  static String _localeLabelFor(Locale locale) {
+    switch (locale.languageCode) {
+      case 'he':
+        return '\u05E2\u05D1\u05E8\u05D9\u05EA (Hebrew)';
+      case 'ar':
+        return '\u0627\u0644\u0639\u0631\u0628\u064A\u0629 (Arabic)';
+      case 'en':
+        return 'English';
+      default:
+        return locale.languageCode;
+    }
+  }
 }
-
-const List<_LocaleEntry> _supportedLocales = [
-  _LocaleEntry(label: 'עברית (Hebrew)', locale: AppLocales.hebrew),
-  _LocaleEntry(label: 'العربية (Arabic)', locale: AppLocales.arabic),
-  _LocaleEntry(label: 'English', locale: AppLocales.english),
-];
 
 // =============================================================================
 // Session history provider + DTO (MOB-CORE-002)

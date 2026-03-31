@@ -16,6 +16,7 @@ import '../../core/models/domain_models.dart';
 import '../../core/services/interaction_feedback_service.dart';
 import '../../core/state/gamification_state.dart';
 import '../../core/state/momentum_state.dart';
+import '../../l10n/app_localizations.dart';
 import 'badge_detail_dialog.dart';
 import 'momentum_meter.dart';
 import 'streak_widget.dart';
@@ -79,7 +80,7 @@ class _MomentumSuggestionCard extends ConsumerWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'נראה שרצף יומי מוסיף לחץ. לעבור ל-Momentum?',
+                  AppLocalizations.of(context).momentumSuggestion,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         fontWeight: FontWeight.w600,
                       ),
@@ -91,7 +92,7 @@ class _MomentumSuggestionCard extends ConsumerWidget {
                         .read(useMomentumMeterProvider.notifier)
                         .setUseMomentum(true);
                   },
-                  child: const Text('כן, לעבור למצב Momentum'),
+                  child: Text(AppLocalizations.of(context).switchToMomentum),
                 ),
               ],
             ),
@@ -174,13 +175,13 @@ class _XpLevelCardState extends ConsumerState<_XpLevelCard> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'Level $level',
+                        AppLocalizations.of(context).levelN(level),
                         style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w700,
                         ),
                       ),
                       Text(
-                        '$totalXp XP total',
+                        AppLocalizations.of(context).xpTotal(totalXp),
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                         ),
@@ -213,7 +214,7 @@ class _XpLevelCardState extends ConsumerState<_XpLevelCard> {
                         ),
                         const SizedBox(width: SpacingTokens.xxs),
                         Text(
-                          '+$dailyXp today',
+                          AppLocalizations.of(context).plusXpToday(dailyXp),
                           style: theme.textTheme.labelSmall?.copyWith(
                             color: const Color(0xFFFFAA00),
                             fontWeight: FontWeight.w700,
@@ -232,13 +233,13 @@ class _XpLevelCardState extends ConsumerState<_XpLevelCard> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Progress to Level ${level + 1}',
+                  AppLocalizations.of(context).progressToLevel(level + 1),
                   style: theme.textTheme.labelMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
                 ),
                 Text(
-                  '$xpWithin / $xpNeeded XP',
+                  AppLocalizations.of(context).xpOfNeeded(xpWithin, xpNeeded),
                   style: theme.textTheme.labelMedium?.copyWith(
                     fontWeight: FontWeight.w600,
                   ),
@@ -300,7 +301,7 @@ class _BadgeGrid extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Badges',
+          AppLocalizations.of(context).badges,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
           ),
@@ -472,7 +473,7 @@ class _RecentAchievements extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          'Recent Activity',
+          AppLocalizations.of(context).recentActivity,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w700,
           ),
@@ -503,7 +504,7 @@ class _EmptyActivityState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: SpacingTokens.lg),
       child: Center(
         child: Text(
-          'Complete a session to see your achievements here.',
+          AppLocalizations.of(context).completeSessionForAchievements,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -523,7 +524,7 @@ class _AchievementRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final timeStr = _formatRelativeTime(event.timestamp);
+    final timeStr = _formatRelativeTime(context, event.timestamp);
 
     return Row(
       children: [
@@ -602,12 +603,13 @@ class _AchievementRow extends StatelessWidget {
     }
   }
 
-  String _formatRelativeTime(DateTime time) {
+  String _formatRelativeTime(BuildContext context, DateTime time) {
+    final l = AppLocalizations.of(context);
     final diff = DateTime.now().difference(time);
-    if (diff.inSeconds < 60) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday';
+    if (diff.inSeconds < 60) return l.justNow;
+    if (diff.inMinutes < 60) return l.minutesAgo(diff.inMinutes);
+    if (diff.inHours < 24) return l.hoursAgo(diff.inHours);
+    if (diff.inDays == 1) return l.yesterday;
     return DateFormat.MMMd().format(time);
   }
 }

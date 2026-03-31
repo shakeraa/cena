@@ -8,13 +8,15 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../features/auth/auth_screen.dart';
-import '../features/home/home_screen.dart';
-import '../features/onboarding/onboarding_screen.dart';
-import '../features/notifications/notification_center_screen.dart';
-import '../features/profile/profile_screen.dart';
 import '../features/auth/try_question_screen.dart';
+import '../features/challenges/challenges_screen.dart';
+import '../features/home/home_screen.dart';
+import '../features/notifications/notification_center_screen.dart';
+import '../features/onboarding/onboarding_screen.dart';
+import '../features/profile/profile_screen.dart';
 import '../features/session/session_screen.dart';
 import '../features/tutor/tutor_chat_screen.dart';
+import '../l10n/app_localizations.dart';
 import 'services/deep_link_service.dart';
 
 /// Named route constants for type-safe navigation.
@@ -29,6 +31,7 @@ abstract class CenaRoutes {
   static const String notifications = '/notifications';
   static const String tutor = '/tutor';
   static const String tryQuestion = '/try';
+  static const String challenges = '/challenges';
 
   /// Routes that require authentication.
   static const Set<String> authenticated = {
@@ -38,6 +41,7 @@ abstract class CenaRoutes {
     profile,
     notifications,
     tutor,
+    challenges,
   };
 
   /// Returns `true` if the given [path] requires an authenticated user.
@@ -183,10 +187,18 @@ GoRouter buildCenaRouter({
           return const TutorChatScreen();
         },
       ),
+      GoRoute(
+        path: CenaRoutes.challenges,
+        name: 'challenges',
+        builder: (BuildContext context, GoRouterState state) {
+          return const ChallengesScreen();
+        },
+      ),
     ],
     errorBuilder: (BuildContext context, GoRouterState state) {
+      final l = AppLocalizations.of(context);
       return Scaffold(
-        appBar: AppBar(title: const Text('Page Not Found')),
+        appBar: AppBar(title: Text(l.pageNotFound)),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -198,14 +210,14 @@ GoRouter buildCenaRouter({
               ),
               const SizedBox(height: 16),
               Text(
-                'Route not found: ${state.uri}',
+                l.routeNotFound(state.uri.toString()),
                 style: Theme.of(context).textTheme.bodyLarge,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 24),
               FilledButton(
                 onPressed: () => context.go(CenaRoutes.home),
-                child: const Text('Go Home'),
+                child: Text(l.goHome),
               ),
             ],
           ),

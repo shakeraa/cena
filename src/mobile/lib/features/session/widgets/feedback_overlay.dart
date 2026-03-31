@@ -10,6 +10,8 @@ import 'package:flutter/material.dart';
 import '../../../core/config/app_config.dart';
 import '../../../core/models/domain_models.dart';
 import '../../../core/services/interaction_feedback_service.dart';
+import '../../../l10n/app_localizations.dart';
+import 'math_text.dart';
 
 /// Full-screen overlay displayed after the server returns an [AnswerResult].
 ///
@@ -92,6 +94,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l = AppLocalizations.of(context);
     final isCorrect = widget.result.isCorrect;
     final isPartial = !isCorrect && widget.result.errorType == ErrorType.none;
 
@@ -129,10 +132,10 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
                   // Result headline
                   Text(
                     isCorrect
-                        ? 'כל הכבוד!'
+                        ? l.wellDone
                         : isPartial
-                            ? 'חלקית נכון'
-                            : 'לא נכון',
+                            ? l.partiallyCorrect
+                            : l.incorrect,
                     style: theme.textTheme.headlineLarge?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w800,
@@ -163,12 +166,11 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
                         color: Colors.white.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(RadiusTokens.xl),
                       ),
-                      child: Text(
-                        widget.result.feedback,
-                        style: theme.textTheme.bodyLarge?.copyWith(
-                          color: Colors.white,
-                        ),
-                        textAlign: TextAlign.center,
+                      child: MathText(
+                        content: widget.result.feedback,
+                        textStyle: theme.textTheme.bodyLarge?.copyWith(color: Colors.white),
+                        mathColor: Colors.white,
+                        mathBackground: Colors.white.withValues(alpha: 0.15),
                       ),
                     ),
 
@@ -183,7 +185,7 @@ class _FeedbackOverlayState extends State<FeedbackOverlay>
 
                   // Tap hint
                   Text(
-                    'הקש להמשך',
+                    l.tapToContinue,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white.withValues(alpha: 0.7),
                     ),
@@ -241,18 +243,18 @@ class _ErrorTypeBadge extends StatelessWidget {
 
   final ErrorType errorType;
 
-  String _label(ErrorType t) {
+  String _label(ErrorType t, AppLocalizations l) {
     switch (t) {
       case ErrorType.conceptual:
-        return 'שגיאה מושגית';
+        return l.conceptualError;
       case ErrorType.procedural:
-        return 'שגיאה בהליך';
+        return l.proceduralError;
       case ErrorType.careless:
-        return 'שגיאת רשלנות';
+        return l.carelessError;
       case ErrorType.notation:
-        return 'שגיאת סימון';
+        return l.notationError;
       case ErrorType.incomplete:
-        return 'תשובה חלקית';
+        return l.incompleteAnswer;
       case ErrorType.none:
         return '';
     }
@@ -261,7 +263,8 @@ class _ErrorTypeBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = _label(errorType);
+    final l = AppLocalizations.of(context);
+    final label = _label(errorType, l);
     if (label.isEmpty) return const SizedBox.shrink();
 
     return Container(
@@ -308,7 +311,7 @@ class _WorkedSolutionCard extends StatelessWidget {
                   size: 16, color: Colors.white),
               const SizedBox(width: SpacingTokens.xs),
               Text(
-                'פתרון מודגם',
+                AppLocalizations.of(context).workedSolution,
                 style: theme.textTheme.labelLarge?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.w700,
@@ -317,11 +320,13 @@ class _WorkedSolutionCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: SpacingTokens.sm),
-          Text(
-            solution,
-            style: theme.textTheme.bodyMedium?.copyWith(
+          MathText(
+            content: solution,
+            textStyle: theme.textTheme.bodyMedium?.copyWith(
               color: Colors.white.withValues(alpha: 0.9),
             ),
+            mathColor: Colors.white,
+            mathBackground: Colors.white.withValues(alpha: 0.1),
           ),
         ],
       ),

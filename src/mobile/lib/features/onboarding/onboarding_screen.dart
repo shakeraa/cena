@@ -20,6 +20,8 @@ import 'package:go_router/go_router.dart';
 import '../../core/config/app_config.dart';
 import '../../core/models/domain_models.dart';
 import '../../core/router.dart';
+import '../../core/state/app_state.dart';
+import '../../l10n/app_localizations.dart';
 import 'onboarding_state.dart';
 
 // ---------------------------------------------------------------------------
@@ -269,16 +271,21 @@ class _WelcomePageState extends ConsumerState<_WelcomePage> {
   /// Selected language code (he / ar / en).
   String _locale = 'he';
 
-  static const _languages = [
-    ('he', 'עברית', TextDirection.rtl),
-    ('ar', 'عربية', TextDirection.rtl),
-    ('en', 'English', TextDirection.ltr),
-  ];
+  static const _languageLabels = <String, (String, TextDirection)>{
+    'he': ('עברית', TextDirection.rtl),
+    'ar': ('عربية', TextDirection.rtl),
+    'en': ('English', TextDirection.ltr),
+  };
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final l = AppLocalizations.of(context);
+    final config = ref.watch(appConfigProvider);
+    final visibleLocales = AppLocales.visibleLocales(
+      hebrewVisible: config.featureFlags.hebrewLocaleVisible,
+    );
 
     return Directionality(
       textDirection: AppLocales.isRtl(Locale(_locale))
@@ -309,9 +316,9 @@ class _WelcomePageState extends ConsumerState<_WelcomePage> {
             ),
             const SizedBox(height: SpacingTokens.lg),
 
-            // Hebrew title (primary)
+            // Title
             Text(
-              'ברוכים הבאים ל-Cena',
+              l.welcomeToCena,
               style: theme.textTheme.displaySmall?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 fontWeight: FontWeight.w800,
@@ -322,7 +329,7 @@ class _WelcomePageState extends ConsumerState<_WelcomePage> {
             ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
-              'המאמן האישי שלך ללמידה',
+              l.yourPersonalLearningCoach,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 color: cs.onSurfaceVariant,
@@ -335,7 +342,7 @@ class _WelcomePageState extends ConsumerState<_WelcomePage> {
 
             // Language selector
             Text(
-              'בחר/י שפה',
+              l.selectLanguage,
               style: theme.textTheme.labelLarge?.copyWith(
                 color: cs.onSurfaceVariant,
               ),
@@ -344,8 +351,11 @@ class _WelcomePageState extends ConsumerState<_WelcomePage> {
             const SizedBox(height: SpacingTokens.sm),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: _languages.map((lang) {
-                final (code, label, dir) = lang;
+              children: visibleLocales.map((locale) {
+                final code = locale.languageCode;
+                final entry = _languageLabels[code];
+                if (entry == null) return const SizedBox.shrink();
+                final (label, dir) = entry;
                 final selected = _locale == code;
                 return Padding(
                   padding: const EdgeInsets.symmetric(
@@ -369,7 +379,7 @@ class _WelcomePageState extends ConsumerState<_WelcomePage> {
 
             FilledButton(
               onPressed: widget.onNext,
-              child: const Text('התחל/י'),
+              child: Text(l.getStarted),
             ),
             const SizedBox(height: SpacingTokens.md),
           ],
@@ -398,6 +408,7 @@ class _SubjectsPage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final l = AppLocalizations.of(context);
     final notifier = ref.read(onboardingProvider.notifier);
 
     return Directionality(
@@ -409,7 +420,7 @@ class _SubjectsPage extends ConsumerWidget {
           children: [
             const SizedBox(height: SpacingTokens.lg),
             Text(
-              'בחר/י מקצועות לימוד',
+              l.selectStudySubjects,
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 fontWeight: FontWeight.w700,
@@ -418,7 +429,7 @@ class _SubjectsPage extends ConsumerWidget {
             ),
             const SizedBox(height: SpacingTokens.xs),
             Text(
-              'ניתן לבחור עד 3 מקצועות',
+              l.upTo3Subjects,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: cs.onSurfaceVariant,
               ),
@@ -453,7 +464,7 @@ class _SubjectsPage extends ConsumerWidget {
             _NavButtons(
               onBack: onBack,
               onNext: selections.canProceedFromSubjects ? onNext : null,
-              nextLabel: 'המשך',
+              nextLabel: l.next,
             ),
             const SizedBox(height: SpacingTokens.md),
           ],
@@ -475,6 +486,22 @@ class _SubjectCard extends StatelessWidget {
   final bool isSelected;
   final bool isDisabled;
   final VoidCallback? onTap;
+
+  String _localizedSubjectName(BuildContext context, Subject subject) {
+    final l = AppLocalizations.of(context);
+    switch (subject) {
+      case Subject.math:
+        return l.math;
+      case Subject.physics:
+        return l.physics;
+      case Subject.chemistry:
+        return l.chemistry;
+      case Subject.biology:
+        return l.biology;
+      case Subject.cs:
+        return l.computerScience;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -515,7 +542,7 @@ class _SubjectCard extends StatelessWidget {
                     ),
                     const SizedBox(height: SpacingTokens.xs),
                     Text(
-                      meta.nameHe,
+                      _localizedSubjectName(context, meta.subject),
                       style: theme.textTheme.titleMedium?.copyWith(
                         fontFamily: TypographyTokens.hebrewFontFamily,
                         fontWeight: FontWeight.w600,
@@ -543,7 +570,7 @@ class _SubjectCard extends StatelessWidget {
                       borderRadius: BorderRadius.circular(RadiusTokens.sm),
                     ),
                     child: Text(
-                      'בקרוב',
+                      AppLocalizations.of(context).comingSoon,
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSecondaryContainer,
                         fontFamily: TypographyTokens.hebrewFontFamily,
@@ -594,6 +621,7 @@ class _GradePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final l = AppLocalizations.of(context);
     final notifier = ref.read(onboardingProvider.notifier);
 
     return Directionality(
@@ -605,7 +633,7 @@ class _GradePage extends ConsumerWidget {
           children: [
             const SizedBox(height: SpacingTokens.lg),
             Text(
-              'כיתה ורמת בגרות',
+              l.gradeAndTrack,
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 fontWeight: FontWeight.w700,
@@ -614,7 +642,7 @@ class _GradePage extends ConsumerWidget {
             ),
             const SizedBox(height: SpacingTokens.xs),
             Text(
-              'נתאים את הלמידה לרמה שלך',
+              l.weAdaptToYourLevel,
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: cs.onSurfaceVariant,
               ),
@@ -624,7 +652,7 @@ class _GradePage extends ConsumerWidget {
 
             // Grade selector
             Text(
-              'כיתה',
+              l.grade,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 fontWeight: FontWeight.w600,
@@ -652,7 +680,7 @@ class _GradePage extends ConsumerWidget {
 
             // Bagrut units selector
             Text(
-              'רמת בגרות',
+              l.examLevel,
               style: theme.textTheme.titleMedium?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 fontWeight: FontWeight.w600,
@@ -675,7 +703,7 @@ class _GradePage extends ConsumerWidget {
             _NavButtons(
               onBack: onBack,
               onNext: selections.canProceedFromGrade ? onNext : null,
-              nextLabel: 'המשך',
+              nextLabel: l.next,
             ),
             const SizedBox(height: SpacingTokens.md),
           ],
@@ -820,6 +848,7 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
   }
 
   Widget _buildIntroView(ThemeData theme, ColorScheme cs) {
+    final l = AppLocalizations.of(context);
     return Directionality(
       textDirection: TextDirection.rtl,
       child: Padding(
@@ -835,7 +864,7 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
             ),
             const SizedBox(height: SpacingTokens.lg),
             Text(
-              'בחן/י את רמתך',
+              l.testYourLevel,
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 fontWeight: FontWeight.w700,
@@ -844,7 +873,7 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
             ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
-              'ענה/י על 5 שאלות קצרות כדי שנוכל להתאים את\nהתוכן לרמה המדויקת שלך.',
+              l.diagnosticDesc,
               style: theme.textTheme.bodyLarge?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 color: cs.onSurfaceVariant,
@@ -854,12 +883,12 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
             const Spacer(),
             FilledButton(
               onPressed: _startQuiz,
-              child: const Text('קח/י אותי לחידון'),
+              child: Text(l.takeTheQuiz),
             ),
             const SizedBox(height: SpacingTokens.sm),
             OutlinedButton(
               onPressed: _skipQuiz,
-              child: const Text('דלג/י בינתיים'),
+              child: Text(l.skipForNow),
             ),
             const SizedBox(height: SpacingTokens.md),
             _NavButtons(
@@ -875,6 +904,7 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
   }
 
   Widget _buildQuizView(ThemeData theme, ColorScheme cs) {
+    final l = AppLocalizations.of(context);
     final question = _diagnosticQuestions[_questionIndex];
     final answers = widget.selections.diagnosticAnswers;
     final answeredForCurrent = answers[_questionIndex];
@@ -893,7 +923,7 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'שאלה ${_questionIndex + 1} מתוך ${_diagnosticQuestions.length}',
+                  l.questionNOfTotal(_questionIndex + 1, _diagnosticQuestions.length),
                   style: theme.textTheme.labelLarge?.copyWith(
                     fontFamily: TypographyTokens.hebrewFontFamily,
                     color: cs.onSurfaceVariant,
@@ -901,7 +931,7 @@ class _DiagnosticPageState extends ConsumerState<_DiagnosticPage> {
                 ),
                 TextButton(
                   onPressed: _skipQuiz,
-                  child: const Text('דלג/י'),
+                  child: Text(l.skip),
                 ),
               ],
             ),
@@ -1048,6 +1078,7 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
+    final l = AppLocalizations.of(context);
     final selections = widget.selections;
 
     return Directionality(
@@ -1089,7 +1120,7 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
             const SizedBox(height: SpacingTokens.lg),
 
             Text(
-              'הכל מוכן!',
+              l.allSet,
               style: theme.textTheme.displaySmall?.copyWith(
                 fontFamily: TypographyTokens.hebrewFontFamily,
                 fontWeight: FontWeight.w800,
@@ -1098,7 +1129,7 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
             ),
             const SizedBox(height: SpacingTokens.sm),
             Text(
-              'הנה סיכום ההגדרות שלך',
+              l.hereSummary,
               style: theme.textTheme.bodyLarge?.copyWith(
                 color: cs.onSurfaceVariant,
                 fontFamily: TypographyTokens.hebrewFontFamily,
@@ -1117,16 +1148,16 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
                   children: [
                     _SummaryRow(
                       icon: Icons.subject_rounded,
-                      label: 'מקצועות',
+                      label: l.subjectsLabel,
                       value: selections.selectedSubjects
-                          .map(_subjectLabel)
+                          .map((s) => _subjectLabel(s, l))
                           .join(', '),
                     ),
                     if (selections.gradeLevel != null) ...[
                       const Divider(height: SpacingTokens.lg),
                       _SummaryRow(
                         icon: Icons.school_rounded,
-                        label: 'כיתה',
+                        label: l.gradeLabel,
                         value: selections.gradeLevel!.label,
                       ),
                     ],
@@ -1134,7 +1165,7 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
                       const Divider(height: SpacingTokens.lg),
                       _SummaryRow(
                         icon: Icons.grade_rounded,
-                        label: 'רמת בגרות',
+                        label: l.examLevelLabel,
                         value: selections.bagrutUnits!.label,
                       ),
                     ],
@@ -1143,10 +1174,10 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
                       icon: selections.skipDiagnostic
                           ? Icons.skip_next_rounded
                           : Icons.quiz_rounded,
-                      label: 'אבחון',
+                      label: l.diagnosticLabel,
                       value: selections.skipDiagnostic
-                          ? 'דולג'
-                          : '${selections.diagnosticAnswers.length} תשובות נרשמו',
+                          ? l.skipped
+                          : l.nAnswersRecorded(selections.diagnosticAnswers.length),
                     ),
                   ],
                 ),
@@ -1160,12 +1191,12 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
                 : FilledButton.icon(
                     onPressed: _handleStart,
                     icon: const Icon(Icons.play_arrow_rounded),
-                    label: const Text('התחל/י ללמוד'),
+                    label: Text(l.startLearning),
                   ),
             const SizedBox(height: SpacingTokens.sm),
             TextButton(
               onPressed: widget.onBack,
-              child: const Text('חזרה'),
+              child: Text(l.back),
             ),
             const SizedBox(height: SpacingTokens.md),
           ],
@@ -1174,18 +1205,18 @@ class _ReadyPageState extends ConsumerState<_ReadyPage>
     );
   }
 
-  static String _subjectLabel(Subject s) {
+  static String _subjectLabel(Subject s, AppLocalizations l) {
     switch (s) {
       case Subject.math:
-        return 'מתמטיקה';
+        return l.math;
       case Subject.physics:
-        return 'פיזיקה';
+        return l.physics;
       case Subject.chemistry:
-        return 'כימיה';
+        return l.chemistry;
       case Subject.biology:
-        return 'ביולוגיה';
+        return l.biology;
       case Subject.cs:
-        return 'מדעי המחשב';
+        return l.computerScience;
     }
   }
 }
@@ -1249,11 +1280,12 @@ class _NavButtons extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l = AppLocalizations.of(context);
     return Row(
       children: [
         OutlinedButton(
           onPressed: onBack,
-          child: const Text('חזרה'),
+          child: Text(l.back),
         ),
         if (nextLabel.isNotEmpty) ...[
           const SizedBox(width: SpacingTokens.sm),

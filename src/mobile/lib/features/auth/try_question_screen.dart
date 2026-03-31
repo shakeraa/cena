@@ -13,6 +13,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/router.dart';
+import '../../l10n/app_localizations.dart';
 
 // ---------------------------------------------------------------------------
 // Seed question data — hardcoded for instant load, no backend needed
@@ -73,6 +74,7 @@ class _TryQuestionScreenState extends State<TryQuestionScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l = AppLocalizations.of(context);
 
     return Scaffold(
       body: SafeArea(
@@ -89,7 +91,7 @@ class _TryQuestionScreenState extends State<TryQuestionScreen> {
                     size: 48, color: colorScheme.primary),
                 const SizedBox(height: SpacingTokens.md),
                 Text(
-                  'Try Cena — answer one question',
+                  l.tryCenaTitle,
                   style: theme.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w700,
                   ),
@@ -192,7 +194,7 @@ class _TryQuestionScreenState extends State<TryQuestionScreen> {
                             ),
                             const SizedBox(width: SpacingTokens.sm),
                             Text(
-                              _isCorrect ? 'Correct!' : 'Not quite — here\'s how:',
+                              _isCorrect ? l.correct : l.notQuiteHereIsHow,
                               style: theme.textTheme.titleSmall?.copyWith(
                                 fontWeight: FontWeight.w700,
                                 color: _isCorrect
@@ -218,7 +220,7 @@ class _TryQuestionScreenState extends State<TryQuestionScreen> {
               // CTA
               if (_answered) ...[
                 Text(
-                  'Cena adapts to your level with AI-powered tutoring.',
+                  l.cenaAdaptsToYou,
                   style: theme.textTheme.bodyMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -228,7 +230,7 @@ class _TryQuestionScreenState extends State<TryQuestionScreen> {
                 FilledButton.icon(
                   onPressed: () => context.go(CenaRoutes.login),
                   icon: const Icon(Icons.arrow_forward_rounded),
-                  label: const Text('Create Account & Continue'),
+                  label: Text(l.createAccountContinue),
                   style: FilledButton.styleFrom(
                     minimumSize: const Size(double.infinity, 48),
                   ),
@@ -236,13 +238,13 @@ class _TryQuestionScreenState extends State<TryQuestionScreen> {
                 const SizedBox(height: SpacingTokens.sm),
                 TextButton(
                   onPressed: () => context.go(CenaRoutes.login),
-                  child: const Text('Already have an account? Sign in'),
+                  child: Text(l.alreadyHaveAccount),
                 ),
               ],
 
               if (!_answered) ...[
                 Text(
-                  'No account needed — just tap an answer',
+                  l.noAccountNeeded,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),

@@ -1,9 +1,9 @@
 arb-dir: lib/l10n
-template-arb-file: app_he.arb
+template-arb-file: app_en.arb
 output-localization-file: app_localizations.dart
 output-class: AppLocalizations
 preferred-supported-locales:
-  - he
-  - ar
   - en
+  - ar
+  - he
 nullable-getter: false
