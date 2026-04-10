@@ -7,6 +7,8 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Bus;
+using Cena.Actors.Events;
+using Cena.Actors.Projections;
 using Cena.Actors.Tutoring;
 using Cena.Api.Contracts.Sessions;
 using Cena.Infrastructure.Auth;
@@ -32,6 +34,108 @@ public static class SessionEndpoints
             .WithTags("Sessions")
             .RequireAuthorization()
             .RequireRateLimiting("api");
+
+        // POST /api/sessions/start — start a new learning session (STB-01)
+        group.MapPost("/start", async (
+            HttpContext ctx,
+            IDocumentStore store,
+            SessionStartRequest request) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            // Validate request
+            if (request.Subjects.Length == 0)
+                return Results.BadRequest(new { error = "At least one subject is required" });
+
+            if (request.DurationMinutes is not (5 or 10 or 15 or 30 or 45 or 60))
+                return Results.BadRequest(new { error = "Invalid duration. Must be 5, 10, 15, 30, 45, or 60 minutes" });
+
+            if (request.Mode is not ("practice" or "challenge" or "review" or "diagnostic"))
+                return Results.BadRequest(new { error = "Invalid mode. Must be 'practice', 'challenge', 'review', or 'diagnostic'" });
+
+            await using var session = store.LightweightSession();
+
+            // Check for existing active session (idempotency)
+            var existingActive = await session.LoadAsync<ActiveSessionSnapshot>(studentId);
+            if (existingActive is not null)
+            {
+                // Return existing session instead of creating duplicate
+                return Results.Ok(new SessionStartResponse(
+                    SessionId: existingActive.SessionId,
+                    HubGroupName: $"session-{existingActive.SessionId}",
+                    FirstQuestionId: existingActive.CurrentQuestionId));
+            }
+
+            // Create new session
+            var sessionId = Guid.NewGuid().ToString("N")[..16];
+            var startedAt = DateTimeOffset.UtcNow;
+
+            var startedEvent = new LearningSessionStarted_V1(
+                StudentId: studentId,
+                SessionId: sessionId,
+                Subjects: request.Subjects,
+                Mode: request.Mode,
+                DurationMinutes: request.DurationMinutes,
+                StartedAt: startedAt);
+
+            // Append event to student stream
+            session.Events.Append(studentId, startedEvent);
+
+            // Create active session snapshot
+            var activeSnapshot = new ActiveSessionSnapshot
+            {
+                Id = studentId,
+                StudentId = studentId,
+                SessionId = sessionId,
+                Subjects = request.Subjects,
+                Mode = request.Mode,
+                DurationMinutes = request.DurationMinutes,
+                StartedAt = startedAt.UtcDateTime
+            };
+            session.Store(activeSnapshot);
+
+            await session.SaveChangesAsync();
+
+            return Results.Ok(new SessionStartResponse(
+                SessionId: sessionId,
+                HubGroupName: $"session-{sessionId}",
+                FirstQuestionId: null)); // Phase 1: null, wired in STB-01b
+        })
+        .WithName("StartSession");
+
+        // GET /api/sessions/active — check if student has an active session (STB-01)
+        group.MapGet("/active", async (
+            HttpContext ctx,
+            IDocumentStore store) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            await using var session = store.QuerySession();
+            var active = await session.LoadAsync<ActiveSessionSnapshot>(studentId);
+
+            if (active is null)
+                return Results.NotFound(new { error = "No active session" });
+
+            var dto = new ActiveSessionDto(
+                SessionId: active.SessionId,
+                Subjects: active.Subjects,
+                Mode: active.Mode,
+                StartedAt: active.StartedAt,
+                DurationMinutes: active.DurationMinutes,
+                ProgressPercent: active.GetProgressPercent(),
+                CurrentQuestionId: active.CurrentQuestionId);
+
+            return Results.Ok(dto);
+        })
+        .WithName("GetActiveSessionV2");
 
         // GET /api/sessions — list student's sessions (paginated, filterable)
         group.MapGet("/", async (

@@ -65,3 +65,26 @@ public sealed record QuestionAttemptDto(
     double PriorMastery,
     double PosteriorMastery,
     DateTimeOffset Timestamp);
+
+// =============================================================================
+// STB-01: Session Start + Active Session DTOs
+// =============================================================================
+
+public sealed record SessionStartRequest(
+    string[] Subjects,
+    int DurationMinutes,     // 5 | 10 | 15 | 30 | 45 | 60
+    string Mode);            // 'practice' | 'challenge' | 'review' | 'diagnostic'
+
+public sealed record SessionStartResponse(
+    string SessionId,
+    string HubGroupName,     // for SignalR subscription: "session-{sessionId}"
+    string? FirstQuestionId); // null in Phase 1, wired in STB-01b
+
+public sealed record ActiveSessionDto(
+    string SessionId,
+    string[] Subjects,
+    string Mode,
+    DateTime StartedAt,
+    int DurationMinutes,
+    int ProgressPercent,
+    string? CurrentQuestionId);

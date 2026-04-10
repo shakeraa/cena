@@ -14,6 +14,7 @@ using Npgsql;
 using Weasel.Core;
 using Cena.Actors.Events;
 using Cena.Actors.Ingest;
+using Cena.Actors.Projections;
 using Cena.Actors.Questions;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Compliance;
@@ -167,6 +168,9 @@ public static class MartenConfiguration
         // REV-014: Index SchoolId for efficient tenant-scoped queries
         opts.Schema.For<StudentProfileSnapshot>().Index(x => x.SchoolId);
 
+        // STB-01: Active session tracking
+        opts.Projections.Snapshot<ActiveSessionSnapshot>(SnapshotLifecycle.Inline);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
@@ -186,6 +190,10 @@ public static class MartenConfiguration
         opts.Events.AddEventType<StagnationDetected_V1>();
         opts.Events.AddEventType<AnnotationAdded_V1>();
         opts.Events.AddEventType<CognitiveLoadCooldownComplete_V1>();
+        
+        // STB-01: Session lifecycle events
+        opts.Events.AddEventType<LearningSessionStarted_V1>();
+        opts.Events.AddEventType<LearningSessionEnded_V1>();
     }
 
     private static void RegisterPedagogyEvents(StoreOptions opts)

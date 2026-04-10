@@ -224,3 +224,31 @@ public record TeacherMethodologyOverride_V1(
     string TeacherId,
     DateTimeOffset Timestamp
 ) : IDelegatedEvent;
+
+// =============================================================================
+// SESSION EVENTS (STB-01)
+// =============================================================================
+
+/// <summary>
+/// Emitted when a student starts a new learning session.
+/// </summary>
+public record LearningSessionStarted_V1(
+    string StudentId,
+    string SessionId,
+    string[] Subjects,
+    string Mode,
+    int DurationMinutes,
+    DateTimeOffset StartedAt
+) : IDelegatedEvent;
+
+/// <summary>
+/// Emitted when a student ends a learning session.
+/// STB-01b: Wire this event to complete session lifecycle
+/// </summary>
+public record LearningSessionEnded_V1(
+    string StudentId,
+    string SessionId,
+    DateTimeOffset EndedAt,
+    int QuestionsAttempted,
+    int QuestionsCorrect
+) : IDelegatedEvent;

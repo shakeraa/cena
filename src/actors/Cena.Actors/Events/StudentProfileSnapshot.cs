@@ -183,6 +183,15 @@ public class StudentProfileSnapshot
 
         SessionsSinceSwitch[e.LevelId] = 0;
     }
+
+    /// <summary>
+    /// STB-01: Apply learning session started event
+    /// </summary>
+    public void Apply(LearningSessionStarted_V1 e)
+    {
+        // Track session count for analytics
+        SessionCount++;
+    }
 }
 
 public class ConceptMasteryState
