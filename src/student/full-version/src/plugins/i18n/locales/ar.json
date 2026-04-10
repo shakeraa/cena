@@ -289,6 +289,41 @@
       "phoneComingSoon": "تسجيل الدخول عبر الرسائل القصيرة قادم قريبًا. استخدم البريد الإلكتروني أو مزودًا آخر في الوقت الحالي."
     }
   },
+  "progress": {
+    "title": "تقدمك",
+    "subtitle": "تابع رحلتك، اكسب المكافآت، واعرف مكانك."
+  },
+  "gamification": {
+    "xp": {
+      "levelLabel": "المستوى",
+      "currentXp": "{current} / {target} نقطة",
+      "xpToGo": "تبقى {count} نقطة",
+      "totalEarned": "المجموع: {total} نقطة",
+      "progressAria": "تقدم المستوى: {percent} بالمئة"
+    },
+    "badges": {
+      "title": "الأوسمة",
+      "counter": "{earned} من {total}",
+      "earnedHeading": "المكتسبة",
+      "lockedHeading": "المقفلة",
+      "tier": {
+        "bronze": "برونزي",
+        "silver": "فضي",
+        "gold": "ذهبي",
+        "platinum": "بلاتيني"
+      }
+    },
+    "leaderboard": {
+      "title": "لوحة المتصدرين",
+      "yourRank": "ترتيبك: #{rank}",
+      "youChip": "أنت",
+      "xpLabel": "{xp} نقطة",
+      "xpValue": "{xp} نقطة"
+    },
+    "streak": {
+      "atRisk": "سلسلتك في خطر — أكمل جلسة اليوم!"
+    }
+  },
   "language": {
     "english": "English",
     "arabic": "العربية",

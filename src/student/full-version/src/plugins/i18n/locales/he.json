@@ -123,6 +123,41 @@
       "phoneComingSoon": "התחברות באמצעות SMS תגיע בקרוב. השתמש בדוא״ל או בספק אחר בינתיים."
     }
   },
+  "progress": {
+    "title": "ההתקדמות שלך",
+    "subtitle": "עקוב אחר המסע, זכה בתגמולים וראה איפה אתה עומד."
+  },
+  "gamification": {
+    "xp": {
+      "levelLabel": "רמה",
+      "currentXp": "{current} / {target} נק׳",
+      "xpToGo": "{count} נק׳ נותרו",
+      "totalEarned": "סך הכול: {total} נק׳",
+      "progressAria": "התקדמות רמה: {percent} אחוז"
+    },
+    "badges": {
+      "title": "תגים",
+      "counter": "{earned} מתוך {total}",
+      "earnedHeading": "הושגו",
+      "lockedHeading": "נעולים",
+      "tier": {
+        "bronze": "ברונזה",
+        "silver": "כסף",
+        "gold": "זהב",
+        "platinum": "פלטינה"
+      }
+    },
+    "leaderboard": {
+      "title": "טבלת מובילים",
+      "yourRank": "הדירוג שלך: #{rank}",
+      "youChip": "אתה",
+      "xpLabel": "{xp} נק׳",
+      "xpValue": "{xp} נק׳"
+    },
+    "streak": {
+      "atRisk": "הרצף שלך בסכנה — השלם שיעור היום!"
+    }
+  },
   "language": {
     "english": "English",
     "arabic": "العربية",

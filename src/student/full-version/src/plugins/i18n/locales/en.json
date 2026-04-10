@@ -288,6 +288,41 @@
       "phoneComingSoon": "SMS sign-in is coming soon. Use email or another provider for now."
     }
   },
+  "progress": {
+    "title": "Your progress",
+    "subtitle": "Track your journey, earn rewards, and see where you stand."
+  },
+  "gamification": {
+    "xp": {
+      "levelLabel": "Level",
+      "currentXp": "{current} / {target} XP",
+      "xpToGo": "{count} XP to go",
+      "totalEarned": "Total earned: {total} XP",
+      "progressAria": "Level progress: {percent} percent"
+    },
+    "badges": {
+      "title": "Badges",
+      "counter": "{earned} of {total}",
+      "earnedHeading": "Earned",
+      "lockedHeading": "Locked",
+      "tier": {
+        "bronze": "Bronze",
+        "silver": "Silver",
+        "gold": "Gold",
+        "platinum": "Platinum"
+      }
+    },
+    "leaderboard": {
+      "title": "Leaderboard",
+      "yourRank": "Your rank: #{rank}",
+      "youChip": "You",
+      "xpLabel": "{xp} XP",
+      "xpValue": "{xp} XP"
+    },
+    "streak": {
+      "atRisk": "Your streak is at risk — complete a session today!"
+    }
+  },
   "home": {
     "greeting": {
       "morning": "Good morning, {name}",
