@@ -41,8 +41,9 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
   test('E2E #1 file-based routing: every placeholder route resolves', async ({ page }) => {
     await seedAuth(page, { uid: 'u-routing' })
 
+    // `/home` has been replaced with a real dashboard in STU-W-05A, so it
+    // no longer renders the placeholder testid. It's exercised by stuw05a.
     const routes = [
-      '/home',
       '/session',
       '/challenges',
       '/challenges/daily',
@@ -74,6 +75,10 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
       // Every placeholder page renders the route-meta block.
       await expect(page.locator('[data-testid="placeholder-route-meta"]')).toBeVisible()
     }
+
+    // `/home` renders the real dashboard instead.
+    await page.goto('/home')
+    await expect(page.locator('[data-testid="home-page"]')).toBeVisible()
 
     await page.screenshot({ path: `${SCREENSHOT_DIR}/routing-home.png` })
   })
@@ -121,8 +126,9 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
 
     await page.goto('/home')
 
-    // Wait for Vue to mount + the router.afterEach title updater to fire.
-    await page.waitForSelector('[data-testid="placeholder-route-meta"]')
+    // Wait for Vue to mount (home-page testid comes from the real STU-W-05A
+    // dashboard) + the router.afterEach title updater to fire.
+    await page.waitForSelector('[data-testid="home-page"]')
     await page.waitForFunction(() => /Home/.test(document.title), null, { timeout: 5000 })
 
     const homeTitle = await page.title()
