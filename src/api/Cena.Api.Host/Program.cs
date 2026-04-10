@@ -253,6 +253,9 @@ app.MapClassroomEndpoints();
 // ---- Gamification REST endpoints (STB-03) ----
 app.MapGamificationEndpoints();
 
+// ---- Tutor REST endpoints (STB-04) ----
+app.MapTutorEndpoints();
+
 // ---- SignalR Hub (SES-001) ----
 app.MapCenaHub();
 
