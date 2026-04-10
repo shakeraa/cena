@@ -12,7 +12,7 @@ async function seedAuth(
     = 'onboardedAt' in opts ? opts.onboardedAt : '2026-04-10T00:00:00Z'
 
   await page.addInitScript(
-    (o) => {
+    o => {
       localStorage.setItem('cena-mock-auth', JSON.stringify({
         uid: o.uid,
         email: `${o.uid}@example.com`,
@@ -70,6 +70,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     for (const path of routes) {
       await page.goto(path)
       await page.waitForLoadState('domcontentloaded')
+
       // Every placeholder page renders the route-meta block.
       await expect(page.locator('[data-testid="placeholder-route-meta"]')).toBeVisible()
     }
@@ -83,8 +84,11 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     await page.waitForURL(/\/login/)
 
     const url = new URL(page.url())
+
     expect(url.pathname).toBe('/login')
+
     const returnTo = url.searchParams.get('returnTo')
+
     expect(returnTo).toBe('/progress/mastery')
 
     await page.screenshot({ path: `${SCREENSHOT_DIR}/authguard-redirect.png` })
@@ -116,14 +120,21 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     await seedAuth(page, { uid: 'u-title' })
 
     await page.goto('/home')
-    await page.waitForLoadState('domcontentloaded')
+    // Wait for Vue to mount + the router.afterEach title updater to fire.
+    await page.waitForSelector('[data-testid="placeholder-route-meta"]')
+    await page.waitForFunction(() => /Home/.test(document.title), null, { timeout: 5000 })
+
     const homeTitle = await page.title()
+
     expect(homeTitle).toContain('Home')
     expect(homeTitle).toContain('Cena')
 
     await page.goto('/progress/mastery')
-    await page.waitForLoadState('domcontentloaded')
+    await page.waitForSelector('[data-testid="placeholder-route-meta"]')
+    await page.waitForFunction(() => /Mastery/.test(document.title), null, { timeout: 5000 })
+
     const masteryTitle = await page.title()
+
     expect(masteryTitle).toContain('Mastery')
     expect(masteryTitle).toContain('Cena')
   })
@@ -139,6 +150,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
 
     // The bottom nav has the `d-md-none` Vuetify class which hides it on md+.
     const bottomNavDesktop = page.locator('[data-testid="student-bottom-nav"]')
+
     await expect(bottomNavDesktop).toHaveCount(1) // exists in DOM
     // On desktop viewport the bottom nav should not be visible (CSS display:none via d-md-none).
     await expect(bottomNavDesktop).not.toBeVisible()
@@ -157,7 +169,9 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     await page.waitForLoadState('domcontentloaded')
 
     await expect(page.locator('[data-testid="student-breadcrumbs"]')).toBeVisible()
+
     const crumbsText = await page.locator('[data-testid="student-breadcrumbs"]').innerText()
+
     expect(crumbsText).toContain('Home')
     expect(crumbsText).toContain('Session History')
 
@@ -176,6 +190,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
 
     // CSP meta tag is injected
     const cspContent = await page.locator('meta#cena-embed-csp').getAttribute('content')
+
     expect(cspContent).toContain('frame-ancestors')
 
     await page.screenshot({ path: `${SCREENSHOT_DIR}/embed-mode.png`, fullPage: true })
@@ -191,6 +206,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     expect(await page.getAttribute('html', 'dir')).toBe('rtl')
 
     const darkApp = page.locator('.v-theme--dark').first()
+
     await expect(darkApp).toBeVisible()
 
     await page.screenshot({ path: `${SCREENSHOT_DIR}/query-overrides.png`, fullPage: true })
@@ -198,6 +214,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
 
   test('E2E #9 returnTo open-redirect protection', async ({ page }) => {
     await clearAuth(page)
+
     // Raw attacker URL — the browser URL-encodes the query, but the sanitizer
     // should reject it regardless.
     await page.goto('/login?returnTo=https://evil.example.com/attack')
@@ -208,6 +225,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     // sign-in via the mock-auth side channel and navigating to the sanitized
     // returnTo ourselves.
     const evilReturnTo = new URL(page.url()).searchParams.get('returnTo')
+
     // The query param arrives raw; sanitization happens when the login flow
     // acts on it. What we verify: the sanitizeReturnTo util rejects this.
     // (Full end-to-end of sign-in + redirect lands in STU-W-04.)
@@ -224,6 +242,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     await page.waitForLoadState('domcontentloaded')
 
     const metaText = await page.locator('[data-testid="placeholder-route-meta"]').innerText()
+
     expect(metaText).toContain('name: settings-privacy')
     expect(metaText).toContain('path: /settings/privacy')
     expect(metaText).toContain('requiresAuth: true')

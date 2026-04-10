@@ -64,6 +64,7 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
       const lang = to.query.lang as 'en' | 'ar' | 'he'
       if (['en', 'ar', 'he'].includes(lang)) {
         const i18n = getI18n()
+
         i18n.global.locale.value = lang
         if (typeof document !== 'undefined') {
           document.documentElement.lang = lang
@@ -130,8 +131,18 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
     if (titleKey) {
       const i18n = getI18n()
       const globalI18n = i18n.global as any
-      const hasKey: boolean = typeof globalI18n.te === 'function' ? globalI18n.te(titleKey) : false
-      const localized: string = hasKey ? globalI18n.t(titleKey) : titleKey
+      // vue-i18n global.t() returns the key as-is if it can't be resolved,
+      // which is fine for our fallback. Wrap in try/catch in case the
+      // messages aren't loaded yet (first navigation race).
+      let localized = titleKey
+      try {
+        const tResult = typeof globalI18n.t === 'function' ? globalI18n.t(titleKey) : titleKey
+        if (typeof tResult === 'string' && tResult.length > 0)
+          localized = tResult
+      }
+      catch {
+        // keep fallback
+      }
 
       title = `${localized} · ${appName}`
     }
