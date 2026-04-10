@@ -295,6 +295,42 @@
     "hebrew": "עברית",
     "switchLanguage": "تغيير اللغة"
   },
+  "onboarding": {
+    "welcome": {
+      "title": "مرحبًا بك في سينا",
+      "subtitle": "لنخصص رحلتك التعليمية بخطوات قليلة."
+    },
+    "role": {
+      "title": "من الذي يتعلم؟",
+      "subtitle": "اختر الخيار الذي يصفك لنخصص تجربتك.",
+      "student": "طالب",
+      "studentDescription": "أدرس في مدرسة أو جامعة.",
+      "selfLearner": "متعلم ذاتي",
+      "selfLearnerDescription": "أتعلم بمفردي بدافع الفضول أو العمل.",
+      "testPrep": "تحضير للاختبار",
+      "testPrepDescription": "أستعد لاختبار محدد.",
+      "homeschool": "تعليم منزلي",
+      "homeschoolDescription": "أتعلم في المنزل أو أُعلِّم أحد أفراد العائلة.",
+      "none": "لم يتم الاختيار"
+    },
+    "language": {
+      "title": "اختر لغتك",
+      "subtitle": "يمكنك تغيير هذا في أي وقت من الإعدادات.",
+      "sampleEn": "Keep going — you're doing great.",
+      "sampleAr": "استمر — أنت تبلي بلاءً حسنًا.",
+      "sampleHe": "המשך — אתה עושה עבודה נהדרת."
+    },
+    "confirm": {
+      "title": "كل شيء جاهز",
+      "subtitle": "راجع اختياراتك وابدأ رحلتك.",
+      "roleLabel": "نوع المتعلم",
+      "languageLabel": "اللغة",
+      "cta": "ابدأ التعلم"
+    },
+    "next": "التالي",
+    "back": "السابق",
+    "getStarted": "لنبدأ"
+  },
   "flow": {
     "warming": "الإحماء",
     "approaching": "اكتساب الزخم",
