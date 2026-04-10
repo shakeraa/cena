@@ -259,6 +259,9 @@ app.MapTutorEndpoints();
 // ---- Challenges REST endpoints (STB-05) ----
 app.MapChallengesEndpoints();
 
+// ---- Notifications REST endpoints (STB-07) ----
+app.MapNotificationsEndpoints();
+
 // ---- SignalR Hub (SES-001) ----
 app.MapCenaHub();
 
