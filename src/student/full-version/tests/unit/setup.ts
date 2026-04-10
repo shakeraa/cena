@@ -49,6 +49,38 @@ const i18n = createI18n({
         displayNameRequired: 'Display name is required.',
         tryAgainInSeconds: 'Try again in {seconds}s',
       },
+      home: {
+        greeting: {
+          morning: 'Good morning, {name}',
+          afternoon: 'Good afternoon, {name}',
+          evening: 'Good evening, {name}',
+          night: 'Hi {name}',
+          fallback: 'there',
+          subtitle: 'Here is where you left off.',
+        },
+        streak: {
+          singular: 'day streak',
+          plural: 'day streak',
+          newBest: 'New best!',
+        },
+        resume: {
+          label: 'Resume session',
+          cta: 'Continue',
+          minutesAgo: 'Started {count} min ago',
+          hoursAgo: 'Started {count} h ago',
+          progressAria: 'Session progress: {percent} percent',
+        },
+        quick: {
+          startSession: 'Start Session',
+          startSessionSubtitle: 'Jump into a new learning block',
+          askTutor: 'Ask the Tutor',
+          askTutorSubtitle: 'Get hints and explanations',
+          dailyChallenge: 'Daily Challenge',
+          dailyChallengeSubtitle: '5 minutes, 5 questions',
+          progress: 'View Progress',
+          progressSubtitle: 'See how far you have come',
+        },
+      },
     },
     ar: {
       common: { save: 'حفظ', cancel: 'إلغاء', copy: 'نسخ' },
