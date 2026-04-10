@@ -4,6 +4,7 @@
 // All reads go directly to Marten; resume sends a NATS command to the actor.
 // =============================================================================
 
+using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Bus;
@@ -26,6 +27,19 @@ public static class SessionEndpoints
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false,
+    };
+
+    // STB-01b: In-memory per-session state tracking (Phase 1 only - resets on restart)
+    private static readonly ConcurrentDictionary<string, SessionState> SessionStates = new();
+
+    // 5 canned questions for stub data
+    private static readonly CannedQuestion[] CannedQuestions =
+    {
+        new("q_001", "What is 12 × 8?", "multiple-choice", new[] { "92", "96", "104", "108" }, "96", "Mathematics"),
+        new("q_002", "Solve for x: 2x + 5 = 15", "multiple-choice", new[] { "5", "10", "15", "20" }, "5", "Mathematics"),
+        new("q_003", "What is the derivative of x²?", "multiple-choice", new[] { "x", "2x", "x²", "2" }, "2x", "Mathematics"),
+        new("q_004", "What is the chemical symbol for water?", "multiple-choice", new[] { "H2O", "CO2", "O2", "NaCl" }, "H2O", "Chemistry"),
+        new("q_005", "What is the speed of light approximately?", "multiple-choice", new[] { "300,000 km/s", "150,000 km/s", "1,000,000 km/s", "100,000 km/s" }, "300,000 km/s", "Physics")
     };
 
     public static IEndpointRouteBuilder MapSessionEndpoints(this IEndpointRouteBuilder app)
@@ -411,6 +425,145 @@ public static class SessionEndpoints
         })
         .WithName("ResumeSession");
 
+        // ═════════════════════════════════════════════════════════════════════════
+        // STB-01b: In-Session Question + Answer Endpoints
+        // ═════════════════════════════════════════════════════════════════════════
+
+        // GET /api/sessions/{sessionId}/current-question — get current question
+        group.MapGet("/{sessionId}/current-question", (
+            string sessionId,
+            HttpContext ctx) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            // Get or create session state
+            var state = SessionStates.GetOrAdd(sessionId, _ => new SessionState { StartedAt = DateTime.UtcNow });
+            var questionIndex = state.CurrentQuestionIndex;
+
+            // Check if we've completed all questions
+            if (questionIndex >= CannedQuestions.Length)
+            {
+                return Results.Ok(new SessionQuestionDto(
+                    QuestionId: "completed",
+                    QuestionIndex: questionIndex,
+                    TotalQuestions: CannedQuestions.Length,
+                    Prompt: "Session completed! No more questions.",
+                    QuestionType: "completed",
+                    Choices: Array.Empty<string>(),
+                    Subject: "",
+                    ExpectedTimeSeconds: 0));
+            }
+
+            var question = CannedQuestions[questionIndex];
+            return Results.Ok(new SessionQuestionDto(
+                QuestionId: question.Id,
+                QuestionIndex: questionIndex + 1,
+                TotalQuestions: CannedQuestions.Length,
+                Prompt: question.Prompt,
+                QuestionType: question.Type,
+                Choices: question.Choices,
+                Subject: question.Subject,
+                ExpectedTimeSeconds: 60));
+        })
+        .WithName("GetCurrentQuestion");
+
+        // POST /api/sessions/{sessionId}/answer — submit an answer
+        group.MapPost("/{sessionId}/answer", (
+            string sessionId,
+            HttpContext ctx,
+            SessionAnswerRequest request) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            if (string.IsNullOrWhiteSpace(request.QuestionId))
+                return Results.BadRequest(new { error = "QuestionId is required" });
+
+            // Get session state
+            if (!SessionStates.TryGetValue(sessionId, out var state))
+                return Results.NotFound(new { error = "Session not found or expired" });
+
+            var questionIndex = state.CurrentQuestionIndex;
+            if (questionIndex >= CannedQuestions.Length)
+                return Results.Conflict(new { error = "Session already completed" });
+
+            var question = CannedQuestions[questionIndex];
+            var isCorrect = string.Equals(request.Answer?.Trim(), question.CorrectAnswer, StringComparison.OrdinalIgnoreCase);
+
+            // Update state
+            state.CurrentQuestionIndex++;
+            if (isCorrect)
+            {
+                state.CorrectCount++;
+                state.TotalXp += 10;
+            }
+            else
+            {
+                state.WrongCount++;
+            }
+
+            // Determine next question ID
+            string? nextQuestionId = null;
+            if (state.CurrentQuestionIndex < CannedQuestions.Length)
+            {
+                nextQuestionId = CannedQuestions[state.CurrentQuestionIndex].Id;
+            }
+
+            var feedback = isCorrect
+                ? "Correct! Great job!"
+                : $"Not quite. The correct answer was: {question.CorrectAnswer}";
+
+            return Results.Ok(new SessionAnswerResponseDto(
+                Correct: isCorrect,
+                Feedback: feedback,
+                XpAwarded: isCorrect ? 10 : 0,
+                MasteryDelta: isCorrect ? 0.05m : 0m,
+                NextQuestionId: nextQuestionId));
+        })
+        .WithName("SubmitAnswer");
+
+        // POST /api/sessions/{sessionId}/complete — complete the session
+        group.MapPost("/{sessionId}/complete", (
+            string sessionId,
+            HttpContext ctx) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            // Get session state
+            if (!SessionStates.TryGetValue(sessionId, out var state))
+                return Results.NotFound(new { error = "Session not found or expired" });
+
+            var totalAnswered = state.CorrectCount + state.WrongCount;
+            var accuracyPercent = totalAnswered > 0
+                ? (int)((double)state.CorrectCount / totalAnswered * 100)
+                : 0;
+
+            var durationSeconds = (int)(DateTime.UtcNow - state.StartedAt).TotalSeconds;
+
+            // Clean up state (optional - could keep for replay)
+            SessionStates.TryRemove(sessionId, out _);
+
+            return Results.Ok(new SessionCompletedDto(
+                SessionId: sessionId,
+                TotalCorrect: state.CorrectCount,
+                TotalWrong: state.WrongCount,
+                TotalXpAwarded: state.TotalXp,
+                AccuracyPercent: accuracyPercent,
+                DurationSeconds: durationSeconds));
+        })
+        .WithName("CompleteSession");
+
         return app;
     }
 
@@ -506,5 +659,26 @@ public static class SessionEndpoints
     {
         if (string.IsNullOrEmpty(camelCase)) return camelCase;
         return char.ToUpperInvariant(camelCase[0]) + camelCase[1..];
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // STB-01b: Helper records and classes
+    // ═════════════════════════════════════════════════════════════════════════
+
+    private record CannedQuestion(
+        string Id,
+        string Prompt,
+        string Type,
+        string[] Choices,
+        string CorrectAnswer,
+        string Subject);
+
+    private class SessionState
+    {
+        public int CurrentQuestionIndex { get; set; } = 0;
+        public int CorrectCount { get; set; } = 0;
+        public int WrongCount { get; set; } = 0;
+        public int TotalXp { get; set; } = 0;
+        public DateTime StartedAt { get; set; } = DateTime.UtcNow;
     }
 }
