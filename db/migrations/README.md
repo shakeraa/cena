@@ -29,23 +29,30 @@ Rules:
 
 Rationale: multiple engineers and multiple environments replay this folder in order against their databases. Mutating history silently breaks any DB that has already applied the old version of a file.
 
-## Execution today (temporary — until DB-02)
+## Execution
 
-Until `Cena.Db.Migrator` (DB-02) ships:
+### Using Cena.Db.Migrator (DB-02) ✓ Shipped
 
-- `src/actors/Cena.Actors/Services/PgVectorMigrationService.cs` runs at actor-host startup
-- It loads every `V*.sql` file from this folder as an **embedded resource** and executes them in order against PostgreSQL
-- All DDL is idempotent (`CREATE ... IF NOT EXISTS`) so re-running is safe
-- There is **no migration tracking table yet** — PgVectorMigrationService is a bridge, not a real migrator
+`src/api/Cena.Db.Migrator/` is a DbUp-based console application that manages schema migrations:
 
-When DB-02 ships:
+```bash
+# Build and run
+dotnet run --project src/api/Cena.Db.Migrator "Host=localhost;Port=5433;Database=cena;Username=cena_migrator;Password=..."
 
-- The bridge is deleted
-- `Cena.Db.Migrator` uses **DbUp** against a `cena.__migrations` tracking table
-- Each `V*.sql` file is executed exactly once per database
-- CI runs `Cena.Db.Migrator validate` on every PR and fails if the Marten config or the migration set has drifted
+# Or with environment variable
+export CENA_MIGRATOR_CONNECTION_STRING="Host=localhost;..."
+dotnet run --project src/api/Cena.Db.Migrator
+```
 
-Until then, if you add a new `V*.sql`, it will run on every actor-host start — make sure your `IF NOT EXISTS` guards are correct.
+Features:
+- Executes each `V*.sql` script exactly once per database
+- Tracks applied migrations in `schemaversions` table
+- Second run is a no-op if no new migrations exist
+- Uses `cena_migrator` role (no statement timeout for schema work)
+
+### Legacy bridge (to be removed in DB-03)
+
+`src/actors/Cena.Actors/Services/PgVectorMigrationService.cs` still runs at actor-host startup for backward compatibility. It will be removed in DB-03 when `AutoCreate.None` is flipped.
 
 ## Scope
 
