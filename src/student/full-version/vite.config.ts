@@ -24,10 +24,9 @@ export default defineConfig({
           .replace(/([a-z\d])([A-Z])/g, '$1-$2')
           .toLowerCase()
       },
-      beforeWriteFiles: root => {
-        root.insert('/apps/email/:filter', '/src/pages/apps/email/index.vue')
-        root.insert('/apps/email/:label', '/src/pages/apps/email/index.vue')
-      },
+      // STU-W-00: removed admin apps/email manual route inserts (referenced
+      // src/pages/apps/email/index.vue which was pruned). If any student
+      // feature tasks need manual route inserts, add them here.
     }),
     vue({
       template: {
@@ -54,7 +53,10 @@ export default defineConfig({
 
     // Docs: https://github.com/antfu/unplugin-vue-components#unplugin-vue-components
     Components({
-      dirs: ['src/@core/components', 'src/views/demos', 'src/components'],
+      // STU-W-00: removed 'src/views/demos' (views/ directory pruned along
+      // with admin-specific subtrees). Student app's component scanning:
+      // @core primitives + student/components + future src/components/common.
+      dirs: ['src/@core/components', 'src/components'],
       dts: true,
       resolvers: [
         componentName => {

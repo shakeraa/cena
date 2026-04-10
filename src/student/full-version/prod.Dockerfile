@@ -1,5 +1,8 @@
-# Use the official Node.js image as the base image
-FROM node:18 as builder
+# Use Node.js 22 (Vite 7+ requires Node 20.19+ or 22.12+).
+# STU-W-00: bumped from node:18 which could not run the Vite 7.1.12 build
+# ('crypto.hash is not a function' was the symptom; Vite itself warned that
+# Node 18 was below its minimum).
+FROM node:22-alpine AS builder
 
 # Set the working directory in the container
 WORKDIR /app
