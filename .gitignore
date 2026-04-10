@@ -47,6 +47,26 @@ src/admin/full-version/*.local
 src/admin/full-version/.env*
 !src/admin/full-version/.env.example
 
+# ── Vuexy reference (vendor copy, not committed) ──
+# Local-only reference copy of the upstream Vuexy starter kept at the repo
+# root for cross-checking during student web scaffold (STU-W-00). Never
+# committed — student web lives under src/student/full-version/.
+/full-version/
+
+# ── Multi-agent worktrees (isolated per-worker git worktrees) ──
+# Agents (claude-code, kimi-coder, sub-agents) create git worktrees under
+# these paths when claiming a task so they do not collide in the main
+# working tree. The worktrees share the repo's .git database but live on
+# disk in isolated directories. Source of truth for the convention:
+# .agentdb/QUEUE.md § "Worktrees".
+.claude/worktrees/
+.agentdb/worktrees/
+
+# ── Multi-agent task queue DB (sensitive-ish, local state) ──
+.agentdb/kimi-queue.db
+.agentdb/kimi-queue.db-shm
+.agentdb/kimi-queue.db-wal
+
 # ── .NET ──
 *.user
 *.suo

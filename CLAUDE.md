@@ -1,8 +1,19 @@
 # Claude Code Configuration - RuFlo V3
 
+> **Cross-agent note**: The sibling file [AGENTS.md](AGENTS.md) at the repo root is the cross-agent onboarding entry point (read automatically by Kimi Code, Codex CLI, and other CLIs that respect the `AGENTS.md` convention). It contains the full 9-step first-session checklist for non-Claude agents joining the shared task queue and mirrors the multi-agent coordination rules in this file. Keep the two in sync when changing coordination protocol — update both, not one.
+
 ## Session Start (Always Run First)
 
 At the start of every new conversation, read all memory files listed in `~/.claude/projects/-Users-shaker-edu-apps-cena/memory/MEMORY.md` before doing anything else. This ensures context about the user, prior decisions, and project state is loaded immediately.
+
+Also check for new inter-agent messages addressed to `claude-code` before starting substantive work:
+
+```bash
+node .agentdb/kimi-queue.js recv --worker claude-code --peek
+node .agentdb/kimi-queue.js workers --active
+```
+
+The `--peek` flag leaves messages unconsumed so you can decide whether to act on them before auto-acking. If other workers (Kimi, sub-agents, human operators) have questions or status updates waiting, address them before claiming new work.
 
 ## Behavioral Rules (Always Enforced)
 
@@ -185,6 +196,130 @@ npx @claude-flow/cli@latest doctor --fix
 - Claude Code's Task tool handles ALL execution: agents, file ops, code generation, git
 - CLI tools handle coordination via Bash: swarm init, memory, hooks, routing
 - NEVER use CLI tools as a substitute for Task tool agents
+
+## Multi-Agent Coordination (Shared Task Queue)
+
+This repo runs multiple coding agents in parallel — Claude Code (this session), Claude sub-agents via the Task tool, Kimi Code CLI, and human operators. They coordinate via a shared SQLite-backed task queue so no two agents duplicate work and every completed task lands under a named branch that the coordinator reviews before merging to `main`.
+
+**Canonical queue**: `.agentdb/kimi-queue.db` (auto-created on first CLI call)
+**CLI**: `node .agentdb/kimi-queue.js`
+**Cross-agent entry point**: [AGENTS.md](AGENTS.md) — what Kimi and other CLIs read on session start
+**Protocol doc**: [.agentdb/QUEUE.md](.agentdb/QUEUE.md) — **read this before assigning or claiming any task**
+**Coder agent instructions**: [.agentdb/AGENT_CODER_INSTRUCTIONS.md](.agentdb/AGENT_CODER_INSTRUCTIONS.md) — required reading for any agent that wants to pull work from the queue
+
+### Golden rules
+
+- **Claude Code main session** is the default coordinator. Worker name: `claude-code`. Owns enqueue, review, merge-to-main.
+- **Every worker** identifies itself with a consistent `--worker <name>` flag (`kimi-coder`, `claude-subagent-<purpose>`, `human-<name>`, etc.).
+- **No worker pushes to `main` directly.** Push feature branches named `<worker>/<task-id>-<slug>`; the coordinator reviews and merges.
+- **Claim before working.** An in-progress task is held by exactly one worker; the atomic claim is enforced by SQLite.
+- **Fail fast and loudly.** If a task blocks, call `fail` with a reason; do not silently drop.
+- **Never delete or update tasks** unless you are the coordinator.
+
+### Essential commands
+
+```bash
+# Peek at the next task for your identity
+node .agentdb/kimi-queue.js next --assignee kimi-coder
+
+# Claim it atomically
+node .agentdb/kimi-queue.js claim <id> --worker kimi-coder
+
+# Read the full task body (goal, files, DoD, reporting requirements)
+node .agentdb/kimi-queue.js show <id>
+
+# Report
+node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<summary+branch>"
+# or
+node .agentdb/kimi-queue.js fail <id> --worker kimi-coder --reason "<blocker>"
+
+# Inspect the whole queue
+node .agentdb/kimi-queue.js list --status pending
+node .agentdb/kimi-queue.js stats
+```
+
+### When spawning a sub-agent via the Task tool
+
+Pass the task ID and worker name in the agent prompt so the sub-agent knows which row to claim and what identity to use. Every sub-agent prompt that operates on a queued task MUST include:
+
+1. A directive to read [.agentdb/AGENT_CODER_INSTRUCTIONS.md](.agentdb/AGENT_CODER_INSTRUCTIONS.md) before anything else
+2. The task ID to claim
+3. The worker name it should use (e.g. `claude-subagent-db00`)
+4. An instruction to report via `complete` or `fail` before returning
+
+### Inter-agent messaging
+
+Beyond the task queue, workers can send and receive free-form messages for coordination (status updates, questions, directives, broadcasts). Same CLI, same DB, different tables.
+
+```bash
+# Send a direct message
+node .agentdb/kimi-queue.js send --from <you> --to <target> \
+  --kind status|question|answer|note|directive --subject "<x>" --body "<y>"
+
+# Receive (auto-acks by default, --peek to leave unconsumed)
+node .agentdb/kimi-queue.js recv --worker <you> [--topic <t>] [--kind ...] [--peek]
+
+# Broadcast to a topic
+node .agentdb/kimi-queue.js send --from <you> --topic coordination --kind directive --body "..."
+
+# Heartbeat (declare presence without sending anything)
+node .agentdb/kimi-queue.js heartbeat --worker <you> --status active
+
+# See who else is active
+node .agentdb/kimi-queue.js workers --active
+```
+
+Messaging is pull-based — no push notifications. Workers should `recv` before every task claim and periodically during long tasks. Directives broadcast on the `coordination` topic by `claude-code` are authoritative.
+
+**Rule**: messages are for **coordination**, not **work assignment**. Work always goes through the task queue. Never use a message to tell someone to do something substantive.
+
+### Worktree isolation (multi-agent parallelism)
+
+When Claude Code spawns a sub-agent to work on a queued task, the sub-agent operates in its own git worktree so it does not collide with the main session's file edits. Worktree convention:
+
+- Claude sub-agents → `.claude/worktrees/<task-id>/` (git-ignored)
+- Kimi and external workers → `.agentdb/worktrees/<task-id>/` (git-ignored)
+- Claude Code main session (coordinator role) → the main repo root
+
+The sub-agent spawn prompt must instruct the sub-agent to:
+
+1. `git worktree add .claude/worktrees/<task-id> -b claude-subagent-<purpose>/<task-id>-<slug> origin/main`
+2. `cd` into the worktree
+3. Do all work there
+4. Commit, push, then `node .agentdb/kimi-queue.js complete <task-id> --worker claude-subagent-<purpose> --result ...`
+5. Return to the main worktree before exiting
+
+The main Claude Code session reviews completed branches and merges to `main` from the main worktree. After merge:
+
+```bash
+git worktree remove .claude/worktrees/<task-id>
+```
+
+If the coordinator also takes on a specific task itself (not just coordinating), it should also use a worktree under `.claude/worktrees/` to keep the main worktree clean for review/merge work.
+
+Full protocol: [.agentdb/QUEUE.md](.agentdb/QUEUE.md) and [AGENTS.md](AGENTS.md).
+
+### Handshake before real work (new workers only)
+
+Every new worker (Kimi Code CLI, a second Claude Code session, a new sub-agent identity) must complete a **handshake task** before claiming any real work. The handshake is zero side-effects and proves the worker can read the protocol, use the CLI, and echo a rotating per-handshake phrase unique to its own task body.
+
+Coordinator enqueues a handshake:
+
+```bash
+node .agentdb/kimi-queue.js handshake <worker-name>
+# Prints: task-id + 8-byte rotating phrase (unique per handshake)
+```
+
+Worker claims, reads the body (which contains the phrase), completes with a result string containing `phrase=<value>,worker=<name>,node=<ver>,os=<sys>,files-read=3/3,ready=true`.
+
+Coordinator verifies:
+
+```bash
+node .agentdb/kimi-queue.js verify <task-id>
+# Exit 0 = PASS, Exit 3 = FAIL
+```
+
+Advisory-only: the CLI does not block real claims, but the coordinator's convention is to only greenlight real work for workers with a passing handshake on record. Protocol details: [.agentdb/QUEUE.md](.agentdb/QUEUE.md#handshake-first-join-ceremony)
 
 ## Support
 
