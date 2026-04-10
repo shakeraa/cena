@@ -41,12 +41,12 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
   test('E2E #1 file-based routing: every placeholder route resolves', async ({ page }) => {
     await seedAuth(page, { uid: 'u-routing' })
 
-    // `/home` (STU-W-05A), `/progress` (STU-W-07), and `/tutor` (STU-W-08)
-    // have been replaced with real pages and no longer render the
-    // placeholder testid. They are covered by their own spec files.
+    // `/home` (STU-W-05A), `/progress` (STU-W-07), `/tutor` (STU-W-08),
+    // and `/challenges` (STU-W-11) have been replaced with real pages
+    // and no longer render the placeholder testid. Covered by the
+    // per-feature spec files.
     const routes = [
       '/session',
-      '/challenges',
       '/challenges/daily',
       '/challenges/boss',
       '/progress/sessions',

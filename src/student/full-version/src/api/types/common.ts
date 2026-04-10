@@ -161,3 +161,58 @@ export interface CreateThreadResponse {
   title: string
   createdAt: string
 }
+
+/**
+ * Challenges DTOs from STB-05 Phase 1. Mirrors
+ * `src/api/Cena.Api.Contracts/Challenges/ChallengesDtos.cs`.
+ * Consumed by STU-W-11 challenges hub.
+ */
+export interface DailyChallengeDto {
+  challengeId: string
+  title: string
+  description: string
+  subject: string
+  difficulty: 'easy' | 'medium' | 'hard'
+  expiresAt: string
+  attempted: boolean
+  bestScore: number | null
+}
+
+export interface BossBattleSummary {
+  bossBattleId: string
+  name: string
+  subject: string
+  difficulty: string
+  requiredMasteryLevel: number
+}
+
+export interface BossBattleListDto {
+  available: BossBattleSummary[]
+  locked: BossBattleSummary[]
+}
+
+export interface CardChainSummary {
+  chainId: string
+  name: string
+  cardsUnlocked: number
+  cardsTotal: number
+  lastUnlockedAt: string | null
+}
+
+export interface CardChainListDto {
+  chains: CardChainSummary[]
+}
+
+export interface TournamentSummary {
+  tournamentId: string
+  name: string
+  startsAt: string
+  endsAt: string
+  participantCount: number
+  isRegistered: boolean
+}
+
+export interface TournamentListDto {
+  upcoming: TournamentSummary[]
+  active: TournamentSummary[]
+}

@@ -158,6 +158,44 @@
       "atRisk": "הרצף שלך בסכנה — השלם שיעור היום!"
     }
   },
+  "challenges": {
+    "hub": {
+      "title": "אתגרים",
+      "subtitle": "אתגרים יומיים, קרבות בוסים וטורנירים שיעזרו לך להמשיך ללמוד."
+    },
+    "difficulty": {
+      "easy": "קל",
+      "medium": "בינוני",
+      "hard": "קשה"
+    },
+    "daily": {
+      "label": "האתגר היומי",
+      "start": "התחל אתגר",
+      "reattempt": "נסה שוב",
+      "attempted": "בוצע ניסיון",
+      "expired": "הסתיים",
+      "timeLeft": "נותרו {hours}ש {minutes}ד"
+    },
+    "boss": {
+      "title": "קרבות בוסים",
+      "subtitle": "בחן את השליטה שלך מול היריבים הקשים ביותר.",
+      "requiresLevel": "דרוש שליטה ברמה {level}"
+    },
+    "chains": {
+      "title": "שרשרות כרטיסים",
+      "subtitle": "בנה שליטה מושג אחד בכל פעם.",
+      "cardsUnlocked": "{unlocked} מתוך {total} כרטיסים נפתחו",
+      "progressAria": "{unlocked} מתוך {total} כרטיסים נפתחו"
+    },
+    "tournaments": {
+      "title": "טורנירים",
+      "subtitle": "התחרו בתלמידים מהכיתה או מכל העולם.",
+      "active": "פעיל",
+      "upcoming": "בקרוב",
+      "participants": "{count} משתתפים",
+      "empty": "אין טורנירים כרגע."
+    }
+  },
   "tutor": {
     "listPage": {
       "title": "מורה AI",
