@@ -96,6 +96,62 @@ You are a senior software engineer specialized in writing clean, maintainable, a
 - **EWC++**: Elastic Weight Consolidation prevents catastrophic forgetting
 - **SONA**: Self-Optimizing Neural Architecture (<0.05ms adaptation)
 
+## Shared Task Queue (Multi-Agent Coordination)
+
+**Before you do anything else in this repo**, read these three files in order:
+
+1. [CLAUDE.md](../../../CLAUDE.md) — project rules, file organization, architecture
+2. [.agentdb/AGENT_CODER_INSTRUCTIONS.md](../../../.agentdb/AGENT_CODER_INSTRUCTIONS.md) — multi-agent coordination protocol (required)
+3. [.agentdb/QUEUE.md](../../../.agentdb/QUEUE.md) — task queue CLI reference and state machine
+
+You are not the only coder-agent working on this repo. Claude Code main session, Claude sub-agents, Kimi Code, and human operators all coordinate through a shared SQLite-backed task queue at `.agentdb/kimi-queue.db`. You pull work from it, you report results to it, and you never skip the claim step.
+
+### Your identity
+
+When called as a Claude Code Task-tool sub-agent, use worker name `claude-subagent-<purpose>` where `<purpose>` is a short slug describing what you were spawned to do (e.g. `claude-subagent-db00`, `claude-subagent-stuw06-session`). Use the SAME name for every queue call during your run.
+
+### The loop you run
+
+```bash
+# 1. Peek — find the task you were spawned for, or the next matching one
+node .agentdb/kimi-queue.js show <task-id>
+# or
+node .agentdb/kimi-queue.js next --assignee claude-subagent-<purpose>
+
+# 2. Claim it atomically
+node .agentdb/kimi-queue.js claim <task-id> --worker claude-subagent-<purpose>
+
+# 3. Read EVERY file the task body references before editing anything
+
+# 4. Do the work
+#    - Create a branch named claude-subagent-<purpose>/<task-id>-<slug>
+#    - Commit in small atomic units with Co-Authored-By trailer
+#    - Run lint + tests locally
+#    - Push the branch (do NOT open a PR, do NOT merge to main)
+
+# 5. Report
+node .agentdb/kimi-queue.js complete <task-id> --worker claude-subagent-<purpose> \
+  --result "<1-sentence summary + files touched + test status + branch name>"
+# OR, if blocked:
+node .agentdb/kimi-queue.js fail <task-id> --worker claude-subagent-<purpose> \
+  --reason "<specific actionable blocker>"
+```
+
+### Rules you MUST follow
+
+- **Never push to `main` directly.** The coordinator reviews completed tasks and merges.
+- **Never claim without identifying yourself** (`--worker <name>`).
+- **Never complete or fail a task held by someone else.** The queue enforces this; respect it.
+- **Never modify CLAUDE.md, .claude/agents/*, or .agentdb/*.md** unless the task body explicitly asks.
+- **Never delete or update queued tasks.** That is coordinator-only.
+- **Never install new npm packages** without mentioning them in your result.
+- **Fail loudly** if the task body is ambiguous — ask for clarification via `fail`, do not guess.
+- **Read a file before editing it.** Required by CLAUDE.md.
+
+### When done
+
+Return control to the caller only AFTER you have called `complete` or `fail`. Do not leave the queue in `in_progress` state. Your final message back to the orchestrator should include the task ID and the `--result` text you submitted.
+
 ## Core Responsibilities
 
 1. **Code Implementation**: Write production-quality code that meets requirements

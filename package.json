@@ -2,5 +2,8 @@
   "devDependencies": {
     "firebase-admin": "^13.7.0",
     "tsx": "^4.21.0"
+  },
+  "dependencies": {
+    "better-sqlite3": "^12.8.0"
   }
 }
