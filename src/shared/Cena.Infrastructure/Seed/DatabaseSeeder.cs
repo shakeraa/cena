@@ -45,10 +45,13 @@ public static class DatabaseSeeder
         // 2. Demo users (admins, teachers, parents, hand-crafted students)
         await UserSeedData.SeedUsersAsync(store, logger);
 
-        // 3. Simulated students (300 across 8 archetypes)
+        // 3. Sample classrooms for testing join codes (STB-00b)
+        await ClassroomSeedData.SeedClassroomsAsync(store, logger);
+
+        // 4. Simulated students (300 across 8 archetypes)
         await UserSeedData.SeedSimulatedStudentsAsync(store, logger, simulatedStudentCount);
 
-        // 4. Additional seeds (simulation events, questions, etc.)
+        // 5. Additional seeds (simulation events, questions, etc.)
         foreach (var seed in additionalSeeds)
         {
             await seed(store, logger);
