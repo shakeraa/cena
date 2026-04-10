@@ -111,3 +111,53 @@ export interface LeaderboardDto {
   entries: LeaderboardEntry[]
   currentStudentRank: number
 }
+
+/**
+ * Tutor DTOs from STB-04 Phase 1. Mirrors
+ * `src/api/Cena.Api.Contracts/Tutor/TutorDtos.cs`. Consumed by STU-W-08.
+ */
+export type TutorMessageRole = 'user' | 'assistant' | 'system'
+
+export interface TutorThreadDto {
+  threadId: string
+  title: string
+  subject: string | null
+  topic: string | null
+  createdAt: string
+  updatedAt: string
+  messageCount: number
+  isArchived: boolean
+}
+
+export interface TutorThreadListDto {
+  items: TutorThreadDto[]
+  totalCount: number
+}
+
+export interface TutorMessageDto {
+  messageId: string
+  role: TutorMessageRole
+  content: string
+  createdAt: string
+  model: string | null
+}
+
+export interface TutorMessageListDto {
+  threadId: string
+  messages: TutorMessageDto[]
+  hasMore: boolean
+}
+
+export interface SendMessageResponse {
+  messageId: string
+  role: TutorMessageRole
+  content: string
+  createdAt: string
+  status: 'complete' | 'streaming'
+}
+
+export interface CreateThreadResponse {
+  threadId: string
+  title: string
+  createdAt: string
+}

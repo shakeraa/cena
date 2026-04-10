@@ -158,6 +158,31 @@
       "atRisk": "הרצף שלך בסכנה — השלם שיעור היום!"
     }
   },
+  "tutor": {
+    "listPage": {
+      "title": "מורה AI",
+      "subtitle": "שאל כל שאלה. המורה שלך כאן כדי לעזור לך ללמוד.",
+      "newThread": "שיחה חדשה",
+      "emptyTitle": "עדיין אין שיחות",
+      "emptySubtitle": "התחל שרשור חדש כדי לשאול את השאלה הראשונה."
+    },
+    "threadList": {
+      "messageCount": "{count} הודעות",
+      "justNow": "הרגע",
+      "minutesAgo": "לפני {count} ד",
+      "hoursAgo": "לפני {count} ש",
+      "daysAgo": "לפני {count} י"
+    },
+    "thread": {
+      "emptyTitle": "שאל את השאלה הראשונה",
+      "emptySubtitle": "נסה משהו כמו 'הסבר פוטוסינתזה'.",
+      "thinking": "המורה חושב…"
+    },
+    "compose": {
+      "placeholder": "שאל את המורה שלך…",
+      "sendAria": "שלח הודעה"
+    }
+  },
   "language": {
     "english": "English",
     "arabic": "العربية",

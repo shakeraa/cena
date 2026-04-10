@@ -324,6 +324,31 @@
       "atRisk": "سلسلتك في خطر — أكمل جلسة اليوم!"
     }
   },
+  "tutor": {
+    "listPage": {
+      "title": "المعلم الذكي",
+      "subtitle": "اسأل أي شيء. معلمك هنا لمساعدتك على التعلم.",
+      "newThread": "محادثة جديدة",
+      "emptyTitle": "لا توجد محادثات بعد",
+      "emptySubtitle": "ابدأ محادثة جديدة لطرح سؤالك الأول."
+    },
+    "threadList": {
+      "messageCount": "{count} رسالة",
+      "justNow": "الآن",
+      "minutesAgo": "قبل {count} د",
+      "hoursAgo": "قبل {count} س",
+      "daysAgo": "قبل {count} يوم"
+    },
+    "thread": {
+      "emptyTitle": "اطرح سؤالك الأول",
+      "emptySubtitle": "جرّب مثلاً 'اشرح عملية التمثيل الضوئي'",
+      "thinking": "المعلم يفكر…"
+    },
+    "compose": {
+      "placeholder": "اسأل معلمك أي شيء…",
+      "sendAria": "إرسال الرسالة"
+    }
+  },
   "language": {
     "english": "English",
     "arabic": "العربية",

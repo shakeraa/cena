@@ -25,6 +25,9 @@ import { handlerStudentMe } from '@db/student-me/index'
 // STU-W-07: student /api/gamification/* handlers for the progress dashboard.
 import { handlerStudentGamification } from '@db/student-gamification/index'
 
+// STU-W-08: student /api/tutor/* handlers for the AI tutor chat.
+import { handlerStudentTutor } from '@db/student-tutor/index'
+
 const worker = setupWorker(
   ...handlerAppsEcommerce,
   ...handlerAppsAcademy,
@@ -45,6 +48,7 @@ const worker = setupWorker(
   ...handlerDashboard,
   ...handlerStudentMe,
   ...handlerStudentGamification,
+  ...handlerStudentTutor,
 )
 
 export default function () {
