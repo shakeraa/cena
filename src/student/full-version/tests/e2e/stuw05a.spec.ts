@@ -42,8 +42,11 @@ test.describe.serial('STU-W-05A home dashboard', () => {
     await expect(page.locator('[data-testid="quick-action-challenge"]')).toBeVisible()
     await expect(page.locator('[data-testid="quick-action-progress"]')).toBeVisible()
 
-    // Resume session card present (mock data has one)
-    await expect(page.locator('[data-testid="resume-session-card"]')).toBeVisible()
+    // Resume session card: STU-W-05A had it from hard-coded mock data,
+    // STU-W-05B hid it until /api/sessions/active from STB-01 lands
+    // (STU-W-05C wires the real endpoint). Just assert it's NOT rendered
+    // in the /api/me-driven state.
+    await expect(page.locator('[data-testid="resume-session-card"]')).toHaveCount(0)
 
     await page.screenshot({ path: `${SCREENSHOT_DIR}/home-desktop.png`, fullPage: true })
   })
@@ -57,13 +60,10 @@ test.describe.serial('STU-W-05A home dashboard', () => {
     expect(new URL(page.url()).pathname).toBe('/session')
   })
 
-  test('E2E #3 resume-session CTA deep-links to the active session', async ({ page }) => {
-    await seedAuthedOnboarded(page)
-    await page.goto('/home')
-    await page.waitForSelector('[data-testid="resume-session-cta"]')
-    await page.locator('[data-testid="resume-session-cta"]').click()
-    await page.waitForURL(url => new URL(url).pathname.startsWith('/session/'))
-    expect(new URL(page.url()).pathname).toMatch(/^\/session\//)
+  test.skip('E2E #3 resume-session CTA deep-links to the active session', async () => {
+    // Skipped in STU-W-05B — the resume session card is hidden until
+    // /api/sessions/active from STB-01 lands. STU-W-05C re-enables this
+    // test once the real active-session endpoint is wired.
   })
 
   test('E2E #4 /home on mobile viewport — KPI grid reflows + bottom nav visible', async ({ page }) => {

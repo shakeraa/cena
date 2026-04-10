@@ -45,3 +45,20 @@ export interface MeProfile {
   onboardedAt: string | null
   role: 'student' | 'self-learner' | 'test-prep' | 'homeschool'
 }
+
+/**
+ * `GET /api/me` bootstrap payload from STB-00.
+ * Mirrors `src/api/Cena.Api.Contracts/Me/MeDtos.cs:MeBootstrapDto`.
+ * STB-10 will replace this with TypeScript codegen.
+ */
+export interface MeBootstrapDto {
+  studentId: string
+  displayName: string
+  role: string
+  locale: 'en' | 'ar' | 'he'
+  onboardedAt: string | null
+  subjects: string[]
+  level: number
+  streakDays: number
+  avatarUrl: string | null
+}

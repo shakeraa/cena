@@ -19,6 +19,9 @@ import { handlerPagesFaq } from '@db/pages/faq/index'
 import { handlerPagesHelpCenter } from '@db/pages/help-center/index'
 import { handlerPagesProfile } from '@db/pages/profile/index'
 
+// STU-W-05B: student /api/me handlers for dev-loop when Cena.Api.Host is offline.
+import { handlerStudentMe } from '@db/student-me/index'
+
 const worker = setupWorker(
   ...handlerAppsEcommerce,
   ...handlerAppsAcademy,
@@ -37,6 +40,7 @@ const worker = setupWorker(
   ...handlerAuth,
   ...handlerAppsKanban,
   ...handlerDashboard,
+  ...handlerStudentMe,
 )
 
 export default function () {
