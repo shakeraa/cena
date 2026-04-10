@@ -19,6 +19,7 @@ using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.EventStore;
+using Cena.Infrastructure.Seed;
 
 namespace Cena.Actors.Configuration;
 
@@ -167,6 +168,31 @@ public static class MartenConfiguration
         // REV-014: Index SchoolId for efficient tenant-scoped queries
         opts.Schema.For<StudentProfileSnapshot>().Index(x => x.SchoolId);
 
+        // ── Student Preferences Document (STB-00b) ──
+        opts.Schema.For<StudentPreferencesDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId);
+
+        // ── Classroom Document (STB-00b) ──
+        opts.Schema.For<ClassroomDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.JoinCode)
+            .Index(x => x.TeacherId)
+            .Index(x => x.SchoolId);
+
+        // ── Device Session Document (STB-00b) ──
+        opts.Schema.For<DeviceSessionDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.LastSeenAt);
+
+        // ── Share Token Document (STB-00b) ──
+        opts.Schema.For<ShareTokenDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.Token)
+            .Index(x => x.ExpiresAt);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
@@ -186,6 +212,7 @@ public static class MartenConfiguration
         opts.Events.AddEventType<StagnationDetected_V1>();
         opts.Events.AddEventType<AnnotationAdded_V1>();
         opts.Events.AddEventType<CognitiveLoadCooldownComplete_V1>();
+        opts.Events.AddEventType<OnboardingCompleted_V1>(); // STB-00
     }
 
     private static void RegisterPedagogyEvents(StoreOptions opts)
