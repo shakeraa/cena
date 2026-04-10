@@ -120,6 +120,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     await seedAuth(page, { uid: 'u-title' })
 
     await page.goto('/home')
+
     // Wait for Vue to mount + the router.afterEach title updater to fire.
     await page.waitForSelector('[data-testid="placeholder-route-meta"]')
     await page.waitForFunction(() => /Home/.test(document.title), null, { timeout: 5000 })

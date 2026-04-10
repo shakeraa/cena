@@ -131,6 +131,7 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
     if (titleKey) {
       const i18n = getI18n()
       const globalI18n = i18n.global as any
+
       // vue-i18n global.t() returns the key as-is if it can't be resolved,
       // which is fine for our fallback. Wrap in try/catch in case the
       // messages aren't loaded yet (first navigation race).
