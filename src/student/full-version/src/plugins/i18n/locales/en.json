@@ -278,7 +278,15 @@
     "invalidCredentials": "That email and password don't match. Try again?",
     "emailAlreadyExists": "An account with this email already exists.",
     "tooManyAttempts": "Too many failed attempts.",
-    "tryAgainInSeconds": "Try again in {seconds}s"
+    "tryAgainInSeconds": "Try again in {seconds}s",
+    "continueWith": "or continue with",
+    "providers": {
+      "google": "Continue with Google",
+      "apple": "Continue with Apple",
+      "microsoft": "Continue with Microsoft",
+      "phone": "Continue with phone",
+      "phoneComingSoon": "SMS sign-in is coming soon. Use email or another provider for now."
+    }
   },
   "home": {
     "greeting": {

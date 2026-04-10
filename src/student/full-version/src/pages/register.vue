@@ -71,6 +71,7 @@ async function handleSubmit(payload: { email: string; password: string; displayN
       :error-message="errorMessage"
       @submit="handleSubmit"
     />
+    <AuthProviderButtons mode="register" />
     <template #footer>
       {{ t('auth.haveAccount') }}
       <RouterLink
