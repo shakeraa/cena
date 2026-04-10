@@ -243,6 +243,7 @@ app.MapCenaAdminEndpoints();
 // ---- Session Lifecycle REST endpoints (SES-002) ----
 app.MapSessionEndpoints();
 app.MapStudentAnalyticsEndpoints();
+app.MapPlanEndpoints();
 
 // ---- SignalR Hub (SES-001) ----
 app.MapCenaHub();
