@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import type { FlowState } from '@/plugins/vuetify/theme'
+import type { MeBootstrapDto } from '@/api/types/common'
+import { useApiQuery } from '@/composables/useApiQuery'
 
 definePage({
   meta: {
@@ -14,126 +16,150 @@ definePage({
   },
 })
 
-// STU-W-05A: mock data only. STU-W-05B replaces these with real
-// `useApiQuery` calls to STB-00 / STB-02 endpoints once the backend
-// feature tasks ship.
-interface MockHomeData {
-  minutesToday: number
-  xp: number
-  xpToNextLevel: number
-  level: number
-  streakDays: number
-  streakIsNewBest: boolean
-  questionsAnswered: number
-  accuracyPercent: number
-  flowState: FlowState
-  activeSession: null | {
-    sessionId: string
-    subject: string
-    startedAt: string
-    progressPercent: number
-  }
-}
+// STU-W-05B: real $api wiring. MSW mocks `/api/me` in dev (see
+// src/plugins/fake-api/handlers/student-me); production hits the
+// real Cena.Api.Host from STB-00.
+const { data: me, error, loading } = useApiQuery<MeBootstrapDto>('/api/me')
 
-const mockData = ref<MockHomeData>({
-  minutesToday: 18,
-  xp: 2340,
-  xpToNextLevel: 500,
-  level: 7,
-  streakDays: 12,
-  streakIsNewBest: false,
-  questionsAnswered: 84,
-  accuracyPercent: 76,
-  flowState: 'approaching',
-  activeSession: {
-    sessionId: 'demo-session-abc123',
-    subject: 'Algebra II — quadratic equations',
-    startedAt: new Date(Date.now() - 14 * 60 * 1000).toISOString(),
-    progressPercent: 35,
-  },
-})
+// Constants that STB-00 doesn't return yet — STU-W-05C wires them
+// when STB-02 (plan/review/recommendations) lands and STU-W-05D
+// picks up live values from SignalR.
+const MOCK_MINUTES_TODAY = 18
+const MOCK_QUESTIONS_TODAY = 84
+const MOCK_ACCURACY = 76
+const MOCK_FLOW_STATE: FlowState = 'approaching'
+
+// Derived values from the real /api/me payload.
+const level = computed(() => me.value?.level ?? 1)
+const streakDays = computed(() => me.value?.streakDays ?? 0)
 
 const xpProgressPercent = computed(() => {
-  const total = mockData.value.xpToNextLevel
-  const current = mockData.value.xp % total
-
-  return Math.round((current / total) * 100)
+  // STB-00's MeBootstrapDto returns level but not xp-within-level.
+  // Stub 40% as a visual placeholder until STB-03 lands the
+  // real gamification endpoint with xp + xpToNextLevel.
+  return 40
 })
+
+// STU-W-05C will wire `GET /api/sessions/active` from STB-01.
+const activeSession = null as null | {
+  sessionId: string
+  subject: string
+  startedAt: string
+  progressPercent: number
+}
 </script>
 
 <template>
-  <FlowAmbientBackground :flow-state="mockData.flowState" />
+  <FlowAmbientBackground :flow-state="MOCK_FLOW_STATE" />
 
   <div
     class="home-page pa-6"
     data-testid="home-page"
   >
-    <HomeGreeting />
-
-    <ResumeSessionCard
-      v-if="mockData.activeSession"
-      :session-id="mockData.activeSession.sessionId"
-      :subject="mockData.activeSession.subject"
-      :started-at="mockData.activeSession.startedAt"
-      :progress-percent="mockData.activeSession.progressPercent"
-      class="mb-6"
-    />
-
-    <section
-      class="home-page__kpis mb-6"
-      aria-labelledby="home-kpis-heading"
-    >
-      <h2
-        id="home-kpis-heading"
-        class="sr-only"
+    <!-- Loading state: show skeleton cards for every slot -->
+    <template v-if="loading">
+      <div
+        class="home-page__skeletons"
+        data-testid="home-loading-skeleton"
       >
-        Today's stats
-      </h2>
-      <StreakWidget
-        :days="mockData.streakDays"
-        :is-new-best="mockData.streakIsNewBest"
-      />
-      <KpiCard
-        label="Minutes today"
-        :value="mockData.minutesToday"
-        :trend="12"
-        icon="tabler-clock"
-        data-testid="kpi-minutes-today"
-      />
-      <KpiCard
-        label="Questions"
-        :value="mockData.questionsAnswered"
-        :trend="8"
-        icon="tabler-question-mark"
-        data-testid="kpi-questions"
-      />
-      <KpiCard
-        label="Accuracy"
-        :value="`${mockData.accuracyPercent}%`"
-        :trend="3"
-        icon="tabler-target"
-        data-testid="kpi-accuracy"
-      />
-      <KpiCard
-        :label="`Level ${mockData.level}`"
-        :value="`${xpProgressPercent}%`"
-        icon="tabler-bolt"
-        data-testid="kpi-level"
-      />
-    </section>
+        <StudentSkeletonCard
+          :lines="2"
+          height="80px"
+        />
+        <div class="home-page__kpis mt-6">
+          <StudentSkeletonCard :lines="3" />
+          <StudentSkeletonCard :lines="3" />
+          <StudentSkeletonCard :lines="3" />
+          <StudentSkeletonCard :lines="3" />
+          <StudentSkeletonCard :lines="3" />
+        </div>
+      </div>
+    </template>
 
-    <section
-      class="home-page__quick-actions-section mb-6"
-      aria-labelledby="home-quick-heading"
-    >
-      <h2
-        id="home-quick-heading"
-        class="text-h6 mb-3"
+    <!-- Error state -->
+    <template v-else-if="error">
+      <VAlert
+        type="error"
+        variant="tonal"
+        prominent
+        data-testid="home-error-state"
       >
-        Quick actions
-      </h2>
-      <QuickActions />
-    </section>
+        <VAlertTitle>Could not load your home dashboard</VAlertTitle>
+        <div class="mb-3">
+          {{ error.message || 'Try refreshing the page.' }}
+        </div>
+      </VAlert>
+    </template>
+
+    <!-- Happy path -->
+    <template v-else-if="me">
+      <HomeGreeting />
+
+      <ResumeSessionCard
+        v-if="activeSession"
+        :session-id="activeSession.sessionId"
+        :subject="activeSession.subject"
+        :started-at="activeSession.startedAt"
+        :progress-percent="activeSession.progressPercent"
+        class="mb-6"
+      />
+
+      <section
+        class="home-page__kpis mb-6"
+        aria-labelledby="home-kpis-heading"
+      >
+        <h2
+          id="home-kpis-heading"
+          class="sr-only"
+        >
+          Today's stats
+        </h2>
+        <StreakWidget
+          :days="streakDays"
+          :is-new-best="false"
+        />
+        <KpiCard
+          label="Minutes today"
+          :value="MOCK_MINUTES_TODAY"
+          :trend="12"
+          icon="tabler-clock"
+          data-testid="kpi-minutes-today"
+        />
+        <KpiCard
+          label="Questions"
+          :value="MOCK_QUESTIONS_TODAY"
+          :trend="8"
+          icon="tabler-question-mark"
+          data-testid="kpi-questions"
+        />
+        <KpiCard
+          label="Accuracy"
+          :value="`${MOCK_ACCURACY}%`"
+          :trend="3"
+          icon="tabler-target"
+          data-testid="kpi-accuracy"
+        />
+        <KpiCard
+          :label="`Level ${level}`"
+          :value="`${xpProgressPercent}%`"
+          icon="tabler-bolt"
+          data-testid="kpi-level"
+        />
+      </section>
+
+      <section
+        class="home-page__quick-actions-section mb-6"
+        aria-labelledby="home-quick-heading"
+      >
+        <h2
+          id="home-quick-heading"
+          class="text-h6 mb-3"
+        >
+          Quick actions
+        </h2>
+        <QuickActions />
+      </section>
+    </template>
   </div>
 </template>
 
