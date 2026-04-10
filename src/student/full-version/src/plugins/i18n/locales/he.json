@@ -113,7 +113,15 @@
     "invalidCredentials": "הדוא״ל והסיסמה אינם תואמים. לנסות שוב?",
     "emailAlreadyExists": "כבר קיים חשבון עם הדוא״ל הזה.",
     "tooManyAttempts": "יותר מדי ניסיונות כושלים.",
-    "tryAgainInSeconds": "נסה שוב בעוד {seconds} שניות"
+    "tryAgainInSeconds": "נסה שוב בעוד {seconds} שניות",
+    "continueWith": "או המשך עם",
+    "providers": {
+      "google": "המשך עם Google",
+      "apple": "המשך עם Apple",
+      "microsoft": "המשך עם Microsoft",
+      "phone": "המשך עם טלפון",
+      "phoneComingSoon": "התחברות באמצעות SMS תגיע בקרוב. השתמש בדוא״ל או בספק אחר בינתיים."
+    }
   },
   "language": {
     "english": "English",

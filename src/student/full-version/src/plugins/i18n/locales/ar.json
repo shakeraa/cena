@@ -279,7 +279,15 @@
     "invalidCredentials": "البريد الإلكتروني وكلمة المرور غير متطابقين. هل تريد المحاولة مرة أخرى؟",
     "emailAlreadyExists": "يوجد حساب بهذا البريد الإلكتروني بالفعل.",
     "tooManyAttempts": "الكثير من المحاولات الفاشلة.",
-    "tryAgainInSeconds": "حاول مرة أخرى خلال {seconds} ثانية"
+    "tryAgainInSeconds": "حاول مرة أخرى خلال {seconds} ثانية",
+    "continueWith": "أو تابع باستخدام",
+    "providers": {
+      "google": "المتابعة باستخدام Google",
+      "apple": "المتابعة باستخدام Apple",
+      "microsoft": "المتابعة باستخدام Microsoft",
+      "phone": "المتابعة باستخدام الهاتف",
+      "phoneComingSoon": "تسجيل الدخول عبر الرسائل القصيرة قادم قريبًا. استخدم البريد الإلكتروني أو مزودًا آخر في الوقت الحالي."
+    }
   },
   "language": {
     "english": "English",

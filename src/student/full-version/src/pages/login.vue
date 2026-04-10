@@ -122,6 +122,7 @@ async function handleSubmit(payload: { email: string; password: string }) {
       :locked-seconds-remaining="lockedSecondsRemaining"
       @submit="handleSubmit"
     />
+    <AuthProviderButtons mode="login" />
     <div class="mt-4 text-center text-body-2">
       <RouterLink
         to="/forgot-password"
