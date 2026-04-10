@@ -256,6 +256,9 @@ app.MapGamificationEndpoints();
 // ---- Tutor REST endpoints (STB-04) ----
 app.MapTutorEndpoints();
 
+// ---- Challenges REST endpoints (STB-05) ----
+app.MapChallengesEndpoints();
+
 // ---- SignalR Hub (SES-001) ----
 app.MapCenaHub();
 
