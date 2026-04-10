@@ -28,6 +28,9 @@ import { handlerStudentGamification } from '@db/student-gamification/index'
 // STU-W-08: student /api/tutor/* handlers for the AI tutor chat.
 import { handlerStudentTutor } from '@db/student-tutor/index'
 
+// STU-W-11: student /api/challenges/* handlers for the challenges hub.
+import { handlerStudentChallenges } from '@db/student-challenges/index'
+
 const worker = setupWorker(
   ...handlerAppsEcommerce,
   ...handlerAppsAcademy,
@@ -49,6 +52,7 @@ const worker = setupWorker(
   ...handlerStudentMe,
   ...handlerStudentGamification,
   ...handlerStudentTutor,
+  ...handlerStudentChallenges,
 )
 
 export default function () {

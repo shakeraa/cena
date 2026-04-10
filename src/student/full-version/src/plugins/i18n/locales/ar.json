@@ -324,6 +324,44 @@
       "atRisk": "سلسلتك في خطر — أكمل جلسة اليوم!"
     }
   },
+  "challenges": {
+    "hub": {
+      "title": "التحديات",
+      "subtitle": "تحديات يومية ومعارك الزعماء والبطولات لتحفيزك."
+    },
+    "difficulty": {
+      "easy": "سهل",
+      "medium": "متوسط",
+      "hard": "صعب"
+    },
+    "daily": {
+      "label": "تحدي اليوم",
+      "start": "ابدأ التحدي",
+      "reattempt": "المحاولة مرة أخرى",
+      "attempted": "تمت المحاولة",
+      "expired": "انتهى",
+      "timeLeft": "متبقٍ {hours}س {minutes}د"
+    },
+    "boss": {
+      "title": "معارك الزعماء",
+      "subtitle": "اختبر إتقانك ضد أصعب الخصوم.",
+      "requiresLevel": "يتطلب مستوى إتقان {level}"
+    },
+    "chains": {
+      "title": "سلاسل البطاقات",
+      "subtitle": "ابنِ إتقانك مفهومًا تلو الآخر.",
+      "cardsUnlocked": "تم فتح {unlocked} من {total} بطاقة",
+      "progressAria": "تم فتح {unlocked} من {total} بطاقة"
+    },
+    "tournaments": {
+      "title": "البطولات",
+      "subtitle": "تنافس مع الطلاب في صفك أو حول العالم.",
+      "active": "مباشر",
+      "upcoming": "قريبًا",
+      "participants": "{count} مشاركًا",
+      "empty": "لا توجد بطولات حالية."
+    }
+  },
   "tutor": {
     "listPage": {
       "title": "المعلم الذكي",

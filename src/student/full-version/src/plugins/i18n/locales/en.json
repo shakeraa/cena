@@ -323,6 +323,44 @@
       "atRisk": "Your streak is at risk — complete a session today!"
     }
   },
+  "challenges": {
+    "hub": {
+      "title": "Challenges",
+      "subtitle": "Daily challenges, boss battles, and tournaments to keep your learning streak on fire."
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "daily": {
+      "label": "Today's daily challenge",
+      "start": "Start challenge",
+      "reattempt": "Try again",
+      "attempted": "Attempted",
+      "expired": "Expired",
+      "timeLeft": "{hours}h {minutes}m left"
+    },
+    "boss": {
+      "title": "Boss battles",
+      "subtitle": "Test your mastery against our toughest opponents.",
+      "requiresLevel": "Requires mastery level {level}"
+    },
+    "chains": {
+      "title": "Card chains",
+      "subtitle": "Build mastery one concept at a time.",
+      "cardsUnlocked": "{unlocked} / {total} cards unlocked",
+      "progressAria": "{unlocked} of {total} cards unlocked"
+    },
+    "tournaments": {
+      "title": "Tournaments",
+      "subtitle": "Compete with students across your class or globally.",
+      "active": "Live",
+      "upcoming": "Upcoming",
+      "participants": "{count} participants",
+      "empty": "No tournaments running right now. Check back soon."
+    }
+  },
   "tutor": {
     "listPage": {
       "title": "AI Tutor",
