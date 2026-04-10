@@ -326,6 +326,42 @@
     "hebrew": "עברית",
     "switchLanguage": "Switch language"
   },
+  "onboarding": {
+    "welcome": {
+      "title": "Welcome to Cena",
+      "subtitle": "Let's personalize your learning journey in just a couple of steps."
+    },
+    "role": {
+      "title": "Who is learning?",
+      "subtitle": "Pick the option that best describes you so we can tailor your experience.",
+      "student": "Student",
+      "studentDescription": "I'm enrolled in a school or university class.",
+      "selfLearner": "Self-learner",
+      "selfLearnerDescription": "I'm learning on my own for curiosity or career.",
+      "testPrep": "Test prep",
+      "testPrepDescription": "I'm preparing for a specific exam or standardized test.",
+      "homeschool": "Homeschool",
+      "homeschoolDescription": "I'm homeschooled or tutoring a family member.",
+      "none": "Not selected"
+    },
+    "language": {
+      "title": "Choose your language",
+      "subtitle": "You can change this anytime from settings.",
+      "sampleEn": "Keep going — you're doing great.",
+      "sampleAr": "استمر — أنت تبلي بلاءً حسنًا.",
+      "sampleHe": "המשך — אתה עושה עבודה נהדרת."
+    },
+    "confirm": {
+      "title": "You're all set",
+      "subtitle": "Review your choices and jump right in.",
+      "roleLabel": "Learner type",
+      "languageLabel": "Language",
+      "cta": "Start learning"
+    },
+    "next": "Next",
+    "back": "Back",
+    "getStarted": "Let's get started"
+  },
   "flow": {
     "warming": "Warming up",
     "approaching": "Building momentum",

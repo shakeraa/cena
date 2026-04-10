@@ -129,6 +129,42 @@
     "hebrew": "עברית",
     "switchLanguage": "החלף שפה"
   },
+  "onboarding": {
+    "welcome": {
+      "title": "ברוכים הבאים לסינה",
+      "subtitle": "בואו נתאים אישית את מסע הלמידה שלך בכמה צעדים פשוטים."
+    },
+    "role": {
+      "title": "מי לומד?",
+      "subtitle": "בחר את האפשרות שמתארת אותך כדי שנוכל להתאים את החוויה.",
+      "student": "תלמיד",
+      "studentDescription": "אני לומד בבית ספר או באוניברסיטה.",
+      "selfLearner": "לומד עצמאי",
+      "selfLearnerDescription": "אני לומד לבד מתוך סקרנות או לקריירה.",
+      "testPrep": "הכנה למבחן",
+      "testPrepDescription": "אני נערך למבחן או בחינה סטנדרטית.",
+      "homeschool": "חינוך ביתי",
+      "homeschoolDescription": "אני לומד בבית או מלמד בן משפחה.",
+      "none": "לא נבחר"
+    },
+    "language": {
+      "title": "בחר את השפה שלך",
+      "subtitle": "ניתן לשנות זאת בכל עת מההגדרות.",
+      "sampleEn": "Keep going — you're doing great.",
+      "sampleAr": "استمر — أنت تبلي بلاءً حسنًا.",
+      "sampleHe": "המשך — אתה עושה עבודה נהדרת."
+    },
+    "confirm": {
+      "title": "הכל מוכן",
+      "subtitle": "סקור את הבחירות שלך ובוא נתחיל.",
+      "roleLabel": "סוג לומד",
+      "languageLabel": "שפה",
+      "cta": "התחל ללמוד"
+    },
+    "next": "הבא",
+    "back": "הקודם",
+    "getStarted": "בואו נתחיל"
+  },
   "flow": {
     "warming": "התחממות",
     "approaching": "צובר תאוצה",
