@@ -1,44 +1,43 @@
 <script setup lang="ts">
-import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
+import { computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
+import { useAuthStore } from '@/stores/authStore'
+import { useMeStore } from '@/stores/meStore'
 
 const router = useRouter()
-const ability = useAbility()
+const { t } = useI18n()
+const authStore = useAuthStore()
+const meStore = useMeStore()
 
-// TODO: Get type from backend
-const userData = useCookie<any>('userData')
+// Simplified in STU-W-UI-POLISH. Removed Vuexy admin-specific menu items
+// (Billing Plan, Pricing, FAQ, pages-account-settings-tab deep links) that
+// don't exist in the student sitemap. Student menu: Profile, Settings,
+// Sign out. Uses the authStore + meStore from STU-W-02 instead of the old
+// `useCookie('userData')` Vuexy convention.
 
-const logout = async () => {
-  // Remove "accessToken" from cookie
-  useCookie('accessToken').value = null
+const displayName = computed(() => meStore.profile?.displayName || authStore.email || 'Student')
 
-  // Remove "userData" from cookie
-  userData.value = null
+const initials = computed(() => {
+  const name = displayName.value
 
-  // Redirect to login page
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join('') || '?'
+})
+
+async function signOut() {
+  authStore.__signOut()
+  meStore.__setProfile(null)
+  if (typeof localStorage !== 'undefined') {
+    localStorage.removeItem('cena-mock-auth')
+    localStorage.removeItem('cena-mock-me')
+  }
   await router.push('/login')
-
-  // ℹ️ We had to remove abilities in then block because if we don't nav menu items mutation is visible while redirecting user to login page
-  // Remove "userAbilities" from cookie
-  useCookie('userAbilityRules').value = null
-
-  // Reset ability to initial ability
-  ability.update([])
 }
-
-const userProfileList = [
-  { type: 'divider' },
-  { type: 'navItem', icon: 'tabler-user', title: 'Profile', to: { name: 'apps-user-view-id', params: { id: 21 } } },
-  { type: 'navItem', icon: 'tabler-settings', title: 'Settings', to: { name: 'pages-account-settings-tab', params: { tab: 'account' } } },
-  { type: 'navItem', icon: 'tabler-file-dollar', title: 'Billing Plan', to: { name: 'pages-account-settings-tab', params: { tab: 'billing-plans' } }, badgeProps: { color: 'error', content: '4' } },
-  { type: 'divider' },
-  { type: 'navItem', icon: 'tabler-currency-dollar', title: 'Pricing', to: { name: 'pages-pricing' } },
-  { type: 'navItem', icon: 'tabler-question-mark', title: 'FAQ', to: { name: 'pages-faq' } },
-]
 </script>
 
 <template>
   <VBadge
-    v-if="userData"
+    v-if="authStore.isSignedIn"
     dot
     bordered
     location="bottom right"
@@ -49,115 +48,71 @@ const userProfileList = [
     <VAvatar
       size="38"
       class="cursor-pointer"
-      :color="!(userData && userData.avatar) ? 'primary' : undefined"
-      :variant="!(userData && userData.avatar) ? 'tonal' : undefined"
+      color="primary"
+      variant="tonal"
+      data-testid="user-profile-avatar"
     >
-      <VImg
-        v-if="userData && userData.avatar"
-        :src="userData.avatar"
-      />
-      <VIcon
-        v-else
-        icon="tabler-user"
-      />
+      <span class="text-caption font-weight-bold">{{ initials }}</span>
 
-      <!-- SECTION Menu -->
       <VMenu
         activator="parent"
         width="240"
         location="bottom end"
         offset="12px"
       >
-        <VList>
+        <VList density="compact">
           <VListItem>
-            <div class="d-flex gap-2 align-center">
-              <VListItemAction>
-                <VBadge
-                  dot
-                  location="bottom right"
-                  offset-x="3"
-                  offset-y="3"
-                  color="success"
-                  bordered
-                >
-                  <VAvatar
-                    :color="!(userData && userData.avatar) ? 'primary' : undefined"
-                    :variant="!(userData && userData.avatar) ? 'tonal' : undefined"
-                  >
-                    <VImg
-                      v-if="userData && userData.avatar"
-                      :src="userData.avatar"
-                    />
-                    <VIcon
-                      v-else
-                      icon="tabler-user"
-                    />
-                  </VAvatar>
-                </VBadge>
-              </VListItemAction>
-
-              <div>
-                <h6 class="text-h6 font-weight-medium">
-                  {{ userData.fullName || userData.username }}
-                </h6>
-                <VListItemSubtitle class="text-capitalize text-disabled">
-                  {{ userData.role }}
-                </VListItemSubtitle>
-              </div>
-            </div>
+            <template #prepend>
+              <VAvatar
+                size="36"
+                color="primary"
+                variant="tonal"
+              >
+                <span class="text-caption font-weight-bold">{{ initials }}</span>
+              </VAvatar>
+            </template>
+            <VListItemTitle class="font-weight-medium">
+              {{ displayName }}
+            </VListItemTitle>
+            <VListItemSubtitle class="text-disabled">
+              {{ authStore.email ?? '' }}
+            </VListItemSubtitle>
           </VListItem>
 
-          <PerfectScrollbar :options="{ wheelPropagation: false }">
-            <template
-              v-for="item in userProfileList"
-              :key="item.title"
+          <VDivider class="my-2" />
+
+          <VListItem
+            :to="{ name: 'profile' }"
+            prepend-icon="tabler-user"
+            data-testid="user-profile-menu-profile"
+          >
+            <VListItemTitle>{{ t('nav.profile') }}</VListItemTitle>
+          </VListItem>
+          <VListItem
+            :to="{ name: 'settings' }"
+            prepend-icon="tabler-settings"
+            data-testid="user-profile-menu-settings"
+          >
+            <VListItemTitle>{{ t('nav.settings') }}</VListItemTitle>
+          </VListItem>
+
+          <VDivider class="my-2" />
+
+          <div class="px-4 py-2">
+            <VBtn
+              block
+              size="small"
+              color="error"
+              variant="tonal"
+              append-icon="tabler-logout"
+              data-testid="user-profile-signout"
+              @click="signOut"
             >
-              <VListItem
-                v-if="item.type === 'navItem'"
-                :to="item.to"
-              >
-                <template #prepend>
-                  <VIcon
-                    :icon="item.icon"
-                    size="22"
-                  />
-                </template>
-
-                <VListItemTitle>{{ item.title }}</VListItemTitle>
-
-                <template
-                  v-if="item.badgeProps"
-                  #append
-                >
-                  <VBadge
-                    rounded="sm"
-                    class="me-3"
-                    v-bind="item.badgeProps"
-                  />
-                </template>
-              </VListItem>
-
-              <VDivider
-                v-else
-                class="my-2"
-              />
-            </template>
-
-            <div class="px-4 py-2">
-              <VBtn
-                block
-                size="small"
-                color="error"
-                append-icon="tabler-logout"
-                @click="logout"
-              >
-                Logout
-              </VBtn>
-            </div>
-          </PerfectScrollbar>
+              {{ t('nav.signOut') }}
+            </VBtn>
+          </div>
         </VList>
       </VMenu>
-      <!-- !SECTION -->
     </VAvatar>
   </VBadge>
 </template>

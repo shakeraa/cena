@@ -2,11 +2,15 @@
 import navItems from '@/navigation/vertical'
 import { themeConfig } from '@themeConfig'
 
-// Components
-import Footer from '@/layouts/components/Footer.vue'
+// Student-web layout navbar. STU-W-UI-POLISH stripped five Vuexy admin
+// leftovers (NavSearchBar, NavbarShortcuts, TheCustomizer, Footer slot,
+// and admin-specific menu items in UserProfile). Kept:
+//   - NavBarI18n: student language switcher
+//   - NavbarThemeSwitcher: dark/light toggle
+//   - NavBarNotifications: placeholder notifications bell — will be wired
+//     by STU-W-14 against STB-07's notification endpoint
+//   - UserProfile: simplified in STU-W-UI-POLISH to use authStore + meStore
 import NavBarNotifications from '@/layouts/components/NavBarNotifications.vue'
-import NavSearchBar from '@/layouts/components/NavSearchBar.vue'
-import NavbarShortcuts from '@/layouts/components/NavbarShortcuts.vue'
 import NavbarThemeSwitcher from '@/layouts/components/NavbarThemeSwitcher.vue'
 import UserProfile from '@/layouts/components/UserProfile.vue'
 import NavBarI18n from '@core/components/I18n.vue'
@@ -31,8 +35,6 @@ import { VerticalNavLayout } from '@layouts'
           />
         </IconBtn>
 
-        <NavSearchBar class="ms-lg-n3" />
-
         <VSpacer />
 
         <NavBarI18n
@@ -40,7 +42,6 @@ import { VerticalNavLayout } from '@layouts'
           :languages="themeConfig.app.i18n.langConfig"
         />
         <NavbarThemeSwitcher />
-        <NavbarShortcuts />
         <NavBarNotifications class="me-1" />
         <UserProfile />
       </div>
@@ -49,12 +50,8 @@ import { VerticalNavLayout } from '@layouts'
     <!-- 👉 Pages -->
     <slot />
 
-    <!-- 👉 Footer -->
-    <template #footer>
-      <Footer />
-    </template>
-
-    <!-- 👉 Customizer -->
-    <TheCustomizer />
+    <!-- STU-W-UI-POLISH: removed <Footer /> slot (Vuexy admin footer) and
+         <TheCustomizer /> (admin theme-picker panel). Student app ships
+         without a footer per docs/student/01-navigation-and-ia.md §Layouts. -->
   </VerticalNavLayout>
 </template>
