@@ -197,6 +197,19 @@ public static class MartenConfiguration
             .Index(x => x.Token)
             .Index(x => x.ExpiresAt);
 
+        // ── Tutor Thread Document (STB-04) ──
+        opts.Schema.For<TutorThreadDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.UpdatedAt);
+
+        // ── Tutor Message Document (STB-04) ──
+        opts.Schema.For<TutorMessageDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.ThreadId)
+            .Index(x => x.StudentId)
+            .Index(x => x.CreatedAt);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
