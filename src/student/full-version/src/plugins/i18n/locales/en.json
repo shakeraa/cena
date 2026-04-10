@@ -323,6 +323,19 @@
       "atRisk": "Your streak is at risk — complete a session today!"
     }
   },
+  "leaderboard": {
+    "title": "Leaderboard",
+    "subtitle": "See how you stack up against other learners.",
+    "yourRankLabel": "Your current rank",
+    "yourRankValue": "#{rank}",
+    "youChip": "You",
+    "xpValue": "{xp} XP",
+    "scope": {
+      "global": "Global",
+      "class": "My class",
+      "friends": "Friends"
+    }
+  },
   "challenges": {
     "hub": {
       "title": "Challenges",

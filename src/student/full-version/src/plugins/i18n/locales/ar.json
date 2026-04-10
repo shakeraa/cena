@@ -324,6 +324,19 @@
       "atRisk": "سلسلتك في خطر — أكمل جلسة اليوم!"
     }
   },
+  "leaderboard": {
+    "title": "لوحة المتصدرين",
+    "subtitle": "شاهد أين تقف مقارنة بالمتعلمين الآخرين.",
+    "yourRankLabel": "ترتيبك الحالي",
+    "yourRankValue": "#{rank}",
+    "youChip": "أنت",
+    "xpValue": "{xp} نقطة",
+    "scope": {
+      "global": "عالميًا",
+      "class": "صفي",
+      "friends": "الأصدقاء"
+    }
+  },
   "challenges": {
     "hub": {
       "title": "التحديات",

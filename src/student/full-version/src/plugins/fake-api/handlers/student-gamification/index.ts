@@ -95,20 +95,39 @@ const mockBadges = {
   ],
 }
 
+const NAMES_GLOBAL = ['Alex Chen', 'Priya Rao', 'Jordan Smith', 'Sam Park', 'Dev Student', 'Riley Evans', 'Casey Kim', 'Maya Patel', 'Noa Levi', 'Yusef Ali', 'Lina Morales', 'Ethan Clarke', 'Aisha Khan', 'Oliver Bennett', 'Sofia Russo', 'Daniel Lee', 'Zara Hoffman', 'Mateo García', 'Hannah Müller', 'Kenji Watanabe']
+const NAMES_CLASS = ['Dev Student', 'Elena Torres', 'Oren Barak', 'Haruki Sato', 'Fatima Al-Said', 'Leo Fischer', 'Maya Patel', 'Noa Levi']
+const NAMES_FRIENDS = ['Alex Chen', 'Priya Rao', 'Dev Student', 'Sam Park', 'Casey Kim']
+
 function makeLeaderboard(scope: string) {
-  const names = ['Alex Chen', 'Priya Rao', 'Jordan Smith', 'Sam Park', 'Dev Student', 'Riley Evans', 'Casey Kim', 'Maya Patel', 'Noa Levi', 'Yusef Ali']
+  let names: string[]
+  let myIndex: number
+
+  if (scope === 'class') {
+    names = NAMES_CLASS
+    myIndex = 0
+  }
+  else if (scope === 'friends') {
+    names = NAMES_FRIENDS
+    myIndex = 2
+  }
+  else {
+    names = NAMES_GLOBAL
+    myIndex = 4
+  }
+
   const entries = names.map((name, i) => ({
     rank: i + 1,
-    studentId: i === 4 ? 'u-dev-student' : `u-${i}`,
+    studentId: i === myIndex ? 'u-dev-student' : `u-${scope}-${i}`,
     displayName: name,
-    xp: 2400 - i * 180,
+    xp: 2400 - i * 150,
     avatarUrl: null,
   }))
 
   return {
     scope,
     entries,
-    currentStudentRank: 5,
+    currentStudentRank: myIndex + 1,
   }
 }
 
