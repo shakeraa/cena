@@ -173,6 +173,72 @@
   "25": "25",
   "50": "50",
   "100": "100",
+  "common": {
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "loading": "جار التحميل…",
+    "error": "خطأ",
+    "close": "إغلاق",
+    "retry": "إعادة المحاولة",
+    "copy": "نسخ"
+  },
+  "nav": {
+    "home": "الرئيسية",
+    "sessions": "الجلسات",
+    "progress": "التقدم",
+    "tutor": "المعلم",
+    "profile": "الملف الشخصي",
+    "settings": "الإعدادات",
+    "signOut": "تسجيل الخروج"
+  },
+  "status": {
+    "online": "متصل",
+    "offline": "غير متصل",
+    "syncing": "جاري المزامنة…",
+    "saved": "تم الحفظ"
+  },
+  "error": {
+    "network": "خطأ في الشبكة. تحقق من اتصالك.",
+    "unauthorized": "يجب عليك تسجيل الدخول للمتابعة.",
+    "notFound": "لم نتمكن من العثور على ذلك.",
+    "serverError": "حدث خطأ ما من جانبنا.",
+    "tryAgain": "حاول مرة أخرى",
+    "reportToSupport": "إبلاغ الدعم",
+    "errorCode": "رمز الخطأ"
+  },
+  "empty": {
+    "noSessions": "لا توجد جلسات بعد",
+    "noSessionsSubtitle": "ابدأ جلستك الدراسية الأولى لتراها هنا.",
+    "noNotifications": "لقد اطلعت على كل شيء",
+    "noResults": "لم يتم العثور على نتائج"
+  },
+  "language": {
+    "english": "English",
+    "arabic": "العربية",
+    "hebrew": "עברית",
+    "switchLanguage": "تغيير اللغة"
+  },
+  "flow": {
+    "warming": "الإحماء",
+    "approaching": "اكتساب الزخم",
+    "inFlow": "في تدفق",
+    "disrupted": "إعادة التركيز",
+    "fatigued": "استراحة"
+  },
+  "mastery": {
+    "novice": "مبتدئ",
+    "learning": "يتعلم",
+    "proficient": "ماهر",
+    "mastered": "متقن",
+    "expert": "خبير"
+  },
+  "kpi": {
+    "trendUp": "اتجاه صاعد",
+    "trendDown": "اتجاه هابط",
+    "trendFlat": "لا تغيير"
+  },
   "$vuetify": {
     "badge": "شارة",
     "noDataText": "لا تتوافر بيانات",

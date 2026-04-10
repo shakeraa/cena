@@ -1,0 +1,107 @@
+{
+  "UI Elements": "רכיבי ממשק",
+  "Pages": "דפים",
+  "Dashboards": "לוחות בקרה",
+  "Settings": "הגדרות",
+  "Login": "התחברות",
+  "Register": "הרשמה",
+  "Logout": "התנתקות",
+  "Home": "בית",
+  "common": {
+    "save": "שמור",
+    "cancel": "בטל",
+    "delete": "מחק",
+    "edit": "ערוך",
+    "loading": "טוען…",
+    "error": "שגיאה",
+    "close": "סגור",
+    "retry": "נסה שוב",
+    "copy": "העתק"
+  },
+  "nav": {
+    "home": "בית",
+    "sessions": "שיעורים",
+    "progress": "התקדמות",
+    "tutor": "מורה",
+    "profile": "פרופיל",
+    "settings": "הגדרות",
+    "signOut": "התנתק"
+  },
+  "status": {
+    "online": "מחובר",
+    "offline": "לא מחובר",
+    "syncing": "מסנכרן…",
+    "saved": "נשמר"
+  },
+  "error": {
+    "network": "שגיאת רשת. בדוק את החיבור שלך.",
+    "unauthorized": "עליך להתחבר כדי להמשיך.",
+    "notFound": "לא הצלחנו למצוא זאת.",
+    "serverError": "משהו השתבש אצלנו.",
+    "tryAgain": "נסה שוב",
+    "reportToSupport": "דווח לתמיכה",
+    "errorCode": "קוד שגיאה"
+  },
+  "empty": {
+    "noSessions": "אין שיעורים עדיין",
+    "noSessionsSubtitle": "התחל את שיעור הלימוד הראשון שלך כדי לראות אותו כאן.",
+    "noNotifications": "אין הודעות חדשות",
+    "noResults": "לא נמצאו תוצאות"
+  },
+  "language": {
+    "english": "English",
+    "arabic": "العربية",
+    "hebrew": "עברית",
+    "switchLanguage": "החלף שפה"
+  },
+  "flow": {
+    "warming": "התחממות",
+    "approaching": "צובר תאוצה",
+    "inFlow": "בזרימה",
+    "disrupted": "חזרה למיקוד",
+    "fatigued": "מנוחה"
+  },
+  "mastery": {
+    "novice": "מתחיל",
+    "learning": "לומד",
+    "proficient": "מיומן",
+    "mastered": "שולט",
+    "expert": "מומחה"
+  },
+  "kpi": {
+    "trendUp": "במגמת עלייה",
+    "trendDown": "במגמת ירידה",
+    "trendFlat": "ללא שינוי"
+  },
+  "$vuetify": {
+    "badge": "תג",
+    "noDataText": "אין נתונים זמינים",
+    "close": "סגור",
+    "open": "פתח",
+    "loading": "טוען",
+    "dataFooter": {
+      "itemsPerPageText": "פריטים בעמוד:",
+      "itemsPerPageAll": "הכל",
+      "pageText": "{0}-{1} מתוך {2}",
+      "firstPage": "עמוד ראשון",
+      "prevPage": "עמוד קודם",
+      "nextPage": "עמוד הבא",
+      "lastPage": "עמוד אחרון"
+    },
+    "pagination": {
+      "ariaLabel": {
+        "root": "שורש",
+        "previous": "הקודם",
+        "first": "ראשון",
+        "last": "אחרון",
+        "next": "הבא",
+        "currentPage": "עמוד נוכחי",
+        "page": "עמוד"
+      }
+    },
+    "input": {
+      "clear": "נקה",
+      "otp": "OTP"
+    }
+  }
+}

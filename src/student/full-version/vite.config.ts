@@ -24,6 +24,7 @@ export default defineConfig({
           .replace(/([a-z\d])([A-Z])/g, '$1-$2')
           .toLowerCase()
       },
+
       // STU-W-00: removed admin apps/email manual route inserts (referenced
       // src/pages/apps/email/index.vue which was pruned). If any student
       // feature tasks need manual route inserts, add them here.

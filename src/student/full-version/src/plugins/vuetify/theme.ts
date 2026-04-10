@@ -3,6 +3,86 @@ import type { ThemeDefinition } from 'vuetify'
 export const staticPrimaryColor = '#7367F0'
 export const staticPrimaryDarkenColor = '#675DD8'
 
+/**
+ * Student-specific design tokens (flow state + mastery levels).
+ * Mirrors the mobile `FlowAmbientIndicator` color scheme and the mastery
+ * progression from `docs/student/02-design-system.md`.
+ *
+ * These live as strongly-typed semantic tokens rather than Vuetify color
+ * slots, because Vuetify strips unknown `ThemeDefinition` keys at runtime.
+ * Consumers read them via the `useStudentTheme()` composable which returns
+ * the right variant for the currently active Vuetify theme.
+ */
+export interface StudentFlowTokens {
+  warming: string
+  approaching: string
+  inFlow: string
+  disrupted: string
+  fatigued: string
+}
+
+export interface StudentMasteryTokens {
+  novice: string
+  learning: string
+  proficient: string
+  mastered: string
+  expert: string
+}
+
+export interface StudentThemeExtension {
+  flow: StudentFlowTokens
+  mastery: StudentMasteryTokens
+}
+
+export type FlowState = keyof StudentFlowTokens
+export type MasteryLevel = keyof StudentMasteryTokens
+
+export const studentLight: StudentThemeExtension = {
+  flow: {
+    warming: '#1565C0',
+    approaching: '#FF8F00',
+    inFlow: '#FFB300',
+    disrupted: '#1565C0',
+    fatigued: 'transparent',
+  },
+  mastery: {
+    novice: '#EF5350',
+    learning: '#FFA726',
+    proficient: '#66BB6A',
+    mastered: '#42A5F5',
+    expert: '#AB47BC',
+  },
+}
+
+// Dark variants pre-computed at theme-definition time (not runtime).
+// Per 02-design-system.md §Dark Mode: "all flow / mastery tokens have
+// dark-mode variants pre-computed".
+export const studentDark: StudentThemeExtension = {
+  flow: {
+    warming: '#42A5F5',
+    approaching: '#FFB74D',
+    inFlow: '#FFCA28',
+    disrupted: '#42A5F5',
+    fatigued: 'transparent',
+  },
+  mastery: {
+    novice: '#FF7370',
+    learning: '#FFB74D',
+    proficient: '#81C784',
+    mastered: '#64B5F6',
+    expert: '#BA68C8',
+  },
+}
+
+export const studentTokens = {
+  light: studentLight,
+  dark: studentDark,
+} as const
+
+export function getStudentTokens(themeName: string): StudentThemeExtension {
+  return themeName === 'dark' ? studentDark : studentLight
+}
+
 export const themes: Record<string, ThemeDefinition> = {
   light: {
     dark: false,
@@ -44,6 +124,15 @@ export const themes: Record<string, ThemeDefinition> = {
       'skin-bordered-background': '#fff',
       'skin-bordered-surface': '#fff',
       'expansion-panel-text-custom-bg': '#fafafa',
+      'flow-warming': studentLight.flow.warming,
+      'flow-approaching': studentLight.flow.approaching,
+      'flow-in-flow': studentLight.flow.inFlow,
+      'flow-disrupted': studentLight.flow.disrupted,
+      'mastery-novice': studentLight.mastery.novice,
+      'mastery-learning': studentLight.mastery.learning,
+      'mastery-proficient': studentLight.mastery.proficient,
+      'mastery-mastered': studentLight.mastery.mastered,
+      'mastery-expert': studentLight.mastery.expert,
     },
 
     variables: {
@@ -117,6 +206,15 @@ export const themes: Record<string, ThemeDefinition> = {
       'perfect-scrollbar-thumb': '#4A5072',
       'skin-bordered-background': '#2F3349',
       'skin-bordered-surface': '#2F3349',
+      'flow-warming': studentDark.flow.warming,
+      'flow-approaching': studentDark.flow.approaching,
+      'flow-in-flow': studentDark.flow.inFlow,
+      'flow-disrupted': studentDark.flow.disrupted,
+      'mastery-novice': studentDark.mastery.novice,
+      'mastery-learning': studentDark.mastery.learning,
+      'mastery-proficient': studentDark.mastery.proficient,
+      'mastery-mastered': studentDark.mastery.mastered,
+      'mastery-expert': studentDark.mastery.expert,
     },
     variables: {
       'code-color': '#d400ff',

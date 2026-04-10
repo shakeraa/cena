@@ -41,3 +41,11 @@ public/mockServiceWorker.js
 # Env files
 .env*
 !.env.example
+
+# STU-W-01 test tooling artifacts (keep screenshots, drop traces)
+test-results/stuw01/playwright-artifacts/
+playwright-report/
+coverage/
+
+# Claude scratch
+.claude-flow/

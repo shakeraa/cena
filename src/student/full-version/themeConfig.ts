@@ -25,13 +25,13 @@ export const { themeConfig, layoutConfig } = defineThemeConfig({
           isRTL: false,
         },
         {
-          label: 'French',
-          i18nLang: 'fr',
-          isRTL: false,
+          label: 'العربية',
+          i18nLang: 'ar',
+          isRTL: true,
         },
         {
-          label: 'Arabic',
-          i18nLang: 'ar',
+          label: 'עברית',
+          i18nLang: 'he',
           isRTL: true,
         },
       ],

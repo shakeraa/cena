@@ -195,9 +195,12 @@ module.exports = {
     //   },
     // }],
 
-    // Internal Rules
-    'valid-appcardcode-code-prop': 'error',
-    'valid-appcardcode-demo-sfc': 'error',
+    // Internal Rules (disabled — STU-W-01 dropped the --rulesdir flag that
+    // loaded eslint-internal-rules/ since that directory was pruned from the
+    // STU-W-00 scaffold; these rules only applied to Vuexy admin AppCardCode
+    // demos which the student app does not use).
+    // 'valid-appcardcode-code-prop': 'error',
+    // 'valid-appcardcode-demo-sfc': 'error',
 
     // https://github.com/gmullerb/eslint-plugin-regex
     'regex/invalid': [

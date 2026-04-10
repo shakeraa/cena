@@ -172,6 +172,72 @@
   "25": "25",
   "50": "50",
   "100": "100",
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading…",
+    "error": "Error",
+    "close": "Close",
+    "retry": "Retry",
+    "copy": "Copy"
+  },
+  "nav": {
+    "home": "Home",
+    "sessions": "Sessions",
+    "progress": "Progress",
+    "tutor": "Tutor",
+    "profile": "Profile",
+    "settings": "Settings",
+    "signOut": "Sign out"
+  },
+  "status": {
+    "online": "Online",
+    "offline": "Offline",
+    "syncing": "Syncing…",
+    "saved": "Saved"
+  },
+  "error": {
+    "network": "Network error. Check your connection.",
+    "unauthorized": "You need to sign in to continue.",
+    "notFound": "We couldn't find that.",
+    "serverError": "Something went wrong on our end.",
+    "tryAgain": "Try again",
+    "reportToSupport": "Report to support",
+    "errorCode": "Error code"
+  },
+  "empty": {
+    "noSessions": "No sessions yet",
+    "noSessionsSubtitle": "Start your first learning session to see it here.",
+    "noNotifications": "You're all caught up",
+    "noResults": "No results found"
+  },
+  "language": {
+    "english": "English",
+    "arabic": "العربية",
+    "hebrew": "עברית",
+    "switchLanguage": "Switch language"
+  },
+  "flow": {
+    "warming": "Warming up",
+    "approaching": "Building momentum",
+    "inFlow": "In flow",
+    "disrupted": "Refocus",
+    "fatigued": "Rest"
+  },
+  "mastery": {
+    "novice": "Novice",
+    "learning": "Learning",
+    "proficient": "Proficient",
+    "mastered": "Mastered",
+    "expert": "Expert"
+  },
+  "kpi": {
+    "trendUp": "Trending up",
+    "trendDown": "Trending down",
+    "trendFlat": "No change"
+  },
   "$vuetify": {
     "badge": "Badge",
     "noDataText": "No data available",
