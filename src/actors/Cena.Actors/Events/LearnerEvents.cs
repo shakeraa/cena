@@ -224,3 +224,20 @@ public record TeacherMethodologyOverride_V1(
     string TeacherId,
     DateTimeOffset Timestamp
 ) : IDelegatedEvent;
+
+// =============================================================================
+// ONBOARDING EVENTS (STB-00)
+// =============================================================================
+
+/// <summary>
+/// Emitted when a student completes the onboarding wizard.
+/// Captures initial preferences and learning goals.
+/// </summary>
+public record OnboardingCompleted_V1(
+    string StudentId,
+    string Role,                              // 'student' | 'self-learner' | 'test-prep' | 'homeschool'
+    string Locale,                            // 'en' | 'ar' | 'he'
+    string[] Subjects,
+    int DailyTimeGoalMinutes,
+    DateTimeOffset CompletedAt
+) : IDelegatedEvent;

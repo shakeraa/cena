@@ -3,7 +3,8 @@
 // Measures precision, recall, F1 against labeled test set
 // =============================================================================
 
-using Cena.Admin.Api.QualityGate;
+using Cena.Api.Contracts.Admin.QualityGate;
+using QualityGateServices = Cena.Admin.Api.QualityGate;
 
 namespace Cena.Admin.Api.Tests.QualityGate;
 
@@ -14,7 +15,7 @@ namespace Cena.Admin.Api.Tests.QualityGate;
 /// </summary>
 public class QualityGateTests
 {
-    private readonly QualityGateService _service = new();
+    private readonly QualityGateServices.QualityGateService _service = new();
 
     [Fact]
     public async Task QualityGate_F1Score_MeetsThreshold()

@@ -41,6 +41,16 @@ public class StudentProfileSnapshot
     // ── Account Lifecycle (LCM-001) ──
     public string AccountStatus { get; set; } = "Active";
 
+    // ── Onboarding (STB-00) ──
+    public DateTime? OnboardedAt { get; set; }
+    public string? Role { get; set; }
+    public string? Locale { get; set; }
+    public string[] Subjects { get; set; } = Array.Empty<string>();
+    public int DailyTimeGoalMinutes { get; set; }
+    public string? DisplayName { get; set; }
+    public string? Bio { get; set; }
+    public string Visibility { get; set; } = "class-only";
+
     // ── Hierarchical Methodology Maps ──
     public Dictionary<string, MethodologyAssignment> SubjectMethodologyMap { get; set; } = new();
     public Dictionary<string, MethodologyAssignment> TopicMethodologyMap { get; set; } = new();
@@ -182,6 +192,18 @@ public class StudentProfileSnapshot
         }
 
         SessionsSinceSwitch[e.LevelId] = 0;
+    }
+
+    /// <summary>
+    /// STB-00: Apply onboarding completion event
+    /// </summary>
+    public void Apply(OnboardingCompleted_V1 e)
+    {
+        OnboardedAt = e.CompletedAt.UtcDateTime;
+        Role = e.Role;
+        Locale = e.Locale;
+        Subjects = e.Subjects;
+        DailyTimeGoalMinutes = e.DailyTimeGoalMinutes;
     }
 }
 
