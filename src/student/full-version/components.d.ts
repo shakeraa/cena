@@ -27,6 +27,7 @@ declare module 'vue' {
     AppTextarea: typeof import('./src/@core/components/app-form-elements/AppTextarea.vue')['default']
     AppTextField: typeof import('./src/@core/components/app-form-elements/AppTextField.vue')['default']
     AuthProviderButtons: typeof import('./src/components/common/AuthProviderButtons.vue')['default']
+    BadgeGrid: typeof import('./src/components/progress/BadgeGrid.vue')['default']
     BuyNow: typeof import('./src/@core/components/BuyNow.vue')['default']
     CardAddEditDialog: typeof import('./src/components/dialogs/CardAddEditDialog.vue')['default']
     CardStatisticsHorizontal: typeof import('./src/@core/components/cards/CardStatisticsHorizontal.vue')['default']
@@ -52,6 +53,7 @@ declare module 'vue' {
     KpiCard: typeof import('./src/components/common/KpiCard.vue')['default']
     LanguagePicker: typeof import('./src/components/onboarding/LanguagePicker.vue')['default']
     LanguageSwitcher: typeof import('./src/components/common/LanguageSwitcher.vue')['default']
+    LeaderboardPreview: typeof import('./src/components/progress/LeaderboardPreview.vue')['default']
     MoreBtn: typeof import('./src/@core/components/MoreBtn.vue')['default']
     Notifications: typeof import('./src/@core/components/Notifications.vue')['default']
     OnboardingStepper: typeof import('./src/components/onboarding/OnboardingStepper.vue')['default']
@@ -82,5 +84,6 @@ declare module 'vue' {
     TwoFactorAuthDialog: typeof import('./src/components/dialogs/TwoFactorAuthDialog.vue')['default']
     UserInfoEditDialog: typeof import('./src/components/dialogs/UserInfoEditDialog.vue')['default']
     UserUpgradePlanDialog: typeof import('./src/components/dialogs/UserUpgradePlanDialog.vue')['default']
+    XpProgressCard: typeof import('./src/components/progress/XpProgressCard.vue')['default']
   }
 }

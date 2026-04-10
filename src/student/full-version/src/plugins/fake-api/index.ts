@@ -22,6 +22,9 @@ import { handlerPagesProfile } from '@db/pages/profile/index'
 // STU-W-05B: student /api/me handlers for dev-loop when Cena.Api.Host is offline.
 import { handlerStudentMe } from '@db/student-me/index'
 
+// STU-W-07: student /api/gamification/* handlers for the progress dashboard.
+import { handlerStudentGamification } from '@db/student-gamification/index'
+
 const worker = setupWorker(
   ...handlerAppsEcommerce,
   ...handlerAppsAcademy,
@@ -41,6 +44,7 @@ const worker = setupWorker(
   ...handlerAppsKanban,
   ...handlerDashboard,
   ...handlerStudentMe,
+  ...handlerStudentGamification,
 )
 
 export default function () {

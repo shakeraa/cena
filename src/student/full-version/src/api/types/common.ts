@@ -62,3 +62,52 @@ export interface MeBootstrapDto {
   streakDays: number
   avatarUrl: string | null
 }
+
+/**
+ * Gamification DTOs from STB-03 Phase 1. Mirrors
+ * `src/api/Cena.Api.Contracts/Gamification/GamificationDtos.cs`.
+ * Consumed by STU-W-07 progress dashboard.
+ */
+export type BadgeTier = 'bronze' | 'silver' | 'gold' | 'platinum'
+
+export interface Badge {
+  badgeId: string
+  name: string
+  description: string
+  iconName: string
+  tier: BadgeTier
+  earnedAt: string | null
+}
+
+export interface BadgeListResponse {
+  earned: Badge[]
+  locked: Badge[]
+}
+
+export interface XpStatusDto {
+  currentLevel: number
+  currentXp: number
+  xpToNextLevel: number
+  totalXpEarned: number
+}
+
+export interface StreakStatusDto {
+  currentDays: number
+  longestDays: number
+  lastActivityAt: string | null
+  isAtRisk: boolean
+}
+
+export interface LeaderboardEntry {
+  rank: number
+  studentId: string
+  displayName: string
+  xp: number
+  avatarUrl: string | null
+}
+
+export interface LeaderboardDto {
+  scope: string
+  entries: LeaderboardEntry[]
+  currentStudentRank: number
+}
