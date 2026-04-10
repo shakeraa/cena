@@ -42,9 +42,9 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     await seedAuth(page, { uid: 'u-routing' })
 
     // `/home` (STU-W-05A), `/progress` (STU-W-07), `/tutor` (STU-W-08),
-    // and `/challenges` (STU-W-11) have been replaced with real pages
-    // and no longer render the placeholder testid. Covered by the
-    // per-feature spec files.
+    // `/challenges` (STU-W-11), and `/social/leaderboard` (STU-W-13)
+    // have been replaced with real pages and no longer render the
+    // placeholder testid. Covered by the per-feature spec files.
     const routes = [
       '/session',
       '/challenges/daily',
@@ -55,7 +55,6 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
       '/knowledge-graph',
       '/social',
       '/social/peers',
-      '/social/leaderboard',
       '/social/friends',
       '/notifications',
       '/profile',

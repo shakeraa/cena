@@ -158,6 +158,19 @@
       "atRisk": "הרצף שלך בסכנה — השלם שיעור היום!"
     }
   },
+  "leaderboard": {
+    "title": "טבלת מובילים",
+    "subtitle": "בדוק איפה אתה עומד ביחס ללומדים אחרים.",
+    "yourRankLabel": "הדירוג הנוכחי שלך",
+    "yourRankValue": "#{rank}",
+    "youChip": "אתה",
+    "xpValue": "{xp} נק׳",
+    "scope": {
+      "global": "גלובלי",
+      "class": "הכיתה שלי",
+      "friends": "חברים"
+    }
+  },
   "challenges": {
     "hub": {
       "title": "אתגרים",
