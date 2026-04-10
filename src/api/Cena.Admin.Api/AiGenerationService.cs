@@ -14,6 +14,7 @@ using Anthropic.Core;
 using Anthropic.Models.Messages;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using QualityGateServices = Cena.Admin.Api.QualityGate;
 
 namespace Cena.Admin.Api;
 
@@ -130,7 +131,7 @@ public sealed record BatchGenerateRequest(
 
 public sealed record BatchGenerateResult(
     AiGeneratedQuestion Question,
-    QualityGate.QualityGateResult QualityGate,
+    QualityGateResult QualityGate,
     bool PassedQualityGate);
 
 public sealed record BatchGenerateResponse(
@@ -185,8 +186,8 @@ public interface IAiGenerationService
     Task<AiSettingsResponse> GetSettingsAsync();
     Task<bool> UpdateSettingsAsync(UpdateAiSettingsRequest request, string userId);
     Task<bool> TestConnectionAsync(AiProvider provider);
-    Task<BatchGenerateResponse> BatchGenerateAsync(BatchGenerateRequest request, QualityGate.IQualityGateService qualityGate);
-    Task<TemplateGenerateResponse> GenerateFromTemplateAsync(TemplateGenerateRequest request, QualityGate.IQualityGateService qualityGate);
+    Task<BatchGenerateResponse> BatchGenerateAsync(BatchGenerateRequest request, QualityGateServices.IQualityGateService qualityGate);
+    Task<TemplateGenerateResponse> GenerateFromTemplateAsync(TemplateGenerateRequest request, QualityGateServices.IQualityGateService qualityGate);
 }
 
 // ── Implementation ──
@@ -740,7 +741,7 @@ public sealed class AiGenerationService : IAiGenerationService
     // ── Batch Generation (CNT-002) ──
 
     public async Task<BatchGenerateResponse> BatchGenerateAsync(
-        BatchGenerateRequest req, QualityGate.IQualityGateService qualityGate)
+        BatchGenerateRequest req, QualityGateServices.IQualityGateService qualityGate)
     {
         var count = Math.Clamp(req.Count, 1, 20);
         var min   = Math.Clamp(req.MinDifficulty, 0f, 1f);
@@ -787,11 +788,11 @@ public sealed class AiGenerationService : IAiGenerationService
                 .Select((o, i) => (o, i))
                 .FirstOrDefault(x => x.o.IsCorrect).i;
 
-            var gateInput = new QualityGate.QualityGateInput(
+            var gateInput = new QualityGateInput(
                 QuestionId:       questionId,
                 Stem:             question.Stem,
                 Options:          question.Options.Select(o =>
-                    new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale))
+                    new QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale))
                     .ToList(),
                 CorrectOptionIndex: correctIndex,
                 Subject:          req.Subject,
@@ -802,7 +803,7 @@ public sealed class AiGenerationService : IAiGenerationService
                 ConceptIds:       null);
 
             var gateResult = await qualityGate.EvaluateAsync(gateInput);
-            var passed = gateResult.Decision != QualityGate.GateDecision.AutoRejected;
+            var passed = gateResult.Decision != GateDecision.AutoRejected;
 
             results.Add(new BatchGenerateResult(question, gateResult, passed));
         }
@@ -811,9 +812,9 @@ public sealed class AiGenerationService : IAiGenerationService
             Success:           true,
             Results:           results,
             TotalGenerated:    results.Count,
-            PassedQualityGate: results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.AutoApproved),
-            NeedsReview:       results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.NeedsReview),
-            AutoRejected:      results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.AutoRejected),
+            PassedQualityGate: results.Count(r => r.QualityGate.Decision == GateDecision.AutoApproved),
+            NeedsReview:       results.Count(r => r.QualityGate.Decision == GateDecision.NeedsReview),
+            AutoRejected:      results.Count(r => r.QualityGate.Decision == GateDecision.AutoRejected),
             ModelUsed:         generateResponse.ModelUsed,
             Error:             null);
     }
@@ -821,7 +822,7 @@ public sealed class AiGenerationService : IAiGenerationService
     // ── Template (OCR) Generation (CNT-002) ──
 
     public async Task<TemplateGenerateResponse> GenerateFromTemplateAsync(
-        TemplateGenerateRequest req, QualityGate.IQualityGateService qualityGate)
+        TemplateGenerateRequest req, QualityGateServices.IQualityGateService qualityGate)
     {
         if (string.IsNullOrWhiteSpace(req.OcrText))
         {
@@ -882,11 +883,11 @@ public sealed class AiGenerationService : IAiGenerationService
                 .Select((o, i) => (o, i))
                 .FirstOrDefault(x => x.o.IsCorrect).i;
 
-            var gateInput = new QualityGate.QualityGateInput(
+            var gateInput = new QualityGateInput(
                 QuestionId:       questionId,
                 Stem:             question.Stem,
                 Options:          question.Options.Select(o =>
-                    new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale))
+                    new QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale))
                     .ToList(),
                 CorrectOptionIndex: correctIndex,
                 Subject:          req.Subject,
@@ -897,7 +898,7 @@ public sealed class AiGenerationService : IAiGenerationService
                 ConceptIds:       null);
 
             var gateResult = await qualityGate.EvaluateAsync(gateInput);
-            var passed = gateResult.Decision != QualityGate.GateDecision.AutoRejected;
+            var passed = gateResult.Decision != GateDecision.AutoRejected;
 
             results.Add(new BatchGenerateResult(question, gateResult, passed));
         }
@@ -906,9 +907,9 @@ public sealed class AiGenerationService : IAiGenerationService
             Success:           true,
             Results:           results,
             TotalGenerated:    results.Count,
-            PassedQualityGate: results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.AutoApproved),
-            NeedsReview:       results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.NeedsReview),
-            AutoRejected:      results.Count(r => r.QualityGate.Decision == QualityGate.GateDecision.AutoRejected),
+            PassedQualityGate: results.Count(r => r.QualityGate.Decision == GateDecision.AutoApproved),
+            NeedsReview:       results.Count(r => r.QualityGate.Decision == GateDecision.NeedsReview),
+            AutoRejected:      results.Count(r => r.QualityGate.Decision == GateDecision.AutoRejected),
             ModelUsed:         generateResponse.ModelUsed,
             Error:             null);
     }
