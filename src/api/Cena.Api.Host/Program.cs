@@ -247,6 +247,9 @@ app.MapStudentAnalyticsEndpoints();
 // ---- Me/Profile REST endpoints (STB-00) ----
 app.MapMeEndpoints();
 
+// ---- Gamification REST endpoints (STB-03) ----
+app.MapGamificationEndpoints();
+
 // ---- SignalR Hub (SES-001) ----
 app.MapCenaHub();
 
