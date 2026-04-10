@@ -1,9 +1,9 @@
 // =============================================================================
-// Cena Platform -- SignalR Hub Contracts (SES-001.1)
+// Cena Platform -- SignalR Hub Contracts (DB-05)
 // Typed interfaces and DTOs for CenaHub client/server communication.
 // =============================================================================
 
-namespace Cena.Api.Host.Hubs;
+namespace Cena.Api.Contracts.Hub;
 
 // ── Server → Client (ICenaClient) ──────────────────────────────────────────
 

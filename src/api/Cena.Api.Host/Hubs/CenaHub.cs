@@ -7,6 +7,7 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Cena.Actors.Bus;
+using Cena.Api.Contracts.Hub;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using NATS.Client.Core;

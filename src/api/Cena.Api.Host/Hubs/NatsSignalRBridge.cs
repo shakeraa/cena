@@ -6,6 +6,7 @@
 
 using System.Text.Json;
 using Cena.Actors.Bus;
+using Cena.Api.Contracts.Hub;
 using Cena.Infrastructure.Tracing;
 using Microsoft.AspNetCore.SignalR;
 using NATS.Client.Core;

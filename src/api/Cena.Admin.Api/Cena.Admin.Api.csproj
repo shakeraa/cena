@@ -9,6 +9,7 @@
   <ItemGroup>
     <ProjectReference Include="../../shared/Cena.Infrastructure/Cena.Infrastructure.csproj" />
     <ProjectReference Include="../../actors/Cena.Actors/Cena.Actors.csproj" />
+    <ProjectReference Include="../Cena.Api.Contracts/Cena.Api.Contracts.csproj" />
   </ItemGroup>
 
   <ItemGroup>
