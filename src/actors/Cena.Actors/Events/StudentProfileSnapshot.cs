@@ -205,6 +205,15 @@ public class StudentProfileSnapshot
         Subjects = e.Subjects;
         DailyTimeGoalMinutes = e.DailyTimeGoalMinutes;
     }
+
+    /// <summary>
+    /// STB-01: Apply learning session started event
+    /// </summary>
+    public void Apply(LearningSessionStarted_V1 e)
+    {
+        // Track session count for analytics
+        SessionCount++;
+    }
 }
 
 public class ConceptMasteryState
