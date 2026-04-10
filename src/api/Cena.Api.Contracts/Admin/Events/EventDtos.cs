@@ -3,7 +3,7 @@
 // ADM-013: Real-time event monitoring and dead letter queue
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Events;
 
 // Live Event Stream
 public sealed record EventStreamResponse(

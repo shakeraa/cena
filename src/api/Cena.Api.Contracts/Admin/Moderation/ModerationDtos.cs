@@ -3,7 +3,16 @@
 // ADM-005: Content moderation queue and review workflows
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Moderation;
+
+public enum ModerationStatus
+{
+    Pending,
+    InReview,
+    Approved,
+    Rejected,
+    Flagged
+}
 
 // Moderation Queue Item
 public sealed record ModerationQueueItem(
@@ -18,15 +27,6 @@ public sealed record ModerationQueueItem(
     int AiQualityScore,
     string SourceType  // authored, ingested
 );
-
-public enum ModerationStatus
-{
-    Pending,
-    InReview,
-    Approved,
-    Rejected,
-    Flagged
-}
 
 // Queue Response
 public sealed record ModerationQueueResponse(

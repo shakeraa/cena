@@ -1,6 +1,6 @@
 // Cena Platform -- Experiment Admin DTOs (ADM-019)
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Experiments;
 
 /// <summary>List of all known A/B experiments with summary metrics.</summary>
 public sealed record ExperimentListResponse(

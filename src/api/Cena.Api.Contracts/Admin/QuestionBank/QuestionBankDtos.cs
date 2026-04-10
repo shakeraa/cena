@@ -3,7 +3,16 @@
 // ADM-010: Question bank browser and management
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.QuestionBank;
+
+public enum QuestionStatus
+{
+    Draft,
+    InReview,
+    Approved,
+    Published,
+    Deprecated
+}
 
 // Question List
 public sealed record QuestionListResponse(
@@ -23,15 +32,6 @@ public sealed record QuestionListItem(
     int QualityScore,
     int UsageCount,
     float? SuccessRate);
-
-public enum QuestionStatus
-{
-    Draft,
-    InReview,
-    Approved,
-    Published,
-    Deprecated
-}
 
 // Question Filters
 public sealed record QuestionFiltersResponse(

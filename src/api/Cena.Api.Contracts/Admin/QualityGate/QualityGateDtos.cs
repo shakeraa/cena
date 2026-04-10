@@ -3,7 +3,22 @@
 // Automated quality scoring for AI-generated educational questions
 // =============================================================================
 
-namespace Cena.Admin.Api.QualityGate;
+namespace Cena.Api.Contracts.Admin.QualityGate;
+
+public enum GateDecision
+{
+    AutoApproved,
+    NeedsReview,
+    AutoRejected
+}
+
+public enum ViolationSeverity
+{
+    Info,
+    Warning,
+    Error,
+    Critical
+}
 
 /// <summary>
 /// Extended quality scores with per-dimension breakdown and gate decision.
@@ -26,26 +41,11 @@ public sealed record DimensionScores(
     int StructuralValidity,
     int CulturalSensitivity);
 
-public enum GateDecision
-{
-    AutoApproved,
-    NeedsReview,
-    AutoRejected
-}
-
 public sealed record QualityViolation(
     string Dimension,
     string RuleId,
     string Description,
     ViolationSeverity Severity);
-
-public enum ViolationSeverity
-{
-    Info,
-    Warning,
-    Error,
-    Critical
-}
 
 /// <summary>
 /// Input to the quality gate — a question candidate to evaluate.

@@ -3,7 +3,7 @@
 // BKD-004: Response types for dashboard overview, activity, alerts, charts
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Dashboard;
 
 // Overview Widgets
 public sealed record DashboardOverviewResponse(

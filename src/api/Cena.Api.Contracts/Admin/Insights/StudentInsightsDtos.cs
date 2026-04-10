@@ -4,7 +4,9 @@
 // hint usage, stagnation, session patterns, response time anomalies.
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Insights;
+
+using Cena.Api.Contracts.Admin.Analytics; // For HeatmapCell, DegradationPoint shared types
 
 // ── Focus Heatmap (per-student) ──
 public sealed record StudentFocusHeatmapResponse(

@@ -3,7 +3,7 @@
 // ADM-017: Response types for tutoring session dashboard, budget, analytics
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Tutoring;
 
 // Paginated session list
 public sealed record TutoringSessionListResponse(

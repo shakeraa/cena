@@ -2,7 +2,7 @@
 // Cena Platform -- Embedding Admin DTOs (ADM-020)
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Embeddings;
 
 // ── Corpus Statistics ──
 

@@ -3,7 +3,7 @@
 // ADM-012: Cultural equity and inclusion monitoring
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Cultural;
 
 // Cultural Distribution Dashboard
 public sealed record CulturalDistributionResponse(

@@ -3,7 +3,7 @@
 // ADM-011: Methodology effectiveness and stagnation monitoring
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Methodology;
 
 // Methodology Effectiveness Dashboard
 public sealed record MethodologyEffectivenessResponse(

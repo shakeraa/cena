@@ -3,7 +3,7 @@
 // ADM-026: SSE event types and active session snapshot for live monitor page
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Monitoring;
 
 // ── SSE Event Envelope ──
 

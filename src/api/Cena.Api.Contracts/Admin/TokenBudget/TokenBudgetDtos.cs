@@ -1,6 +1,6 @@
 // Cena Platform -- Token Budget & NATS Admin DTOs (ADM-023)
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.TokenBudget;
 
 public sealed record TokenBudgetStatusResponse(
     List<StudentTokenUsageDto> Students,

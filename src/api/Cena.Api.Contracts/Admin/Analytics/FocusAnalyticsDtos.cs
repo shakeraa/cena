@@ -3,7 +3,7 @@
 // ADM-006: Focus & attention analytics for teachers and admins
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Analytics;
 
 // Focus Overview Dashboard
 public sealed record FocusOverviewResponse(

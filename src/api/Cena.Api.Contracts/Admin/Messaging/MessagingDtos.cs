@@ -3,7 +3,7 @@
 // ADM-025: Response types for admin messaging/chat endpoints
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Messaging;
 
 // Paginated thread list
 public sealed record MessagingThreadListResponse(

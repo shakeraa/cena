@@ -3,7 +3,7 @@
 // ADM-014: Re-engagement monitoring and analytics
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Outreach;
 
 // Outreach Overview Dashboard
 public sealed record OutreachSummaryResponse(

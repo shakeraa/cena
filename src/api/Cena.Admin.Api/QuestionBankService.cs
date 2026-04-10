@@ -8,7 +8,8 @@ using System.Globalization;
 using System.Text.Json;
 using Cena.Actors.Events;
 using Cena.Actors.Questions;
-using Cena.Admin.Api.QualityGate;
+using QualityGateServices = Cena.Admin.Api.QualityGate;
+
 using Marten;
 using Microsoft.Extensions.Logging;
 using DomainStatus = Cena.Actors.Questions.QuestionLifecycleStatus;
@@ -39,12 +40,12 @@ public interface IQuestionBankService
 public sealed class QuestionBankService : IQuestionBankService
 {
     private readonly IDocumentStore _store;
-    private readonly IQualityGateService _qualityGate;
+    private readonly QualityGateServices.IQualityGateService _qualityGate;
     private readonly ILogger<QuestionBankService> _logger;
 
     public QuestionBankService(
         IDocumentStore store,
-        IQualityGateService qualityGate,
+        QualityGateServices.IQualityGateService qualityGate,
         ILogger<QuestionBankService> logger)
     {
         _store = store;
@@ -378,10 +379,10 @@ public sealed class QuestionBankService : IQuestionBankService
 
     // ── Private Helpers ──
 
-    private async Task<QualityGate.QualityGateResult> EvaluateQualityGateAsync(QuestionState state, string stem)
+    private async Task<QualityGateResult> EvaluateQualityGateAsync(QuestionState state, string stem)
     {
         var gateOptions = state.Options.Select(o =>
-            new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale)).ToList();
+            new QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale)).ToList();
 
         int correctIdx = gateOptions.FindIndex(o => o.IsCorrect);
         var input = new QualityGateInput(
@@ -398,7 +399,7 @@ public sealed class QuestionBankService : IQuestionBankService
         string? grade, IReadOnlyList<string>? conceptIds)
     {
         var gateOptions = options.Select(o =>
-            new QualityGate.QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale)).ToList();
+            new QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale)).ToList();
         int correctIdx = gateOptions.FindIndex(o => o.IsCorrect);
         return new QualityGateInput(
             id, stem, gateOptions, Math.Max(0, correctIdx),
@@ -406,7 +407,7 @@ public sealed class QuestionBankService : IQuestionBankService
     }
 
     private static QuestionQualityEvaluated_V1 MapGateEvent(
-        string id, QualityGate.QualityGateResult r, DateTimeOffset ts) =>
+        string id, QualityGateResult r, DateTimeOffset ts) =>
         new(id, r.CompositeScore,
             r.Scores.FactualAccuracy, r.Scores.LanguageQuality,
             r.Scores.PedagogicalQuality, r.Scores.DistractorQuality,

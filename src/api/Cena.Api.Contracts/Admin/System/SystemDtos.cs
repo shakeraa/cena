@@ -3,7 +3,7 @@
 // ADM-008: System health, settings, and audit logging
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.System;
 
 // System Health Dashboard
 public sealed record SystemHealthResponse(

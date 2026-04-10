@@ -2,7 +2,7 @@
 // Cena Platform -- Explanation Cache Admin DTOs (ADM-018)
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Cache;
 
 // ── Cache Statistics ──
 

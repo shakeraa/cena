@@ -3,7 +3,7 @@
 // ADM-007: Mastery & learning progress analytics
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Mastery;
 
 // Mastery Overview Dashboard
 public sealed record MasteryOverviewResponse(

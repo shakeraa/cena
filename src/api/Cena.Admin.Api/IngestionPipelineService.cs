@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
+using IngestionDto = Cena.Api.Contracts.Admin.Ingestion;
 
 namespace Cena.Admin.Api;
 
@@ -79,12 +80,12 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
         {
             var stageItems = allItems.Where(i => i.CurrentStage == s.Item1).ToList();
             var hasError = stageItems.Any(i => i.Status == "failed");
-            return new PipelineStage(
+            return new IngestionDto.PipelineStage(
                 StageId: s.Item2,
                 Name: s.Item3,
                 Count: stageItems.Count,
                 Status: hasError ? "failed" : stageItems.Count > 50 ? "slow" : "healthy",
-                Items: stageItems.Take(10).Select(i => new PipelineItem(
+                Items: stageItems.Take(10).Select(i => new IngestionDto.PipelineItem(
                     Id: i.Id,
                     SourceFilename: i.SourceFilename,
                     SourceType: i.SourceType,
@@ -215,10 +216,10 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
         var form = await request.ReadFormAsync();
         var file = form.Files.GetFile("file");
         if (file is null)
-            return new UploadFileResponse("", "error", null);
+            return new IngestionDto.UploadFileResponse("", "error", null);
 
         if (_orchestrator is null)
-            return new UploadFileResponse("", "error", null);
+            return new IngestionDto.UploadFileResponse("", "error", null);
 
         using var stream = file.OpenReadStream();
         var result = await _orchestrator.ProcessFileAsync(new IngestionRequest(
@@ -230,7 +231,7 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
             SubmittedBy: "admin"
         ));
 
-        return new UploadFileResponse(
+        return new IngestionDto.UploadFileResponse(
             UploadId: result.PipelineItemId,
             Status: result.Success ? "completed" : "failed",
             PipelineItemId: result.PipelineItemId);
@@ -240,7 +241,7 @@ public sealed class IngestionPipelineService : IIngestionPipelineService
     {
         // Placeholder for direct file path uploads
         var uploadId = $"upload-{Guid.NewGuid():N}";
-        return new UploadFileResponse(uploadId, "queued", null);
+        return new IngestionDto.UploadFileResponse(uploadId, "queued", null);
     }
 
     public async Task<PipelineStatsResponse> GetStatsAsync()

@@ -3,7 +3,7 @@
 // ADM-009: Pipeline dashboard and management
 // =============================================================================
 
-namespace Cena.Admin.Api;
+namespace Cena.Api.Contracts.Admin.Ingestion;
 
 // Pipeline Kanban View
 public sealed record PipelineStatusResponse(
