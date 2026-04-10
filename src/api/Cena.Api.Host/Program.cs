@@ -244,6 +244,9 @@ app.MapCenaAdminEndpoints();
 app.MapSessionEndpoints();
 app.MapStudentAnalyticsEndpoints();
 
+// ---- Me/Profile REST endpoints (STB-00) ----
+app.MapMeEndpoints();
+
 // ---- SignalR Hub (SES-001) ----
 app.MapCenaHub();
 

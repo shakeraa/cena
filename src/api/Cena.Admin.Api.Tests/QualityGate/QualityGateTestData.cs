@@ -4,8 +4,8 @@
 // Each labeled with expected gate decision and which dimensions should flag
 // =============================================================================
 
-using Cena.Admin.Api.QualityGate;
-using QualityGateOption = Cena.Admin.Api.QualityGate.QualityGateOption;
+using Cena.Api.Contracts.Admin.QualityGate;
+using QualityGateOption = Cena.Api.Contracts.Admin.QualityGate.QualityGateOption;
 
 namespace Cena.Admin.Api.Tests.QualityGate;
 
