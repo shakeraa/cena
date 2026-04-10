@@ -16,6 +16,17 @@ import { cookieRef } from '@/@layouts/stores/config'
 import '@core/scss/template/libs/vuetify/index.scss'
 import 'vuetify/styles'
 
+let vuetifyInstance: ReturnType<typeof createVuetify> | null = null
+
+/**
+ * Exposes the created Vuetify instance to non-component callers (e.g. the
+ * router guard's `?theme=` override handler). Returns `null` until the
+ * plugin has run.
+ */
+export function getVuetify() {
+  return vuetifyInstance
+}
+
 export default function (app: App) {
   const cookieThemeValues = {
     defaultTheme: resolveVuetifyTheme(themeConfig.app.theme),
@@ -51,6 +62,8 @@ export default function (app: App) {
       adapter: createVueI18nAdapter({ i18n: getI18n(), useI18n }),
     },
   })
+
+  vuetifyInstance = vuetify
 
   app.use(vuetify)
 }
