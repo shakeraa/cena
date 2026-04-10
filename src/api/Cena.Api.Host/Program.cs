@@ -262,6 +262,9 @@ app.MapChallengesEndpoints();
 // ---- Social REST endpoints (STB-06) ----
 app.MapSocialEndpoints();
 
+// ---- Notifications REST endpoints (STB-07) ----
+app.MapNotificationsEndpoints();
+
 // ---- SignalR Hub (SES-001) ----
 app.MapCenaHub();
 
