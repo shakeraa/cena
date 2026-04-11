@@ -360,3 +360,66 @@ export interface PathDto {
   totalSteps: number
   estimatedMinutes: number
 }
+
+/**
+ * Social DTOs from STB-06 Phase 1 + STB-06b Phase 1b. Mirrors
+ * `src/api/Cena.Api.Contracts/Social/SocialDtos.cs`. Consumed by STU-W-12.
+ */
+export type FeedItemKind = 'achievement' | 'milestone' | 'question' | 'announcement'
+
+export interface ClassFeedItem {
+  itemId: string
+  kind: FeedItemKind
+  authorStudentId: string
+  authorDisplayName: string
+  authorAvatarUrl: string | null
+  title: string
+  body: string | null
+  postedAt: string
+  reactionCount: number
+  commentCount: number
+}
+
+export interface ClassFeedDto {
+  items: ClassFeedItem[]
+  page: number
+  pageSize: number
+  hasMore: boolean
+}
+
+export interface PeerSolution {
+  solutionId: string
+  questionId: string
+  authorStudentId: string
+  authorDisplayName: string
+  content: string
+  upvoteCount: number
+  downvoteCount: number
+  postedAt: string
+}
+
+export interface PeerSolutionListDto {
+  solutions: PeerSolution[]
+}
+
+export interface Friend {
+  studentId: string
+  displayName: string
+  avatarUrl: string | null
+  level: number
+  streakDays: number
+  isOnline: boolean
+}
+
+export interface FriendRequest {
+  requestId: string
+  fromStudentId: string
+  fromDisplayName: string
+  fromAvatarUrl: string | null
+  requestedAt: string
+}
+
+export interface FriendsListDto {
+  friends: Friend[]
+  pendingRequests: FriendRequest[]
+}

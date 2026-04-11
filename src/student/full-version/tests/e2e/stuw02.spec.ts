@@ -44,15 +44,13 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     // `/home` (STU-W-05A), `/progress` (STU-W-07), `/tutor` (STU-W-08),
     // `/challenges` (STU-W-11), `/social/leaderboard` (STU-W-13),
     // `/session` (STU-W-06), `/progress/{sessions,mastery,time}`
-    // (STU-W-09), and `/knowledge-graph` (STU-W-10) have been replaced
-    // with real pages and no longer render the placeholder testid.
+    // (STU-W-09), `/knowledge-graph` (STU-W-10), and
+    // `/social{,/peers,/friends}` (STU-W-12) have been replaced with
+    // real pages and no longer render the placeholder testid.
     // Covered by the per-feature spec files.
     const routes = [
       '/challenges/daily',
       '/challenges/boss',
-      '/social',
-      '/social/peers',
-      '/social/friends',
       '/notifications',
       '/profile',
       '/profile/edit',
