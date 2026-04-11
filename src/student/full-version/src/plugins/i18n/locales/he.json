@@ -203,6 +203,78 @@
       "friends": "חברים"
     }
   },
+  "notifications": {
+    "title": "התראות",
+    "subtitle": "הישאר מעודכן בהתקדמות הלמידה שלך.",
+    "markAllRead": "סמן הכל כנקרא",
+    "unreadCount": "{count} לא נקראו",
+    "emptyTitle": "הכל מעודכן",
+    "emptySubtitle": "אין התראות חדשות.",
+    "justNow": "הרגע",
+    "minutesAgo": "לפני {count} ד",
+    "hoursAgo": "לפני {count} ש",
+    "daysAgo": "לפני {count} י"
+  },
+  "profile": {
+    "editProfile": "ערוך פרופיל",
+    "editTitle": "ערוך פרופיל",
+    "editSubtitle": "עדכן איך אתה נראה לחברים לכיתה.",
+    "editSaved": "הפרופיל נשמר.",
+    "levelLabel": "רמה {level}",
+    "streakLabel": "רצף של {days} ימים",
+    "aboutTitle": "אודות",
+    "bioEmpty": "אין ביוגרפיה עדיין.",
+    "bioLabel": "ביוגרפיה",
+    "bioPlaceholder": "ספר קצת על עצמך…",
+    "favoriteSubjectsTitle": "מקצועות מועדפים",
+    "subjectsEmpty": "אין מקצועות מועדפים עדיין.",
+    "displayNameLabel": "שם תצוגה",
+    "visibilityLabel": "נראות פרופיל",
+    "visibilityPublic": "ציבורי",
+    "visibilityClass": "חברים לכיתה בלבד",
+    "visibilityPrivate": "פרטי"
+  },
+  "settingsPage": {
+    "title": "הגדרות",
+    "subtitle": "התאם אישית את חווית סינה שלך.",
+    "account": {
+      "title": "חשבון",
+      "subtitle": "פרטי התחברות ויציאה",
+      "accountInfo": "פרטי חשבון",
+      "studentId": "מזהה תלמיד",
+      "role": "תפקיד",
+      "signOutTitle": "התנתק",
+      "signOutSubtitle": "תצטרך להתחבר שוב.",
+      "phaseANote": "שלב א מציג פרטי חשבון בלבד."
+    },
+    "appearance": {
+      "title": "מראה",
+      "subtitle": "ערכת נושא ושפה",
+      "themeLabel": "ערכת נושא",
+      "themeLight": "בהיר",
+      "themeDark": "כהה",
+      "languageLabel": "שפה"
+    },
+    "notifications": {
+      "title": "התראות",
+      "subtitle": "דוא״ל ודחיפה",
+      "email": "התראות דוא״ל",
+      "push": "התראות דחיפה",
+      "dailyReminder": "תזכורת לימוד יומית",
+      "weekly": "סיכום שבועי",
+      "streakAlerts": "התראות רצף",
+      "newContent": "התראות תוכן חדש",
+      "phaseANote": "ההעדפות נשמרות מקומית בלבד בשלב א."
+    },
+    "privacy": {
+      "title": "פרטיות",
+      "subtitle": "שיתוף נתונים",
+      "showProgressToClass": "הצג את התקדמותי לחברים לכיתה",
+      "allowPeerComparison": "אפשר השוואת עמיתים",
+      "shareAnalytics": "שתף נתונים אנונימיים",
+      "phaseANote": "ההעדפות נשמרות מקומית בלבד בשלב א."
+    }
+  },
   "social": {
     "feed": {
       "title": "פיד כיתתי",

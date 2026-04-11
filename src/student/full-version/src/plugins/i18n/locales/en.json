@@ -368,6 +368,78 @@
       "friends": "Friends"
     }
   },
+  "notifications": {
+    "title": "Notifications",
+    "subtitle": "Stay on top of your learning progress.",
+    "markAllRead": "Mark all as read",
+    "unreadCount": "{count} unread",
+    "emptyTitle": "You're all caught up",
+    "emptySubtitle": "No new notifications.",
+    "justNow": "just now",
+    "minutesAgo": "{count}m ago",
+    "hoursAgo": "{count}h ago",
+    "daysAgo": "{count}d ago"
+  },
+  "profile": {
+    "editProfile": "Edit profile",
+    "editTitle": "Edit profile",
+    "editSubtitle": "Update how you appear to classmates.",
+    "editSaved": "Profile saved.",
+    "levelLabel": "Level {level}",
+    "streakLabel": "{days}-day streak",
+    "aboutTitle": "About",
+    "bioEmpty": "No bio yet. Add one from edit profile.",
+    "bioLabel": "Bio",
+    "bioPlaceholder": "Tell classmates a bit about yourself…",
+    "favoriteSubjectsTitle": "Favorite subjects",
+    "subjectsEmpty": "No favorite subjects selected yet.",
+    "displayNameLabel": "Display name",
+    "visibilityLabel": "Profile visibility",
+    "visibilityPublic": "Public",
+    "visibilityClass": "Classmates only",
+    "visibilityPrivate": "Private"
+  },
+  "settingsPage": {
+    "title": "Settings",
+    "subtitle": "Customize your Cena experience.",
+    "account": {
+      "title": "Account",
+      "subtitle": "Sign-in info, sign out, delete account",
+      "accountInfo": "Account info",
+      "studentId": "Student ID",
+      "role": "Role",
+      "signOutTitle": "Sign out",
+      "signOutSubtitle": "You'll need to sign back in to continue learning.",
+      "phaseANote": "Phase A shows account info only. STU-W-14b adds email change, password reset, and account deletion when STB-00b settings writes land."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "subtitle": "Theme, language, text size",
+      "themeLabel": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "languageLabel": "Language"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "subtitle": "Email, push, and reminder preferences",
+      "email": "Email notifications",
+      "push": "Push notifications",
+      "dailyReminder": "Daily study reminder",
+      "weekly": "Weekly progress summary",
+      "streakAlerts": "Streak alerts",
+      "newContent": "New content alerts",
+      "phaseANote": "Phase A persists preferences to localStorage only. STU-W-14b wires real /api/me/settings when STB-00b settings writes land."
+    },
+    "privacy": {
+      "title": "Privacy",
+      "subtitle": "Data sharing and visibility",
+      "showProgressToClass": "Show my progress to classmates",
+      "allowPeerComparison": "Allow peer comparison",
+      "shareAnalytics": "Share anonymized analytics",
+      "phaseANote": "Phase A persists preferences to localStorage only. STU-W-14b wires the real privacy settings endpoint."
+    }
+  },
   "social": {
     "feed": {
       "title": "Class feed",
