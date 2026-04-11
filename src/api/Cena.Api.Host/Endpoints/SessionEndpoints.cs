@@ -472,9 +472,10 @@ public static class SessionEndpoints
         .WithName("GetCurrentQuestion");
 
         // POST /api/sessions/{sessionId}/answer — submit an answer
-        group.MapPost("/{sessionId}/answer", (
+        group.MapPost("/{sessionId}/answer", async (
             string sessionId,
             HttpContext ctx,
+            IDocumentStore store,
             SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -507,6 +508,65 @@ public static class SessionEndpoints
             else
             {
                 state.WrongCount++;
+            }
+
+            // STB-03b: Append XP event and concept attempt on correct answer
+            if (isCorrect)
+            {
+                await using var session = store.LightweightSession();
+                
+                // Load current profile to get total XP
+                var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+                var currentXp = profile?.TotalXp ?? 0;
+                var newTotalXp = currentXp + 10;
+
+                // Append XpAwarded event
+                var xpEvent = new XpAwarded_V1(
+                    StudentId: studentId,
+                    XpAmount: 10,
+                    Source: "correct_answer",
+                    TotalXp: newTotalXp,
+                    DifficultyLevel: "medium",
+                    DifficultyMultiplier: 1);
+
+                session.Events.Append(studentId, xpEvent);
+
+                // Also append a concept attempted event for badge tracking
+                var conceptAttempt = new ConceptAttempted_V1(
+                    StudentId: studentId,
+                    ConceptId: "stub_concept_math",
+                    SessionId: sessionId,
+                    IsCorrect: true,
+                    ResponseTimeMs: request.TimeSpentMs,
+                    QuestionId: request.QuestionId,
+                    QuestionType: "multiple-choice",
+                    MethodologyActive: "practice",
+                    ErrorType: "",
+                    PriorMastery: 0.5,
+                    PosteriorMastery: 0.55,
+                    HintCountUsed: 0,
+                    WasSkipped: false,
+                    AnswerHash: "",
+                    BackspaceCount: 0,
+                    AnswerChangeCount: 0,
+                    WasOffline: false,
+                    Timestamp: DateTimeOffset.UtcNow);
+
+                session.Events.Append(studentId, conceptAttempt);
+
+                // Update profile snapshot
+                if (profile is null)
+                {
+                    profile = new StudentProfileSnapshot
+                    {
+                        StudentId = studentId,
+                        CreatedAt = DateTimeOffset.UtcNow
+                    };
+                }
+                profile.Apply(xpEvent);
+                session.Store(profile);
+
+                await session.SaveChangesAsync();
             }
 
             // Determine next question ID
