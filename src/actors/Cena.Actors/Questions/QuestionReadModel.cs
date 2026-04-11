@@ -32,4 +32,11 @@ public class QuestionReadModel
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
     public string? Explanation { get; set; }
+
+    /// <summary>
+    /// FIND-pedagogy-008 — learning-objective id the question assesses.
+    /// Null for V1 questions seeded before the field existed. See
+    /// Wiggins &amp; McTighe (2005) and Anderson &amp; Krathwohl (2001).
+    /// </summary>
+    public string? LearningObjectiveId { get; set; }
 }

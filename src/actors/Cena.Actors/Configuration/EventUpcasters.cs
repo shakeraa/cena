@@ -48,3 +48,103 @@ public sealed class ConceptAttemptedV1ToV2Upcaster
         FocusState: old.FocusState
     );
 }
+
+// =============================================================================
+// FIND-pedagogy-008 — Question creation V1 → V2 upcasters
+//
+// V2 adds LearningObjectiveId; V1 events default to null so old streams
+// replay cleanly without losing fidelity. See Wiggins &amp; McTighe (2005) and
+// Anderson &amp; Krathwohl (2001) for the pedagogical rationale.
+// =============================================================================
+
+/// <summary>
+/// Upcasts <see cref="QuestionAuthored_V1"/> to <see cref="QuestionAuthored_V2"/>.
+/// Adds a null <c>LearningObjectiveId</c>.
+/// </summary>
+public sealed class QuestionAuthoredV1ToV2Upcaster
+    : EventUpcaster<QuestionAuthored_V1, QuestionAuthored_V2>
+{
+    public static readonly QuestionAuthoredV1ToV2Upcaster Instance = new();
+
+    protected override QuestionAuthored_V2 Upcast(QuestionAuthored_V1 old) => new(
+        QuestionId: old.QuestionId,
+        Stem: old.Stem,
+        StemHtml: old.StemHtml,
+        Options: old.Options,
+        Subject: old.Subject,
+        Topic: old.Topic,
+        Grade: old.Grade,
+        BloomsLevel: old.BloomsLevel,
+        Difficulty: old.Difficulty,
+        ConceptIds: old.ConceptIds,
+        Language: old.Language,
+        AuthorId: old.AuthorId,
+        Timestamp: old.Timestamp,
+        Explanation: old.Explanation,
+        LearningObjectiveId: null
+    );
+}
+
+/// <summary>
+/// Upcasts <see cref="QuestionIngested_V1"/> to <see cref="QuestionIngested_V2"/>.
+/// Adds a null <c>LearningObjectiveId</c>.
+/// </summary>
+public sealed class QuestionIngestedV1ToV2Upcaster
+    : EventUpcaster<QuestionIngested_V1, QuestionIngested_V2>
+{
+    public static readonly QuestionIngestedV1ToV2Upcaster Instance = new();
+
+    protected override QuestionIngested_V2 Upcast(QuestionIngested_V1 old) => new(
+        QuestionId: old.QuestionId,
+        Stem: old.Stem,
+        StemHtml: old.StemHtml,
+        Options: old.Options,
+        Subject: old.Subject,
+        Topic: old.Topic,
+        Grade: old.Grade,
+        BloomsLevel: old.BloomsLevel,
+        Difficulty: old.Difficulty,
+        ConceptIds: old.ConceptIds,
+        Language: old.Language,
+        SourceDocId: old.SourceDocId,
+        SourceUrl: old.SourceUrl,
+        SourceFilename: old.SourceFilename,
+        OriginalText: old.OriginalText,
+        ImportedBy: old.ImportedBy,
+        Timestamp: old.Timestamp,
+        Explanation: old.Explanation,
+        LearningObjectiveId: null
+    );
+}
+
+/// <summary>
+/// Upcasts <see cref="QuestionAiGenerated_V1"/> to <see cref="QuestionAiGenerated_V2"/>.
+/// Adds a null <c>LearningObjectiveId</c>.
+/// </summary>
+public sealed class QuestionAiGeneratedV1ToV2Upcaster
+    : EventUpcaster<QuestionAiGenerated_V1, QuestionAiGenerated_V2>
+{
+    public static readonly QuestionAiGeneratedV1ToV2Upcaster Instance = new();
+
+    protected override QuestionAiGenerated_V2 Upcast(QuestionAiGenerated_V1 old) => new(
+        QuestionId: old.QuestionId,
+        Stem: old.Stem,
+        StemHtml: old.StemHtml,
+        Options: old.Options,
+        Subject: old.Subject,
+        Topic: old.Topic,
+        Grade: old.Grade,
+        BloomsLevel: old.BloomsLevel,
+        Difficulty: old.Difficulty,
+        ConceptIds: old.ConceptIds,
+        Language: old.Language,
+        PromptText: old.PromptText,
+        ModelId: old.ModelId,
+        ModelTemperature: old.ModelTemperature,
+        RawModelOutput: old.RawModelOutput,
+        RequestedBy: old.RequestedBy,
+        Explanation: old.Explanation,
+        Timestamp: old.Timestamp,
+        LearningObjectiveId: null
+    );
+}

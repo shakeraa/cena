@@ -701,6 +701,33 @@ public static class AdminApiEndpoints
         return app;
     }
 
+    /// <summary>
+    /// FIND-pedagogy-008 — read-only endpoints for the learning-objective
+    /// picker. Full CRUD is explicitly deferred; authors can still backfill
+    /// via the update-question endpoint.
+    /// </summary>
+    public static IEndpointRouteBuilder MapLearningObjectiveEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/admin/learning-objectives")
+            .WithTags("Learning Objectives")
+            .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+            .RequireRateLimiting("api");
+
+        group.MapGet("/", async (string? subject, ILearningObjectiveService service) =>
+        {
+            var result = await service.ListAsync(subject);
+            return Results.Ok(result);
+        }).WithName("ListLearningObjectives");
+
+        group.MapGet("/{id}", async (string id, ILearningObjectiveService service) =>
+        {
+            var result = await service.GetByIdAsync(id);
+            return result != null ? Results.Ok(result) : Results.NotFound();
+        }).WithName("GetLearningObjective");
+
+        return app;
+    }
+
     public static IEndpointRouteBuilder MapAiGenerationEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/admin/ai")

@@ -25,7 +25,44 @@ const editForm = ref({
   difficulty: 0.5,
   options: [] as Array<{ id: string; text: string; isCorrect: boolean; distractorRationale: string }>,
   conceptIds: [] as string[],
+  // FIND-pedagogy-008 — explicit learning-objective link per Wiggins & McTighe
+  // (2005) backward design and Anderson & Krathwohl (2001) revised Bloom's.
+  learningObjectiveId: null as string | null,
 })
+
+// FIND-pedagogy-008 — learning-objective picker data
+type LearningObjectiveItem = {
+  id: string
+  code: string
+  title: string
+  description: string
+  subject: string
+  grade: string | null
+  cognitiveProcess: string
+  knowledgeType: string
+  bloomsLevel: number
+  conceptIds: string[]
+}
+const learningObjectives = ref<LearningObjectiveItem[]>([])
+const isLoadingObjectives = ref(false)
+
+const fetchLearningObjectives = async (subject?: string) => {
+  isLoadingObjectives.value = true
+  try {
+    const path = subject
+      ? `/admin/learning-objectives?subject=${encodeURIComponent(subject)}`
+      : '/admin/learning-objectives'
+    const res = await $api(path)
+    learningObjectives.value = res?.objectives ?? []
+  }
+  catch (err) {
+    console.error('Failed to load learning objectives', err)
+    learningObjectives.value = []
+  }
+  finally {
+    isLoadingObjectives.value = false
+  }
+}
 
 // Lifecycle actions
 const isApproving = ref(false)
@@ -59,7 +96,12 @@ const fetchQuestion = async () => {
           distractorRationale: o.distractorRationale ?? '',
         })),
         conceptIds: questionRes.conceptIds ?? [],
+        learningObjectiveId: questionRes.learningObjectiveId ?? null,
       }
+
+      // FIND-pedagogy-008 — prefetch LO picker items filtered to the
+      // question's subject so the dropdown is scoped.
+      await fetchLearningObjectives(questionRes.subject)
     }
   }
   catch (err) {
@@ -149,6 +191,9 @@ const saveEdits = async () => {
         difficulty: editForm.value.difficulty,
         options: editForm.value.options,
         conceptIds: editForm.value.conceptIds,
+        // FIND-pedagogy-008 — send explicit LO id so the service emits a
+        // LearningObjectiveAssigned_V1 event when it differs from current.
+        learningObjectiveId: editForm.value.learningObjectiveId,
       },
     })
     isEditing.value = false
@@ -173,6 +218,7 @@ const cancelEdit = () => {
         distractorRationale: o.distractorRationale ?? '',
       })),
       conceptIds: question.value.conceptIds ?? [],
+      learningObjectiveId: question.value.learningObjectiveId ?? null,
     }
   }
 }
@@ -402,6 +448,23 @@ const shortId = (id: string) => id?.length > 10 ? `${id.slice(0, 10)}...` : id
                       <template #prepend><span class="text-body-2 text-medium-emphasis" style="min-inline-size: 90px;">Created By</span></template>
                       <VListItemTitle>{{ question.createdBy }}</VListItemTitle>
                     </VListItem>
+                    <!-- FIND-pedagogy-008 — learning objective readout -->
+                    <VListItem>
+                      <template #prepend><span class="text-body-2 text-medium-emphasis" style="min-inline-size: 90px;">Objective</span></template>
+                      <VListItemTitle>
+                        <template v-if="question.learningObjectiveId">
+                          <VChip size="small" label color="info" class="me-1">
+                            {{ question.learningObjectiveId }}
+                          </VChip>
+                          <span v-if="question.learningObjectiveTitle" class="text-body-2">
+                            {{ question.learningObjectiveTitle }}
+                          </span>
+                        </template>
+                        <span v-else class="text-caption text-warning">
+                          Not assigned — backfill in Edit tab
+                        </span>
+                      </VListItemTitle>
+                    </VListItem>
                   </VList>
                 </VCardText>
               </VCard>
@@ -525,6 +588,48 @@ const shortId = (id: string) => id?.length > 10 ? `${id.slice(0, 10)}...` : id
                     color="primary"
                     @update:model-value="isEditing = true"
                   />
+                </VCol>
+
+                <!-- FIND-pedagogy-008 — learning-objective picker.
+                     Backward design (Wiggins & McTighe 2005): every assessment
+                     item must map to an explicit goal. Revised Bloom's
+                     (Anderson & Krathwohl 2001): cognitive-process dimension
+                     shown alongside knowledge type so authors can see the
+                     2-axis classification at picker time. -->
+                <VCol cols="12" sm="8">
+                  <label class="text-body-2 text-medium-emphasis d-block mb-1">
+                    Learning Objective
+                    <span v-if="!editForm.learningObjectiveId" class="text-warning">
+                      (required for backward-design coverage — unset)
+                    </span>
+                  </label>
+                  <AppAutocomplete
+                    v-model="editForm.learningObjectiveId"
+                    :items="learningObjectives"
+                    item-title="title"
+                    item-value="id"
+                    :loading="isLoadingObjectives"
+                    placeholder="Pick a learning objective…"
+                    clearable
+                    density="compact"
+                    @update:model-value="isEditing = true"
+                  >
+                    <template #item="{ props: itemProps, item }">
+                      <VListItem v-bind="itemProps" :title="item.raw.title">
+                        <template #subtitle>
+                          <span class="text-caption text-disabled">
+                            {{ item.raw.code }} · {{ item.raw.cognitiveProcess }} / {{ item.raw.knowledgeType }}
+                          </span>
+                        </template>
+                      </VListItem>
+                    </template>
+                    <template #selection="{ item }">
+                      <VChip size="small" label class="me-1">
+                        {{ item.raw.code }}
+                      </VChip>
+                      {{ item.raw.title }}
+                    </template>
+                  </AppAutocomplete>
                 </VCol>
 
                 <VCol cols="12">

@@ -31,7 +31,12 @@ public sealed record QuestionListItem(
     QuestionStatus Status,
     int QualityScore,
     int UsageCount,
-    float? SuccessRate);
+    float? SuccessRate,
+    /// <summary>
+    /// FIND-pedagogy-008 — learning-objective id if the question carries one.
+    /// Null for V1 questions that have not been backfilled yet.
+    /// </summary>
+    string? LearningObjectiveId = null);
 
 // Question Filters
 public sealed record QuestionFiltersResponse(
@@ -68,7 +73,17 @@ public sealed record QuestionBankDetailResponse(
     string? Explanation,
     QuestionStats? Performance,
     QuestionProvenance? Provenance,
-    QualityGateDetail? QualityGate = null);
+    QualityGateDetail? QualityGate = null,
+    /// <summary>
+    /// FIND-pedagogy-008 — learning-objective id. Null means "not assigned";
+    /// the admin UI should prompt the author to pick one.
+    /// </summary>
+    string? LearningObjectiveId = null,
+    /// <summary>
+    /// FIND-pedagogy-008 — resolved learning-objective title for display.
+    /// Null when <c>LearningObjectiveId</c> is null or the LO has been deleted.
+    /// </summary>
+    string? LearningObjectiveTitle = null);
 
 /// <summary>8-dimension quality gate breakdown for frontend display.</summary>
 public sealed record QualityGateDetail(
@@ -119,7 +134,12 @@ public sealed record UpdateBankQuestionRequest(
     string? CorrectAnswer,
     float? Difficulty,
     IReadOnlyList<string>? ConceptIds,
-    QuestionStatus? Status);
+    QuestionStatus? Status,
+    /// <summary>
+    /// FIND-pedagogy-008 — update or backfill the learning objective.
+    /// Null means "leave unchanged"; an empty string is rejected.
+    /// </summary>
+    string? LearningObjectiveId = null);
 
 public sealed record UpdateAnswerOption(
     string Id,
@@ -165,7 +185,13 @@ public sealed record CreateQuestionRequest(
     float? ModelTemperature,
     string? RawModelOutput,
     // Explanation (any source type)
-    string? Explanation);
+    string? Explanation,
+    /// <summary>
+    /// FIND-pedagogy-008 — learning-objective id. Optional at create time to
+    /// preserve back-compat with existing admin forms; the service logs a
+    /// warning when it is omitted so curriculum authors can audit coverage.
+    /// </summary>
+    string? LearningObjectiveId = null);
 
 public sealed record CreateOptionRequest(
     string Label,
@@ -186,3 +212,50 @@ public sealed record AddLanguageVersionRequest(
     string Stem,
     string? StemHtml,
     IReadOnlyList<CreateOptionRequest> Options);
+
+// =============================================================================
+// FIND-pedagogy-008 — Learning objectives
+// =============================================================================
+
+/// <summary>
+/// List response for <c>GET /api/admin/learning-objectives</c>. Flat list so
+/// the admin Vue picker can render it without additional joins.
+/// </summary>
+public sealed record LearningObjectiveListResponse(
+    IReadOnlyList<LearningObjectiveListItem> Objectives,
+    int Total);
+
+/// <summary>
+/// Single learning-objective row for the admin picker.
+/// </summary>
+/// <param name="Id">Stable Marten document id.</param>
+/// <param name="Code">Human-readable curriculum code (e.g., MATH-ALG-LINEAR-001).</param>
+/// <param name="Title">Short student-facing title.</param>
+/// <param name="Description">Long-form description (SWBAT statement).</param>
+/// <param name="Subject">Subject slug.</param>
+/// <param name="Grade">Grade band (nullable for cross-grade objectives).</param>
+/// <param name="CognitiveProcess">
+/// Anderson &amp; Krathwohl (2001) cognitive-process dimension
+/// (Remember/Understand/Apply/Analyze/Evaluate/Create) as a string.
+/// </param>
+/// <param name="KnowledgeType">
+/// Anderson &amp; Krathwohl (2001) knowledge dimension
+/// (Factual/Conceptual/Procedural/Metacognitive) as a string.
+/// </param>
+/// <param name="BloomsLevel">
+/// Back-compat single-int view of the cognitive-process (1..6).
+/// </param>
+/// <param name="ConceptIds">Concepts the objective covers.</param>
+/// <param name="StandardsAlignment">Framework → code mapping (Bagrut, Common Core, etc.).</param>
+public sealed record LearningObjectiveListItem(
+    string Id,
+    string Code,
+    string Title,
+    string Description,
+    string Subject,
+    string? Grade,
+    string CognitiveProcess,
+    string KnowledgeType,
+    int BloomsLevel,
+    IReadOnlyList<string> ConceptIds,
+    IReadOnlyDictionary<string, string> StandardsAlignment);

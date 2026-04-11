@@ -8,6 +8,7 @@ using System.Globalization;
 using System.Text.Json;
 using Cena.Actors.Events;
 using Cena.Actors.Questions;
+using Cena.Infrastructure.Documents;
 using QualityGateServices = Cena.Admin.Api.QualityGate;
 
 using Marten;
@@ -113,7 +114,8 @@ public sealed class QuestionBankService : IQuestionBankService
             q.Id, q.StemPreview, q.Subject, q.Concepts,
             q.BloomsLevel, q.Difficulty,
             Enum.TryParse<QuestionStatus>(q.Status, out var s) ? s : QuestionStatus.Draft,
-            q.QualityScore, q.UsageCount, q.SuccessRate)).ToList();
+            q.QualityScore, q.UsageCount, q.SuccessRate,
+            LearningObjectiveId: q.LearningObjectiveId)).ToList();
 
         return new QuestionListResponse(mapped, total, page, pageSize);
     }
@@ -122,7 +124,17 @@ public sealed class QuestionBankService : IQuestionBankService
     {
         await using var session = _store.QuerySession();
         var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
-        return state == null ? null : MapToDetail(state);
+        if (state == null) return null;
+
+        // FIND-pedagogy-008 — resolve LO title for the detail response.
+        string? loTitle = null;
+        if (!string.IsNullOrWhiteSpace(state.LearningObjectiveId))
+        {
+            var loDoc = await session.LoadAsync<LearningObjectiveDocument>(state.LearningObjectiveId);
+            loTitle = loDoc?.Title;
+        }
+
+        return MapToDetail(state, loTitle);
     }
 
     public async Task<QuestionBankDetailResponse?> UpdateQuestionAsync(
@@ -175,6 +187,20 @@ public sealed class QuestionBankService : IQuestionBankService
                 JsonSerializer.Serialize(state.ConceptIds),
                 JsonSerializer.Serialize(request.ConceptIds),
                 editor, now));
+        }
+
+        // FIND-pedagogy-008 — LO backfill / reassignment. Only emit the event
+        // when the incoming value actually changes and is non-empty. Null
+        // means "leave unchanged"; an empty string is treated as a no-op too.
+        if (!string.IsNullOrWhiteSpace(request.LearningObjectiveId) &&
+            request.LearningObjectiveId != state.LearningObjectiveId)
+        {
+            events.Add(new LearningObjectiveAssigned_V1(
+                id,
+                state.LearningObjectiveId,
+                request.LearningObjectiveId,
+                editor,
+                now));
         }
 
         if (events.Count > 0)
@@ -276,30 +302,48 @@ public sealed class QuestionBankService : IQuestionBankService
             o.Label, o.Text, o.TextHtml ?? $"<p>{o.Text}</p>",
             o.IsCorrect, o.DistractorRationale)).ToList();
 
+        // FIND-pedagogy-008 — log a warning when a newly-authored question has
+        // no learning objective. Do not fail the write so the admin UI stays
+        // responsive, but surface the gap in ops logs so curriculum authors
+        // can backfill. This matches the "runtime warning, deferred CI rule"
+        // guidance from the task body (Wiggins & McTighe 2005 backward-design
+        // traceability is enforced at review time, not at write time).
+        if (string.IsNullOrWhiteSpace(request.LearningObjectiveId))
+        {
+            _logger.LogWarning(
+                "Question {QuestionId} created without a LearningObjectiveId (FIND-pedagogy-008). " +
+                "Curriculum author should backfill so backward-design coverage analysis is possible. " +
+                "Source={SourceType} Subject={Subject} User={UserId}",
+                id, request.SourceType, request.Subject, userId);
+        }
+
         object creationEvent = request.SourceType switch
         {
-            "ingested" => new QuestionIngested_V1(
+            "ingested" => new QuestionIngested_V2(
                 id, request.Stem, request.StemHtml ?? $"<p>{request.Stem}</p>",
                 options, request.Subject, request.Topic ?? "", request.Grade ?? "",
                 request.BloomsLevel, request.Difficulty,
                 request.ConceptIds ?? new List<string>(), request.Language,
                 request.SourceDocId ?? "", request.SourceUrl ?? "",
                 request.SourceFilename ?? "", request.OriginalText,
-                userId, now, request.Explanation),
-            "ai-generated" => new QuestionAiGenerated_V1(
+                userId, now, request.Explanation,
+                request.LearningObjectiveId),
+            "ai-generated" => new QuestionAiGenerated_V2(
                 id, request.Stem, request.StemHtml ?? $"<p>{request.Stem}</p>",
                 options, request.Subject, request.Topic ?? "", request.Grade ?? "",
                 request.BloomsLevel, request.Difficulty,
                 request.ConceptIds ?? new List<string>(), request.Language,
                 request.PromptText ?? "", request.ModelId ?? "",
                 request.ModelTemperature ?? 0.7f, request.RawModelOutput ?? "",
-                userId, request.Explanation, now),
-            _ => new QuestionAuthored_V1(
+                userId, request.Explanation, now,
+                request.LearningObjectiveId),
+            _ => new QuestionAuthored_V2(
                 id, request.Stem, request.StemHtml ?? $"<p>{request.Stem}</p>",
                 options, request.Subject, request.Topic ?? "", request.Grade ?? "",
                 request.BloomsLevel, request.Difficulty,
                 request.ConceptIds ?? new List<string>(), request.Language,
-                userId, now, request.Explanation)
+                userId, now, request.Explanation,
+                request.LearningObjectiveId)
         };
 
         var events = new List<object> { creationEvent };
@@ -415,7 +459,9 @@ public sealed class QuestionBankService : IQuestionBankService
             r.Scores.StructuralValidity, r.Scores.CulturalSensitivity,
             r.Decision.ToString(), r.Violations.Count, ts);
 
-    private static QuestionBankDetailResponse MapToDetail(QuestionState s) =>
+    private static QuestionBankDetailResponse MapToDetail(
+        QuestionState s,
+        string? loTitle = null) =>
         new(Id: s.Id,
             Stem: s.Stem,
             StemHtml: s.StemHtml,
@@ -456,7 +502,9 @@ public sealed class QuestionBankService : IQuestionBankService
                 s.LastQualityEvaluation.StructuralValidity,
                 s.LastQualityEvaluation.CulturalSensitivity,
                 s.LastQualityEvaluation.ViolationCount,
-                s.LastQualityEvaluation.EvaluatedAt) : null);
+                s.LastQualityEvaluation.EvaluatedAt) : null,
+            LearningObjectiveId: s.LearningObjectiveId,
+            LearningObjectiveTitle: loTitle);
 
     private static QuestionStatus MapStatus(DomainStatus s) => s switch
     {

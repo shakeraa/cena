@@ -87,6 +87,16 @@ public sealed class QuestionState
     public float Difficulty { get; set; }
     public List<string> ConceptIds { get; set; } = new();
 
+    /// <summary>
+    /// FIND-pedagogy-008 — learning-objective id this question assesses.
+    /// Nullable: old V1 streams upcast with null; authored questions should
+    /// set a value at creation time and the authoring service logs a warning
+    /// when missing. See Wiggins &amp; McTighe (2005) for the backward-design
+    /// rationale and Anderson &amp; Krathwohl (2001) for the 2-axis Bloom's
+    /// matrix that the LO carries.
+    /// </summary>
+    public string? LearningObjectiveId { get; set; }
+
     // Lifecycle
     public QuestionLifecycleStatus Status { get; set; } = QuestionLifecycleStatus.Draft;
     public int QualityScore { get; set; }
@@ -114,7 +124,19 @@ public sealed class QuestionState
 
     // ── Apply Methods ──
 
-    public void Apply(QuestionAuthored_V1 e)
+    // ── V1 Apply methods are retained for back-compat with existing unit
+    //    tests. In the live system, Marten upcasts V1 → V2 on stream read
+    //    before dispatching to Apply, so production code only ever sees V2.
+    //    The V1 overloads delegate to the V2 form with a null LO id.
+
+    public void Apply(QuestionAuthored_V1 e) =>
+        Apply(new QuestionAuthored_V2(
+            e.QuestionId, e.Stem, e.StemHtml, e.Options,
+            e.Subject, e.Topic, e.Grade, e.BloomsLevel, e.Difficulty,
+            e.ConceptIds, e.Language, e.AuthorId, e.Timestamp,
+            e.Explanation, LearningObjectiveId: null));
+
+    public void Apply(QuestionAuthored_V2 e)
     {
         Id = e.QuestionId;
         Stem = e.Stem;
@@ -132,10 +154,19 @@ public sealed class QuestionState
         CreatedAt = e.Timestamp;
         Explanation = e.Explanation;
         Status = QuestionLifecycleStatus.Draft;
+        LearningObjectiveId = e.LearningObjectiveId;
         EventVersion++;
     }
 
-    public void Apply(QuestionIngested_V1 e)
+    public void Apply(QuestionIngested_V1 e) =>
+        Apply(new QuestionIngested_V2(
+            e.QuestionId, e.Stem, e.StemHtml, e.Options,
+            e.Subject, e.Topic, e.Grade, e.BloomsLevel, e.Difficulty,
+            e.ConceptIds, e.Language, e.SourceDocId, e.SourceUrl,
+            e.SourceFilename, e.OriginalText, e.ImportedBy, e.Timestamp,
+            e.Explanation, LearningObjectiveId: null));
+
+    public void Apply(QuestionIngested_V2 e)
     {
         Id = e.QuestionId;
         Stem = e.Stem;
@@ -153,13 +184,22 @@ public sealed class QuestionState
         CreatedAt = e.Timestamp;
         Explanation = e.Explanation;
         Status = QuestionLifecycleStatus.Draft;
+        LearningObjectiveId = e.LearningObjectiveId;
         Provenance = new QuestionProvenanceState(
             e.SourceDocId, e.SourceUrl, e.SourceFilename,
             e.OriginalText, e.ImportedBy, e.Timestamp);
         EventVersion++;
     }
 
-    public void Apply(QuestionAiGenerated_V1 e)
+    public void Apply(QuestionAiGenerated_V1 e) =>
+        Apply(new QuestionAiGenerated_V2(
+            e.QuestionId, e.Stem, e.StemHtml, e.Options,
+            e.Subject, e.Topic, e.Grade, e.BloomsLevel, e.Difficulty,
+            e.ConceptIds, e.Language, e.PromptText, e.ModelId,
+            e.ModelTemperature, e.RawModelOutput, e.RequestedBy,
+            e.Explanation, e.Timestamp, LearningObjectiveId: null));
+
+    public void Apply(QuestionAiGenerated_V2 e)
     {
         Id = e.QuestionId;
         Stem = e.Stem;
@@ -176,11 +216,19 @@ public sealed class QuestionState
         CreatedBy = e.RequestedBy;
         CreatedAt = e.Timestamp;
         Status = QuestionLifecycleStatus.Draft;
+        LearningObjectiveId = e.LearningObjectiveId;
         AiProvenance = new AiGenerationState(
             e.PromptText, e.ModelId, e.ModelTemperature,
             e.RawModelOutput, e.RequestedBy, e.Timestamp,
             e.Explanation);
         Explanation = e.Explanation;
+        EventVersion++;
+    }
+
+    public void Apply(LearningObjectiveAssigned_V1 e)
+    {
+        LearningObjectiveId = e.NewObjectiveId;
+        UpdatedAt = e.Timestamp;
         EventVersion++;
     }
 

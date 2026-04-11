@@ -285,7 +285,15 @@ public static class MartenConfiguration
             .Index(x => x.Subject)
             .Index(x => x.Difficulty)
             .Index(x => x.ConceptId)
-            .Index(x => x.Grade);
+            .Index(x => x.Grade)
+            .Index(x => x.LearningObjectiveId!); // FIND-pedagogy-008
+
+        // ── Learning Objective Document (FIND-pedagogy-008) ──
+        opts.Schema.For<LearningObjectiveDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.Code)
+            .Index(x => x.Subject)
+            .Index(x => x.IsActive);
 
         // ── Boss Attempt Document (STB-05b) ──
         opts.Schema.For<BossAttemptDocument>()
@@ -573,8 +581,11 @@ public static class MartenConfiguration
     private static void RegisterQuestionEvents(StoreOptions opts)
     {
         opts.Events.AddEventType<QuestionAuthored_V1>();
+        opts.Events.AddEventType<QuestionAuthored_V2>(); // FIND-pedagogy-008
         opts.Events.AddEventType<QuestionIngested_V1>();
+        opts.Events.AddEventType<QuestionIngested_V2>(); // FIND-pedagogy-008
         opts.Events.AddEventType<QuestionAiGenerated_V1>();
+        opts.Events.AddEventType<QuestionAiGenerated_V2>(); // FIND-pedagogy-008
         opts.Events.AddEventType<QuestionStemEdited_V1>();
         opts.Events.AddEventType<QuestionOptionChanged_V1>();
         opts.Events.AddEventType<QuestionMetadataUpdated_V1>();
@@ -586,6 +597,7 @@ public static class MartenConfiguration
         opts.Events.AddEventType<ExplanationEdited_V1>();
         opts.Events.AddEventType<QuestionExplanationUpdated_V1>();
         opts.Events.AddEventType<LanguageVersionAdded_V1>();
+        opts.Events.AddEventType<LearningObjectiveAssigned_V1>(); // FIND-pedagogy-008
     }
 
     /// <summary>
@@ -597,5 +609,10 @@ public static class MartenConfiguration
     {
         // ConceptAttempted: V1 -> V2 (adds Duration field, defaults to TimeSpan.Zero)
         opts.RegisterUpcaster(ConceptAttemptedV1ToV2Upcaster.Instance);
+
+        // FIND-pedagogy-008: Question creation V1 -> V2 upcasters (add LearningObjectiveId).
+        opts.RegisterUpcaster(QuestionAuthoredV1ToV2Upcaster.Instance);
+        opts.RegisterUpcaster(QuestionIngestedV1ToV2Upcaster.Instance);
+        opts.RegisterUpcaster(QuestionAiGeneratedV1ToV2Upcaster.Instance);
     }
 }
