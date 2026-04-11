@@ -15,6 +15,7 @@ using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
 
 namespace Cena.Api.Host.Endpoints;
@@ -35,8 +36,10 @@ public static class TutorEndpoints
         group.MapGet("/threads/{threadId}/messages", GetMessages).WithName("GetTutorMessages");
         group.MapPost("/threads/{threadId}/messages", SendMessage).WithName("SendTutorMessage");
         
-        // SSE streaming endpoint (STB-04b)
-        group.MapPost("/threads/{threadId}/stream", StreamMessage).WithName("StreamTutorMessage");
+        // SSE streaming endpoint (HARDEN: Real LLM with rate limiting)
+        group.MapPost("/threads/{threadId}/stream", StreamMessage)
+            .WithName("StreamTutorMessage")
+            .RequireRateLimiting("tutor"); // 10 messages/min/student
 
         return app;
     }
@@ -122,7 +125,7 @@ public static class TutorEndpoints
                 CreatedAt = now
             };
 
-            // Create stub assistant response (non-streaming for initial)
+            // Create welcome message (non-streaming for initial thread creation)
             var assistantMessageId = $"tutor_msg_{Guid.NewGuid():N}";
             var assistantMessage = new TutorMessageDocument
             {
@@ -132,8 +135,7 @@ public static class TutorEndpoints
                 StudentId = studentId,
                 Role = "assistant",
                 Content = "Hello! I'm your AI tutor. How can I help you with your learning today?",
-                CreatedAt = now.AddSeconds(1),
-                Model = "gpt-4-stub"
+                CreatedAt = now.AddSeconds(1)
             };
 
             session.Store(userMessage);
@@ -190,7 +192,7 @@ public static class TutorEndpoints
             HasMore: false)); // Phase 1: no pagination
     }
 
-    // POST /api/tutor/threads/{threadId}/messages — send a message and get stub response
+    // POST /api/tutor/threads/{threadId}/messages — send a message (use /stream for AI response)
     private static async Task<IResult> SendMessage(
         HttpContext ctx,
         IDocumentStore store,
@@ -231,7 +233,7 @@ public static class TutorEndpoints
         };
         session.Store(userMessage);
 
-        // Generate stub assistant response (Phase 1: no real LLM)
+        // Placeholder response — use /stream endpoint for AI tutoring
         var assistantMessageId = $"tutor_msg_{Guid.NewGuid():N}";
         var assistantMessage = new TutorMessageDocument
         {
@@ -240,9 +242,8 @@ public static class TutorEndpoints
             ThreadId = threadId,
             StudentId = studentId,
             Role = "assistant",
-            Content = "Great question! I'd be happy to help with that. (Use /stream endpoint for SSE)",
-            CreatedAt = now.AddSeconds(1),
-            Model = "gpt-4-stub"
+            Content = "Great question! Use the /stream endpoint for an AI-powered response.",
+            CreatedAt = now.AddSeconds(1)
         };
         session.Store(assistantMessage);
 
@@ -330,15 +331,35 @@ public static class TutorEndpoints
         // Send message ID first
         yield return new SseEvent("message_id", JsonSerializer.Serialize(new { messageId = assistantMessageId }));
 
-        // Stream tokens from stub LLM
-        await foreach (var token in llmService.StreamResponseAsync(
-            studentId, threadId, request.Content, conversationHistory, ct))
+        // Build tutor context for LLM
+        var tutorContext = new TutorContext(
+            StudentId: studentId,
+            ThreadId: threadId,
+            MessageHistory: conversationHistory
+                .Select(m => new global::Cena.Actors.Tutor.TutorMessage(m.Role, m.Content))
+                .ToList(),
+            Subject: thread.Subject,
+            CurrentGrade: null // Could be loaded from student profile
+        );
+
+        // Stream tokens from real LLM (HARDEN: No stubs)
+        int? totalTokensUsed = null;
+        await foreach (var chunk in llmService.StreamCompletionAsync(tutorContext, ct))
         {
-            fullContent.Append(token);
-            yield return new SseEvent("token", JsonSerializer.Serialize(new { token }));
+            if (!string.IsNullOrEmpty(chunk.Delta))
+            {
+                fullContent.Append(chunk.Delta);
+                yield return new SseEvent("token", JsonSerializer.Serialize(new { token = chunk.Delta }));
+            }
+            
+            // Capture token usage from final chunk
+            if (chunk.Finished && chunk.TokensUsed.HasValue)
+            {
+                totalTokensUsed = chunk.TokensUsed.Value;
+            }
         }
 
-        // Store the complete assistant message
+        // Store the complete assistant message with token accounting (HARDEN)
         var assistantMessage = new TutorMessageDocument
         {
             Id = assistantMessageId,
@@ -348,7 +369,8 @@ public static class TutorEndpoints
             Role = "assistant",
             Content = fullContent.ToString().Trim(),
             CreatedAt = DateTime.UtcNow,
-            Model = "gpt-4-stub"
+            Model = "claude-3-sonnet-20240229", // HARDEN: Real model name
+            TokensUsed = totalTokensUsed // HARDEN: Persist for billing/throttling
         };
         session.Store(assistantMessage);
 
@@ -365,7 +387,7 @@ public static class TutorEndpoints
             TurnNumber: (int)thread.MessageCount / 2,
             Role: "tutor",
             MessagePreview: assistantMessage.Content[..Math.Min(200, assistantMessage.Content.Length)],
-            SourceCount: 0, // Stub has no RAG sources
+            SourceCount: 0, // Future: RAG source count when implemented
             Timestamp: DateTimeOffset.UtcNow);
         
         session.Events.Append(studentId, tutoringEvent);

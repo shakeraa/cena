@@ -34,6 +34,12 @@ public class TutorMessageDocument
     public string Role { get; set; } = ""; // 'user' | 'assistant' | 'system'
     public string Content { get; set; } = "";
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    public string? Model { get; set; } // For assistant messages: 'gpt-4', etc.
+    public string? Model { get; set; } // For assistant messages: 'claude-3-opus-20240229', etc.
     public int? TokenCount { get; set; }
+    
+    /// <summary>
+    /// Total tokens used for this message (input + output) for billing/throttling.
+    /// HARDEN: Persisted from LLM response for token accounting.
+    /// </summary>
+    public int? TokensUsed { get; set; }
 }

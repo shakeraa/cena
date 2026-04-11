@@ -12,6 +12,7 @@ using Cena.Actors.Notifications;
 using Cena.Actors.Projections;
 using Cena.Actors.Serving;
 using Cena.Actors.Tutor;
+using Serilog;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
 using Cena.Api.Host.Endpoints;
@@ -104,9 +105,6 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<NatsEventSubscribe
 // ---- STB-07b: Notification Dispatcher ----
 builder.Services.AddHostedService<NotificationDispatcher>();
 
-// ---- STB-04b: Tutor LLM Service ----
-builder.Services.AddSingleton<ITutorLlmService, StubTutorLlmService>();
-
 // ---- Firebase Auth + Authorization (BKD-001) ----
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);
@@ -153,6 +151,14 @@ builder.Services.AddRateLimiter(options =>
         opt.QueueLimit = 0;
     });
 
+    // Tutor LLM: 10 messages/min per student (HARDEN)
+    options.AddFixedWindowLimiter("tutor", opt =>
+    {
+        opt.PermitLimit = 10;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+
     // Destructive operations: 2 req/min per user
     options.AddFixedWindowLimiter("destructive", opt =>
     {
@@ -193,6 +199,21 @@ builder.Services.AddScoped<INotificationChannelService, NotificationChannelServi
 
 // ---- HARDEN SessionEndpoints: Question Bank Service ----
 builder.Services.AddScoped<IQuestionBank, QuestionBank>();
+
+// ---- HARDEN TutorEndpoints: LLM Service ----
+// Register Claude if API key is present, otherwise Null (operational failure mode)
+var llmApiKey = builder.Configuration["Cena:Llm:ApiKey"];
+if (!string.IsNullOrEmpty(llmApiKey))
+{
+    builder.Services.AddScoped<ITutorLlmService, ClaudeTutorLlmService>();
+    Log.Information("ClaudeTutorLlmService registered for AI tutoring");
+}
+else
+{
+    builder.Services.AddScoped<ITutorLlmService, NullTutorLlmService>();
+    Log.Warning("NullTutorLlmService registered — Cena:Llm:ApiKey not configured. " +
+        "Set CENA_LLM_API_KEY environment variable to enable AI tutoring.");
+}
 
 // =============================================================================
 // OPENTELEMETRY (REV-018.3)
