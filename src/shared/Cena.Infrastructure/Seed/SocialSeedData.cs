@@ -45,7 +45,6 @@ public static class SocialSeedData
         IDocumentSession session,
         ILogger logger)
     {
-
         var feedItems = new[]
         {
             new ClassFeedItemDocument
@@ -195,7 +194,6 @@ public static class SocialSeedData
         IDocumentSession session,
         ILogger logger)
     {
-
         var questionId = "seed:question:001";
 
         var solutions = new[]
@@ -277,7 +275,6 @@ public static class SocialSeedData
         IDocumentSession session,
         ILogger logger)
     {
-
         // Seed accepted friendships
         var friendships = new[]
         {
@@ -359,7 +356,6 @@ public static class SocialSeedData
         IDocumentSession session,
         ILogger logger)
     {
-
         var rooms = new[]
         {
             new StudyRoomDocument

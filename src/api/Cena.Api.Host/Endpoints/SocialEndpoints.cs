@@ -113,14 +113,14 @@ public static class SocialEndpoints
             .OrderByDescending(x => x.UpvoteCount - x.DownvoteCount)
             .ThenByDescending(x => x.PostedAt)
             .Select(x => new PeerSolution(
-                SolutionId: x.SolutionId,
-                QuestionId: x.QuestionId,
-                AuthorStudentId: x.AuthorStudentId,
-                AuthorDisplayName: x.AuthorDisplayName,
-                Content: x.Content,
-                UpvoteCount: x.UpvoteCount,
-                DownvoteCount: x.DownvoteCount,
-                PostedAt: x.PostedAt))
+                x.SolutionId,
+                x.QuestionId,
+                x.AuthorStudentId,
+                x.AuthorDisplayName,
+                x.Content,
+                x.UpvoteCount,
+                x.DownvoteCount,
+                x.PostedAt))
             .ToListAsync();
 
         var dto = new PeerSolutionListDto(Solutions: solutions.ToArray());
@@ -156,7 +156,7 @@ public static class SocialEndpoints
             friends.Add(new Friend(
                 StudentId: friendId,
                 DisplayName: friendProfile?.DisplayName ?? friendProfile?.FullName ?? "Student",
-                AvatarUrl: friendProfile?.AvatarUrl,
+                AvatarUrl: null, // Future: add AvatarUrl to StudentProfileSnapshot
                 Level: level,
                 StreakDays: 0, // Future: compute from streak projection
                 IsOnline: false)); // Future: check presence service
@@ -175,7 +175,7 @@ public static class SocialEndpoints
                 RequestId: r.RequestId,
                 FromStudentId: r.FromStudentId,
                 FromDisplayName: fromProfile?.DisplayName ?? fromProfile?.FullName ?? "Student",
-                FromAvatarUrl: fromProfile?.AvatarUrl,
+                FromAvatarUrl: null, // Future: add AvatarUrl to StudentProfileSnapshot
                 RequestedAt: r.RequestedAt));
         }
 
