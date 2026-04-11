@@ -202,7 +202,7 @@ public static class ChallengesEndpoints
         foreach (var boss in BossBattleCatalog.Bosses)
         {
             var summary = new BossBattleSummary(
-                BossBattleId: boss.BossBattleId,
+                BossBattleId: boss.Id,
                 Name: boss.Name,
                 Subject: boss.Subject,
                 Difficulty: boss.Difficulty,
