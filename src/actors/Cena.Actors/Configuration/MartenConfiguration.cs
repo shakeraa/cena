@@ -73,6 +73,7 @@ public static class MartenConfiguration
         RegisterOutreachEvents(opts);
         RegisterQuestionEvents(opts);
         RegisterFocusEvents(opts);
+        RegisterNotificationEvents(opts); // FIND-data-002: Was defined but never called
 
         // ── Register Upcasters (V(N) -> V(N+1) schema evolution, DATA-009) ──
         RegisterUpcasters(opts);
@@ -491,6 +492,8 @@ public static class MartenConfiguration
         opts.Events.AddEventType<ReviewDue_V1>();
         // STB-01c: Session question answered event
         opts.Events.AddEventType<QuestionAnsweredInSession_V1>();
+        // FIND-data-007b: Profile updated event for event-sourced profile changes
+        opts.Events.AddEventType<ProfileUpdated_V1>();
     }
 
     private static void RegisterOutreachEvents(StoreOptions opts)

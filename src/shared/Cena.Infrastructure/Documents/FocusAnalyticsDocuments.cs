@@ -8,7 +8,7 @@ namespace Cena.Infrastructure.Documents;
 
 /// <summary>
 /// Per-student daily focus rollup. One row per (studentId, yyyy-MM-dd).
-/// Rolls up focus_score_updated__v1 / mind_wandering_detected__v1 /
+/// Rolls up focus_score_updated_v1 / mind_wandering_detected_v1 /
 /// microbreak_* events for a single day so admin queries don't have to
 /// scan the raw event stream.
 /// </summary>

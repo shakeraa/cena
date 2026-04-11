@@ -129,17 +129,17 @@ public static class MeEndpoints
         if (profile is null)
             return Results.NotFound();
 
-        // Apply patch
-        if (patch.DisplayName is not null)
-            profile.DisplayName = patch.DisplayName;
-        if (patch.Bio is not null)
-            profile.Bio = patch.Bio;
-        if (patch.FavoriteSubjects is not null)
-            profile.Subjects = patch.FavoriteSubjects;
-        if (patch.Visibility is not null)
-            profile.Visibility = patch.Visibility;
+        // FIND-data-007b: Emit ProfileUpdated event instead of direct snapshot modification.
+        // The inline projection will apply this event to the snapshot on SaveChangesAsync.
+        var profileUpdatedEvent = new ProfileUpdated_V1(
+            StudentId: studentId,
+            DisplayName: patch.DisplayName,
+            Bio: patch.Bio,
+            Subjects: patch.FavoriteSubjects,
+            Visibility: patch.Visibility,
+            UpdatedAt: DateTimeOffset.UtcNow);
 
-        session.Store(profile);
+        session.Events.Append(studentId, profileUpdatedEvent);
         await session.SaveChangesAsync();
 
         return Results.NoContent();
@@ -187,9 +187,9 @@ public static class MeEndpoints
 
         session.Events.Append(studentId, onboardingEvent);
 
-        // Apply to snapshot immediately (inline projection)
-        profile.Apply(onboardingEvent);
-        session.Store(profile);
+        // FIND-data-007b: Removed profile.Apply and session.Store(profile).
+        // StudentProfileSnapshot is an INLINE projection — Marten auto-rebuilds
+        // from events on SaveChangesAsync(). Manual Store() races with daemon.
 
         await session.SaveChangesAsync();
 

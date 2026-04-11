@@ -222,6 +222,22 @@ public class StudentProfileSnapshot
     }
 
     /// <summary>
+    /// FIND-data-007b: Apply profile updated event.
+    /// Updates mutable profile fields that students can change after onboarding.
+    /// </summary>
+    public void Apply(ProfileUpdated_V1 e)
+    {
+        if (e.DisplayName is not null)
+            DisplayName = e.DisplayName;
+        if (e.Bio is not null)
+            Bio = e.Bio;
+        if (e.Subjects is not null)
+            Subjects = e.Subjects;
+        if (e.Visibility is not null)
+            Visibility = e.Visibility;
+    }
+
+    /// <summary>
     /// STB-01: Apply learning session started event
     /// </summary>
     public void Apply(LearningSessionStarted_V1 e)

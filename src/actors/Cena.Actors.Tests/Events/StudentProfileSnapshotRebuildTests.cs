@@ -49,6 +49,9 @@ public sealed class StudentProfileSnapshotRebuildTests
                 case LearningSessionStarted_V1 sessionStart:
                     snapshot.Apply(sessionStart);
                     break;
+                case ProfileUpdated_V1 profileUpdated:
+                    snapshot.Apply(profileUpdated);
+                    break;
                 default:
                     throw new InvalidOperationException(
                         $"Test helper has no Apply wiring for event type {evt.GetType().Name}");
@@ -279,5 +282,126 @@ public sealed class StudentProfileSnapshotRebuildTests
 
         Assert.Equal(existingCreatedAt, snapshot.CreatedAt);
         Assert.Equal(onboardedAt.UtcDateTime, snapshot.OnboardedAt);
+    }
+
+    // -------------------------------------------------------------------------
+    // FIND-data-007b (a): ProfileUpdated_V1 applies display name, bio, subjects, visibility.
+    // -------------------------------------------------------------------------
+    [Fact]
+    public void Apply_ProfileUpdated_UpdatesAllFields()
+    {
+        var studentId = "student-profile-update";
+        var updatedAt = new DateTimeOffset(2026, 4, 11, 15, 0, 0, TimeSpan.Zero);
+
+        // First onboard the student
+        var onboarding = new OnboardingCompleted_V1(
+            StudentId: studentId,
+            Role: "student",
+            Locale: "en",
+            Subjects: new[] { "Mathematics" },
+            DailyTimeGoalMinutes: 30,
+            CompletedAt: new DateTimeOffset(2026, 4, 11, 10, 0, 0, TimeSpan.Zero));
+
+        // Then update profile
+        var profileUpdate = new ProfileUpdated_V1(
+            StudentId: studentId,
+            DisplayName: "Math Whiz",
+            Bio: "I love solving equations!",
+            Subjects: new[] { "Mathematics", "Physics" },
+            Visibility: "public",
+            UpdatedAt: updatedAt);
+
+        var snapshot = RebuildFromEvents(studentId, onboarding, profileUpdate);
+
+        Assert.Equal("Math Whiz", snapshot.DisplayName);
+        Assert.Equal("I love solving equations!", snapshot.Bio);
+        Assert.Equal(new[] { "Mathematics", "Physics" }, snapshot.Subjects);
+        Assert.Equal("public", snapshot.Visibility);
+    }
+
+    // -------------------------------------------------------------------------
+    // FIND-data-007b (b): ProfileUpdated_V1 with null fields leaves existing values.
+    // -------------------------------------------------------------------------
+    [Fact]
+    public void Apply_ProfileUpdated_NullFieldsPreservesExisting()
+    {
+        var studentId = "student-partial-update";
+
+        var onboarding = new OnboardingCompleted_V1(
+            StudentId: studentId,
+            Role: "student",
+            Locale: "en",
+            Subjects: new[] { "Mathematics" },
+            DailyTimeGoalMinutes: 30,
+            CompletedAt: new DateTimeOffset(2026, 4, 11, 10, 0, 0, TimeSpan.Zero));
+
+        // First update sets display name
+        var firstUpdate = new ProfileUpdated_V1(
+            StudentId: studentId,
+            DisplayName: "Original Name",
+            Bio: null,
+            Subjects: null,
+            Visibility: null,
+            UpdatedAt: new DateTimeOffset(2026, 4, 11, 11, 0, 0, TimeSpan.Zero));
+
+        // Second update only changes bio
+        var secondUpdate = new ProfileUpdated_V1(
+            StudentId: studentId,
+            DisplayName: null,
+            Bio: "New bio",
+            Subjects: null,
+            Visibility: null,
+            UpdatedAt: new DateTimeOffset(2026, 4, 11, 12, 0, 0, TimeSpan.Zero));
+
+        var snapshot = RebuildFromEvents(studentId, onboarding, firstUpdate, secondUpdate);
+
+        // Display name from first update preserved
+        Assert.Equal("Original Name", snapshot.DisplayName);
+        // Bio from second update
+        Assert.Equal("New bio", snapshot.Bio);
+        // Subjects from onboarding preserved
+        Assert.Equal(new[] { "Mathematics" }, snapshot.Subjects);
+    }
+
+    // -------------------------------------------------------------------------
+    // FIND-data-007b (c): Profile survives rebuild with both onboarding and profile update.
+    // -------------------------------------------------------------------------
+    [Fact]
+    public void Rebuild_OnboardingPlusProfileUpdate_AllFieldsSurvive()
+    {
+        var studentId = "student-full-profile";
+        var onboardedAt = new DateTimeOffset(2026, 4, 11, 9, 0, 0, TimeSpan.Zero);
+
+        var onboarding = new OnboardingCompleted_V1(
+            StudentId: studentId,
+            Role: "student",
+            Locale: "en",
+            Subjects: new[] { "Mathematics" },
+            DailyTimeGoalMinutes: 30,
+            CompletedAt: onboardedAt);
+
+        var profileUpdate = new ProfileUpdated_V1(
+            StudentId: studentId,
+            DisplayName: "Math Pro",
+            Bio: "Expert in algebra",
+            Subjects: new[] { "Mathematics", "Calculus", "Linear Algebra" },
+            Visibility: "class-only",
+            UpdatedAt: new DateTimeOffset(2026, 4, 11, 10, 0, 0, TimeSpan.Zero));
+
+        var rebuilt = RebuildFromEvents(studentId, onboarding, profileUpdate);
+
+        // Onboarding fields preserved
+        Assert.Equal(onboardedAt.UtcDateTime, rebuilt.OnboardedAt);
+        Assert.Equal("student", rebuilt.Role);
+        Assert.Equal("en", rebuilt.Locale);
+
+        // Profile update fields applied
+        Assert.Equal("Math Pro", rebuilt.DisplayName);
+        Assert.Equal("Expert in algebra", rebuilt.Bio);
+        Assert.Equal(new[] { "Mathematics", "Calculus", "Linear Algebra" }, rebuilt.Subjects);
+        Assert.Equal("class-only", rebuilt.Visibility);
+
+        // CreatedAt set from onboarding
+        Assert.Equal(onboardedAt, rebuilt.CreatedAt);
     }
 }

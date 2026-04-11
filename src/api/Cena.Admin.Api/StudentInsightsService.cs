@@ -47,7 +47,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         await using var session = _store.QuerySession();
 
         var focusEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated__v1")
+            .Where(e => e.EventTypeName == "focus_score_updated_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(2000)
             .ToListAsync();
@@ -83,7 +83,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         await using var session = _store.QuerySession();
 
         var focusEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated__v1")
+            .Where(e => e.EventTypeName == "focus_score_updated_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(2000)
             .ToListAsync();
@@ -116,7 +116,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
 
         // Query streak events
         var streakEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "streak_updated__v1")
+            .Where(e => e.EventTypeName == "streak_updated_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(500)
             .ToListAsync();
@@ -130,7 +130,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
 
         // Query XP events
         var xpEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "xp_awarded__v1")
+            .Where(e => e.EventTypeName == "xp_awarded_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(2000)
             .ToListAsync();
@@ -150,7 +150,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
 
         // Query badge events
         var badgeEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "badge_earned__v1")
+            .Where(e => e.EventTypeName == "badge_earned_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(500)
             .ToListAsync();
@@ -183,7 +183,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         await using var session = _store.QuerySession();
 
         var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted__v1")
+            .Where(e => e.EventTypeName == "concept_attempted_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(5000)
             .ToListAsync();
@@ -230,7 +230,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         await using var session = _store.QuerySession();
 
         var hintEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "hint_requested__v1")
+            .Where(e => e.EventTypeName == "hint_requested_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(2000)
             .ToListAsync();
@@ -257,7 +257,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
 
         // Check effectiveness: did student get the next question right after a hint?
         var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted__v1")
+            .Where(e => e.EventTypeName == "concept_attempted_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(3000)
             .ToListAsync();
@@ -290,7 +290,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         await using var session = _store.QuerySession();
 
         var stagnationEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "stagnation_detected__v1")
+            .Where(e => e.EventTypeName == "stagnation_detected_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(1000)
             .ToListAsync();
@@ -320,7 +320,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
 
         // Methodology switches for stagnating concepts
         var switchEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "methodology_switched__v1")
+            .Where(e => e.EventTypeName == "methodology_switched_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(1000)
             .ToListAsync();
@@ -354,13 +354,13 @@ public sealed class StudentInsightsService : IStudentInsightsService
         await using var session = _store.QuerySession();
 
         var startEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "session_started__v1")
+            .Where(e => e.EventTypeName == "session_started_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(2000)
             .ToListAsync();
 
         var endEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "session_ended__v1")
+            .Where(e => e.EventTypeName == "session_ended_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(2000)
             .ToListAsync();
@@ -436,7 +436,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         await using var session = _store.QuerySession();
 
         var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted__v1")
+            .Where(e => e.EventTypeName == "concept_attempted_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(5000)
             .ToListAsync();

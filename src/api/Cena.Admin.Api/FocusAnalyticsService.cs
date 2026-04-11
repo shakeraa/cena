@@ -131,7 +131,7 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
         var since30d = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-30);
         var focusEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated__v1")
+            .Where(e => e.EventTypeName == "focus_score_updated_v1")
             .Where(e => e.Timestamp >= since30d)
             .ToListAsync();
 

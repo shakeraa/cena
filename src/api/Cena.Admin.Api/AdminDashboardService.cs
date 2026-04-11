@@ -151,14 +151,14 @@ public sealed class AdminDashboardService : IAdminDashboardService
         var since = now.AddDays(-days);
 
         // Query real question events from Marten event store
-        // Marten stores type names with double underscore (e.g., question_authored__v1)
+        // Marten stores type names with double underscore (e.g., question_authored_v1)
         var questionEvents = await session.Events.QueryAllRawEvents()
             .Where(e => e.Timestamp >= since)
-            .Where(e => e.EventTypeName == "question_authored__v1"
-                     || e.EventTypeName == "question_ai_generated__v1"
-                     || e.EventTypeName == "question_ingested__v1"
-                     || e.EventTypeName == "question_reviewed__v1"
-                     || e.EventTypeName == "question_approved__v1")
+            .Where(e => e.EventTypeName == "question_authored_v1"
+                     || e.EventTypeName == "question_ai_generated_v1"
+                     || e.EventTypeName == "question_ingested_v1"
+                     || e.EventTypeName == "question_reviewed_v1"
+                     || e.EventTypeName == "question_approved_v1")
             .OrderBy(e => e.Timestamp)
             .ToListAsync();
 
@@ -172,10 +172,10 @@ public sealed class AdminDashboardService : IAdminDashboardService
 
             dataPoints.Add(new PipelinePoint(
                 Date: date.ToString("yyyy-MM-dd"),
-                Created: dayEvents.Count(e => e.EventTypeName is "question_authored__v1"
-                    or "question_ai_generated__v1" or "question_ingested__v1"),
-                Reviewed: dayEvents.Count(e => e.EventTypeName == "question_reviewed__v1"),
-                Approved: dayEvents.Count(e => e.EventTypeName == "question_approved__v1"),
+                Created: dayEvents.Count(e => e.EventTypeName is "question_authored_v1"
+                    or "question_ai_generated_v1" or "question_ingested_v1"),
+                Reviewed: 0, // FIND-data-005: question_reviewed_v1 not a registered event
+                Approved: dayEvents.Count(e => e.EventTypeName == "question_approved_v1"),
                 Rejected: 0));
         }
 

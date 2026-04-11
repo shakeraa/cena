@@ -51,7 +51,7 @@ public sealed class ExperimentAdminService : IExperimentAdminService
         // from the total student population without persisted assignment records.
         var uniqueStudentIds = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(SessionStarted_V1))
+            .Where(e => e.EventTypeName == "session_started_v1")
             .Select(e => ((SessionStarted_V1)e.Data).StudentId)
             .Distinct()
             .ToListAsync();
@@ -99,7 +99,7 @@ public sealed class ExperimentAdminService : IExperimentAdminService
         // Gather unique student IDs from session events
         var uniqueStudentIds = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(SessionStarted_V1))
+            .Where(e => e.EventTypeName == "session_started_v1")
             .Select(e => ((SessionStarted_V1)e.Data).StudentId)
             .Distinct()
             .ToListAsync();
@@ -118,13 +118,13 @@ public sealed class ExperimentAdminService : IExperimentAdminService
         // Query aggregate metrics from event stream
         var tutoringEpisodes = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(TutoringEpisodeCompleted_V1))
+            .Where(e => e.EventTypeName == "tutoring_episode_completed_v1")
             .Select(e => (TutoringEpisodeCompleted_V1)e.Data)
             .ToListAsync();
 
         var masteryEvents = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(ConceptMastered_V1))
+            .Where(e => e.EventTypeName == "concept_mastered_v1")
             .Select(e => (ConceptMastered_V1)e.Data)
             .ToListAsync();
 
@@ -175,7 +175,7 @@ public sealed class ExperimentAdminService : IExperimentAdminService
         // Stage 1 — Assigned: all unique students with any session event
         var assignedStudents = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(SessionStarted_V1))
+            .Where(e => e.EventTypeName == "session_started_v1")
             .Select(e => ((SessionStarted_V1)e.Data).StudentId)
             .Distinct()
             .ToListAsync();
@@ -185,7 +185,7 @@ public sealed class ExperimentAdminService : IExperimentAdminService
         // Stage 2 — Engaged: students with a TutoringSessionStarted event (interacted with tutor)
         var engagedStudents = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(TutoringSessionStarted_V1))
+            .Where(e => e.EventTypeName == "tutoring_session_started_v1")
             .Select(e => ((TutoringSessionStarted_V1)e.Data).StudentId)
             .Distinct()
             .ToListAsync();
@@ -194,7 +194,7 @@ public sealed class ExperimentAdminService : IExperimentAdminService
         // Stage 3 — Confused: students with confusion-type annotations
         var confusedStudents = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(AnnotationAdded_V1))
+            .Where(e => e.EventTypeName == "annotation_added_v1")
             .Select(e => (AnnotationAdded_V1)e.Data)
             .Where(a => a.AnnotationType == "confusion")
             .Select(a => a.StudentId)
@@ -205,7 +205,7 @@ public sealed class ExperimentAdminService : IExperimentAdminService
         // Stage 4 — Resolved: students with at least one resolved tutoring episode
         var resolvedStudents = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(TutoringEpisodeCompleted_V1))
+            .Where(e => e.EventTypeName == "tutoring_episode_completed_v1")
             .Select(e => (TutoringEpisodeCompleted_V1)e.Data)
             .Where(ep => ep.ResolutionStatus == "resolved")
             .Select(ep => ep.StudentId)
@@ -216,7 +216,7 @@ public sealed class ExperimentAdminService : IExperimentAdminService
         // Stage 5 — Mastered: students who crossed the mastery threshold
         var masteredStudents = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.EventTypeName == nameof(ConceptMastered_V1))
+            .Where(e => e.EventTypeName == "concept_mastered_v1")
             .Select(e => ((ConceptMastered_V1)e.Data).StudentId)
             .Distinct()
             .ToListAsync();
