@@ -6,7 +6,7 @@
 
 using Cena.Actors.Events;
 using Cena.Actors.Projections;
-using Cena.Api.Host.Services;
+using Cena.Api.Host.Services; // FIND-arch-001: Now from Cena.Student.Api.Host via InternalsVisibleTo
 
 namespace Cena.Actors.Tests.Services;
 

@@ -21,7 +21,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Cena.Actors\Cena.Actors.csproj" />
-    <ProjectReference Include="..\..\api\Cena.Api.Host\Cena.Api.Host.csproj" />
+    <ProjectReference Include="..\..\api\Cena.Student.Api.Host\Cena.Student.Api.Host.csproj" />
+    <ProjectReference Include="..\..\api\Cena.Admin.Api.Host\Cena.Admin.Api.Host.csproj" />
   </ItemGroup>
 
 </Project>

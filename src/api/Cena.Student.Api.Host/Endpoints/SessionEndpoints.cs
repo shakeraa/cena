@@ -854,7 +854,7 @@ public static class SessionEndpoints
     // ═════════════════════════════════════════════════════════════════════════
     // FIND-pedagogy-001 / -002 / -003: Pure helpers for the answer path.
     // Extracted as `internal static` methods so xUnit tests in
-    // Cena.Actors.Tests (InternalsVisibleTo enabled in Cena.Api.Host.csproj)
+    // FIND-arch-001: InternalsVisibleTo enabled in Cena.Student.Api.Host.csproj for Cena.Actors.Tests
     // can call them directly without spinning up an HTTP pipeline.
     // ═════════════════════════════════════════════════════════════════════════
 

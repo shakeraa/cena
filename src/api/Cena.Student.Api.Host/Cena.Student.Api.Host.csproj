@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Cena.Actors.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\actors\Cena.Actors\Cena.Actors.csproj" />
     <ProjectReference Include="..\..\shared\Cena.Infrastructure\Cena.Infrastructure.csproj" />
     <ProjectReference Include="..\Cena.Admin.Api\Cena.Admin.Api.csproj" />

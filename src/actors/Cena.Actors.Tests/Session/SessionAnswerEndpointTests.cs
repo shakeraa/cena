@@ -17,7 +17,7 @@
 // =============================================================================
 
 using Cena.Actors.Services;
-using Cena.Api.Host.Endpoints;
+using Cena.Api.Host.Endpoints; // FIND-arch-001: Now from Cena.Student.Api.Host via InternalsVisibleTo
 using Cena.Infrastructure.Documents;
 
 namespace Cena.Actors.Tests.Session;
