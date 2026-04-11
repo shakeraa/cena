@@ -88,3 +88,37 @@ public sealed record ActiveSessionDto(
     int DurationMinutes,
     int ProgressPercent,
     string? CurrentQuestionId);
+
+// =============================================================================
+// STB-01b: Session Question + Answer DTOs
+// =============================================================================
+
+public sealed record SessionQuestionDto(
+    string QuestionId,
+    int QuestionIndex,
+    int TotalQuestions,
+    string Prompt,
+    string QuestionType,  // 'multiple-choice' | 'short-answer' | 'numeric'
+    string[] Choices,     // Empty for non-multiple-choice
+    string Subject,
+    int ExpectedTimeSeconds);
+
+public sealed record SessionAnswerRequest(
+    string QuestionId,
+    string Answer,
+    int TimeSpentMs);
+
+public sealed record SessionAnswerResponseDto(
+    bool Correct,
+    string Feedback,
+    int XpAwarded,
+    decimal MasteryDelta,
+    string? NextQuestionId);
+
+public sealed record SessionCompletedDto(
+    string SessionId,
+    int TotalCorrect,
+    int TotalWrong,
+    int TotalXpAwarded,
+    int AccuracyPercent,
+    int DurationSeconds);
