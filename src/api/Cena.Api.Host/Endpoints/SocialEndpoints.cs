@@ -7,6 +7,7 @@ using System.Security.Claims;
 using Cena.Api.Contracts.Social;
 using Cena.Actors.Events;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -26,6 +27,15 @@ public static class SocialEndpoints
         group.MapGet("/peers/solutions", GetPeerSolutions).WithName("GetPeerSolutions");
         group.MapGet("/friends", GetFriends).WithName("GetFriends");
         group.MapGet("/study-rooms", GetStudyRooms).WithName("GetStudyRooms");
+
+        // STB-06b: Write endpoints
+        group.MapPost("/reactions", AddReaction).WithName("AddReaction");
+        group.MapPost("/comments", AddComment).WithName("AddComment");
+        group.MapPost("/friends/request", SendFriendRequest).WithName("SendFriendRequest");
+        group.MapPost("/friends/{id}/accept", AcceptFriendRequest).WithName("AcceptFriendRequest");
+        group.MapPost("/study-rooms", CreateStudyRoom).WithName("CreateStudyRoom");
+        group.MapPost("/study-rooms/{id}/join", JoinStudyRoom).WithName("JoinStudyRoom");
+        group.MapPost("/study-rooms/{id}/leave", LeaveStudyRoom).WithName("LeaveStudyRoom");
 
         return app;
     }
@@ -401,6 +411,397 @@ public static class SocialEndpoints
 
         var dto = new StudyRoomListDto(Rooms: rooms);
         return Results.Ok(dto);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // STB-06b: Write Endpoints
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // POST /api/social/reactions — add a reaction to an item
+    private static async Task<IResult> AddReaction(
+        HttpContext ctx,
+        IDocumentStore store,
+        AddReactionRequest request)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        if (string.IsNullOrWhiteSpace(request.ItemId) || string.IsNullOrWhiteSpace(request.ReactionType))
+            return Results.BadRequest(new { error = "ItemId and ReactionType are required" });
+
+        await using var session = store.LightweightSession();
+
+        // Append reaction event
+        var reactionEvent = new ReactionAdded_V1(
+            StudentId: studentId,
+            ItemId: request.ItemId,
+            ReactionType: request.ReactionType,
+            AddedAt: DateTimeOffset.UtcNow);
+
+        session.Events.Append(studentId, reactionEvent);
+        await session.SaveChangesAsync();
+
+        // Get approximate new count (would be projection in real implementation)
+        return Results.Ok(new AddReactionResponse(
+            Ok: true,
+            ItemId: request.ItemId,
+            ReactionType: request.ReactionType,
+            NewCount: 1));
+    }
+
+    // POST /api/social/comments — add a comment to an item
+    private static async Task<IResult> AddComment(
+        HttpContext ctx,
+        IDocumentStore store,
+        AddCommentRequest request)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        if (string.IsNullOrWhiteSpace(request.ItemId) || string.IsNullOrWhiteSpace(request.Content))
+            return Results.BadRequest(new { error = "ItemId and Content are required" });
+
+        await using var session = store.LightweightSession();
+
+        var commentId = $"comment_{Guid.NewGuid():N}";
+        var now = DateTime.UtcNow;
+
+        var comment = new CommentDocument
+        {
+            Id = commentId,
+            CommentId = commentId,
+            ItemId = request.ItemId,
+            AuthorStudentId = studentId,
+            Content = request.Content,
+            PostedAt = now
+        };
+
+        session.Store(comment);
+
+        // Append event
+        var commentEvent = new CommentPosted_V1(
+            CommentId: commentId,
+            ItemId: request.ItemId,
+            AuthorStudentId: studentId,
+            Content: request.Content,
+            PostedAt: now);
+
+        session.Events.Append(studentId, commentEvent);
+        await session.SaveChangesAsync();
+
+        return Results.Ok(new AddCommentResponse(
+            CommentId: commentId,
+            ItemId: request.ItemId,
+            Content: request.Content,
+            PostedAt: now));
+    }
+
+    // POST /api/social/friends/request — send a friend request
+    private static async Task<IResult> SendFriendRequest(
+        HttpContext ctx,
+        IDocumentStore store,
+        SendFriendRequestRequest request)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        if (string.IsNullOrWhiteSpace(request.TargetStudentId))
+            return Results.BadRequest(new { error = "TargetStudentId is required" });
+
+        if (request.TargetStudentId == studentId)
+            return Results.BadRequest(new { error = "Cannot send friend request to yourself" });
+
+        await using var session = store.LightweightSession();
+
+        // Check if already friends
+        var existingFriendship = await session.Query<FriendshipDocument>()
+            .FirstOrDefaultAsync(f => 
+                (f.StudentAId == studentId && f.StudentBId == request.TargetStudentId) ||
+                (f.StudentAId == request.TargetStudentId && f.StudentBId == studentId));
+
+        if (existingFriendship != null)
+            return Results.Conflict(new { error = "Already friends with this student" });
+
+        // Check for existing pending request
+        var existingRequest = await session.Query<FriendRequestDocument>()
+            .FirstOrDefaultAsync(r => 
+                r.FromStudentId == studentId && 
+                r.ToStudentId == request.TargetStudentId && 
+                r.Status == "pending");
+
+        if (existingRequest != null)
+            return Results.Ok(new SendFriendRequestResponse(
+                RequestId: existingRequest.RequestId,
+                Status: "pending"));
+
+        var requestId = $"friend_req_{Guid.NewGuid():N}";
+        var now = DateTime.UtcNow;
+
+        var friendRequest = new FriendRequestDocument
+        {
+            Id = requestId,
+            RequestId = requestId,
+            FromStudentId = studentId,
+            ToStudentId = request.TargetStudentId,
+            Status = "pending",
+            RequestedAt = now
+        };
+
+        session.Store(friendRequest);
+
+        // Append event
+        var requestEvent = new FriendRequestSent_V1(
+            RequestId: requestId,
+            FromStudentId: studentId,
+            ToStudentId: request.TargetStudentId,
+            RequestedAt: now);
+
+        session.Events.Append(studentId, requestEvent);
+        await session.SaveChangesAsync();
+
+        return Results.Ok(new SendFriendRequestResponse(
+            RequestId: requestId,
+            Status: "pending"));
+    }
+
+    // POST /api/social/friends/{id}/accept — accept a friend request
+    private static async Task<IResult> AcceptFriendRequest(
+        HttpContext ctx,
+        IDocumentStore store,
+        string id)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.LightweightSession();
+
+        var friendRequest = await session.LoadAsync<FriendRequestDocument>(id);
+        if (friendRequest == null)
+            return Results.NotFound(new { error = "Friend request not found" });
+
+        if (friendRequest.ToStudentId != studentId)
+            return Results.Forbid();
+
+        if (friendRequest.Status != "pending")
+            return Results.Conflict(new { error = "Friend request is not pending" });
+
+        // Update request status
+        friendRequest.Status = "accepted";
+        friendRequest.RespondedAt = DateTime.UtcNow;
+        session.Store(friendRequest);
+
+        // Create friendship
+        var friendshipId = $"friendship_{Guid.NewGuid():N}";
+        var friendship = new FriendshipDocument
+        {
+            Id = friendshipId,
+            FriendshipId = friendshipId,
+            StudentAId = friendRequest.FromStudentId,
+            StudentBId = friendRequest.ToStudentId,
+            BecameFriendsAt = DateTime.UtcNow
+        };
+        session.Store(friendship);
+
+        // Append event
+        var acceptedEvent = new FriendRequestAccepted_V1(
+            RequestId: id,
+            FromStudentId: friendRequest.FromStudentId,
+            ToStudentId: studentId,
+            AcceptedAt: DateTime.UtcNow);
+
+        session.Events.Append(studentId, acceptedEvent);
+        await session.SaveChangesAsync();
+
+        return Results.Ok(new AcceptFriendRequestResponse(
+            Ok: true,
+            FriendshipId: friendshipId));
+    }
+
+    // POST /api/social/study-rooms — create a study room
+    private static async Task<IResult> CreateStudyRoom(
+        HttpContext ctx,
+        IDocumentStore store,
+        CreateStudyRoomRequest request)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        if (string.IsNullOrWhiteSpace(request.Name))
+            return Results.BadRequest(new { error = "Name is required" });
+
+        await using var session = store.LightweightSession();
+
+        var roomId = $"room_{Guid.NewGuid():N}";
+        var now = DateTime.UtcNow;
+
+        var room = new StudyRoomDocument
+        {
+            Id = roomId,
+            RoomId = roomId,
+            Name = request.Name,
+            Subject = request.Subject ?? "General",
+            HostStudentId = studentId,
+            IsPublic = request.IsPublic,
+            MaxCapacity = request.MaxCapacity > 0 ? request.MaxCapacity : 10,
+            CreatedAt = now
+        };
+
+        session.Store(room);
+
+        // Create membership for host
+        var membershipId = $"membership_{Guid.NewGuid():N}";
+        var membership = new StudyRoomMembershipDocument
+        {
+            Id = membershipId,
+            RoomId = roomId,
+            StudentId = studentId,
+            JoinedAt = now,
+            IsActive = true
+        };
+        session.Store(membership);
+
+        // Append event
+        var roomEvent = new StudyRoomCreated_V1(
+            RoomId: roomId,
+            Name: request.Name,
+            Subject: request.Subject ?? "General",
+            HostStudentId: studentId,
+            IsPublic: request.IsPublic,
+            MaxCapacity: request.MaxCapacity > 0 ? request.MaxCapacity : 10,
+            CreatedAt: now);
+
+        session.Events.Append(studentId, roomEvent);
+        await session.SaveChangesAsync();
+
+        // Get profile for display name
+        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        var displayName = profile?.DisplayName ?? profile?.FullName ?? "Student";
+
+        return Results.Ok(new StudyRoom(
+            RoomId: roomId,
+            Name: request.Name,
+            Subject: request.Subject ?? "General",
+            HostStudentId: studentId,
+            HostDisplayName: displayName,
+            MemberCount: 1,
+            MaxCapacity: request.MaxCapacity > 0 ? request.MaxCapacity : 10,
+            IsPublic: request.IsPublic,
+            CreatedAt: now));
+    }
+
+    // POST /api/social/study-rooms/{id}/join — join a study room
+    private static async Task<IResult> JoinStudyRoom(
+        HttpContext ctx,
+        IDocumentStore store,
+        string id)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.LightweightSession();
+
+        var room = await session.LoadAsync<StudyRoomDocument>(id);
+        if (room == null)
+            return Results.NotFound(new { error = "Study room not found" });
+
+        if (!room.IsActive)
+            return Results.Conflict(new { error = "Study room is not active" });
+
+        // Check if already a member
+        var existingMembership = await session.Query<StudyRoomMembershipDocument>()
+            .FirstOrDefaultAsync(m => m.RoomId == id && m.StudentId == studentId && m.IsActive);
+
+        if (existingMembership != null)
+            return Results.Ok(new JoinStudyRoomResponse(Ok: true, RoomId: id, MemberCount: room.MaxCapacity));
+
+        // Check capacity
+        var currentMembers = await session.Query<StudyRoomMembershipDocument>()
+            .CountAsync(m => m.RoomId == id && m.IsActive);
+
+        if (currentMembers >= room.MaxCapacity)
+            return Results.Conflict(new { error = "Study room is full" });
+
+        var membershipId = $"membership_{Guid.NewGuid():N}";
+        var now = DateTime.UtcNow;
+
+        var membership = new StudyRoomMembershipDocument
+        {
+            Id = membershipId,
+            RoomId = id,
+            StudentId = studentId,
+            JoinedAt = now,
+            IsActive = true
+        };
+
+        session.Store(membership);
+
+        // Append event
+        var joinEvent = new StudyRoomJoined_V1(
+            RoomId: id,
+            StudentId: studentId,
+            JoinedAt: now);
+
+        session.Events.Append(studentId, joinEvent);
+        await session.SaveChangesAsync();
+
+        return Results.Ok(new JoinStudyRoomResponse(
+            Ok: true,
+            RoomId: id,
+            MemberCount: currentMembers + 1));
+    }
+
+    // POST /api/social/study-rooms/{id}/leave — leave a study room
+    private static async Task<IResult> LeaveStudyRoom(
+        HttpContext ctx,
+        IDocumentStore store,
+        string id)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.LightweightSession();
+
+        var membership = await session.Query<StudyRoomMembershipDocument>()
+            .FirstOrDefaultAsync(m => m.RoomId == id && m.StudentId == studentId && m.IsActive);
+
+        if (membership == null)
+            return Results.Ok(new { ok = true }); // Idempotent: already not in room
+
+        membership.IsActive = false;
+        membership.LeftAt = DateTime.UtcNow;
+        session.Store(membership);
+
+        // Append event
+        var leaveEvent = new StudyRoomLeft_V1(
+            RoomId: id,
+            StudentId: studentId,
+            LeftAt: DateTime.UtcNow);
+
+        session.Events.Append(studentId, leaveEvent);
+        await session.SaveChangesAsync();
+
+        return Results.Ok(new { ok = true });
     }
 
     private static string? GetStudentId(ClaimsPrincipal user)
