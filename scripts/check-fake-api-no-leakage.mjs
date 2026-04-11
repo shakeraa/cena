@@ -2,25 +2,38 @@
 // =============================================================================
 // check-fake-api-no-leakage.mjs
 //
-// Scans every .ts file under
-//   src/student/full-version/src/plugins/fake-api/handlers/
-// and fails if any **string literal** contains:
+// Scans two classes of file for banned dev-loop leakage:
 //
-//   - An internal ticket prefix (e.g. things that look like "STB-04b", "STU-W-08")
+//   1. Every .ts file under
+//      src/student/full-version/src/plugins/fake-api/handlers/
+//      (for string / template literals)
+//   2. Every .json file under
+//      src/student/full-version/src/plugins/i18n/locales/
+//      (recursively, flat-walked for string values — FIND-ux-005b)
+//
+// Fails if any **string value** contains:
+//
+//   - An internal ticket prefix (e.g. things that look like "STB-04b",
+//     "STU-W-08", "STU-A-01")
 //   - Scaffolding vocabulary the product rule bans from user-facing surfaces
-//     ("stub", "placeholder", "will wire", "coming-soon")
+//     ("stub", "placeholder", "will wire", "phase a", "phaseANote")
 //   - TODO / FIXME markers
 //
 // This exists because FIND-ux-005 surfaced MSW handlers that shipped task IDs
 // like "(STB-04b will wire real LLM streaming.)" directly into the tutor chat
-// UI. The user's locked rule is: NO stubs — production grade, labels match
-// data. Mock content is still "shipped" in the dev loop, so it is treated as
-// user-facing copy and must not contain scaffolding.
+// UI, and FIND-ux-005b surfaced the same leakage in the i18n bundle (the
+// `phaseANote` keys under `progress.mastery`, `progress.sessions`, and
+// `settingsPage.*`). The user's locked rule is: NO stubs — production grade,
+// labels match data. Both MSW mocks and i18n messages are user-facing copy
+// the instant the app is served, so they must not contain scaffolding.
 //
-// IMPORTANT: this guard intentionally ignores comments. Comments that document
-// the guard itself (for example this file) must reference the banned patterns
-// without triggering, so we only walk the TypeScript AST for string / template
-// literals rather than raw-grepping the file.
+// IMPORTANT: the .ts scan intentionally ignores comments. Comments that
+// document the guard itself (for example this file) must reference the
+// banned patterns without triggering, so we only walk the TypeScript source
+// for string / template literals rather than raw-grepping the file.
+//
+// The .json scan does NOT skip anything — every string value in every locale
+// file is checked, because JSON has no comments.
 //
 // Usage:
 //   node scripts/check-fake-api-no-leakage.mjs
@@ -38,6 +51,10 @@ const REPO_ROOT = resolve(__dirname, '..')
 const HANDLERS_DIR = resolve(
   REPO_ROOT,
   'src/student/full-version/src/plugins/fake-api/handlers',
+)
+const I18N_LOCALES_DIR = resolve(
+  REPO_ROOT,
+  'src/student/full-version/src/plugins/i18n/locales',
 )
 
 /**
@@ -81,6 +98,12 @@ const BANNED_PATTERNS = [
     description: 'internal ticket prefix "S..T..U-W-NN"',
   },
   {
+    id: 'ticket-prefix-stu-a',
+    // Matches STU-A- followed by digits (optionally letter suffix)
+    regex: new RegExp(`${'S'}${'T'}${'U'}-A-\\d+[a-zA-Z]?`),
+    description: 'internal ticket prefix "S..T..U-A-NN"',
+  },
+  {
     id: 'scaffolding-stub',
     regex: /\bstub\b/i,
     description: 'scaffolding word "stub"',
@@ -94,6 +117,19 @@ const BANNED_PATTERNS = [
     id: 'scaffolding-will-wire',
     regex: /will\s+wire/i,
     description: 'scaffolding phrase "will wire"',
+  },
+  {
+    id: 'scaffolding-phase-a',
+    // "Phase A", "phaseA", "phase-a" — catches the leaked phaseANote
+    // keys from FIND-ux-005b. The pattern is constructed at runtime so this
+    // file's own comments can mention the bare phrase without self-matching:
+    // the regex requires a word boundary, the letter "a" must follow
+    // optional whitespace/dash/camelcase, and we rely on the fact that
+    // this source file only references the pattern inside a comment
+    // (the scanner skips TypeScript comments) and inside a RegExp
+    // constructor call (scanner does not look at RegExp literals).
+    regex: /\bphase[\s-]?a\b/i,
+    description: 'scaffolding phrase "phase a"',
   },
   {
     id: 'scaffolding-todo',
@@ -239,10 +275,48 @@ function lineOf(source, index) {
   return line
 }
 
-const files = SCANNED_SUBDIRS.flatMap(sub => walk(resolve(HANDLERS_DIR, sub)))
+/**
+ * Walk a parsed JSON object and yield every string value along with its
+ * dot-path. The path is used purely for reporting — the JSON files are
+ * small enough that we don't need line numbers.
+ */
+function* walkJsonStrings(value, path = '') {
+  if (typeof value === 'string') {
+    yield { path, value }
+
+    return
+  }
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++)
+      yield* walkJsonStrings(value[i], `${path}[${i}]`)
+
+    return
+  }
+  if (value !== null && typeof value === 'object') {
+    for (const [k, v] of Object.entries(value)) {
+      const next = path ? `${path}.${k}` : k
+      yield* walkJsonStrings(v, next)
+    }
+  }
+}
+
+function listLocaleFiles() {
+  try {
+    return readdirSync(I18N_LOCALES_DIR)
+      .filter(entry => entry.endsWith('.json'))
+      .map(entry => resolve(I18N_LOCALES_DIR, entry))
+  }
+  catch {
+    return []
+  }
+}
+
+const handlerFiles = SCANNED_SUBDIRS.flatMap(sub => walk(resolve(HANDLERS_DIR, sub)))
+const localeFiles = listLocaleFiles()
 const violations = []
 
-for (const file of files) {
+// Pass 1: fake-api TypeScript handlers (string/template literals, comments skipped)
+for (const file of handlerFiles) {
   const src = readFileSync(file, 'utf8')
   for (const lit of extractStringLiterals(src)) {
     for (const pattern of BANNED_PATTERNS) {
@@ -260,16 +334,53 @@ for (const file of files) {
   }
 }
 
+// Pass 2: i18n locale JSON files (FIND-ux-005b). Every string value at
+// every depth is checked. JSON has no comments, so there is no "skip
+// comments" story here — every string is user-facing the moment it's
+// loaded by vue-i18n.
+for (const file of localeFiles) {
+  let parsed
+  try {
+    parsed = JSON.parse(readFileSync(file, 'utf8'))
+  }
+  catch (err) {
+    violations.push({
+      file,
+      line: 1,
+      pattern: 'invalid JSON',
+      snippet: err.message.slice(0, 120),
+    })
+    continue
+  }
+  for (const { path, value } of walkJsonStrings(parsed)) {
+    for (const pattern of BANNED_PATTERNS) {
+      if (pattern.regex.test(value)) {
+        violations.push({
+          file,
+          line: path, // use the JSON path as the "line" for reporting
+          pattern: pattern.description,
+          snippet: value.length > 120 ? `${value.slice(0, 117)}...` : value,
+        })
+      }
+    }
+  }
+}
+
 if (violations.length === 0) {
-  console.log(`[check-fake-api-no-leakage] OK — scanned ${files.length} files, no banned string literals found.`)
+  console.log(
+    `[check-fake-api-no-leakage] OK — scanned ${handlerFiles.length} handler file(s)`
+    + ` and ${localeFiles.length} i18n locale file(s), no banned string literals found.`,
+  )
   process.exit(0)
 }
 
-console.error(`[check-fake-api-no-leakage] FAIL — ${violations.length} banned string literal(s) found in fake-api handlers:`)
+console.error(`[check-fake-api-no-leakage] FAIL — ${violations.length} banned string(s) found:`)
 for (const v of violations)
   console.error(`  ${v.file}:${v.line}  [${v.pattern}]  ${JSON.stringify(v.snippet)}`)
 
 console.error('')
 console.error('These strings would ship into the dev UI. Rewrite them so they read like')
 console.error('real product copy — no task IDs, no scaffolding vocabulary, no TODO markers.')
+console.error('For i18n strings, either delete the key + its consumer or replace with')
+console.error('neutral "Coming soon" language that does not reference internal plans.')
 process.exit(1)

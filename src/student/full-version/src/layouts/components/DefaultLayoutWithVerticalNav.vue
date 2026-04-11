@@ -1,4 +1,5 @@
 <script lang="ts" setup>
+import { computed } from 'vue'
 import navItems from '@/navigation/vertical'
 import { themeConfig } from '@themeConfig'
 
@@ -17,6 +18,19 @@ import NavBarI18n from '@core/components/I18n.vue'
 
 // @layouts plugin
 import { VerticalNavLayout } from '@layouts'
+
+// FIND-ux-014: gate the Hebrew locale in the navbar switcher. We filter
+// themeConfig.app.i18n.langConfig through the same composable the
+// standalone LanguageSwitcher uses so both surfaces stay in lockstep.
+import { useAvailableLocales } from '@/composables/useAvailableLocales'
+
+const { codes: availableCodes } = useAvailableLocales()
+
+const visibleLangConfig = computed(() =>
+  (themeConfig.app.i18n.langConfig ?? []).filter(lang =>
+    availableCodes.value.includes(lang.i18nLang as 'en' | 'ar' | 'he'),
+  ),
+)
 </script>
 
 <template>
@@ -38,8 +52,8 @@ import { VerticalNavLayout } from '@layouts'
         <VSpacer />
 
         <NavBarI18n
-          v-if="themeConfig.app.i18n.enable && themeConfig.app.i18n.langConfig?.length"
-          :languages="themeConfig.app.i18n.langConfig"
+          v-if="themeConfig.app.i18n.enable && visibleLangConfig.length"
+          :languages="visibleLangConfig"
         />
         <NavbarThemeSwitcher />
         <NavBarNotifications class="me-1" />
@@ -50,8 +64,10 @@ import { VerticalNavLayout } from '@layouts'
     <!-- 👉 Pages -->
     <slot />
 
-    <!-- STU-W-UI-POLISH: removed <Footer /> slot (Vuexy admin footer) and
-         <TheCustomizer /> (admin theme-picker panel). Student app ships
-         without a footer per docs/student/01-navigation-and-ia.md §Layouts. -->
+    <!--
+      STU-W-UI-POLISH: removed <Footer /> slot (Vuexy admin footer) and
+      <TheCustomizer /> (admin theme-picker panel). Student app ships
+      without a footer per docs/student/01-navigation-and-ia.md §Layouts.
+    -->
   </VerticalNavLayout>
 </template>

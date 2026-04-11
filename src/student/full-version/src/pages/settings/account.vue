@@ -92,16 +92,6 @@ function handleSignOut() {
         {{ t('nav.signOut') }}
       </VBtn>
     </VCard>
-
-    <VAlert
-      type="info"
-      variant="tonal"
-      density="compact"
-      class="mt-4"
-      data-testid="account-phase-a-note"
-    >
-      {{ t('settingsPage.account.phaseANote') }}
-    </VAlert>
   </div>
 </template>
 
