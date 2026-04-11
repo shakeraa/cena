@@ -30,6 +30,7 @@ public record StreakUpdated_V1(
 
 /// <summary>
 /// Emitted when a student earns a badge (mastery, streak, exploration, methodology).
+/// FIND-data-001: Added Timestamp for deterministic event-sourced replay.
 /// </summary>
 public record BadgeEarned_V1(
     string StudentId,
@@ -37,8 +38,9 @@ public record BadgeEarned_V1(
     string BadgeName,
     string BadgeCategory = "general",
     string BadgeDescription = "",
-    DateTimeOffset AwardedAt = default
-);
+    DateTimeOffset AwardedAt = default,
+    DateTimeOffset Timestamp = default
+) : IDelegatedEvent;
 
 /// <summary>
 /// Emitted as a warning that a streak is about to expire.
