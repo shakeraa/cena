@@ -195,7 +195,13 @@ public class StudentProfileSnapshot
     }
 
     /// <summary>
-    /// STB-00: Apply onboarding completion event
+    /// STB-00: Apply onboarding completion event.
+    /// FIND-data-007: This is the canonical profile-creation event for a student.
+    /// On snapshot rebuild from the event stream, this handler is responsible for
+    /// setting <see cref="CreatedAt"/> — otherwise rebuild would regress CreatedAt
+    /// to DateTime.MinValue (0001-01-01). We treat the first OnboardingCompleted_V1
+    /// as the canonical creation timestamp; any later replays of the same stream
+    /// will re-set CreatedAt to the same value, so this is idempotent.
     /// </summary>
     public void Apply(OnboardingCompleted_V1 e)
     {
@@ -204,6 +210,15 @@ public class StudentProfileSnapshot
         Locale = e.Locale;
         Subjects = e.Subjects;
         DailyTimeGoalMinutes = e.DailyTimeGoalMinutes;
+
+        // FIND-data-007: Preserve creation timestamp across projection rebuilds.
+        // Only set CreatedAt if it has not already been set (default = DateTimeOffset.MinValue).
+        // This makes the first OnboardingCompleted_V1 in the stream authoritative
+        // and is idempotent under replay.
+        if (CreatedAt == default)
+        {
+            CreatedAt = e.CompletedAt;
+        }
     }
 
     /// <summary>
