@@ -598,15 +598,29 @@ public static class SessionEndpoints
 
             session.Events.Append(studentId, answeredEvent);
 
-            // STB-03b: Append XP event and concept attempt on correct answer
+            // STB-03b: Append XP event and concept attempt on correct answer.
+            //
+            // FIND-data-007: StudentProfileSnapshot is registered as an Inline
+            // SnapshotProjection in MartenConfiguration (SnapshotLifecycle.Inline).
+            // Marten rebuilds the snapshot from the event stream on every
+            // SaveChangesAsync by replaying Apply(...) handlers. The endpoint MUST
+            // NOT manually Store() a StudentProfileSnapshot — doing so races the
+            // inline projection daemon and the write order is undefined.
+            //
+            // All mutations to TotalXp / ConceptMastery / etc. must flow through
+            // event append + Apply handler. Every event going to the student's
+            // stream is appended in ONE call so Marten's inline projection sees
+            // them as a single rebuild unit.
             if (isCorrect)
             {
-                // Load current profile to get total XP
+                // Load current profile ONLY to compute the new absolute TotalXp
+                // that we stamp into the XpAwarded_V1 event (the event contract
+                // expects an absolute, not a delta).
                 var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
                 var currentXp = profile?.TotalXp ?? 0;
                 var newTotalXp = currentXp + 10;
 
-                // Append XpAwarded event
+                // XP event — absolute TotalXp snapshot
                 var xpEvent = new XpAwarded_V1(
                     StudentId: studentId,
                     XpAmount: 10,
@@ -615,13 +629,11 @@ public static class SessionEndpoints
                     DifficultyLevel: questionDoc.Difficulty,
                     DifficultyMultiplier: 1);
 
-                session.Events.Append(studentId, xpEvent);
-
-                // Also append a concept attempted event for badge tracking
-                // HARDEN: Use real concept ID from question instead of stub
+                // Concept attempt event — drives ConceptMastery, badges, BKT.
+                // HARDEN: Use real concept ID from question instead of stub.
                 var conceptAttempt = new ConceptAttempted_V1(
                     StudentId: studentId,
-                    ConceptId: questionDoc.ConceptId, // Real concept ID from question
+                    ConceptId: questionDoc.ConceptId,
                     SessionId: sessionId,
                     IsCorrect: true,
                     ResponseTimeMs: request.TimeSpentMs,
@@ -639,19 +651,13 @@ public static class SessionEndpoints
                     WasOffline: false,
                     Timestamp: DateTimeOffset.UtcNow);
 
-                session.Events.Append(studentId, conceptAttempt);
-
-                // Update profile snapshot
-                if (profile is null)
-                {
-                    profile = new StudentProfileSnapshot
-                    {
-                        StudentId = studentId,
-                        CreatedAt = DateTimeOffset.UtcNow
-                    };
-                }
-                profile.Apply(xpEvent);
-                session.Store(profile);
+                // FIND-data-007: BOTH events go to the stream in a single Append
+                // call. Marten's inline SnapshotProjection<StudentProfileSnapshot>
+                // will rebuild the snapshot from ALL events (including these two)
+                // on SaveChangesAsync and persist the new document. The endpoint
+                // NO LONGER calls session.Store(profile) — event sourcing is the
+                // single source of truth.
+                session.Events.Append(studentId, conceptAttempt, xpEvent);
             }
 
             await session.SaveChangesAsync();
