@@ -1,4 +1,10 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
+import PeerSolutionCard from '@/components/social/PeerSolutionCard.vue'
+import { useApiQuery } from '@/composables/useApiQuery'
+import { $api } from '@/api/$api'
+import type { PeerSolutionListDto } from '@/api/types/common'
+
 definePage({
   meta: {
     layout: 'default',
@@ -10,8 +16,71 @@ definePage({
     breadcrumbs: true,
   },
 })
+
+const { t } = useI18n()
+
+const solutionsQuery = useApiQuery<PeerSolutionListDto>('/api/social/peers/solutions')
+
+async function handleVote(solutionId: string, direction: 'up' | 'down') {
+  try {
+    await $api(`/api/social/peers/solutions/${solutionId}/vote`, {
+      method: 'POST' as any,
+      body: { direction } as any,
+    })
+    solutionsQuery.refresh()
+  }
+  catch {
+    // swallow — would surface a snackbar in 12b
+  }
+}
 </script>
 
 <template>
-  <PlaceholderPage title-key="nav.peerSolutions" />
+  <div
+    class="peers-page pa-4"
+    data-testid="peers-page"
+  >
+    <h1 class="text-h4 mb-1">
+      {{ t('social.peers.title') }}
+    </h1>
+    <p class="text-body-1 text-medium-emphasis mb-6">
+      {{ t('social.peers.subtitle') }}
+    </p>
+
+    <div
+      v-if="solutionsQuery.loading.value && !solutionsQuery.data.value"
+      class="d-flex justify-center py-12"
+      data-testid="peers-loading"
+    >
+      <VProgressCircular indeterminate />
+    </div>
+
+    <VAlert
+      v-else-if="solutionsQuery.error.value"
+      type="error"
+      variant="tonal"
+      data-testid="peers-error"
+    >
+      {{ solutionsQuery.error.value.message }}
+    </VAlert>
+
+    <div
+      v-else-if="solutionsQuery.data.value"
+      data-testid="peers-list"
+    >
+      <PeerSolutionCard
+        v-for="sol in solutionsQuery.data.value.solutions"
+        :key="sol.solutionId"
+        :solution="sol"
+        @vote="handleVote"
+      />
+    </div>
+  </div>
 </template>
+
+<style scoped>
+.peers-page {
+  max-inline-size: 800px;
+  margin-inline: auto;
+}
+</style>

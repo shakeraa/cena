@@ -369,6 +369,38 @@
       "friends": "الأصدقاء"
     }
   },
+  "social": {
+    "feed": {
+      "title": "موجز الفصل",
+      "subtitle": "شاهد ماذا يفعل زملاؤك.",
+      "justNow": "الآن",
+      "minutesAgo": "قبل {count} د",
+      "hoursAgo": "قبل {count} س",
+      "kind": {
+        "achievement": "إنجاز",
+        "milestone": "علامة فارقة",
+        "question": "سؤال",
+        "announcement": "إعلان"
+      }
+    },
+    "peers": {
+      "title": "حلول الأقران",
+      "subtitle": "تعلم من كيف حل الآخرون نفس الأسئلة.",
+      "forQuestion": "السؤال #{questionId}"
+    },
+    "friends": {
+      "title": "الأصدقاء",
+      "subtitle": "دائرتك التعليمية.",
+      "pendingTitle": "طلبات الصداقة",
+      "wantsToConnect": "يرغب في التواصل",
+      "accept": "قبول",
+      "listTitle": "الأصدقاء ({count})",
+      "level": "المستوى {level}",
+      "streak": "سلسلة {days} يوم",
+      "online": "متصل",
+      "offline": "غير متصل"
+    }
+  },
   "knowledgeGraph": {
     "title": "خريطة المعرفة",
     "subtitle": "استكشف المفاهيم وخطط مسار تعلمك.",

@@ -203,6 +203,38 @@
       "friends": "חברים"
     }
   },
+  "social": {
+    "feed": {
+      "title": "פיד כיתתי",
+      "subtitle": "ראה מה חבריך לכיתה עושים.",
+      "justNow": "הרגע",
+      "minutesAgo": "לפני {count} ד",
+      "hoursAgo": "לפני {count} ש",
+      "kind": {
+        "achievement": "הישג",
+        "milestone": "אבן דרך",
+        "question": "שאלה",
+        "announcement": "הודעה"
+      }
+    },
+    "peers": {
+      "title": "פתרונות עמיתים",
+      "subtitle": "למד מאיך אחרים פתרו את אותן שאלות.",
+      "forQuestion": "שאלה #{questionId}"
+    },
+    "friends": {
+      "title": "חברים",
+      "subtitle": "מעגל הלמידה שלך.",
+      "pendingTitle": "בקשות חברות",
+      "wantsToConnect": "רוצה להתחבר",
+      "accept": "אשר",
+      "listTitle": "חברים ({count})",
+      "level": "רמה {level}",
+      "streak": "רצף של {days} ימים",
+      "online": "מחובר",
+      "offline": "מנותק"
+    }
+  },
   "knowledgeGraph": {
     "title": "מפת ידע",
     "subtitle": "גלה מושגים, ראה דרישות מוקדמות, ותכנן את מסלול הלמידה.",

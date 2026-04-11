@@ -368,6 +368,38 @@
       "friends": "Friends"
     }
   },
+  "social": {
+    "feed": {
+      "title": "Class feed",
+      "subtitle": "See what your classmates are up to.",
+      "justNow": "just now",
+      "minutesAgo": "{count}m ago",
+      "hoursAgo": "{count}h ago",
+      "kind": {
+        "achievement": "Achievement",
+        "milestone": "Milestone",
+        "question": "Question",
+        "announcement": "Announcement"
+      }
+    },
+    "peers": {
+      "title": "Peer solutions",
+      "subtitle": "Learn from how others solved the same questions.",
+      "forQuestion": "Question #{questionId}"
+    },
+    "friends": {
+      "title": "Friends",
+      "subtitle": "Your learning circle.",
+      "pendingTitle": "Friend requests",
+      "wantsToConnect": "wants to connect",
+      "accept": "Accept",
+      "listTitle": "Friends ({count})",
+      "level": "Level {level}",
+      "streak": "{days}-day streak",
+      "online": "Online",
+      "offline": "Offline"
+    }
+  },
   "knowledgeGraph": {
     "title": "Knowledge graph",
     "subtitle": "Explore concepts, see prerequisites, and plan your learning path.",
