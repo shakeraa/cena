@@ -302,3 +302,61 @@ export interface FlowAccuracyPoint {
 export interface FlowAccuracyDto {
   points: FlowAccuracyPoint[]
 }
+
+/**
+ * Knowledge/content DTOs from STB-08 Phase 1. Mirrors
+ * `src/api/Cena.Api.Contracts/Content/KnowledgeDtos.cs`.
+ * Consumed by STU-W-10 knowledge graph page.
+ */
+export type ConceptDifficulty = 'beginner' | 'intermediate' | 'advanced'
+export type ConceptStatus = 'locked' | 'available' | 'in-progress' | 'mastered'
+
+export interface ConceptSummary {
+  conceptId: string
+  name: string
+  subject: string
+  topic: string | null
+  difficulty: ConceptDifficulty
+  status: ConceptStatus
+}
+
+export interface ConceptListDto {
+  items: ConceptSummary[]
+}
+
+export interface ConceptDetailDto {
+  conceptId: string
+  name: string
+  description: string
+  subject: string
+  topic: string | null
+  difficulty: ConceptDifficulty
+  status: ConceptStatus
+  currentMastery: number | null
+  prerequisites: string[]
+  dependencies: string[]
+  estimatedMinutes: number
+  questionCount: number
+}
+
+export interface PathNode {
+  conceptId: string
+  name: string
+  stepNumber: number
+  status: ConceptStatus
+}
+
+export interface PathEdge {
+  fromConceptId: string
+  toConceptId: string
+  relationship: 'prerequisite' | 'dependency'
+}
+
+export interface PathDto {
+  fromConceptId: string
+  toConceptId: string
+  nodes: PathNode[]
+  edges: PathEdge[]
+  totalSteps: number
+  estimatedMinutes: number
+}
