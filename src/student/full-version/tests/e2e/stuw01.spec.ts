@@ -4,13 +4,20 @@ import AxeBuilder from '@axe-core/playwright'
 const SCREENSHOT_DIR = 'test-results/stuw01'
 
 test.describe.serial('STU-W-01 design system', () => {
+  // FIND-ux-002: the root route `/` used to render a dev chassis with a
+  // `data-testid="index-toggle-theme"` button under "No sessions yet". The
+  // chassis has been removed and `/` now redirects to `/home`; the
+  // chassis's theme-toggle affordance lives at `/_dev/design-system` as
+  // `data-testid="ds-toggle-theme"`. This test now drives the dev-only
+  // route instead, keeping dark-mode-persistence coverage without the
+  // dead button on the production root route.
   test('E2E #2 dark mode toggle persists', async ({ page }) => {
-    await page.goto('/')
-    await page.waitForSelector('[data-testid="index-toggle-theme"]')
+    await page.goto('/_dev/design-system')
+    await page.waitForSelector('[data-testid="ds-toggle-theme"]')
 
     await page.screenshot({ path: `${SCREENSHOT_DIR}/darkmode-light.png`, fullPage: true })
 
-    await page.click('[data-testid="index-toggle-theme"]')
+    await page.click('[data-testid="ds-toggle-theme"]')
     await page.waitForTimeout(300)
 
     // Vuetify applies the theme class to .v-application / .v-theme-provider,

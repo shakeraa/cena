@@ -10,7 +10,14 @@ import { AppContentLayoutNav, ContentWidth, FooterType, NavbarType } from '@layo
 
 export const { themeConfig, layoutConfig } = defineThemeConfig({
   app: {
-    title: 'cena admin' as const,
+    // FIND-ux-003: must not contain a SP character. Cookie names are
+    // namespaced via `${app.title}-${key}` (see @layouts/stores/config.ts).
+    // RFC 6265 disallows SP in the cookie-name token grammar; with a space
+    // in here, MSW's cookie parser in the student web threw on every
+    // cross-origin request when the cookies leaked from localhost:5174 to
+    // localhost:5175, taking down HMR and blanking every student page.
+    // Hyphen, never space.
+    title: 'cena-admin' as const,
     logo: h('div', { innerHTML: logo, style: 'line-height:0; color: rgb(var(--v-global-theme-primary))' }),
     contentWidth: ContentWidth.Boxed,
     contentLayoutNav: AppContentLayoutNav.Vertical,

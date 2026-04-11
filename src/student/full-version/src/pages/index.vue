@@ -1,85 +1,46 @@
 <script setup lang="ts">
-import { useTheme } from 'vuetify'
-import { useI18n } from 'vue-i18n'
-
 definePage({
   meta: {
+    // FIND-ux-002: `public: true` so the auth guard does not
+    // synchronously bounce to /login before the onMounted redirect
+    // fires — we want every hit on `/` to immediately forward to
+    // `/home`, and `/home`'s own `requiresAuth: true` meta is what
+    // eventually forwards unauthed users to /login.
     layout: 'blank',
+    public: true,
+    requiresAuth: false,
+    requiresOnboarded: false,
   },
 })
 
-const theme = useTheme()
-const { t } = useI18n()
+/*
+ * FIND-ux-002: replace the STU-W-01 dev chassis with a pure redirect.
+ *
+ * The root route `/` used to render a "design system chassis" card with
+ * a dead "Save" button and a task ID leaking into the UI. The fix:
+ *
+ *  - Signed-in users land on `/home` (the real student dashboard).
+ *  - Signed-out users are bounced to `/login` by the auth guard in
+ *    `plugins/1.router/guards.ts` when they try to enter `/home`.
+ *
+ * This component renders nothing visible; it only triggers an immediate
+ * router.replace so `/` is never a reachable surface with UI of its own.
+ * The dev chassis has been moved to `/_dev/design-system` and
+ * `/_dev/flow-states`, which are both already present.
+ *
+ * `onMounted` and `useRouter` are provided by unplugin-auto-import (see
+ * vite.config.ts → imports: ['vue', VueRouterAutoImports, ...]); no
+ * explicit imports needed.
+ */
+const router = useRouter()
 
-const toggleTheme = () => {
-  theme.global.name.value = theme.global.current.value.dark ? 'light' : 'dark'
-}
+onMounted(() => {
+  // Use replace so the empty `/` entry never shows in browser history.
+  router.replace({ path: '/home' })
+})
 </script>
 
 <template>
-  <div
-    class="d-flex align-center justify-center pa-8"
-    style="min-height: 100vh"
-  >
-    <VCard
-      max-width="640"
-      class="pa-6"
-    >
-      <VCardTitle class="text-h4 mb-2">
-        Cena — Student Web
-      </VCardTitle>
-      <VCardText>
-        <p class="mb-2">
-          STU-W-01 design system chassis. Theme, tokens, locales, and shared components wired up.
-        </p>
-        <div class="d-flex align-center gap-2 mb-4">
-          <span class="text-body-2 text-medium-emphasis">Theme:</span>
-          <VChip
-            size="small"
-            color="primary"
-            variant="flat"
-          >
-            {{ theme.global.name.value }}
-          </VChip>
-        </div>
-        <div class="d-flex gap-3 flex-wrap">
-          <StudentEmptyState
-            :title="t('empty.noSessions')"
-            :subtitle="t('empty.noSessionsSubtitle')"
-            icon="tabler-books"
-          >
-            <template #actions>
-              <VBtn
-                color="primary"
-                data-testid="index-empty-cta"
-              >
-                {{ t('common.save') }}
-              </VBtn>
-            </template>
-          </StudentEmptyState>
-        </div>
-      </VCardText>
-      <VCardActions class="d-flex gap-2 flex-wrap">
-        <VBtn
-          data-testid="index-toggle-theme"
-          @click="toggleTheme"
-        >
-          Toggle theme
-        </VBtn>
-        <LanguageSwitcher />
-        <VBtn
-          variant="text"
-          to="/_dev/design-system"
-        >
-          Design system
-        </VBtn>
-        <VBtn
-          variant="text"
-          to="/_dev/flow-states"
-        >
-          Flow states
-        </VBtn>
-      </VCardActions>
-    </VCard>
-  </div>
+  <!-- Intentionally empty: this route exists only to forward to /home. -->
+  <div />
 </template>
