@@ -42,3 +42,23 @@ public class WebPushSubscriptionDocument
     public string Auth { get; set; } = "";   // Auth secret
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
+
+/// <summary>
+/// Per-student notification preferences (STB-07c).
+/// Stores channel opt-in, quiet hours window, timezone, and throttle settings.
+/// </summary>
+public class NotificationPreferencesDocument
+{
+    public string Id { get; set; } = "";
+    public string StudentId { get; set; } = "";
+    public bool EmailEnabled { get; set; } = true;
+    public bool PushEnabled { get; set; } = false;
+    public bool SmsEnabled { get; set; } = false;
+    public bool InAppEnabled { get; set; } = true;
+    public string Timezone { get; set; } = "UTC";
+    public int? QuietHoursStartLocal { get; set; } // hour 0-23, null = no quiet window
+    public int? QuietHoursEndLocal { get; set; }
+    public bool DailyReminder { get; set; } = true;
+    public int MaxXpNotificationsPerHour { get; set; } = 5;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+}

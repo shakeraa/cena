@@ -22,6 +22,7 @@ using Cena.Infrastructure.Content;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
+using Cena.Infrastructure.Gamification;
 using Cena.Infrastructure.Seed;
 using Marten;
 using OpenTelemetry.Metrics;
@@ -178,6 +179,12 @@ builder.Services.AddScoped<IContentCatalogService, ContentCatalogService>();
 
 // ---- STB-09b: Analytics Rollup Service ----
 builder.Services.AddScoped<IAnalyticsRollupService, AnalyticsRollupService>();
+
+// ---- STB-03c: Leaderboard Service ----
+builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
+
+// ---- STB-07c: Notification Channel Service ----
+builder.Services.AddScoped<INotificationChannelService, NotificationChannelService>();
 
 // =============================================================================
 // OPENTELEMETRY (REV-018.3)

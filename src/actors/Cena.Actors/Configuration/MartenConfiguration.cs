@@ -282,6 +282,22 @@ public static class MartenConfiguration
             .Index(x => x.StudentId)
             .Index(x => x.Subject);
 
+        // ── Notification Documents (STB-07b + STB-07c) ──
+        opts.Schema.For<NotificationDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.Read)
+            .Index(x => x.CreatedAt);
+
+        opts.Schema.For<NotificationPreferencesDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId);
+
+        opts.Schema.For<WebPushSubscriptionDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.Endpoint);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
