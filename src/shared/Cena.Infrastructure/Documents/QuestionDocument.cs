@@ -15,7 +15,19 @@ public class QuestionDocument
     public string QuestionId { get; set; } = "";
     public string Subject { get; set; } = "";
     public string? Topic { get; set; }
+    /// <summary>
+    /// UI display label for difficulty (easy, medium, hard).
+    /// FIND-pedagogy-009: This is for display ONLY — adaptive decisions use DifficultyElo.
+    /// </summary>
     public string Difficulty { get; set; } = "medium"; // easy, medium, hard
+
+    /// <summary>
+    /// FIND-pedagogy-009: Continuous Elo rating for adaptive item selection.
+    /// Targets 85% expected correctness (Wilson et al., 2019).
+    /// Default: 1000 + (Grade - 7) * 100, or 1000 if grade unknown.
+    /// </summary>
+    public float DifficultyElo { get; set; } = 1000f;
+
     public string ConceptId { get; set; } = "";
     public string Prompt { get; set; } = "";
     public string QuestionType { get; set; } = "multiple-choice"; // multiple-choice, free-text, etc.

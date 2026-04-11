@@ -525,6 +525,7 @@ public static class SessionEndpoints
             IQuestionBank questionBank,
             IBktService bktService,
             IErrorClassificationService errorClassifier,
+            IEloDifficultyService eloService,
             SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -666,6 +667,14 @@ public static class SessionEndpoints
             }
 
             await session.SaveChangesAsync();
+
+            // FIND-pedagogy-009: Update question DifficultyElo using Elo formula
+            // D_new = D_old + K * (actual - expected)
+            // This calibrates question difficulty toward the 85% correctness target.
+            await eloService.UpdateDifficultyAsync(
+                questionDoc,
+                studentTheta: (float)priorMastery,
+                isCorrect: isCorrect);
 
             // Determine next question ID
             string? nextQuestionId = null;

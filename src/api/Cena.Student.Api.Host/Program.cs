@@ -100,6 +100,11 @@ builder.Services.AddScoped<IQuestionBank, QuestionBank>();
 // posterior mastery as PriorMastery + 0.05, which bypassed BKT entirely.
 builder.Services.AddSingleton<IBktService, BktService>();
 
+// ---- FIND-pedagogy-009: Elo difficulty calibration for 85% rule ----
+// Updates question DifficultyElo after each answer using Elo formula.
+// Wilson et al. (2019): "The Eighty Five Percent Rule for optimal learning."
+builder.Services.AddScoped<IEloDifficultyService, EloDifficultyService>();
+
 // ---- HARDEN TutorEndpoints: LLM Service ----
 var llmApiKey = builder.Configuration["Cena:Llm:ApiKey"];
 if (!string.IsNullOrEmpty(llmApiKey))
