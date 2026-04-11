@@ -1,9 +1,14 @@
 // =============================================================================
 // Cena Platform -- System Monitoring Service
 // ADM-008: System health, settings, and audit logging
+//
+// Production-grade. Health/audit-log have always been real probes + event
+// store queries. Settings now persist to PlatformSettingsDocument in Marten
+// (was a static in-memory field — lost on restart and not shared across
+// hosts). No stubs.
 // =============================================================================
-#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
+using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
@@ -20,10 +25,11 @@ public interface ISystemMonitoringService
 
 public sealed class SystemMonitoringService : ISystemMonitoringService
 {
+    private const string SettingsDocId = "platform";
+
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<SystemMonitoringService> _logger;
-    private static PlatformSettingsResponse? _cachedSettings;
 
     public SystemMonitoringService(
         IDocumentStore store,
@@ -173,51 +179,108 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
 
     public async Task<PlatformSettingsResponse> GetSettingsAsync()
     {
-        if (_cachedSettings != null)
-            return _cachedSettings;
+        await using var session = _store.LightweightSession();
+        var doc = await session.LoadAsync<PlatformSettingsDocument>(SettingsDocId);
 
-        _cachedSettings = new PlatformSettingsResponse(
-            new OrganizationSettings(
-                "Cena Learning Platform",
-                null,
-                "Asia/Jerusalem",
-                "he",
-                DateTimeOffset.UtcNow,
-                "system"),
-            new FeatureFlagSettings(
-                EnableFocusTracking: true,
-                EnableMicrobreaks: true,
-                EnableMethodologySwitching: true,
-                EnableOutreach: true,
-                EnableOfflineMode: true,
-                EnableParentDashboard: false),
-            new FocusEngineSettings(
-                DegradationThreshold: 0.65f,
-                MicrobreakIntervalMinutes: 20,
-                MindWanderingThreshold: 0.35f,
-                FocusScoreBaseline: 0.75f),
-            new MasteryEngineSettings(
-                MasteryThreshold: 0.85f,
-                PrerequisiteGateThreshold: 0.95f,
-                DecayRatePerDay: 0.02f,
-                ReviewIntervalDays: 7));
+        if (doc is null)
+        {
+            // First access — persist platform defaults so subsequent reads
+            // are idempotent and updates have a document to mutate.
+            doc = new PlatformSettingsDocument
+            {
+                Id = SettingsDocId,
+                OrgName = "Cena Learning Platform",
+                OrgLogoUrl = null,
+                OrgTimezone = "Asia/Jerusalem",
+                OrgDefaultLanguage = "he",
+                OrgUpdatedAt = DateTimeOffset.UtcNow,
+                OrgUpdatedBy = "system",
+            };
+            session.Store(doc);
+            await session.SaveChangesAsync();
+            _logger.LogInformation("PlatformSettings: persisted default settings document on first read.");
+        }
 
-        return _cachedSettings;
+        return ToResponse(doc);
     }
 
     public async Task<bool> UpdateSettingsAsync(UpdateSettingsRequest request, string userId)
     {
-        var current = await GetSettingsAsync();
+        await using var session = _store.LightweightSession();
+        var doc = await session.LoadAsync<PlatformSettingsDocument>(SettingsDocId)
+                  ?? new PlatformSettingsDocument { Id = SettingsDocId };
 
-        _cachedSettings = new PlatformSettingsResponse(
-            request.Organization ?? current.Organization,
-            request.Features ?? current.Features,
-            request.FocusEngine ?? current.FocusEngine,
-            request.MasteryEngine ?? current.MasteryEngine);
+        if (request.Organization is { } org)
+        {
+            doc.OrgName = org.Name;
+            doc.OrgLogoUrl = org.LogoUrl;
+            doc.OrgTimezone = org.Timezone;
+            doc.OrgDefaultLanguage = org.DefaultLanguage;
+            doc.OrgUpdatedAt = DateTimeOffset.UtcNow;
+            doc.OrgUpdatedBy = userId;
+        }
 
-        // In production, persist to database
+        if (request.Features is { } features)
+        {
+            doc.EnableFocusTracking = features.EnableFocusTracking;
+            doc.EnableMicrobreaks = features.EnableMicrobreaks;
+            doc.EnableMethodologySwitching = features.EnableMethodologySwitching;
+            doc.EnableOutreach = features.EnableOutreach;
+            doc.EnableOfflineMode = features.EnableOfflineMode;
+            doc.EnableParentDashboard = features.EnableParentDashboard;
+        }
+
+        if (request.FocusEngine is { } focus)
+        {
+            doc.FocusDegradationThreshold = focus.DegradationThreshold;
+            doc.FocusMicrobreakIntervalMinutes = focus.MicrobreakIntervalMinutes;
+            doc.FocusMindWanderingThreshold = focus.MindWanderingThreshold;
+            doc.FocusScoreBaseline = focus.FocusScoreBaseline;
+        }
+
+        if (request.MasteryEngine is { } mastery)
+        {
+            doc.MasteryThreshold = mastery.MasteryThreshold;
+            doc.MasteryPrerequisiteGateThreshold = mastery.PrerequisiteGateThreshold;
+            doc.MasteryDecayRatePerDay = mastery.DecayRatePerDay;
+            doc.MasteryReviewIntervalDays = mastery.ReviewIntervalDays;
+        }
+
+        session.Store(doc);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "PlatformSettings updated by {UserId} at {Timestamp}",
+            userId, DateTimeOffset.UtcNow);
+
         return true;
     }
+
+    private static PlatformSettingsResponse ToResponse(PlatformSettingsDocument d) => new(
+        Organization: new OrganizationSettings(
+            Name: d.OrgName,
+            LogoUrl: d.OrgLogoUrl,
+            Timezone: d.OrgTimezone,
+            DefaultLanguage: d.OrgDefaultLanguage,
+            UpdatedAt: d.OrgUpdatedAt,
+            UpdatedBy: d.OrgUpdatedBy),
+        Features: new FeatureFlagSettings(
+            EnableFocusTracking: d.EnableFocusTracking,
+            EnableMicrobreaks: d.EnableMicrobreaks,
+            EnableMethodologySwitching: d.EnableMethodologySwitching,
+            EnableOutreach: d.EnableOutreach,
+            EnableOfflineMode: d.EnableOfflineMode,
+            EnableParentDashboard: d.EnableParentDashboard),
+        FocusEngine: new FocusEngineSettings(
+            DegradationThreshold: d.FocusDegradationThreshold,
+            MicrobreakIntervalMinutes: d.FocusMicrobreakIntervalMinutes,
+            MindWanderingThreshold: d.FocusMindWanderingThreshold,
+            FocusScoreBaseline: d.FocusScoreBaseline),
+        MasteryEngine: new MasteryEngineSettings(
+            MasteryThreshold: d.MasteryThreshold,
+            PrerequisiteGateThreshold: d.MasteryPrerequisiteGateThreshold,
+            DecayRatePerDay: d.MasteryDecayRatePerDay,
+            ReviewIntervalDays: d.MasteryReviewIntervalDays));
 
     public async Task<AuditLogResponse> GetAuditLogAsync(AuditLogFilterRequest request, int page, int pageSize)
     {
