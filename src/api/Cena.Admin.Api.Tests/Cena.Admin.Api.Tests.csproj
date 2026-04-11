@@ -27,6 +27,10 @@
     <ProjectReference Include="..\..\shared\Cena.Infrastructure\Cena.Infrastructure.csproj" />
     <ProjectReference Include="..\..\actors\Cena.Actors\Cena.Actors.csproj" />
     <ProjectReference Include="..\Cena.Api.Contracts\Cena.Api.Contracts.csproj" />
+    <!-- FIND-ux-006b: cover the Student host's AuthEndpoints.PasswordReset
+         handler from the existing admin test project so CI picks it up
+         without needing a new test csproj wired into backend.yml. -->
+    <ProjectReference Include="..\Cena.Student.Api.Host\Cena.Student.Api.Host.csproj" />
   </ItemGroup>
 
 </Project>

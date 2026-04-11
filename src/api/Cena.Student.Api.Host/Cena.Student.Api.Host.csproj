@@ -9,6 +9,10 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Cena.Actors.Tests" />
+    <!-- FIND-ux-006b: Cena.Admin.Api.Tests hosts the AuthEndpoints
+         password-reset tests so CI picks them up via the existing backend
+         workflow; those tests invoke the internal handler directly. -->
+    <InternalsVisibleTo Include="Cena.Admin.Api.Tests" />
   </ItemGroup>
 
   <ItemGroup>
