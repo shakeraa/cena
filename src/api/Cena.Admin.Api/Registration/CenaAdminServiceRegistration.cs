@@ -4,6 +4,7 @@
 // Both Cena.Actors.Host and Cena.Api.Host call these extension methods.
 // =============================================================================
 
+using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -68,6 +69,13 @@ public static class CenaAdminServiceRegistration
         // Stagnation Insights (job-based causal factor analysis)
         services.AddScoped<IStagnationInsightsService, StagnationInsightsService>();
 
+        // FIND-arch-006: GDPR compliance services (SEC-005, Articles 17 & 20).
+        // Both services depend only on Marten IDocumentStore + ILogger, which
+        // are registered by the host's AddMarten() call before this method
+        // runs. Scoped lifetime matches the host-scoped HTTP request.
+        services.AddScoped<IGdprConsentManager, GdprConsentManager>();
+        services.AddScoped<IRightToErasureService, RightToErasureService>();
+
         return services;
     }
 
@@ -114,6 +122,11 @@ public static class CenaAdminServiceRegistration
 
         // Stagnation Insights endpoints
         app.MapStagnationInsightsEndpoints();
+
+        // FIND-arch-006: GDPR admin endpoints (SEC-005, Articles 17 & 20).
+        // Previously defined in GdprEndpoints.cs but never wired — all six
+        // consent / export / erasure routes were unreachable.
+        app.MapGdprEndpoints();
 
         return app;
     }
