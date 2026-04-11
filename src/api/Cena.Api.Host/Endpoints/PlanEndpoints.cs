@@ -1,11 +1,14 @@
 // =============================================================================
-// Cena Platform -- Plan/Review/Recommendations Endpoints (STB-02)
-// Student daily plan and learning recommendations
+// Cena Platform -- Plan/Review/Recommendations Endpoints
+// Reads StudentProfileSnapshot (HLR timers), AnalyticsRollupService
+// (daily time breakdown), and SubjectMasteryTimeline projections.
 // =============================================================================
 
 using System.Security.Claims;
 using Cena.Actors.Events;
+using Cena.Actors.Projections;
 using Cena.Api.Contracts.Plan;
+using Cena.Api.Host.Services;
 using Cena.Infrastructure.Auth;
 using Marten;
 using Microsoft.AspNetCore.Builder;
@@ -18,114 +21,144 @@ public static class PlanEndpoints
 {
     public static IEndpointRouteBuilder MapPlanEndpoints(this IEndpointRouteBuilder app)
     {
-        // GET /api/me/plan/today — today's learning plan
-        app.MapGet("/api/me/plan/today", async (
-            HttpContext ctx,
-            IDocumentStore store) =>
-        {
-            var studentId = GetStudentId(ctx.User);
-            if (string.IsNullOrEmpty(studentId))
-                return Results.Unauthorized();
+        app.MapGet("/api/me/plan/today", GetTodaysPlan)
+            .WithName("GetTodaysPlan")
+            .RequireAuthorization();
 
-            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+        app.MapGet("/api/review/due", GetReviewDue)
+            .WithName("GetReviewDue")
+            .RequireAuthorization();
 
-            await using var session = store.QuerySession();
-            var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-
-            if (profile is null)
-                return Results.NotFound(new { error = "Student profile not found" });
-
-            // STB-02 Phase 1: Stub data from StudentProfileSnapshot
-            var dailyGoal = profile.DailyTimeGoalMinutes > 0 
-                ? profile.DailyTimeGoalMinutes 
-                : 30; // Default fallback
-
-            var firstSubject = profile.Subjects.Length > 0 
-                ? profile.Subjects[0] 
-                : "math"; // Default fallback
-
-            var plan = new TodaysPlanDto(
-                DailyGoalMinutes: dailyGoal,
-                CompletedMinutes: 0, // STB-02b: compute from today's events
-                NextBlock: new PlanBlock(
-                    Subject: firstSubject,
-                    EstimatedMinutes: Math.Min(15, dailyGoal / 2)));
-
-            return Results.Ok(plan);
-        })
-        .WithName("GetTodaysPlan")
-        .RequireAuthorization();
-
-        // GET /api/review/due — review items due (STB-02 Phase 1: stub)
-        app.MapGet("/api/review/due", async (
-            HttpContext ctx,
-            IDocumentStore store) =>
-        {
-            var studentId = GetStudentId(ctx.User);
-            if (string.IsNullOrEmpty(studentId))
-                return Results.Unauthorized();
-
-            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
-
-            // STB-02 Phase 1: Always return empty (real SRS in STB-02b)
-            var reviewDue = new ReviewDueDto(
-                Count: 0,
-                OldestDueAt: null,
-                SampleSubjects: Array.Empty<string>());
-
-            return Results.Ok(reviewDue);
-        })
-        .WithName("GetReviewDue")
-        .RequireAuthorization();
-
-        // GET /api/recommendations/sessions — recommended sessions (STB-02 Phase 1: stub)
-        app.MapGet("/api/recommendations/sessions", async (
-            HttpContext ctx,
-            IDocumentStore store) =>
-        {
-            var studentId = GetStudentId(ctx.User);
-            if (string.IsNullOrEmpty(studentId))
-                return Results.Unauthorized();
-
-            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
-
-            await using var session = store.QuerySession();
-            var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-
-            // STB-02 Phase 1: Generate stub recommendations from subjects
-            var recommendations = new List<RecommendedSession>();
-            
-            if (profile?.Subjects.Length > 0)
-            {
-                var difficulties = new[] { "easy", "medium", "hard" };
-                
-                for (int i = 0; i < Math.Min(3, profile.Subjects.Length); i++)
-                {
-                    recommendations.Add(new RecommendedSession(
-                        SessionId: $"rec-{i + 1}-{Guid.NewGuid().ToString()[..8]}",
-                        Subject: profile.Subjects[i],
-                        Reason: "Based on your goals",
-                        Difficulty: difficulties[i % 3],
-                        EstimatedMinutes: 15));
-                }
-            }
-            else
-            {
-                // Fallback if no subjects
-                recommendations.Add(new RecommendedSession(
-                    SessionId: $"rec-default-{Guid.NewGuid().ToString()[..8]}",
-                    Subject: "math",
-                    Reason: "Recommended for beginners",
-                    Difficulty: "easy",
-                    EstimatedMinutes: 15));
-            }
-
-            return Results.Ok(new RecommendedSessionsResponse(recommendations.ToArray()));
-        })
-        .WithName("GetRecommendedSessions")
-        .RequireAuthorization();
+        app.MapGet("/api/recommendations/sessions", GetRecommendedSessions)
+            .WithName("GetRecommendedSessions")
+            .RequireAuthorization();
 
         return app;
+    }
+
+    // GET /api/me/plan/today — real CompletedMinutes + recommendation-driven NextBlock
+    private static async Task<IResult> GetTodaysPlan(
+        HttpContext ctx,
+        IDocumentStore store,
+        IAnalyticsRollupService analytics,
+        IRecommendationService recommendations)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.QuerySession();
+        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        if (profile is null)
+            return Results.NotFound(new { error = "Student profile not found" });
+
+        var dailyGoal = profile.DailyTimeGoalMinutes > 0 ? profile.DailyTimeGoalMinutes : 30;
+
+        var today = DateTime.UtcNow.Date;
+        var breakdown = await analytics.GetTimeBreakdownAsync(studentId, today, ctx.RequestAborted);
+        var completedMinutes = breakdown?.TotalMinutes ?? 0;
+
+        var remaining = Math.Max(0, dailyGoal - completedMinutes);
+        var nextBlock = remaining == 0
+            ? null
+            : await recommendations.GetNextBlockAsync(studentId, remaining, ctx.RequestAborted);
+
+        var plan = new TodaysPlanDto(
+            DailyGoalMinutes: dailyGoal,
+            CompletedMinutes: completedMinutes,
+            NextBlock: nextBlock);
+
+        return Results.Ok(plan);
+    }
+
+    // GET /api/review/due — computed from HLR state on StudentProfileSnapshot
+    private static async Task<IResult> GetReviewDue(
+        HttpContext ctx,
+        IDocumentStore store)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.QuerySession();
+        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        if (profile is null || profile.HalfLifeMap.Count == 0)
+            return Results.Ok(new ReviewDueDto(0, null, Array.Empty<string>()));
+
+        var now = DateTimeOffset.UtcNow;
+        var dueCount = 0;
+        DateTimeOffset? oldestDueAt = null;
+
+        foreach (var (conceptId, halfLifeHours) in profile.HalfLifeMap)
+        {
+            if (halfLifeHours <= 0) continue;
+
+            profile.ConceptMastery.TryGetValue(conceptId, out var mastery);
+            var lastReviewAt = mastery?.LastAttemptedAt ?? profile.CreatedAt;
+            var deltaHours = (now - lastReviewAt).TotalHours;
+            var predictedRecall = Math.Pow(2, -deltaHours / halfLifeHours);
+
+            if (predictedRecall < RecommendationService.RecallReviewThreshold)
+            {
+                dueCount++;
+                var dueAt = lastReviewAt.AddHours(
+                    -halfLifeHours * Math.Log2(RecommendationService.RecallReviewThreshold));
+                if (oldestDueAt is null || dueAt < oldestDueAt)
+                    oldestDueAt = dueAt;
+            }
+        }
+
+        // Attribute due items to the subjects with the weakest mastery timelines.
+        var sampleSubjects = Array.Empty<string>();
+        if (dueCount > 0 && profile.Subjects.Length > 0)
+        {
+            var ids = profile.Subjects.Select(s => $"{studentId}:{s}").ToList();
+            var timelines = await session.Query<SubjectMasteryTimeline>()
+                .Where(t => ids.Contains(t.Id))
+                .ToListAsync(ctx.RequestAborted);
+
+            sampleSubjects = profile.Subjects
+                .OrderByDescending(s =>
+                {
+                    var tl = timelines.FirstOrDefault(t => string.Equals(t.Subject, s, StringComparison.OrdinalIgnoreCase));
+                    if (tl is null || tl.Snapshots.Count == 0) return 1.0;
+                    var latest = tl.Snapshots.OrderByDescending(x => x.Date).First();
+                    return Math.Clamp(1.0 - latest.AverageMastery, 0.0, 1.0);
+                })
+                .Take(5)
+                .ToArray();
+        }
+
+        var response = new ReviewDueDto(
+            Count: dueCount,
+            OldestDueAt: oldestDueAt?.UtcDateTime,
+            SampleSubjects: sampleSubjects);
+
+        return Results.Ok(response);
+    }
+
+    // GET /api/recommendations/sessions — delegates to IRecommendationService
+    private static async Task<IResult> GetRecommendedSessions(
+        HttpContext ctx,
+        IRecommendationService recommendations,
+        int? max = 3)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        var items = await recommendations.RankForStudentAsync(
+            studentId,
+            Math.Max(1, Math.Min(max ?? 3, 10)),
+            ctx.RequestAborted);
+
+        return Results.Ok(new RecommendedSessionsResponse(items));
     }
 
     private static string? GetStudentId(ClaimsPrincipal user)
