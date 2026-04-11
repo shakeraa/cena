@@ -1,8 +1,9 @@
 // =============================================================================
 // Cena Platform — AI Question Generation Service
-// Provider-agnostic abstraction for LLM-based question generation.
-// Anthropic (Claude) is the only implemented provider. Others throw
-// NotImplementedException per Task-00 spec.
+// LLM-based question generation service. Anthropic (Claude) is the only
+// supported provider — secondary providers (OpenAI, Google, AzureOpenAI) were
+// removed in FIND-arch-005 because they were stubs that threw
+// NotImplementedException at runtime.
 // =============================================================================
 
 using System.Diagnostics;
@@ -20,12 +21,14 @@ namespace Cena.Admin.Api;
 
 // ── Provider Configuration ──
 
+/// <summary>
+/// Supported LLM providers for question generation.
+/// Only Anthropic is implemented; additional providers must be added here
+/// alongside a real <c>CallXxxAsync</c> implementation (no stubs).
+/// </summary>
 public enum AiProvider
 {
-    Anthropic,
-    OpenAI,
-    Google,
-    AzureOpenAI
+    Anthropic
 }
 
 public sealed record AiProviderConfig(
@@ -33,8 +36,8 @@ public sealed record AiProviderConfig(
     string ApiKey,
     string ModelId,
     float Temperature,
-    string? BaseUrl,        // For Azure OpenAI custom endpoints
-    string? ApiVersion,     // Azure API version
+    string? BaseUrl,        // Optional custom base URL (reserved for future providers)
+    string? ApiVersion,     // Optional API version (reserved for future providers)
     bool IsEnabled);
 
 public sealed record AiSettingsResponse(
@@ -259,12 +262,6 @@ public sealed class AiGenerationService : IAiGenerationService
         {
             [AiProvider.Anthropic] = new(AiProvider.Anthropic, "", SonnetModelId,
                 DefaultTemperature, null, null, true),
-            [AiProvider.OpenAI] = new(AiProvider.OpenAI, "", "gpt-4o",
-                0.7f, null, null, false),
-            [AiProvider.Google] = new(AiProvider.Google, "", "gemini-2.0-flash",
-                0.7f, null, null, false),
-            [AiProvider.AzureOpenAI] = new(AiProvider.AzureOpenAI, "", "gpt-4o",
-                0.7f, null, "2024-12-01-preview", false),
         };
 
         _defaults = new("he", 3, "4 Units", 5, true);
@@ -279,24 +276,15 @@ public sealed class AiGenerationService : IAiGenerationService
             ? config.ApiKey
             : _configuration["Anthropic:ApiKey"];
 
-        if (_activeProvider == AiProvider.Anthropic && string.IsNullOrEmpty(apiKey))
+        if (string.IsNullOrEmpty(apiKey))
         {
             return new AiGenerateResponse(false, Array.Empty<AiGeneratedQuestion>(),
                 "", config.ModelId, config.Temperature, null,
                 "No API key configured for Anthropic. Set Anthropic:ApiKey in configuration or go to Settings > AI Providers.");
         }
 
-        if (_activeProvider != AiProvider.Anthropic && string.IsNullOrEmpty(config.ApiKey))
-        {
-            return new AiGenerateResponse(false, Array.Empty<AiGeneratedQuestion>(),
-                "", config.ModelId, config.Temperature, null,
-                $"No API key configured for {_activeProvider}. Go to Settings > AI Providers to add one.");
-        }
-
-        // For Anthropic, inject the resolved key into config for downstream use
-        var effectiveConfig = _activeProvider == AiProvider.Anthropic
-            ? config with { ApiKey = apiKey! }
-            : config;
+        // Inject the resolved key into config for downstream use
+        var effectiveConfig = config with { ApiKey = apiKey };
 
         var prompt = BuildPrompt(request, effectiveConfig);
 
@@ -309,9 +297,6 @@ public sealed class AiGenerationService : IAiGenerationService
             var (rawOutput, questions) = _activeProvider switch
             {
                 AiProvider.Anthropic => await CallAnthropicAsync(effectiveConfig, prompt, request),
-                AiProvider.OpenAI => await CallOpenAiAsync(effectiveConfig, prompt, request),
-                AiProvider.Google => await CallGoogleAsync(effectiveConfig, prompt, request),
-                AiProvider.AzureOpenAI => await CallAzureOpenAiAsync(effectiveConfig, prompt, request),
                 _ => throw new NotSupportedException($"Provider {_activeProvider} not implemented")
             };
 
@@ -333,9 +318,6 @@ public sealed class AiGenerationService : IAiGenerationService
             p.Provider switch
             {
                 AiProvider.Anthropic => "Anthropic (Claude)",
-                AiProvider.OpenAI => "OpenAI (GPT)",
-                AiProvider.Google => "Google (Gemini)",
-                AiProvider.AzureOpenAI => "Azure OpenAI",
                 _ => p.Provider.ToString()
             },
             p.IsEnabled,
@@ -378,9 +360,14 @@ public sealed class AiGenerationService : IAiGenerationService
 
     public Task<bool> TestConnectionAsync(AiProvider provider)
     {
-        var config = _providers[provider];
+        if (!_providers.TryGetValue(provider, out var config))
+        {
+            _logger.LogWarning("Unknown AI provider requested for test: {Provider}", provider);
+            return Task.FromResult(false);
+        }
+
         var hasKey = !string.IsNullOrEmpty(config.ApiKey)
-            || (provider == AiProvider.Anthropic && !string.IsNullOrEmpty(_configuration["Anthropic:ApiKey"]));
+            || !string.IsNullOrEmpty(_configuration["Anthropic:ApiKey"]);
         _logger.LogInformation("Testing {Provider} connection: hasKey={HasKey}", provider, hasKey);
         return Task.FromResult(hasKey);
     }
@@ -620,24 +607,6 @@ public sealed class AiGenerationService : IAiGenerationService
             _logger.LogError(ex, "Anthropic API call failed after {ElapsedMs}ms", sw.ElapsedMilliseconds);
             throw;
         }
-    }
-
-    private Task<(string, IReadOnlyList<AiGeneratedQuestion>)> CallOpenAiAsync(
-        AiProviderConfig config, string prompt, AiGenerateRequest req)
-    {
-        throw new NotImplementedException("Provider not yet implemented — use Anthropic");
-    }
-
-    private Task<(string, IReadOnlyList<AiGeneratedQuestion>)> CallGoogleAsync(
-        AiProviderConfig config, string prompt, AiGenerateRequest req)
-    {
-        throw new NotImplementedException("Provider not yet implemented — use Anthropic");
-    }
-
-    private Task<(string, IReadOnlyList<AiGeneratedQuestion>)> CallAzureOpenAiAsync(
-        AiProviderConfig config, string prompt, AiGenerateRequest req)
-    {
-        throw new NotImplementedException("Provider not yet implemented — use Anthropic");
     }
 
     // ── Response Parsing ──

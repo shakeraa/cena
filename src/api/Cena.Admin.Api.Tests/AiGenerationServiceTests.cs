@@ -27,12 +27,12 @@ public class AiGenerationServiceTests
         var service = CreateService();
         var settings = await service.GetSettingsAsync();
 
+        // FIND-arch-005: only Anthropic is supported. Secondary providers
+        // (OpenAI, Google, AzureOpenAI) were removed when their stub
+        // implementations were deleted.
         Assert.Equal(AiProvider.Anthropic, settings.ActiveProvider);
-        Assert.Equal(4, settings.Providers.Count);
+        Assert.Single(settings.Providers);
         Assert.Contains(settings.Providers, p => p.Provider == AiProvider.Anthropic);
-        Assert.Contains(settings.Providers, p => p.Provider == AiProvider.OpenAI);
-        Assert.Contains(settings.Providers, p => p.Provider == AiProvider.Google);
-        Assert.Contains(settings.Providers, p => p.Provider == AiProvider.AzureOpenAI);
     }
 
     [Fact]
@@ -49,13 +49,13 @@ public class AiGenerationServiceTests
     }
 
     [Fact]
-    public async Task UpdateSettings_ChangesActiveProvider()
+    public async Task UpdateSettings_UpdatesAnthropicConfig()
     {
         var service = CreateService();
         await service.UpdateSettingsAsync(new UpdateAiSettingsRequest(
-            ActiveProvider: AiProvider.OpenAI,
-            ApiKey: "sk-test-key",
-            ModelId: "gpt-4o",
+            ActiveProvider: AiProvider.Anthropic,
+            ApiKey: "sk-ant-test-key",
+            ModelId: "claude-sonnet-4-5-20251001",
             Temperature: 0.5f,
             BaseUrl: null, ApiVersion: null,
             DefaultLanguage: null, DefaultBloomsLevel: null,
@@ -63,10 +63,10 @@ public class AiGenerationServiceTests
             AutoRunQualityGate: null), "test-user");
 
         var settings = await service.GetSettingsAsync();
-        Assert.Equal(AiProvider.OpenAI, settings.ActiveProvider);
-        var openai = settings.Providers.First(p => p.Provider == AiProvider.OpenAI);
-        Assert.True(openai.HasApiKey);
-        Assert.Equal("gpt-4o", openai.ModelId);
+        Assert.Equal(AiProvider.Anthropic, settings.ActiveProvider);
+        var anthropic = settings.Providers.First(p => p.Provider == AiProvider.Anthropic);
+        Assert.True(anthropic.HasApiKey);
+        Assert.Equal("claude-sonnet-4-5-20251001", anthropic.ModelId);
     }
 
     [Fact]
@@ -132,23 +132,23 @@ public class AiGenerationServiceTests
     public async Task TestConnection_WithoutKey_ReturnsFalse()
     {
         var service = CreateService();
-        var result = await service.TestConnectionAsync(AiProvider.Google);
+        var result = await service.TestConnectionAsync(AiProvider.Anthropic);
         Assert.False(result);
     }
 
     [Fact]
-    public async Task TestConnection_WithKey_ReturnsTrue()
+    public async Task TestConnection_WithExplicitKey_ReturnsTrue()
     {
         var service = CreateService();
         await service.UpdateSettingsAsync(new UpdateAiSettingsRequest(
-            ActiveProvider: AiProvider.Google,
-            ApiKey: "test-key", ModelId: null, Temperature: null,
+            ActiveProvider: AiProvider.Anthropic,
+            ApiKey: "sk-ant-test", ModelId: null, Temperature: null,
             BaseUrl: null, ApiVersion: null,
             DefaultLanguage: null, DefaultBloomsLevel: null,
             DefaultGrade: null, QuestionsPerBatch: null,
             AutoRunQualityGate: null), "test-user");
 
-        var result = await service.TestConnectionAsync(AiProvider.Google);
+        var result = await service.TestConnectionAsync(AiProvider.Anthropic);
         Assert.True(result);
     }
 
@@ -162,72 +162,6 @@ public class AiGenerationServiceTests
 
         var result = await service.TestConnectionAsync(AiProvider.Anthropic);
         Assert.True(result);
-    }
-
-    [Fact]
-    public async Task GenerateQuestions_OpenAi_ThrowsNotImplemented()
-    {
-        var service = CreateService();
-        await service.UpdateSettingsAsync(new UpdateAiSettingsRequest(
-            ActiveProvider: AiProvider.OpenAI,
-            ApiKey: "sk-test", ModelId: null, Temperature: null,
-            BaseUrl: null, ApiVersion: null,
-            DefaultLanguage: null, DefaultBloomsLevel: null,
-            DefaultGrade: null, QuestionsPerBatch: null,
-            AutoRunQualityGate: null), "test-user");
-
-        var result = await service.GenerateQuestionsAsync(new AiGenerateRequest(
-            Subject: "Math", Topic: null, Grade: "3 Units",
-            BloomsLevel: 1, MinDifficulty: 0.3f, MaxDifficulty: 0.3f, Language: "en",
-            Context: null, ImageBase64: null, FileName: null,
-            StyleContext: null, StyleImageBase64: null, StyleFileName: null, Count: 1));
-
-        Assert.False(result.Success);
-        Assert.Contains("not yet implemented", result.Error);
-    }
-
-    [Fact]
-    public async Task GenerateQuestions_Google_ThrowsNotImplemented()
-    {
-        var service = CreateService();
-        await service.UpdateSettingsAsync(new UpdateAiSettingsRequest(
-            ActiveProvider: AiProvider.Google,
-            ApiKey: "gcp-test", ModelId: null, Temperature: null,
-            BaseUrl: null, ApiVersion: null,
-            DefaultLanguage: null, DefaultBloomsLevel: null,
-            DefaultGrade: null, QuestionsPerBatch: null,
-            AutoRunQualityGate: null), "test-user");
-
-        var result = await service.GenerateQuestionsAsync(new AiGenerateRequest(
-            Subject: "Math", Topic: null, Grade: "3 Units",
-            BloomsLevel: 1, MinDifficulty: 0.3f, MaxDifficulty: 0.3f, Language: "en",
-            Context: null, ImageBase64: null, FileName: null,
-            StyleContext: null, StyleImageBase64: null, StyleFileName: null, Count: 1));
-
-        Assert.False(result.Success);
-        Assert.Contains("not yet implemented", result.Error);
-    }
-
-    [Fact]
-    public async Task GenerateQuestions_AzureOpenAi_ThrowsNotImplemented()
-    {
-        var service = CreateService();
-        await service.UpdateSettingsAsync(new UpdateAiSettingsRequest(
-            ActiveProvider: AiProvider.AzureOpenAI,
-            ApiKey: "azure-test", ModelId: null, Temperature: null,
-            BaseUrl: "https://test.openai.azure.com", ApiVersion: "2024-12-01-preview",
-            DefaultLanguage: null, DefaultBloomsLevel: null,
-            DefaultGrade: null, QuestionsPerBatch: null,
-            AutoRunQualityGate: null), "test-user");
-
-        var result = await service.GenerateQuestionsAsync(new AiGenerateRequest(
-            Subject: "Math", Topic: null, Grade: "3 Units",
-            BloomsLevel: 1, MinDifficulty: 0.3f, MaxDifficulty: 0.3f, Language: "en",
-            Context: null, ImageBase64: null, FileName: null,
-            StyleContext: null, StyleImageBase64: null, StyleFileName: null, Count: 1));
-
-        Assert.False(result.Success);
-        Assert.Contains("not yet implemented", result.Error);
     }
 
     [Fact]

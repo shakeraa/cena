@@ -45,11 +45,11 @@ const settings = ref<AiSettings>({
 })
 
 // Per-provider API key inputs (not sent back from server for security)
+// FIND-arch-005: only Anthropic is supported; secondary providers were removed
+// because their server-side implementations were stubs that threw
+// NotImplementedException.
 const apiKeys = ref<Record<string, string>>({
   Anthropic: '',
-  OpenAI: '',
-  Google: '',
-  AzureOpenAI: '',
 })
 
 const activeProviderConfig = computed(() =>
@@ -58,9 +58,6 @@ const activeProviderConfig = computed(() =>
 
 const providerIcons: Record<string, string> = {
   Anthropic: 'tabler-brand-react',
-  OpenAI: 'tabler-brand-openai',
-  Google: 'tabler-brand-google',
-  AzureOpenAI: 'tabler-cloud',
 }
 
 const modelOptions: Record<string, { title: string; value: string }[]> = {
@@ -68,19 +65,6 @@ const modelOptions: Record<string, { title: string; value: string }[]> = {
     { title: 'Claude Opus 4.6', value: 'claude-opus-4-6' },
     { title: 'Claude Sonnet 4.6', value: 'claude-sonnet-4-6' },
     { title: 'Claude Haiku 4.5', value: 'claude-haiku-4-5-20251001' },
-  ],
-  OpenAI: [
-    { title: 'GPT-4o', value: 'gpt-4o' },
-    { title: 'GPT-4o Mini', value: 'gpt-4o-mini' },
-    { title: 'o3', value: 'o3' },
-  ],
-  Google: [
-    { title: 'Gemini 2.5 Pro', value: 'gemini-2.5-pro' },
-    { title: 'Gemini 2.0 Flash', value: 'gemini-2.0-flash' },
-  ],
-  AzureOpenAI: [
-    { title: 'GPT-4o (Azure)', value: 'gpt-4o' },
-    { title: 'GPT-4o Mini (Azure)', value: 'gpt-4o-mini' },
   ],
 }
 
@@ -350,19 +334,6 @@ onMounted(fetchSettings)
                     :step="0.05"
                     thumb-label
                     color="primary"
-                  />
-                </VCol>
-
-                <!-- Azure-specific -->
-                <VCol
-                  v-if="settings.activeProvider === 'AzureOpenAI'"
-                  cols="12"
-                  sm="6"
-                >
-                  <AppTextField
-                    v-model="activeProviderConfig!.baseUrl"
-                    label="Azure Endpoint URL"
-                    placeholder="https://your-resource.openai.azure.com/"
                   />
                 </VCol>
 

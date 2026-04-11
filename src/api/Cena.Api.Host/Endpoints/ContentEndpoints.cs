@@ -7,7 +7,6 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using Cena.Actors.Diagrams;
 using Cena.Actors.Questions;
 using Marten;
 using Microsoft.AspNetCore.Builder;
@@ -123,33 +122,12 @@ public static class ContentEndpoints
             return Results.Ok(new { subject, topics });
         });
 
-        // GET /api/content/diagrams/{id} — serve cached diagram
-        group.MapGet("/diagrams/{id:guid}", async (
-            Guid id, HttpContext httpContext, IDiagramCache diagramCache) =>
-        {
-            var diagram = await diagramCache.GetByIdAsync(id);
-            if (diagram is null)
-                return Results.NotFound(new { error = "Diagram not found" });
-
-            var etag = $"\"{diagram.Id}-{diagram.HitCount}\"";
-            if (IsNotModified(httpContext, etag))
-                return Results.StatusCode(304);
-
-            httpContext.Response.Headers.ETag = etag;
-            httpContext.Response.Headers.CacheControl = "public, max-age=86400";
-
-            return Results.Ok(new
-            {
-                diagram.Id,
-                diagram.MermaidCode,
-                diagram.SvgContent,
-                diagram.Subject,
-                diagram.Topic,
-                diagram.DiagramType,
-                diagram.ResultDescription,
-                diagram.CreatedAt
-            });
-        });
+        // FIND-arch-007: /api/content/diagrams/{id} was served from a
+        // Marten-backed IDiagramCache that had no writer path and no DI
+        // registration — the route threw on every hit. The entire diagram
+        // generation feature (LLM-009) was dead code; the endpoint, the
+        // generator, the cache, and the orphaned admin endpoints were all
+        // removed together.
 
         return app;
     }
