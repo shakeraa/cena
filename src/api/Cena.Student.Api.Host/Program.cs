@@ -1,10 +1,32 @@
 // =============================================================================
-// Cena Platform -- Student API Host (DB-06 Phase 1 Scaffold)
+// Cena Platform — Student API Host (DB-06b)
 // Student-facing REST endpoints + SignalR real-time tutoring hub.
-// Phase 1: Skeleton only — endpoints migrate in DB-06b.
+// Migrated from Cena.Api.Host — see README.md for migration notes.
 // =============================================================================
 
+using System.Threading.RateLimiting;
+using Cena.Actors.Bus;
+using Cena.Actors.Configuration;
+using Cena.Actors.Notifications;
+using Cena.Actors.Serving;
+using Cena.Actors.Tutor;
+using Cena.Api.Host.Endpoints;
+using Cena.Api.Host.Hubs;
+using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Compliance;
+using Cena.Infrastructure.Configuration;
+using Cena.Infrastructure.Correlation;
+using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Seed;
+using Marten;
+using Microsoft.AspNetCore.RateLimiting;
+using NATS.Client.Core;
+using NatsEventSubscriber = Cena.Admin.Api.NatsEventSubscriber;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Serilog;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -16,34 +38,257 @@ builder.Host.UseSerilog((context, configuration) =>
         .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}");
 });
 
-// ---- Health checks ----
-builder.Services.AddHealthChecks();
+// ---- Configuration ----
+var redisConnectionString = CenaConnectionStrings.GetRedis(builder.Configuration, builder.Environment);
 
-// ---- CORS (minimal default) ----
+// ---- PostgreSQL: Shared NpgsqlDataSource + Marten ----
+var pgMaxPool = builder.Configuration.GetValue<int>("PostgreSQL:MaxPoolSize", 50);
+var pgMinPool = builder.Configuration.GetValue<int>("PostgreSQL:MinPoolSize", 5);
+builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, pgMaxPool, pgMinPool);
+
+builder.Services.AddMarten(opts =>
+{
+    var pgConnectionString = CenaConnectionStrings.GetPostgres(builder.Configuration, builder.Environment);
+    opts.ConfigureCenaEventStore(pgConnectionString);
+}).UseNpgsqlDataSource();
+
+// ---- Redis ----
+builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+{
+    var options = ConfigurationOptions.Parse(redisConnectionString);
+    options.Password = builder.Configuration["Redis:Password"]
+        ?? Environment.GetEnvironmentVariable("REDIS_PASSWORD")
+        ?? (builder.Environment.IsDevelopment() ? "cena_dev_redis" : null);
+    options.AbortOnConnectFail = false;
+    options.ConnectRetry = 3;
+    options.ConnectTimeout = 5000;
+    return ConnectionMultiplexer.Connect(options);
+});
+
+// ---- NATS ----
+var natsUrl = builder.Configuration.GetConnectionString("NATS") ?? "nats://localhost:4222";
+builder.Services.AddSingleton<NATS.Client.Core.INatsConnection>(sp =>
+{
+    var logger = sp.GetRequiredService<ILogger<NATS.Client.Core.INatsConnection>>();
+    var natsUser = builder.Configuration["NATS:ApiUsername"] 
+        ?? Environment.GetEnvironmentVariable("NATS_API_USERNAME") 
+        ?? "cena_api_user";
+    var natsPass = builder.Configuration["NATS:ApiPassword"] 
+        ?? Environment.GetEnvironmentVariable("NATS_API_PASSWORD") 
+        ?? "dev_api_pass";
+
+    var opts = new NATS.Client.Core.NatsOpts
+    {
+        Url = natsUrl,
+        Name = "cena-student-api",
+        AuthOpts = new NATS.Client.Core.NatsAuthOpts { Username = natsUser, Password = natsPass },
+    };
+    logger.LogInformation("Configuring NATS connection to {NatsUrl} as {NatsUser}", natsUrl, natsUser);
+    return new NATS.Client.Core.NatsConnection(opts);
+});
+builder.Services.AddSingleton<NatsEventSubscriber>();
+builder.Services.AddHostedService(sp => sp.GetRequiredService<NatsEventSubscriber>());
+
+// ---- STB-07b: Notification Dispatcher ----
+builder.Services.AddHostedService<NotificationDispatcher>();
+
+// ---- HARDEN SessionEndpoints: Question Bank Service ----
+builder.Services.AddScoped<IQuestionBank, QuestionBank>();
+
+// ---- HARDEN TutorEndpoints: LLM Service ----
+var llmApiKey = builder.Configuration["Cena:Llm:ApiKey"];
+if (!string.IsNullOrEmpty(llmApiKey))
+{
+    builder.Services.AddScoped<ITutorLlmService, ClaudeTutorLlmService>();
+    Log.Information("ClaudeTutorLlmService registered for AI tutoring");
+}
+else
+{
+    builder.Services.AddScoped<ITutorLlmService, NullTutorLlmService>();
+    Log.Warning("NullTutorLlmService registered — Cena:Llm:ApiKey not configured.");
+}
+
+// ---- Firebase Auth + Authorization ----
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddFirebaseAuth(builder.Configuration);
+builder.Services.AddCenaAuthorization();
+
+// ---- SignalR Real-Time Hub ----
+builder.Services.AddCenaSignalR();
+builder.Services.AddSignalRTokenExtraction();
+
+// ---- CORS ----
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:5174" };
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
-            .AllowAnyMethod()
-            .AllowAnyHeader();
+        policy.WithOrigins(allowedOrigins)
+            .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
+            .WithHeaders("Authorization", "Content-Type", "Accept", "X-Requested-With",
+                "X-SignalR-User-Agent")
+            .AllowCredentials();
     });
 });
 
+// ---- Rate limiting ----
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+    // General API: 100 req/min per user
+    options.AddFixedWindowLimiter("api", opt =>
+    {
+        opt.PermitLimit = 100;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+
+    // AI generation: 10 req/min per user (cost protection)
+    options.AddFixedWindowLimiter("ai", opt =>
+    {
+        opt.PermitLimit = 10;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+
+    // Tutor LLM: 10 messages/min per student
+    options.AddFixedWindowLimiter("tutor", opt =>
+    {
+        opt.PermitLimit = 10;
+        opt.Window = TimeSpan.FromMinutes(1);
+        opt.QueueLimit = 0;
+    });
+
+    options.OnRejected = async (context, _) =>
+    {
+        context.HttpContext.Response.Headers["Retry-After"] = "60";
+        await context.HttpContext.Response.WriteAsJsonAsync(new
+        {
+            error = "Rate limit exceeded. Please try again later.",
+            retryAfterSeconds = 60
+        });
+    };
+});
+
+// ---- Health checks ----
+builder.Services.AddHealthChecks();
+
+// ---- OpenTelemetry ----
+var otlpEndpoint = builder.Configuration.GetValue<string>("Cluster:OtlpEndpoint")
+    ?? "http://localhost:4317";
+
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(resource => resource
+        .AddService(
+            serviceName: "cena-student-api",
+            serviceVersion: "1.0.0",
+            serviceInstanceId: Environment.MachineName))
+    .WithTracing(tracing => tracing
+        .AddAspNetCoreInstrumentation()
+        .AddHttpClientInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)))
+    .WithMetrics(metrics => metrics
+        .AddAspNetCoreInstrumentation()
+        .AddRuntimeInstrumentation()
+        .AddProcessInstrumentation()
+        .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
+        .AddPrometheusExporter());
+
+// =============================================================================
+// BUILD & PIPELINE
+// =============================================================================
+
 var app = builder.Build();
 
-// ---- Middleware pipeline ----
-app.UseCors();
+// ---- Correlation ID middleware ----
+app.UseMiddleware<CorrelationIdMiddleware>();
 
-// ---- Health endpoints ----
+// ---- Global exception handler ----
+app.UseMiddleware<GlobalExceptionMiddleware>();
+
+// ---- Concurrency conflict handler ----
+app.UseMiddleware<Cena.Infrastructure.EventStore.ConcurrencyConflictMiddleware>();
+
+// ---- Security response headers ----
+app.Use(async (context, next) =>
+{
+    var headers = context.Response.Headers;
+    headers["X-Content-Type-Options"] = "nosniff";
+    headers["X-Frame-Options"] = "DENY";
+    headers["X-XSS-Protection"] = "0";
+    headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+    headers["Content-Security-Policy"] =
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+        "img-src 'self' data:; font-src 'self'; connect-src 'self'; frame-ancestors 'none';";
+
+    if (!context.Request.Path.StartsWithSegments("/health"))
+    {
+        headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains";
+    }
+
+    await next();
+});
+
+// Middleware order: CORS → Auth → Revocation → FERPA Audit → RateLimiter → Endpoints
+app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseMiddleware<TokenRevocationMiddleware>();
+app.UseMiddleware<StudentDataAuditMiddleware>();
+app.UseRateLimiter();
+
+// ---- Prometheus metrics endpoint ----
+app.MapPrometheusScrapingEndpoint();
+
+// ---- Health check ----
+app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "cena-student-api" }));
 app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
+
+// ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
+
+// Me/Profile endpoints (STB-00, STB-00b)
+app.MapMeEndpoints();
+
+// Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
+app.MapSessionEndpoints();
+
+// Plan/Recommendation endpoints (STB-02)
+app.MapPlanEndpoints();
+
+// Gamification endpoints (STB-03, STB-03b, STB-03c)
+app.MapGamificationEndpoints();
+
+// Tutor endpoints (STB-04, STB-04b)
+app.MapTutorEndpoints();
+
+// Challenges endpoints (STB-05, STB-05b)
+app.MapChallengesEndpoints();
+
+// Social endpoints (STB-06, STB-06b)
+app.MapSocialEndpoints();
+
+// Notifications endpoints (STB-07, STB-07b, STB-07c)
+app.MapNotificationsEndpoints();
+
+// Knowledge/Content endpoints (STB-08)
+app.MapKnowledgeEndpoints();
+
+// Student Analytics endpoints (STB-09)
+app.MapStudentAnalyticsEndpoints();
+
+// ---- SignalR Hub ----
+app.MapCenaHub();
 
 // ---- Root endpoint ----
 app.MapGet("/", () => Results.Ok(new 
 { 
     service = "Cena Student API Host", 
-    status = "scaffold (DB-06 Phase 1)",
+    status = "healthy (DB-06b)",
     timestamp = DateTimeOffset.UtcNow
 }));
 
