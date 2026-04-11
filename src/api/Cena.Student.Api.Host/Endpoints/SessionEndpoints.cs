@@ -637,12 +637,15 @@ public static class SessionEndpoints
             // event append + Apply handler. Every event going to the student's
             // stream is appended in a single call so Marten's inline projection
             // sees them as one rebuild unit.
+            // FIND-pedagogy-009 (enriched): load the profile ONCE up front.
+            // It feeds both the absolute TotalXp stamp on the XP event (when
+            // isCorrect) and the Elo dual update below (regardless of
+            // correctness). Wrong-answer path pays one extra doc load to
+            // avoid two round-trips.
+            var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+
             if (isCorrect)
             {
-                // Load current profile ONLY to compute the new absolute TotalXp
-                // that we stamp into the XpAwarded_V1 event (the event contract
-                // expects an absolute, not a delta).
-                var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
                 var currentXp = profile?.TotalXp ?? 0;
                 var newTotalXp = currentXp + 10;
 
@@ -666,15 +669,25 @@ public static class SessionEndpoints
                 session.Events.Append(studentId, conceptAttempt);
             }
 
-            await session.SaveChangesAsync();
+            // FIND-pedagogy-009 (enriched): dual Elo update on the SAME
+            // session — one SaveChangesAsync, no race. The service reads the
+            // REAL StudentProfileSnapshot.EloRating (not priorMastery, which
+            // the original pedagogy-009 passed as theta — BKT posterior is
+            // on [0,1] and Elo is on [500,2500], so every expected value
+            // collapsed to ~0). The service appends StudentEloRatingUpdated_V1
+            // to the student stream AND stages the question document on the
+            // caller's session (cf. the FIND-data-007 CQRS lesson).
+            if (profile is not null)
+            {
+                eloService.UpdateRatings(
+                    session: session,
+                    profile: profile,
+                    questionDoc: questionDoc,
+                    isCorrect: isCorrect,
+                    timestamp: DateTimeOffset.UtcNow);
+            }
 
-            // FIND-pedagogy-009: Update question DifficultyElo using Elo formula
-            // D_new = D_old + K * (actual - expected)
-            // This calibrates question difficulty toward the 85% correctness target.
-            await eloService.UpdateDifficultyAsync(
-                questionDoc,
-                studentTheta: (float)priorMastery,
-                isCorrect: isCorrect);
+            await session.SaveChangesAsync();
 
             // Determine next question ID
             string? nextQuestionId = null;

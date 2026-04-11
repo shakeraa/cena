@@ -22,11 +22,49 @@ public class QuestionDocument
     public string Difficulty { get; set; } = "medium"; // easy, medium, hard
 
     /// <summary>
-    /// FIND-pedagogy-009: Continuous Elo rating for adaptive item selection.
-    /// Targets 85% expected correctness (Wilson et al., 2019).
-    /// Default: 1000 + (Grade - 7) * 100, or 1000 if grade unknown.
+    /// FIND-pedagogy-009 (enriched): Continuous Elo rating for adaptive item
+    /// selection. Targets ≈0.85 expected correctness per Wilson et al. 2019.
+    /// Default 1500.0 matches standard Elo convention (1500 = average).
+    ///
+    /// Existing seeded questions should call <see cref="SeedDifficultyEloFromBucket"/>
+    /// on first load to bootstrap from the 3-bucket <see cref="Difficulty"/>
+    /// string: easy→1300, medium→1500, hard→1700. Default is used only when
+    /// the bucket string is also missing or unknown.
+    ///
+    /// Stored as double (not float) because Elo accumulates many tiny updates
+    /// over thousands of attempts and float precision loss is observable.
     /// </summary>
-    public float DifficultyElo { get; set; } = 1000f;
+    public double DifficultyElo { get; set; } = 1500.0;
+
+    /// <summary>
+    /// FIND-pedagogy-009 (enriched): attempt counter for K-factor decay on the
+    /// question side. New items use a larger K (≈32) for fast calibration and
+    /// decay to a small K (≈8) once settled (&gt;500 attempts), mirroring the
+    /// student-side decay in Cena.Actors.Mastery.EloScoring.StudentKFactor.
+    /// </summary>
+    public int EloAttemptCount { get; set; }
+
+    /// <summary>
+    /// FIND-pedagogy-009 (enriched): migrates the 3-bucket Difficulty string
+    /// into an Elo seed on first load. Idempotent — only writes if DifficultyElo
+    /// is still at the default. Returns true if a seed was applied so the
+    /// caller can persist it.
+    /// </summary>
+    public bool SeedDifficultyEloFromBucket()
+    {
+        // Only seed if DifficultyElo is still at the unset default.
+        if (Math.Abs(DifficultyElo - 1500.0) > 0.001) return false;
+        var seed = Difficulty?.ToLowerInvariant() switch
+        {
+            "easy"   => 1300.0,
+            "medium" => 1500.0,
+            "hard"   => 1700.0,
+            _        => 1500.0
+        };
+        if (Math.Abs(seed - 1500.0) < 0.001) return false; // medium == default
+        DifficultyElo = seed;
+        return true;
+    }
 
     public string ConceptId { get; set; } = "";
     public string Prompt { get; set; } = "";

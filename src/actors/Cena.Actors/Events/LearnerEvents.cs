@@ -249,6 +249,34 @@ public record OnboardingCompleted_V1(
 /// selectively. The inline StudentProfileSnapshot projection applies
 /// this through the event stream instead of racing the snapshot.
 /// </summary>
+/// <summary>
+/// FIND-pedagogy-009 (enriched): emitted whenever a student answer triggers a
+/// dual Elo rating update. Appended to the STUDENT event stream so the inline
+/// StudentProfileSnapshot projection picks up the new rating on replay, and the
+/// QuestionDocument write (non-event-sourced) rides on the same IDocumentSession
+/// inside SaveChangesAsync — no separate LightweightSession, no race with the
+/// caller's own transaction (the same CQRS lesson that FIND-data-007 taught).
+///
+/// Citations:
+///   Elo, A. E. (1978). The Rating of Chessplayers, Past and Present. ISBN 0-668-04721-6.
+///   Wilson, R. C. et al. (2019). The Eighty Five Percent Rule for optimal learning.
+///   Nature Communications 10, 4646. DOI: 10.1038/s41467-019-12552-4 — target
+///   expected success probability is ≈0.85 for noisy binary classifiers (the
+///   exact threshold derived in the paper is 0.847).
+/// </summary>
+public record StudentEloRatingUpdated_V1(
+    string StudentId,
+    string QuestionId,
+    double OldStudentElo,
+    double NewStudentElo,
+    double OldQuestionElo,
+    double NewQuestionElo,
+    bool IsCorrect,
+    double ExpectedCorrectness,
+    int StudentAttemptCountAfter,
+    DateTimeOffset Timestamp
+) : IDelegatedEvent;
+
 public record ProfileUpdated_V1(
     string StudentId,
     string? DisplayName,

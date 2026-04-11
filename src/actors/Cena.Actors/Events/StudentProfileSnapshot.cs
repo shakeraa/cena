@@ -32,6 +32,14 @@ public class StudentProfileSnapshot
     public int CurrentStreak { get; set; }
     public int LongestStreak { get; set; }
     public DateTimeOffset LastActivityDate { get; set; }
+
+    // FIND-pedagogy-009 (enriched): student-side Elo rating for adaptive item
+    // selection via the 85% rule (Wilson et al. 2019). Default 1500.0 matches
+    // standard Elo convention. EloAttemptCount drives K-factor decay — new
+    // learners get K=40 for fast calibration, decays to K=10 once settled
+    // (see Cena.Actors.Mastery.EloScoring.StudentKFactor).
+    public double EloRating { get; set; } = 1500.0;
+    public int EloAttemptCount { get; set; }
     public string? ExperimentCohort { get; set; }
     public double BaselineAccuracy { get; set; }
     public double BaselineResponseTimeMs { get; set; }
@@ -119,6 +127,17 @@ public class StudentProfileSnapshot
     }
 
     public void Apply(XpAwarded_V1 e) => TotalXp = e.TotalXp;
+
+    /// <summary>
+    /// FIND-pedagogy-009 (enriched): replays the student-side Elo rating
+    /// change from the event stream. The question-side update is a plain
+    /// QuestionDocument write and lives outside the event stream by design.
+    /// </summary>
+    public void Apply(StudentEloRatingUpdated_V1 e)
+    {
+        EloRating = e.NewStudentElo;
+        EloAttemptCount = e.StudentAttemptCountAfter;
+    }
 
     public void Apply(StreakUpdated_V1 e)
     {
