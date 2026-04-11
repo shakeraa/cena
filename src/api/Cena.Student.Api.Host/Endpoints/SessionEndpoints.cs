@@ -10,6 +10,7 @@ using System.Text.Json;
 using Cena.Actors.Bus;
 using Cena.Actors.Events;
 using Cena.Actors.Projections;
+using Cena.Actors.Questions;
 using Cena.Actors.Services;
 using Cena.Actors.Serving;
 using Cena.Actors.Tutoring;
@@ -523,6 +524,7 @@ public static class SessionEndpoints
             IDocumentStore store,
             IQuestionBank questionBank,
             IBktService bktService,
+            IErrorClassificationService errorClassifier,
             SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -874,6 +876,59 @@ public static class SessionEndpoints
             PInitial: defaults.PInitial,
             ProgressionThreshold: defaults.ProgressionThreshold,
             PrerequisiteGateThreshold: defaults.PrerequisiteGateThreshold);
+    }
+
+    /// <summary>
+    /// FIND-pedagogy-006 — Build hint option states from the authored
+    /// question choices + distractor rationales. Used by the hint
+    /// generation path so the progressive reveal uses the correct option's
+    /// rationale as a fallback when no explanation is authored. If the
+    /// question has no choices (free-text / numeric), returns an empty list
+    /// and HintGenerator falls back gracefully.
+    /// </summary>
+    internal static IReadOnlyList<QuestionOptionState> BuildHintOptionStates(
+        QuestionDocument questionDoc)
+    {
+        var choices = questionDoc.Choices;
+        if (choices is null || choices.Length == 0)
+            return Array.Empty<QuestionOptionState>();
+
+        var rationales = questionDoc.DistractorRationales;
+        var correctAnswer = questionDoc.CorrectAnswer ?? string.Empty;
+
+        var result = new List<QuestionOptionState>(choices.Length);
+        foreach (var choice in choices)
+        {
+            var isCorrect = string.Equals(choice, correctAnswer, StringComparison.OrdinalIgnoreCase);
+            string? rationale = null;
+            if (rationales is not null)
+            {
+                if (rationales.TryGetValue(choice, out var exact))
+                {
+                    rationale = exact;
+                }
+                else
+                {
+                    foreach (var kv in rationales)
+                    {
+                        if (string.Equals(kv.Key, choice, StringComparison.OrdinalIgnoreCase))
+                        {
+                            rationale = kv.Value;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            result.Add(new QuestionOptionState(
+                Label: choice,
+                Text: choice,
+                TextHtml: choice,
+                IsCorrect: isCorrect,
+                DistractorRationale: rationale));
+        }
+
+        return result;
     }
 
     /// <summary>

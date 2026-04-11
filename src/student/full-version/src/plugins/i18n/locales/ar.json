@@ -573,7 +573,11 @@
       "exit": "خروج",
       "exitAria": "الخروج من الجلسة",
       "sessionIdLabel": "الجلسة",
-      "completing": "جارٍ الإنهاء…"
+      "completing": "جارٍ الإنهاء…",
+      "continueWhenReady": "متابعة",
+      "workedExampleLabel": "مثال محلول",
+      "hintLevel": "تلميح {level}",
+      "requestHint": "أظهر تلميحاً (تبقى {remaining})"
     },
     "summary": {
       "title": "اكتملت الجلسة",

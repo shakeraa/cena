@@ -58,11 +58,14 @@ class _ChallengeCardWidgetState extends State<ChallengeCardWidget> {
   void _submitMcq(int index) {
     if (_isAnswered) return;
     final option = widget.card.options[index];
+    final locale = Localizations.localeOf(context).languageCode;
     setState(() {
       _selectedOptionIndex = index;
       _isAnswered = true;
       _isCorrect = option.isCorrect;
-      _wrongFeedback = option.isCorrect ? null : option.feedbackHe;
+      // FIND-pedagogy-004: resolve per-option distractor feedback in the
+      // student's current locale (was hard-coded to Hebrew).
+      _wrongFeedback = option.isCorrect ? null : option.localizedFeedback(locale);
     });
     _handleResult();
   }
@@ -102,6 +105,16 @@ class _ChallengeCardWidgetState extends State<ChallengeCardWidget> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final tierColor = _tierColor();
+    final locale = Localizations.localeOf(context).languageCode;
+
+    // FIND-pedagogy-004 — refuse to render Hebrew content for English
+    // students. If the active locale is 'en' and any ChallengeOption is
+    // missing an English translation, hide the card entirely. This
+    // matches the product stance that English is the primary locale
+    // and Hebrew must be hideable outside Israel.
+    if (!challengeCardSupportsLocale(widget.card, locale)) {
+      return _unavailablePlaceholder(theme, cs);
+    }
 
     return ShakeWidget(
       key: _shakeKey,
@@ -202,6 +215,7 @@ class _ChallengeCardWidgetState extends State<ChallengeCardWidget> {
   // -- MCQ ------------------------------------------------------------------
 
   Widget _mcqOptions(ThemeData theme, ColorScheme cs) {
+    final locale = Localizations.localeOf(context).languageCode;
     return Column(
       children: widget.card.options.asMap().entries.map((e) {
         final i = e.key;
@@ -224,7 +238,9 @@ class _ChallengeCardWidgetState extends State<ChallengeCardWidget> {
                 border: Border.all(color: c.withValues(alpha: 0.6), width: selected || correct ? 2 : 1),
               ),
               child: Row(children: [
-                Expanded(child: Text(opt.textHe, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.normal))),
+                // FIND-pedagogy-004: resolve option text in the student's
+                // current locale, not hard-coded Hebrew.
+                Expanded(child: Text(opt.localizedText(locale), style: theme.textTheme.bodyMedium?.copyWith(fontWeight: selected ? FontWeight.w600 : FontWeight.normal))),
                 if (correct) const Icon(Icons.check_circle_rounded, size: 20, color: Color(0xFF4CAF50)),
                 if (wrong) Icon(Icons.cancel_rounded, size: 20, color: cs.error),
               ]),
@@ -234,6 +250,32 @@ class _ChallengeCardWidgetState extends State<ChallengeCardWidget> {
       }).toList(),
     );
   }
+
+  // -- Hidden / unavailable placeholder (FIND-pedagogy-004) ----------------
+
+  /// Rendered when the current locale lacks a translation for at least
+  /// one option on the card. We deliberately render an inert placeholder
+  /// (not a popup, not an error) so the parent screen can still lay out
+  /// the slot without crashing, while guaranteeing no Hebrew text leaks
+  /// into an English-locale student's session.
+  Widget _unavailablePlaceholder(ThemeData theme, ColorScheme cs) => GlassCard(
+        borderOpacity: 0.3,
+        child: Padding(
+          padding: const EdgeInsets.all(SpacingTokens.lg),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.translate_rounded, size: 32, color: cs.onSurface.withValues(alpha: 0.5)),
+              const SizedBox(height: SpacingTokens.sm),
+              Text(
+                'This challenge is not available in your language yet.',
+                textAlign: TextAlign.center,
+                style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurface.withValues(alpha: 0.7)),
+              ),
+            ],
+          ),
+        ),
+      );
 
   // -- Numeric / Expression -------------------------------------------------
 

@@ -294,19 +294,133 @@ enum ChallengeAnswerType {
   tapHotspot,
 }
 
+// ─────────────────────────────────────────────────────────────────────
+// FIND-pedagogy-004 — Localized ChallengeOption
+//
+// Previous shape required `textHe` (+ optional `feedbackHe`), so an
+// English-locale student saw Hebrew text and Hebrew feedback regardless
+// of their locale. That violates the project's English-primary language
+// strategy (decision 2026-03-27: "English primary, Arabic/Hebrew
+// secondary, Hebrew hideable outside Israel") AND contradicts the
+// research consensus that comprehension feedback must be delivered in
+// the learner's language of instruction (August & Shanahan 2006,
+// "Developing Literacy in Second-Language Learners", ISBN 978-0805860788).
+//
+// The fix: store `text` and `feedback` as `Map<String, String>` keyed
+// by locale code ('en', 'he', 'ar'). Readers resolve via
+// [localizedText] / [localizedFeedback] using the current locale with
+// a fallback chain (current → 'en' → 'he' → first available). If the
+// current locale is English and no English text has been authored,
+// [hasAnyEnglishText] returns false and the caller must HIDE the
+// feature rather than leak Hebrew to English students.
+//
+// JSON backward compatibility: [fromJson] accepts either the new shape
+// ({"text":{"en":"...","he":"..."}, ...}) or the legacy shape
+// ({"textHe":"...","feedbackHe":"..."}) and migrates the legacy shape
+// into the map automatically. Authored seed data can be migrated at
+// rest via the simple rewrite:
+//     {"textHe":"X"} → {"text":{"he":"X"}}
+// ─────────────────────────────────────────────────────────────────────
+
 @freezed
 class ChallengeOption with _$ChallengeOption {
+  const ChallengeOption._();
+
   const factory ChallengeOption({
     required String id,
-    required String textHe,
+
+    /// Localized option text keyed by locale code ('en', 'he', 'ar').
+    /// At least one locale MUST be present. Authors should add 'en' for
+    /// the English-primary strategy; 'he' remains supported for Hebrew
+    /// content and is the fallback when no 'en' is present.
+    required Map<String, String> text,
     required bool isCorrect,
 
-    /// Shown if student selects this wrong answer
-    String? feedbackHe,
+    /// Localized per-option distractor rationale shown when the student
+    /// selects this wrong answer. Same locale-keyed shape as [text].
+    Map<String, String>? feedback,
   }) = _ChallengeOption;
 
-  factory ChallengeOption.fromJson(Map<String, dynamic> json) =>
-      _$ChallengeOptionFromJson(json);
+  /// Resolve a localized string from a locale map using the fallback
+  /// chain: `locale → 'en' → 'he' → first-available`. Returns null
+  /// when the map is empty or null.
+  static String? resolveLocalized(
+    Map<String, String>? map,
+    String locale,
+  ) {
+    if (map == null || map.isEmpty) return null;
+    if (map.containsKey(locale)) return map[locale];
+    if (map.containsKey('en')) return map['en'];
+    if (map.containsKey('he')) return map['he'];
+    return map.values.first;
+  }
+
+  /// Resolve the option text for the given locale. Falls back through
+  /// `locale → en → he → first available`. Returns empty string only if
+  /// the author left the text map entirely empty (which should be
+  /// caught by the model's `required` constraint at construction time).
+  String localizedText(String locale) =>
+      resolveLocalized(text, locale) ?? '';
+
+  /// Resolve per-option feedback for the given locale. Null when no
+  /// feedback has been authored.
+  String? localizedFeedback(String locale) =>
+      resolveLocalized(feedback, locale);
+
+  /// True when an English version of the option text exists. Used by
+  /// the UI to hide the feature entirely on 'en' locale if no English
+  /// translation is available — prevents Hebrew from leaking into an
+  /// English student's session.
+  bool get hasEnglishText =>
+      text.containsKey('en') && (text['en']?.isNotEmpty ?? false);
+
+  factory ChallengeOption.fromJson(Map<String, dynamic> json) {
+    // Accept either the new map shape or the legacy He-only shape.
+    // When both are present, the map shape wins.
+    Map<String, String>? textMap;
+    final rawText = json['text'];
+    if (rawText is Map) {
+      textMap = rawText.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+    }
+    if ((textMap == null || textMap.isEmpty) && json['textHe'] is String) {
+      textMap = {'he': json['textHe'] as String};
+    }
+    textMap ??= <String, String>{};
+
+    Map<String, String>? feedbackMap;
+    final rawFeedback = json['feedback'];
+    if (rawFeedback is Map) {
+      feedbackMap = rawFeedback.map((k, v) => MapEntry(k.toString(), v?.toString() ?? ''));
+    }
+    if ((feedbackMap == null || feedbackMap.isEmpty) && json['feedbackHe'] is String) {
+      feedbackMap = {'he': json['feedbackHe'] as String};
+    }
+
+    return ChallengeOption(
+      id: json['id'] as String,
+      text: textMap,
+      isCorrect: json['isCorrect'] as bool,
+      feedback: feedbackMap,
+    );
+  }
+}
+
+/// Whether the ChallengeCard has sufficient localization for the given
+/// locale to be rendered. Specifically: every option must have text for
+/// the active locale OR a valid fallback chain that reaches text in the
+/// target locale's script family. For English ('en') we refuse to render
+/// if ANY option is missing an English translation, to avoid leaking
+/// Hebrew into English students' sessions — the feature must be HIDDEN
+/// rather than rendered with the Hebrew fallback.
+bool challengeCardSupportsLocale(ChallengeCard card, String locale) {
+  if (card.options.isEmpty) return false;
+  if (locale == 'en') {
+    return card.options.every((o) => o.hasEnglishText);
+  }
+  // For other locales, presence of any text is acceptable because
+  // fallback chain will reach something in the same script family
+  // (he/ar are supported as authored locales).
+  return card.options.every((o) => o.text.isNotEmpty);
 }
 
 // ─────────────────────────────────────────────────────────────────────

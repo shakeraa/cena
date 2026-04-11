@@ -572,7 +572,11 @@
       "exit": "Exit",
       "exitAria": "Exit session",
       "sessionIdLabel": "Session",
-      "completing": "Finishing up…"
+      "completing": "Finishing up…",
+      "continueWhenReady": "Continue",
+      "workedExampleLabel": "Worked example",
+      "hintLevel": "Hint {level}",
+      "requestHint": "Show a hint ({remaining} left)"
     },
     "summary": {
       "title": "Session complete",
