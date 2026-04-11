@@ -4,7 +4,24 @@ import type { AppContentLayoutNav, ContentWidth, FooterType, HorizontalNavType, 
 
 export interface LayoutConfig {
   app: {
+
+    /**
+     * Lowercase identifier used as a cookie-namespace prefix
+     * (see @layouts/stores/config.ts#namespaceConfig). RFC 6265 forbids
+     * spaces in cookie-name tokens, which is why this field is
+     * `Lowercase<string>` and must be a single hyphen-free word, e.g.
+     * `cena-admin` or `cena-student`. It is NOT user-visible — use
+     * `brandTitle` for anything rendered in the UI.
+     */
     title: Lowercase<string>
+
+    /**
+     * Human-readable display title used in the vertical nav header,
+     * auth page logos, and copy strings. Falls back to `title` when
+     * absent. MUST be used for any brand label shown to end users —
+     * `title` is the internal cookie prefix.
+     */
+    brandTitle?: string
     logo: VNode
     contentWidth: typeof ContentWidth[keyof typeof ContentWidth]
     contentLayoutNav: typeof AppContentLayoutNav[keyof typeof AppContentLayoutNav]

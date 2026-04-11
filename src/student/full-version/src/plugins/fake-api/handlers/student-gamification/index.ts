@@ -1,4 +1,5 @@
 import { HttpResponse, http } from 'msw'
+import { readMockSession } from '../../mockSession'
 
 /**
  * MSW handlers for the student `/api/gamification/*` endpoint group.
@@ -7,6 +8,12 @@ import { HttpResponse, http } from 'msw'
  * deterministic backend without running the student API host. In
  * production the MSW worker is NOT registered, so real requests pass
  * through to the hardened backend.
+ *
+ * FIND-ux-013: the leaderboard previously hardcoded a 'Dev Student'
+ * entry at a fixed rank regardless of who was signed in. It now reads
+ * the real mock session from localStorage and injects that identity as
+ * the "you" row, so the leaderboard matches the user the home page
+ * greets.
  */
 
 const mockXp = {
@@ -94,31 +101,57 @@ const mockBadges = {
   ],
 }
 
-const NAMES_GLOBAL = ['Alex Chen', 'Priya Rao', 'Jordan Smith', 'Sam Park', 'Dev Student', 'Riley Evans', 'Casey Kim', 'Maya Patel', 'Noa Levi', 'Yusef Ali', 'Lina Morales', 'Ethan Clarke', 'Aisha Khan', 'Oliver Bennett', 'Sofia Russo', 'Daniel Lee', 'Zara Hoffman', 'Mateo García', 'Hannah Müller', 'Kenji Watanabe']
-const NAMES_CLASS = ['Dev Student', 'Elena Torres', 'Oren Barak', 'Haruki Sato', 'Fatima Al-Said', 'Leo Fischer', 'Maya Patel', 'Noa Levi']
-const NAMES_FRIENDS = ['Alex Chen', 'Priya Rao', 'Dev Student', 'Sam Park', 'Casey Kim']
+// Supporting cast — the "you" row is injected at `myIndex` below, so
+// these lists contain only the OTHER students.
+const NAMES_GLOBAL = ['Alex Chen', 'Priya Rao', 'Jordan Smith', 'Sam Park', 'Riley Evans', 'Casey Kim', 'Maya Patel', 'Noa Levi', 'Yusef Ali', 'Lina Morales', 'Ethan Clarke', 'Aisha Khan', 'Oliver Bennett', 'Sofia Russo', 'Daniel Lee', 'Zara Hoffman', 'Mateo García', 'Hannah Müller', 'Kenji Watanabe']
+const NAMES_CLASS = ['Elena Torres', 'Oren Barak', 'Haruki Sato', 'Fatima Al-Said', 'Leo Fischer', 'Maya Patel', 'Noa Levi']
+const NAMES_FRIENDS = ['Alex Chen', 'Priya Rao', 'Sam Park', 'Casey Kim']
 
 function makeLeaderboard(scope: string) {
-  let names: string[]
+  const session = readMockSession()
+
+  let supporting: string[]
   let myIndex: number
 
   if (scope === 'class') {
-    names = NAMES_CLASS
+    supporting = NAMES_CLASS
     myIndex = 0
   }
   else if (scope === 'friends') {
-    names = NAMES_FRIENDS
+    supporting = NAMES_FRIENDS
     myIndex = 2
   }
   else {
-    names = NAMES_GLOBAL
+    supporting = NAMES_GLOBAL
     myIndex = 4
   }
 
-  const entries = names.map((name, i) => ({
+  // Build the final display order with the authenticated user slotted
+  // into `myIndex`. Their xp is computed from that position so the
+  // ranking stays monotonically decreasing.
+  const displayNames: Array<{ studentId: string; displayName: string }> = []
+  let supportingCursor = 0
+  for (let i = 0; i < supporting.length + 1; i++) {
+    if (i === myIndex) {
+      displayNames.push({
+        studentId: session.studentId,
+        displayName: session.displayName,
+      })
+    }
+    else {
+      const name = supporting[supportingCursor++]
+
+      displayNames.push({
+        studentId: `u-${scope}-${i}`,
+        displayName: name,
+      })
+    }
+  }
+
+  const entries = displayNames.map((row, i) => ({
     rank: i + 1,
-    studentId: i === myIndex ? 'u-dev-student' : `u-${scope}-${i}`,
-    displayName: name,
+    studentId: row.studentId,
+    displayName: row.displayName,
     xp: 2400 - i * 150,
     avatarUrl: null,
   }))

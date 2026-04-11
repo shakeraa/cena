@@ -10,7 +10,13 @@ import { AppContentLayoutNav, ContentWidth, FooterType, NavbarType } from '@layo
 
 export const { themeConfig, layoutConfig } = defineThemeConfig({
   app: {
-    title: 'vuexy',
+    // FIND-ux-003: cookie-namespace prefix (see @layouts/stores/config.ts).
+    // Must be lowercase + hyphen-free per RFC 6265. NOT user-visible.
+    title: 'cena-student',
+
+    // FIND-ux-009: display label rendered in the vertical nav H1 and
+    // any brand copy string. Shown to students as 'Cena'.
+    brandTitle: 'Cena',
     logo: h('div', { innerHTML: logo, style: 'line-height:0; color: rgb(var(--v-global-theme-primary))' }),
     contentWidth: ContentWidth.Boxed,
     contentLayoutNav: AppContentLayoutNav.Vertical,

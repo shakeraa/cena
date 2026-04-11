@@ -18,6 +18,10 @@ export const { themeConfig, layoutConfig } = defineThemeConfig({
     // localhost:5175, taking down HMR and blanking every student page.
     // Hyphen, never space.
     title: 'cena-admin' as const,
+
+    // FIND-ux-008: display label rendered in the vertical nav H1, auth
+    // page logos, and brand copy. `title` stays the cookie prefix.
+    brandTitle: 'Cena Admin',
     logo: h('div', { innerHTML: logo, style: 'line-height:0; color: rgb(var(--v-global-theme-primary))' }),
     contentWidth: ContentWidth.Boxed,
     contentLayoutNav: AppContentLayoutNav.Vertical,

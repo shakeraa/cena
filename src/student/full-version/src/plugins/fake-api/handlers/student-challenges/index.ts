@@ -1,4 +1,5 @@
 import { HttpResponse, http } from 'msw'
+import { readMockSession } from '../../mockSession'
 
 /**
  * MSW handlers for the student `/api/challenges/*` endpoint group.
@@ -7,6 +8,10 @@ import { HttpResponse, http } from 'msw'
  * deterministic backend without running the student API host. In
  * production the MSW worker is NOT registered, so real requests pass
  * through to the hardened challenges endpoints.
+ *
+ * FIND-ux-013: the daily-challenge leaderboard previously hardcoded
+ * rank 5 as 'Dev Student'. It now injects the signed-in user so every
+ * leaderboard the student sees agrees on who "you" is.
  */
 
 function endOfDayIso(): string {
@@ -116,13 +121,15 @@ export const handlerStudentChallenges = [
   http.get('/api/challenges/daily', () => HttpResponse.json(mockDaily)),
 
   http.get('/api/challenges/daily/leaderboard', () => {
+    const session = readMockSession()
+
     return HttpResponse.json({
       entries: [
         { rank: 1, studentId: 'u-1', displayName: 'Alex Chen', score: 100, timeSeconds: 42 },
         { rank: 2, studentId: 'u-2', displayName: 'Priya Rao', score: 95, timeSeconds: 48 },
         { rank: 3, studentId: 'u-3', displayName: 'Jordan Smith', score: 92, timeSeconds: 51 },
         { rank: 4, studentId: 'u-4', displayName: 'Sam Park', score: 90, timeSeconds: 55 },
-        { rank: 5, studentId: 'u-dev-student', displayName: 'Dev Student', score: 88, timeSeconds: 60 },
+        { rank: 5, studentId: session.studentId, displayName: session.displayName, score: 88, timeSeconds: 60 },
       ],
       currentStudentRank: 5,
     })

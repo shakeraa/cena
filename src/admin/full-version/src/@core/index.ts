@@ -7,6 +7,7 @@ export const defineThemeConfig = (userConfig: UserThemeConfig): { themeConfig: U
     layoutConfig: {
       app: {
         title: userConfig.app.title,
+        brandTitle: userConfig.app.brandTitle,
         logo: userConfig.app.logo,
         contentWidth: userConfig.app.contentWidth,
         contentLayoutNav: userConfig.app.contentLayoutNav,
