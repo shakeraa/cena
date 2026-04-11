@@ -90,6 +90,10 @@ public static class MartenConfiguration
 
         // ── Question Read Model (inline projection for list queries) ──
         opts.Projections.Add<QuestionListProjection>(ProjectionLifecycle.Inline);
+
+        // HARDEN SocialEndpoints: Async projection for class feed items from events
+        opts.Projections.Add<ClassFeedItemProjection>(ProjectionLifecycle.Async);
+
         opts.Schema.For<QuestionReadModel>()
             .Identity(x => x.Id)
             .Index(x => x.Subject)
@@ -246,6 +250,20 @@ public static class MartenConfiguration
             .Index(x => x.RoomId)
             .Index(x => x.StudentId)
             .Index(x => x.IsActive);
+
+        // ── Class Feed Documents (HARDEN SocialEndpoints) ──
+        opts.Schema.For<ClassFeedItemDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.ClassroomId)
+            .Index(x => x.Kind)
+            .Index(x => x.AuthorStudentId)
+            .Index(x => x.PostedAt);
+
+        opts.Schema.For<PeerSolutionDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.QuestionId)
+            .Index(x => x.AuthorStudentId)
+            .Index(x => x.PostedAt);
 
         // ── Boss Attempt Document (STB-05b) ──
         opts.Schema.For<BossAttemptDocument>()
