@@ -224,7 +224,7 @@ public static class ChallengesEndpoints
             Difficulty: boss.Difficulty,
             AttemptsRemaining: attemptsRemaining,
             AttemptsMax: boss.MaxAttemptsPerDay,
-            Rewards: boss.Rewards.Select(r => new BossBattleReward(Type: r.Type, Amount: r.Amount)).ToArray());
+            Rewards: boss.Rewards.Select(r => new Contracts.Challenges.BossBattleReward(Type: r.Type, Amount: r.Amount)).ToArray());
 
         return Results.Ok(dto);
     }

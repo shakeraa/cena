@@ -17,6 +17,7 @@ using Cena.Api.Host.Hubs;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
+using Cena.Infrastructure.Content;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
@@ -170,6 +171,9 @@ builder.Services.AddRateLimiter(options =>
 // ---- Admin Services (ADM-004 through ADM-023, REV-016.2) ----
 builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminService>();
 builder.Services.AddCenaAdminServices();
+
+// ---- STB-08b: Content Catalog Service ----
+builder.Services.AddScoped<IContentCatalogService, ContentCatalogService>();
 
 // =============================================================================
 // OPENTELEMETRY (REV-018.3)

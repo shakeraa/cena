@@ -1,11 +1,13 @@
 // =============================================================================
-// Cena Platform -- Knowledge/Content REST Endpoints (STB-08 Phase 1)
-// Concepts and learning path endpoints (stub data)
+// Cena Platform -- Knowledge/Content REST Endpoints (STB-08 Phase 1 + STB-08b)
+// Concepts and learning path endpoints with real catalog data
 // =============================================================================
 
 using System.Security.Claims;
 using Cena.Api.Contracts.Content;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Content;
+using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -14,111 +16,6 @@ namespace Cena.Api.Host.Endpoints;
 
 public static class KnowledgeEndpoints
 {
-    // Hard-coded list of ~12 math concepts (Algebra I basics)
-    private static readonly ConceptSummary[] StubConcepts =
-    {
-        new("concept_linear_eq", "Linear Equations", "Mathematics", "Algebra", "beginner", "mastered"),
-        new("concept_inequalities", "Inequalities", "Mathematics", "Algebra", "beginner", "mastered"),
-        new("concept_systems_linear", "Systems of Linear Equations", "Mathematics", "Algebra", "intermediate", "in-progress"),
-        new("concept_quadratic_eq", "Quadratic Equations", "Mathematics", "Algebra", "intermediate", "available"),
-        new("concept_factoring", "Factoring Polynomials", "Mathematics", "Algebra", "intermediate", "available"),
-        new("concept_exp_rules", "Exponent Rules", "Mathematics", "Algebra", "beginner", "mastered"),
-        new("concept_radicals", "Radicals and Rational Exponents", "Mathematics", "Algebra", "intermediate", "locked"),
-        new("concept_functions", "Introduction to Functions", "Mathematics", "Algebra", "intermediate", "locked"),
-        new("concept_quad_functions", "Quadratic Functions", "Mathematics", "Algebra", "advanced", "locked"),
-        new("concept_polynomials", "Polynomial Operations", "Mathematics", "Algebra", "intermediate", "locked"),
-        new("concept_rational", "Rational Expressions", "Mathematics", "Algebra", "advanced", "locked"),
-        new("concept_seq_series", "Sequences and Series", "Mathematics", "Algebra", "advanced", "locked")
-    };
-
-    private static readonly Dictionary<string, ConceptDetailDto> ConceptDetails = new()
-    {
-        ["concept_linear_eq"] = new ConceptDetailDto(
-            "concept_linear_eq", "Linear Equations", 
-            "Learn to solve equations of the form ax + b = c. Master isolating variables and checking solutions.",
-            "Mathematics", "Algebra", "beginner", "mastered", 0.95,
-            Array.Empty<string>(),
-            new[] { "concept_inequalities", "concept_systems_linear" },
-            30, 25),
-        ["concept_inequalities"] = new ConceptDetailDto(
-            "concept_inequalities", "Inequalities",
-            "Solve and graph linear inequalities. Understand compound inequalities and interval notation.",
-            "Mathematics", "Algebra", "beginner", "mastered", 0.88,
-            new[] { "concept_linear_eq" },
-            new[] { "concept_systems_linear" },
-            35, 30),
-        ["concept_systems_linear"] = new ConceptDetailDto(
-            "concept_systems_linear", "Systems of Linear Equations",
-            "Solve systems using substitution and elimination methods. Graph systems and interpret solutions.",
-            "Mathematics", "Algebra", "intermediate", "in-progress", 0.45,
-            new[] { "concept_linear_eq", "concept_inequalities" },
-            new[] { "concept_functions" },
-            45, 40),
-        ["concept_quadratic_eq"] = new ConceptDetailDto(
-            "concept_quadratic_eq", "Quadratic Equations",
-            "Solve quadratics by factoring, completing the square, and using the quadratic formula.",
-            "Mathematics", "Algebra", "intermediate", "available", null,
-            new[] { "concept_factoring" },
-            new[] { "concept_quad_functions" },
-            50, 45),
-        ["concept_factoring"] = new ConceptDetailDto(
-            "concept_factoring", "Factoring Polynomials",
-            "Factor trinomials, difference of squares, and perfect square trinomials.",
-            "Mathematics", "Algebra", "intermediate", "available", null,
-            new[] { "concept_exp_rules" },
-            new[] { "concept_quadratic_eq", "concept_polynomials" },
-            40, 35),
-        ["concept_exp_rules"] = new ConceptDetailDto(
-            "concept_exp_rules", "Exponent Rules",
-            "Master product, quotient, and power rules for exponents. Work with negative and zero exponents.",
-            "Mathematics", "Algebra", "beginner", "mastered", 0.92,
-            Array.Empty<string>(),
-            new[] { "concept_factoring", "concept_radicals" },
-            25, 20),
-        ["concept_radicals"] = new ConceptDetailDto(
-            "concept_radicals", "Radicals and Rational Exponents",
-            "Simplify radical expressions and convert between radical and rational exponent forms.",
-            "Mathematics", "Algebra", "intermediate", "locked", null,
-            new[] { "concept_exp_rules" },
-            new[] { "concept_quad_functions" },
-            35, 30),
-        ["concept_functions"] = new ConceptDetailDto(
-            "concept_functions", "Introduction to Functions",
-            "Understand function notation, domain, range, and evaluate functions.",
-            "Mathematics", "Algebra", "intermediate", "locked", null,
-            new[] { "concept_systems_linear" },
-            new[] { "concept_quad_functions" },
-            40, 35),
-        ["concept_quad_functions"] = new ConceptDetailDto(
-            "concept_quad_functions", "Quadratic Functions",
-            "Graph parabolas, find vertex and axis of symmetry, and solve real-world problems.",
-            "Mathematics", "Algebra", "advanced", "locked", null,
-            new[] { "concept_quadratic_eq", "concept_functions", "concept_radicals" },
-            new[] { "concept_rational" },
-            55, 50),
-        ["concept_polynomials"] = new ConceptDetailDto(
-            "concept_polynomials", "Polynomial Operations",
-            "Add, subtract, multiply, and divide polynomials.",
-            "Mathematics", "Algebra", "intermediate", "locked", null,
-            new[] { "concept_factoring" },
-            Array.Empty<string>(),
-            35, 30),
-        ["concept_rational"] = new ConceptDetailDto(
-            "concept_rational", "Rational Expressions",
-            "Simplify, multiply, divide, add, and subtract rational expressions.",
-            "Mathematics", "Algebra", "advanced", "locked", null,
-            new[] { "concept_quad_functions", "concept_polynomials" },
-            new[] { "concept_seq_series" },
-            50, 45),
-        ["concept_seq_series"] = new ConceptDetailDto(
-            "concept_seq_series", "Sequences and Series",
-            "Work with arithmetic and geometric sequences and series.",
-            "Mathematics", "Algebra", "advanced", "locked", null,
-            new[] { "concept_functions", "concept_rational" },
-            Array.Empty<string>(),
-            45, 40)
-    };
-
     public static IEndpointRouteBuilder MapKnowledgeEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("")
@@ -127,6 +24,13 @@ public static class KnowledgeEndpoints
         // Content/Concepts endpoints
         group.MapGet("/api/content/concepts", GetConcepts).WithName("GetConcepts").WithTags("Content");
         group.MapGet("/api/content/concepts/{id}", GetConceptDetail).WithName("GetConceptDetail").WithTags("Content");
+        group.MapGet("/api/content/concepts/{id}/graph", GetConceptGraph).WithName("GetConceptGraph").WithTags("Content");
+        group.MapGet("/api/content/search", SearchConcepts).WithName("SearchConcepts").WithTags("Content");
+        group.MapGet("/api/content/bagrut", GetBagrutConcepts).WithName("GetBagrutConcepts").WithTags("Content");
+        
+        // Learning paths
+        group.MapGet("/api/content/paths", GetLearningPaths).WithName("GetLearningPaths").WithTags("Content");
+        group.MapGet("/api/content/paths/{id}", GetLearningPathDetail).WithName("GetLearningPathDetail").WithTags("Content");
 
         // Knowledge path endpoint
         group.MapGet("/api/knowledge/path", GetKnowledgePath).WithName("GetKnowledgePath").WithTags("Knowledge");
@@ -135,7 +39,10 @@ public static class KnowledgeEndpoints
     }
 
     // GET /api/content/concepts — returns list of concepts
-    private static IResult GetConcepts(HttpContext ctx)
+    private static async Task<IResult> GetConcepts(
+        HttpContext ctx,
+        IContentCatalogService catalog,
+        string? subject = null)
     {
         var studentId = GetStudentId(ctx.User);
         if (string.IsNullOrEmpty(studentId))
@@ -143,13 +50,28 @@ public static class KnowledgeEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Return hardcoded concept list
-        var dto = new ConceptListDto(Items: StubConcepts);
+        var concepts = string.IsNullOrEmpty(subject)
+            ? await catalog.GetConceptsBySubjectAsync("Mathematics") // Default
+            : await catalog.GetConceptsBySubjectAsync(subject);
+
+        var dtos = concepts.Select(c => new ConceptSummary(
+            c.ConceptId,
+            c.Name,
+            c.Subject,
+            c.Topics.FirstOrDefault() ?? "General",
+            MapDifficulty(c.Difficulty),
+            "available" // Status would come from student progress
+        )).ToArray();
+
+        var dto = new ConceptListDto(Items: dtos);
         return Results.Ok(dto);
     }
 
     // GET /api/content/concepts/{id} — returns concept detail
-    private static IResult GetConceptDetail(HttpContext ctx, string id)
+    private static async Task<IResult> GetConceptDetail(
+        HttpContext ctx,
+        IContentCatalogService catalog,
+        string id)
     {
         var studentId = GetStudentId(ctx.User);
         if (string.IsNullOrEmpty(studentId))
@@ -157,18 +79,155 @@ public static class KnowledgeEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Return hardcoded concept detail or 404
-        if (!ConceptDetails.TryGetValue(id, out var detail))
-        {
+        var concept = await catalog.GetConceptAsync(id);
+        if (concept == null)
             return Results.NotFound(new { Error = "Concept not found" });
-        }
 
-        return Results.Ok(detail);
+        var dto = MapToDetailDto(concept);
+        return Results.Ok(dto);
+    }
+
+    // GET /api/content/concepts/{id}/graph — returns concept graph
+    private static async Task<IResult> GetConceptGraph(
+        HttpContext ctx,
+        IContentCatalogService catalog,
+        string id)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        var graph = await catalog.GetConceptGraphAsync(id);
+        if (graph == null)
+            return Results.NotFound(new { Error = "Concept not found" });
+
+        var dto = new ConceptGraphDto(
+            Concept: MapToDetailDto(graph.Concept),
+            Prerequisites: graph.Prerequisites.Select(MapToSummaryDto).ToArray(),
+            Successors: graph.Successors.Select(MapToSummaryDto).ToArray(),
+            Parents: graph.Parents.Select(MapToSummaryDto).ToArray()
+        );
+
+        return Results.Ok(dto);
+    }
+
+    // GET /api/content/search?q={query} — search concepts
+    private static async Task<IResult> SearchConcepts(
+        HttpContext ctx,
+        IContentCatalogService catalog,
+        string q,
+        string? subject = null)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        if (string.IsNullOrWhiteSpace(q))
+            return Results.BadRequest(new { Error = "Query parameter 'q' is required" });
+
+        var concepts = await catalog.SearchConceptsAsync(q, subject);
+        var dtos = concepts.Select(MapToSummaryDto).ToArray();
+
+        return Results.Ok(new { Items = dtos, Count = dtos.Length });
+    }
+
+    // GET /api/content/bagrut — Bagrut-relevant concepts
+    private static async Task<IResult> GetBagrutConcepts(
+        HttpContext ctx,
+        IContentCatalogService catalog,
+        string? subject = null,
+        int? limit = 20)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        var concepts = await catalog.GetBagrutConceptsAsync(subject, limit ?? 20);
+        var dtos = concepts.Select(c => new BagrutConceptDto(
+            c.ConceptId,
+            c.Name,
+            c.Subject,
+            c.BagrutFrequencyScore,
+            MapDifficulty(c.Difficulty)
+        )).ToArray();
+
+        return Results.Ok(new { Items = dtos, Count = dtos.Length });
+    }
+
+    // GET /api/content/paths — returns learning paths
+    private static async Task<IResult> GetLearningPaths(
+        HttpContext ctx,
+        IContentCatalogService catalog,
+        string? subject = null,
+        string? grade = null)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        var paths = await catalog.GetLearningPathsAsync(subject, grade);
+        var dtos = paths.Select(p => new LearningPathSummaryDto(
+            p.PathId,
+            p.Name,
+            p.Description,
+            p.Subject,
+            p.TargetGrade,
+            p.Difficulty,
+            p.EstimatedHours,
+            p.Concepts.Count
+        )).ToArray();
+
+        return Results.Ok(new { Items = dtos, Count = dtos.Length });
+    }
+
+    // GET /api/content/paths/{id} — returns learning path detail
+    private static async Task<IResult> GetLearningPathDetail(
+        HttpContext ctx,
+        IContentCatalogService catalog,
+        string id)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        var path = await catalog.GetLearningPathDetailAsync(id);
+        if (path == null)
+            return Results.NotFound(new { Error = "Learning path not found" });
+
+        var dto = new LearningPathDetailDto(
+            PathId: path.Path.PathId,
+            Name: path.Path.Name,
+            Description: path.Path.Description,
+            Subject: path.Path.Subject,
+            TargetGrade: path.Path.TargetGrade,
+            Difficulty: path.Path.Difficulty,
+            EstimatedHours: path.Path.EstimatedHours,
+            Concepts: path.Concepts.Select(c => new PathConceptDto(
+                c.Concept.ConceptId,
+                c.Concept.Name,
+                c.SequenceOrder,
+                c.IsRequired,
+                MapDifficulty(c.Concept.Difficulty)
+            )).ToArray()
+        );
+
+        return Results.Ok(dto);
     }
 
     // GET /api/knowledge/path?from={conceptA}&to={conceptB} — returns learning path
-    private static IResult GetKnowledgePath(
+    private static async Task<IResult> GetKnowledgePath(
         HttpContext ctx,
+        IContentCatalogService catalog,
         string? from = null,
         string? to = null)
     {
@@ -178,46 +237,133 @@ public static class KnowledgeEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Validate input and return stub path
         if (string.IsNullOrWhiteSpace(from) || string.IsNullOrWhiteSpace(to))
         {
             return Results.BadRequest(new { Error = "Both 'from' and 'to' concept IDs are required" });
         }
 
-        // Return a sample path from linear equations to quadratic functions
-        var nodes = new[]
-        {
-            new PathNode("concept_linear_eq", "Linear Equations", 1, "mastered"),
-            new PathNode("concept_inequalities", "Inequalities", 2, "mastered"),
-            new PathNode("concept_systems_linear", "Systems of Linear Equations", 3, "in-progress"),
-            new PathNode("concept_exp_rules", "Exponent Rules", 4, "mastered"),
-            new PathNode("concept_factoring", "Factoring Polynomials", 5, "available"),
-            new PathNode("concept_quadratic_eq", "Quadratic Equations", 6, "available"),
-            new PathNode("concept_functions", "Introduction to Functions", 7, "locked"),
-            new PathNode("concept_quad_functions", "Quadratic Functions", 8, "locked")
-        };
+        // Get concept graph for the 'from' concept to build path
+        var graph = await catalog.GetConceptGraphAsync(from);
+        if (graph == null)
+            return Results.NotFound(new { Error = "Source concept not found" });
 
-        var edges = new[]
+        // Build path using BFS through successor relationships
+        var path = BuildPath(graph, to);
+        
+        if (path == null)
         {
-            new PathEdge("concept_linear_eq", "concept_inequalities", "dependency"),
-            new PathEdge("concept_linear_eq", "concept_systems_linear", "dependency"),
-            new PathEdge("concept_inequalities", "concept_systems_linear", "dependency"),
-            new PathEdge("concept_systems_linear", "concept_functions", "dependency"),
-            new PathEdge("concept_exp_rules", "concept_factoring", "dependency"),
-            new PathEdge("concept_factoring", "concept_quadratic_eq", "prerequisite"),
-            new PathEdge("concept_quadratic_eq", "concept_quad_functions", "prerequisite"),
-            new PathEdge("concept_functions", "concept_quad_functions", "prerequisite")
-        };
+            // Return direct path if no graph path found
+            path = new[] { from, to };
+        }
+
+        // Load concept details for each step
+        var nodes = new List<PathNode>();
+        for (int i = 0; i < path.Length; i++)
+        {
+            var concept = await catalog.GetConceptAsync(path[i]);
+            if (concept != null)
+            {
+                nodes.Add(new PathNode(
+                    concept.ConceptId,
+                    concept.Name,
+                    i + 1,
+                    "available" // Would be based on student progress
+                ));
+            }
+        }
+
+        var edges = new List<PathEdge>();
+        for (int i = 0; i < nodes.Count - 1; i++)
+        {
+            edges.Add(new PathEdge(nodes[i].ConceptId, nodes[i + 1].ConceptId, "dependency"));
+        }
 
         var dto = new PathDto(
             FromConceptId: from,
             ToConceptId: to,
-            Nodes: nodes,
-            Edges: edges,
-            TotalSteps: nodes.Length,
-            EstimatedMinutes: nodes.Sum(n => 40)); // ~40 min per concept
+            Nodes: nodes.ToArray(),
+            Edges: edges.ToArray(),
+            TotalSteps: nodes.Count,
+            EstimatedMinutes: nodes.Count * 40);
 
         return Results.Ok(dto);
+    }
+
+    private static string[]? BuildPath(ConceptGraph startGraph, string targetId)
+    {
+        // BFS to find path from start to target
+        var visited = new HashSet<string> { startGraph.Concept.ConceptId };
+        var queue = new Queue<List<string>>();
+        queue.Enqueue(new List<string> { startGraph.Concept.ConceptId });
+
+        while (queue.Count > 0)
+        {
+            var path = queue.Dequeue();
+            var current = path.Last();
+
+            if (current == targetId)
+                return path.ToArray();
+
+            // Get successors of current
+            var currentGraph = startGraph.Successors.FirstOrDefault(s => s.ConceptId == current);
+            if (currentGraph == null && current == startGraph.Concept.ConceptId)
+                currentGraph = startGraph.Concept;
+
+            if (currentGraph != null)
+            {
+                foreach (var successor in startGraph.Successors)
+                {
+                    if (!visited.Contains(successor.ConceptId))
+                    {
+                        visited.Add(successor.ConceptId);
+                        var newPath = new List<string>(path) { successor.ConceptId };
+                        queue.Enqueue(newPath);
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static ConceptDetailDto MapToDetailDto(Cena.Infrastructure.Documents.ConceptDocument c)
+    {
+        return new ConceptDetailDto(
+            c.ConceptId,
+            c.Name,
+            c.Description ?? $"Learn about {c.Name}",
+            c.Subject,
+            c.Topics.FirstOrDefault() ?? "General",
+            MapDifficulty(c.Difficulty),
+            "available",
+            null, // Mastery would come from student progress
+            c.PrerequisiteIds.ToArray(),
+            c.SuccessorIds.ToArray(),
+            c.EstimatedQuestionsToMaster * 3, // ~3 min per question
+            c.EstimatedQuestionsToMaster
+        );
+    }
+
+    private static ConceptSummary MapToSummaryDto(Cena.Infrastructure.Documents.ConceptDocument c)
+    {
+        return new ConceptSummary(
+            c.ConceptId,
+            c.Name,
+            c.Subject,
+            c.Topics.FirstOrDefault() ?? "General",
+            MapDifficulty(c.Difficulty),
+            "available"
+        );
+    }
+
+    private static string MapDifficulty(double difficulty)
+    {
+        return difficulty switch
+        {
+            < 0.35 => "beginner",
+            < 0.65 => "intermediate",
+            _ => "advanced"
+        };
     }
 
     private static string? GetStudentId(ClaimsPrincipal user)
@@ -226,3 +372,44 @@ public static class KnowledgeEndpoints
             ?? user.FindFirst("sub")?.Value;
     }
 }
+
+// Additional DTOs
+public record ConceptGraphDto(
+    ConceptDetailDto Concept,
+    ConceptSummary[] Prerequisites,
+    ConceptSummary[] Successors,
+    ConceptSummary[] Parents);
+
+public record BagrutConceptDto(
+    string ConceptId,
+    string Name,
+    string Subject,
+    int BagrutFrequency,
+    string Difficulty);
+
+public record LearningPathSummaryDto(
+    string PathId,
+    string Name,
+    string Description,
+    string Subject,
+    string TargetGrade,
+    string Difficulty,
+    int EstimatedHours,
+    int ConceptCount);
+
+public record LearningPathDetailDto(
+    string PathId,
+    string Name,
+    string Description,
+    string Subject,
+    string TargetGrade,
+    string Difficulty,
+    int EstimatedHours,
+    PathConceptDto[] Concepts);
+
+public record PathConceptDto(
+    string ConceptId,
+    string Name,
+    int SequenceOrder,
+    bool IsRequired,
+    string Difficulty);

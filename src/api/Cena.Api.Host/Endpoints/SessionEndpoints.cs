@@ -10,6 +10,7 @@ using System.Text.Json;
 using Cena.Actors.Bus;
 using Cena.Actors.Events;
 using Cena.Actors.Projections;
+using Cena.Actors.Serving;
 using Cena.Actors.Tutoring;
 using Cena.Api.Contracts.Sessions;
 using Cena.Infrastructure.Auth;
@@ -302,6 +303,58 @@ public static class SessionEndpoints
                 MasteryDeltas: masteryDeltas));
         })
         .WithName("GetSessionDetail");
+
+        // GET /api/sessions/{sessionId}/history — session question history (STB-01c)
+        group.MapGet("/{sessionId}/history", async (
+            string sessionId,
+            HttpContext ctx,
+            IDocumentStore store) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            await using var session = store.QuerySession();
+            
+            // Load the session queue projection
+            var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
+            if (queue == null)
+            {
+                // Fall back to querying by sessionId field if Id doesn't match
+                queue = await session.Query<LearningSessionQueueProjection>()
+                    .FirstOrDefaultAsync(q => q.SessionId == sessionId);
+            }
+
+            if (queue == null)
+                return Results.NotFound(new { error = $"Session '{sessionId}' not found" });
+
+            if (queue.StudentId != studentId)
+                return Results.Forbid();
+
+            // Build history response
+            var history = new SessionHistoryDto(
+                SessionId: queue.SessionId,
+                StartedAt: queue.StartedAt,
+                EndedAt: queue.EndedAt,
+                Mode: queue.Mode,
+                Subjects: queue.Subjects,
+                TotalQuestionsAttempted: queue.TotalQuestionsAttempted,
+                CorrectAnswers: queue.CorrectAnswers,
+                Accuracy: Math.Round(queue.GetAccuracy(), 3),
+                CurrentStreak: queue.StreakCount,
+                QuestionHistory: queue.AnsweredQuestions.Select(h => new QuestionHistoryItemDto(
+                    QuestionId: h.QuestionId,
+                    AnsweredAt: h.AnsweredAt,
+                    IsCorrect: h.IsCorrect,
+                    TimeSpentSeconds: h.TimeSpentSeconds,
+                    SelectedOption: h.SelectedOption)).ToList(),
+                RemainingInQueue: queue.QuestionQueue.Count);
+
+            return Results.Ok(history);
+        })
+        .WithName("GetSessionHistory");
 
         // GET /api/sessions/{sessionId}/replay — question-by-question replay
         group.MapGet("/{sessionId}/replay", async (

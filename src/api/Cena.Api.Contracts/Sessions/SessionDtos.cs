@@ -122,3 +122,27 @@ public sealed record SessionCompletedDto(
     int TotalXpAwarded,
     int AccuracyPercent,
     int DurationSeconds);
+
+// =============================================================================
+// STB-01c: Session History DTOs
+// =============================================================================
+
+public sealed record SessionHistoryDto(
+    string SessionId,
+    DateTime StartedAt,
+    DateTime? EndedAt,
+    string Mode,
+    string[] Subjects,
+    int TotalQuestionsAttempted,
+    int CorrectAnswers,
+    double Accuracy,
+    int CurrentStreak,
+    IReadOnlyList<QuestionHistoryItemDto> QuestionHistory,
+    int RemainingInQueue);
+
+public sealed record QuestionHistoryItemDto(
+    string QuestionId,
+    DateTime AnsweredAt,
+    bool IsCorrect,
+    int TimeSpentSeconds,
+    string? SelectedOption);

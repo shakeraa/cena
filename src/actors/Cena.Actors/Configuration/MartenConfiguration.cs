@@ -16,6 +16,7 @@ using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Projections;
 using Cena.Actors.Questions;
+using Cena.Actors.Serving;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Documents;
@@ -172,6 +173,13 @@ public static class MartenConfiguration
         // STB-01: Active session tracking
         opts.Projections.Snapshot<ActiveSessionSnapshot>(SnapshotLifecycle.Inline);
 
+        // STB-01c: Learning session queue projection for adaptive question selection
+        opts.Projections.Snapshot<LearningSessionQueueProjection>(SnapshotLifecycle.Inline);
+        opts.Schema.For<LearningSessionQueueProjection>()
+            .Index(x => x.StudentId)
+            .Index(x => x.SessionId)
+            .Index(x => x.StartedAt);
+
         // ── Student Preferences Document (STB-00b) ──
         opts.Schema.For<StudentPreferencesDocument>()
             .Identity(x => x.Id)
@@ -246,6 +254,18 @@ public static class MartenConfiguration
             .Index(x => x.BossBattleId)
             .Index(x => x.Date);
 
+        // ── Content Catalog Documents (STB-08b) ──
+        opts.Schema.For<ConceptDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.ConceptId)
+            .Index(x => x.Subject)
+            .Index(x => x.Difficulty);
+
+        opts.Schema.For<LearningPathDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.PathId)
+            .Index(x => x.Subject)
+            .Index(x => x.TargetGrade);
 
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
@@ -293,6 +313,8 @@ public static class MartenConfiguration
         opts.Events.AddEventType<BadgeEarned_V1>();
         opts.Events.AddEventType<StreakExpiring_V1>();
         opts.Events.AddEventType<ReviewDue_V1>();
+        // STB-01c: Session question answered event
+        opts.Events.AddEventType<QuestionAnsweredInSession_V1>();
     }
 
     private static void RegisterOutreachEvents(StoreOptions opts)
