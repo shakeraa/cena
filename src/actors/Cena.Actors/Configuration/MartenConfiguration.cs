@@ -272,6 +272,39 @@ public static class MartenConfiguration
             .Index(x => x.BossBattleId)
             .Index(x => x.Date);
 
+        // ── Challenge Catalog Documents (HARDEN STB-05) ──
+        opts.Schema.For<DailyChallengeDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.Date)
+            .Index(x => x.Locale);
+
+        opts.Schema.For<DailyChallengeCompletionDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.Date)
+            .Index(x => x.Score);
+
+        opts.Schema.For<CardChainDefinitionDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.ChainId)
+            .Index(x => x.Subject);
+
+        opts.Schema.For<CardChainProgressDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.ChainId);
+
+        opts.Schema.For<TournamentDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.IsActive)
+            .Index(x => x.StartsAt)
+            .Index(x => x.EndsAt);
+
+        opts.Schema.For<TournamentRegistrationDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.TournamentId);
+
         // ── Content Catalog Documents (STB-08b) ──
         opts.Schema.For<ConceptDocument>()
             .Identity(x => x.Id)

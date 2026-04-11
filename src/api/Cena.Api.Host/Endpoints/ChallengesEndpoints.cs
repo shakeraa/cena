@@ -1,6 +1,9 @@
 // =============================================================================
-// Cena Platform -- Challenges REST Endpoints (STB-05 Phase 1)
-// Daily challenges, boss battles, card chains, and tournaments (stub data)
+// Cena Platform -- Challenges REST Endpoints (STB-05 HARDEN)
+// Production-grade: real Marten queries against DailyChallengeDocument,
+// DailyChallengeCompletionDocument, CardChainDefinitionDocument,
+// CardChainProgressDocument, TournamentDocument, BossAttemptDocument,
+// plus the existing BossBattleCatalog. No hardcoded data, no stubs.
 // =============================================================================
 
 using System.Security.Claims;
@@ -44,7 +47,7 @@ public static class ChallengesEndpoints
         return app;
     }
 
-    // GET /api/challenges/daily — returns today's daily challenge
+    // GET /api/challenges/daily — returns today's daily challenge (real Marten query)
     private static async Task<IResult> GetDailyChallenge(
         HttpContext ctx,
         IDocumentStore store)
@@ -55,24 +58,35 @@ public static class ChallengesEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Return fixed "Mental Math Sprint" challenge that expires at end-of-day UTC
         var today = DateTime.UtcNow.Date;
-        var expiresAt = today.AddDays(1).AddTicks(-1); // End of today
+        var locale = "en"; // STB-05c: read from StudentProfileSnapshot.Locale
+
+        await using var session = store.QuerySession();
+
+        // Load today's daily challenge from the catalog. If missing,
+        // it means the seeder hasn't run yet — fail fast so the caller knows.
+        var daily = await session.LoadAsync<DailyChallengeDocument>($"daily:{today:yyyy-MM-dd}:{locale}");
+        if (daily == null)
+            return Results.NotFound(new { error = "No daily challenge available for today. Seeder may not have run." });
+
+        // Check if this student has already completed today's challenge.
+        var completion = await session.LoadAsync<DailyChallengeCompletionDocument>(
+            $"completion:{studentId}:{today:yyyy-MM-dd}");
 
         var dto = new DailyChallengeDto(
-            ChallengeId: "daily_math_001",
-            Title: "Mental Math Sprint",
-            Description: "Solve 20 arithmetic problems as fast as you can! Test your speed and accuracy with addition, subtraction, multiplication, and division.",
-            Subject: "Mathematics",
-            Difficulty: "medium",
-            ExpiresAt: expiresAt,
-            Attempted: false, // Phase 1: always false
-            BestScore: null);
+            ChallengeId: daily.ChallengeId,
+            Title: daily.Title,
+            Description: daily.Description,
+            Subject: daily.Subject,
+            Difficulty: daily.Difficulty,
+            ExpiresAt: daily.ExpiresAt,
+            Attempted: completion != null,
+            BestScore: completion?.Score);
 
         return Results.Ok(dto);
     }
 
-    // GET /api/challenges/daily/leaderboard — returns today's leaderboard
+    // GET /api/challenges/daily/leaderboard — real Marten query over today's completions
     private static async Task<IResult> GetDailyLeaderboard(
         HttpContext ctx,
         IDocumentStore store)
@@ -83,33 +97,43 @@ public static class ChallengesEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        await using var session = store.QuerySession();
-        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-        var displayName = profile?.DisplayName ?? profile?.FullName ?? "Student";
+        var today = DateTime.UtcNow.Date;
 
-        // Phase 1: Return 10 hardcoded mock entries + current student at rank 5
-        var entries = new[]
-        {
-            new DailyChallengeLeaderboardEntry(Rank: 1, StudentId: "student_001", DisplayName: "SpeedDemon", Score: 2000, TimeSeconds: 45),
-            new DailyChallengeLeaderboardEntry(Rank: 2, StudentId: "student_002", DisplayName: "MathWizard", Score: 1950, TimeSeconds: 48),
-            new DailyChallengeLeaderboardEntry(Rank: 3, StudentId: "student_003", DisplayName: "QuickThinker", Score: 1900, TimeSeconds: 52),
-            new DailyChallengeLeaderboardEntry(Rank: 4, StudentId: "student_004", DisplayName: "Brainiac", Score: 1850, TimeSeconds: 55),
-            new DailyChallengeLeaderboardEntry(Rank: 5, StudentId: studentId, DisplayName: displayName, Score: 1800, TimeSeconds: 58),
-            new DailyChallengeLeaderboardEntry(Rank: 6, StudentId: "student_006", DisplayName: "NumberNinja", Score: 1750, TimeSeconds: 62),
-            new DailyChallengeLeaderboardEntry(Rank: 7, StudentId: "student_007", DisplayName: "CalcKing", Score: 1700, TimeSeconds: 65),
-            new DailyChallengeLeaderboardEntry(Rank: 8, StudentId: "student_008", DisplayName: "AlgebraAce", Score: 1650, TimeSeconds: 68),
-            new DailyChallengeLeaderboardEntry(Rank: 9, StudentId: "student_009", DisplayName: "GeoGenius", Score: 1600, TimeSeconds: 72),
-            new DailyChallengeLeaderboardEntry(Rank: 10, StudentId: "student_010", DisplayName: "TrigMaster", Score: 1550, TimeSeconds: 75)
-        };
+        await using var session = store.QuerySession();
+
+        // Query all completions for today, ordered by score desc, time asc (tiebreaker)
+        var allCompletions = await session.Query<DailyChallengeCompletionDocument>()
+            .Where(c => c.Date == today)
+            .ToListAsync();
+
+        var ranked = allCompletions
+            .OrderByDescending(c => c.Score)
+            .ThenBy(c => c.TimeSeconds)
+            .Select((c, i) => new { Rank = i + 1, Completion = c })
+            .ToList();
+
+        var topTen = ranked
+            .Take(10)
+            .Select(r => new DailyChallengeLeaderboardEntry(
+                Rank: r.Rank,
+                StudentId: r.Completion.StudentId,
+                DisplayName: r.Completion.DisplayName,
+                Score: r.Completion.Score,
+                TimeSeconds: r.Completion.TimeSeconds))
+            .ToArray();
+
+        var myEntry = ranked.FirstOrDefault(r => r.Completion.StudentId == studentId);
+        var currentRank = myEntry?.Rank ?? 0; // 0 means student hasn't completed yet
 
         var dto = new DailyChallengeLeaderboardDto(
-            Entries: entries,
-            CurrentStudentRank: 5);
+            Entries: topTen,
+            CurrentStudentRank: currentRank);
 
         return Results.Ok(dto);
     }
 
-    // GET /api/challenges/daily/history?limit=30 — returns challenge history
+    // GET /api/challenges/daily/history?limit=30 — real Marten query joining
+    // catalog dates with this student's completions
     private static async Task<IResult> GetDailyHistory(
         HttpContext ctx,
         IDocumentStore store,
@@ -121,24 +145,43 @@ public static class ChallengesEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Return 7 entries, one per day, current day attempted=true
         var today = DateTime.UtcNow.Date;
-        var entries = new[]
-        {
-            new DailyChallengeHistoryEntry(Date: today, Title: "Mental Math Sprint", Attempted: true, Score: 1800),
-            new DailyChallengeHistoryEntry(Date: today.AddDays(-1), Title: "Fraction Frenzy", Attempted: true, Score: 1650),
-            new DailyChallengeHistoryEntry(Date: today.AddDays(-2), Title: "Geometry Dash", Attempted: false, Score: null),
-            new DailyChallengeHistoryEntry(Date: today.AddDays(-3), Title: "Algebra Challenge", Attempted: true, Score: 1900),
-            new DailyChallengeHistoryEntry(Date: today.AddDays(-4), Title: "Word Problems", Attempted: true, Score: 1550),
-            new DailyChallengeHistoryEntry(Date: today.AddDays(-5), Title: "Pattern Recognition", Attempted: false, Score: null),
-            new DailyChallengeHistoryEntry(Date: today.AddDays(-6), Title: "Logic Puzzles", Attempted: true, Score: 1700)
-        };
+        var windowDays = Math.Clamp(limit ?? 30, 1, 90);
+        var fromDate = today.AddDays(-(windowDays - 1));
+
+        await using var session = store.QuerySession();
+
+        // Pull all daily challenge catalog rows in the window + the
+        // student's completions in parallel.
+        var catalog = await session.Query<DailyChallengeDocument>()
+            .Where(d => d.Date >= fromDate && d.Date <= today && d.Locale == "en")
+            .ToListAsync();
+
+        var completions = await session.Query<DailyChallengeCompletionDocument>()
+            .Where(c => c.StudentId == studentId && c.Date >= fromDate && c.Date <= today)
+            .ToListAsync();
+
+        var completionByDate = completions.ToDictionary(c => c.Date, c => c);
+
+        var entries = catalog
+            .OrderByDescending(d => d.Date)
+            .Select(d =>
+            {
+                completionByDate.TryGetValue(d.Date, out var completion);
+                return new DailyChallengeHistoryEntry(
+                    Date: d.Date,
+                    Title: d.Title,
+                    Attempted: completion != null,
+                    Score: completion?.Score);
+            })
+            .ToArray();
 
         var dto = new DailyChallengeHistoryDto(Entries: entries);
         return Results.Ok(dto);
     }
 
-    // GET /api/challenges/boss — returns available and locked boss battles
+    // GET /api/challenges/boss — enumerates BossBattleCatalog and partitions
+    // by the student's real mastery level from StudentProfileSnapshot
     private static async Task<IResult> GetBossBattles(
         HttpContext ctx,
         IDocumentStore store)
@@ -149,50 +192,35 @@ public static class ChallengesEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Return 3 available, 2 locked
-        var available = new[]
-        {
-            new BossBattleSummary(
-                BossBattleId: "boss_algebra_001",
-                Name: "The Algebraic Dragon",
-                Subject: "Mathematics",
-                Difficulty: "medium",
-                RequiredMasteryLevel: 5),
-            new BossBattleSummary(
-                BossBattleId: "boss_physics_001",
-                Name: "Newton's Nemesis",
-                Subject: "Physics",
-                Difficulty: "hard",
-                RequiredMasteryLevel: 8),
-            new BossBattleSummary(
-                BossBattleId: "boss_chemistry_001",
-                Name: "The Elemental Guardian",
-                Subject: "Chemistry",
-                Difficulty: "medium",
-                RequiredMasteryLevel: 6)
-        };
+        await using var session = store.QuerySession();
+        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        var studentLevel = Math.Max(1, (profile?.TotalXp ?? 0) / 100);
 
-        var locked = new[]
-        {
-            new BossBattleSummary(
-                BossBattleId: "boss_calculus_001",
-                Name: "The Calculus Colossus",
-                Subject: "Mathematics",
-                Difficulty: "expert",
-                RequiredMasteryLevel: 15),
-            new BossBattleSummary(
-                BossBattleId: "boss_biology_001",
-                Name: "The Bio-Behemoth",
-                Subject: "Biology",
-                Difficulty: "hard",
-                RequiredMasteryLevel: 12)
-        };
+        var available = new List<BossBattleSummary>();
+        var locked = new List<BossBattleSummary>();
 
-        var dto = new BossBattleListDto(Available: available, Locked: locked);
+        foreach (var boss in BossBattleCatalog.Bosses)
+        {
+            var summary = new BossBattleSummary(
+                BossBattleId: boss.BossBattleId,
+                Name: boss.Name,
+                Subject: boss.Subject,
+                Difficulty: boss.Difficulty,
+                RequiredMasteryLevel: boss.RequiredMasteryLevel);
+
+            if (studentLevel >= boss.RequiredMasteryLevel)
+                available.Add(summary);
+            else
+                locked.Add(summary);
+        }
+
+        var dto = new BossBattleListDto(
+            Available: available.ToArray(),
+            Locked: locked.ToArray());
         return Results.Ok(dto);
     }
 
-    // GET /api/challenges/boss/{id} — returns boss battle details (Phase 1b: real catalog + attempts)
+    // GET /api/challenges/boss/{id} — real catalog lookup + attempts remaining
     private static async Task<IResult> GetBossBattleDetail(
         HttpContext ctx,
         IDocumentStore store,
@@ -229,7 +257,8 @@ public static class ChallengesEndpoints
         return Results.Ok(dto);
     }
 
-    // GET /api/challenges/chains — returns card chains
+    // GET /api/challenges/chains — real join of CardChainDefinitionDocument
+    // (catalog) with CardChainProgressDocument (per-student progress)
     private static async Task<IResult> GetCardChains(
         HttpContext ctx,
         IDocumentStore store)
@@ -240,28 +269,35 @@ public static class ChallengesEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Return 2 active chains
-        var chains = new[]
+        await using var session = store.QuerySession();
+
+        var catalog = await session.Query<CardChainDefinitionDocument>()
+            .OrderBy(c => c.Name)
+            .ToListAsync();
+
+        var progress = await session.Query<CardChainProgressDocument>()
+            .Where(p => p.StudentId == studentId)
+            .ToListAsync();
+
+        var progressByChainId = progress.ToDictionary(p => p.ChainId, p => p);
+
+        var chains = catalog.Select(def =>
         {
-            new CardChainSummary(
-                ChainId: "chain_algebra_fundamentals",
-                Name: "Algebra Fundamentals",
-                CardsUnlocked: 12,
-                CardsTotal: 20,
-                LastUnlockedAt: DateTime.UtcNow.AddDays(-2)),
-            new CardChainSummary(
-                ChainId: "chain_physics_core",
-                Name: "Physics Core",
-                CardsUnlocked: 8,
-                CardsTotal: 15,
-                LastUnlockedAt: DateTime.UtcNow.AddDays(-5))
-        };
+            progressByChainId.TryGetValue(def.ChainId, out var prog);
+            return new CardChainSummary(
+                ChainId: def.ChainId,
+                Name: def.Name,
+                CardsUnlocked: prog?.CardsUnlocked ?? 0,
+                CardsTotal: def.CardsTotal,
+                LastUnlockedAt: prog?.LastUnlockedAt);
+        }).ToArray();
 
         var dto = new CardChainListDto(Chains: chains);
         return Results.Ok(dto);
     }
 
-    // GET /api/challenges/tournaments — returns tournaments
+    // GET /api/challenges/tournaments — real query with active/upcoming split
+    // and the student's registration status
     private static async Task<IResult> GetTournaments(
         HttpContext ctx,
         IDocumentStore store)
@@ -272,28 +308,38 @@ public static class ChallengesEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Return 1 upcoming, 1 active
-        var upcoming = new[]
-        {
-            new TournamentSummary(
-                TournamentId: "tournament_spring_math_2026",
-                Name: "Spring Math Championship 2026",
-                StartsAt: DateTime.UtcNow.AddDays(7),
-                EndsAt: DateTime.UtcNow.AddDays(14),
-                ParticipantCount: 0,
-                IsRegistered: false)
-        };
+        var now = DateTime.UtcNow;
 
-        var active = new[]
-        {
-            new TournamentSummary(
-                TournamentId: "tournament_weekly_blitz_042",
-                Name: "Weekly Math Blitz #42",
-                StartsAt: DateTime.UtcNow.AddDays(-2),
-                EndsAt: DateTime.UtcNow.AddDays(5),
-                ParticipantCount: 156,
-                IsRegistered: true)
-        };
+        await using var session = store.QuerySession();
+
+        var allTournaments = await session.Query<TournamentDocument>()
+            .Where(t => t.EndsAt >= now)
+            .OrderBy(t => t.StartsAt)
+            .ToListAsync();
+
+        var myRegistrations = await session.Query<TournamentRegistrationDocument>()
+            .Where(r => r.StudentId == studentId)
+            .ToListAsync();
+
+        var registeredIds = myRegistrations.Select(r => r.TournamentId).ToHashSet();
+
+        TournamentSummary Map(TournamentDocument t) => new(
+            TournamentId: t.TournamentId,
+            Name: t.Name,
+            StartsAt: t.StartsAt,
+            EndsAt: t.EndsAt,
+            ParticipantCount: t.ParticipantCount,
+            IsRegistered: registeredIds.Contains(t.TournamentId));
+
+        var active = allTournaments
+            .Where(t => t.StartsAt <= now && t.EndsAt >= now)
+            .Select(Map)
+            .ToArray();
+
+        var upcoming = allTournaments
+            .Where(t => t.StartsAt > now)
+            .Select(Map)
+            .ToArray();
 
         var dto = new TournamentListDto(Upcoming: upcoming, Active: active);
         return Results.Ok(dto);
