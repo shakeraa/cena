@@ -11,6 +11,7 @@
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
+using Cena.Actors.Bus;
 using Cena.Infrastructure.Tracing;
 using Marten;
 using Microsoft.Extensions.Hosting;
@@ -290,8 +291,13 @@ public sealed class NatsOutboxPublisher : BackgroundService
     /// Maps an event type name to a durable NATS subject categorised by bounded context.
     /// JetStream streams subscribe to <c>cena.durable.{category}.></c> wildcards,
     /// so each event lands in the correct stream for replay and durability.
+    ///
+    /// Public so downstream subscribers can compute the exact same subject for a
+    /// given event type (see ExplanationCacheInvalidator). The curriculum branch
+    /// is also exposed as <see cref="NatsSubjects.DurableCurriculumEvent(string)"/>
+    /// for strong typing on the subscriber side.
     /// </summary>
-    private static string GetDurableSubject(string eventTypeName) => eventTypeName switch
+    public static string GetDurableSubject(string eventTypeName) => eventTypeName switch
     {
         var e when e.StartsWith("Concept") || e.StartsWith("Mastery") || e.StartsWith("Stagnation")
             || e.StartsWith("Methodology") || e.StartsWith("Annotation") || e.StartsWith("CognitiveLoad")
@@ -309,7 +315,7 @@ public sealed class NatsOutboxPublisher : BackgroundService
         var e when e.StartsWith("Tutoring")
             => $"cena.durable.pedagogy.{eventTypeName}",
         var e when e.StartsWith("Question") || e.StartsWith("Pipeline") || e.StartsWith("File")
-            => $"cena.durable.curriculum.{eventTypeName}",
+            => NatsSubjects.DurableCurriculumEvent(eventTypeName),
         _ => $"cena.durable.system.{eventTypeName}"
     };
 }
