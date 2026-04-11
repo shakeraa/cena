@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Cena.Actors.Configuration;
 using Cena.Actors.Notifications;
 using Cena.Actors.Projections;
+using Cena.Actors.Serving;
 using Cena.Actors.Tutor;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
@@ -185,6 +186,9 @@ builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
 
 // ---- STB-07c: Notification Channel Service ----
 builder.Services.AddScoped<INotificationChannelService, NotificationChannelService>();
+
+// ---- HARDEN SessionEndpoints: Question Bank Service ----
+builder.Services.AddScoped<IQuestionBank, QuestionBank>();
 
 // =============================================================================
 // OPENTELEMETRY (REV-018.3)

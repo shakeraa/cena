@@ -265,6 +265,15 @@ public static class MartenConfiguration
             .Index(x => x.AuthorStudentId)
             .Index(x => x.PostedAt);
 
+        // ── Question Document (HARDEN SessionEndpoints) ──
+        opts.Schema.For<QuestionDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.QuestionId)
+            .Index(x => x.Subject)
+            .Index(x => x.Difficulty)
+            .Index(x => x.ConceptId)
+            .Index(x => x.Grade);
+
         // ── Boss Attempt Document (STB-05b) ──
         opts.Schema.For<BossAttemptDocument>()
             .Identity(x => x.Id)

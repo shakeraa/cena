@@ -30,18 +30,10 @@ public static class SessionEndpoints
         WriteIndented = false,
     };
 
-    // STB-01b: In-memory per-session state tracking (Phase 1 only - resets on restart)
-    private static readonly ConcurrentDictionary<string, SessionState> SessionStates = new();
-
-    // 5 canned questions for stub data
-    private static readonly CannedQuestion[] CannedQuestions =
-    {
-        new("q_001", "What is 12 × 8?", "multiple-choice", new[] { "92", "96", "104", "108" }, "96", "Mathematics"),
-        new("q_002", "Solve for x: 2x + 5 = 15", "multiple-choice", new[] { "5", "10", "15", "20" }, "5", "Mathematics"),
-        new("q_003", "What is the derivative of x²?", "multiple-choice", new[] { "x", "2x", "x²", "2" }, "2x", "Mathematics"),
-        new("q_004", "What is the chemical symbol for water?", "multiple-choice", new[] { "H2O", "CO2", "O2", "NaCl" }, "H2O", "Chemistry"),
-        new("q_005", "What is the speed of light approximately?", "multiple-choice", new[] { "300,000 km/s", "150,000 km/s", "1,000,000 km/s", "100,000 km/s" }, "300,000 km/s", "Physics")
-    };
+    // HARDEN SessionEndpoints: Removed Phase 1b in-memory state tracking
+    // - Deleted ConcurrentDictionary<string, SessionState> SessionStates
+    // - Deleted CannedQuestion[] literal
+    // Now uses LearningSessionQueueProjection + QuestionDocument from Marten
 
     public static IEndpointRouteBuilder MapSessionEndpoints(this IEndpointRouteBuilder app)
     {
@@ -483,9 +475,11 @@ public static class SessionEndpoints
         // ═════════════════════════════════════════════════════════════════════════
 
         // GET /api/sessions/{sessionId}/current-question — get current question
-        group.MapGet("/{sessionId}/current-question", (
+        group.MapGet("/{sessionId}/current-question", async (
             string sessionId,
-            HttpContext ctx) =>
+            HttpContext ctx,
+            IDocumentStore store,
+            IQuestionBank questionBank) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -493,17 +487,20 @@ public static class SessionEndpoints
 
             ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-            // Get or create session state
-            var state = SessionStates.GetOrAdd(sessionId, _ => new SessionState { StartedAt = DateTime.UtcNow });
-            var questionIndex = state.CurrentQuestionIndex;
+            await using var session = store.QuerySession();
 
-            // Check if we've completed all questions
-            if (questionIndex >= CannedQuestions.Length)
+            // Get the session queue projection
+            var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
+            if (queue == null)
+                return Results.NotFound(new { error = "Session not found" });
+
+            // Check if session has ended
+            if (queue.EndedAt.HasValue)
             {
                 return Results.Ok(new SessionQuestionDto(
                     QuestionId: "completed",
-                    QuestionIndex: questionIndex,
-                    TotalQuestions: CannedQuestions.Length,
+                    QuestionIndex: queue.TotalQuestionsAttempted,
+                    TotalQuestions: queue.TotalQuestionsAttempted,
                     Prompt: "Session completed! No more questions.",
                     QuestionType: "completed",
                     Choices: Array.Empty<string>(),
@@ -511,15 +508,37 @@ public static class SessionEndpoints
                     ExpectedTimeSeconds: 0));
             }
 
-            var question = CannedQuestions[questionIndex];
+            // Get current question from queue
+            var currentQuestion = queue.PeekNext();
+            if (currentQuestion == null)
+            {
+                return Results.Ok(new SessionQuestionDto(
+                    QuestionId: "completed",
+                    QuestionIndex: queue.TotalQuestionsAttempted,
+                    TotalQuestions: queue.TotalQuestionsAttempted,
+                    Prompt: "Session completed! No more questions.",
+                    QuestionType: "completed",
+                    Choices: Array.Empty<string>(),
+                    Subject: "",
+                    ExpectedTimeSeconds: 0));
+            }
+
+            // Dequeue the question for display
+            queue.DequeueNext();
+
+            // Load full question details from question bank
+            var questionDoc = await questionBank.GetQuestionAsync(currentQuestion.QuestionId);
+            if (questionDoc == null)
+                return Results.NotFound(new { error = "Question not found" });
+
             return Results.Ok(new SessionQuestionDto(
-                QuestionId: question.Id,
-                QuestionIndex: questionIndex + 1,
-                TotalQuestions: CannedQuestions.Length,
-                Prompt: question.Prompt,
-                QuestionType: question.Type,
-                Choices: question.Choices,
-                Subject: question.Subject,
+                QuestionId: questionDoc.QuestionId,
+                QuestionIndex: queue.TotalQuestionsAttempted + 1,
+                TotalQuestions: queue.TotalQuestionsAttempted + queue.QuestionQueue.Count + 1,
+                Prompt: questionDoc.Prompt,
+                QuestionType: questionDoc.QuestionType,
+                Choices: questionDoc.Choices ?? Array.Empty<string>(),
+                Subject: questionDoc.Subject,
                 ExpectedTimeSeconds: 60));
         })
         .WithName("GetCurrentQuestion");
@@ -529,6 +548,7 @@ public static class SessionEndpoints
             string sessionId,
             HttpContext ctx,
             IDocumentStore store,
+            IQuestionBank questionBank,
             SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -540,34 +560,47 @@ public static class SessionEndpoints
             if (string.IsNullOrWhiteSpace(request.QuestionId))
                 return Results.BadRequest(new { error = "QuestionId is required" });
 
-            // Get session state
-            if (!SessionStates.TryGetValue(sessionId, out var state))
-                return Results.NotFound(new { error = "Session not found or expired" });
+            await using var session = store.LightweightSession();
 
-            var questionIndex = state.CurrentQuestionIndex;
-            if (questionIndex >= CannedQuestions.Length)
+            // Get session queue
+            var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
+            if (queue == null)
+                return Results.NotFound(new { error = "Session not found" });
+
+            if (queue.EndedAt.HasValue)
                 return Results.Conflict(new { error = "Session already completed" });
 
-            var question = CannedQuestions[questionIndex];
-            var isCorrect = string.Equals(request.Answer?.Trim(), question.CorrectAnswer, StringComparison.OrdinalIgnoreCase);
+            // Get current question
+            var currentQuestion = queue.PeekNext();
+            if (currentQuestion == null)
+                return Results.Conflict(new { error = "No current question" });
 
-            // Update state
-            state.CurrentQuestionIndex++;
-            if (isCorrect)
-            {
-                state.CorrectCount++;
-                state.TotalXp += 10;
-            }
-            else
-            {
-                state.WrongCount++;
-            }
+            // Load question details
+            var questionDoc = await questionBank.GetQuestionAsync(currentQuestion.QuestionId);
+            if (questionDoc == null)
+                return Results.NotFound(new { error = "Question not found" });
+
+            var isCorrect = string.Equals(request.Answer?.Trim(), questionDoc.CorrectAnswer, StringComparison.OrdinalIgnoreCase);
+
+            // Record answer in queue
+            queue.RecordAnswer(currentQuestion.QuestionId, isCorrect, TimeSpan.FromMilliseconds(request.TimeSpentMs), request.Answer);
+            session.Store(queue);
+
+            // Append QuestionAnsweredInSession event
+            var answeredEvent = new QuestionAnsweredInSession_V1(
+                StudentId: studentId,
+                SessionId: sessionId,
+                QuestionId: currentQuestion.QuestionId,
+                IsCorrect: isCorrect,
+                TimeSpentSeconds: (int)(request.TimeSpentMs / 1000),
+                SelectedOption: request.Answer,
+                AnsweredAt: DateTimeOffset.UtcNow);
+
+            session.Events.Append(studentId, answeredEvent);
 
             // STB-03b: Append XP event and concept attempt on correct answer
             if (isCorrect)
             {
-                await using var session = store.LightweightSession();
-                
                 // Load current profile to get total XP
                 var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
                 var currentXp = profile?.TotalXp ?? 0;
@@ -579,24 +612,25 @@ public static class SessionEndpoints
                     XpAmount: 10,
                     Source: "correct_answer",
                     TotalXp: newTotalXp,
-                    DifficultyLevel: "medium",
+                    DifficultyLevel: questionDoc.Difficulty,
                     DifficultyMultiplier: 1);
 
                 session.Events.Append(studentId, xpEvent);
 
                 // Also append a concept attempted event for badge tracking
+                // HARDEN: Use real concept ID from question instead of stub
                 var conceptAttempt = new ConceptAttempted_V1(
                     StudentId: studentId,
-                    ConceptId: "stub_concept_math",
+                    ConceptId: questionDoc.ConceptId, // Real concept ID from question
                     SessionId: sessionId,
                     IsCorrect: true,
                     ResponseTimeMs: request.TimeSpentMs,
-                    QuestionId: request.QuestionId,
-                    QuestionType: "multiple-choice",
-                    MethodologyActive: "practice",
+                    QuestionId: currentQuestion.QuestionId,
+                    QuestionType: questionDoc.QuestionType,
+                    MethodologyActive: queue.Mode,
                     ErrorType: "",
-                    PriorMastery: 0.5,
-                    PosteriorMastery: 0.55,
+                    PriorMastery: queue.ConceptMasterySnapshot.GetValueOrDefault(questionDoc.ConceptId, 0.5),
+                    PosteriorMastery: Math.Min(1.0, queue.ConceptMasterySnapshot.GetValueOrDefault(questionDoc.ConceptId, 0.5) + 0.05),
                     HintCountUsed: 0,
                     WasSkipped: false,
                     AnswerHash: "",
@@ -618,20 +652,21 @@ public static class SessionEndpoints
                 }
                 profile.Apply(xpEvent);
                 session.Store(profile);
-
-                await session.SaveChangesAsync();
             }
+
+            await session.SaveChangesAsync();
 
             // Determine next question ID
             string? nextQuestionId = null;
-            if (state.CurrentQuestionIndex < CannedQuestions.Length)
+            var nextQuestion = queue.PeekNext();
+            if (nextQuestion != null)
             {
-                nextQuestionId = CannedQuestions[state.CurrentQuestionIndex].Id;
+                nextQuestionId = nextQuestion.QuestionId;
             }
 
             var feedback = isCorrect
                 ? "Correct! Great job!"
-                : $"Not quite. The correct answer was: {question.CorrectAnswer}";
+                : $"Not quite. The correct answer was: {questionDoc.CorrectAnswer}";
 
             return Results.Ok(new SessionAnswerResponseDto(
                 Correct: isCorrect,
@@ -643,9 +678,10 @@ public static class SessionEndpoints
         .WithName("SubmitAnswer");
 
         // POST /api/sessions/{sessionId}/complete — complete the session
-        group.MapPost("/{sessionId}/complete", (
+        group.MapPost("/{sessionId}/complete", async (
             string sessionId,
-            HttpContext ctx) =>
+            HttpContext ctx,
+            IDocumentStore store) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -653,25 +689,45 @@ public static class SessionEndpoints
 
             ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-            // Get session state
-            if (!SessionStates.TryGetValue(sessionId, out var state))
-                return Results.NotFound(new { error = "Session not found or expired" });
+            await using var session = store.LightweightSession();
 
-            var totalAnswered = state.CorrectCount + state.WrongCount;
+            // Get session queue
+            var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
+            if (queue == null)
+                return Results.NotFound(new { error = "Session not found" });
+
+            if (queue.EndedAt.HasValue)
+                return Results.Conflict(new { error = "Session already completed" });
+
+            // End the session
+            queue.EndedAt = DateTime.UtcNow;
+            session.Store(queue);
+
+            // Append LearningSessionEnded event
+            var endedEvent = new LearningSessionEnded_V1(
+                StudentId: studentId,
+                SessionId: sessionId,
+                EndedAt: DateTimeOffset.UtcNow,
+                QuestionsAttempted: queue.TotalQuestionsAttempted,
+                QuestionsCorrect: queue.CorrectAnswers);
+
+            session.Events.Append(studentId, endedEvent);
+            await session.SaveChangesAsync();
+
+            var totalAnswered = queue.TotalQuestionsAttempted;
             var accuracyPercent = totalAnswered > 0
-                ? (int)((double)state.CorrectCount / totalAnswered * 100)
+                ? (int)(queue.GetAccuracy() * 100)
                 : 0;
 
-            var durationSeconds = (int)(DateTime.UtcNow - state.StartedAt).TotalSeconds;
+            var durationSeconds = (int)(queue.EndedAt.Value - queue.StartedAt).TotalSeconds;
 
-            // Clean up state (optional - could keep for replay)
-            SessionStates.TryRemove(sessionId, out _);
-
+            var wrongAnswers = queue.TotalQuestionsAttempted - queue.CorrectAnswers;
+            
             return Results.Ok(new SessionCompletedDto(
                 SessionId: sessionId,
-                TotalCorrect: state.CorrectCount,
-                TotalWrong: state.WrongCount,
-                TotalXpAwarded: state.TotalXp,
+                TotalCorrect: queue.CorrectAnswers,
+                TotalWrong: wrongAnswers,
+                TotalXpAwarded: queue.CorrectAnswers * 10, // 10 XP per correct answer
                 AccuracyPercent: accuracyPercent,
                 DurationSeconds: durationSeconds));
         })
@@ -775,23 +831,17 @@ public static class SessionEndpoints
     }
 
     // ═════════════════════════════════════════════════════════════════════════
-    // STB-01b: Helper records and classes
+    // HARDEN SessionEndpoints: Production-grade helper methods
     // ═════════════════════════════════════════════════════════════════════════
 
-    private record CannedQuestion(
-        string Id,
-        string Prompt,
-        string Type,
-        string[] Choices,
-        string CorrectAnswer,
-        string Subject);
-
-    private class SessionState
+    /// <summary>
+    /// Gets the real concept ID from a question using the question bank.
+    /// </summary>
+    private static async Task<string> GetConceptIdForQuestionAsync(
+        string questionId,
+        IQuestionBank questionBank)
     {
-        public int CurrentQuestionIndex { get; set; } = 0;
-        public int CorrectCount { get; set; } = 0;
-        public int WrongCount { get; set; } = 0;
-        public int TotalXp { get; set; } = 0;
-        public DateTime StartedAt { get; set; } = DateTime.UtcNow;
+        var question = await questionBank.GetQuestionAsync(questionId);
+        return question?.ConceptId ?? "unknown-concept";
     }
 }

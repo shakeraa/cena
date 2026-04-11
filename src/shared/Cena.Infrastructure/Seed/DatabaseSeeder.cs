@@ -54,6 +54,9 @@ public static class DatabaseSeeder
         // 4b. Challenge catalog (daily, card chains, tournaments)
         await ChallengeSeedData.SeedAsync(store, logger);
 
+        // 4c. Session questions (HARDEN SessionEndpoints)
+        await SessionQuestionSeedData.SeedSessionQuestionsAsync(store, logger);
+
         // 5. Simulated students (300 across 8 archetypes)
         await UserSeedData.SeedSimulatedStudentsAsync(store, logger, simulatedStudentCount);
 
