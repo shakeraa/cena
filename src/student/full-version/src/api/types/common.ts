@@ -216,3 +216,65 @@ export interface TournamentListDto {
   upcoming: TournamentSummary[]
   active: TournamentSummary[]
 }
+
+/**
+ * Session DTOs from STB-01 + STB-01b. Mirrors
+ * `src/api/Cena.Api.Contracts/Sessions/SessionDtos.cs`. Consumed by STU-W-06.
+ */
+export type SessionMode = 'practice' | 'challenge' | 'review' | 'diagnostic'
+
+export interface SessionStartRequest {
+  subjects: string[]
+  durationMinutes: number
+  mode: SessionMode
+}
+
+export interface SessionStartResponse {
+  sessionId: string
+  hubGroupName: string
+  firstQuestionId: string | null
+}
+
+export interface ActiveSessionDto {
+  sessionId: string
+  subjects: string[]
+  mode: SessionMode
+  startedAt: string
+  durationMinutes: number
+  progressPercent: number
+  currentQuestionId: string | null
+}
+
+export interface SessionQuestionDto {
+  questionId: string
+  questionIndex: number
+  totalQuestions: number
+  prompt: string
+  questionType: 'multiple-choice' | 'short-answer' | 'numeric'
+  choices: string[]
+  subject: string
+  expectedTimeSeconds: number
+}
+
+export interface SessionAnswerRequest {
+  questionId: string
+  answer: string
+  timeSpentMs: number
+}
+
+export interface SessionAnswerResponseDto {
+  correct: boolean
+  feedback: string
+  xpAwarded: number
+  masteryDelta: number
+  nextQuestionId: string | null
+}
+
+export interface SessionCompletedDto {
+  sessionId: string
+  totalCorrect: number
+  totalWrong: number
+  totalXpAwarded: number
+  accuracyPercent: number
+  durationSeconds: number
+}

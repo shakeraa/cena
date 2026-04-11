@@ -336,6 +336,56 @@
       "friends": "Friends"
     }
   },
+  "session": {
+    "setup": {
+      "title": "Start a learning session",
+      "subtitle": "Pick subjects, a duration, and a mode to begin.",
+      "subjectsLabel": "Subjects",
+      "durationLabel": "Duration",
+      "durationMinutes": "{minutes} min",
+      "modeLabel": "Mode",
+      "startCta": "Start session",
+      "subjects": {
+        "math": "Math",
+        "physics": "Physics",
+        "chemistry": "Chemistry",
+        "biology": "Biology",
+        "english": "English",
+        "history": "History"
+      },
+      "modes": {
+        "practice": "Practice",
+        "challenge": "Challenge",
+        "review": "Review",
+        "diagnostic": "Diagnostic"
+      }
+    },
+    "runner": {
+      "questionProgress": "Question {current} of {total}",
+      "progressAria": "Question {current} of {total}",
+      "choicesAria": "Answer choices",
+      "submitAnswer": "Submit",
+      "correct": "Correct!",
+      "wrong": "Not quite.",
+      "xpAwarded": "+{xp} XP",
+      "exit": "Exit",
+      "exitAria": "Exit session",
+      "sessionIdLabel": "Session",
+      "completing": "Finishing up…"
+    },
+    "summary": {
+      "title": "Session complete",
+      "subtitle": "Here's how you did.",
+      "xpEarned": "XP earned",
+      "accuracy": "Accuracy",
+      "correctCount": "Correct",
+      "duration": "Duration",
+      "durationSecs": "{secs}s",
+      "durationMinsSecs": "{mins}m {secs}s",
+      "startAnother": "Start another",
+      "backToHome": "Back to home"
+    }
+  },
   "challenges": {
     "hub": {
       "title": "Challenges",

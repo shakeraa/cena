@@ -171,6 +171,56 @@
       "friends": "חברים"
     }
   },
+  "session": {
+    "setup": {
+      "title": "התחל שיעור לימוד",
+      "subtitle": "בחר נושאים, משך וסגנון כדי להתחיל.",
+      "subjectsLabel": "נושאים",
+      "durationLabel": "משך",
+      "durationMinutes": "{minutes} דקות",
+      "modeLabel": "מצב",
+      "startCta": "התחל שיעור",
+      "subjects": {
+        "math": "מתמטיקה",
+        "physics": "פיזיקה",
+        "chemistry": "כימיה",
+        "biology": "ביולוגיה",
+        "english": "אנגלית",
+        "history": "היסטוריה"
+      },
+      "modes": {
+        "practice": "תרגול",
+        "challenge": "אתגר",
+        "review": "סקירה",
+        "diagnostic": "אבחון"
+      }
+    },
+    "runner": {
+      "questionProgress": "שאלה {current} מתוך {total}",
+      "progressAria": "שאלה {current} מתוך {total}",
+      "choicesAria": "אפשרויות תשובה",
+      "submitAnswer": "שלח",
+      "correct": "נכון!",
+      "wrong": "לא בדיוק.",
+      "xpAwarded": "+{xp} נק׳",
+      "exit": "יציאה",
+      "exitAria": "יציאה מהשיעור",
+      "sessionIdLabel": "שיעור",
+      "completing": "מסיים…"
+    },
+    "summary": {
+      "title": "השיעור הושלם",
+      "subtitle": "זה הביצוע שלך.",
+      "xpEarned": "נקודות שהושגו",
+      "accuracy": "דיוק",
+      "correctCount": "תשובות נכונות",
+      "duration": "משך",
+      "durationSecs": "{secs} ש׳",
+      "durationMinsSecs": "{mins} ד {secs} ש׳",
+      "startAnother": "התחל עוד שיעור",
+      "backToHome": "חזרה הביתה"
+    }
+  },
   "challenges": {
     "hub": {
       "title": "אתגרים",
