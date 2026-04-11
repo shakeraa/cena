@@ -44,7 +44,9 @@ public static class SessionQuestionSeedData
                 CorrectAnswer = "96",
                 Explanation = "12 × 8 = (10 × 8) + (2 × 8) = 80 + 16 = 96",
                 Grade = 5,
-                IsActive = true
+                IsActive = true,
+                // FIND-pedagogy-008: explicit learning objective link
+                LearningObjectiveId = "lo-math-alg-linear-001",
             },
             new QuestionDocument
             {
@@ -60,7 +62,8 @@ public static class SessionQuestionSeedData
                 CorrectAnswer = "5",
                 Explanation = "2x + 5 = 15 → 2x = 10 → x = 5",
                 Grade = 7,
-                IsActive = true
+                IsActive = true,
+                LearningObjectiveId = "lo-math-alg-linear-001",
             },
             new QuestionDocument
             {
@@ -76,7 +79,8 @@ public static class SessionQuestionSeedData
                 CorrectAnswer = "2x",
                 Explanation = "Using the power rule: d/dx(x^n) = n·x^(n-1). So d/dx(x²) = 2x.",
                 Grade = 11,
-                IsActive = true
+                IsActive = true,
+                LearningObjectiveId = "lo-math-calc-derivatives-001",
             }
         };
 
@@ -97,7 +101,8 @@ public static class SessionQuestionSeedData
                 CorrectAnswer = "H2O",
                 Explanation = "Water consists of two hydrogen atoms and one oxygen atom, giving the formula H2O.",
                 Grade = 6,
-                IsActive = true
+                IsActive = true,
+                LearningObjectiveId = "lo-chem-acids-bases-001",
             },
             new QuestionDocument
             {
@@ -113,7 +118,8 @@ public static class SessionQuestionSeedData
                 CorrectAnswer = "300,000 km/s",
                 Explanation = "The speed of light in a vacuum is approximately 299,792 km/s, often rounded to 300,000 km/s.",
                 Grade = 9,
-                IsActive = true
+                IsActive = true,
+                LearningObjectiveId = "lo-physics-mech-kinematics-001",
             }
         };
 

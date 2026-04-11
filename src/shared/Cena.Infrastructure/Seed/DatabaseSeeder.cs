@@ -54,6 +54,10 @@ public static class DatabaseSeeder
         // 4b. Challenge catalog (daily, card chains, tournaments)
         await ChallengeSeedData.SeedAsync(store, logger);
 
+        // 4b1. Learning objectives (FIND-pedagogy-008) — must run BEFORE the
+        //      question seeders so each question can reference a stable LO id.
+        await LearningObjectiveSeedData.SeedLearningObjectivesAsync(store, logger);
+
         // 4c. Session questions (HARDEN SessionEndpoints)
         await SessionQuestionSeedData.SeedSessionQuestionsAsync(store, logger);
 

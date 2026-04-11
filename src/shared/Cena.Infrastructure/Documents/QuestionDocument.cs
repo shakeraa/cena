@@ -61,4 +61,24 @@ public class QuestionDocument
     public int? Grade { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
     public bool IsActive { get; set; } = true;
+
+    /// <summary>
+    /// FIND-pedagogy-008 — reference to the <see cref="LearningObjectiveDocument"/>
+    /// that this question assesses. Nullable so existing seeded questions
+    /// replay cleanly; authored questions produced after this change are
+    /// expected to carry an LO id and the authoring service logs a warning
+    /// when one is missing.
+    ///
+    /// <para>
+    /// Pedagogical rationale (Wiggins &amp; McTighe 2005, "Understanding by
+    /// Design"): every assessment item must trace to an explicit learning
+    /// goal so coverage analysis, gap detection, and standards alignment are
+    /// possible. Bloom's taxonomy alone (Anderson &amp; Krathwohl 2001) is
+    /// insufficient — the cognitive-process dimension tells you HOW deeply
+    /// the learner must think, but the LO tells you WHAT specific goal is
+    /// being demonstrated.
+    /// </para>
+    /// </summary>
+    public string? LearningObjectiveId { get; set; }
 }
+

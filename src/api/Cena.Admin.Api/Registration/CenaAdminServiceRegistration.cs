@@ -36,6 +36,8 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
         services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
         services.AddScoped<IQuestionBankService, QuestionBankService>();
+        // FIND-pedagogy-008: read API for the admin LO picker
+        services.AddScoped<ILearningObjectiveService, LearningObjectiveService>();
         services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();
         services.AddScoped<ICulturalContextService, CulturalContextService>();
         services.AddHostedService<CulturalContextSeeder>();
@@ -94,6 +96,8 @@ public static class CenaAdminServiceRegistration
         app.MapSystemMonitoringEndpoints();
         app.MapIngestionPipelineEndpoints();
         app.MapQuestionBankEndpoints();
+        // FIND-pedagogy-008: learning-objective picker (read-only)
+        app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();
         app.MapCulturalContextEndpoints();
         app.MapEventStreamEndpoints();

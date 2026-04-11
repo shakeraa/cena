@@ -8,6 +8,7 @@
 using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Questions;
+using Cena.Infrastructure.Seed;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -39,6 +40,13 @@ public static class QuestionBankSeedData
 
         logger.LogInformation("Seeding question bank — have {Existing}, targeting ~1000...", existingCount);
 
+        // FIND-pedagogy-008 — ensure the canonical learning-objective set is
+        // present and build a lookup for per-question backfill. The LO set is
+        // seeded by LearningObjectiveSeedData earlier in the boot order; if
+        // the caller skipped it we defensively seed from the static list now.
+        await LearningObjectiveSeedData.SeedLearningObjectivesAsync(store, logger);
+        var loObjectives = LearningObjectiveSeedData.GetSeedObjectives();
+
         // Pre-fetch existing stream keys to avoid collision with concurrent seeding
         await using var querySession = store.QuerySession();
         var existingStreamKeys = (await querySession.Events.QueryAllRawEvents()
@@ -53,6 +61,7 @@ public static class QuestionBankSeedData
         var auditRng = new Random(Seed); // seeded for reproducible audit data
         int seeded = 0;
         int skipped = 0;
+        int withLo = 0;
 
         foreach (var q in GetSeedQuestions())
         {
@@ -66,9 +75,23 @@ public static class QuestionBankSeedData
             var options = q.Options.Select(o => new QuestionOptionData(
                 o.Label, o.Text, $"<p>{o.Text}</p>", o.IsCorrect, o.Rationale)).ToList();
 
+            // FIND-pedagogy-008 — backfill a plausible learning-objective id.
+            // Match by subject + concept overlap; null is tolerated for
+            // defensive reasons but should be extremely rare for seed data
+            // (logs one warning per occurrence).
+            var loId = LearningObjectiveSeedData.PickBestObjectiveId(
+                q.Subject, q.Concepts, loObjectives);
+            if (loId != null) withLo++;
+            else
+            {
+                logger.LogWarning(
+                    "Seed question {QuestionId} has no matching LearningObjective (subject={Subject}, concepts={Concepts})",
+                    id, q.Subject, string.Join(",", q.Concepts));
+            }
+
             object creationEvent = q.Source switch
             {
-                "ai-generated" => new QuestionAiGenerated_V1(
+                "ai-generated" => new QuestionAiGenerated_V2(
                     id, q.Stem, $"<p>{q.Stem}</p>", options,
                     q.Subject, q.Topic, q.Grade, q.Bloom, q.Difficulty,
                     q.Concepts, q.Language,
@@ -77,18 +100,23 @@ public static class QuestionBankSeedData
                     $"AI output for: {q.Stem}",
                     "seed-script",
                     q.Explanation,
-                    now),
-                "ingested" => new QuestionIngested_V1(
+                    now,
+                    loId),
+                "ingested" => new QuestionIngested_V2(
                     id, q.Stem, $"<p>{q.Stem}</p>", options,
                     q.Subject, q.Topic, q.Grade, q.Bloom, q.Difficulty,
                     q.Concepts, q.Language,
                     $"doc-{seeded}", "https://edu.gov.il/bagrut", "bagrut-2024.pdf",
-                    q.Stem, "seed-script", now),
-                _ => new QuestionAuthored_V1(
+                    q.Stem, "seed-script", now,
+                    q.Explanation,
+                    loId),
+                _ => new QuestionAuthored_V2(
                     id, q.Stem, $"<p>{q.Stem}</p>", options,
                     q.Subject, q.Topic, q.Grade, q.Bloom, q.Difficulty,
                     q.Concepts, q.Language,
-                    "seed-script", now)
+                    "seed-script", now,
+                    q.Explanation,
+                    loId)
             };
 
             writeSession.Events.StartStream<QuestionState>(id, creationEvent);
@@ -124,8 +152,9 @@ public static class QuestionBankSeedData
         }
 
         await writeSession.SaveChangesAsync();
-        logger.LogInformation("Seeded {Count} new questions (skipped {Skipped} existing), total now ~{Total}",
-            seeded, skipped, seeded + skipped);
+        logger.LogInformation(
+            "Seeded {Count} new questions (skipped {Skipped} existing, {WithLo} tagged with LearningObjective), total now ~{Total}",
+            seeded, skipped, withLo, seeded + skipped);
     }
 
     // ── MATH (25 questions) ──────────────────────────────────────────────

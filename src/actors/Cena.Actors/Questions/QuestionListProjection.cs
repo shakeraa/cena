@@ -13,35 +13,73 @@ namespace Cena.Actors.Questions;
 public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, string>
 {
     // ── Creation Events → Create Read Model ──
+    //
+    // NOTE: In production Marten upcasts V1 → V2 before dispatch, so only
+    // the V2 Create methods run against a live store. We keep the V1
+    // overloads as a safety net for unit tests and any legacy replay paths
+    // that bypass upcasting.
 
-    public QuestionReadModel Create(QuestionAuthored_V1 e)
+    public QuestionReadModel Create(QuestionAuthored_V1 e) =>
+        Create(new QuestionAuthored_V2(
+            e.QuestionId, e.Stem, e.StemHtml, e.Options,
+            e.Subject, e.Topic, e.Grade, e.BloomsLevel, e.Difficulty,
+            e.ConceptIds, e.Language, e.AuthorId, e.Timestamp,
+            e.Explanation, LearningObjectiveId: null));
+
+    public QuestionReadModel Create(QuestionAuthored_V2 e)
     {
         var model = FromCreation(
             e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
             e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
             "authored", e.AuthorId, e.Timestamp);
         model.Explanation = e.Explanation;
+        model.LearningObjectiveId = e.LearningObjectiveId;
         return model;
     }
 
-    public QuestionReadModel Create(QuestionIngested_V1 e)
+    public QuestionReadModel Create(QuestionIngested_V1 e) =>
+        Create(new QuestionIngested_V2(
+            e.QuestionId, e.Stem, e.StemHtml, e.Options,
+            e.Subject, e.Topic, e.Grade, e.BloomsLevel, e.Difficulty,
+            e.ConceptIds, e.Language, e.SourceDocId, e.SourceUrl,
+            e.SourceFilename, e.OriginalText, e.ImportedBy, e.Timestamp,
+            e.Explanation, LearningObjectiveId: null));
+
+    public QuestionReadModel Create(QuestionIngested_V2 e)
     {
         var model = FromCreation(
             e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
             e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
             "ingested", e.ImportedBy, e.Timestamp);
         model.Explanation = e.Explanation;
+        model.LearningObjectiveId = e.LearningObjectiveId;
         return model;
     }
 
-    public QuestionReadModel Create(QuestionAiGenerated_V1 e)
+    public QuestionReadModel Create(QuestionAiGenerated_V1 e) =>
+        Create(new QuestionAiGenerated_V2(
+            e.QuestionId, e.Stem, e.StemHtml, e.Options,
+            e.Subject, e.Topic, e.Grade, e.BloomsLevel, e.Difficulty,
+            e.ConceptIds, e.Language, e.PromptText, e.ModelId,
+            e.ModelTemperature, e.RawModelOutput, e.RequestedBy,
+            e.Explanation, e.Timestamp, LearningObjectiveId: null));
+
+    public QuestionReadModel Create(QuestionAiGenerated_V2 e)
     {
         var model = FromCreation(
             e.QuestionId, e.Stem, e.Subject, e.Topic, e.Grade,
             e.BloomsLevel, e.Difficulty, e.ConceptIds, e.Language,
             "ai-generated", e.RequestedBy, e.Timestamp);
         model.Explanation = e.Explanation;
+        model.LearningObjectiveId = e.LearningObjectiveId;
         return model;
+    }
+
+    // ── FIND-pedagogy-008 — LO backfill on an existing question ──
+    public void Apply(LearningObjectiveAssigned_V1 e, QuestionReadModel model)
+    {
+        model.LearningObjectiveId = e.NewObjectiveId;
+        model.UpdatedAt = e.Timestamp;
     }
 
     // ── Explanation Events ──
