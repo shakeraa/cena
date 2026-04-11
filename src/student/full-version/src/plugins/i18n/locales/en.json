@@ -368,6 +368,41 @@
       "friends": "Friends"
     }
   },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "subtitle": "Work faster with your keyboard.",
+    "empty": "No shortcuts registered yet.",
+    "scopes": {
+      "global": "Global",
+      "session": "Learning session",
+      "tutor": "AI tutor",
+      "graph": "Knowledge graph",
+      "palette": "Command palette"
+    }
+  },
+  "commandPalette": {
+    "placeholder": "Type a command or search…",
+    "empty": "No matching commands",
+    "category": {
+      "navigate": "Go to",
+      "action": "Action"
+    },
+    "cmds": {
+      "home": "Go to Home",
+      "startSession": "Start a session",
+      "progress": "View progress",
+      "tutor": "Open AI tutor",
+      "challenges": "View challenges",
+      "knowledgeGraph": "Browse knowledge graph",
+      "leaderboard": "View leaderboard",
+      "social": "Open class feed",
+      "notifications": "View notifications",
+      "profile": "View my profile",
+      "settings": "Open settings",
+      "toggleTheme": "Toggle dark/light theme",
+      "signOut": "Sign out"
+    }
+  },
   "notifications": {
     "title": "Notifications",
     "subtitle": "Stay on top of your learning progress.",
