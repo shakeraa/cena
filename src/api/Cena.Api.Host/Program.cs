@@ -215,6 +215,12 @@ else
         "Set CENA_LLM_API_KEY environment variable to enable AI tutoring.");
 }
 
+// FIND-arch-004: Non-streaming tutor message path. Both /messages (unary) and
+// /stream (SSE) must go through real LLM. TutorMessageService wraps the same
+// ITutorLlmService the /stream endpoint uses, so there is no "stub" code path.
+builder.Services.AddScoped<ITutorMessageRepository, MartenTutorMessageRepository>();
+builder.Services.AddScoped<ITutorMessageService, TutorMessageService>();
+
 // =============================================================================
 // OPENTELEMETRY (REV-018.3)
 // =============================================================================
