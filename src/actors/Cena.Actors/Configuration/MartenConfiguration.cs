@@ -321,6 +321,10 @@ public static class MartenConfiguration
             .Index(x => x.Language)
             .Index(x => x.Subject);
 
+        // ── Platform Settings (ADM-008) — singleton doc, id='platform' ──
+        opts.Schema.For<PlatformSettingsDocument>()
+            .Identity(x => x.Id);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
