@@ -203,6 +203,41 @@
       "friends": "חברים"
     }
   },
+  "shortcuts": {
+    "title": "קיצורי מקלדת",
+    "subtitle": "עבוד מהר יותר עם המקלדת.",
+    "empty": "אין קיצורים רשומים עדיין.",
+    "scopes": {
+      "global": "גלובלי",
+      "session": "שיעור לימוד",
+      "tutor": "מורה AI",
+      "graph": "מפת ידע",
+      "palette": "לוח פקודות"
+    }
+  },
+  "commandPalette": {
+    "placeholder": "הקלד פקודה או חפש…",
+    "empty": "לא נמצאו פקודות תואמות",
+    "category": {
+      "navigate": "עבור אל",
+      "action": "פעולה"
+    },
+    "cmds": {
+      "home": "לבית",
+      "startSession": "התחל שיעור",
+      "progress": "צפה בהתקדמות",
+      "tutor": "פתח מורה AI",
+      "challenges": "צפה באתגרים",
+      "knowledgeGraph": "עיין במפת ידע",
+      "leaderboard": "צפה בטבלת מובילים",
+      "social": "פתח פיד כיתתי",
+      "notifications": "צפה בהתראות",
+      "profile": "צפה בפרופיל שלי",
+      "settings": "פתח הגדרות",
+      "toggleTheme": "החלף בין בהיר/כהה",
+      "signOut": "התנתק"
+    }
+  },
   "notifications": {
     "title": "התראות",
     "subtitle": "הישאר מעודכן בהתקדמות הלמידה שלך.",

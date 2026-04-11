@@ -2,6 +2,7 @@ import { createApp } from 'vue'
 
 import App from '@/App.vue'
 import { registerPlugins } from '@core/utils/plugins'
+import { registerServiceWorker } from '@/utils/registerServiceWorker'
 
 // Styles
 import '@core/scss/template/index.scss'
@@ -15,3 +16,7 @@ registerPlugins(app)
 
 // Mount vue app
 app.mount('#app')
+
+// STU-W-15: register the Cena service worker (prod only, skipped in dev
+// where MSW owns the worker slot).
+registerServiceWorker()

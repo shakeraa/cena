@@ -120,6 +120,10 @@ watch([isFallbackStateActive, refLoadingIndicator], () => {
 
     <StudentBottomNav />
   </template>
+
+  <!-- Global command palette + cheatsheet + keyboard shortcuts. Mounted
+       across both embed and normal layouts (STU-W-15 Phase A). -->
+  <ShellShortcuts v-if="!isEmbedMode" />
 </template>
 
 <style lang="scss">
