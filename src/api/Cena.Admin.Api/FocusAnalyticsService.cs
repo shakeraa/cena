@@ -1,12 +1,14 @@
 // =============================================================================
 // Cena Platform -- Focus Analytics Service
-// ADM-006: Focus & attention analytics implementation
+// ADM-014: Focus & attention analytics implementation (production-grade)
+// All methods query real Marten documents (rollups) or the raw event store.
+// No Random. No hardcoded student/class data. No literal arrays.
 // =============================================================================
-#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Events;
+using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -26,7 +28,7 @@ public interface IFocusAnalyticsService
     Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId);
 }
 
-public sealed class FocusAnalyticsService : IFocusAnalyticsService
+public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 {
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
@@ -44,388 +46,95 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
 
     public async Task<FocusOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user)
     {
-        // REV-014: Determine school scope for this caller
         var schoolId = TenantScope.GetSchoolFilter(user);
-
         await using var session = _store.QuerySession();
 
-        // REV-014: Load scoped student IDs when not SUPER_ADMIN
-        HashSet<string>? scopedStudentIds = null;
-        if (schoolId is not null)
-        {
-            var ids = await session.Query<StudentProfileSnapshot>()
-                .Where(s => s.SchoolId == schoolId)
-                .Select(s => s.StudentId)
-                .ToListAsync();
-            scopedStudentIds = new HashSet<string>(ids);
-        }
-
-        var now = DateTimeOffset.UtcNow;
-        var today = new DateTimeOffset(now.Date, TimeSpan.Zero);
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var since30d = today.AddDays(-30);
-        var since14d = today.AddDays(-14);
-        var since7d = today.AddDays(-7);
-        var since1h = now.AddHours(-1);
 
-        // Query focus score events from last 30 days
-        var allFocusRaw = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
+        var query = session.Query<FocusSessionRollupDocument>()
+            .Where(r => r.Date >= since30d);
+        if (schoolId is not null)
+            query = query.Where(r => r.SchoolId == schoolId);
+        if (!string.IsNullOrEmpty(classId))
+            query = query.Where(r => r.ClassId == classId);
 
-        // REV-014: Filter events to scoped students if caller is not SUPER_ADMIN
-        var focusEvents = scopedStudentIds is null
-            ? allFocusRaw
-            : allFocusRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
-
-        var allMWRaw = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "mind_wandering_detected__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
-        var mindWanderingEvents = scopedStudentIds is null
-            ? allMWRaw
-            : allMWRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
-
-        var allBreaksTakenRaw = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "microbreak_taken__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
-        var microbreaksTaken = scopedStudentIds is null
-            ? allBreaksTakenRaw
-            : allBreaksTakenRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
-
-        var allBreaksSkippedRaw = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "microbreak_skipped__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
-        var microbreaksSkipped = scopedStudentIds is null
-            ? allBreaksSkippedRaw
-            : allBreaksSkippedRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
-
-        // Active sessions: sessions started in the last hour
-        var allRecentStartedRaw = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "session_started__v1")
-            .Where(e => e.Timestamp >= since1h)
-            .ToListAsync();
-        var recentSessionsStarted = scopedStudentIds is null
-            ? allRecentStartedRaw
-            : allRecentStartedRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
-
-        // Calculate overview metrics
-        var focusScores = focusEvents
-            .Select(e => ExtractDouble(e, "focusScore"))
-            .Where(s => s > 0)
-            .ToList();
-
-        var avgFocusScore = focusScores.Count > 0
-            ? (float)(focusScores.Average() * 100)
-            : 0f;
-
-        var mindWanderingRate = focusEvents.Count > 0
-            ? (float)mindWanderingEvents.Count / focusEvents.Count * 100f
-            : 0f;
-
-        var totalMicrobreakResponses = microbreaksTaken.Count + microbreaksSkipped.Count;
-        var microbreakCompliance = totalMicrobreakResponses > 0
-            ? (float)microbreaksTaken.Count / totalMicrobreakResponses * 100f
-            : 0f;
-
-        var activeStudents = recentSessionsStarted
-            .Select(e => ExtractString(e, "studentId"))
-            .Where(s => !string.IsNullOrEmpty(s))
-            .Distinct()
-            .Count();
-
-        // Build 7-day trend
-        var trend = new List<FocusTrendPoint>();
-        for (int i = 6; i >= 0; i--)
-        {
-            var dayStart = today.AddDays(-i);
-            var dayEnd = dayStart.AddDays(1);
-
-            var dayFocusScores = focusEvents
-                .Where(e => e.Timestamp >= dayStart && e.Timestamp < dayEnd)
-                .Select(e => ExtractDouble(e, "focusScore"))
-                .Where(s => s > 0)
-                .ToList();
-
-            var daySessionCount = focusEvents
-                .Where(e => e.Timestamp >= dayStart && e.Timestamp < dayEnd)
-                .Select(e => ExtractString(e, "sessionId"))
-                .Where(s => !string.IsNullOrEmpty(s))
-                .Distinct()
-                .Count();
-
-            var dayAvg = dayFocusScores.Count > 0
-                ? (float)(dayFocusScores.Average() * 100)
-                : 0f;
-
-            trend.Add(new FocusTrendPoint(
-                dayStart.ToString("yyyy-MM-dd"),
-                MathF.Round(dayAvg, 1),
-                daySessionCount));
-        }
-
-        return new FocusOverviewResponse(
-            AvgFocusScore: MathF.Round(avgFocusScore, 1),
-            MindWanderingRate: MathF.Round(mindWanderingRate, 1),
-            MicrobreakCompliance: MathF.Round(microbreakCompliance, 1),
-            ActiveStudents: activeStudents,
-            Trend: trend);
+        var rollups = await query.ToListAsync();
+        return BuildFocusOverview(rollups, today);
     }
 
     public async Task<StudentFocusDetailResponse?> GetStudentFocusAsync(string studentId, ClaimsPrincipal user)
     {
-        // REV-014: Verify this student belongs to the caller's school
         var schoolId = TenantScope.GetSchoolFilter(user);
-
         await using var session = _store.QuerySession();
 
+        // Tenant check
         if (schoolId is not null)
         {
-            var snapshot = await session.Query<StudentProfileSnapshot>()
-                .Where(s => s.StudentId == studentId)
-                .FirstOrDefaultAsync();
-            if (snapshot?.SchoolId != schoolId)
-                return null; // Not in caller's school
+            var snapshotCheck = await session.Query<FocusSessionRollupDocument>()
+                .Where(r => r.StudentId == studentId && r.SchoolId == schoolId)
+                .Take(1)
+                .ToListAsync();
+            if (snapshotCheck.Count == 0)
+                return null;
         }
 
-        var now = DateTimeOffset.UtcNow;
-        var today = new DateTimeOffset(now.Date, TimeSpan.Zero);
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var since30d = today.AddDays(-30);
-        var since7d = today.AddDays(-7);
 
-        // Query all focus events for this student
-        var allFocusEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated__v1")
-            .Where(e => e.Timestamp >= since30d)
+        var rollups = await session.Query<FocusSessionRollupDocument>()
+            .Where(r => r.StudentId == studentId && r.Date >= since30d)
+            .OrderByDescending(r => r.Date)
             .ToListAsync();
 
-        var studentFocusEvents = allFocusEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
-            .ToList();
+        if (rollups.Count == 0) return null;
 
-        if (studentFocusEvents.Count == 0)
-            return null;
-
-        // Session events
-        var allSessionStarted = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "session_started__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
-
-        var allSessionEnded = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "session_ended__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
-
-        var studentSessionStarts = allSessionStarted
-            .Where(e => ExtractString(e, "studentId") == studentId)
-            .ToList();
-
-        var studentSessionEnds = allSessionEnded
-            .Where(e => ExtractString(e, "studentId") == studentId)
-            .ToList();
-
-        // Build sessions from session_started/session_ended pairs
-        var sessions = studentSessionStarts
-            .Select(startEvt =>
-            {
-                var sessId = ExtractString(startEvt, "sessionId");
-                var endEvt = studentSessionEnds
-                    .FirstOrDefault(e => ExtractString(e, "sessionId") == sessId);
-
-                var sessionFocusScores = studentFocusEvents
-                    .Where(e => ExtractString(e, "sessionId") == sessId)
-                    .Select(e => (float)(ExtractDouble(e, "focusScore") * 100))
-                    .ToList();
-
-                var avgScore = sessionFocusScores.Count > 0
-                    ? sessionFocusScores.Average() : 0f;
-                var minScore = sessionFocusScores.Count > 0
-                    ? sessionFocusScores.Min() : 0f;
-                var maxScore = sessionFocusScores.Count > 0
-                    ? sessionFocusScores.Max() : 0f;
-
-                var endedAt = endEvt?.Timestamp;
-                var durationMin = endedAt.HasValue
-                    ? (int)(endedAt.Value - startEvt.Timestamp).TotalMinutes
-                    : (int)(now - startEvt.Timestamp).TotalMinutes;
-
-                return new FocusSession(
-                    SessionId: sessId,
-                    StartedAt: startEvt.Timestamp,
-                    EndedAt: endedAt,
-                    AvgFocusScore: MathF.Round(avgScore, 1),
-                    MinFocusScore: MathF.Round(minScore, 1),
-                    MaxFocusScore: MathF.Round(maxScore, 1),
-                    DurationMinutes: Math.Max(1, durationMin));
-            })
-            .OrderByDescending(s => s.StartedAt)
-            .ToList();
-
-        // Mind wandering events
-        var allMindWandering = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "mind_wandering_detected__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
-
-        var studentMindWandering = allMindWandering
-            .Where(e => ExtractString(e, "studentId") == studentId)
-            .Select(e => new MindWanderingEvent(
-                Timestamp: e.Timestamp,
-                FocusScoreAtEvent: (float)(ExtractDouble(e, "focusScore") * 100),
-                Context: ExtractString(e, "context"),
-                Trigger: ExtractString(e, "trigger")))
-            .OrderByDescending(e => e.Timestamp)
-            .ToList();
-
-        // Microbreak history
-        var allTaken = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "microbreak_taken__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
-
-        var allSkipped = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "microbreak_skipped__v1")
-            .Where(e => e.Timestamp >= since30d)
-            .ToListAsync();
-
-        var studentMicrobreaks = new List<MicrobreakRecord>();
-
-        foreach (var evt in allTaken.Where(e => ExtractString(e, "studentId") == studentId))
-        {
-            var suggestedAtStr = ExtractString(evt, "suggestedAt");
-            var suggestedAt = DateTimeOffset.TryParse(suggestedAtStr, out var sa)
-                ? sa : evt.Timestamp;
-            var durationSec = (int)ExtractDouble(evt, "durationSeconds");
-
-            studentMicrobreaks.Add(new MicrobreakRecord(
-                SuggestedAt: suggestedAt,
-                WasTaken: true,
-                TakenAt: evt.Timestamp,
-                DurationSeconds: durationSec > 0 ? durationSec : 60));
-        }
-
-        foreach (var evt in allSkipped.Where(e => ExtractString(e, "studentId") == studentId))
-        {
-            studentMicrobreaks.Add(new MicrobreakRecord(
-                SuggestedAt: evt.Timestamp,
-                WasTaken: false,
-                TakenAt: null,
-                DurationSeconds: 0));
-        }
-
-        studentMicrobreaks = studentMicrobreaks
-            .OrderByDescending(m => m.SuggestedAt)
-            .ToList();
-
-        // Calculate averages
-        var scores7d = studentFocusEvents
-            .Where(e => e.Timestamp >= since7d)
-            .Select(e => ExtractDouble(e, "focusScore"))
-            .Where(s => s > 0)
-            .ToList();
-
-        var scores30d = studentFocusEvents
-            .Select(e => ExtractDouble(e, "focusScore"))
-            .Where(s => s > 0)
-            .ToList();
-
-        var avg7d = scores7d.Count > 0 ? (float)(scores7d.Average() * 100) : 0f;
-        var avg30d = scores30d.Count > 0 ? (float)(scores30d.Average() * 100) : 0f;
-
-        // Determine chronotype from session start times
-        var morningCount = studentSessionStarts
-            .Count(e => e.Timestamp.Hour >= 6 && e.Timestamp.Hour < 12);
-        var eveningCount = studentSessionStarts
-            .Count(e => e.Timestamp.Hour >= 17 && e.Timestamp.Hour < 23);
-
-        var chronotype = morningCount > eveningCount ? "morning"
-            : eveningCount > morningCount ? "evening" : "neutral";
-
-        var optimalTime = chronotype switch
-        {
-            "morning" => "9:00 AM - 12:00 PM",
-            "evening" => "6:00 PM - 9:00 PM",
-            _ => "10:00 AM - 2:00 PM"
-        };
-
-        var chronoText = chronotype switch
-        {
-            "morning" => "Based on your focus patterns, you perform best during morning hours.",
-            "evening" => "Based on your focus patterns, you perform best during evening hours.",
-            _ => "Your focus patterns are fairly consistent throughout the day."
-        };
-
-        return new StudentFocusDetailResponse(
-            StudentId: studentId,
-            StudentName: $"Student {studentId}",
-            AvgFocusScore7d: MathF.Round(avg7d, 1),
-            AvgFocusScore30d: MathF.Round(avg30d, 1),
-            Sessions: sessions,
-            MindWanderingEvents: studentMindWandering,
-            MicrobreakHistory: studentMicrobreaks,
-            Chronotype: new ChronotypeRecommendation(
-                DetectedChronotype: chronotype,
-                OptimalStudyTime: optimalTime,
-                RecommendationText: chronoText));
+        return BuildStudentFocusDetail(studentId, rollups, today);
     }
 
     public async Task<ClassFocusResponse?> GetClassFocusAsync(string classId)
     {
-        // Class-level grouping requires class membership data not in events;
-        // keeping mock implementation until class roster integration is available.
-        var random = new Random(classId.GetHashCode());
-        var students = new List<StudentFocusSummary>();
+        await using var session = _store.QuerySession();
 
-        for (int i = 0; i < 25; i++)
-        {
-            var score = 50f + random.NextSingle() * 45f;
-            students.Add(new StudentFocusSummary(
-                StudentId: $"stu-{i}",
-                StudentName: $"Student {i + 1}",
-                AvgFocusScore: score,
-                Trend: random.NextSingle() > 0.6 ? "improving" : (random.NextSingle() > 0.5 ? "stable" : "declining"),
-                NeedsAttention: score < 60f));
-        }
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
+        var since7d = today.AddDays(-7);
 
-        var timeSlots = new List<TimeSlotFocus>
-        {
-            new("9:00-10:00", 78f, 25),
-            new("10:00-11:00", 82f, 25),
-            new("11:00-12:00", 75f, 24),
-            new("14:00-15:00", 68f, 23),
-            new("15:00-16:00", 65f, 22),
-        };
+        var classRollup = await session.Query<ClassAttentionRollupDocument>()
+            .Where(r => r.ClassId == classId)
+            .OrderByDescending(r => r.Date)
+            .Take(1)
+            .ToListAsync();
 
-        var subjects = new List<SubjectFocus>
-        {
-            new("Math", 74f, 120),
-            new("Physics", 71f, 95),
-        };
+        var studentRollups = await session.Query<FocusSessionRollupDocument>()
+            .Where(r => r.ClassId == classId && r.Date >= since7d)
+            .ToListAsync();
 
-        return new ClassFocusResponse(
-            ClassId: classId,
-            ClassName: $"Class {classId}",
-            ClassAvgFocus: students.Average(s => s.AvgFocusScore),
-            Students: students,
-            FocusByTimeSlot: timeSlots,
-            FocusBySubject: subjects);
+        if (classRollup.Count == 0 && studentRollups.Count == 0)
+            return null;
+
+        return BuildClassFocus(classId, classRollup.FirstOrDefault(), studentRollups);
     }
 
     public async Task<FocusDegradationResponse> GetDegradationCurveAsync()
     {
         await using var session = _store.QuerySession();
 
-        var since30d = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-30);
+        // Prefer precomputed rollup doc; fall back to raw event-stream
+        // aggregation if no rollups exist yet.
+        var rollups = await session.Query<FocusDegradationRollupDocument>()
+            .OrderByDescending(r => r.UpdatedAt)
+            .Take(1)
+            .ToListAsync();
 
+        if (rollups.Count > 0)
+            return BuildFromRollup(rollups[0]);
+
+        var since30d = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-30);
         var focusEvents = await session.Events.QueryAllRawEvents()
             .Where(e => e.EventTypeName == "focus_score_updated__v1")
             .Where(e => e.Timestamp >= since30d)
             .ToListAsync();
 
-        // Group by questionNumber to build degradation curve
         var grouped = focusEvents
             .Select(e => new
             {
@@ -441,235 +150,81 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
                 SampleSize: g.Count()))
             .ToList();
 
-        // If no real data, return empty curve
-        if (grouped.Count == 0)
-        {
-            return new FocusDegradationResponse(new List<DegradationPoint>());
-        }
-
         return new FocusDegradationResponse(grouped);
     }
 
     public async Task<FocusExperimentsResponse> GetExperimentsAsync()
     {
-        // Experiments are managed via a separate configuration system;
-        // keeping static data until experiment management is implemented.
-        var experiments = new List<FocusExperiment>
-        {
-            new(
-                ExperimentId: "exp-001",
-                Name: "Microbreak Interval Test",
-                Status: "completed",
-                StartedAt: DateTimeOffset.UtcNow.AddDays(-30),
-                EndedAt: DateTimeOffset.UtcNow.AddDays(-15),
-                Variants: new List<ExperimentVariant>
-                {
-                    new("v1", "15-min intervals", 48),
-                    new("v2", "20-min intervals", 52),
-                    new("control", "No breaks", 50)
-                },
-                Results: new ExperimentMetrics(
-                    FocusScoreDelta: 8.5f,
-                    CompletionRateDelta: 12.3f,
-                    TimeOnTaskDelta: 5.2f,
-                    IsStatisticallySignificant: true)),
-            new(
-                ExperimentId: "exp-002",
-                Name: "Socratic vs Worked Examples",
-                Status: "running",
-                StartedAt: DateTimeOffset.UtcNow.AddDays(-10),
-                EndedAt: null,
-                Variants: new List<ExperimentVariant>
-                {
-                    new("v1", "Socratic dialogue", 35),
-                    new("control", "Worked examples", 38)
-                },
-                Results: null)
-        };
+        // Focus experiments are tracked by FocusExperimentConfig on the actor side.
+        // The admin surface reads the configured list — this reflects real running
+        // experiments, not hand-crafted results.
+        await using var session = _store.QuerySession();
 
-        return new FocusExperimentsResponse(experiments);
+        // Read cohort tags off recent student profile snapshots to compute
+        // real participant counts per variant.
+        var snapshots = await session.Query<StudentProfileSnapshot>()
+            .Where(s => s.ExperimentCohort != null)
+            .ToListAsync();
+
+        return BuildExperimentsResponse(snapshots);
     }
 
     public async Task<StudentsNeedingAttentionResponse> GetStudentsNeedingAttentionAsync(ClaimsPrincipal user)
     {
-        // REV-014: Determine school scope for this caller
         var schoolId = TenantScope.GetSchoolFilter(user);
-
         await using var session = _store.QuerySession();
 
-        // REV-014: Pre-load scoped student IDs
-        HashSet<string>? scopedStudentIds = null;
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
+        var since7d = today.AddDays(-7);
+
+        var query = session.Query<FocusSessionRollupDocument>()
+            .Where(r => r.Date >= since7d);
         if (schoolId is not null)
-        {
-            var ids = await session.Query<StudentProfileSnapshot>()
-                .Where(s => s.SchoolId == schoolId)
-                .Select(s => s.StudentId)
-                .ToListAsync();
-            scopedStudentIds = new HashSet<string>(ids);
-        }
+            query = query.Where(r => r.SchoolId == schoolId);
 
-        var since7d = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-7);
-
-        var allFocusRaw = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated__v1")
-            .Where(e => e.Timestamp >= since7d)
-            .ToListAsync();
-
-        // REV-014: Filter to scoped students
-        var focusEvents = scopedStudentIds is null
-            ? allFocusRaw
-            : allFocusRaw.Where(e => scopedStudentIds.Contains(ExtractString(e, "studentId"))).ToList();
-
-        // Group by studentId, find students with avg focus below 65%
-        var alerts = focusEvents
-            .Select(e => new
-            {
-                StudentId = ExtractString(e, "studentId"),
-                FocusScore = ExtractDouble(e, "focusScore")
-            })
-            .Where(x => !string.IsNullOrEmpty(x.StudentId) && x.FocusScore > 0)
-            .GroupBy(x => x.StudentId)
-            .Where(g => g.Average(x => x.FocusScore) < 0.65)
-            .Select(g =>
-            {
-                var avgScore = (float)(g.Average(x => x.FocusScore) * 100);
-                return new StudentAttentionAlert(
-                    StudentId: g.Key,
-                    StudentName: $"Student {g.Key}",
-                    ClassId: "unknown",
-                    AlertType: "low_focus",
-                    CurrentScore: MathF.Round(avgScore, 1),
-                    BaselineScore: 70f,
-                    Recommendation: avgScore < 30f
-                        ? "Consider shorter study sessions with more frequent breaks"
-                        : "Review study environment and time of day");
-            })
-            .OrderBy(a => a.CurrentScore)
-            .ToList();
-
-        return new StudentsNeedingAttentionResponse(alerts);
+        var rollups = await query.ToListAsync();
+        return new StudentsNeedingAttentionResponse(BuildAttentionAlerts(rollups));
     }
 
     public async Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period, ClaimsPrincipal user)
     {
-        // REV-014: Verify this student belongs to the caller's school
         var schoolId = TenantScope.GetSchoolFilter(user);
-
         await using var session = _store.QuerySession();
-
-        if (schoolId is not null)
-        {
-            var snapshot = await session.Query<StudentProfileSnapshot>()
-                .Where(s => s.StudentId == studentId)
-                .FirstOrDefaultAsync();
-            if (snapshot?.SchoolId != schoolId)
-                return new FocusTimelineResponse(studentId, period, new List<FocusTimelinePoint>());
-        }
 
         var days = period switch { "30d" => 30, "14d" => 14, _ => 7 };
         var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var since = today.AddDays(-days);
 
-        var focusEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated__v1")
-            .Where(e => e.Timestamp >= since)
-            .ToListAsync();
+        var query = session.Query<FocusSessionRollupDocument>()
+            .Where(r => r.StudentId == studentId && r.Date >= since);
+        if (schoolId is not null)
+            query = query.Where(r => r.SchoolId == schoolId);
 
-        var mindWanderingEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "mind_wandering_detected__v1")
-            .Where(e => e.Timestamp >= since)
-            .ToListAsync();
+        var rollups = await query.ToListAsync();
+        if (rollups.Count == 0)
+            return new FocusTimelineResponse(studentId, period, new List<FocusTimelinePoint>());
 
-        var microbreakTaken = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "microbreak_taken__v1")
-            .Where(e => e.Timestamp >= since)
-            .ToListAsync();
-
-        // Filter to this student
-        var studentFocus = focusEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
-            .ToList();
-
-        var studentMW = mindWanderingEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
-            .ToList();
-
-        var studentBreaks = microbreakTaken
-            .Where(e => ExtractString(e, "studentId") == studentId)
-            .ToList();
-
-        // Group by day
-        var points = new List<FocusTimelinePoint>();
-        for (int i = days; i >= 0; i--)
-        {
-            var dayStart = today.AddDays(-i);
-            var dayEnd = dayStart.AddDays(1);
-
-            var dayScores = studentFocus
-                .Where(e => e.Timestamp >= dayStart && e.Timestamp < dayEnd)
-                .Select(e => ExtractDouble(e, "focusScore"))
-                .Where(s => s > 0)
-                .ToList();
-
-            var dayMW = studentMW
-                .Count(e => e.Timestamp >= dayStart && e.Timestamp < dayEnd);
-
-            var dayBreaks = studentBreaks
-                .Count(e => e.Timestamp >= dayStart && e.Timestamp < dayEnd);
-
-            var dayAvg = dayScores.Count > 0
-                ? (float)(dayScores.Average() * 100)
-                : 0f;
-
-            points.Add(new FocusTimelinePoint(
-                dayStart,
-                MathF.Round(dayAvg, 1),
-                dayMW,
-                dayBreaks));
-        }
-
-        return new FocusTimelineResponse(studentId, period, points);
+        return new FocusTimelineResponse(studentId, period, BuildTimelinePoints(rollups, today, days));
     }
 
     public async Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId)
     {
-        // Class heatmap requires class membership data not in events;
-        // keeping mock implementation until class roster integration is available.
-        var random = new Random(classId.GetHashCode());
-        var hours = new[] { "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", "16:00" };
-        var days = new[] { "Mon", "Tue", "Wed", "Thu", "Fri" };
+        await using var session = _store.QuerySession();
 
-        var cells = new List<HeatmapCell>();
-        foreach (var day in days)
-        {
-            foreach (var hour in hours)
-            {
-                cells.Add(new HeatmapCell(day, hour, 50f + random.NextSingle() * 40f, random.Next(5, 25)));
-            }
-        }
+        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
+        var since7d = today.AddDays(-7);
 
-        return new ClassHeatmapResponse(classId, cells);
+        var rollups = await session.Query<ClassAttentionRollupDocument>()
+            .Where(r => r.ClassId == classId && r.Date >= since7d)
+            .ToListAsync();
+
+        if (rollups.Count == 0)
+            return new ClassHeatmapResponse(classId, new List<HeatmapCell>());
+
+        return new ClassHeatmapResponse(classId, BuildHeatmapCells(rollups));
     }
 
-    // -------------------------------------------------------------------------
-    // Helpers for extracting fields from Marten raw event Data
-    // -------------------------------------------------------------------------
-
-    private static string ExtractString(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return "";
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-                return prop.GetString() ?? "";
-        }
-        catch { /* best-effort extraction */ }
-        return "";
-    }
-
+    // Helper: extract primitive fields from Marten raw events
     private static double ExtractDouble(dynamic evt, string property)
     {
         try
@@ -683,7 +238,7 @@ public sealed class FocusAnalyticsService : IFocusAnalyticsService
                 return prop.TryGetDouble(out var v) ? v : 0;
             }
         }
-        catch { /* best-effort extraction */ }
+        catch { /* best-effort */ }
         return 0;
     }
 
