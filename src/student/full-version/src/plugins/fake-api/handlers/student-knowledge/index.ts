@@ -2,11 +2,12 @@ import { HttpResponse, http } from 'msw'
 
 /**
  * MSW handlers for the student `/api/content/*` and `/api/knowledge/*`
- * endpoint groups from STB-08 Phase 1.
+ * endpoint groups.
  *
- * STB-08b will replace the backend stub with a real ConceptDocument
- * seeded from knowledge-seed.json. The TypeScript/MSW side keeps a
- * parallel hardcoded catalog so the dev loop works without Cena.Api.Host.
+ * The TypeScript/MSW side keeps a parallel hardcoded catalog so the dev
+ * loop works when the student API host is not running. In production the
+ * MSW worker is NOT registered, so real requests pass through to the
+ * backend ConceptDocument projection.
  */
 
 interface Concept {
@@ -32,16 +33,19 @@ const CATALOG: Concept[] = [
   { conceptId: 'math-geometry', name: 'Plane Geometry', description: 'Shapes, angles, and the Pythagorean theorem.', subject: 'math', topic: 'geometry', difficulty: 'intermediate', status: 'available', currentMastery: null, prerequisites: ['math-algebra'], estimatedMinutes: 50, questionCount: 36 },
   { conceptId: 'math-trig', name: 'Trigonometry', description: 'Sine, cosine, tangent, and the unit circle.', subject: 'math', topic: 'geometry', difficulty: 'advanced', status: 'locked', currentMastery: null, prerequisites: ['math-geometry'], estimatedMinutes: 70, questionCount: 42 },
   { conceptId: 'math-calculus', name: 'Introduction to Calculus', description: 'Limits, derivatives, and integrals.', subject: 'math', topic: 'calculus', difficulty: 'advanced', status: 'locked', currentMastery: null, prerequisites: ['math-quadratics', 'math-trig'], estimatedMinutes: 90, questionCount: 50 },
+
   // Physics
   { conceptId: 'physics-kinematics', name: 'Kinematics', description: 'Motion in a straight line: position, velocity, acceleration.', subject: 'physics', topic: 'mechanics', difficulty: 'beginner', status: 'in-progress', currentMastery: 0.42, prerequisites: [], estimatedMinutes: 55, questionCount: 36 },
   { conceptId: 'physics-forces', name: 'Newton\'s Laws', description: 'Force, mass, and acceleration.', subject: 'physics', topic: 'mechanics', difficulty: 'intermediate', status: 'available', currentMastery: null, prerequisites: ['physics-kinematics'], estimatedMinutes: 60, questionCount: 40 },
   { conceptId: 'physics-energy', name: 'Energy & Work', description: 'Kinetic, potential, and conservation of energy.', subject: 'physics', topic: 'mechanics', difficulty: 'intermediate', status: 'locked', currentMastery: null, prerequisites: ['physics-forces'], estimatedMinutes: 55, questionCount: 34 },
   { conceptId: 'physics-waves', name: 'Waves & Sound', description: 'Wavelength, frequency, interference.', subject: 'physics', topic: 'waves', difficulty: 'advanced', status: 'locked', currentMastery: null, prerequisites: ['physics-energy'], estimatedMinutes: 65, questionCount: 38 },
+
   // Chemistry
   { conceptId: 'chem-atoms', name: 'Atomic Structure', description: 'Protons, neutrons, electrons, and the periodic table.', subject: 'chemistry', topic: 'atoms', difficulty: 'beginner', status: 'mastered', currentMastery: 0.95, prerequisites: [], estimatedMinutes: 45, questionCount: 30 },
   { conceptId: 'chem-bonds', name: 'Chemical Bonding', description: 'Ionic, covalent, and metallic bonds.', subject: 'chemistry', topic: 'bonding', difficulty: 'intermediate', status: 'available', currentMastery: null, prerequisites: ['chem-atoms'], estimatedMinutes: 50, questionCount: 32 },
   { conceptId: 'chem-reactions', name: 'Chemical Reactions', description: 'Balancing equations and reaction types.', subject: 'chemistry', topic: 'reactions', difficulty: 'intermediate', status: 'locked', currentMastery: null, prerequisites: ['chem-bonds'], estimatedMinutes: 55, questionCount: 36 },
   { conceptId: 'chem-organic', name: 'Organic Chemistry Intro', description: 'Hydrocarbons and functional groups.', subject: 'chemistry', topic: 'organic', difficulty: 'advanced', status: 'locked', currentMastery: null, prerequisites: ['chem-reactions'], estimatedMinutes: 75, questionCount: 44 },
+
   // Biology
   { conceptId: 'bio-cells', name: 'Cell Biology', description: 'Cell structure and function.', subject: 'biology', topic: 'cells', difficulty: 'beginner', status: 'available', currentMastery: null, prerequisites: [], estimatedMinutes: 50, questionCount: 32 },
   { conceptId: 'bio-genetics', name: 'Genetics Basics', description: 'DNA, genes, and heredity.', subject: 'biology', topic: 'genetics', difficulty: 'intermediate', status: 'locked', currentMastery: null, prerequisites: ['bio-cells'], estimatedMinutes: 60, questionCount: 38 },
@@ -58,6 +62,7 @@ export const handlerStudentKnowledge = [
   http.get('/api/content/concepts', ({ request }) => {
     const url = new URL(request.url)
     const subject = url.searchParams.get('subject')
+
     const items = CATALOG.filter(c => !subject || c.subject === subject).map(c => ({
       conceptId: c.conceptId,
       name: c.name,
@@ -110,7 +115,7 @@ export const handlerStudentKnowledge = [
 
     // Build adjacency: concept → prerequisites that reach it
     const visited = new Set<string>()
-    const queue: { id: string, path: string[] }[] = [{ id: fromConceptId, path: [fromConceptId] }]
+    const queue: { id: string; path: string[] }[] = [{ id: fromConceptId, path: [fromConceptId] }]
 
     while (queue.length > 0) {
       const { id, path } = queue.shift()!
@@ -125,11 +130,13 @@ export const handlerStudentKnowledge = [
             status: c.status,
           }
         })
+
         const edges = path.slice(0, -1).map((cid, i) => ({
           fromConceptId: cid,
           toConceptId: path[i + 1],
           relationship: 'dependency',
         }))
+
         const totalMinutes = path.reduce((acc, cid) => {
           const c = CATALOG.find(x => x.conceptId === cid)!
 
@@ -148,6 +155,7 @@ export const handlerStudentKnowledge = [
       if (visited.has(id))
         continue
       visited.add(id)
+
       const deps = dependenciesOf(id)
       for (const d of deps)
         queue.push({ id: d, path: [...path, d] })

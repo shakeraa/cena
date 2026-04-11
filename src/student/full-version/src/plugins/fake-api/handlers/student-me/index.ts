@@ -1,14 +1,12 @@
 import { HttpResponse, http } from 'msw'
 
 /**
- * MSW handlers for the student `/api/me/*` endpoint group from STB-00.
+ * MSW handlers for the student `/api/me/*` endpoint group.
  *
  * These mock responses let the student web dev loop work against a
- * deterministic backend without running `Cena.Api.Host`. In production
- * the MSW worker is NOT registered, so real requests pass through to
- * the deployed API host.
- *
- * STU-W-05B wires /api/me into the home dashboard via useApiQuery.
+ * deterministic backend without running the student API host. In
+ * production the MSW worker is NOT registered, so real requests pass
+ * through to the deployed API host.
  */
 
 const mockBootstrap = {

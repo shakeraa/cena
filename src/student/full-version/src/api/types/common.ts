@@ -17,14 +17,26 @@ export interface PaginatedResponse<T> {
   pageSize: number
 }
 
+/**
+ * `GET /api/analytics/summary` response. Mirrors the real C# record
+ * `Cena.Api.Contracts.Analytics.AnalyticsSummaryDto`. All fields are
+ * overall-to-date, computed server-side from the student's event stream
+ * and `StudentProfileSnapshot`. There is no per-"today" summary in this
+ * payload — for today-specific values the front end queries
+ * `GET /api/analytics/time-breakdown` (returns the last 30 days with
+ * today as the final entry).
+ *
+ * `overallAccuracy` is a normalized 0..1 value. UI code must multiply by
+ * 100 to render a percentage.
+ */
 export interface AnalyticsSummaryDto {
-  studentId: string
-  minutesThisWeek: number
-  questionsAnswered: number
-  accuracyPercent: number
-  streakDays: number
-  xp: number
-  updatedAt: string
+  totalSessions: number
+  totalQuestionsAttempted: number
+  overallAccuracy: number
+  currentStreak: number
+  longestStreak: number
+  totalXp: number
+  level: number
 }
 
 export interface SessionSummary {
