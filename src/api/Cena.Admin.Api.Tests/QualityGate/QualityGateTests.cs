@@ -93,7 +93,7 @@ public class QualityGateTests
     public void StructuralValidator_PerfectQuestion_ScoresAbove80()
     {
         var input = QualityGateTestData.GetGoodQuestions().First().Input;
-        var (score, violations) = StructuralValidator.Validate(input);
+        var (score, violations) = QualityGateServices.StructuralValidator.Validate(input);
         Assert.True(score >= 80, $"Perfect question scored only {score}. Violations: {string.Join(", ", violations.Select(v => v.RuleId))}");
     }
 
@@ -101,7 +101,7 @@ public class QualityGateTests
     public void StemClarityScorer_WellFormedStem_ScoresAbove70()
     {
         var input = QualityGateTestData.GetGoodQuestions().First().Input;
-        var (score, _) = StemClarityScorer.Score(input);
+        var (score, _) = QualityGateServices.StemClarityScorer.Score(input);
         Assert.True(score >= 70, $"Well-formed stem scored only {score}");
     }
 
@@ -110,7 +110,7 @@ public class QualityGateTests
     {
         // Use G04 which has full rationales on all distractors
         var g04 = QualityGateTestData.GetGoodQuestions().First(tc => tc.Id == "G04");
-        var (score, _) = DistractorQualityScorer.Score(g04.Input);
+        var (score, _) = QualityGateServices.DistractorQualityScorer.Score(g04.Input);
         Assert.True(score >= 60, $"Good distractors scored only {score}");
     }
 
@@ -119,7 +119,7 @@ public class QualityGateTests
     {
         // G01 is Bloom 3 (Apply) with "Solve for x" — should match Middle tier
         var g01 = QualityGateTestData.GetGoodQuestions().First(tc => tc.Id == "G01");
-        var (score, _) = BloomAlignmentScorer.Score(g01.Input);
+        var (score, _) = QualityGateServices.BloomAlignmentScorer.Score(g01.Input);
         Assert.True(score >= 70, $"Correct Bloom alignment scored only {score}");
     }
 

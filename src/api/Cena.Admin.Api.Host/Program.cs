@@ -28,10 +28,12 @@ using StackExchange.Redis;
 var builder = WebApplication.CreateBuilder(args);
 
 // ---- Serilog ----
-builder.Host.UseSerilog((context, configuration) =>
+// FIND-sec-004: Use 3-arg overload to access services and add PII destructuring policy
+builder.Host.UseSerilog((context, services, configuration) =>
 {
     configuration
         .ReadFrom.Configuration(context.Configuration)
+        .Destructure.With<PiiDestructuringPolicy>()
         .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}");
 });
 
@@ -67,12 +69,8 @@ var natsUrl = builder.Configuration.GetConnectionString("NATS") ?? "nats://local
 builder.Services.AddSingleton<NATS.Client.Core.INatsConnection>(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<NATS.Client.Core.INatsConnection>>();
-    var natsUser = builder.Configuration["NATS:ApiUsername"] 
-        ?? Environment.GetEnvironmentVariable("NATS_API_USERNAME") 
-        ?? "cena_api_user";
-    var natsPass = builder.Configuration["NATS:ApiPassword"] 
-        ?? Environment.GetEnvironmentVariable("NATS_API_PASSWORD") 
-        ?? "dev_api_pass";
+    // FIND-sec-003: Use centralized NATS auth resolution with dev-only fallback
+    var (natsUser, natsPass) = CenaNatsOptions.GetApiAuth(builder.Configuration, builder.Environment);
 
     var opts = new NATS.Client.Core.NatsOpts
     {

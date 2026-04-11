@@ -191,35 +191,6 @@ public static class SessionEndpoints
         })
         .WithName("GetStudentSessions");
 
-        // GET /api/sessions/active — check if student has an active (unended) session
-        group.MapGet("/active", async (
-            HttpContext ctx,
-            IDocumentStore store) =>
-        {
-            var studentId = GetStudentId(ctx.User);
-            if (string.IsNullOrEmpty(studentId))
-                return Results.Unauthorized();
-
-            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
-
-            await using var session = store.QuerySession();
-            var doc = await session.Query<TutoringSessionDocument>()
-                .Where(d => d.StudentId == studentId && d.EndedAt == null)
-                .OrderByDescending(d => d.StartedAt)
-                .FirstOrDefaultAsync();
-
-            if (doc is null)
-                return Results.Ok(new ActiveSessionResponse(
-                    HasActive: false, SessionId: null, Subject: null, StartedAt: null));
-
-            return Results.Ok(new ActiveSessionResponse(
-                HasActive: true,
-                SessionId: doc.SessionId,
-                Subject: doc.Subject,
-                StartedAt: doc.StartedAt));
-        })
-        .WithName("GetActiveSession");
-
         // GET /api/sessions/{sessionId} — full session detail
         group.MapGet("/{sessionId}", async (
             string sessionId,

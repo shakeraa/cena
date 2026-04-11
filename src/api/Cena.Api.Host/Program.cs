@@ -85,11 +85,8 @@ builder.Services.AddSingleton<NATS.Client.Core.INatsConnection>(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<NATS.Client.Core.INatsConnection>>();
 
-    // REV-002: NATS authentication — admin-api user (subscribe-only)
-    var natsUser = builder.Configuration["Nats:User"] ?? "admin-api";
-    var natsPass = builder.Configuration["Nats:Password"]
-        ?? Environment.GetEnvironmentVariable("NATS_API_PASSWORD")
-        ?? "dev_api_pass";
+    // FIND-sec-003: Use centralized NATS auth resolution with dev-only fallback
+    var (natsUser, natsPass) = CenaNatsOptions.GetApiAuth(builder.Configuration, builder.Environment);
 
     var opts = new NATS.Client.Core.NatsOpts
     {
