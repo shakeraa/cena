@@ -298,6 +298,29 @@ public static class MartenConfiguration
             .Index(x => x.StudentId)
             .Index(x => x.Endpoint);
 
+        // ── Cultural Context Documents (ADM-012) ──
+        opts.Schema.For<CulturalContextGroupDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.Context);
+
+        opts.Schema.For<MethodologyEffectivenessByCultureDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.Methodology);
+
+        opts.Schema.For<EquityAlertDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.Severity)
+            .Index(x => x.DetectedAt);
+
+        opts.Schema.For<ContentBalanceRecommendationDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.Language)
+            .Index(x => x.Subject);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);

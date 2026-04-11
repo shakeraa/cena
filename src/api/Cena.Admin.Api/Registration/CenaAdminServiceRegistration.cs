@@ -37,6 +37,7 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<IQuestionBankService, QuestionBankService>();
         services.AddScoped<IMethodologyAnalyticsService, MethodologyAnalyticsService>();
         services.AddScoped<ICulturalContextService, CulturalContextService>();
+        services.AddHostedService<CulturalContextSeeder>();
         services.AddScoped<IEventStreamService, EventStreamService>();
         services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
         services.AddSingleton<IAiGenerationService, AiGenerationService>();

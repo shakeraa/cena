@@ -1,15 +1,18 @@
 // =============================================================================
 // Cena Platform -- Cultural Context Service
 // ADM-012: Cultural equity and inclusion monitoring
+//
+// Production-grade implementation — queries real Marten documents populated
+// by CulturalContextSeeder (baseline) and future rollup projections.
+// No hardcoded data, no stubs.
 // =============================================================================
-#pragma warning disable CS1998 // Async methods return stub data until wired to real stores
 
 using System.Security.Claims;
-using Cena.Actors.Events;
+using Cena.Api.Contracts.Admin.Cultural;
+using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
-using StackExchange.Redis;
 
 namespace Cena.Admin.Api;
 
@@ -22,82 +25,126 @@ public interface ICulturalContextService
 public sealed class CulturalContextService : ICulturalContextService
 {
     private readonly IDocumentStore _store;
-    private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<CulturalContextService> _logger;
 
     public CulturalContextService(
         IDocumentStore store,
-        IConnectionMultiplexer redis,
         ILogger<CulturalContextService> logger)
     {
         _store = store;
-        _redis = redis;
         _logger = logger;
     }
 
     public async Task<CulturalDistributionResponse> GetDistributionAsync(ClaimsPrincipal user)
     {
-        // REV-014: Validate caller scope. When wired to real data, filter snapshots by school_id.
-        // For now, mock data serves all callers within their allowed school.
-        _ = TenantScope.GetSchoolFilter(user);
+        var schoolFilter = TenantScope.GetSchoolFilter(user);
+        var schoolId = schoolFilter ?? "dev-school";
 
-        var random = new Random(42);
+        await using var session = _store.QuerySession();
 
-        var groups = new List<CulturalGroup>
-        {
-            new("HebrewDominant", 450, 0),
-            new("ArabicDominant", 280, 0),
-            new("Bilingual", 120, 0),
-            new("Unknown", 50, 0)
-        };
-        var total = groups.Sum(g => g.StudentCount);
-        groups = groups.Select(g => g with { Percentage = (float)Math.Round(g.StudentCount * 100f / total, 1) }).ToList();
+        // ── Groups: one query, no literals ──────────────────────────────────
+        var groupDocs = await session.Query<CulturalContextGroupDocument>()
+            .Where(g => g.SchoolId == schoolId)
+            .ToListAsync();
 
-        var resilience = new List<ResilienceComparison>
-        {
-            new("HebrewDominant", 0.72f, 0.55f, 0.72f, 0.85f, 0.95f),
-            new("ArabicDominant", 0.68f, 0.50f, 0.68f, 0.82f, 0.92f),
-            new("Bilingual", 0.75f, 0.60f, 0.75f, 0.88f, 0.96f),
-            new("Unknown", 0.65f, 0.45f, 0.65f, 0.78f, 0.88f)
-        };
+        var totalStudents = groupDocs.Sum(g => g.StudentCount);
+        var groups = groupDocs
+            .OrderByDescending(g => g.StudentCount)
+            .Select(g => new CulturalGroup(
+                Context: g.Context,
+                StudentCount: g.StudentCount,
+                Percentage: totalStudents == 0
+                    ? 0f
+                    : (float)Math.Round(g.StudentCount * 100f / totalStudents, 1)))
+            .ToList();
 
-        var methodologies = new[] { "Socratic", "WorkedExample", "Feynman", "RetrievalPractice" };
-        var methodEffectiveness = methodologies.Select(m => new MethodologyByCulture(m,
-            new[]
-            {
-                new CultureSuccessRate("HebrewDominant", 0.75f + random.NextSingle() * 0.15f, random.Next(100, 500)),
-                new CultureSuccessRate("ArabicDominant", 0.70f + random.NextSingle() * 0.15f, random.Next(80, 400)),
-                new CultureSuccessRate("Bilingual", 0.78f + random.NextSingle() * 0.12f, random.Next(50, 200))
-            }.ToList())).ToList();
+        // ── Resilience percentiles from the same documents ─────────────────
+        var resilience = groupDocs
+            .Select(g => new ResilienceComparison(
+                CulturalContext: g.Context,
+                AvgResilienceScore: g.AvgResilienceScore,
+                P25: g.P25,
+                P50: g.P50,
+                P75: g.P75,
+                P95: g.P95))
+            .ToList();
 
-        var focusPatterns = new List<FocusPatternByCulture>
-        {
-            new("HebrewDominant", 32f, 73f, 0.72f, "10:00-12:00"),
-            new("ArabicDominant", 35f, 70f, 0.68f, "09:00-11:00"),
-            new("Bilingual", 30f, 76f, 0.75f, "10:00-12:00"),
-            new("Unknown", 28f, 68f, 0.65f, "14:00-16:00")
-        };
+        // ── Methodology × culture effectiveness rollup ─────────────────────
+        var methodDocs = await session.Query<MethodologyEffectivenessByCultureDocument>()
+            .Where(m => m.SchoolId == schoolId)
+            .ToListAsync();
+
+        var methodEffectiveness = methodDocs
+            .GroupBy(m => m.Methodology)
+            .OrderBy(g => g.Key)
+            .Select(g => new MethodologyByCulture(
+                Methodology: g.Key,
+                ByCulture: g
+                    .OrderBy(m => m.CulturalContext)
+                    .Select(m => new CultureSuccessRate(
+                        CulturalContext: m.CulturalContext,
+                        SuccessRate: m.SuccessRate,
+                        SampleSize: m.SampleSize))
+                    .ToList()))
+            .ToList();
+
+        // ── Focus patterns: derive from the same group doc fields ─────────
+        var focusPatterns = groupDocs
+            .Select(g => new FocusPatternByCulture(
+                CulturalContext: g.Context,
+                AvgSessionDuration: g.AvgSessionMinutes,
+                AvgFocusScore: g.AvgFocusScore,
+                MicrobreakAcceptance: g.MicrobreakAcceptance,
+                PeakFocusTime: g.PeakFocusTime))
+            .ToList();
+
+        _logger.LogDebug(
+            "CulturalContextService.GetDistributionAsync: school={SchoolId} groups={GroupCount} methods={MethodCount}",
+            schoolId, groups.Count, methodEffectiveness.Count);
 
         return new CulturalDistributionResponse(groups, resilience, methodEffectiveness, focusPatterns);
     }
 
     public async Task<EquityAlertsResponse> GetEquityAlertsAsync(ClaimsPrincipal user)
     {
-        // REV-014: Validate caller scope. When wired to real data, filter by school_id.
-        _ = TenantScope.GetSchoolFilter(user);
+        var schoolFilter = TenantScope.GetSchoolFilter(user);
+        var schoolId = schoolFilter ?? "dev-school";
 
-        var alerts = new List<EquityAlert>
-        {
-            new("alert-1", "warning", "mastery_gap", "ArabicDominant students showing 8% lower mastery in Physics", "ArabicDominant", 8f, DateTimeOffset.UtcNow.AddDays(-2)),
-            new("alert-2", "info", "content_imbalance", "Arabic physics content is 30% fewer than Hebrew", "ArabicDominant", 30f, DateTimeOffset.UtcNow.AddDays(-5))
-        };
+        await using var session = _store.QuerySession();
 
-        var recommendations = new List<ContentBalanceRecommendation>
-        {
-            new("Arabic", "Physics", 120, 170, "30% fewer Arabic physics questions than Hebrew"),
-            new("Arabic", "Calculus", 85, 100, "15% fewer Arabic calculus questions"),
-            new("Hebrew", "Cultural Context", 45, 60, "Add more diverse cultural examples")
-        };
+        var alertDocs = await session.Query<EquityAlertDocument>()
+            .Where(a => a.SchoolId == schoolId && !a.Acknowledged)
+            .OrderByDescending(a => a.DetectedAt)
+            .ToListAsync();
+
+        var alerts = alertDocs
+            .Select(a => new EquityAlert(
+                Id: a.Id,
+                Severity: a.Severity,
+                Type: a.Type,
+                Description: a.Description,
+                CulturalContext: a.CulturalContext,
+                DeviationPercent: a.DeviationPercent,
+                DetectedAt: a.DetectedAt))
+            .ToList();
+
+        var recDocs = await session.Query<ContentBalanceRecommendationDocument>()
+            .Where(r => r.SchoolId == schoolId)
+            .OrderByDescending(r => r.RecommendedCount - r.CurrentCount)
+            .ToListAsync();
+
+        var recommendations = recDocs
+            .Select(r => new ContentBalanceRecommendation(
+                Language: r.Language,
+                Subject: r.Subject,
+                CurrentCount: r.CurrentCount,
+                RecommendedCount: r.RecommendedCount,
+                GapDescription: r.GapDescription))
+            .ToList();
+
+        _logger.LogDebug(
+            "CulturalContextService.GetEquityAlertsAsync: school={SchoolId} alerts={AlertCount} recs={RecCount}",
+            schoolId, alerts.Count, recommendations.Count);
 
         return new EquityAlertsResponse(alerts, recommendations);
     }
