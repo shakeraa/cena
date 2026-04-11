@@ -41,24 +41,12 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
   test('E2E #1 file-based routing: every placeholder route resolves', async ({ page }) => {
     await seedAuth(page, { uid: 'u-routing' })
 
-    // `/home` (STU-W-05A), `/progress` (STU-W-07), `/tutor` (STU-W-08),
-    // `/challenges` (STU-W-11), `/social/leaderboard` (STU-W-13),
-    // `/session` (STU-W-06), `/progress/{sessions,mastery,time}`
-    // (STU-W-09), `/knowledge-graph` (STU-W-10), and
-    // `/social{,/peers,/friends}` (STU-W-12) have been replaced with
-    // real pages and no longer render the placeholder testid.
-    // Covered by the per-feature spec files.
+    // Most routes have been replaced with real pages in Phase A tasks.
+    // Only `/challenges/daily` and `/challenges/boss` still render the
+    // placeholder (reserved for STU-W-11b Phase B subpages).
     const routes = [
       '/challenges/daily',
       '/challenges/boss',
-      '/notifications',
-      '/profile',
-      '/profile/edit',
-      '/settings',
-      '/settings/account',
-      '/settings/appearance',
-      '/settings/notifications',
-      '/settings/privacy',
     ]
 
     for (const path of routes) {
@@ -239,13 +227,15 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
 
   test('E2E #10 placeholder page shows route metadata', async ({ page }) => {
     await seedAuth(page, { uid: 'u-placeholder' })
-    await page.goto('/settings/privacy')
+    // /challenges/daily is still a placeholder (STU-W-11 ships the hub,
+    // 11b will ship the per-challenge subpages).
+    await page.goto('/challenges/daily')
     await page.waitForLoadState('domcontentloaded')
 
     const metaText = await page.locator('[data-testid="placeholder-route-meta"]').innerText()
 
-    expect(metaText).toContain('name: settings-privacy')
-    expect(metaText).toContain('path: /settings/privacy')
+    expect(metaText).toContain('name: challenges-daily')
+    expect(metaText).toContain('path: /challenges/daily')
     expect(metaText).toContain('requiresAuth: true')
   })
 })

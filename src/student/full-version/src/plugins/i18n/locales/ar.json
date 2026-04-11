@@ -369,6 +369,78 @@
       "friends": "الأصدقاء"
     }
   },
+  "notifications": {
+    "title": "الإشعارات",
+    "subtitle": "ابقَ على اطلاع بتقدمك في التعلم.",
+    "markAllRead": "وضع علامة مقروء على الكل",
+    "unreadCount": "{count} غير مقروء",
+    "emptyTitle": "لقد اطلعت على كل شيء",
+    "emptySubtitle": "لا توجد إشعارات جديدة.",
+    "justNow": "الآن",
+    "minutesAgo": "قبل {count} د",
+    "hoursAgo": "قبل {count} س",
+    "daysAgo": "قبل {count} يوم"
+  },
+  "profile": {
+    "editProfile": "تعديل الملف الشخصي",
+    "editTitle": "تعديل الملف الشخصي",
+    "editSubtitle": "حدّث كيف تظهر لزملاء الصف.",
+    "editSaved": "تم حفظ الملف الشخصي.",
+    "levelLabel": "المستوى {level}",
+    "streakLabel": "سلسلة {days} يوم",
+    "aboutTitle": "حول",
+    "bioEmpty": "لا توجد سيرة بعد.",
+    "bioLabel": "السيرة",
+    "bioPlaceholder": "أخبر زملاءك قليلاً عن نفسك…",
+    "favoriteSubjectsTitle": "المواد المفضلة",
+    "subjectsEmpty": "لم تختر مواد مفضلة بعد.",
+    "displayNameLabel": "الاسم المعروض",
+    "visibilityLabel": "ظهور الملف الشخصي",
+    "visibilityPublic": "عام",
+    "visibilityClass": "زملاء الصف فقط",
+    "visibilityPrivate": "خاص"
+  },
+  "settingsPage": {
+    "title": "الإعدادات",
+    "subtitle": "خصّص تجربتك في سينا.",
+    "account": {
+      "title": "الحساب",
+      "subtitle": "معلومات تسجيل الدخول وتسجيل الخروج",
+      "accountInfo": "معلومات الحساب",
+      "studentId": "معرّف الطالب",
+      "role": "الدور",
+      "signOutTitle": "تسجيل الخروج",
+      "signOutSubtitle": "ستحتاج إلى تسجيل الدخول مرة أخرى.",
+      "phaseANote": "المرحلة أ تعرض معلومات الحساب فقط."
+    },
+    "appearance": {
+      "title": "المظهر",
+      "subtitle": "السمة واللغة",
+      "themeLabel": "السمة",
+      "themeLight": "فاتح",
+      "themeDark": "داكن",
+      "languageLabel": "اللغة"
+    },
+    "notifications": {
+      "title": "الإشعارات",
+      "subtitle": "البريد الإلكتروني والإشعارات الفورية",
+      "email": "إشعارات البريد الإلكتروني",
+      "push": "الإشعارات الفورية",
+      "dailyReminder": "تذكير يومي بالدراسة",
+      "weekly": "ملخص أسبوعي",
+      "streakAlerts": "تنبيهات السلسلة",
+      "newContent": "تنبيهات المحتوى الجديد",
+      "phaseANote": "تُحفظ التفضيلات محليًا فقط في المرحلة أ."
+    },
+    "privacy": {
+      "title": "الخصوصية",
+      "subtitle": "مشاركة البيانات",
+      "showProgressToClass": "إظهار تقدمي لزملاء الصف",
+      "allowPeerComparison": "السماح بمقارنة الأقران",
+      "shareAnalytics": "مشاركة تحليلات مجهولة",
+      "phaseANote": "تُحفظ التفضيلات محليًا فقط في المرحلة أ."
+    }
+  },
   "social": {
     "feed": {
       "title": "موجز الفصل",

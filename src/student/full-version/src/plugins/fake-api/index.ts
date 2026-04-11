@@ -43,6 +43,9 @@ import { handlerStudentKnowledge } from '@db/student-knowledge/index'
 // STU-W-12: student /api/social/* handlers for class feed + peers + friends.
 import { handlerStudentSocial } from '@db/student-social/index'
 
+// STU-W-14: student /api/notifications/* handlers for the notifications center.
+import { handlerStudentNotifications } from '@db/student-notifications/index'
+
 const worker = setupWorker(
   ...handlerAppsEcommerce,
   ...handlerAppsAcademy,
@@ -69,6 +72,7 @@ const worker = setupWorker(
   ...handlerStudentAnalytics,
   ...handlerStudentKnowledge,
   ...handlerStudentSocial,
+  ...handlerStudentNotifications,
 )
 
 export default function () {

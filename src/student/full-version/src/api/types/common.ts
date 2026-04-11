@@ -423,3 +423,57 @@ export interface FriendsListDto {
   friends: Friend[]
   pendingRequests: FriendRequest[]
 }
+
+/**
+ * Notification DTOs from STB-07 Phase 1. Mirrors
+ * `src/api/Cena.Api.Contracts/Notifications/NotificationsDtos.cs`.
+ * Consumed by STU-W-14 notifications center.
+ */
+export type NotificationKind = 'xp' | 'badge' | 'streak' | 'friend-request' | 'review-due' | 'system'
+export type NotificationPriority = 'low' | 'normal' | 'high'
+
+export interface NotificationItem {
+  notificationId: string
+  kind: NotificationKind
+  priority: NotificationPriority
+  title: string
+  body: string
+  iconName: string | null
+  deepLinkUrl: string | null
+  read: boolean
+  createdAt: string
+}
+
+export interface NotificationListDto {
+  items: NotificationItem[]
+  page: number
+  pageSize: number
+  total: number
+  hasMore: boolean
+  unreadCount: number
+}
+
+export interface UnreadCountDto {
+  count: number
+}
+
+/**
+ * Profile DTOs from STB-00. Mirrors
+ * `src/api/Cena.Api.Contracts/Me/MeDtos.cs:ProfileDto + ProfilePatchDto`.
+ */
+export interface ProfileDto {
+  studentId: string
+  displayName: string
+  email: string
+  avatarUrl: string | null
+  bio: string | null
+  favoriteSubjects: string[]
+  visibility: 'public' | 'class-only' | 'private'
+}
+
+export interface ProfilePatchDto {
+  displayName?: string
+  bio?: string
+  favoriteSubjects?: string[]
+  visibility?: 'public' | 'class-only' | 'private'
+}

@@ -62,6 +62,7 @@ declare module 'vue' {
     LanguageSwitcher: typeof import('./src/components/common/LanguageSwitcher.vue')['default']
     LeaderboardPreview: typeof import('./src/components/progress/LeaderboardPreview.vue')['default']
     MoreBtn: typeof import('./src/@core/components/MoreBtn.vue')['default']
+    NotificationListItem: typeof import('./src/components/notifications/NotificationListItem.vue')['default']
     Notifications: typeof import('./src/@core/components/Notifications.vue')['default']
     OnboardingStepper: typeof import('./src/components/onboarding/OnboardingStepper.vue')['default']
     PaymentProvidersDialog: typeof import('./src/components/dialogs/PaymentProvidersDialog.vue')['default']
