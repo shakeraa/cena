@@ -337,6 +337,56 @@
       "friends": "الأصدقاء"
     }
   },
+  "session": {
+    "setup": {
+      "title": "ابدأ جلسة تعلم",
+      "subtitle": "اختر المواضيع والمدة والنمط للبدء.",
+      "subjectsLabel": "المواضيع",
+      "durationLabel": "المدة",
+      "durationMinutes": "{minutes} د",
+      "modeLabel": "الوضع",
+      "startCta": "ابدأ الجلسة",
+      "subjects": {
+        "math": "رياضيات",
+        "physics": "فيزياء",
+        "chemistry": "كيمياء",
+        "biology": "أحياء",
+        "english": "إنجليزي",
+        "history": "تاريخ"
+      },
+      "modes": {
+        "practice": "تدريب",
+        "challenge": "تحدٍّ",
+        "review": "مراجعة",
+        "diagnostic": "تشخيص"
+      }
+    },
+    "runner": {
+      "questionProgress": "السؤال {current} من {total}",
+      "progressAria": "السؤال {current} من {total}",
+      "choicesAria": "خيارات الإجابة",
+      "submitAnswer": "إرسال",
+      "correct": "صحيح!",
+      "wrong": "ليس بالضبط.",
+      "xpAwarded": "+{xp} نقطة",
+      "exit": "خروج",
+      "exitAria": "الخروج من الجلسة",
+      "sessionIdLabel": "الجلسة",
+      "completing": "جارٍ الإنهاء…"
+    },
+    "summary": {
+      "title": "اكتملت الجلسة",
+      "subtitle": "هذا أداؤك.",
+      "xpEarned": "النقاط المكتسبة",
+      "accuracy": "الدقة",
+      "correctCount": "إجابات صحيحة",
+      "duration": "المدة",
+      "durationSecs": "{secs} ث",
+      "durationMinsSecs": "{mins} د {secs} ث",
+      "startAnother": "ابدأ جلسة أخرى",
+      "backToHome": "العودة للرئيسية"
+    }
+  },
   "challenges": {
     "hub": {
       "title": "التحديات",
