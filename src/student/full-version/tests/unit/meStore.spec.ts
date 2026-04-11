@@ -4,6 +4,12 @@ import { useMeStore } from '@/stores/meStore'
 
 describe('meStore', () => {
   beforeEach(() => {
+    // FIND-ux-010: meStore now persists to localStorage['cena-mock-me'].
+    // Clear it between tests so each spec starts from a known empty
+    // state; otherwise assertions on `profile === null` would leak
+    // from a previous test that wrote a profile.
+    if (typeof window !== 'undefined' && window.localStorage)
+      window.localStorage.removeItem('cena-mock-me')
     setActivePinia(createPinia())
   })
 

@@ -5,7 +5,7 @@
   <link rel="icon" href="/favicon.ico" />
   <meta name="robots" content="noindex, nofollow" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Vuexy - Vuejs Admin Dashboard Template</title>
+  <title>Cena Admin</title>
   <link rel="stylesheet" type="text/css" href="/loader.css" />
 </head>
 
@@ -40,8 +40,10 @@
   </div>
   <script type="module" src="/src/main.ts"></script>
   <script>
-    const loaderColor = localStorage.getItem('vuexy-initial-loader-bg') || '#FFFFFF'
-    const primaryColor = localStorage.getItem('vuexy-initial-loader-color') || '#7367F0'
+    // FIND-ux-008: keys are namespaced by themeConfig.app.title via
+    // namespaceConfig(). For the admin web the prefix is `cena-admin`.
+    const loaderColor = localStorage.getItem('cena-admin-initial-loader-bg') || '#FFFFFF'
+    const primaryColor = localStorage.getItem('cena-admin-initial-loader-color') || '#7367F0'
 
     if (loaderColor)
       document.documentElement.style.setProperty('--initial-loader-bg', loaderColor)

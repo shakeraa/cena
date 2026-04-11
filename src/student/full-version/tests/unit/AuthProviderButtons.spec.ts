@@ -20,6 +20,12 @@ function makeRouter() {
 
 describe('AuthProviderButtons', () => {
   beforeEach(() => {
+    // FIND-ux-010: the auth/me stores now persist to localStorage; clear
+    // between tests so each case starts fresh.
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem('cena-mock-auth')
+      window.localStorage.removeItem('cena-mock-me')
+    }
     setActivePinia(createPinia())
   })
 

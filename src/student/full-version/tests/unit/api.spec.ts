@@ -10,6 +10,11 @@ import { __internal } from '@/api/$api'
 
 describe('$api internals', () => {
   beforeEach(() => {
+    // FIND-ux-010: authStore now persists to localStorage; clear between
+    // tests so each case sees the in-test __mockSignIn identity and not
+    // a leak from a previous test.
+    if (typeof window !== 'undefined' && window.localStorage)
+      window.localStorage.removeItem('cena-mock-auth')
     setActivePinia(createPinia())
 
     const auth = useAuthStore()

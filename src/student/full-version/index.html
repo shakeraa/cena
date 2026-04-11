@@ -43,8 +43,10 @@
   </div>
   <script type="module" src="/src/main.ts"></script>
   <script>
-    const loaderColor = localStorage.getItem('vuexy-initial-loader-bg') || '#FFFFFF'
-    const primaryColor = localStorage.getItem('vuexy-initial-loader-color') || '#7367F0'
+    // FIND-ux-009: keys are namespaced by themeConfig.app.title via
+    // namespaceConfig(). For the student web the prefix is `cena-student`.
+    const loaderColor = localStorage.getItem('cena-student-initial-loader-bg') || '#FFFFFF'
+    const primaryColor = localStorage.getItem('cena-student-initial-loader-color') || '#7367F0'
 
     if (loaderColor)
       document.documentElement.style.setProperty('--initial-loader-bg', loaderColor)

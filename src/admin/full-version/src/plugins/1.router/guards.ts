@@ -25,6 +25,7 @@ function waitForAuthReady(): Promise<void> {
             const ADMIN_ROLES: CenaRole[] = ['MODERATOR', 'ADMIN', 'SUPER_ADMIN']
             if (ADMIN_ROLES.includes(role)) {
               const abilities = mapRoleToAbilities(role)
+
               ability.update(abilities)
               useCookie('userAbilityRules').value = abilities as any
               useCookie('accessToken').value = tokenResult.token
@@ -39,6 +40,7 @@ function waitForAuthReady(): Promise<void> {
       })
     })
   }
+
   return _authReady
 }
 
@@ -61,12 +63,36 @@ function canNavigateRoute(to: RouteLocationNormalized): boolean {
   return to.matched.some(route => {
     if (route.meta.action && route.meta.subject)
       return ability.can(route.meta.action as Actions, route.meta.subject as Subjects)
+
     return false
   })
 }
 
+/**
+ * Brand label used as the document.title suffix across every admin tab.
+ * FIND-ux-008: a hard-coded 'Vuexy' used to leak through from the
+ * vite index.html and the route `meta.title` strings; the afterEach
+ * hook below rewrites the tab title on every navigation so new tabs,
+ * hard refreshes, and deep-links all stay on-brand.
+ */
+const ADMIN_APP_NAME = 'Cena Admin'
+
 export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]: any }>) => {
-  router.beforeEach(async (to) => {
+  router.afterEach(to => {
+    if (typeof document === 'undefined')
+      return
+
+    // route.meta.title is already used by the Vuexy layout for breadcrumb
+    // rendering; we reuse it here so we don't duplicate labels. If a
+    // route doesn't set meta.title, fall back to just the brand.
+    const pageLabel = typeof to.meta.title === 'string' && to.meta.title.length > 0
+      ? to.meta.title
+      : null
+
+    document.title = pageLabel ? `${pageLabel} · ${ADMIN_APP_NAME}` : ADMIN_APP_NAME
+  })
+
+  router.beforeEach(async to => {
     // Public routes: 404, maintenance, etc.
     if (to.meta.public)
       return

@@ -54,7 +54,7 @@ const referAndEarnSteps = [
           Refer & Earn
         </h4>
         <p class="text-body-1 mb-6 text-center">
-          Invite your friend to <span class="text-capitalize">{{ themeConfig.app.title }}</span>, if they sign up, you and your friend will get 30 days free trial
+          Invite your friend to <span class="text-capitalize">{{ themeConfig.app.brandTitle ?? themeConfig.app.title }}</span>, if they sign up, you and your friend will get 30 days free trial
         </p>
 
         <VRow class="text-center mt-8">
@@ -95,7 +95,7 @@ const referAndEarnSteps = [
         >
           <AppTextField
             placeholder="johnDoe@gmail.com"
-            label="Enter your friend's email address and invite them to join Vuexy 😍"
+            label="Enter your friend's email address and invite them to join Cena 😍"
           />
 
           <VBtn
