@@ -18,6 +18,7 @@ using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Seed;
 using Marten;
 using Microsoft.AspNetCore.RateLimiting;
@@ -129,6 +130,12 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);
 builder.Services.AddCenaAuthorization();
 
+// FIND-ux-006b: the student host needs the Firebase Admin SDK wrapper to
+// back the anonymous POST /api/auth/password-reset endpoint. The admin host
+// already registers this as a singleton; mirror that here so the student
+// self-service forgot-password flow has a real implementation on both sides.
+builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminService>();
+
 // ---- SignalR Real-Time Hub ----
 builder.Services.AddCenaSignalR();
 builder.Services.AddSignalRTokenExtraction();
@@ -176,6 +183,28 @@ builder.Services.AddRateLimiter(options =>
         opt.PermitLimit = 10;
         opt.Window = TimeSpan.FromMinutes(1);
         opt.QueueLimit = 0;
+    });
+
+    // FIND-ux-006b: password-reset is anonymous and must be partitioned by
+    // remote IP so a single attacker cannot drain a shared quota for every
+    // other visitor. 5 requests / 5 minutes per IP is aligned with common
+    // abuse-prevention guidance for unauthed account recovery endpoints.
+    options.AddPolicy("password-reset", httpContext =>
+    {
+        var forwardedFor = httpContext.Request.Headers["X-Forwarded-For"].ToString();
+        var partitionKey = !string.IsNullOrWhiteSpace(forwardedFor)
+            ? forwardedFor.Split(',')[0].Trim()
+            : httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 5,
+                Window = TimeSpan.FromMinutes(5),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
     });
 
     options.OnRejected = async (context, _) =>
@@ -266,6 +295,9 @@ app.MapHealthChecks("/health/live");
 app.MapHealthChecks("/health/ready");
 
 // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
+
+// Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
+app.MapAuthEndpoints();
 
 // Me/Profile endpoints (STB-00, STB-00b)
 app.MapMeEndpoints();
