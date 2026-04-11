@@ -6,6 +6,7 @@
 using System.Security.Claims;
 using Cena.Api.Contracts.Gamification;
 using Cena.Actors.Events;
+using Cena.Actors.Projections;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Gamification;
@@ -49,30 +50,19 @@ public static class GamificationEndpoints
         // Get student profile
         var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
         
-        // Get stats from events
-        var sessionEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "learning_session_started_v1")
-            .ToListAsync();
-        var sessionCount = sessionEvents.Count(e => e.StreamKey == studentId);
+        // FIND-data-009: Use StudentLifetimeStats instead of QueryAllRawEvents full scan
+        var stats = await session.LoadAsync<StudentLifetimeStats>(studentId);
+        
+        var sessionCount = stats?.TotalSessions ?? 0;
         var hasStartedSession = sessionCount > 0;
-
-        var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted_v1")
-            .ToListAsync();
-        var studentAttempts = attemptEvents.Where(e => e.StreamKey == studentId).ToList();
-        var correctAnswers = studentAttempts.Count(e => ExtractBool(e, "isCorrect"));
-
-        var currentStreak = await CalculateCurrentStreak(session, studentId);
+        var totalAttempts = stats?.TotalAttempts ?? 0;
+        var correctAnswers = stats?.TotalCorrect ?? 0;
+        var currentStreak = stats?.CurrentStreak ?? 0;
+        var bossesDefeated = stats?.BossesDefeated ?? 0;
 
         // Get friend count
         var friendCount = await session.Query<FriendshipDocument>()
             .CountAsync(f => f.StudentAId == studentId || f.StudentBId == studentId);
-
-        // Get bosses defeated (from challenge events)
-        var challengeEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "challenge_completed_v1")
-            .ToListAsync();
-        var bossesDefeated = challengeEvents.Count(e => e.StreamKey == studentId);
 
         // Evaluate all badges from catalog
         var earned = new List<Badge>();
@@ -165,21 +155,13 @@ public static class GamificationEndpoints
 
         await using var session = store.QuerySession();
 
-        // Compute streak from real LearningSessionStarted_V1 events
-        var currentStreak = await CalculateCurrentStreak(session, studentId);
-        
-        // Get longest streak from profile
+        // FIND-data-009: Use StudentLifetimeStats instead of QueryAllRawEvents
+        var stats = await session.LoadAsync<StudentLifetimeStats>(studentId);
         var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-        var longestStreak = profile?.LongestStreak ?? currentStreak;
-
-        // Get last activity date from events
-        var lastSessionEvent = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "learning_session_started_v1")
-            .Where(e => e.StreamKey == studentId)
-            .OrderByDescending(e => e.Timestamp)
-            .FirstOrDefaultAsync();
-
-        var lastActivityAt = lastSessionEvent?.Timestamp;
+        
+        var currentStreak = stats?.CurrentStreak ?? profile?.CurrentStreak ?? 0;
+        var longestStreak = profile?.LongestStreak ?? stats?.LongestStreak ?? currentStreak;
+        var lastActivityAt = stats?.LastSessionAt ?? profile?.LastActivityDate;
         var isAtRisk = lastActivityAt.HasValue &&
                        (DateTimeOffset.UtcNow - lastActivityAt.Value).TotalHours > 20;
 
@@ -314,11 +296,12 @@ public static class GamificationEndpoints
     // Helper: Calculate current streak from LearningSessionStarted_V1 events
     private static async Task<int> CalculateCurrentStreak(IQuerySession session, string studentId)
     {
-        var sessionEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "learning_session_started_v1")
-            .Where(e => e.StreamKey == studentId)
+        // FIND-data-009: Use FetchStreamAsync instead of QueryAllRawEvents full scan
+        var events = await session.Events.FetchStreamAsync(studentId);
+        var sessionEvents = events
+            .Where(e => e.EventType == typeof(LearningSessionStarted_V1))
             .OrderByDescending(e => e.Timestamp)
-            .ToListAsync();
+            .ToList();
 
         if (sessionEvents.Count == 0)
             return 0;

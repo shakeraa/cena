@@ -193,6 +193,10 @@ public static class MartenConfiguration
             .Index(x => x.SessionId)
             .Index(x => x.StartedAt);
 
+        // FIND-data-009: Student lifetime stats projection for fast analytics
+        // Replaces QueryAllRawEvents full-scans with single-document lookup
+        opts.Projections.Add<StudentLifetimeStatsProjection>(ProjectionLifecycle.Inline);
+
         // ── Student Preferences Document (STB-00b) ──
         opts.Schema.For<StudentPreferencesDocument>()
             .Identity(x => x.Id)
@@ -502,6 +506,8 @@ public static class MartenConfiguration
         opts.Events.AddEventType<QuestionAnsweredInSession_V1>();
         // FIND-data-007b: Profile updated event for event-sourced profile changes
         opts.Events.AddEventType<ProfileUpdated_V1>();
+        // FIND-data-009: Challenge completed event for StudentLifetimeStats
+        opts.Events.AddEventType<ChallengeCompleted_V1>();
     }
 
     private static void RegisterOutreachEvents(StoreOptions opts)

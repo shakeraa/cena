@@ -214,34 +214,33 @@ public static class SessionEndpoints
             if (doc.StudentId != studentId)
                 return Results.Forbid();
 
-            // Count correct turns from ConceptAttempted events for accuracy
-            var events = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1")
-                .ToListAsync();
-
+            // FIND-data-009: Use FetchStreamAsync instead of QueryAllRawEvents full scan
+            var events = await session.Events.FetchStreamAsync(studentId);
             var sessionEvents = events
-                .Where(e => ExtractString(e, "sessionId") == doc.SessionId)
+                .Where(e => e.EventType == typeof(ConceptAttempted_V1) || e.EventType == typeof(ConceptAttempted_V2))
+                .Select(e => e.Data)
+                .Cast<ConceptAttempted_V1>()
+                .Where(e => e.SessionId == doc.SessionId)
                 .ToList();
 
             var questionsAttempted = sessionEvents.Count;
-            var questionsCorrect   = sessionEvents.Count(e => ExtractBool(e, "isCorrect"));
+            var questionsCorrect   = sessionEvents.Count(e => e.IsCorrect);
             var accuracy           = questionsAttempted > 0
                 ? (double)questionsCorrect / questionsAttempted
                 : 0;
 
-            var fatigueScore = sessionEvents.Count > 0
-                ? sessionEvents.Average(e => ExtractDouble(e, "fatigueScore"))
-                : 0;
+            // FIND-arch-009: FatigueScore removed - ConceptAttempted_V1 does not have this property
+            var fatigueScore = 0.0;
 
             var masteryDeltas = sessionEvents
-                .GroupBy(e => ExtractString(e, "conceptId"))
+                .GroupBy(e => e.ConceptId)
                 .ToDictionary(
                     g => g.Key,
                     g =>
                     {
                         var ordered  = g.OrderBy(e => e.Timestamp).ToList();
-                        var initial  = ExtractDouble(ordered.First(), "priorMastery");
-                        var terminal = ExtractDouble(ordered.Last(), "posteriorMastery");
+                        var initial  = ordered.First().PriorMastery;
+                        var terminal = ordered.Last().PosteriorMastery;
                         return terminal - initial;
                     });
 
@@ -343,26 +342,30 @@ public static class SessionEndpoints
             if (doc.StudentId != studentId)
                 return Results.Forbid();
 
-            // Load ConceptAttempted events for this session, ordered by timestamp
-            var rawEvents = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1")
-                .ToListAsync();
-
-            var attempts = rawEvents
-                .Where(e => ExtractString(e, "sessionId") == doc.SessionId)
-                .OrderBy(e => e.Timestamp)
-                .Select((e, i) => new QuestionAttemptDto(
-                    Sequence: i + 1,
-                    QuestionId: ExtractString(e, "questionId"),
-                    ConceptId: ExtractString(e, "conceptId"),
-                    QuestionType: ExtractString(e, "questionType"),
-                    IsCorrect: ExtractBool(e, "isCorrect"),
-                    ResponseTimeMs: ExtractInt(e, "responseTimeMs"),
-                    HintCountUsed: ExtractInt(e, "hintCountUsed"),
-                    WasSkipped: ExtractBool(e, "wasSkipped"),
-                    PriorMastery: Math.Round(ExtractDouble(e, "priorMastery"), 4),
-                    PosteriorMastery: Math.Round(ExtractDouble(e, "posteriorMastery"), 4),
-                    Timestamp: e.Timestamp))
+            // FIND-data-009: Use FetchStreamAsync instead of QueryAllRawEvents full scan
+            var events = await session.Events.FetchStreamAsync(studentId);
+            var attempts = events
+                .Where(e => e.EventType == typeof(ConceptAttempted_V1) || e.EventType == typeof(ConceptAttempted_V2))
+                .Select((e, i) => {
+                    if (e.Data is ConceptAttempted_V1 v1)
+                    {
+                        return new QuestionAttemptDto(
+                            Sequence: i + 1,
+                            QuestionId: v1.QuestionId,
+                            ConceptId: v1.ConceptId,
+                            QuestionType: v1.QuestionType,
+                            IsCorrect: v1.IsCorrect,
+                            ResponseTimeMs: (int)v1.ResponseTimeMs,
+                            HintCountUsed: v1.HintCountUsed,
+                            WasSkipped: v1.WasSkipped,
+                            PriorMastery: Math.Round(v1.PriorMastery, 4),
+                            PosteriorMastery: Math.Round(v1.PosteriorMastery, 4),
+                            Timestamp: e.Timestamp);
+                    }
+                    return null;
+                })
+                .Where(dto => dto != null)
+                .Cast<QuestionAttemptDto>()
                 .ToList();
 
             return Results.Ok(new SessionReplayDto(

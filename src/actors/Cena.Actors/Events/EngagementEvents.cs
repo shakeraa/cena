@@ -29,6 +29,19 @@ public record StreakUpdated_V1(
 ) : IDelegatedEvent;
 
 /// <summary>
+/// Emitted when a student completes a challenge.
+/// FIND-data-009: Added for StudentLifetimeStats projection.
+/// </summary>
+public record ChallengeCompleted_V1(
+    string StudentId,
+    string ChallengeId,
+    string ChallengeName,
+    bool IsBoss,
+    int Score,
+    DateTimeOffset CompletedAt
+) : IDelegatedEvent;
+
+/// <summary>
 /// Emitted when a student earns a badge (mastery, streak, exploration, methodology).
 /// FIND-data-001: Added Timestamp for deterministic event-sourced replay.
 /// </summary>

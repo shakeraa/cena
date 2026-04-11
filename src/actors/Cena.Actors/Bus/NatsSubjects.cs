@@ -41,6 +41,7 @@ public static class NatsSubjects
     public const string StudentHintDelivered       = "hint_delivered";
     public const string StudentXpAwarded           = "xp_awarded";
     public const string StudentStreakUpdated        = "streak_updated";
+    public const string StudentBadgeEarned         = "badge_earned";
     public const string StudentStagnationDetected  = "stagnation_detected";
     public const string StudentMethodologySwitched = "methodology_switched";
     public const string StudentTutoringStarted     = "tutoring_started";

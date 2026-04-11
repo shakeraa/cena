@@ -43,6 +43,15 @@ public class NotificationDispatcher : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken ct)
     {
+        // Start both subscriptions in parallel
+        var xpTask = SubscribeToXpEventsAsync(ct);
+        var moderationTask = SubscribeToModerationEventsAsync(ct);
+        
+        await Task.WhenAll(xpTask, moderationTask);
+    }
+
+    private async Task SubscribeToXpEventsAsync(CancellationToken ct)
+    {
         var subject = NatsSubjects.StudentEventTypeWildcard(NatsSubjects.StudentXpAwarded);
         _logger.LogInformation(
             "Notification Dispatcher started — subscribing to {Subject}", subject);
@@ -81,6 +90,45 @@ public class NotificationDispatcher : BackgroundService
             }
         }
     }
+
+    private async Task SubscribeToModerationEventsAsync(CancellationToken ct)
+    {
+        // Subscribe to content moderation events for audit logging
+        // Pattern: cena.review.item.approved and cena.review.item.rejected
+        var approvedSub = _nats.SubscribeAsync<byte[]>("cena.review.item.approved", cancellationToken: ct);
+        var rejectedSub = _nats.SubscribeAsync<byte[]>("cena.review.item.rejected", cancellationToken: ct);
+
+        var approvedTask = HandleModerationEventsAsync(approvedSub, "approved", ct);
+        var rejectedTask = HandleModerationEventsAsync(rejectedSub, "rejected", ct);
+
+        await Task.WhenAll(approvedTask, rejectedTask);
+    }
+
+    private async Task HandleModerationEventsAsync(
+        IAsyncEnumerable<NatsMsg<byte[]>> subscription, 
+        string action, 
+        CancellationToken ct)
+    {
+        await foreach (var msg in subscription)
+        {
+            try
+            {
+                var payload = System.Text.Json.JsonSerializer.Deserialize<ModerationEventPayload>(msg.Data);
+                if (payload != null)
+                {
+                    _logger.LogInformation(
+                        "Content moderation: question {QuestionId} {Action} by moderator {ModeratorId}",
+                        payload.QuestionId, action, payload.ModeratorId);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to process moderation {Action} event", action);
+            }
+        }
+    }
+
+    private record ModerationEventPayload(string QuestionId, string ModeratorId, string? Reason);
 
     internal async Task HandleXpAwardedAsync(string studentId, XpAwarded_V1 evt, CancellationToken ct)
     {

@@ -185,8 +185,8 @@ const fetchStudentData = async () => {
 const fetchTimeline = async () => {
   timelineLoading.value = true
   try {
-    const days = timelineRange.value === '7d' ? 7 : 30
-    const data = await $api(`/admin/focus/students/${studentId.value}/timeline?days=${days}`)
+    // FIND-arch-010: Use period query param (7d/30d) instead of days
+    const data = await $api(`/admin/focus/students/${studentId.value}/timeline?period=${timelineRange.value}`)
 
     timelineData.value = (Array.isArray(data) ? data : (data.points ?? [])).map((p: any) => ({
       date: p.date,

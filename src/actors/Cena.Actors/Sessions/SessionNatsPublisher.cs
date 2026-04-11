@@ -59,6 +59,9 @@ public sealed class SessionNatsPublisher : ISessionEventPublisher
     public Task PublishStreakUpdatedAsync(string studentId, StreakUpdated_V1 evt) =>
         PublishSafe(NatsSubjects.StudentEvent(studentId, "streak_updated"), evt, $"{studentId}-streak-{evt.CurrentStreak}-{evt.LastActivityDate.Ticks}");
 
+    public Task PublishBadgeEarnedAsync(string studentId, BadgeEarned_V1 evt) =>
+        PublishSafe(NatsSubjects.StudentEvent(studentId, "badge_earned"), evt, $"{studentId}-badge-{evt.BadgeId}");
+
     public Task PublishStagnationDetectedAsync(string studentId, StagnationDetected_V1 evt) =>
         PublishSafe(NatsSubjects.StudentEvent(studentId, "stagnation_detected"), evt, $"{evt.ConceptId}-stag-{DateTimeOffset.UtcNow.Ticks}");
 

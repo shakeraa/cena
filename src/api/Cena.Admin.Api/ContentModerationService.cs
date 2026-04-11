@@ -224,6 +224,10 @@ public sealed class ContentModerationService : IContentModerationService
         await _nats.PublishAsync("cena.review.item.approved",
             System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { questionId = id, moderatorId }));
 
+        // FIND-arch-011: Publish to cena.serve.item.published for QuestionPoolActor hot-reload
+        await _nats.PublishAsync("cena.serve.item.published",
+            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { questionId = id, subject = audit.Subject }));
+
         _logger.LogInformation("[AUDIT] Moderation APPROVE: question={Id} moderator={Moderator}", id, moderatorId);
         return true;
     }

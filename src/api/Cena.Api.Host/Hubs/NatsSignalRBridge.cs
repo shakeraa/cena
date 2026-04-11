@@ -170,6 +170,11 @@ public sealed class NatsSignalRBridge : BackgroundService
                 if (streakUpdated != null) await group.StreakUpdated(streakUpdated);
                 break;
 
+            case NatsSubjects.StudentBadgeEarned:
+                var badgeEarned = Deserialize<BadgeEarnedEvent>(payloadJson);
+                if (badgeEarned != null) await group.BadgeEarned(badgeEarned);
+                break;
+
             case NatsSubjects.StudentTutoringStarted:
                 var tutoringStarted = Deserialize<TutoringStartedEvent>(payloadJson);
                 if (tutoringStarted != null) await group.TutoringStarted(tutoringStarted);

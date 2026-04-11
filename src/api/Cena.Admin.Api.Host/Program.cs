@@ -233,6 +233,9 @@ app.MapClassroomEndpoints();
 // ---- Content management endpoints ----
 app.MapContentEndpoints();
 
+// ---- FERPA Compliance endpoints (FIND-arch-008) ----
+app.MapComplianceEndpoints();
+
 // ---- Root endpoint ----
 app.MapGet("/", () => Results.Ok(new 
 { 

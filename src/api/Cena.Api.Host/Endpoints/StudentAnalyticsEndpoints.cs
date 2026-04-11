@@ -39,28 +39,13 @@ public static class StudentAnalyticsEndpoints
 
             await using var session = store.QuerySession();
 
-            // Load student profile snapshot for XP, streak, session count
-            var snapshot = await session.Query<StudentProfileSnapshot>()
-                .FirstOrDefaultAsync(s => s.StudentId == studentId);
+            // FIND-data-009: Use StudentLifetimeStats instead of QueryAllRawEvents full scan
+            var stats = await session.LoadAsync<StudentLifetimeStats>(studentId);
+            var snapshot = await session.LoadAsync<StudentProfileSnapshot>(studentId);
 
-            // Count sessions from TutoringSessionDocument
-            var sessions = await session.Query<TutoringSessionDocument>()
-                .Where(d => d.StudentId == studentId)
-                .ToListAsync();
-
-            var totalSessions = sessions.Count;
-
-            // Load ConceptAttempted events for accuracy stats
-            var allAttemptEvents = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1")
-                .ToListAsync();
-
-            var studentAttempts = allAttemptEvents
-                .Where(e => ExtractString(e, "studentId") == studentId)
-                .ToList();
-
-            var totalQuestionsAttempted = studentAttempts.Count;
-            var totalCorrect = studentAttempts.Count(e => ExtractBool(e, "isCorrect"));
+            var totalSessions = stats?.TotalSessions ?? 0;
+            var totalQuestionsAttempted = stats?.TotalAttempts ?? 0;
+            var totalCorrect = stats?.TotalCorrect ?? 0;
             var overallAccuracy = totalQuestionsAttempted > 0
                 ? Math.Round((double)totalCorrect / totalQuestionsAttempted, 3)
                 : 0;
@@ -69,8 +54,8 @@ public static class StudentAnalyticsEndpoints
                 TotalSessions: totalSessions,
                 TotalQuestionsAttempted: totalQuestionsAttempted,
                 OverallAccuracy: overallAccuracy,
-                CurrentStreak: snapshot?.CurrentStreak ?? 0,
-                LongestStreak: snapshot?.LongestStreak ?? 0,
+                CurrentStreak: stats?.CurrentStreak ?? snapshot?.CurrentStreak ?? 0,
+                LongestStreak: stats?.LongestStreak ?? snapshot?.LongestStreak ?? 0,
                 TotalXp: snapshot?.TotalXp ?? 0,
                 Level: ComputeLevel(snapshot?.TotalXp ?? 0)));
         })
@@ -135,13 +120,10 @@ public static class StudentAnalyticsEndpoints
                 .Where(d => d.StudentId == studentId && d.StartedAt >= startDate && d.StartedAt <= endDate)
                 .ToListAsync();
 
-            // Query all attempt events for this student in range
-            var allAttemptEvents = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1")
-                .ToListAsync();
-
-            var studentAttempts = allAttemptEvents
-                .Where(e => ExtractString(e, "studentId") == studentId)
+            // FIND-data-009: Use FetchStreamAsync instead of QueryAllRawEvents full scan
+            var events = await session.Events.FetchStreamAsync(studentId);
+            var studentAttempts = events
+                .Where(e => e.EventType == typeof(ConceptAttempted_V1) || e.EventType == typeof(ConceptAttempted_V2))
                 .Where(e => e.Timestamp >= startDate && e.Timestamp <= endDate)
                 .ToList();
 
@@ -161,7 +143,13 @@ public static class StudentAnalyticsEndpoints
                         .Where(e => e.Timestamp.Date == date)
                         .ToList();
 
-                    var correct = dayAttempts.Count(e => ExtractBool(e, "isCorrect"));
+                    // Extract IsCorrect from event data
+                    var correct = dayAttempts.Count(e => 
+                    {
+                        if (e.Data is ConceptAttempted_V1 v1) return v1.IsCorrect;
+                        if (e.Data is ConceptAttempted_V2 v2) return v2.IsCorrect;
+                        return false;
+                    });
                     var accuracy = dayAttempts.Count > 0
                         ? Math.Round((double)correct / dayAttempts.Count, 3)
                         : 0;

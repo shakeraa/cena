@@ -27,6 +27,7 @@ public interface ICenaClient
     // Gamification events
     Task XpAwarded(XpAwardedEvent evt);
     Task StreakUpdated(StreakUpdatedEvent evt);
+    Task BadgeEarned(BadgeEarnedEvent evt);
 
     // Tutoring events
     Task TutoringStarted(TutoringStartedEvent evt);
@@ -163,6 +164,14 @@ public sealed record StreakUpdatedEvent(
     int CurrentStreak,
     int LongestStreak,
     DateTimeOffset Timestamp);
+
+public sealed record BadgeEarnedEvent(
+    string StudentId,
+    string BadgeId,
+    string BadgeName,
+    string BadgeCategory,
+    string BadgeDescription,
+    DateTimeOffset AwardedAt);
 
 public sealed record TutoringStartedEvent(
     string SessionId,
