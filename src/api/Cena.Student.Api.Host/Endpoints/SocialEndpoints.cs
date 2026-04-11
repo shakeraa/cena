@@ -4,6 +4,7 @@
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Admin.Api.Queries.Social;
 using Cena.Api.Contracts.Social;
 using Cena.Actors.Events;
 using Cena.Infrastructure.Auth;
@@ -128,6 +129,15 @@ public static class SocialEndpoints
     }
 
     // GET /api/social/friends — returns friends list
+    //
+    // FIND-data-010 (2026-04-11): this handler used to issue one
+    // LoadAsync<StudentProfileSnapshot> per friend AND per pending
+    // request inside a foreach, producing (friendCount + pendingCount)
+    // extra round-trips. The fix below batch-loads ALL needed profiles
+    // in a single Marten LINQ query, then hands the pre-built dictionary
+    // to the pure SocialProjectionBuilder helper. Total queries per
+    // request: 3 (friendships, pending, profiles) — constant, regardless
+    // of friend count. See docs/reviews/agent-3-data-findings.md.
     private static async Task<IResult> GetFriends(
         HttpContext ctx,
         IDocumentStore store)
@@ -140,53 +150,56 @@ public static class SocialEndpoints
 
         await using var session = store.QuerySession();
 
-        // Query friendships from Marten
+        // Query 1: friendships involving the current student.
         var friendships = await session.Query<FriendshipDocument>()
             .Where(f => f.StudentAId == studentId || f.StudentBId == studentId)
             .ToListAsync();
 
-        // Build friend list with profile data
-        var friends = new List<Friend>();
-        foreach (var f in friendships)
-        {
-            var friendId = f.StudentAId == studentId ? f.StudentBId : f.StudentAId;
-            var friendProfile = await session.LoadAsync<StudentProfileSnapshot>(friendId);
-            var level = Math.Max(1, (friendProfile?.TotalXp ?? 0) / 100);
-            
-            friends.Add(new Friend(
-                StudentId: friendId,
-                DisplayName: friendProfile?.DisplayName ?? friendProfile?.FullName ?? "Student",
-                AvatarUrl: null, // Future: add AvatarUrl to StudentProfileSnapshot
-                Level: level,
-                StreakDays: 0, // Future: compute from streak projection
-                IsOnline: false)); // Future: check presence service
-        }
-
-        // Query pending friend requests to this student
+        // Query 2: pending incoming friend requests.
         var pendingDocs = await session.Query<FriendRequestDocument>()
             .Where(r => r.ToStudentId == studentId && r.Status == "pending")
             .ToListAsync();
 
-        var pendingRequests = new List<FriendRequest>();
-        foreach (var r in pendingDocs)
-        {
-            var fromProfile = await session.LoadAsync<StudentProfileSnapshot>(r.FromStudentId);
-            pendingRequests.Add(new FriendRequest(
-                RequestId: r.RequestId,
-                FromStudentId: r.FromStudentId,
-                FromDisplayName: fromProfile?.DisplayName ?? fromProfile?.FullName ?? "Student",
-                FromAvatarUrl: null, // Future: add AvatarUrl to StudentProfileSnapshot
-                RequestedAt: r.RequestedAt));
-        }
+        // Collect every student id whose profile we'll need to render the
+        // response. The helper de-dupes across friendships + pending.
+        var profileIds = SocialProjectionBuilder.CollectFriendProfileIds(
+            friendships.ToList(),
+            studentId,
+            pendingDocs.ToList());
 
-        var dto = new FriendsListDto(
-            Friends: friends.ToArray(),
-            PendingRequests: pendingRequests.ToArray());
+        // Query 3: ONE batch fetch for every profile we need. This replaces
+        // the old (N+M) sequential LoadAsync loop. Short-circuit when there
+        // is nothing to fetch to avoid a pointless round-trip.
+        var profilesById = profileIds.Count == 0
+            ? new Dictionary<string, StudentProfileSnapshot>(StringComparer.Ordinal)
+            : (await session.Query<StudentProfileSnapshot>()
+                    .Where(p => profileIds.Contains(p.StudentId))
+                    .ToListAsync())
+                .GroupBy(p => p.StudentId, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+
+        // Pure assembly — no further I/O. See SocialProjectionBuilder for the
+        // guarantee that this path cannot re-introduce an N+1 regression.
+        var dto = SocialProjectionBuilder.BuildFriendsListDto(
+            friendships.ToList(),
+            studentId,
+            pendingDocs.ToList(),
+            profilesById);
 
         return Results.Ok(dto);
     }
 
     // GET /api/social/study-rooms — returns study rooms
+    //
+    // FIND-data-011 (2026-04-11): this handler used to issue TWO queries
+    // per room inside a foreach — one CountAsync for members and one
+    // LoadAsync for the host profile — producing (1 + 2*N) round-trips.
+    // The fix below batch-loads all active memberships for the visible
+    // rooms in ONE query, aggregates the counts in memory, and
+    // batch-loads all host profiles in ONE more query. Total queries per
+    // request: 4 (memberships-for-me, rooms, all-active-memberships,
+    // host-profiles) — constant, regardless of room count.
+    // See docs/reviews/agent-3-data-findings.md.
     private static async Task<IResult> GetStudyRooms(
         HttpContext ctx,
         IDocumentStore store)
@@ -199,39 +212,65 @@ public static class SocialEndpoints
 
         await using var session = store.QuerySession();
 
-        // Get rooms that are either public or the student is a member of
+        // Query 1: rooms the current student is a member of (for the
+        // visibility filter below).
         var memberships = await session.Query<StudyRoomMembershipDocument>()
             .Where(m => m.StudentId == studentId && m.IsActive)
             .Select(m => m.RoomId)
             .ToListAsync();
 
+        // Query 2: rooms the student is allowed to see (own + public).
         var rooms = await session.Query<StudyRoomDocument>()
             .Where(r => r.IsActive && (r.IsPublic || memberships.Contains(r.RoomId)))
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
 
-        // Build room list with member counts
-        var roomDtos = new List<StudyRoom>();
-        foreach (var r in rooms)
+        var roomList = rooms.ToList();
+        var roomIds = SocialProjectionBuilder.CollectRoomIds(roomList);
+        var hostIds = SocialProjectionBuilder.CollectHostProfileIds(roomList);
+
+        // Query 3: ALL active memberships for every visible room in ONE
+        // shot. We only project the RoomId column so the response payload
+        // is small even for popular rooms. The aggregation happens in
+        // memory in the pure helper.
+        IReadOnlyDictionary<string, int> memberCountsByRoomId;
+        if (roomIds.Count == 0)
         {
-            var memberCount = await session.Query<StudyRoomMembershipDocument>()
-                .CountAsync(m => m.RoomId == r.RoomId && m.IsActive);
+            memberCountsByRoomId = new Dictionary<string, int>(StringComparer.Ordinal);
+        }
+        else
+        {
+            var activeMembershipRoomIds = await session.Query<StudyRoomMembershipDocument>()
+                .Where(m => roomIds.Contains(m.RoomId) && m.IsActive)
+                .Select(m => m.RoomId)
+                .ToListAsync();
 
-            var hostProfile = await session.LoadAsync<StudentProfileSnapshot>(r.HostStudentId);
-
-            roomDtos.Add(new StudyRoom(
-                RoomId: r.RoomId,
-                Name: r.Name,
-                Subject: r.Subject,
-                HostStudentId: r.HostStudentId,
-                HostDisplayName: hostProfile?.DisplayName ?? hostProfile?.FullName ?? "Student",
-                MemberCount: memberCount,
-                MaxCapacity: r.MaxCapacity,
-                IsPublic: r.IsPublic,
-                CreatedAt: r.CreatedAt));
+            memberCountsByRoomId = SocialProjectionBuilder.AggregateMemberCounts(
+                activeMembershipRoomIds);
         }
 
-        var dto = new StudyRoomListDto(Rooms: roomDtos.ToArray());
+        // Query 4: ONE batch fetch for every host profile we need.
+        IReadOnlyDictionary<string, StudentProfileSnapshot> hostProfilesById;
+        if (hostIds.Count == 0)
+        {
+            hostProfilesById = new Dictionary<string, StudentProfileSnapshot>(StringComparer.Ordinal);
+        }
+        else
+        {
+            hostProfilesById = (await session.Query<StudentProfileSnapshot>()
+                    .Where(p => hostIds.Contains(p.StudentId))
+                    .ToListAsync())
+                .GroupBy(p => p.StudentId, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.First(), StringComparer.Ordinal);
+        }
+
+        // Pure assembly — no I/O. The helper's signature guarantees that
+        // the N+1 pattern cannot be re-introduced by a future refactor.
+        var dto = SocialProjectionBuilder.BuildStudyRoomListDto(
+            roomList,
+            memberCountsByRoomId,
+            hostProfilesById);
+
         return Results.Ok(dto);
     }
 
