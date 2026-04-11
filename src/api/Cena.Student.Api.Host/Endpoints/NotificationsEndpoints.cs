@@ -4,6 +4,7 @@
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Admin.Api.Queries.Notifications;
 using Cena.Api.Contracts.Notifications;
 using Cena.Actors.Events;
 using Cena.Infrastructure.Auth;
@@ -41,12 +42,27 @@ public static class NotificationsEndpoints
         return app;
     }
 
-    // GET /api/notifications?filter=all&page=1 — returns notification list
+    // GET /api/notifications?filter=all&page=1&pageSize=10 — returns notification list
+    //
+    // FIND-data-013 (2026-04-11): this handler used to call
+    // .OrderByDescending(...).ToListAsync() with NO Skip/Take, then
+    // filter + page in memory. For a student with thousands of
+    // notifications, every page-1 request pulled the full set from
+    // Postgres.
+    //
+    // The fix below pushes snooze-filter + OrderBy + Skip + Take into
+    // the Marten LINQ query so the DB response is O(pageSize), not
+    // O(total). Total + unread counts are issued as separate scalar
+    // CountAsync queries. The pageSize is clamped by
+    // NotificationQueryBuilder.ClampPage so a malicious
+    // ?pageSize=1000000 cannot re-introduce unbounded-query behaviour
+    // under a different name. See docs/reviews/agent-3-data-findings.md.
     private static async Task<IResult> GetNotifications(
         HttpContext ctx,
         IDocumentStore store,
         string? filter = "all",
-        int? page = 1)
+        int? page = 1,
+        int? pageSize = null)
     {
         var studentId = GetStudentId(ctx.User);
         if (string.IsNullOrEmpty(studentId))
@@ -56,23 +72,37 @@ public static class NotificationsEndpoints
 
         await using var session = store.LightweightSession();
 
-        // Query visible notifications (not deleted, not snoozed)
-        var query = session.Query<NotificationDocument>()
-            .Where(n => n.StudentId == studentId && n.DeletedAt == null);
-
-        if (filter == "unread")
-            query = query.Where(n => !n.Read);
-        else if (filter == "read")
-            query = query.Where(n => n.Read);
-
+        var spec = NotificationQueryBuilder.ClampPage(page, pageSize);
+        var parsedFilter = NotificationQueryBuilder.ParseFilter(filter);
         var now = DateTime.UtcNow;
-        var notifications = await query
+
+        // Build the base WHERE — tenant scope (StudentId) + not-deleted +
+        // snooze filter pushed into SQL.
+        var baseQuery = session.Query<NotificationDocument>()
+            .Where(n => n.StudentId == studentId
+                && n.DeletedAt == null
+                && (n.SnoozedUntil == null || n.SnoozedUntil < now));
+
+        // Apply the read/unread filter.
+        var filteredQuery = parsedFilter switch
+        {
+            NotificationFilter.Unread => baseQuery.Where(n => !n.Read),
+            NotificationFilter.Read => baseQuery.Where(n => n.Read),
+            _ => baseQuery
+        };
+
+        // Query 1: the page itself. Skip/Take push into SQL — the DB
+        // returns at most pageSize+1 rows regardless of how many the
+        // student has in total. The +1 is the HasMore detector.
+        var fetched = await filteredQuery
             .OrderByDescending(n => n.CreatedAt)
+            .Skip(spec.Skip)
+            .Take(spec.Take)
             .ToListAsync();
 
-        // Filter out snoozed notifications
-        var visible = notifications
-            .Where(n => n.SnoozedUntil == null || n.SnoozedUntil < now)
+        var (pageRows, hasMore) = NotificationQueryBuilder.SplitPage(fetched.ToList(), spec);
+
+        var pagedItems = pageRows
             .Select(n => new NotificationItem(
                 NotificationId: n.NotificationId,
                 Kind: n.Kind,
@@ -83,21 +113,25 @@ public static class NotificationsEndpoints
                 DeepLinkUrl: n.DeepLinkUrl,
                 Read: n.Read,
                 CreatedAt: n.CreatedAt))
-            .ToList();
+            .ToArray();
 
-        const int pageSize = 10;
-        var currentPage = Math.Max(1, page ?? 1);
-        var skip = (currentPage - 1) * pageSize;
-        var pagedItems = visible.Skip(skip).Take(pageSize).ToArray();
-        var hasMore = visible.Count > skip + pagedItems.Length;
+        // Query 2: scalar total count for the active filter (cheap
+        // indexed count, not a full-table materialisation).
+        var total = await filteredQuery.CountAsync();
 
-        var unreadCount = visible.Count(n => !n.Read);
+        // Query 3: scalar unread count. Independent of the filter so the
+        // UI badge stays stable no matter what the viewer selected.
+        var unreadCount = await session.Query<NotificationDocument>()
+            .CountAsync(n => n.StudentId == studentId
+                && !n.Read
+                && n.DeletedAt == null
+                && (n.SnoozedUntil == null || n.SnoozedUntil < now));
 
         var dto = new NotificationListDto(
             Items: pagedItems,
-            Page: currentPage,
-            PageSize: pageSize,
-            Total: visible.Count,
+            Page: spec.Page,
+            PageSize: spec.PageSize,
+            Total: total,
             HasMore: hasMore,
             UnreadCount: unreadCount);
 
