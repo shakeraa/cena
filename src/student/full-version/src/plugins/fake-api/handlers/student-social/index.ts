@@ -1,10 +1,11 @@
 import { HttpResponse, http } from 'msw'
 
 /**
- * MSW handlers for the student `/api/social/*` endpoint group from
- * STB-06 Phase 1 + STB-06b Phase 1b writes.
+ * MSW handlers for the student `/api/social/*` endpoint group.
  *
- * STU-W-12 wires these into the /social pages.
+ * These mock responses let the student web dev loop work without the
+ * student API host. In production the MSW worker is NOT registered,
+ * so real requests pass through to the deployed social endpoints.
  */
 
 interface FeedItem {
@@ -50,6 +51,7 @@ interface FriendRequest {
 
 function makeFeed(): FeedItem[] {
   const now = Date.now()
+
   const items: FeedItem[] = [
     { itemId: 'f1', kind: 'achievement', authorStudentId: 'u-alex', authorDisplayName: 'Alex Chen', authorAvatarUrl: null, title: 'Earned the Quiz Master badge', body: 'Finally got 90% accuracy on 10 quizzes in a row!', postedAt: new Date(now - 30 * 60_000).toISOString(), reactionCount: 12, commentCount: 3 },
     { itemId: 'f2', kind: 'milestone', authorStudentId: 'u-priya', authorDisplayName: 'Priya Rao', authorAvatarUrl: null, title: 'Reached level 10 in Math', body: 'That calculus chain was brutal.', postedAt: new Date(now - 2 * 3600_000).toISOString(), reactionCount: 8, commentCount: 1 },
@@ -97,7 +99,7 @@ export const handlerStudentSocial = [
   }),
 
   http.post('/api/social/reactions', async ({ request }) => {
-    const body = await request.json() as { itemId: string, reactionType: string }
+    const body = await request.json() as { itemId: string; reactionType: string }
 
     return HttpResponse.json({
       ok: true,

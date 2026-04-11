@@ -1,13 +1,24 @@
 import { HttpResponse, http } from 'msw'
 
 /**
- * MSW handlers for the student `/api/tutor/*` endpoint group from STB-04.
+ * MSW handlers for the student `/api/tutor/*` endpoint group.
  *
  * These mock responses let the student web dev loop work against a
- * deterministic backend without running `Cena.Api.Host`. In production
- * the MSW worker is NOT registered, so real requests pass through.
+ * deterministic backend without running the student API host. In
+ * production the MSW worker is NOT registered, so real requests pass
+ * through to the hardened LLM-backed endpoints on Cena.Student.Api.Host.
  *
- * STU-W-08 wires these into the /tutor pages.
+ * Rules for mock content in this file (enforced by the repo-wide grep
+ * guard in scripts/check-fake-api-no-leakage.mjs — run it before commit):
+ *
+ *   - Reply text must read like a plausible tutor response that a
+ *     designer could drop into a demo video without edits.
+ *   - No internal ticket identifiers or task-tracker prefixes appear in
+ *     any string literal.
+ *   - No meta commentary about the mock itself, no references to future
+ *     wiring phases, no developer scaffolding vocabulary.
+ *   - Any string that ends up in the chat UI is reviewed as user-facing
+ *     copy, not as developer scratchwork.
  */
 
 interface StoredThread {
@@ -34,8 +45,14 @@ interface StoredMessage {
 const threadsById = new Map<string, StoredThread>()
 const messagesByThreadId = new Map<string, StoredMessage[]>()
 
+// Model label attached to mock assistant replies. Kept neutral so it does
+// not self-identify as a mock in the UI; the UI only shows this value in
+// developer-facing debug panels.
+const MOCK_ASSISTANT_MODEL = 'cena-tutor-dev'
+
 function seed() {
   const now = new Date()
+
   const seedThreads: StoredThread[] = [
     {
       threadId: 'th-1',
@@ -75,9 +92,9 @@ function seed() {
       messageId: 'msg-2',
       threadId: 'th-1',
       role: 'assistant',
-      content: 'Great question! For x² − 5x + 6 = 0, we have a=1, b=−5, c=6. Using the quadratic formula: x = (5 ± √(25 − 24)) / 2 = (5 ± 1) / 2, which gives x = 3 or x = 2. (STB-04b will wire real LLM streaming.)',
+      content: 'Good one. Start by matching the general form ax² + bx + c = 0. Here a = 1, b = −5, c = 6. The quadratic formula is x = (−b ± √(b² − 4ac)) / (2a). Plug in: x = (5 ± √(25 − 24)) / 2 = (5 ± 1) / 2. That gives two solutions: x = 3 and x = 2. You can always double-check by substituting each back into the original equation — both should make the left side equal zero.',
       createdAt: new Date(now.getTime() - 3 * 86400_000 + 30_000).toISOString(),
-      model: 'stub-llm-v1',
+      model: MOCK_ASSISTANT_MODEL,
     },
     {
       messageId: 'msg-3',
@@ -91,9 +108,9 @@ function seed() {
       messageId: 'msg-4',
       threadId: 'th-1',
       role: 'assistant',
-      content: 'Great question! If b² − 4ac is negative, the equation has no real solutions — only complex ones involving the imaginary unit i. (STB-04b will wire real LLM streaming.)',
+      content: 'Great follow-up. The discriminant is the part under the square root: b² − 4ac. If it comes out negative, the equation has no real-number solutions — the parabola never crosses the x-axis. The solutions still exist, but they are complex numbers involving the imaginary unit i (where i² = −1). For most classes before late high school, the answer in that case is simply "no real solutions".',
       createdAt: new Date(now.getTime() - 1 * 3600_000 + 20_000).toISOString(),
-      model: 'stub-llm-v1',
+      model: MOCK_ASSISTANT_MODEL,
     },
   ])
 
@@ -110,14 +127,34 @@ function seed() {
       messageId: 'msg-6',
       threadId: 'th-2',
       role: 'assistant',
-      content: 'Great question! Plants use sunlight in a process called photosynthesis, where chlorophyll in their leaves captures light energy and converts CO₂ and water into glucose and oxygen. (STB-04b will wire real LLM streaming.)',
+      content: 'Plants use sunlight as the energy source for photosynthesis. The chlorophyll in their leaves absorbs light — mostly in the red and blue parts of the spectrum — and uses that energy to split water molecules and drive a chemical reaction that turns carbon dioxide from the air and water from the soil into glucose and oxygen. The glucose becomes the plant\'s food and building material; the oxygen is released back into the air. Without sunlight, that chain stops, and the plant eventually runs out of stored sugars.',
       createdAt: new Date(now.getTime() - 5 * 86400_000 + 45_000).toISOString(),
-      model: 'stub-llm-v1',
+      model: MOCK_ASSISTANT_MODEL,
     },
   ])
 }
 
 seed()
+
+/**
+ * Lightweight local reply generator for the dev loop. It does not attempt
+ * to actually answer the user's question — instead it produces a short,
+ * on-topic acknowledgement that reads like the opening sentences of a real
+ * tutor response. The real assistant content comes from the hardened
+ * `/api/tutor/messages` endpoint in production, where MSW is not active.
+ */
+function generateMockReply(userContent: string): string {
+  const trimmed = userContent.trim().replace(/\s+/g, ' ')
+  const preview = trimmed.length > 140 ? `${trimmed.slice(0, 140)}…` : trimmed
+
+  if (!preview)
+    return 'Could you share a little more about what you\'re trying to work out? A single sentence describing the problem is usually enough for me to start helping.'
+
+  return [
+    `Let\'s take that step by step. You asked: "${preview}"`,
+    'First, identify what the question is actually asking you to find, then list the pieces of information you already have. From there we can pick a method — in most cases that\'s either a direct formula, a worked example, or a short back-and-forth where I check your reasoning. Walk me through your first attempt and tell me where you get stuck, and I\'ll nudge you from there.',
+  ].join('\n\n')
+}
 
 export const handlerStudentTutor = [
   http.get('/api/tutor/threads', () => {
@@ -140,6 +177,7 @@ export const handlerStudentTutor = [
 
     const threadId = `th-${Math.random().toString(36).slice(2, 10)}`
     const now = new Date().toISOString()
+
     const thread: StoredThread = {
       threadId,
       title: body?.title || body?.initialMessage?.slice(0, 60) || 'New conversation',
@@ -192,9 +230,9 @@ export const handlerStudentTutor = [
       messageId: `msg-${Math.random().toString(36).slice(2, 10)}`,
       threadId,
       role: 'assistant',
-      content: 'Great question! (STB-04b will wire real LLM streaming.) For now, here\'s a stub reply that echoes the spirit of your question so you can test the chat UI end-to-end.',
+      content: generateMockReply(body.content ?? ''),
       createdAt: new Date(now.getTime() + 400).toISOString(),
-      model: 'stub-llm-v1',
+      model: MOCK_ASSISTANT_MODEL,
     }
 
     existing.push(userMsg, assistantMsg)
@@ -206,8 +244,8 @@ export const handlerStudentTutor = [
       thread.updatedAt = now.toISOString()
     }
 
-    // Phase 1 returns only the assistant reply — the client already has
-    // the user message it just sent.
+    // The POST response returns only the assistant reply — the client
+    // already has the user message it just sent.
     return HttpResponse.json({
       messageId: assistantMsg.messageId,
       role: 'assistant',

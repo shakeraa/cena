@@ -1,18 +1,17 @@
 import { HttpResponse, http } from 'msw'
 
 /**
- * MSW handlers for the student `/api/challenges/*` endpoint group from STB-05.
+ * MSW handlers for the student `/api/challenges/*` endpoint group.
  *
  * These mock responses let the student web dev loop work against a
- * deterministic backend without running `Cena.Api.Host`. STB-05 Phase 1
- * ships the real (stub) endpoints on the backend side — these MSW
- * handlers mirror the same shapes so offline dev works unchanged.
- *
- * STU-W-11 wires these into the /challenges hub page.
+ * deterministic backend without running the student API host. In
+ * production the MSW worker is NOT registered, so real requests pass
+ * through to the hardened challenges endpoints.
  */
 
 function endOfDayIso(): string {
   const d = new Date()
+
   d.setUTCHours(23, 59, 59, 999)
 
   return d.toISOString()

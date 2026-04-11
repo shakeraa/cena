@@ -19,31 +19,32 @@ import { handlerPagesFaq } from '@db/pages/faq/index'
 import { handlerPagesHelpCenter } from '@db/pages/help-center/index'
 import { handlerPagesProfile } from '@db/pages/profile/index'
 
-// STU-W-05B: student /api/me handlers for dev-loop when Cena.Api.Host is offline.
+// Student /api/me handlers — used by the dev loop when the student API host
+// is offline. Production bypasses MSW entirely.
 import { handlerStudentMe } from '@db/student-me/index'
 
-// STU-W-07: student /api/gamification/* handlers for the progress dashboard.
+// Student /api/gamification/* handlers for the progress dashboard.
 import { handlerStudentGamification } from '@db/student-gamification/index'
 
-// STU-W-08: student /api/tutor/* handlers for the AI tutor chat.
+// Student /api/tutor/* handlers for the AI tutor chat.
 import { handlerStudentTutor } from '@db/student-tutor/index'
 
-// STU-W-11: student /api/challenges/* handlers for the challenges hub.
+// Student /api/challenges/* handlers for the challenges hub.
 import { handlerStudentChallenges } from '@db/student-challenges/index'
 
-// STU-W-06: student /api/sessions/* handlers for the learning session runner.
+// Student /api/sessions/* handlers for the learning session runner.
 import { handlerStudentSessions } from '@db/student-sessions/index'
 
-// STU-W-09: student /api/analytics/* handlers for progress subpages.
+// Student /api/analytics/* handlers for progress subpages.
 import { handlerStudentAnalytics } from '@db/student-analytics/index'
 
-// STU-W-10: student /api/content/* + /api/knowledge/* handlers.
+// Student /api/content/* + /api/knowledge/* handlers.
 import { handlerStudentKnowledge } from '@db/student-knowledge/index'
 
-// STU-W-12: student /api/social/* handlers for class feed + peers + friends.
+// Student /api/social/* handlers for class feed + peers + friends.
 import { handlerStudentSocial } from '@db/student-social/index'
 
-// STU-W-14: student /api/notifications/* handlers for the notifications center.
+// Student /api/notifications/* handlers for the notifications center.
 import { handlerStudentNotifications } from '@db/student-notifications/index'
 
 const worker = setupWorker(

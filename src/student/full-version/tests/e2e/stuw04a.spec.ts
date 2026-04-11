@@ -81,22 +81,48 @@ test.describe.serial('STU-W-04A auth UI', () => {
     expect(new URL(page.url()).pathname).toBe('/onboarding')
   })
 
-  test('E2E #5 /forgot-password submits email and shows confirmation', async ({ page }) => {
+  test('E2E #5 /forgot-password renders honest unavailable state and does not fire a network request', async ({ page }) => {
     await clearAuth(page)
-    await page.goto('/forgot-password')
-    await page.waitForSelector('[data-testid="forgot-password-form"]')
-    await page.locator('[data-testid="forgot-email"] input').fill('user@example.com')
-    await page.locator('[data-testid="forgot-submit"]').click()
 
-    await expect(page.locator('[data-testid="forgot-confirmation"]')).toBeVisible()
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/forgot-confirmed.png` })
+    // Assert zero network traffic — the page must not silently hit any
+    // backend or Firebase endpoint. We capture requests and fail if any
+    // of them looks like an auth / password-reset call.
+    const outboundRequests: string[] = []
+
+    page.on('request', req => {
+      const url = req.url()
+      if (/password|reset|oob|identitytoolkit|\/api\/auth/i.test(url))
+        outboundRequests.push(url)
+    })
+
+    await page.goto('/forgot-password')
+
+    // Unavailable card + explanation body are both visible.
+    await expect(page.locator('[data-testid="forgot-unavailable-icon"]')).toBeVisible()
+    await expect(page.locator('[data-testid="forgot-unavailable-body"]')).toBeVisible()
+    await expect(page.locator('[data-testid="forgot-return-to-login"]')).toBeVisible()
+
+    // There is no form, no email input, and no submit button.
+    await expect(page.locator('[data-testid="forgot-password-form"]')).toHaveCount(0)
+    await expect(page.locator('[data-testid="forgot-email"]')).toHaveCount(0)
+    await expect(page.locator('[data-testid="forgot-submit"]')).toHaveCount(0)
+
+    // The body copy explicitly says "isn't" or "contact your school admin".
+    const bodyText = await page.locator('[data-testid="forgot-unavailable-body"]').textContent()
+
+    expect(bodyText?.toLowerCase()).toMatch(/admin|teacher|not.*available|isn't/)
+
+    // No auth/password-reset requests were issued.
+    expect(outboundRequests).toEqual([])
+
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/forgot-unavailable.png` })
   })
 
   test('E2E #6 auth pages pass axe in light mode', async ({ page }) => {
     await clearAuth(page)
     for (const path of ['/login', '/register', '/forgot-password'] as const) {
       await page.goto(path)
-      await page.waitForSelector('[data-testid="email-password-form"], [data-testid="forgot-password-form"]')
+      await page.waitForSelector('[data-testid="email-password-form"], [data-testid="forgot-unavailable-icon"]')
 
       const results = await new AxeBuilder({ page })
         .exclude('.v-overlay-container')

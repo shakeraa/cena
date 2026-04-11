@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import type { FlowState } from '@/plugins/vuetify/theme'
-import type { MeBootstrapDto } from '@/api/types/common'
+import type {
+  AnalyticsSummaryDto,
+  MeBootstrapDto,
+  TimeBreakdownDto,
+} from '@/api/types/common'
 import { useApiQuery } from '@/composables/useApiQuery'
 
 definePage({
@@ -16,31 +19,97 @@ definePage({
   },
 })
 
-// STU-W-05B: real $api wiring. MSW mocks `/api/me` in dev (see
-// src/plugins/fake-api/handlers/student-me); production hits the
-// real Cena.Api.Host from STB-00.
-const { data: me, error, loading } = useApiQuery<MeBootstrapDto>('/api/me')
+// ── Bootstrap: identity + level + streak days (real endpoint). ────────────
+// MSW mocks `/api/me` in dev (see src/plugins/fake-api/handlers/student-me);
+// production hits the real Cena.Student.Api.Host endpoint.
+const {
+  data: me,
+  error: meError,
+  loading: meLoading,
+} = useApiQuery<MeBootstrapDto>('/api/me')
 
-// Constants that STB-00 doesn't return yet — STU-W-05C wires them
-// when STB-02 (plan/review/recommendations) lands and STU-W-05D
-// picks up live values from SignalR.
-const MOCK_MINUTES_TODAY = 18
-const MOCK_QUESTIONS_TODAY = 84
-const MOCK_ACCURACY = 76
-const MOCK_FLOW_STATE: FlowState = 'approaching'
+// ── Analytics summary: overall-to-date stats. ─────────────────────────────
+// Mirrors the real C# record AnalyticsSummaryDto from
+// Cena.Api.Contracts.Analytics. `overallAccuracy` is a normalized 0..1
+// value. These are OVERALL counts, not today-specific.
+const {
+  data: summary,
+  error: summaryError,
+} = useApiQuery<AnalyticsSummaryDto>('/api/analytics/summary')
 
-// Derived values from the real /api/me payload.
+// ── Time breakdown: last 30 days of learning minutes. ─────────────────────
+// The last entry is today. We read it to render a real "Minutes today" KPI
+// only when the entry's date is actually in the current UTC day.
+const {
+  data: timeBreakdown,
+  error: timeBreakdownError,
+} = useApiQuery<TimeBreakdownDto>('/api/analytics/time-breakdown')
+
+// The page is "loading" until the primary /api/me call resolves. The
+// analytics calls fire in parallel — if they are still inflight when /api/me
+// resolves, the individual KPI cards drop out until their own data arrives.
+const loading = computed(() => meLoading.value)
+const error = computed(() => meError.value)
+
+// Derived identity/profile values from the real /api/me payload.
 const level = computed(() => me.value?.level ?? 1)
 const streakDays = computed(() => me.value?.streakDays ?? 0)
 
-const xpProgressPercent = computed(() => {
-  // STB-00's MeBootstrapDto returns level but not xp-within-level.
-  // Stub 40% as a visual placeholder until STB-03 lands the
-  // real gamification endpoint with xp + xpToNextLevel.
-  return 40
+// ── Derived values from /api/analytics/summary. ───────────────────────────
+const hasSummary = computed(() => summary.value !== null && !summaryError.value)
+
+// Overall-to-date question count. Explicitly relabelled to "Questions
+// answered" so the UI does not claim these are today's answers.
+const questionsAnswered = computed(() => summary.value?.totalQuestionsAttempted ?? null)
+
+// Overall-to-date accuracy, rendered as a percentage with no decimals.
+// The backend already rounds to 3 decimal places.
+const accuracyPercentLabel = computed(() => {
+  const value = summary.value?.overallAccuracy
+  if (value == null)
+    return null
+
+  return `${Math.round(value * 100)}%`
 })
 
-// STU-W-05C will wire `GET /api/sessions/active` from STB-01.
+// Session count — real. Shown alongside the level card instead of a fake
+// "xp to next level" percentage, because the backend does not yet surface
+// xp-within-level and inventing a value would be a lie.
+const totalSessions = computed(() => summary.value?.totalSessions ?? null)
+
+// ── Derived values from /api/analytics/time-breakdown. ────────────────────
+const minutesTodayLabel = computed(() => {
+  if (timeBreakdownError.value)
+    return null
+
+  const items = timeBreakdown.value?.items
+  if (!items || items.length === 0)
+    return null
+
+  const last = items[items.length - 1]
+  if (!last)
+    return null
+
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const itemIso = (last.date ?? '').slice(0, 10)
+  if (itemIso !== todayIso)
+    return 0
+
+  return last.minutes ?? 0
+})
+
+// True once we have at least one real analytics KPI to render. If all
+// analytics endpoints fail, the KPI section collapses to just the streak
+// widget and the empty-state card explains what will appear here.
+const hasAnyAnalyticsKpi = computed(() =>
+  minutesTodayLabel.value != null
+  || questionsAnswered.value != null
+  || accuracyPercentLabel.value != null
+  || totalSessions.value != null,
+)
+
+// The resume-session card is hidden until the backend `GET /api/sessions/active`
+// wire-up lands. Explicitly typed as `null` so no stale shape ships.
 const activeSession = null as null | {
   sessionId: string
   subject: string
@@ -50,8 +119,6 @@ const activeSession = null as null | {
 </script>
 
 <template>
-  <FlowAmbientBackground :flow-state="MOCK_FLOW_STATE" />
-
   <div
     class="home-page pa-6"
     data-testid="home-page"
@@ -112,40 +179,87 @@ const activeSession = null as null | {
           id="home-kpis-heading"
           class="sr-only"
         >
-          Today's stats
+          Your learning stats
         </h2>
+
+        <!--
+          Streak is always rendered — it comes from the real /api/me payload
+          and is 0 for brand-new students. A 0-day streak is an honest value.
+        -->
         <StreakWidget
           :days="streakDays"
           :is-new-best="false"
         />
+
+        <!--
+          Minutes today: rendered only when the time-breakdown endpoint
+          returned today's entry. On the very first session of the day the
+          value is 0, which is honest. If the endpoint errored we drop the
+          card entirely rather than fabricate.
+        -->
         <KpiCard
+          v-if="minutesTodayLabel != null"
           label="Minutes today"
-          :value="MOCK_MINUTES_TODAY"
-          :trend="12"
+          :value="minutesTodayLabel"
           icon="tabler-clock"
           data-testid="kpi-minutes-today"
         />
+
+        <!--
+          Questions answered: overall-to-date count, NOT today's count.
+          The server has no per-day question count wired into
+          /api/analytics/summary, so we explicitly label it as the
+          cumulative total.
+        -->
         <KpiCard
-          label="Questions"
-          :value="MOCK_QUESTIONS_TODAY"
-          :trend="8"
+          v-if="questionsAnswered != null"
+          label="Questions answered"
+          :value="questionsAnswered"
           icon="tabler-question-mark"
-          data-testid="kpi-questions"
+          data-testid="kpi-questions-answered"
         />
+
+        <!-- Overall accuracy, computed server-side from the event stream. -->
         <KpiCard
-          label="Accuracy"
-          :value="`${MOCK_ACCURACY}%`"
-          :trend="3"
+          v-if="accuracyPercentLabel != null"
+          label="Overall accuracy"
+          :value="accuracyPercentLabel"
           icon="tabler-target"
-          data-testid="kpi-accuracy"
+          data-testid="kpi-overall-accuracy"
         />
+
+        <!--
+          Level card: shows the real level from /api/analytics/summary
+          (falling back to /api/me when summary is not available). We do
+          NOT show a "XX% to next level" percentage because the backend
+          does not yet surface xp-within-level. The secondary value is the
+          real session count, or an em-dash when unavailable.
+        -->
         <KpiCard
           :label="`Level ${level}`"
-          :value="`${xpProgressPercent}%`"
+          :value="totalSessions != null ? `${totalSessions} sessions` : '—'"
           icon="tabler-bolt"
           data-testid="kpi-level"
         />
       </section>
+
+      <!--
+        Empty state: if /api/me succeeds but every analytics KPI above
+        has no data (new student, or analytics endpoint errors) we tell
+        the user explicitly what will appear here, instead of silently
+        collapsing to a single streak card.
+      -->
+      <VAlert
+        v-if="!hasSummary && !hasAnyAnalyticsKpi"
+        variant="tonal"
+        color="primary"
+        class="mb-6"
+        data-testid="home-empty-stats"
+      >
+        <VAlertTitle>Your stats appear here after your first session</VAlertTitle>
+        Finish a learning session and your minutes, questions answered, and
+        accuracy will show up on this dashboard.
+      </VAlert>
 
       <section
         class="home-page__quick-actions-section mb-6"

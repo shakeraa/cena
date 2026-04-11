@@ -1,10 +1,11 @@
 import { HttpResponse, http } from 'msw'
 
 /**
- * MSW handlers for the student `/api/notifications/*` endpoint group
- * from STB-07 Phase 1 (reads) + STB-07b Phase 1b (writes).
+ * MSW handlers for the student `/api/notifications/*` endpoint group.
  *
- * STU-W-14 wires these into the /notifications center.
+ * These mock responses let the student web dev loop work without the
+ * student API host. In production the MSW worker is NOT registered,
+ * so real requests pass through to the deployed notifications center.
  */
 
 interface NotificationItem {

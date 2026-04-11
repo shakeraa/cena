@@ -28,12 +28,22 @@ test.describe.serial('STU-W-05A home dashboard', () => {
     // Greeting visible
     await expect(page.locator('.home-greeting')).toBeVisible()
 
-    // KPI cards all rendered
+    // KPI cards rendered against the real endpoints. MSW seeds
+    // /api/analytics/summary + /api/analytics/time-breakdown, so all the
+    // data-driven cards should show up. The labels here match the real
+    // backend shapes: "Minutes today" comes from the time-breakdown
+    // endpoint, "Questions answered" + "Overall accuracy" come from the
+    // summary endpoint, and the level card reads the /api/me payload.
     await expect(page.locator('[data-testid="streak-widget"]')).toBeVisible()
     await expect(page.locator('[data-testid="kpi-minutes-today"]')).toBeVisible()
-    await expect(page.locator('[data-testid="kpi-questions"]')).toBeVisible()
-    await expect(page.locator('[data-testid="kpi-accuracy"]')).toBeVisible()
+    await expect(page.locator('[data-testid="kpi-questions-answered"]')).toBeVisible()
+    await expect(page.locator('[data-testid="kpi-overall-accuracy"]')).toBeVisible()
     await expect(page.locator('[data-testid="kpi-level"]')).toBeVisible()
+
+    // The empty-state card must NOT render when the analytics endpoints
+    // return data — this catches regressions where the KPI rows silently
+    // fall back to the empty state because of shape mismatches.
+    await expect(page.locator('[data-testid="home-empty-stats"]')).toHaveCount(0)
 
     // Quick actions grid
     await expect(page.locator('[data-testid="quick-actions"]')).toBeVisible()

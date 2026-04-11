@@ -1,13 +1,12 @@
 import { HttpResponse, http } from 'msw'
 
 /**
- * MSW handlers for the student `/api/gamification/*` endpoint group from STB-03.
+ * MSW handlers for the student `/api/gamification/*` endpoint group.
  *
  * These mock responses let the student web dev loop work against a
- * deterministic backend without running `Cena.Api.Host`. In production
- * the MSW worker is NOT registered, so real requests pass through.
- *
- * STU-W-07 wires these into the /progress dashboard via useApiQuery.
+ * deterministic backend without running the student API host. In
+ * production the MSW worker is NOT registered, so real requests pass
+ * through to the hardened backend.
  */
 
 const mockXp = {

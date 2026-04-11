@@ -1,15 +1,12 @@
 import { HttpResponse, http } from 'msw'
 
 /**
- * MSW handlers for the student `/api/sessions/*` endpoint group from
- * STB-01 + STB-01b (Phase 1 stub).
+ * MSW handlers for the student `/api/sessions/*` endpoint group.
  *
  * These mock responses let the student web dev loop work against a
- * deterministic backend without running `Cena.Api.Host`. Mirrors the
- * same canned question set as `SessionEndpoints.cs` so front-end + back-end
- * stay in sync.
- *
- * STU-W-06 wires these into the /session flow.
+ * deterministic backend without running the student API host. They
+ * mirror the same canned question set as `SessionEndpoints.cs` so
+ * front-end and back-end stay in sync.
  */
 
 interface CannedQuestion {
@@ -177,6 +174,7 @@ export const handlerStudentSessions = [
 
   http.post('/api/sessions/:sessionId/answer', async ({ params, request }) => {
     const sessionId = params.sessionId as string
+
     const body = await request.json() as {
       questionId: string
       answer: string
