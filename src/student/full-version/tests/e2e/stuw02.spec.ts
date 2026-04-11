@@ -43,15 +43,12 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
 
     // `/home` (STU-W-05A), `/progress` (STU-W-07), `/tutor` (STU-W-08),
     // `/challenges` (STU-W-11), `/social/leaderboard` (STU-W-13),
-    // and `/session` (STU-W-06) have been replaced with real pages and
-    // no longer render the placeholder testid. Covered by the per-feature
-    // spec files.
+    // `/session` (STU-W-06), and `/progress/{sessions,mastery,time}`
+    // (STU-W-09) have been replaced with real pages and no longer render
+    // the placeholder testid. Covered by the per-feature spec files.
     const routes = [
       '/challenges/daily',
       '/challenges/boss',
-      '/progress/sessions',
-      '/progress/mastery',
-      '/progress/time',
       '/knowledge-graph',
       '/social',
       '/social/peers',
@@ -135,7 +132,8 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     expect(homeTitle).toContain('Cena')
 
     await page.goto('/progress/mastery')
-    await page.waitForSelector('[data-testid="placeholder-route-meta"]')
+    // STU-W-09 made /progress/mastery a real page; wait on the new testid.
+    await page.waitForSelector('[data-testid="progress-mastery-page"]')
     await page.waitForFunction(() => /Mastery/.test(document.title), null, { timeout: 5000 })
 
     const masteryTitle = await page.title()

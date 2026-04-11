@@ -278,3 +278,27 @@ export interface SessionCompletedDto {
   accuracyPercent: number
   durationSeconds: number
 }
+
+/**
+ * Analytics DTOs from STB-09 Phase 1. Mirrors
+ * `src/api/Cena.Api.Contracts/Analytics/AnalyticsDtos.cs`.
+ * Consumed by STU-W-09 progress subpages.
+ */
+export interface TimeBreakdownItem {
+  date: string
+  minutes: number
+}
+
+export interface TimeBreakdownDto {
+  items: TimeBreakdownItem[]
+}
+
+export interface FlowAccuracyPoint {
+  timestamp: string
+  flowScore: number
+  accuracyPercent: number
+}
+
+export interface FlowAccuracyDto {
+  points: FlowAccuracyPoint[]
+}

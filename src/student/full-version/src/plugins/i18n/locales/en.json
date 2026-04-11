@@ -290,7 +290,39 @@
   },
   "progress": {
     "title": "Your progress",
-    "subtitle": "Track your journey, earn rewards, and see where you stand."
+    "subtitle": "Track your journey, earn rewards, and see where you stand.",
+    "time": {
+      "title": "Learning time",
+      "subtitle": "30 days of minutes studied.",
+      "chartTitle": "Daily minutes",
+      "chartSubtitle": "Last 30 days",
+      "chartAria": "Time breakdown chart: {total} total minutes, {avg} average per day",
+      "avgPerDay": "Avg / day",
+      "today": "Today",
+      "kpi30dayTotal": "30-day total",
+      "kpi7dayTotal": "Last 7 days",
+      "kpiDayStreak": "Active streak"
+    },
+    "mastery": {
+      "title": "Subject mastery",
+      "subtitle": "Your progress across every subject you're learning.",
+      "overallLabel": "Overall mastery",
+      "masteryLabel": "Mastery",
+      "questionsAttempted": "{count} questions attempted",
+      "accuracy": "{percent}% accuracy",
+      "rowAria": "{subject}: {percent} percent mastery",
+      "phaseANote": "Phase A shows derived mastery from onboarding subjects. STU-W-09b will wire real MasteryProjection data."
+    },
+    "sessions": {
+      "title": "Session history",
+      "subtitle": "Recent learning sessions — tap any to review.",
+      "activeLabel": "Active session",
+      "resume": "Resume",
+      "justNow": "just now",
+      "hoursAgo": "{count}h ago",
+      "daysAgo": "{count}d ago",
+      "phaseANote": "Phase A shows stub history data. STU-W-09b wires the real /api/sessions/history endpoint once STB-01c lands."
+    }
   },
   "gamification": {
     "xp": {
