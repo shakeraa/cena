@@ -385,6 +385,64 @@ public static class MartenConfiguration
         opts.Schema.For<PlatformSettingsDocument>()
             .Identity(x => x.Id);
 
+        // ── Focus Analytics Rollups (ADM-014) ──
+        opts.Schema.For<FocusSessionRollupDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.StudentId)
+            .Index(x => x.Date);
+
+        opts.Schema.For<ClassAttentionRollupDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.ClassId)
+            .Index(x => x.Date);
+
+        opts.Schema.For<FocusDegradationRollupDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId);
+
+        // ── Mastery Rollups (ADM-016) ──
+        opts.Schema.For<ClassMasteryRollupDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.ClassId)
+            .Index(x => x.Date);
+
+        opts.Schema.For<AtRiskStudentDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.StudentId)
+            .Index(x => x.Date);
+
+        opts.Schema.For<ConceptDifficultyDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.ConceptId);
+
+        // ── Outreach Engagement (ADM-018) ──
+        opts.Schema.For<OutreachEventDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.StudentId)
+            .Index(x => x.Channel)
+            .Index(x => x.SentAt);
+
+        opts.Schema.For<OutreachBudgetDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId);
+
+        opts.Schema.For<StudentNotificationPreferencesDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.SchoolId);
+
+        // ── Ingestion Rollups (ADM-015) ──
+        opts.Schema.For<IngestionMetricsRollupDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.Date);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);

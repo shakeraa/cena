@@ -60,7 +60,12 @@ public static class DatabaseSeeder
         // 5. Simulated students (300 across 8 archetypes)
         await UserSeedData.SeedSimulatedStudentsAsync(store, logger, simulatedStudentCount);
 
-        // 5. Additional seeds (simulation events, questions, etc.)
+        // 6. Admin analytics rollup seeds (ADM-014/015/016/018)
+        //    Idempotent rollups that power admin dashboards without
+        //    requiring the simulation pipeline to run first.
+        await AdminAnalyticsSeedData.SeedAllAsync(store, logger);
+
+        // 7. Additional seeds (simulation events, questions, etc.)
         foreach (var seed in additionalSeeds)
         {
             await seed(store, logger);

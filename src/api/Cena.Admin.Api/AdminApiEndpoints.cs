@@ -1066,15 +1066,15 @@ public static class AdminApiEndpoints
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
 
-        group.MapGet("/summary", async (IOutreachEngagementService service) =>
+        group.MapGet("/summary", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
-            var summary = await service.GetSummaryAsync();
+            var summary = await service.GetSummaryAsync(user);
             return Results.Ok(summary);
         }).WithName("GetOutreachSummary");
 
-        group.MapGet("/overview", async (IOutreachEngagementService service) =>
+        group.MapGet("/overview", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
-            var summary = await service.GetSummaryAsync();
+            var summary = await service.GetSummaryAsync(user);
             return Results.Ok(new
             {
                 totalSentToday = summary.TotalSentToday,
@@ -1084,16 +1084,16 @@ public static class AdminApiEndpoints
             });
         }).WithName("GetOutreachOverview");
 
-        group.MapGet("/by-channel", async (IOutreachEngagementService service) =>
+        group.MapGet("/by-channel", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
-            var summary = await service.GetSummaryAsync();
+            var summary = await service.GetSummaryAsync(user);
             var channels = summary.ByChannel.Select(c => new { channel = c.Channel, sentToday = c.SentToday, deliveryRate = c.OpenRate, responseRate = c.ClickRate });
             return Results.Ok(new { channels });
         }).WithName("GetOutreachByChannel");
 
-        group.MapGet("/by-trigger", async (IOutreachEngagementService service) =>
+        group.MapGet("/by-trigger", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
-            var effectiveness = await service.GetChannelEffectivenessAsync();
+            var effectiveness = await service.GetChannelEffectivenessAsync(user);
             var series = effectiveness.VolumeByTrigger.Select(t => new
             {
                 date = t.Trend.FirstOrDefault()?.Date ?? "",
@@ -1102,16 +1102,16 @@ public static class AdminApiEndpoints
             return Results.Ok(new { series });
         }).WithName("GetOutreachByTrigger");
 
-        group.MapGet("/send-times", async (IOutreachEngagementService service) =>
+        group.MapGet("/send-times", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
-            var effectiveness = await service.GetChannelEffectivenessAsync();
+            var effectiveness = await service.GetChannelEffectivenessAsync(user);
             var cells = effectiveness.SendTimeHeatmap.Select(s => new { hour = s.Hour, day = s.DayOfWeek, responseRate = s.ResponseRate });
             return Results.Ok(new { cells });
         }).WithName("GetOutreachSendTimes");
 
-        group.MapGet("/re-engagement-rate", async (IOutreachEngagementService service) =>
+        group.MapGet("/re-engagement-rate", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
-            var summary = await service.GetSummaryAsync();
+            var summary = await service.GetSummaryAsync(user);
             return Results.Ok(summary.ReEngagementRate);
         }).WithName("GetReEngagementRate");
 
@@ -1121,9 +1121,9 @@ public static class AdminApiEndpoints
             return history != null ? Results.Ok(history) : Results.NotFound();
         }).WithName("GetStudentOutreachHistory");
 
-        group.MapGet("/budget-alert", async (IOutreachEngagementService service) =>
+        group.MapGet("/budget-alert", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
-            var alert = await service.GetBudgetAlertAsync();
+            var alert = await service.GetBudgetAlertAsync(user);
             return Results.Ok(alert);
         }).WithName("GetBudgetAlert");
 
