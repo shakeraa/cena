@@ -37,3 +37,24 @@ public sealed record DailyLearningTimeDto(
     DateTimeOffset Date,
     int Minutes,
     int SessionsCount);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STB-09: Time Breakdown and Flow vs Accuracy Analytics
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// <summary>Time breakdown for the last 30 days (STB-09)</summary>
+public sealed record TimeBreakdownDto(TimeBreakdownItem[] Items);
+
+/// <summary>Single day time entry (STB-09)</summary>
+public sealed record TimeBreakdownItem(
+    DateTime Date,
+    int Minutes);
+
+/// <summary>Flow vs Accuracy data for the last 7 days (STB-09)</summary>
+public sealed record FlowAccuracyDto(FlowAccuracyPoint[] Points);
+
+/// <summary>Single flow/accuracy data point (STB-09)</summary>
+public sealed record FlowAccuracyPoint(
+    DateTime Timestamp,
+    int FlowScore,        // 0-100
+    int AccuracyPercent); // 0-100

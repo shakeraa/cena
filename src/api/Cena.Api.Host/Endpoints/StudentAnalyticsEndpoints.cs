@@ -6,6 +6,7 @@
 
 using System.Security.Claims;
 using System.Text.Json;
+using Cena.Api.Contracts.Analytics;
 using Cena.Actors.Events;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Auth;
@@ -189,6 +190,80 @@ public static class StudentAnalyticsEndpoints
             return Results.Ok(progressPoints);
         })
         .WithName("GetAnalyticsProgress");
+
+        // GET /api/analytics/time-breakdown — daily learning time for last 30 days (STB-09)
+        group.MapGet("/time-breakdown", (
+            HttpContext ctx) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            // Phase 1: Return 30 days of deterministic stub data
+            var today = DateTime.UtcNow.Date;
+            var random = new Random(42); // Seeded for determinism
+            
+            var items = Enumerable.Range(0, 30)
+                .Select(i =>
+                {
+                    var date = today.AddDays(-29 + i);
+                    // Generate realistic-looking data: more time on weekdays, less on weekends
+                    var dayOfWeek = date.DayOfWeek;
+                    var isWeekend = dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.sunday;
+                    var baseMinutes = isWeekend ? 15 : 45;
+                    var variation = random.Next(-20, 30);
+                    var minutes = Math.Max(0, baseMinutes + variation);
+                    
+                    return new TimeBreakdownItem(date, minutes);
+                })
+                .ToArray();
+
+            return Results.Ok(new TimeBreakdownDto(Items: items));
+        })
+        .WithName("GetTimeBreakdown");
+
+        // GET /api/analytics/flow-vs-accuracy — flow score vs accuracy for last 7 days (STB-09)
+        group.MapGet("/flow-vs-accuracy", (
+            HttpContext ctx) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            // Phase 1: Return 7 days x 8 hours/day of deterministic stub data
+            var today = DateTime.UtcNow.Date;
+            var random = new Random(42); // Seeded for determinism
+            var points = new List<FlowAccuracyPoint>();
+
+            // Generate 8 data points per day for the last 7 days (hourly during study hours)
+            for (int day = 0; day < 7; day++)
+            {
+                var date = today.AddDays(-6 + day);
+                // Study hours: 9 AM to 5 PM (8 hours)
+                for (int hour = 0; hour < 8; hour++)
+                {
+                    var timestamp = date.AddHours(9 + hour);
+                    // Flow score tends to be higher in morning, accuracy varies
+                    var timeOfDayFactor = (8 - hour) / 8.0; // Higher in morning
+                    var baseFlow = (int)(60 + 30 * timeOfDayFactor);
+                    var flowVariation = random.Next(-15, 15);
+                    var flowScore = Math.Clamp(baseFlow + flowVariation, 0, 100);
+                    
+                    var baseAccuracy = 75;
+                    var accuracyVariation = random.Next(-20, 20);
+                    var accuracy = Math.Clamp(baseAccuracy + accuracyVariation, 0, 100);
+                    
+                    points.Add(new FlowAccuracyPoint(timestamp, flowScore, accuracy));
+                }
+            }
+
+            return Results.Ok(new FlowAccuracyDto(Points: points.ToArray()));
+        })
+        .WithName("GetFlowVsAccuracy");
 
         return app;
     }
