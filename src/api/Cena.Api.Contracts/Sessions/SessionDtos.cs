@@ -108,12 +108,32 @@ public sealed record SessionAnswerRequest(
     string Answer,
     int TimeSpentMs);
 
+/// <summary>
+/// Response for POST /api/sessions/{id}/answer.
+///
+/// FIND-pedagogy-001 — feedback is no longer binary. In addition to the short
+/// <see cref="Feedback"/> label ("Correct" / "Not quite"), the response carries:
+///
+/// - <see cref="Explanation"/>: the authored per-question worked explanation
+///   (<c>QuestionDocument.Explanation</c>). Shown on every answer when present.
+/// - <see cref="DistractorRationale"/>: the authored rationale for the SPECIFIC
+///   wrong option the student chose (<c>QuestionDocument.DistractorRationales</c>).
+///   Null on correct answers and null when no per-option rationale exists.
+///
+/// Both fields are nullable — the UI renders them only when present and falls
+/// back gracefully when the question has no authored explanation yet.
+///
+/// Citations: Hattie &amp; Timperley (2007) "The Power of Feedback";
+/// Black &amp; Wiliam (1998) "Assessment and Classroom Learning".
+/// </summary>
 public sealed record SessionAnswerResponseDto(
     bool Correct,
     string Feedback,
     int XpAwarded,
     decimal MasteryDelta,
-    string? NextQuestionId);
+    string? NextQuestionId,
+    string? Explanation = null,
+    string? DistractorRationale = null);
 
 public sealed record SessionCompletedDto(
     string SessionId,

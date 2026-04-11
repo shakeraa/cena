@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.RateLimiting;
 using Cena.Actors.Configuration;
 using Cena.Actors.Notifications;
 using Cena.Actors.Projections;
+using Cena.Actors.Services;
 using Cena.Actors.Serving;
 using Cena.Actors.Tutor;
 using Serilog;
@@ -199,6 +200,12 @@ builder.Services.AddScoped<INotificationChannelService, NotificationChannelServi
 
 // ---- HARDEN SessionEndpoints: Question Bank Service ----
 builder.Services.AddScoped<IQuestionBank, QuestionBank>();
+
+// ---- FIND-pedagogy-003: Real BKT posterior for session answer endpoint ----
+// BktService is stateless, allocation-free on the hot path, and cheap to
+// instantiate — singleton is fine. The student API host used to compute
+// posterior mastery as PriorMastery + 0.05, which bypassed BKT entirely.
+builder.Services.AddSingleton<IBktService, BktService>();
 
 // ---- HARDEN TutorEndpoints: LLM Service ----
 // Register Claude if API key is present, otherwise Null (operational failure mode)
