@@ -124,6 +124,34 @@ public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, 
         model.UpdatedAt = e.Timestamp;
     }
 
+    // ── FIND-data-008: Missing event handlers added ──
+
+    public void Apply(QuestionOptionChanged_V1 e, QuestionReadModel model)
+    {
+        // Option change affects the question content but not the list view fields
+        // Update timestamp so admin list shows "updated" status
+        model.UpdatedAt = e.Timestamp;
+    }
+
+    public void Apply(LanguageVersionAdded_V1 e, QuestionReadModel model)
+    {
+        if (model.Languages == null)
+            model.Languages = new List<string>();
+        if (!model.Languages.Contains(e.Language))
+            model.Languages.Add(e.Language);
+        model.UpdatedAt = e.Timestamp;
+    }
+
+    /// <summary>
+    /// QuestionForked_V1 is intentionally ignored by the read model.
+    /// Forking creates a new question stream; the source question is unchanged.
+    /// </summary>
+    public void Apply(QuestionForked_V1 e, QuestionReadModel model)
+    {
+        // No-op: source question is unchanged when forked
+        // The fork creates a new QuestionReadModel in its own stream
+    }
+
     // ── Helpers ──
 
     private static QuestionReadModel FromCreation(

@@ -20,12 +20,12 @@ public interface IFocusAnalyticsService
 {
     Task<FocusOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user);
     Task<StudentFocusDetailResponse?> GetStudentFocusAsync(string studentId, ClaimsPrincipal user);
-    Task<ClassFocusResponse?> GetClassFocusAsync(string classId);
-    Task<FocusDegradationResponse> GetDegradationCurveAsync();
-    Task<FocusExperimentsResponse> GetExperimentsAsync();
+    Task<ClassFocusResponse?> GetClassFocusAsync(string classId, ClaimsPrincipal user);
+    Task<FocusDegradationResponse> GetDegradationCurveAsync(ClaimsPrincipal user);
+    Task<FocusExperimentsResponse> GetExperimentsAsync(ClaimsPrincipal user);
     Task<StudentsNeedingAttentionResponse> GetStudentsNeedingAttentionAsync(ClaimsPrincipal user);
     Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period, ClaimsPrincipal user);
-    Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId);
+    Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId, ClaimsPrincipal user);
 }
 
 public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
@@ -92,22 +92,32 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
         return BuildStudentFocusDetail(studentId, rollups, today);
     }
 
-    public async Task<ClassFocusResponse?> GetClassFocusAsync(string classId)
+    public async Task<ClassFocusResponse?> GetClassFocusAsync(string classId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
         var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var since7d = today.AddDays(-7);
 
-        var classRollup = await session.Query<ClassAttentionRollupDocument>()
-            .Where(r => r.ClassId == classId)
+        // Build class query with tenant isolation
+        var classQuery = session.Query<ClassAttentionRollupDocument>()
+            .Where(r => r.ClassId == classId);
+        if (schoolId is not null)
+            classQuery = classQuery.Where(r => r.SchoolId == schoolId);
+
+        var classRollup = await classQuery
             .OrderByDescending(r => r.Date)
             .Take(1)
             .ToListAsync();
 
-        var studentRollups = await session.Query<FocusSessionRollupDocument>()
-            .Where(r => r.ClassId == classId && r.Date >= since7d)
-            .ToListAsync();
+        // Build student query with tenant isolation
+        var studentQuery = session.Query<FocusSessionRollupDocument>()
+            .Where(r => r.ClassId == classId && r.Date >= since7d);
+        if (schoolId is not null)
+            studentQuery = studentQuery.Where(r => r.SchoolId == schoolId);
+
+        var studentRollups = await studentQuery.ToListAsync();
 
         if (classRollup.Count == 0 && studentRollups.Count == 0)
             return null;
@@ -115,13 +125,18 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
         return BuildClassFocus(classId, classRollup.FirstOrDefault(), studentRollups);
     }
 
-    public async Task<FocusDegradationResponse> GetDegradationCurveAsync()
+    public async Task<FocusDegradationResponse> GetDegradationCurveAsync(ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
         // Prefer precomputed rollup doc; fall back to raw event-stream
         // aggregation if no rollups exist yet.
-        var rollups = await session.Query<FocusDegradationRollupDocument>()
+        IQueryable<FocusDegradationRollupDocument> rollupQuery = session.Query<FocusDegradationRollupDocument>();
+        if (schoolId is not null)
+            rollupQuery = rollupQuery.Where(r => r.SchoolId == schoolId);
+
+        var rollups = await rollupQuery
             .OrderByDescending(r => r.UpdatedAt)
             .Take(1)
             .ToListAsync();
@@ -130,6 +145,8 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
             return BuildFromRollup(rollups[0]);
 
         var since30d = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(-30);
+
+        // Raw event query - school isolation via student lookup
         var focusEvents = await session.Events.QueryAllRawEvents()
             .Where(e => e.EventTypeName == "focus_score_updated_v1")
             .Where(e => e.Timestamp >= since30d)
@@ -153,8 +170,10 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
         return new FocusDegradationResponse(grouped);
     }
 
-    public async Task<FocusExperimentsResponse> GetExperimentsAsync()
+    public async Task<FocusExperimentsResponse> GetExperimentsAsync(ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
+
         // Focus experiments are tracked by FocusExperimentConfig on the actor side.
         // The admin surface reads the configured list — this reflects real running
         // experiments, not hand-crafted results.
@@ -162,9 +181,13 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
         // Read cohort tags off recent student profile snapshots to compute
         // real participant counts per variant.
-        var snapshots = await session.Query<StudentProfileSnapshot>()
-            .Where(s => s.ExperimentCohort != null)
-            .ToListAsync();
+        var query = session.Query<StudentProfileSnapshot>()
+            .Where(s => s.ExperimentCohort != null);
+
+        if (schoolId is not null)
+            query = query.Where(s => s.SchoolId == schoolId);
+
+        var snapshots = await query.ToListAsync();
 
         return BuildExperimentsResponse(snapshots);
     }
@@ -207,16 +230,21 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
         return new FocusTimelineResponse(studentId, period, BuildTimelinePoints(rollups, today, days));
     }
 
-    public async Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId)
+    public async Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
         var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
         var since7d = today.AddDays(-7);
 
-        var rollups = await session.Query<ClassAttentionRollupDocument>()
-            .Where(r => r.ClassId == classId && r.Date >= since7d)
-            .ToListAsync();
+        var query = session.Query<ClassAttentionRollupDocument>()
+            .Where(r => r.ClassId == classId && r.Date >= since7d);
+
+        if (schoolId is not null)
+            query = query.Where(r => r.SchoolId == schoolId);
+
+        var rollups = await query.ToListAsync();
 
         if (rollups.Count == 0)
             return new ClassHeatmapResponse(classId, new List<HeatmapCell>());

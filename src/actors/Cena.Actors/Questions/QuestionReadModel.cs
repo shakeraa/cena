@@ -25,6 +25,7 @@ public class QuestionReadModel
     public float? SuccessRate { get; set; }
     public string SourceType { get; set; } = "authored";
     public string Language { get; set; } = "he";
+    public List<string> Languages { get; set; } = new(); // FIND-data-008: tracks added language versions
     public string Grade { get; set; } = "";
     public string Topic { get; set; } = "";
     public string CreatedBy { get; set; } = "";

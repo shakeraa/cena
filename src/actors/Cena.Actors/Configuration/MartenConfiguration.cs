@@ -74,6 +74,7 @@ public static class MartenConfiguration
         RegisterQuestionEvents(opts);
         RegisterFocusEvents(opts);
         RegisterNotificationEvents(opts); // FIND-data-002: Was defined but never called
+        RegisterMessagingEvents(opts); // FIND-data-012: Register messaging events
 
         // ── Register Upcasters (V(N) -> V(N+1) schema evolution, DATA-009) ──
         RegisterUpcasters(opts);
@@ -176,11 +177,18 @@ public static class MartenConfiguration
         opts.Schema.For<StudentProfileSnapshot>().Index(x => x.SchoolId);
 
         // STB-01: Active session tracking
-        opts.Projections.Snapshot<ActiveSessionSnapshot>(SnapshotLifecycle.Inline);
+        // FIND-data-004: Changed from Inline Snapshot to regular document.
+        // This type is mutated directly via session.Store(), not rebuilt from events.
+        opts.Schema.For<ActiveSessionSnapshot>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId);
 
         // STB-01c: Learning session queue projection for adaptive question selection
-        opts.Projections.Snapshot<LearningSessionQueueProjection>(SnapshotLifecycle.Inline);
+        // FIND-data-003: Changed from Inline Snapshot to regular document.
+        // This type is mutated directly via session.Store() in SessionEndpoints,
+        // not rebuilt from events via Apply handlers.
         opts.Schema.For<LearningSessionQueueProjection>()
+            .Identity(x => x.Id)
             .Index(x => x.StudentId)
             .Index(x => x.SessionId)
             .Index(x => x.StartedAt);
@@ -532,6 +540,19 @@ public static class MartenConfiguration
         opts.Events.AddEventType<NotificationSnoozed_V1>();
         opts.Events.AddEventType<WebPushSubscribed_V1>();
         opts.Events.AddEventType<WebPushUnsubscribed_V1>();
+    }
+
+    /// <summary>
+    /// FIND-data-012: Register messaging events for thread persistence.
+    /// ThreadSummaryProjection maintains thread metadata in PostgreSQL.
+    /// </summary>
+    private static void RegisterMessagingEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<ThreadCreated_V1>();
+        opts.Events.AddEventType<MessageSent_V1>();
+        
+        // Register ThreadSummaryProjection as inline for immediate consistency
+        opts.Projections.Add<Cena.Actors.Messaging.ThreadSummaryProjection>(ProjectionLifecycle.Inline);
     }
 
     private static void RegisterFocusEvents(StoreOptions opts)

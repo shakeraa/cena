@@ -37,21 +37,21 @@ public static class AdminApiEndpoints
             return detail != null ? Results.Ok(detail) : Results.NotFound();
         }).WithName("GetStudentFocus");
 
-        group.MapGet("/classes/{classId}", async (string classId, IFocusAnalyticsService service) =>
+        group.MapGet("/classes/{classId}", async (string classId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
-            var detail = await service.GetClassFocusAsync(classId);
+            var detail = await service.GetClassFocusAsync(classId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
         }).WithName("GetClassFocus");
 
-        group.MapGet("/degradation-curve", async (IFocusAnalyticsService service) =>
+        group.MapGet("/degradation-curve", async (ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
-            var curve = await service.GetDegradationCurveAsync();
+            var curve = await service.GetDegradationCurveAsync(user);
             return Results.Ok(curve);
         }).WithName("GetFocusDegradationCurve");
 
-        group.MapGet("/experiments", async (IFocusAnalyticsService service) =>
+        group.MapGet("/experiments", async (ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
-            var experiments = await service.GetExperimentsAsync();
+            var experiments = await service.GetExperimentsAsync(user);
             return Results.Ok(experiments);
         }).WithName("GetFocusExperiments");
 
@@ -68,9 +68,9 @@ public static class AdminApiEndpoints
             return Results.Ok(timeline);
         }).WithName("GetStudentFocusTimeline");
 
-        group.MapGet("/classes/{classId}/heatmap", async (string classId, IFocusAnalyticsService service) =>
+        group.MapGet("/classes/{classId}/heatmap", async (string classId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
-            var heatmap = await service.GetClassHeatmapAsync(classId);
+            var heatmap = await service.GetClassHeatmapAsync(classId, user);
             return Results.Ok(heatmap);
         }).WithName("GetClassFocusHeatmap");
 
