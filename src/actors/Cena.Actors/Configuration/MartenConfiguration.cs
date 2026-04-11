@@ -210,6 +210,13 @@ public static class MartenConfiguration
             .Index(x => x.StudentId)
             .Index(x => x.CreatedAt);
 
+        // ── Boss Attempt Document (STB-05b) ──
+        opts.Schema.For<BossAttemptDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.BossBattleId)
+            .Index(x => x.Date);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
@@ -234,6 +241,10 @@ public static class MartenConfiguration
         opts.Events.AddEventType<LearningSessionStarted_V1>();
         opts.Events.AddEventType<LearningSessionEnded_V1>();
         opts.Events.AddEventType<OnboardingCompleted_V1>(); // STB-00
+
+        // STB-05b: Challenge events
+        opts.Events.AddEventType<ChallengeStarted_V1>();
+        opts.Events.AddEventType<BossAttemptConsumed_V1>();
     }
 
     private static void RegisterPedagogyEvents(StoreOptions opts)

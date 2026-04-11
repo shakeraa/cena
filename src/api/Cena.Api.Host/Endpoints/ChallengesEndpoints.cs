@@ -7,6 +7,8 @@ using System.Security.Claims;
 using Cena.Api.Contracts.Challenges;
 using Cena.Actors.Events;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Challenges;
+using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -24,12 +26,14 @@ public static class ChallengesEndpoints
 
         // Daily challenge endpoints
         group.MapGet("/daily", GetDailyChallenge).WithName("GetDailyChallenge");
+        group.MapPost("/daily/start", StartDailyChallenge).WithName("StartDailyChallenge");
         group.MapGet("/daily/leaderboard", GetDailyLeaderboard).WithName("GetDailyLeaderboard");
         group.MapGet("/daily/history", GetDailyHistory).WithName("GetDailyHistory");
 
         // Boss battle endpoints
         group.MapGet("/boss", GetBossBattles).WithName("GetBossBattles");
         group.MapGet("/boss/{id}", GetBossBattleDetail).WithName("GetBossBattleDetail");
+        group.MapPost("/boss/{id}/start", StartBossBattle).WithName("StartBossBattle");
 
         // Card chain endpoints
         group.MapGet("/chains", GetCardChains).WithName("GetCardChains");
@@ -188,7 +192,7 @@ public static class ChallengesEndpoints
         return Results.Ok(dto);
     }
 
-    // GET /api/challenges/boss/{id} — returns boss battle details
+    // GET /api/challenges/boss/{id} — returns boss battle details (Phase 1b: real catalog + attempts)
     private static async Task<IResult> GetBossBattleDetail(
         HttpContext ctx,
         IDocumentStore store,
@@ -200,21 +204,27 @@ public static class ChallengesEndpoints
 
         ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-        // Phase 1: Return static details for any id
+        // Look up boss in catalog
+        var boss = BossBattleCatalog.GetById(id);
+        if (boss is null)
+            return Results.NotFound(new { error = "Boss battle not found" });
+
+        // Get attempts remaining
+        await using var session = store.QuerySession();
+        var attemptDoc = await session.Query<BossAttemptDocument>()
+            .FirstOrDefaultAsync(a => a.StudentId == studentId && a.BossBattleId == id && a.Date == DateTime.UtcNow.Date);
+
+        var attemptsRemaining = attemptDoc?.AttemptsRemaining ?? boss.MaxAttemptsPerDay;
+
         var dto = new BossBattleDetailDto(
             BossBattleId: id,
-            Name: "The Algebraic Dragon",
-            Description: "A formidable foe guarding the secrets of algebra! Defeat this boss by solving a series of progressively difficult algebraic equations. Each correct answer deals damage, but mistakes cost you precious time.",
-            Subject: "Mathematics",
-            Difficulty: "medium",
-            AttemptsRemaining: 3,
-            AttemptsMax: 3,
-            Rewards: new[]
-            {
-                new BossBattleReward(Type: "xp", Amount: 500),
-                new BossBattleReward(Type: "badge", Amount: 1),
-                new BossBattleReward(Type: "gems", Amount: 50)
-            });
+            Name: boss.Name,
+            Description: boss.Description,
+            Subject: boss.Subject,
+            Difficulty: boss.Difficulty,
+            AttemptsRemaining: attemptsRemaining,
+            AttemptsMax: boss.MaxAttemptsPerDay,
+            Rewards: boss.Rewards.Select(r => new BossBattleReward(Type: r.Type, Amount: r.Amount)).ToArray());
 
         return Results.Ok(dto);
     }
@@ -287,6 +297,156 @@ public static class ChallengesEndpoints
 
         var dto = new TournamentListDto(Upcoming: upcoming, Active: active);
         return Results.Ok(dto);
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // STB-05b: Write Endpoints
+    // ═════════════════════════════════════════════════════════════════════════
+
+    // POST /api/challenges/daily/start — begin today's daily challenge
+    private static async Task<IResult> StartDailyChallenge(
+        HttpContext ctx,
+        IDocumentStore store)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.LightweightSession();
+
+        // Create a new learning session for the challenge
+        var sessionId = $"challenge_daily_{Guid.NewGuid():N}";
+        var now = DateTime.UtcNow;
+        var expiresAt = now.Date.AddDays(1).AddTicks(-1);
+
+        // Append ChallengeStarted event
+        var challengeEvent = new ChallengeStarted_V1(
+            StudentId: studentId,
+            ChallengeId: "daily_math_001",
+            Kind: "daily",
+            BossBattleId: null,
+            StartedAt: now);
+
+        session.Events.Append(studentId, challengeEvent);
+
+        // Also start a learning session
+        var learningSessionEvent = new LearningSessionStarted_V1(
+            StudentId: studentId,
+            SessionId: sessionId,
+            Subjects: new[] { "Mathematics" },
+            Mode: "challenge",
+            DurationMinutes: 15,
+            StartedAt: now);
+
+        session.Events.Append(studentId, learningSessionEvent);
+
+        await session.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            SessionId = sessionId,
+            ChallengeId = "daily_math_001",
+            ExpiresAt = expiresAt
+        });
+    }
+
+    // POST /api/challenges/boss/{id}/start — begin a boss battle
+    private static async Task<IResult> StartBossBattle(
+        HttpContext ctx,
+        IDocumentStore store,
+        string id)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        // Look up boss in catalog
+        var boss = BossBattleCatalog.GetById(id);
+        if (boss is null)
+            return Results.NotFound(new { error = "Boss battle not found" });
+
+        await using var session = store.LightweightSession();
+
+        // Check if student meets mastery requirement
+        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        var studentLevel = Math.Max(1, (profile?.TotalXp ?? 0) / 100);
+
+        if (studentLevel < boss.RequiredMasteryLevel)
+        {
+            return Results.StatusCode(403);
+        }
+
+        // Check/get attempts
+        var today = DateTime.UtcNow.Date;
+        var attemptDoc = await session.Query<BossAttemptDocument>()
+            .FirstOrDefaultAsync(a => a.StudentId == studentId && a.BossBattleId == id && a.Date == today);
+
+        if (attemptDoc == null)
+        {
+            attemptDoc = new BossAttemptDocument
+            {
+                Id = $"boss_attempt_{studentId}_{id}_{today:yyyyMMdd}",
+                StudentId = studentId,
+                BossBattleId = id,
+                Date = today,
+                AttemptsUsed = 0,
+                AttemptsMax = boss.MaxAttemptsPerDay
+            };
+        }
+        else if (!attemptDoc.HasAttemptsRemaining)
+        {
+            return Results.StatusCode(429); // Too many requests / attempts exhausted
+        }
+
+        // Consume attempt
+        attemptDoc.AttemptsUsed++;
+        attemptDoc.LastAttemptAt = DateTime.UtcNow;
+        session.Store(attemptDoc);
+
+        // Create learning session
+        var sessionId = $"challenge_boss_{Guid.NewGuid():N}";
+        var now = DateTime.UtcNow;
+
+        // Append events
+        var challengeEvent = new ChallengeStarted_V1(
+            StudentId: studentId,
+            ChallengeId: id,
+            Kind: "boss",
+            BossBattleId: id,
+            StartedAt: now);
+
+        session.Events.Append(studentId, challengeEvent);
+
+        var bossAttemptEvent = new BossAttemptConsumed_V1(
+            StudentId: studentId,
+            BossBattleId: id,
+            AttemptsRemaining: attemptDoc.AttemptsRemaining,
+            ConsumedAt: now);
+
+        session.Events.Append(studentId, bossAttemptEvent);
+
+        var learningSessionEvent = new LearningSessionStarted_V1(
+            StudentId: studentId,
+            SessionId: sessionId,
+            Subjects: new[] { boss.Subject },
+            Mode: "challenge",
+            DurationMinutes: 30,
+            StartedAt: now);
+
+        session.Events.Append(studentId, learningSessionEvent);
+
+        await session.SaveChangesAsync();
+
+        return Results.Ok(new
+        {
+            SessionId = sessionId,
+            BossBattleId = id,
+            AttemptsRemaining = attemptDoc.AttemptsRemaining
+        });
     }
 
     private static string? GetStudentId(ClaimsPrincipal user)
