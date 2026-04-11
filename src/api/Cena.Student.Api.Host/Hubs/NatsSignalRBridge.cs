@@ -150,11 +150,15 @@ public sealed class NatsSignalRBridge : BackgroundService
                 if (hintDelivered != null) await group.HintDelivered(hintDelivered);
                 break;
 
+            // FIND-arch-009: MethodologySwitched is hub-caller-only (not subscribed in student web UI)
+            // Used by: Admin dashboard, analytics consumers, future mobile app
             case NatsSubjects.StudentMethodologySwitched:
                 var methodologySwitched = Deserialize<MethodologySwitchedEvent>(payloadJson);
                 if (methodologySwitched != null) await group.MethodologySwitched(methodologySwitched);
                 break;
 
+            // FIND-arch-009: StagnationDetected is hub-caller-only (not subscribed in student web UI)
+            // Used by: Admin dashboard, intervention triggers, analytics
             case NatsSubjects.StudentStagnationDetected:
                 var stagnation = Deserialize<StagnationDetectedEvent>(payloadJson);
                 if (stagnation != null) await group.StagnationDetected(stagnation);
@@ -175,16 +179,21 @@ public sealed class NatsSignalRBridge : BackgroundService
                 if (badgeEarned != null) await group.BadgeEarned(badgeEarned);
                 break;
 
+            // FIND-arch-009: TutoringStarted is hub-caller-only (not subscribed in student web UI v1)
+            // Used by: Admin dashboard real-time monitor (ADM-026), future session chat UI
             case NatsSubjects.StudentTutoringStarted:
                 var tutoringStarted = Deserialize<TutoringStartedEvent>(payloadJson);
                 if (tutoringStarted != null) await group.TutoringStarted(tutoringStarted);
                 break;
 
+            // FIND-arch-009: TutorMessage is UI-subscribed (student web src/api/signalr.ts:86)
             case NatsSubjects.StudentTutorMessage:
                 var tutorMessage = Deserialize<TutorMessageEvent>(payloadJson);
                 if (tutorMessage != null) await group.TutorMessage(tutorMessage);
                 break;
 
+            // FIND-arch-009: TutoringEnded is hub-caller-only (not subscribed in student web UI v1)
+            // Used by: Admin dashboard real-time monitor (ADM-026), future session chat UI
             case NatsSubjects.StudentTutoringEnded:
                 var tutoringEnded = Deserialize<TutoringEndedEvent>(payloadJson);
                 if (tutoringEnded != null) await group.TutoringEnded(tutoringEnded);
