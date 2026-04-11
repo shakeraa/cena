@@ -69,6 +69,7 @@ public static class MartenConfiguration
         RegisterLearnerEvents(opts);
         RegisterPedagogyEvents(opts);
         RegisterEngagementEvents(opts);
+        RegisterSocialEvents(opts);
         RegisterOutreachEvents(opts);
         RegisterQuestionEvents(opts);
         RegisterFocusEvents(opts);
@@ -210,6 +211,35 @@ public static class MartenConfiguration
             .Index(x => x.StudentId)
             .Index(x => x.CreatedAt);
 
+        // ── Social Documents (STB-06b) ──
+        opts.Schema.For<CommentDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.ItemId)
+            .Index(x => x.AuthorStudentId)
+            .Index(x => x.PostedAt);
+
+        opts.Schema.For<FriendRequestDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.FromStudentId)
+            .Index(x => x.ToStudentId)
+            .Index(x => x.Status);
+
+        opts.Schema.For<FriendshipDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentAId)
+            .Index(x => x.StudentBId);
+
+        opts.Schema.For<StudyRoomDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.HostStudentId)
+            .Index(x => x.IsPublic);
+
+        opts.Schema.For<StudyRoomMembershipDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.RoomId)
+            .Index(x => x.StudentId)
+            .Index(x => x.IsActive);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
@@ -252,6 +282,18 @@ public static class MartenConfiguration
         opts.Events.AddEventType<BadgeEarned_V1>();
         opts.Events.AddEventType<StreakExpiring_V1>();
         opts.Events.AddEventType<ReviewDue_V1>();
+    }
+
+    private static void RegisterSocialEvents(StoreOptions opts)
+    {
+        // STB-06b: Social events
+        opts.Events.AddEventType<ReactionAdded_V1>();
+        opts.Events.AddEventType<CommentPosted_V1>();
+        opts.Events.AddEventType<FriendRequestSent_V1>();
+        opts.Events.AddEventType<FriendRequestAccepted_V1>();
+        opts.Events.AddEventType<StudyRoomCreated_V1>();
+        opts.Events.AddEventType<StudyRoomJoined_V1>();
+        opts.Events.AddEventType<StudyRoomLeft_V1>();
     }
 
     private static void RegisterOutreachEvents(StoreOptions opts)

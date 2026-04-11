@@ -82,3 +82,24 @@ public record StudyRoom(
     int MaxCapacity,
     bool IsPublic,
     DateTime CreatedAt);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STB-06b: Write Endpoint Request/Response DTOs
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Reactions
+public record AddReactionRequest(string ItemId, string ReactionType);
+public record AddReactionResponse(bool Ok, string ItemId, string ReactionType, int NewCount);
+
+// Comments
+public record AddCommentRequest(string ItemId, string Content);
+public record AddCommentResponse(string CommentId, string ItemId, string Content, DateTime PostedAt);
+
+// Friend Requests
+public record SendFriendRequestRequest(string TargetStudentId);
+public record SendFriendRequestResponse(string RequestId, string Status);
+public record AcceptFriendRequestResponse(bool Ok, string FriendshipId);
+
+// Study Rooms
+public record CreateStudyRoomRequest(string Name, string Subject, bool IsPublic, int MaxCapacity);
+public record JoinStudyRoomResponse(bool Ok, string RoomId, int MemberCount);
