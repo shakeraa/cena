@@ -369,6 +369,33 @@
       "friends": "الأصدقاء"
     }
   },
+  "knowledgeGraph": {
+    "title": "خريطة المعرفة",
+    "subtitle": "استكشف المفاهيم وخطط مسار تعلمك.",
+    "progressLabel": "المفاهيم المتقنة",
+    "status": {
+      "locked": "مقفل",
+      "available": "متاح",
+      "in-progress": "قيد التقدم",
+      "mastered": "متقن"
+    },
+    "difficulty": {
+      "beginner": "مبتدئ",
+      "intermediate": "متوسط",
+      "advanced": "متقدم"
+    },
+    "detail": {
+      "masteryLabel": "إتقانك",
+      "estimatedMinutes": "~{minutes} د",
+      "questionCount": "الأسئلة",
+      "subject": "المادة",
+      "prerequisitesTitle": "المتطلبات السابقة",
+      "prerequisitesEmpty": "لا توجد متطلبات سابقة.",
+      "dependenciesTitle": "يفتح",
+      "dependenciesEmpty": "لا شيء يعتمد على هذا المفهوم.",
+      "startSession": "تدرب على هذا المفهوم"
+    }
+  },
   "session": {
     "setup": {
       "title": "ابدأ جلسة تعلم",

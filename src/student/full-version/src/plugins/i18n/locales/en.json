@@ -368,6 +368,33 @@
       "friends": "Friends"
     }
   },
+  "knowledgeGraph": {
+    "title": "Knowledge graph",
+    "subtitle": "Explore concepts, see prerequisites, and plan your learning path.",
+    "progressLabel": "Mastered in this subject",
+    "status": {
+      "locked": "Locked",
+      "available": "Available",
+      "in-progress": "In progress",
+      "mastered": "Mastered"
+    },
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "detail": {
+      "masteryLabel": "Your mastery",
+      "estimatedMinutes": "~{minutes} min",
+      "questionCount": "Questions",
+      "subject": "Subject",
+      "prerequisitesTitle": "Prerequisites",
+      "prerequisitesEmpty": "No prerequisites — you can start this any time.",
+      "dependenciesTitle": "Unlocks",
+      "dependenciesEmpty": "Nothing depends on this concept.",
+      "startSession": "Practice this concept"
+    }
+  },
   "session": {
     "setup": {
       "title": "Start a learning session",

@@ -203,6 +203,33 @@
       "friends": "חברים"
     }
   },
+  "knowledgeGraph": {
+    "title": "מפת ידע",
+    "subtitle": "גלה מושגים, ראה דרישות מוקדמות, ותכנן את מסלול הלמידה.",
+    "progressLabel": "מושגים שנשלטו",
+    "status": {
+      "locked": "נעול",
+      "available": "זמין",
+      "in-progress": "בתהליך",
+      "mastered": "נשלט"
+    },
+    "difficulty": {
+      "beginner": "מתחיל",
+      "intermediate": "בינוני",
+      "advanced": "מתקדם"
+    },
+    "detail": {
+      "masteryLabel": "השליטה שלך",
+      "estimatedMinutes": "~{minutes} דק",
+      "questionCount": "שאלות",
+      "subject": "מקצוע",
+      "prerequisitesTitle": "דרישות מוקדמות",
+      "prerequisitesEmpty": "אין דרישות מוקדמות.",
+      "dependenciesTitle": "פותח",
+      "dependenciesEmpty": "שום דבר לא תלוי במושג זה.",
+      "startSession": "תרגל את המושג"
+    }
+  },
   "session": {
     "setup": {
       "title": "התחל שיעור לימוד",

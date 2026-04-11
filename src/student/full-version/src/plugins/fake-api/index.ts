@@ -37,6 +37,9 @@ import { handlerStudentSessions } from '@db/student-sessions/index'
 // STU-W-09: student /api/analytics/* handlers for progress subpages.
 import { handlerStudentAnalytics } from '@db/student-analytics/index'
 
+// STU-W-10: student /api/content/* + /api/knowledge/* handlers.
+import { handlerStudentKnowledge } from '@db/student-knowledge/index'
+
 const worker = setupWorker(
   ...handlerAppsEcommerce,
   ...handlerAppsAcademy,
@@ -61,6 +64,7 @@ const worker = setupWorker(
   ...handlerStudentChallenges,
   ...handlerStudentSessions,
   ...handlerStudentAnalytics,
+  ...handlerStudentKnowledge,
 )
 
 export default function () {
