@@ -244,4 +244,28 @@ app.MapGet("/", () => Results.Ok(new
     timestamp = DateTimeOffset.UtcNow
 }));
 
+// FIND-sec-007: Application started hook — seed database + init Firebase (fail-fast)
+app.Lifetime.ApplicationStarted.Register(async () =>
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    
+    try
+    {
+        // Seed database (roles, users, classrooms, social data, etc.)
+        var store = app.Services.GetRequiredService<IDocumentStore>();
+        await CenaHostBootstrap.InitializeAsync(store, logger);
+        
+        // Initialize Firebase Admin SDK and sync admin claims
+        // This will throw if Firebase credentials are misconfigured (fail-fast)
+        var firebaseService = app.Services.GetRequiredService<IFirebaseAdminService>();
+        await CenaHostBootstrap.InitializeFirebaseAsync(firebaseService, logger);
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "Admin API Host startup failed — triggering graceful shutdown");
+        // Trigger graceful shutdown so orchestrators know the host is unhealthy
+        app.Lifetime.StopApplication();
+    }
+});
+
 app.Run();

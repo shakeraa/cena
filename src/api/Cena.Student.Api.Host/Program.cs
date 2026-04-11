@@ -303,4 +303,27 @@ app.MapGet("/", () => Results.Ok(new
     timestamp = DateTimeOffset.UtcNow
 }));
 
+// FIND-sec-007: Application started hook — seed database (no Firebase admin claims sync)
+app.Lifetime.ApplicationStarted.Register(async () =>
+{
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    
+    try
+    {
+        // Seed database (roles, users, classrooms, social data, etc.)
+        // Student host seeds the same data but does NOT sync Firebase admin claims
+        var store = app.Services.GetRequiredService<IDocumentStore>();
+        await CenaHostBootstrap.InitializeAsync(store, logger);
+        
+        // Note: Firebase claims sync is admin-host only — student host should not
+        // provision admin users. Firebase Auth for students is handled at registration time.
+    }
+    catch (Exception ex)
+    {
+        logger.LogCritical(ex, "Student API Host startup failed — triggering graceful shutdown");
+        // Trigger graceful shutdown so orchestrators know the host is unhealthy
+        app.Lifetime.StopApplication();
+    }
+});
+
 app.Run();
