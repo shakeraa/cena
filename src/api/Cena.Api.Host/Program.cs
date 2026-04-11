@@ -243,6 +243,7 @@ app.MapCenaAdminEndpoints();
 // ---- Session Lifecycle REST endpoints (SES-002) ----
 app.MapSessionEndpoints();
 app.MapStudentAnalyticsEndpoints();
+app.MapPlanEndpoints();
 
 // ---- Me/Profile REST endpoints (STB-00, STB-00b) ----
 app.MapMeEndpoints();
