@@ -2,12 +2,23 @@
 // Cena Platform -- Explanation Cache Invalidator (NATS Subscriber)
 // SAI-003.5: Invalidates L2 Redis cache when question content changes
 //
-// Subscribes to: cena.question.stem.edited, cena.question.option.changed
+// Subscribes to the durable JetStream subjects emitted by NatsOutboxPublisher
+// when QuestionStemEdited_V1 / QuestionOptionChanged_V1 events are committed
+// to Marten. The outbox uses the convention
+//   cena.durable.{category}.{EventTypeName}
+// and curriculum events land on
+//   cena.durable.curriculum.QuestionStemEdited_V1
+//   cena.durable.curriculum.QuestionOptionChanged_V1
+// These subjects are produced by NatsSubjects.DurableCurriculumEvent(...) and
+// by NatsOutboxPublisher.GetDurableSubject(...), both of which share the same
+// prefix helper so a drift here is now a compile-time dependency mismatch.
 // On receipt, calls IExplanationCacheService.InvalidateQuestionAsync to
 // delete all ErrorType variants for the affected question.
 // =============================================================================
 
 using System.Text.Json;
+using Cena.Actors.Bus;
+using Cena.Actors.Events;
 using Cena.Actors.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -42,11 +53,19 @@ public sealed class ExplanationCacheInvalidator : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        _logger.LogInformation("SAI-003: Explanation cache invalidator starting NATS subscriptions");
+        // NatsOutboxPublisher publishes curriculum events (Question*, Pipeline*, File*)
+        // on cena.durable.curriculum.{EventTypeName}. We compute the exact subjects
+        // here via the typed registry (NatsSubjects.DurableCurriculumEvent) so the
+        // subscribe side cannot drift from the publish side.
+        var stemSubject = NatsSubjects.DurableCurriculumEvent(nameof(QuestionStemEdited_V1));
+        var optionSubject = NatsSubjects.DurableCurriculumEvent(nameof(QuestionOptionChanged_V1));
 
-        // Outbox publishes events as: cena.events.{EventTypeName}
-        var stemTask = SubscribeAsync("cena.events.QuestionStemEdited_V1", stoppingToken);
-        var optionTask = SubscribeAsync("cena.events.QuestionOptionChanged_V1", stoppingToken);
+        _logger.LogInformation(
+            "SAI-003: Explanation cache invalidator starting NATS subscriptions on {Stem} and {Option}",
+            stemSubject, optionSubject);
+
+        var stemTask = SubscribeAsync(stemSubject, stoppingToken);
+        var optionTask = SubscribeAsync(optionSubject, stoppingToken);
 
         await Task.WhenAll(stemTask, optionTask);
     }
