@@ -10,10 +10,12 @@ using System.Text.Json;
 using Cena.Actors.Bus;
 using Cena.Actors.Events;
 using Cena.Actors.Projections;
+using Cena.Actors.Services;
 using Cena.Actors.Serving;
 using Cena.Actors.Tutoring;
 using Cena.Api.Contracts.Sessions;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -549,6 +551,7 @@ public static class SessionEndpoints
             HttpContext ctx,
             IDocumentStore store,
             IQuestionBank questionBank,
+            IBktService bktService,
             SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -584,7 +587,6 @@ public static class SessionEndpoints
 
             // Record answer in queue
             queue.RecordAnswer(currentQuestion.QuestionId, isCorrect, TimeSpan.FromMilliseconds(request.TimeSpentMs), request.Answer);
-            session.Store(queue);
 
             // Append QuestionAnsweredInSession event
             var answeredEvent = new QuestionAnsweredInSession_V1(
@@ -598,7 +600,54 @@ public static class SessionEndpoints
 
             session.Events.Append(studentId, answeredEvent);
 
-            // STB-03b: Append XP event and concept attempt on correct answer.
+            // ─── FIND-pedagogy-003: Real BKT posterior via BktService ───
+            //
+            // The prior comes from the in-flight session's concept mastery
+            // snapshot (or 0.5 — neutral — when the student has never seen
+            // this concept). The BKT parameters are sourced from the question
+            // document (per-concept slip/guess/learning rates) with a fallback
+            // to BktParameters.Default. The posterior is written BOTH into the
+            // ConceptAttempted_V1 event AND back into the queue's snapshot so
+            // the next question on the same concept uses the updated prior.
+            var priorMastery = queue.ConceptMasterySnapshot.GetValueOrDefault(
+                questionDoc.ConceptId, 0.5);
+
+            var bktParams = BuildBktParameters(questionDoc);
+            var bktResult = bktService.Update(new BktUpdateInput(
+                PriorMastery: priorMastery,
+                IsCorrect: isCorrect,
+                Parameters: bktParams));
+            var posteriorMastery = bktResult.PosteriorMastery;
+
+            // Update in-session snapshot so the next attempt sees the new prior.
+            queue.ConceptMasterySnapshot[questionDoc.ConceptId] = posteriorMastery;
+            session.Store(queue);
+
+            // ─── FIND-pedagogy-002: ConceptAttempted_V1 on EVERY answer ───
+            //
+            // Previously this append was wrapped in `if (isCorrect)` and the
+            // IsCorrect field was hard-coded to `true`. Both bugs broke the
+            // actor-side BKT pipeline (BktTracer.Update has a correct
+            // P(L|incorrect) branch that was never fed). The append now runs
+            // for every answer and carries the real outcome. The XP append
+            // (below) remains gated on isCorrect — this is intentional.
+            //
+            // ErrorType is left empty on this write path; the LLM-backed
+            // ErrorClassificationService wiring is tracked separately by
+            // FIND-pedagogy-007 and will enrich the event stream from an
+            // async projection rather than the hot answer path.
+            var conceptAttempt = BuildConceptAttempt(
+                studentId: studentId,
+                sessionId: sessionId,
+                questionDoc: questionDoc,
+                currentQuestionId: currentQuestion.QuestionId,
+                methodology: queue.Mode,
+                isCorrect: isCorrect,
+                responseTimeMs: request.TimeSpentMs,
+                priorMastery: priorMastery,
+                posteriorMastery: posteriorMastery);
+
+            // STB-03b: Append XP event and concept attempt.
             //
             // FIND-data-007: StudentProfileSnapshot is registered as an Inline
             // SnapshotProjection in MartenConfiguration (SnapshotLifecycle.Inline).
@@ -609,8 +658,8 @@ public static class SessionEndpoints
             //
             // All mutations to TotalXp / ConceptMastery / etc. must flow through
             // event append + Apply handler. Every event going to the student's
-            // stream is appended in ONE call so Marten's inline projection sees
-            // them as a single rebuild unit.
+            // stream is appended in a single call so Marten's inline projection
+            // sees them as one rebuild unit.
             if (isCorrect)
             {
                 // Load current profile ONLY to compute the new absolute TotalXp
@@ -629,35 +678,15 @@ public static class SessionEndpoints
                     DifficultyLevel: questionDoc.Difficulty,
                     DifficultyMultiplier: 1);
 
-                // Concept attempt event — drives ConceptMastery, badges, BKT.
-                // HARDEN: Use real concept ID from question instead of stub.
-                var conceptAttempt = new ConceptAttempted_V1(
-                    StudentId: studentId,
-                    ConceptId: questionDoc.ConceptId,
-                    SessionId: sessionId,
-                    IsCorrect: true,
-                    ResponseTimeMs: request.TimeSpentMs,
-                    QuestionId: currentQuestion.QuestionId,
-                    QuestionType: questionDoc.QuestionType,
-                    MethodologyActive: queue.Mode,
-                    ErrorType: "",
-                    PriorMastery: queue.ConceptMasterySnapshot.GetValueOrDefault(questionDoc.ConceptId, 0.5),
-                    PosteriorMastery: Math.Min(1.0, queue.ConceptMasterySnapshot.GetValueOrDefault(questionDoc.ConceptId, 0.5) + 0.05),
-                    HintCountUsed: 0,
-                    WasSkipped: false,
-                    AnswerHash: "",
-                    BackspaceCount: 0,
-                    AnswerChangeCount: 0,
-                    WasOffline: false,
-                    Timestamp: DateTimeOffset.UtcNow);
-
-                // FIND-data-007: BOTH events go to the stream in a single Append
-                // call. Marten's inline SnapshotProjection<StudentProfileSnapshot>
-                // will rebuild the snapshot from ALL events (including these two)
-                // on SaveChangesAsync and persist the new document. The endpoint
-                // NO LONGER calls session.Store(profile) — event sourcing is the
-                // single source of truth.
+                // Correct path: ConceptAttempted + XpAwarded in one Append.
                 session.Events.Append(studentId, conceptAttempt, xpEvent);
+            }
+            else
+            {
+                // Wrong path: ConceptAttempted only (no XP award). This is the
+                // fix for FIND-pedagogy-002 — the event is emitted with
+                // IsCorrect=false so BKT projections see failure signals.
+                session.Events.Append(studentId, conceptAttempt);
             }
 
             await session.SaveChangesAsync();
@@ -670,16 +699,16 @@ public static class SessionEndpoints
                 nextQuestionId = nextQuestion.QuestionId;
             }
 
-            var feedback = isCorrect
-                ? "Correct! Great job!"
-                : $"Not quite. The correct answer was: {questionDoc.CorrectAnswer}";
+            // ─── FIND-pedagogy-001: Formative feedback with explanation ───
+            var response = BuildAnswerFeedback(
+                questionDoc: questionDoc,
+                studentAnswer: request.Answer,
+                isCorrect: isCorrect,
+                priorMastery: priorMastery,
+                posteriorMastery: posteriorMastery,
+                nextQuestionId: nextQuestionId);
 
-            return Results.Ok(new SessionAnswerResponseDto(
-                Correct: isCorrect,
-                Feedback: feedback,
-                XpAwarded: isCorrect ? 10 : 0,
-                MasteryDelta: isCorrect ? 0.05m : 0m,
-                NextQuestionId: nextQuestionId));
+            return Results.Ok(response);
         })
         .WithName("SubmitAnswer");
 
@@ -849,5 +878,141 @@ public static class SessionEndpoints
     {
         var question = await questionBank.GetQuestionAsync(questionId);
         return question?.ConceptId ?? "unknown-concept";
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // FIND-pedagogy-001 / -002 / -003: Pure helpers for the answer path.
+    // Extracted as `internal static` methods so xUnit tests in
+    // Cena.Actors.Tests (InternalsVisibleTo enabled in Cena.Api.Host.csproj)
+    // can call them directly without spinning up an HTTP pipeline.
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// FIND-pedagogy-003 — Build the BKT parameter set for a question. Uses
+    /// per-concept slip / guess / learning rates from the question document
+    /// when authored, otherwise falls back to the library default.
+    /// </summary>
+    internal static BktParameters BuildBktParameters(QuestionDocument questionDoc)
+    {
+        var defaults = BktParameters.Default;
+        return new BktParameters(
+            PLearning: questionDoc.BktLearning ?? defaults.PLearning,
+            PSlip: questionDoc.BktSlip ?? defaults.PSlip,
+            PGuess: questionDoc.BktGuess ?? defaults.PGuess,
+            PForget: defaults.PForget,
+            PInitial: defaults.PInitial,
+            ProgressionThreshold: defaults.ProgressionThreshold,
+            PrerequisiteGateThreshold: defaults.PrerequisiteGateThreshold);
+    }
+
+    /// <summary>
+    /// FIND-pedagogy-002 — Build a ConceptAttempted_V1 event carrying the real
+    /// answer outcome. Called for EVERY answer (correct or wrong) — the
+    /// previous code hard-coded <c>IsCorrect: true</c> inside the
+    /// <c>if (isCorrect)</c> branch, which starved BKT projections of failure
+    /// signal. Tests assert <c>IsCorrect</c> mirrors the supplied flag.
+    /// </summary>
+    internal static ConceptAttempted_V1 BuildConceptAttempt(
+        string studentId,
+        string sessionId,
+        QuestionDocument questionDoc,
+        string currentQuestionId,
+        string methodology,
+        bool isCorrect,
+        int responseTimeMs,
+        double priorMastery,
+        double posteriorMastery)
+    {
+        return new ConceptAttempted_V1(
+            StudentId: studentId,
+            ConceptId: questionDoc.ConceptId,
+            SessionId: sessionId,
+            IsCorrect: isCorrect,
+            ResponseTimeMs: responseTimeMs,
+            QuestionId: currentQuestionId,
+            QuestionType: questionDoc.QuestionType,
+            MethodologyActive: methodology,
+            // ErrorType is left empty here and populated by the async
+            // ErrorClassificationService pipeline tracked by FIND-pedagogy-007.
+            // Synchronous LLM classification on the hot answer path would
+            // block every student submission on an LLM round-trip.
+            ErrorType: "",
+            PriorMastery: priorMastery,
+            PosteriorMastery: posteriorMastery,
+            HintCountUsed: 0,
+            WasSkipped: false,
+            AnswerHash: "",
+            BackspaceCount: 0,
+            AnswerChangeCount: 0,
+            WasOffline: false,
+            Timestamp: DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// FIND-pedagogy-001 — Build the formative feedback response.
+    ///
+    /// The short pill ("Correct" / "Not quite") is preserved so the UI has a
+    /// one-line summary, but the authored <c>Explanation</c> and (on wrong
+    /// answers) the matching <c>DistractorRationale</c> are shipped alongside
+    /// as dedicated fields. The UI renders the explanation block only when
+    /// at least one of the fields is non-empty, so questions without authored
+    /// feedback fall back to the short pill only — no empty cards.
+    /// </summary>
+    internal static SessionAnswerResponseDto BuildAnswerFeedback(
+        QuestionDocument questionDoc,
+        string? studentAnswer,
+        bool isCorrect,
+        double priorMastery,
+        double posteriorMastery,
+        string? nextQuestionId)
+    {
+        // Short pill label. The previous "Correct! Great job!" /
+        // "Not quite. The correct answer was: X" literal strings are gone —
+        // the detailed worked explanation now travels in the dedicated field
+        // so the UI can render it in a separate component below the pill.
+        var label = isCorrect ? "Correct" : "Not quite";
+
+        // Distractor rationale is ONLY surfaced for wrong answers, and ONLY
+        // when the authored question has a rationale for the specific option
+        // the student chose. The keys must match option values as authored.
+        string? distractorRationale = null;
+        if (!isCorrect && !string.IsNullOrWhiteSpace(studentAnswer)
+            && questionDoc.DistractorRationales is { } rationales)
+        {
+            var trimmed = studentAnswer.Trim();
+            if (rationales.TryGetValue(trimmed, out var direct))
+            {
+                distractorRationale = direct;
+            }
+            else
+            {
+                // Case-insensitive fallback for free-text answers that don't
+                // exactly match the authored key casing.
+                foreach (var kv in rationales)
+                {
+                    if (string.Equals(kv.Key, trimmed, StringComparison.OrdinalIgnoreCase))
+                    {
+                        distractorRationale = kv.Value;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Mastery delta is computed from the REAL BKT posterior, not a
+        // hard-coded constant (FIND-pedagogy-003). Wrong answers can produce
+        // negative deltas — the UI must handle non-positive values.
+        var masteryDelta = (decimal)(posteriorMastery - priorMastery);
+
+        return new SessionAnswerResponseDto(
+            Correct: isCorrect,
+            Feedback: label,
+            XpAwarded: isCorrect ? 10 : 0,
+            MasteryDelta: masteryDelta,
+            NextQuestionId: nextQuestionId,
+            Explanation: string.IsNullOrWhiteSpace(questionDoc.Explanation)
+                ? null
+                : questionDoc.Explanation,
+            DistractorRationale: distractorRationale);
     }
 }
