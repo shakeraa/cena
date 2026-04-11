@@ -234,6 +234,160 @@ Filed as a task in the kimi-queue (see `Next` stub below):
 
 ---
 
-## Revision log
+---
 
-- 2026-04-11: initial draft; Decision 1 locked per project-owner confirmation; Decision 2 staged for verification.
+## Finalized decisions (2026-04-11 session 2)
+
+After a UI/flows conversation with the project owner, the following were committed on top of the original Decision 1 / Decision 2 split. These supersede any conflicting detail in the body above.
+
+### Role naming — unified "Mentor"
+
+"Mentor" is the single role for any adult guiding students. Their capabilities are not fixed by the role; they come from the **classroom mode** and a **capability flag set** per classroom. Institute ownership and classroom assignment are orthogonal permissions on top of the Mentor role, not separate roles. Student is unchanged.
+
+This collapses the earlier "Mentor vs Instructor vs Coach" three-way split — the schema stores one role and configures capabilities per relationship.
+
+### Two-level class hierarchy — Program + Classroom
+
+The product owner clarified that a class is **two things**: what's being taught (authored once) and who is in the room this round (a cohort). Flat `Classroom` was collapsing them and forcing authoring duplication.
+
+```
+Institute
+  ├── CurriculumTrack            ← target-exam level (MATH-BAGRUT-5UNIT …)
+  │     └── LearningObjective[]  ← FIND-pedagogy-008
+  │
+  └── Program                    ← the course: "Grade 10 Algebra 2026-27"
+        │  authored once: content, lesson plans, question bank, schedule template
+        │  points at 1 CurriculumTrack; owned by 1..N mentors
+        │
+        └── Classroom (cohort)   ← "Round 1", "Group 2", "Mon-Wed 9am"
+              │  per-cohort: roster, join code, approval mode, schedule, analytics
+              │
+              └── Enrollment (student ↔ classroom)
+```
+
+Enrollment keys become `(StudentId, ClassroomId)`. Track is derived through `Classroom → Program → CurriculumTrack`, not stored on the enrollment — removes a drift source.
+
+### Three classroom modes
+
+```csharp
+public enum ClassroomMode
+{
+    SelfPaced,            // student alone with a platform Program; no mentor
+    InstructorLed,        // cohort with curriculum authoring; 1..N mentors, 5..40 students
+    PersonalMentorship    // light 1-on-1; mentor attaches to student's existing platform enrollment
+                          // to provide tasks + notes; does NOT author curriculum
+}
+```
+
+`PersonalMentorship` explicitly **does not** create new curriculum — it attaches a mentor's guidance layer on top of a student's existing `SelfPaced` platform enrollment.
+
+### Mentor capability flags (deferrable feature set)
+
+```csharp
+[Flags]
+public enum MentorCapability
+{
+    None          = 0,
+    PushTasks     = 1 << 0,  // assignments — "do these 10 questions by Thursday"
+    LeaveNotes    = 1 << 1,  // markdown notes anchored to sessions or questions
+    Chat          = 1 << 2,  // text chat channel (piggybacks SignalR infrastructure)
+    ViewProgress  = 1 << 3,  // read student analytics (mastery, Elo, sessions)
+    SendReminders = 1 << 4   // push notification for session/due-date
+}
+```
+
+Default bundles per mode:
+- `SelfPaced` → `None` (no mentor attached)
+- `InstructorLed` → `PushTasks | LeaveNotes | Chat | ViewProgress | SendReminders` (full)
+- `PersonalMentorship` → `PushTasks | LeaveNotes | ViewProgress` (no chat by default; flip per-relationship)
+
+### Classroom join approval — per-classroom setting
+
+```csharp
+public enum ClassroomJoinApproval
+{
+    AutoApprove,   // any valid join code → instant enrollment (default)
+    ManualApprove, // instructor sees a pending-request queue, approves one by one
+    InviteOnly     // no code works — signed invite links only (1-on-1 tutoring, private cohorts)
+}
+```
+
+Lives on the `Classroom` (not `Institute` or `Program`). Default: `AutoApprove`. `PersonalMentorship` classrooms default to `InviteOnly`.
+
+### Platform-owned canonical programs (self-learner path)
+
+Cena itself owns a platform-type Institute ("Cena Platform") that ships a canonical set of `Program`s. Self-learners enroll directly in a `Mode: SelfPaced` classroom under a platform program — no synthetic per-student institute is created.
+
+**Initial canonical seed set (day 1)**:
+- `MATH-BAGRUT-3UNIT` — Bagrut Math 3-unit
+- `MATH-BAGRUT-4UNIT` — Bagrut Math 4-unit
+- `MATH-BAGRUT-5UNIT` — Bagrut Math 5-unit
+- `MATH-SAT-700` — SAT Math
+- `MATH-PSYCHOMETRY-QUANTITATIVE` — Psychometry Quantitative
+
+Non-math subjects (Bagrut English, Hebrew, History, etc.) are **not** day-one — the BKT tracer, Elo calibration, and question bank are math-only today.
+
+Third-party institutes can:
+- **Reference** a platform program (default) — use as-is, receive automatic minor-version updates
+- **Fork** — clone into the institute's namespace, edit freely, no automatic updates
+- **Author** — build from a bare `CurriculumTrack`
+
+Platform program updates:
+- Minor version bump → pushed immediately to all Reference institutes
+- Major version bump → Reference institutes see a "review and accept" gate on the mentor dashboard
+- `Program.ContentPackVersion` drives this (semver-ish)
+
+### Initial canonical seed defaults
+
+These were committed as "accepted defaults" rather than deferred questions:
+
+1. **Psychometry Quantitative in day-1 seed**: yes
+2. **Self-paced cohort shape**: one shared `Mode: SelfPaced` classroom per platform program, leaderboard shows anonymized handles only
+3. **Platform program updates**: immediate push for minor versions, review gate for major versions
+4. **Non-math day 1**: math-only
+
+### AssignmentDocument is Phase 2, not Phase 1
+
+Assignments (`PushTasks` capability) are a user-facing feature, not schema scaffolding. They belong with `PersonalMentorship` in Phase 2, not with the zero-behavior-change schema lift in Phase 1. `InstructorLed` classrooms today have no assignment concept anyway — nothing regresses.
+
+### Revised phasing
+
+| Phase | Modes delivered | Features | Blocks on |
+|---|---|---|---|
+| **1 — Schema scaffold** | `SelfPaced`, `InstructorLed` (existing behavior preserved) | 4 new docs + extend `ClassroomDocument` + 8 new events + idempotent upcaster + platform seed data (Institute + 5 programs + 5 self-paced classrooms) | nothing — ships independently |
+| **2 — Cross-enrollment + PersonalMentorship + Assignments** | + `PersonalMentorship` | Re-key mastery state per ADR-0002, new `AssignmentDocument`, optional `MentorNoteDocument`, enrollment switcher UI, `/api/me/enrollments` surface, onboarding V2 with platform catalog picker | ADR-0002 (VERIFY-0001) |
+| **3 — Mentor admin surface** | All three modes | Mentor + Instructor Firebase custom claims, mentor dashboard UI, `Chat` capability wire-up, pending-request queue UI, fork/reference mentor workflows | Phase 2 |
+
+### Revised Phase 1 schema (committed)
+
+New document types:
+- `InstituteDocument` — `InstituteId`, `Name`, `Type` (`platform | school | private-tutor | cram-school | ngo`), `Country`, `MentorIds[]` (owners), `CreatedAt`
+- `CurriculumTrackDocument` — `TrackId`, `Code`, `Title`, `Subject`, `TargetExam`, `LearningObjectiveIds[]`, `StandardMappings[]`
+- `ProgramDocument` — `ProgramId`, `InstituteId`, `TrackId`, `Title`, `Description`, `Origin` (`Platform | Forked | Custom`), `ParentProgramId?`, `ContentPackVersion`, `CreatedByMentorId`, `CreatedAt`
+- `EnrollmentDocument` — `EnrollmentId`, `StudentId`, `ClassroomId`, `Status`, `EnrolledAt`, `EndedAt?`
+
+Modified document types:
+- `ClassroomDocument` — add `InstituteId`, `ProgramId`, `Mode` (`SelfPaced | InstructorLed | PersonalMentorship`), `MentorIds[]` (rename from `TeacherId`), `JoinApprovalMode`, `Status` (`active | archived | completed`), `StartDate`, `EndDate`. Keep existing `JoinCode`, `Grade`, `Subjects[]` for back-compat.
+
+New events (in `EnrollmentEvents.cs`):
+- `InstituteCreated_V1 (InstituteId, Type, Name, Country, MentorId, CreatedAt)`
+- `CurriculumTrackPublished_V1 (TrackId, Code, Title, Subject, TargetExam, LearningObjectiveIds)`
+- `ProgramCreated_V1 (ProgramId, InstituteId, TrackId, Title, Origin, ParentProgramId, ContentPackVersion, CreatedByMentorId)`
+- `ProgramForkedFromPlatform_V1 (NewProgramId, ParentProgramId, InstituteId, ForkedByMentorId)`
+- `ClassroomCreated_V1 (ClassroomId, InstituteId, ProgramId, Mode, MentorIds, JoinApprovalMode)`
+- `ClassroomStatusChanged_V1 (ClassroomId, NewStatus, ChangedAt, Reason?)`
+- `EnrollmentCreated_V1 (EnrollmentId, StudentId, ClassroomId, EnrolledAt)`
+- `EnrollmentStatusChanged_V1 (EnrollmentId, NewStatus, ChangedAt, Reason?)`
+
+Seed data (in `Cena.Infrastructure/Seed/`):
+- `PlatformInstituteSeedData` — creates the "Cena Platform" institute (InstituteId `"cena-platform"`, Type `Platform`, MentorIds `[]`)
+- `PlatformProgramSeedData` — creates 5 canonical programs + their tracks + their self-paced classrooms (one per program)
+- Migration upcaster: on first read of an existing student stream, prepend a synthetic `EnrollmentCreated_V1` binding the student to whichever platform classroom best matches their stated subjects (default to Bagrut 5-unit if ambiguous; log the mapping)
+
+Tenant scoping:
+- Add `TenantScope.GetInstituteFilter(user) → IReadOnlyList<string>` returning `[student.DefaultInstituteId]` in Phase 1 (single-element list). Keep `GetSchoolFilter` as a thin alias until Phase 2 re-keys.
+
+### Revision log
+
+- 2026-04-11 (session 2): three classroom modes, unified Mentor role, MentorCapability flags, Program/Classroom two-level hierarchy, platform-owned canonical programs, committed seed defaults, AssignmentDocument deferred to Phase 2. Phase 1 executable as committed.
+- 2026-04-11 (session 1): initial draft; Decision 1 locked per project-owner confirmation; Decision 2 staged for verification.
