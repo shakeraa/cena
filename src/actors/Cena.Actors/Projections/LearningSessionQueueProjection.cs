@@ -42,6 +42,16 @@ public class LearningSessionQueueProjection
     public DateTime? EndedAt { get; set; }
 
     /// <summary>
+    /// FIND-pedagogy-006 — Per-question hint counter. Keyed by QuestionId,
+    /// stores how many progressive hints the student has already consumed
+    /// for THAT question. Used by the REST /hint endpoint to enforce the
+    /// MaxHints budget published by <c>ScaffoldingService.GetScaffoldingMetadata</c>.
+    /// Serialized as part of the Marten document; new sessions default to
+    /// an empty map so older session snapshots remain forward-compatible.
+    /// </summary>
+    public Dictionary<string, int> HintsUsedByQuestion { get; set; } = new();
+
+    /// <summary>
     /// Check if queue needs refill (empty or low)
     /// </summary>
     public bool NeedsRefill => QuestionQueue.Count < 3 && EndedAt == null;

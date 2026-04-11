@@ -407,7 +407,11 @@
       "exit": "יציאה",
       "exitAria": "יציאה מהשיעור",
       "sessionIdLabel": "שיעור",
-      "completing": "מסיים…"
+      "completing": "מסיים…",
+      "continueWhenReady": "המשך",
+      "workedExampleLabel": "דוגמה מלאה",
+      "hintLevel": "רמז {level}",
+      "requestHint": "הצג רמז (נותרו {remaining})"
     },
     "summary": {
       "title": "השיעור הושלם",

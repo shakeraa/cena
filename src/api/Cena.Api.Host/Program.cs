@@ -204,6 +204,21 @@ builder.Services.AddScoped<IQuestionBank, QuestionBank>();
 // posterior mastery as PriorMastery + 0.05, which bypassed BKT entirely.
 builder.Services.AddSingleton<IBktService, BktService>();
 
+// ---- FIND-pedagogy-006: Scaffolding + hint generator for session REST path ----
+// HintGenerator is a pure stateless function — singleton is fine. The Vue
+// session flow used to ignore ScaffoldingService entirely; novices got zero
+// worked examples and zero hints. Registering IHintGenerator lets the REST
+// hint endpoint call the same generator that LearningSessionActor uses.
+//
+// Citations (the basis for wiring this up):
+//   - Sweller, van Merriënboer & Paas (1998), Educational Psychology Review
+//     10(3), 251-296. DOI: 10.1023/A:1022193728205 (worked example effect)
+//   - Renkl & Atkinson (2003), Educational Psychologist 38(1), 15-22.
+//     DOI: 10.1207/S15326985EP3801_3 (faded examples)
+//   - Kalyuga et al. (2003), Educational Psychologist 38(1), 23-31.
+//     DOI: 10.1207/S15326985EP3801_4 (expertise reversal effect)
+builder.Services.AddSingleton<IHintGenerator, HintGenerator>();
+
 // ---- HARDEN TutorEndpoints: LLM Service ----
 // Register Claude if API key is present, otherwise Null (operational failure mode)
 var llmApiKey = builder.Configuration["Cena:Llm:ApiKey"];

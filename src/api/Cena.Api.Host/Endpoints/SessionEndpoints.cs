@@ -9,7 +9,9 @@ using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Bus;
 using Cena.Actors.Events;
+using Cena.Actors.Mastery;
 using Cena.Actors.Projections;
+using Cena.Actors.Questions;
 using Cena.Actors.Services;
 using Cena.Actors.Serving;
 using Cena.Actors.Tutoring;
@@ -463,7 +465,12 @@ public static class SessionEndpoints
 
             ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-            await using var session = store.QuerySession();
+            // FIND-pedagogy-006 — We need a write session because we reset the
+            // per-question hint counter (`HintsUsedByQuestion[qid] = 0`) when
+            // a new question is served. The existing DequeueNext() call also
+            // mutates the queue and was previously not persisted — switching
+            // to LightweightSession fixes that drift as a side effect.
+            await using var session = store.LightweightSession();
 
             // Get the session queue projection
             var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
@@ -507,6 +514,60 @@ public static class SessionEndpoints
             if (questionDoc == null)
                 return Results.NotFound(new { error = "Question not found" });
 
+            // ─── FIND-pedagogy-006 — Compute scaffolding from real mastery ───
+            //
+            // Until now the Vue session flow served every student the same
+            // bare question with no hints and no worked example, regardless
+            // of whether they were at 5% mastery or 80% mastery. We now
+            // feed the REAL per-concept BKT mastery snapshot (already
+            // maintained inside `queue.ConceptMasterySnapshot` by the
+            // /answer endpoint via IBktService) into ScaffoldingService and
+            // return the level alongside the question.
+            //
+            // PSI note: the actor-side code uses a PrerequisiteSatisfaction
+            // index computed from the graph cache. The REST path does not
+            // load the concept graph (keeping the hot path fast), so we
+            // conservatively pass PSI=1.0 — this never PROMOTES a student
+            // into Full scaffolding they don't deserve (the Full branch is
+            // gated on `effectiveMastery < 0.20 && psi < 0.80`, so PSI=1.0
+            // DEMOTES Full → Partial when mastery is very low). In the
+            // worst case a novice gets 'Partial' instead of 'Full', which
+            // is a graceful degradation matching the cognitive-load
+            // literature (Kalyuga et al. 2003 — too much scaffolding hurts
+            // learners who don't need it). The actor path remains the
+            // authoritative scaffolder for mastered concept work.
+            //
+            // When mastery for this concept has never been observed, we
+            // default to 0.5 (neutral prior, same value used by the /answer
+            // endpoint).
+            var scaffoldPrior = (float)queue.ConceptMasterySnapshot.GetValueOrDefault(
+                questionDoc.ConceptId, 0.5);
+            var scaffoldLevel = ScaffoldingService.DetermineLevel(scaffoldPrior, 1.0f);
+            var scaffoldMeta = ScaffoldingService.GetScaffoldingMetadata(scaffoldLevel);
+
+            // Worked example is ONLY surfaced at the Full scaffolding level.
+            // Reuses the authored QuestionDocument.Explanation as the worked
+            // example body — this is the same text the actor-side
+            // HintGenerator.GenerateReveal returns for its Level-3 reveal.
+            // Novices literally need to see the worked solution step by step;
+            // higher-mastery students must not see it (expertise reversal).
+            string? workedExample = null;
+            if (scaffoldMeta.ShowWorkedExample
+                && !string.IsNullOrWhiteSpace(questionDoc.Explanation))
+            {
+                workedExample = questionDoc.Explanation;
+            }
+
+            // Reset per-question hint counter when a fresh question is served.
+            // The student starts each question with the full hint budget for
+            // their scaffolding level. Older sessions whose snapshot predates
+            // this field will simply lack the key and default to 0.
+            queue.HintsUsedByQuestion[questionDoc.QuestionId] = 0;
+            session.Store(queue);
+            await session.SaveChangesAsync();
+
+            var hintsAvailable = scaffoldMeta.MaxHints;
+
             return Results.Ok(new SessionQuestionDto(
                 QuestionId: questionDoc.QuestionId,
                 QuestionIndex: queue.TotalQuestionsAttempted + 1,
@@ -515,9 +576,135 @@ public static class SessionEndpoints
                 QuestionType: questionDoc.QuestionType,
                 Choices: questionDoc.Choices ?? Array.Empty<string>(),
                 Subject: questionDoc.Subject,
-                ExpectedTimeSeconds: 60));
+                ExpectedTimeSeconds: 60,
+                ScaffoldingLevel: scaffoldLevel.ToString(),
+                WorkedExample: workedExample,
+                HintsAvailable: hintsAvailable,
+                HintsRemaining: hintsAvailable));
         })
         .WithName("GetCurrentQuestion");
+
+        // POST /api/sessions/{sessionId}/question/{questionId}/hint — FIND-pedagogy-006
+        //
+        // Progressive hint delivery for the REST student flow. Uses the same
+        // `IHintGenerator` that `LearningSessionActor.HandleHintRequest` uses on
+        // the actor side, so the Vue student sees the same 3-level ladder
+        // (Nudge → Scaffold → Reveal) as the native mobile path.
+        //
+        // Budget enforcement:
+        //   - Scaffolding level is recomputed from the current BKT mastery
+        //     snapshot (same logic as current-question). The level's MaxHints
+        //     is the ceiling.
+        //   - Usage is tracked per QuestionId on the queue projection
+        //     (`HintsUsedByQuestion`), so hints consumed on a previous
+        //     question never carry over.
+        //   - When the student has exhausted their budget, or when the
+        //     question is at ScaffoldingLevel.None, the endpoint returns 404
+        //     (no fake hints — matching the production-grade constraint
+        //     stated in the pedagogy review).
+        //
+        // Citations: Sweller et al. 1998, Renkl & Atkinson 2003, Kalyuga
+        // et al. 2003 (see SessionDtos.cs for DOIs).
+        group.MapPost("/{sessionId}/question/{questionId}/hint", async (
+            string sessionId,
+            string questionId,
+            HttpContext ctx,
+            IDocumentStore store,
+            IQuestionBank questionBank,
+            IHintGenerator hintGenerator) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            if (string.IsNullOrWhiteSpace(questionId))
+                return Results.BadRequest(new { error = "QuestionId is required" });
+
+            await using var session = store.LightweightSession();
+
+            var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
+            if (queue == null)
+                return Results.NotFound(new { error = "Session not found" });
+
+            if (queue.EndedAt.HasValue)
+                return Results.Conflict(new { error = "Session already completed" });
+
+            // The hint must be for the question the student is actually on.
+            // Looking at the queue's CurrentQuestionId prevents a client from
+            // requesting hints for a future queued question or a past answered one.
+            if (!string.Equals(queue.CurrentQuestionId, questionId, StringComparison.Ordinal))
+            {
+                return Results.Conflict(new
+                {
+                    error = "Hint requested for a question that is not in flight"
+                });
+            }
+
+            var questionDoc = await questionBank.GetQuestionAsync(questionId);
+            if (questionDoc == null)
+                return Results.NotFound(new { error = "Question not found" });
+
+            // Recompute scaffolding from the current mastery snapshot — same
+            // prior we showed the student on current-question, so they see a
+            // consistent budget.
+            var priorMastery = (float)queue.ConceptMasterySnapshot.GetValueOrDefault(
+                questionDoc.ConceptId, 0.5);
+            var level = ScaffoldingService.DetermineLevel(priorMastery, 1.0f);
+            var meta = ScaffoldingService.GetScaffoldingMetadata(level);
+
+            if (!meta.ShowHintButton || meta.MaxHints <= 0)
+            {
+                // Experts (ScaffoldingLevel.None) don't get hints — that's the
+                // expertise-reversal principle. No 200-with-empty, no fake
+                // string: a clean 404 the UI can use to hide the hint button.
+                return Results.NotFound(new { error = "Hints are not available at this scaffolding level" });
+            }
+
+            var usedSoFar = queue.HintsUsedByQuestion.GetValueOrDefault(questionId, 0);
+            if (usedSoFar >= meta.MaxHints)
+            {
+                return Results.NotFound(new { error = "No more hints remaining for this question" });
+            }
+
+            // The hint ladder is 1-indexed; the next level is usedSoFar + 1.
+            // HintGenerator shapes the hint text from real per-question data
+            // (prerequisite names, options, explanation). For the REST path we
+            // don't have a pre-resolved prerequisite list (that comes from the
+            // concept graph cache on the actor side), so we pass an empty
+            // list; HintGenerator gracefully falls back to a generic re-read
+            // prompt at Level 1. Level 2 and Level 3 always produce real text
+            // from the authored question data.
+            var nextLevel = usedSoFar + 1;
+            var options = BuildHintOptionStates(questionDoc);
+            var content = hintGenerator.Generate(new HintRequest(
+                HintLevel: nextLevel,
+                QuestionId: questionId,
+                ConceptId: questionDoc.ConceptId,
+                PrerequisiteConceptNames: Array.Empty<string>(),
+                Options: options,
+                Explanation: questionDoc.Explanation,
+                StudentAnswer: null,
+                Prerequisites: null,
+                ConceptState: null));
+
+            // Only charge the student's budget AFTER we successfully produced
+            // a hint string. Failures in HintGenerator (rare — pure function)
+            // should not decrement the counter.
+            queue.HintsUsedByQuestion[questionId] = nextLevel;
+            session.Store(queue);
+            await session.SaveChangesAsync();
+
+            var hintsRemaining = Math.Max(0, meta.MaxHints - nextLevel);
+
+            return Results.Ok(new SessionHintResponseDto(
+                HintLevel: nextLevel,
+                HintText: content.Text,
+                HasMoreHints: hintsRemaining > 0,
+                HintsRemaining: hintsRemaining));
+        })
+        .WithName("GetQuestionHint");
 
         // POST /api/sessions/{sessionId}/answer — submit an answer
         group.MapPost("/{sessionId}/answer", async (
@@ -865,11 +1052,17 @@ public static class SessionEndpoints
     /// FIND-pedagogy-003 — Build the BKT parameter set for a question. Uses
     /// per-concept slip / guess / learning rates from the question document
     /// when authored, otherwise falls back to the library default.
+    ///
+    /// The fully-qualified type is required because FIND-pedagogy-006 pulled
+    /// in <c>Cena.Actors.Mastery</c> (for <c>ScaffoldingService</c>), which
+    /// also has a <c>BktParameters</c> struct with a different field shape.
+    /// BktService consumes the <c>Cena.Actors.Services</c> record — we stick
+    /// to that one.
     /// </summary>
-    internal static BktParameters BuildBktParameters(QuestionDocument questionDoc)
+    internal static Cena.Actors.Services.BktParameters BuildBktParameters(QuestionDocument questionDoc)
     {
-        var defaults = BktParameters.Default;
-        return new BktParameters(
+        var defaults = Cena.Actors.Services.BktParameters.Default;
+        return new Cena.Actors.Services.BktParameters(
             PLearning: questionDoc.BktLearning ?? defaults.PLearning,
             PSlip: questionDoc.BktSlip ?? defaults.PSlip,
             PGuess: questionDoc.BktGuess ?? defaults.PGuess,
@@ -877,6 +1070,61 @@ public static class SessionEndpoints
             PInitial: defaults.PInitial,
             ProgressionThreshold: defaults.ProgressionThreshold,
             PrerequisiteGateThreshold: defaults.PrerequisiteGateThreshold);
+    }
+
+    /// <summary>
+    /// FIND-pedagogy-006 — Project a <see cref="QuestionDocument"/> into the
+    /// <see cref="QuestionOptionState"/> shape the <see cref="IHintGenerator"/>
+    /// expects. The Level-2 scaffold hint uses per-option distractor
+    /// rationales to produce real elimination guidance, and the Level-3
+    /// reveal uses the correct option's rationale as a fallback when no
+    /// explanation is authored. If the question has no choices (free-text /
+    /// numeric), we return an empty list and HintGenerator falls back
+    /// gracefully to the explanation / generic guidance branches.
+    /// </summary>
+    internal static IReadOnlyList<QuestionOptionState> BuildHintOptionStates(
+        QuestionDocument questionDoc)
+    {
+        var choices = questionDoc.Choices;
+        if (choices is null || choices.Length == 0)
+            return Array.Empty<QuestionOptionState>();
+
+        var rationales = questionDoc.DistractorRationales;
+        var correctAnswer = questionDoc.CorrectAnswer ?? string.Empty;
+
+        var result = new List<QuestionOptionState>(choices.Length);
+        foreach (var choice in choices)
+        {
+            var isCorrect = string.Equals(choice, correctAnswer, StringComparison.OrdinalIgnoreCase);
+            string? rationale = null;
+            if (rationales is not null)
+            {
+                if (rationales.TryGetValue(choice, out var exact))
+                {
+                    rationale = exact;
+                }
+                else
+                {
+                    foreach (var kv in rationales)
+                    {
+                        if (string.Equals(kv.Key, choice, StringComparison.OrdinalIgnoreCase))
+                        {
+                            rationale = kv.Value;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            result.Add(new QuestionOptionState(
+                Label: choice,
+                Text: choice,
+                TextHtml: choice,
+                IsCorrect: isCorrect,
+                DistractorRationale: rationale));
+        }
+
+        return result;
     }
 
     /// <summary>
