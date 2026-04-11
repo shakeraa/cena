@@ -48,14 +48,15 @@ public static class GamificationEndpoints
         
         // Count learning sessions for "first-steps" badge
         var sessionEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "learning_session_started_v1" && e.StreamId == studentId)
+            .Where(e => e.EventTypeName == "learning_session_started_v1")
             .ToListAsync();
-        var hasStartedSession = sessionEvents.Count > 0;
+        var hasStartedSession = sessionEvents.Any(e => e.StreamKey == studentId);
 
         // Count correct answers for "quiz-master" badge
         var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted_v1" && e.StreamId == studentId)
+            .Where(e => e.EventTypeName == "concept_attempted_v1")
             .ToListAsync();
+        attemptEvents = attemptEvents.Where(e => e.StreamKey == studentId).ToList();
         var correctAnswers = attemptEvents.Count(e => 
         {
             try 
@@ -216,7 +217,8 @@ public static class GamificationEndpoints
 
         // Get last activity date from events
         var lastSessionEvent = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "learning_session_started_v1" && e.StreamId == studentId)
+            .Where(e => e.EventTypeName == "learning_session_started_v1")
+            .Where(e => e.StreamKey == studentId)
             .OrderByDescending(e => e.Timestamp)
             .FirstOrDefaultAsync();
 
@@ -277,7 +279,8 @@ public static class GamificationEndpoints
     private static async Task<int> CalculateCurrentStreak(IQuerySession session, string studentId)
     {
         var sessionEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "learning_session_started_v1" && e.StreamId == studentId)
+            .Where(e => e.EventTypeName == "learning_session_started_v1")
+            .Where(e => e.StreamKey == studentId)
             .OrderByDescending(e => e.Timestamp)
             .ToListAsync();
 

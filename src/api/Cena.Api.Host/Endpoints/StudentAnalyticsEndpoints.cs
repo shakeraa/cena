@@ -211,7 +211,7 @@ public static class StudentAnalyticsEndpoints
                     var date = today.AddDays(-29 + i);
                     // Generate realistic-looking data: more time on weekdays, less on weekends
                     var dayOfWeek = date.DayOfWeek;
-                    var isWeekend = dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.sunday;
+                    var isWeekend = dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.Sunday;
                     var baseMinutes = isWeekend ? 15 : 45;
                     var variation = random.Next(-20, 30);
                     var minutes = Math.Max(0, baseMinutes + variation);

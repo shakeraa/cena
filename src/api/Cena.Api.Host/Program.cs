@@ -8,6 +8,8 @@
 using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Cena.Actors.Configuration;
+using Cena.Actors.Notifications;
+using Cena.Actors.Tutor;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
 using Cena.Api.Host.Endpoints;
@@ -93,6 +95,12 @@ builder.Services.AddSingleton<NATS.Client.Core.INatsConnection>(sp =>
 });
 builder.Services.AddSingleton<NatsEventSubscriber>();
 builder.Services.AddHostedService(sp => sp.GetRequiredService<NatsEventSubscriber>());
+
+// ---- STB-07b: Notification Dispatcher ----
+builder.Services.AddHostedService<NotificationDispatcher>();
+
+// ---- STB-04b: Tutor LLM Service ----
+builder.Services.AddSingleton<ITutorLlmService, StubTutorLlmService>();
 
 // ---- Firebase Auth + Authorization (BKD-001) ----
 builder.Services.AddHttpContextAccessor();

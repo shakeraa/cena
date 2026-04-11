@@ -1,0 +1,44 @@
+// =============================================================================
+// Cena Platform — Notification Documents (STB-07b)
+// Notifications and Web Push subscriptions
+// =============================================================================
+
+namespace Cena.Infrastructure.Documents;
+
+/// <summary>
+/// Notification document for in-app notifications.
+/// </summary>
+public class NotificationDocument
+{
+    public string Id { get; set; } = "";
+    public string NotificationId { get; set; } = "";
+    public string StudentId { get; set; } = "";
+    public string Kind { get; set; } = ""; // 'xp' | 'badge' | 'streak' | 'system' | 'friend-request' | 'review-due'
+    public string Priority { get; set; } = "normal"; // 'low' | 'normal' | 'high'
+    public string Title { get; set; } = "";
+    public string Body { get; set; } = "";
+    public string? IconName { get; set; }
+    public string? DeepLinkUrl { get; set; }
+    public bool Read { get; set; } = false;
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? DeletedAt { get; set; }
+    public DateTime? SnoozedUntil { get; set; }
+
+    /// <summary>
+    /// Determines if the notification is visible (not deleted and not snoozed past now).
+    /// </summary>
+    public bool IsVisible => DeletedAt == null && (SnoozedUntil == null || SnoozedUntil < DateTime.UtcNow);
+}
+
+/// <summary>
+/// Web Push subscription document for browser notifications.
+/// </summary>
+public class WebPushSubscriptionDocument
+{
+    public string Id { get; set; } = "";
+    public string StudentId { get; set; } = "";
+    public string Endpoint { get; set; } = "";
+    public string P256dh { get; set; } = ""; // Public key
+    public string Auth { get; set; } = "";   // Auth secret
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

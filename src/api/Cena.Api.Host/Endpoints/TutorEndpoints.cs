@@ -1,10 +1,15 @@
 // =============================================================================
-// Cena Platform -- Tutor REST Endpoints (STB-04 Phase 1)
-// AI tutor thread and message endpoints (stub responses, no streaming)
+// Cena Platform -- Tutor REST Endpoints (STB-04 Phase 1 + STB-04b Phase 1b)
+// AI tutor thread and message endpoints with SSE streaming
 // =============================================================================
 
+using System.Runtime.CompilerServices;
 using System.Security.Claims;
+using System.Text.Json;
 using Cena.Api.Contracts.Tutor;
+using Cena.Actors.Events;
+using Cena.Actors.Tutor;
+using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Marten;
@@ -29,6 +34,9 @@ public static class TutorEndpoints
         // Message endpoints
         group.MapGet("/threads/{threadId}/messages", GetMessages).WithName("GetTutorMessages");
         group.MapPost("/threads/{threadId}/messages", SendMessage).WithName("SendTutorMessage");
+        
+        // SSE streaming endpoint (STB-04b)
+        group.MapPost("/threads/{threadId}/stream", StreamMessage).WithName("StreamTutorMessage");
 
         return app;
     }
@@ -114,7 +122,7 @@ public static class TutorEndpoints
                 CreatedAt = now
             };
 
-            // Create stub assistant response
+            // Create stub assistant response (non-streaming for initial)
             var assistantMessageId = $"tutor_msg_{Guid.NewGuid():N}";
             var assistantMessage = new TutorMessageDocument
             {
@@ -123,7 +131,7 @@ public static class TutorEndpoints
                 ThreadId = threadId,
                 StudentId = studentId,
                 Role = "assistant",
-                Content = "Great question! I'd be happy to help with that. (STB-04b will wire real LLM streaming)",
+                Content = "Hello! I'm your AI tutor. How can I help you with your learning today?",
                 CreatedAt = now.AddSeconds(1),
                 Model = "gpt-4-stub"
             };
@@ -232,7 +240,7 @@ public static class TutorEndpoints
             ThreadId = threadId,
             StudentId = studentId,
             Role = "assistant",
-            Content = "Great question! I'd be happy to help with that. (STB-04b will wire real LLM streaming)",
+            Content = "Great question! I'd be happy to help with that. (Use /stream endpoint for SSE)",
             CreatedAt = now.AddSeconds(1),
             Model = "gpt-4-stub"
         };
@@ -253,9 +261,137 @@ public static class TutorEndpoints
             Status: "complete")); // Phase 1: always complete (no streaming)
     }
 
+    // POST /api/tutor/threads/{threadId}/stream — SSE streaming endpoint (STB-04b)
+    private static async IAsyncEnumerable<SseEvent> StreamMessage(
+        HttpContext ctx,
+        IDocumentStore store,
+        ITutorLlmService llmService,
+        string threadId,
+        StreamMessageRequest request,
+        [EnumeratorCancellation] CancellationToken ct)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+        {
+            yield return new SseEvent("error", JsonSerializer.Serialize(new { error = "Unauthorized" }));
+            yield break;
+        }
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        if (string.IsNullOrWhiteSpace(request.Content))
+        {
+            yield return new SseEvent("error", JsonSerializer.Serialize(new { error = "Content is required" }));
+            yield break;
+        }
+
+        await using var session = store.LightweightSession();
+        
+        // Verify thread exists and belongs to student
+        var thread = await session.LoadAsync<TutorThreadDocument>(threadId);
+        if (thread is null || thread.StudentId != studentId)
+        {
+            yield return new SseEvent("error", JsonSerializer.Serialize(new { error = "Thread not found" }));
+            yield break;
+        }
+
+        var now = DateTime.UtcNow;
+
+        // Store user message
+        var userMessageId = $"tutor_msg_{Guid.NewGuid():N}";
+        var userMessage = new TutorMessageDocument
+        {
+            Id = userMessageId,
+            MessageId = userMessageId,
+            ThreadId = threadId,
+            StudentId = studentId,
+            Role = "user",
+            Content = request.Content,
+            CreatedAt = now
+        };
+        session.Store(userMessage);
+
+        // Get conversation history for context
+        var history = await session.Query<TutorMessageDocument>()
+            .Where(m => m.ThreadId == threadId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(10)
+            .ToListAsync();
+
+        var conversationHistory = history
+            .OrderBy(m => m.CreatedAt)
+            .Select(m => (m.Role, m.Content))
+            .ToList();
+
+        // Prepare for assistant response
+        var assistantMessageId = $"tutor_msg_{Guid.NewGuid():N}";
+        var fullContent = new System.Text.StringBuilder();
+
+        // Send message ID first
+        yield return new SseEvent("message_id", JsonSerializer.Serialize(new { messageId = assistantMessageId }));
+
+        // Stream tokens from stub LLM
+        await foreach (var token in llmService.StreamResponseAsync(
+            studentId, threadId, request.Content, conversationHistory, ct))
+        {
+            fullContent.Append(token);
+            yield return new SseEvent("token", JsonSerializer.Serialize(new { token }));
+        }
+
+        // Store the complete assistant message
+        var assistantMessage = new TutorMessageDocument
+        {
+            Id = assistantMessageId,
+            MessageId = assistantMessageId,
+            ThreadId = threadId,
+            StudentId = studentId,
+            Role = "assistant",
+            Content = fullContent.ToString().Trim(),
+            CreatedAt = DateTime.UtcNow,
+            Model = "gpt-4-stub"
+        };
+        session.Store(assistantMessage);
+
+        // Update thread
+        thread.MessageCount += 2;
+        thread.UpdatedAt = assistantMessage.CreatedAt;
+        session.Store(thread);
+
+        // Append tutoring session event for analytics (using internal tutoring event)
+        var tutoringEvent = new TutoringMessageSent_V1(
+            StudentId: studentId,
+            SessionId: threadId,
+            TutoringSessionId: threadId,
+            TurnNumber: (int)thread.MessageCount / 2,
+            Role: "tutor",
+            MessagePreview: assistantMessage.Content[..Math.Min(200, assistantMessage.Content.Length)],
+            SourceCount: 0, // Stub has no RAG sources
+            Timestamp: DateTimeOffset.UtcNow);
+        
+        session.Events.Append(studentId, tutoringEvent);
+        await session.SaveChangesAsync(ct);
+
+        // Signal completion
+        yield return new SseEvent("done", JsonSerializer.Serialize(new { 
+            messageId = assistantMessageId,
+            content = assistantMessage.Content,
+            createdAt = assistantMessage.CreatedAt
+        }));
+    }
+
     private static string? GetStudentId(ClaimsPrincipal user)
     {
         return user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
     }
 }
+
+/// <summary>
+/// SSE event structure for streaming responses.
+/// </summary>
+public record SseEvent(string Event, string Data);
+
+/// <summary>
+/// Request body for SSE streaming endpoint.
+/// </summary>
+public record StreamMessageRequest(string Content);

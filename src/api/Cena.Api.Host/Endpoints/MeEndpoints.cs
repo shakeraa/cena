@@ -17,6 +17,9 @@ namespace Cena.Api.Host.Endpoints;
 
 public static class MeEndpoints
 {
+    // Marker type for logger (static classes can't be type arguments)
+    private sealed class MeLoggerMarker { }
+
     public static IEndpointRouteBuilder MapMeEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/me")
@@ -199,7 +202,7 @@ public static class MeEndpoints
     private static async Task<IResult> GetSettings(
         HttpContext ctx,
         IDocumentStore store,
-        ILogger<MeEndpoints> logger)
+        ILogger<MeLoggerMarker> logger)
     {
         var studentId = GetStudentId(ctx.User);
         if (string.IsNullOrEmpty(studentId))

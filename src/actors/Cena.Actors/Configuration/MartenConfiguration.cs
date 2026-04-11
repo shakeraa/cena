@@ -69,7 +69,6 @@ public static class MartenConfiguration
         RegisterLearnerEvents(opts);
         RegisterPedagogyEvents(opts);
         RegisterEngagementEvents(opts);
-        RegisterSocialEvents(opts);
         RegisterOutreachEvents(opts);
         RegisterQuestionEvents(opts);
         RegisterFocusEvents(opts);
@@ -247,6 +246,7 @@ public static class MartenConfiguration
             .Index(x => x.BossBattleId)
             .Index(x => x.Date);
 
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
@@ -295,18 +295,6 @@ public static class MartenConfiguration
         opts.Events.AddEventType<ReviewDue_V1>();
     }
 
-    private static void RegisterSocialEvents(StoreOptions opts)
-    {
-        // STB-06b: Social events
-        opts.Events.AddEventType<ReactionAdded_V1>();
-        opts.Events.AddEventType<CommentPosted_V1>();
-        opts.Events.AddEventType<FriendRequestSent_V1>();
-        opts.Events.AddEventType<FriendRequestAccepted_V1>();
-        opts.Events.AddEventType<StudyRoomCreated_V1>();
-        opts.Events.AddEventType<StudyRoomJoined_V1>();
-        opts.Events.AddEventType<StudyRoomLeft_V1>();
-    }
-
     private static void RegisterOutreachEvents(StoreOptions opts)
     {
         opts.Events.AddEventType<OutreachMessageSent_V1>();
@@ -335,6 +323,14 @@ public static class MartenConfiguration
         opts.Events.AddEventType<TutoringMessageSent_V1>();
         opts.Events.AddEventType<TutoringSessionEnded_V1>();
         opts.Events.AddEventType<TutoringEpisodeCompleted_V1>();
+    }
+
+    private static void RegisterNotificationEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<NotificationDeleted_V1>();
+        opts.Events.AddEventType<NotificationSnoozed_V1>();
+        opts.Events.AddEventType<WebPushSubscribed_V1>();
+        opts.Events.AddEventType<WebPushUnsubscribed_V1>();
     }
 
     private static void RegisterFocusEvents(StoreOptions opts)
