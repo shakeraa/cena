@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "predev": "node scripts/predev-check.mjs",
     "dev": "vite --port 5175",
+    "prebuild": "node scripts/predev-check.mjs",
     "build": "vite build",
     "preview": "vite preview --port 5050",
     "typecheck": "vue-tsc --noEmit",
@@ -12,10 +14,11 @@
     "check:fake-api": "node ../../../scripts/check-fake-api-no-leakage.mjs",
     "build:icons": "tsx src/plugins/iconify/build-icons.ts",
     "msw:init": "msw init public/ --save",
+    "setup": "npm run build:icons && npm run msw:init",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:e2e": "playwright test",
-    "postinstall": "npm run build:icons && npm run msw:init"
+    "postinstall": "node scripts/postinstall-guard.mjs"
   },
   "dependencies": {
     "@casl/ability": "6.7.3",

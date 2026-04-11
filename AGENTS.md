@@ -277,6 +277,8 @@ Whenever a task touches code, you MUST:
 
 Never call `complete` on a task with broken build, failing tests, or new lint errors unless the task body explicitly accepts that state.
 
+**Student web (`src/student/full-version/`) install recipe**: on a fresh clone, run `npm install && npm run dev`. The package's `postinstall` is gated by `scripts/postinstall-guard.mjs`, which cannot crash the install even if the optional icon/MSW bootstrap fails; a separate `predev` hook verifies every required artifact before Vite starts and prints a clear recovery recipe if anything is missing. If you ever see `sh: vite: command not found`, run `rm -rf node_modules package-lock.json && npm install` from the package directory. See [src/student/full-version/README.md](src/student/full-version/README.md) for the full recovery flow (FIND-ux-001).
+
 ### Security
 
 - **NEVER hardcode API keys, secrets, or credentials** in source files
