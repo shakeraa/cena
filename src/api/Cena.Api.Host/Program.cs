@@ -15,6 +15,7 @@ using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
 using Cena.Api.Host.Endpoints;
 using Cena.Api.Host.Hubs;
+using Cena.Api.Host.Services;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
@@ -179,6 +180,9 @@ builder.Services.AddScoped<IContentCatalogService, ContentCatalogService>();
 
 // ---- STB-09b: Analytics Rollup Service ----
 builder.Services.AddScoped<IAnalyticsRollupService, AnalyticsRollupService>();
+
+// ---- HARDEN PlanEndpoints: Recommendation Service ----
+builder.Services.AddScoped<IRecommendationService, RecommendationService>();
 
 // ---- STB-03c: Leaderboard Service ----
 builder.Services.AddScoped<ILeaderboardService, LeaderboardService>();
