@@ -596,7 +596,7 @@ public static class SessionEndpoints
             queue.ConceptMasterySnapshot[questionDoc.ConceptId] = posteriorMastery;
             session.Store(queue);
 
-            // ─── FIND-pedagogy-002: ConceptAttempted_V1 on EVERY answer ───
+            // ─── FIND-pedagogy-002/007: ConceptAttempted_V1 on EVERY answer with ErrorType ───
             //
             // Previously this append was wrapped in `if (isCorrect)` and the
             // IsCorrect field was hard-coded to `true`. Both bugs broke the
@@ -605,10 +605,12 @@ public static class SessionEndpoints
             // for every answer and carries the real outcome. The XP append
             // (below) remains gated on isCorrect — this is intentional.
             //
-            // ErrorType is left empty on this write path; the LLM-backed
-            // ErrorClassificationService wiring is tracked separately by
-            // FIND-pedagogy-007 and will enrich the event stream from an
-            // async projection rather than the hot answer path.
+            // FIND-pedagogy-007: On wrong answers, classify the error type using
+            // LLM-based ErrorClassificationService. On correct answers, ErrorType is "None".
+            var errorType = isCorrect 
+                ? "None" 
+                : await ClassifyErrorAsync(errorClassifier, questionDoc, request.Answer, priorMastery);
+
             var conceptAttempt = BuildConceptAttempt(
                 studentId: studentId,
                 sessionId: sessionId,
@@ -618,7 +620,8 @@ public static class SessionEndpoints
                 isCorrect: isCorrect,
                 responseTimeMs: request.TimeSpentMs,
                 priorMastery: priorMastery,
-                posteriorMastery: posteriorMastery);
+                posteriorMastery: posteriorMastery,
+                errorType: errorType);
 
             // STB-03b: Append XP event and concept attempt.
             //
@@ -932,8 +935,8 @@ public static class SessionEndpoints
     }
 
     /// <summary>
-    /// FIND-pedagogy-002 — Build a ConceptAttempted_V1 event carrying the real
-    /// answer outcome. Called for EVERY answer (correct or wrong) — the
+    /// FIND-pedagogy-002/007 — Build a ConceptAttempted_V1 event carrying the real
+    /// answer outcome and error classification. Called for EVERY answer (correct or wrong) — the
     /// previous code hard-coded <c>IsCorrect: true</c> inside the
     /// <c>if (isCorrect)</c> branch, which starved BKT projections of failure
     /// signal. Tests assert <c>IsCorrect</c> mirrors the supplied flag.
@@ -947,7 +950,8 @@ public static class SessionEndpoints
         bool isCorrect,
         int responseTimeMs,
         double priorMastery,
-        double posteriorMastery)
+        double posteriorMastery,
+        string errorType)
     {
         return new ConceptAttempted_V1(
             StudentId: studentId,
@@ -958,11 +962,10 @@ public static class SessionEndpoints
             QuestionId: currentQuestionId,
             QuestionType: questionDoc.QuestionType,
             MethodologyActive: methodology,
-            // ErrorType is left empty here and populated by the async
-            // ErrorClassificationService pipeline tracked by FIND-pedagogy-007.
-            // Synchronous LLM classification on the hot answer path would
-            // block every student submission on an LLM round-trip.
-            ErrorType: "",
+            // FIND-pedagogy-007: ErrorType is now populated via LLM classification
+            // for wrong answers ("Procedural", "Conceptual", "Careless", "Systematic", "Transfer")
+            // or "None" for correct answers.
+            ErrorType: errorType,
             PriorMastery: priorMastery,
             PosteriorMastery: posteriorMastery,
             HintCountUsed: 0,
@@ -972,6 +975,56 @@ public static class SessionEndpoints
             AnswerChangeCount: 0,
             WasOffline: false,
             Timestamp: DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// FIND-pedagogy-007 — Classify the error type for a wrong answer.
+    /// Uses LLM-based classification and maps ExplanationErrorType to ErrorType enum strings.
+    /// </summary>
+    private static async Task<string> ClassifyErrorAsync(
+        IErrorClassificationService classifier,
+        QuestionDocument questionDoc,
+        string? studentAnswer,
+        double priorMastery)
+    {
+        try
+        {
+            // Parse difficulty string to float (easy=0.3, medium=0.6, hard=0.9)
+            var difficultyFloat = questionDoc.Difficulty?.ToLowerInvariant() switch
+            {
+                "easy" => 0.3f,
+                "hard" => 0.9f,
+                _ => 0.6f // medium default
+            };
+
+            var input = new ErrorClassificationInput(
+                QuestionStem: questionDoc.Prompt,
+                CorrectAnswer: questionDoc.CorrectAnswer ?? "",
+                StudentAnswer: studentAnswer ?? "",
+                DistractorRationale: questionDoc.DistractorRationales?.GetValueOrDefault(studentAnswer ?? ""),
+                Subject: questionDoc.Subject,
+                Language: "en", // Default to English; QuestionDocument doesn't have Language property
+                QuestionDifficulty: difficultyFloat,
+                StudentMastery: (float?)priorMastery);
+
+            var classification = await classifier.ClassifyAsync(input, CancellationToken.None);
+
+            // Map ExplanationErrorType to ErrorType enum strings
+            return classification switch
+            {
+                ExplanationErrorType.ConceptualMisunderstanding => "Conceptual",
+                ExplanationErrorType.ProceduralError => "Procedural",
+                ExplanationErrorType.CarelessMistake => "Careless",
+                ExplanationErrorType.Guessing => "Motivational",
+                ExplanationErrorType.PartialUnderstanding => "Transfer",
+                _ => "Conceptual" // Safe default
+            };
+        }
+        catch
+        {
+            // If classification fails, default to Conceptual (safest pedagogical choice)
+            return "Conceptual";
+        }
     }
 
     /// <summary>

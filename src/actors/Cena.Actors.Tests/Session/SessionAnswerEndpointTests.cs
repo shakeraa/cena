@@ -173,9 +173,11 @@ public sealed class SessionAnswerEndpointTests
             isCorrect: false,
             responseTimeMs: 4_200,
             priorMastery: 0.55,
-            posteriorMastery: 0.37);
+            posteriorMastery: 0.37,
+            errorType: "Conceptual"); // FIND-pedagogy-007: ErrorType now required
 
         Assert.False(evt.IsCorrect);
+        Assert.Equal("Conceptual", evt.ErrorType);
         Assert.Equal(ConceptId, evt.ConceptId);
         Assert.Equal(QuestionId, evt.QuestionId);
         Assert.Equal(StudentId, evt.StudentId);
@@ -205,7 +207,8 @@ public sealed class SessionAnswerEndpointTests
             isCorrect: true,
             responseTimeMs: 3_100,
             priorMastery: 0.4,
-            posteriorMastery: 0.55);
+            posteriorMastery: 0.55,
+            errorType: "None"); // FIND-pedagogy-007: Correct answers have ErrorType "None"
 
         Assert.True(evt.IsCorrect);
         Assert.Equal(0.4, evt.PriorMastery);
