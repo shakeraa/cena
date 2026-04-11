@@ -242,6 +242,22 @@ public record OnboardingCompleted_V1(
     DateTimeOffset CompletedAt
 ) : IDelegatedEvent;
 
+/// <summary>
+/// FIND-data-007b: emitted when a student updates their profile
+/// (display name, bio, favorite subjects, visibility). Nullable fields
+/// signal "do not change" so MeEndpoints.UpdateProfile can patch
+/// selectively. The inline StudentProfileSnapshot projection applies
+/// this through the event stream instead of racing the snapshot.
+/// </summary>
+public record ProfileUpdated_V1(
+    string StudentId,
+    string? DisplayName,
+    string? Bio,
+    string[]? Subjects,
+    string? Visibility,                       // 'class-only' | 'friends' | 'public'
+    DateTimeOffset UpdatedAt
+) : IDelegatedEvent;
+
 // =============================================================================
 // SESSION EVENTS (STB-01)
 // =============================================================================
