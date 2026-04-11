@@ -78,16 +78,6 @@ function persist() {
         @update:model-value="persist"
       />
     </VCard>
-
-    <VAlert
-      type="info"
-      variant="tonal"
-      density="compact"
-      class="mt-4"
-      data-testid="privacy-phase-a-note"
-    >
-      {{ t('settingsPage.privacy.phaseANote') }}
-    </VAlert>
   </div>
 </template>
 

@@ -13,6 +13,19 @@ import UserProfile from '@/layouts/components/UserProfile.vue'
 import NavBarI18n from '@core/components/I18n.vue'
 import { HorizontalNavLayout } from '@layouts'
 import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
+
+// FIND-ux-014: gate the Hebrew locale in the navbar switcher. See the
+// sibling DefaultLayoutWithVerticalNav for the rationale.
+import { computed } from 'vue'
+import { useAvailableLocales } from '@/composables/useAvailableLocales'
+
+const { codes: availableCodes } = useAvailableLocales()
+
+const visibleLangConfig = computed(() =>
+  (themeConfig.app.i18n.langConfig ?? []).filter(lang =>
+    availableCodes.value.includes(lang.i18nLang as 'en' | 'ar' | 'he' | 'fr'),
+  ),
+)
 </script>
 
 <template>
@@ -34,8 +47,8 @@ import { VNodeRenderer } from '@layouts/components/VNodeRenderer'
       <NavSearchBar trigger-btn-class="ms-lg-n3" />
 
       <NavBarI18n
-        v-if="themeConfig.app.i18n.enable && themeConfig.app.i18n.langConfig?.length"
-        :languages="themeConfig.app.i18n.langConfig"
+        v-if="themeConfig.app.i18n.enable && visibleLangConfig.length"
+        :languages="visibleLangConfig"
       />
 
       <NavbarThemeSwitcher />

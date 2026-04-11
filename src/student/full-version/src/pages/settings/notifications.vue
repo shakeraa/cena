@@ -105,16 +105,6 @@ function persist() {
         @update:model-value="persist"
       />
     </VCard>
-
-    <VAlert
-      type="info"
-      variant="tonal"
-      density="compact"
-      class="mt-4"
-      data-testid="notif-phase-a-note"
-    >
-      {{ t('settingsPage.notifications.phaseANote') }}
-    </VAlert>
   </div>
 </template>
 

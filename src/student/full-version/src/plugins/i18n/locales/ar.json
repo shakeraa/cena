@@ -1,4 +1,12 @@
 {
+  "2": "2",
+  "3": "3",
+  "5": "5",
+  "10": "10",
+  "20": "20",
+  "25": "25",
+  "50": "50",
+  "100": "100",
   "UI Elements": "عناصر واجهة المستخدم",
   "Forms & Tables": "النماذج والجداول",
   "Pages": "الصفحات",
@@ -102,7 +110,6 @@
   "Page Not Found - 404": "الصفحة غير موجودة - 404",
   "Not Authorized - 401": "غير مصرح - 401",
   "Server Error - 500": "خطأ في الخادم - 500",
-  "2": "2",
   "Forms": "نماذج",
   "Timeline": "الجدول الزمني",
   "Disabled Menu": "قائمة المعوقين",
@@ -166,13 +173,6 @@
   "Role Management": "إدارة الأدوار",
   "Permission": "إذن",
   "Dashboard Analytics": "تحليلات لوحة القيادة",
-  "3": "3",
-  "5": "5",
-  "10": "10",
-  "20": "20",
-  "25": "25",
-  "50": "50",
-  "100": "100",
   "common": {
     "save": "حفظ",
     "cancel": "إلغاء",
@@ -314,8 +314,7 @@
       "masteryLabel": "الإتقان",
       "questionsAttempted": "{count} سؤالًا تمت محاولته",
       "accuracy": "{percent}% دقة",
-      "rowAria": "{subject}: {percent} بالمئة من الإتقان",
-      "phaseANote": "المرحلة أ تعرض إتقانًا مشتقًا من مواد التسجيل. STU-W-09b ستربط بيانات إتقان حقيقية."
+      "rowAria": "{subject}: {percent} بالمئة من الإتقان"
     },
     "sessions": {
       "title": "سجل الجلسات",
@@ -324,8 +323,7 @@
       "resume": "استئناف",
       "justNow": "الآن",
       "hoursAgo": "قبل {count} س",
-      "daysAgo": "قبل {count} يوم",
-      "phaseANote": "المرحلة أ تعرض بيانات سجل مؤقتة. STU-W-09b ستربط السجل الحقيقي."
+      "daysAgo": "قبل {count} يوم"
     }
   },
   "gamification": {
@@ -448,8 +446,7 @@
       "studentId": "معرّف الطالب",
       "role": "الدور",
       "signOutTitle": "تسجيل الخروج",
-      "signOutSubtitle": "ستحتاج إلى تسجيل الدخول مرة أخرى.",
-      "phaseANote": "المرحلة أ تعرض معلومات الحساب فقط."
+      "signOutSubtitle": "ستحتاج إلى تسجيل الدخول مرة أخرى."
     },
     "appearance": {
       "title": "المظهر",
@@ -467,16 +464,14 @@
       "dailyReminder": "تذكير يومي بالدراسة",
       "weekly": "ملخص أسبوعي",
       "streakAlerts": "تنبيهات السلسلة",
-      "newContent": "تنبيهات المحتوى الجديد",
-      "phaseANote": "تُحفظ التفضيلات محليًا فقط في المرحلة أ."
+      "newContent": "تنبيهات المحتوى الجديد"
     },
     "privacy": {
       "title": "الخصوصية",
       "subtitle": "مشاركة البيانات",
       "showProgressToClass": "إظهار تقدمي لزملاء الصف",
       "allowPeerComparison": "السماح بمقارنة الأقران",
-      "shareAnalytics": "مشاركة تحليلات مجهولة",
-      "phaseANote": "تُحفظ التفضيلات محليًا فقط في المرحلة أ."
+      "shareAnalytics": "مشاركة تحليلات مجهولة"
     }
   },
   "social": {
@@ -651,6 +646,56 @@
       "sendAria": "إرسال الرسالة"
     }
   },
+  "home": {
+    "greeting": {
+      "morning": "صباح الخير، {name}",
+      "afternoon": "مساء الخير، {name}",
+      "evening": "مساء الخير، {name}",
+      "night": "مرحبًا {name}",
+      "fallback": "يا صديق",
+      "subtitle": "هذا ما توقفت عنده وما هو التالي."
+    },
+    "streak": {
+      "singular": "يوم متواصل",
+      "plural": "أيام متواصلة",
+      "newBest": "رقم قياسي جديد!"
+    },
+    "resume": {
+      "label": "استئناف الجلسة",
+      "cta": "متابعة",
+      "minutesAgo": "بدأت منذ {count} دقيقة",
+      "hoursAgo": "بدأت منذ {count} ساعة",
+      "progressAria": "تقدم الجلسة: {percent} بالمئة"
+    },
+    "quick": {
+      "startSession": "ابدأ جلسة",
+      "startSessionSubtitle": "ادخل إلى جلسة تعلم جديدة",
+      "askTutor": "اسأل المعلم",
+      "askTutorSubtitle": "احصل على تلميحات وشروحات",
+      "dailyChallenge": "التحدي اليومي",
+      "dailyChallengeSubtitle": "٥ دقائق، ٥ أسئلة",
+      "progress": "عرض التقدم",
+      "progressSubtitle": "شاهد إلى أي مدى وصلت"
+    },
+    "errorState": {
+      "title": "تعذر تحميل لوحة التحكم الخاصة بك",
+      "fallback": "حاول تحديث الصفحة."
+    },
+    "statsAriaLabel": "إحصاءات التعلم الخاصة بك",
+    "quickActionsHeading": "إجراءات سريعة",
+    "emptyStats": {
+      "title": "ستظهر إحصاءاتك هنا بعد جلستك الأولى",
+      "body": "أكمل جلسة تعلم واحدة وستظهر دقائقك والأسئلة التي أجبت عنها ودقتك على هذه اللوحة."
+    },
+    "kpi": {
+      "minutesToday": "دقائق اليوم",
+      "questionsAnswered": "الأسئلة المُجاب عنها",
+      "overallAccuracy": "الدقة الإجمالية",
+      "level": "المستوى {level}",
+      "sessionsValue": "{count} جلسة",
+      "unavailable": "—"
+    }
+  },
   "language": {
     "english": "English",
     "arabic": "العربية",
@@ -754,7 +799,8 @@
       "clear": "صافي",
       "appendAction": "إلحاق الإجراء",
       "prependAction": "قبل العمل",
-      "otp": "أوتب"
+      "otp": "أوتب",
+      "counterSize": "حجم العداد"
     },
     "fileInput": {
       "counterSize": "حجم العداد"

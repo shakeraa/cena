@@ -133,16 +133,6 @@ const stubHistory = computed<StubSession[]>(() => {
         :xp-awarded="s.xpAwarded"
       />
     </div>
-
-    <VAlert
-      type="info"
-      variant="tonal"
-      density="compact"
-      class="mt-4"
-      data-testid="sessions-phase-a-note"
-    >
-      {{ t('progress.sessions.phaseANote') }}
-    </VAlert>
   </div>
 </template>
 

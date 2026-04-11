@@ -121,16 +121,6 @@ const overallMastery = computed(() => {
           :accuracy-percent="s.accuracyPercent"
         />
       </div>
-
-      <VAlert
-        type="info"
-        variant="tonal"
-        density="compact"
-        class="mt-4"
-        data-testid="mastery-phase-a-note"
-      >
-        {{ t('progress.mastery.phaseANote') }}
-      </VAlert>
     </template>
   </div>
 </template>

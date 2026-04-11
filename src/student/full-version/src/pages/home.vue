@@ -1,11 +1,17 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import type {
   AnalyticsSummaryDto,
   MeBootstrapDto,
   TimeBreakdownDto,
 } from '@/api/types/common'
 import { useApiQuery } from '@/composables/useApiQuery'
+
+// FIND-ux-007: all user-facing copy on this page goes through i18n so
+// /home renders correctly in Arabic and Hebrew. See
+// src/plugins/i18n/locales/*.json for the `home.*` key group.
+const { t } = useI18n()
 
 definePage({
   meta: {
@@ -151,9 +157,9 @@ const activeSession = null as null | {
         prominent
         data-testid="home-error-state"
       >
-        <VAlertTitle>Could not load your home dashboard</VAlertTitle>
+        <VAlertTitle>{{ t('home.errorState.title') }}</VAlertTitle>
         <div class="mb-3">
-          {{ error.message || 'Try refreshing the page.' }}
+          {{ error.message || t('home.errorState.fallback') }}
         </div>
       </VAlert>
     </template>
@@ -179,7 +185,7 @@ const activeSession = null as null | {
           id="home-kpis-heading"
           class="sr-only"
         >
-          Your learning stats
+          {{ t('home.statsAriaLabel') }}
         </h2>
 
         <!--
@@ -199,7 +205,7 @@ const activeSession = null as null | {
         -->
         <KpiCard
           v-if="minutesTodayLabel != null"
-          label="Minutes today"
+          :label="t('home.kpi.minutesToday')"
           :value="minutesTodayLabel"
           icon="tabler-clock"
           data-testid="kpi-minutes-today"
@@ -213,7 +219,7 @@ const activeSession = null as null | {
         -->
         <KpiCard
           v-if="questionsAnswered != null"
-          label="Questions answered"
+          :label="t('home.kpi.questionsAnswered')"
           :value="questionsAnswered"
           icon="tabler-question-mark"
           data-testid="kpi-questions-answered"
@@ -222,7 +228,7 @@ const activeSession = null as null | {
         <!-- Overall accuracy, computed server-side from the event stream. -->
         <KpiCard
           v-if="accuracyPercentLabel != null"
-          label="Overall accuracy"
+          :label="t('home.kpi.overallAccuracy')"
           :value="accuracyPercentLabel"
           icon="tabler-target"
           data-testid="kpi-overall-accuracy"
@@ -236,8 +242,8 @@ const activeSession = null as null | {
           real session count, or an em-dash when unavailable.
         -->
         <KpiCard
-          :label="`Level ${level}`"
-          :value="totalSessions != null ? `${totalSessions} sessions` : '—'"
+          :label="t('home.kpi.level', { level })"
+          :value="totalSessions != null ? t('home.kpi.sessionsValue', { count: totalSessions }) : t('home.kpi.unavailable')"
           icon="tabler-bolt"
           data-testid="kpi-level"
         />
@@ -256,9 +262,8 @@ const activeSession = null as null | {
         class="mb-6"
         data-testid="home-empty-stats"
       >
-        <VAlertTitle>Your stats appear here after your first session</VAlertTitle>
-        Finish a learning session and your minutes, questions answered, and
-        accuracy will show up on this dashboard.
+        <VAlertTitle>{{ t('home.emptyStats.title') }}</VAlertTitle>
+        {{ t('home.emptyStats.body') }}
       </VAlert>
 
       <section
@@ -269,7 +274,7 @@ const activeSession = null as null | {
           id="home-quick-heading"
           class="text-h6 mb-3"
         >
-          Quick actions
+          {{ t('home.quickActionsHeading') }}
         </h2>
         <QuickActions />
       </section>

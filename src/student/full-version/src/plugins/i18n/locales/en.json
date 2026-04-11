@@ -1,4 +1,12 @@
 {
+  "2": "2",
+  "3": "3",
+  "5": "5",
+  "10": "10",
+  "20": "20",
+  "25": "25",
+  "50": "50",
+  "100": "100",
   "UI Elements": "UI Elements",
   "Forms & Tables": "Forms & Tables",
   "Pages": "Pages",
@@ -103,7 +111,6 @@
   "Page Not Found - 404": "Page Not Found - 404",
   "Not Authorized - 401": "Not Authorized - 401",
   "Server Error - 500": "Server Error - 500",
-  "2": "2",
   "Forms": "Forms",
   "Timeline": "Timeline",
   "Disabled Menu": "Disabled Menu",
@@ -133,7 +140,6 @@
   "Wizard Pages": "Wizard Pages",
   "Form Wizard": "Form Wizard",
   "Numbered": "Numbered",
-  "3": "3",
   "ecommerce": "ecommerce",
   "Ecommerce": "Ecommerce",
   "Editors": "Editors",
@@ -166,12 +172,6 @@
   "Role Management": "Role Management",
   "Permission": "Permission",
   "Dashboard Analytics": "Dashboard Analytics",
-  "5": "5",
-  "10": "10",
-  "20": "20",
-  "25": "25",
-  "50": "50",
-  "100": "100",
   "common": {
     "save": "Save",
     "cancel": "Cancel",
@@ -313,8 +313,7 @@
       "masteryLabel": "Mastery",
       "questionsAttempted": "{count} questions attempted",
       "accuracy": "{percent}% accuracy",
-      "rowAria": "{subject}: {percent} percent mastery",
-      "phaseANote": "Phase A shows derived mastery from onboarding subjects. STU-W-09b will wire real MasteryProjection data."
+      "rowAria": "{subject}: {percent} percent mastery"
     },
     "sessions": {
       "title": "Session history",
@@ -323,8 +322,7 @@
       "resume": "Resume",
       "justNow": "just now",
       "hoursAgo": "{count}h ago",
-      "daysAgo": "{count}d ago",
-      "phaseANote": "Phase A shows stub history data. STU-W-09b wires the real /api/sessions/history endpoint once STB-01c lands."
+      "daysAgo": "{count}d ago"
     }
   },
   "gamification": {
@@ -447,8 +445,7 @@
       "studentId": "Student ID",
       "role": "Role",
       "signOutTitle": "Sign out",
-      "signOutSubtitle": "You'll need to sign back in to continue learning.",
-      "phaseANote": "Phase A shows account info only. STU-W-14b adds email change, password reset, and account deletion when STB-00b settings writes land."
+      "signOutSubtitle": "You'll need to sign back in to continue learning."
     },
     "appearance": {
       "title": "Appearance",
@@ -466,16 +463,14 @@
       "dailyReminder": "Daily study reminder",
       "weekly": "Weekly progress summary",
       "streakAlerts": "Streak alerts",
-      "newContent": "New content alerts",
-      "phaseANote": "Phase A persists preferences to localStorage only. STU-W-14b wires real /api/me/settings when STB-00b settings writes land."
+      "newContent": "New content alerts"
     },
     "privacy": {
       "title": "Privacy",
       "subtitle": "Data sharing and visibility",
       "showProgressToClass": "Show my progress to classmates",
       "allowPeerComparison": "Allow peer comparison",
-      "shareAnalytics": "Share anonymized analytics",
-      "phaseANote": "Phase A persists preferences to localStorage only. STU-W-14b wires the real privacy settings endpoint."
+      "shareAnalytics": "Share anonymized analytics"
     }
   },
   "social": {
@@ -680,6 +675,24 @@
       "dailyChallengeSubtitle": "5 minutes, 5 questions",
       "progress": "View Progress",
       "progressSubtitle": "See how far you've come"
+    },
+    "errorState": {
+      "title": "Could not load your home dashboard",
+      "fallback": "Try refreshing the page."
+    },
+    "statsAriaLabel": "Your learning stats",
+    "quickActionsHeading": "Quick actions",
+    "emptyStats": {
+      "title": "Your stats appear here after your first session",
+      "body": "Finish a learning session and your minutes, questions answered, and accuracy will show up on this dashboard."
+    },
+    "kpi": {
+      "minutesToday": "Minutes today",
+      "questionsAnswered": "Questions answered",
+      "overallAccuracy": "Overall accuracy",
+      "level": "Level {level}",
+      "sessionsValue": "{count} sessions",
+      "unavailable": "—"
     }
   },
   "language": {

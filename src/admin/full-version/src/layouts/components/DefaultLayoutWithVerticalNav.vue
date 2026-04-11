@@ -13,6 +13,19 @@ import NavBarI18n from '@core/components/I18n.vue'
 
 // @layouts plugin
 import { VerticalNavLayout } from '@layouts'
+
+// FIND-ux-014: gate the Hebrew locale in the navbar switcher.
+// See src/composables/useAvailableLocales.ts for the rule.
+import { computed } from 'vue'
+import { useAvailableLocales } from '@/composables/useAvailableLocales'
+
+const { codes: availableCodes } = useAvailableLocales()
+
+const visibleLangConfig = computed(() =>
+  (themeConfig.app.i18n.langConfig ?? []).filter(lang =>
+    availableCodes.value.includes(lang.i18nLang as 'en' | 'ar' | 'he' | 'fr'),
+  ),
+)
 </script>
 
 <template>
@@ -36,8 +49,8 @@ import { VerticalNavLayout } from '@layouts'
         <VSpacer />
 
         <NavBarI18n
-          v-if="themeConfig.app.i18n.enable && themeConfig.app.i18n.langConfig?.length"
-          :languages="themeConfig.app.i18n.langConfig"
+          v-if="themeConfig.app.i18n.enable && visibleLangConfig.length"
+          :languages="visibleLangConfig"
         />
         <NavbarThemeSwitcher />
         <NavbarShortcuts />

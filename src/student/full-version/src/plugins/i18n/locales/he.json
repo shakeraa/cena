@@ -1,12 +1,177 @@
 {
+  "2": "2",
+  "3": "3",
+  "5": "5",
+  "10": "10",
+  "20": "20",
+  "25": "25",
+  "50": "50",
+  "100": "100",
   "UI Elements": "רכיבי ממשק",
+  "Forms & Tables": "טפסים וטבלאות",
   "Pages": "דפים",
+  "Charts & Maps": "תרשימים ומפות",
+  "Others": "אחרים",
+  "Typography": "טיפוגרפיה",
+  "Cards": "כרטיסים",
+  "Basic": "בסיסי",
+  "Advance": "מתקדם",
+  "Widgets": "ווידג׳טים",
+  "Components": "רכיבים",
+  "Alert": "התראה",
+  "Close Alert": "סגור התראה",
+  "Avatar": "אווטאר",
+  "Badge": "תג",
+  "Button": "כפתור",
+  "Calendar": "לוח שנה",
+  "Kanban": "קנבן",
+  "Image": "תמונה",
+  "Pagination": "ניווט עמודים",
+  "Progress Circular": "התקדמות מעגלית",
+  "Progress Linear": "התקדמות ליניארית",
+  "Autocomplete": "השלמה אוטומטית",
+  "Tooltip": "טולטיפ",
+  "Slider": "מחוון",
+  "Date Time Picker": "בוחר תאריך ושעה",
+  "Select": "בחירה",
+  "Switch": "מתג",
+  "Checkbox": "תיבת סימון",
+  "Radio": "רדיו",
+  "Textarea": "אזור טקסט",
+  "Rating": "דירוג",
+  "File Input": "העלאת קובץ",
+  "Otp Input": "קלט OTP",
+  "Form Layout": "פריסת טופס",
+  "Form Validation": "אימות טופס",
+  "Charts": "תרשימים",
+  "Apex Chart": "Apex Chart",
+  "Chartjs": "Chart.js",
+  "Account Settings": "הגדרות חשבון",
+  "User Profile": "פרופיל משתמש",
+  "FAQ": "שאלות נפוצות",
+  "Dialog Examples": "דוגמאות דיאלוג",
+  "Pricing": "תמחור",
+  "List": "רשימה",
+  "Edit": "ערוך",
+  "Nav Levels": "רמות ניווט",
+  "Level 2.1": "רמה 2.1",
+  "Level 2.2": "רמה 2.2",
+  "Level 3.1": "רמה 3.1",
+  "Level 3.2": "רמה 3.2",
+  "Raise Support": "העלה תמיכה",
+  "Documentation": "תיעוד",
   "Dashboards": "לוחות בקרה",
-  "Settings": "הגדרות",
-  "Login": "התחברות",
+  "Analytics": "אנליטיקה",
+  "Apps & Pages": "אפליקציות ודפים",
+  "Email": "דוא״ל",
+  "Chat": "צ׳אט",
+  "Invoice": "חשבונית",
+  "Preview": "תצוגה מקדימה",
+  "Add": "הוסף",
+  "User": "משתמש",
+  "View": "צפייה",
+  "Login v1": "כניסה v1",
+  "Login v2": "כניסה v2",
+  "Login": "כניסה",
+  "Register v1": "הרשמה v1",
+  "Register v2": "הרשמה v2",
   "Register": "הרשמה",
-  "Logout": "התנתקות",
-  "Home": "בית",
+  "Forget Password v1": "שכחת סיסמה v1",
+  "Forget Password v2": "שכחת סיסמה v2",
+  "Forgot Password v1": "שכחת סיסמה v1",
+  "Forgot Password v2": "שכחת סיסמה v2",
+  "Forgot Password": "שכחת סיסמה",
+  "Reset Password v1": "איפוס סיסמה v1",
+  "Reset Password v2": "איפוס סיסמה v2",
+  "Reset Password": "איפוס סיסמה",
+  "Miscellaneous": "שונות",
+  "Coming Soon": "בקרוב",
+  "Not Authorized": "לא מורשה",
+  "Under Maintenance": "בתחזוקה",
+  "Error": "שגיאה",
+  "Statistics": "סטטיסטיקה",
+  "Actions": "פעולות",
+  "Access Control": "בקרת גישה",
+  "User Interface": "ממשק משתמש",
+  "CRM": "CRM",
+  "eCommerce": "מסחר אלקטרוני",
+  "Icons": "אייקונים",
+  "Chip": "צ׳יפ",
+  "Dialog": "דיאלוג",
+  "Expansion Panel": "לוח הרחבה",
+  "Combobox": "קומבובוקס",
+  "Textfield": "שדה טקסט",
+  "Range Slider": "מחוון טווח",
+  "Menu": "תפריט",
+  "Snackbar": "סנאקבר",
+  "Tabs": "לשוניות",
+  "Form Elements": "רכיבי טופס",
+  "Form Layouts": "פריסות טפסים",
+  "Authentication": "אימות",
+  "Page Not Found - 404": "עמוד לא נמצא - 404",
+  "Not Authorized - 401": "לא מורשה - 401",
+  "Server Error - 500": "שגיאת שרת - 500",
+  "Forms": "טפסים",
+  "Timeline": "ציר זמן",
+  "Disabled Menu": "תפריט מושבת",
+  "Help Center": "מרכז עזרה",
+  "Verify Email": "אמת דוא״ל",
+  "Verify Email v1": "אמת דוא״ל v1",
+  "Verify Email v2": "אמת דוא״ל v2",
+  "Two Steps": "שני שלבים",
+  "Two Steps v1": "שני שלבים v1",
+  "Two Steps v2": "שני שלבים v2",
+  "Custom Input": "קלט מותאם",
+  "Extensions": "הרחבות",
+  "Tour": "סיור",
+  "Register Multi-Steps": "הרשמה רב-שלבית",
+  "Wizard Examples": "דוגמאות אשף",
+  "Checkout": "תשלום",
+  "Create Deal": "צור עסקה",
+  "Property Listing": "רישום נכס",
+  "Roles & Permissions": "תפקידים והרשאות",
+  "Roles": "תפקידים",
+  "Simple Table": "טבלה פשוטה",
+  "Tables": "טבלאות",
+  "Data Table": "טבלת נתונים",
+  "Permissions": "הרשאות",
+  "Apps": "אפליקציות",
+  "Misc": "שונות",
+  "Wizard Pages": "דפי אשף",
+  "Form Wizard": "אשף טפסים",
+  "Numbered": "ממוספר",
+  "ecommerce": "מסחר אלקטרוני",
+  "Ecommerce": "מסחר אלקטרוני",
+  "Editors": "עורכים",
+  "Front Pages": "עמודי חזית",
+  "Landing": "דף נחיתה",
+  "checkout": "תשלום",
+  "Payment": "תשלום",
+  "Swiper": "סוויפר",
+  "Product": "מוצר",
+  "Category": "קטגוריה",
+  "Order": "הזמנה",
+  "Details": "פרטים",
+  "Customer": "לקוח",
+  "Manage Review": "ניהול ביקורות",
+  "Referrals": "הפניות",
+  "Settings": "הגדרות",
+  "Overview": "סקירה כללית",
+  "My Course": "הקורס שלי",
+  "Course Details": "פרטי קורס",
+  "Academy": "אקדמיה",
+  "Logistics": "לוגיסטיקה",
+  "Dashboard": "לוח בקרה",
+  "Fleet": "צי",
+  "Shortcut": "קיצור דרך",
+  "Appointments": "פגישות",
+  "Invoice App": "אפליקציית חשבוניות",
+  "Manage Accounts": "ניהול חשבונות",
+  "Users": "משתמשים",
+  "Manage Users": "ניהול משתמשים",
+  "Role Management": "ניהול תפקידים",
+  "Permission": "הרשאה",
+  "Dashboard Analytics": "אנליטיקת לוח בקרה",
   "common": {
     "save": "שמור",
     "cancel": "בטל",
@@ -148,8 +313,7 @@
       "masteryLabel": "שליטה",
       "questionsAttempted": "{count} שאלות נוסו",
       "accuracy": "{percent}% דיוק",
-      "rowAria": "{subject}: {percent} אחוז שליטה",
-      "phaseANote": "שלב א מציג שליטה נגזרת ממקצועות ההרשמה. STU-W-09b יחבר נתוני שליטה אמיתיים."
+      "rowAria": "{subject}: {percent} אחוז שליטה"
     },
     "sessions": {
       "title": "היסטוריית שיעורים",
@@ -158,8 +322,7 @@
       "resume": "המשך",
       "justNow": "הרגע",
       "hoursAgo": "לפני {count} ש",
-      "daysAgo": "לפני {count} י",
-      "phaseANote": "שלב א מציג נתוני סטאב. STU-W-09b יחבר היסטוריה אמיתית."
+      "daysAgo": "לפני {count} י"
     }
   },
   "gamification": {
@@ -282,8 +445,7 @@
       "studentId": "מזהה תלמיד",
       "role": "תפקיד",
       "signOutTitle": "התנתק",
-      "signOutSubtitle": "תצטרך להתחבר שוב.",
-      "phaseANote": "שלב א מציג פרטי חשבון בלבד."
+      "signOutSubtitle": "תצטרך להתחבר שוב."
     },
     "appearance": {
       "title": "מראה",
@@ -301,16 +463,14 @@
       "dailyReminder": "תזכורת לימוד יומית",
       "weekly": "סיכום שבועי",
       "streakAlerts": "התראות רצף",
-      "newContent": "התראות תוכן חדש",
-      "phaseANote": "ההעדפות נשמרות מקומית בלבד בשלב א."
+      "newContent": "התראות תוכן חדש"
     },
     "privacy": {
       "title": "פרטיות",
       "subtitle": "שיתוף נתונים",
       "showProgressToClass": "הצג את התקדמותי לחברים לכיתה",
       "allowPeerComparison": "אפשר השוואת עמיתים",
-      "shareAnalytics": "שתף נתונים אנונימיים",
-      "phaseANote": "ההעדפות נשמרות מקומית בלבד בשלב א."
+      "shareAnalytics": "שתף נתונים אנונימיים"
     }
   },
   "social": {
@@ -485,6 +645,56 @@
       "sendAria": "שלח הודעה"
     }
   },
+  "home": {
+    "greeting": {
+      "morning": "בוקר טוב, {name}",
+      "afternoon": "צהריים טובים, {name}",
+      "evening": "ערב טוב, {name}",
+      "night": "היי {name}",
+      "fallback": "חבר",
+      "subtitle": "כאן עצרת בפעם הקודמת, ומה הלאה."
+    },
+    "streak": {
+      "singular": "יום רצוף",
+      "plural": "ימים ברצף",
+      "newBest": "שיא חדש!"
+    },
+    "resume": {
+      "label": "המשך שיעור",
+      "cta": "המשך",
+      "minutesAgo": "התחלת לפני {count} דקות",
+      "hoursAgo": "התחלת לפני {count} שעות",
+      "progressAria": "התקדמות השיעור: {percent} אחוזים"
+    },
+    "quick": {
+      "startSession": "התחל שיעור",
+      "startSessionSubtitle": "קפוץ ישר לבלוק לימוד חדש",
+      "askTutor": "שאל את המורה",
+      "askTutorSubtitle": "קבל רמזים והסברים",
+      "dailyChallenge": "אתגר יומי",
+      "dailyChallengeSubtitle": "5 דקות, 5 שאלות",
+      "progress": "צפה בהתקדמות",
+      "progressSubtitle": "ראה עד כמה התקדמת"
+    },
+    "errorState": {
+      "title": "לא ניתן לטעון את לוח הבית שלך",
+      "fallback": "נסה לרענן את העמוד."
+    },
+    "statsAriaLabel": "נתוני הלמידה שלך",
+    "quickActionsHeading": "פעולות מהירות",
+    "emptyStats": {
+      "title": "הנתונים שלך יופיעו כאן אחרי השיעור הראשון",
+      "body": "סיים שיעור אחד והדקות, השאלות שענית עליהן והדיוק שלך יופיעו בלוח הבקרה הזה."
+    },
+    "kpi": {
+      "minutesToday": "דקות היום",
+      "questionsAnswered": "שאלות שנענו",
+      "overallAccuracy": "דיוק כולל",
+      "level": "רמה {level}",
+      "sessionsValue": "{count} שיעורים",
+      "unavailable": "—"
+    }
+  },
   "language": {
     "english": "English",
     "arabic": "العربية",
@@ -574,7 +784,38 @@
     },
     "input": {
       "clear": "נקה",
-      "otp": "OTP"
+      "otp": "OTP",
+      "appendAction": "פעולה מצורפת",
+      "prependAction": "פעולה קודמת",
+      "counterSize": "גודל מונה"
+    },
+    "carousel": {
+      "ariaLabel": {
+        "delimiter": "מפריד"
+      }
+    },
+    "colorPicker": {
+      "ariaLabel": {
+        "hueSlider": "מחוון גוון",
+        "eyedropper": "טפטפת",
+        "hexInput": "קלט הקס"
+      }
+    },
+    "fileInput": {
+      "counterSize": "גודל מונה קבצים"
+    },
+    "rating": {
+      "ariaLabel": {
+        "item": "פריט"
+      }
+    },
+    "video": {
+      "seek": "חפש",
+      "play": "נגן",
+      "pause": "השהה",
+      "showVolume": "הצג עוצמה",
+      "enterFullscreen": "מסך מלא",
+      "volume": "עוצמה"
     }
   }
 }
