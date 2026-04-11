@@ -1,13 +1,13 @@
 // =============================================================================
-// Cena Platform -- Student Analytics REST Endpoints (SES-002.3)
-// Per-student analytics: summary, per-concept mastery, daily progress.
-// All queries use Marten async projections — no actor calls for reads.
+// Cena Platform -- Student Analytics REST Endpoints (STB-09b)
+// Per-student analytics with real rollup projections
 // =============================================================================
 
 using System.Security.Claims;
 using System.Text.Json;
 using Cena.Api.Contracts.Analytics;
 using Cena.Actors.Events;
+using Cena.Actors.Projections;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Auth;
 using Marten;
@@ -98,38 +98,26 @@ public static class StudentAnalyticsEndpoints
             var masteryDtos = snapshot.ConceptMastery
                 .Select(kv =>
                 {
-                    var state   = kv.Value;
-                    var status  = state.IsMastered
-                        ? "mastered"
-                        : state.PKnown >= 0.7 ? "proficient"
-                        : state.PKnown >= 0.4 ? "learning"
-                        : "novice";
-
-                    // Subject is derived from the lastMethodology or falls back to concept prefix
-                    var subject = state.LastMethodology is not null
-                        ? ExtractSubjectFromMethodology(kv.Key)
-                        : "";
-
+                    var state = kv.Value;
                     return new ConceptMasteryDto(
                         ConceptId: kv.Key,
-                        ConceptName: kv.Key, // Name resolution deferred to concept graph lookup
-                        Subject: subject,
-                        MasteryLevel: Math.Round(state.PKnown, 4),
-                        LastPracticed: state.LastAttemptedAt,
-                        Status: status);
+                        MasteryLevel: state.PKnown,
+                        IsMastered: state.IsMastered,
+                        AttemptsCount: state.TotalAttempts,
+                        LastAttemptAt: state.LastAttemptedAt?.UtcDateTime);
                 })
-                .OrderByDescending(d => d.LastPracticed)
                 .ToList();
 
             return Results.Ok(masteryDtos);
         })
-        .WithName("GetAnalyticsMastery");
+        .WithName("GetConceptMastery");
 
-        // GET /api/analytics/progress?days=30 — daily session counts and accuracy
+        // GET /api/analytics/progress — daily progress over date range
         group.MapGet("/progress", async (
             HttpContext ctx,
             IDocumentStore store,
-            int? days) =>
+            DateTimeOffset? from = null,
+            DateTimeOffset? to = null) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -137,45 +125,44 @@ public static class StudentAnalyticsEndpoints
 
             ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-            var rangeDays = Math.Clamp(days ?? 30, 1, 365);
-            var cutoff    = DateTimeOffset.UtcNow.AddDays(-rangeDays);
-            var today     = DateTimeOffset.UtcNow.Date;
+            var endDate = to?.UtcDateTime ?? DateTime.UtcNow;
+            var startDate = from?.UtcDateTime ?? endDate.AddDays(-30);
 
             await using var session = store.QuerySession();
 
-            // Load sessions in range
+            // Query sessions within date range
             var sessions = await session.Query<TutoringSessionDocument>()
-                .Where(d => d.StudentId == studentId && d.StartedAt >= cutoff)
+                .Where(d => d.StudentId == studentId && d.StartedAt >= startDate && d.StartedAt <= endDate)
                 .ToListAsync();
 
-            // Load concept attempt events in range for accuracy per day
+            // Query all attempt events for this student in range
             var allAttemptEvents = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1" && e.Timestamp >= cutoff)
+                .Where(e => e.EventTypeName == "concept_attempted_v1")
                 .ToListAsync();
 
             var studentAttempts = allAttemptEvents
                 .Where(e => ExtractString(e, "studentId") == studentId)
+                .Where(e => e.Timestamp >= startDate && e.Timestamp <= endDate)
                 .ToList();
 
-            // Build date-keyed dictionaries
-            var sessionsByDate = sessions
-                .GroupBy(s => s.StartedAt.Date)
-                .ToDictionary(g => g.Key, g => g.ToList());
+            // Group by day
+            var days = Enumerable.Range(0, (endDate.Date - startDate.Date).Days + 1)
+                .Select(offset => startDate.Date.AddDays(offset))
+                .ToList();
 
-            var attemptsByDate = studentAttempts
-                .GroupBy(e => e.Timestamp.Date)
-                .ToDictionary(g => g.Key, g => g.ToList());
-
-            // Generate one entry per day in the range
-            var progressPoints = Enumerable
-                .Range(0, rangeDays)
-                .Select(i => today.AddDays(-rangeDays + 1 + i))
+            var progressPoints = days
                 .Select(date =>
                 {
-                    var daySessions  = sessionsByDate.TryGetValue(date, out var s) ? s : [];
-                    var dayAttempts  = attemptsByDate.TryGetValue(date, out var a) ? a : [];
-                    var correct      = dayAttempts.Count(e => ExtractBool(e, "isCorrect"));
-                    var accuracy     = dayAttempts.Count > 0
+                    var daySessions = sessions
+                        .Where(s => s.StartedAt.Date == date)
+                        .ToList();
+
+                    var dayAttempts = studentAttempts
+                        .Where(e => e.Timestamp.Date == date)
+                        .ToList();
+
+                    var correct = dayAttempts.Count(e => ExtractBool(e, "isCorrect"));
+                    var accuracy = dayAttempts.Count > 0
                         ? Math.Round((double)correct / dayAttempts.Count, 3)
                         : 0;
 
@@ -191,9 +178,11 @@ public static class StudentAnalyticsEndpoints
         })
         .WithName("GetAnalyticsProgress");
 
-        // GET /api/analytics/time-breakdown — daily learning time for last 30 days (STB-09)
-        group.MapGet("/time-breakdown", (
-            HttpContext ctx) =>
+        // GET /api/analytics/time-breakdown — daily learning time (STB-09b)
+        group.MapGet("/time-breakdown", async (
+            HttpContext ctx,
+            IAnalyticsRollupService analytics,
+            int? days = 30) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -201,32 +190,32 @@ public static class StudentAnalyticsEndpoints
 
             ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-            // Phase 1: Return 30 days of deterministic stub data
-            var today = DateTime.UtcNow.Date;
-            var random = new Random(42); // Seeded for determinism
-            
-            var items = Enumerable.Range(0, 30)
-                .Select(i =>
-                {
-                    var date = today.AddDays(-29 + i);
-                    // Generate realistic-looking data: more time on weekdays, less on weekends
-                    var dayOfWeek = date.DayOfWeek;
-                    var isWeekend = dayOfWeek == DayOfWeek.Saturday || dayOfWeek == DayOfWeek.Sunday;
-                    var baseMinutes = isWeekend ? 15 : 45;
-                    var variation = random.Next(-20, 30);
-                    var minutes = Math.Max(0, baseMinutes + variation);
-                    
-                    return new TimeBreakdownItem(date, minutes);
-                })
-                .ToArray();
+            var endDate = DateTime.UtcNow.Date;
+            var startDate = endDate.AddDays(-(days ?? 30) + 1);
 
-            return Results.Ok(new TimeBreakdownDto(Items: items));
+            var breakdowns = await analytics.GetTimeRangeAsync(studentId, startDate, endDate);
+
+            // Fill in missing days with zeros
+            var items = new List<TimeBreakdownItem>();
+            var current = startDate;
+            while (current <= endDate)
+            {
+                var breakdown = breakdowns.FirstOrDefault(b => b.Date.Date == current);
+                items.Add(new TimeBreakdownItem(
+                    current, 
+                    breakdown?.TotalMinutes ?? 0));
+                current = current.AddDays(1);
+            }
+
+            return Results.Ok(new TimeBreakdownDto(Items: items.ToArray()));
         })
         .WithName("GetTimeBreakdown");
 
-        // GET /api/analytics/flow-vs-accuracy — flow score vs accuracy for last 7 days (STB-09)
-        group.MapGet("/flow-vs-accuracy", (
-            HttpContext ctx) =>
+        // GET /api/analytics/time-breakdown/subjects — time by subject (STB-09b)
+        group.MapGet("/time-breakdown/subjects", async (
+            HttpContext ctx,
+            IAnalyticsRollupService analytics,
+            int? days = 30) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -234,34 +223,79 @@ public static class StudentAnalyticsEndpoints
 
             ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
-            // Phase 1: Return 7 days x 8 hours/day of deterministic stub data
-            var today = DateTime.UtcNow.Date;
-            var random = new Random(42); // Seeded for determinism
-            var points = new List<FlowAccuracyPoint>();
+            var endDate = DateTime.UtcNow.Date;
+            var startDate = endDate.AddDays(-(days ?? 30) + 1);
 
-            // Generate 8 data points per day for the last 7 days (hourly during study hours)
-            for (int day = 0; day < 7; day++)
+            var breakdowns = await analytics.GetTimeRangeAsync(studentId, startDate, endDate);
+
+            // Aggregate by subject
+            var subjectTotals = new Dictionary<string, int>();
+            foreach (var b in breakdowns)
             {
-                var date = today.AddDays(-6 + day);
-                // Study hours: 9 AM to 5 PM (8 hours)
-                for (int hour = 0; hour < 8; hour++)
+                foreach (var kv in b.BySubject)
                 {
-                    var timestamp = date.AddHours(9 + hour);
-                    // Flow score tends to be higher in morning, accuracy varies
-                    var timeOfDayFactor = (8 - hour) / 8.0; // Higher in morning
-                    var baseFlow = (int)(60 + 30 * timeOfDayFactor);
-                    var flowVariation = random.Next(-15, 15);
-                    var flowScore = Math.Clamp(baseFlow + flowVariation, 0, 100);
-                    
-                    var baseAccuracy = 75;
-                    var accuracyVariation = random.Next(-20, 20);
-                    var accuracy = Math.Clamp(baseAccuracy + accuracyVariation, 0, 100);
-                    
-                    points.Add(new FlowAccuracyPoint(timestamp, flowScore, accuracy));
+                    if (!subjectTotals.ContainsKey(kv.Key))
+                        subjectTotals[kv.Key] = 0;
+                    subjectTotals[kv.Key] += kv.Value;
                 }
             }
 
-            return Results.Ok(new FlowAccuracyDto(Points: points.ToArray()));
+            return Results.Ok(new { 
+                TotalDays = days,
+                SubjectBreakdown = subjectTotals,
+                TotalMinutes = subjectTotals.Values.Sum()
+            });
+        })
+        .WithName("GetTimeBreakdownBySubject");
+
+        // GET /api/analytics/flow-vs-accuracy — flow score vs accuracy (STB-09b)
+        group.MapGet("/flow-vs-accuracy", async (
+            HttpContext ctx,
+            IAnalyticsRollupService analytics) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            var profile = await analytics.GetFlowAccuracyProfileAsync(studentId);
+
+            if (profile == null)
+            {
+                // Return empty data if no analytics yet
+                return Results.Ok(new FlowAccuracyDto(Points: Array.Empty<FlowAccuracyPoint>(),
+                    Summary: new FlowAccuracySummary(0, 0, 0, null)));
+            }
+
+            // Build points from by-time-of-day data
+            var points = new List<FlowAccuracyPoint>();
+            foreach (var kv in profile.ByTimeOfDay)
+            {
+                points.Add(new FlowAccuracyPoint(
+                    Category: kv.Key,
+                    FlowScore: (int)(kv.Value.AvgFlowScore * 100),
+                    Accuracy: (int)(kv.Value.AvgAccuracy * 100),
+                    SampleCount: kv.Value.SampleCount));
+            }
+
+            // Also add by-focus-state
+            foreach (var kv in profile.ByFocusState)
+            {
+                points.Add(new FlowAccuracyPoint(
+                    Category: $"focus:{kv.Key}",
+                    FlowScore: (int)(kv.Value.AvgFlowScore * 100),
+                    Accuracy: (int)(kv.Value.AvgAccuracy * 100),
+                    SampleCount: kv.Value.SampleCount));
+            }
+
+            var summary = new FlowAccuracySummary(
+                OverallFlowScore: (int)(profile.Overall.AvgFlowScore * 100),
+                OverallAccuracy: (int)(profile.Overall.AvgAccuracy * 100),
+                TotalSamples: profile.Overall.SampleCount,
+                BestTimeOfDay: profile.Overall.BestTimeRecommendation);
+
+            return Results.Ok(new FlowAccuracyDto(Points: points.ToArray(), Summary: summary));
         })
         .WithName("GetFlowVsAccuracy");
 
@@ -277,82 +311,70 @@ public static class StudentAnalyticsEndpoints
 
     /// <summary>
     /// Simple XP-to-level formula: each level requires progressively more XP.
-    /// Level = floor(sqrt(totalXp / 100)) + 1, capped at 100.
+    /// Level 1: 0 XP, Level 2: 100 XP, Level 3: 250 XP, Level 4: 450 XP...
+    /// Formula: xp = 50 * (level^2 - level)
     /// </summary>
     private static int ComputeLevel(int totalXp)
     {
         if (totalXp <= 0) return 1;
-        return Math.Min(100, (int)Math.Floor(Math.Sqrt(totalXp / 100.0)) + 1);
+        // Inverse: level = (1 + sqrt(1 + 8*xp/100)) / 2
+        var level = (int)((1 + Math.Sqrt(1 + 8 * totalXp / 100.0)) / 2);
+        return Math.Max(1, level);
     }
 
-    /// <summary>
-    /// Best-effort subject extraction from a concept identifier.
-    /// Concept IDs often have the form "{subject}_{concept}" or are plain IDs.
-    /// </summary>
-    private static string ExtractSubjectFromMethodology(string conceptId)
-    {
-        var parts = conceptId.Split('_', 2);
-        return parts.Length > 1 ? parts[0] : "";
-    }
-
-    private static bool ExtractBool(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return false;
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-                return prop.ValueKind == JsonValueKind.True;
-        }
-        catch { /* best-effort */ }
-        return false;
-    }
-
-    private static string ExtractString(dynamic evt, string property)
+    private static string ExtractString(dynamic evt, string propertyName)
     {
         try
         {
             object? data = evt.Data;
             if (data is null) return "";
             var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
+            if (json.RootElement.TryGetProperty(propertyName, out var prop) ||
+                json.RootElement.TryGetProperty(ToPascalCase(propertyName), out prop))
                 return prop.GetString() ?? "";
         }
         catch { /* best-effort */ }
         return "";
     }
 
+    private static bool ExtractBool(dynamic evt, string propertyName)
+    {
+        try
+        {
+            object? data = evt.Data;
+            if (data is null) return false;
+            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
+            if (json.RootElement.TryGetProperty(propertyName, out var prop) ||
+                json.RootElement.TryGetProperty(ToPascalCase(propertyName), out prop))
+                return prop.ValueKind == JsonValueKind.True;
+        }
+        catch { /* best-effort */ }
+        return false;
+    }
+
     private static string ToPascalCase(string camelCase)
     {
         if (string.IsNullOrEmpty(camelCase)) return camelCase;
-        return char.ToUpperInvariant(camelCase[0]) + camelCase[1..];
+        return char.ToUpperInvariant(camelCase[0]) + camelCase.Substring(1);
     }
 }
 
-// ── Response DTOs ──
+// Additional DTOs for STB-09b
+public record FlowAccuracySummary(
+    int OverallFlowScore,
+    int OverallAccuracy,
+    int TotalSamples,
+    string? BestTimeOfDay);
 
-public sealed record AnalyticsSummaryDto(
-    int TotalSessions,
-    int TotalQuestionsAttempted,
-    double OverallAccuracy,
-    int CurrentStreak,
-    int LongestStreak,
-    int TotalXp,
-    int Level);
+public record FlowAccuracyPoint(
+    string Category,
+    int FlowScore,
+    int Accuracy,
+    int SampleCount);
 
-public sealed record ConceptMasteryDto(
-    string ConceptId,
-    string ConceptName,
-    string Subject,
-    double MasteryLevel,
-    DateTimeOffset? LastPracticed,
-    string Status);  // "mastered", "proficient", "learning", "novice"
+public record FlowAccuracyDto(
+    FlowAccuracyPoint[] Points,
+    FlowAccuracySummary? Summary = null);
 
-public sealed record DailyProgressDto(
-    DateTimeOffset Date,
-    int SessionCount,
-    int QuestionsAttempted,
-    double Accuracy);
+public record TimeBreakdownItem(DateTime Date, int Minutes);
+public record TimeBreakdownDto(TimeBreakdownItem[] Items);

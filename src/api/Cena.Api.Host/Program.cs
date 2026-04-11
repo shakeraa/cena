@@ -9,6 +9,7 @@ using System.Threading.RateLimiting;
 using Microsoft.AspNetCore.RateLimiting;
 using Cena.Actors.Configuration;
 using Cena.Actors.Notifications;
+using Cena.Actors.Projections;
 using Cena.Actors.Tutor;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
@@ -174,6 +175,9 @@ builder.Services.AddCenaAdminServices();
 
 // ---- STB-08b: Content Catalog Service ----
 builder.Services.AddScoped<IContentCatalogService, ContentCatalogService>();
+
+// ---- STB-09b: Analytics Rollup Service ----
+builder.Services.AddScoped<IAnalyticsRollupService, AnalyticsRollupService>();
 
 // =============================================================================
 // OPENTELEMETRY (REV-018.3)

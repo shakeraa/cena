@@ -58,3 +58,29 @@ public sealed record FlowAccuracyPoint(
     DateTime Timestamp,
     int FlowScore,        // 0-100
     int AccuracyPercent); // 0-100
+
+// ═════════════════════════════════════════════════════════════════════════════
+// STB-09b: Additional Analytics DTOs
+// ═════════════════════════════════════════════════════════════════════════════
+
+public sealed record AnalyticsSummaryDto(
+    int TotalSessions,
+    int TotalQuestionsAttempted,
+    double OverallAccuracy,
+    int CurrentStreak,
+    int LongestStreak,
+    int TotalXp,
+    int Level);
+
+public sealed record ConceptMasteryDto(
+    string ConceptId,
+    double MasteryLevel,
+    bool IsMastered,
+    int AttemptsCount,
+    DateTime? LastAttemptAt);
+
+public sealed record DailyProgressDto(
+    DateTimeOffset Date,
+    int SessionCount,
+    int QuestionsAttempted,
+    double Accuracy);

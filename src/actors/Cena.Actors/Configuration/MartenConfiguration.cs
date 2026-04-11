@@ -267,6 +267,21 @@ public static class MartenConfiguration
             .Index(x => x.Subject)
             .Index(x => x.TargetGrade);
 
+        // ── Analytics Projections (STB-09b) ──
+        opts.Schema.For<StudentTimeBreakdown>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.Date);
+
+        opts.Schema.For<StudentFlowAccuracyProfile>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId);
+
+        opts.Schema.For<SubjectMasteryTimeline>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.Subject);
+
         // Future projections — uncomment when projection types are available:
         // opts.Projections.Add<StudentMasteryProjection>(ProjectionLifecycle.Inline);
         // opts.Projections.Add<ClassOverviewProjection>(ProjectionLifecycle.Inline);
