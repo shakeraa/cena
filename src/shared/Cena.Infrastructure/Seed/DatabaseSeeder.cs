@@ -48,7 +48,10 @@ public static class DatabaseSeeder
         // 3. Sample classrooms for testing join codes (STB-00b)
         await ClassroomSeedData.SeedClassroomsAsync(store, logger);
 
-        // 4. Simulated students (300 across 8 archetypes)
+        // 4. Social data (feed items, peer solutions, friendships, study rooms)
+        await SocialSeedData.SeedSocialDataAsync(store, logger);
+
+        // 5. Simulated students (300 across 8 archetypes)
         await UserSeedData.SeedSimulatedStudentsAsync(store, logger, simulatedStudentCount);
 
         // 5. Additional seeds (simulation events, questions, etc.)

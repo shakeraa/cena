@@ -73,3 +73,40 @@ public class StudyRoomMembershipDocument
     public DateTime? LeftAt { get; set; }
     public bool IsActive { get; set; } = true;
 }
+
+/// <summary>
+/// Class feed item document for social activity feed (achievements, milestones, questions, announcements).
+/// </summary>
+public class ClassFeedItemDocument
+{
+    public string Id { get; set; } = "";
+    public string FeedItemId { get; set; } = "";
+    public string? ClassroomId { get; set; }
+    public string Kind { get; set; } = ""; // 'achievement' | 'milestone' | 'question' | 'announcement'
+    public string AuthorStudentId { get; set; } = "";
+    public string AuthorDisplayName { get; set; } = "";
+    public string? AuthorAvatarUrl { get; set; }
+    public string Title { get; set; } = "";
+    public string Body { get; set; } = "";
+    public DateTime PostedAt { get; set; } = DateTime.UtcNow;
+    public int ReactionCount { get; set; }
+    public int CommentCount { get; set; }
+    public bool IsDeleted { get; set; } = false;
+}
+
+/// <summary>
+/// Peer solution document for student-contributed answers to questions.
+/// </summary>
+public class PeerSolutionDocument
+{
+    public string Id { get; set; } = "";
+    public string SolutionId { get; set; } = "";
+    public string QuestionId { get; set; } = "";
+    public string AuthorStudentId { get; set; } = "";
+    public string AuthorDisplayName { get; set; } = "";
+    public string Content { get; set; } = "";
+    public int UpvoteCount { get; set; }
+    public int DownvoteCount { get; set; }
+    public DateTime PostedAt { get; set; } = DateTime.UtcNow;
+    public bool IsDeleted { get; set; } = false;
+}

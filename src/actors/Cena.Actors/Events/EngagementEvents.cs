@@ -35,7 +35,9 @@ public record BadgeEarned_V1(
     string StudentId,
     string BadgeId,
     string BadgeName,
-    string BadgeCategory
+    string BadgeCategory = "general",
+    string BadgeDescription = "",
+    DateTimeOffset AwardedAt = default
 );
 
 /// <summary>
