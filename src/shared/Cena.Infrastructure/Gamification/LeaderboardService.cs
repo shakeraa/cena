@@ -2,10 +2,27 @@
 // Cena Platform — Leaderboard Service (STB-03c)
 // Real-time leaderboard aggregation for global/class/friends scopes
 // =============================================================================
+//
+// FIND-sec-001 (2026-04-11): Every raw SQL in this file used C# verbatim string
+// interpolation (dollar-at-quote verbatim interpolation) and was then executed
+// via NpgsqlCommand.CommandText with NO parameter binding. Any SchoolId,
+// studentId, friend id, studentXp, or limit value that reached the DB was a
+// SQL injection vector. All 7 interpolated statements have been replaced with
+// positional parameters (numbered $1, $2, ...) bound through
+// NpgsqlCommand.Parameters. No behavioural change — same SQL shape, same
+// return values — just hard-parameterised.
+//
+// Reference pattern: src/api/Cena.Admin.Api/EmbeddingAdminService.cs L149-L163
+// =============================================================================
 
+using System.Runtime.CompilerServices;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
+using Npgsql;
+using NpgsqlTypes;
+
+[assembly: InternalsVisibleTo("Cena.Infrastructure.Tests")]
 
 namespace Cena.Infrastructure.Gamification;
 
@@ -76,36 +93,19 @@ public class LeaderboardService : ILeaderboardService
     {
         await using var session = _store.QuerySession();
 
-        // Query using raw SQL to avoid dependency on StudentProfileSnapshot type
-        // StudentProfileSnapshot has Id = StudentId
-        var sql = $@"
-            SELECT data->>'StudentId' as StudentId,
-                   data->>'DisplayName' as DisplayName,
-                   COALESCE((data->>'TotalXp')::int, 0) as TotalXp,
-                   COALESCE((data->>'CurrentStreak')::int, 0) as CurrentStreak,
-                   data->>'FullName' as FullName
-            FROM cena.mt_doc_studentprofilesnapshot
-            ORDER BY COALESCE((data->>'TotalXp')::int, 0) DESC
-            LIMIT {limit}";
+        var (sql, parameters) = SqlBuilders.BuildGlobalLeaderboardQuery(limit);
 
         var entries = new List<LeaderboardEntry>();
         try
         {
-            await using var cmd = session.Connection?.CreateCommand();
-            if (cmd != null)
+            if (session.Connection is NpgsqlConnection conn)
             {
-                cmd.CommandText = sql;
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                ApplyParameters(cmd, parameters);
                 await using var reader = await cmd.ExecuteReaderAsync(ct);
                 while (await reader.ReadAsync(ct))
                 {
-                    entries.Add(new LeaderboardEntry(
-                        StudentId: reader.GetString(0),
-                        DisplayName: reader.GetString(1) ?? reader.GetString(4) ?? "Anonymous",
-                        AvatarUrl: null,
-                        TotalXp: reader.GetInt32(2),
-                        Level: ComputeLevel(reader.GetInt32(2)),
-                        CurrentStreak: reader.GetInt32(3),
-                        WeeklyXp: 0));
+                    entries.Add(ReadLeaderboardEntry(reader));
                 }
             }
         }
@@ -143,36 +143,19 @@ public class LeaderboardService : ILeaderboardService
                 GeneratedAt: DateTime.UtcNow);
         }
 
-        // Query students from same school
-        var sql = $@"
-            SELECT data->>'StudentId' as StudentId,
-                   data->>'DisplayName' as DisplayName,
-                   COALESCE((data->>'TotalXp')::int, 0) as TotalXp,
-                   COALESCE((data->>'CurrentStreak')::int, 0) as CurrentStreak,
-                   data->>'FullName' as FullName
-            FROM cena.mt_doc_studentprofilesnapshot
-            WHERE data->>'SchoolId' = '{classroom.SchoolId}'
-            ORDER BY COALESCE((data->>'TotalXp')::int, 0) DESC
-            LIMIT {limit}";
+        var (sql, parameters) = SqlBuilders.BuildClassLeaderboardQuery(classroom.SchoolId, limit);
 
         var entries = new List<LeaderboardEntry>();
         try
         {
-            await using var cmd = session.Connection?.CreateCommand();
-            if (cmd != null)
+            if (session.Connection is NpgsqlConnection conn)
             {
-                cmd.CommandText = sql;
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                ApplyParameters(cmd, parameters);
                 await using var reader = await cmd.ExecuteReaderAsync(ct);
                 while (await reader.ReadAsync(ct))
                 {
-                    entries.Add(new LeaderboardEntry(
-                        StudentId: reader.GetString(0),
-                        DisplayName: reader.GetString(1) ?? reader.GetString(4) ?? "Anonymous",
-                        AvatarUrl: null,
-                        TotalXp: reader.GetInt32(2),
-                        Level: ComputeLevel(reader.GetInt32(2)),
-                        CurrentStreak: reader.GetInt32(3),
-                        WeeklyXp: 0));
+                    entries.Add(ReadLeaderboardEntry(reader));
                 }
             }
         }
@@ -210,37 +193,19 @@ public class LeaderboardService : ILeaderboardService
                 GeneratedAt: DateTime.UtcNow);
         }
 
-        // Build IN clause
-        var idList = string.Join("','", friendIds);
-        var sql = $@"
-            SELECT data->>'StudentId' as StudentId,
-                   data->>'DisplayName' as DisplayName,
-                   COALESCE((data->>'TotalXp')::int, 0) as TotalXp,
-                   COALESCE((data->>'CurrentStreak')::int, 0) as CurrentStreak,
-                   data->>'FullName' as FullName
-            FROM cena.mt_doc_studentprofilesnapshot
-            WHERE data->>'StudentId' IN ('{idList}')
-            ORDER BY COALESCE((data->>'TotalXp')::int, 0) DESC
-            LIMIT {limit}";
+        var (sql, parameters) = SqlBuilders.BuildFriendsLeaderboardQuery(friendIds, limit);
 
         var entries = new List<LeaderboardEntry>();
         try
         {
-            await using var cmd = session.Connection?.CreateCommand();
-            if (cmd != null)
+            if (session.Connection is NpgsqlConnection conn)
             {
-                cmd.CommandText = sql;
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                ApplyParameters(cmd, parameters);
                 await using var reader = await cmd.ExecuteReaderAsync(ct);
                 while (await reader.ReadAsync(ct))
                 {
-                    entries.Add(new LeaderboardEntry(
-                        StudentId: reader.GetString(0),
-                        DisplayName: reader.GetString(1) ?? reader.GetString(4) ?? "Anonymous",
-                        AvatarUrl: null,
-                        TotalXp: reader.GetInt32(2),
-                        Level: ComputeLevel(reader.GetInt32(2)),
-                        CurrentStreak: reader.GetInt32(3),
-                        WeeklyXp: 0));
+                    entries.Add(ReadLeaderboardEntry(reader));
                 }
             }
         }
@@ -263,31 +228,22 @@ public class LeaderboardService : ILeaderboardService
     {
         await using var session = _store.QuerySession();
 
-        // Get student XP using raw query
-        var sql = $@"
-            SELECT COALESCE((data->>'TotalXp')::int, 0) as TotalXp,
-                   data->>'SchoolId' as SchoolId
-            FROM cena.mt_doc_studentprofilesnapshot
-            WHERE data->>'StudentId' = '{studentId}'";
-
         int studentXp = 0;
         string? schoolId = null;
 
+        // --- 1. Student XP lookup ---
         try
         {
-            await using var cmd = session.Connection?.CreateCommand();
-            if (cmd != null)
+            if (session.Connection is NpgsqlConnection conn)
             {
-                cmd.CommandText = sql;
-                var result = await cmd.ExecuteScalarAsync(ct);
-                if (result != null)
+                var (sql, parameters) = SqlBuilders.BuildStudentXpLookupQuery(studentId);
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                ApplyParameters(cmd, parameters);
+                await using var reader = await cmd.ExecuteReaderAsync(ct);
+                if (await reader.ReadAsync(ct))
                 {
-                    await using var reader = await cmd.ExecuteReaderAsync(ct);
-                    if (await reader.ReadAsync(ct))
-                    {
-                        studentXp = reader.GetInt32(0);
-                        schoolId = reader.IsDBNull(1) ? null : reader.GetString(1);
-                    }
+                    studentXp = reader.GetInt32(0);
+                    schoolId = reader.IsDBNull(1) ? null : reader.GetString(1);
                 }
             }
         }
@@ -296,73 +252,67 @@ public class LeaderboardService : ILeaderboardService
             _logger.LogError(ex, "Error getting student rank");
         }
 
-        // Global rank
-        var globalRankSql = $@"
-            SELECT COUNT(*) 
-            FROM cena.mt_doc_studentprofilesnapshot
-            WHERE COALESCE((data->>'TotalXp')::int, 0) > {studentXp}";
-
+        // --- 2. Global rank ---
         int globalRank = 0;
         try
         {
-            await using var cmd = session.Connection?.CreateCommand();
-            if (cmd != null)
+            if (session.Connection is NpgsqlConnection conn)
             {
-                cmd.CommandText = globalRankSql;
+                var (sql, parameters) = SqlBuilders.BuildGlobalRankQuery(studentXp);
+                await using var cmd = new NpgsqlCommand(sql, conn);
+                ApplyParameters(cmd, parameters);
                 var result = await cmd.ExecuteScalarAsync(ct);
                 globalRank = (result != null ? (int)(long)result : 0) + 1;
             }
         }
-        catch { }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error getting global rank");
+        }
 
-        // Class rank (by school)
+        // --- 3. Class rank (by school) ---
         int? classRank = null;
         if (!string.IsNullOrEmpty(schoolId))
         {
-            var classRankSql = $@"
-                SELECT COUNT(*) 
-                FROM cena.mt_doc_studentprofilesnapshot
-                WHERE data->>'SchoolId' = '{schoolId}'
-                AND COALESCE((data->>'TotalXp')::int, 0) > {studentXp}";
-
             try
             {
-                await using var cmd = session.Connection?.CreateCommand();
-                if (cmd != null)
+                if (session.Connection is NpgsqlConnection conn)
                 {
-                    cmd.CommandText = classRankSql;
+                    var (sql, parameters) = SqlBuilders.BuildClassRankQuery(schoolId, studentXp);
+                    await using var cmd = new NpgsqlCommand(sql, conn);
+                    ApplyParameters(cmd, parameters);
                     var result = await cmd.ExecuteScalarAsync(ct);
                     classRank = (result != null ? (int)(long)result : 0) + 1;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting class rank");
+            }
         }
 
-        // Friends rank
+        // --- 4. Friends rank ---
         var friendIds = await GetFriendIdsAsync(session, studentId, ct);
         friendIds.Add(studentId);
 
         int? friendsRank = null;
         if (friendIds.Count > 0)
         {
-            var idList = string.Join("','", friendIds);
-            var friendsRankSql = $@"
-                SELECT COUNT(*) 
-                FROM cena.mt_doc_studentprofilesnapshot
-                WHERE data->>'StudentId' IN ('{idList}')
-                AND COALESCE((data->>'TotalXp')::int, 0) > {studentXp}";
-
             try
             {
-                await using var cmd = session.Connection?.CreateCommand();
-                if (cmd != null)
+                if (session.Connection is NpgsqlConnection conn)
                 {
-                    cmd.CommandText = friendsRankSql;
+                    var (sql, parameters) = SqlBuilders.BuildFriendsRankQuery(friendIds, studentXp);
+                    await using var cmd = new NpgsqlCommand(sql, conn);
+                    ApplyParameters(cmd, parameters);
                     var result = await cmd.ExecuteScalarAsync(ct);
                     friendsRank = (result != null ? (int)(long)result : 0) + 1;
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error getting friends rank");
+            }
         }
 
         return new StudentRanks(
@@ -406,6 +356,177 @@ public class LeaderboardService : ILeaderboardService
         if (totalXp <= 0) return 1;
         var level = (int)((1 + Math.Sqrt(1 + 8 * totalXp / 100.0)) / 2);
         return Math.Max(1, level);
+    }
+
+    /// <summary>
+    /// Reads a leaderboard entry row from the shared projection columns:
+    /// 0 = StudentId, 1 = DisplayName, 2 = TotalXp, 3 = CurrentStreak, 4 = FullName.
+    /// </summary>
+    private static LeaderboardEntry ReadLeaderboardEntry(System.Data.Common.DbDataReader reader)
+    {
+        return new LeaderboardEntry(
+            StudentId: reader.GetString(0),
+            DisplayName: reader.IsDBNull(1)
+                ? (reader.IsDBNull(4) ? "Anonymous" : reader.GetString(4))
+                : reader.GetString(1),
+            AvatarUrl: null,
+            TotalXp: reader.GetInt32(2),
+            Level: ComputeLevel(reader.GetInt32(2)),
+            CurrentStreak: reader.GetInt32(3),
+            WeeklyXp: 0);
+    }
+
+    /// <summary>
+    /// Copies pre-built parameters onto an NpgsqlCommand. The parameter array is
+    /// positional, so the first entry binds to $1, the second to $2, and so on.
+    /// </summary>
+    private static void ApplyParameters(NpgsqlCommand cmd, NpgsqlParameter[] parameters)
+    {
+        foreach (var p in parameters)
+        {
+            cmd.Parameters.Add(p);
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // SQL Builders — pure functions, independent of any DB connection.
+    // Every statement uses positional parameters ($1, $2, ...) so values
+    // are BOUND, not interpolated. These are exposed as `internal static`
+    // so Cena.Admin.Api.Tests can assert the SQL shape + parameter values
+    // without a live Postgres instance.
+    // ─────────────────────────────────────────────────────────────────────
+    internal static class SqlBuilders
+    {
+        private const string BaseProjection = @"
+            SELECT data->>'StudentId' as StudentId,
+                   data->>'DisplayName' as DisplayName,
+                   COALESCE((data->>'TotalXp')::int, 0) as TotalXp,
+                   COALESCE((data->>'CurrentStreak')::int, 0) as CurrentStreak,
+                   data->>'FullName' as FullName
+            FROM cena.mt_doc_studentprofilesnapshot";
+
+        public static (string sql, NpgsqlParameter[] parameters) BuildGlobalLeaderboardQuery(int limit)
+        {
+            var sql = BaseProjection + @"
+            ORDER BY COALESCE((data->>'TotalXp')::int, 0) DESC
+            LIMIT $1";
+
+            var parameters = new[]
+            {
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Integer, Value = limit }
+            };
+
+            return (sql, parameters);
+        }
+
+        public static (string sql, NpgsqlParameter[] parameters) BuildClassLeaderboardQuery(
+            string schoolId, int limit)
+        {
+            var sql = BaseProjection + @"
+            WHERE data->>'SchoolId' = $1
+            ORDER BY COALESCE((data->>'TotalXp')::int, 0) DESC
+            LIMIT $2";
+
+            var parameters = new[]
+            {
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Text, Value = schoolId },
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Integer, Value = limit }
+            };
+
+            return (sql, parameters);
+        }
+
+        public static (string sql, NpgsqlParameter[] parameters) BuildFriendsLeaderboardQuery(
+            IEnumerable<string> friendIds, int limit)
+        {
+            var sql = BaseProjection + @"
+            WHERE data->>'StudentId' = ANY($1::text[])
+            ORDER BY COALESCE((data->>'TotalXp')::int, 0) DESC
+            LIMIT $2";
+
+            var parameters = new[]
+            {
+                new NpgsqlParameter
+                {
+                    NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Text,
+                    Value = friendIds.ToArray()
+                },
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Integer, Value = limit }
+            };
+
+            return (sql, parameters);
+        }
+
+        public static (string sql, NpgsqlParameter[] parameters) BuildStudentXpLookupQuery(string studentId)
+        {
+            const string sql = @"
+            SELECT COALESCE((data->>'TotalXp')::int, 0) as TotalXp,
+                   data->>'SchoolId' as SchoolId
+            FROM cena.mt_doc_studentprofilesnapshot
+            WHERE data->>'StudentId' = $1";
+
+            var parameters = new[]
+            {
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Text, Value = studentId }
+            };
+
+            return (sql, parameters);
+        }
+
+        public static (string sql, NpgsqlParameter[] parameters) BuildGlobalRankQuery(int studentXp)
+        {
+            const string sql = @"
+            SELECT COUNT(*)
+            FROM cena.mt_doc_studentprofilesnapshot
+            WHERE COALESCE((data->>'TotalXp')::int, 0) > $1";
+
+            var parameters = new[]
+            {
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Integer, Value = studentXp }
+            };
+
+            return (sql, parameters);
+        }
+
+        public static (string sql, NpgsqlParameter[] parameters) BuildClassRankQuery(
+            string schoolId, int studentXp)
+        {
+            const string sql = @"
+            SELECT COUNT(*)
+            FROM cena.mt_doc_studentprofilesnapshot
+            WHERE data->>'SchoolId' = $1
+            AND COALESCE((data->>'TotalXp')::int, 0) > $2";
+
+            var parameters = new[]
+            {
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Text, Value = schoolId },
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Integer, Value = studentXp }
+            };
+
+            return (sql, parameters);
+        }
+
+        public static (string sql, NpgsqlParameter[] parameters) BuildFriendsRankQuery(
+            IEnumerable<string> friendIds, int studentXp)
+        {
+            const string sql = @"
+            SELECT COUNT(*)
+            FROM cena.mt_doc_studentprofilesnapshot
+            WHERE data->>'StudentId' = ANY($1::text[])
+            AND COALESCE((data->>'TotalXp')::int, 0) > $2";
+
+            var parameters = new[]
+            {
+                new NpgsqlParameter
+                {
+                    NpgsqlDbType = NpgsqlDbType.Array | NpgsqlDbType.Text,
+                    Value = friendIds.ToArray()
+                },
+                new NpgsqlParameter { NpgsqlDbType = NpgsqlDbType.Integer, Value = studentXp }
+            };
+
+            return (sql, parameters);
+        }
     }
 }
 
