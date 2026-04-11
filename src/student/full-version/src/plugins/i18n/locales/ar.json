@@ -291,7 +291,39 @@
   },
   "progress": {
     "title": "تقدمك",
-    "subtitle": "تابع رحلتك، اكسب المكافآت، واعرف مكانك."
+    "subtitle": "تابع رحلتك، اكسب المكافآت، واعرف مكانك.",
+    "time": {
+      "title": "وقت التعلم",
+      "subtitle": "30 يومًا من دقائق الدراسة.",
+      "chartTitle": "الدقائق اليومية",
+      "chartSubtitle": "آخر 30 يومًا",
+      "chartAria": "مخطط الوقت: {total} دقيقة، بمتوسط {avg} يوميًا",
+      "avgPerDay": "المتوسط اليومي",
+      "today": "اليوم",
+      "kpi30dayTotal": "إجمالي 30 يومًا",
+      "kpi7dayTotal": "آخر 7 أيام",
+      "kpiDayStreak": "سلسلة النشاط"
+    },
+    "mastery": {
+      "title": "إتقان المواد",
+      "subtitle": "تقدمك عبر كل مادة تدرسها.",
+      "overallLabel": "الإتقان الإجمالي",
+      "masteryLabel": "الإتقان",
+      "questionsAttempted": "{count} سؤالًا تمت محاولته",
+      "accuracy": "{percent}% دقة",
+      "rowAria": "{subject}: {percent} بالمئة من الإتقان",
+      "phaseANote": "المرحلة أ تعرض إتقانًا مشتقًا من مواد التسجيل. STU-W-09b ستربط بيانات إتقان حقيقية."
+    },
+    "sessions": {
+      "title": "سجل الجلسات",
+      "subtitle": "الجلسات التعليمية الأخيرة — اضغط على أي منها للمراجعة.",
+      "activeLabel": "جلسة نشطة",
+      "resume": "استئناف",
+      "justNow": "الآن",
+      "hoursAgo": "قبل {count} س",
+      "daysAgo": "قبل {count} يوم",
+      "phaseANote": "المرحلة أ تعرض بيانات سجل مؤقتة. STU-W-09b ستربط السجل الحقيقي."
+    }
   },
   "gamification": {
     "xp": {
