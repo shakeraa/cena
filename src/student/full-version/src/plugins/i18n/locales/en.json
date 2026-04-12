@@ -507,7 +507,8 @@
       "dailyReminder": "Daily study reminder",
       "weekly": "Weekly progress summary",
       "streakAlerts": "Streak alerts",
-      "newContent": "New content alerts"
+      "newContent": "New content alerts",
+      "saveError": "Could not save your notification preferences. Please try again."
     },
     "privacy": {
       "title": "Privacy",

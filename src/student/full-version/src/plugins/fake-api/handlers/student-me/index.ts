@@ -69,6 +69,47 @@ function buildProfile(): ProfilePayload {
   }
 }
 
+/**
+ * In-memory settings store used by the MSW handlers so that GET returns
+ * whatever PATCH last wrote. Seeded with the same ICO-compliant defaults
+ * the real backend uses (FIND-privacy-010).
+ */
+const settingsStore: Record<string, unknown> = {
+  appearance: {
+    theme: 'system',
+    language: 'en',
+    reducedMotion: false,
+    highContrast: false,
+  },
+  notifications: {
+    emailNotifications: false,
+    pushNotifications: false,
+    dailyReminder: false,
+    dailyReminderTime: null,
+    weeklyProgress: false,
+    streakAlerts: false,
+    newContentAlerts: false,
+  },
+  privacy: {
+    profileVisibility: 'private',
+    showProgressToClass: false,
+    allowPeerComparison: false,
+    shareAnalytics: false,
+  },
+  learning: {
+    autoAdvance: false,
+    showHintsByDefault: true,
+    soundEffects: true,
+    targetSessionMinutes: 15,
+    difficultyPreference: 'adaptive',
+  },
+  homeLayout: {
+    widgetOrder: ['streak', 'progress', 'recommended', 'achievements', 'activity'],
+    hiddenWidgets: [],
+    compactMode: false,
+  },
+}
+
 export const handlerStudentMe = [
   http.get('/api/me', () => {
     return HttpResponse.json(buildBootstrap())
@@ -87,5 +128,23 @@ export const handlerStudentMe = [
 
   http.post('/api/me/onboarding', async () => {
     return HttpResponse.json({ success: true, redirectTo: '/home' })
+  }),
+
+  // FIND-ux-032: GET /api/me/settings — returns merged settings state
+  http.get('/api/me/settings', () => {
+    return HttpResponse.json(settingsStore)
+  }),
+
+  // FIND-ux-032: PATCH /api/me/settings — merge-patches into the store
+  http.patch('/api/me/settings', async ({ request }) => {
+    const patch = await request.json() as Record<string, Record<string, unknown>>
+
+    for (const [section, values] of Object.entries(patch)) {
+      if (settingsStore[section] && typeof values === 'object' && values !== null) {
+        Object.assign(settingsStore[section] as Record<string, unknown>, values)
+      }
+    }
+
+    return new HttpResponse(null, { status: 204 })
   }),
 ]
