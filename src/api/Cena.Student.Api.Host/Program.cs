@@ -107,6 +107,12 @@ builder.Services.AddSingleton<IBktService, BktService>();
 // Wilson et al. (2019): "The Eighty Five Percent Rule for optimal learning."
 builder.Services.AddScoped<IEloDifficultyService, EloDifficultyService>();
 
+// ---- FIND-privacy-003: GDPR self-service compliance services ----
+// Students must be able to exercise data rights (consent, export, erasure, DSAR)
+// without going through an admin. GDPR Art 12-22, COPPA 312.6, Israel PPL 13.
+builder.Services.AddScoped<IGdprConsentManager, GdprConsentManager>();
+builder.Services.AddScoped<IRightToErasureService, RightToErasureService>();
+
 // ---- HARDEN TutorEndpoints: LLM Service ----
 var llmApiKey = builder.Configuration["Cena:Llm:ApiKey"];
 if (!string.IsNullOrEmpty(llmApiKey))
@@ -248,6 +254,42 @@ builder.Services.AddRateLimiter(options =>
             });
     });
 
+    // FIND-privacy-003: GDPR data export — 1 request per hour per student
+    options.AddPolicy("gdpr-export", httpContext =>
+    {
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"gdpr-export:{userId}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 1,
+                Window = TimeSpan.FromHours(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+
+    // FIND-privacy-003: GDPR erasure + DSAR — 1 request per day per student
+    options.AddPolicy("gdpr-erasure", httpContext =>
+    {
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"gdpr-erasure:{userId}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 1,
+                Window = TimeSpan.FromDays(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+
     options.OnRejected = async (context, _) =>
     {
         context.HttpContext.Response.Headers["Retry-After"] = "60";
@@ -369,6 +411,10 @@ app.MapKnowledgeEndpoints();
 
 // Student Analytics endpoints (STB-09)
 app.MapStudentAnalyticsEndpoints();
+
+// GDPR Self-Service endpoints (FIND-privacy-003)
+// Student-facing consent, export, erasure, and DSAR endpoints
+app.MapMeGdprEndpoints();
 
 // ---- SignalR Hub ----
 app.MapCenaHub();
