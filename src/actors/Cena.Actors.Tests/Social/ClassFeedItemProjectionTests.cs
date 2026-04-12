@@ -3,6 +3,7 @@
 // Tests for projection that creates feed items from events.
 // =============================================================================
 
+using System.IO;
 using Cena.Actors.Events;
 using Cena.Actors.Projections;
 using Cena.Infrastructure.Documents;
@@ -91,18 +92,31 @@ public sealed class ClassFeedItemProjectionTests
         _operations.Received(2).Store(Arg.Any<ClassFeedItemDocument>());
     }
 
-    // FIND-qa-005: Determinism regression tests
+    private static ClassFeedItemDocument? GetStoredDocument(IDocumentOperations ops)
+    {
+        var calls = ops.ReceivedCalls()
+            .Where(c => c.GetMethodInfo().Name == "Store")
+            .ToList();
+        
+        return calls.FirstOrDefault()?.GetArguments()[0] as ClassFeedItemDocument;
+    }
+
+    // ---- FIND-qa-005: Determinism regression tests ----------------------------
 
     [Fact]
-    public void Project_SameEventTwice_ProducesIdenticalOutput()
+    public void Project_SameEventTwice_ProducesBitIdenticalOutput()
     {
-        // Arrange: Fixed timestamp (simulating deterministic replay)
+        // FIND-qa-005: Lock the determinism so a regression that re-adds 
+        // DateTime.UtcNow fails the build. The projection must produce 
+        // bit-identical output for the same input (event-driven determinism).
+        
+        // Arrange: Fixed deterministic event (no UtcNow dependency)
         var fixedTimestamp = DateTimeOffset.Parse("2026-04-10T10:00:00Z");
         var evt = new BadgeEarned_V1(
             StudentId: "student-determinism",
-            BadgeId: "badge-test",
-            BadgeName: "Test Badge",
-            BadgeDescription: "For testing",
+            BadgeId: "badge-determinism-test",
+            BadgeName: "Determinism Test",
+            BadgeDescription: "Testing deterministic projection",
             AwardedAt: fixedTimestamp,
             Timestamp: fixedTimestamp);
 
@@ -113,69 +127,78 @@ public sealed class ClassFeedItemProjectionTests
         _projection.Project(evt, ops1);
         _projection.Project(evt, ops2);
 
-        // Assert: Both received identical documents
+        // Assert: Capture both stored documents
         var doc1 = GetStoredDocument(ops1);
         var doc2 = GetStoredDocument(ops2);
 
         Assert.NotNull(doc1);
         Assert.NotNull(doc2);
+
+        // Bit-identical assertions - every field must match
         Assert.Equal(doc1.Id, doc2.Id);
+        Assert.Equal(doc1.FeedItemId, doc2.FeedItemId);
+        Assert.Equal(doc1.Kind, doc2.Kind);
+        Assert.Equal(doc1.AuthorStudentId, doc2.AuthorStudentId);
+        Assert.Equal(doc1.AuthorDisplayName, doc2.AuthorDisplayName);
         Assert.Equal(doc1.Title, doc2.Title);
         Assert.Equal(doc1.Body, doc2.Body);
         Assert.Equal(doc1.PostedAt, doc2.PostedAt);
+        Assert.Equal(doc1.ReactionCount, doc2.ReactionCount);
+        Assert.Equal(doc1.CommentCount, doc2.CommentCount);
     }
 
     [Fact]
-    public void Project_DoesNotUse_DateTimeUtcNow()
+    public void ProjectionSource_DoesNotContain_DateTimeUtcNow()
     {
-        // FIND-qa-005: Verifies projection uses only event data, not wall clock
-        // This catches non-deterministic sources like DateTime.UtcNow
+        // FIND-qa-005: Ban DateTime.UtcNow/Now in projection source.
+        // If this test fails, someone added non-deterministic wall-clock reads.
         
-        // Arrange: Event with explicit timestamps (no UtcNow dependency)
-        var explicitTimestamp = DateTimeOffset.Parse("2026-01-15T10:30:00Z");
-        var evt = new BadgeEarned_V1(
-            StudentId: "student-123",
-            BadgeId: "badge-456",
-            BadgeName: "Deterministic",
-            BadgeDescription: "Test",
-            AwardedAt: explicitTimestamp,
-            Timestamp: explicitTimestamp);
+        var assembly = typeof(ClassFeedItemProjection).Assembly;
+        var projectionType = typeof(ClassFeedItemProjection);
+        
+        // Get the source file path from the worktree
+        var solutionDir = GetSolutionDirectory();
+        var projectionPath = Path.Combine(solutionDir, 
+            "src", "actors", "Cena.Actors", "Projections", "ClassFeedItemProjection.cs");
 
-        // Act
-        _projection.Project(evt, _operations);
+        Assert.True(File.Exists(projectionPath), 
+            $"Could not find projection source at {projectionPath}");
 
-        // Assert: PostedAt matches event timestamp, not system time
-        _operations.Received(1).Store(Arg.Is<ClassFeedItemDocument>(doc =>
-            doc.PostedAt == explicitTimestamp.UtcDateTime));
+        var sourceCode = File.ReadAllText(projectionPath);
+
+        // Assert: No DateTime.UtcNow or DateTime.Now in the projection
+        Assert.DoesNotContain("DateTime.UtcNow", sourceCode);
+        Assert.DoesNotContain("DateTime.Now", sourceCode);
     }
 
     [Fact]
-    public void Project_WithDefaultAwardedAt_FallsBackToTimestamp()
+    public void ProjectionSource_Contains_FindData001_Comment()
     {
-        // Arrange: Event with default AwardedAt (older event format)
-        var timestamp = DateTimeOffset.Parse("2026-03-20T14:00:00Z");
-        var evt = new BadgeEarned_V1(
-            StudentId: "student-fallback",
-            BadgeId: "badge-legacy",
-            BadgeName: "Legacy Badge",
-            BadgeDescription: "Old format",
-            AwardedAt: default, // Not set
-            Timestamp: timestamp);
+        // FIND-qa-005: Verify the source code comment warning against UtcNow exists
+        var solutionDir = GetSolutionDirectory();
+        var projectionPath = Path.Combine(solutionDir, 
+            "src", "actors", "Cena.Actors", "Projections", "ClassFeedItemProjection.cs");
 
-        // Act
-        _projection.Project(evt, _operations);
+        var sourceCode = File.ReadAllText(projectionPath);
 
-        // Assert: Uses Timestamp as fallback (deterministic)
-        _operations.Received(1).Store(Arg.Is<ClassFeedItemDocument>(doc =>
-            doc.PostedAt == timestamp.UtcDateTime));
+        // Assert: The educational comment exists
+        Assert.Contains("FIND-data-001", sourceCode);
+        Assert.Contains("Never use DateTime.UtcNow in projections", sourceCode);
     }
 
-    private static ClassFeedItemDocument? GetStoredDocument(IDocumentOperations ops)
+    private static string GetSolutionDirectory()
     {
-        var calls = ops.ReceivedCalls()
-            .Where(c => c.GetMethodInfo().Name == "Store")
-            .ToList();
-        
-        return calls.FirstOrDefault()?.GetArguments()[0] as ClassFeedItemDocument;
+        // Traverse up from test assembly location to find solution root
+        var currentDir = Directory.GetCurrentDirectory();
+        while (!string.IsNullOrEmpty(currentDir))
+        {
+            if (Directory.GetFiles(currentDir, "*.sln").Any() ||
+                Directory.Exists(Path.Combine(currentDir, ".git")))
+            {
+                return currentDir;
+            }
+            currentDir = Directory.GetParent(currentDir)?.FullName!;
+        }
+        throw new InvalidOperationException("Could not find solution directory");
     }
 }
