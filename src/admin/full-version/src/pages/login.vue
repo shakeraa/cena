@@ -152,10 +152,10 @@ const onSubmit = () => {
       >
         <VCardText>
           <h1 class="text-h4 mb-1">
-            Cena Admin
+            {{ $t('auth.cenaAdmin') }}
           </h1>
           <p class="mb-0">
-            Sign in to manage the Cena learning platform
+            {{ $t('auth.signInSubtitle') }}
           </p>
         </VCardText>
 
@@ -180,7 +180,7 @@ const onSubmit = () => {
               <VCol cols="12">
                 <AppTextField
                   v-model="credentials.email"
-                  label="Email"
+                  :label="$t('auth.email')"
                   placeholder="admin@cena.edu"
                   type="email"
                   autofocus
@@ -193,7 +193,7 @@ const onSubmit = () => {
               <VCol cols="12">
                 <AppTextField
                   v-model="credentials.password"
-                  label="Password"
+                  :label="$t('auth.password')"
                   placeholder="············"
                   :rules="[requiredValidator]"
                   :type="isPasswordVisible ? 'text' : 'password'"
@@ -204,7 +204,7 @@ const onSubmit = () => {
                     <IconBtn
                       data-testid="password-toggle-btn"
                       size="small"
-                      :aria-label="isPasswordVisible ? 'Hide password' : 'Show password'"
+                      :aria-label="isPasswordVisible ? $t('auth.hidePassword') : $t('auth.showPassword')"
                       @click="isPasswordVisible = !isPasswordVisible"
                     >
                       <VIcon
@@ -218,13 +218,13 @@ const onSubmit = () => {
                 <div class="d-flex align-center flex-wrap justify-space-between my-6">
                   <VCheckbox
                     v-model="rememberMe"
-                    label="Remember me"
+                    :label="$t('auth.rememberMe')"
                   />
                   <RouterLink
                     class="text-high-emphasis ms-2 mb-1 text-decoration-underline"
                     :to="{ name: 'forgot-password' }"
                   >
-                    Forgot Password?
+                    {{ $t('auth.forgotPassword') }}
                   </RouterLink>
                 </div>
 
@@ -234,7 +234,7 @@ const onSubmit = () => {
                   :loading="isSubmitting"
                   :disabled="isSubmitting"
                 >
-                  Sign In
+                  {{ $t('auth.signIn') }}
                 </VBtn>
               </VCol>
 
@@ -244,7 +244,7 @@ const onSubmit = () => {
                 class="d-flex align-center"
               >
                 <VDivider />
-                <span class="mx-4">or</span>
+                <span class="mx-4">{{ $t('auth.or') }}</span>
                 <VDivider />
               </VCol>
 
@@ -264,7 +264,7 @@ const onSubmit = () => {
                     size="20"
                     class="me-2"
                   />
-                  Sign in with Google
+                  {{ $t('auth.signInWithGoogle') }}
                 </VBtn>
 
                 <VBtn
@@ -279,7 +279,7 @@ const onSubmit = () => {
                     size="20"
                     class="me-2"
                   />
-                  Sign in with Apple
+                  {{ $t('auth.signInWithApple') }}
                 </VBtn>
               </VCol>
 
@@ -294,7 +294,7 @@ const onSubmit = () => {
                   class="text-medium-emphasis text-decoration-underline"
                   data-testid="admin-login-privacy-link"
                 >
-                  Privacy Policy
+                  {{ $t('auth.privacyPolicy') }}
                 </RouterLink>
                 <span class="mx-1">&middot;</span>
                 <RouterLink
@@ -302,7 +302,7 @@ const onSubmit = () => {
                   class="text-medium-emphasis text-decoration-underline"
                   data-testid="admin-login-terms-link"
                 >
-                  Terms of Service
+                  {{ $t('auth.termsOfService') }}
                 </RouterLink>
               </VCol>
             </VRow>

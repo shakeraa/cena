@@ -97,10 +97,10 @@ const handleResetPassword = async () => {
       >
         <VCardText>
           <h1 class="text-h4 mb-1">
-            Forgot Password? 🔒
+            {{ $t('auth.forgotPasswordTitle') }}
           </h1>
           <p class="mb-0">
-            Enter your email and we'll send you instructions to reset your password
+            {{ $t('auth.forgotPasswordSubtitle') }}
           </p>
         </VCardText>
 
@@ -120,7 +120,7 @@ const handleResetPassword = async () => {
             color="success"
             variant="tonal"
           >
-            If an account exists with that email, a password reset link has been sent. Check your inbox.
+            {{ $t('auth.resetEmailSent') }}
           </VAlert>
         </VCardText>
 
@@ -132,7 +132,7 @@ const handleResetPassword = async () => {
                 <AppTextField
                   v-model="email"
                   autofocus
-                  label="Email"
+                  :label="$t('auth.email')"
                   type="email"
                   placeholder="admin@cena.edu"
                   :rules="[requiredValidator, emailValidator]"
@@ -148,7 +148,7 @@ const handleResetPassword = async () => {
                   :loading="isSubmitting"
                   :disabled="isSubmitting || emailSent"
                 >
-                  Send Reset Link
+                  {{ $t('auth.sendResetLink') }}
                 </VBtn>
               </VCol>
 
@@ -163,7 +163,7 @@ const handleResetPassword = async () => {
                     size="20"
                     class="me-1 flip-in-rtl"
                   />
-                  <span>Back to login</span>
+                  <span>{{ $t('auth.backToLogin') }}</span>
                 </RouterLink>
               </VCol>
 
@@ -176,14 +176,14 @@ const handleResetPassword = async () => {
                   to="/privacy"
                   class="text-medium-emphasis text-decoration-underline"
                 >
-                  Privacy Policy
+                  {{ $t('auth.privacyPolicy') }}
                 </RouterLink>
                 <span class="mx-1">&middot;</span>
                 <RouterLink
                   to="/terms"
                   class="text-medium-emphasis text-decoration-underline"
                 >
-                  Terms of Service
+                  {{ $t('auth.termsOfService') }}
                 </RouterLink>
               </VCol>
             </VRow>
