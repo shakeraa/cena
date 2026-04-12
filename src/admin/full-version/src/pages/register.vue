@@ -133,6 +133,7 @@ const isPasswordVisible = ref(false)
                   @click:append-inner="isPasswordVisible = !isPasswordVisible"
                 />
 
+                <!-- FIND-privacy-002: Link to real privacy policy and terms -->
                 <div class="d-flex align-center my-6">
                   <VCheckbox
                     id="privacy-policy"
@@ -143,11 +144,22 @@ const isPasswordVisible = ref(false)
                     for="privacy-policy"
                     style="opacity: 1;"
                   >
-                    <span class="me-1 text-high-emphasis">I agree to</span>
-                    <a
-                      href="javascript:void(0)"
+                    <span class="me-1 text-high-emphasis">I agree to the</span>
+                    <RouterLink
+                      to="/privacy"
                       class="text-high-emphasis text-decoration-underline"
-                    >privacy policy & terms</a>
+                      data-testid="admin-register-privacy-link"
+                    >
+                      Privacy Policy
+                    </RouterLink>
+                    <span class="mx-1 text-high-emphasis">&amp;</span>
+                    <RouterLink
+                      to="/terms"
+                      class="text-high-emphasis text-decoration-underline"
+                      data-testid="admin-register-terms-link"
+                    >
+                      Terms of Service
+                    </RouterLink>
                   </VLabel>
                 </div>
 

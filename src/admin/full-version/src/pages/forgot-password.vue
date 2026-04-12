@@ -165,6 +165,26 @@ const handleResetPassword = async () => {
                   <span>Back to login</span>
                 </RouterLink>
               </VCol>
+
+              <!-- FIND-privacy-002: Legal links on admin forgot-password page -->
+              <VCol
+                cols="12"
+                class="text-center text-caption text-medium-emphasis"
+              >
+                <RouterLink
+                  to="/privacy"
+                  class="text-medium-emphasis text-decoration-underline"
+                >
+                  Privacy Policy
+                </RouterLink>
+                <span class="mx-1">&middot;</span>
+                <RouterLink
+                  to="/terms"
+                  class="text-medium-emphasis text-decoration-underline"
+                >
+                  Terms of Service
+                </RouterLink>
+              </VCol>
             </VRow>
           </VForm>
         </VCardText>

@@ -1,10 +1,18 @@
 <script setup lang="ts">
+/**
+ * FIND-privacy-002: Added legal footer links (Privacy Policy, Terms, Children's Notice)
+ * to every auth page via this shared card component.
+ */
+import { useI18n } from 'vue-i18n'
+
 interface Props {
   title: string
   subtitle?: string
 }
 
 defineProps<Props>()
+
+const { t } = useI18n()
 </script>
 
 <template>
@@ -28,6 +36,35 @@ defineProps<Props>()
       class="student-auth-card__footer mt-6 text-center text-body-2"
     >
       <slot name="footer" />
+    </div>
+    <!-- FIND-privacy-002: Legal links on every auth page -->
+    <div
+      class="student-auth-card__legal mt-4 text-center text-caption text-medium-emphasis"
+      data-testid="auth-legal-links"
+    >
+      <RouterLink
+        to="/privacy"
+        class="text-medium-emphasis text-decoration-underline"
+        data-testid="auth-privacy-link"
+      >
+        {{ t('legal.footer.privacyLink') }}
+      </RouterLink>
+      <span class="mx-1">&middot;</span>
+      <RouterLink
+        to="/terms"
+        class="text-medium-emphasis text-decoration-underline"
+        data-testid="auth-terms-link"
+      >
+        {{ t('legal.footer.termsLink') }}
+      </RouterLink>
+      <span class="mx-1">&middot;</span>
+      <RouterLink
+        to="/privacy/children"
+        class="text-medium-emphasis text-decoration-underline"
+        data-testid="auth-children-link"
+      >
+        {{ t('legal.footer.childrenLink') }}
+      </RouterLink>
     </div>
   </VCard>
 </template>

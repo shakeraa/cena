@@ -291,6 +291,35 @@ async function handleSubmit(payload: { email: string; password: string; displayN
         :error-message="errorMessage"
         @submit="handleSubmit"
       />
+      <!-- FIND-privacy-002: Agreement notice with links to Terms and Privacy Policy -->
+      <p
+        class="text-caption text-medium-emphasis text-center mt-3"
+        data-testid="register-agreement-notice"
+      >
+        <i18n-t
+          keypath="legal.footer.agreementNotice"
+          tag="span"
+        >
+          <template #terms>
+            <RouterLink
+              to="/terms"
+              class="text-medium-emphasis text-decoration-underline"
+              data-testid="register-terms-link"
+            >
+              {{ t('legal.footer.termsLink') }}
+            </RouterLink>
+          </template>
+          <template #privacy>
+            <RouterLink
+              to="/privacy"
+              class="text-medium-emphasis text-decoration-underline"
+              data-testid="register-privacy-link"
+            >
+              {{ t('legal.footer.privacyLink') }}
+            </RouterLink>
+          </template>
+        </i18n-t>
+      </p>
       <AuthProviderButtons mode="register" />
     </template>
 

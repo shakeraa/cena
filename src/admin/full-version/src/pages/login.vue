@@ -269,6 +269,29 @@ const onSubmit = () => {
                   Sign in with Apple
                 </VBtn>
               </VCol>
+
+              <!-- FIND-privacy-002: Legal links on admin login page -->
+              <VCol
+                cols="12"
+                class="text-center text-caption text-medium-emphasis"
+                data-testid="admin-login-legal-links"
+              >
+                <RouterLink
+                  to="/privacy"
+                  class="text-medium-emphasis text-decoration-underline"
+                  data-testid="admin-login-privacy-link"
+                >
+                  Privacy Policy
+                </RouterLink>
+                <span class="mx-1">&middot;</span>
+                <RouterLink
+                  to="/terms"
+                  class="text-medium-emphasis text-decoration-underline"
+                  data-testid="admin-login-terms-link"
+                >
+                  Terms of Service
+                </RouterLink>
+              </VCol>
             </VRow>
           </VForm>
         </VCardText>

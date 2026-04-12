@@ -78,6 +78,33 @@ function persist() {
         @update:model-value="persist"
       />
     </VCard>
+
+    <!-- FIND-privacy-002: Links to full policy pages from settings -->
+    <div
+      class="mt-6 text-body-2 text-medium-emphasis"
+      data-testid="settings-legal-links"
+    >
+      <RouterLink
+        to="/privacy"
+        class="text-medium-emphasis text-decoration-underline"
+      >
+        {{ t('legal.footer.privacyLink') }}
+      </RouterLink>
+      <span class="mx-2">&middot;</span>
+      <RouterLink
+        to="/terms"
+        class="text-medium-emphasis text-decoration-underline"
+      >
+        {{ t('legal.footer.termsLink') }}
+      </RouterLink>
+      <span class="mx-2">&middot;</span>
+      <RouterLink
+        to="/privacy/children"
+        class="text-medium-emphasis text-decoration-underline"
+      >
+        {{ t('legal.footer.childrenLink') }}
+      </RouterLink>
+    </div>
   </div>
 </template>
 
