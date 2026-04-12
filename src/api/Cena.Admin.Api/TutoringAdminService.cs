@@ -139,12 +139,12 @@ public sealed class TutoringAdminService : ITutoringAdminService
                 turns[i] = turns[i] with { RagSourceCount = src };
         }
 
-        // Estimate tokens from message events (approximate: 4 chars per token)
-        var tokensUsed = sessionMessages.Sum(e =>
-        {
-            var preview = ExtractString(e, "messagePreview");
-            return preview.Length / 4;
-        });
+        // FIND-data-021: Use real token count from TutorMessageDocument instead of estimating
+        var messageIds = sessionMessages.Select(e => e.Id.ToString()).ToList();
+        var tutorMessages = await session.Query<TutorMessageDocument>()
+            .Where(m => m.SessionId == sessionId && m.TokensUsed.HasValue)
+            .ToListAsync();
+        var tokensUsed = tutorMessages.Sum(m => m.TokensUsed ?? 0);
 
         var durationSeconds = doc.EndedAt.HasValue
             ? (int)(doc.EndedAt.Value - doc.StartedAt).TotalSeconds
@@ -204,18 +204,19 @@ public sealed class TutoringAdminService : ITutoringAdminService
             .Where(e => e.Timestamp >= today && e.Timestamp < tomorrow)
             .ToListAsync();
 
-        var studentTokens = todayMessages
-            .GroupBy(e => ExtractString(e, "studentId"))
+        // FIND-data-021: Use real token counts from TutorMessageDocument
+        var today = DateTimeOffset.UtcNow.Date;
+        var messageDocs = await session.Query<TutorMessageDocument>()
+            .Where(m => m.SentAt >= today && m.SentAt < today.AddDays(1) && m.TokensUsed.HasValue)
+            .ToListAsync();
+        
+        var studentTokens = messageDocs
+            .GroupBy(m => m.StudentId)
             .Where(g => !string.IsNullOrEmpty(g.Key)
                 && (scopedStudentIds is null || scopedStudentIds.Contains(g.Key))) // REV-014
             .Select(g =>
             {
-                var tokensUsed = g.Sum(e =>
-                {
-                    var preview = ExtractString(e, "messagePreview");
-                    return preview.Length / 4; // Approximate token count
-                });
-
+                var tokensUsed = g.Sum(m => m.TokensUsed ?? 0);
                 var percentUsed = (double)tokensUsed / DailyOutputTokenLimit * 100;
 
                 return new StudentBudgetDto(
@@ -331,22 +332,15 @@ public sealed class TutoringAdminService : ITutoringAdminService
     private async Task<int> GetStudentBudgetRemainingAsync(
         Marten.IQuerySession querySession, string studentId)
     {
-        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
-        var tomorrow = today.AddDays(1);
+        var today = DateTimeOffset.UtcNow.Date;
 
-        var todayMessages = await querySession.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "tutoring_message_sent_v1")
-            .Where(e => e.Timestamp >= today && e.Timestamp < tomorrow)
-            .ToListAsync();
-
-        var studentMessages = todayMessages
-            .Where(e => ExtractString(e, "studentId") == studentId);
-
-        var tokensUsed = studentMessages.Sum(e =>
-        {
-            var preview = ExtractString(e, "messagePreview");
-            return preview.Length / 4;
-        });
+        // FIND-data-021: Use real token counts from TutorMessageDocument
+        var tokensUsed = await querySession.Query<TutorMessageDocument>()
+            .Where(m => m.StudentId == studentId 
+                && m.SentAt >= today 
+                && m.SentAt < today.AddDays(1) 
+                && m.TokensUsed.HasValue)
+            .SumAsync(m => m.TokensUsed ?? 0);
 
         return Math.Max(0, DailyOutputTokenLimit - tokensUsed);
     }

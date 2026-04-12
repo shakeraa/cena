@@ -39,25 +39,19 @@ public sealed class TokenBudgetAdminService : ITokenBudgetAdminService
         var targetDate = (date ?? DateTimeOffset.UtcNow).Date;
         var nextDay = targetDate.AddDays(1);
 
-        // Query Marten event stream for TutoringMessageSent_V1 events from the target day
-        var dayMessages = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "tutoring_message_sent_v1")
-            .Where(e => e.Timestamp >= targetDate && e.Timestamp < nextDay)
+        // FIND-data-021: Use real token counts from TutorMessageDocument
+        var messageDocs = await session.Query<TutorMessageDocument>()
+            .Where(m => m.SentAt >= targetDate && m.SentAt < nextDay && m.TokensUsed.HasValue)
             .ToListAsync();
 
         var dailyLimit = _dailyLimitOverride;
 
-        var students = dayMessages
-            .GroupBy(e => ExtractString(e, "studentId"))
+        var students = messageDocs
+            .GroupBy(m => m.StudentId)
             .Where(g => !string.IsNullOrEmpty(g.Key))
             .Select(g =>
             {
-                // Estimate tokens: MessagePreview.Length / 4 * 2 (input + output)
-                var tokensUsed = g.Sum(e =>
-                {
-                    var preview = ExtractString(e, "messagePreview");
-                    return preview.Length / 4 * 2;
-                });
+                var tokensUsed = g.Sum(m => m.TokensUsed ?? 0);
 
                 var percentUsed = (float)tokensUsed / dailyLimit * 100f;
                 var estimatedCost = tokensUsed * CostPerToken;
@@ -91,22 +85,18 @@ public sealed class TokenBudgetAdminService : ITokenBudgetAdminService
         var endDate = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero).AddDays(1);
         var startDate = endDate.AddDays(-days);
 
-        var messages = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "tutoring_message_sent_v1")
-            .Where(e => e.Timestamp >= startDate && e.Timestamp < endDate)
+        // FIND-data-021: Use real token counts from TutorMessageDocument
+        var messageDocs = await session.Query<TutorMessageDocument>()
+            .Where(m => m.SentAt >= startDate && m.SentAt < endDate && m.TokensUsed.HasValue)
             .ToListAsync();
 
-        var dailyData = messages
-            .GroupBy(e => e.Timestamp.Date)
+        var dailyData = messageDocs
+            .GroupBy(m => m.SentAt.Date)
             .OrderBy(g => g.Key)
             .Select(g =>
             {
-                var totalTokens = g.Sum(e =>
-                {
-                    var preview = ExtractString(e, "messagePreview");
-                    return (long)(preview.Length / 4 * 2);
-                });
-                var uniqueStudents = g.Select(e => ExtractString(e, "studentId"))
+                var totalTokens = g.Sum(m => (long)(m.TokensUsed ?? 0));
+                var uniqueStudents = g.Select(m => m.StudentId)
                     .Where(id => !string.IsNullOrEmpty(id))
                     .Distinct()
                     .Count();
