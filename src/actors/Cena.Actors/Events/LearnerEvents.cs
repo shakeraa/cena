@@ -343,3 +343,61 @@ public record LearningSessionEnded_V1(
     int QuestionsAttempted,
     int QuestionsCorrect
 ) : IDelegatedEvent;
+
+// =============================================================================
+// RIGHT TO ERASURE EVENTS (GDPR Article 17 / CCPA)
+// =============================================================================
+
+/// <summary>
+/// Represents a single erasure action taken against a specific data store.
+/// Part of the ErasureManifest for audit trail purposes.
+/// </summary>
+public record ErasureManifestItem(
+    string StoreName,              // e.g., "Marten.Events", "AgentDB.Vectors", "S3.BlobStorage"
+    string ActionTaken,            // e.g., "deleted", "anonymized", "retained_legal_hold"
+    int RowsAffected,              // Number of records/rows affected in this store
+    string? Details = null         // Additional context (e.g., "3 events soft-deleted")
+);
+
+/// <summary>
+/// Complete manifest of all erasure actions taken across all data stores.
+/// Provides full audit trail for compliance verification.
+/// </summary>
+public record ErasureManifest(
+    string RequestId,
+    string StudentId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset CompletedAt,
+    IReadOnlyList<ErasureManifestItem> StoreActions,
+    int TotalRowsAffected,
+    bool IsComplete              // false if any store failed or requires manual review
+);
+
+/// <summary>
+/// Emitted when a student or authorized parent requests data erasure under GDPR Article 17 or CCPA.
+/// The erasure is scheduled for processing after a mandatory cooling-off period (30 days by default)
+/// to allow for cancellation of the request.
+///
+/// This event is appended to the student's event stream for audit purposes.
+/// </summary>
+public record StudentErasureRequested_V1(
+    string StudentId,
+    Guid RequestId,
+    DateTimeOffset RequestedAt,
+    string RequestedBy,                // "student:self" | "parent:<email>" | "guardian:<id>"
+    DateTimeOffset ScheduledProcessingAt // RequestedAt + 30 days cooling-off period
+) : IDelegatedEvent;
+
+/// <summary>
+/// Emitted when the erasure process has been completed across all data stores.
+/// Includes a complete manifest of actions taken per store for compliance audit.
+///
+/// This event is appended to the student's event stream for audit purposes.
+/// </summary>
+public record StudentErasureCompleted_V1(
+    string StudentId,
+    Guid RequestId,
+    DateTimeOffset CompletedAt,
+    ErasureManifest Manifest,          // Detailed record of all erasure actions per store
+    int RowsAffected                   // Total rows affected across all stores (convenience field)
+) : IDelegatedEvent;

@@ -224,6 +224,23 @@ builder.Services.AddSingleton<Cena.Actors.Services.IContentRetriever, Cena.Actor
 builder.Services.AddHostedService<Cena.Actors.Services.PgVectorMigrationService>();
 builder.Services.AddHostedService<Cena.Actors.Services.EmbeddingIngestionHandler>();
 
+// REV-013.3: Data retention worker for GDPR/FERPA/COPPA compliance
+builder.Services.AddRetentionWorker(opts =>
+{
+    opts.CronExpression = builder.Configuration.GetValue<string>("Cena:Compliance:RetentionCron") ?? "0 2 * * *";
+    opts.UseSoftDelete = builder.Configuration.GetValue<bool>("Cena:Compliance:UseSoftDelete", true);
+    opts.BatchSize = builder.Configuration.GetValue<int>("Cena:Compliance:BatchSize", 1000);
+});
+
+// SEC-005: GDPR right-to-erasure worker (runs after retention)
+builder.Services.AddErasureWorker(opts =>
+{
+    opts.CronExpression = builder.Configuration.GetValue<string>("Cena:Compliance:ErasureCron") ?? "0 3 * * *";
+    opts.CoolingPeriod = TimeSpan.FromDays(builder.Configuration.GetValue<int>("Cena:Compliance:ErasureCoolingDays", 30));
+    opts.BatchSize = builder.Configuration.GetValue<int>("Cena:Compliance:ErasureBatchSize", 100);
+});
+builder.Services.AddRightToErasureService(builder.Configuration.GetValue<string>("Cena:Compliance:ErasurePepper") ?? "change-me-in-production");
+
 // SAI-000: LLM client abstraction and usage tracking
 builder.Services.AddSingleton<AnthropicLlmClient>();
 builder.Services.AddSingleton<ILlmClient, LlmClientRouter>();

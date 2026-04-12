@@ -63,7 +63,7 @@ public class GdprEndpointsWiringTests
     }
 
     [Fact]
-    public void MapGdprEndpoints_RegistersAllSixRoutes()
+    public void MapGdprEndpoints_RegistersAllSevenRoutes()
     {
         var app = BuildTestApp();
         app.MapGdprEndpoints();
@@ -79,6 +79,7 @@ public class GdprEndpointsWiringTests
         Assert.Contains("/api/admin/gdpr/export/{studentId}",   patterns);
         Assert.Contains("/api/admin/gdpr/erasure/{studentId}",  patterns);
         Assert.Contains("/api/admin/gdpr/erasure/{studentId}/status", patterns);
+        Assert.Contains("/api/admin/gdpr/erasure/{studentId}/manifest", patterns);
     }
 
     [Fact]

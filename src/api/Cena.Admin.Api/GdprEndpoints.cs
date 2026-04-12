@@ -8,7 +8,7 @@
 // endpoints are reachable at runtime.
 // =============================================================================
 
-using System.Security.Claims;
+using Cena.Actors.Events;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Marten;
@@ -21,6 +21,8 @@ namespace Cena.Admin.Api;
 
 public static class GdprEndpoints
 {
+    private static readonly TimeSpan CoolingPeriod = TimeSpan.FromDays(30);
+
     public static RouteGroupBuilder MapGdprEndpoints(this IEndpointRouteBuilder app)
     {
         // FIND-arch-006: the original policy name "AdminPolicy" did not match
@@ -36,12 +38,18 @@ public static class GdprEndpoints
             string studentId,
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
-            HttpContext ctx) =>
+            HttpContext ctx,
+            [FromServices] ILogger<GdprEndpoints> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
-            
+
             var consents = await consentManager.GetConsentsAsync(studentId);
+
+            logger.LogInformation(
+                "[SIEM] ConsentsQueried: StudentId={StudentId}, Count={Count}, QueriedBy={QueriedBy}",
+                studentId, consents.Count, ctx.User.Identity?.Name ?? "unknown");
+
             return Results.Ok(new { studentId, consents });
         });
 
@@ -49,7 +57,8 @@ public static class GdprEndpoints
             [FromBody] ConsentRequest request,
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
-            HttpContext ctx) =>
+            HttpContext ctx,
+            [FromServices] ILogger<GdprEndpoints> logger) =>
         {
             if (!Enum.TryParse<ConsentType>(request.ConsentType, true, out var type))
                 return Results.BadRequest(new { error = $"Invalid consent type: {request.ConsentType}" });
@@ -58,6 +67,11 @@ public static class GdprEndpoints
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(request.StudentId, ctx.User, store);
 
             await consentManager.RecordConsentAsync(request.StudentId, type);
+
+            logger.LogInformation(
+                "[SIEM] ConsentRecorded: StudentId={StudentId}, ConsentType={ConsentType}, RecordedBy={RecordedBy}",
+                request.StudentId, type, ctx.User.Identity?.Name ?? "unknown");
+
             return Results.Ok(new { request.StudentId, request.ConsentType, granted = true });
         });
 
@@ -66,7 +80,8 @@ public static class GdprEndpoints
             string consentType,
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
-            HttpContext ctx) =>
+            HttpContext ctx,
+            [FromServices] ILogger<GdprEndpoints> logger) =>
         {
             if (!Enum.TryParse<ConsentType>(consentType, true, out var type))
                 return Results.BadRequest(new { error = $"Invalid consent type: {consentType}" });
@@ -75,6 +90,11 @@ public static class GdprEndpoints
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
 
             await consentManager.RevokeConsentAsync(studentId, type);
+
+            logger.LogInformation(
+                "[SIEM] ConsentRevoked: StudentId={StudentId}, ConsentType={ConsentType}, RevokedBy={RevokedBy}",
+                studentId, type, ctx.User.Identity?.Name ?? "unknown");
+
             return Results.Ok(new { studentId, consentType, granted = false });
         });
 
@@ -83,19 +103,30 @@ public static class GdprEndpoints
         group.MapPost("/export/{studentId}", async (
             string studentId,
             [FromServices] IDocumentStore store,
-            HttpContext ctx) =>
+            HttpContext ctx,
+            [FromServices] ILogger<GdprEndpoints> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
 
             await using var session = store.QuerySession();
-            var snapshot = await session.Query<Cena.Actors.Events.StudentProfileSnapshot>()
+            var snapshot = await session.Query<StudentProfileSnapshot>()
                 .FirstOrDefaultAsync(s => s.StudentId == studentId);
 
             if (snapshot is null)
+            {
+                logger.LogWarning(
+                    "[SIEM] DataExportFailed: StudentId={StudentId}, Reason=NotFound, RequestedBy={RequestedBy}",
+                    studentId, ctx.User.Identity?.Name ?? "unknown");
                 return Results.NotFound(new { error = $"Student {studentId} not found" });
+            }
 
             var export = StudentDataExporter.Export(studentId, snapshot);
+
+            logger.LogInformation(
+                "[SIEM] DataExportGenerated: StudentId={StudentId}, FieldCount={FieldCount}, GeneratedBy={GeneratedBy}",
+                studentId, export.Profile.Count, ctx.User.Identity?.Name ?? "unknown");
+
             return Results.Ok(export);
         });
 
@@ -105,19 +136,42 @@ public static class GdprEndpoints
             string studentId,
             [FromServices] IRightToErasureService erasureService,
             [FromServices] IDocumentStore store,
-            HttpContext httpContext) =>
+            HttpContext httpContext,
+            [FromServices] ILogger<GdprEndpoints> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school (CRITICAL - destructive operation)
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, httpContext.User, store);
 
             var requestedBy = httpContext.User.Identity?.Name ?? "admin";
             var request = await erasureService.RequestErasureAsync(studentId, requestedBy);
+
+            // Emit StudentErasureRequested_V1 event to student's event stream
+            await using (var session = store.LightweightSession())
+            {
+                var scheduledProcessingAt = request.RequestedAt.Add(CoolingPeriod);
+                var erasureEvent = new StudentErasureRequested_V1(
+                    StudentId: studentId,
+                    RequestId: request.Id,
+                    RequestedAt: request.RequestedAt,
+                    RequestedBy: $"admin:{requestedBy}",
+                    ScheduledProcessingAt: scheduledProcessingAt
+                );
+
+                session.Events.Append(studentId, erasureEvent);
+                await session.SaveChangesAsync();
+            }
+
+            logger.LogInformation(
+                "[SIEM] ErasureRequested: StudentId={StudentId}, RequestId={RequestId}, RequestedBy={RequestedBy}, ScheduledProcessingAt={ScheduledProcessingAt}",
+                studentId, request.Id, requestedBy, request.RequestedAt.Add(CoolingPeriod));
+
             return Results.Ok(new
             {
                 request.StudentId,
+                requestId = request.Id,
                 request.Status,
                 request.RequestedAt,
-                coolingPeriodEnds = request.RequestedAt.AddDays(30)
+                coolingPeriodEnds = request.RequestedAt.Add(CoolingPeriod)
             });
         });
 
@@ -125,15 +179,130 @@ public static class GdprEndpoints
             string studentId,
             [FromServices] IRightToErasureService erasureService,
             [FromServices] IDocumentStore store,
-            HttpContext ctx) =>
+            HttpContext ctx,
+            [FromServices] ILogger<GdprEndpoints> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
 
             var request = await erasureService.GetErasureStatusAsync(studentId);
-            return request is null
-                ? Results.NotFound(new { error = $"No erasure request for {studentId}" })
-                : Results.Ok(request);
+
+            if (request is null)
+            {
+                logger.LogInformation(
+                    "[SIEM] ErasureStatusQueried: StudentId={StudentId}, Result=NotFound, QueriedBy={QueriedBy}",
+                    studentId, ctx.User.Identity?.Name ?? "unknown");
+                return Results.NotFound(new { error = $"No erasure request for {studentId}" });
+            }
+
+            var now = DateTimeOffset.UtcNow;
+            var scheduledProcessingAt = request.RequestedAt.Add(CoolingPeriod);
+            var coolingPeriodPassed = now >= scheduledProcessingAt;
+
+            // Check for completed manifest if status is Completed
+            ErasureManifest? manifest = null;
+            if (request.Status == ErasureStatus.Completed)
+            {
+                await using var session = store.QuerySession();
+                manifest = await session.Query<ErasureManifest>()
+                    .FirstOrDefaultAsync(m => m.RequestId == request.Id.ToString());
+            }
+
+            logger.LogInformation(
+                "[SIEM] ErasureStatusQueried: StudentId={StudentId}, RequestId={RequestId}, Status={Status}, CoolingPeriodPassed={CoolingPeriodPassed}, QueriedBy={QueriedBy}",
+                studentId, request.Id, request.Status, coolingPeriodPassed, ctx.User.Identity?.Name ?? "unknown");
+
+            return Results.Ok(new
+            {
+                request.StudentId,
+                requestId = request.Id,
+                status = request.Status.ToString(),
+                request.RequestedAt,
+                request.ProcessedAt,
+                coolingPeriodEnds = scheduledProcessingAt,
+                coolingPeriodPassed,
+                scheduledProcessingAt,
+                manifestLink = request.Status == ErasureStatus.Completed
+                    ? $"/api/admin/gdpr/erasure/{studentId}/manifest"
+                    : null,
+                manifestSummary = manifest is not null
+                    ? new
+                    {
+                        manifest.RequestId,
+                        manifest.TotalRowsAffected,
+                        manifest.IsComplete,
+                        storeActions = manifest.StoreActions.Select(a => new { a.StoreName, a.ActionTaken, a.RowsAffected })
+                    }
+                    : null
+            });
+        });
+
+        // GET /erasure/{studentId}/manifest - Returns the erasure manifest if completed
+        group.MapGet("/erasure/{studentId}/manifest", async (
+            string studentId,
+            [FromServices] IRightToErasureService erasureService,
+            [FromServices] IDocumentStore store,
+            HttpContext ctx,
+            [FromServices] ILogger<GdprEndpoints> logger) =>
+        {
+            // FIND-sec-011: Verify student belongs to caller's school
+            await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
+
+            var request = await erasureService.GetErasureStatusAsync(studentId);
+
+            if (request is null)
+            {
+                logger.LogInformation(
+                    "[SIEM] ErasureManifestQueried: StudentId={StudentId}, Result=RequestNotFound, QueriedBy={QueriedBy}",
+                    studentId, ctx.User.Identity?.Name ?? "unknown");
+                return Results.NotFound(new { error = $"No erasure request for {studentId}" });
+            }
+
+            if (request.Status != ErasureStatus.Completed)
+            {
+                logger.LogInformation(
+                    "[SIEM] ErasureManifestQueried: StudentId={StudentId}, RequestId={RequestId}, Result=NotCompleted, Status={Status}, QueriedBy={QueriedBy}",
+                    studentId, request.Id, request.Status, ctx.User.Identity?.Name ?? "unknown");
+                return Results.BadRequest(new
+                {
+                    error = "Erasure not yet completed",
+                    status = request.Status.ToString(),
+                    message = "Manifest is only available after erasure is fully processed."
+                });
+            }
+
+            await using var session = store.QuerySession();
+            var manifest = await session.Query<ErasureManifest>()
+                .FirstOrDefaultAsync(m => m.RequestId == request.Id.ToString());
+
+            if (manifest is null)
+            {
+                logger.LogWarning(
+                    "[SIEM] ErasureManifestQueried: StudentId={StudentId}, RequestId={RequestId}, Result=ManifestNotFound, QueriedBy={QueriedBy}",
+                    studentId, request.Id, ctx.User.Identity?.Name ?? "unknown");
+                return Results.NotFound(new { error = "Erasure manifest not found" });
+            }
+
+            logger.LogInformation(
+                "[SIEM] ErasureManifestQueried: StudentId={StudentId}, RequestId={RequestId}, TotalRowsAffected={TotalRowsAffected}, IsComplete={IsComplete}, QueriedBy={QueriedBy}",
+                studentId, manifest.RequestId, manifest.TotalRowsAffected, manifest.IsComplete, ctx.User.Identity?.Name ?? "unknown");
+
+            return Results.Ok(new
+            {
+                manifest.RequestId,
+                manifest.StudentId,
+                manifest.StartedAt,
+                manifest.CompletedAt,
+                manifest.TotalRowsAffected,
+                manifest.IsComplete,
+                storeActions = manifest.StoreActions.Select(a => new
+                {
+                    a.StoreName,
+                    a.ActionTaken,
+                    a.RowsAffected,
+                    a.Details
+                })
+            });
         });
 
         return group;
