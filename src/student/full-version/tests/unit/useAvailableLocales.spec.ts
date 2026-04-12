@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { isHebrewEnabled, useAvailableLocales } from '@/composables/useAvailableLocales'
+import { isHebrewEnabled, sanitizeLocale, useAvailableLocales } from '@/composables/useAvailableLocales'
 
 // ─────────────────────────────────────────────────────────────────────────
 // FIND-ux-014 — `useAvailableLocales()` is the single source of truth for
@@ -61,5 +61,68 @@ describe('useAvailableLocales', () => {
       vi.stubEnv('VITE_ENABLE_HEBREW', falsy)
       expect(isHebrewEnabled(), `flag="${falsy}"`).toBe(false)
     }
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────
+// FIND-pedagogy-010 — `sanitizeLocale()` is the runtime gate that prevents
+// cookie-injection and localStorage-based Hebrew bypass. It must reject
+// 'he' when the build flag is off and pass it through when on.
+// ─────────────────────────────────────────────────────────────────────────
+
+describe('sanitizeLocale', () => {
+  beforeEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('returns "en" when input is "he" and Hebrew is disabled (cookie bypass)', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    expect(sanitizeLocale('he')).toBe('en')
+  })
+
+  it('returns "he" when input is "he" and Hebrew is enabled', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'true')
+    expect(sanitizeLocale('he')).toBe('he')
+  })
+
+  it('passes through "en" regardless of Hebrew flag', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    expect(sanitizeLocale('en')).toBe('en')
+
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'true')
+    expect(sanitizeLocale('en')).toBe('en')
+  })
+
+  it('passes through "ar" regardless of Hebrew flag', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    expect(sanitizeLocale('ar')).toBe('ar')
+  })
+
+  it('falls back to "en" for unknown locale codes', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    expect(sanitizeLocale('fr')).toBe('en')
+    expect(sanitizeLocale('')).toBe('en')
+    expect(sanitizeLocale('zh')).toBe('en')
+  })
+
+  it('uses the custom fallback when provided', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    expect(sanitizeLocale('he', 'ar')).toBe('ar')
+  })
+
+  it('logs a warning when Hebrew is blocked', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    sanitizeLocale('he')
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('[cena-i18n] Hebrew locale requested but VITE_ENABLE_HEBREW is not enabled'),
+    )
+
+    warnSpy.mockRestore()
   })
 })

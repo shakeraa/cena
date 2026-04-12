@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 
@@ -6,8 +6,13 @@ const STORAGE_KEY = 'cena-onboarding-state'
 
 describe('onboardingStore', () => {
   beforeEach(() => {
+    vi.unstubAllEnvs()
     localStorage.clear()
     setActivePinia(createPinia())
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
   })
 
   it('starts at the welcome step with a null role and en locale', () => {
@@ -89,7 +94,8 @@ describe('onboardingStore', () => {
     expect(parsed.step).toBe('role')
   })
 
-  it('rehydrates from localStorage on store creation', () => {
+  it('rehydrates from localStorage on store creation (Hebrew enabled)', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'true')
     localStorage.setItem(STORAGE_KEY, JSON.stringify({
       step: 'language',
       role: 'self-learner',
@@ -104,6 +110,48 @@ describe('onboardingStore', () => {
     expect(store.step).toBe('language')
     expect(store.role).toBe('self-learner')
     expect(store.locale).toBe('he')
+  })
+
+  // FIND-pedagogy-010: regression test — stale 'he' in localStorage must
+  // be sanitized to 'en' when the Hebrew gate is off.
+  it('sanitizes persisted he locale to en when Hebrew is disabled', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({
+      step: 'language',
+      role: 'self-learner',
+      locale: 'he',
+      dailyTimeGoalMinutes: 30,
+      subjects: [],
+      completedAt: null,
+    }))
+
+    const store = useOnboardingStore()
+
+    expect(store.locale).toBe('en')
+  })
+
+  // FIND-pedagogy-010: regression test — setLocale('he') is blocked when
+  // Hebrew is disabled.
+  it('setLocale("he") falls back to en when Hebrew is disabled', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    const store = useOnboardingStore()
+
+    store.setLocale('he')
+    expect(store.locale).toBe('en')
+  })
+
+  // FIND-pedagogy-010: canAdvance must be false on language step when
+  // locale is 'he' but Hebrew is disabled (which sanitizeLocale would have
+  // blocked, but belt-and-suspenders).
+  it('canAdvance is true on language step when locale is valid (en)', () => {
+    vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+    const store = useOnboardingStore()
+
+    store.next() // welcome -> role
+    store.setRole('student')
+    store.next() // role -> language
+    store.setLocale('en')
+    expect(store.canAdvance).toBe(true)
   })
 
   it('reset() clears state and wipes localStorage', () => {

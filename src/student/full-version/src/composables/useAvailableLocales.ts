@@ -79,6 +79,39 @@ export function isHebrewEnabled(): boolean {
 }
 
 /**
+ * Sanitize a locale code against the Hebrew gate. If Hebrew is disabled
+ * and the input is 'he', returns the fallback (default: 'en'). Otherwise
+ * returns the input unchanged.
+ *
+ * Use this everywhere a locale value enters the system from an untrusted
+ * source (cookie, localStorage, URL param, onboarding store) to prevent
+ * Hebrew from leaking through even when the build flag is off.
+ *
+ * FIND-pedagogy-010: this is the critical runtime gate that closes the
+ * cookie-injection bypass.
+ */
+export function sanitizeLocale(
+  code: string,
+  fallback: 'en' | 'ar' = 'en',
+): 'en' | 'ar' | 'he' {
+  if (code === 'he' && !isHebrewEnabled()) {
+    if (typeof console !== 'undefined') {
+      console.warn(
+        `[cena-i18n] Hebrew locale requested but VITE_ENABLE_HEBREW is not enabled. Falling back to '${fallback}'.`,
+      )
+    }
+
+    return fallback
+  }
+
+  // Validate the code is one of the known locales; fall back if not
+  if (code === 'en' || code === 'ar' || code === 'he')
+    return code
+
+  return fallback
+}
+
+/**
  * Returns the filtered list of locales the UI should expose in the
  * language switcher. Pure function of the build-time env — callers can
  * use it in script setup to populate menus, filter `langConfig`, etc.

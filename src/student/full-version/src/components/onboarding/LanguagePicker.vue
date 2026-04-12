@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SupportedLocale } from '@/stores/onboardingStore'
+import { useAvailableLocales } from '@/composables/useAvailableLocales'
 
 interface Props {
   modelValue: SupportedLocale
@@ -13,6 +15,11 @@ const emit = defineEmits<{
 
 const { t } = useI18n()
 
+// FIND-pedagogy-010: use the shared Hebrew gate instead of a hardcoded
+// 3-locale array. When VITE_ENABLE_HEBREW is false the 'he' entry is
+// excluded, closing the onboarding picker bypass.
+const { locales: availableLocales } = useAvailableLocales()
+
 interface LocaleOption {
   code: SupportedLocale
   nativeLabel: string
@@ -21,7 +28,7 @@ interface LocaleOption {
   testId: string
 }
 
-const LOCALES: LocaleOption[] = [
+const ALL_LOCALES: LocaleOption[] = [
   {
     code: 'en',
     nativeLabel: 'English',
@@ -44,6 +51,13 @@ const LOCALES: LocaleOption[] = [
     testId: 'locale-he',
   },
 ]
+
+// Filter the locale options through the Hebrew gate
+const LOCALES = computed<LocaleOption[]>(() => {
+  const allowedCodes = new Set(availableLocales.value.map(l => l.code))
+
+  return ALL_LOCALES.filter(opt => allowedCodes.has(opt.code))
+})
 
 function select(code: SupportedLocale) {
   emit('update:modelValue', code)

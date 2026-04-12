@@ -3,6 +3,7 @@ import { useTheme } from 'vuetify'
 import { useConfigStore } from '@core/stores/config'
 import { cookieRef, namespaceConfig } from '@layouts/stores/config'
 import { themeConfig } from '@themeConfig'
+import { sanitizeLocale } from '@/composables/useAvailableLocales'
 
 const _syncAppRtl = () => {
   const configStore = useConfigStore()
@@ -10,20 +11,41 @@ const _syncAppRtl = () => {
 
   const { locale } = useI18n({ useScope: 'global' })
 
-  // TODO: Handle case where i18n can't read persisted value
-  if (locale.value !== storedLang.value && storedLang.value)
-    locale.value = storedLang.value
+  // FIND-pedagogy-010: validate the stored cookie against the Hebrew gate
+  // before restoring it into the i18n runtime. This closes the attack
+  // vector where someone injects cena-student-language=he into the cookie
+  // and gets a Hebrew UI despite the build flag being off.
+  if (storedLang.value) {
+    const sanitized = sanitizeLocale(storedLang.value)
+    if (sanitized !== storedLang.value) {
+      // Rewrite the cookie to the safe fallback
+      storedLang.value = sanitized
+    }
+    if (locale.value !== sanitized)
+      locale.value = sanitized
+  }
 
   // watch and change lang attribute of html on language change
   watch(
     locale,
     val => {
+      // FIND-pedagogy-010: gate the cookie write — never persist 'he'
+      // when Hebrew is disabled, even if somehow the i18n locale was set
+      // to 'he' programmatically.
+      const safeVal = sanitizeLocale(val as string)
+      if (safeVal !== val) {
+        // Force the i18n locale back to the safe value
+        locale.value = safeVal
+
+        return // The watcher will re-fire with the corrected value
+      }
+
       // Update lang attribute of html tag
       if (typeof document !== 'undefined')
-        document.documentElement.setAttribute('lang', val as string)
+        document.documentElement.setAttribute('lang', safeVal)
 
       // Store selected language in cookie
-      storedLang.value = val as string
+      storedLang.value = safeVal
 
       // set isAppRtl value based on selected language
       if (themeConfig.app.i18n.langConfig && themeConfig.app.i18n.langConfig.length) {
