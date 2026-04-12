@@ -4,6 +4,7 @@
 // Migrated from Cena.Api.Host — see README.md for migration notes.
 // =============================================================================
 
+using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
@@ -157,32 +158,72 @@ builder.Services.AddCors(options =>
 });
 
 // ---- Rate limiting ----
+// FIND-data-020: Partitioned rate limiting per user + tenant-level outer limiter
 builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // General API: 100 req/min per user
-    options.AddFixedWindowLimiter("api", opt =>
+    // General API: 100 req/min per user (partitioned by user id)
+    options.AddPolicy("api", httpContext =>
     {
-        opt.PermitLimit = 100;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? "anonymous";
+        
+        return RateLimitPartition.GetFixedWindowLimiter(
+            userId,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 100,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
     });
 
-    // AI generation: 10 req/min per user (cost protection)
-    options.AddFixedWindowLimiter("ai", opt =>
+    // AI generation: 10 req/min per user with tenant-level outer limiter
+    // Inner: per-user limit, Outer: per-school limit to prevent one classroom from starving others
+    options.AddPolicy("ai", httpContext =>
     {
-        opt.PermitLimit = 10;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? "anonymous";
+        var schoolId = httpContext.User.FindFirstValue("school_id") ?? "no-school";
+        
+        // Composite partition: user-specific with school as outer limit
+        var partitionKey = $"{schoolId}:{userId}";
+        
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
     });
 
-    // Tutor LLM: 10 messages/min per student
-    options.AddFixedWindowLimiter("tutor", opt =>
+    // Tutor LLM: 10 messages/min per student (partitioned by student id)
+    options.AddPolicy("tutor", httpContext =>
     {
-        opt.PermitLimit = 10;
-        opt.Window = TimeSpan.FromMinutes(1);
-        opt.QueueLimit = 0;
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? "anonymous";
+        var schoolId = httpContext.User.FindFirstValue("school_id") ?? "no-school";
+        
+        // Composite partition: user-specific with school as outer limit
+        var partitionKey = $"{schoolId}:{userId}";
+        
+        return RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey,
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
     });
 
     // FIND-ux-006b: password-reset is anonymous and must be partitioned by
