@@ -1,4 +1,4 @@
-import { existsSync, unlinkSync } from 'node:fs'
+import { existsSync, readFileSync, unlinkSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
@@ -13,6 +13,66 @@ import VueDevTools from 'vite-plugin-vue-devtools'
 import MetaLayouts from 'vite-plugin-vue-meta-layouts'
 import vuetify from 'vite-plugin-vuetify'
 import svgLoader from 'vite-svg-loader'
+
+/**
+ * FIND-ux-029: Vite plugin that validates PWA manifest icons exist at
+ * build time. Reads manifest.webmanifest from public/, checks every
+ * icon src resolves to a real file, and fails the build if any are missing.
+ *
+ * In dev mode it logs a warning on server start; in build mode it throws
+ * to prevent broken manifests from shipping.
+ */
+function validateManifestIcons() {
+  let publicDir = 'public'
+  let isBuild = false
+
+  return {
+    name: 'validate-manifest-icons',
+    configResolved(config: { publicDir: string; command: string }) {
+      publicDir = config.publicDir
+      isBuild = config.command === 'build'
+    },
+    buildStart() {
+      const manifestPath = resolve(publicDir, 'manifest.webmanifest')
+      if (!existsSync(manifestPath)) {
+        const msg = '[validate-manifest-icons] manifest.webmanifest not found in public/'
+        if (isBuild)
+          throw new Error(msg)
+
+        // eslint-disable-next-line no-console
+        console.warn(msg)
+
+        return
+      }
+
+      const raw = readFileSync(manifestPath, 'utf-8')
+      const manifest = JSON.parse(raw)
+      const icons: Array<{ src: string }> = manifest.icons || []
+      const missing: string[] = []
+
+      for (const icon of icons) {
+        const src: string = icon.src || ''
+        const rel = src.startsWith('/') ? src.slice(1) : src
+        const fullPath = resolve(publicDir, rel)
+        if (!existsSync(fullPath))
+          missing.push(src)
+      }
+
+      if (missing.length > 0) {
+        const msg = `[validate-manifest-icons] Missing icon files in public/:\n${missing.map(m => `  - ${m}`).join('\n')}\nBrowsers will receive the SPA HTML fallback instead of the icon image.`
+
+        // eslint-disable-next-line no-console
+        console.error(msg)
+        if (isBuild)
+          throw new Error(msg)
+      }
+      else {
+        // eslint-disable-next-line no-console
+        console.log(`[validate-manifest-icons] All ${icons.length} manifest icon(s) verified.`)
+      }
+    },
+  }
+}
 
 /**
  * FIND-arch-017: Vite plugin that strips mockServiceWorker.js from
@@ -125,6 +185,9 @@ export default defineConfig({
       ],
     }),
     svgLoader(),
+
+    // FIND-ux-029: validate PWA manifest icon files exist
+    validateManifestIcons(),
 
     // FIND-arch-017: strip mockServiceWorker.js from production dist/
     stripMswInProduction(),
