@@ -216,6 +216,13 @@ public static class MartenConfiguration
             .Index(x => x.SessionId)
             .Index(x => x.StudentId);
 
+        // FIND-arch-024: Feature flag projection for persistence and audit
+        // Replaces in-memory storage with event-sourced persistence
+        opts.Projections.Add<FeatureFlagProjection>(ProjectionLifecycle.Inline);
+        opts.Schema.For<FeatureFlagDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.Name);
+
         // ── Student Preferences Document (STB-00b) ──
         opts.Schema.For<StudentPreferencesDocument>()
             .Identity(x => x.Id)
