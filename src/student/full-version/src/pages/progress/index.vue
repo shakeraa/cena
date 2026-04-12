@@ -98,7 +98,7 @@ function retry() {
             {{ t('error.serverError') }}
           </div>
           <div class="text-body-2 text-medium-emphasis">
-            {{ error.message }}
+            {{ t(error.i18nKey ?? 'common.errorGeneric') }}
           </div>
         </div>
         <VBtn

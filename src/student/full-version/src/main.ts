@@ -11,8 +11,12 @@ import '@styles/styles.scss'
 // Create vue app
 const app = createApp(App)
 
-// Register plugins
-registerPlugins(app)
+// FIND-ux-021: await registerPlugins so that async plugins (e.g. MSW
+// worker.start() in the fake-api plugin) complete BEFORE the app mounts.
+// Without this, cold-load races produce 404s for /api/* paths that MSW
+// should intercept, and raw error strings like '[GET] "/api/me": 404 Not
+// Found' leak to the UI.
+await registerPlugins(app)
 
 // Mount vue app
 app.mount('#app')

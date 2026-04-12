@@ -80,7 +80,7 @@ const dayStreakCount = computed(() => {
       variant="tonal"
       data-testid="time-error"
     >
-      {{ timeQuery.error.value.message }}
+      {{ t(timeQuery.error.value.i18nKey ?? 'common.errorGeneric') }}
     </VAlert>
 
     <template v-else-if="timeQuery.data.value">

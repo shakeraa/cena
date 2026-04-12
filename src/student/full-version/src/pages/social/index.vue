@@ -63,7 +63,7 @@ async function handleReact(itemId: string) {
       variant="tonal"
       data-testid="feed-error"
     >
-      {{ feedQuery.error.value.message }}
+      {{ t(feedQuery.error.value.i18nKey ?? 'social.feedUnavailable') }}
     </VAlert>
 
     <div

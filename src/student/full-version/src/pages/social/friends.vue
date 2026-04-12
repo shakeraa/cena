@@ -64,7 +64,7 @@ async function handleAccept(requestId: string) {
       variant="tonal"
       data-testid="friends-error"
     >
-      {{ friendsQuery.error.value.message }}
+      {{ t(friendsQuery.error.value.i18nKey ?? 'social.friendsUnavailable') }}
     </VAlert>
 
     <template v-else-if="friendsQuery.data.value">

@@ -83,7 +83,7 @@ async function createNewThread() {
       variant="tonal"
       data-testid="tutor-list-error"
     >
-      {{ threadsQuery.error.value.message }}
+      {{ t(threadsQuery.error.value.i18nKey ?? 'tutor.threadsUnavailable') }}
     </VAlert>
 
     <div

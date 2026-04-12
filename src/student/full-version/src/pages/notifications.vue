@@ -98,7 +98,7 @@ async function handleMarkAllRead() {
       variant="tonal"
       data-testid="notifications-error"
     >
-      {{ listQuery.error.value.message }}
+      {{ t(listQuery.error.value.i18nKey ?? 'notifications.unavailable') }}
     </VAlert>
 
     <div

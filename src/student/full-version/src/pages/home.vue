@@ -159,7 +159,7 @@ const activeSession = null as null | {
       >
         <VAlertTitle>{{ t('home.errorState.title') }}</VAlertTitle>
         <div class="mb-3">
-          {{ error.message || t('home.errorState.fallback') }}
+          {{ t(error.i18nKey ?? 'home.dashboardUnavailable') }}
         </div>
       </VAlert>
     </template>
