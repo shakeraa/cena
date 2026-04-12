@@ -76,3 +76,42 @@ public record StudyRoomLeft_V1(
     string StudentId,
     DateTimeOffset LeftAt
 );
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FIND-privacy-018: Reporting & Blocking Events
+// ICO Children's Code Std 11 — safeguarding tools for minors
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// Emitted when a student files a report against social content.
+/// Categories: Bullying, Inappropriate, Spam, SelfHarmRisk, Other.
+/// </summary>
+public record SocialReportFiled_V1(
+    string ReportId,
+    string ReporterStudentId,
+    string ContentType,     // 'feed-item' | 'comment' | 'peer-solution' | 'friend-request' | 'study-room'
+    string ContentId,
+    string Category,        // 'bullying' | 'inappropriate' | 'spam' | 'self-harm-risk' | 'other'
+    string Severity,        // 'low' | 'medium' | 'high' | 'critical'
+    string? Reason,
+    DateTimeOffset ReportedAt
+);
+
+/// <summary>
+/// Emitted when a student blocks another student.
+/// Blocked user's content is filtered from the blocker's social surfaces.
+/// </summary>
+public record UserBlocked_V1(
+    string BlockerStudentId,
+    string BlockedStudentId,
+    DateTimeOffset BlockedAt
+);
+
+/// <summary>
+/// Emitted when a student unblocks a previously blocked student.
+/// </summary>
+public record UserUnblocked_V1(
+    string BlockerStudentId,
+    string UnblockedStudentId,
+    DateTimeOffset UnblockedAt
+);

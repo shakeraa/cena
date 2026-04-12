@@ -2,9 +2,11 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PeerSolutionCard from '@/components/social/PeerSolutionCard.vue'
+import ReportDialog from '@/components/social/ReportDialog.vue'
+import BlockUserDialog from '@/components/social/BlockUserDialog.vue'
 import { useApiQuery } from '@/composables/useApiQuery'
 import { $api } from '@/api/$api'
-import type { PeerSolutionListDto } from '@/api/types/common'
+import type { PeerSolutionListDto, ReportContentType } from '@/api/types/common'
 
 definePage({
   meta: {
@@ -24,6 +26,40 @@ const solutionsQuery = useApiQuery<PeerSolutionListDto>('/api/social/peers/solut
 
 const voteError = ref<string | null>(null)
 const voteErrorVisible = ref(false)
+
+// FIND-privacy-018: Report dialog state
+const reportDialogOpen = ref(false)
+const reportContentId = ref('')
+const reportContentType = ref<ReportContentType>('peer-solution')
+
+// FIND-privacy-018: Block dialog state
+const blockDialogOpen = ref(false)
+const blockTargetId = ref('')
+const blockTargetName = ref('')
+
+const reportSuccessVisible = ref(false)
+const blockSuccessVisible = ref(false)
+
+function handleReport(contentId: string, contentType: ReportContentType) {
+  reportContentId.value = contentId
+  reportContentType.value = contentType
+  reportDialogOpen.value = true
+}
+
+function handleBlock(studentId: string, displayName: string) {
+  blockTargetId.value = studentId
+  blockTargetName.value = displayName
+  blockDialogOpen.value = true
+}
+
+function onReported() {
+  reportSuccessVisible.value = true
+}
+
+function onBlocked() {
+  blockSuccessVisible.value = true
+  solutionsQuery.refresh()
+}
 
 async function handleVote(solutionId: string, direction: 'up' | 'down') {
   try {
@@ -79,8 +115,24 @@ async function handleVote(solutionId: string, direction: 'up' | 'down') {
         :key="sol.solutionId"
         :solution="sol"
         @vote="handleVote"
+        @report="handleReport"
+        @block="handleBlock"
       />
     </div>
+
+    <!-- FIND-privacy-018: Report & Block dialogs -->
+    <ReportDialog
+      v-model="reportDialogOpen"
+      :content-type="reportContentType"
+      :content-id="reportContentId"
+      @reported="onReported"
+    />
+    <BlockUserDialog
+      v-model="blockDialogOpen"
+      :target-student-id="blockTargetId"
+      :target-display-name="blockTargetName"
+      @blocked="onBlocked"
+    />
 
     <VSnackbar
       v-model="voteErrorVisible"
@@ -89,6 +141,22 @@ async function handleVote(solutionId: string, direction: 'up' | 'down') {
       data-testid="vote-error-snackbar"
     >
       {{ voteError ?? t('social.peers.voteError') }}
+    </VSnackbar>
+    <VSnackbar
+      v-model="reportSuccessVisible"
+      color="success"
+      timeout="4000"
+      data-testid="report-success-snackbar"
+    >
+      {{ t('social.report.success') }}
+    </VSnackbar>
+    <VSnackbar
+      v-model="blockSuccessVisible"
+      color="success"
+      timeout="4000"
+      data-testid="block-success-snackbar"
+    >
+      {{ t('social.block.success') }}
     </VSnackbar>
   </div>
 </template>

@@ -10,6 +10,8 @@ interface Props {
 const props = defineProps<Props>()
 const emit = defineEmits<{
   react: [itemId: string]
+  report: [contentId: string, contentType: 'feed-item']
+  block: [studentId: string, displayName: string]
 }>()
 
 const { t } = useI18n()
@@ -125,6 +127,27 @@ function handleReact() {
       >
         {{ item.commentCount }}
       </VBtn>
+
+      <VSpacer />
+
+      <!-- FIND-privacy-018: Report & Block buttons for safeguarding -->
+      <VBtn
+        variant="text"
+        size="small"
+        icon="tabler-flag"
+        color="error"
+        :aria-label="t('social.report.ariaLabel')"
+        :data-testid="`report-${item.itemId}`"
+        @click="emit('report', item.itemId, 'feed-item')"
+      />
+      <VBtn
+        variant="text"
+        size="small"
+        icon="tabler-ban"
+        :aria-label="t('social.block.ariaLabel', { name: item.authorDisplayName })"
+        :data-testid="`block-${item.authorStudentId}`"
+        @click="emit('block', item.authorStudentId, item.authorDisplayName)"
+      />
     </div>
   </VCard>
 </template>

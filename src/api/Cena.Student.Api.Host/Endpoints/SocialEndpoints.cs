@@ -14,6 +14,7 @@ using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -68,6 +69,18 @@ public static class SocialEndpoints
             .WithName("LeaveStudyRoom")
             .RequireConsent(ProcessingPurpose.SocialFeatures);
 
+        // FIND-privacy-018: Content reporting & user blocking
+        // ICO Children's Code Std 11 — safeguarding tools for minors
+        group.MapPost("/report", SubmitReport)
+            .WithName("SubmitReport")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        group.MapPost("/block", BlockUser)
+            .WithName("BlockUser")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        group.MapDelete("/block/{targetStudentId}", UnblockUser)
+            .WithName("UnblockUser")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+
         return app;
     }
 
@@ -88,6 +101,9 @@ public static class SocialEndpoints
 
         await using var session = store.QuerySession();
 
+        // FIND-privacy-018: load blocklist so blocked users' content is filtered
+        var blockedIds = await GetBlockedStudentIds(session, studentId);
+
         // Query feed items from Marten, ordered by posted date descending
         var feedItems = await session.Query<ClassFeedItemDocument>()
             .Where(x => !x.IsDeleted)
@@ -95,6 +111,10 @@ public static class SocialEndpoints
             .Skip((currentPage - 1) * pageSize)
             .Take(pageSize + 1) // Take one extra to determine if there's more
             .ToListAsync();
+
+        // FIND-privacy-018: in-memory filter for blocked authors
+        if (blockedIds.Count > 0)
+            feedItems = feedItems.Where(x => !blockedIds.Contains(x.AuthorStudentId)).ToList();
 
         var hasMore = feedItems.Count > pageSize;
         var items = feedItems.Take(pageSize).Select(x => new ClassFeedItem(
@@ -132,9 +152,12 @@ public static class SocialEndpoints
 
         await using var session = store.QuerySession();
 
+        // FIND-privacy-018: load blocklist so blocked users' content is filtered
+        var blockedIds = await GetBlockedStudentIds(session, studentId);
+
         // Query peer solutions from Marten for the given question
         var query = session.Query<PeerSolutionDocument>().Where(x => !x.IsDeleted);
-        
+
         if (!string.IsNullOrEmpty(questionId))
         {
             query = query.Where(x => x.QuestionId == questionId);
@@ -153,6 +176,10 @@ public static class SocialEndpoints
                 x.DownvoteCount,
                 x.PostedAt))
             .ToListAsync();
+
+        // FIND-privacy-018: in-memory filter for blocked authors
+        if (blockedIds.Count > 0)
+            solutions = solutions.Where(s => !blockedIds.Contains(s.AuthorStudentId)).ToList();
 
         var dto = new PeerSolutionListDto(Solutions: solutions.ToArray());
         return Results.Ok(dto);
@@ -693,6 +720,246 @@ public static class SocialEndpoints
         await session.SaveChangesAsync();
 
         return Results.Ok(new { ok = true });
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // FIND-privacy-018: Report, Block, Unblock
+    // ═════════════════════════════════════════════════════════════════════════
+
+    private static readonly string[] ValidContentTypes =
+        { "feed-item", "comment", "peer-solution", "friend-request", "study-room" };
+    private static readonly string[] ValidCategories =
+        { "bullying", "inappropriate", "spam", "self-harm-risk", "other" };
+
+    /// <summary>
+    /// Infer severity from report category per ICO Children's Code Std 11.
+    /// Self-harm is always critical (triggers safeguarding alert).
+    /// Bullying is high. Inappropriate is medium. Spam/Other is low.
+    /// </summary>
+    private static string InferSeverity(string category) => category switch
+    {
+        "self-harm-risk" => "critical",
+        "bullying" => "high",
+        "inappropriate" => "medium",
+        "spam" => "low",
+        "other" => "low",
+        _ => "medium",
+    };
+
+    // POST /api/social/report — file a content report
+    private static async Task<IResult> SubmitReport(
+        HttpContext ctx,
+        IDocumentStore store,
+        ILoggerFactory loggerFactory,
+        SubmitReportRequest request)
+    {
+        var logger = loggerFactory.CreateLogger("Cena.Social.Report");
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        // Input validation
+        if (string.IsNullOrWhiteSpace(request.ContentType) || !ValidContentTypes.Contains(request.ContentType))
+            return Results.BadRequest(new { error = "ContentType must be one of: feed-item, comment, peer-solution, friend-request, study-room" });
+        if (string.IsNullOrWhiteSpace(request.ContentId))
+            return Results.BadRequest(new { error = "ContentId is required" });
+        if (string.IsNullOrWhiteSpace(request.Category) || !ValidCategories.Contains(request.Category))
+            return Results.BadRequest(new { error = "Category must be one of: bullying, inappropriate, spam, self-harm-risk, other" });
+
+        await using var session = store.LightweightSession();
+
+        // Rate limit: max 10 reports/hour per student
+        var oneHourAgo = DateTime.UtcNow.AddHours(-1);
+        var recentReportCount = await session.Query<SocialReportDocument>()
+            .CountAsync(r => r.ReporterStudentId == studentId && r.ReportedAt > oneHourAgo);
+
+        if (recentReportCount >= 10)
+        {
+            logger.LogWarning(
+                "FIND-privacy-018 report rate-limited: student {StudentId} hit 10/hour cap",
+                studentId);
+            return Results.StatusCode(429);
+        }
+
+        var reportId = $"report_{Guid.NewGuid():N}";
+        var severity = InferSeverity(request.Category);
+        var now = DateTime.UtcNow;
+
+        var doc = new SocialReportDocument
+        {
+            Id = reportId,
+            ReportId = reportId,
+            ReporterStudentId = studentId,
+            ContentType = request.ContentType,
+            ContentId = request.ContentId,
+            Category = request.Category,
+            Severity = severity,
+            Reason = request.Reason,
+            ReportedAt = now,
+            Status = "pending",
+        };
+
+        session.Store(doc);
+
+        var reportEvent = new SocialReportFiled_V1(
+            ReportId: reportId,
+            ReporterStudentId: studentId,
+            ContentType: request.ContentType,
+            ContentId: request.ContentId,
+            Category: request.Category,
+            Severity: severity,
+            Reason: request.Reason,
+            ReportedAt: now);
+
+        session.Events.Append(studentId, reportEvent);
+        await session.SaveChangesAsync();
+
+        logger.LogInformation(
+            "FIND-privacy-018 content report filed: reportId={ReportId} contentType={ContentType} category={Category} severity={Severity} reporter={StudentId}",
+            reportId, request.ContentType, request.Category, severity, studentId);
+
+        return Results.Ok(new SubmitReportResponse(
+            ReportId: reportId,
+            Severity: severity,
+            ReportedAt: now));
+    }
+
+    // POST /api/social/block — block another student
+    private static async Task<IResult> BlockUser(
+        HttpContext ctx,
+        IDocumentStore store,
+        ILoggerFactory loggerFactory,
+        BlockUserRequest request)
+    {
+        var logger = loggerFactory.CreateLogger("Cena.Social.Block");
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        if (string.IsNullOrWhiteSpace(request.TargetStudentId))
+            return Results.BadRequest(new { error = "TargetStudentId is required" });
+        if (request.TargetStudentId == studentId)
+            return Results.BadRequest(new { error = "Cannot block yourself" });
+
+        await using var session = store.LightweightSession();
+
+        var blocklistId = $"blocklist_{studentId}";
+        var blocklist = await session.LoadAsync<UserBlocklistDocument>(blocklistId);
+        var now = DateTime.UtcNow;
+
+        if (blocklist == null)
+        {
+            blocklist = new UserBlocklistDocument
+            {
+                Id = blocklistId,
+                StudentId = studentId,
+                BlockedUsers = new List<BlockedEntry>
+                {
+                    new() { BlockedStudentId = request.TargetStudentId, BlockedAt = now },
+                },
+            };
+        }
+        else
+        {
+            // Idempotent: skip if already blocked
+            if (blocklist.BlockedUsers.Any(b => b.BlockedStudentId == request.TargetStudentId))
+                return Results.Ok(new BlockUserResponse(Ok: true, TargetStudentId: request.TargetStudentId, BlockedAt: now));
+
+            blocklist.BlockedUsers.Add(new BlockedEntry
+            {
+                BlockedStudentId = request.TargetStudentId,
+                BlockedAt = now,
+            });
+        }
+
+        session.Store(blocklist);
+
+        var blockEvent = new UserBlocked_V1(
+            BlockerStudentId: studentId,
+            BlockedStudentId: request.TargetStudentId,
+            BlockedAt: now);
+
+        session.Events.Append(studentId, blockEvent);
+        await session.SaveChangesAsync();
+
+        logger.LogInformation(
+            "FIND-privacy-018 user blocked: blocker={Blocker} target={Target}",
+            studentId, request.TargetStudentId);
+
+        return Results.Ok(new BlockUserResponse(
+            Ok: true,
+            TargetStudentId: request.TargetStudentId,
+            BlockedAt: now));
+    }
+
+    // DELETE /api/social/block/{targetStudentId} — unblock a student
+    private static async Task<IResult> UnblockUser(
+        HttpContext ctx,
+        IDocumentStore store,
+        ILoggerFactory loggerFactory,
+        string targetStudentId)
+    {
+        var logger = loggerFactory.CreateLogger("Cena.Social.Block");
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.LightweightSession();
+
+        var blocklistId = $"blocklist_{studentId}";
+        var blocklist = await session.LoadAsync<UserBlocklistDocument>(blocklistId);
+
+        if (blocklist == null)
+            return Results.Ok(new UnblockUserResponse(Ok: true, TargetStudentId: targetStudentId));
+
+        var removed = blocklist.BlockedUsers.RemoveAll(b => b.BlockedStudentId == targetStudentId);
+        if (removed == 0)
+            return Results.Ok(new UnblockUserResponse(Ok: true, TargetStudentId: targetStudentId));
+
+        session.Store(blocklist);
+
+        var unblockEvent = new UserUnblocked_V1(
+            BlockerStudentId: studentId,
+            UnblockedStudentId: targetStudentId,
+            UnblockedAt: DateTimeOffset.UtcNow);
+
+        session.Events.Append(studentId, unblockEvent);
+        await session.SaveChangesAsync();
+
+        logger.LogInformation(
+            "FIND-privacy-018 user unblocked: blocker={Blocker} target={Target}",
+            studentId, targetStudentId);
+
+        return Results.Ok(new UnblockUserResponse(
+            Ok: true,
+            TargetStudentId: targetStudentId));
+    }
+
+    // ═════════════════════════════════════════════════════════════════════════
+    // Helpers
+    // ═════════════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Load the current student's blocklist and return the set of blocked
+    /// student IDs. Returns empty set when no blocklist exists.
+    /// </summary>
+    private static async Task<HashSet<string>> GetBlockedStudentIds(
+        Marten.IQuerySession session, string studentId)
+    {
+        var blocklistId = $"blocklist_{studentId}";
+        var blocklist = await session.LoadAsync<UserBlocklistDocument>(blocklistId);
+        if (blocklist == null || blocklist.BlockedUsers.Count == 0)
+            return new HashSet<string>(StringComparer.Ordinal);
+
+        return blocklist.BlockedUsers
+            .Select(b => b.BlockedStudentId)
+            .ToHashSet(StringComparer.Ordinal);
     }
 
     private static string? GetStudentId(ClaimsPrincipal user)

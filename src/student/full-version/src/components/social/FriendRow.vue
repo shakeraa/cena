@@ -7,6 +7,9 @@ interface Props {
 }
 
 defineProps<Props>()
+const emit = defineEmits<{
+  block: [studentId: string, displayName: string]
+}>()
 const { t } = useI18n()
 </script>
 
@@ -49,6 +52,16 @@ const { t } = useI18n()
           </span>
         </div>
       </div>
+
+      <!-- FIND-privacy-018: Block button for safeguarding -->
+      <VBtn
+        variant="text"
+        size="small"
+        icon="tabler-ban"
+        :aria-label="t('social.block.ariaLabel', { name: friend.displayName })"
+        :data-testid="`block-${friend.studentId}`"
+        @click="emit('block', friend.studentId, friend.displayName)"
+      />
     </div>
   </VCard>
 </template>

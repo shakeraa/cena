@@ -103,6 +103,36 @@ function getFeed(): FeedItem[] {
   return feedItems
 }
 
+// FIND-privacy-018: Report & Block state for MSW dev mode
+interface Report {
+  reportId: string
+  reporterStudentId: string
+  contentType: string
+  contentId: string
+  category: string
+  severity: string
+  reason: string | null
+  reportedAt: string
+  status: string
+}
+
+const reports: Report[] = []
+const blockedUsers = new Set<string>()
+
+// Rate limiter: tracks report timestamps per-hour window
+const reportTimestamps: number[] = []
+
+function inferSeverity(category: string): string {
+  switch (category) {
+    case 'self-harm-risk': return 'critical'
+    case 'bullying': return 'high'
+    case 'inappropriate': return 'medium'
+    case 'spam': return 'low'
+    case 'other': return 'low'
+    default: return 'medium'
+  }
+}
+
 export const handlerStudentSocial = [
   http.get('/api/social/class-feed', () => {
     const items = getFeed()
@@ -202,6 +232,83 @@ export const handlerStudentSocial = [
     return HttpResponse.json({
       ok: true,
       friendshipId: `friend-${params.id}`,
+    })
+  }),
+
+  // ─── FIND-privacy-018: Report & Block handlers ───────────────────
+
+  http.post('/api/social/report', async ({ request }) => {
+    const body = await request.json() as {
+      contentType: string
+      contentId: string
+      category: string
+      reason?: string
+    }
+
+    const validContentTypes = ['feed-item', 'comment', 'peer-solution', 'friend-request', 'study-room']
+    const validCategories = ['bullying', 'inappropriate', 'spam', 'self-harm-risk', 'other']
+
+    if (!validContentTypes.includes(body.contentType))
+      return HttpResponse.json({ error: 'Invalid contentType' }, { status: 400 })
+    if (!validCategories.includes(body.category))
+      return HttpResponse.json({ error: 'Invalid category' }, { status: 400 })
+    if (!body.contentId)
+      return HttpResponse.json({ error: 'contentId is required' }, { status: 400 })
+
+    // Rate limiting: max 10 per hour
+    const oneHourAgo = Date.now() - 3600_000
+    const recentCount = reportTimestamps.filter(ts => ts > oneHourAgo).length
+    if (recentCount >= 10)
+      return new HttpResponse(null, { status: 429 })
+
+    reportTimestamps.push(Date.now())
+    const severity = inferSeverity(body.category)
+    const now = new Date().toISOString()
+    const reportId = `report_${Date.now()}`
+
+    const report: Report = {
+      reportId,
+      reporterStudentId: 'current-user',
+      contentType: body.contentType,
+      contentId: body.contentId,
+      category: body.category,
+      severity,
+      reason: body.reason ?? null,
+      reportedAt: now,
+      status: 'pending',
+    }
+
+    reports.push(report)
+
+    return HttpResponse.json({
+      reportId,
+      severity,
+      reportedAt: now,
+    })
+  }),
+
+  http.post('/api/social/block', async ({ request }) => {
+    const body = await request.json() as { targetStudentId: string }
+
+    if (!body.targetStudentId)
+      return HttpResponse.json({ error: 'targetStudentId is required' }, { status: 400 })
+
+    blockedUsers.add(body.targetStudentId)
+
+    return HttpResponse.json({
+      ok: true,
+      targetStudentId: body.targetStudentId,
+      blockedAt: new Date().toISOString(),
+    })
+  }),
+
+  http.delete('/api/social/block/:targetStudentId', ({ params }) => {
+    const targetStudentId = params.targetStudentId as string
+    blockedUsers.delete(targetStudentId)
+
+    return HttpResponse.json({
+      ok: true,
+      targetStudentId,
     })
   }),
 ]
