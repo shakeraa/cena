@@ -138,6 +138,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);
 builder.Services.AddCenaAuthorization();
 
+// FIND-sec-014: Security metrics for observability
+builder.Services.AddSecurityMetrics();
+
 // Firebase Admin SDK (required by AdminUserService/AdminRoleService)
 builder.Services.AddSingleton<Cena.Infrastructure.Firebase.IFirebaseAdminService,
     Cena.Infrastructure.Firebase.FirebaseAdminService>();

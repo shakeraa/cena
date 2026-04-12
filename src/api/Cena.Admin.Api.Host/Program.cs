@@ -94,6 +94,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);
 builder.Services.AddCenaAuthorization();
 
+// FIND-sec-014: Security metrics for observability
+builder.Services.AddSecurityMetrics();
+
 // ---- CORS ----
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
     ?? new[] { "http://localhost:5175" };

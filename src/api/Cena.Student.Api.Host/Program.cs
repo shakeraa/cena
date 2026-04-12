@@ -149,6 +149,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);
 builder.Services.AddCenaAuthorization();
 
+// FIND-sec-014: Security metrics for observability
+builder.Services.AddSecurityMetrics();
+
 // FIND-ux-006b: the student host needs the Firebase Admin SDK wrapper to
 // back the anonymous POST /api/auth/password-reset endpoint. The admin host
 // already registers this as a singleton; mirror that here so the student
