@@ -85,9 +85,9 @@ function isYou(entry: LeaderboardEntry): boolean {
         <template #append>
           <div
             class="text-body-2 text-medium-emphasis"
-            :aria-label="t('gamification.leaderboard.xpLabel', { xp: entry.xp })"
+            :aria-label="t('gamification.leaderboard.xpLabel', entry.xp, { xp: entry.xp })"
           >
-            {{ t('gamification.leaderboard.xpValue', { xp: entry.xp }) }}
+            {{ t('gamification.leaderboard.xpValue', entry.xp, { xp: entry.xp }) }}
           </div>
         </template>
       </VListItem>

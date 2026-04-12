@@ -43,9 +43,9 @@ const relativePostedAt = computed(() => {
   if (diffMin < 1)
     return t('social.feed.justNow')
   if (diffMin < 60)
-    return t('social.feed.minutesAgo', { count: diffMin })
+    return t('social.feed.minutesAgo', diffMin, { count: diffMin })
 
-  return t('social.feed.hoursAgo', { count: diffHour })
+  return t('social.feed.hoursAgo', diffHour, { count: diffHour })
 })
 
 function handleReact() {
@@ -111,7 +111,7 @@ function handleReact() {
         variant="text"
         size="small"
         prepend-icon="tabler-heart"
-        :aria-label="t('social.feed.reactionAriaLabel', { count: item.reactionCount })"
+        :aria-label="t('social.feed.reactionAriaLabel', item.reactionCount, { count: item.reactionCount })"
         :data-testid="`react-${item.itemId}`"
         @click="handleReact"
       >
@@ -121,7 +121,7 @@ function handleReact() {
         variant="text"
         size="small"
         prepend-icon="tabler-message"
-        :aria-label="t('social.feed.commentAriaLabel', { count: item.commentCount })"
+        :aria-label="t('social.feed.commentAriaLabel', item.commentCount, { count: item.commentCount })"
       >
         {{ item.commentCount }}
       </VBtn>

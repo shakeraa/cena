@@ -90,7 +90,7 @@ const profileQuery = useApiQuery<ProfileDto>('/api/me/profile')
                 color="white"
                 text-color="primary"
               >
-                {{ t('profile.streakLabel', { days: meQuery.data.value.streakDays }) }}
+                {{ t('profile.streakLabel', meQuery.data.value.streakDays) }}
               </VChip>
             </div>
           </div>

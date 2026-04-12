@@ -337,7 +337,7 @@
       "subtitle": "30 ימים של דקות לימוד.",
       "chartTitle": "דקות יומיות",
       "chartSubtitle": "30 הימים האחרונים",
-      "chartAria": "תרשים זמן: {total} דקות סך הכל, ממוצע {avg} ליום",
+      "chartAria": "תרשים זמן: 0 דקות, ממוצע {avg} ליום | תרשים זמן: דקה אחת, ממוצע {avg} ליום | תרשים זמן: שתי דקות, ממוצע {avg} ליום | תרשים זמן: {total} דקות, ממוצע {avg} ליום",
       "avgPerDay": "ממוצע יומי",
       "today": "היום",
       "kpi30dayTotal": "סך 30 ימים",
@@ -349,7 +349,7 @@
       "subtitle": "ההתקדמות שלך בכל מקצוע שאתה לומד.",
       "overallLabel": "שליטה כוללת",
       "masteryLabel": "שליטה",
-      "questionsAttempted": "{count} שאלות נוסו",
+      "questionsAttempted": "לא נוסו שאלות | שאלה אחת נוסתה | שתי שאלות נוסו | {count} שאלות נוסו",
       "accuracy": "{percent}% דיוק",
       "rowAria": "{subject}: {percent} אחוז שליטה"
     },
@@ -359,21 +359,21 @@
       "activeLabel": "שיעור פעיל",
       "resume": "המשך",
       "justNow": "הרגע",
-      "hoursAgo": "לפני {count} ש",
-      "daysAgo": "לפני {count} י"
+      "hoursAgo": "הרגע | לפני שעה | לפני שעתיים | לפני {count} שעות",
+      "daysAgo": "היום | לפני יום | לפני יומיים | לפני {count} ימים"
     }
   },
   "gamification": {
     "xp": {
       "levelLabel": "רמה",
       "currentXp": "{current} / {target} נק׳",
-      "xpToGo": "{count} נק׳ נותרו",
-      "totalEarned": "סך הכול: {total} נק׳",
+      "xpToGo": "אין נקודות נותרו | נקודה אחת נותרה | שתי נקודות נותרו | {count} נקודות נותרו",
+      "totalEarned": "0 נק׳ | נקודה אחת | שתי נקודות | סך הכול: {total} נק׳",
       "progressAria": "התקדמות רמה: {percent} אחוז"
     },
     "badges": {
       "title": "תגים",
-      "counter": "{earned} מתוך {total}",
+      "counter": "אין תגים מתוך {total} | תג אחד מתוך {total} | שני תגים מתוך {total} | {earned} מתוך {total}",
       "earnedHeading": "הושגו",
       "lockedHeading": "נעולים",
       "tier": {
@@ -387,8 +387,8 @@
       "title": "טבלת מובילים",
       "yourRank": "הדירוג שלך: #{rank}",
       "youChip": "אתה",
-      "xpLabel": "{xp} נק׳",
-      "xpValue": "{xp} נק׳"
+      "xpLabel": "0 נק׳ | נק׳ אחת | שתי נק׳ | {xp} נק׳",
+      "xpValue": "0 נק׳ | נק׳ אחת | שתי נק׳ | {xp} נק׳"
     },
     "streak": {
       "atRisk": "הרצף שלך בסכנה — השלם שיעור היום!"
@@ -401,7 +401,7 @@
     "yourRankLabel": "הדירוג הנוכחי שלך",
     "yourRankValue": "#{rank}",
     "youChip": "אתה",
-    "xpValue": "{xp} נק׳",
+    "xpValue": "0 נק׳ | נק׳ אחת | שתי נק׳ | {xp} נק׳",
     "scope": {
       "global": "גלובלי",
       "class": "הכיתה שלי",
@@ -448,13 +448,13 @@
     "title": "התראות",
     "subtitle": "הישאר מעודכן בהתקדמות הלמידה שלך.",
     "markAllRead": "סמן הכל כנקרא",
-    "unreadCount": "{count} לא נקראו",
+    "unreadCount": "אין שלא נקראו | הודעה אחת שלא נקראה | שתיים שלא נקראו | {count} שלא נקראו",
     "emptyTitle": "הכל מעודכן",
     "emptySubtitle": "אין התראות חדשות.",
     "justNow": "הרגע",
-    "minutesAgo": "לפני {count} ד",
-    "hoursAgo": "לפני {count} ש",
-    "daysAgo": "לפני {count} י"
+    "minutesAgo": "הרגע | לפני דקה | לפני שתי דקות | לפני {count} דקות",
+    "hoursAgo": "הרגע | לפני שעה | לפני שעתיים | לפני {count} שעות",
+    "daysAgo": "היום | לפני יום | לפני יומיים | לפני {count} ימים"
   },
   "profile": {
     "editProfile": "ערוך פרופיל",
@@ -462,7 +462,7 @@
     "editSubtitle": "עדכן איך אתה נראה לחברים לכיתה.",
     "editSaved": "הפרופיל נשמר.",
     "levelLabel": "רמה {level}",
-    "streakLabel": "רצף של {days} ימים",
+    "streakLabel": "אין ימים ברצף | יום אחד רצוף | יומיים רצופים | רצף של {count} ימים",
     "aboutTitle": "אודות",
     "bioEmpty": "אין ביוגרפיה עדיין.",
     "bioLabel": "ביוגרפיה",
@@ -543,14 +543,16 @@
       "title": "פיד כיתתי",
       "subtitle": "ראה מה חבריך לכיתה עושים.",
       "justNow": "הרגע",
-      "minutesAgo": "לפני {count} ד",
-      "hoursAgo": "לפני {count} ש",
+      "minutesAgo": "הרגע | לפני דקה | לפני שתי דקות | לפני {count} דקות",
+      "hoursAgo": "הרגע | לפני שעה | לפני שעתיים | לפני {count} שעות",
       "kind": {
         "achievement": "הישג",
         "milestone": "אבן דרך",
         "question": "שאלה",
         "announcement": "הודעה"
-      }
+      },
+      "reactionAriaLabel": "אין תגובות | לייק, תגובה אחת | לייק, שתי תגובות | לייק, {count} תגובות",
+      "commentAriaLabel": "אין תגובות | תגובה אחת | שתי תגובות | {count} תגובות"
     },
     "peers": {
       "title": "פתרונות עמיתים",
@@ -563,9 +565,9 @@
       "pendingTitle": "בקשות חברות",
       "wantsToConnect": "רוצה להתחבר",
       "accept": "אשר",
-      "listTitle": "חברים ({count})",
+      "listTitle": "אין חברים | חבר אחד | שני חברים | חברים ({count})",
       "level": "רמה {level}",
-      "streak": "רצף של {days} ימים",
+      "streak": "אין ימים ברצף | יום אחד רצוף | יומיים רצופים | רצף של {count} ימים",
       "online": "מחובר",
       "offline": "מנותק"
     }
@@ -588,7 +590,7 @@
     },
     "detail": {
       "masteryLabel": "השליטה שלך",
-      "estimatedMinutes": "~{minutes} דק",
+      "estimatedMinutes": "0 דק | ~דקה | ~שתי דקות | ~{minutes} דקות",
       "questionCount": "שאלות",
       "subject": "מקצוע",
       "prerequisitesTitle": "דרישות מוקדמות",
@@ -604,7 +606,7 @@
       "subtitle": "בחר נושאים, משך וסגנון כדי להתחיל.",
       "subjectsLabel": "נושאים",
       "durationLabel": "משך",
-      "durationMinutes": "{minutes} דקות",
+      "durationMinutes": "0 דקות | דקה אחת | שתי דקות | {minutes} דקות",
       "modeLabel": "מצב",
       "startCta": "התחל שיעור",
       "subjects": {
@@ -623,13 +625,13 @@
       }
     },
     "runner": {
-      "questionProgress": "שאלה {current} מתוך {total}",
-      "progressAria": "שאלה {current} מתוך {total}",
+      "questionProgress": "אין שאלות | שאלה {current} מתוך {total} | שאלה {current} מתוך {total} | שאלה {current} מתוך {total}",
+      "progressAria": "אין שאלות | שאלה {current} מתוך {total} | שאלה {current} מתוך {total} | שאלה {current} מתוך {total}",
       "choicesAria": "אפשרויות תשובה",
       "submitAnswer": "שלח",
       "correct": "נכון!",
       "wrong": "לא בדיוק.",
-      "xpAwarded": "+{xp} נק׳",
+      "xpAwarded": "+0 נק׳ | +נק׳ אחת | +שתי נק׳ | +{xp} נק׳",
       "exit": "יציאה",
       "exitAria": "יציאה מהשיעור",
       "sessionIdLabel": "שיעור",
@@ -646,8 +648,8 @@
       "accuracy": "דיוק",
       "correctCount": "תשובות נכונות",
       "duration": "משך",
-      "durationSecs": "{secs} ש׳",
-      "durationMinsSecs": "{mins} ד {secs} ש׳",
+      "durationSecs": "0 ש׳ | {secs} ש׳ | {secs} ש׳ | {secs} ש׳",
+      "durationMinsSecs": "0 ד {secs} ש׳ | {mins} ד {secs} ש׳ | {mins} ד {secs} ש׳ | {mins} ד {secs} ש׳",
       "startAnother": "התחל עוד שיעור",
       "backToHome": "חזרה הביתה"
     }
@@ -669,7 +671,7 @@
       "reattempt": "נסה שוב",
       "attempted": "בוצע ניסיון",
       "expired": "הסתיים",
-      "timeLeft": "נותרו {hours}ש {minutes}ד"
+      "timeLeft": "הזמן עבר | נותר שעה {minutes}ד | נותרו שעתיים {minutes}ד | נותרו {hours}ש {minutes}ד"
     },
     "boss": {
       "title": "קרבות בוסים",
@@ -679,15 +681,15 @@
     "chains": {
       "title": "שרשרות כרטיסים",
       "subtitle": "בנה שליטה מושג אחד בכל פעם.",
-      "cardsUnlocked": "{unlocked} מתוך {total} כרטיסים נפתחו",
-      "progressAria": "{unlocked} מתוך {total} כרטיסים נפתחו"
+      "cardsUnlocked": "לא נפתחו כרטיסים מתוך {total} | כרטיס אחד מתוך {total} נפתח | שני כרטיסים מתוך {total} נפתחו | {unlocked} מתוך {total} כרטיסים נפתחו",
+      "progressAria": "לא נפתחו כרטיסים מתוך {total} | כרטיס אחד מתוך {total} נפתח | שני כרטיסים מתוך {total} נפתחו | {unlocked} מתוך {total} כרטיסים נפתחו"
     },
     "tournaments": {
       "title": "טורנירים",
       "subtitle": "התחרו בתלמידים מהכיתה או מכל העולם.",
       "active": "פעיל",
       "upcoming": "בקרוב",
-      "participants": "{count} משתתפים",
+      "participants": "אין משתתפים | משתתף אחד | שני משתתפים | {count} משתתפים",
       "empty": "אין טורנירים כרגע."
     }
   },
@@ -701,11 +703,11 @@
       "emptySubtitle": "התחל שרשור חדש כדי לשאול את השאלה הראשונה."
     },
     "threadList": {
-      "messageCount": "{count} הודעות",
+      "messageCount": "אין הודעות | הודעה אחת | שתי הודעות | {count} הודעות",
       "justNow": "הרגע",
-      "minutesAgo": "לפני {count} ד",
-      "hoursAgo": "לפני {count} ש",
-      "daysAgo": "לפני {count} י"
+      "minutesAgo": "הרגע | לפני דקה | לפני שתי דקות | לפני {count} דקות",
+      "hoursAgo": "הרגע | לפני שעה | לפני שעתיים | לפני {count} שעות",
+      "daysAgo": "היום | לפני יום | לפני יומיים | לפני {count} ימים"
     },
     "thread": {
       "emptyTitle": "שאל את השאלה הראשונה",
@@ -735,8 +737,8 @@
     "resume": {
       "label": "המשך שיעור",
       "cta": "המשך",
-      "minutesAgo": "התחלת לפני {count} דקות",
-      "hoursAgo": "התחלת לפני {count} שעות",
+      "minutesAgo": "התחלת הרגע | התחלת לפני דקה | התחלת לפני שתי דקות | התחלת לפני {count} דקות",
+      "hoursAgo": "התחלת הרגע | התחלת לפני שעה | התחלת לפני שעתיים | התחלת לפני {count} שעות",
       "progressAria": "התקדמות השיעור: {percent} אחוזים"
     },
     "quick": {
@@ -765,7 +767,7 @@
       "questionsAnswered": "שאלות שנענו",
       "overallAccuracy": "דיוק כולל",
       "level": "רמה {level}",
-      "sessionsValue": "{count} שיעורים",
+      "sessionsValue": "אין שיעורים | שיעור אחד | שני שיעורים | {count} שיעורים",
       "unavailable": "—"
     }
   },

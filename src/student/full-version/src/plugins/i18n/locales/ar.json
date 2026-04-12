@@ -338,7 +338,7 @@
       "subtitle": "30 يومًا من دقائق الدراسة.",
       "chartTitle": "الدقائق اليومية",
       "chartSubtitle": "آخر 30 يومًا",
-      "chartAria": "مخطط الوقت: {total} دقيقة، بمتوسط {avg} يوميًا",
+      "chartAria": "مخطط الوقت: لا دقائق، بمتوسط {avg} يوميًا | مخطط الوقت: دقيقة واحدة، بمتوسط {avg} يوميًا | مخطط الوقت: دقيقتان، بمتوسط {avg} يوميًا | مخطط الوقت: {total} دقائق، بمتوسط {avg} يوميًا | مخطط الوقت: {total} دقيقة، بمتوسط {avg} يوميًا | مخطط الوقت: {total} دقيقة، بمتوسط {avg} يوميًا",
       "avgPerDay": "المتوسط اليومي",
       "today": "اليوم",
       "kpi30dayTotal": "إجمالي 30 يومًا",
@@ -350,7 +350,7 @@
       "subtitle": "تقدمك عبر كل مادة تدرسها.",
       "overallLabel": "الإتقان الإجمالي",
       "masteryLabel": "الإتقان",
-      "questionsAttempted": "{count} سؤالًا تمت محاولته",
+      "questionsAttempted": "لم تُحاول أي سؤال | سؤال واحد تمت محاولته | سؤالان تمت محاولتهما | {count} أسئلة تمت محاولتها | {count} سؤالًا تمت محاولته | {count} سؤال تمت محاولته",
       "accuracy": "{percent}% دقة",
       "rowAria": "{subject}: {percent} بالمئة من الإتقان"
     },
@@ -360,21 +360,21 @@
       "activeLabel": "جلسة نشطة",
       "resume": "استئناف",
       "justNow": "الآن",
-      "hoursAgo": "قبل {count} س",
-      "daysAgo": "قبل {count} يوم"
+      "hoursAgo": "الآن | قبل ساعة | قبل ساعتين | قبل {count} ساعات | قبل {count} ساعة | قبل {count} ساعة",
+      "daysAgo": "اليوم | قبل يوم | قبل يومين | قبل {count} أيام | قبل {count} يومًا | قبل {count} يوم"
     }
   },
   "gamification": {
     "xp": {
       "levelLabel": "المستوى",
       "currentXp": "{current} / {target} نقطة",
-      "xpToGo": "تبقى {count} نقطة",
-      "totalEarned": "المجموع: {total} نقطة",
+      "xpToGo": "لا نقاط متبقية | تبقى نقطة واحدة | تبقى نقطتان | تبقى {count} نقاط | تبقى {count} نقطة | تبقى {count} نقطة",
+      "totalEarned": "المجموع: لا نقاط | المجموع: نقطة واحدة | المجموع: نقطتان | المجموع: {total} نقاط | المجموع: {total} نقطة | المجموع: {total} نقطة",
       "progressAria": "تقدم المستوى: {percent} بالمئة"
     },
     "badges": {
       "title": "الأوسمة",
-      "counter": "{earned} من {total}",
+      "counter": "لا أوسمة من {total} | وسام واحد من {total} | وسامان من {total} | {earned} من {total} | {earned} من {total} | {earned} من {total}",
       "earnedHeading": "المكتسبة",
       "lockedHeading": "المقفلة",
       "tier": {
@@ -388,8 +388,8 @@
       "title": "لوحة المتصدرين",
       "yourRank": "ترتيبك: #{rank}",
       "youChip": "أنت",
-      "xpLabel": "{xp} نقطة",
-      "xpValue": "{xp} نقطة"
+      "xpLabel": "لا نقاط | نقطة واحدة | نقطتان | {xp} نقاط | {xp} نقطة | {xp} نقطة",
+      "xpValue": "لا نقاط | نقطة واحدة | نقطتان | {xp} نقاط | {xp} نقطة | {xp} نقطة"
     },
     "streak": {
       "atRisk": "سلسلتك في خطر — أكمل جلسة اليوم!"
@@ -402,7 +402,7 @@
     "yourRankLabel": "ترتيبك الحالي",
     "yourRankValue": "#{rank}",
     "youChip": "أنت",
-    "xpValue": "{xp} نقطة",
+    "xpValue": "لا نقاط | نقطة واحدة | نقطتان | {xp} نقاط | {xp} نقطة | {xp} نقطة",
     "scope": {
       "global": "عالميًا",
       "class": "صفي",
@@ -449,13 +449,13 @@
     "title": "الإشعارات",
     "subtitle": "ابقَ على اطلاع بتقدمك في التعلم.",
     "markAllRead": "وضع علامة مقروء على الكل",
-    "unreadCount": "{count} غير مقروء",
+    "unreadCount": "لا غير مقروء | غير مقروء واحد | غير مقروءان | {count} غير مقروء | {count} غير مقروء | {count} غير مقروء",
     "emptyTitle": "لقد اطلعت على كل شيء",
     "emptySubtitle": "لا توجد إشعارات جديدة.",
     "justNow": "الآن",
-    "minutesAgo": "قبل {count} د",
-    "hoursAgo": "قبل {count} س",
-    "daysAgo": "قبل {count} يوم"
+    "minutesAgo": "الآن | قبل دقيقة | قبل دقيقتين | قبل {count} دقائق | قبل {count} دقيقة | قبل {count} دقيقة",
+    "hoursAgo": "الآن | قبل ساعة | قبل ساعتين | قبل {count} ساعات | قبل {count} ساعة | قبل {count} ساعة",
+    "daysAgo": "اليوم | قبل يوم | قبل يومين | قبل {count} أيام | قبل {count} يومًا | قبل {count} يوم"
   },
   "profile": {
     "editProfile": "تعديل الملف الشخصي",
@@ -463,7 +463,7 @@
     "editSubtitle": "حدّث كيف تظهر لزملاء الصف.",
     "editSaved": "تم حفظ الملف الشخصي.",
     "levelLabel": "المستوى {level}",
-    "streakLabel": "سلسلة {days} يوم",
+    "streakLabel": "لا أيام متواصلة | يوم واحد متواصل | يومان متواصلان | سلسلة {count} أيام | سلسلة {count} يومًا | سلسلة {count} يوم",
     "aboutTitle": "حول",
     "bioEmpty": "لا توجد سيرة بعد.",
     "bioLabel": "السيرة",
@@ -544,14 +544,16 @@
       "title": "موجز الفصل",
       "subtitle": "شاهد ماذا يفعل زملاؤك.",
       "justNow": "الآن",
-      "minutesAgo": "قبل {count} د",
-      "hoursAgo": "قبل {count} س",
+      "minutesAgo": "الآن | قبل دقيقة | قبل دقيقتين | قبل {count} دقائق | قبل {count} دقيقة | قبل {count} دقيقة",
+      "hoursAgo": "الآن | قبل ساعة | قبل ساعتين | قبل {count} ساعات | قبل {count} ساعة | قبل {count} ساعة",
       "kind": {
         "achievement": "إنجاز",
         "milestone": "علامة فارقة",
         "question": "سؤال",
         "announcement": "إعلان"
-      }
+      },
+      "reactionAriaLabel": "إعجاب، لا تفاعلات | إعجاب، تفاعل واحد | إعجاب، تفاعلان | إعجاب، {count} تفاعلات | إعجاب، {count} تفاعلًا | إعجاب، {count} تفاعل",
+      "commentAriaLabel": "لا تعليقات | تعليق واحد | تعليقان | {count} تعليقات | {count} تعليقًا | {count} تعليق"
     },
     "peers": {
       "title": "حلول الأقران",
@@ -564,9 +566,9 @@
       "pendingTitle": "طلبات الصداقة",
       "wantsToConnect": "يرغب في التواصل",
       "accept": "قبول",
-      "listTitle": "الأصدقاء ({count})",
+      "listTitle": "لا أصدقاء | صديق واحد | صديقان | الأصدقاء ({count}) | الأصدقاء ({count}) | الأصدقاء ({count})",
       "level": "المستوى {level}",
-      "streak": "سلسلة {days} يوم",
+      "streak": "لا أيام متواصلة | يوم واحد متواصل | يومان متواصلان | سلسلة {count} أيام | سلسلة {count} يومًا | سلسلة {count} يوم",
       "online": "متصل",
       "offline": "غير متصل"
     }
@@ -589,7 +591,7 @@
     },
     "detail": {
       "masteryLabel": "إتقانك",
-      "estimatedMinutes": "~{minutes} د",
+      "estimatedMinutes": "~{minutes} د | ~{minutes} د | ~{minutes} د | ~{minutes} د | ~{minutes} د | ~{minutes} د",
       "questionCount": "الأسئلة",
       "subject": "المادة",
       "prerequisitesTitle": "المتطلبات السابقة",
@@ -605,7 +607,7 @@
       "subtitle": "اختر المواضيع والمدة والنمط للبدء.",
       "subjectsLabel": "المواضيع",
       "durationLabel": "المدة",
-      "durationMinutes": "{minutes} د",
+      "durationMinutes": "{minutes} د | {minutes} د | {minutes} د | {minutes} د | {minutes} د | {minutes} د",
       "modeLabel": "الوضع",
       "startCta": "ابدأ الجلسة",
       "subjects": {
@@ -624,13 +626,13 @@
       }
     },
     "runner": {
-      "questionProgress": "السؤال {current} من {total}",
-      "progressAria": "السؤال {current} من {total}",
+      "questionProgress": "لا أسئلة | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total}",
+      "progressAria": "لا أسئلة | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total}",
       "choicesAria": "خيارات الإجابة",
       "submitAnswer": "إرسال",
       "correct": "صحيح!",
       "wrong": "ليس بالضبط.",
-      "xpAwarded": "+{xp} نقطة",
+      "xpAwarded": "لا نقاط | +نقطة واحدة | +نقطتان | +{xp} نقاط | +{xp} نقطة | +{xp} نقطة",
       "exit": "خروج",
       "exitAria": "الخروج من الجلسة",
       "sessionIdLabel": "الجلسة",
@@ -647,8 +649,8 @@
       "accuracy": "الدقة",
       "correctCount": "إجابات صحيحة",
       "duration": "المدة",
-      "durationSecs": "{secs} ث",
-      "durationMinsSecs": "{mins} د {secs} ث",
+      "durationSecs": "0 ث | {secs} ث | {secs} ث | {secs} ث | {secs} ث | {secs} ث",
+      "durationMinsSecs": "{mins} د {secs} ث | {mins} د {secs} ث | {mins} د {secs} ث | {mins} د {secs} ث | {mins} د {secs} ث | {mins} د {secs} ث",
       "startAnother": "ابدأ جلسة أخرى",
       "backToHome": "العودة للرئيسية"
     }
@@ -670,7 +672,7 @@
       "reattempt": "المحاولة مرة أخرى",
       "attempted": "تمت المحاولة",
       "expired": "انتهى",
-      "timeLeft": "متبقٍ {hours}س {minutes}د"
+      "timeLeft": "لم يتبقَ وقت | متبقٍ ساعة و{minutes}د | متبقٍ ساعتان و{minutes}د | متبقٍ {hours}س {minutes}د | متبقٍ {hours}س {minutes}د | متبقٍ {hours}س {minutes}د"
     },
     "boss": {
       "title": "معارك الزعماء",
@@ -680,15 +682,15 @@
     "chains": {
       "title": "سلاسل البطاقات",
       "subtitle": "ابنِ إتقانك مفهومًا تلو الآخر.",
-      "cardsUnlocked": "تم فتح {unlocked} من {total} بطاقة",
-      "progressAria": "تم فتح {unlocked} من {total} بطاقة"
+      "cardsUnlocked": "لم تُفتح أي بطاقة من {total} | بطاقة واحدة من {total} مفتوحة | بطاقتان من {total} مفتوحتان | {unlocked} من {total} بطاقات مفتوحة | {unlocked} من {total} بطاقة مفتوحة | {unlocked} من {total} بطاقة مفتوحة",
+      "progressAria": "لم تُفتح أي بطاقة من {total} | بطاقة واحدة من {total} مفتوحة | بطاقتان من {total} مفتوحتان | {unlocked} من {total} بطاقات مفتوحة | {unlocked} من {total} بطاقة مفتوحة | {unlocked} من {total} بطاقة مفتوحة"
     },
     "tournaments": {
       "title": "البطولات",
       "subtitle": "تنافس مع الطلاب في صفك أو حول العالم.",
       "active": "مباشر",
       "upcoming": "قريبًا",
-      "participants": "{count} مشاركًا",
+      "participants": "لا مشاركين | مشارك واحد | مشاركان | {count} مشاركين | {count} مشاركًا | {count} مشارك",
       "empty": "لا توجد بطولات حالية."
     }
   },
@@ -702,11 +704,11 @@
       "emptySubtitle": "ابدأ محادثة جديدة لطرح سؤالك الأول."
     },
     "threadList": {
-      "messageCount": "{count} رسالة",
+      "messageCount": "لا رسائل | رسالة واحدة | رسالتان | {count} رسائل | {count} رسالة | {count} رسالة",
       "justNow": "الآن",
-      "minutesAgo": "قبل {count} د",
-      "hoursAgo": "قبل {count} س",
-      "daysAgo": "قبل {count} يوم"
+      "minutesAgo": "الآن | قبل دقيقة | قبل دقيقتين | قبل {count} دقائق | قبل {count} دقيقة | قبل {count} دقيقة",
+      "hoursAgo": "الآن | قبل ساعة | قبل ساعتين | قبل {count} ساعات | قبل {count} ساعة | قبل {count} ساعة",
+      "daysAgo": "اليوم | قبل يوم | قبل يومين | قبل {count} أيام | قبل {count} يومًا | قبل {count} يوم"
     },
     "thread": {
       "emptyTitle": "اطرح سؤالك الأول",
@@ -736,8 +738,8 @@
     "resume": {
       "label": "استئناف الجلسة",
       "cta": "متابعة",
-      "minutesAgo": "بدأت منذ {count} دقيقة",
-      "hoursAgo": "بدأت منذ {count} ساعة",
+      "minutesAgo": "بدأت الآن | بدأت منذ دقيقة | بدأت منذ دقيقتين | بدأت منذ {count} دقائق | بدأت منذ {count} دقيقة | بدأت منذ {count} دقيقة",
+      "hoursAgo": "بدأت الآن | بدأت منذ ساعة | بدأت منذ ساعتين | بدأت منذ {count} ساعات | بدأت منذ {count} ساعة | بدأت منذ {count} ساعة",
       "progressAria": "تقدم الجلسة: {percent} بالمئة"
     },
     "quick": {
@@ -766,7 +768,7 @@
       "questionsAnswered": "الأسئلة المُجاب عنها",
       "overallAccuracy": "الدقة الإجمالية",
       "level": "المستوى {level}",
-      "sessionsValue": "{count} جلسة",
+      "sessionsValue": "لا جلسات | جلسة واحدة | جلستان | {count} جلسات | {count} جلسة | {count} جلسة",
       "unavailable": "—"
     }
   },

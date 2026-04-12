@@ -76,7 +76,7 @@ function handleContinue() {
           class="text-caption text-success"
           data-testid="feedback-xp"
         >
-          {{ t('session.runner.xpAwarded', { xp: feedback.xpAwarded }) }}
+          {{ t('session.runner.xpAwarded', feedback.xpAwarded, { xp: feedback.xpAwarded }) }}
         </div>
       </div>
     </div>

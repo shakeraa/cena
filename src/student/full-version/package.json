@@ -20,6 +20,7 @@
     "test:unit:watch": "vitest",
     "test:a11y": "vitest run --config vitest.a11y.config.ts",
     "test:e2e": "playwright test",
+    "check:i18n-plurals": "node scripts/check-i18n-plural-forms.mjs",
     "postinstall": "node scripts/postinstall-guard.mjs"
   },
   "dependencies": {

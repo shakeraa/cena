@@ -75,7 +75,7 @@ function formatDate(iso: string): string {
     <div
       class="time-breakdown-chart__bars"
       role="img"
-      :aria-label="t('progress.time.chartAria', { total: totalMinutes, avg: avgMinutes })"
+      :aria-label="t('progress.time.chartAria', totalMinutes, { total: totalMinutes, avg: avgMinutes })"
       data-testid="time-bars"
     >
       <div

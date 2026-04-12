@@ -230,7 +230,7 @@ function rankColor(rank: number): string | undefined {
           </VListItemTitle>
           <template #append>
             <div class="text-body-1 font-weight-medium">
-              {{ t('leaderboard.xpValue', { xp: entry.xp }) }}
+              {{ t('leaderboard.xpValue', entry.xp, { xp: entry.xp }) }}
             </div>
           </template>
         </VListItem>

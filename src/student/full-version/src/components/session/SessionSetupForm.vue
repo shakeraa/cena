@@ -88,7 +88,7 @@ function handleSubmit() {
           :value="d"
           :data-testid="`setup-duration-${d}`"
         >
-          {{ t('session.setup.durationMinutes', { minutes: d }) }}
+          {{ t('session.setup.durationMinutes', d, { minutes: d }) }}
         </VBtn>
       </VBtnToggle>
     </section>
