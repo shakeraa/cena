@@ -52,22 +52,41 @@ public static class IngestionSettingsEndpoints
 
         // POST — test email connection
         group.MapPost("/test-email", async (
-            EmailIngestionConfig config,
+            TestEmailRequest request,
             IIngestionSettingsService service) =>
         {
-            var ok = await service.TestEmailConnectionAsync(config);
-            return Results.Ok(new { connected = ok });
+            var result = await service.TestEmailConnectionAsync(request.Config, request.Password);
+            return Results.Ok(new
+            {
+                connected = result.Success,
+                error = result.Error,
+                details = result.Details
+            });
         }).WithName("TestEmailIngestionConnection");
 
         // POST — test cloud directory connection
         group.MapPost("/test-cloud-dir", async (
-            CloudDirConfig config,
+            TestCloudDirRequest request,
             IIngestionSettingsService service) =>
         {
-            var ok = await service.TestCloudDirAsync(config);
-            return Results.Ok(new { connected = ok });
+            var result = await service.TestCloudDirAsync(request.Config, request.SecretKey);
+            return Results.Ok(new
+            {
+                connected = result.Success,
+                error = result.Error,
+                details = result.Details
+            });
         }).WithName("TestCloudDirConnection");
 
         return app;
     }
 }
+
+// Request DTOs for test endpoints
+public sealed record TestEmailRequest(
+    EmailIngestionConfig Config,
+    string? Password);
+
+public sealed record TestCloudDirRequest(
+    CloudDirConfig Config,
+    string? SecretKey);
