@@ -93,3 +93,7 @@ To exercise these rights, email privacy@cena.edu from the parent email address r
 For privacy inquiries: **privacy@cena.edu**
 
 Data Protection Officer: **dpo@cena.edu** (appointment pending — this is a placeholder address that will be monitored until a DPO is formally appointed).
+
+## 12. Data Protection Impact Assessment
+
+We have conducted a Data Protection Impact Assessment (DPIA) for our processing of children's personal data, as required by GDPR Article 35. The DPIA is reviewed quarterly and covers all processing activities described in this policy, including adaptive learning profiling, AI tutoring, and behavioral analytics. The current DPIA is maintained at `docs/compliance/dpia-2026-04.md` in our source repository.
