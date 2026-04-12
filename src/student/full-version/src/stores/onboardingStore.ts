@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
+import { sanitizeLocale } from '@/composables/useAvailableLocales'
 
 /**
  * `onboardingStore` — Pinia store backing the 3-step wizard from
@@ -53,7 +54,11 @@ export const useOnboardingStore = defineStore('onboarding', () => {
 
   const step = ref<WizardStep>(persisted?.step ?? 'welcome')
   const role = ref<StudentRole | null>(persisted?.role ?? null)
-  const locale = ref<SupportedLocale>((persisted?.locale as SupportedLocale) ?? 'en')
+  // FIND-pedagogy-010: sanitize persisted locale through the Hebrew gate
+  // so a stale 'he' in localStorage doesn't survive a build-flag flip.
+  const locale = ref<SupportedLocale>(
+    sanitizeLocale((persisted?.locale as string) ?? 'en') as SupportedLocale,
+  )
   const dailyTimeGoalMinutes = ref<number>(persisted?.dailyTimeGoalMinutes ?? DEFAULT_DAILY_GOAL)
   const subjects = ref<string[]>(persisted?.subjects ?? [])
   const completedAt = ref<string | null>(persisted?.completedAt ?? null)
@@ -73,7 +78,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     switch (step.value) {
       case 'welcome': return true
       case 'role': return role.value !== null
-      case 'language': return ['en', 'ar', 'he'].includes(locale.value)
+      case 'language': return sanitizeLocale(locale.value) === locale.value
       case 'confirm': return role.value !== null
       default: return false
     }
@@ -98,7 +103,8 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   }
 
   function setLocale(next: SupportedLocale) {
-    locale.value = next
+    // FIND-pedagogy-010: validate through the Hebrew gate before accepting
+    locale.value = sanitizeLocale(next) as SupportedLocale
   }
 
   function reset() {
