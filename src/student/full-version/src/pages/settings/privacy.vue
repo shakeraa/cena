@@ -19,9 +19,10 @@ definePage({
 const { t } = useI18n()
 
 // ---- Visibility/sharing preferences (existing) ----
+// FIND-privacy-010: ICO Children's Code Std 3+7 — all defaults OFF (high-privacy)
 const prefs = ref({
-  showProgressToClass: true,
-  allowPeerComparison: true,
+  showProgressToClass: false,
+  allowPeerComparison: false,
   shareAnalytics: false,
 })
 

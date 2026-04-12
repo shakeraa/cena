@@ -18,12 +18,14 @@ const { t } = useI18n()
 
 // Phase A: local toggles persist to localStorage only.
 // STU-W-14b will wire /api/me/settings when STB-00b settings writes land.
+// FIND-privacy-010: ICO Children's Code Std 3+7 — all notification defaults OFF
+// (high-privacy by default for minors; Std 13 prohibits default-on engagement nudges)
 const prefs = ref({
-  emailNotifications: true,
+  emailNotifications: false,
   pushNotifications: false,
-  dailyReminder: true,
-  weeklyProgress: true,
-  streakAlerts: true,
+  dailyReminder: false,
+  weeklyProgress: false,
+  streakAlerts: false,
   newContentAlerts: false,
 })
 

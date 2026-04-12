@@ -21,18 +21,21 @@ public class StudentPreferencesDocument
     public bool HighContrast { get; set; } = false;
 
     // Notification settings
-    public bool EmailNotifications { get; set; } = true;
-    public bool PushNotifications { get; set; } = true;
-    public bool DailyReminder { get; set; } = true;
-    public TimeSpan? DailyReminderTime { get; set; } = TimeSpan.FromHours(9); // 9 AM default
-    public bool WeeklyProgress { get; set; } = true;
-    public bool StreakAlerts { get; set; } = true;
-    public bool NewContentAlerts { get; set; } = true;
+    // FIND-privacy-010: ICO Children's Code Std 3+7 — all engagement/notification
+    // defaults must be OFF (high-privacy by default for minors).
+    public bool EmailNotifications { get; set; } = false;
+    public bool PushNotifications { get; set; } = false;
+    public bool DailyReminder { get; set; } = false;
+    public TimeSpan? DailyReminderTime { get; set; } = TimeSpan.FromHours(9); // 9 AM default (only relevant when DailyReminder=true)
+    public bool WeeklyProgress { get; set; } = false;
+    public bool StreakAlerts { get; set; } = false;
+    public bool NewContentAlerts { get; set; } = false;
 
     // Privacy settings
-    public string ProfileVisibility { get; set; } = "class-only"; // 'public' | 'class-only' | 'private'
-    public bool ShowProgressToClass { get; set; } = true;
-    public bool AllowPeerComparison { get; set; } = true;
+    // FIND-privacy-010: ICO Children's Code Std 3 — most-private defaults
+    public string ProfileVisibility { get; set; } = "private"; // 'public' | 'class-only' | 'private'
+    public bool ShowProgressToClass { get; set; } = false;
+    public bool AllowPeerComparison { get; set; } = false;
     public bool ShareAnalytics { get; set; } = false;
 
     // Learning settings
