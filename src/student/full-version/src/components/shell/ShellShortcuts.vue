@@ -33,7 +33,7 @@ useShortcut([
     keys: '?',
     label: 'Show keyboard shortcuts',
     scope: 'global',
-    blockInInputs: false,
+    blockInInputs: true,
     handler: () => {
       cheatsheetOpen.value = true
     },

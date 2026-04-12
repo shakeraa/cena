@@ -52,6 +52,7 @@ async function setScope(next: Scope) {
     data.value = await $api<LeaderboardDto>(`/api/gamification/leaderboard?scope=${next}`)
   }
   catch (err) {
+    console.error('[FIND-ux-011] leaderboard scope-switch failed', { scope: next, error: err })
     error.value = err as Error
   }
   finally {
