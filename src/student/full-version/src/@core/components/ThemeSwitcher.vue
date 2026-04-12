@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { useConfigStore } from '@core/stores/config'
 import type { ThemeSwitcherTheme } from '@layouts/types'
 
@@ -6,6 +7,7 @@ const props = defineProps<{
   themes: ThemeSwitcherTheme[]
 }>()
 
+const { t } = useI18n()
 const configStore = useConfigStore()
 
 const selectedItem = ref([configStore.theme])
@@ -21,7 +23,10 @@ watch(
 </script>
 
 <template>
-  <IconBtn color="rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity))">
+  <IconBtn
+    color="rgba(var(--v-theme-on-surface), var(--v-high-emphasis-opacity))"
+    :aria-label="t('aria.themeSwitch')"
+  >
     <VIcon :icon="props.themes.find(t => t.name === configStore.theme)?.icon" />
 
     <VTooltip

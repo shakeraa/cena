@@ -221,7 +221,8 @@
     "settingsAccount": "الحساب والأمان",
     "settingsAppearance": "المظهر",
     "settingsNotifications": "إعدادات الإشعارات",
-    "settingsPrivacy": "البيانات والخصوصية"
+    "settingsPrivacy": "البيانات والخصوصية",
+    "userMenu": "قائمة الحساب لـ {name}"
   },
   "status": {
     "online": "متصل",
@@ -705,6 +706,12 @@
     "arabic": "العربية",
     "hebrew": "עברית",
     "switchLanguage": "تغيير اللغة"
+  },
+  "aria": {
+    "sidebarToggle": "تبديل شريط التنقل الجانبي",
+    "languageSwitch": "تغيير اللغة",
+    "themeSwitch": "تبديل السمة",
+    "notifications": "الإشعارات"
   },
   "onboarding": {
     "welcome": {

@@ -220,7 +220,8 @@
     "settingsAccount": "חשבון ואבטחה",
     "settingsAppearance": "מראה",
     "settingsNotifications": "הגדרות התראות",
-    "settingsPrivacy": "נתונים ופרטיות"
+    "settingsPrivacy": "נתונים ופרטיות",
+    "userMenu": "תפריט חשבון עבור {name}"
   },
   "status": {
     "online": "מחובר",
@@ -704,6 +705,12 @@
     "arabic": "العربية",
     "hebrew": "עברית",
     "switchLanguage": "החלף שפה"
+  },
+  "aria": {
+    "sidebarToggle": "החלף סרגל ניווט צדדי",
+    "languageSwitch": "החלף שפה",
+    "themeSwitch": "החלף ערכת נושא",
+    "notifications": "התראות"
   },
   "onboarding": {
     "welcome": {
