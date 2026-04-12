@@ -129,8 +129,88 @@ public static class ComplianceEndpoints
         .WithName("AuditLogSummary");
 
         // GET /api/admin/compliance/data-retention
-        group.MapGet("/data-retention", () =>
+        group.MapGet("/data-retention", async (IQuerySession querySession) =>
         {
+            // Query the most recent retention run history
+            var lastRun = await querySession.Query<RetentionRunHistory>()
+                .OrderByDescending(x => x.RunAt)
+                .FirstOrDefaultAsync();
+
+            // Determine retention enforcement status
+            var hasEverRun = lastRun != null;
+            var isEnforced = lastRun?.Status == RetentionRunStatus.Completed;
+            var isRunning = lastRun?.Status == RetentionRunStatus.Running;
+
+            // Calculate next scheduled run (default: 24 hours after last completed run)
+            DateTimeOffset? nextRunAt = null;
+            if (lastRun?.Status == RetentionRunStatus.Completed && lastRun.CompletedAt.HasValue)
+            {
+                nextRunAt = lastRun.CompletedAt.Value.AddHours(24);
+            }
+            else if (lastRun == null)
+            {
+                // No runs yet - schedule for next midnight
+                var now = DateTimeOffset.UtcNow;
+                nextRunAt = new DateTimeOffset(now.Date.AddDays(1), TimeSpan.Zero);
+            }
+
+            // Build per-category purge counts from last run
+            var categoryStats = new List<object>();
+            if (lastRun?.CategorySummaries != null)
+            {
+                foreach (var summary in lastRun.CategorySummaries)
+                {
+                    categoryStats.Add(new
+                    {
+                        category = summary.Category,
+                        purgedCount = summary.PurgedCount,
+                        expiredCount = summary.ExpiredCount,
+                        retentionDays = (int)summary.RetentionPeriod.TotalDays
+                    });
+                }
+            }
+
+            // Default category stats if no runs yet
+            if (categoryStats.Count == 0)
+            {
+                categoryStats = new List<object>
+                {
+                    new
+                    {
+                        category = "AuditLog",
+                        purgedCount = 0,
+                        expiredCount = 0,
+                        retentionDays = (int)DataRetentionPolicy.AuditLogRetention.TotalDays
+                    },
+                    new
+                    {
+                        category = "ConsentRecord",
+                        purgedCount = 0,
+                        expiredCount = 0,
+                        retentionDays = (int)DataRetentionPolicy.StudentRecordRetention.TotalDays
+                    }
+                };
+            }
+
+            // Determine status message
+            string statusMessage;
+            if (isRunning)
+            {
+                statusMessage = "Retention worker is currently running";
+            }
+            else if (isEnforced)
+            {
+                statusMessage = "Retention policies are actively enforced";
+            }
+            else if (lastRun?.Status == RetentionRunStatus.Failed)
+            {
+                statusMessage = $"Last retention run failed: {lastRun.ErrorMessage ?? "Unknown error"}";
+            }
+            else
+            {
+                statusMessage = "Retention enforcement pending - no completed runs yet";
+            }
+
             return Results.Ok(new
             {
                 policies = new[]
@@ -164,9 +244,29 @@ public static class ComplianceEndpoints
                         description = "XP, streaks, badges (1 year after inactivity)"
                     }
                 },
-                archivalStatus = "Scheduled background job not yet implemented (see REV-013.3 notes)",
-                note = "Retention periods are enforced after archival job is deployed. " +
-                       "Currently all data is retained indefinitely in the event store."
+                enforcement = new
+                {
+                    isEnforced,
+                    isRunning,
+                    hasEverRun,
+                    status = statusMessage
+                },
+                lastRun = lastRun != null ? new
+                {
+                    runId = lastRun.Id,
+                    runAt = lastRun.RunAt,
+                    completedAt = lastRun.CompletedAt,
+                    status = lastRun.Status.ToString(),
+                    rowsPurged = lastRun.DocumentsPurged,
+                    rowsScanned = lastRun.DocumentsScanned,
+                    erasureRequestsAccelerated = lastRun.ErasureRequestsAccelerated,
+                    errorMessage = lastRun.ErrorMessage
+                } : null,
+                nextRunAt,
+                categoryStats,
+                failures = lastRun?.Status == RetentionRunStatus.Failed
+                    ? new[] { new { error = lastRun.ErrorMessage ?? "Unknown error", runAt = lastRun.RunAt } }
+                    : Array.Empty<object>()
             });
         })
         .WithName("DataRetentionPolicy");
