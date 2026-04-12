@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import navItems from '@/navigation/vertical'
 import { themeConfig } from '@themeConfig'
 
@@ -24,6 +25,7 @@ import { VerticalNavLayout } from '@layouts'
 // standalone LanguageSwitcher uses so both surfaces stay in lockstep.
 import { useAvailableLocales } from '@/composables/useAvailableLocales'
 
+const { t } = useI18n()
 const { codes: availableCodes } = useAvailableLocales()
 
 const visibleLangConfig = computed(() =>
@@ -41,6 +43,7 @@ const visibleLangConfig = computed(() =>
         <IconBtn
           id="vertical-nav-toggle-btn"
           class="ms-n3 d-lg-none"
+          :aria-label="t('aria.sidebarToggle')"
           @click="toggleVerticalOverlayNavActive(true)"
         >
           <VIcon

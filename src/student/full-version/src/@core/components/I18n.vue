@@ -14,7 +14,7 @@ const { locale } = useI18n({ useScope: 'global' })
 </script>
 
 <template>
-  <IconBtn>
+  <IconBtn :aria-label="$t('aria.languageSwitch')">
     <VIcon icon="tabler-language" />
 
     <!-- Menu -->

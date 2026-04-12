@@ -45,14 +45,20 @@ async function signOut() {
     offset-y="2"
     color="success"
   >
-    <VAvatar
+    <VBtn
+      icon
+      variant="text"
       size="38"
-      class="cursor-pointer"
-      color="primary"
-      variant="tonal"
-      data-testid="user-profile-avatar"
+      :aria-label="t('nav.userMenu', { name: displayName })"
+      data-testid="user-profile-avatar-button"
     >
-      <span class="text-caption font-weight-bold">{{ initials }}</span>
+      <VAvatar
+        size="38"
+        color="primary"
+        variant="tonal"
+      >
+        <span class="text-caption font-weight-bold">{{ initials }}</span>
+      </VAvatar>
 
       <VMenu
         activator="parent"
@@ -113,6 +119,6 @@ async function signOut() {
           </div>
         </VList>
       </VMenu>
-    </VAvatar>
+    </VBtn>
   </VBadge>
 </template>

@@ -220,7 +220,8 @@
     "settingsAccount": "Account & Security",
     "settingsAppearance": "Appearance",
     "settingsNotifications": "Notification Preferences",
-    "settingsPrivacy": "Data & Privacy"
+    "settingsPrivacy": "Data & Privacy",
+    "userMenu": "Account menu for {name}"
   },
   "status": {
     "online": "Online",
@@ -709,6 +710,12 @@
     "arabic": "العربية",
     "hebrew": "עברית",
     "switchLanguage": "Switch language"
+  },
+  "aria": {
+    "sidebarToggle": "Toggle sidebar navigation",
+    "languageSwitch": "Switch language",
+    "themeSwitch": "Switch theme",
+    "notifications": "Notifications"
   },
   "onboarding": {
     "welcome": {
