@@ -25,10 +25,8 @@ export interface Shortcut {
   handler: (event: KeyboardEvent) => void
   /**
    * When true, the shortcut will NOT fire while an input/textarea/contenteditable
-   * is focused. Default true. Only set to false for modifier-based shortcuts
-   * (e.g. Cmd+K) or non-character keys (e.g. Escape) that cannot be confused
-   * with typed text. Single-character shortcuts like '?' MUST leave this true
-   * so they do not eat keystrokes in text fields (FIND-ux-012).
+   * is focused. Default true. Global shortcuts like `?` and Cmd+K should set
+   * this false so they work everywhere.
    */
   blockInInputs?: boolean
 }
@@ -121,9 +119,7 @@ function handleKeydown(e: KeyboardEvent) {
   }
 
   // If the pressed key could be the start of a 2-key sequence, buffer it.
-  // Skip buffering when focus is in an editable field to avoid sequence
-  // state leaking across focus changes (FIND-ux-012).
-  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey && !isEditable(e.target)) {
+  if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) {
     const hasSequenceStartingWith = Array.from(registry.values()).some(
       s => s.keys.startsWith(`${e.key.toLowerCase()} `),
     )

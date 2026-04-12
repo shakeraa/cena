@@ -1,8 +1,6 @@
 // =============================================================================
 // Cena Platform -- Student Insights Service
-// Per-student cross-cutting analytics: session patterns, engagement, error
-// types, hint usage, response time anomalies, stagnation, focus heatmap,
-// and focus degradation curve.
+// FIND-data-025: Per-student analytics with tenant scoping, no global scans
 // =============================================================================
 
 using System.Security.Claims;
@@ -11,97 +9,122 @@ using Cena.Actors.Events;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Tenancy;
 using Marten;
-using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api;
 
 public interface IStudentInsightsService
 {
-    Task<StudentFocusHeatmapResponse> GetFocusHeatmapAsync(string studentId, ClaimsPrincipal user);
-    Task<StudentDegradationCurveResponse> GetDegradationCurveAsync(string studentId, ClaimsPrincipal user);
-    Task<StudentEngagementResponse> GetEngagementAsync(string studentId, ClaimsPrincipal user);
-    Task<StudentErrorTypesResponse> GetErrorTypesAsync(string studentId, ClaimsPrincipal user);
-    Task<StudentHintUsageResponse> GetHintUsageAsync(string studentId, ClaimsPrincipal user);
-    Task<StudentStagnationResponse> GetStagnationAsync(string studentId, ClaimsPrincipal user);
-    Task<StudentSessionPatternsResponse> GetSessionPatternsAsync(string studentId, ClaimsPrincipal user);
-    Task<StudentResponseTimeResponse> GetResponseTimesAsync(string studentId, ClaimsPrincipal user);
+    Task<StudentFocusHeatmapResponse?> GetFocusHeatmapAsync(string studentId, ClaimsPrincipal user);
+    Task<StudentDegradationCurveResponse?> GetDegradationCurveAsync(string studentId, ClaimsPrincipal user);
+    Task<StudentEngagementResponse?> GetEngagementAsync(string studentId, ClaimsPrincipal user);
+    Task<StudentErrorTypesResponse?> GetErrorTypesAsync(string studentId, ClaimsPrincipal user);
+    Task<StudentHintUsageResponse?> GetHintUsageAsync(string studentId, ClaimsPrincipal user);
+    Task<StudentStagnationResponse?> GetStagnationAsync(string studentId, ClaimsPrincipal user);
+    Task<StudentSessionPatternsResponse?> GetSessionPatternsAsync(string studentId, ClaimsPrincipal user);
+    Task<StudentResponseTimeResponse?> GetResponseTimesAsync(string studentId, ClaimsPrincipal user);
 }
 
 public sealed class StudentInsightsService : IStudentInsightsService
 {
     private readonly IDocumentStore _store;
-    private readonly ILogger<StudentInsightsService> _logger;
 
-    public StudentInsightsService(IDocumentStore store, ILogger<StudentInsightsService> logger)
+    public StudentInsightsService(IDocumentStore store)
     {
         _store = store;
-        _logger = logger;
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 1. PER-STUDENT FOCUS HEATMAP (day x hour)
+    // TENANT AUTHORIZATION
     // ═══════════════════════════════════════════════════════════════
 
-    public async Task<StudentFocusHeatmapResponse> GetFocusHeatmapAsync(string studentId, ClaimsPrincipal user)
+    private async Task<bool> CanAccessStudentAsync(IQuerySession session, string studentId, string? schoolId)
     {
+        // SUPER_ADMIN (schoolId == null) can access any student
+        if (schoolId is null)
+            return true;
+
+        // Verify student belongs to the caller's school
+        var snapshot = await session.Query<StudentProfileSnapshot>()
+            .Where(s => s.StudentId == studentId)
+            .FirstOrDefaultAsync();
+
+        return snapshot?.SchoolId == schoolId;
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // 1. FOCUS HEATMAP
+    // ═══════════════════════════════════════════════════════════════
+
+    public async Task<StudentFocusHeatmapResponse?> GetFocusHeatmapAsync(string studentId, ClaimsPrincipal user)
+    {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        var focusEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(2000)
-            .ToListAsync();
+        // FIND-data-025: Verify tenant access
+        if (!await CanAccessStudentAsync(session, studentId, schoolId))
+            return null;
 
-        var studentEvents = focusEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        // FIND-data-025: Query only this student's events instead of global scan
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
+        var focusEvents = studentEvents
+            .Where(e => e.Data is FocusScoreUpdated_V1)
+            .Select(e => (FocusScoreUpdated_V1)e.Data)
             .ToList();
 
-        var cells = studentEvents
-            .GroupBy(e =>
-            {
-                var ts = e.Timestamp.ToOffset(TimeSpan.FromHours(3)); // Israel time
-                return (Day: ts.DayOfWeek.ToString()[..3], Hour: ts.Hour);
-            })
-            .Select(g => new HeatmapCell(
-                Day: g.Key.Day,
-                Hour: $"{g.Key.Hour:D2}:00",
-                AvgFocusScore: (float)(g.Average(e => ExtractDouble(e, "focusScore")) * 100),
-                StudentCount: g.Count()))
-            .OrderBy(c => c.Day)
-            .ThenBy(c => c.Hour)
+        // Aggregate by day-of-week and hour
+        var cells = focusEvents
+            .GroupBy(f => (Day: (int)f.Timestamp.DayOfWeek, Hour: f.Timestamp.Hour))
+            .Select(g => new FocusHeatmapCell(
+                DayOfWeek: g.Key.Day,
+                Hour: g.Key.Hour,
+                AvgFocusScore: (float)g.Average(f => f.FocusScore * 100),
+                SampleCount: g.Count()))
             .ToList();
 
         return new StudentFocusHeatmapResponse(studentId, cells);
     }
 
     // ═══════════════════════════════════════════════════════════════
-    // 2. PER-STUDENT DEGRADATION CURVE
+    // 2. FOCUS DEGRADATION CURVE
     // ═══════════════════════════════════════════════════════════════
 
-    public async Task<StudentDegradationCurveResponse> GetDegradationCurveAsync(string studentId, ClaimsPrincipal user)
+    public async Task<StudentDegradationCurveResponse?> GetDegradationCurveAsync(string studentId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        var focusEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "focus_score_updated_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(2000)
-            .ToListAsync();
+        // FIND-data-025: Verify tenant access
+        if (!await CanAccessStudentAsync(session, studentId, schoolId))
+            return null;
 
-        var studentEvents = focusEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        // FIND-data-025: Query only this student's events
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
+        var focusEvents = studentEvents
+            .Where(e => e.Data is FocusScoreUpdated_V1)
+            .Select(e => (FocusScoreUpdated_V1)e.Data)
+            .OrderBy(f => f.Timestamp)
             .ToList();
 
-        // Group by question number (proxy for minutes into session)
-        var points = studentEvents
-            .GroupBy(e => (int)ExtractDouble(e, "questionNumber"))
-            .Where(g => g.Key > 0)
-            .Select(g => new DegradationPoint(
-                MinutesIntoSession: g.Key * 2, // ~2 min per question estimate
-                AvgFocusScore: (float)(g.Average(e => ExtractDouble(e, "focusScore")) * 100),
-                SampleSize: g.Count()))
-            .OrderBy(p => p.MinutesIntoSession)
+        // Group by session (using date as session proxy) and calculate degradation
+        var sessionGroups = focusEvents
+            .GroupBy(f => f.Timestamp.Date)
+            .Where(g => g.Count() >= 3) // Need at least a few points
             .ToList();
+
+        var points = new List<DegradationPoint>();
+        int bucket = 0;
+        foreach (var sessionGroup in sessionGroups.TakeLast(10)) // Last 10 sessions
+        {
+            var ordered = sessionGroup.OrderBy(f => f.Timestamp).ToList();
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                points.Add(new DegradationPoint(
+                    MinutesIntoSession: bucket * 2 + i,
+                    AvgFocusScore: (float)(ordered[i].FocusScore * 100),
+                    SampleSize: 1));
+            }
+            bucket++;
+        }
 
         return new StudentDegradationCurveResponse(studentId, points);
     }
@@ -110,58 +133,56 @@ public sealed class StudentInsightsService : IStudentInsightsService
     // 3. ENGAGEMENT: Streak, XP, Badges
     // ═══════════════════════════════════════════════════════════════
 
-    public async Task<StudentEngagementResponse> GetEngagementAsync(string studentId, ClaimsPrincipal user)
+    public async Task<StudentEngagementResponse?> GetEngagementAsync(string studentId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        // Query streak events
-        var streakEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "streak_updated_v1")
+        // FIND-data-025: Verify tenant access
+        if (!await CanAccessStudentAsync(session, studentId, schoolId))
+            return null;
+
+        // FIND-data-025: Query only this student's events
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
+
+        // Streak events
+        var streakEvents = studentEvents
+            .Where(e => e.Data is StreakUpdated_V1)
+            .Select(e => (StreakUpdated_V1)e.Data)
             .OrderByDescending(e => e.Timestamp)
-            .Take(500)
-            .ToListAsync();
+            .ToList();
 
-        var latestStreak = streakEvents
-            .FirstOrDefault(e => ExtractString(e, "studentId") == studentId);
-
-        int currentStreak = latestStreak != null ? (int)ExtractDouble(latestStreak, "currentStreak") : 0;
-        int longestStreak = latestStreak != null ? (int)ExtractDouble(latestStreak, "longestStreak") : 0;
+        var latestStreak = streakEvents.FirstOrDefault();
+        int currentStreak = latestStreak?.CurrentStreak ?? 0;
+        int longestStreak = latestStreak?.LongestStreak ?? 0;
         var lastActivity = latestStreak?.Timestamp;
 
-        // Query XP events
-        var xpEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "xp_awarded_v1")
+        // XP events
+        var xpEvents = studentEvents
+            .Where(e => e.Data is XpAwarded_V1)
+            .Select(e => (XpAwarded_V1)e.Data)
             .OrderByDescending(e => e.Timestamp)
-            .Take(2000)
-            .ToListAsync();
-
-        var studentXpEvents = xpEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
             .ToList();
 
-        int totalXp = studentXpEvents.Count > 0
-            ? (int)ExtractDouble(studentXpEvents.First(), "totalXp")
-            : 0;
+        int totalXp = xpEvents.FirstOrDefault()?.TotalXp ?? 0;
 
-        var xpByDifficulty = studentXpEvents
-            .GroupBy(e => ExtractString(e, "difficultyLevel"))
-            .Select(g => new XpByDifficulty(g.Key, g.Sum(e => (int)ExtractDouble(e, "xpAmount")), g.Count()))
+        var xpByDifficulty = xpEvents
+            .GroupBy(e => e.DifficultyLevel?.ToString() ?? "unknown")
+            .Select(g => new XpByDifficulty(g.Key, g.Sum(e => e.XpAmount), g.Count()))
             .ToList();
 
-        // Query badge events
-        var badgeEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "badge_earned_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(500)
-            .ToListAsync();
+        // Badge events
+        var badgeEvents = studentEvents
+            .Where(e => e.Data is BadgeEarned_V1)
+            .Select(e => (BadgeEarned_V1)e.Data)
+            .ToList();
 
         var studentBadges = badgeEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
-            .Select(e => new BadgeRecord(
-                ExtractString(e, "badgeId"),
-                ExtractString(e, "badgeName"),
-                ExtractString(e, "badgeCategory"),
-                e.Timestamp))
+            .Select(b => new BadgeRecord(
+                b.BadgeId,
+                b.BadgeName,
+                b.BadgeCategory?.ToString() ?? "",
+                b.Timestamp))
             .ToList();
 
         return new StudentEngagementResponse(
@@ -178,45 +199,51 @@ public sealed class StudentInsightsService : IStudentInsightsService
     // 4. ERROR TYPE DISTRIBUTION
     // ═══════════════════════════════════════════════════════════════
 
-    public async Task<StudentErrorTypesResponse> GetErrorTypesAsync(string studentId, ClaimsPrincipal user)
+    public async Task<StudentErrorTypesResponse?> GetErrorTypesAsync(string studentId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(5000)
-            .ToListAsync();
+        // FIND-data-025: Verify tenant access
+        if (!await CanAccessStudentAsync(session, studentId, schoolId))
+            return null;
 
-        var studentAttempts = attemptEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        // FIND-data-025: Query only this student's events
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
+        var attempts = studentEvents
+            .Where(e => e.Data is ConceptAttempted_V1)
+            .Select(e => (ConceptAttempted_V1)e.Data)
             .ToList();
 
-        var incorrect = studentAttempts.Where(e => !ExtractBool(e, "isCorrect")).ToList();
+        var incorrect = attempts.Where(a => !a.IsCorrect).ToList();
 
         var byErrorType = incorrect
-            .GroupBy(e => ExtractString(e, "errorType"))
+            .GroupBy(a => a.ErrorType)
             .Where(g => !string.IsNullOrEmpty(g.Key))
-            .Select(g => new ErrorTypeCount(g.Key, g.Count(),
+            .Select(g => new ErrorTypeCount(
+                g.Key,
+                g.Count(),
                 (float)g.Count() / Math.Max(1, incorrect.Count) * 100f))
             .OrderByDescending(e => e.Count)
             .ToList();
 
         var byConcept = incorrect
-            .GroupBy(e => ExtractString(e, "conceptId"))
-            .Select(g => new ConceptErrorCount(g.Key, g.Count(),
-                g.GroupBy(e => ExtractString(e, "errorType"))
+            .GroupBy(a => a.ConceptId)
+            .Select(g => new ConceptErrorCount(
+                g.Key,
+                g.Count(),
+                g.GroupBy(a => a.ErrorType)
                     .OrderByDescending(eg => eg.Count())
-                    .First().Key))
+                    .FirstOrDefault()?.Key ?? ""))
             .OrderByDescending(c => c.ErrorCount)
             .Take(10)
             .ToList();
 
         return new StudentErrorTypesResponse(
             StudentId: studentId,
-            TotalAttempts: studentAttempts.Count,
+            TotalAttempts: attempts.Count,
             TotalErrors: incorrect.Count,
-            ErrorRate: studentAttempts.Count > 0 ? (float)incorrect.Count / studentAttempts.Count * 100 : 0,
+            ErrorRate: attempts.Count > 0 ? (float)incorrect.Count / attempts.Count * 100 : 0,
             ByErrorType: byErrorType,
             ByConceptTopErrors: byConcept);
     }
@@ -225,22 +252,25 @@ public sealed class StudentInsightsService : IStudentInsightsService
     // 5. HINT USAGE PATTERNS
     // ═══════════════════════════════════════════════════════════════
 
-    public async Task<StudentHintUsageResponse> GetHintUsageAsync(string studentId, ClaimsPrincipal user)
+    public async Task<StudentHintUsageResponse?> GetHintUsageAsync(string studentId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        var hintEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "hint_requested_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(2000)
-            .ToListAsync();
+        // FIND-data-025: Verify tenant access
+        if (!await CanAccessStudentAsync(session, studentId, schoolId))
+            return null;
 
-        var studentHints = hintEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        // FIND-data-025: Query only this student's events
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
+
+        var hints = studentEvents
+            .Where(e => e.Data is HintRequested_V1)
+            .Select(e => (HintRequested_V1)e.Data)
             .ToList();
 
-        var byLevel = studentHints
-            .GroupBy(e => (int)ExtractDouble(e, "hintLevel"))
+        var byLevel = hints
+            .GroupBy(h => h.HintLevel)
             .Select(g => new HintLevelCount(
                 Level: g.Key,
                 Label: g.Key switch { 1 => "Nudge", 2 => "Scaffolded", 3 => "Near-Answer", _ => $"Level {g.Key}" },
@@ -248,34 +278,30 @@ public sealed class StudentInsightsService : IStudentInsightsService
             .OrderBy(h => h.Level)
             .ToList();
 
-        var byConcept = studentHints
-            .GroupBy(e => ExtractString(e, "conceptId"))
+        var byConcept = hints
+            .GroupBy(h => h.ConceptId)
             .Select(g => new ConceptHintCount(g.Key, g.Count()))
             .OrderByDescending(c => c.HintCount)
             .Take(10)
             .ToList();
 
-        // Check effectiveness: did student get the next question right after a hint?
-        var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(3000)
-            .ToListAsync();
-
-        var studentAttempts = attemptEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        // Check effectiveness using attempts
+        var attempts = studentEvents
+            .Where(e => e.Data is ConceptAttempted_V1)
+            .Select(e => (ConceptAttempted_V1)e.Data)
             .ToList();
 
-        int hintsUsed = studentAttempts.Sum(e => (int)ExtractDouble(e, "hintCountUsed"));
-        int hintedCorrect = studentAttempts
-            .Where(e => (int)ExtractDouble(e, "hintCountUsed") > 0 && ExtractBool(e, "isCorrect"))
-            .Count();
+        int hintsUsed = attempts.Sum(a => a.HintCountUsed);
+        int hintedCorrect = attempts.Count(a => a.HintCountUsed > 0 && a.IsCorrect);
+        int hintedAttempts = attempts.Count(a => a.HintCountUsed > 0);
 
-        float hintEffectiveness = hintsUsed > 0 ? (float)hintedCorrect / studentAttempts.Count(e => (int)ExtractDouble(e, "hintCountUsed") > 0) * 100f : 0;
+        float hintEffectiveness = hintedAttempts > 0
+            ? (float)hintedCorrect / hintedAttempts * 100f
+            : 0;
 
         return new StudentHintUsageResponse(
             StudentId: studentId,
-            TotalHintRequests: studentHints.Count,
+            TotalHintRequests: hints.Count,
             ByLevel: byLevel,
             ByConcept: byConcept,
             HintEffectivenessPercent: MathF.Round(hintEffectiveness, 1));
@@ -285,32 +311,36 @@ public sealed class StudentInsightsService : IStudentInsightsService
     // 6. STAGNATION
     // ═══════════════════════════════════════════════════════════════
 
-    public async Task<StudentStagnationResponse> GetStagnationAsync(string studentId, ClaimsPrincipal user)
+    public async Task<StudentStagnationResponse?> GetStagnationAsync(string studentId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        var stagnationEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "stagnation_detected_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(1000)
-            .ToListAsync();
+        // FIND-data-025: Verify tenant access
+        if (!await CanAccessStudentAsync(session, studentId, schoolId))
+            return null;
 
-        var studentStagnation = stagnationEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        // FIND-data-025: Query only this student's events
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
+
+        var stagnationEvents = studentEvents
+            .Where(e => e.Data is StagnationDetected_V1)
+            .Select(e => (StagnationDetected_V1)e.Data)
+            .OrderByDescending(e => e.Timestamp)
             .ToList();
 
-        var concepts = studentStagnation
-            .GroupBy(e => ExtractString(e, "conceptId"))
+        var concepts = stagnationEvents
+            .GroupBy(s => s.ConceptId)
             .Select(g =>
             {
-                var latest = g.First(); // most recent
+                var latest = g.First();
                 return new StagnationConcept
                 {
                     ConceptId = g.Key,
-                    CompositeScore = ExtractDouble(latest, "compositeScore"),
-                    ConsecutiveStagnantSessions = (int)ExtractDouble(latest, "consecutiveStagnantSessions"),
-                    AccuracyPlateau = ExtractDouble(latest, "accuracyPlateau"),
-                    ErrorRepetition = ExtractDouble(latest, "errorRepetition"),
+                    CompositeScore = latest.CompositeScore,
+                    ConsecutiveStagnantSessions = latest.ConsecutiveStagnantSessions,
+                    AccuracyPlateau = latest.AccuracyPlateau,
+                    ErrorRepetition = latest.ErrorRepetition,
                     LastDetected = latest.Timestamp,
                     TotalDetections = g.Count(),
                 };
@@ -319,65 +349,60 @@ public sealed class StudentInsightsService : IStudentInsightsService
             .ToList();
 
         // Methodology switches for stagnating concepts
-        var switchEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "methodology_switched_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(1000)
-            .ToListAsync();
-
-        var studentSwitches = switchEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        var switches = studentEvents
+            .Where(e => e.Data is MethodologySwitched_V1)
+            .Select(e => (MethodologySwitched_V1)e.Data)
             .ToList();
 
-        var switchesByConcept = studentSwitches
-            .GroupBy(e => ExtractString(e, "conceptId"))
-            .ToDictionary(g => g.Key, g => g.Select(e => ExtractString(e, "newMethodology")).Distinct().ToList());
+        var switchesByConcept = switches
+            .GroupBy(s => s.ConceptId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(s => s.NewMethodology?.ToString()).Distinct().ToList());
 
         foreach (var concept in concepts)
         {
             if (switchesByConcept.TryGetValue(concept.ConceptId, out var methods))
-                concept.AttemptedMethodologies.AddRange(methods);
+                concept.AttemptedMethodologies.AddRange(methods.Where(m => m != null)!);
         }
 
         return new StudentStagnationResponse(
             StudentId: studentId,
             StagnatingConcepts: concepts,
-            TotalStagnationEvents: studentStagnation.Count);
+            TotalStagnationEvents: stagnationEvents.Count);
     }
 
     // ═══════════════════════════════════════════════════════════════
     // 7. SESSION PATTERNS (time-of-day, duration, abandonment)
     // ═══════════════════════════════════════════════════════════════
 
-    public async Task<StudentSessionPatternsResponse> GetSessionPatternsAsync(string studentId, ClaimsPrincipal user)
+    public async Task<StudentSessionPatternsResponse?> GetSessionPatternsAsync(string studentId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        var startEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "session_started_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(2000)
-            .ToListAsync();
+        // FIND-data-025: Verify tenant access
+        if (!await CanAccessStudentAsync(session, studentId, schoolId))
+            return null;
 
-        var endEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "session_ended_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(2000)
-            .ToListAsync();
+        // FIND-data-025: Query only this student's events
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
 
-        var studentStarts = startEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        var starts = studentEvents
+            .Where(e => e.Data is SessionStarted_V1)
+            .Select(e => (SessionStarted_V1)e.Data)
             .ToList();
 
-        var studentEnds = endEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        var ends = studentEvents
+            .Where(e => e.Data is SessionEnded_V1)
+            .Select(e => (SessionEnded_V1)e.Data)
             .ToList();
 
         // Time-of-day distribution
-        var byHour = studentStarts
-            .GroupBy(e =>
+        var byHour = starts
+            .GroupBy(s =>
             {
-                var ts = e.Timestamp.ToOffset(TimeSpan.FromHours(3));
+                var ts = s.Timestamp.ToOffset(TimeSpan.FromHours(3));
                 return ts.Hour;
             })
             .Select(g => new SessionTimeSlot($"{g.Key:D2}:00", g.Count()))
@@ -385,40 +410,42 @@ public sealed class StudentInsightsService : IStudentInsightsService
             .ToList();
 
         // Day-of-week distribution
-        var byDay = studentStarts
-            .GroupBy(e =>
+        var byDay = starts
+            .GroupBy(s =>
             {
-                var ts = e.Timestamp.ToOffset(TimeSpan.FromHours(3));
+                var ts = s.Timestamp.ToOffset(TimeSpan.FromHours(3));
                 return ts.DayOfWeek;
             })
             .Select(g => new SessionDayCount(g.Key.ToString(), g.Count()))
             .ToList();
 
         // End reasons (abandonment analysis)
-        var endReasons = studentEnds
-            .GroupBy(e => ExtractString(e, "endReason"))
-            .Select(g => new EndReasonCount(g.Key, g.Count(),
-                (float)g.Count() / Math.Max(1, studentEnds.Count) * 100f))
+        var endReasons = ends
+            .GroupBy(e => e.EndReason?.ToString() ?? "unknown")
+            .Select(g => new EndReasonCount(
+                g.Key,
+                g.Count(),
+                (float)g.Count() / Math.Max(1, ends.Count) * 100f))
             .OrderByDescending(r => r.Count)
             .ToList();
 
         // Average duration
-        var durations = studentEnds
-            .Select(e => (int)ExtractDouble(e, "durationMinutes"))
+        var durations = ends
+            .Select(e => e.DurationMinutes)
             .Where(d => d > 0)
             .ToList();
 
         float avgDuration = durations.Count > 0 ? (float)durations.Average() : 0;
-        float avgQuestionsPerSession = studentEnds.Count > 0
-            ? (float)studentEnds.Average(e => ExtractDouble(e, "questionsAttempted"))
+        float avgQuestionsPerSession = ends.Count > 0
+            ? (float)ends.Average(e => e.QuestionsAttempted)
             : 0;
 
-        int abandonedCount = studentEnds.Count(e => ExtractString(e, "endReason") == "abandoned");
-        float abandonmentRate = studentEnds.Count > 0 ? (float)abandonedCount / studentEnds.Count * 100f : 0;
+        int abandonedCount = ends.Count(e => e.EndReason?.ToString() == "abandoned");
+        float abandonmentRate = ends.Count > 0 ? (float)abandonedCount / ends.Count * 100f : 0;
 
         return new StudentSessionPatternsResponse(
             StudentId: studentId,
-            TotalSessions: studentStarts.Count,
+            TotalSessions: starts.Count,
             AvgDurationMinutes: MathF.Round(avgDuration, 1),
             AvgQuestionsPerSession: MathF.Round(avgQuestionsPerSession, 1),
             AbandonmentRate: MathF.Round(abandonmentRate, 1),
@@ -431,28 +458,30 @@ public sealed class StudentInsightsService : IStudentInsightsService
     // 8. RESPONSE TIME ANOMALIES
     // ═══════════════════════════════════════════════════════════════
 
-    public async Task<StudentResponseTimeResponse> GetResponseTimesAsync(string studentId, ClaimsPrincipal user)
+    public async Task<StudentResponseTimeResponse?> GetResponseTimesAsync(string studentId, ClaimsPrincipal user)
     {
+        var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted_v1")
-            .OrderByDescending(e => e.Timestamp)
-            .Take(5000)
-            .ToListAsync();
+        // FIND-data-025: Verify tenant access
+        if (!await CanAccessStudentAsync(session, studentId, schoolId))
+            return null;
 
-        var studentAttempts = attemptEvents
-            .Where(e => ExtractString(e, "studentId") == studentId)
+        // FIND-data-025: Query only this student's events
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
+        var attempts = studentEvents
+            .Where(e => e.Data is ConceptAttempted_V1)
+            .Select(e => (ConceptAttempted_V1)e.Data)
             .OrderBy(e => e.Timestamp)
             .ToList();
 
-        if (studentAttempts.Count < 5)
+        if (attempts.Count < 5)
         {
             return new StudentResponseTimeResponse(studentId, 0, 0, 0, new List<RtTrendPoint>(), new List<RtAnomaly>());
         }
 
-        var rtValues = studentAttempts
-            .Select(e => (int)ExtractDouble(e, "responseTimeMs"))
+        var rtValues = attempts
+            .Select(a => a.ResponseTimeMs)
             .Where(rt => rt > 0)
             .ToList();
 
@@ -461,11 +490,11 @@ public sealed class StudentInsightsService : IStudentInsightsService
         double median = rtValues.OrderBy(r => r).ElementAt(rtValues.Count / 2);
 
         // Trend: group by date
-        var trend = studentAttempts
-            .GroupBy(e => e.Timestamp.ToString("yyyy-MM-dd"))
+        var trend = attempts
+            .GroupBy(a => a.Timestamp.ToString("yyyy-MM-dd"))
             .Select(g => new RtTrendPoint(
                 Date: g.Key,
-                AvgRtMs: (int)g.Average(e => ExtractDouble(e, "responseTimeMs")),
+                AvgRtMs: (int)g.Average(a => a.ResponseTimeMs),
                 AttemptCount: g.Count()))
             .OrderBy(t => t.Date)
             .TakeLast(30)
@@ -473,12 +502,12 @@ public sealed class StudentInsightsService : IStudentInsightsService
 
         // Anomalies: >2 standard deviations from mean
         double anomalyThreshold = mean + 2 * stdDev;
-        var anomalies = studentAttempts
-            .Where(e => ExtractDouble(e, "responseTimeMs") > anomalyThreshold)
-            .Select(e => new RtAnomaly(
-                Timestamp: e.Timestamp,
-                ResponseTimeMs: (int)ExtractDouble(e, "responseTimeMs"),
-                ConceptId: ExtractString(e, "conceptId"),
+        var anomalies = attempts
+            .Where(a => a.ResponseTimeMs > anomalyThreshold)
+            .Select(a => new RtAnomaly(
+                Timestamp: a.Timestamp,
+                ResponseTimeMs: a.ResponseTimeMs,
+                ConceptId: a.ConceptId,
                 ExpectedRangeMs: $"{(int)(mean - stdDev)}-{(int)(mean + stdDev)}"))
             .TakeLast(20)
             .ToList();
@@ -491,63 +520,83 @@ public sealed class StudentInsightsService : IStudentInsightsService
             Trend: trend,
             Anomalies: anomalies);
     }
-
-    // ═══════════════════════════════════════════════════════════════
-    // HELPERS (same pattern as FocusAnalyticsService)
-    // ═══════════════════════════════════════════════════════════════
-
-    private static string ExtractString(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return "";
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-                return prop.GetString() ?? "";
-        }
-        catch { /* best-effort extraction */ }
-        return "";
-    }
-
-    private static double ExtractDouble(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return 0;
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-            {
-                return prop.TryGetDouble(out var v) ? v : 0;
-            }
-        }
-        catch { /* best-effort extraction */ }
-        return 0;
-    }
-
-    private static bool ExtractBool(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return false;
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-            {
-                return prop.ValueKind == JsonValueKind.True;
-            }
-        }
-        catch { /* best-effort extraction */ }
-        return false;
-    }
-
-    private static string ToPascalCase(string camelCase)
-    {
-        if (string.IsNullOrEmpty(camelCase)) return camelCase;
-        return char.ToUpperInvariant(camelCase[0]) + camelCase[1..];
-    }
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// RESPONSE DTOs
+// ═════════════════════════════════════════════════════════════════════════════
+
+public record StudentFocusHeatmapResponse(string StudentId, IReadOnlyList<FocusHeatmapCell> Cells);
+public record FocusHeatmapCell(int DayOfWeek, int Hour, float AvgFocusScore, int SampleCount);
+
+public record StudentDegradationCurveResponse(string StudentId, IReadOnlyList<DegradationPoint> Points);
+public record DegradationPoint(int MinutesIntoSession, float AvgFocusScore, int SampleSize);
+
+public record StudentEngagementResponse(
+    string StudentId,
+    int CurrentStreak,
+    int LongestStreak,
+    DateTimeOffset? LastActivityDate,
+    int TotalXp,
+    IReadOnlyList<XpByDifficulty> XpByDifficulty,
+    IReadOnlyList<BadgeRecord> Badges);
+public record XpByDifficulty(string DifficultyLevel, int TotalXp, int Count);
+public record BadgeRecord(string BadgeId, string BadgeName, string BadgeCategory, DateTimeOffset EarnedAt);
+
+public record StudentErrorTypesResponse(
+    string StudentId,
+    int TotalAttempts,
+    int TotalErrors,
+    float ErrorRate,
+    IReadOnlyList<ErrorTypeCount> ByErrorType,
+    IReadOnlyList<ConceptErrorCount> ByConceptTopErrors);
+public record ErrorTypeCount(string ErrorType, int Count, float Percentage);
+public record ConceptErrorCount(string ConceptId, int ErrorCount, string TopErrorType);
+
+public record StudentHintUsageResponse(
+    string StudentId,
+    int TotalHintRequests,
+    IReadOnlyList<HintLevelCount> ByLevel,
+    IReadOnlyList<ConceptHintCount> ByConcept,
+    float HintEffectivenessPercent);
+public record HintLevelCount(int Level, string Label, int Count);
+public record ConceptHintCount(string ConceptId, int HintCount);
+
+public record StudentStagnationResponse(
+    string StudentId,
+    IReadOnlyList<StagnationConcept> StagnatingConcepts,
+    int TotalStagnationEvents);
+public class StagnationConcept
+{
+    public string ConceptId { get; set; } = "";
+    public double CompositeScore { get; set; }
+    public int ConsecutiveStagnantSessions { get; set; }
+    public double AccuracyPlateau { get; set; }
+    public double ErrorRepetition { get; set; }
+    public DateTimeOffset LastDetected { get; set; }
+    public int TotalDetections { get; set; }
+    public List<string> AttemptedMethodologies { get; set; } = new();
+}
+
+public record StudentSessionPatternsResponse(
+    string StudentId,
+    int TotalSessions,
+    float AvgDurationMinutes,
+    float AvgQuestionsPerSession,
+    float AbandonmentRate,
+    IReadOnlyList<SessionTimeSlot> ByHour,
+    IReadOnlyList<SessionDayCount> ByDay,
+    IReadOnlyList<EndReasonCount> EndReasons);
+public record SessionTimeSlot(string TimeSlot, int Count);
+public record SessionDayCount(string DayOfWeek, int Count);
+public record EndReasonCount(string Reason, int Count, float Percentage);
+
+public record StudentResponseTimeResponse(
+    string StudentId,
+    int MedianRtMs,
+    int MeanRtMs,
+    int StdDevMs,
+    IReadOnlyList<RtTrendPoint> Trend,
+    IReadOnlyList<RtAnomaly> Anomalies);
+public record RtTrendPoint(string Date, int AvgRtMs, int AttemptCount);
+public record RtAnomaly(DateTimeOffset Timestamp, int ResponseTimeMs, string ConceptId, string ExpectedRangeMs);
