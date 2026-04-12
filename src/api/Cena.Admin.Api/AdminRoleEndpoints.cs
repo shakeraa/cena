@@ -102,12 +102,12 @@ public static class AdminRoleEndpoints
         .WithName("ListPermissions")
         .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
 
-        // POST /api/admin/users/{id}/role — AdminOnly
-        app.MapPost("/api/admin/users/{id}/role", async (string id, AssignRoleRequest request, IAdminRoleService service) =>
+        // POST /api/admin/users/{id}/role — SuperAdminOnly (FIND-sec-010: privilege escalation fix)
+        app.MapPost("/api/admin/users/{id}/role", async (string id, AssignRoleRequest request, IAdminRoleService service, HttpContext ctx) =>
         {
             try
             {
-                await service.AssignRoleToUserAsync(id, request);
+                await service.AssignRoleToUserAsync(id, request, ctx.User);
                 return Results.NoContent();
             }
             catch (KeyNotFoundException)
@@ -122,10 +122,14 @@ public static class AdminRoleEndpoints
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
+            catch (UnauthorizedAccessException)
+            {
+                return Results.Forbid();
+            }
         })
         .WithTags("Admin Roles")
         .WithName("AssignRoleToUser")
-        .RequireAuthorization(CenaAuthPolicies.AdminOnly);
+        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
 
         // GET /api/admin/users/{id}/abilities — AdminOnly
         app.MapGet("/api/admin/users/{id}/abilities", async (string id, IAdminRoleService service) =>
