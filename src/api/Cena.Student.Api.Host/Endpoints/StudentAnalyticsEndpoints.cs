@@ -50,17 +50,15 @@ public static class StudentAnalyticsEndpoints
 
             var totalSessions = sessions.Count;
 
-            // Load ConceptAttempted events for accuracy stats
-            var allAttemptEvents = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1")
-                .ToListAsync();
-
-            var studentAttempts = allAttemptEvents
-                .Where(e => ExtractString(e, "studentId") == studentId)
+            // FIND-data-027: Query only this student's events instead of global scan
+            var studentEvents = await session.Events.FetchStreamAsync(studentId);
+            var studentAttempts = studentEvents
+                .Where(e => e.Data is ConceptAttempted_V1)
+                .Select(e => (ConceptAttempted_V1)e.Data)
                 .ToList();
 
             var totalQuestionsAttempted = studentAttempts.Count;
-            var totalCorrect = studentAttempts.Count(e => ExtractBool(e, "isCorrect"));
+            var totalCorrect = studentAttempts.Count(a => a.IsCorrect);
             var overallAccuracy = totalQuestionsAttempted > 0
                 ? Math.Round((double)totalCorrect / totalQuestionsAttempted, 3)
                 : 0;
@@ -135,14 +133,12 @@ public static class StudentAnalyticsEndpoints
                 .Where(d => d.StudentId == studentId && d.StartedAt >= startDate && d.StartedAt <= endDate)
                 .ToListAsync();
 
-            // Query all attempt events for this student in range
-            var allAttemptEvents = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1")
-                .ToListAsync();
-
-            var studentAttempts = allAttemptEvents
-                .Where(e => ExtractString(e, "studentId") == studentId)
-                .Where(e => e.Timestamp >= startDate && e.Timestamp <= endDate)
+            // FIND-data-027: Query only this student's events instead of global scan
+            var studentStream = await session.Events.FetchStreamAsync(studentId);
+            var studentAttempts = studentStream
+                .Where(e => e.Data is ConceptAttempted_V1)
+                .Select(e => (ConceptAttempted_V1)e.Data)
+                .Where(a => a.Timestamp >= startDate && a.Timestamp <= endDate)
                 .ToList();
 
             // Group by day
@@ -161,7 +157,7 @@ public static class StudentAnalyticsEndpoints
                         .Where(e => e.Timestamp.Date == date)
                         .ToList();
 
-                    var correct = dayAttempts.Count(e => ExtractBool(e, "isCorrect"));
+                    var correct = dayAttempts.Count(a => a.IsCorrect);
                     var accuracy = dayAttempts.Count > 0
                         ? Math.Round((double)correct / dayAttempts.Count, 3)
                         : 0;

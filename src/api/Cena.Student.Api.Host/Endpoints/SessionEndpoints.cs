@@ -217,34 +217,29 @@ public static class SessionEndpoints
             if (doc.StudentId != studentId)
                 return Results.Forbid();
 
-            // Count correct turns from ConceptAttempted events for accuracy
-            var events = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1")
-                .ToListAsync();
-
-            var sessionEvents = events
-                .Where(e => ExtractString(e, "sessionId") == doc.SessionId)
+            // FIND-data-027: Query only this student's events instead of global scan
+            var studentEvents = await session.Events.FetchStreamAsync(studentId);
+            var sessionEvents = studentEvents
+                .Where(e => e.Data is ConceptAttempted_V1)
+                .Select(e => (ConceptAttempted_V1)e.Data)
+                .Where(a => a.SessionId == doc.SessionId)
                 .ToList();
 
             var questionsAttempted = sessionEvents.Count;
-            var questionsCorrect   = sessionEvents.Count(e => ExtractBool(e, "isCorrect"));
+            var questionsCorrect   = sessionEvents.Count(e => e.IsCorrect);
             var accuracy           = questionsAttempted > 0
                 ? (double)questionsCorrect / questionsAttempted
                 : 0;
 
-            var fatigueScore = sessionEvents.Count > 0
-                ? sessionEvents.Average(e => ExtractDouble(e, "fatigueScore"))
-                : 0;
-
             var masteryDeltas = sessionEvents
-                .GroupBy(e => ExtractString(e, "conceptId"))
+                .GroupBy(e => e.ConceptId)
                 .ToDictionary(
                     g => g.Key,
                     g =>
                     {
                         var ordered  = g.OrderBy(e => e.Timestamp).ToList();
-                        var initial  = ExtractDouble(ordered.First(), "priorMastery");
-                        var terminal = ExtractDouble(ordered.Last(), "posteriorMastery");
+                        var initial  = ordered.First().PriorMastery;
+                        var terminal = ordered.Last().PosteriorMastery;
                         return terminal - initial;
                     });
 
@@ -346,26 +341,25 @@ public static class SessionEndpoints
             if (doc.StudentId != studentId)
                 return Results.Forbid();
 
-            // Load ConceptAttempted events for this session, ordered by timestamp
-            var rawEvents = await session.Events.QueryAllRawEvents()
-                .Where(e => e.EventTypeName == "concept_attempted_v1")
-                .ToListAsync();
-
-            var attempts = rawEvents
-                .Where(e => ExtractString(e, "sessionId") == doc.SessionId)
-                .OrderBy(e => e.Timestamp)
-                .Select((e, i) => new QuestionAttemptDto(
+            // FIND-data-027: Query only this student's events instead of global scan
+            var studentStream = await session.Events.FetchStreamAsync(studentId);
+            var attempts = studentStream
+                .Where(e => e.Data is ConceptAttempted_V1)
+                .Select(e => (ConceptAttempted_V1)e.Data)
+                .Where(a => a.SessionId == doc.SessionId)
+                .OrderBy(a => a.Timestamp)
+                .Select((a, i) => new QuestionAttemptDto(
                     Sequence: i + 1,
-                    QuestionId: ExtractString(e, "questionId"),
-                    ConceptId: ExtractString(e, "conceptId"),
-                    QuestionType: ExtractString(e, "questionType"),
-                    IsCorrect: ExtractBool(e, "isCorrect"),
-                    ResponseTimeMs: ExtractInt(e, "responseTimeMs"),
-                    HintCountUsed: ExtractInt(e, "hintCountUsed"),
-                    WasSkipped: ExtractBool(e, "wasSkipped"),
-                    PriorMastery: Math.Round(ExtractDouble(e, "priorMastery"), 4),
-                    PosteriorMastery: Math.Round(ExtractDouble(e, "posteriorMastery"), 4),
-                    Timestamp: e.Timestamp))
+                    QuestionId: a.QuestionId,
+                    ConceptId: a.ConceptId,
+                    QuestionType: a.QuestionType,
+                    IsCorrect: a.IsCorrect,
+                    ResponseTimeMs: a.ResponseTimeMs,
+                    HintCountUsed: a.HintCountUsed,
+                    WasSkipped: a.WasSkipped,
+                    PriorMastery: Math.Round(a.PriorMastery, 4),
+                    PosteriorMastery: Math.Round(a.PosteriorMastery, 4),
+                    Timestamp: a.Timestamp))
                 .ToList();
 
             return Results.Ok(new SessionReplayDto(
