@@ -243,7 +243,7 @@ const activeSession = null as null | {
         -->
         <KpiCard
           :label="t('home.kpi.level', { level })"
-          :value="totalSessions != null ? t('home.kpi.sessionsValue', { count: totalSessions }) : t('home.kpi.unavailable')"
+          :value="totalSessions != null ? t('home.kpi.sessionsValue', totalSessions, { count: totalSessions }) : t('home.kpi.unavailable')"
           icon="tabler-bolt"
           data-testid="kpi-level"
         />

@@ -42,7 +42,7 @@ const { t } = useI18n()
         <div class="d-flex align-center ga-2 text-caption text-medium-emphasis">
           <span>{{ t('social.friends.level', { level: friend.level }) }}</span>
           <span>·</span>
-          <span>{{ t('social.friends.streak', { days: friend.streakDays }) }}</span>
+          <span>{{ t('social.friends.streak', friend.streakDays) }}</span>
           <span>·</span>
           <span :class="friend.isOnline ? 'text-success' : ''">
             {{ friend.isOnline ? t('social.friends.online') : t('social.friends.offline') }}

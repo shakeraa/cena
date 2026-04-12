@@ -29,7 +29,7 @@ const timeLeft = computed(() => {
   const hours = Math.floor(diffMs / 3600_000)
   const minutes = Math.floor((diffMs % 3600_000) / 60_000)
 
-  return t('challenges.daily.timeLeft', { hours, minutes })
+  return t('challenges.daily.timeLeft', hours, { hours, minutes })
 })
 </script>
 

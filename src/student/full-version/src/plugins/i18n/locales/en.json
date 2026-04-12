@@ -337,7 +337,7 @@
       "subtitle": "30 days of minutes studied.",
       "chartTitle": "Daily minutes",
       "chartSubtitle": "Last 30 days",
-      "chartAria": "Time breakdown chart: {total} total minutes, {avg} average per day",
+      "chartAria": "Time breakdown chart: {total} total minute, {avg} average per day | Time breakdown chart: {total} total minutes, {avg} average per day",
       "avgPerDay": "Avg / day",
       "today": "Today",
       "kpi30dayTotal": "30-day total",
@@ -349,7 +349,7 @@
       "subtitle": "Your progress across every subject you're learning.",
       "overallLabel": "Overall mastery",
       "masteryLabel": "Mastery",
-      "questionsAttempted": "{count} questions attempted",
+      "questionsAttempted": "{count} question attempted | {count} questions attempted",
       "accuracy": "{percent}% accuracy",
       "rowAria": "{subject}: {percent} percent mastery"
     },
@@ -359,21 +359,21 @@
       "activeLabel": "Active session",
       "resume": "Resume",
       "justNow": "just now",
-      "hoursAgo": "{count}h ago",
-      "daysAgo": "{count}d ago"
+      "hoursAgo": "{count}h ago | {count}h ago",
+      "daysAgo": "{count}d ago | {count}d ago"
     }
   },
   "gamification": {
     "xp": {
       "levelLabel": "Level",
       "currentXp": "{current} / {target} XP",
-      "xpToGo": "{count} XP to go",
-      "totalEarned": "Total earned: {total} XP",
+      "xpToGo": "{count} XP to go | {count} XP to go",
+      "totalEarned": "Total earned: {total} XP | Total earned: {total} XP",
       "progressAria": "Level progress: {percent} percent"
     },
     "badges": {
       "title": "Badges",
-      "counter": "{earned} of {total}",
+      "counter": "{earned} of {total} | {earned} of {total}",
       "earnedHeading": "Earned",
       "lockedHeading": "Locked",
       "tier": {
@@ -387,8 +387,8 @@
       "title": "Leaderboard",
       "yourRank": "Your rank: #{rank}",
       "youChip": "You",
-      "xpLabel": "{xp} XP",
-      "xpValue": "{xp} XP"
+      "xpLabel": "{xp} XP | {xp} XP",
+      "xpValue": "{xp} XP | {xp} XP"
     },
     "streak": {
       "atRisk": "Your streak is at risk — complete a session today!"
@@ -401,7 +401,7 @@
     "yourRankLabel": "Your current rank",
     "yourRankValue": "#{rank}",
     "youChip": "You",
-    "xpValue": "{xp} XP",
+    "xpValue": "{xp} XP | {xp} XP",
     "scope": {
       "global": "Global",
       "class": "My class",
@@ -448,13 +448,13 @@
     "title": "Notifications",
     "subtitle": "Stay on top of your learning progress.",
     "markAllRead": "Mark all as read",
-    "unreadCount": "{count} unread",
+    "unreadCount": "{count} unread | {count} unread",
     "emptyTitle": "You're all caught up",
     "emptySubtitle": "No new notifications.",
     "justNow": "just now",
-    "minutesAgo": "{count}m ago",
-    "hoursAgo": "{count}h ago",
-    "daysAgo": "{count}d ago"
+    "minutesAgo": "{count}m ago | {count}m ago",
+    "hoursAgo": "{count}h ago | {count}h ago",
+    "daysAgo": "{count}d ago | {count}d ago"
   },
   "profile": {
     "editProfile": "Edit profile",
@@ -462,7 +462,7 @@
     "editSubtitle": "Update how you appear to classmates.",
     "editSaved": "Profile saved.",
     "levelLabel": "Level {level}",
-    "streakLabel": "{days}-day streak",
+    "streakLabel": "{count}-day streak | {count}-day streak",
     "aboutTitle": "About",
     "bioEmpty": "No bio yet. Add one from edit profile.",
     "bioLabel": "Bio",
@@ -543,16 +543,16 @@
       "title": "Class feed",
       "subtitle": "See what your classmates are up to.",
       "justNow": "just now",
-      "minutesAgo": "{count}m ago",
-      "hoursAgo": "{count}h ago",
+      "minutesAgo": "{count}m ago | {count}m ago",
+      "hoursAgo": "{count}h ago | {count}h ago",
       "kind": {
         "achievement": "Achievement",
         "milestone": "Milestone",
         "question": "Question",
         "announcement": "Announcement"
       },
-      "reactionAriaLabel": "Like, {count} reactions",
-      "commentAriaLabel": "Comments, {count}",
+      "reactionAriaLabel": "Like, {count} reaction | Like, {count} reactions",
+      "commentAriaLabel": "Comments, {count} | Comments, {count}",
       "reactionError": "Could not save your reaction. Please try again."
     },
     "peers": {
@@ -567,9 +567,9 @@
       "pendingTitle": "Friend requests",
       "wantsToConnect": "wants to connect",
       "accept": "Accept",
-      "listTitle": "Friends ({count})",
+      "listTitle": "Friends ({count}) | Friends ({count})",
       "level": "Level {level}",
-      "streak": "{days}-day streak",
+      "streak": "{count}-day streak | {count}-day streak",
       "online": "Online",
       "offline": "Offline",
       "acceptError": "Could not accept the friend request. Please try again."
@@ -593,7 +593,7 @@
     },
     "detail": {
       "masteryLabel": "Your mastery",
-      "estimatedMinutes": "~{minutes} min",
+      "estimatedMinutes": "~{minutes} min | ~{minutes} min",
       "questionCount": "Questions",
       "subject": "Subject",
       "prerequisitesTitle": "Prerequisites",
@@ -609,7 +609,7 @@
       "subtitle": "Pick subjects, a duration, and a mode to begin.",
       "subjectsLabel": "Subjects",
       "durationLabel": "Duration",
-      "durationMinutes": "{minutes} min",
+      "durationMinutes": "{minutes} min | {minutes} min",
       "modeLabel": "Mode",
       "startCta": "Start session",
       "subjects": {
@@ -628,13 +628,13 @@
       }
     },
     "runner": {
-      "questionProgress": "Question {current} of {total}",
-      "progressAria": "Question {current} of {total}",
+      "questionProgress": "Question {current} of {total} | Question {current} of {total}",
+      "progressAria": "Question {current} of {total} | Question {current} of {total}",
       "choicesAria": "Answer choices",
       "submitAnswer": "Submit",
       "correct": "Correct!",
       "wrong": "Not quite.",
-      "xpAwarded": "+{xp} XP",
+      "xpAwarded": "+{xp} XP | +{xp} XP",
       "exit": "Exit",
       "exitAria": "Exit session",
       "sessionIdLabel": "Session",
@@ -652,8 +652,8 @@
       "accuracy": "Accuracy",
       "correctCount": "Correct",
       "duration": "Duration",
-      "durationSecs": "{secs}s",
-      "durationMinsSecs": "{mins}m {secs}s",
+      "durationSecs": "{secs}s | {secs}s",
+      "durationMinsSecs": "{mins}m {secs}s | {mins}m {secs}s",
       "startAnother": "Start another",
       "backToHome": "Back to home"
     }
@@ -675,7 +675,7 @@
       "reattempt": "Try again",
       "attempted": "Attempted",
       "expired": "Expired",
-      "timeLeft": "{hours}h {minutes}m left"
+      "timeLeft": "{hours}h {minutes}m left | {hours}h {minutes}m left"
     },
     "boss": {
       "title": "Boss battles",
@@ -685,15 +685,15 @@
     "chains": {
       "title": "Card chains",
       "subtitle": "Build mastery one concept at a time.",
-      "cardsUnlocked": "{unlocked} / {total} cards unlocked",
-      "progressAria": "{unlocked} of {total} cards unlocked"
+      "cardsUnlocked": "{unlocked} / {total} card unlocked | {unlocked} / {total} cards unlocked",
+      "progressAria": "{unlocked} of {total} card unlocked | {unlocked} of {total} cards unlocked"
     },
     "tournaments": {
       "title": "Tournaments",
       "subtitle": "Compete with students across your class or globally.",
       "active": "Live",
       "upcoming": "Upcoming",
-      "participants": "{count} participants",
+      "participants": "{count} participant | {count} participants",
       "empty": "No tournaments running right now. Check back soon."
     }
   },
@@ -707,11 +707,11 @@
       "emptySubtitle": "Start a new thread to ask your first question."
     },
     "threadList": {
-      "messageCount": "{count} messages",
+      "messageCount": "{count} message | {count} messages",
       "justNow": "just now",
-      "minutesAgo": "{count}m ago",
-      "hoursAgo": "{count}h ago",
-      "daysAgo": "{count}d ago"
+      "minutesAgo": "{count}m ago | {count}m ago",
+      "hoursAgo": "{count}h ago | {count}h ago",
+      "daysAgo": "{count}d ago | {count}d ago"
     },
     "thread": {
       "emptyTitle": "Ask your first question",
@@ -741,8 +741,8 @@
     "resume": {
       "label": "Resume session",
       "cta": "Continue",
-      "minutesAgo": "Started {count} min ago",
-      "hoursAgo": "Started {count} h ago",
+      "minutesAgo": "Started {count} min ago | Started {count} min ago",
+      "hoursAgo": "Started {count} h ago | Started {count} h ago",
       "progressAria": "Session progress: {percent} percent"
     },
     "quick": {
@@ -771,7 +771,7 @@
       "questionsAnswered": "Questions answered",
       "overallAccuracy": "Overall accuracy",
       "level": "Level {level}",
-      "sessionsValue": "{count} sessions",
+      "sessionsValue": "{count} session | {count} sessions",
       "unavailable": "—"
     }
   },

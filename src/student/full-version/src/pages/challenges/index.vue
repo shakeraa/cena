@@ -138,13 +138,13 @@ const anyError = computed(() =>
               color="primary"
               height="8"
               rounded
-              :aria-label="t('challenges.chains.progressAria', {
+              :aria-label="t('challenges.chains.progressAria', chain.cardsUnlocked, {
                 unlocked: chain.cardsUnlocked,
                 total: chain.cardsTotal,
               })"
             />
             <div class="text-caption text-medium-emphasis mt-2">
-              {{ t('challenges.chains.cardsUnlocked', {
+              {{ t('challenges.chains.cardsUnlocked', chain.cardsUnlocked, {
                 unlocked: chain.cardsUnlocked,
                 total: chain.cardsTotal,
               }) }}
@@ -195,7 +195,7 @@ const anyError = computed(() =>
               {{ tourn.name }}
             </div>
             <div class="text-caption text-white opacity-90 mt-1">
-              {{ t('challenges.tournaments.participants', { count: tourn.participantCount }) }}
+              {{ t('challenges.tournaments.participants', tourn.participantCount, { count: tourn.participantCount }) }}
             </div>
           </VCard>
           <VCard
@@ -217,7 +217,7 @@ const anyError = computed(() =>
               {{ tourn.name }}
             </div>
             <div class="text-caption text-medium-emphasis mt-1">
-              {{ t('challenges.tournaments.participants', { count: tourn.participantCount }) }}
+              {{ t('challenges.tournaments.participants', tourn.participantCount, { count: tourn.participantCount }) }}
             </div>
           </VCard>
         </div>

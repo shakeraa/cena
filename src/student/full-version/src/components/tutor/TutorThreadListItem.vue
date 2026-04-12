@@ -21,11 +21,11 @@ const relativeUpdated = computed(() => {
   if (diffMin < 1)
     return t('tutor.threadList.justNow')
   if (diffMin < 60)
-    return t('tutor.threadList.minutesAgo', { count: diffMin })
+    return t('tutor.threadList.minutesAgo', diffMin, { count: diffMin })
   if (diffHour < 24)
-    return t('tutor.threadList.hoursAgo', { count: diffHour })
+    return t('tutor.threadList.hoursAgo', diffHour, { count: diffHour })
 
-  return t('tutor.threadList.daysAgo', { count: diffDay })
+  return t('tutor.threadList.daysAgo', diffDay, { count: diffDay })
 })
 </script>
 
@@ -62,7 +62,7 @@ const relativeUpdated = computed(() => {
           >
             {{ thread.subject }}
           </VChip>
-          <span>{{ t('tutor.threadList.messageCount', { count: thread.messageCount }) }}</span>
+          <span>{{ t('tutor.threadList.messageCount', thread.messageCount, { count: thread.messageCount }) }}</span>
           <span class="mx-1">·</span>
           <span>{{ relativeUpdated }}</span>
         </div>

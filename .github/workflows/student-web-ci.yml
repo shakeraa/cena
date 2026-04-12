@@ -30,6 +30,9 @@ jobs:
       - name: Lint
         run: npm run lint
       
+      - name: i18n plural form lint
+        run: npm run check:i18n-plurals
+
       - name: Unit tests
         run: npm run test:unit
 

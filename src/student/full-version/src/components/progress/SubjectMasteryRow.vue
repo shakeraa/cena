@@ -85,7 +85,7 @@ const tierColor = computed(() => {
 
     <div class="d-flex justify-space-between mt-2 text-caption text-medium-emphasis">
       <span>
-        {{ t('progress.mastery.questionsAttempted', { count: questionsAttempted }) }}
+        {{ t('progress.mastery.questionsAttempted', questionsAttempted, { count: questionsAttempted }) }}
       </span>
       <span>
         {{ t('progress.mastery.accuracy', { percent: accuracyPercent }) }}
