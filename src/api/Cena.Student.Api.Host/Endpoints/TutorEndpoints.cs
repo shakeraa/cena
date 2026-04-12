@@ -227,6 +227,14 @@ public static class TutorEndpoints
                 Content: s.Content,
                 CreatedAt: s.CreatedAt,
                 Status: "complete")),
+            // FIND-privacy-008: safeguarding concern -> return the "talk to trusted adult"
+            // response as a normal assistant message so the student sees support info.
+            SendTutorMessageResult.SafeguardingEscalated sg => Results.Ok(new SendMessageResponse(
+                MessageId: $"safeguard_{Guid.NewGuid():N}",
+                Role: "assistant",
+                Content: sg.StudentResponse,
+                CreatedAt: DateTime.UtcNow,
+                Status: "safeguarding")),
             SendTutorMessageResult.InvalidContent ic =>
                 Results.BadRequest(new { Error = ic.Reason }),
             SendTutorMessageResult.ThreadNotFound =>
@@ -241,10 +249,14 @@ public static class TutorEndpoints
     }
 
     // POST /api/tutor/threads/{threadId}/stream — SSE streaming endpoint (STB-04b)
+    // FIND-privacy-008: PII scrubbing + safeguarding scan added.
     private static async IAsyncEnumerable<SseEvent> StreamMessage(
         HttpContext ctx,
         IDocumentStore store,
         ITutorLlmService llmService,
+        ITutorPromptScrubber scrubber,
+        ISafeguardingClassifier classifier,
+        ISafeguardingEscalation escalation,
         string threadId,
         StreamMessageRequest request,
         [EnumeratorCancellation] CancellationToken ct)
@@ -264,8 +276,29 @@ public static class TutorEndpoints
             yield break;
         }
 
+        // ── FIND-privacy-008: Safeguarding scan BEFORE any persistence ──
+        var safeguardingResult = classifier.Scan(request.Content);
+        if (safeguardingResult.IsConcern && safeguardingResult.Severity >= SafeguardingSeverity.High)
+        {
+            var escalationResult = await escalation.EscalateAsync(
+                studentId, threadId, safeguardingResult, market: null, ct);
+
+            yield return new SseEvent("safeguarding", JsonSerializer.Serialize(new
+            {
+                response = escalationResult.StudentResponse,
+                severity = safeguardingResult.Severity.ToString()
+            }));
+            yield return new SseEvent("done", JsonSerializer.Serialize(new
+            {
+                messageId = escalationResult.Alert.AlertId,
+                content = escalationResult.StudentResponse,
+                createdAt = DateTime.UtcNow
+            }));
+            yield break;
+        }
+
         await using var session = store.LightweightSession();
-        
+
         // Verify thread exists and belongs to student
         var thread = await session.LoadAsync<TutorThreadDocument>(threadId);
         if (thread is null || thread.StudentId != studentId)
@@ -276,7 +309,7 @@ public static class TutorEndpoints
 
         var now = DateTime.UtcNow;
 
-        // Store user message
+        // Store user message (original content for local DB)
         var userMessageId = $"tutor_msg_{Guid.NewGuid():N}";
         var userMessage = new TutorMessageDocument
         {
@@ -290,6 +323,12 @@ public static class TutorEndpoints
         };
         session.Store(userMessage);
 
+        // ── FIND-privacy-008: PII scrubbing for outbound LLM call ──
+        var piiContext = new StudentPiiContext(
+            StudentId: studentId,
+            FirstName: null, LastName: null, Email: null,
+            SchoolName: null, ParentName: null, City: null);
+
         // Get conversation history for context
         var history = await session.Query<TutorMessageDocument>()
             .Where(m => m.ThreadId == threadId)
@@ -299,7 +338,13 @@ public static class TutorEndpoints
 
         var conversationHistory = history
             .OrderBy(m => m.CreatedAt)
-            .Select(m => (m.Role, m.Content))
+            .Select(m =>
+            {
+                var content = m.Role == "user"
+                    ? scrubber.Scrub(m.Content, piiContext).ScrubbedText
+                    : m.Content;
+                return (m.Role, Content: content);
+            })
             .ToList();
 
         // Prepare for assistant response
@@ -309,7 +354,8 @@ public static class TutorEndpoints
         // Send message ID first
         yield return new SseEvent("message_id", JsonSerializer.Serialize(new { messageId = assistantMessageId }));
 
-        // Build tutor context for LLM
+        // Build tutor context for LLM with SCRUBBED content
+        var scrubbedInput = scrubber.Scrub(request.Content, piiContext).ScrubbedText;
         var tutorContext = new TutorContext(
             StudentId: studentId,
             ThreadId: threadId,
@@ -329,7 +375,7 @@ public static class TutorEndpoints
                 fullContent.Append(chunk.Delta);
                 yield return new SseEvent("token", JsonSerializer.Serialize(new { token = chunk.Delta }));
             }
-            
+
             // Capture token usage from final chunk
             if (chunk.Finished && chunk.TokensUsed.HasValue)
             {
@@ -367,12 +413,12 @@ public static class TutorEndpoints
             MessagePreview: assistantMessage.Content[..Math.Min(200, assistantMessage.Content.Length)],
             SourceCount: 0, // Future: RAG source count when implemented
             Timestamp: DateTimeOffset.UtcNow);
-        
+
         session.Events.Append(studentId, tutoringEvent);
         await session.SaveChangesAsync(ct);
 
         // Signal completion
-        yield return new SseEvent("done", JsonSerializer.Serialize(new { 
+        yield return new SseEvent("done", JsonSerializer.Serialize(new {
             messageId = assistantMessageId,
             content = assistantMessage.Content,
             createdAt = assistantMessage.CreatedAt

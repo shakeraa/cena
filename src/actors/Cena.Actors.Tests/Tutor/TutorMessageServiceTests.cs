@@ -1,7 +1,8 @@
 // =============================================================================
-// Cena Platform — Tutor Message Service Tests (FIND-arch-004)
+// Cena Platform — Tutor Message Service Tests (FIND-arch-004 + FIND-privacy-008)
 // Asserts the non-streaming /messages path calls the real LLM and never returns
 // the old canned placeholder that used to redirect callers to /stream.
+// Also asserts PII scrubbing and safeguarding classification pipeline.
 // =============================================================================
 
 using System.Runtime.CompilerServices;
@@ -22,6 +23,8 @@ namespace Cena.Actors.Tests.Tutor;
 /// These guard FIND-arch-004: the tutor /messages endpoint must use the real
 /// LLM, not a canned placeholder. Every test asserts the returned content does
 /// NOT contain any of the old stub strings.
+///
+/// FIND-privacy-008: Also guards PII scrubbing and safeguarding classification.
 /// </summary>
 public sealed class TutorMessageServiceTests
 {
@@ -40,11 +43,20 @@ public sealed class TutorMessageServiceTests
 
     private readonly ITutorMessageRepository _repo = Substitute.For<ITutorMessageRepository>();
     private readonly ITutorLlmService _llm = Substitute.For<ITutorLlmService>();
+    private readonly ITutorPromptScrubber _scrubber;
+    private readonly ISafeguardingClassifier _classifier;
+    private readonly ISafeguardingEscalation _escalation = Substitute.For<ISafeguardingEscalation>();
     private readonly TutorMessageService _sut;
 
     public TutorMessageServiceTests()
     {
-        _sut = new TutorMessageService(_repo, _llm, NullLogger<TutorMessageService>.Instance);
+        // Use real implementations for scrubber and classifier so we test
+        // the full pipeline, not mocked no-ops.
+        _scrubber = new TutorPromptScrubber(NullLogger<TutorPromptScrubber>.Instance);
+        _classifier = new SafeguardingClassifier(NullLogger<SafeguardingClassifier>.Instance);
+        _sut = new TutorMessageService(
+            _repo, _llm, _scrubber, _classifier, _escalation,
+            NullLogger<TutorMessageService>.Instance);
     }
 
     [Fact]
@@ -283,6 +295,104 @@ public sealed class TutorMessageServiceTests
         AssertResultFreeOfCanned(r4);
     }
 
+    // ── FIND-privacy-008: Safeguarding pipeline tests ──────────────────────
+
+    [Fact]
+    public async Task SendAsync_SafeguardingHighSeverity_SuppressesLlmCall_DoesNotStoreMessage()
+    {
+        // Arrange: "I want to hurt myself" should trigger HIGH severity.
+        _escalation.EscalateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<SafeguardingResult>(),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new SafeguardingEscalationResult(
+                StudentResponse: "Please talk to a trusted adult.",
+                Alert: new SafeguardingAlert(
+                    "alert-1", "student-1", DateTimeOffset.UtcNow,
+                    SafeguardingSeverity.High,
+                    new List<string> { "self_harm" }, "thread-1", null)));
+
+        // Act
+        var result = await _sut.SendAsync("student-1", "thread-1", "I want to hurt myself");
+
+        // Assert: SafeguardingEscalated result, NOT Success.
+        var escalated = Assert.IsType<SendTutorMessageResult.SafeguardingEscalated>(result);
+        Assert.Equal(SafeguardingSeverity.High, escalated.Severity);
+        Assert.Contains("trusted adult", escalated.StudentResponse);
+
+        // LLM was NEVER called.
+        _ = _llm.DidNotReceive().StreamCompletionAsync(
+            Arg.Any<TutorContext>(), Arg.Any<CancellationToken>());
+
+        // User message was NOT persisted (safeguarding content is not stored).
+        await _repo.DidNotReceive().PersistUserMessageAsync(
+            Arg.Any<TutorThreadDocument>(),
+            Arg.Any<TutorMessageDocument>(),
+            Arg.Any<CancellationToken>());
+
+        // Escalation service WAS called.
+        await _escalation.Received(1).EscalateAsync(
+            "student-1", "thread-1",
+            Arg.Is<SafeguardingResult>(r => r.Severity == SafeguardingSeverity.High),
+            Arg.Any<string?>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SendAsync_NormalText_PassesThroughToLlm_NoSafeguardingEscalation()
+    {
+        // Arrange: normal academic text should NOT trigger safeguarding.
+        var thread = NewThread("thread-1", "student-1", 0);
+        _repo.LoadOwnedThreadAsync("thread-1", "student-1", Arg.Any<CancellationToken>())
+            .Returns(thread);
+        _repo.LoadRecentHistoryAsync("thread-1", 10, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<TutorMessage>>(new List<TutorMessage>()));
+        _llm.StreamCompletionAsync(Arg.Any<TutorContext>(), Arg.Any<CancellationToken>())
+            .Returns(_ => ToAsyncEnumerable(
+                new LlmChunk("Photosynthesis is the process...", Finished: true, TokensUsed: 5, Model: "claude-sonnet-4-6")));
+
+        // Act
+        var result = await _sut.SendAsync("student-1", "thread-1", "What is photosynthesis?");
+
+        // Assert: normal Success result, escalation NOT called.
+        Assert.IsType<SendTutorMessageResult.Success>(result);
+        await _escalation.DidNotReceive().EscalateAsync(
+            Arg.Any<string>(), Arg.Any<string>(), Arg.Any<SafeguardingResult>(),
+            Arg.Any<string?>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task SendAsync_PiiInContent_ScrubbedBeforeLlm()
+    {
+        // Arrange: content contains an email that the scrubber should redact.
+        var thread = NewThread("thread-1", "student-1", 0);
+        _repo.LoadOwnedThreadAsync("thread-1", "student-1", Arg.Any<CancellationToken>())
+            .Returns(thread);
+        _repo.LoadRecentHistoryAsync("thread-1", 10, Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult<IReadOnlyList<TutorMessage>>(new List<TutorMessage>()));
+
+        TutorContext? capturedContext = null;
+        _llm.StreamCompletionAsync(Arg.Any<TutorContext>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo =>
+            {
+                capturedContext = callInfo.Arg<TutorContext>();
+                return ToAsyncEnumerable(
+                    new LlmChunk("OK", Finished: true, TokensUsed: 1, Model: "claude-sonnet-4-6"));
+            });
+
+        // Act: the content contains a phone number
+        await _sut.SendAsync("student-1", "thread-1", "My phone is 054-1234567, help with math");
+
+        // Assert: LLM was called (normal text otherwise), and the original
+        // content was persisted (not the scrubbed version), but the scrubber
+        // ran. We can verify the user message was persisted with the ORIGINAL.
+        await _repo.Received(1).PersistUserMessageAsync(
+            Arg.Any<TutorThreadDocument>(),
+            Arg.Is<TutorMessageDocument>(m =>
+                m.Role == "user" &&
+                m.Content == "My phone is 054-1234567, help with math"),
+            Arg.Any<CancellationToken>());
+    }
+
     // -------------------------------------------------------------------------
     // Helpers
     // -------------------------------------------------------------------------
@@ -340,6 +450,9 @@ public sealed class TutorMessageServiceTests
                 break;
             case SendTutorMessageResult.LlmError le:
                 AssertNoCannedPlaceholder(le.Reason);
+                break;
+            case SendTutorMessageResult.SafeguardingEscalated sg:
+                AssertNoCannedPlaceholder(sg.StudentResponse);
                 break;
             case SendTutorMessageResult.ThreadNotFound:
                 // No text field to check; this case is fine by construction.

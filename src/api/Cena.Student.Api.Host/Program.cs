@@ -132,6 +132,12 @@ else
 builder.Services.AddScoped<ITutorMessageRepository, MartenTutorMessageRepository>();
 builder.Services.AddScoped<ITutorMessageService, TutorMessageService>();
 
+// FIND-privacy-008: PII scrubbing + safeguarding classification pipeline.
+// These run on every student message BEFORE the Anthropic API call.
+builder.Services.AddSingleton<ITutorPromptScrubber, TutorPromptScrubber>();
+builder.Services.AddSingleton<ISafeguardingClassifier, SafeguardingClassifier>();
+builder.Services.AddScoped<ISafeguardingEscalation, SafeguardingEscalation>();
+
 // ---- Firebase Auth + Authorization ----
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);

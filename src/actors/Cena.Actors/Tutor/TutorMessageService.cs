@@ -1,11 +1,15 @@
 // =============================================================================
-// Cena Platform — Tutor Message Service (FIND-arch-004)
+// Cena Platform — Tutor Message Service (FIND-arch-004 + FIND-privacy-008)
 // Production-grade non-streaming tutor message handler.
 //
 // Replaces the canned placeholder that used to live inline in
 // TutorEndpoints.SendMessage (which redirected callers to /stream instead of
 // actually answering). All LLM calls now go through the real ITutorLlmService
 // — the same implementation used by the /stream endpoint.
+//
+// FIND-privacy-008: PII scrubbing and safeguarding classification are now
+// applied to every student message BEFORE the LLM call. On a safeguarding
+// concern, the LLM call is skipped and a SafeguardingAlert is created.
 //
 // The service is extracted from the endpoint handler to make it:
 //   1. Directly unit-testable via ITutorMessageRepository (no Marten host test).
@@ -39,6 +43,14 @@ public abstract record SendTutorMessageResult
     public sealed record InvalidContent(string Reason) : SendTutorMessageResult;
 
     public sealed record LlmError(string Reason) : SendTutorMessageResult;
+
+    /// <summary>
+    /// FIND-privacy-008: Safeguarding concern detected. LLM call was skipped,
+    /// message was NOT stored, and a SafeguardingAlert was created.
+    /// </summary>
+    public sealed record SafeguardingEscalated(
+        string StudentResponse,
+        SafeguardingSeverity Severity) : SendTutorMessageResult;
 }
 
 /// <summary>
@@ -98,20 +110,30 @@ public interface ITutorMessageService
 
 /// <summary>
 /// Production implementation of <see cref="ITutorMessageService"/>.
+/// FIND-privacy-008: PII scrubbing + safeguarding classification pipeline.
 /// </summary>
 public sealed class TutorMessageService : ITutorMessageService
 {
     private readonly ITutorMessageRepository _repository;
     private readonly ITutorLlmService _llmService;
+    private readonly ITutorPromptScrubber _scrubber;
+    private readonly ISafeguardingClassifier _classifier;
+    private readonly ISafeguardingEscalation _escalation;
     private readonly ILogger<TutorMessageService> _logger;
 
     public TutorMessageService(
         ITutorMessageRepository repository,
         ITutorLlmService llmService,
+        ITutorPromptScrubber scrubber,
+        ISafeguardingClassifier classifier,
+        ISafeguardingEscalation escalation,
         ILogger<TutorMessageService> logger)
     {
         _repository = repository;
         _llmService = llmService;
+        _scrubber = scrubber;
+        _classifier = classifier;
+        _escalation = escalation;
         _logger = logger;
     }
 
@@ -128,13 +150,49 @@ public sealed class TutorMessageService : ITutorMessageService
         if (string.IsNullOrWhiteSpace(threadId))
             return new SendTutorMessageResult.InvalidContent("ThreadId is required");
 
+        // ── FIND-privacy-008: Safeguarding scan BEFORE any persistence ──
+        // If the student input triggers a safeguarding concern, we do NOT
+        // store the message and do NOT call the LLM. Instead we create a
+        // SafeguardingAlert and return a "talk to a trusted adult" response.
+        var safeguardingResult = _classifier.Scan(content);
+        if (safeguardingResult.IsConcern && safeguardingResult.Severity >= SafeguardingSeverity.High)
+        {
+            _logger.LogWarning(
+                "[SAFEGUARDING] concern_level={Level} student={StudentId} thread={ThreadId} -- LLM call suppressed, message NOT stored",
+                safeguardingResult.Severity, studentId, threadId);
+
+            var escalationResult = await _escalation.EscalateAsync(
+                studentId, threadId, safeguardingResult, market: null, ct);
+
+            return new SendTutorMessageResult.SafeguardingEscalated(
+                StudentResponse: escalationResult.StudentResponse,
+                Severity: safeguardingResult.Severity);
+        }
+
         var thread = await _repository.LoadOwnedThreadAsync(threadId, studentId, ct);
         if (thread is null)
             return new SendTutorMessageResult.ThreadNotFound();
 
         var now = DateTime.UtcNow;
 
+        // ── FIND-privacy-008: PII scrubbing on the content before LLM ──
+        // We build a StudentPiiContext from the known student data.
+        // For now we use a minimal context (studentId only); the full profile
+        // lookup is wired via DI and used by the streaming endpoint.
+        var piiContext = new StudentPiiContext(
+            StudentId: studentId,
+            FirstName: null,  // Populated via IStudentPiiProvider when registered
+            LastName: null,
+            Email: null,
+            SchoolName: null,
+            ParentName: null,
+            City: null);
+        var scrubResult = _scrubber.Scrub(content, piiContext);
+        var scrubbedContent = scrubResult.ScrubbedText;
+
         // Persist the user message up front so we don't lose it if the LLM fails.
+        // Store the ORIGINAL content in the DB (not scrubbed) -- the scrubbed
+        // version is only used for the outbound LLM call.
         var userMessageId = $"tutor_msg_{Guid.NewGuid():N}";
         var userMessage = new TutorMessageDocument
         {
@@ -153,16 +211,28 @@ public sealed class TutorMessageService : ITutorMessageService
         // Build conversation history (last 10 messages) for LLM context.
         var history = await _repository.LoadRecentHistoryAsync(threadId, 10, ct);
 
+        // ── FIND-privacy-008: Scrub history content for LLM context ──
+        var scrubbedHistory = history.Select(m =>
+        {
+            if (m.Role == "user")
+            {
+                var scrubbed = _scrubber.Scrub(m.Content, piiContext);
+                return new TutorMessage(m.Role, scrubbed.ScrubbedText);
+            }
+            return m;
+        }).ToList();
+
         var tutorContext = new TutorContext(
             StudentId: studentId,
             ThreadId: threadId,
-            MessageHistory: history,
+            MessageHistory: scrubbedHistory,
             Subject: thread.Subject,
             CurrentGrade: null);
 
         // Real LLM call. We reuse the same ITutorLlmService that /stream uses
-        // (ClaudeTutorLlmService → Anthropic), draining the async stream into a
+        // (ClaudeTutorLlmService -> Anthropic), draining the async stream into a
         // single complete response for this unary endpoint. No placeholder text.
+        // The outbound payload now contains SCRUBBED text, never raw PII.
         var fullContent = new System.Text.StringBuilder();
         int? totalTokensUsed = null;
         string? model = null;
