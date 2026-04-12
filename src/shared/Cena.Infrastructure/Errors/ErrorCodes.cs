@@ -51,6 +51,11 @@ public static class ErrorCodes
     public const string CENA_SEC_TAMPER_NONCE      = "CENA_SEC_TAMPER_NONCE";
     public const string CENA_SEC_TAMPER_SIGNATURE  = "CENA_SEC_TAMPER_SIGNATURE";
 
+    // ---- GDPR / Privacy (FIND-privacy-003) ----
+    public const string CENA_GDPR_EXPORT_FAILED         = "CENA_GDPR_EXPORT_FAILED";
+    public const string CENA_GDPR_ERASURE_FAILED        = "CENA_GDPR_ERASURE_FAILED";
+    public const string CENA_GDPR_DSAR_FAILED           = "CENA_GDPR_DSAR_FAILED";
+
     // ---- Internal ----
     public const string CENA_INTERNAL_ERROR             = "CENA_INTERNAL_ERROR";
     public const string CENA_INTERNAL_VALIDATION        = "CENA_INTERNAL_VALIDATION";
