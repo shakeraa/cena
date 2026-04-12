@@ -22,4 +22,9 @@ public class StudentRecordAccessLog
     public string HttpMethod { get; set; } = "";
     public int StatusCode { get; set; }
     public string? IpAddress { get; set; }
+    /// <summary>
+    /// Category of access: data_access, privileged_action, export, deletion, etc.
+    /// Used for FERPA audit filtering.
+    /// </summary>
+    public string Category { get; set; } = "data_access";
 }

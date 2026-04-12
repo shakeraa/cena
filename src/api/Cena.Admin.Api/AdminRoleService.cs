@@ -3,10 +3,13 @@
 // BKD-003: Business logic for role CRUD, permission matrix, CASL mapping
 // =============================================================================
 
+using System.Security.Claims;
 using System.Text.RegularExpressions;
+using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Seed;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -20,7 +23,7 @@ public interface IAdminRoleService
     Task<RoleDto> UpdatePermissionsAsync(string id, UpdatePermissionsRequest request);
     Task DeleteRoleAsync(string id);
     Task<IReadOnlyList<PermissionCategoryDto>> ListPermissionsAsync();
-    Task AssignRoleToUserAsync(string userId, AssignRoleRequest request);
+    Task AssignRoleToUserAsync(string userId, AssignRoleRequest request, ClaimsPrincipal caller);
     Task<IReadOnlyList<CaslAbilityRule>> GetUserAbilitiesAsync(string userId);
 }
 
@@ -161,7 +164,7 @@ public sealed class AdminRoleService : IAdminRoleService
         return Task.FromResult(result);
     }
 
-    public async Task AssignRoleToUserAsync(string userId, AssignRoleRequest request)
+    public async Task AssignRoleToUserAsync(string userId, AssignRoleRequest request, ClaimsPrincipal caller)
     {
         if (!Enum.TryParse<CenaRole>(request.Role, true, out var newRole))
             throw new ArgumentException($"Invalid role: {request.Role}");
@@ -169,6 +172,30 @@ public sealed class AdminRoleService : IAdminRoleService
         await using var session = _store.LightweightSession();
         var user = await session.LoadAsync<AdminUser>(userId)
             ?? throw new KeyNotFoundException($"User '{userId}' not found");
+
+        // FIND-sec-010: Get caller's role and school for privilege escalation checks
+        var callerRole = caller.FindFirstValue(ClaimTypes.Role)
+            ?? caller.FindFirstValue("role")
+            ?? throw new UnauthorizedAccessException("Caller has no role claim");
+
+        var callerSchool = TenantScope.GetSchoolFilter(caller);
+        var isSuperAdmin = callerRole == "SUPER_ADMIN";
+
+        // FIND-sec-010: Only SUPER_ADMIN can assign SUPER_ADMIN role
+        if (newRole == CenaRole.SUPER_ADMIN && !isSuperAdmin)
+        {
+            _logger.LogWarning("Privilege escalation attempt: caller {Caller} with role {CallerRole} attempted to assign SUPER_ADMIN to user {UserId}",
+                caller.FindFirstValue("sub") ?? "unknown", callerRole, userId);
+            throw new UnauthorizedAccessException("Only SUPER_ADMIN can assign the SUPER_ADMIN role");
+        }
+
+        // FIND-sec-010: ADMIN can only assign roles to users in their own school
+        if (!isSuperAdmin && callerSchool != null && user.School != callerSchool)
+        {
+            _logger.LogWarning("Cross-school role assignment attempt: caller from school {CallerSchool} attempted to assign role to user {UserId} in school {TargetSchool}",
+                callerSchool, userId, user.School);
+            throw new KeyNotFoundException($"User '{userId}' not found");
+        }
 
         // Safety: cannot remove last SUPER_ADMIN
         if (user.Role == CenaRole.SUPER_ADMIN && newRole != CenaRole.SUPER_ADMIN)
@@ -192,7 +219,25 @@ public sealed class AdminRoleService : IAdminRoleService
             ["locale"] = user.Locale
         });
 
-        _logger.LogInformation("Assigned role {Role} to user {UserId}", newRole, userId);
+        // FIND-sec-010: Emit audit log for FERPA compliance
+        var accessLog = new StudentRecordAccessLog
+        {
+            Id = Guid.NewGuid(),
+            AccessedAt = DateTimeOffset.UtcNow,
+            AccessedBy = caller.FindFirstValue("sub") ?? caller.FindFirstValue(ClaimTypes.NameIdentifier) ?? "unknown",
+            AccessorRole = callerRole,
+            AccessorSchool = callerSchool,
+            StudentId = userId,
+            Endpoint = "/api/admin/users/{id}/role",
+            HttpMethod = "POST",
+            StatusCode = 204,
+            Category = "privileged_action"
+        };
+        session.Store(accessLog);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation("Assigned role {Role} to user {UserId} by caller {Caller} with role {CallerRole}",
+            newRole, userId, accessLog.AccessedBy, callerRole);
     }
 
     public async Task<IReadOnlyList<CaslAbilityRule>> GetUserAbilitiesAsync(string userId)
