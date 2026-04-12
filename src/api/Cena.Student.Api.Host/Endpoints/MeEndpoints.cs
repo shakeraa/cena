@@ -12,6 +12,7 @@ using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -31,6 +32,9 @@ public static class MeEndpoints
         group.MapGet("/profile", GetProfile).WithName("GetMeProfile");
         group.MapPatch("/profile", UpdateProfile).WithName("UpdateMeProfile");
         group.MapPost("/onboarding", SubmitOnboarding).WithName("SubmitOnboarding");
+
+        // FIND-privacy-001: Record DOB + consent for authenticated users (adults)
+        group.MapPost("/age-consent", RecordAgeConsent).WithName("RecordAgeConsent");
 
         // STB-00b: Settings
         group.MapGet("/settings", GetSettings).WithName("GetSettings");
@@ -446,6 +450,67 @@ public static class MeEndpoints
             ExpiresAt: expiresAt);
 
         return Results.Ok(dto);
+    }
+
+    // ---- FIND-privacy-001: Age & Consent ----
+
+    /// <summary>
+    /// POST /api/me/age-consent — Records DOB and consent for an authenticated
+    /// user who has completed the age gate. For adults (age >= 16), this sets
+    /// consent_status=not_required. For teens/children, this should only be
+    /// called after the parent consent flow is complete.
+    /// </summary>
+    private static async Task<IResult> RecordAgeConsent(
+        HttpContext ctx,
+        IDocumentStore store,
+        AgeConsentRequest request,
+        ILogger<MeLoggerMarker> logger)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var dob = request.DateOfBirth;
+
+        if (dob > today)
+            return Results.BadRequest(new { Error = "Date of birth cannot be in the future." });
+
+        var age = today.Year - dob.Year;
+        if (today < dob.AddYears(age))
+            age--;
+
+        var consentTier = age switch
+        {
+            < 13 => "child",
+            < 16 => "teen",
+            _ => "adult",
+        };
+
+        var consentStatus = consentTier == "adult" ? "not_required" : "pending_parent";
+
+        await using var session = store.LightweightSession();
+        var consentEvent = new AgeAndConsentRecorded_V1(
+            StudentId: studentId,
+            DateOfBirth: dob,
+            AgeAtRegistration: age,
+            ConsentTier: consentTier,
+            ParentEmail: request.ParentEmail,
+            ParentalConsentGiven: consentTier == "adult",
+            ParentalConsentToken: null,
+            ConsentStatus: consentStatus,
+            RecordedAt: DateTimeOffset.UtcNow);
+
+        session.Events.Append(studentId, consentEvent);
+        await session.SaveChangesAsync();
+
+        logger.LogInformation(
+            "FIND-privacy-001: Age consent recorded for student {StudentId}, age={Age}, tier={ConsentTier}, status={ConsentStatus}",
+            studentId, age, consentTier, consentStatus);
+
+        return Results.Ok(new { Success = true, ConsentTier = consentTier, ConsentStatus = consentStatus });
     }
 
     // ---- Helper methods ----

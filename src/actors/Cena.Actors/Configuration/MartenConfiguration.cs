@@ -488,6 +488,7 @@ public static class MartenConfiguration
         opts.Events.AddEventType<LearningSessionStarted_V1>();
         opts.Events.AddEventType<LearningSessionEnded_V1>();
         opts.Events.AddEventType<OnboardingCompleted_V1>(); // STB-00
+        opts.Events.AddEventType<AgeAndConsentRecorded_V1>(); // FIND-privacy-001
 
         // STB-05b: Challenge events
         opts.Events.AddEventType<ChallengeStarted_V1>();

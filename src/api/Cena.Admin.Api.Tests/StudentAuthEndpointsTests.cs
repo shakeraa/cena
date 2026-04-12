@@ -206,4 +206,139 @@ public class StudentAuthEndpointsTests
         Assert.NotNull(rateLimiter);
         Assert.Equal("password-reset", rateLimiter!.PolicyName);
     }
+
+    // =========================================================================
+    // FIND-privacy-001: Age check endpoint tests
+    // =========================================================================
+
+    [Fact]
+    public void AgeCheck_AdultAge_ReturnsNoneConsentPath()
+    {
+        // Student born 20 years ago — should get "adult" tier, no consent needed
+        var dob = DateOnly.FromDateTime(System.DateTime.UtcNow.AddYears(-20));
+        var request = new AuthEndpoints.AgeCheckRequest(dob);
+
+        var result = AuthEndpoints.AgeCheck(request, NullLogger());
+
+        var okResult = Assert.IsType<Ok<AuthEndpoints.AgeCheckResponse>>(result);
+        Assert.NotNull(okResult.Value);
+        Assert.Equal("none", okResult.Value!.ConsentPath);
+        Assert.Equal("adult", okResult.Value.ConsentTier);
+        Assert.Equal(20, okResult.Value.Age);
+    }
+
+    [Fact]
+    public void AgeCheck_TeenAge_ReturnsParentRequired()
+    {
+        // Student born 14 years ago — should get "teen" tier, parent required
+        var dob = DateOnly.FromDateTime(System.DateTime.UtcNow.AddYears(-14));
+        var request = new AuthEndpoints.AgeCheckRequest(dob);
+
+        var result = AuthEndpoints.AgeCheck(request, NullLogger());
+
+        var okResult = Assert.IsType<Ok<AuthEndpoints.AgeCheckResponse>>(result);
+        Assert.NotNull(okResult.Value);
+        Assert.Equal("parent-required", okResult.Value!.ConsentPath);
+        Assert.Equal("teen", okResult.Value.ConsentTier);
+    }
+
+    [Fact]
+    public void AgeCheck_ChildAge_ReturnsParentRequired()
+    {
+        // Student born 10 years ago — should get "child" tier, parent required (COPPA)
+        var dob = DateOnly.FromDateTime(System.DateTime.UtcNow.AddYears(-10));
+        var request = new AuthEndpoints.AgeCheckRequest(dob);
+
+        var result = AuthEndpoints.AgeCheck(request, NullLogger());
+
+        var okResult = Assert.IsType<Ok<AuthEndpoints.AgeCheckResponse>>(result);
+        Assert.NotNull(okResult.Value);
+        Assert.Equal("parent-required", okResult.Value!.ConsentPath);
+        Assert.Equal("child", okResult.Value.ConsentTier);
+    }
+
+    [Fact]
+    public void AgeCheck_ExactlyAge16_ReturnsAdult()
+    {
+        // Boundary test: exactly 16 years old today
+        var today = DateOnly.FromDateTime(System.DateTime.UtcNow);
+        var dob = new DateOnly(today.Year - 16, today.Month, today.Day);
+        var request = new AuthEndpoints.AgeCheckRequest(dob);
+
+        var result = AuthEndpoints.AgeCheck(request, NullLogger());
+
+        var okResult = Assert.IsType<Ok<AuthEndpoints.AgeCheckResponse>>(result);
+        Assert.NotNull(okResult.Value);
+        Assert.Equal("adult", okResult.Value!.ConsentTier);
+        Assert.Equal(16, okResult.Value.Age);
+    }
+
+    [Fact]
+    public void AgeCheck_ExactlyAge13_ReturnsTeen()
+    {
+        var today = DateOnly.FromDateTime(System.DateTime.UtcNow);
+        var dob = new DateOnly(today.Year - 13, today.Month, today.Day);
+        var request = new AuthEndpoints.AgeCheckRequest(dob);
+
+        var result = AuthEndpoints.AgeCheck(request, NullLogger());
+
+        var okResult = Assert.IsType<Ok<AuthEndpoints.AgeCheckResponse>>(result);
+        Assert.NotNull(okResult.Value);
+        Assert.Equal("teen", okResult.Value!.ConsentTier);
+        Assert.Equal(13, okResult.Value.Age);
+    }
+
+    [Fact]
+    public void AgeCheck_FutureDob_Returns400()
+    {
+        var tomorrow = DateOnly.FromDateTime(System.DateTime.UtcNow.AddDays(1));
+        var request = new AuthEndpoints.AgeCheckRequest(tomorrow);
+
+        var result = AuthEndpoints.AgeCheck(request, NullLogger());
+
+        var badRequest = Assert.IsType<BadRequest<AuthEndpoints.AuthErrorResponse>>(result);
+        Assert.Contains("future", badRequest.Value!.Error, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void AgeCheck_NullRequest_Returns400()
+    {
+        var result = AuthEndpoints.AgeCheck(null!, NullLogger());
+
+        Assert.IsType<BadRequest<AuthEndpoints.AuthErrorResponse>>(result);
+    }
+
+    // ---- CalculateAge helper tests ------------------------------------------
+
+    [Fact]
+    public void CalculateAge_BirthdayAlreadyPassed_ReturnsCorrectAge()
+    {
+        var dob = new DateOnly(2010, 1, 15);
+        var asOf = new DateOnly(2026, 4, 11);
+        Assert.Equal(16, AuthEndpoints.CalculateAge(dob, asOf));
+    }
+
+    [Fact]
+    public void CalculateAge_BirthdayNotYetPassed_ReturnsAgeMinus1()
+    {
+        var dob = new DateOnly(2010, 12, 25);
+        var asOf = new DateOnly(2026, 4, 11);
+        Assert.Equal(15, AuthEndpoints.CalculateAge(dob, asOf));
+    }
+
+    [Fact]
+    public void CalculateAge_ExactBirthday_ReturnsExactAge()
+    {
+        var dob = new DateOnly(2013, 4, 11);
+        var asOf = new DateOnly(2026, 4, 11);
+        Assert.Equal(13, AuthEndpoints.CalculateAge(dob, asOf));
+    }
+
+    [Fact]
+    public void CalculateAge_LeapYearBirthday_NonLeapYear()
+    {
+        var dob = new DateOnly(2008, 2, 29);
+        var asOf = new DateOnly(2025, 3, 1);
+        Assert.Equal(17, AuthEndpoints.CalculateAge(dob, asOf));
+    }
 }

@@ -147,3 +147,16 @@ public record ShareTokenResponse(
     string Token,
     string Url,
     DateTime ExpiresAt);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FIND-privacy-001: Age Gate & Consent
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// POST /api/me/age-consent request body. Records DOB and optional parent
+/// email for an authenticated student. Used during the registration flow
+/// after the age gate step.
+/// </summary>
+public record AgeConsentRequest(
+    DateOnly DateOfBirth,
+    string? ParentEmail);
