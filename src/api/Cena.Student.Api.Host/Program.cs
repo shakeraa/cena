@@ -14,6 +14,7 @@ using Cena.Actors.Serving;
 using Cena.Actors.Tutor;
 using Cena.Api.Host.Endpoints;
 using Cena.Api.Host.Hubs;
+using Cena.Infrastructure.Ai;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
@@ -69,6 +70,9 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     options.ConnectTimeout = 5000;
     return ConnectionMultiplexer.Connect(options);
 });
+
+// ---- AI Token Budget (FIND-sec-015) ----
+builder.Services.AddAiTokenBudget();
 
 // ---- NATS ----
 var natsUrl = builder.Configuration.GetConnectionString("NATS") ?? "nats://localhost:4222";
@@ -300,6 +304,39 @@ builder.Services.AddRateLimiter(options =>
             {
                 PermitLimit = 1,
                 Window = TimeSpan.FromDays(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+
+    // FIND-sec-015: Global tutor rate limit (not per-user) — 1000 msg/min across all users
+    var globalTutorLimit = builder.Configuration.GetValue<int>("Cena:LlmBudget:GlobalTutorPerMinute", 1000);
+    options.AddPolicy("tutor-global", _ =>
+    {
+        return RateLimitPartition.GetFixedWindowLimiter(
+            "tutor-global",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = globalTutorLimit,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+
+    // FIND-sec-015: Per-tenant tutor rate limit — 200 msg/min per school
+    var tenantTutorLimit = builder.Configuration.GetValue<int>("Cena:LlmBudget:TenantTutorPerMinute", 200);
+    options.AddPolicy("tutor-tenant", httpContext =>
+    {
+        var schoolId = httpContext.User.FindFirstValue("school_id") ?? "no-school";
+        
+        return RateLimitPartition.GetSlidingWindowLimiter(
+            $"tutor-tenant:{schoolId}",
+            _ => new SlidingWindowRateLimiterOptions
+            {
+                PermitLimit = tenantTutorLimit,
+                Window = TimeSpan.FromMinutes(1),
+                SegmentsPerWindow = 6, // 10-second segments for smoother limiting
                 QueueLimit = 0,
                 AutoReplenishment = true,
             });

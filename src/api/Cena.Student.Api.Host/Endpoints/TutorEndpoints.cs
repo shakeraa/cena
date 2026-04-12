@@ -44,16 +44,22 @@ public static class TutorEndpoints
         
         // FIND-arch-004: SendMessage now calls the real LLM via ITutorMessageService,
         // so it must share the same rate limit as /stream (10 msg/min/student).
+        // FIND-sec-015: Chained with global and per-tenant limits for cost protection.
         group.MapPost("/threads/{threadId}/messages", SendMessage)
             .WithName("SendTutorMessage")
-            .RequireRateLimiting("tutor")
+            .RequireRateLimiting("tutor")      // Per-user: 10 msg/min/student
+            .RequireRateLimiting("tutor-tenant") // Per-tenant: 200 msg/min/school
+            .RequireRateLimiting("tutor-global") // Global: 1000 msg/min across all users
             .RequireConsent(ProcessingPurpose.ThirdPartyAi);
 
         // SSE streaming endpoint (HARDEN: Real LLM with rate limiting)
         // Requires ThirdPartyAI consent
+        // FIND-sec-015: Chained rate limits for cost protection
         group.MapPost("/threads/{threadId}/stream", StreamMessage)
             .WithName("StreamTutorMessage")
-            .RequireRateLimiting("tutor") // 10 messages/min/student
+            .RequireRateLimiting("tutor")      // Per-user: 10 msg/min/student
+            .RequireRateLimiting("tutor-tenant") // Per-tenant: 200 msg/min/school  
+            .RequireRateLimiting("tutor-global") // Global: 1000 msg/min across all users
             .RequireConsent(ProcessingPurpose.ThirdPartyAi);
 
         return app;
