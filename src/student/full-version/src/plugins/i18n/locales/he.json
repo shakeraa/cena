@@ -610,6 +610,7 @@
       "durationMinutes": "0 דקות | דקה אחת | שתי דקות | {minutes} דקות",
       "modeLabel": "מצב",
       "startCta": "התחל שיעור",
+      "subjectChipGroupLabel": "בחר נושאים",
       "subjects": {
         "math": "מתמטיקה",
         "physics": "פיזיקה",

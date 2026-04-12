@@ -613,6 +613,7 @@
       "durationMinutes": "{minutes} min | {minutes} min",
       "modeLabel": "Mode",
       "startCta": "Start session",
+      "subjectChipGroupLabel": "Select subjects",
       "subjects": {
         "math": "Math",
         "physics": "Physics",
