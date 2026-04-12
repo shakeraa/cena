@@ -16,6 +16,7 @@ using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Nats;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
@@ -172,6 +173,9 @@ builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationSe
 builder.Services.AddSingleton<IExplanationOrchestrator, ExplanationOrchestrator>();
 builder.Services.AddSingleton<IPersonalizedExplanationService, PersonalizedExplanationService>();
 builder.Services.AddSingleton<OfflineSyncHandler>();
+
+// FIND-arch-022: JetStream bootstrapper ensures streams exist before NatsOutboxPublisher starts
+builder.Services.AddHostedService<Cena.Infrastructure.Nats.JetStreamBootstrapper>();
 builder.Services.AddHostedService<NatsOutboxPublisher>();
 
 // Analysis Job Processor (background worker for stagnation analysis jobs)

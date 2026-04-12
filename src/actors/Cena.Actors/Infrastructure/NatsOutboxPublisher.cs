@@ -222,8 +222,9 @@ public sealed class NatsOutboxPublisher : BackgroundService
                 // (NatsBusRouter, NatsSignalRBridge) can link their spans to this publish.
                 var headers = NatsTracePropagation.InjectTraceContext();
 
-                // Publish to NATS and wait for confirmation
-                await _nats.PublishAsync(subject, payload, headers: headers, cancellationToken: ct);
+                // FIND-arch-022: Publish to JetStream for durability
+                var js = _nats.CreateJetStreamContext();
+                await js.PublishAsync(subject, payload, headers: headers, cancellationToken: ct);
 
                 highestSequence = eventWrapper.Sequence;
                 published++;
