@@ -115,11 +115,8 @@ builder.Services.AddSingleton<INatsConnection>(sp =>
 {
     var logger = sp.GetRequiredService<ILogger<INatsConnection>>();
 
-    // REV-002: NATS authentication — actor-host user with subject ACLs
-    var natsUser = builder.Configuration["Nats:User"] ?? "actor-host";
-    var natsPass = builder.Configuration["Nats:Password"]
-        ?? Environment.GetEnvironmentVariable("NATS_ACTOR_PASSWORD")
-        ?? "dev_actor_pass";
+    // FIND-sec-009: Use centralized NATS auth resolution with environment gating
+    var (natsUser, natsPass) = CenaNatsOptions.GetActorAuth(builder.Configuration, builder.Environment);
 
     var opts = new NatsOpts
     {
