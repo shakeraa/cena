@@ -3,6 +3,16 @@ import type { ThemeDefinition } from 'vuetify'
 export const staticPrimaryColor = '#7367F0'
 export const staticPrimaryDarkenColor = '#675DD8'
 
+/**
+ * WCAG 2.2 AA compliant text variants of the primary color.
+ * Use these for body-size text instead of #7367F0 directly.
+ *
+ * - Light theme: #5B4FC4 on #FFFFFF = ~5.5:1 (AA pass)
+ * - Dark theme:  #B3A9FF on #2F3349 = ~4.7:1 (AA pass)
+ */
+export const primaryTextLight = '#5B4FC4'
+export const primaryTextDark = '#B3A9FF'
+
 export const themes: Record<string, ThemeDefinition> = {
   light: {
     dark: false,
@@ -44,6 +54,7 @@ export const themes: Record<string, ThemeDefinition> = {
       'skin-bordered-background': '#fff',
       'skin-bordered-surface': '#fff',
       'expansion-panel-text-custom-bg': '#fafafa',
+      'primary-text': primaryTextLight,
     },
 
     variables: {
@@ -117,6 +128,7 @@ export const themes: Record<string, ThemeDefinition> = {
       'perfect-scrollbar-thumb': '#4A5072',
       'skin-bordered-background': '#2F3349',
       'skin-bordered-surface': '#2F3349',
+      'primary-text': primaryTextDark,
     },
     variables: {
       'code-color': '#d400ff',

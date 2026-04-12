@@ -69,8 +69,8 @@ const dialogModelValueUpdate = (val: boolean) => {
         </p>
         <div class="d-flex justify-space-between align-center flex-wrap">
           <div class="d-flex align-center gap-1 me-3">
-            <sup class="text-body-1 text-primary">$</sup>
-            <h1 class="text-h1 text-primary">
+            <sup class="text-body-1 text-primary-text">$</sup>
+            <h1 class="text-h1 text-primary-text">
               99
             </h1>
             <sub class="text-body-2 mt-5">

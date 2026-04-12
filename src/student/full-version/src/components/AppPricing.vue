@@ -174,7 +174,7 @@ const pricingPlans = [
               <div class="text-body-1 align-self-start font-weight-medium">
                 $
               </div>
-              <h1 class="text-h1 font-weight-medium text-primary">
+              <h1 class="text-h1 font-weight-medium text-primary-text">
                 {{ annualMonthlyPlanPriceToggler ? Math.floor(Number(plan.yearlyPrice) / 12) : plan.monthlyPrice }}
               </h1>
               <div class="text-body-1 font-weight-medium align-self-end">

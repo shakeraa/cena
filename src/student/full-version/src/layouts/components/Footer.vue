@@ -15,11 +15,11 @@
         href="https://pixinvent.com"
         target="_blank"
         rel="noopener noreferrer"
-        class="text-primary ms-1"
+        class="text-high-emphasis ms-1 text-decoration-underline"
       >Pixinvent</a>
     </span>
     <!-- 👉 Footer: right content -->
-    <span class="d-md-flex gap-x-4 text-primary d-none">
+    <span class="d-md-flex gap-x-4 text-high-emphasis d-none">
       <a
         href="https://themeforest.net/licenses/standard"
         target="noopener noreferrer"
