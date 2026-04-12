@@ -302,6 +302,14 @@ Never call `complete` on a task with broken build, failing tests, or new lint er
 
 To prevent collisions between parallel workers (claude-code, kimi-coder, sub-agents), every worker operates in its own **git worktree**. The worktrees share the single `.git/` database at the repo root but each has its own on-disk working directory, its own checked-out branch, and its own build artifacts. Multiple workers can claim and execute different tasks at the same time without touching each other's files.
 
+**CRITICAL GIT RULES** (enforced after 2026-04-12 index corruption incident):
+
+1. **NEVER push directly to `main`.** Always work on a named branch in your worktree. The coordinator (`claude-code`) merges your branch to `main`.
+2. **NEVER run git commands in the main repo root** (`/Users/shaker/edu-apps/cena`). Only the coordinator operates there. Running `git status`, `git fsck`, or any git command in the main worktree while the coordinator is merging corrupts the shared `.git/index` and blocks all workers.
+3. **ALWAYS create a worktree** for every task. The worktree gives you an isolated directory where your git operations cannot collide with anyone else's.
+4. **NEVER run `git status -uall`** — it scans every file and holds the index lock for extended periods. Use `git status -uno` or `git status --short` instead.
+5. If you see `.git/index.lock` errors, **do not delete the lock file yourself**. Message the coordinator and wait — someone else's merge is in progress.
+
 **Convention**:
 
 | Worker | Worktree root |
