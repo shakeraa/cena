@@ -504,7 +504,8 @@
       "dailyReminder": "תזכורת לימוד יומית",
       "weekly": "סיכום שבועי",
       "streakAlerts": "התראות רצף",
-      "newContent": "התראות תוכן חדש"
+      "newContent": "התראות תוכן חדש",
+      "saveError": "לא ניתן לשמור את הגדרות ההתראות. נסה שוב."
     },
     "privacy": {
       "title": "פרטיות",
