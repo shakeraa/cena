@@ -4,7 +4,10 @@
 // for admin messaging endpoints.
 // =============================================================================
 
+using System.Security.Claims;
 using Cena.Actors.Messaging;
+using Cena.Infrastructure.Documents;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -14,10 +17,10 @@ public interface IMessagingAdminService
 {
     Task<MessagingThreadListResponse> GetThreadsAsync(
         string? threadType, string? participantId, string? search, int page, int pageSize,
-        DateTimeOffset? since = null);
+        ClaimsPrincipal user, DateTimeOffset? since = null);
     Task<MessagingThreadDetailDto?> GetThreadDetailAsync(
-        string threadId, string? beforeCursor, int limit);
-    Task<MessagingContactListResponse> GetContactsAsync(string? search);
+        string threadId, string? beforeCursor, int limit, ClaimsPrincipal user);
+    Task<MessagingContactListResponse> GetContactsAsync(string? search, ClaimsPrincipal user);
 }
 
 public sealed class MessagingAdminService : IMessagingAdminService
@@ -33,8 +36,9 @@ public sealed class MessagingAdminService : IMessagingAdminService
 
     public async Task<MessagingThreadListResponse> GetThreadsAsync(
         string? threadType, string? participantId, string? search, int page, int pageSize,
-        DateTimeOffset? since = null)
+        ClaimsPrincipal user, DateTimeOffset? since = null)
     {
+        var callerSchoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
         IQueryable<ThreadSummary> query = session.Query<ThreadSummary>();
@@ -53,13 +57,38 @@ public sealed class MessagingAdminService : IMessagingAdminService
         if (since.HasValue)
             query = query.Where(t => t.LastMessageAt > since.Value);
 
-        var totalCount = await query.CountAsync();
-
-        var threads = await query
+        var allThreads = await query
             .OrderByDescending(t => t.LastMessageAt)
+            .ToListAsync();
+
+        // FIND-sec-011: Filter threads by caller's school (check if any participant is in caller's school)
+        var filteredThreads = allThreads;
+        if (callerSchoolId is not null)
+        {
+            // Get all students and admins in caller's school
+            var schoolStudentIds = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.SchoolId == callerSchoolId)
+                .Select(s => s.StudentId)
+                .ToListAsync();
+            
+            var schoolAdminIds = await session.Query<AdminUser>()
+                .Where(a => a.School == callerSchoolId && !a.SoftDeleted)
+                .Select(a => a.Id)
+                .ToListAsync();
+
+            var schoolUserIds = schoolStudentIds.Concat(schoolAdminIds).ToHashSet();
+
+            // Only include threads where at least one participant is in caller's school
+            filteredThreads = allThreads
+                .Where(t => t.ParticipantIds.Any(p => schoolUserIds.Contains(p)))
+                .ToList();
+        }
+
+        var totalCount = filteredThreads.Count;
+        var threads = filteredThreads
             .Skip((page - 1) * pageSize)
             .Take(pageSize)
-            .ToListAsync();
+            .ToList();
 
         var items = threads.Select(t => new MessagingThreadDto(
             t.Id,
@@ -77,13 +106,37 @@ public sealed class MessagingAdminService : IMessagingAdminService
     }
 
     public async Task<MessagingThreadDetailDto?> GetThreadDetailAsync(
-        string threadId, string? beforeCursor, int limit)
+        string threadId, string? beforeCursor, int limit, ClaimsPrincipal user)
     {
+        var callerSchoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
         var summary = await session.LoadAsync<ThreadSummary>(threadId);
         if (summary is null)
             return null;
+
+        // FIND-sec-011: Verify caller can access this thread (has participant in caller's school)
+        if (callerSchoolId is not null)
+        {
+            var schoolStudentIds = await session.Query<StudentProfileSnapshot>()
+                .Where(s => s.SchoolId == callerSchoolId)
+                .Select(s => s.StudentId)
+                .ToListAsync();
+            
+            var schoolAdminIds = await session.Query<AdminUser>()
+                .Where(a => a.School == callerSchoolId && !a.SoftDeleted)
+                .Select(a => a.Id)
+                .ToListAsync();
+
+            var schoolUserIds = schoolStudentIds.Concat(schoolAdminIds).ToHashSet();
+
+            if (!summary.ParticipantIds.Any(p => schoolUserIds.Contains(p)))
+            {
+                _logger.LogWarning("Cross-tenant thread access: caller from school {CallerSchool} attempted to access thread {ThreadId}",
+                    callerSchoolId, threadId);
+                return null;
+            }
+        }
 
         // Messages are in Redis Streams (MSG-002), but for the admin view we return
         // Marten-stored event data as a fallback. Full Redis integration is in MSG-002.
@@ -135,12 +188,17 @@ public sealed class MessagingAdminService : IMessagingAdminService
         );
     }
 
-    public async Task<MessagingContactListResponse> GetContactsAsync(string? search)
+    public async Task<MessagingContactListResponse> GetContactsAsync(string? search, ClaimsPrincipal user)
     {
+        var callerSchoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
-        var query = session.Query<Cena.Infrastructure.Documents.AdminUser>()
-            .Where(u => !u.SoftDeleted && u.Status == Cena.Infrastructure.Documents.UserStatus.Active);
+        var query = session.Query<AdminUser>()
+            .Where(u => !u.SoftDeleted && u.Status == UserStatus.Active);
+
+        // FIND-sec-011: Filter by caller's school
+        if (callerSchoolId is not null)
+            query = query.Where(u => u.School == callerSchoolId);
 
         // Marten translates string.Contains(term) to PostgreSQL ILIKE
         // but doesn't support the StringComparison overload — use plain Contains

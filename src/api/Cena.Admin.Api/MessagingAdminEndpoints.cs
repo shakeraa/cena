@@ -3,6 +3,8 @@
 // ADM-025: REST endpoints for admin messaging/chat
 // =============================================================================
 
+using System.Security.Claims;
+using System.Text.Json;
 using Cena.Admin.Api.Validation;
 using Cena.Actors.Messaging;
 using Cena.Infrastructure.Auth;
@@ -12,7 +14,6 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using NATS.Client.Core;
-using System.Text.Json;
 
 namespace Cena.Admin.Api;
 
@@ -37,6 +38,7 @@ public static class MessagingAdminEndpoints
             int? page,
             int? pageSize,
             string? since,
+            ClaimsPrincipal user,
             IMessagingAdminService service) =>
         {
             var validPage = ParameterValidator.ValidatePage(page);
@@ -46,7 +48,7 @@ public static class MessagingAdminEndpoints
                 && DateTimeOffset.TryParse(since, out var parsed))
                 sinceTime = parsed;
             var result = await service.GetThreadsAsync(
-                type, participantId, search, validPage, validPageSize, sinceTime);
+                type, participantId, search, validPage, validPageSize, user, sinceTime);
             return Results.Ok(result);
         }).WithName("GetMessagingThreads");
 
@@ -54,10 +56,11 @@ public static class MessagingAdminEndpoints
             string threadId,
             string? before,
             int? limit,
+            ClaimsPrincipal user,
             IMessagingAdminService service) =>
         {
             var validLimit = Math.Clamp(limit ?? 50, 1, 100);
-            var detail = await service.GetThreadDetailAsync(threadId, before, validLimit);
+            var detail = await service.GetThreadDetailAsync(threadId, before, validLimit, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
         }).WithName("GetMessagingThreadDetail");
 
@@ -194,9 +197,10 @@ public static class MessagingAdminEndpoints
 
         group.MapGet("/contacts", async (
             string? search,
+            ClaimsPrincipal user,
             IMessagingAdminService service) =>
         {
-            var result = await service.GetContactsAsync(search);
+            var result = await service.GetContactsAsync(search, user);
             return Results.Ok(result);
         }).WithName("GetMessagingContacts");
 
