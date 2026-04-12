@@ -129,9 +129,21 @@ const isPasswordVisible = ref(false)
                   placeholder="············"
                   :type="isPasswordVisible ? 'text' : 'password'"
                   autocomplete="password"
-                  :append-inner-icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
-                  @click:append-inner="isPasswordVisible = !isPasswordVisible"
-                />
+                >
+                  <template #append-inner>
+                    <IconBtn
+                      data-testid="password-toggle-btn"
+                      size="small"
+                      :aria-label="isPasswordVisible ? 'Hide password' : 'Show password'"
+                      @click="isPasswordVisible = !isPasswordVisible"
+                    >
+                      <VIcon
+                        :icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
+                        size="20"
+                      />
+                    </IconBtn>
+                  </template>
+                </AppTextField>
 
                 <!-- FIND-privacy-002: Link to real privacy policy and terms -->
                 <div class="d-flex align-center my-6">

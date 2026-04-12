@@ -198,9 +198,21 @@ const onSubmit = () => {
                   :type="isPasswordVisible ? 'text' : 'password'"
                   autocomplete="current-password"
                   :disabled="isSubmitting"
-                  :append-inner-icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
-                  @click:append-inner="isPasswordVisible = !isPasswordVisible"
-                />
+                >
+                  <template #append-inner>
+                    <IconBtn
+                      data-testid="password-toggle-btn"
+                      size="small"
+                      :aria-label="isPasswordVisible ? 'Hide password' : 'Show password'"
+                      @click="isPasswordVisible = !isPasswordVisible"
+                    >
+                      <VIcon
+                        :icon="isPasswordVisible ? 'tabler-eye-off' : 'tabler-eye'"
+                        size="20"
+                      />
+                    </IconBtn>
+                  </template>
+                </AppTextField>
 
                 <div class="d-flex align-center flex-wrap justify-space-between my-6">
                   <VCheckbox
