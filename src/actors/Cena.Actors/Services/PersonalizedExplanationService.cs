@@ -27,6 +27,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Cena.Actors.Gateway;
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Mastery;
 using Microsoft.Extensions.Logging;
 
@@ -132,6 +133,7 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
     private readonly ILlmClient _llm;
     private readonly IExplanationCacheService _cache;
     private readonly ILogger<PersonalizedExplanationService> _logger;
+    private readonly IClock _clock;
     private readonly Histogram<double> _latencyHistogram;
     private readonly Counter<long> _generationCounter;
     private readonly Counter<long> _budgetExhaustedCounter;
@@ -141,11 +143,13 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
         ILlmClient llm,
         IExplanationCacheService cache,
         ILogger<PersonalizedExplanationService> logger,
-        IMeterFactory meterFactory)
+        IMeterFactory meterFactory,
+        IClock clock)
     {
         _llm = llm;
         _cache = cache;
         _logger = logger;
+        _clock = clock;
 
         var meter = meterFactory.Create("Cena.Actors.PersonalizedExplanation", "1.0.0");
         _latencyHistogram = meter.CreateHistogram<double>(
@@ -188,7 +192,7 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
         }
 
         // ── Gate 3: Daily token budget check ──
-        var budgetKey = BuildBudgetKey(ctx.StudentBudgetKey);
+        var budgetKey = BuildBudgetKey(ctx.StudentBudgetKey, _clock.UtcDateTime);
         var currentUsage = s_dailyTokens.GetValueOrDefault(budgetKey, 0);
         if (currentUsage >= DailyOutputTokenLimit)
         {
@@ -577,8 +581,8 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
     // BUDGET KEY
     // =========================================================================
 
-    private static string BuildBudgetKey(string studentBudgetKey) =>
-        $"l3:{studentBudgetKey}:{DateTime.UtcNow:yyyy-MM-dd}";
+    private static string BuildBudgetKey(string studentBudgetKey, DateTime now) =>
+        $"l3:{studentBudgetKey}:{now:yyyy-MM-dd}";
 
     // =========================================================================
     // TEST HELPERS (internal for unit tests)
@@ -587,9 +591,9 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
     /// <summary>
     /// Returns current daily token usage for a student. For testing and monitoring.
     /// </summary>
-    internal static int GetDailyTokenUsage(string studentBudgetKey)
+    internal int GetDailyTokenUsage(string studentBudgetKey)
     {
-        var key = BuildBudgetKey(studentBudgetKey);
+        var key = BuildBudgetKey(studentBudgetKey, _clock.UtcDateTime);
         return s_dailyTokens.GetValueOrDefault(key, 0);
     }
 

@@ -5,6 +5,7 @@
 // =============================================================================
 
 using Cena.Actors.Events;
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Projections;
 using Cena.Infrastructure.Documents;
 using Marten;
@@ -67,15 +68,18 @@ public class AdaptiveQuestionPool : IAdaptiveQuestionPool
     private readonly IDocumentStore _store;
     private readonly IQuestionSelector _selector;
     private readonly ILogger<AdaptiveQuestionPool> _logger;
+    private readonly IClock _clock;
 
     public AdaptiveQuestionPool(
         IDocumentStore store,
         IQuestionSelector selector,
-        ILogger<AdaptiveQuestionPool> logger)
+        ILogger<AdaptiveQuestionPool> logger,
+        IClock clock)
     {
         _store = store;
         _selector = selector;
         _logger = logger;
+        _clock = clock;
     }
 
     public async Task<LearningSessionQueueProjection> InitializeSessionAsync(
@@ -106,7 +110,7 @@ public class AdaptiveQuestionPool : IAdaptiveQuestionPool
             Mode = mode,
             ConceptMasterySnapshot = masterySnapshot,
             CurrentDifficulty = 0.5,
-            StartedAt = DateTime.UtcNow
+            StartedAt = _clock.UtcDateTime
         };
 
         session.Store(queue);
@@ -140,7 +144,7 @@ public class AdaptiveQuestionPool : IAdaptiveQuestionPool
         }
 
         // Get next question
-        var next = queue.DequeueNext();
+        var next = queue.DequeueNext(_clock.UtcDateTime);
         if (next != null)
         {
             session.Store(queue);
@@ -167,7 +171,7 @@ public class AdaptiveQuestionPool : IAdaptiveQuestionPool
             return;
         }
 
-        queue.RecordAnswer(questionId, isCorrect, timeSpent, selectedOption);
+        queue.RecordAnswer(questionId, isCorrect, timeSpent, selectedOption, _clock.UtcDateTime);
         session.Store(queue);
 
         // Also append event to student stream for analytics
@@ -178,7 +182,7 @@ public class AdaptiveQuestionPool : IAdaptiveQuestionPool
             IsCorrect: isCorrect,
             TimeSpentSeconds: (int)timeSpent.TotalSeconds,
             SelectedOption: selectedOption,
-            AnsweredAt: DateTimeOffset.UtcNow);
+            AnsweredAt: _clock.UtcNow);
 
         session.Events.Append(queue.StudentId, evt);
         await session.SaveChangesAsync(ct);
@@ -199,7 +203,7 @@ public class AdaptiveQuestionPool : IAdaptiveQuestionPool
         var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
         if (queue == null) return;
 
-        queue.EndedAt = DateTime.UtcNow;
+        queue.EndedAt = _clock.UtcDateTime;
         session.Store(queue);
 
         _logger.LogInformation(
@@ -243,7 +247,7 @@ public class AdaptiveQuestionPool : IAdaptiveQuestionPool
                 BloomLevel = result.SelectedItem.BloomLevel,
                 Difficulty = result.SelectedItem.Difficulty,
                 SelectionReason = result.SelectionReason,
-                QueuedAt = DateTime.UtcNow
+                QueuedAt = _clock.UtcDateTime
             });
 
             // Add to seen items so selector picks different ones

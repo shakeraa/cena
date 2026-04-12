@@ -138,6 +138,9 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);
 builder.Services.AddCenaAuthorization();
 
+// IClock for deterministic time-based testing
+builder.Services.AddClock();
+
 // Firebase Admin SDK (required by AdminUserService/AdminRoleService)
 builder.Services.AddSingleton<Cena.Infrastructure.Firebase.IFirebaseAdminService,
     Cena.Infrastructure.Firebase.FirebaseAdminService>();

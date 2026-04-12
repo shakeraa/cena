@@ -35,7 +35,7 @@ public class StudentTimeBreakdown
     /// </summary>
     public Dictionary<int, int> HourlyDistribution { get; set; } = new();
     
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class ActivityTimeBreakdown
@@ -61,7 +61,7 @@ public class StudentWeeklyTimeSummary
     public int SessionsCount { get; set; }
     public int QuestionsAnswered { get; set; }
     
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; }
 }
 
 /// <summary>
@@ -93,7 +93,7 @@ public class StudentFlowAccuracyProfile
     /// </summary>
     public FlowAccuracyStats Overall { get; set; } = new();
     
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class FlowAccuracyStats
@@ -138,7 +138,7 @@ public class SubjectMasteryTimeline
     /// </summary>
     public List<MasterySnapshot> Snapshots { get; set; } = new();
     
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; }
 }
 
 public class MasterySnapshot

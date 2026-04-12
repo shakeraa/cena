@@ -67,13 +67,13 @@ public class LearningSessionQueueProjection
     /// <summary>
     /// Dequeue and return next question, updating current state
     /// </summary>
-    public QueuedQuestion? DequeueNext()
+    public QueuedQuestion? DequeueNext(DateTime now)
     {
         if (QuestionQueue.Count == 0) return null;
         
         var question = QuestionQueue.Dequeue();
         CurrentQuestionId = question.QuestionId;
-        CurrentQuestionShownAt = DateTime.UtcNow;
+        CurrentQuestionShownAt = now;
         LastQuestionAt = CurrentQuestionShownAt;
         
         return question;
@@ -97,12 +97,12 @@ public class LearningSessionQueueProjection
     /// <summary>
     /// Record an answer and update adaptive state
     /// </summary>
-    public void RecordAnswer(string questionId, bool isCorrect, TimeSpan timeSpent, string? selectedOption)
+    public void RecordAnswer(string questionId, bool isCorrect, TimeSpan timeSpent, string? selectedOption, DateTime now)
     {
         var history = new QuestionHistory
         {
             QuestionId = questionId,
-            AnsweredAt = DateTime.UtcNow,
+            AnsweredAt = now,
             IsCorrect = isCorrect,
             TimeSpentSeconds = (int)timeSpent.TotalSeconds,
             SelectedOption = selectedOption
@@ -141,9 +141,9 @@ public class LearningSessionQueueProjection
     /// <summary>
     /// Get session duration
     /// </summary>
-    public TimeSpan GetDuration()
+    public TimeSpan GetDuration(DateTime now)
     {
-        var end = EndedAt ?? DateTime.UtcNow;
+        var end = EndedAt ?? now;
         return end - StartedAt;
     }
 }

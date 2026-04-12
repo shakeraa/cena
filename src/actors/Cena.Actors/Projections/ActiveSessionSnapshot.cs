@@ -26,10 +26,10 @@ public class ActiveSessionSnapshot
     /// <summary>
     /// Calculate progress percentage based on time elapsed vs duration
     /// </summary>
-    public int GetProgressPercent()
+    public int GetProgressPercent(DateTime now)
     {
         if (DurationMinutes <= 0) return 0;
-        var elapsed = DateTime.UtcNow - StartedAt;
+        var elapsed = now - StartedAt;
         var percent = (int)(elapsed.TotalMinutes / DurationMinutes * 100);
         return Math.Min(100, Math.Max(0, percent));
     }

@@ -3,6 +3,7 @@
 // Multi-channel notification delivery with receptive timing
 // =============================================================================
 
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Projections;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Gamification;
@@ -47,15 +48,18 @@ public class NotificationChannelService : INotificationChannelService
     private readonly IDocumentStore _store;
     private readonly IAnalyticsRollupService _analytics;
     private readonly ILogger<NotificationChannelService> _logger;
+    private readonly IClock _clock;
 
     public NotificationChannelService(
         IDocumentStore store,
         IAnalyticsRollupService analytics,
-        ILogger<NotificationChannelService> logger)
+        ILogger<NotificationChannelService> logger,
+        IClock clock)
     {
         _store = store;
         _analytics = analytics;
         _logger = logger;
+        _clock = clock;
     }
 
     public async Task<bool> SendNotificationAsync(
@@ -94,7 +98,7 @@ public class NotificationChannelService : INotificationChannelService
         string studentId,
         CancellationToken ct = default)
     {
-        var now = DateTime.UtcNow;
+        var now = _clock.UtcDateTime;
         var hour = now.Hour;
 
         // Get user's flow accuracy profile to find best times
@@ -267,5 +271,5 @@ public class NotificationPreferencesDocument
     public int? QuietHoursStart { get; set; }
     public int? QuietHoursEnd { get; set; }
     public string DigestMode { get; set; } = "immediate";
-    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; }
 }

@@ -14,6 +14,7 @@
 
 using System.Collections.Concurrent;
 using Cena.Actors.Gateway;
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Services;
 using Cena.Actors.Sessions;
 using Microsoft.Extensions.Logging;
@@ -125,6 +126,7 @@ public sealed class TutorActor : IActor
     private readonly IContentRetriever _contentRetriever;
     private readonly IExplanationCacheService _explanationCache;
     private readonly ILogger<TutorActor> _logger;
+    private readonly IClock _clock;
 
     // Per-student daily token tracking (shared across all TutorActor instances).
     // Key: "tutor:{studentId}:{yyyy-MM-dd}", Value: cumulative output tokens.
@@ -155,7 +157,8 @@ public sealed class TutorActor : IActor
         ITutorSafetyGuard safetyGuard,
         IContentRetriever contentRetriever,
         IExplanationCacheService explanationCache,
-        ILogger<TutorActor> logger)
+        ILogger<TutorActor> logger,
+        IClock clock)
     {
         _llm = llm;
         _promptBuilder = promptBuilder;
@@ -163,6 +166,7 @@ public sealed class TutorActor : IActor
         _contentRetriever = contentRetriever;
         _explanationCache = explanationCache;
         _logger = logger;
+        _clock = clock;
     }
 
     public Task ReceiveAsync(IContext context)
@@ -610,7 +614,7 @@ public sealed class TutorActor : IActor
     }
 
     private string BuildBudgetKey() =>
-        $"tutor:{_studentId}:{DateTime.UtcNow:yyyy-MM-dd}";
+        $"tutor:{_studentId}:{_clock.UtcDateTime:yyyy-MM-dd}";
 
     private async Task<string?> GetL2FallbackAsync()
     {
