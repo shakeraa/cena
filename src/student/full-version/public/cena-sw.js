@@ -13,6 +13,8 @@ const APP_SHELL = [
   '/offline.html',
   '/manifest.webmanifest',
   '/favicon.ico',
+  '/images/icon-192.png',
+  '/images/icon-512.png',
 ]
 
 self.addEventListener('install', event => {
@@ -36,12 +38,11 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('fetch', event => {
   const req = event.request
+  const url = new URL(req.url)
 
   // Only handle GET
   if (req.method !== 'GET')
     return
-
-  const url = new URL(req.url)
 
   // Never intercept API calls — they must always hit the network.
   if (url.pathname.startsWith('/api/')) {
@@ -50,6 +51,45 @@ self.addEventListener('fetch', event => {
 
   // Never intercept the MSW worker file or MSW mocks.
   if (url.pathname.startsWith('/mockServiceWorker')) {
+    return
+  }
+
+  // FIND-ux-029: structured log when a manifest icon fetch fails in the SW.
+  // Detectable in production via console filter for [cena-sw:icon-fetch-err].
+  if (url.pathname.startsWith('/images/icon-')) {
+    event.respondWith(
+      caches.match(req).then(cached => {
+        if (cached) return cached
+        return fetch(req).then(resp => {
+          if (resp && resp.status === 200) {
+            const ct = resp.headers.get('content-type') || ''
+            if (!ct.startsWith('image/')) {
+              console.error(
+                JSON.stringify({
+                  event: 'cena-sw:icon-fetch-err',
+                  url: req.url,
+                  contentType: ct,
+                  msg: 'PWA manifest icon returned non-image Content-Type; likely SPA HTML fallback',
+                }),
+              )
+            }
+            const clone = resp.clone()
+            caches.open(CACHE_VERSION).then(c => c.put(req, clone)).catch(() => null)
+          }
+          return resp
+        }).catch(err => {
+          console.error(
+            JSON.stringify({
+              event: 'cena-sw:icon-fetch-err',
+              url: req.url,
+              error: err.message || String(err),
+              msg: 'PWA manifest icon fetch failed',
+            }),
+          )
+          return new Response('', { status: 504 })
+        })
+      }),
+    )
     return
   }
 
