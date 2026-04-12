@@ -5,9 +5,19 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useMeStore } from '@/stores/meStore'
 import { sanitizeReturnTo } from '@/utils/returnTo'
+import { useMockAuth } from '@/plugins/firebase'
+import { useFirebaseAuth } from '@/composables/useFirebaseAuth'
+
+/**
+ * FIND-ux-023: OAuth provider buttons — wired to real Firebase Auth.
+ *
+ * Google, Apple, Microsoft call real `signInWithPopup` via the composable.
+ * Phone auth remains "coming soon" (requires reCAPTCHA integration).
+ *
+ * Mock path (dev only, VITE_USE_MOCK_AUTH=true) preserves the old stub.
+ */
 
 interface Props {
-
   /** 'login' lands onboarded users on /home; 'register' lands fresh users on /onboarding. */
   mode: 'login' | 'register'
 }
@@ -19,9 +29,11 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const meStore = useMeStore()
+const { loginWithProvider, errorKey } = useFirebaseAuth()
 
 const loadingProvider = ref<string | null>(null)
 const phoneAuthMessage = ref<string>('')
+const providerError = ref<string>('')
 
 type Provider = 'google' | 'apple' | 'microsoft' | 'phone'
 
@@ -39,20 +51,21 @@ const PROVIDERS: ProviderButton[] = [
   { id: 'phone', icon: 'tabler-phone', labelKey: 'auth.providers.phone', testId: 'auth-provider-phone' },
 ]
 
-async function handleProvider(provider: Provider) {
-  loadingProvider.value = provider
-  phoneAuthMessage.value = ''
+function navigateAfterAuth() {
+  if (props.mode === 'login') {
+    const raw = typeof route.query.returnTo === 'string' ? route.query.returnTo : null
+    const target = sanitizeReturnTo(raw, '/home')
 
-  // STU-W-04B stub: phone auth shows a coming-soon placeholder. Real
-  // `signInWithPhoneNumber` + reCAPTCHA lands in STU-W-04C.
-  if (provider === 'phone') {
-    phoneAuthMessage.value = t('auth.providers.phoneComingSoon')
-    loadingProvider.value = null
-
-    return
+    return router.replace(target)
   }
 
-  // Simulated latency
+  return router.replace('/onboarding')
+}
+
+/**
+ * Mock provider sign-in — dev only.
+ */
+async function handleMockProvider(provider: Provider) {
   await new Promise(resolve => setTimeout(resolve, 150))
 
   const uid = `mock-${provider}-${Date.now().toString(36)}`
@@ -69,11 +82,6 @@ async function handleProvider(provider: Provider) {
       locale: 'en',
       onboardedAt: '2026-04-10T00:00:00Z',
     })
-
-    const raw = typeof route.query.returnTo === 'string' ? route.query.returnTo : null
-    const target = sanitizeReturnTo(raw, '/home')
-
-    await router.replace(target)
   }
   else {
     meStore.__setProfile({
@@ -83,10 +91,85 @@ async function handleProvider(provider: Provider) {
       locale: 'en',
       onboardedAt: null,
     })
-    await router.replace('/onboarding')
   }
 
   loadingProvider.value = null
+  await navigateAfterAuth()
+}
+
+/**
+ * Real Firebase provider sign-in.
+ */
+async function handleFirebaseProvider(provider: 'google' | 'apple' | 'microsoft') {
+  try {
+    await loginWithProvider(provider)
+
+    // onAuthStateChanged will update the auth store.
+    // Wait a tick for the listener to fire.
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // Set meStore profile from auth store data after onAuthStateChanged
+    if (props.mode === 'login') {
+      meStore.__setProfile({
+        uid: authStore.uid!,
+        displayName: authStore.displayName || '',
+        email: authStore.email || '',
+        locale: 'en',
+        onboardedAt: '2026-04-10T00:00:00Z',
+      })
+    }
+    else {
+      meStore.__setProfile({
+        uid: authStore.uid!,
+        displayName: authStore.displayName || '',
+        email: authStore.email || '',
+        locale: 'en',
+        onboardedAt: null,
+      })
+    }
+
+    loadingProvider.value = null
+    await navigateAfterAuth()
+  }
+  catch (error: unknown) {
+    const err = error as { code?: string }
+
+    loadingProvider.value = null
+
+    // Don't show error for user-cancelled popups
+    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+      return
+    }
+
+    providerError.value = errorKey.value
+      ? t(errorKey.value)
+      : t('auth.providerSignInFailed', { provider: provider.charAt(0).toUpperCase() + provider.slice(1) })
+
+    console.error('[AuthProviderButtons] Provider sign-in failed', {
+      provider,
+      firebaseCode: err.code,
+    })
+  }
+}
+
+async function handleProvider(provider: Provider) {
+  loadingProvider.value = provider
+  phoneAuthMessage.value = ''
+  providerError.value = ''
+
+  // Phone auth: still coming soon (requires reCAPTCHA integration)
+  if (provider === 'phone') {
+    phoneAuthMessage.value = t('auth.providers.phoneComingSoon')
+    loadingProvider.value = null
+    return
+  }
+
+  if (useMockAuth) {
+    await handleMockProvider(provider)
+    return
+  }
+
+  await handleFirebaseProvider(provider)
 }
 </script>
 
@@ -132,6 +215,17 @@ async function handleProvider(provider: Provider) {
       data-testid="auth-provider-phone-message"
     >
       {{ phoneAuthMessage }}
+    </VAlert>
+
+    <VAlert
+      v-if="providerError"
+      type="error"
+      variant="tonal"
+      density="compact"
+      class="mt-3"
+      data-testid="auth-provider-error"
+    >
+      {{ providerError }}
     </VAlert>
   </div>
 </template>
