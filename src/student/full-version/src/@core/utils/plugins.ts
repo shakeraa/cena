@@ -41,11 +41,26 @@ import type { App } from 'vue'
  */
 
 export const registerPlugins = (app: App) => {
-  const imports = import.meta.glob<{ default: (app: App) => void }>(['../../plugins/*.{ts,js}', '../../plugins/*/index.{ts,js}'], { eager: true })
+  // FIND-arch-017: in production builds the fake-api module is excluded via
+  // the runtime guard below (path.includes('fake-api') check). The fake-api
+  // index.ts itself also gates all MSW imports behind import.meta.env.DEV
+  // with dynamic imports, so Vite tree-shakes the entire MSW dependency
+  // graph out of the production bundle even though the glob still matches
+  // the file path.
+  const imports = import.meta.glob<{ default: (app: App) => void }>(
+    ['../../plugins/*.{ts,js}', '../../plugins/*/index.{ts,js}'],
+    { eager: true },
+  )
 
   const importPaths = Object.keys(imports).sort()
 
   importPaths.forEach(path => {
+    // FIND-arch-017: skip the fake-api plugin in production builds.
+    // Belt-and-suspenders alongside the glob exclusion above — if Vite's
+    // glob somehow still picks up the fake-api module, we skip calling it.
+    if (!import.meta.env.DEV && path.includes('fake-api'))
+      return
+
     const pluginImportModule = imports[path]
 
     pluginImportModule.default?.(app)

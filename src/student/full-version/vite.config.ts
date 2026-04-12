@@ -1,4 +1,6 @@
+import { existsSync, unlinkSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import { resolve } from 'node:path'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
@@ -11,6 +13,36 @@ import VueDevTools from 'vite-plugin-vue-devtools'
 import MetaLayouts from 'vite-plugin-vue-meta-layouts'
 import vuetify from 'vite-plugin-vuetify'
 import svgLoader from 'vite-svg-loader'
+
+/**
+ * FIND-arch-017: Vite plugin that strips mockServiceWorker.js from
+ * production builds. In dev mode the file is served from public/ as
+ * usual; during `vite build` the plugin deletes the file from dist/
+ * after Vite copies it from public/.
+ *
+ * Vite copies public/ files to dist/ outside the Rollup pipeline, so
+ * we use `closeBundle` (runs after all writes are flushed) to remove
+ * the file from the output directory.
+ */
+function stripMswInProduction() {
+  let outDir = 'dist'
+
+  return {
+    name: 'strip-msw-production',
+    apply: 'build' as const,
+    configResolved(config: { build: { outDir: string } }) {
+      outDir = config.build.outDir
+    },
+    closeBundle() {
+      const mswPath = resolve(outDir, 'mockServiceWorker.js')
+      if (existsSync(mswPath)) {
+        unlinkSync(mswPath)
+        // eslint-disable-next-line no-console
+        console.log('[strip-msw-production] Removed mockServiceWorker.js from dist/')
+      }
+    },
+  }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -94,6 +126,8 @@ export default defineConfig({
     }),
     svgLoader(),
 
+    // FIND-arch-017: strip mockServiceWorker.js from production dist/
+    stripMswInProduction(),
   ],
   define: { 'process.env': {} },
   resolve: {
