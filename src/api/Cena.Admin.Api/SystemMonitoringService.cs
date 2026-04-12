@@ -8,6 +8,7 @@
 // hosts). No stubs.
 // =============================================================================
 
+using Cena.Api.Contracts.Admin.System;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -286,27 +287,57 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
     {
         await using var session = _store.QuerySession();
 
-        // Query real events from Marten event store as audit log entries
-        var query = session.Events.QueryAllRawEvents()
-            .OrderByDescending(e => e.Timestamp);
+        // FIND-data-024: Use dedicated AuditEventDocument instead of all raw events
+        var query = session.Query<AuditEventDocument>().AsQueryable();
 
-        var totalCount = await query.CountAsync();
+        // Apply filters from request (these were previously ignored!)
+        if (request.From.HasValue)
+            query = query.Where(e => e.Timestamp >= request.From.Value);
+        
+        if (request.To.HasValue)
+            query = query.Where(e => e.Timestamp <= request.To.Value);
+        
+        if (!string.IsNullOrEmpty(request.UserId))
+            query = query.Where(e => e.UserId == request.UserId);
+        
+        if (!string.IsNullOrEmpty(request.TenantId))
+            query = query.Where(e => e.TenantId == request.TenantId);
+        
+        if (!string.IsNullOrEmpty(request.Action))
+            query = query.Where(e => e.Action == request.Action);
+        
+        if (!string.IsNullOrEmpty(request.TargetType))
+            query = query.Where(e => e.TargetType == request.TargetType);
+        
+        if (!string.IsNullOrEmpty(request.IpAddress))
+            query = query.Where(e => e.IpAddress == request.IpAddress);
+        
+        if (request.Success.HasValue)
+            query = query.Where(e => e.Success == request.Success.Value);
 
-        var rawEvents = await query
+        // Order by timestamp descending
+        query = query.OrderByDescending(e => e.Timestamp);
+
+        // Use Stats() for efficient count without fetching all records
+        var stats = await query.Stats(out var totalCount).ToListAsync();
+
+        var pagedQuery = query
             .Skip((page - 1) * pageSize)
-            .Take(pageSize)
-            .ToListAsync();
+            .Take(pageSize);
 
-        var entries = rawEvents.Select(e => new AuditLogEntry(
-            Id: e.Id.ToString(),
+        var auditDocs = await pagedQuery.ToListAsync();
+
+        var entries = auditDocs.Select(e => new AuditLogEntry(
+            Id: e.Id,
             Timestamp: e.Timestamp,
-            UserId: e.StreamKey ?? "system",
-            UserName: e.StreamKey ?? "System",
-            Action: e.EventTypeName ?? "unknown",
-            TargetType: "Event",
-            TargetId: e.StreamKey ?? "",
-            Details: $"{e.EventTypeName} on stream {e.StreamKey}",
-            IpAddress: "server"
+            UserId: e.UserId,
+            UserName: e.UserName,
+            Action: e.Action,
+            TargetType: e.TargetType,
+            TargetId: e.TargetId,
+            Details: e.Description,
+            IpAddress: e.IpAddress,
+            Success: e.Success
         )).ToList();
 
         return new AuditLogResponse(entries, totalCount, page, pageSize);

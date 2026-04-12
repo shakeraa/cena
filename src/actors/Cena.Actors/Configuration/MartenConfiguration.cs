@@ -12,6 +12,7 @@ using Marten.Events.Projections;
 using Marten.Storage;
 using Npgsql;
 using Weasel.Core;
+using Cena.Actors.Audit;
 using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Projections;
@@ -95,6 +96,16 @@ public static class MartenConfiguration
 
         // HARDEN SocialEndpoints: Async projection for class feed items from events
         opts.Projections.Add<ClassFeedItemProjection>(ProjectionLifecycle.Async);
+
+        // FIND-data-024: Security audit projection for compliance/forensics
+        opts.Projections.Add<SecurityAuditProjection>(ProjectionLifecycle.Async);
+        opts.Schema.For<AuditEventDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.Timestamp)
+            .Index(x => x.UserId)
+            .Index(x => x.TenantId)
+            .Index(x => x.Action)
+            .Index(x => x.EventType);
 
         opts.Schema.For<QuestionReadModel>()
             .Identity(x => x.Id)
