@@ -68,7 +68,8 @@ public class StudentProfileSnapshot
     public int DailyTimeGoalMinutes { get; set; }
     public string? DisplayName { get; set; }
     public string? Bio { get; set; }
-    public string Visibility { get; set; } = "class-only";
+    // FIND-privacy-010: ICO Children's Code Std 3 — most-private default
+    public string Visibility { get; set; } = "private";
 
     // ── Hierarchical Methodology Maps ──
     public Dictionary<string, MethodologyAssignment> SubjectMethodologyMap { get; set; } = new();

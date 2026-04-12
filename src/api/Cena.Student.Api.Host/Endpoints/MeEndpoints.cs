@@ -223,9 +223,22 @@ public static class MeEndpoints
             prefs = CreateDefaultPreferences(studentId);
             session.Store(prefs);
             await session.SaveChangesAsync();
+
+            // FIND-privacy-010: Structured log — detectable re-regression sentinel.
+            // If this log fires AND ProfileVisibility != "private", a default has regressed.
+            logger.LogInformation(
+                "FIND-privacy-010: Created high-privacy default preferences for student {StudentId}. " +
+                "ProfileVisibility={ProfileVisibility}, ShowProgressToClass={ShowProgressToClass}, " +
+                "AllowPeerComparison={AllowPeerComparison}, EmailNotifications={EmailNotifications}, " +
+                "PushNotifications={PushNotifications}",
+                studentId,
+                prefs.ProfileVisibility,
+                prefs.ShowProgressToClass,
+                prefs.AllowPeerComparison,
+                prefs.EmailNotifications,
+                prefs.PushNotifications);
         }
 
-        // Placeholder for FERPA logging (deferred per spec)
         logger.LogInformation("Student {StudentId} accessed settings", studentId);
 
         var dto = MapToSettingsDto(prefs);
@@ -527,8 +540,13 @@ public static class MeEndpoints
         return Math.Max(1, totalXp / 100);
     }
 
-    private static StudentPreferencesDocument CreateDefaultPreferences(string studentId)
+    // FIND-privacy-010: internal so the test project can verify high-privacy defaults
+    internal static StudentPreferencesDocument CreateDefaultPreferences(string studentId)
     {
+        // FIND-privacy-010: ICO Children's Code Standard 3 + 7 require
+        // "high-privacy by default" for minors. All visibility, sharing,
+        // notification, and engagement toggles default to OFF/private.
+        // Students (or parents for <13) opt-in explicitly after onboarding.
         return new StudentPreferencesDocument
         {
             Id = studentId,
@@ -537,17 +555,20 @@ public static class MeEndpoints
             Language = "en",
             ReducedMotion = false,
             HighContrast = false,
-            EmailNotifications = true,
-            PushNotifications = true,
-            DailyReminder = true,
+            // Notifications — all OFF by default (ICO Std 3, Std 13 nudge techniques)
+            EmailNotifications = false,
+            PushNotifications = false,
+            DailyReminder = false,
             DailyReminderTime = TimeSpan.FromHours(9),
-            WeeklyProgress = true,
-            StreakAlerts = true,
-            NewContentAlerts = true,
-            ProfileVisibility = "class-only",
-            ShowProgressToClass = true,
-            AllowPeerComparison = true,
+            WeeklyProgress = false,
+            StreakAlerts = false,
+            NewContentAlerts = false,
+            // Privacy — most-private defaults (ICO Std 3, Std 7)
+            ProfileVisibility = "private",
+            ShowProgressToClass = false,
+            AllowPeerComparison = false,
             ShareAnalytics = false,
+            // Learning — functional defaults (not privacy-relevant)
             AutoAdvance = false,
             ShowHintsByDefault = true,
             SoundEffects = true,
