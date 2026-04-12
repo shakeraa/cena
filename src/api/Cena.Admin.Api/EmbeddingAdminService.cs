@@ -5,11 +5,15 @@
 // =============================================================================
 
 using System.Diagnostics;
+using System.Text.Json;
+using Cena.Actors.Services;
 using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Security;
+using Marten;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using NATS.Client.Core;
 using Npgsql;
 
 namespace Cena.Admin.Api;
@@ -19,19 +23,27 @@ public interface IEmbeddingAdminService
     Task<EmbeddingCorpusStatsResponse> GetCorpusStatsAsync();
     Task<EmbeddingSearchResponse> SearchAsync(EmbeddingSearchRequest request);
     Task<EmbeddingDuplicateResponse> GetDuplicatesAsync(float threshold, int page, int pageSize);
-    Task<ReindexResponse> RequestReindexAsync(ReindexRequest request);
+    Task<ReindexResponse> RequestReindexAsync(ReindexRequest request, string requestedBy);
 }
 
 public sealed class EmbeddingAdminService : IEmbeddingAdminService
 {
     private readonly NpgsqlDataSource _dataSource;
+    private readonly IDocumentStore _documentStore;
+    private readonly INatsConnection _nats;
     private readonly ILogger<EmbeddingAdminService> _logger;
+
+    private const string NatsReindexSubject = "cena.embeddings.reindex.command";
 
     public EmbeddingAdminService(
         NpgsqlDataSource dataSource,
+        IDocumentStore documentStore,
+        INatsConnection nats,
         ILogger<EmbeddingAdminService> logger)
     {
         _dataSource = dataSource;
+        _documentStore = documentStore;
+        _nats = nats;
         _logger = logger;
     }
 
@@ -263,7 +275,7 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
 
     // ── Reindex ──
 
-    public async Task<ReindexResponse> RequestReindexAsync(ReindexRequest request)
+    public async Task<ReindexResponse> RequestReindexAsync(ReindexRequest request, string requestedBy)
     {
         await using var conn = await _dataSource.OpenConnectionAsync();
 
@@ -286,11 +298,42 @@ public sealed class EmbeddingAdminService : IEmbeddingAdminService
         var estimatedBlocks = Convert.ToInt32(await cmd.ExecuteScalarAsync());
         var jobId = Guid.NewGuid().ToString("N");
 
-        // In production, this would publish a NATS message to trigger the
-        // reindex pipeline. For now, we log the request and return the job ID.
+        // Create job document
+        var job = new ReindexJobDocument
+        {
+            Id = jobId,
+            Scope = request.Scope.ToLowerInvariant(),
+            Filter = request.Filter,
+            EstimatedBlocks = estimatedBlocks,
+            Status = ReindexJobStatus.Pending,
+            RequestedBy = requestedBy,
+            CreatedAt = DateTimeOffset.UtcNow
+        };
+
+        // Persist job document
+        await using var session = _documentStore.LightweightSession();
+        session.Store(job);
+        await session.SaveChangesAsync();
+
+        // Publish NATS command to trigger background processing
+        var command = new ReindexCommand(
+            JobId: jobId,
+            Scope: request.Scope.ToLowerInvariant(),
+            Filter: request.Filter,
+            EstimatedBlocks: estimatedBlocks,
+            RequestedBy: requestedBy,
+            RequestedAt: DateTimeOffset.UtcNow);
+
+        var payload = JsonSerializer.SerializeToUtf8Bytes(command, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        });
+
+        await _nats.PublishAsync(NatsReindexSubject, payload);
+
         _logger.LogInformation(
-            "Reindex requested: scope={Scope} filter={Filter} estimatedBlocks={Est} jobId={JobId}",
-            request.Scope, request.Filter ?? "(none)", estimatedBlocks, jobId);
+            "Reindex requested: scope={Scope} filter={Filter} estimatedBlocks={Est} jobId={JobId} requestedBy={User}",
+            request.Scope, request.Filter ?? "(none)", estimatedBlocks, jobId, requestedBy);
 
         return new ReindexResponse(jobId, estimatedBlocks);
     }

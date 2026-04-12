@@ -3,6 +3,7 @@
 // Corpus stats, text search, duplicate detection, reindex trigger
 // =============================================================================
 
+using System.Security.Claims;
 using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
@@ -55,9 +56,15 @@ public static class EmbeddingAdminEndpoints
         // POST /api/admin/embeddings/reindex
         group.MapPost("/reindex", async (
             ReindexRequest request,
+            HttpContext ctx,
             IEmbeddingAdminService service) =>
         {
-            var result = await service.RequestReindexAsync(request);
+            var userId = ctx.User.FindFirstValue("user_id")
+                ?? ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? ctx.User.FindFirstValue("sub")
+                ?? "unknown";
+
+            var result = await service.RequestReindexAsync(request, userId);
             return Results.Ok(result);
         }).WithName("RequestEmbeddingReindex");
 
