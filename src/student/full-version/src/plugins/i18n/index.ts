@@ -12,6 +12,23 @@ const messages = Object.fromEntries(
 
 let _i18n: any = null
 
+/**
+ * FIND-pedagogy-015: Returns the active i18n locale code ('en' | 'ar' | 'he').
+ * Designed for non-Vue callers (utility functions, formatters) that need the
+ * current locale but don't have access to a Vue component's setup context.
+ *
+ * Falls back to 'en' if i18n hasn't been initialized yet.
+ */
+export function getActiveLocale(): string {
+  if (_i18n === null) {
+    console.warn('[cena-i18n] getActiveLocale() called before i18n init — defaulting to "en"')
+
+    return 'en'
+  }
+
+  return _i18n.global.locale.value ?? 'en'
+}
+
 export const getI18n = () => {
   if (_i18n === null) {
     const langCookie = cookieRef('language', themeConfig.app.i18n.defaultLocale)

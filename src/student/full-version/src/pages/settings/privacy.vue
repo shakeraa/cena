@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiQuery } from '@/composables/useApiQuery'
 import { useApiMutation } from '@/composables/useApiMutation'
+import { useLocaleFormatters } from '@/composables/useLocaleFormatters'
 
 definePage({
   meta: {
@@ -17,6 +18,7 @@ definePage({
 })
 
 const { t } = useI18n()
+const { formatDate: fmtDate } = useLocaleFormatters()
 
 // ---- Visibility/sharing preferences (existing) ----
 // FIND-privacy-010: ICO Children's Code Std 3+7 — all defaults OFF (high-privacy)
@@ -242,7 +244,7 @@ async function handleDsar() {
       {{ t('settingsPage.privacy.erasureActiveBanner', {
         status: erasureStatus.data.value?.status ?? '',
         date: erasureStatus.data.value?.coolingPeriodEnds
-          ? new Date(erasureStatus.data.value.coolingPeriodEnds).toLocaleDateString()
+          ? fmtDate(erasureStatus.data.value.coolingPeriodEnds)
           : '',
       }) }}
     </VAlert>

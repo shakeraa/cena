@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useLocaleFormatters } from '@/composables/useLocaleFormatters'
 import type { TimeBreakdownItem } from '@/api/types/common'
 
 interface Props {
@@ -9,6 +10,7 @@ interface Props {
 
 const props = defineProps<Props>()
 const { t } = useI18n()
+const { bcp47 } = useLocaleFormatters()
 
 const maxMinutes = computed(() =>
   props.items.reduce((acc, item) => Math.max(acc, item.minutes), 1),
@@ -29,16 +31,20 @@ function heightPercent(minutes: number): number {
   return Math.max(4, Math.round((minutes / maxMinutes.value) * 100))
 }
 
+/**
+ * FIND-pedagogy-015: Uses the active i18n locale (via BCP 47 tag) instead
+ * of `undefined` which falls back to the browser locale.
+ */
 function formatDay(iso: string): string {
   const d = new Date(iso)
 
-  return d.toLocaleDateString(undefined, { weekday: 'short' })
+  return d.toLocaleDateString(bcp47.value, { weekday: 'short' })
 }
 
 function formatDate(iso: string): string {
   const d = new Date(iso)
 
-  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return d.toLocaleDateString(bcp47.value, { month: 'short', day: 'numeric' })
 }
 </script>
 
