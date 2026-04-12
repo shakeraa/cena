@@ -78,7 +78,7 @@ public sealed record SessionStartRequest(
 public sealed record SessionStartResponse(
     string SessionId,
     string HubGroupName,     // for SignalR subscription: "session-{sessionId}"
-    string? FirstQuestionId); // null in Phase 1, wired in STB-01b
+    string? FirstQuestionId); // FIND-pedagogy-016: seeded by AdaptiveQuestionPool on session start
 
 public sealed record ActiveSessionDto(
     string SessionId,

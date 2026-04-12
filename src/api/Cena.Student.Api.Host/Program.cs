@@ -98,6 +98,13 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<NatsEventSubscribe
 builder.Services.AddHostedService<NotificationDispatcher>();
 
 // ---- HARDEN SessionEndpoints: Question Bank Service ----
+// ---- FIND-pedagogy-016: Adaptive Question Pool for REST session seeding ----
+// AdaptiveQuestionPool needs IQuestionSelector (stateless, singleton-safe) and
+// IDocumentStore (already registered above). MartenQuestionPool is loaded
+// per-session in SessionEndpoints because it is parameterized by subjects.
+builder.Services.AddSingleton<IQuestionSelector, QuestionSelector>();
+builder.Services.AddScoped<IAdaptiveQuestionPool, AdaptiveQuestionPool>();
+
 builder.Services.AddScoped<IQuestionBank, QuestionBank>();
 
 // ---- SAI-002: Hint Generation (stateless pure function) ----

@@ -48,9 +48,12 @@ public static class SessionEndpoints
             .RequireRateLimiting("api");
 
         // POST /api/sessions/start — start a new learning session (STB-01)
+        // FIND-pedagogy-016: inject IAdaptiveQuestionPool to seed the question queue
         group.MapPost("/start", async (
             HttpContext ctx,
             IDocumentStore store,
+            IAdaptiveQuestionPool adaptivePool,
+            ILogger<SessionEndpoints> logger,
             SessionStartRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -112,10 +115,50 @@ public static class SessionEndpoints
 
             await session.SaveChangesAsync();
 
+            // ── FIND-pedagogy-016: Seed the adaptive question queue ──
+            // InitializeSessionAsync creates the LearningSessionQueueProjection
+            // document in Marten. Then we load a MartenQuestionPool for the
+            // requested subjects and call GetNextQuestionAsync to trigger the
+            // first refill (5 questions). The first question's ID is returned
+            // in the response so GET /current-question never hits an empty queue.
+            string? firstQuestionId = null;
+            try
+            {
+                var queueProjection = await adaptivePool.InitializeSessionAsync(
+                    studentId, sessionId, request.Subjects, request.Mode);
+
+                // Load a Marten-backed question pool for the requested subjects
+                var pool = await MartenQuestionPool.LoadAsync(
+                    store, request.Subjects, logger);
+
+                if (pool.ItemCount > 0)
+                {
+                    var firstQuestion = await adaptivePool.GetNextQuestionAsync(
+                        sessionId, pool);
+                    firstQuestionId = firstQuestion?.QuestionId;
+                }
+                else
+                {
+                    logger.LogWarning(
+                        "FIND-pedagogy-016: No published questions found for subjects [{Subjects}]. " +
+                        "Session {SessionId} started with empty queue.",
+                        string.Join(", ", request.Subjects), sessionId);
+                }
+            }
+            catch (Exception ex)
+            {
+                // Log but do not fail the session start — the queue can be
+                // seeded lazily on the first GET /current-question call.
+                logger.LogError(ex,
+                    "FIND-pedagogy-016: Failed to seed question queue for session {SessionId}. " +
+                    "GET /current-question will retry seeding.",
+                    sessionId);
+            }
+
             return Results.Ok(new SessionStartResponse(
                 SessionId: sessionId,
                 HubGroupName: $"session-{sessionId}",
-                FirstQuestionId: null)); // Phase 1: null, wired in STB-01b
+                FirstQuestionId: firstQuestionId));
         })
         .WithName("StartSession");
 
@@ -423,12 +466,15 @@ public static class SessionEndpoints
         // ═════════════════════════════════════════════════════════════════════════
 
         // GET /api/sessions/{sessionId}/current-question — get current question
+        // FIND-pedagogy-016: inject IAdaptiveQuestionPool for lazy refill
         group.MapGet("/{sessionId}/current-question", async (
             string sessionId,
             HttpContext ctx,
             IDocumentStore store,
             IQuestionBank questionBank,
-            IScaffoldingService scaffoldingService) =>
+            IScaffoldingService scaffoldingService,
+            IAdaptiveQuestionPool adaptivePool,
+            ILogger<SessionEndpoints> logger) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -457,23 +503,57 @@ public static class SessionEndpoints
                     ExpectedTimeSeconds: 0));
             }
 
-            // Get current question from queue
+            // FIND-pedagogy-016: If queue is empty but session not ended, try refill
             var currentQuestion = queue.PeekNext();
             if (currentQuestion == null)
             {
-                return Results.Ok(new SessionQuestionDto(
-                    QuestionId: "completed",
-                    QuestionIndex: queue.TotalQuestionsAttempted,
-                    TotalQuestions: queue.TotalQuestionsAttempted,
-                    Prompt: "Session completed! No more questions.",
-                    QuestionType: "completed",
-                    Choices: Array.Empty<string>(),
-                    Subject: "",
-                    ExpectedTimeSeconds: 0));
+                // Attempt adaptive refill before declaring completion
+                try
+                {
+                    var pool = await MartenQuestionPool.LoadAsync(
+                        store, queue.Subjects, logger);
+
+                    if (pool.ItemCount > 0)
+                    {
+                        var refilled = await adaptivePool.GetNextQuestionAsync(
+                            sessionId, pool);
+                        if (refilled != null)
+                        {
+                            // Re-load queue after refill (GetNextQuestionAsync persisted it)
+                            queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
+                            currentQuestion = queue?.PeekNext();
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    logger.LogError(ex,
+                        "FIND-pedagogy-016: Refill failed for session {SessionId}",
+                        sessionId);
+                }
+
+                // If still empty after refill attempt, session is genuinely done
+                if (currentQuestion == null)
+                {
+                    logger.LogInformation(
+                        "FIND-pedagogy-016: Session {SessionId} exhausted question pool " +
+                        "after {Attempted} questions. Returning completed.",
+                        sessionId, queue?.TotalQuestionsAttempted ?? 0);
+
+                    return Results.Ok(new SessionQuestionDto(
+                        QuestionId: "completed",
+                        QuestionIndex: queue?.TotalQuestionsAttempted ?? 0,
+                        TotalQuestions: queue?.TotalQuestionsAttempted ?? 0,
+                        Prompt: "Session completed! No more questions.",
+                        QuestionType: "completed",
+                        Choices: Array.Empty<string>(),
+                        Subject: "",
+                        ExpectedTimeSeconds: 0));
+                }
             }
 
             // Dequeue the question for display
-            queue.DequeueNext();
+            queue!.DequeueNext();
 
             // Load full question details from question bank
             var questionDoc = await questionBank.GetQuestionAsync(currentQuestion.QuestionId);
@@ -690,6 +770,34 @@ public static class SessionEndpoints
             }
 
             await session.SaveChangesAsync();
+
+            // FIND-pedagogy-016: Refill queue if needed after answer
+            if (queue.NeedsRefill)
+            {
+                try
+                {
+                    var adaptivePool = ctx.RequestServices.GetRequiredService<IAdaptiveQuestionPool>();
+                    var answerLogger = loggerFactory.CreateLogger("SessionEndpoints.Answer");
+                    var pool = await MartenQuestionPool.LoadAsync(
+                        store, queue.Subjects, answerLogger);
+
+                    if (pool.ItemCount > 0)
+                    {
+                        // GetNextQuestionAsync will refill and persist
+                        await adaptivePool.GetNextQuestionAsync(sessionId, pool);
+
+                        // Reload queue after refill
+                        queue = (await session.LoadAsync<LearningSessionQueueProjection>(sessionId))!;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    var answerLogger = loggerFactory.CreateLogger("SessionEndpoints.Answer");
+                    answerLogger.LogError(ex,
+                        "FIND-pedagogy-016: Queue refill failed after answer for session {SessionId}",
+                        sessionId);
+                }
+            }
 
             // Determine next question ID
             string? nextQuestionId = null;
