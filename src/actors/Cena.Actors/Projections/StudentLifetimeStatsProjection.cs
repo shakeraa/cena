@@ -81,13 +81,16 @@ public class StudentLifetimeStatsProjection : SingleStreamProjection<StudentLife
 
     public void Apply(LearningSessionStarted_V1 e, StudentLifetimeStats stats)
     {
+        // FIND-data-023: Fixed streak calculation - compare BEFORE updating LastSessionAt
+        var previousLastSession = stats.LastSessionAt;
+        
         stats.TotalSessions++;
         stats.LastSessionAt = e.StartedAt;
         
         // Streak calculation (simplified: consecutive days)
-        if (stats.LastSessionAt.HasValue)
+        if (previousLastSession.HasValue)
         {
-            var daysSinceLast = (e.StartedAt - stats.LastSessionAt.Value).TotalDays;
+            var daysSinceLast = (e.StartedAt - previousLastSession.Value).TotalDays;
             if (daysSinceLast <= 1)
             {
                 stats.CurrentStreak++;
@@ -97,6 +100,12 @@ public class StudentLifetimeStatsProjection : SingleStreamProjection<StudentLife
             {
                 stats.CurrentStreak = 1;
             }
+        }
+        else
+        {
+            // First session
+            stats.CurrentStreak = 1;
+            stats.LongestStreak = Math.Max(stats.LongestStreak, 1);
         }
         
         stats.UpdatedAt = e.StartedAt;
@@ -115,6 +124,7 @@ public class StudentLifetimeStatsProjection : SingleStreamProjection<StudentLife
         stats.BadgeCount++;
         if (!stats.BadgeIds.Contains(e.BadgeId))
             stats.BadgeIds.Add(e.BadgeId);
-        stats.UpdatedAt = DateTimeOffset.UtcNow;
+        // FIND-data-023: Use event timestamp instead of wall-clock
+        stats.UpdatedAt = e.AwardedAt;
     }
 }
