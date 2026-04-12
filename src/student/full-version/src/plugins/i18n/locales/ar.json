@@ -223,7 +223,8 @@
     "settingsAppearance": "المظهر",
     "settingsNotifications": "إعدادات الإشعارات",
     "settingsPrivacy": "البيانات والخصوصية",
-    "userMenu": "قائمة الحساب لـ {name}"
+    "userMenu": "قائمة الحساب لـ {name}",
+    "notificationsBell": "إشعارات"
   },
   "status": {
     "online": "متصل",
