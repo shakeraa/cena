@@ -44,7 +44,7 @@ const emit = defineEmits<{
   continue: []
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 function handleContinue() {
   emit('continue')
@@ -80,32 +80,52 @@ function handleContinue() {
         </div>
       </div>
     </div>
-    <div
-      class="text-body-2 text-medium-emphasis mb-3"
-      data-testid="feedback-message"
-    >
-      {{ feedback.feedback }}
-    </div>
 
     <!--
-      FIND-pedagogy-001 — dedicated worked-explanation block. The
-      backend ships SessionAnswerResponseDto.explanation and
-      .distractorRationale; render them separately so students can
-      read the authored rationale without the page yanking away.
+      FIND-pedagogy-017 — the `feedback.feedback` field (English short pill
+      from the server: "Correct" / "Not quite") was rendered here as raw text.
+      When the UI locale is ar/he, the translated heading above would be
+      followed by an English string, creating a bilingual mash-up.
+
+      Fix: removed. The translated heading (session.runner.correct / .wrong)
+      is the ONLY correctness indicator. The server `Feedback` field is
+      deprecated (kept for one release for backwards-compat, then removed).
+
+      The explanation and distractorRationale below are authored content
+      that ships in the question's original language. Until FIND-pedagogy-013
+      delivers backend-localised explanations, we wrap them in `lang="en"`
+      so screen readers announce the language switch, and show a translated
+      label when the UI locale is not English.
     -->
     <div
       v-if="feedback.distractorRationale"
       class="text-body-2 mb-3"
       data-testid="feedback-distractor-rationale"
     >
-      {{ feedback.distractorRationale }}
+      <div
+        v-if="locale !== 'en'"
+        class="text-caption text-medium-emphasis mb-1"
+      >
+        {{ t('session.runner.explanationLangNote') }}
+      </div>
+      <div lang="en" dir="ltr">
+        {{ feedback.distractorRationale }}
+      </div>
     </div>
     <div
       v-if="feedback.explanation"
       class="text-body-2 text-medium-emphasis mb-3"
       data-testid="feedback-explanation"
     >
-      {{ feedback.explanation }}
+      <div
+        v-if="locale !== 'en' && !feedback.distractorRationale"
+        class="text-caption text-medium-emphasis mb-1"
+      >
+        {{ t('session.runner.explanationLangNote') }}
+      </div>
+      <div lang="en" dir="ltr">
+        {{ feedback.explanation }}
+      </div>
     </div>
 
     <!--

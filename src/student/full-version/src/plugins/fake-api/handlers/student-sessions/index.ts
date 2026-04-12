@@ -344,8 +344,9 @@ export const handlerStudentSessions = [
     state.currentMastery = posteriorMastery
     const masteryDelta = posteriorMastery - priorMastery
 
-    // Feedback label — short pill matching SessionEndpoints.BuildAnswerFeedback
-    const feedback = correct ? 'Correct' : 'Not quite'
+    // FIND-pedagogy-017: Feedback field is deprecated — the UI renders its own
+    // translated heading via i18n keys. Ship empty string for backwards-compat.
+    const feedback = ''
 
     // Distractor rationale — only for wrong answers, matching the real
     // backend logic in SessionEndpoints.BuildAnswerFeedback

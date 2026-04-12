@@ -19,6 +19,7 @@ using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
+using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using NATS.Client.Core;
@@ -526,6 +527,7 @@ public static class SessionEndpoints
             IBktService bktService,
             IErrorClassificationService errorClassifier,
             IEloDifficultyService eloService,
+            ILoggerFactory loggerFactory,
             SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -705,6 +707,22 @@ public static class SessionEndpoints
                 priorMastery: priorMastery,
                 posteriorMastery: posteriorMastery,
                 nextQuestionId: nextQuestionId);
+
+            // FIND-pedagogy-017: structured log for re-regression detection.
+            // If the Feedback field ever ships non-empty again, this warning
+            // fires in production telemetry so the bilingual mash-up is caught
+            // before users report it.
+            if (!string.IsNullOrEmpty(response.Feedback))
+            {
+                var logger = loggerFactory.CreateLogger<SessionEndpoints>();
+                logger.LogWarning(
+                    "FIND-pedagogy-017 re-regression: Feedback field is non-empty " +
+                    "({Feedback}) for student {StudentId}, question {QuestionId}. " +
+                    "The UI heading is i18n-translated; this field must remain empty.",
+                    response.Feedback,
+                    studentId,
+                    request.QuestionId);
+            }
 
             return Results.Ok(response);
         })
@@ -1050,14 +1068,19 @@ public static class SessionEndpoints
     }
 
     /// <summary>
-    /// FIND-pedagogy-001 — Build the formative feedback response.
+    /// FIND-pedagogy-001 / FIND-pedagogy-017 — Build the formative feedback response.
     ///
-    /// The short pill ("Correct" / "Not quite") is preserved so the UI has a
-    /// one-line summary, but the authored <c>Explanation</c> and (on wrong
-    /// answers) the matching <c>DistractorRationale</c> are shipped alongside
-    /// as dedicated fields. The UI renders the explanation block only when
-    /// at least one of the fields is non-empty, so questions without authored
-    /// feedback fall back to the short pill only — no empty cards.
+    /// The <c>Feedback</c> field is now deprecated (empty string). The UI
+    /// renders its own translated heading via i18n keys
+    /// (<c>session.runner.correct</c> / <c>session.runner.wrong</c>), so the
+    /// server no longer ships a monolingual English pill. The field is kept
+    /// for one release for backwards-compat — callers should stop reading it.
+    ///
+    /// The authored <c>Explanation</c> and (on wrong answers) the matching
+    /// <c>DistractorRationale</c> are shipped alongside as dedicated fields.
+    /// The UI renders the explanation block only when at least one of the
+    /// fields is non-empty, so questions without authored feedback fall back
+    /// to the translated heading only — no empty cards.
     /// </summary>
     internal static SessionAnswerResponseDto BuildAnswerFeedback(
         QuestionDocument questionDoc,
@@ -1067,11 +1090,15 @@ public static class SessionEndpoints
         double posteriorMastery,
         string? nextQuestionId)
     {
-        // Short pill label. The previous "Correct! Great job!" /
-        // "Not quite. The correct answer was: X" literal strings are gone —
-        // the detailed worked explanation now travels in the dedicated field
-        // so the UI can render it in a separate component below the pill.
-        var label = isCorrect ? "Correct" : "Not quite";
+        // FIND-pedagogy-017 — the short English pill ("Correct" / "Not quite")
+        // was rendered verbatim by AnswerFeedback.vue alongside the translated
+        // heading, producing a bilingual mash-up for ar/he users. The UI now
+        // uses its own i18n keys for the heading, so the server ships an empty
+        // string. The field is kept for one release for backwards-compat.
+        //
+        // Structured log line for re-regression detection in production:
+        // If a caller is still reading this field, their telemetry will show
+        // empty feedback — which is the intended deprecation signal.
 
         // Distractor rationale is ONLY surfaced for wrong answers, and ONLY
         // when the authored question has a rationale for the specific option
@@ -1107,7 +1134,7 @@ public static class SessionEndpoints
 
         return new SessionAnswerResponseDto(
             Correct: isCorrect,
-            Feedback: label,
+            Feedback: string.Empty,
             XpAwarded: isCorrect ? 10 : 0,
             MasteryDelta: masteryDelta,
             NextQuestionId: nextQuestionId,
