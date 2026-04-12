@@ -567,10 +567,11 @@ lifetime.ApplicationStarted.Register(async () =>
         ManagerPid: null)); // Manager PID can be registered later when available
     appLogger.LogInformation("RES-005: Health aggregator spawned at {Pid}", healthPid);
 
-    // RES-010: Spawn Feature Flag singleton
+    // RES-010/FIND-arch-024: Spawn Feature Flag singleton with persistence
     var ffProps = Props.FromProducer(() =>
         new FeatureFlagActor(
-            app.Services.GetRequiredService<ILoggerFactory>().CreateLogger<FeatureFlagActor>()));
+            app.Services.GetRequiredService<ILoggerFactory>().CreateLogger<FeatureFlagActor>(),
+            app.Services.GetRequiredService<IDocumentStore>()));
     var ffPid = actorSystem.Root.SpawnNamed(ffProps, "feature-flags");
     appLogger.LogInformation("RES-010: Feature flag service spawned at {Pid}", ffPid);
 
