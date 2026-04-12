@@ -11,6 +11,7 @@ using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Security;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
 using NATS.Client.Core;
@@ -23,21 +24,21 @@ public interface IAdminUserService
     Task<UserListResponse> ListUsersAsync(
         string? query, string? role, string? status, string? school, string? grade,
         int page, int itemsPerPage, string? sortBy, string? orderBy, ClaimsPrincipal caller);
-    Task<AdminUserDto?> GetUserAsync(string id);
-    Task<AdminUserDto> CreateUserAsync(CreateUserRequest request);
-    Task<AdminUserDto> UpdateUserAsync(string id, UpdateUserRequest request);
-    Task SoftDeleteUserAsync(string id);
-    Task SuspendUserAsync(string id, string reason);
-    Task ActivateUserAsync(string id);
-    Task<AdminUserDto> InviteUserAsync(InviteUserRequest request);
-    Task<BulkInviteResult> BulkInviteAsync(Stream csvStream);
+    Task<AdminUserDto?> GetUserAsync(string id, ClaimsPrincipal caller);
+    Task<AdminUserDto> CreateUserAsync(CreateUserRequest request, ClaimsPrincipal caller);
+    Task<AdminUserDto> UpdateUserAsync(string id, UpdateUserRequest request, ClaimsPrincipal caller);
+    Task SoftDeleteUserAsync(string id, ClaimsPrincipal caller);
+    Task SuspendUserAsync(string id, string reason, ClaimsPrincipal caller);
+    Task ActivateUserAsync(string id, ClaimsPrincipal caller);
+    Task<AdminUserDto> InviteUserAsync(InviteUserRequest request, ClaimsPrincipal caller);
+    Task<BulkInviteResult> BulkInviteAsync(Stream csvStream, ClaimsPrincipal caller);
     Task<UserStatsResponse> GetStatsAsync(ClaimsPrincipal caller);
-    Task<IReadOnlyList<UserActivityEntry>> GetActivityAsync(string userId);
-    Task<IReadOnlyList<UserSessionDto>> GetSessionsAsync(string userId);
-    Task RevokeSessionAsync(string userId, string sessionId);
+    Task<IReadOnlyList<UserActivityEntry>> GetActivityAsync(string userId, ClaimsPrincipal caller);
+    Task<IReadOnlyList<UserSessionDto>> GetSessionsAsync(string userId, ClaimsPrincipal caller);
+    Task RevokeSessionAsync(string userId, string sessionId, ClaimsPrincipal caller);
     Task RecordSessionAsync(string userId, string sessionId, string device, string browser, string ip);
-    Task<bool> ForcePasswordResetAsync(string id);
-    Task<bool> RevokeApiKeyAsync(string userId, string keyId);
+    Task<bool> ForcePasswordResetAsync(string id, ClaimsPrincipal caller);
+    Task<bool> RevokeApiKeyAsync(string userId, string keyId, ClaimsPrincipal caller);
 }
 
 public sealed class AdminUserService : IAdminUserService
@@ -132,24 +133,46 @@ public sealed class AdminUserService : IAdminUserService
             page);
     }
 
-    public async Task<AdminUserDto?> GetUserAsync(string id)
+    public async Task<AdminUserDto?> GetUserAsync(string id, ClaimsPrincipal caller)
     {
         await using var session = _store.QuerySession();
         var user = await session.LoadAsync<AdminUser>(id);
-        return user is { SoftDeleted: false } ? AdminUserDto.From(user) : null;
+        if (user is null or { SoftDeleted: true })
+            return null;
+
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only access users in their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant access attempt: caller from school {CallerSchool} attempted to access user {UserId} in school {TargetSchool}",
+                schoolId, id, user.School);
+            return null; // Return 404 (not 403) to avoid leaking existence
+        }
+
+        return AdminUserDto.From(user);
     }
 
-    public async Task<AdminUserDto> CreateUserAsync(CreateUserRequest request)
+    public async Task<AdminUserDto> CreateUserAsync(CreateUserRequest request, ClaimsPrincipal caller)
     {
         if (!Enum.TryParse<CenaRole>(request.Role, true, out var role))
             throw new ArgumentException($"Invalid role: {request.Role}");
+
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only create users in their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        var targetSchool = request.School ?? schoolId ?? "";
+        if (schoolId is not null && targetSchool != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant create attempt: caller from school {CallerSchool} attempted to create user in school {TargetSchool}",
+                schoolId, targetSchool);
+            throw new UnauthorizedAccessException("Cannot create user in a different school");
+        }
 
         var uid = await _firebase.CreateUserAsync(request.Email, request.FullName, request.Password);
 
         await _firebase.SetCustomClaimsAsync(uid, new Dictionary<string, object>
         {
             ["role"] = role.ToString(),
-            ["school_id"] = request.School ?? "",
+            ["school_id"] = targetSchool,
             ["locale"] = request.Locale
         });
 
@@ -160,7 +183,7 @@ public sealed class AdminUserService : IAdminUserService
             FullName = request.FullName,
             Role = role,
             Status = string.IsNullOrEmpty(request.Password) ? UserStatus.Pending : UserStatus.Active,
-            School = request.School,
+            School = targetSchool,
             Grade = request.Grade,
             Locale = request.Locale,
             CreatedAt = DateTimeOffset.UtcNow
@@ -174,11 +197,20 @@ public sealed class AdminUserService : IAdminUserService
         return AdminUserDto.From(user);
     }
 
-    public async Task<AdminUserDto> UpdateUserAsync(string id, UpdateUserRequest request)
+    public async Task<AdminUserDto> UpdateUserAsync(string id, UpdateUserRequest request, ClaimsPrincipal caller)
     {
         await using var session = _store.LightweightSession();
         var user = await session.LoadAsync<AdminUser>(id)
             ?? throw new KeyNotFoundException($"User {id} not found");
+
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only update users in their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant update attempt: caller from school {CallerSchool} attempted to update user {UserId} in school {TargetSchool}",
+                schoolId, id, user.School);
+            throw new KeyNotFoundException($"User {id} not found");
+        }
 
         var updated = user with
         {
@@ -212,11 +244,20 @@ public sealed class AdminUserService : IAdminUserService
         return AdminUserDto.From(updated);
     }
 
-    public async Task SoftDeleteUserAsync(string id)
+    public async Task SoftDeleteUserAsync(string id, ClaimsPrincipal caller)
     {
         await using var session = _store.LightweightSession();
         var user = await session.LoadAsync<AdminUser>(id)
             ?? throw new KeyNotFoundException($"User {id} not found");
+
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only delete users in their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant delete attempt: caller from school {CallerSchool} attempted to delete user {UserId} in school {TargetSchool}",
+                schoolId, id, user.School);
+            throw new KeyNotFoundException($"User {id} not found");
+        }
 
         var deleted = user with
         {
@@ -236,11 +277,20 @@ public sealed class AdminUserService : IAdminUserService
         await SetAccountStatusAsync(id, "pending_delete", "Account deleted by admin", "system");
     }
 
-    public async Task SuspendUserAsync(string id, string reason)
+    public async Task SuspendUserAsync(string id, string reason, ClaimsPrincipal caller)
     {
         await using var session = _store.LightweightSession();
         var user = await session.LoadAsync<AdminUser>(id)
             ?? throw new KeyNotFoundException($"User {id} not found");
+
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only suspend users in their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant suspend attempt: caller from school {CallerSchool} attempted to suspend user {UserId} in school {TargetSchool}",
+                schoolId, id, user.School);
+            throw new KeyNotFoundException($"User {id} not found");
+        }
 
         var suspended = user with
         {
@@ -260,11 +310,20 @@ public sealed class AdminUserService : IAdminUserService
         _logger.LogInformation("Suspended user {Uid}: {Reason}", id, reason);
     }
 
-    public async Task ActivateUserAsync(string id)
+    public async Task ActivateUserAsync(string id, ClaimsPrincipal caller)
     {
         await using var session = _store.LightweightSession();
         var user = await session.LoadAsync<AdminUser>(id)
             ?? throw new KeyNotFoundException($"User {id} not found");
+
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only activate users in their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant activate attempt: caller from school {CallerSchool} attempted to activate user {UserId} in school {TargetSchool}",
+                schoolId, id, user.School);
+            throw new KeyNotFoundException($"User {id} not found");
+        }
 
         var activated = user with
         {
@@ -307,17 +366,27 @@ public sealed class AdminUserService : IAdminUserService
         await _nats.PublishAsync(NatsSubjects.AccountStatusChanged, JsonSerializer.Serialize(envelope, JsonOpts));
     }
 
-    public async Task<AdminUserDto> InviteUserAsync(InviteUserRequest request)
+    public async Task<AdminUserDto> InviteUserAsync(InviteUserRequest request, ClaimsPrincipal caller)
     {
         if (!Enum.TryParse<CenaRole>(request.Role, true, out var role))
             throw new ArgumentException($"Invalid role: {request.Role}");
+
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only invite users to their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        var targetSchool = request.School ?? schoolId ?? "";
+        if (schoolId is not null && targetSchool != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant invite attempt: caller from school {CallerSchool} attempted to invite user to school {TargetSchool}",
+                schoolId, targetSchool);
+            throw new UnauthorizedAccessException("Cannot invite user to a different school");
+        }
 
         var uid = await _firebase.CreateUserAsync(request.Email, request.Email, password: null);
 
         await _firebase.SetCustomClaimsAsync(uid, new Dictionary<string, object>
         {
             ["role"] = role.ToString(),
-            ["school_id"] = request.School ?? "",
+            ["school_id"] = targetSchool,
             ["locale"] = "en"
         });
 
@@ -331,7 +400,7 @@ public sealed class AdminUserService : IAdminUserService
             FullName = request.Email,
             Role = role,
             Status = UserStatus.Pending,
-            School = request.School,
+            School = targetSchool,
             CreatedAt = DateTimeOffset.UtcNow
         };
 
@@ -342,10 +411,14 @@ public sealed class AdminUserService : IAdminUserService
         return AdminUserDto.From(user);
     }
 
-    public async Task<BulkInviteResult> BulkInviteAsync(Stream csvStream)
+    public async Task<BulkInviteResult> BulkInviteAsync(Stream csvStream, ClaimsPrincipal caller)
     {
         var created = 0;
         var failed = new List<BulkInviteFailure>();
+
+        // FIND-sec-008: Determine the target school for all bulk invites
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        var targetSchool = schoolId ?? ""; // SUPER_ADMIN can invite to any school (empty means no school restriction)
 
         using var reader = new StreamReader(csvStream);
         var header = await reader.ReadLineAsync(); // skip header
@@ -365,7 +438,7 @@ public sealed class AdminUserService : IAdminUserService
 
             try
             {
-                await InviteUserAsync(new InviteUserRequest(email, role, null));
+                await InviteUserAsync(new InviteUserRequest(email, role, targetSchool), caller);
                 created++;
             }
             catch (Exception ex)
@@ -403,9 +476,22 @@ public sealed class AdminUserService : IAdminUserService
                 .ToDictionary(g => g.Key, g => g.Count()));
     }
 
-    public async Task<IReadOnlyList<UserActivityEntry>> GetActivityAsync(string userId)
+    public async Task<IReadOnlyList<UserActivityEntry>> GetActivityAsync(string userId, ClaimsPrincipal caller)
     {
         await using var session = _store.QuerySession();
+
+        // FIND-sec-008: Verify tenant access before querying activity
+        var user = await session.LoadAsync<AdminUser>(userId);
+        if (user is null or { SoftDeleted: true })
+            return Array.Empty<UserActivityEntry>();
+
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant activity access attempt: caller from school {CallerSchool} attempted to access activity for user {UserId} in school {TargetSchool}",
+                schoolId, userId, user.School);
+            return Array.Empty<UserActivityEntry>();
+        }
 
         // Query Marten event stream for user-related events
         var events = await session.Events.FetchStreamAsync($"student-{userId}");
@@ -455,8 +541,22 @@ public sealed class AdminUserService : IAdminUserService
         }
     }
 
-    public async Task<IReadOnlyList<UserSessionDto>> GetSessionsAsync(string userId)
+    public async Task<IReadOnlyList<UserSessionDto>> GetSessionsAsync(string userId, ClaimsPrincipal caller)
     {
+        // FIND-sec-008: Verify tenant access before querying sessions
+        await using var session = _store.QuerySession();
+        var user = await session.LoadAsync<AdminUser>(userId);
+        if (user is null or { SoftDeleted: true })
+            return Array.Empty<UserSessionDto>();
+
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant session access attempt: caller from school {CallerSchool} attempted to access sessions for user {UserId} in school {TargetSchool}",
+                schoolId, userId, user.School);
+            return Array.Empty<UserSessionDto>();
+        }
+
         try
         {
             var db = _redis.GetDatabase();
@@ -496,8 +596,22 @@ public sealed class AdminUserService : IAdminUserService
         }
     }
 
-    public async Task RevokeSessionAsync(string userId, string sessionId)
+    public async Task RevokeSessionAsync(string userId, string sessionId, ClaimsPrincipal caller)
     {
+        // FIND-sec-008: Verify tenant access before revoking session
+        await using var session = _store.QuerySession();
+        var user = await session.LoadAsync<AdminUser>(userId);
+        if (user is null or { SoftDeleted: true })
+            throw new KeyNotFoundException($"User {userId} not found");
+
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant session revoke attempt: caller from school {CallerSchool} attempted to revoke session for user {UserId} in school {TargetSchool}",
+                schoolId, userId, user.School);
+            throw new KeyNotFoundException($"User {userId} not found");
+        }
+
         try
         {
             var db = _redis.GetDatabase();
@@ -511,24 +625,42 @@ public sealed class AdminUserService : IAdminUserService
         }
     }
 
-    public async Task<bool> ForcePasswordResetAsync(string id)
+    public async Task<bool> ForcePasswordResetAsync(string id, ClaimsPrincipal caller)
     {
         await using var session = _store.QuerySession();
         var user = await session.LoadAsync<AdminUser>(id);
         if (user is null or { SoftDeleted: true })
             return false;
 
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only reset passwords for users in their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant password reset attempt: caller from school {CallerSchool} attempted to reset password for user {UserId} in school {TargetSchool}",
+                schoolId, id, user.School);
+            return false;
+        }
+
         var link = await _firebase.GenerateSignInLinkAsync(user.Email);
         _logger.LogInformation("Forced password reset for user {UserId}, link generated", id);
         return true;
     }
 
-    public async Task<bool> RevokeApiKeyAsync(string userId, string keyId)
+    public async Task<bool> RevokeApiKeyAsync(string userId, string keyId, ClaimsPrincipal caller)
     {
         await using var session = _store.QuerySession();
         var user = await session.LoadAsync<AdminUser>(userId);
         if (user is null or { SoftDeleted: true })
             return false;
+
+        // FIND-sec-008: Enforce tenant scoping - ADMIN can only revoke API keys for users in their school
+        var schoolId = TenantScope.GetSchoolFilter(caller);
+        if (schoolId is not null && user.School != schoolId)
+        {
+            _logger.LogWarning("Cross-tenant API key revoke attempt: caller from school {CallerSchool} attempted to revoke key for user {UserId} in school {TargetSchool}",
+                schoolId, userId, user.School);
+            return false;
+        }
 
         _logger.LogInformation("Revoked API key {KeyId} for user {UserId}", keyId, userId);
         return true;

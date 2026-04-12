@@ -44,18 +44,18 @@ public static class AdminUserEndpoints
         .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
 
         // GET /api/admin/users/{id}
-        group.MapGet("/{id}", async (string id, IAdminUserService service) =>
+        group.MapGet("/{id}", async (string id, IAdminUserService service, HttpContext ctx) =>
         {
-            var user = await service.GetUserAsync(id);
+            var user = await service.GetUserAsync(id, ctx.User);
             return user != null ? Results.Ok(user) : Results.NotFound();
         }).WithName("GetUser");
 
         // POST /api/admin/users
-        group.MapPost("/", async (CreateUserRequest request, IAdminUserService service) =>
+        group.MapPost("/", async (CreateUserRequest request, IAdminUserService service, HttpContext ctx) =>
         {
             try
             {
-                var user = await service.CreateUserAsync(request);
+                var user = await service.CreateUserAsync(request, ctx.User);
                 return Results.Created($"/api/admin/users/{user.Id}", user);
             }
             catch (ArgumentException ex)
@@ -65,11 +65,11 @@ public static class AdminUserEndpoints
         }).WithName("CreateUser");
 
         // PUT /api/admin/users/{id}
-        group.MapPut("/{id}", async (string id, UpdateUserRequest request, IAdminUserService service) =>
+        group.MapPut("/{id}", async (string id, UpdateUserRequest request, IAdminUserService service, HttpContext ctx) =>
         {
             try
             {
-                var user = await service.UpdateUserAsync(id, request);
+                var user = await service.UpdateUserAsync(id, request, ctx.User);
                 return Results.Ok(user);
             }
             catch (KeyNotFoundException)
@@ -79,11 +79,11 @@ public static class AdminUserEndpoints
         }).WithName("UpdateUser");
 
         // DELETE /api/admin/users/{id}
-        group.MapDelete("/{id}", async (string id, IAdminUserService service) =>
+        group.MapDelete("/{id}", async (string id, IAdminUserService service, HttpContext ctx) =>
         {
             try
             {
-                await service.SoftDeleteUserAsync(id);
+                await service.SoftDeleteUserAsync(id, ctx.User);
                 return Results.NoContent();
             }
             catch (KeyNotFoundException)
@@ -93,11 +93,11 @@ public static class AdminUserEndpoints
         }).WithName("DeleteUser");
 
         // POST /api/admin/users/{id}/suspend
-        group.MapPost("/{id}/suspend", async (string id, SuspendUserRequest request, IAdminUserService service) =>
+        group.MapPost("/{id}/suspend", async (string id, SuspendUserRequest request, IAdminUserService service, HttpContext ctx) =>
         {
             try
             {
-                await service.SuspendUserAsync(id, request.Reason);
+                await service.SuspendUserAsync(id, request.Reason, ctx.User);
                 return Results.NoContent();
             }
             catch (KeyNotFoundException)
@@ -107,11 +107,11 @@ public static class AdminUserEndpoints
         }).WithName("SuspendUser");
 
         // POST /api/admin/users/{id}/activate
-        group.MapPost("/{id}/activate", async (string id, IAdminUserService service) =>
+        group.MapPost("/{id}/activate", async (string id, IAdminUserService service, HttpContext ctx) =>
         {
             try
             {
-                await service.ActivateUserAsync(id);
+                await service.ActivateUserAsync(id, ctx.User);
                 return Results.NoContent();
             }
             catch (KeyNotFoundException)
@@ -121,21 +121,25 @@ public static class AdminUserEndpoints
         }).WithName("ActivateUser");
 
         // POST /api/admin/users/invite
-        group.MapPost("/invite", async (InviteUserRequest request, IAdminUserService service) =>
+        group.MapPost("/invite", async (InviteUserRequest request, IAdminUserService service, HttpContext ctx) =>
         {
             try
             {
-                var user = await service.InviteUserAsync(request);
+                var user = await service.InviteUserAsync(request, ctx.User);
                 return Results.Created($"/api/admin/users/{user.Id}", user);
             }
             catch (ArgumentException ex)
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
+            catch (UnauthorizedAccessException ex)
+            {
+                return Results.Forbid();
+            }
         }).WithName("InviteUser");
 
         // POST /api/admin/users/bulk-invite
-        group.MapPost("/bulk-invite", async (HttpRequest request, IAdminUserService service) =>
+        group.MapPost("/bulk-invite", async (HttpRequest request, IAdminUserService service, HttpContext ctx) =>
         {
             if (!request.HasFormContentType)
                 return Results.BadRequest(new { error = "Expected multipart/form-data with CSV file" });
@@ -162,14 +166,16 @@ public static class AdminUserEndpoints
                 .Replace("\\", "");
 
             using var stream = file.OpenReadStream();
-            var result = await service.BulkInviteAsync(stream);
+            var result = await service.BulkInviteAsync(stream, ctx.User);
             return Results.Ok(result);
         }).WithName("BulkInviteUsers").DisableAntiforgery();
 
         // GET /api/admin/users/{id}/security
-        group.MapGet("/{id}/security", async (string id, IAdminUserService service) =>
+        group.MapGet("/{id}/security", async (string id, IAdminUserService service, HttpContext ctx) =>
         {
-            var user = await service.GetUserAsync(id);
+            var user = await service.GetUserAsync(id, ctx.User);
+            if (user == null)
+                return Results.NotFound();
             return Results.Ok(new
             {
                 twoFactorEnabled = false,
@@ -178,37 +184,44 @@ public static class AdminUserEndpoints
         }).WithName("GetUserSecurity");
 
         // GET /api/admin/users/{id}/activity
-        group.MapGet("/{id}/activity", async (string id, IAdminUserService service) =>
+        group.MapGet("/{id}/activity", async (string id, IAdminUserService service, HttpContext ctx) =>
         {
-            var activity = await service.GetActivityAsync(id);
+            var activity = await service.GetActivityAsync(id, ctx.User);
             return Results.Ok(activity);
         }).WithName("GetUserActivity");
 
         // GET /api/admin/users/{id}/sessions (BKD-002.9)
-        group.MapGet("/{id}/sessions", async (string id, IAdminUserService service) =>
+        group.MapGet("/{id}/sessions", async (string id, IAdminUserService service, HttpContext ctx) =>
         {
-            var sessions = await service.GetSessionsAsync(id);
+            var sessions = await service.GetSessionsAsync(id, ctx.User);
             return Results.Ok(sessions);
         }).WithName("GetUserSessions");
 
         // DELETE /api/admin/users/{id}/sessions/{sid} (BKD-002.9)
-        group.MapDelete("/{id}/sessions/{sid}", async (string id, string sid, IAdminUserService service) =>
+        group.MapDelete("/{id}/sessions/{sid}", async (string id, string sid, IAdminUserService service, HttpContext ctx) =>
         {
-            await service.RevokeSessionAsync(id, sid);
-            return Results.NoContent();
+            try
+            {
+                await service.RevokeSessionAsync(id, sid, ctx.User);
+                return Results.NoContent();
+            }
+            catch (KeyNotFoundException)
+            {
+                return Results.NotFound();
+            }
         }).WithName("RevokeUserSession");
 
         // POST /api/admin/users/{id}/force-reset
-        group.MapPost("/{id}/force-reset", async (string id, IAdminUserService service) =>
+        group.MapPost("/{id}/force-reset", async (string id, IAdminUserService service, HttpContext ctx) =>
         {
-            var success = await service.ForcePasswordResetAsync(id);
+            var success = await service.ForcePasswordResetAsync(id, ctx.User);
             return success ? Results.Ok() : Results.NotFound();
         }).WithName("ForcePasswordReset");
 
         // DELETE /api/admin/users/{id}/api-keys/{keyId}
-        group.MapDelete("/{id}/api-keys/{keyId}", async (string id, string keyId, IAdminUserService service) =>
+        group.MapDelete("/{id}/api-keys/{keyId}", async (string id, string keyId, IAdminUserService service, HttpContext ctx) =>
         {
-            var success = await service.RevokeApiKeyAsync(id, keyId);
+            var success = await service.RevokeApiKeyAsync(id, keyId, ctx.User);
             return success ? Results.Ok() : Results.NotFound();
         }).WithName("RevokeApiKey");
 
