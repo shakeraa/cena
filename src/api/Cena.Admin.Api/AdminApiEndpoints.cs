@@ -208,9 +208,9 @@ public static class AdminApiEndpoints
             return Results.Ok(new { items });
         }).WithName("GetStudentReviewPriority");
 
-        group.MapGet("/classes/{classId}", async (string classId, IMasteryTrackingService service) =>
+        group.MapGet("/classes/{classId}", async (string classId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
-            var detail = await service.GetClassMasteryAsync(classId);
+            var detail = await service.GetClassMasteryAsync(classId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
         }).WithName("GetClassMastery");
 
@@ -239,16 +239,17 @@ public static class AdminApiEndpoints
             IMasteryTrackingService service) =>
         {
             var teacherId = ctx.User.FindFirst("sub")?.Value ?? "unknown";
-            var result = await service.OverrideMethodologyAsync(studentId, body.Level, body.LevelId, body.Methodology, teacherId);
+            var result = await service.OverrideMethodologyAsync(studentId, body.Level, body.LevelId, body.Methodology, teacherId, ctx.User);
             return result ? Results.Ok(new { message = "Override applied" }) : Results.BadRequest(new { error = "Override failed" });
         }).WithName("PostStudentMethodologyOverride");
 
         // GET /api/admin/mastery/students/{studentId}/methodology-overrides
         group.MapGet("/students/{studentId}/methodology-overrides", async (
             string studentId,
+            ClaimsPrincipal user,
             IMasteryTrackingService service) =>
         {
-            var overrides = await service.GetStudentOverridesAsync(studentId);
+            var overrides = await service.GetStudentOverridesAsync(studentId, user);
             var result = overrides.Select(o => new
             {
                 id = o.Id,
@@ -266,9 +267,10 @@ public static class AdminApiEndpoints
         group.MapDelete("/students/{studentId}/methodology-overrides/{overrideId}", async (
             string studentId,
             string overrideId,
+            ClaimsPrincipal user,
             IMasteryTrackingService service) =>
         {
-            var removed = await service.RemoveOverrideAsync(studentId, Uri.UnescapeDataString(overrideId));
+            var removed = await service.RemoveOverrideAsync(studentId, Uri.UnescapeDataString(overrideId), user);
             return removed ? Results.Ok(new { message = "Override removed" }) : Results.NotFound(new { error = "Override not found" });
         }).WithName("DeleteStudentMethodologyOverride");
 

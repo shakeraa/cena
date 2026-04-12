@@ -19,12 +19,12 @@ public interface IMasteryTrackingService
 {
     Task<MasteryOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user);
     Task<StudentMasteryDetailResponse?> GetStudentMasteryAsync(string studentId, ClaimsPrincipal user);
-    Task<ClassMasteryResponse?> GetClassMasteryAsync(string classId);
+    Task<ClassMasteryResponse?> GetClassMasteryAsync(string classId, ClaimsPrincipal user);
     Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync(ClaimsPrincipal user);
     Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId, ClaimsPrincipal user);
-    Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId);
-    Task<IReadOnlyList<MethodologyOverrideDocument>> GetStudentOverridesAsync(string studentId);
-    Task<bool> RemoveOverrideAsync(string studentId, string overrideId);
+    Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId, ClaimsPrincipal user);
+    Task<IReadOnlyList<MethodologyOverrideDocument>> GetStudentOverridesAsync(string studentId, ClaimsPrincipal user);
+    Task<bool> RemoveOverrideAsync(string studentId, string overrideId, ClaimsPrincipal user);
 }
 
 public sealed class MasteryTrackingService : IMasteryTrackingService
@@ -71,8 +71,9 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         return BuildStudentMasteryDetail(studentId, snapshot);
     }
 
-    public async Task<ClassMasteryResponse?> GetClassMasteryAsync(string classId)
+    public async Task<ClassMasteryResponse?> GetClassMasteryAsync(string classId, ClaimsPrincipal user)
     {
+        var callerSchoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
         var latest = await session.Query<ClassMasteryRollupDocument>()
@@ -82,6 +83,14 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
             .ToListAsync();
         if (latest.Count == 0) return null;
         var rollup = latest[0];
+
+        // FIND-sec-011: Enforce tenant scoping - ADMIN can only access classes in their school
+        if (callerSchoolId is not null && rollup.SchoolId != callerSchoolId)
+        {
+            _logger.LogWarning("Cross-tenant mastery access: caller from school {CallerSchool} attempted to access class {ClassId} in school {TargetSchool}",
+                callerSchoolId, classId, rollup.SchoolId);
+            return null;
+        }
 
         var difficulty = await session.Query<ConceptDifficultyDocument>()
             .Where(c => c.SchoolId == rollup.SchoolId)
@@ -156,9 +165,21 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         return new MethodologyProfileAdminResponse(studentId, subjects, topics, concepts);
     }
 
-    public async Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId)
+    public async Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId, ClaimsPrincipal user)
     {
+        var callerSchoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.LightweightSession();
+
+        // FIND-sec-011: Verify student belongs to caller's school
+        var student = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        if (student is null) return false;
+        if (callerSchoolId is not null && student.SchoolId != callerSchoolId)
+        {
+            _logger.LogWarning("Cross-tenant override attempt: caller from school {CallerSchool} attempted to override methodology for student {StudentId} in school {TargetSchool}",
+                callerSchoolId, studentId, student.SchoolId);
+            return false;
+        }
+
         var overrideDoc = new MethodologyOverrideDocument
         {
             Id = $"{studentId}:{level}:{levelId}",
@@ -177,18 +198,42 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         return true;
     }
 
-    public async Task<IReadOnlyList<MethodologyOverrideDocument>> GetStudentOverridesAsync(string studentId)
+    public async Task<IReadOnlyList<MethodologyOverrideDocument>> GetStudentOverridesAsync(string studentId, ClaimsPrincipal user)
     {
+        var callerSchoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
+
+        // FIND-sec-011: Verify student belongs to caller's school
+        var student = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        if (student is null) return Array.Empty<MethodologyOverrideDocument>();
+        if (callerSchoolId is not null && student.SchoolId != callerSchoolId)
+        {
+            _logger.LogWarning("Cross-tenant override read attempt: caller from school {CallerSchool} attempted to access overrides for student {StudentId} in school {TargetSchool}",
+                callerSchoolId, studentId, student.SchoolId);
+            return Array.Empty<MethodologyOverrideDocument>();
+        }
+
         return await session.Query<MethodologyOverrideDocument>()
             .Where(o => o.StudentId == studentId)
             .OrderByDescending(o => o.CreatedAt)
             .ToListAsync();
     }
 
-    public async Task<bool> RemoveOverrideAsync(string studentId, string overrideId)
+    public async Task<bool> RemoveOverrideAsync(string studentId, string overrideId, ClaimsPrincipal user)
     {
+        var callerSchoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.LightweightSession();
+
+        // FIND-sec-011: Verify student belongs to caller's school
+        var student = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        if (student is null) return false;
+        if (callerSchoolId is not null && student.SchoolId != callerSchoolId)
+        {
+            _logger.LogWarning("Cross-tenant override remove attempt: caller from school {CallerSchool} attempted to remove override for student {StudentId} in school {TargetSchool}",
+                callerSchoolId, studentId, student.SchoolId);
+            return false;
+        }
+
         var existing = await session.LoadAsync<MethodologyOverrideDocument>(overrideId);
         if (existing == null || existing.StudentId != studentId) return false;
         session.Delete<MethodologyOverrideDocument>(overrideId);
