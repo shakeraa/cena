@@ -1,52 +1,108 @@
 import type { App } from 'vue'
+import { getSentryConfig } from './sentry.config'
 
 /**
- * Sentry plugin stub. STU-W-03 reserves the slot so feature tasks can
- * assume `Sentry.captureException()` is available; the real `@sentry/vue`
- * SDK initialization lands in a follow-up (STU-W-OBS-SENTRY) once the
- * DSN is provisioned.
+ * Sentry plugin — privacy-safe facade for error tracking.
  *
- * Until then, the export is a no-op facade with the same API surface
- * `$api.ts` and feature code can call without a runtime error.
+ * FIND-privacy-016: The shim API deliberately excludes email, username,
+ * IP address, and all other directly-identifiable PII. When the real
+ * @sentry/vue SDK lands (STU-W-OBS-SENTRY), it MUST use the locked-down
+ * config from `sentry.config.ts` which enforces `defaultPii: false`,
+ * disables session replay, and scrubs PII in `beforeSend`.
+ *
+ * The `setUser` method only accepts a SHA-256 hash of the student ID
+ * combined with a per-tenant pepper. Callers MUST NOT pass raw student
+ * IDs or any other PII.
  */
 
-interface SentryShim {
+/** Hashed-only user identifier. No email, no username, no IP. */
+export interface SentryUser {
+  /** SHA-256(tenantPepper + studentId). Never a raw ID or email. */
+  id_hash: string
+}
+
+export interface SentryShim {
   captureException: (err: unknown, context?: Record<string, unknown>) => void
   addBreadcrumb: (breadcrumb: Record<string, unknown>) => void
   setTag: (key: string, value: string) => void
-  setUser: (user: { id: string; email?: string } | null) => void
+  /**
+   * Set the current user context using ONLY a hashed identifier.
+   * Pass `null` to clear. Email/username/IP are NOT accepted.
+   */
+  setUser: (user: SentryUser | null) => void
 }
 
-// FIND-privacy-016: Gate to prevent student email pre-wiring to SaaS
-// This stub explicitly NEVER sets user data, even when DSN is configured.
-// Real Sentry init with user tracking is blocked until STU-W-OBS-SENTRY.
-const SENTRY_USER_TRACKING_ENABLED = false // Gate: never enable until explicit approval
-
-export const Sentry: SentryShim = {
-  captureException: (err, context) => {
-    if ((import.meta as any).env?.DEV)
-      console.error('[sentry stub]', err, context)
-    // Production: no-op until STU-W-OBS-SENTRY
-  },
-  addBreadcrumb: () => {},
-  setTag: () => {},
-  // FIND-privacy-016: setUser is explicitly blocked to prevent email leakage
-  setUser: (user) => {
-    if (SENTRY_USER_TRACKING_ENABLED && (import.meta as any).env?.DEV) {
-      console.log('[sentry stub] setUser blocked:', user?.id)
-    }
-    // Always no-op - user data never sent to Sentry
-  },
+/**
+ * Check whether the user has granted observability consent.
+ * Reads from localStorage where the consent manager persists choices.
+ * Returns false if consent is missing, revoked, or unreadable.
+ */
+export function hasObservabilityConsent(): boolean {
+  try {
+    const raw = globalThis.localStorage?.getItem('cena-consent-observability')
+    return raw === 'true'
+  }
+  catch {
+    // localStorage unavailable (SSR, sandboxed iframe, etc.)
+    return false
+  }
 }
 
-export default function (__: App) {
+/**
+ * Create a no-op Sentry facade. Used when DSN is absent, consent is
+ * not granted, or the real SDK has not been initialized.
+ */
+function createNoOpSentry(): SentryShim {
+  return {
+    captureException: (err, context) => {
+      if ((import.meta as any).env?.DEV)
+        console.error('[sentry:noop] captureException:', err, context)
+    },
+    addBreadcrumb: () => {},
+    setTag: () => {},
+    setUser: () => {},
+  }
+}
+
+/** The singleton Sentry facade. Always safe to call; no-op until initialized. */
+export let Sentry: SentryShim = createNoOpSentry()
+
+/**
+ * Vue plugin install function.
+ *
+ * Initialization is gated on THREE conditions — ALL must be true:
+ *   1. VITE_SENTRY_DSN env var is non-empty
+ *   2. User has granted observability consent (consent.observability = true)
+ *   3. The real @sentry/vue SDK is available (STU-W-OBS-SENTRY follow-up)
+ *
+ * Until all three are met, `Sentry` remains the no-op facade.
+ */
+export default function installSentry(_app: App) {
   const dsn = (import.meta as any).env?.VITE_SENTRY_DSN
 
-  // Stub mode when dsn is missing — `Sentry` above is a no-op facade.
-  // Real init (import @sentry/vue and initialize with app + dsn + tracing)
-  // will replace this in STU-W-OBS-SENTRY once the DSN is provisioned.
-  if (dsn) {
-    // Placeholder — real Sentry init lives in STU-W-OBS-SENTRY follow-up.
-    void dsn
+  if (!dsn) {
+    // No DSN provisioned — stay no-op.
+    if ((import.meta as any).env?.DEV)
+      console.info('[sentry] No DSN configured. Sentry disabled.')
+    return
   }
+
+  if (!hasObservabilityConsent()) {
+    // User has not consented to observability tracking.
+    console.info('[sentry] Observability consent not granted. Sentry disabled.')
+    return
+  }
+
+  // DSN present and consent granted, but real SDK init is deferred to
+  // STU-W-OBS-SENTRY. When that task lands, it will:
+  //   1. Import @sentry/vue
+  //   2. Call Sentry.init() with getSentryConfig(dsn)
+  //   3. Replace the `Sentry` export with the real SDK instance
+  //
+  // The config from sentry.config.ts enforces all privacy constraints.
+  const _config = getSentryConfig(dsn)
+  void _config // Will be consumed by the real init in STU-W-OBS-SENTRY
+
+  if ((import.meta as any).env?.DEV)
+    console.info('[sentry] DSN + consent OK. Awaiting real SDK init (STU-W-OBS-SENTRY).')
 }
