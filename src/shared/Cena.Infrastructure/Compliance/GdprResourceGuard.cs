@@ -4,11 +4,23 @@
 // =============================================================================
 
 using System.Security.Claims;
-using Cena.Actors.Events;
 using Cena.Infrastructure.Tenancy;
 using Marten;
 
 namespace Cena.Infrastructure.Compliance;
+
+/// <summary>
+/// Lightweight POCO used by <see cref="GdprResourceGuard"/> to verify school
+/// membership without pulling in the Cena.Actors assembly. The real projection
+/// lives in Cena.Actors.Events.StudentProfileSnapshot; Marten resolves the
+/// table by document type name at runtime, which matches as long as the
+/// schema is the same.
+/// </summary>
+internal class StudentProfileSnapshotRef
+{
+    public string Id { get; set; } = "";
+    public string? SchoolId { get; set; }
+}
 
 /// <summary>
 /// Guards GDPR operations against cross-tenant access.
@@ -20,7 +32,7 @@ public static class GdprResourceGuard
     /// Throws <see cref="KeyNotFoundException"/> if student not found or not in caller's school.
     /// </summary>
     public static async Task VerifyStudentBelongsToCallerSchoolAsync(
-        string studentId, 
+        string studentId,
         ClaimsPrincipal caller,
         IDocumentStore store)
     {
@@ -32,8 +44,8 @@ public static class GdprResourceGuard
         }
 
         await using var session = store.QuerySession();
-        var student = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-        
+        var student = await session.LoadAsync<StudentProfileSnapshotRef>(studentId);
+
         if (student is null)
         {
             throw new KeyNotFoundException($"Student '{studentId}' not found");

@@ -39,4 +39,13 @@ public static class DataRetentionPolicy
     /// Engagement data (XP, streaks, badges): 1 year after inactivity.
     /// </summary>
     public static readonly TimeSpan EngagementRetention = TimeSpan.FromDays(365);
+
+    /// <summary>
+    /// FIND-privacy-008: Tutor message retention — 90 days.
+    /// Third-party AI processor (Anthropic) conversations are retained for a
+    /// shorter window than general student records to minimise PII exposure.
+    /// Applies to: TutorMessageDocument, TutorThreadDocument.
+    /// Enforced by RetentionWorker (FIND-privacy-004).
+    /// </summary>
+    public static readonly TimeSpan TutorMessageRetention = TimeSpan.FromDays(90);
 }

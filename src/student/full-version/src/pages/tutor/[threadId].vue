@@ -174,6 +174,13 @@ async function handleSubmit(content: string) {
         :loading="sendMutation.loading.value"
         @submit="handleSubmit"
       />
+      <!-- FIND-privacy-008: DPA disclosure for AI processing -->
+      <p
+        class="text-caption text-medium-emphasis mt-2 text-center"
+        data-testid="tutor-dpa-disclosure"
+      >
+        {{ t('tutor.thread.dpaDisclosure') }}
+      </p>
     </div>
   </div>
 </template>

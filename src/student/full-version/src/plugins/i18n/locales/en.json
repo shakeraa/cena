@@ -692,7 +692,8 @@
     "thread": {
       "emptyTitle": "Ask your first question",
       "emptySubtitle": "Try something like 'Explain photosynthesis' or 'Help me solve x² − 5x + 6 = 0'.",
-      "thinking": "Tutor is thinking…"
+      "thinking": "Tutor is thinking…",
+      "dpaDisclosure": "Your conversations are processed by AI. See our Privacy Policy for details."
     },
     "compose": {
       "placeholder": "Ask your tutor anything…",
