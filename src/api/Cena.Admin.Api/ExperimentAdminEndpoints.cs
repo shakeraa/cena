@@ -1,5 +1,7 @@
-// Cena Platform -- Experiment Admin Endpoints (ADM-019)
+// Cena Platform -- Experiment Admin Endpoints (FIND-data-026)
+// Tenant-scoped experiment analytics with optimized queries.
 
+using System.Security.Claims;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -16,21 +18,22 @@ public static class ExperimentAdminEndpoints
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
 
-        group.MapGet("/", async (IExperimentAdminService service) =>
+        // FIND-data-026: Pass ClaimsPrincipal for tenant scoping
+        group.MapGet("/", async (ClaimsPrincipal user, IExperimentAdminService service) =>
         {
-            var result = await service.GetExperimentsAsync();
+            var result = await service.GetExperimentsAsync(user);
             return Results.Ok(result);
         }).WithName("GetExperiments");
 
-        group.MapGet("/{experimentName}", async (string experimentName, IExperimentAdminService service) =>
+        group.MapGet("/{experimentName}", async (string experimentName, ClaimsPrincipal user, IExperimentAdminService service) =>
         {
-            var result = await service.GetExperimentDetailAsync(experimentName);
+            var result = await service.GetExperimentDetailAsync(experimentName, user);
             return result is not null ? Results.Ok(result) : Results.NotFound();
         }).WithName("GetExperimentDetail");
 
-        group.MapGet("/{experimentName}/funnel", async (string experimentName, IExperimentAdminService service) =>
+        group.MapGet("/{experimentName}/funnel", async (string experimentName, ClaimsPrincipal user, IExperimentAdminService service) =>
         {
-            var result = await service.GetFunnelAsync(experimentName);
+            var result = await service.GetFunnelAsync(experimentName, user);
             return result is not null ? Results.Ok(result) : Results.NotFound();
         }).WithName("GetExperimentFunnel");
 
