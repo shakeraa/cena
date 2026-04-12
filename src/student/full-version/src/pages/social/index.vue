@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ClassFeedItemCard from '@/components/social/ClassFeedItemCard.vue'
 import { useApiQuery } from '@/composables/useApiQuery'
@@ -20,15 +21,18 @@ definePage({
 const { t } = useI18n()
 
 const feedQuery = useApiQuery<ClassFeedDto>('/api/social/class-feed')
-const reactMutation = useApiMutation<{ ok: boolean }, { itemId: string, reactionType: string }>('/api/social/reactions', 'POST')
+const reactMutation = useApiMutation<{ ok: boolean; newCount: number }, { itemId: string; reactionType: string }>('/api/social/reactions', 'POST')
+
+const reactionErrorVisible = ref(false)
 
 async function handleReact(itemId: string) {
   try {
     await reactMutation.execute({ itemId, reactionType: 'heart' })
     feedQuery.refresh()
   }
-  catch {
-    // error surfaced via reactMutation.error
+  catch (err) {
+    console.error('[FIND-ux-024] class-feed reaction failed', { itemId, error: err })
+    reactionErrorVisible.value = true
   }
 }
 </script>
@@ -73,6 +77,15 @@ async function handleReact(itemId: string) {
         @react="handleReact"
       />
     </div>
+
+    <VSnackbar
+      v-model="reactionErrorVisible"
+      color="error"
+      timeout="4000"
+      data-testid="reaction-error-snackbar"
+    >
+      {{ reactMutation.error.value?.message ?? t('social.feed.reactionError') }}
+    </VSnackbar>
   </div>
 </template>
 

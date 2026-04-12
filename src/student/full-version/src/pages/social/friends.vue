@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FriendRow from '@/components/social/FriendRow.vue'
 import { useApiQuery } from '@/composables/useApiQuery'
@@ -21,13 +22,18 @@ const { t } = useI18n()
 
 const friendsQuery = useApiQuery<FriendsListDto>('/api/social/friends')
 
+const acceptError = ref<string | null>(null)
+const acceptErrorVisible = ref(false)
+
 async function handleAccept(requestId: string) {
   try {
     await $api(`/api/social/friends/${requestId}/accept`, { method: 'POST' as any, body: {} as any })
     friendsQuery.refresh()
   }
-  catch {
-    // swallow
+  catch (err) {
+    console.error('[FIND-ux-024] friend-accept failed', { requestId, error: err })
+    acceptError.value = err instanceof Error ? err.message : t('social.friends.acceptError')
+    acceptErrorVisible.value = true
   }
 }
 </script>
@@ -121,6 +127,15 @@ async function handleAccept(requestId: string) {
         />
       </section>
     </template>
+
+    <VSnackbar
+      v-model="acceptErrorVisible"
+      color="error"
+      timeout="4000"
+      data-testid="accept-error-snackbar"
+    >
+      {{ acceptError ?? t('social.friends.acceptError') }}
+    </VSnackbar>
   </div>
 </template>
 

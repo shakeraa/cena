@@ -86,9 +86,26 @@ const pendingRequests: FriendRequest[] = [
   { requestId: 'req-2', fromStudentId: 'u-riley', fromDisplayName: 'Riley Evans', fromAvatarUrl: null, requestedAt: new Date(Date.now() - 1 * 86400_000).toISOString() },
 ]
 
+/**
+ * Per-item reaction state. Keyed by `${itemId}:${reactionType}`.
+ * Tracks whether the current user has reacted and the running count
+ * (seeded from the initial feed data on first toggle).
+ */
+const reactionState = new Map<string, { reacted: boolean; count: number }>()
+
+/** Seed data keeps its own mutable counts so GET /class-feed reflects toggles. */
+let feedItems: FeedItem[] | null = null
+
+function getFeed(): FeedItem[] {
+  if (!feedItems)
+    feedItems = makeFeed()
+
+  return feedItems
+}
+
 export const handlerStudentSocial = [
   http.get('/api/social/class-feed', () => {
-    const items = makeFeed()
+    const items = getFeed()
 
     return HttpResponse.json({
       items,
@@ -100,12 +117,38 @@ export const handlerStudentSocial = [
 
   http.post('/api/social/reactions', async ({ request }) => {
     const body = await request.json() as { itemId: string; reactionType: string }
+    const key = `${body.itemId}:${body.reactionType}`
+    const items = getFeed()
+    const feedItem = items.find(i => i.itemId === body.itemId)
+
+    let state = reactionState.get(key)
+    if (!state) {
+      // Seed from the feed item's current count (first interaction)
+      state = { reacted: false, count: feedItem?.reactionCount ?? 0 }
+    }
+
+    // Toggle: un-react if already reacted, react if not
+    if (state.reacted) {
+      state.count = Math.max(0, state.count - 1)
+      state.reacted = false
+    }
+    else {
+      state.count += 1
+      state.reacted = true
+    }
+
+    reactionState.set(key, state)
+
+    // Keep the feed item in sync so subsequent GET /class-feed reflects the change
+    if (feedItem)
+      feedItem.reactionCount = state.count
 
     return HttpResponse.json({
       ok: true,
       itemId: body.itemId,
       reactionType: body.reactionType,
-      newCount: 1,
+      newCount: state.count,
+      reacted: state.reacted,
     })
   }),
 

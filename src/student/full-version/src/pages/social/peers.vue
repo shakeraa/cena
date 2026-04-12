@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import PeerSolutionCard from '@/components/social/PeerSolutionCard.vue'
 import { useApiQuery } from '@/composables/useApiQuery'
@@ -21,6 +22,9 @@ const { t } = useI18n()
 
 const solutionsQuery = useApiQuery<PeerSolutionListDto>('/api/social/peers/solutions')
 
+const voteError = ref<string | null>(null)
+const voteErrorVisible = ref(false)
+
 async function handleVote(solutionId: string, direction: 'up' | 'down') {
   try {
     await $api(`/api/social/peers/solutions/${solutionId}/vote`, {
@@ -29,8 +33,10 @@ async function handleVote(solutionId: string, direction: 'up' | 'down') {
     })
     solutionsQuery.refresh()
   }
-  catch {
-    // swallow — would surface a snackbar in 12b
+  catch (err) {
+    console.error('[FIND-ux-024] peer-vote failed', { solutionId, direction, error: err })
+    voteError.value = err instanceof Error ? err.message : t('social.peers.voteError')
+    voteErrorVisible.value = true
   }
 }
 </script>
@@ -75,6 +81,15 @@ async function handleVote(solutionId: string, direction: 'up' | 'down') {
         @vote="handleVote"
       />
     </div>
+
+    <VSnackbar
+      v-model="voteErrorVisible"
+      color="error"
+      timeout="4000"
+      data-testid="vote-error-snackbar"
+    >
+      {{ voteError ?? t('social.peers.voteError') }}
+    </VSnackbar>
   </div>
 </template>
 
