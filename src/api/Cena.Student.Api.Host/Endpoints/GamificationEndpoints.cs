@@ -34,6 +34,7 @@ public static class GamificationEndpoints
     }
 
     // GET /api/gamification/badges — returns earned and locked badges (STB-03c)
+    // FIND-data-028: Uses real BadgeEarned_v1 events instead of fabricated timestamps
     private static async Task<IResult> GetBadges(
         HttpContext ctx,
         IDocumentStore store)
@@ -46,21 +47,31 @@ public static class GamificationEndpoints
 
         await using var session = store.QuerySession();
 
-        // Get student profile
-        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-        
-        // Get stats from events
-        var sessionEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "learning_session_started_v1")
-            .ToListAsync();
-        var sessionCount = sessionEvents.Count(e => e.StreamKey == studentId);
-        var hasStartedSession = sessionCount > 0;
+        // FIND-data-028: Query only this student's events instead of global scan
+        var studentEvents = await session.Events.FetchStreamAsync(studentId);
 
-        var attemptEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "concept_attempted_v1")
-            .ToListAsync();
-        var studentAttempts = attemptEvents.Where(e => e.StreamKey == studentId).ToList();
-        var correctAnswers = studentAttempts.Count(e => ExtractBool(e, "isCorrect"));
+        // Get real badge earned events with actual timestamps
+        var badgeEarnedEvents = studentEvents
+            .Where(e => e.Data is BadgeEarned_V1)
+            .Select(e => (BadgeEarned_V1)e.Data)
+            .ToList();
+
+        // Build lookup of earned badges by badge ID
+        var earnedBadgeLookup = badgeEarnedEvents
+            .GroupBy(b => b.BadgeId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.OrderByDescending(b => b.Timestamp).First().Timestamp);
+
+        // Get stats from student's own events only
+        var sessionCount = studentEvents
+            .Count(e => e.Data is LearningSessionStarted_V1);
+
+        var studentAttempts = studentEvents
+            .Where(e => e.Data is ConceptAttempted_V1)
+            .Select(e => (ConceptAttempted_V1)e.Data)
+            .ToList();
+        var correctAnswers = studentAttempts.Count(a => a.IsCorrect);
 
         var currentStreak = await CalculateCurrentStreak(session, studentId);
 
@@ -68,11 +79,12 @@ public static class GamificationEndpoints
         var friendCount = await session.Query<FriendshipDocument>()
             .CountAsync(f => f.StudentAId == studentId || f.StudentBId == studentId);
 
-        // Get bosses defeated (from challenge events)
-        var challengeEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "challenge_completed_v1")
-            .ToListAsync();
-        var bossesDefeated = challengeEvents.Count(e => e.StreamKey == studentId);
+        // Get bosses defeated from student's challenge events
+        var bossesDefeated = studentEvents
+            .Count(e => e.Data is ChallengeCompleted_V1);
+
+        // Get student profile for mastered concepts
+        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
 
         // Evaluate all badges from catalog
         var earned = new List<Badge>();
@@ -80,15 +92,18 @@ public static class GamificationEndpoints
 
         foreach (var badgeDef in BadgeCatalog.All)
         {
-            var isEarned = EvaluateBadge(badgeDef, 
-                sessionCount, 
-                correctAnswers, 
-                currentStreak, 
-                friendCount, 
+            var isEarned = EvaluateBadge(badgeDef,
+                sessionCount,
+                correctAnswers,
+                currentStreak,
+                friendCount,
                 bossesDefeated,
                 profile);
 
-            if (isEarned)
+            // FIND-data-028: Use real timestamp from BadgeEarned_v1 event
+            var earnedTimestamp = earnedBadgeLookup.TryGetValue(badgeDef.Id, out var ts) ? ts : (DateTimeOffset?)null;
+
+            if (isEarned && earnedTimestamp.HasValue)
             {
                 earned.Add(new Badge(
                     BadgeId: badgeDef.Id,
@@ -96,7 +111,7 @@ public static class GamificationEndpoints
                     Description: badgeDef.Description,
                     IconName: badgeDef.IconName,
                     Tier: badgeDef.Tier,
-                    EarnedAt: DateTime.UtcNow.AddDays(-new Random(badgeDef.Id.GetHashCode()).Next(1, 60))));
+                    EarnedAt: earnedTimestamp.Value.UtcDateTime));
             }
             else
             {
@@ -312,13 +327,14 @@ public static class GamificationEndpoints
     }
 
     // Helper: Calculate current streak from LearningSessionStarted_V1 events
+    // FIND-data-028: Uses FetchStreamAsync instead of QueryAllRawEvents
     private static async Task<int> CalculateCurrentStreak(IQuerySession session, string studentId)
     {
-        var sessionEvents = await session.Events.QueryAllRawEvents()
-            .Where(e => e.EventTypeName == "learning_session_started_v1")
-            .Where(e => e.StreamKey == studentId)
+        var studentStream = await session.Events.FetchStreamAsync(studentId);
+        var sessionEvents = studentStream
+            .Where(e => e.Data is LearningSessionStarted_V1)
             .OrderByDescending(e => e.Timestamp)
-            .ToListAsync();
+            .ToList();
 
         if (sessionEvents.Count == 0)
             return 0;
