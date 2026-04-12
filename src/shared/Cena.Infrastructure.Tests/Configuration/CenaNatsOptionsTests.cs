@@ -133,9 +133,112 @@ public sealed class CenaNatsOptionsTests
         Assert.Equal("dev_config_pass", password);
     }
 
-    /// <summary>
-    /// Minimal IHostEnvironment implementation for testing.
-    /// </summary>
+    // =========================================================================
+    // GetActorAuth Tests (FIND-sec-009)
+    // =========================================================================
+
+    [Fact]
+    public void GetActorAuth_ExplicitConfig_ReturnsConfiguredValues()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["NATS:ActorUsername"] = "actor_test_user",
+                ["NATS:ActorPassword"] = "actor_test_pass"
+            })
+            .Build();
+
+        var env = new TestHostEnvironment(isDevelopment: false);
+        var (username, password) = CenaNatsOptions.GetActorAuth(config, env);
+
+        Assert.Equal("actor_test_user", username);
+        Assert.Equal("actor_test_pass", password);
+    }
+
+    [Fact]
+    public void GetActorAuth_LegacyConfigKeys_ReturnsConfiguredValues()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Nats:User"] = "legacy_actor_user",
+                ["Nats:Password"] = "legacy_actor_pass"
+            })
+            .Build();
+
+        var env = new TestHostEnvironment(isDevelopment: false);
+        var (username, password) = CenaNatsOptions.GetActorAuth(config, env);
+
+        Assert.Equal("legacy_actor_user", username);
+        Assert.Equal("legacy_actor_pass", password);
+    }
+
+    [Fact]
+    public void GetActorAuth_EnvironmentVariables_ReturnsEnvValues()
+    {
+        Environment.SetEnvironmentVariable("NATS_ACTOR_USERNAME", "env_actor_user");
+        Environment.SetEnvironmentVariable("NATS_ACTOR_PASSWORD", "env_actor_pass");
+
+        try
+        {
+            var config = new ConfigurationBuilder().Build();
+            var env = new TestHostEnvironment(isDevelopment: false);
+            var (username, password) = CenaNatsOptions.GetActorAuth(config, env);
+
+            Assert.Equal("env_actor_user", username);
+            Assert.Equal("env_actor_pass", password);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("NATS_ACTOR_USERNAME", null);
+            Environment.SetEnvironmentVariable("NATS_ACTOR_PASSWORD", null);
+        }
+    }
+
+    [Fact]
+    public void GetActorAuth_NonDevelopmentMissingConfig_ThrowsInvalidOperationException()
+    {
+        var config = new ConfigurationBuilder().Build();
+        var env = new TestHostEnvironment(isDevelopment: false);
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+            CenaNatsOptions.GetActorAuth(config, env));
+
+        Assert.Contains("NATS Actor credentials not configured", ex.Message);
+    }
+
+    [Fact]
+    public void GetActorAuth_DevelopmentMissingConfig_UsesDevDefaults()
+    {
+        var config = new ConfigurationBuilder().Build();
+        var env = new TestHostEnvironment(isDevelopment: true);
+        var (username, password) = CenaNatsOptions.GetActorAuth(config, env);
+
+        Assert.Equal("actor-host", username);
+        Assert.Equal("dev_actor_pass", password);
+    }
+
+    [Fact]
+    public void GetActorAuth_DevelopmentWithConfig_UsesConfiguredValues()
+    {
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["NATS:ActorUsername"] = "dev_actor_config_user",
+                ["NATS:ActorPassword"] = "dev_actor_config_pass"
+            })
+            .Build();
+
+        var env = new TestHostEnvironment(isDevelopment: true);
+        var (username, password) = CenaNatsOptions.GetActorAuth(config, env);
+
+        Assert.Equal("dev_actor_config_user", username);
+        Assert.Equal("dev_actor_config_pass", password);
+    }
+
+    // =========================================================================
+    // Minimal IHostEnvironment implementation for testing.
+    // =========================================================================
     private sealed class TestHostEnvironment : IHostEnvironment
     {
         public string EnvironmentName { get; set; }
