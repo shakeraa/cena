@@ -22,6 +22,10 @@ Thumbs.db
 # ── Docs assets (large/binary) ──
 docs/example-images/
 
+# ── Playwright MCP snapshots (review reference, not source) ──
+docs/reviews/playwright-mcp-snapshots/
+.playwright-mcp/
+
 # ── Secrets (NEVER commit) ──
 .env
 .env.*
