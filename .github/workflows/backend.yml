@@ -24,24 +24,31 @@ jobs:
           dotnet restore src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj
           dotnet restore src/api/Cena.Api.Host/Cena.Api.Host.csproj
           dotnet restore src/api/Cena.Admin.Api/Cena.Admin.Api.csproj
+          dotnet restore src/api/Cena.Student.Api.Host/Cena.Student.Api.Host.csproj
           dotnet restore src/emulator/Cena.Emulator.csproj
           dotnet restore src/actors/Cena.Actors.Tests/Cena.Actors.Tests.csproj
           dotnet restore src/api/Cena.Admin.Api.Tests/Cena.Admin.Api.Tests.csproj
+          dotnet restore src/shared/Cena.Infrastructure.Tests/Cena.Infrastructure.Tests.csproj
 
       - name: Build (Release)
         run: |
           dotnet build src/actors/Cena.Actors.Host/ -c Release --no-restore
           dotnet build src/api/Cena.Api.Host/ -c Release --no-restore
           dotnet build src/api/Cena.Admin.Api/ -c Release --no-restore
+          dotnet build src/api/Cena.Student.Api.Host/ -c Release --no-restore
           dotnet build src/emulator/ -c Release --no-restore
           dotnet build src/actors/Cena.Actors.Tests/ -c Release --no-restore
           dotnet build src/api/Cena.Admin.Api.Tests/ -c Release --no-restore
+          dotnet build src/shared/Cena.Infrastructure.Tests/ -c Release --no-restore
 
       - name: Run Actor Tests
         run: dotnet test src/actors/Cena.Actors.Tests/ -c Release --no-build --logger "trx;LogFileName=actors.trx"
 
       - name: Run Admin API Tests
         run: dotnet test src/api/Cena.Admin.Api.Tests/ -c Release --no-build --logger "trx;LogFileName=admin-api.trx"
+
+      - name: Run Infrastructure Tests (incl. SQLi regression suite)
+        run: dotnet test src/shared/Cena.Infrastructure.Tests/ -c Release --no-build --logger "trx;LogFileName=infrastructure.trx"
 
       - name: Check for vulnerable packages
         run: |
