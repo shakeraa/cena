@@ -217,31 +217,13 @@ public static class SessionEndpoints
             if (doc.StudentId != studentId)
                 return Results.Forbid();
 
-            // FIND-data-027: Query only this student's events instead of global scan
-            var studentEvents = await session.Events.FetchStreamAsync(studentId);
-            var sessionEvents = studentEvents
-                .Where(e => e.Data is ConceptAttempted_V1)
-                .Select(e => (ConceptAttempted_V1)e.Data)
-                .Where(a => a.SessionId == doc.SessionId)
-                .ToList();
-
-            var questionsAttempted = sessionEvents.Count;
-            var questionsCorrect   = sessionEvents.Count(e => e.IsCorrect);
-            var accuracy           = questionsAttempted > 0
-                ? (double)questionsCorrect / questionsAttempted
-                : 0;
-
-            var masteryDeltas = sessionEvents
-                .GroupBy(e => e.ConceptId)
-                .ToDictionary(
-                    g => g.Key,
-                    g =>
-                    {
-                        var ordered  = g.OrderBy(e => e.Timestamp).ToList();
-                        var initial  = ordered.First().PriorMastery;
-                        var terminal = ordered.Last().PosteriorMastery;
-                        return terminal - initial;
-                    });
+            // FIND-arch-023: Use projection instead of event stream query
+            var attemptHistory = await session.LoadAsync<SessionAttemptHistoryDocument>(doc.SessionId);
+            
+            var questionsAttempted = attemptHistory?.TotalAttempts ?? 0;
+            var questionsCorrect = attemptHistory?.CorrectAttempts ?? 0;
+            var accuracy = attemptHistory?.Accuracy ?? 0;
+            var masteryDeltas = attemptHistory?.MasteryDeltas ?? new Dictionary<string, double>();
 
             var durationSeconds = doc.EndedAt.HasValue
                 ? (int)(doc.EndedAt.Value - doc.StartedAt).TotalSeconds
@@ -259,7 +241,6 @@ public static class SessionEndpoints
                 QuestionsAttempted: questionsAttempted,
                 QuestionsCorrect: questionsCorrect,
                 Accuracy: Math.Round(accuracy, 3),
-                FatigueScore: Math.Round(fatigueScore, 3),
                 DurationSeconds: durationSeconds,
                 StartedAt: doc.StartedAt,
                 EndedAt: doc.EndedAt,
@@ -341,12 +322,9 @@ public static class SessionEndpoints
             if (doc.StudentId != studentId)
                 return Results.Forbid();
 
-            // FIND-data-027: Query only this student's events instead of global scan
-            var studentStream = await session.Events.FetchStreamAsync(studentId);
-            var attempts = studentStream
-                .Where(e => e.Data is ConceptAttempted_V1)
-                .Select(e => (ConceptAttempted_V1)e.Data)
-                .Where(a => a.SessionId == doc.SessionId)
+            // FIND-arch-023: Use projection instead of event stream query
+            var attemptHistory = await session.LoadAsync<SessionAttemptHistoryDocument>(doc.SessionId);
+            var attempts = attemptHistory?.Attempts
                 .OrderBy(a => a.Timestamp)
                 .Select((a, i) => new QuestionAttemptDto(
                     Sequence: i + 1,
@@ -360,7 +338,7 @@ public static class SessionEndpoints
                     PriorMastery: Math.Round(a.PriorMastery, 4),
                     PosteriorMastery: Math.Round(a.PosteriorMastery, 4),
                     Timestamp: a.Timestamp))
-                .ToList();
+                .ToList() ?? new List<QuestionAttemptDto>();
 
             return Results.Ok(new SessionReplayDto(
                 SessionId: doc.SessionId,

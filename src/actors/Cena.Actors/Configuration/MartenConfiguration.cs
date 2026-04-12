@@ -208,6 +208,14 @@ public static class MartenConfiguration
         // Replaces QueryAllRawEvents full-scans with single-document lookup
         opts.Projections.Add<StudentLifetimeStatsProjection>(ProjectionLifecycle.Inline);
 
+        // FIND-arch-023: Session attempt history projection for fast session detail/replay
+        // Replaces FetchStreamAsync event queries with single-document lookup
+        opts.Projections.Add<SessionAttemptHistoryProjection>(ProjectionLifecycle.Inline);
+        opts.Schema.For<SessionAttemptHistoryDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SessionId)
+            .Index(x => x.StudentId);
+
         // ── Student Preferences Document (STB-00b) ──
         opts.Schema.For<StudentPreferencesDocument>()
             .Identity(x => x.Id)
