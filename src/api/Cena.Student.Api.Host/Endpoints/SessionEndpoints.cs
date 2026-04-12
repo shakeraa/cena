@@ -728,13 +728,18 @@ public static class SessionEndpoints
             }
 
             // ─── FIND-pedagogy-001: Formative feedback with explanation ───
+            // FIND-pedagogy-013: Extract student locale from claims for localized content
+            var studentLocale = ctx.User.FindFirstValue("locale") ?? "en";
+            var logger = loggerFactory.CreateLogger<SessionEndpoints>();
             var response = BuildAnswerFeedback(
                 questionDoc: questionDoc,
                 studentAnswer: request.Answer,
                 isCorrect: isCorrect,
                 priorMastery: priorMastery,
                 posteriorMastery: posteriorMastery,
-                nextQuestionId: nextQuestionId);
+                nextQuestionId: nextQuestionId,
+                studentLocale: studentLocale,
+                logger: logger);
 
             // FIND-pedagogy-017: structured log for re-regression detection.
             // If the Feedback field ever ships non-empty again, this warning
@@ -742,7 +747,6 @@ public static class SessionEndpoints
             // before users report it.
             if (!string.IsNullOrEmpty(response.Feedback))
             {
-                var logger = loggerFactory.CreateLogger<SessionEndpoints>();
                 logger.LogWarning(
                     "FIND-pedagogy-017 re-regression: Feedback field is non-empty " +
                     "({Feedback}) for student {StudentId}, question {QuestionId}. " +
@@ -1248,7 +1252,9 @@ public static class SessionEndpoints
         bool isCorrect,
         double priorMastery,
         double posteriorMastery,
-        string? nextQuestionId)
+        string? nextQuestionId,
+        string studentLocale,  // NEW parameter — FIND-pedagogy-013
+        ILogger logger)        // NEW parameter — FIND-pedagogy-013
     {
         // FIND-pedagogy-017 — the short English pill ("Correct" / "Not quite")
         // was rendered verbatim by AnswerFeedback.vue alongside the translated
@@ -1260,31 +1266,24 @@ public static class SessionEndpoints
         // If a caller is still reading this field, their telemetry will show
         // empty feedback — which is the intended deprecation signal.
 
-        // Distractor rationale is ONLY surfaced for wrong answers, and ONLY
-        // when the authored question has a rationale for the specific option
-        // the student chose. The keys must match option values as authored.
+        // FIND-pedagogy-013: Get distractor rationale for the student's locale
         string? distractorRationale = null;
-        if (!isCorrect && !string.IsNullOrWhiteSpace(studentAnswer)
-            && questionDoc.DistractorRationales is { } rationales)
+        if (!isCorrect && !string.IsNullOrWhiteSpace(studentAnswer))
         {
-            var trimmed = studentAnswer.Trim();
-            if (rationales.TryGetValue(trimmed, out var direct))
-            {
-                distractorRationale = direct;
-            }
-            else
-            {
-                // Case-insensitive fallback for free-text answers that don't
-                // exactly match the authored key casing.
-                foreach (var kv in rationales)
-                {
-                    if (string.Equals(kv.Key, trimmed, StringComparison.OrdinalIgnoreCase))
-                    {
-                        distractorRationale = kv.Value;
-                        break;
-                    }
-                }
-            }
+            distractorRationale = questionDoc.GetDistractorRationaleForLocale(studentAnswer.Trim(), studentLocale);
+        }
+
+        // FIND-pedagogy-013: Get explanation for the student's locale
+        // Fallback chain: requested locale → en → null
+        // NEVER fall back to a language the learner did not request
+        var explanation = questionDoc.GetExplanationForLocale(studentLocale);
+
+        // FIND-pedagogy-013: Structured logging for SIEM if explanation is not available
+        // in the requested locale (but exists in some form)
+        if (explanation == null && !string.IsNullOrEmpty(questionDoc.Explanation))
+        {
+            logger.LogWarning("[SIEM] ExplanationNotAvailableInLocale: QuestionId={QuestionId}, Locale={Locale}",
+                questionDoc.QuestionId, studentLocale);
         }
 
         // Mastery delta is computed from the REAL BKT posterior, not a
@@ -1298,9 +1297,7 @@ public static class SessionEndpoints
             XpAwarded: isCorrect ? 10 : 0,
             MasteryDelta: masteryDelta,
             NextQuestionId: nextQuestionId,
-            Explanation: string.IsNullOrWhiteSpace(questionDoc.Explanation)
-                ? null
-                : questionDoc.Explanation,
+            Explanation: explanation,
             DistractorRationale: distractorRationale);
     }
 }

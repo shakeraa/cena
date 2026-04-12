@@ -74,6 +74,13 @@ public class QuestionDocument
     public string? Explanation { get; set; }
 
     /// <summary>
+    /// FIND-pedagogy-013 — Per-locale explanations keyed by language code
+    /// (e.g., "en", "ar", "he"). Legacy single-string Explanation is backfilled
+    /// into the "en" slot for backward compatibility.
+    /// </summary>
+    public Dictionary<string, string>? ExplanationByLocale { get; set; }
+
+    /// <summary>
     /// FIND-pedagogy-001 — per-option distractor rationale keyed by the choice
     /// text (must match the value stored in <see cref="Choices"/>). When a
     /// student selects a wrong option, the endpoint looks up the rationale for
@@ -84,6 +91,12 @@ public class QuestionDocument
     /// missing for options that have no rationale yet.
     /// </summary>
     public Dictionary<string, string>? DistractorRationales { get; set; }
+
+    /// <summary>
+    /// FIND-pedagogy-013 — Per-locale distractor rationales keyed by language code.
+    /// Each inner dictionary maps choice text to rationale for that locale.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, string>>? DistractorRationalesByLocale { get; set; }
 
     /// <summary>
     /// FIND-pedagogy-003 — BKT slip probability for this concept
@@ -144,5 +157,49 @@ public class QuestionDocument
     /// for novice learners.
     /// </summary>
     public string? WorkedExample { get; set; }
+
+    /// <summary>
+    /// FIND-pedagogy-013 — Gets the explanation for the specified locale,
+    /// falling back to "en" and then to the legacy Explanation property.
+    /// </summary>
+    /// <param name="locale">The locale code (e.g., "en", "ar", "he")</param>
+    /// <returns>The explanation text, or null if none found</returns>
+    public string? GetExplanationForLocale(string locale)
+    {
+        // Try requested locale first
+        if (ExplanationByLocale?.TryGetValue(locale, out var explanation) == true)
+            return explanation;
+
+        // Fall back to "en" (backfilled legacy content)
+        if (ExplanationByLocale?.TryGetValue("en", out var enExplanation) == true)
+            return enExplanation;
+
+        // Legacy fallback for old documents
+        return Explanation;
+    }
+
+    /// <summary>
+    /// FIND-pedagogy-013 — Gets the distractor rationale for the specified
+    /// choice and locale, falling back to "en" and then to the legacy
+    /// DistractorRationales property.
+    /// </summary>
+    /// <param name="choice">The choice text</param>
+    /// <param name="locale">The locale code (e.g., "en", "ar", "he")</param>
+    /// <returns>The rationale text, or null if none found</returns>
+    public string? GetDistractorRationaleForLocale(string choice, string locale)
+    {
+        // Try requested locale first
+        if (DistractorRationalesByLocale?.TryGetValue(locale, out var rationales) == true)
+            if (rationales?.TryGetValue(choice, out var rationale) == true)
+                return rationale;
+
+        // Fall back to "en"
+        if (DistractorRationalesByLocale?.TryGetValue("en", out var enRationales) == true)
+            if (enRationales?.TryGetValue(choice, out var enRationale) == true)
+                return enRationale;
+
+        // Legacy fallback
+        return DistractorRationales?.GetValueOrDefault(choice);
+    }
 }
 

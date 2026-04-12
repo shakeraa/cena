@@ -177,6 +177,42 @@ public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, 
             model.Languages = new List<string>();
         if (!model.Languages.Contains(e.Language))
             model.Languages.Add(e.Language);
+        
+        // FIND-pedagogy-013 — Persist per-locale explanation and distractor rationales
+        if (!string.IsNullOrEmpty(e.Explanation))
+        {
+            model.ExplanationByLocale ??= new Dictionary<string, string>();
+            model.ExplanationByLocale[e.Language] = e.Explanation;
+        }
+        
+        if (e.DistractorRationales?.Count > 0)
+        {
+            model.DistractorRationalesByLocale ??= new Dictionary<string, Dictionary<string, string>>();
+            model.DistractorRationalesByLocale[e.Language] = e.DistractorRationales.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value);
+        }
+        
+        model.UpdatedAt = e.Timestamp;
+    }
+    
+    // FIND-pedagogy-013 — Apply explanation to existing language version
+    public void Apply(LanguageExplanationAdded_V1 e, QuestionReadModel model)
+    {
+        if (!string.IsNullOrEmpty(e.Explanation))
+        {
+            model.ExplanationByLocale ??= new Dictionary<string, string>();
+            model.ExplanationByLocale[e.Language] = e.Explanation;
+        }
+        
+        if (e.DistractorRationales?.Count > 0)
+        {
+            model.DistractorRationalesByLocale ??= new Dictionary<string, Dictionary<string, string>>();
+            model.DistractorRationalesByLocale[e.Language] = e.DistractorRationales.ToDictionary(
+                kvp => kvp.Key,
+                kvp => kvp.Value);
+        }
+        
         model.UpdatedAt = e.Timestamp;
     }
 

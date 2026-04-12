@@ -259,12 +259,29 @@ public sealed record QuestionExplanationUpdated_V1(
 
 // ── Multi-Language ──
 
-/// <summary>Adds a Hebrew/Arabic/English version to an existing question.</summary>
+/// <summary>
+/// FIND-pedagogy-013 — Adds a Hebrew/Arabic/English version to an existing question.
+/// Includes per-locale explanation and distractor rationales.
+/// </summary>
 public sealed record LanguageVersionAdded_V1(
     string QuestionId,
     string Language,
     string Stem,
     string StemHtml,
     IReadOnlyList<QuestionOptionData> Options,
+    string? Explanation,  // NEW
+    IReadOnlyDictionary<string, string>? DistractorRationales,  // NEW - keyed by option label
     string TranslatedBy,
+    DateTimeOffset Timestamp);
+
+/// <summary>
+/// FIND-pedagogy-013 — Adds or updates explanation for an existing language version.
+/// Used for backfilling explanations without re-translating the entire question.
+/// </summary>
+public sealed record LanguageExplanationAdded_V1(
+    string QuestionId,
+    string Language,
+    string Explanation,
+    IReadOnlyDictionary<string, string>? DistractorRationales,
+    string AddedBy,
     DateTimeOffset Timestamp);

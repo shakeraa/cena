@@ -19,6 +19,7 @@
 using Cena.Actors.Services;
 using Cena.Api.Host.Endpoints; // FIND-arch-001: Now from Cena.Student.Api.Host via InternalsVisibleTo
 using Cena.Infrastructure.Documents;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cena.Actors.Tests.Session;
 
@@ -61,7 +62,9 @@ public sealed class SessionAnswerEndpointTests
             isCorrect: true,
             priorMastery: 0.4,
             posteriorMastery: 0.55,
-            nextQuestionId: "q_math_101");
+            nextQuestionId: "q_math_101",
+            studentLocale: "en",
+            logger: NullLogger.Instance);
 
         // Assert
         Assert.True(response.Correct);
@@ -104,7 +107,9 @@ public sealed class SessionAnswerEndpointTests
             isCorrect: false,
             priorMastery: 0.4,
             posteriorMastery: 0.25,
-            nextQuestionId: null);
+            nextQuestionId: null,
+            studentLocale: "en",
+            logger: NullLogger.Instance);
 
         // Assert
         Assert.False(response.Correct);
@@ -142,7 +147,9 @@ public sealed class SessionAnswerEndpointTests
             isCorrect: true,
             priorMastery: 0.4,
             posteriorMastery: 0.55,
-            nextQuestionId: null);
+            nextQuestionId: null,
+            studentLocale: "en",
+            logger: NullLogger.Instance);
 
         // Assert — no explanation, no distractor.
         // FIND-pedagogy-017: Feedback field is now deprecated (empty string).

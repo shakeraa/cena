@@ -32,6 +32,18 @@ public class QuestionReadModel
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
     public string? Explanation { get; set; }
+    
+    /// <summary>
+    /// FIND-pedagogy-013 — Per-locale explanations keyed by language code
+    /// (e.g., "en", "ar", "he"). Backfilled from legacy Explanation field.
+    /// </summary>
+    public Dictionary<string, string>? ExplanationByLocale { get; set; }
+    
+    /// <summary>
+    /// FIND-pedagogy-013 — Per-locale distractor rationales keyed by language code.
+    /// Inner dictionary maps option label to rationale for that locale.
+    /// </summary>
+    public Dictionary<string, Dictionary<string, string>>? DistractorRationalesByLocale { get; set; }
 
     /// <summary>
     /// FIND-pedagogy-008 — learning-objective id the question assesses.
