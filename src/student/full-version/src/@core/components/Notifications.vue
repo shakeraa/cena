@@ -49,7 +49,7 @@ const toggleReadUnread = (isSeen: boolean, Id: number) => {
 <template>
   <IconBtn
     id="notification-btn"
-    :aria-label="$t('aria.notifications')"
+    :aria-label="$t('nav.notificationsBell')"
   >
     <VBadge
       v-bind="props.badgeProps"
@@ -58,6 +58,7 @@ const toggleReadUnread = (isSeen: boolean, Id: number) => {
       dot
       offset-x="2"
       offset-y="3"
+      aria-label=""
     >
       <VIcon icon="tabler-bell" />
     </VBadge>

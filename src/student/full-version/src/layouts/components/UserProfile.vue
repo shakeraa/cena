@@ -44,6 +44,7 @@ async function signOut() {
     offset-x="1"
     offset-y="2"
     color="success"
+    aria-label=""
   >
     <VBtn
       icon

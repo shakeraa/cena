@@ -222,7 +222,8 @@
     "settingsAppearance": "Appearance",
     "settingsNotifications": "Notification Preferences",
     "settingsPrivacy": "Data & Privacy",
-    "userMenu": "Account menu for {name}"
+    "userMenu": "Account menu for {name}",
+    "notificationsBell": "Notifications"
   },
   "status": {
     "online": "Online",
