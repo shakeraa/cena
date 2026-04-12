@@ -11,6 +11,9 @@ import { useMeStore } from '@/stores/meStore'
  *
  * The auth store flips `ready = true` after the next microtask so the global
  * router guard sees a resolved state instead of hanging.
+ *
+ * FIND-ux-020: __mockSignIn now seeds CASL ability rules and writes the
+ * userAbilityRules cookie internally, so no extra work needed here.
  */
 export default function (__: App) {
   const authStore = useAuthStore()
@@ -28,8 +31,12 @@ export default function (__: App) {
   if (mockAuth) {
     try {
       const parsed = JSON.parse(mockAuth)
-      if (parsed?.uid)
+      if (parsed?.uid) {
+        // FIND-ux-020: __mockSignIn now also calls ability.update()
+        // and writes the userAbilityRules cookie, so we don't need
+        // to do anything extra here.
         authStore.__mockSignIn(parsed)
+      }
     }
     catch {
       // ignore malformed mocks

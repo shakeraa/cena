@@ -1,5 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
+import { ability, studentAbilityRules } from '@/plugins/casl/ability'
+import type { Rule } from '@/plugins/casl/ability'
 
 /**
  * Auth store — student app wrapper over Firebase Auth state.
@@ -12,6 +14,10 @@ import { computed, ref } from 'vue'
  * bounced the user to /login. The store now persists the mock identity
  * to `localStorage['cena-mock-auth']` so `src/plugins/firebase.ts` can
  * rehydrate it on boot *and* so URL-share / refresh flows survive.
+ *
+ * FIND-ux-020: seeds CASL ability rules on sign-in and persists them to
+ * the `userAbilityRules` cookie so the sidebar nav items pass the `can()`
+ * check. Mirrors the admin app pattern from useFirebaseAuth.ts.
  *
  * Persistence is intentionally gated on `typeof window !== 'undefined'`
  * so SSR / unit tests with a jsdom shim still work. The storage key is
@@ -50,6 +56,40 @@ function clearMockAuthFromStorage(): void {
     return
   try {
     window.localStorage.removeItem(MOCK_AUTH_STORAGE_KEY)
+  }
+  catch {
+    // ignore
+  }
+}
+
+/**
+ * FIND-ux-020: one-shot cookie write/clear for CASL ability rules.
+ *
+ * We do NOT use the reactive `useCookie` composable here because it
+ * depends on Vue auto-imports (`ref`, `watch`) which are unavailable
+ * in the vitest environment. A raw `document.cookie` write is
+ * sufficient — the reactive cookie ref in the CASL plugin (index.ts)
+ * reads the cookie on app boot and the sidebar only re-evaluates on
+ * navigation, not mid-action.
+ */
+function writeAbilityCookie(rules: Rule[]): void {
+  if (typeof document === 'undefined')
+    return
+  try {
+    const value = encodeURIComponent(JSON.stringify(rules))
+    const maxAge = 60 * 60 * 24 * 30 // 30 days
+    document.cookie = `userAbilityRules=${value}; path=/; max-age=${maxAge}`
+  }
+  catch {
+    // ignore — in-memory ability.update() already applied
+  }
+}
+
+function clearAbilityCookie(): void {
+  if (typeof document === 'undefined')
+    return
+  try {
+    document.cookie = 'userAbilityRules=; path=/; max-age=-1'
   }
   catch {
     // ignore
@@ -102,6 +142,10 @@ export const useAuthStore = defineStore('auth', () => {
     email.value = hydrated.email ?? null
     displayName.value = hydrated.displayName ?? null
     idToken.value = `mock-token-${hydrated.uid}`
+
+    // FIND-ux-020: also seed CASL abilities on hydration so the sidebar
+    // renders after a page refresh without waiting for __mockSignIn.
+    ability.update(studentAbilityRules)
   }
 
   const isSignedIn = computed(() => uid.value !== null)
@@ -117,6 +161,14 @@ export const useAuthStore = defineStore('auth', () => {
     idToken.value = `mock-token-${payload.uid}`
     ready.value = true
     writeMockAuthToStorage(payload)
+
+    // FIND-ux-020: seed CASL abilities so sidebar nav items render.
+    // Mirrors the admin pattern at src/admin/.../useFirebaseAuth.ts:79.
+    ability.update(studentAbilityRules)
+    writeAbilityCookie(studentAbilityRules)
+
+    // eslint-disable-next-line no-console
+    console.info('[auth] CASL ability rules seeded for student', payload.uid)
   }
 
   function __signOut() {
@@ -125,6 +177,14 @@ export const useAuthStore = defineStore('auth', () => {
     displayName.value = null
     idToken.value = null
     clearMockAuthFromStorage()
+
+    // FIND-ux-020: clear CASL abilities so stale nav doesn't render
+    // after sign-out. Mirrors the admin pattern.
+    ability.update([])
+    clearAbilityCookie()
+
+    // eslint-disable-next-line no-console
+    console.info('[auth] CASL ability rules cleared on sign-out')
   }
 
   return {

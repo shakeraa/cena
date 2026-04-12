@@ -18,6 +18,13 @@ export const can = (action: string | undefined, subject: string | undefined) => 
   if (!vm)
     return false
 
+  // FIND-ux-020: nav items that omit action+subject have no ACL restriction
+  // and should be visible to every authenticated user. Previously, delegating
+  // $can(undefined, undefined) to CASL returned false, hiding the entire
+  // student sidebar.
+  if (!action && !subject)
+    return true
+
   const localCan = vm.proxy && '$can' in vm.proxy
 
   // @ts-expect-error We will get TS error in below line because we aren't using $can in component instance
