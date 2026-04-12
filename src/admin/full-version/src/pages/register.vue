@@ -89,10 +89,10 @@ const isPasswordVisible = ref(false)
       >
         <VCardText>
           <h1 class="text-h4 mb-1">
-            Adventure starts here 🚀
+            {{ $t('auth.registerTitle') }}
           </h1>
           <p class="mb-0">
-            Make your app management easy and fun!
+            {{ $t('auth.registerSubtitle') }}
           </p>
         </VCardText>
 
@@ -105,7 +105,7 @@ const isPasswordVisible = ref(false)
                   v-model="form.username"
                   :rules="[requiredValidator]"
                   autofocus
-                  label="Username"
+                  :label="$t('auth.username')"
                   placeholder="Johndoe"
                 />
               </VCol>
@@ -115,7 +115,7 @@ const isPasswordVisible = ref(false)
                 <AppTextField
                   v-model="form.email"
                   :rules="[requiredValidator, emailValidator]"
-                  label="Email"
+                  :label="$t('auth.email')"
                   type="email"
                   placeholder="johndoe@email.com"
                 />
@@ -126,7 +126,7 @@ const isPasswordVisible = ref(false)
                 <AppTextField
                   v-model="form.password"
                   :rules="[requiredValidator]"
-                  label="Password"
+                  :label="$t('auth.password')"
                   placeholder="············"
                   :type="isPasswordVisible ? 'text' : 'password'"
                   autocomplete="password"
@@ -135,7 +135,7 @@ const isPasswordVisible = ref(false)
                     <IconBtn
                       data-testid="password-toggle-btn"
                       size="small"
-                      :aria-label="isPasswordVisible ? 'Hide password' : 'Show password'"
+                      :aria-label="isPasswordVisible ? $t('auth.hidePassword') : $t('auth.showPassword')"
                       @click="isPasswordVisible = !isPasswordVisible"
                     >
                       <VIcon
@@ -157,21 +157,21 @@ const isPasswordVisible = ref(false)
                     for="privacy-policy"
                     style="opacity: 1;"
                   >
-                    <span class="me-1 text-high-emphasis">I agree to the</span>
+                    <span class="me-1 text-high-emphasis">{{ $t('auth.iAgreeTo') }}</span>
                     <RouterLink
                       to="/privacy"
                       class="text-high-emphasis text-decoration-underline"
                       data-testid="admin-register-privacy-link"
                     >
-                      Privacy Policy
+                      {{ $t('auth.privacyPolicy') }}
                     </RouterLink>
-                    <span class="mx-1 text-high-emphasis">&amp;</span>
+                    <span class="mx-1 text-high-emphasis">{{ $t('auth.and') }}</span>
                     <RouterLink
                       to="/terms"
                       class="text-high-emphasis text-decoration-underline"
                       data-testid="admin-register-terms-link"
                     >
-                      Terms of Service
+                      {{ $t('auth.termsOfService') }}
                     </RouterLink>
                   </VLabel>
                 </div>
@@ -180,7 +180,7 @@ const isPasswordVisible = ref(false)
                   block
                   type="submit"
                 >
-                  Sign up
+                  {{ $t('auth.signUp') }}
                 </VBtn>
               </VCol>
 
@@ -189,12 +189,12 @@ const isPasswordVisible = ref(false)
                 cols="12"
                 class="text-center text-base"
               >
-                <span class="d-inline-block">Already have an account?</span>
+                <span class="d-inline-block">{{ $t('auth.alreadyHaveAccount') }}</span>
                 <RouterLink
                   class="text-high-emphasis ms-1 d-inline-block text-decoration-underline"
                   :to="{ name: 'login' }"
                 >
-                  Sign in instead
+                  {{ $t('auth.signInInstead') }}
                 </RouterLink>
               </VCol>
 
@@ -203,7 +203,7 @@ const isPasswordVisible = ref(false)
                 class="d-flex align-center"
               >
                 <VDivider />
-                <span class="mx-4">or</span>
+                <span class="mx-4">{{ $t('auth.or') }}</span>
                 <VDivider />
               </VCol>
             </VRow>
