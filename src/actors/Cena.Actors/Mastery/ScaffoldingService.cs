@@ -6,6 +6,36 @@
 namespace Cena.Actors.Mastery;
 
 /// <summary>
+/// Interface for scaffolding service operations.
+/// Allows for testable, injectable access to scaffolding logic.
+/// </summary>
+public interface IScaffoldingService
+{
+    /// <summary>
+    /// Determine scaffolding level from effective mastery and PSI.
+    /// </summary>
+    ScaffoldingLevel DetermineLevel(float effectiveMastery, float psi);
+
+    /// <summary>
+    /// Get metadata for LLM prompt construction from scaffolding level.
+    /// </summary>
+    ScaffoldingMetadata GetScaffoldingMetadata(ScaffoldingLevel level);
+}
+
+/// <summary>
+/// Wrapper for the static ScaffoldingService to enable DI injection.
+/// Stateless, thread-safe — registered as Singleton.
+/// </summary>
+public sealed class ScaffoldingServiceWrapper : IScaffoldingService
+{
+    public ScaffoldingLevel DetermineLevel(float effectiveMastery, float psi)
+        => ScaffoldingService.DetermineLevel(effectiveMastery, psi);
+
+    public ScaffoldingMetadata GetScaffoldingMetadata(ScaffoldingLevel level)
+        => ScaffoldingService.GetScaffoldingMetadata(level);
+}
+
+/// <summary>
 /// Determines how much instructional support the LLM provides
 /// based on the student's effective mastery and prerequisite satisfaction.
 /// Pure stateless mapping function.

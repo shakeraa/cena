@@ -9,6 +9,7 @@ using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Bus;
 using Cena.Actors.Events;
+using Cena.Actors.Mastery;
 using Cena.Actors.Projections;
 using Cena.Actors.Questions;
 using Cena.Actors.Services;
@@ -453,7 +454,8 @@ public static class SessionEndpoints
             string sessionId,
             HttpContext ctx,
             IDocumentStore store,
-            IQuestionBank questionBank) =>
+            IQuestionBank questionBank,
+            IScaffoldingService scaffoldingService) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -505,6 +507,28 @@ public static class SessionEndpoints
             if (questionDoc == null)
                 return Results.NotFound(new { error = "Question not found" });
 
+            // Get student's concept mastery from queue.ConceptMasterySnapshot
+            var effectiveMastery = (float)queue.ConceptMasterySnapshot.GetValueOrDefault(questionDoc.ConceptId, 0.0);
+
+            // Calculate PSI (prerequisite satisfaction index) if prerequisites available
+            float psi = 1.0f;
+            if (questionDoc.Prerequisites?.Count > 0)
+            {
+                var prereqMasteries = questionDoc.Prerequisites
+                    .Select(p => queue.ConceptMasterySnapshot.GetValueOrDefault(p, 0.0))
+                    .ToList();
+                psi = prereqMasteries.Count > 0
+                    ? (float)prereqMasteries.Average()
+                    : 1.0f;
+            }
+
+            // Determine scaffolding level and metadata
+            var level = scaffoldingService.DetermineLevel(effectiveMastery, psi);
+            var metadata = scaffoldingService.GetScaffoldingMetadata(level);
+
+            // Get hints used for this question
+            var hintsUsed = queue.HintsUsedByQuestion.GetValueOrDefault(questionDoc.QuestionId, 0);
+
             return Results.Ok(new SessionQuestionDto(
                 QuestionId: questionDoc.QuestionId,
                 QuestionIndex: queue.TotalQuestionsAttempted + 1,
@@ -513,7 +537,11 @@ public static class SessionEndpoints
                 QuestionType: questionDoc.QuestionType,
                 Choices: questionDoc.Choices ?? Array.Empty<string>(),
                 Subject: questionDoc.Subject,
-                ExpectedTimeSeconds: 60));
+                ExpectedTimeSeconds: 60,
+                ScaffoldingLevel: level.ToString(),
+                WorkedExample: metadata.ShowWorkedExample ? questionDoc.WorkedExample : null,
+                HintsAvailable: metadata.MaxHints,
+                HintsRemaining: Math.Max(0, metadata.MaxHints - hintsUsed)));
         })
         .WithName("GetCurrentQuestion");
 
@@ -765,6 +793,138 @@ public static class SessionEndpoints
                 DurationSeconds: durationSeconds));
         })
         .WithName("CompleteSession");
+
+        // POST /api/sessions/{sessionId}/question/{questionId}/hint — request a progressive hint
+        group.MapPost("/{sessionId}/question/{questionId}/hint", async (
+            string sessionId,
+            string questionId,
+            HttpContext ctx,
+            IDocumentStore store,
+            IQuestionBank questionBank,
+            IHintGenerator hintGenerator,
+            ILogger<SessionEndpoints> logger,
+            SessionHintRequest request) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId))
+                return Results.Unauthorized();
+
+            // 1. Verify student owns the session
+            ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            // Validate hint level
+            if (request.HintLevel is < 1 or > 3)
+                return Results.BadRequest(new { error = "HintLevel must be between 1 and 3" });
+
+            await using var session = store.LightweightSession();
+
+            // 2. Load LearningSessionQueueProjection by sessionId
+            var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
+            if (queue == null)
+                return Results.NotFound(new { error = "Session not found" });
+
+            if (queue.StudentId != studentId)
+                return Results.Forbid();
+
+            // 3. Verify questionId matches queue.CurrentQuestionId
+            if (queue.CurrentQuestionId != questionId)
+            {
+                logger.LogWarning("[SIEM] HintRequested: Question mismatch for student {StudentId}, session {SessionId}. Expected: {ExpectedQuestionId}, Got: {ActualQuestionId}",
+                    studentId, sessionId, queue.CurrentQuestionId, questionId);
+                return Results.BadRequest(new { error = "Question is not the current active question" });
+            }
+
+            // Load the question document
+            var questionDoc = await questionBank.GetQuestionAsync(questionId);
+            if (questionDoc == null)
+                return Results.NotFound(new { error = "Question not found" });
+
+            // 4. Get hintsUsed from queue.HintsUsedByQuestion
+            var hintsUsed = queue.HintsUsedByQuestion.GetValueOrDefault(questionId, 0);
+
+            // 5. Determine scaffolding level from student mastery
+            var priorMastery = queue.ConceptMasterySnapshot.GetValueOrDefault(questionDoc.ConceptId, 0.5);
+            var effectiveMastery = (float)priorMastery;
+            var psi = 1.0f; // PSI=1.0 for REST path (no prerequisite graph lookup)
+            var scaffoldingLevel = ScaffoldingService.DetermineLevel(effectiveMastery, psi);
+
+            // 6. Get metadata = IScaffoldingService.GetScaffoldingMetadata(level)
+            var metadata = ScaffoldingService.GetScaffoldingMetadata(scaffoldingLevel);
+
+            // 7. If hintsUsed >= metadata.MaxHints, return 429 Too Many Requests
+            if (hintsUsed >= metadata.MaxHints)
+            {
+                logger.LogWarning("[SIEM] HintBudgetExceeded: Student {StudentId}, session {SessionId}, question {QuestionId}. Used: {HintsUsed}, Max: {MaxHints}",
+                    studentId, sessionId, questionId, hintsUsed, metadata.MaxHints);
+                return Results.StatusCode(429); // Too Many Requests
+            }
+
+            // 8. Increment queue.HintsUsedByQuestion[questionId]
+            queue.HintsUsedByQuestion[questionId] = hintsUsed + 1;
+            session.Store(queue);
+
+            // 9. Save the projection (will be saved with SaveChangesAsync at the end)
+
+            // Get student's last attempt for this question (if any)
+            string? studentAnswer = null;
+            var lastAttempt = queue.AnsweredQuestions.LastOrDefault(q => q.QuestionId == questionId);
+            if (lastAttempt != null)
+            {
+                studentAnswer = lastAttempt.SelectedOption;
+            }
+
+            // Build QuestionOptionState list from question choices
+            var options = BuildHintOptionStates(questionDoc);
+
+            // Get student profile for ConceptState
+            var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+            ConceptMasteryState? conceptState = null;
+            if (profile?.ConceptMastery.TryGetValue(questionDoc.ConceptId, out var state) == true)
+            {
+                // Map from snapshot ConceptMasteryState to domain ConceptMasteryState
+                conceptState = new ConceptMasteryState
+                {
+                    MasteryProbability = (float)state.PKnown,
+                    AttemptCount = state.TotalAttempts,
+                    CorrectCount = state.CorrectCount,
+                };
+            }
+
+            // Build prerequisite edges (empty for REST path - no graph lookup)
+            IReadOnlyList<MasteryPrerequisiteEdge> prerequisites = Array.Empty<MasteryPrerequisiteEdge>();
+
+            // 10. Call IHintGenerator.Generate()
+            var hintRequest = new HintRequest(
+                HintLevel: request.HintLevel,
+                QuestionId: questionId,
+                ConceptId: questionDoc.ConceptId,
+                PrerequisiteConceptNames: Array.Empty<string>(), // REST path doesn't resolve prereq names
+                Options: options,
+                Explanation: questionDoc.Explanation,
+                StudentAnswer: studentAnswer,
+                Prerequisites: prerequisites,
+                ConceptState: conceptState);
+
+            var hintContent = hintGenerator.Generate(hintRequest);
+
+            logger.LogInformation("[SIEM] HintGenerated: Student {StudentId}, session {SessionId}, question {QuestionId}, level {HintLevel}",
+                studentId, sessionId, questionId, request.HintLevel);
+
+            logger.LogInformation("[SIEM] HintRequested: Student {StudentId}, session {SessionId}, question {QuestionId}, level {HintLevel}, hintsUsed {HintsUsed}",
+                studentId, sessionId, questionId, request.HintLevel, hintsUsed + 1);
+
+            // 11. Return SessionHintResponseDto
+            var response = new SessionHintResponseDto(
+                HintLevel: request.HintLevel,
+                HintText: hintContent.Text,
+                HasMoreHints: hintContent.HasMoreHints && (hintsUsed + 1) < metadata.MaxHints,
+                HintsRemaining: metadata.MaxHints - (hintsUsed + 1));
+
+            await session.SaveChangesAsync();
+
+            return Results.Ok(response);
+        })
+        .WithName("RequestHint");
 
         return app;
     }

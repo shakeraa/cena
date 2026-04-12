@@ -96,6 +96,12 @@ builder.Services.AddHostedService<NotificationDispatcher>();
 // ---- HARDEN SessionEndpoints: Question Bank Service ----
 builder.Services.AddScoped<IQuestionBank, QuestionBank>();
 
+// ---- SAI-002: Hint Generation (stateless pure function) ----
+builder.Services.AddSingleton<IHintGenerator, HintGenerator>();
+
+// ---- MST-011: Scaffolding Service (stateless pure function wrapper) ----
+builder.Services.AddSingleton<IScaffoldingService, ScaffoldingServiceWrapper>();
+
 // ---- FIND-pedagogy-003: Real BKT posterior for session answer endpoint ----
 // BktService is stateless, allocation-free on the hot path, and cheap to
 // instantiate — singleton is fine. The student API host used to compute

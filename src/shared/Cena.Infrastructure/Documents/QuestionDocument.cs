@@ -130,5 +130,19 @@ public class QuestionDocument
     /// </para>
     /// </summary>
     public string? LearningObjectiveId { get; set; }
+
+    /// <summary>
+    /// FIND-pedagogy-006 — list of prerequisite concept IDs that should be
+    /// mastered before attempting this question. Used to calculate the
+    /// Prerequisite Satisfaction Index (PSI) for scaffolding level determination.
+    /// </summary>
+    public List<string>? Prerequisites { get; set; }
+
+    /// <summary>
+    /// FIND-pedagogy-006 — authored worked example text shown to students
+    /// when scaffolding level is "Full". Provides step-by-step guidance
+    /// for novice learners.
+    /// </summary>
+    public string? WorkedExample { get; set; }
 }
 

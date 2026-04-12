@@ -149,6 +149,12 @@ public sealed record SessionHintResponseDto(
 /// </summary>
 public sealed record SessionHintUsageDto(string QuestionId, int HintsUsed);
 
+/// <summary>
+/// Request body for POST /api/sessions/{sessionId}/question/{questionId}/hint.
+/// HintLevel must be between 1 and 3 (inclusive).
+/// </summary>
+public sealed record SessionHintRequest(int HintLevel);
+
 public sealed record SessionAnswerRequest(
     string QuestionId,
     string Answer,
