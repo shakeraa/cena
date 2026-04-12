@@ -241,7 +241,7 @@ public sealed class AnalysisJobProcessor : BackgroundService
         await using var session = _store.QuerySession();
         var events = await session.Events
             .QueryAllRawEvents()
-            .Where(e => e.StreamKey == studentId && e.EventTypeName == "ConceptAttempted_V1")
+            .Where(e => e.StreamKey == studentId && e.EventTypeName == "concept_attempted_v1")
             .OrderByDescending(e => e.Timestamp)
             .Take(200)
             .ToListAsync(ct);
