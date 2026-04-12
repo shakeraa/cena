@@ -146,7 +146,7 @@ const isPasswordVisible = ref(false)
                     <span class="me-1 text-high-emphasis">I agree to</span>
                     <a
                       href="javascript:void(0)"
-                      class="text-primary"
+                      class="text-high-emphasis text-decoration-underline"
                     >privacy policy & terms</a>
                   </VLabel>
                 </div>
@@ -166,7 +166,7 @@ const isPasswordVisible = ref(false)
               >
                 <span class="d-inline-block">Already have an account?</span>
                 <RouterLink
-                  class="text-primary ms-1 d-inline-block"
+                  class="text-high-emphasis ms-1 d-inline-block text-decoration-underline"
                   :to="{ name: 'login' }"
                 >
                   Sign in instead

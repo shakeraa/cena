@@ -600,7 +600,7 @@ onMounted(() => {
         <VCard :loading="focusLoading">
           <VCardText class="text-center">
             <div class="text-caption text-medium-emphasis mb-1">Best Study Time</div>
-            <div class="text-h6 font-weight-bold text-primary">
+            <div class="text-h6 font-weight-bold text-primary-text">
               {{ focusData?.chronotype?.optimalStudyTime ?? '--' }}
             </div>
             <div class="text-caption text-medium-emphasis">
@@ -945,7 +945,7 @@ onMounted(() => {
         <VCard :loading="engagementLoading">
           <VCardText class="text-center">
             <div class="text-caption text-medium-emphasis mb-1">Current Streak</div>
-            <div class="text-h4 font-weight-bold text-primary">
+            <div class="text-h4 font-weight-bold text-primary-text">
               {{ engagement?.currentStreak ?? 0 }}
             </div>
             <div class="text-caption text-medium-emphasis">

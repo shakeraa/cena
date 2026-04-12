@@ -18,6 +18,7 @@
     "setup": "npm run build:icons && npm run msw:init",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
+    "test:a11y": "vitest run --config vitest.a11y.config.ts",
     "test:e2e": "playwright test",
     "postinstall": "node scripts/postinstall-guard.mjs"
   },

@@ -208,7 +208,7 @@ const onSubmit = () => {
                     label="Remember me"
                   />
                   <RouterLink
-                    class="text-primary ms-2 mb-1"
+                    class="text-high-emphasis ms-2 mb-1 text-decoration-underline"
                     :to="{ name: 'forgot-password' }"
                   >
                     Forgot Password?

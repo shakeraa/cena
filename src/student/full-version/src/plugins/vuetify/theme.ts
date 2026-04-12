@@ -2,16 +2,36 @@ import type { ThemeDefinition } from 'vuetify'
 
 /**
  * Vuexy Primary Color (#7367F0) - WCAG AA Contrast Analysis
- * 
- * Contrast ratio with white (#fff): 5.83:1
- * - Exceeds WCAG 2.1 AA requirement for normal text (4.5:1) ✅
- * - Exceeds WCAG 2.1 AA requirement for large text (3:1) ✅
- * 
- * Decision: KEEP primary color (contrast is accessible)
- * See: docs/accessibility/WCAG-AA-Primary-Color-Analysis.md
+ *
+ * Contrast ratio with white (#fff): 4.26:1
+ * - FAILS WCAG 2.2 AA requirement for normal text (4.5:1)
+ * - Passes WCAG 2.2 AA requirement for large text (>= 18pt or >= 14pt bold, 3:1)
+ *
+ * Contrast ratio with dark surface (#2F3349): 2.91:1
+ * - FAILS WCAG 2.2 AA requirement for normal text (4.5:1)
+ * - FAILS WCAG 2.2 AA requirement for large text (3:1) — marginal
+ *
+ * Decision: KEEP #7367F0 as the primary brand color. Use it ONLY for:
+ *   - Large text (>= 18pt / >= 14pt bold)
+ *   - Component fills/backgrounds (buttons, chips, badges)
+ *   - Hover/focus states on interactive elements
+ * For normal-size text, use 'primary-text' semantic color which provides
+ * WCAG 2.2 AA compliant darker/lighter variants.
+ *
+ * See: FIND-ux-019
  */
 export const staticPrimaryColor = '#7367F0'
 export const staticPrimaryDarkenColor = '#675DD8'
+
+/**
+ * WCAG 2.2 AA compliant text variants of the primary color.
+ * Use these for body-size text instead of #7367F0 directly.
+ *
+ * - Light theme: #5B4FC4 on #FFFFFF = ~5.5:1 (AA pass)
+ * - Dark theme:  #B3A9FF on #2F3349 = ~4.7:1 (AA pass)
+ */
+export const primaryTextLight = '#5B4FC4'
+export const primaryTextDark = '#B3A9FF'
 
 /**
  * Student-specific design tokens (flow state + mastery levels).
@@ -134,6 +154,7 @@ export const themes: Record<string, ThemeDefinition> = {
       'skin-bordered-background': '#fff',
       'skin-bordered-surface': '#fff',
       'expansion-panel-text-custom-bg': '#fafafa',
+      'primary-text': primaryTextLight,
       'flow-warming': studentLight.flow.warming,
       'flow-approaching': studentLight.flow.approaching,
       'flow-in-flow': studentLight.flow.inFlow,
@@ -216,6 +237,7 @@ export const themes: Record<string, ThemeDefinition> = {
       'perfect-scrollbar-thumb': '#4A5072',
       'skin-bordered-background': '#2F3349',
       'skin-bordered-surface': '#2F3349',
+      'primary-text': primaryTextDark,
       'flow-warming': studentDark.flow.warming,
       'flow-approaching': studentDark.flow.approaching,
       'flow-in-flow': studentDark.flow.inFlow,
