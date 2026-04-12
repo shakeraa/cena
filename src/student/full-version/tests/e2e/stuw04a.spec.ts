@@ -81,48 +81,56 @@ test.describe.serial('STU-W-04A auth UI', () => {
     expect(new URL(page.url()).pathname).toBe('/onboarding')
   })
 
-  test('E2E #5 /forgot-password renders honest unavailable state and does not fire a network request', async ({ page }) => {
+  test('E2E #5 /forgot-password submits email → POST /api/auth/password-reset → 204 → success message', async ({ page }) => {
     await clearAuth(page)
 
-    // Assert zero network traffic — the page must not silently hit any
-    // backend or Firebase endpoint. We capture requests and fail if any
-    // of them looks like an auth / password-reset call.
-    const outboundRequests: string[] = []
+    // Track outbound requests to /api/auth/password-reset.
+    const passwordResetRequests: { url: string; method: string; status: number }[] = []
 
-    page.on('request', req => {
-      const url = req.url()
-      if (/password|reset|oob|identitytoolkit|\/api\/auth/i.test(url))
-        outboundRequests.push(url)
+    // Intercept the POST and return 204 No Content (the backend contract).
+    await page.route('**/api/auth/password-reset', async (route) => {
+      const request = route.request()
+      passwordResetRequests.push({
+        url: request.url(),
+        method: request.method(),
+        status: 204,
+      })
+      await route.fulfill({ status: 204, body: '' })
     })
 
     await page.goto('/forgot-password')
 
-    // Unavailable card + explanation body are both visible.
-    await expect(page.locator('[data-testid="forgot-unavailable-icon"]')).toBeVisible()
-    await expect(page.locator('[data-testid="forgot-unavailable-body"]')).toBeVisible()
+    // Form, email input, and submit button are visible.
+    await expect(page.locator('[data-testid="forgot-password-form"]')).toBeVisible()
+    await expect(page.locator('[data-testid="forgot-email"]')).toBeVisible()
+    await expect(page.locator('[data-testid="forgot-submit"]')).toBeVisible()
+
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/forgot-form.png` })
+
+    // Fill in the email and submit.
+    await page.locator('[data-testid="forgot-email"] input').fill('student@example.com')
+    await page.locator('[data-testid="forgot-submit"]').click()
+
+    // After successful 204, the success state replaces the form.
+    await expect(page.locator('[data-testid="forgot-success-icon"]')).toBeVisible()
     await expect(page.locator('[data-testid="forgot-return-to-login"]')).toBeVisible()
 
-    // There is no form, no email input, and no submit button.
+    // The form is no longer visible.
     await expect(page.locator('[data-testid="forgot-password-form"]')).toHaveCount(0)
-    await expect(page.locator('[data-testid="forgot-email"]')).toHaveCount(0)
-    await expect(page.locator('[data-testid="forgot-submit"]')).toHaveCount(0)
 
-    // The body copy explicitly says "isn't" or "contact your school admin".
-    const bodyText = await page.locator('[data-testid="forgot-unavailable-body"]').textContent()
+    // Exactly one POST /api/auth/password-reset was issued.
+    expect(passwordResetRequests).toHaveLength(1)
+    expect(passwordResetRequests[0].method).toBe('POST')
+    expect(passwordResetRequests[0].status).toBe(204)
 
-    expect(bodyText?.toLowerCase()).toMatch(/admin|teacher|not.*available|isn't/)
-
-    // No auth/password-reset requests were issued.
-    expect(outboundRequests).toEqual([])
-
-    await page.screenshot({ path: `${SCREENSHOT_DIR}/forgot-unavailable.png` })
+    await page.screenshot({ path: `${SCREENSHOT_DIR}/forgot-success.png` })
   })
 
   test('E2E #6 auth pages pass axe in light mode', async ({ page }) => {
     await clearAuth(page)
     for (const path of ['/login', '/register', '/forgot-password'] as const) {
       await page.goto(path)
-      await page.waitForSelector('[data-testid="email-password-form"], [data-testid="forgot-unavailable-icon"]')
+      await page.waitForSelector('[data-testid="email-password-form"], [data-testid="forgot-password-form"]')
 
       const results = await new AxeBuilder({ page })
         .exclude('.v-overlay-container')
