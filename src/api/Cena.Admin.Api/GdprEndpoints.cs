@@ -60,19 +60,19 @@ public static class GdprEndpoints
             HttpContext ctx,
             [FromServices] ILogger<GdprEndpoints> logger) =>
         {
-            if (!Enum.TryParse<ConsentType>(request.ConsentType, true, out var type))
-                return Results.BadRequest(new { error = $"Invalid consent type: {request.ConsentType}" });
+            if (!Enum.TryParse<ProcessingPurpose>(request.Purpose, true, out var purpose))
+                return Results.BadRequest(new { error = $"Invalid consent purpose: {request.Purpose}" });
 
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(request.StudentId, ctx.User, store);
 
-            await consentManager.RecordConsentAsync(request.StudentId, type);
+            await consentManager.RecordConsentAsync(request.StudentId, purpose);
 
             logger.LogInformation(
-                "[SIEM] ConsentRecorded: StudentId={StudentId}, ConsentType={ConsentType}, RecordedBy={RecordedBy}",
-                request.StudentId, type, ctx.User.Identity?.Name ?? "unknown");
+                "[SIEM] ConsentRecorded: StudentId={StudentId}, Purpose={Purpose}, RecordedBy={RecordedBy}",
+                request.StudentId, purpose, ctx.User.Identity?.Name ?? "unknown");
 
-            return Results.Ok(new { request.StudentId, request.ConsentType, granted = true });
+            return Results.Ok(new { request.StudentId, purpose = purpose.ToString(), granted = true });
         });
 
         group.MapDelete("/consents/{studentId}/{consentType}", async (
@@ -83,19 +83,19 @@ public static class GdprEndpoints
             HttpContext ctx,
             [FromServices] ILogger<GdprEndpoints> logger) =>
         {
-            if (!Enum.TryParse<ConsentType>(consentType, true, out var type))
-                return Results.BadRequest(new { error = $"Invalid consent type: {consentType}" });
+            if (!Enum.TryParse<ProcessingPurpose>(consentType, true, out var purpose))
+                return Results.BadRequest(new { error = $"Invalid consent purpose: {consentType}" });
 
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
 
-            await consentManager.RevokeConsentAsync(studentId, type);
+            await consentManager.RevokeConsentAsync(studentId, purpose);
 
             logger.LogInformation(
-                "[SIEM] ConsentRevoked: StudentId={StudentId}, ConsentType={ConsentType}, RevokedBy={RevokedBy}",
-                studentId, type, ctx.User.Identity?.Name ?? "unknown");
+                "[SIEM] ConsentRevoked: StudentId={StudentId}, Purpose={Purpose}, RevokedBy={RevokedBy}",
+                studentId, purpose, ctx.User.Identity?.Name ?? "unknown");
 
-            return Results.Ok(new { studentId, consentType, granted = false });
+            return Results.Ok(new { studentId, consentType = purpose.ToString(), granted = false });
         });
 
         // ── Data Export (Article 20) ──
@@ -309,4 +309,4 @@ public static class GdprEndpoints
     }
 }
 
-public sealed record ConsentRequest(string StudentId, string ConsentType);
+public sealed record ConsentRequest(string StudentId, string Purpose);

@@ -11,6 +11,7 @@ using Cena.Actors.Events;
 using Cena.Actors.Tutor;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
@@ -28,22 +29,32 @@ public static class TutorEndpoints
             .WithTags("Tutor")
             .RequireAuthorization();
 
-        // Thread endpoints
-        group.MapGet("/threads", GetThreads).WithName("GetTutorThreads");
-        group.MapPost("/threads", CreateThread).WithName("CreateTutorThread");
+        // Thread endpoints - all require ThirdPartyAI consent
+        group.MapGet("/threads", GetThreads)
+            .WithName("GetTutorThreads")
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
+        group.MapPost("/threads", CreateThread)
+            .WithName("CreateTutorThread")
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
         
-        // Message endpoints
-        group.MapGet("/threads/{threadId}/messages", GetMessages).WithName("GetTutorMessages");
+        // Message endpoints - all require ThirdPartyAI consent
+        group.MapGet("/threads/{threadId}/messages", GetMessages)
+            .WithName("GetTutorMessages")
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
+        
         // FIND-arch-004: SendMessage now calls the real LLM via ITutorMessageService,
         // so it must share the same rate limit as /stream (10 msg/min/student).
         group.MapPost("/threads/{threadId}/messages", SendMessage)
             .WithName("SendTutorMessage")
-            .RequireRateLimiting("tutor");
+            .RequireRateLimiting("tutor")
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
 
         // SSE streaming endpoint (HARDEN: Real LLM with rate limiting)
+        // Requires ThirdPartyAI consent
         group.MapPost("/threads/{threadId}/stream", StreamMessage)
             .WithName("StreamTutorMessage")
-            .RequireRateLimiting("tutor"); // 10 messages/min/student
+            .RequireRateLimiting("tutor") // 10 messages/min/student
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
 
         return app;
     }

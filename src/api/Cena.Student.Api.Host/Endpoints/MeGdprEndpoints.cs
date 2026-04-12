@@ -17,6 +17,7 @@ using System.Security.Claims;
 using Cena.Actors.Events;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
+using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -62,6 +63,17 @@ public static class MeGdprEndpoints
             .WithName("SubmitMyDsar")
             .RequireRateLimiting("gdpr-erasure");
 
+        // ---- Consent Management (privacy.vue) ----
+        // Student-facing consent endpoints under /api/me/consent
+        var consentGroup = app.MapGroup("/api/me/consent")
+            .WithTags("Consent")
+            .RequireAuthorization(CenaAuthPolicies.StudentOnly);
+
+        consentGroup.MapGet("", GetConsentState).WithName("GetMyConsentState");
+        consentGroup.MapPost("", UpdateConsent).WithName("UpdateMyConsent");
+        consentGroup.MapPost("/bulk", UpdateBulkConsents).WithName("UpdateMyBulkConsents");
+        consentGroup.MapGet("/defaults", GetDefaultConsents).WithName("GetMyDefaultConsents");
+
         return app;
     }
 
@@ -88,7 +100,7 @@ public static class MeGdprEndpoints
             studentId,
             consents = consents.Select(c => new
             {
-                type = c.ConsentType.ToString(),
+                purpose = c.Purpose.ToString(),
                 granted = c.Granted,
                 grantedAt = c.GrantedAt,
                 revokedAt = c.RevokedAt,
@@ -109,16 +121,16 @@ public static class MeGdprEndpoints
         if (string.IsNullOrEmpty(studentId))
             return Results.Unauthorized();
 
-        if (!Enum.TryParse<ConsentType>(request.ConsentType, true, out var type))
-            return Results.BadRequest(new { error = $"Invalid consent type: {request.ConsentType}. Valid types: Analytics, Marketing, ThirdParty" });
+        if (!Enum.TryParse<ProcessingPurpose>(request.Purpose, true, out var purpose))
+            return Results.BadRequest(new { error = $"Invalid consent purpose: {request.Purpose}" });
 
-        await consentManager.RecordConsentAsync(studentId, type);
+        await consentManager.RecordConsentAsync(studentId, purpose);
 
         logger.LogInformation(
-            "FIND-privacy-003: Student {StudentId} granted consent for {ConsentType}",
-            studentId, type);
+            "FIND-privacy-003: Student {StudentId} granted consent for {Purpose}",
+            studentId, purpose);
 
-        return Results.Ok(new { studentId, consentType = type.ToString(), granted = true });
+        return Results.Ok(new { studentId, consentType = purpose.ToString(), granted = true });
     }
 
     // ========================================================================
@@ -134,16 +146,16 @@ public static class MeGdprEndpoints
         if (string.IsNullOrEmpty(studentId))
             return Results.Unauthorized();
 
-        if (!Enum.TryParse<ConsentType>(purpose, true, out var type))
-            return Results.BadRequest(new { error = $"Invalid consent type: {purpose}. Valid types: Analytics, Marketing, ThirdParty" });
+        if (!Enum.TryParse<ProcessingPurpose>(purpose, true, out var processingPurpose))
+            return Results.BadRequest(new { error = $"Invalid consent purpose: {purpose}" });
 
-        await consentManager.RevokeConsentAsync(studentId, type);
+        await consentManager.RevokeConsentAsync(studentId, processingPurpose);
 
         logger.LogInformation(
-            "FIND-privacy-003: Student {StudentId} revoked consent for {ConsentType}",
-            studentId, type);
+            "FIND-privacy-003: Student {StudentId} revoked consent for {Purpose}",
+            studentId, processingPurpose);
 
-        return Results.Ok(new { studentId, consentType = type.ToString(), granted = false });
+        return Results.Ok(new { studentId, consentType = processingPurpose.ToString(), granted = false });
     }
 
     // ========================================================================
@@ -288,20 +300,296 @@ public static class MeGdprEndpoints
         });
     }
 
-    // ---- Helpers ----
+    // ====================================================================================
+    // GET /api/me/consent
+    // Returns current student's consent settings for all purposes
+    // Shows which are granted, which are denied, which are defaults
+    // ====================================================================================
+    private static async Task<IResult> GetConsentState(
+        HttpContext ctx,
+        [FromServices] IGdprConsentManager consentManager,
+        [FromServices] ILogger<GdprLoggerMarker> logger)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        var consents = await consentManager.GetConsentsAsync(studentId);
+        var consentDict = consents.ToDictionary(c => c.Purpose, c => c);
+
+        // Build ConsentDto for all known processing purposes
+        var allPurposes = Enum.GetValues<ProcessingPurpose>();
+        var consentDtos = allPurposes.Select(purpose =>
+        {
+            if (consentDict.TryGetValue(purpose, out var record))
+            {
+                return new ConsentDto(
+                    Purpose: purpose.ToString().ToLowerInvariant(),
+                    Granted: record.Granted,
+                    GrantedAt: record.GrantedAt,
+                    RevokedAt: record.RevokedAt,
+                    IsDefault: false
+                );
+            }
+            else
+            {
+                // No explicit consent record - this is a default state (denied)
+                return new ConsentDto(
+                    Purpose: purpose.ToString().ToLowerInvariant(),
+                    Granted: false,
+                    GrantedAt: null,
+                    RevokedAt: null,
+                    IsDefault: true
+                );
+            }
+        }).ToList();
+
+        logger.LogInformation(
+            "[SIEM] ConsentStateQueried: StudentId={StudentId}, Count={Count}",
+            studentId, consentDtos.Count);
+
+        return Results.Ok(new ConsentStateResponse(studentId, consentDtos));
+    }
+
+    // ====================================================================================
+    // POST /api/me/consent
+    // Request body: { "purpose": "analytics", "granted": true/false }
+    // Records consent change via GdprConsentManager
+    // Returns updated consent state
+    // ====================================================================================
+    private static async Task<IResult> UpdateConsent(
+        HttpContext ctx,
+        [FromBody] ConsentUpdateRequest request,
+        [FromServices] IGdprConsentManager consentManager,
+        [FromServices] ILogger<GdprLoggerMarker> logger)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        if (!Enum.TryParse<ProcessingPurpose>(request.Purpose, true, out var purpose))
+        {
+            return Results.BadRequest(new
+            {
+                error = $"Invalid consent purpose: {request.Purpose}",
+                validPurposes = Enum.GetNames<ProcessingPurpose>().Select(p => p.ToLowerInvariant())
+            });
+        }
+
+        // Record or revoke consent based on granted flag
+        if (request.Granted)
+        {
+            await consentManager.RecordConsentAsync(studentId, purpose);
+        }
+        else
+        {
+            await consentManager.RevokeConsentAsync(studentId, purpose);
+        }
+
+        logger.LogInformation(
+            "[SIEM] ConsentUpdated: StudentId={StudentId}, Purpose={Purpose}, Granted={Granted}",
+            studentId, purpose, request.Granted);
+
+        // Return updated consent state
+        var updatedConsent = new ConsentDto(
+            Purpose: purpose.ToString().ToLowerInvariant(),
+            Granted: request.Granted,
+            GrantedAt: request.Granted ? DateTimeOffset.UtcNow : null,
+            RevokedAt: request.Granted ? null : DateTimeOffset.UtcNow,
+            IsDefault: false
+        );
+
+        return Results.Ok(updatedConsent);
+    }
+
+    // ====================================================================================
+    // POST /api/me/consent/bulk
+    // Request body: { "consents": [{"purpose": "x", "granted": true}, ...] }
+    // Records multiple consent changes at once
+    // Used by privacy.vue on initial load
+    // ====================================================================================
+    private static async Task<IResult> UpdateBulkConsents(
+        HttpContext ctx,
+        [FromBody] BulkConsentRequest request,
+        [FromServices] IGdprConsentManager consentManager,
+        [FromServices] ILogger<GdprLoggerMarker> logger)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        if (request.Consents == null || request.Consents.Count == 0)
+        {
+            return Results.BadRequest(new { error = "Consents array is required and cannot be empty" });
+        }
+
+        var results = new List<ConsentDto>();
+        var errors = new List<string>();
+
+        foreach (var consent in request.Consents)
+        {
+            if (!Enum.TryParse<ProcessingPurpose>(consent.Purpose, true, out var purpose))
+            {
+                errors.Add($"Invalid consent purpose: {consent.Purpose}");
+                continue;
+            }
+
+            try
+            {
+                if (consent.Granted)
+                {
+                    await consentManager.RecordConsentAsync(studentId, purpose);
+                }
+                else
+                {
+                    await consentManager.RevokeConsentAsync(studentId, purpose);
+                }
+
+                results.Add(new ConsentDto(
+                    Purpose: purpose.ToString().ToLowerInvariant(),
+                    Granted: consent.Granted,
+                    GrantedAt: consent.Granted ? DateTimeOffset.UtcNow : null,
+                    RevokedAt: consent.Granted ? null : DateTimeOffset.UtcNow,
+                    IsDefault: false
+                ));
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Failed to update {consent.Purpose}: {ex.Message}");
+                logger.LogError(ex,
+                    "[SIEM] ConsentUpdateFailed: StudentId={StudentId}, Purpose={Purpose}, Granted={Granted}",
+                    studentId, consentType, consent.Granted);
+            }
+        }
+
+        logger.LogInformation(
+            "[SIEM] BulkConsentsUpdated: StudentId={StudentId}, SuccessCount={SuccessCount}, ErrorCount={ErrorCount}",
+            studentId, results.Count, errors.Count);
+
+        return Results.Ok(new BulkConsentResponse(studentId, results, errors));
+    }
+
+    // ====================================================================================
+    // GET /api/me/consent/defaults
+    // Returns default consent values based on student's age
+    // Uses GetDefaultConsentsAsync logic
+    // ====================================================================================
+    private static async Task<IResult> GetDefaultConsents(
+        HttpContext ctx,
+        [FromServices] IDocumentStore store,
+        [FromServices] ILogger<GdprLoggerMarker> logger)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        // Get student's age from profile if available
+        await using var session = store.QuerySession();
+        var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+
+        int? age = null;
+        if (profile?.DateOfBirth.HasValue == true)
+        {
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var dob = DateOnly.FromDateTime(profile.DateOfBirth.Value.Date);
+            age = today.Year - dob.Year;
+            if (today < dob.AddYears(age.Value))
+                age--;
+        }
+
+        // Calculate default consents based on age
+        // Under 13 (COPPA): all denied
+        // 13-15: all denied (opt-in required)
+        // 16+ (adult): can have defaults based on policy
+        var defaults = GetDefaultConsentsForAge(age);
+
+        logger.LogInformation(
+            "[SIEM] DefaultConsentsQueried: StudentId={StudentId}, Age={Age}",
+            studentId, age?.ToString() ?? "unknown");
+
+        return Results.Ok(new DefaultConsentsResponse(studentId, age, defaults));
+    }
+
+    // ---- Helper methods ----
 
     private static string? GetStudentId(ClaimsPrincipal user)
     {
         return user.FindFirst(ClaimTypes.NameIdentifier)?.Value
             ?? user.FindFirst("sub")?.Value;
     }
+
+    /// <summary>
+    /// Determines if the student is a minor (under 16) based on their profile.
+    /// </summary>
+    private static bool IsMinor(StudentProfileSnapshot? profile)
+    {
+        if (profile?.DateOfBirth.HasValue != true)
+        {
+            // If age unknown, default to minor (high-privacy default)
+            return true;
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var dob = DateOnly.FromDateTime(profile.DateOfBirth.Value.Date);
+        var age = today.Year - dob.Year;
+        if (today < dob.AddYears(age))
+            age--;
+
+        return age < 16;
+    }
 }
 
 // ---- Request/Response DTOs ----
 
-public sealed record SelfConsentRequest(string ConsentType);
+public sealed record SelfConsentRequest(string Purpose);
 
 public sealed record DsarSubmitRequest(string Message, string? ContactEmail = null);
+
+/// <summary>
+/// Consent DTO returned by all consent endpoints.
+/// </summary>
+public sealed record ConsentDto(
+    string Purpose,
+    bool Granted,
+    DateTimeOffset? GrantedAt,
+    DateTimeOffset? RevokedAt,
+    bool IsDefault);
+
+/// <summary>
+/// Response for GET /api/me/consent
+/// </summary>
+public sealed record ConsentStateResponse(string StudentId, IReadOnlyList<ConsentDto> Consents);
+
+/// <summary>
+/// Request body for POST /api/me/consent
+/// </summary>
+public sealed record ConsentUpdateRequest(string Purpose, bool Granted);
+
+/// <summary>
+/// Single consent entry for bulk update
+/// </summary>
+public sealed record ConsentEntry(string Purpose, bool Granted);
+
+/// <summary>
+/// Request body for POST /api/me/consent/bulk
+/// </summary>
+public sealed record BulkConsentRequest(IReadOnlyList<ConsentEntry> Consents);
+
+/// <summary>
+/// Response for POST /api/me/consent/bulk
+/// </summary>
+public sealed record BulkConsentResponse(
+    string StudentId,
+    IReadOnlyList<ConsentDto> Results,
+    IReadOnlyList<string> Errors);
+
+/// <summary>
+/// Response for GET /api/me/consent/defaults
+/// </summary>
+public sealed record DefaultConsentsResponse(
+    string StudentId,
+    int? Age,
+    IReadOnlyList<ConsentDto> Defaults);
 
 /// <summary>
 /// Marten document for persisting DSAR (Data Subject Access Request) records.

@@ -209,7 +209,7 @@ public sealed class RightToErasureEndToEndTests
         {
             Id = Guid.NewGuid(),
             StudentId = TestStudentId,
-            ConsentType = ConsentType.Analytics,
+            Purpose = ProcessingPurpose.BehavioralAnalytics,
             Granted = true,
             GrantedAt = _clock.UtcNow.AddDays(-365)
         };
@@ -375,8 +375,8 @@ public sealed class RightToErasureEndToEndTests
 
         var consentRecords = new List<ConsentRecord>
         {
-            new() { Id = Guid.NewGuid(), StudentId = TestStudentId, ConsentType = ConsentType.Analytics, Granted = true },
-            new() { Id = Guid.NewGuid(), StudentId = TestStudentId, ConsentType = ConsentType.Marketing, Granted = false }
+            new() { Id = Guid.NewGuid(), StudentId = TestStudentId, Purpose = ProcessingPurpose.BehavioralAnalytics, Granted = true },
+            new() { Id = Guid.NewGuid(), StudentId = TestStudentId, Purpose = ProcessingPurpose.MarketingNudges, Granted = false }
         };
 
         var accessLogs = new List<StudentRecordAccessLog>
@@ -575,7 +575,7 @@ public sealed class RightToErasureEndToEndTests
             {
                 Id = Guid.NewGuid(),
                 StudentId = TestStudentId,
-                ConsentType = ConsentType.Analytics,
+                Purpose = ProcessingPurpose.BehavioralAnalytics,
                 Granted = true,
                 GrantedAt = _clock.UtcNow.AddDays(-365)
             },
@@ -583,7 +583,7 @@ public sealed class RightToErasureEndToEndTests
             {
                 Id = Guid.NewGuid(),
                 StudentId = TestStudentId,
-                ConsentType = ConsentType.Marketing,
+                Purpose = ProcessingPurpose.MarketingNudges,
                 Granted = false,
                 GrantedAt = _clock.UtcNow.AddDays(-365),
                 RevokedAt = _clock.UtcNow.AddDays(-180)
@@ -628,7 +628,7 @@ public sealed class RightToErasureEndToEndTests
         {
             Id = Guid.NewGuid(),
             StudentId = TestStudentId,
-            ConsentType = ConsentType.Analytics,
+            Purpose = ProcessingPurpose.BehavioralAnalytics,
             Granted = true,
             GrantedAt = _clock.UtcNow.AddDays(-365)
         };

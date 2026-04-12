@@ -8,6 +8,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Events;
+using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Tenancy;
 using Marten;
@@ -33,19 +34,45 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<FocusAnalyticsService> _logger;
+    private readonly IGdprConsentManager _consentManager;
 
     public FocusAnalyticsService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
-        ILogger<FocusAnalyticsService> logger)
+        ILogger<FocusAnalyticsService> logger,
+        IGdprConsentManager consentManager)
     {
         _store = store;
         _redis = redis;
         _logger = logger;
+        _consentManager = consentManager;
     }
 
     public async Task<FocusOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user)
     {
+        // Check consent for behavioral analytics
+        var studentId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+            ?? user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrEmpty(studentId))
+        {
+            var isMinor = await IsMinorAsync(studentId);
+            var hasConsent = await _consentManager.HasConsentAsync(studentId, ProcessingPurpose.BehavioralAnalytics, isMinor);
+            if (!hasConsent)
+            {
+                _logger.LogWarning(
+                    "[SIEM] ConsentRequiredButMissing: Student {StudentId} lacks consent for {Purpose}",
+                    studentId,
+                    ProcessingPurpose.BehavioralAnalytics);
+                // Return empty overview when consent is missing
+                return new FocusOverviewResponse(
+                    TodaySessions: 0,
+                    TodayFocusScore: 0,
+                    WeeklyAverage: 0,
+                    WeeklyTrend: "insufficient_data",
+                    ComparisonToClass: null);
+            }
+        }
+
         var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
@@ -65,6 +92,26 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
     public async Task<StudentFocusDetailResponse?> GetStudentFocusAsync(string studentId, ClaimsPrincipal user)
     {
+        // Check consent for behavioral analytics
+        var isMinor = await IsMinorAsync(studentId);
+        var hasConsent = await _consentManager.HasConsentAsync(studentId, ProcessingPurpose.BehavioralAnalytics, isMinor);
+        if (!hasConsent)
+        {
+            _logger.LogWarning(
+                "[SIEM] ConsentRequiredButMissing: Student {StudentId} lacks consent for {Purpose}",
+                studentId,
+                ProcessingPurpose.BehavioralAnalytics);
+            // Return anonymized/empty data when consent is missing
+            return new StudentFocusDetailResponse(
+                StudentId: studentId,
+                OverallFocusScore: 0,
+                SessionCount: 0,
+                TotalLearningTimeMinutes: 0,
+                DailyBreakdown: new List<DailyFocusSummary>(),
+                SubjectBreakdown: new List<SubjectFocusSummary>(),
+                AttentionPattern: "insufficient_data");
+        }
+
         var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
@@ -94,6 +141,30 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
     public async Task<ClassFocusResponse?> GetClassFocusAsync(string classId, ClaimsPrincipal user)
     {
+        // Check consent for behavioral analytics at class level
+        var requesterId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+            ?? user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrEmpty(requesterId))
+        {
+            var isMinor = await IsMinorAsync(requesterId);
+            var hasConsent = await _consentManager.HasConsentAsync(requesterId, ProcessingPurpose.BehavioralAnalytics, isMinor);
+            if (!hasConsent)
+            {
+                _logger.LogWarning(
+                    "[SIEM] ConsentRequiredButMissing: User {UserId} lacks consent for {Purpose}",
+                    requesterId,
+                    ProcessingPurpose.BehavioralAnalytics);
+                // Return empty response when consent is missing
+                return new ClassFocusResponse(
+                    ClassId: classId,
+                    AverageFocusScore: 0,
+                    SessionCount: 0,
+                    StudentCount: 0,
+                    TopStudents: new List<StudentFocusSummary>(),
+                    AttentionTrend: "insufficient_data");
+            }
+        }
+
         var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
@@ -127,6 +198,24 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
     public async Task<FocusDegradationResponse> GetDegradationCurveAsync(ClaimsPrincipal user)
     {
+        // Check consent for behavioral analytics
+        var studentId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+            ?? user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrEmpty(studentId))
+        {
+            var isMinor = await IsMinorAsync(studentId);
+            var hasConsent = await _consentManager.HasConsentAsync(studentId, ProcessingPurpose.BehavioralAnalytics, isMinor);
+            if (!hasConsent)
+            {
+                _logger.LogWarning(
+                    "[SIEM] ConsentRequiredButMissing: Student {StudentId} lacks consent for {Purpose}",
+                    studentId,
+                    ProcessingPurpose.BehavioralAnalytics);
+                // Return empty degradation curve when consent is missing
+                return new FocusDegradationResponse(new List<DegradationPoint>());
+            }
+        }
+
         var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
@@ -172,6 +261,24 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
     public async Task<FocusExperimentsResponse> GetExperimentsAsync(ClaimsPrincipal user)
     {
+        // Check consent for behavioral analytics
+        var studentId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+            ?? user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrEmpty(studentId))
+        {
+            var isMinor = await IsMinorAsync(studentId);
+            var hasConsent = await _consentManager.HasConsentAsync(studentId, ProcessingPurpose.BehavioralAnalytics, isMinor);
+            if (!hasConsent)
+            {
+                _logger.LogWarning(
+                    "[SIEM] ConsentRequiredButMissing: Student {StudentId} lacks consent for {Purpose}",
+                    studentId,
+                    ProcessingPurpose.BehavioralAnalytics);
+                // Return empty experiments response when consent is missing
+                return new FocusExperimentsResponse(new List<FocusExperiment>());
+            }
+        }
+
         var schoolId = TenantScope.GetSchoolFilter(user);
 
         // Focus experiments are tracked by FocusExperimentConfig on the actor side.
@@ -194,6 +301,24 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
     public async Task<StudentsNeedingAttentionResponse> GetStudentsNeedingAttentionAsync(ClaimsPrincipal user)
     {
+        // Check consent for behavioral analytics
+        var requesterId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+            ?? user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrEmpty(requesterId))
+        {
+            var isMinor = await IsMinorAsync(requesterId);
+            var hasConsent = await _consentManager.HasConsentAsync(requesterId, ProcessingPurpose.BehavioralAnalytics, isMinor);
+            if (!hasConsent)
+            {
+                _logger.LogWarning(
+                    "[SIEM] ConsentRequiredButMissing: User {UserId} lacks consent for {Purpose}",
+                    requesterId,
+                    ProcessingPurpose.BehavioralAnalytics);
+                // Return empty attention list when consent is missing
+                return new StudentsNeedingAttentionResponse(new List<AttentionAlert>());
+            }
+        }
+
         var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
@@ -211,6 +336,19 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
     public async Task<FocusTimelineResponse> GetStudentTimelineAsync(string studentId, string period, ClaimsPrincipal user)
     {
+        // Check consent for behavioral analytics
+        var isMinor = await IsMinorAsync(studentId);
+        var hasConsent = await _consentManager.HasConsentAsync(studentId, ProcessingPurpose.BehavioralAnalytics, isMinor);
+        if (!hasConsent)
+        {
+            _logger.LogWarning(
+                "[SIEM] ConsentRequiredButMissing: Student {StudentId} lacks consent for {Purpose}",
+                studentId,
+                ProcessingPurpose.BehavioralAnalytics);
+            // Return empty timeline when consent is missing
+            return new FocusTimelineResponse(studentId, period, new List<FocusTimelinePoint>());
+        }
+
         var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
@@ -232,6 +370,24 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
 
     public async Task<ClassHeatmapResponse> GetClassHeatmapAsync(string classId, ClaimsPrincipal user)
     {
+        // Check consent for behavioral analytics
+        var requesterId = user.FindFirst(ClaimTypes.NameIdentifier)?.Value 
+            ?? user.FindFirst("sub")?.Value;
+        if (!string.IsNullOrEmpty(requesterId))
+        {
+            var isMinor = await IsMinorAsync(requesterId);
+            var hasConsent = await _consentManager.HasConsentAsync(requesterId, ProcessingPurpose.BehavioralAnalytics, isMinor);
+            if (!hasConsent)
+            {
+                _logger.LogWarning(
+                    "[SIEM] ConsentRequiredButMissing: User {UserId} lacks consent for {Purpose}",
+                    requesterId,
+                    ProcessingPurpose.BehavioralAnalytics);
+                // Return empty heatmap when consent is missing
+                return new ClassHeatmapResponse(classId, new List<HeatmapCell>());
+            }
+        }
+
         var schoolId = TenantScope.GetSchoolFilter(user);
         await using var session = _store.QuerySession();
 
@@ -274,5 +430,37 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
     {
         if (string.IsNullOrEmpty(camelCase)) return camelCase;
         return char.ToUpperInvariant(camelCase[0]) + camelCase[1..];
+    }
+
+    /// <summary>
+    /// Determines if the student is a minor (under 16) based on their profile.
+    /// Defaults to true (high-privacy) if age cannot be determined.
+    /// </summary>
+    private async Task<bool> IsMinorAsync(string studentId)
+    {
+        try
+        {
+            await using var session = _store.QuerySession();
+            var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+            
+            if (profile?.DateOfBirth.HasValue != true)
+            {
+                // If age unknown, default to minor (high-privacy default)
+                return true;
+            }
+
+            var today = DateOnly.FromDateTime(DateTime.UtcNow);
+            var dob = DateOnly.FromDateTime(profile.DateOfBirth.Value.Date);
+            var age = today.Year - dob.Year;
+            if (today < dob.AddYears(age))
+                age--;
+
+            return age < 16;
+        }
+        catch
+        {
+            // Default to high-privacy on any error
+            return true;
+        }
     }
 }

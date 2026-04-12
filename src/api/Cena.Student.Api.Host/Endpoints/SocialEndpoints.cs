@@ -8,6 +8,7 @@ using Cena.Admin.Api.Queries.Social;
 using Cena.Api.Contracts.Social;
 using Cena.Actors.Events;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
@@ -24,19 +25,48 @@ public static class SocialEndpoints
             .WithTags("Social")
             .RequireAuthorization();
 
-        group.MapGet("/class-feed", GetClassFeed).WithName("GetClassFeed");
-        group.MapGet("/peers/solutions", GetPeerSolutions).WithName("GetPeerSolutions");
-        group.MapGet("/friends", GetFriends).WithName("GetFriends");
-        group.MapGet("/study-rooms", GetStudyRooms).WithName("GetStudyRooms");
+        // Social features require consent
+        group.MapGet("/class-feed", GetClassFeed)
+            .WithName("GetClassFeed")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        
+        // Peer comparison features require consent
+        group.MapGet("/peers/solutions", GetPeerSolutions)
+            .WithName("GetPeerSolutions")
+            .RequireConsent(ProcessingPurpose.PeerComparison);
+        
+        // Social features require consent
+        group.MapGet("/friends", GetFriends)
+            .WithName("GetFriends")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        
+        // Social features require consent
+        group.MapGet("/study-rooms", GetStudyRooms)
+            .WithName("GetStudyRooms")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
 
-        // STB-06b: Write endpoints
-        group.MapPost("/reactions", AddReaction).WithName("AddReaction");
-        group.MapPost("/comments", AddComment).WithName("AddComment");
-        group.MapPost("/friends/request", SendFriendRequest).WithName("SendFriendRequest");
-        group.MapPost("/friends/{id}/accept", AcceptFriendRequest).WithName("AcceptFriendRequest");
-        group.MapPost("/study-rooms", CreateStudyRoom).WithName("CreateStudyRoom");
-        group.MapPost("/study-rooms/{id}/join", JoinStudyRoom).WithName("JoinStudyRoom");
-        group.MapPost("/study-rooms/{id}/leave", LeaveStudyRoom).WithName("LeaveStudyRoom");
+        // STB-06b: Write endpoints - all require SocialFeatures consent
+        group.MapPost("/reactions", AddReaction)
+            .WithName("AddReaction")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        group.MapPost("/comments", AddComment)
+            .WithName("AddComment")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        group.MapPost("/friends/request", SendFriendRequest)
+            .WithName("SendFriendRequest")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        group.MapPost("/friends/{id}/accept", AcceptFriendRequest)
+            .WithName("AcceptFriendRequest")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        group.MapPost("/study-rooms", CreateStudyRoom)
+            .WithName("CreateStudyRoom")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        group.MapPost("/study-rooms/{id}/join", JoinStudyRoom)
+            .WithName("JoinStudyRoom")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
+        group.MapPost("/study-rooms/{id}/leave", LeaveStudyRoom)
+            .WithName("LeaveStudyRoom")
+            .RequireConsent(ProcessingPurpose.SocialFeatures);
 
         return app;
     }

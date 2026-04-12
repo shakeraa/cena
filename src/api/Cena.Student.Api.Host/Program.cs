@@ -367,11 +367,12 @@ app.Use(async (context, next) =>
     await next();
 });
 
-// Middleware order: CORS → Auth → Revocation → FERPA Audit → RateLimiter → Endpoints
+// Middleware order: CORS → Auth → Revocation → Consent → FERPA Audit → RateLimiter → Endpoints
 app.UseCors();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseMiddleware<TokenRevocationMiddleware>();
+app.UseConsentEnforcement(); // FIND-privacy-007: Consent gates data processing
 app.UseMiddleware<StudentDataAuditMiddleware>();
 app.UseRateLimiter();
 
@@ -421,6 +422,10 @@ app.MapStudentAnalyticsEndpoints();
 // GDPR Self-Service endpoints (FIND-privacy-003)
 // Student-facing consent, export, erasure, and DSAR endpoints
 app.MapMeGdprEndpoints();
+
+// Granular Consent Management endpoints (SEC-006)
+// Per-purpose consent control with defaults and bulk operations
+app.MapConsentEndpoints();
 
 // ---- SignalR Hub ----
 app.MapCenaHub();
