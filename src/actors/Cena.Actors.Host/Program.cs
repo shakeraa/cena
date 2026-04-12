@@ -138,6 +138,21 @@ builder.Services.AddHttpContextAccessor();
 builder.Services.AddFirebaseAuth(builder.Configuration);
 builder.Services.AddCenaAuthorization();
 
+// ---- CORS (FIND-sec-012: restrict cross-origin access) ----
+var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:5175" };
+
+builder.Services.AddCors(options =>
+{
+    options.AddDefaultPolicy(policy =>
+    {
+        policy.WithOrigins(allowedOrigins)
+            .WithMethods("GET", "POST", "PUT", "DELETE", "PATCH")
+            .WithHeaders("Authorization", "Content-Type", "Accept", "X-Requested-With")
+            .AllowCredentials();
+    });
+});
+
 // Firebase Admin SDK (required by AdminUserService/AdminRoleService)
 builder.Services.AddSingleton<Cena.Infrastructure.Firebase.IFirebaseAdminService,
     Cena.Infrastructure.Firebase.FirebaseAdminService>();
@@ -430,14 +445,15 @@ app.MapHealthChecks("/health/live", new HealthCheckOptions
 });
 
 // ---- Actor stats endpoint (real-time from NatsBusRouter) ----
+// FIND-sec-012: gated behind SuperAdminOnly; PII hashed
 app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
 {
     var actors = router.ActiveActors.Values
         .OrderByDescending(a => a.LastActivity)
         .Select(a => new
         {
-            studentId = a.StudentId,
-            sessionId = a.SessionId,
+            studentIdHash = EmailHasher.Hash(a.StudentId),
+            sessionIdHash = EmailHasher.Hash(a.SessionId),
             messagesProcessed = a.MessagesProcessed,
             totalAttempts = a.TotalAttempts,
             correctAttempts = a.CorrectAttempts,
@@ -464,14 +480,12 @@ app.MapGet("/api/actors/stats", (Cena.Actors.Bus.NatsBusRouter router) =>
             e.Category,
             e.Subject,
             e.Message,
-            e.StudentId
+            studentIdHash = EmailHasher.Hash(e.StudentId)
         }),
         activeActorCount = router.ActiveActors.Count,
         actors = actors
     });
-}).WithName("GetActorStats");
-// Internal endpoint — called by SystemMonitoringService health probes.
-// Dashboard UI access is gated by the Admin API's own auth layer.
+}).RequireAuthorization(CenaAuthPolicies.SuperAdminOnly).WithName("GetActorStats");
 
 // ---- Cluster diagnostic endpoint (read-only, REV-004) ----
 app.MapGet("/api/actors/diag", (ActorSystem system) =>
@@ -511,6 +525,9 @@ app.MapPost("/api/actors/warmup", async (
         studentCount = request.StudentIds.Count
     });
 }).RequireAuthorization(CenaAuthPolicies.SuperAdminOnly).WithName("WarmUpActors");
+
+// ---- CORS must be before Auth to handle preflight ----
+app.UseCors();
 
 // ---- Auth middleware (required by admin endpoints with RequireAuthorization) ----
 app.UseAuthentication();
