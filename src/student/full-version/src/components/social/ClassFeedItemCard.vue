@@ -111,6 +111,7 @@ function handleReact() {
         variant="text"
         size="small"
         prepend-icon="tabler-heart"
+        :aria-label="t('social.feed.reactionAriaLabel', { count: item.reactionCount })"
         :data-testid="`react-${item.itemId}`"
         @click="handleReact"
       >
@@ -120,6 +121,7 @@ function handleReact() {
         variant="text"
         size="small"
         prepend-icon="tabler-message"
+        :aria-label="t('social.feed.commentAriaLabel', { count: item.commentCount })"
       >
         {{ item.commentCount }}
       </VBtn>

@@ -485,12 +485,16 @@
         "milestone": "Milestone",
         "question": "Question",
         "announcement": "Announcement"
-      }
+      },
+      "reactionAriaLabel": "Like, {count} reactions",
+      "commentAriaLabel": "Comments, {count}",
+      "reactionError": "Could not save your reaction. Please try again."
     },
     "peers": {
       "title": "Peer solutions",
       "subtitle": "Learn from how others solved the same questions.",
-      "forQuestion": "Question #{questionId}"
+      "forQuestion": "Question #{questionId}",
+      "voteError": "Could not save your vote. Please try again."
     },
     "friends": {
       "title": "Friends",
@@ -502,7 +506,8 @@
       "level": "Level {level}",
       "streak": "{days}-day streak",
       "online": "Online",
-      "offline": "Offline"
+      "offline": "Offline",
+      "acceptError": "Could not accept the friend request. Please try again."
     }
   },
   "knowledgeGraph": {
