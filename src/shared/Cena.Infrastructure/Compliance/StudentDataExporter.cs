@@ -1,32 +1,25 @@
 // =============================================================================
-// Cena Platform -- Student Data Exporter
+// Cena Platform -- Student Data Exporter (FIND-privacy-006)
 // SEC-003 / GDPR Article 20: Data portability export for student records.
 //
-// Produces a structured JSON document containing all student data held by
-// the platform. PII fields are clearly labelled with their classification
-// level and category so the export consumer (student / parent / DPO) can
-// identify and act on each piece of data.
-//
-// The exporter is generic: it accepts any object, reflects its properties,
-// and annotates fields decorated with [Pii]. The caller is responsible for
-// loading the snapshot (e.g. StudentProfileSnapshot) and passing it in.
-//
-// Usage (from a compliance endpoint or admin service):
-//
-//   var snapshot = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-//   var export   = StudentDataExporter.Export(studentId, snapshot);
-//   var json     = JsonSerializer.Serialize(export, JsonOptions.Web);
+// Produces a structured JSON document containing ALL student data:
+// - Profile snapshot (with PII annotations)
+// - Tutoring session history
+// - Learning session events
+// - All domain events in the student's stream
 // =============================================================================
 
 using System.Reflection;
 using System.Text.Json.Serialization;
+using Cena.Actors.Events;
+using Cena.Infrastructure.Documents;
+using Marten;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Infrastructure.Compliance;
 
 /// <summary>
-/// A single field entry in the GDPR portability export, carrying the value alongside
-/// its PII classification metadata.
+/// A single field entry in the GDPR portability export.
 /// </summary>
 public sealed record ExportedField(
     [property: JsonPropertyName("name")] string Name,
@@ -36,69 +29,182 @@ public sealed record ExportedField(
     [property: JsonPropertyName("requiresEncryption")] bool RequiresEncryption);
 
 /// <summary>
-/// Full portability export document produced for a single student.
+/// Full portability export document.
+/// FIND-privacy-006: Now includes tutor history, sessions, and events.
 /// </summary>
 public sealed record StudentDataExport(
     [property: JsonPropertyName("exportedAt")] DateTimeOffset ExportedAt,
     [property: JsonPropertyName("studentId")] string StudentId,
     [property: JsonPropertyName("schemaVersion")] string SchemaVersion,
     [property: JsonPropertyName("profile")] IReadOnlyList<ExportedField> Profile,
+    [property: JsonPropertyName("tutoringSessions")] IReadOnlyList<TutoringSessionExport> TutoringSessions,
+    [property: JsonPropertyName("learningSessions")] IReadOnlyList<LearningSessionExport> LearningSessions,
+    [property: JsonPropertyName("events")] IReadOnlyList<StudentEventExport> Events,
+    [property: JsonPropertyName("eventCount")] int EventCount,
     [property: JsonPropertyName("notice")] string Notice);
 
 /// <summary>
-/// Exports any persisted student data object for GDPR Article 20 portability requests.
-/// PII fields are annotated in the output with their classification level and category.
-/// Non-PII properties are included with PiiLevel = "None".
+/// Tutoring session export record.
+/// </summary>
+public sealed record TutoringSessionExport(
+    string SessionId,
+    string Subject,
+    string ConceptId,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    int TurnCount,
+    string Status);
+
+/// <summary>
+/// Learning session export record.
+/// </summary>
+public sealed record LearningSessionExport(
+    string SessionId,
+    string[] Subjects,
+    string Mode,
+    DateTimeOffset StartedAt,
+    DateTimeOffset? EndedAt,
+    int? QuestionsAttempted,
+    int? QuestionsCorrect);
+
+/// <summary>
+/// Student domain event export.
+/// </summary>
+public sealed record StudentEventExport(
+    string EventType,
+    DateTimeOffset Timestamp,
+    object Data);
+
+/// <summary>
+/// Exports all persisted student data for GDPR Article 20 portability requests.
+/// FIND-privacy-006: Extended to include tutor history, sessions, and events.
 /// </summary>
 public static class StudentDataExporter
 {
-    private const string SchemaVersion = "1.0";
+    private const string SchemaVersion = "2.0";
     private const string PortabilityNotice =
         "This export was generated in response to a GDPR Article 20 data portability request. " +
-        "Fields marked with a piiLevel indicate personal data held by Cena. " +
-        "Retain securely and share only with the data subject or their authorised representative.";
+        "It includes your profile, tutoring sessions, learning activity, and all events. " +
+        "Retain securely and share only with authorized representatives.";
 
     /// <summary>
-    /// Builds a portability export from any student data object.
+    /// Builds a complete portability export including profile, tutor history, sessions, and events.
     /// </summary>
-    /// <param name="studentId">The student's identifier (used as the document key).</param>
-    /// <param name="dataObject">
-    /// The student data instance to export. Must not be null.
-    /// Typically a <c>StudentProfileSnapshot</c> loaded from Marten.
-    /// </param>
-    /// <param name="logger">Optional logger — logs field counts at Information level.</param>
-    public static StudentDataExport Export(
+    public static async Task<StudentDataExport> ExportAsync(
         string studentId,
-        object dataObject,
+        IDocumentStore store,
         ILogger? logger = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(studentId);
-        ArgumentNullException.ThrowIfNull(dataObject);
 
-        var profileFields = ExtractFields(dataObject);
+        await using var session = store.QuerySession();
+
+        // 1. Profile snapshot
+        var snapshot = await session.LoadAsync<StudentProfileSnapshot>(studentId);
+        var profileFields = snapshot != null 
+            ? ExtractFields(snapshot) 
+            : new List<ExportedField>();
+
+        // 2. Tutoring sessions
+        var tutoringSessions = await session.Query<TutoringSessionDocument>()
+            .Where(t => t.StudentId == studentId)
+            .OrderByDescending(t => t.StartedAt)
+            .ToListAsync();
+
+        var tutoringExports = tutoringSessions.Select(t => new TutoringSessionExport(
+            t.SessionId,
+            t.Subject,
+            t.ConceptId,
+            t.StartedAt,
+            t.EndedAt,
+            t.TotalTurns,
+            t.EndedAt.HasValue ? "completed" : "active"
+        )).ToList();
+
+        // 3. Learning sessions from events
+        var events = await session.Events.FetchStreamAsync(studentId);
+        var learningSessions = events
+            .Where(e => e.Data is LearningSessionStarted_V1)
+            .Select(e => (LearningSessionStarted_V1)e.Data)
+            .Select(ls => new LearningSessionExport(
+                ls.SessionId,
+                ls.Subjects,
+                ls.Mode,
+                ls.StartedAt,
+                null, // EndedAt from LearningSessionEnded_V1
+                null,
+                null))
+            .ToList();
+
+        // Match ends with starts
+        var endedSessions = events
+            .Where(e => e.Data is LearningSessionEnded_V1)
+            .Select(e => (LearningSessionEnded_V1)e.Data)
+            .ToDictionary(e => e.SessionId);
+
+        learningSessions = learningSessions.Select(ls =>
+        {
+            if (endedSessions.TryGetValue(ls.SessionId, out var ended))
+            {
+                return ls with 
+                { 
+                    EndedAt = ended.EndedAt, 
+                    QuestionsAttempted = ended.QuestionsAttempted,
+                    QuestionsCorrect = ended.QuestionsCorrect
+                };
+            }
+            return ls;
+        }).ToList();
+
+        // 4. All domain events
+        var eventExports = events.Select(e => new StudentEventExport(
+            e.Data?.GetType().Name ?? "Unknown",
+            e.Timestamp,
+            e.Data ?? new object()
+        )).ToList();
 
         logger?.LogInformation(
-            "SEC-003: GDPR portability export generated for student {StudentId}. " +
-            "Fields={FieldCount}, PiiFields={PiiFieldCount}",
-            studentId,
-            profileFields.Count,
-            profileFields.Count(f => f.PiiLevel != nameof(Compliance.PiiLevel.None)));
+            "FIND-privacy-006: GDPR export for {StudentId}: Profile={ProfileFields}, " +
+            "Tutoring={TutoringCount}, Learning={LearningCount}, Events={EventCount}",
+            studentId, profileFields.Count, tutoringExports.Count, learningSessions.Count, eventExports.Count);
 
         return new StudentDataExport(
             ExportedAt: DateTimeOffset.UtcNow,
             StudentId: studentId,
             SchemaVersion: SchemaVersion,
             Profile: profileFields,
+            TutoringSessions: tutoringExports,
+            LearningSessions: learningSessions,
+            Events: eventExports,
+            EventCount: eventExports.Count,
             Notice: PortabilityNotice);
     }
 
-    // ── Internal helpers ──────────────────────────────────────────────────────
-
     /// <summary>
-    /// Iterates all public properties of the data object and builds export records.
-    /// Properties with a <see cref="PiiAttribute"/> carry full classification metadata;
-    /// all others are included with PiiLevel = "None".
+    /// Legacy synchronous export for backward compatibility (profile only).
     /// </summary>
+    [Obsolete("Use ExportAsync for complete data export")]
+    public static StudentDataExport Export(
+        string studentId,
+        object dataObject,
+        ILogger? logger = null)
+    {
+        var profileFields = ExtractFields(dataObject);
+
+        logger?.LogWarning("Using legacy Export method - tutor history, sessions, and events not included");
+
+        return new StudentDataExport(
+            ExportedAt: DateTimeOffset.UtcNow,
+            StudentId: studentId,
+            SchemaVersion: "1.0",
+            Profile: profileFields,
+            TutoringSessions: new List<TutoringSessionExport>(),
+            LearningSessions: new List<LearningSessionExport>(),
+            Events: new List<StudentEventExport>(),
+            EventCount: 0,
+            Notice: PortabilityNotice + " [Legacy export - incomplete data]");
+    }
+
     private static List<ExportedField> ExtractFields(object dataObject)
     {
         var properties = dataObject.GetType()

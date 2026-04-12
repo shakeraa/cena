@@ -160,6 +160,7 @@ public static class MeGdprEndpoints
 
     // ========================================================================
     // POST /api/me/gdpr/export
+    // FIND-privacy-006: Complete export including tutor history, sessions, events
     // ========================================================================
     private static async Task<IResult> RequestExport(
         HttpContext ctx,
@@ -170,23 +171,13 @@ public static class MeGdprEndpoints
         if (string.IsNullOrEmpty(studentId))
             return Results.Unauthorized();
 
-        await using var session = store.QuerySession();
-        var snapshot = await session.Query<StudentProfileSnapshot>()
-            .FirstOrDefaultAsync(s => s.StudentId == studentId);
-
-        if (snapshot is null)
-        {
-            logger.LogWarning(
-                "FIND-privacy-003: Data export requested by student {StudentId} but no profile found",
-                studentId);
-            return Results.NotFound(new { error = "Student profile not found" });
-        }
-
-        var export = StudentDataExporter.Export(studentId, snapshot, logger);
+        // FIND-privacy-006: Use async export with full data (tutor, sessions, events)
+        var export = await StudentDataExporter.ExportAsync(studentId, store, logger);
 
         logger.LogInformation(
-            "FIND-privacy-003: Data export generated for student {StudentId}, fields={FieldCount}",
-            studentId, export.Profile.Count);
+            "FIND-privacy-006: Complete data export for student {StudentId}: " +
+            "Profile={ProfileFields}, Tutoring={TutoringCount}, Learning={LearningCount}, Events={EventCount}",
+            studentId, export.Profile.Count, export.TutoringSessions.Count, export.LearningSessions.Count, export.EventCount);
 
         return Results.Json(export, contentType: "application/json", statusCode: 200);
     }
