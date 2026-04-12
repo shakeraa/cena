@@ -10,6 +10,7 @@
 using System.ComponentModel.DataAnnotations;
 using System.Security.Cryptography;
 using Cena.Actors.Events;
+using Cena.Infrastructure.Network;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Firebase;
 using Marten;
@@ -156,9 +157,13 @@ public static class AuthEndpoints
         // Capture the client IP once so failure and success branches log the
         // same correlation data. X-Forwarded-For is honoured by the ambient
         // reverse proxy; fall back to the direct RemoteIpAddress otherwise.
-        var clientIp = ctx.Request.Headers.TryGetValue("X-Forwarded-For", out var fwd) && fwd.Count > 0
+        // FIND-privacy-015: Normalize IP before any persistence (logs included).
+        // Raw IP stays available via ctx.Connection.RemoteIpAddress for in-memory
+        // rate limiting but is never persisted in its raw form.
+        var rawClientIp = ctx.Request.Headers.TryGetValue("X-Forwarded-For", out var fwd) && fwd.Count > 0
             ? fwd[0]
             : ctx.Connection.RemoteIpAddress?.ToString();
+        var clientIp = IpAddressNormalizer.Normalize(rawClientIp);
 
         try
         {

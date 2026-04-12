@@ -7,6 +7,7 @@
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Infrastructure.Network;
 using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -73,7 +74,7 @@ public sealed class StudentDataAuditMiddleware
                 Endpoint = path,
                 HttpMethod = context.Request.Method,
                 StatusCode = context.Response.StatusCode,
-                IpAddress = context.Connection.RemoteIpAddress?.ToString()
+                IpAddress = IpAddressNormalizer.Normalize(context.Connection.RemoteIpAddress)
             });
 
             await session.SaveChangesAsync();
