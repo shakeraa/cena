@@ -46,6 +46,17 @@ public class StudentProfileSnapshot
     public int SessionCount { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 
+    // ── Age Gate & Parental Consent (FIND-privacy-001) ──
+    // COPPA §312.5 / GDPR Art 8 / ICO Children's Code Std 7+11 / Israel PPL §11
+    [Pii(PiiLevel.High, "identity")]
+    public DateOnly? DateOfBirth { get; set; }
+    public int? AgeAtRegistration { get; set; }
+    public string ConsentTier { get; set; } = "unknown";    // "adult" | "teen" | "child" | "unknown"
+    [Pii(PiiLevel.High, "contact")]
+    public string? ParentEmail { get; set; }
+    public bool ParentalConsentGiven { get; set; }
+    public string ConsentStatus { get; set; } = "unknown_needs_reverification"; // "verified" | "pending_parent" | "not_required" | "unknown_needs_reverification"
+
     // ── Account Lifecycle (LCM-001) ──
     public string AccountStatus { get; set; } = "Active";
 
@@ -263,6 +274,21 @@ public class StudentProfileSnapshot
     {
         // Track session count for analytics
         SessionCount++;
+    }
+
+    /// <summary>
+    /// FIND-privacy-001: Apply age gate and consent event.
+    /// Records DOB, computed age, consent tier, and parent details.
+    /// Idempotent — later events with the same student overwrite.
+    /// </summary>
+    public void Apply(AgeAndConsentRecorded_V1 e)
+    {
+        DateOfBirth = e.DateOfBirth;
+        AgeAtRegistration = e.AgeAtRegistration;
+        ConsentTier = e.ConsentTier;
+        ParentEmail = e.ParentEmail;
+        ParentalConsentGiven = e.ParentalConsentGiven;
+        ConsentStatus = e.ConsentStatus;
     }
 }
 

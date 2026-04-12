@@ -287,6 +287,36 @@ public record ProfileUpdated_V1(
 ) : IDelegatedEvent;
 
 // =============================================================================
+// AGE GATE & PARENTAL CONSENT EVENTS (FIND-privacy-001)
+// =============================================================================
+
+/// <summary>
+/// FIND-privacy-001: Emitted when a student's age and consent status are
+/// recorded during registration. Captures date of birth, computed age at
+/// registration, consent tier, and parent/guardian email where applicable.
+///
+/// Consent tiers:
+///   - "adult" (age >= 16): no parental consent needed (GDPR Art 8 default)
+///   - "teen" (13-15): parental consent required (ICO/GDPR-K)
+///   - "child" (&lt; 13): parental consent required (COPPA §312.5)
+///
+/// This event is appended to the student's event stream immediately after
+/// account creation, before the onboarding wizard begins. The
+/// StudentProfileSnapshot projection picks up the fields on replay.
+/// </summary>
+public record AgeAndConsentRecorded_V1(
+    string StudentId,
+    DateOnly DateOfBirth,
+    int AgeAtRegistration,
+    string ConsentTier,                // "adult" | "teen" | "child"
+    string? ParentEmail,               // required when ConsentTier != "adult"
+    bool ParentalConsentGiven,         // true if parent completed challenge; false = pending
+    string? ParentalConsentToken,      // opaque token sent to parent for verification
+    string ConsentStatus,              // "verified" | "pending_parent" | "not_required"
+    DateTimeOffset RecordedAt
+) : IDelegatedEvent;
+
+// =============================================================================
 // SESSION EVENTS (STB-01)
 // =============================================================================
 

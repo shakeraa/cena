@@ -291,6 +291,35 @@
       "microsoft": "Continue with Microsoft",
       "phone": "Continue with phone",
       "phoneComingSoon": "SMS sign-in is coming soon. Use email or another provider for now."
+    },
+    "ageGate": {
+      "title": "When were you born?",
+      "subtitle": "We need your date of birth to set up your account safely.",
+      "dobLabel": "Date of birth",
+      "dobRequired": "Date of birth is required.",
+      "dobInvalid": "Please enter a valid date of birth.",
+      "dobFuture": "Date of birth cannot be in the future.",
+      "tooYoung": "You must be at least 4 years old to use Cena.",
+      "ageConfirmed": "You are {age} years old. You can create your account.",
+      "parentRequired": "Because of your age, a parent or guardian needs to give permission before you can create an account.",
+      "privacyNotice": "Your date of birth is stored securely and used only to verify your age. We never share it with other users."
+    },
+    "parentConsent": {
+      "title": "Parent or guardian permission",
+      "subtitle": "Because you are {age} years old, we need your parent or guardian to approve your account.",
+      "emailLabel": "Parent or guardian email",
+      "emailPlaceholder": "parent@example.com",
+      "emailRequired": "A parent or guardian email is required.",
+      "emailInvalid": "Please enter a valid email address.",
+      "whatWeCollect": "What information we collect",
+      "collectName": "Display name (chosen by the student)",
+      "collectEmail": "Email address (for sign-in and account recovery)",
+      "collectDob": "Date of birth (for age verification only)",
+      "collectProgress": "Learning progress and session activity",
+      "whyWeCollect": "Why we collect this information",
+      "whyExplanation": "Cena is a learning platform that adapts to each student's pace. We collect the minimum information needed to provide a personalized, safe learning experience. We never sell personal data or show advertising.",
+      "consentLabel": "I am the parent or guardian and I give permission for this account to be created.",
+      "verificationNotice": "We will send a verification email to the parent or guardian address. The account will have limited features until the parent confirms."
     }
   },
   "progress": {
