@@ -172,7 +172,7 @@ public sealed class RightToErasureEndToEndTests
                 AppVersion = "2.5.1",
                 FirstSeenAt = _clock.UtcNow.AddDays(-60),
                 LastSeenAt = _clock.UtcNow.AddDays(-1),
-                LastIpAddress = "192.168.1.100"
+                LastIpAddress = "192.168.1.0"  // FIND-privacy-015: truncated /24
             }
         };
 
