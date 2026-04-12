@@ -637,7 +637,8 @@
       "continueWhenReady": "המשך",
       "workedExampleLabel": "דוגמה מלאה",
       "hintLevel": "רמז {level}",
-      "requestHint": "הצג רמז (נותרו {remaining})"
+      "requestHint": "הצג רמז (נותרו {remaining})",
+      "explanationLangNote": "הסבר (באנגלית)"
     },
     "summary": {
       "title": "השיעור הושלם",

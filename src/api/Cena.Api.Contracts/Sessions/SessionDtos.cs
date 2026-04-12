@@ -163,9 +163,13 @@ public sealed record SessionAnswerRequest(
 /// <summary>
 /// Response for POST /api/sessions/{id}/answer.
 ///
-/// FIND-pedagogy-001 — feedback is no longer binary. In addition to the short
-/// <see cref="Feedback"/> label ("Correct" / "Not quite"), the response carries:
+/// FIND-pedagogy-001 / FIND-pedagogy-017 — feedback is no longer binary.
+/// The <see cref="Feedback"/> field is DEPRECATED: the server ships an empty
+/// string since FIND-pedagogy-017. The UI renders its own translated heading
+/// via i18n keys. This field is kept for one release for backwards-compat;
+/// callers should stop reading it.
 ///
+/// The response carries:
 /// - <see cref="Explanation"/>: the authored per-question worked explanation
 ///   (<c>QuestionDocument.Explanation</c>). Shown on every answer when present.
 /// - <see cref="DistractorRationale"/>: the authored rationale for the SPECIFIC
@@ -180,6 +184,7 @@ public sealed record SessionAnswerRequest(
 /// </summary>
 public sealed record SessionAnswerResponseDto(
     bool Correct,
+    [property: Obsolete("FIND-pedagogy-017: UI uses i18n keys for the heading. This field ships empty and will be removed next release.")]
     string Feedback,
     int XpAwarded,
     decimal MasteryDelta,

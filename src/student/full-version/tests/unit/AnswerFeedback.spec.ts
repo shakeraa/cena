@@ -9,10 +9,11 @@ import * as directives from 'vuetify/directives'
 import { createVuetify } from 'vuetify'
 import AnswerFeedback from '@/components/session/AnswerFeedback.vue'
 
-function makeI18n() {
+function makeI18n(locale = 'en') {
   return createI18n({
     legacy: false,
-    locale: 'en',
+    locale,
+    fallbackLocale: 'en',
     messages: {
       en: {
         session: {
@@ -21,6 +22,29 @@ function makeI18n() {
             wrong: 'Not quite.',
             xpAwarded: '+{xp} XP',
             continueWhenReady: 'Continue',
+            explanationLangNote: 'Explanation (English)',
+          },
+        },
+      },
+      he: {
+        session: {
+          runner: {
+            correct: '\u05E0\u05DB\u05D5\u05DF!',
+            wrong: '\u05DC\u05D0 \u05D1\u05D3\u05D9\u05D5\u05E7.',
+            xpAwarded: '+{xp} \u05E0\u05E7\u05F3',
+            continueWhenReady: '\u05D4\u05DE\u05E9\u05DA',
+            explanationLangNote: '\u05D4\u05E1\u05D1\u05E8 (\u05D1\u05D0\u05E0\u05D2\u05DC\u05D9\u05EA)',
+          },
+        },
+      },
+      ar: {
+        session: {
+          runner: {
+            correct: '\u0635\u062D\u064A\u062D!',
+            wrong: '\u0644\u064A\u0633 \u0628\u0627\u0644\u0636\u0628\u0637.',
+            xpAwarded: '+{xp} \u0646\u0642\u0637\u0629',
+            continueWhenReady: '\u0645\u062A\u0627\u0628\u0639\u0629',
+            explanationLangNote: '\u062A\u0641\u0633\u064A\u0631 (\u0628\u0627\u0644\u0625\u0646\u062C\u0644\u064A\u0632\u064A\u0629)',
           },
         },
       },
@@ -38,7 +62,7 @@ describe('AnswerFeedback', () => {
       props: {
         feedback: {
           correct: true,
-          feedback: 'Great job!',
+          feedback: '', // FIND-pedagogy-017: deprecated — empty string
           xpAwarded: 10,
           masteryDelta: 0.05,
           nextQuestionId: 'q_002',
@@ -51,7 +75,7 @@ describe('AnswerFeedback', () => {
 
     expect(root.attributes('data-correct')).toBe('true')
     expect(wrapper.text()).toContain('Correct!')
-    expect(wrapper.text()).toContain('Great job!')
+    // FIND-pedagogy-017: the raw feedback.feedback field is no longer rendered
     expect(wrapper.find('[data-testid="feedback-xp"]').text()).toContain('10')
   })
 
@@ -60,7 +84,7 @@ describe('AnswerFeedback', () => {
       props: {
         feedback: {
           correct: false,
-          feedback: 'Not quite — try again next time.',
+          feedback: '', // FIND-pedagogy-017: deprecated — empty string
           xpAwarded: 0,
           masteryDelta: -0.02,
           nextQuestionId: 'q_002',
@@ -72,6 +96,7 @@ describe('AnswerFeedback', () => {
     const root = wrapper.find('[data-testid="answer-feedback"]')
 
     expect(root.attributes('data-correct')).toBe('false')
+    // The i18n heading "Not quite." renders via t('session.runner.wrong')
     expect(wrapper.text()).toContain('Not quite.')
     expect(wrapper.find('[data-testid="feedback-xp"]').exists()).toBe(false)
   })
@@ -94,7 +119,7 @@ describe('AnswerFeedback', () => {
       props: {
         feedback: {
           correct: false,
-          feedback: 'Not quite.',
+          feedback: '',
           xpAwarded: 0,
           masteryDelta: 0,
           nextQuestionId: 'q_002',
@@ -114,7 +139,7 @@ describe('AnswerFeedback', () => {
       props: {
         feedback: {
           correct: true,
-          feedback: 'Nice.',
+          feedback: '',
           xpAwarded: 10,
           masteryDelta: 0.1,
           nextQuestionId: null,
@@ -134,7 +159,7 @@ describe('AnswerFeedback', () => {
       props: {
         feedback: {
           correct: false,
-          feedback: 'Not quite.',
+          feedback: '',
           xpAwarded: 0,
           masteryDelta: -0.03,
           nextQuestionId: 'q_003',
@@ -172,7 +197,7 @@ describe('AnswerFeedback', () => {
       props: {
         feedback: {
           correct: true,
-          feedback: 'Nice.',
+          feedback: '',
           xpAwarded: 10,
           masteryDelta: 0.1,
           nextQuestionId: 'q_002',
@@ -185,6 +210,198 @@ describe('AnswerFeedback', () => {
     const btn = wrapper.find('[data-testid="feedback-continue"]')
 
     expect(btn.attributes('disabled')).toBeDefined()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────
+// FIND-pedagogy-017 — i18n regression: no English leaking into RTL locales
+//
+// The old template rendered `{{ feedback.feedback }}` (the English server
+// pill "Correct" / "Not quite") below the translated heading, producing a
+// bilingual mash-up for Hebrew and Arabic users.
+//
+// Fix: the template no longer renders the `feedback` field at all. The
+// heading comes from the i18n key. Explanation blocks are wrapped with
+// `lang="en"` and get a translated "(English)" label when locale != 'en'.
+//
+// Cite: Hattie & Timperley (2007) DOI 10.3102/003465430298487
+// ─────────────────────────────────────────────────────────────────────
+
+/** Regex matching ASCII Latin letters (A-Z, a-z). */
+const LATIN_RE = /[A-Za-z]/
+
+describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
+  it('HE locale — correct answer heading contains only Hebrew, no Latin text', () => {
+    const wrapper = mount(AnswerFeedback, {
+      props: {
+        feedback: {
+          correct: true,
+          feedback: '',
+          xpAwarded: 10,
+          masteryDelta: 0.15,
+          nextQuestionId: 'q2',
+          explanation: null,
+          distractorRationale: null,
+        },
+      },
+      global: { plugins: [makeI18n('he'), makeVuetify()] },
+    })
+
+    const heading = wrapper.find('.text-h6')
+    expect(heading.exists()).toBe(true)
+    // The heading must be the Hebrew "נכון!" — no Latin characters
+    expect(heading.text()).toContain('\u05E0\u05DB\u05D5\u05DF')
+    expect(heading.text()).not.toMatch(LATIN_RE)
+  })
+
+  it('HE locale — wrong answer heading contains only Hebrew, no Latin text', () => {
+    const wrapper = mount(AnswerFeedback, {
+      props: {
+        feedback: {
+          correct: false,
+          feedback: '',
+          xpAwarded: 0,
+          masteryDelta: -0.1,
+          nextQuestionId: null,
+          explanation: null,
+          distractorRationale: null,
+        },
+      },
+      global: { plugins: [makeI18n('he'), makeVuetify()] },
+    })
+
+    const heading = wrapper.find('.text-h6')
+    expect(heading.exists()).toBe(true)
+    expect(heading.text()).not.toMatch(LATIN_RE)
+  })
+
+  it('AR locale — correct answer heading contains only Arabic, no Latin text', () => {
+    const wrapper = mount(AnswerFeedback, {
+      props: {
+        feedback: {
+          correct: true,
+          feedback: '',
+          xpAwarded: 10,
+          masteryDelta: 0.15,
+          nextQuestionId: 'q2',
+          explanation: null,
+          distractorRationale: null,
+        },
+      },
+      global: { plugins: [makeI18n('ar'), makeVuetify()] },
+    })
+
+    const heading = wrapper.find('.text-h6')
+    expect(heading.exists()).toBe(true)
+    expect(heading.text()).not.toMatch(LATIN_RE)
+  })
+
+  it('does NOT render the deprecated feedback.feedback field even if non-empty', () => {
+    // Even if the server mistakenly ships a non-empty Feedback string,
+    // the component must NOT render it anywhere.
+    const wrapper = mount(AnswerFeedback, {
+      props: {
+        feedback: {
+          correct: true,
+          feedback: 'Correct', // old English pill — should NOT appear
+          xpAwarded: 10,
+          masteryDelta: 0.15,
+          nextQuestionId: 'q2',
+          explanation: null,
+          distractorRationale: null,
+        },
+      },
+      global: { plugins: [makeI18n('he'), makeVuetify()] },
+    })
+
+    const cardText = wrapper.find('[data-testid="answer-feedback"]').text()
+    expect(cardText).not.toContain('Correct')
+  })
+
+  it('HE locale — shows Hebrew language note when explanation is present', () => {
+    const wrapper = mount(AnswerFeedback, {
+      props: {
+        feedback: {
+          correct: true,
+          feedback: '',
+          xpAwarded: 10,
+          masteryDelta: 0.15,
+          nextQuestionId: 'q2',
+          explanation: 'Adding fractions with same denominator.',
+          distractorRationale: null,
+        },
+      },
+      global: { plugins: [makeI18n('he'), makeVuetify()] },
+    })
+
+    const explanationBlock = wrapper.find('[data-testid="feedback-explanation"]')
+    expect(explanationBlock.exists()).toBe(true)
+
+    // Must have lang="en" on the explanation text wrapper
+    const langEnDiv = explanationBlock.find('[lang="en"]')
+    expect(langEnDiv.exists()).toBe(true)
+
+    // Must show the Hebrew label
+    expect(explanationBlock.text()).toContain('\u05D4\u05E1\u05D1\u05E8')
+  })
+
+  it('EN locale — does NOT show language note on explanation', () => {
+    const wrapper = mount(AnswerFeedback, {
+      props: {
+        feedback: {
+          correct: true,
+          feedback: '',
+          xpAwarded: 10,
+          masteryDelta: 0.15,
+          nextQuestionId: 'q2',
+          explanation: 'Adding fractions with same denominator.',
+          distractorRationale: null,
+        },
+      },
+      global: { plugins: [makeI18n('en'), makeVuetify()] },
+    })
+
+    const explanationBlock = wrapper.find('[data-testid="feedback-explanation"]')
+    expect(explanationBlock.exists()).toBe(true)
+    expect(explanationBlock.text()).not.toContain('Explanation (English)')
+  })
+
+  it('AR locale — distractor rationale has lang="en" wrapper and Arabic label', () => {
+    const wrapper = mount(AnswerFeedback, {
+      props: {
+        feedback: {
+          correct: false,
+          feedback: '',
+          xpAwarded: 0,
+          masteryDelta: -0.1,
+          nextQuestionId: null,
+          explanation: 'Some explanation.',
+          distractorRationale: 'You added numerators AND denominators.',
+        },
+      },
+      global: { plugins: [makeI18n('ar'), makeVuetify()] },
+    })
+
+    const rationaleBlock = wrapper.find('[data-testid="feedback-distractor-rationale"]')
+    expect(rationaleBlock.exists()).toBe(true)
+
+    const langEnDiv = rationaleBlock.find('[lang="en"]')
+    expect(langEnDiv.exists()).toBe(true)
+    expect(langEnDiv.text()).toContain('You added numerators AND denominators.')
+
+    // Arabic language note label
+    expect(rationaleBlock.text()).toContain('\u062A\u0641\u0633\u064A\u0631')
+  })
+
+  it('component source does not contain {{ feedback.feedback }}', () => {
+    // FIND-pedagogy-017 regression guard: the template must never render
+    // the raw server feedback string. This catches accidental re-introduction.
+    const src = readFileSync(
+      resolve(process.cwd(), 'src/components/session/AnswerFeedback.vue'),
+      'utf8',
+    )
+
+    expect(src).not.toContain('{{ feedback.feedback }}')
   })
 })
 

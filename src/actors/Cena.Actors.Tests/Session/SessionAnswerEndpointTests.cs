@@ -65,7 +65,9 @@ public sealed class SessionAnswerEndpointTests
 
         // Assert
         Assert.True(response.Correct);
-        Assert.Equal("Correct", response.Feedback);
+        // FIND-pedagogy-017: Feedback field is now deprecated (empty string).
+        // The UI renders its own i18n-translated heading.
+        Assert.Equal(string.Empty, response.Feedback);
         Assert.Equal(
             "To add fractions with the same denominator, add the numerators.",
             response.Explanation);
@@ -106,7 +108,8 @@ public sealed class SessionAnswerEndpointTests
 
         // Assert
         Assert.False(response.Correct);
-        Assert.Equal("Not quite", response.Feedback);
+        // FIND-pedagogy-017: Feedback field is now deprecated (empty string).
+        Assert.Equal(string.Empty, response.Feedback);
         Assert.Equal(
             "Adding 1/4 + 1/4 gives 2/4 which simplifies to 1/2.",
             response.Explanation);
@@ -141,8 +144,9 @@ public sealed class SessionAnswerEndpointTests
             posteriorMastery: 0.55,
             nextQuestionId: null);
 
-        // Assert — no explanation, no distractor, just the short pill.
-        Assert.Equal("Correct", response.Feedback);
+        // Assert — no explanation, no distractor.
+        // FIND-pedagogy-017: Feedback field is now deprecated (empty string).
+        Assert.Equal(string.Empty, response.Feedback);
         Assert.Null(response.Explanation);
         Assert.Null(response.DistractorRationale);
     }

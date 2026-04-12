@@ -642,7 +642,8 @@
       "continueWhenReady": "Continue",
       "workedExampleLabel": "Worked example",
       "hintLevel": "Hint {level}",
-      "requestHint": "Show a hint ({remaining} left)"
+      "requestHint": "Show a hint ({remaining} left)",
+      "explanationLangNote": "Explanation (English)"
     },
     "summary": {
       "title": "Session complete",
