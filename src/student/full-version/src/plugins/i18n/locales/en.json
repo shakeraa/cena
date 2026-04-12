@@ -181,7 +181,8 @@
     "error": "Error",
     "close": "Close",
     "retry": "Retry",
-    "copy": "Copy"
+    "copy": "Copy",
+    "errorGeneric": "Something went wrong. Please try again."
   },
   "nav": {
     "home": "Home",
@@ -292,6 +293,7 @@
     }
   },
   "progress": {
+    "sessionsUnavailable": "Could not load your session data. Try again.",
     "title": "Your progress",
     "subtitle": "Track your journey, earn rewards, and see where you stand.",
     "time": {
@@ -357,6 +359,7 @@
     }
   },
   "leaderboard": {
+    "unavailable": "Could not load the leaderboard. Try again.",
     "title": "Leaderboard",
     "subtitle": "See how you stack up against other learners.",
     "yourRankLabel": "Your current rank",
@@ -405,6 +408,7 @@
     }
   },
   "notifications": {
+    "unavailable": "Could not load notifications. Try again.",
     "title": "Notifications",
     "subtitle": "Stay on top of your learning progress.",
     "markAllRead": "Mark all as read",
@@ -474,6 +478,8 @@
     }
   },
   "social": {
+    "feedUnavailable": "Could not load the class feed. Try again.",
+    "friendsUnavailable": "Could not load your friends list. Try again.",
     "feed": {
       "title": "Class feed",
       "subtitle": "See what your classmates are up to.",
@@ -506,6 +512,7 @@
     }
   },
   "knowledgeGraph": {
+    "unavailable": "Could not load the knowledge graph. Try again.",
     "title": "Knowledge graph",
     "subtitle": "Explore concepts, see prerequisites, and plan your learning path.",
     "progressLabel": "Mastered in this subject",
@@ -587,6 +594,7 @@
     }
   },
   "challenges": {
+    "unavailable": "Could not load challenges. Try again.",
     "hub": {
       "title": "Challenges",
       "subtitle": "Daily challenges, boss battles, and tournaments to keep your learning streak on fire."
@@ -625,6 +633,7 @@
     }
   },
   "tutor": {
+    "threadsUnavailable": "Could not load your tutor conversations. Try again.",
     "listPage": {
       "title": "AI Tutor",
       "subtitle": "Ask anything. Your tutor is here to help you learn.",
@@ -684,6 +693,7 @@
       "title": "Could not load your home dashboard",
       "fallback": "Try refreshing the page."
     },
+    "dashboardUnavailable": "Something went wrong loading your home dashboard. Try again.",
     "statsAriaLabel": "Your learning stats",
     "quickActionsHeading": "Quick actions",
     "emptyStats": {

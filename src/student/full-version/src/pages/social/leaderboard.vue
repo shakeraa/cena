@@ -67,17 +67,23 @@ function isYou(entry: LeaderboardEntry): boolean {
 }
 
 function rankIcon(rank: number): string | null {
-  if (rank === 1) return 'tabler-trophy'
-  if (rank === 2) return 'tabler-medal'
-  if (rank === 3) return 'tabler-medal-2'
+  if (rank === 1)
+    return 'tabler-trophy'
+  if (rank === 2)
+    return 'tabler-medal'
+  if (rank === 3)
+    return 'tabler-medal-2'
 
   return null
 }
 
 function rankColor(rank: number): string | undefined {
-  if (rank === 1) return 'yellow-darken-2'
-  if (rank === 2) return 'grey'
-  if (rank === 3) return 'amber-darken-4'
+  if (rank === 1)
+    return 'yellow-darken-2'
+  if (rank === 2)
+    return 'grey'
+  if (rank === 3)
+    return 'amber-darken-4'
 
   return undefined
 }
@@ -151,7 +157,7 @@ function rankColor(rank: number): string | undefined {
       variant="tonal"
       data-testid="leaderboard-error"
     >
-      {{ error.message }}
+      {{ t(error.i18nKey ?? 'leaderboard.unavailable') }}
     </VAlert>
 
     <VCard

@@ -94,7 +94,7 @@ const totalCount = computed(() => concepts.value.length)
       variant="tonal"
       data-testid="concepts-error"
     >
-      {{ error.message }}
+      {{ t(error.i18nKey ?? 'knowledgeGraph.unavailable') }}
     </VAlert>
 
     <template v-else>

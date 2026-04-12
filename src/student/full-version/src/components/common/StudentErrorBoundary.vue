@@ -53,7 +53,7 @@ const reset = () => {
           {{ t('error.serverError') }}
         </div>
         <div class="text-body-2 text-medium-emphasis mb-4">
-          {{ error.message }}
+          {{ t('common.errorGeneric') }}
         </div>
         <div
           v-if="errorCode"

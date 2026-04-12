@@ -20,7 +20,7 @@ definePage({
 const { t } = useI18n()
 
 const feedQuery = useApiQuery<ClassFeedDto>('/api/social/class-feed')
-const reactMutation = useApiMutation<{ ok: boolean }, { itemId: string, reactionType: string }>('/api/social/reactions', 'POST')
+const reactMutation = useApiMutation<{ ok: boolean }, { itemId: string; reactionType: string }>('/api/social/reactions', 'POST')
 
 async function handleReact(itemId: string) {
   try {
@@ -59,7 +59,7 @@ async function handleReact(itemId: string) {
       variant="tonal"
       data-testid="feed-error"
     >
-      {{ feedQuery.error.value.message }}
+      {{ t(feedQuery.error.value.i18nKey ?? 'social.feedUnavailable') }}
     </VAlert>
 
     <div

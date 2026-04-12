@@ -14,7 +14,7 @@
  */
 
 // eslint-disable-next-line import/no-mutable-exports
-let startFakeApi: () => void = () => {
+let startFakeApi: () => Promise<void> = async () => {
   // Production no-op. Structured log so monitoring can detect if this path
   // is ever reached in a production build (it should not be).
   if (typeof console !== 'undefined') {
@@ -171,7 +171,7 @@ if (import.meta.env.DEV) {
     }
   }
 
-  startFakeApi = () => {
+  startFakeApi = async () => {
     // Defense-in-depth: even after admin's migration lands, a user with a
     // stale browser profile could still carry poison cookies on first load.
     // Scrub them before MSW's cookie parser runs, not after.
@@ -179,7 +179,11 @@ if (import.meta.env.DEV) {
 
     const workerUrl = `${import.meta.env.BASE_URL ?? '/'}mockServiceWorker.js`
 
-    worker.start({
+    // FIND-ux-021: await worker.start() so the MSW service worker is fully
+    // registered and intercepting requests BEFORE the Vue app mounts and
+    // fires its first API calls. Without this, cold-load races produce
+    // 404s from the dev server for /api/* paths that MSW should intercept.
+    await worker.start({
       serviceWorker: {
         url: workerUrl,
       },

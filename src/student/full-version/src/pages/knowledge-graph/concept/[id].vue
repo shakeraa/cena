@@ -50,7 +50,7 @@ function handleStartSession() {
       variant="tonal"
       data-testid="concept-error"
     >
-      {{ detailQuery.error.value.message }}
+      {{ t(detailQuery.error.value.i18nKey ?? 'knowledgeGraph.unavailable') }}
     </VAlert>
 
     <template v-else-if="detailQuery.data.value">

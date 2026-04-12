@@ -53,6 +53,7 @@ const scrollContainer = ref<HTMLElement | null>(null)
 
 async function scrollToBottom() {
   await nextTick()
+
   const el = scrollContainer.value
   if (el)
     el.scrollTop = el.scrollHeight
@@ -116,7 +117,7 @@ async function handleSubmit(content: string) {
         variant="tonal"
         data-testid="tutor-messages-error"
       >
-        {{ messagesQuery.error.value.message }}
+        {{ t(messagesQuery.error.value.i18nKey ?? 'tutor.threadsUnavailable') }}
       </VAlert>
 
       <div
@@ -167,7 +168,7 @@ async function handleSubmit(content: string) {
         class="mb-3"
         data-testid="tutor-compose-error"
       >
-        {{ sendMutation.error.value.message }}
+        {{ t(sendMutation.error.value.i18nKey ?? 'common.errorGeneric') }}
       </VAlert>
       <TutorComposeForm
         :loading="sendMutation.loading.value"

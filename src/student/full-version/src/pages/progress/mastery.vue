@@ -83,7 +83,7 @@ const overallMastery = computed(() => {
       variant="tonal"
       data-testid="mastery-error"
     >
-      {{ meQuery.error.value.message }}
+      {{ t(meQuery.error.value.i18nKey ?? 'common.errorGeneric') }}
     </VAlert>
 
     <template v-else-if="meQuery.data.value">

@@ -61,7 +61,7 @@ async function handleVote(solutionId: string, direction: 'up' | 'down') {
       variant="tonal"
       data-testid="peers-error"
     >
-      {{ solutionsQuery.error.value.message }}
+      {{ t(solutionsQuery.error.value.i18nKey ?? 'common.errorGeneric') }}
     </VAlert>
 
     <div
