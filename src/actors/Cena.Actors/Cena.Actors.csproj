@@ -28,8 +28,10 @@
     <PackageReference Include="Proto.Actor" Version="1.8.0" />
     <PackageReference Include="Proto.Cluster" Version="1.8.0" />
     <PackageReference Include="Proto.Remote" Version="1.8.0" />
+    <PackageReference Include="MailKit" Version="4.11.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.12.8" />
+    <PackageReference Include="Lib.Net.Http.WebPush" Version="3.3.1" />
   </ItemGroup>
 
 </Project>

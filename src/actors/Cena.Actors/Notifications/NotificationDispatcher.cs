@@ -29,16 +29,19 @@ public class NotificationDispatcher : BackgroundService
 {
     private readonly INatsConnection _nats;
     private readonly IDocumentStore _store;
+    private readonly INotificationChannelService? _channelService;
     private readonly ILogger<NotificationDispatcher> _logger;
 
     public NotificationDispatcher(
         INatsConnection nats,
         IDocumentStore store,
-        ILogger<NotificationDispatcher> logger)
+        ILogger<NotificationDispatcher> logger,
+        INotificationChannelService? channelService = null)
     {
         _nats = nats;
         _store = store;
         _logger = logger;
+        _channelService = channelService;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -137,14 +140,25 @@ public class NotificationDispatcher : BackgroundService
         var notification = BuildNotification(studentId, evt);
         await PersistNotificationAsync(notification, ct);
 
-        // Try to send web push notification (best-effort, never blocks persistence)
-        var subscriptionCount = await CountPushSubscriptionsAsync(studentId, ct);
-        if (subscriptionCount > 0)
+        // Dispatch to external channels (best-effort, never blocks in-app persistence)
+        if (_channelService != null)
         {
-            _logger.LogInformation(
-                "Would send push to {Count} subscriptions for student {StudentId}",
-                subscriptionCount, studentId);
-            // Actual push sending would happen here with a Web Push library
+            try
+            {
+                var prefs = await _channelService.GetPreferencesAsync(studentId, ct);
+                var sent = await _channelService.SendNotificationAsync(notification, prefs, ct);
+                _logger.LogInformation(
+                    "Notification dispatched via channel service. " +
+                    "StudentId={StudentId}, NotificationId={NotificationId}, Result={Result}",
+                    studentId, notification.NotificationId, sent ? "delivered" : "no_external_channels");
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex,
+                    "External channel dispatch failed (in-app notification preserved). " +
+                    "StudentId={StudentId}, NotificationId={NotificationId}, ErrorCode={ErrorCode}",
+                    studentId, notification.NotificationId, "CHANNEL_DISPATCH_ERROR");
+            }
         }
     }
 
