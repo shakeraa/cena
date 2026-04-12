@@ -574,6 +574,32 @@
       "online": "Online",
       "offline": "Offline",
       "acceptError": "Could not accept the friend request. Please try again."
+    },
+    "report": {
+      "title": "Report content",
+      "description": "Help us keep the community safe. Select a reason for reporting this content.",
+      "categoryLabel": "Why are you reporting this?",
+      "category": {
+        "bullying": "Bullying or harassment",
+        "inappropriate": "Inappropriate content",
+        "spam": "Spam",
+        "self-harm-risk": "Self-harm or safety concern",
+        "other": "Other"
+      },
+      "reasonLabel": "Additional details (optional)",
+      "reasonPlaceholder": "Tell us more about what happened…",
+      "submitBtn": "Submit report",
+      "submitError": "Could not submit your report. Please try again.",
+      "success": "Thank you. Your report has been submitted and will be reviewed.",
+      "ariaLabel": "Report this content"
+    },
+    "block": {
+      "title": "Block user",
+      "confirmMessage": "Are you sure you want to block {name}? You will no longer see their posts, comments, or solutions.",
+      "confirmBtn": "Block",
+      "error": "Could not block this user. Please try again.",
+      "success": "User blocked. Their content will no longer appear in your feed.",
+      "ariaLabel": "Block {name}"
     }
   },
   "knowledgeGraph": {

@@ -103,3 +103,21 @@ public record AcceptFriendRequestResponse(bool Ok, string FriendshipId);
 // Study Rooms
 public record CreateStudyRoomRequest(string Name, string Subject, bool IsPublic, int MaxCapacity);
 public record JoinStudyRoomResponse(bool Ok, string RoomId, int MemberCount);
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FIND-privacy-018: Content Reporting & User Blocking DTOs
+// ICO Children's Code Std 11 — safeguarding tools for minors
+// ═════════════════════════════════════════════════════════════════════════════
+
+// Reporting
+public record SubmitReportRequest(
+    string ContentType,     // 'feed-item' | 'comment' | 'peer-solution' | 'friend-request' | 'study-room'
+    string ContentId,
+    string Category,        // 'bullying' | 'inappropriate' | 'spam' | 'self-harm-risk' | 'other'
+    string? Reason);
+public record SubmitReportResponse(string ReportId, string Severity, DateTime ReportedAt);
+
+// Blocking
+public record BlockUserRequest(string TargetStudentId);
+public record BlockUserResponse(bool Ok, string TargetStudentId, DateTime BlockedAt);
+public record UnblockUserResponse(bool Ok, string TargetStudentId);

@@ -2,9 +2,11 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import FriendRow from '@/components/social/FriendRow.vue'
+import ReportDialog from '@/components/social/ReportDialog.vue'
+import BlockUserDialog from '@/components/social/BlockUserDialog.vue'
 import { useApiQuery } from '@/composables/useApiQuery'
 import { $api } from '@/api/$api'
-import type { FriendsListDto } from '@/api/types/common'
+import type { FriendsListDto, ReportContentType } from '@/api/types/common'
 
 definePage({
   meta: {
@@ -24,6 +26,40 @@ const friendsQuery = useApiQuery<FriendsListDto>('/api/social/friends')
 
 const acceptError = ref<string | null>(null)
 const acceptErrorVisible = ref(false)
+
+// FIND-privacy-018: Report dialog state (for friend requests)
+const reportDialogOpen = ref(false)
+const reportContentId = ref('')
+const reportContentType = ref<ReportContentType>('friend-request')
+
+// FIND-privacy-018: Block dialog state
+const blockDialogOpen = ref(false)
+const blockTargetId = ref('')
+const blockTargetName = ref('')
+
+const reportSuccessVisible = ref(false)
+const blockSuccessVisible = ref(false)
+
+function handleReport(contentId: string, contentType: ReportContentType) {
+  reportContentId.value = contentId
+  reportContentType.value = contentType
+  reportDialogOpen.value = true
+}
+
+function handleBlock(studentId: string, displayName: string) {
+  blockTargetId.value = studentId
+  blockTargetName.value = displayName
+  blockDialogOpen.value = true
+}
+
+function onReported() {
+  reportSuccessVisible.value = true
+}
+
+function onBlocked() {
+  blockSuccessVisible.value = true
+  friendsQuery.refresh()
+}
 
 async function handleAccept(requestId: string) {
   try {
@@ -104,6 +140,17 @@ async function handleAccept(requestId: string) {
                 {{ t('social.friends.wantsToConnect') }}
               </div>
             </div>
+            <!-- FIND-privacy-018: Report button on friend requests -->
+            <VBtn
+              variant="text"
+              size="small"
+              icon="tabler-flag"
+              color="error"
+              :aria-label="t('social.report.ariaLabel')"
+              :data-testid="`report-${req.requestId}`"
+              class="me-1"
+              @click="handleReport(req.requestId, 'friend-request')"
+            />
             <VBtn
               color="primary"
               size="small"
@@ -124,9 +171,24 @@ async function handleAccept(requestId: string) {
           v-for="f in friendsQuery.data.value.friends"
           :key="f.studentId"
           :friend="f"
+          @block="handleBlock"
         />
       </section>
     </template>
+
+    <!-- FIND-privacy-018: Report & Block dialogs -->
+    <ReportDialog
+      v-model="reportDialogOpen"
+      :content-type="reportContentType"
+      :content-id="reportContentId"
+      @reported="onReported"
+    />
+    <BlockUserDialog
+      v-model="blockDialogOpen"
+      :target-student-id="blockTargetId"
+      :target-display-name="blockTargetName"
+      @blocked="onBlocked"
+    />
 
     <VSnackbar
       v-model="acceptErrorVisible"
@@ -135,6 +197,22 @@ async function handleAccept(requestId: string) {
       data-testid="accept-error-snackbar"
     >
       {{ acceptError ?? t('social.friends.acceptError') }}
+    </VSnackbar>
+    <VSnackbar
+      v-model="reportSuccessVisible"
+      color="success"
+      timeout="4000"
+      data-testid="report-success-snackbar"
+    >
+      {{ t('social.report.success') }}
+    </VSnackbar>
+    <VSnackbar
+      v-model="blockSuccessVisible"
+      color="success"
+      timeout="4000"
+      data-testid="block-success-snackbar"
+    >
+      {{ t('social.block.success') }}
     </VSnackbar>
   </div>
 </template>

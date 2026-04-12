@@ -9,6 +9,8 @@ interface Props {
 defineProps<Props>()
 const emit = defineEmits<{
   vote: [solutionId: string, direction: 'up' | 'down']
+  report: [contentId: string, contentType: 'peer-solution']
+  block: [studentId: string, displayName: string]
 }>()
 
 const { t } = useI18n()
@@ -71,6 +73,27 @@ const { t } = useI18n()
       >
         {{ solution.downvoteCount }}
       </VBtn>
+
+      <VSpacer />
+
+      <!-- FIND-privacy-018: Report & Block buttons for safeguarding -->
+      <VBtn
+        variant="text"
+        size="small"
+        icon="tabler-flag"
+        color="error"
+        :aria-label="t('social.report.ariaLabel')"
+        :data-testid="`report-${solution.solutionId}`"
+        @click="emit('report', solution.solutionId, 'peer-solution')"
+      />
+      <VBtn
+        variant="text"
+        size="small"
+        icon="tabler-ban"
+        :aria-label="t('social.block.ariaLabel', { name: solution.authorDisplayName })"
+        :data-testid="`block-${solution.authorStudentId}`"
+        @click="emit('block', solution.authorStudentId, solution.authorDisplayName)"
+      />
     </div>
   </VCard>
 </template>

@@ -2,9 +2,11 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ClassFeedItemCard from '@/components/social/ClassFeedItemCard.vue'
+import ReportDialog from '@/components/social/ReportDialog.vue'
+import BlockUserDialog from '@/components/social/BlockUserDialog.vue'
 import { useApiQuery } from '@/composables/useApiQuery'
 import { useApiMutation } from '@/composables/useApiMutation'
-import type { ClassFeedDto } from '@/api/types/common'
+import type { ClassFeedDto, ReportContentType } from '@/api/types/common'
 
 definePage({
   meta: {
@@ -24,6 +26,40 @@ const feedQuery = useApiQuery<ClassFeedDto>('/api/social/class-feed')
 const reactMutation = useApiMutation<{ ok: boolean; newCount: number }, { itemId: string; reactionType: string }>('/api/social/reactions', 'POST')
 
 const reactionErrorVisible = ref(false)
+
+// FIND-privacy-018: Report dialog state
+const reportDialogOpen = ref(false)
+const reportContentId = ref('')
+const reportContentType = ref<ReportContentType>('feed-item')
+
+// FIND-privacy-018: Block dialog state
+const blockDialogOpen = ref(false)
+const blockTargetId = ref('')
+const blockTargetName = ref('')
+
+const reportSuccessVisible = ref(false)
+const blockSuccessVisible = ref(false)
+
+function handleReport(contentId: string, contentType: ReportContentType) {
+  reportContentId.value = contentId
+  reportContentType.value = contentType
+  reportDialogOpen.value = true
+}
+
+function handleBlock(studentId: string, displayName: string) {
+  blockTargetId.value = studentId
+  blockTargetName.value = displayName
+  blockDialogOpen.value = true
+}
+
+function onReported() {
+  reportSuccessVisible.value = true
+}
+
+function onBlocked() {
+  blockSuccessVisible.value = true
+  feedQuery.refresh()
+}
 
 async function handleReact(itemId: string) {
   try {
@@ -75,8 +111,24 @@ async function handleReact(itemId: string) {
         :key="item.itemId"
         :item="item"
         @react="handleReact"
+        @report="handleReport"
+        @block="handleBlock"
       />
     </div>
+
+    <!-- FIND-privacy-018: Report & Block dialogs -->
+    <ReportDialog
+      v-model="reportDialogOpen"
+      :content-type="reportContentType"
+      :content-id="reportContentId"
+      @reported="onReported"
+    />
+    <BlockUserDialog
+      v-model="blockDialogOpen"
+      :target-student-id="blockTargetId"
+      :target-display-name="blockTargetName"
+      @blocked="onBlocked"
+    />
 
     <VSnackbar
       v-model="reactionErrorVisible"
@@ -85,6 +137,22 @@ async function handleReact(itemId: string) {
       data-testid="reaction-error-snackbar"
     >
       {{ reactMutation.error.value?.message ?? t('social.feed.reactionError') }}
+    </VSnackbar>
+    <VSnackbar
+      v-model="reportSuccessVisible"
+      color="success"
+      timeout="4000"
+      data-testid="report-success-snackbar"
+    >
+      {{ t('social.report.success') }}
+    </VSnackbar>
+    <VSnackbar
+      v-model="blockSuccessVisible"
+      color="success"
+      timeout="4000"
+      data-testid="block-success-snackbar"
+    >
+      {{ t('social.block.success') }}
     </VSnackbar>
   </div>
 </template>

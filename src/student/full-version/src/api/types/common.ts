@@ -551,3 +551,38 @@ export interface ProfilePatchDto {
   favoriteSubjects?: string[]
   visibility?: 'public' | 'class-only' | 'private'
 }
+
+/**
+ * FIND-privacy-018: Content Reporting & User Blocking DTOs.
+ * ICO Children's Code Std 11 — safeguarding tools for minors.
+ */
+export type ReportContentType = 'feed-item' | 'comment' | 'peer-solution' | 'friend-request' | 'study-room'
+export type ReportCategory = 'bullying' | 'inappropriate' | 'spam' | 'self-harm-risk' | 'other'
+
+export interface SubmitReportRequest {
+  contentType: ReportContentType
+  contentId: string
+  category: ReportCategory
+  reason?: string
+}
+
+export interface SubmitReportResponse {
+  reportId: string
+  severity: string
+  reportedAt: string
+}
+
+export interface BlockUserRequest {
+  targetStudentId: string
+}
+
+export interface BlockUserResponse {
+  ok: boolean
+  targetStudentId: string
+  blockedAt: string
+}
+
+export interface UnblockUserResponse {
+  ok: boolean
+  targetStudentId: string
+}

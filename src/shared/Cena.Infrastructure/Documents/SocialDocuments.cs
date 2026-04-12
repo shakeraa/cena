@@ -110,3 +110,50 @@ public class PeerSolutionDocument
     public DateTime PostedAt { get; set; } = DateTime.UtcNow;
     public bool IsDeleted { get; set; } = false;
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// FIND-privacy-018: Reporting & Blocking Documents
+// ICO Children's Code Std 11 — safeguarding tools for minors
+// ═════════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// A report filed by a student against social content. Feeds the back-office
+/// moderation queue where safeguarding admins review, resolve, or escalate.
+/// </summary>
+public class SocialReportDocument
+{
+    public string Id { get; set; } = "";
+    public string ReportId { get; set; } = "";
+    public string ReporterStudentId { get; set; } = "";
+    public string ContentType { get; set; } = "";    // 'feed-item' | 'comment' | 'peer-solution' | 'friend-request' | 'study-room'
+    public string ContentId { get; set; } = "";
+    public string Category { get; set; } = "";        // 'bullying' | 'inappropriate' | 'spam' | 'self-harm-risk' | 'other'
+    public string Severity { get; set; } = "medium";  // 'low' | 'medium' | 'high' | 'critical'
+    public string? Reason { get; set; }
+    public DateTime ReportedAt { get; set; } = DateTime.UtcNow;
+    public string Status { get; set; } = "pending";   // 'pending' | 'reviewing' | 'resolved' | 'escalated'
+    public string? ReviewedByAdminId { get; set; }
+    public DateTime? ReviewedAt { get; set; }
+    public string? Resolution { get; set; }
+}
+
+/// <summary>
+/// Per-student block list document. Each student has at most one document
+/// with an array of blocked student IDs. All social queries filter out
+/// content authored by blocked students.
+/// </summary>
+public class UserBlocklistDocument
+{
+    public string Id { get; set; } = "";
+    public string StudentId { get; set; } = "";
+    public List<BlockedEntry> BlockedUsers { get; set; } = new();
+}
+
+/// <summary>
+/// An individual entry in a user's block list.
+/// </summary>
+public class BlockedEntry
+{
+    public string BlockedStudentId { get; set; } = "";
+    public DateTime BlockedAt { get; set; } = DateTime.UtcNow;
+}
