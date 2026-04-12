@@ -17,14 +17,26 @@ interface SentryShim {
   setUser: (user: { id: string; email?: string } | null) => void
 }
 
+// FIND-privacy-016: Gate to prevent student email pre-wiring to SaaS
+// This stub explicitly NEVER sets user data, even when DSN is configured.
+// Real Sentry init with user tracking is blocked until STU-W-OBS-SENTRY.
+const SENTRY_USER_TRACKING_ENABLED = false // Gate: never enable until explicit approval
+
 export const Sentry: SentryShim = {
   captureException: (err, context) => {
     if ((import.meta as any).env?.DEV)
       console.error('[sentry stub]', err, context)
+    // Production: no-op until STU-W-OBS-SENTRY
   },
   addBreadcrumb: () => {},
   setTag: () => {},
-  setUser: () => {},
+  // FIND-privacy-016: setUser is explicitly blocked to prevent email leakage
+  setUser: (user) => {
+    if (SENTRY_USER_TRACKING_ENABLED && (import.meta as any).env?.DEV) {
+      console.log('[sentry stub] setUser blocked:', user?.id)
+    }
+    // Always no-op - user data never sent to Sentry
+  },
 }
 
 export default function (__: App) {

@@ -19,14 +19,33 @@ public sealed class StudentDataAuditMiddleware
     private readonly RequestDelegate _next;
     private readonly ILogger<StudentDataAuditMiddleware> _logger;
 
+    // FIND-privacy-012: Expanded FERPA audit coverage for all student data endpoints
     private static readonly HashSet<string> AuditedPaths = new(StringComparer.OrdinalIgnoreCase)
     {
+        // Admin API - Student data access
         "/api/admin/mastery",
         "/api/admin/focus",
         "/api/admin/tutoring",
         "/api/admin/outreach",
         "/api/admin/cultural",
-        "/api/v1/mastery"
+        "/api/admin/students",           // FIND-privacy-012: Student list/detail
+        "/api/admin/analytics",          // FIND-privacy-012: Analytics endpoints
+        "/api/admin/classroom",          // FIND-privacy-012: Classroom/student associations
+        "/api/admin/insights",           // FIND-privacy-012: Student insights
+        "/api/admin/experiments",        // FIND-privacy-012: Experiment assignments
+        "/api/admin/content",            // FIND-privacy-012: Content with student progress
+        "/api/admin/social",             // FIND-privacy-012: Social/feed data
+        "/api/admin/compliance",         // FIND-privacy-012: Compliance exports
+        
+        // Student API - Self-access (also audited for completeness)
+        "/api/v1/mastery",
+        "/api/me/gdpr/export",           // FIND-privacy-012: Data exports
+        "/api/me/profile",
+        "/api/sessions",                 // FIND-privacy-012: Session history
+        "/api/analytics",                // FIND-privacy-012: Student analytics
+        
+        // Actor API - Direct student data access
+        "/api/actors/student",           // FIND-privacy-012: Actor student queries
     };
 
     public StudentDataAuditMiddleware(
@@ -87,35 +106,42 @@ public sealed class StudentDataAuditMiddleware
     }
 
     /// <summary>
-    /// Extracts student ID from route values or query string parameters.
-    /// Looks for common parameter names: studentId, student_id, id (on student-specific routes).
+    /// Extracts student ID from route values, query string, or request body.
+    /// FIND-privacy-012: Expanded to cover more parameter patterns.
     /// </summary>
     private static string? ExtractStudentId(HttpRequest request)
     {
-        // Check route values first
-        if (request.RouteValues.TryGetValue("studentId", out var routeStudentId)
-            && routeStudentId is string rsId && !string.IsNullOrEmpty(rsId))
+        // Check route values first (common patterns)
+        var routeKeys = new[] { "studentId", "student_id", "studentId", "id", "userId", "user_id" };
+        foreach (var key in routeKeys)
         {
-            return rsId;
+            if (request.RouteValues.TryGetValue(key, out var routeValue)
+                && routeValue is string rsId && !string.IsNullOrEmpty(rsId))
+            {
+                return rsId;
+            }
         }
 
-        if (request.RouteValues.TryGetValue("id", out var routeId)
-            && routeId is string rId && !string.IsNullOrEmpty(rId))
+        // Check query string (common patterns)
+        var queryKeys = new[] { "studentId", "student_id", "studentId", "userId", "user_id", "uid" };
+        foreach (var key in queryKeys)
         {
-            return rId;
+            if (request.Query.TryGetValue(key, out var qValue) && !string.IsNullOrEmpty(qValue))
+            {
+                return qValue;
+            }
         }
 
-        // Check query string
-        if (request.Query.TryGetValue("studentId", out var qStudentId)
-            && !string.IsNullOrEmpty(qStudentId))
+        // Check if path contains student ID pattern (e.g., /api/admin/students/{id}/...)
+        var path = request.Path.Value ?? "";
+        var segments = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        for (int i = 0; i < segments.Length - 1; i++)
         {
-            return qStudentId;
-        }
-
-        if (request.Query.TryGetValue("student_id", out var qStudentIdUnderscore)
-            && !string.IsNullOrEmpty(qStudentIdUnderscore))
-        {
-            return qStudentIdUnderscore;
+            if (segments[i].Equals("students", StringComparison.OrdinalIgnoreCase) &&
+                segments[i + 1].Length > 10) // Likely a student ID
+            {
+                return segments[i + 1];
+            }
         }
 
         return null;
