@@ -85,23 +85,8 @@ public sealed partial class StudentActor
                 "Escalation: {Action}",
                 _studentId, msg.ConceptId, decision.EscalationAction);
 
-            // ACT-027: Fire-and-forget escalation notification (not a domain event).
-            // Published directly since this is an operational alert, not persisted in event stream.
-            try
-            {
-                await _nats.PublishAsync("cena.student.escalation",
-                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-                    {
-                        StudentId = _studentId,
-                        ConceptId = msg.ConceptId,
-                        Action = decision.EscalationAction,
-                        Timestamp = DateTimeOffset.UtcNow
-                    }));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to publish escalation for student {StudentId}", _studentId);
-            }
+            // FIND-arch-021: Removed orphan NATS publisher (cena.student.escalation had no subscribers)
+            // Escalation events are persisted via Marten event stream and available via projections.
         }
 
         await FlushEvents();

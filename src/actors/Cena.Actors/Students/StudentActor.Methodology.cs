@@ -88,31 +88,9 @@ public sealed partial class StudentActor
                 _studentId, level, levelId, assignment.Methodology,
                 assignment.AttemptCount, assignment.Confidence, assignment.SuccessRate);
 
-            // Fire-and-forget NATS admin alert with explicit error handling
-            _ = PublishMethodologyAlert(level, levelId, assignment)
-                .ContinueWith(t =>
-                {
-                    if (t.IsFaulted)
-                        _logger.LogError(t.Exception, "Failed to publish methodology alert for {Level}", level);
-                }, TaskContinuationOptions.OnlyOnFaulted);
+            // FIND-arch-021: Removed orphan NATS publisher (cena.admin.methodology.confidence-reached had no subscribers)
+            // Methodology confidence events are persisted via Marten event stream (MethodologyConfidenceReached_V1).
         }
-    }
-
-    private async Task PublishMethodologyAlert(
-        MethodologyLevel level, string levelId, MethodologyAssignment assignment)
-    {
-        await _nats.PublishAsync("cena.admin.methodology.confidence-reached",
-            System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-            {
-                StudentId = _studentId,
-                Level = level.ToString(),
-                LevelId = levelId,
-                Methodology = assignment.Methodology.ToString(),
-                Confidence = assignment.Confidence,
-                AttemptCount = assignment.AttemptCount,
-                SuccessRate = assignment.SuccessRate,
-                Timestamp = DateTimeOffset.UtcNow
-            }));
     }
 
     // =========================================================================
@@ -182,25 +160,8 @@ public sealed partial class StudentActor
 
             StageEvent(deferredEvent);
 
-            // Fire NATS alert so admin dashboard can show deferred switches
-            try
-            {
-                await _nats.PublishAsync("cena.admin.methodology.switch-deferred",
-                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-                    {
-                        StudentId = _studentId,
-                        ConceptId = msg.ConceptId,
-                        CurrentMethodology = currentMethodology.ToString(),
-                        RecommendedMethodology = decision.RecommendedMethodology.ToString(),
-                        Reason = decision.DecisionTrace,
-                        CooldownRemaining = decision.CooldownSessionsRemaining,
-                        Timestamp = DateTimeOffset.UtcNow
-                    }));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to publish switch deferred alert");
-            }
+            // FIND-arch-021: Removed orphan NATS publisher (cena.admin.methodology.switch-deferred had no subscribers)
+            // Methodology switch deferred events are persisted via Marten event stream (MethodologySwitchDeferred_V1).
         }
         else if (decision.ShouldSwitch)
         {
@@ -234,21 +195,8 @@ public sealed partial class StudentActor
                 "Escalation: {Action}",
                 _studentId, msg.ConceptId, decision.EscalationAction);
 
-            try
-            {
-                await _nats.PublishAsync("cena.student.escalation",
-                    System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-                    {
-                        StudentId = _studentId,
-                        ConceptId = msg.ConceptId,
-                        Action = decision.EscalationAction,
-                        Timestamp = DateTimeOffset.UtcNow
-                    }));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to publish escalation for student {StudentId}", _studentId);
-            }
+            // FIND-arch-021: Removed orphan NATS publisher (cena.student.escalation had no subscribers)
+            // Escalation events are persisted via Marten event stream and available via projections.
         }
 
         await FlushEvents();

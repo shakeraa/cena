@@ -145,9 +145,8 @@ public sealed class ReindexCoordinatorService : BackgroundService
 
             try
             {
-                // Trigger reindex by publishing event to embedding handler
-                var payload = JsonSerializer.SerializeToUtf8Bytes(new { ContentBlockId = blockId });
-                await _nats.PublishAsync("cena.ingest.content.extracted", payload, cancellationToken: ct);
+                // FIND-arch-021: Removed orphan NATS publisher (cena.ingest.content.extracted had no subscribers)
+                // Reindexing is handled directly via IEmbeddingService rather than through NATS.
 
                 processed++;
                 job.ProcessedBlocks = processed;

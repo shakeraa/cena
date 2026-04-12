@@ -114,8 +114,8 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                 fileBytes.Length, request.SubmittedBy, now);
             session.Events.Append(pipelineItemId, fileReceivedEvent);
 
-            await _nats.PublishAsync("cena.ingest.file.received",
-                System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new { pipelineItemId, request.Filename }), cancellationToken: ct);
+            // FIND-arch-021: Removed orphan NATS publisher (cena.ingest.file.received had no subscribers)
+            // Ingestion events are persisted via Marten event stream and available via projections.
 
             // ── Stage 2: OCR ──
             AdvanceStage(pipelineItem, PipelineStage.OcrProcessing);
@@ -236,14 +236,8 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
 
                 CompleteStage(pipelineItem, PipelineStage.ContentExtraction);
 
-                // SAI-06/SAI-07: Publish NATS events for async embedding (non-blocking)
-                foreach (var blockId in contentBlockIds)
-                {
-                    await _nats.PublishAsync("cena.ingest.content.extracted",
-                        System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(
-                            new { ContentBlockId = blockId, PipelineItemId = pipelineItemId }),
-                        cancellationToken: ct);
-                }
+                // FIND-arch-021: Removed orphan NATS publisher (cena.ingest.content.extracted had no subscribers)
+                // Content extraction events are persisted via Marten event stream (ContentExtracted_V1).
             }
 
             // ── Stage 4: Normalize + Dedup each question ──
@@ -317,15 +311,8 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
             session.Store(pipelineItem);
             await session.SaveChangesAsync(ct);
 
-            await _nats.PublishAsync("cena.ingest.item.classified",
-                System.Text.Json.JsonSerializer.SerializeToUtf8Bytes(new
-                {
-                    pipelineItemId,
-                    questionsExtracted = allQuestions.Count,
-                    questionsUnique = questionIds.Count,
-                    duplicates = duplicateCount,
-                    contentBlocksExtracted = contentBlocks.Count
-                }), cancellationToken: ct);
+            // FIND-arch-021: Removed orphan NATS publisher (cena.ingest.item.classified had no subscribers)
+            // Pipeline completion is tracked via PipelineItemDocument and event stream.
 
             return new IngestionResult(
                 PipelineItemId: pipelineItemId,
