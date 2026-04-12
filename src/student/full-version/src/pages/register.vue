@@ -26,6 +26,8 @@ import { useMeStore } from '@/stores/meStore'
 import AgeGateStep from '@/components/onboarding/AgeGateStep.vue'
 import ParentalConsentStep from '@/components/onboarding/ParentalConsentStep.vue'
 import type { AgeGateResult, ConsentTier } from '@/composables/useAgeGate'
+import { useMockAuth } from '@/plugins/firebase'
+import { useFirebaseAuth } from '@/composables/useFirebaseAuth'
 
 definePage({
   meta: {
@@ -43,11 +45,12 @@ const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const meStore = useMeStore()
+const { registerWithEmail, errorKey } = useFirebaseAuth()
 
 const loading = ref(false)
 const errorMessage = ref('')
 
-// ── Age Gate State ──
+// ── Age Gate State (FIND-privacy-001) ──
 type RegistrationStep = 'age-gate' | 'parental-consent' | 'credentials'
 const currentStep = ref<RegistrationStep>('age-gate')
 const dateOfBirth = ref<string | null>(null)
@@ -115,13 +118,9 @@ const canProceedFromConsent = computed(() => {
   return parentEmail.value.length > 0 && consentGiven.value
 })
 
-async function handleSubmit(payload: { email: string; password: string; displayName?: string }) {
-  errorMessage.value = ''
-  loading.value = true
-
+// ── Mock submit (dev only, FIND-ux-023) ──
+async function handleMockSubmit(payload: { email: string; password: string; displayName?: string }) {
   await new Promise(resolve => setTimeout(resolve, 120))
-
-  // Mock-backend rule: `exists@test.com` -> rejected (email already in use).
   if (payload.email === 'exists@test.com') {
     errorMessage.value = t('auth.emailAlreadyExists')
     loading.value = false
@@ -133,7 +132,6 @@ async function handleSubmit(payload: { email: string; password: string; displayN
 
   authStore.__mockSignIn({ uid, email: payload.email, displayName })
 
-  // Fresh registrations start NOT onboarded so the guard redirects them.
   meStore.__setProfile({
     uid,
     displayName,
@@ -166,9 +164,52 @@ async function handleSubmit(payload: { email: string; password: string; displayN
   }
 
   loading.value = false
-
-  // Onboarding wizard is STU-W-04C; for Phase A we land on the placeholder.
   await router.replace('/onboarding')
+}
+
+async function handleFirebaseSubmit(payload: { email: string; password: string; displayName?: string }) {
+  try {
+    await registerWithEmail(payload.email, payload.password, payload.displayName)
+
+    // onAuthStateChanged in firebase.ts plugin will update the auth store.
+    // Wait a tick for the listener to fire.
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    // Fresh registrations start NOT onboarded.
+    meStore.__setProfile({
+      uid: authStore.uid!,
+      displayName: payload.displayName || payload.email,
+      email: payload.email,
+      locale: 'en',
+      onboardedAt: null,
+    })
+
+    loading.value = false
+    await router.replace('/onboarding')
+  }
+  catch (error: unknown) {
+    loading.value = false
+    errorMessage.value = errorKey.value ? t(errorKey.value) : t('auth.signInFailed')
+
+    const err = error as { code?: string }
+
+    console.error('[register] Registration failed', {
+      email: payload.email,
+      firebaseCode: err.code,
+    })
+  }
+}
+
+async function handleSubmit(payload: { email: string; password: string; displayName?: string }) {
+  errorMessage.value = ''
+  loading.value = true
+
+  if (useMockAuth) {
+    await handleMockSubmit(payload)
+    return
+  }
+
+  await handleFirebaseSubmit(payload)
 }
 </script>
 

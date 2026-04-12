@@ -47,18 +47,44 @@ function newCorrelationId(): string {
 }
 
 /**
- * Hook the auth store exposes to the API layer. STU-W-02 provided the
- * store; STU-W-03 consumes it here. Real Firebase refresh will arrive
- * in STU-W-04.
+ * FIND-ux-023: reads the current Firebase ID token, optionally forcing
+ * a refresh. When real Firebase Auth is active, `forceRefresh=true`
+ * calls `FirebaseUser.getIdToken(true)` to get a fresh JWT. The auth
+ * store is also updated with the new token so subsequent requests
+ * pick it up without another refresh.
+ *
+ * When mock auth is enabled (dev only), falls back to the in-memory
+ * mock token from the auth store.
  */
 async function readTokenFromStore(forceRefresh: boolean): Promise<string | null> {
   const auth = useAuthStore()
 
-  // STU-W-03 stub: on `forceRefresh`, a future Firebase `getIdToken(true)`
-  // call will be made here. For now both paths read the current value.
-  void forceRefresh
+  if (!forceRefresh)
+    return auth.idToken
 
-  return auth.idToken
+  // Try to get a fresh token from Firebase Auth SDK
+  try {
+    const { getFirebaseAuth, useMockAuth } = await import('@/plugins/firebase')
+
+    if (useMockAuth)
+      return auth.idToken
+
+    const firebaseAuth = getFirebaseAuth()
+    const currentUser = firebaseAuth.currentUser
+
+    if (!currentUser)
+      return null
+
+    const freshToken = await currentUser.getIdToken(true)
+
+    auth.__updateIdToken(freshToken)
+
+    return freshToken
+  }
+  catch {
+    // If Firebase is not initialized (e.g., test environment), fall back
+    return auth.idToken
+  }
 }
 
 async function getCurrentToken(): Promise<string | null> {

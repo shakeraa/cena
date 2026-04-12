@@ -5,6 +5,16 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
 import { useMeStore } from '@/stores/meStore'
 import { sanitizeReturnTo } from '@/utils/returnTo'
+import { useMockAuth } from '@/plugins/firebase'
+import { useFirebaseAuth } from '@/composables/useFirebaseAuth'
+
+/**
+ * FIND-ux-023: Student login page — wired to real Firebase Auth.
+ *
+ * Default path uses `signInWithEmailAndPassword` from Firebase Auth SDK.
+ * Mock path (dev only, VITE_USE_MOCK_AUTH=true) preserves the old stub
+ * behavior for offline development.
+ */
 
 definePage({
   meta: {
@@ -23,6 +33,7 @@ const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 const meStore = useMeStore()
+const { loginWithEmail, errorKey } = useFirebaseAuth()
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -30,8 +41,8 @@ const failedAttempts = ref(0)
 const lockedUntil = ref<number>(0)
 const lockedSecondsRemaining = ref(0)
 
-const MAX_ATTEMPTS_BEFORE_LOCKOUT = 3
-const LOCKOUT_DURATION_MS = 5000
+const MAX_ATTEMPTS_BEFORE_LOCKOUT = 5
+const LOCKOUT_DURATION_MS = 30000
 
 let tickHandle: ReturnType<typeof setInterval> | null = null
 
@@ -58,20 +69,19 @@ onBeforeUnmount(() => {
   }
 })
 
-async function handleSubmit(payload: { email: string; password: string }) {
-  if (submitLocked.value)
-    return
+function navigateAfterLogin() {
+  const rawReturnTo = typeof route.query.returnTo === 'string' ? route.query.returnTo : null
+  const target = sanitizeReturnTo(rawReturnTo, '/home')
 
-  errorMessage.value = ''
-  loading.value = true
+  return router.replace(target)
+}
 
-  // Simulated latency so the loading state is visible; mock backend otherwise.
+/**
+ * Mock sign-in path — only reachable when VITE_USE_MOCK_AUTH=true in dev mode.
+ */
+async function handleMockSubmit(payload: { email: string; password: string }) {
   await new Promise(resolve => setTimeout(resolve, 120))
 
-  // Mock-backend rules for Phase A:
-  //   - `fail@test.com` → rejected (wrong credentials)
-  //   - `unverified@test.com` → rejected (email not verified)
-  //   - any other well-formed email → accepted
   if (payload.email === 'fail@test.com') {
     failedAttempts.value += 1
     loading.value = false
@@ -84,11 +94,9 @@ async function handleSubmit(payload: { email: string; password: string }) {
     else {
       errorMessage.value = t('auth.invalidCredentials')
     }
-
     return
   }
 
-  // Mock success: synth a UID from the email.
   const uid = `mock-${payload.email.replace(/[^a-z0-9]/gi, '-')}`
 
   authStore.__mockSignIn({ uid, email: payload.email, displayName: payload.email })
@@ -101,11 +109,79 @@ async function handleSubmit(payload: { email: string; password: string }) {
   })
 
   loading.value = false
+  await navigateAfterLogin()
+}
 
-  const rawReturnTo = typeof route.query.returnTo === 'string' ? route.query.returnTo : null
-  const target = sanitizeReturnTo(rawReturnTo, '/home')
+/**
+ * Real Firebase Auth sign-in path — the default.
+ */
+async function handleFirebaseSubmit(payload: { email: string; password: string }) {
+  try {
+    await loginWithEmail(payload.email, payload.password)
 
-  await router.replace(target)
+    // onAuthStateChanged in firebase.ts plugin will update the auth store.
+    // We just need to navigate. Wait a tick for the listener to fire.
+    await new Promise(resolve => setTimeout(resolve, 50))
+
+    loading.value = false
+    await navigateAfterLogin()
+  }
+  catch (error: unknown) {
+    const err = error as { code?: string }
+
+    failedAttempts.value += 1
+    loading.value = false
+
+    // Firebase's own rate limiting returns auth/too-many-requests
+    if (err.code === 'auth/too-many-requests') {
+      lockedUntil.value = Date.now() + LOCKOUT_DURATION_MS
+      lockedSecondsRemaining.value = Math.ceil(LOCKOUT_DURATION_MS / 1000)
+      errorMessage.value = t('auth.tooManyAttempts')
+      startLockoutTick()
+
+      // Structured log for production monitoring
+      console.error('[login] Firebase rate limit hit', {
+        email: payload.email,
+        failedAttempts: failedAttempts.value,
+        firebaseCode: err.code,
+      })
+      return
+    }
+
+    // Client-side lockout as additional UX safeguard
+    if (failedAttempts.value >= MAX_ATTEMPTS_BEFORE_LOCKOUT) {
+      lockedUntil.value = Date.now() + LOCKOUT_DURATION_MS
+      lockedSecondsRemaining.value = Math.ceil(LOCKOUT_DURATION_MS / 1000)
+      errorMessage.value = t('auth.tooManyAttempts')
+      startLockoutTick()
+    }
+    else {
+      // Translate Firebase error code to user-friendly i18n message
+      errorMessage.value = errorKey.value ? t(errorKey.value) : t('auth.signInFailed')
+    }
+
+    // Structured log for production monitoring
+    console.error('[login] Sign-in failed', {
+      email: payload.email,
+      failedAttempts: failedAttempts.value,
+      firebaseCode: err.code,
+    })
+  }
+}
+
+async function handleSubmit(payload: { email: string; password: string }) {
+  if (submitLocked.value)
+    return
+
+  errorMessage.value = ''
+  loading.value = true
+
+  if (useMockAuth) {
+    await handleMockSubmit(payload)
+    return
+  }
+
+  await handleFirebaseSubmit(payload)
 }
 </script>
 

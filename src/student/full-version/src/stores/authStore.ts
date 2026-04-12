@@ -5,24 +5,17 @@ import type { Rule } from '@/plugins/casl/ability'
 
 /**
  * Auth store — student app wrapper over Firebase Auth state.
- * STU-W-02 ships a stub that starts unauthed and exposes a `__mockSignIn`
- * helper so E2E tests can simulate post-sign-in flow without real Firebase.
- * STU-W-04 will replace the internals with real Firebase Auth SDK wiring.
  *
- * FIND-ux-010: the original stub kept everything in in-memory refs, which
- * meant every hard navigation / page refresh wiped the mock session and
- * bounced the user to /login. The store now persists the mock identity
- * to `localStorage['cena-mock-auth']` so `src/plugins/firebase.ts` can
- * rehydrate it on boot *and* so URL-share / refresh flows survive.
+ * FIND-ux-023: replaced the Phase-A stub with real Firebase Auth.
+ * The store now tracks a real Firebase ID token via `__firebaseSignIn`
+ * (called by the firebase.ts plugin's `onAuthStateChanged` listener).
  *
- * FIND-ux-020: seeds CASL ability rules on sign-in and persists them to
- * the `userAbilityRules` cookie so the sidebar nav items pass the `can()`
- * check. Mirrors the admin app pattern from useFirebaseAuth.ts.
+ * Mock auth (`__mockSignIn`) is retained for:
+ *   - Dev mode with `VITE_USE_MOCK_AUTH=true`
+ *   - Unit/E2E tests that seed `localStorage['cena-mock-auth']`
  *
- * Persistence is intentionally gated on `typeof window !== 'undefined'`
- * so SSR / unit tests with a jsdom shim still work. The storage key is
- * the SAME one `firebase.ts` already reads on plugin init, which means
- * the hydration path is unchanged — we just start writing to it too.
+ * FIND-ux-010: persistence to localStorage for mock path survives refresh.
+ * FIND-ux-020: seeds CASL ability rules on sign-in.
  */
 
 export interface MockAuthPayload {
@@ -31,11 +24,13 @@ export interface MockAuthPayload {
   displayName?: string
 }
 
-/**
- * localStorage key for the mock auth payload. Intentionally matches the
- * key `src/plugins/firebase.ts` already reads so there is exactly ONE
- * source of truth for where the mock session lives.
- */
+export interface FirebaseAuthPayload {
+  uid: string
+  email?: string
+  displayName?: string
+  idToken: string
+}
+
 const MOCK_AUTH_STORAGE_KEY = 'cena-mock-auth'
 
 function writeMockAuthToStorage(payload: MockAuthPayload): void {
@@ -45,9 +40,7 @@ function writeMockAuthToStorage(payload: MockAuthPayload): void {
     window.localStorage.setItem(MOCK_AUTH_STORAGE_KEY, JSON.stringify(payload))
   }
   catch {
-    // Quota exceeded / privacy mode — silently ignore. The in-memory
-    // session still works for the current tab; only the refresh-survives
-    // guarantee is weakened.
+    // Quota exceeded / privacy mode — silently ignore.
   }
 }
 
@@ -130,12 +123,9 @@ export const useAuthStore = defineStore('auth', () => {
   // is signed in.
   const ready = ref(false)
 
-  // FIND-ux-010: eagerly hydrate from localStorage on store init. Without
-  // this, the router guard would run BEFORE `firebase.ts` had a chance to
-  // call `__mockSignIn`, and the first `to.meta.requiresAuth` check would
-  // redirect to /login even though the mock session was present on disk.
-  // We still leave `ready` false here — `firebase.ts` flips it on the next
-  // microtask so the async Firebase boot flow stays unchanged.
+  // FIND-ux-010: eagerly hydrate from localStorage on store init (mock path
+  // only). For real Firebase, the `onAuthStateChanged` listener handles
+  // hydration. We still leave `ready` false here — firebase.ts flips it.
   const hydrated = readMockAuthFromStorage()
   if (hydrated) {
     uid.value = hydrated.uid
@@ -154,6 +144,52 @@ export const useAuthStore = defineStore('auth', () => {
     ready.value = true
   }
 
+  /**
+   * Called by the firebase.ts plugin when `onAuthStateChanged` fires
+   * with a valid user. This is the REAL sign-in path.
+   */
+  function __firebaseSignIn(payload: FirebaseAuthPayload) {
+    uid.value = payload.uid
+    email.value = payload.email ?? null
+    displayName.value = payload.displayName ?? null
+    idToken.value = payload.idToken
+    ready.value = true
+
+    ability.update(studentAbilityRules)
+    writeAbilityCookie(studentAbilityRules)
+
+    // eslint-disable-next-line no-console
+    console.info('[auth] Firebase sign-in complete for', payload.uid)
+  }
+
+  /**
+   * Called by the firebase.ts plugin when `onAuthStateChanged` fires
+   * with null (user signed out).
+   */
+  function __firebaseSignOut() {
+    uid.value = null
+    email.value = null
+    displayName.value = null
+    idToken.value = null
+
+    ability.update([])
+    clearAbilityCookie()
+
+    // eslint-disable-next-line no-console
+    console.info('[auth] Firebase sign-out complete')
+  }
+
+  /**
+   * Update the stored ID token. Called after a forced token refresh
+   * (e.g. by the API client on 401).
+   */
+  function __updateIdToken(token: string) {
+    idToken.value = token
+  }
+
+  /**
+   * Mock sign-in — for dev+mock mode and tests.
+   */
   function __mockSignIn(payload: MockAuthPayload) {
     uid.value = payload.uid
     email.value = payload.email ?? null
@@ -163,7 +199,6 @@ export const useAuthStore = defineStore('auth', () => {
     writeMockAuthToStorage(payload)
 
     // FIND-ux-020: seed CASL abilities so sidebar nav items render.
-    // Mirrors the admin pattern at src/admin/.../useFirebaseAuth.ts:79.
     ability.update(studentAbilityRules)
     writeAbilityCookie(studentAbilityRules)
 
@@ -195,6 +230,9 @@ export const useAuthStore = defineStore('auth', () => {
     ready,
     isSignedIn,
     __setReady,
+    __firebaseSignIn,
+    __firebaseSignOut,
+    __updateIdToken,
     __mockSignIn,
     __signOut,
   }
