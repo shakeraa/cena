@@ -59,15 +59,17 @@ public static class ContentEndpoints
         });
 
         // GET /api/content/questions/{id}/explanation — get explanation
+        // FIND-sec-013: Only Published questions, never expose aiPrompt
         group.MapGet("/questions/{id}/explanation", async (
             string id, IDocumentStore store, HttpContext httpContext) =>
         {
             await using var session = store.QuerySession();
             var question = await session.Query<QuestionState>()
-                .FirstOrDefaultAsync(q => q.Id == id);
+                .FirstOrDefaultAsync(q => q.Id == id
+                    && q.Status == QuestionLifecycleStatus.Published);
 
             if (question is null)
-                return Results.NotFound(new { error = $"Question {id} not found" });
+                return Results.NotFound(new { error = $"Question {id} not found or not published" });
 
             var etag = ComputeETag($"expl-{id}", question.EventVersion);
             if (IsNotModified(httpContext, etag))
@@ -80,7 +82,6 @@ public static class ContentEndpoints
             {
                 questionId = question.Id,
                 explanation = question.Explanation ?? "",
-                aiPrompt = question.AiProvenance?.PromptText,
                 version = question.EventVersion
             });
         });
