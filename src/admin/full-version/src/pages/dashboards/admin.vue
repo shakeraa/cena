@@ -65,9 +65,10 @@ const widgetData = computed(() => {
   <div>
     <div class="d-flex align-center justify-space-between mb-6">
       <div>
-        <h4 class="text-h4">
+        <!-- FIND-ux-026: Promoted to h1 — this is the page's content heading -->
+        <h1 class="text-h4">
           Platform Overview
-        </h4>
+        </h1>
         <p class="text-body-1 mb-0">
           Cena Learning Platform Dashboard
         </p>
@@ -91,9 +92,10 @@ const widgetData = computed(() => {
                   {{ data.title }}
                 </div>
                 <div class="d-flex gap-x-2 align-center">
-                  <h4 class="text-h4">
+                  <!-- FIND-ux-026: Data value, not a heading — use span with visual class -->
+                  <span class="text-h4">
                     {{ data.value }}
-                  </h4>
+                  </span>
                   <div
                     v-if="data.change !== 0"
                     class="text-base"
@@ -201,9 +203,10 @@ const widgetData = computed(() => {
                 <div class="text-body-2 text-medium-emphasis mb-1">
                   Content Corpus
                 </div>
-                <h4 class="text-h4">
+                <!-- FIND-ux-026: Data value, not a heading -->
+                <span class="text-h4">
                   {{ corpusBlocks.toLocaleString() }}
-                </h4>
+                </span>
                 <div class="text-sm">
                   Total content blocks
                 </div>
@@ -234,9 +237,10 @@ const widgetData = computed(() => {
                 <div class="text-body-2 text-medium-emphasis mb-1">
                   Active Experiments
                 </div>
-                <h4 class="text-h4">
+                <!-- FIND-ux-026: Data value, not a heading -->
+                <span class="text-h4">
                   {{ activeExperiments }}
-                </h4>
+                </span>
                 <div class="text-sm">
                   Running A/B tests
                 </div>

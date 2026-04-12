@@ -103,9 +103,10 @@ const onSubmit = () => {
   <RouterLink to="/">
     <div class="auth-logo d-flex align-center gap-x-3">
       <VNodeRenderer :nodes="themeConfig.app.logo" />
-      <h1 class="auth-title">
+      <!-- FIND-ux-026: Brand mark demoted from h1 to span; not a content heading -->
+      <span class="auth-title">
         {{ themeConfig.app.brandTitle ?? themeConfig.app.title }}
-      </h1>
+      </span>
     </div>
   </RouterLink>
 
@@ -150,9 +151,9 @@ const onSubmit = () => {
         class="mt-12 mt-sm-0 pa-4"
       >
         <VCardText>
-          <h4 class="text-h4 mb-1">
+          <h1 class="text-h4 mb-1">
             Cena Admin
-          </h4>
+          </h1>
           <p class="mb-0">
             Sign in to manage the Cena learning platform
           </p>

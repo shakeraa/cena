@@ -39,9 +39,10 @@ const isPasswordVisible = ref(false)
   <RouterLink to="/">
     <div class="auth-logo d-flex align-center gap-x-3">
       <VNodeRenderer :nodes="themeConfig.app.logo" />
-      <h1 class="auth-title">
+      <!-- FIND-ux-026: Brand mark demoted from h1 to span; not a content heading -->
+      <span class="auth-title">
         {{ themeConfig.app.brandTitle ?? themeConfig.app.title }}
-      </h1>
+      </span>
     </div>
   </RouterLink>
 
@@ -87,9 +88,9 @@ const isPasswordVisible = ref(false)
         class="mt-12 mt-sm-0 pa-4"
       >
         <VCardText>
-          <h4 class="text-h4 mb-1">
+          <h1 class="text-h4 mb-1">
             Adventure starts here 🚀
-          </h4>
+          </h1>
           <p class="mb-0">
             Make your app management easy and fun!
           </p>
