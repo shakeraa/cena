@@ -1,0 +1,127 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cena.fullname" . }}-admin
+  labels:
+    {{- include "cena.componentLabels" (dict "root" . "component" "admin") | nindent 4 }}
+spec:
+  replicas: {{ .Values.admin.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cena.selectorLabels" (dict "root" . "component" "admin") | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "cena.componentLabels" (dict "root" . "component" "admin") | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "cena.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cena.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        # Wait for the student service to be ready for a soak period before
+        # starting admin pods. This enforces the deploy order:
+        # migrator -> student (healthy) -> admin.
+        - name: wait-for-student
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - |
+              echo "Waiting for student service to become ready..."
+              STUDENT_SVC="{{ include "cena.fullname" . }}-student.{{ .Release.Namespace }}.svc.cluster.local"
+              STUDENT_PORT={{ .Values.student.service.port }}
+              SOAK={{ .Values.admin.studentSoakSeconds }}
+
+              # Phase 1: wait until the student service responds
+              until wget -q --spider "http://${STUDENT_SVC}:${STUDENT_PORT}/health/ready" 2>/dev/null; do
+                echo "  student not ready yet, retrying in 5s..."
+                sleep 5
+              done
+              echo "Student service is ready. Soaking for ${SOAK}s..."
+
+              # Phase 2: soak — keep checking that it stays healthy
+              elapsed=0
+              while [ "$elapsed" -lt "$SOAK" ]; do
+                sleep 5
+                elapsed=$((elapsed + 5))
+                if ! wget -q --spider "http://${STUDENT_SVC}:${STUDENT_PORT}/health/ready" 2>/dev/null; then
+                  echo "  student became unhealthy during soak at ${elapsed}s, restarting soak..."
+                  elapsed=0
+                fi
+              done
+              echo "Soak complete. Proceeding with admin startup."
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              cpu: 50m
+              memory: 32Mi
+      containers:
+        - name: admin
+          image: "{{ .Values.admin.image.repository }}:{{ .Values.admin.image.tag }}"
+          imagePullPolicy: {{ .Values.admin.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.admin.service.targetPort }}
+              protocol: TCP
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.admin.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.admin.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.admin.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.admin.probes.readiness.failureThreshold }}
+            timeoutSeconds: {{ .Values.admin.probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.admin.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.admin.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.admin.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.admin.probes.liveness.failureThreshold }}
+            timeoutSeconds: {{ .Values.admin.probes.liveness.timeoutSeconds }}
+          env:
+            - name: ConnectionStrings__Cena
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: connection-string-admin
+            - name: ASPNETCORE_URLS
+              value: "http://+:{{ .Values.admin.service.targetPort }}"
+            {{- range .Values.admin.env }}
+            - name: {{ .name }}
+              {{- if .value }}
+              value: {{ .value | quote }}
+              {{- end }}
+              {{- if .valueFrom }}
+              valueFrom:
+                {{- toYaml .valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.admin.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

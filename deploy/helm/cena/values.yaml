@@ -1,0 +1,172 @@
+# =============================================================================
+# Cena Platform — Helm Values
+# =============================================================================
+
+# -- Global settings ----------------------------------------------------------
+
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Database -----------------------------------------------------------------
+
+database:
+  # Name of the Kubernetes Secret containing the connection strings.
+  # The secret must contain the following keys:
+  #   connection-string-migrator   — used by the migrator job
+  #   connection-string-student    — used by the student API host
+  #   connection-string-admin      — used by the admin API host
+  secretName: cena-db-credentials
+
+# -- Migrator Job (pre-install / pre-upgrade hook) ----------------------------
+
+migrator:
+  image:
+    repository: ghcr.io/cena-platform/cena-db-migrator
+    tag: latest
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  backoffLimit: 3
+  activeDeadlineSeconds: 300
+
+# -- Student API Host ---------------------------------------------------------
+
+student:
+  replicaCount: 2
+  image:
+    repository: ghcr.io/cena-platform/cena-student-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 5051
+  resources:
+    requests:
+      cpu: 250m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 512Mi
+  probes:
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 3
+      timeoutSeconds: 5
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 5
+  hpa:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 20
+    targetCPUUtilizationPercentage: 60
+    targetMemoryUtilizationPercentage: 80
+  env: []
+  # - name: ASPNETCORE_ENVIRONMENT
+  #   value: Production
+
+# -- Admin API Host -----------------------------------------------------------
+
+admin:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/cena-platform/cena-admin-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 5052
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  probes:
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 10
+      periodSeconds: 5
+      failureThreshold: 3
+      timeoutSeconds: 5
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 15
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 5
+  hpa:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 5
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 85
+  # Seconds to wait after student service is ready before starting admin pods.
+  studentSoakSeconds: 60
+  env: []
+  # - name: ASPNETCORE_ENVIRONMENT
+  #   value: Production
+
+# -- Ingress (optional) -------------------------------------------------------
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: cena.example.com
+      paths:
+        - path: /api/student
+          pathType: Prefix
+          service: student
+        - path: /api/admin
+          pathType: Prefix
+          service: admin
+  tls: []
+  # - secretName: cena-tls
+  #   hosts:
+  #     - cena.example.com
+
+# -- Image pull secrets -------------------------------------------------------
+
+imagePullSecrets: []
+# - name: ghcr-credentials
+
+# -- Service account ----------------------------------------------------------
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# -- Pod-level settings -------------------------------------------------------
+
+podAnnotations: {}
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  fsGroup: 10001
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+nodeSelector: {}
+tolerations: []
+affinity: {}

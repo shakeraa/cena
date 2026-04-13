@@ -325,6 +325,44 @@ public class StudentProfileSnapshot
             DefaultEnrollmentId = e.EnrollmentId;
         }
     }
+
+    // ── TENANCY-P2a: V3 events with enrollment-scoped mastery keys ──
+
+    public void Apply(ConceptAttempted_V3 e)
+    {
+        var key = MasteryKeys.Key(e.EnrollmentId, e.ConceptId);
+        if (!ConceptMastery.ContainsKey(key))
+            ConceptMastery[key] = new ConceptMasteryState();
+
+        var state = ConceptMastery[key];
+        state.PKnown = e.PosteriorMastery;
+        state.TotalAttempts++;
+        if (e.IsCorrect) state.CorrectCount++;
+        state.LastAttemptedAt = e.Timestamp;
+        state.LastMethodology = e.MethodologyActive;
+    }
+
+    public void Apply(ConceptMastered_V2 e)
+    {
+        var key = MasteryKeys.Key(e.EnrollmentId, e.ConceptId);
+        if (!ConceptMastery.ContainsKey(key))
+            ConceptMastery[key] = new ConceptMasteryState();
+
+        ConceptMastery[key].IsMastered = true;
+        ConceptMastery[key].MasteredAt = e.Timestamp;
+        HalfLifeMap[key] = e.InitialHalfLifeHours;
+    }
+
+    public void Apply(MasterySeepageApplied_V1 e)
+    {
+        var key = MasteryKeys.Key(e.TargetEnrollmentId, e.ConceptId);
+        if (!ConceptMastery.ContainsKey(key))
+            ConceptMastery[key] = new ConceptMasteryState();
+
+        ConceptMastery[key].PKnown = e.SeededPKnown;
+        ConceptMastery[key].SourceEnrollmentId = e.SourceEnrollmentId;
+        ConceptMastery[key].SeepageFactor = e.SeepageFactor;
+    }
 }
 
 public class ConceptMasteryState
@@ -337,4 +375,20 @@ public class ConceptMasteryState
     public DateTimeOffset? LastAttemptedAt { get; set; }
     public DateTimeOffset? MasteredAt { get; set; }
     public string? LastMethodology { get; set; }
+
+    // TENANCY-P2a: Cross-track seepage audit fields
+    public string? SourceEnrollmentId { get; set; }
+    public double? SeepageFactor { get; set; }
+}
+
+public static class MasteryKeys
+{
+    public static string Key(string enrollmentId, string conceptId) => $"{enrollmentId}:{conceptId}";
+
+    public static (string EnrollmentId, string ConceptId) Parse(string key)
+    {
+        var idx = key.IndexOf(':');
+        if (idx < 0) return ("default", key);
+        return (key[..idx], key[(idx + 1)..]);
+    }
 }

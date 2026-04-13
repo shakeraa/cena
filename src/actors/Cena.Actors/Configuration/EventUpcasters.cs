@@ -148,3 +148,70 @@ public sealed class QuestionAiGeneratedV1ToV2Upcaster
         LearningObjectiveId: null
     );
 }
+
+// =============================================================================
+// TENANCY-P2a — Enrollment-scoped mastery upcasters
+//
+// V2→V3 (ConceptAttempted): adds EnrollmentId, defaults to "default" for
+// legacy streams. V1→V2 (ConceptMastered): same pattern.
+// =============================================================================
+
+/// <summary>
+/// Upcasts <see cref="ConceptAttempted_V2"/> to <see cref="ConceptAttempted_V3"/>.
+/// Adds EnrollmentId defaulting to "default" for legacy events.
+/// </summary>
+public sealed class ConceptAttemptedV2ToV3Upcaster
+    : EventUpcaster<ConceptAttempted_V2, ConceptAttempted_V3>
+{
+    public static readonly ConceptAttemptedV2ToV3Upcaster Instance = new();
+
+    protected override ConceptAttempted_V3 Upcast(ConceptAttempted_V2 old) => new(
+        StudentId: old.StudentId,
+        ConceptId: old.ConceptId,
+        SessionId: old.SessionId,
+        IsCorrect: old.IsCorrect,
+        ResponseTimeMs: old.ResponseTimeMs,
+        QuestionId: old.QuestionId,
+        QuestionType: old.QuestionType,
+        MethodologyActive: old.MethodologyActive,
+        ErrorType: old.ErrorType,
+        PriorMastery: old.PriorMastery,
+        PosteriorMastery: old.PosteriorMastery,
+        HintCountUsed: old.HintCountUsed,
+        WasSkipped: old.WasSkipped,
+        AnswerHash: old.AnswerHash,
+        BackspaceCount: old.BackspaceCount,
+        AnswerChangeCount: old.AnswerChangeCount,
+        WasOffline: old.WasOffline,
+        Timestamp: old.Timestamp,
+        Duration: old.Duration,
+        EnrollmentId: "default",
+        QuestionDifficulty: old.QuestionDifficulty,
+        DifficultyGap: old.DifficultyGap,
+        DifficultyFrame: old.DifficultyFrame,
+        FocusState: old.FocusState
+    );
+}
+
+/// <summary>
+/// Upcasts <see cref="ConceptMastered_V1"/> to <see cref="ConceptMastered_V2"/>.
+/// Adds EnrollmentId defaulting to "default" for legacy events.
+/// </summary>
+public sealed class ConceptMasteredV1ToV2Upcaster
+    : EventUpcaster<ConceptMastered_V1, ConceptMastered_V2>
+{
+    public static readonly ConceptMasteredV1ToV2Upcaster Instance = new();
+
+    protected override ConceptMastered_V2 Upcast(ConceptMastered_V1 old) => new(
+        StudentId: old.StudentId,
+        ConceptId: old.ConceptId,
+        SessionId: old.SessionId,
+        MasteryLevel: old.MasteryLevel,
+        TotalAttempts: old.TotalAttempts,
+        TotalSessions: old.TotalSessions,
+        MethodologyAtMastery: old.MethodologyAtMastery,
+        InitialHalfLifeHours: old.InitialHalfLifeHours,
+        Timestamp: old.Timestamp,
+        EnrollmentId: "default"
+    );
+}

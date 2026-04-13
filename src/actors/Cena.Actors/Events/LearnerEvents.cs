@@ -106,6 +106,73 @@ public record MasteryDecayed_V1(
     double HoursSinceLastReview
 );
 
+// ═══════════════════════════════════════════════════════════════════════════
+// TENANCY-P2a: Enrollment-scoped mastery events
+// ═══════════════════════════════════════════════════════════════════════════
+
+/// <summary>
+/// V3 of ConceptAttempted — adds EnrollmentId for per-track mastery keying.
+/// Upcasted from V2 with EnrollmentId defaulting to "default" for legacy events.
+/// </summary>
+public record ConceptAttempted_V3(
+    string StudentId,
+    string ConceptId,
+    string SessionId,
+    bool IsCorrect,
+    int ResponseTimeMs,
+    string QuestionId,
+    string QuestionType,
+    string MethodologyActive,
+    string ErrorType,
+    double PriorMastery,
+    double PosteriorMastery,
+    int HintCountUsed,
+    bool WasSkipped,
+    string AnswerHash,
+    int BackspaceCount,
+    int AnswerChangeCount,
+    bool WasOffline,
+    DateTimeOffset Timestamp,
+    TimeSpan Duration,
+    string EnrollmentId,
+    float QuestionDifficulty = 0f,
+    float DifficultyGap = 0f,
+    string? DifficultyFrame = null,
+    string? FocusState = null
+) : IDelegatedEvent;
+
+/// <summary>
+/// V2 of ConceptMastered — adds EnrollmentId for per-track mastery keying.
+/// Upcasted from V1 with EnrollmentId defaulting to "default" for legacy events.
+/// </summary>
+public record ConceptMastered_V2(
+    string StudentId,
+    string ConceptId,
+    string SessionId,
+    double MasteryLevel,
+    int TotalAttempts,
+    int TotalSessions,
+    string MethodologyAtMastery,
+    double InitialHalfLifeHours,
+    DateTimeOffset Timestamp,
+    string EnrollmentId
+) : IDelegatedEvent;
+
+/// <summary>
+/// TENANCY-P2a: Emitted when mastery state seeps from a source enrollment
+/// to a newly created target enrollment. One-time, auditable, never inflates.
+/// </summary>
+public record MasterySeepageApplied_V1(
+    string StudentId,
+    string SourceEnrollmentId,
+    string TargetEnrollmentId,
+    string ConceptId,
+    double SeepageFactor,
+    double SourcePKnown,
+    double SeededPKnown,
+    DateTimeOffset AppliedAt
+);
+
 /// <summary>
 /// Emitted when the active pedagogy methodology changes for a concept.
 /// </summary>
