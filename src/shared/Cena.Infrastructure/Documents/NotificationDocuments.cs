@@ -40,7 +40,9 @@ public class WebPushSubscriptionDocument
     public string Endpoint { get; set; } = "";
     public string P256dh { get; set; } = ""; // Public key
     public string Auth { get; set; } = "";   // Auth secret
+    public string? DeviceLabel { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime? LastUsedAt { get; set; }
 }
 
 /// <summary>
@@ -55,6 +57,11 @@ public class NotificationPreferencesDocument
     public bool PushEnabled { get; set; } = false;
     public bool SmsEnabled { get; set; } = false;
     public bool InAppEnabled { get; set; } = true;
+    public bool SessionReminderEnabled { get; set; } = true;
+    public bool AssignmentDueEnabled { get; set; } = true;
+    public bool TeacherMessageEnabled { get; set; } = true;
+    public bool WeeklySummaryEnabled { get; set; } = false;
+    public bool MasteryMilestoneEnabled { get; set; } = true;
     public string Timezone { get; set; } = "UTC";
     public int? QuietHoursStartLocal { get; set; } // hour 0-23, null = no quiet window
     public int? QuietHoursEndLocal { get; set; }

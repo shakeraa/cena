@@ -19,6 +19,7 @@ using Cena.Actors.Mastery;
 using Cena.Actors.Projections;
 using Cena.Actors.Services;
 using Cena.Api.Contracts.Sessions;
+using Cena.Api.Host.Endpoints;
 using Cena.Infrastructure.Documents;
 
 namespace Cena.Actors.Tests.Session;

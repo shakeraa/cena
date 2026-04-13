@@ -9,6 +9,7 @@
 //   5. In-app fallback works when external channels are down
 // =============================================================================
 
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Notifications;
 using Cena.Actors.Projections;
 using Cena.Infrastructure.Documents;
@@ -32,9 +33,10 @@ public sealed class NotificationChannelServiceTests
     private readonly ISmsSender _smsSender = Substitute.For<ISmsSender>();
     private readonly ILogger<NotificationChannelService> _logger =
         NullLogger<NotificationChannelService>.Instance;
+    private readonly IClock _clock = Substitute.For<IClock>();
 
     private NotificationChannelService CreateSut() =>
-        new(_store, _analytics, _webPush, _emailSender, _smsSender, _logger);
+        new(_store, _analytics, _webPush, _emailSender, _smsSender, _logger, _clock);
 
     private static NotificationDocument MakeNotification(string studentId = "stu-001") => new()
     {
@@ -462,7 +464,7 @@ public sealed class NotificationChannelServiceTests
             throw new NotImplementedException();
         public IMartenQueryableIncludeBuilder<T, TKey, TInclude> Include<TKey, TInclude>(IDictionary<TKey, List<TInclude>> dictionary) where TKey : notnull where TInclude : notnull =>
             throw new NotImplementedException();
-        public IMartenQueryable<T> WhereSub<TSub>(System.Linq.Expressions.Expression<Func<TSub, bool>> filter) where TSub : notnull =>
+        public IMartenQueryable<T> WhereSub<TSub>(System.Linq.Expressions.Expression<Func<TSub, bool>> filter) where TSub : T =>
             throw new NotImplementedException();
         public IMartenQueryable<T> Stats(out QueryStatistics stats)
         {

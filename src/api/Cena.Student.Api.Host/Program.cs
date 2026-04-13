@@ -99,6 +99,11 @@ builder.Services.AddHostedService(sp => sp.GetRequiredService<NatsEventSubscribe
 // ---- STB-07b: Notification Dispatcher ----
 builder.Services.AddHostedService<NotificationDispatcher>();
 
+// ---- PWA-BE-002: Web Push dispatch + rate limiting ----
+builder.Services.AddSingleton<IPushNotificationRateLimiter, PushNotificationRateLimiter>();
+builder.Services.AddScoped<IWebPushDispatchService, WebPushDispatchService>();
+builder.Services.AddHostedService<PushNotificationTriggerService>();
+
 // ---- HARDEN SessionEndpoints: Question Bank Service ----
 // ---- FIND-pedagogy-016: Adaptive Question Pool for REST session seeding ----
 // AdaptiveQuestionPool needs IQuestionSelector (stateless, singleton-safe) and

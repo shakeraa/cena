@@ -13,6 +13,7 @@ using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -35,9 +36,19 @@ public static class NotificationsEndpoints
         group.MapPost("/{id}/snooze", SnoozeNotification).WithName("SnoozeNotification");
         group.MapPost("/test", CreateTestNotification).WithName("CreateTestNotification");
 
-        // Web Push endpoints
+        // Web Push endpoints (PWA-BE-002)
         group.MapPost("/web-push/subscribe", SubscribeWebPush).WithName("SubscribeWebPush");
         group.MapPost("/web-push/unsubscribe", UnsubscribeWebPush).WithName("UnsubscribeWebPush");
+
+        // PWA-BE-002: VAPID public key (unauthenticated, cacheable)
+        app.MapGet("/api/notifications/vapid-key", GetVapidPublicKey)
+            .WithName("GetVapidPublicKey")
+            .WithTags("Notifications")
+            .AllowAnonymous();
+
+        // PWA-BE-002: Notification preferences
+        group.MapGet("/preferences", GetNotificationPreferences).WithName("GetNotificationPreferences");
+        group.MapPut("/preferences", UpdateNotificationPreferences).WithName("UpdateNotificationPreferences");
 
         return app;
     }
@@ -334,8 +345,92 @@ public static class NotificationsEndpoints
         return Results.Ok(new { NotificationId = notificationId, CreatedAt = notification.CreatedAt });
     }
 
-    // POST /api/notifications/web-push/subscribe (STB-07b)
-    private static async Task<IResult> SubscribeWebPush(
+    // GET /api/notifications/vapid-key (PWA-BE-002)
+    internal static IResult GetVapidPublicKey(IConfiguration configuration)
+    {
+        var publicKey = configuration["WebPush:VapidPublicKey"];
+        if (string.IsNullOrWhiteSpace(publicKey))
+            return Results.NotFound(new { Error = "VAPID public key not configured" });
+
+        return Results.Ok(new { PublicKey = publicKey });
+    }
+
+    // GET /api/notifications/preferences (PWA-BE-002)
+    internal static async Task<IResult> GetNotificationPreferences(
+        HttpContext ctx,
+        IDocumentStore store)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.QuerySession();
+        var prefs = await session.Query<NotificationPreferencesDocument>()
+            .FirstOrDefaultAsync(p => p.StudentId == studentId);
+
+        if (prefs == null)
+        {
+            prefs = new NotificationPreferencesDocument
+            {
+                Id = $"prefs/{studentId}",
+                StudentId = studentId
+            };
+        }
+
+        return Results.Ok(prefs);
+    }
+
+    // PUT /api/notifications/preferences (PWA-BE-002)
+    internal static async Task<IResult> UpdateNotificationPreferences(
+        HttpContext ctx,
+        IDocumentStore store,
+        NotificationPreferencesDocument dto)
+    {
+        var studentId = GetStudentId(ctx.User);
+        if (string.IsNullOrEmpty(studentId))
+            return Results.Unauthorized();
+
+        ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+        await using var session = store.LightweightSession();
+        var prefs = await session.Query<NotificationPreferencesDocument>()
+            .FirstOrDefaultAsync(p => p.StudentId == studentId);
+
+        if (prefs == null)
+        {
+            prefs = new NotificationPreferencesDocument
+            {
+                Id = $"prefs/{studentId}",
+                StudentId = studentId
+            };
+        }
+
+        prefs.EmailEnabled = dto.EmailEnabled;
+        prefs.PushEnabled = dto.PushEnabled;
+        prefs.SmsEnabled = dto.SmsEnabled;
+        prefs.InAppEnabled = dto.InAppEnabled;
+        prefs.SessionReminderEnabled = dto.SessionReminderEnabled;
+        prefs.AssignmentDueEnabled = dto.AssignmentDueEnabled;
+        prefs.TeacherMessageEnabled = dto.TeacherMessageEnabled;
+        prefs.WeeklySummaryEnabled = dto.WeeklySummaryEnabled;
+        prefs.MasteryMilestoneEnabled = dto.MasteryMilestoneEnabled;
+        prefs.Timezone = dto.Timezone;
+        prefs.QuietHoursStartLocal = dto.QuietHoursStartLocal;
+        prefs.QuietHoursEndLocal = dto.QuietHoursEndLocal;
+        prefs.DailyReminder = dto.DailyReminder;
+        prefs.MaxXpNotificationsPerHour = dto.MaxXpNotificationsPerHour;
+        prefs.UpdatedAt = DateTime.UtcNow;
+
+        session.Store(prefs);
+        await session.SaveChangesAsync();
+
+        return Results.Ok(prefs);
+    }
+
+    // POST /api/notifications/web-push/subscribe (STB-07b + PWA-BE-002)
+    internal static async Task<IResult> SubscribeWebPush(
         HttpContext ctx,
         IDocumentStore store,
         WebPushSubscribeDto dto)
@@ -371,6 +466,10 @@ public static class NotificationsEndpoints
                 existing.Auth = dto.Keys.Auth;
                 session.Store(existing);
             }
+            existing.LastUsedAt = DateTime.UtcNow;
+            if (!string.IsNullOrWhiteSpace(dto.DeviceLabel))
+                existing.DeviceLabel = dto.DeviceLabel;
+            session.Store(existing);
         }
         else
         {
@@ -382,7 +481,9 @@ public static class NotificationsEndpoints
                 Endpoint = dto.Endpoint,
                 P256dh = dto.Keys.P256dh,
                 Auth = dto.Keys.Auth,
-                CreatedAt = DateTime.UtcNow
+                DeviceLabel = dto.DeviceLabel,
+                CreatedAt = DateTime.UtcNow,
+                LastUsedAt = DateTime.UtcNow
             };
             session.Store(subscription);
         }
@@ -397,7 +498,7 @@ public static class NotificationsEndpoints
     }
 
     // POST /api/notifications/web-push/unsubscribe (STB-07b)
-    private static async Task<IResult> UnsubscribeWebPush(
+    internal static async Task<IResult> UnsubscribeWebPush(
         HttpContext ctx,
         IDocumentStore store,
         WebPushUnsubscribeDto dto)
@@ -453,7 +554,8 @@ public record SnoozeRequestDto(int? DurationMinutes = null);
 
 public record WebPushSubscribeDto(
     string Endpoint,
-    WebPushKeysDto? Keys
+    WebPushKeysDto? Keys,
+    string? DeviceLabel = null
 );
 
 public record WebPushKeysDto(

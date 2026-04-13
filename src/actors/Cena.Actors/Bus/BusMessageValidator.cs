@@ -86,6 +86,17 @@ public static class BusMessageValidator
         return BusValidationResult.Ok();
     }
 
+    public static BusValidationResult Validate(BusGetSessionSnapshot msg)
+    {
+        if (!IsValidId(msg.StudentId))
+            return BusValidationResult.Reject("GetSessionSnapshot.StudentId is invalid");
+
+        if (!IsValidId(msg.SessionId))
+            return BusValidationResult.Reject("GetSessionSnapshot.SessionId is invalid");
+
+        return BusValidationResult.Ok();
+    }
+
     public static BusValidationResult Validate(BusConceptAttempt msg)
     {
         if (!IsValidId(msg.StudentId))
