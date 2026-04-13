@@ -3,6 +3,7 @@
 // Computes and maintains analytics projections
 // =============================================================================
 
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Serving;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -13,13 +14,16 @@ public class AnalyticsRollupService : IAnalyticsRollupService
 {
     private readonly IDocumentStore _store;
     private readonly ILogger<AnalyticsRollupService> _logger;
+    private readonly IClock _clock;
 
     public AnalyticsRollupService(
         IDocumentStore store,
-        ILogger<AnalyticsRollupService> logger)
+        ILogger<AnalyticsRollupService> logger,
+        IClock clock)
     {
         _store = store;
         _logger = logger;
+        _clock = clock;
     }
 
     public async Task RecordStudyTimeAsync(
@@ -73,12 +77,12 @@ public class AnalyticsRollupService : IAnalyticsRollupService
         }
 
         // Update hourly distribution
-        var hour = DateTime.UtcNow.Hour;
+        var hour = _clock.UtcDateTime.Hour;
         if (!breakdown.HourlyDistribution.ContainsKey(hour))
             breakdown.HourlyDistribution[hour] = 0;
         breakdown.HourlyDistribution[hour] += minutes;
 
-        breakdown.UpdatedAt = DateTime.UtcNow;
+        breakdown.UpdatedAt = _clock.UtcDateTime;
         session.Store(breakdown);
         await session.SaveChangesAsync(ct);
 
@@ -139,7 +143,7 @@ public class AnalyticsRollupService : IAnalyticsRollupService
         // Update best time recommendation
         profile.Overall.BestTimeRecommendation = FindBestTime(profile.ByTimeOfDay);
 
-        profile.UpdatedAt = DateTime.UtcNow;
+        profile.UpdatedAt = _clock.UtcDateTime;
         session.Store(profile);
         await session.SaveChangesAsync(ct);
     }

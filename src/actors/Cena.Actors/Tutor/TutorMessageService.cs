@@ -19,6 +19,7 @@
 //      call the same code path — no drift possible).
 // =============================================================================
 
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Documents;
 using Microsoft.Extensions.Logging;
@@ -120,6 +121,7 @@ public sealed class TutorMessageService : ITutorMessageService
     private readonly ISafeguardingClassifier _classifier;
     private readonly ISafeguardingEscalation _escalation;
     private readonly ILogger<TutorMessageService> _logger;
+    private readonly IClock _clock;
 
     public TutorMessageService(
         ITutorMessageRepository repository,
@@ -127,7 +129,8 @@ public sealed class TutorMessageService : ITutorMessageService
         ITutorPromptScrubber scrubber,
         ISafeguardingClassifier classifier,
         ISafeguardingEscalation escalation,
-        ILogger<TutorMessageService> logger)
+        ILogger<TutorMessageService> logger,
+        IClock clock)
     {
         _repository = repository;
         _llmService = llmService;
@@ -135,6 +138,7 @@ public sealed class TutorMessageService : ITutorMessageService
         _classifier = classifier;
         _escalation = escalation;
         _logger = logger;
+        _clock = clock;
     }
 
     public async Task<SendTutorMessageResult> SendAsync(
@@ -173,7 +177,7 @@ public sealed class TutorMessageService : ITutorMessageService
         if (thread is null)
             return new SendTutorMessageResult.ThreadNotFound();
 
-        var now = DateTime.UtcNow;
+        var now = _clock.UtcDateTime;
 
         // ── FIND-privacy-008: PII scrubbing on the content before LLM ──
         // We build a StudentPiiContext from the known student data.
@@ -272,7 +276,7 @@ public sealed class TutorMessageService : ITutorMessageService
 
         // Persist the assistant message + analytics event + updated thread.
         var assistantMessageId = $"tutor_msg_{Guid.NewGuid():N}";
-        var assistantCreatedAt = DateTime.UtcNow;
+        var assistantCreatedAt = _clock.UtcDateTime;
         var assistantMessage = new TutorMessageDocument
         {
             Id = assistantMessageId,
@@ -300,7 +304,7 @@ public sealed class TutorMessageService : ITutorMessageService
             Role: "tutor",
             MessagePreview: preview,
             SourceCount: 0,
-            Timestamp: DateTimeOffset.UtcNow);
+            Timestamp: _clock.UtcNow);
 
         await _repository.PersistAssistantMessageAsync(thread, assistantMessage, tutoringEvent, ct);
 

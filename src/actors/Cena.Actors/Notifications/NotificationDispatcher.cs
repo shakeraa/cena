@@ -16,6 +16,7 @@ using Marten;
 using NATS.Client.Core;
 using Cena.Actors.Bus;
 using Cena.Actors.Events;
+using Cena.Actors.Infrastructure;
 using Cena.Infrastructure.Documents;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
@@ -31,17 +32,20 @@ public class NotificationDispatcher : BackgroundService
     private readonly IDocumentStore _store;
     private readonly INotificationChannelService? _channelService;
     private readonly ILogger<NotificationDispatcher> _logger;
+    private readonly IClock _clock;
 
     public NotificationDispatcher(
         INatsConnection nats,
         IDocumentStore store,
         ILogger<NotificationDispatcher> logger,
-        INotificationChannelService? channelService = null)
+        INotificationChannelService? channelService = null,
+        IClock? clock = null)
     {
         _nats = nats;
         _store = store;
         _logger = logger;
         _channelService = channelService;
+        _clock = clock;
     }
 
     protected override async Task ExecuteAsync(CancellationToken ct)
@@ -137,7 +141,7 @@ public class NotificationDispatcher : BackgroundService
     {
         // Persist the in-app notification via the injected store abstraction
         // so the handler is unit-testable without a live Marten connection.
-        var notification = BuildNotification(studentId, evt);
+        var notification = BuildNotification(studentId, evt, _clock.UtcDateTime);
         await PersistNotificationAsync(notification, ct);
 
         // Dispatch to external channels (best-effort, never blocks in-app persistence)
@@ -166,7 +170,7 @@ public class NotificationDispatcher : BackgroundService
     /// Build the NotificationDocument for an XP event. Pure function — easy to
     /// unit-test assertions about title/body/kind.
     /// </summary>
-    internal static NotificationDocument BuildNotification(string studentId, XpAwarded_V1 evt)
+    internal static NotificationDocument BuildNotification(string studentId, XpAwarded_V1 evt, DateTime now)
     {
         var notificationId = Guid.NewGuid().ToString("N")[..16];
         return new NotificationDocument
@@ -179,7 +183,7 @@ public class NotificationDispatcher : BackgroundService
             Title = "XP Gained!",
             Body = $"You earned {evt.XpAmount} XP from {evt.Source}",
             IconName = "award",
-            CreatedAt = DateTime.UtcNow
+            CreatedAt = now
         };
     }
 

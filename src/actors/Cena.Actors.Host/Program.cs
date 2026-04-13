@@ -142,6 +142,9 @@ builder.Services.AddCenaAuthorization();
 // FIND-sec-014: Security metrics for observability
 builder.Services.AddSecurityMetrics();
 
+// IClock for deterministic time-based testing (FIND-qa-007)
+builder.Services.AddClock();
+
 // Firebase Admin SDK (required by AdminUserService/AdminRoleService)
 builder.Services.AddSingleton<Cena.Infrastructure.Firebase.IFirebaseAdminService,
     Cena.Infrastructure.Firebase.FirebaseAdminService>();

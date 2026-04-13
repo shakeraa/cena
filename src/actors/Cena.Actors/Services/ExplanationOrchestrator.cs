@@ -16,6 +16,7 @@
 // =============================================================================
 
 using System.Collections.Concurrent;
+using Cena.Actors.Infrastructure;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Services;
@@ -72,19 +73,22 @@ public sealed class ExplanationOrchestrator : IExplanationOrchestrator
     private readonly IL3ExplanationGenerator _l3Generator;
     private readonly IErrorClassificationService _errorClassifier;
     private readonly ILogger<ExplanationOrchestrator> _logger;
+    private readonly IClock _clock;
 
     public ExplanationOrchestrator(
         IExplanationCacheService cache,
         IExplanationGenerator generator,
         IL3ExplanationGenerator l3Generator,
         IErrorClassificationService errorClassifier,
-        ILogger<ExplanationOrchestrator> logger)
+        ILogger<ExplanationOrchestrator> logger,
+        IClock clock)
     {
         _cache = cache;
         _generator = generator;
         _l3Generator = l3Generator;
         _errorClassifier = errorClassifier;
         _logger = logger;
+        _clock = clock;
     }
 
     public async Task<string> ResolveAsync(ExplanationRequest request, CancellationToken ct)
@@ -217,7 +221,7 @@ public sealed class ExplanationOrchestrator : IExplanationOrchestrator
         var l3Ctx = request.L3Context!;
 
         // SAI-004: Check per-student daily output token budget
-        var budgetKey = $"l3:{DateTime.UtcNow:yyyy-MM-dd}";
+        var budgetKey = $"l3:{_clock.UtcDateTime:yyyy-MM-dd}";
         var currentUsage = s_dailyTokenUsage.GetValueOrDefault(budgetKey, 0);
         if (currentUsage >= DailyOutputTokenLimit)
         {
@@ -311,7 +315,7 @@ public sealed class ExplanationOrchestrator : IExplanationOrchestrator
             Text: generated.Text,
             ModelId: generated.ModelId,
             TokenCount: generated.TokenCount,
-            GeneratedAt: DateTimeOffset.UtcNow);
+            GeneratedAt: _clock.UtcNow);
 
         // Fire-and-forget cache write -- don't block the response
         _ = _cache.SetAsync(questionId, errorType, language, toCache, ct);
