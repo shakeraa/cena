@@ -138,7 +138,7 @@ public static class LaTeXSanitizer
 
                 if (AllowedCommands.Contains(command))
                 {
-                    result.Append(latex[start - 1..end]); // include backslash
+                    result.Append(latex[(start - 1)..end]); // include backslash
                 }
                 // else: unknown command — strip silently
 

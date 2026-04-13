@@ -72,8 +72,17 @@ public sealed class StepSolverQuestionDocument
     /// <summary>The question stem / problem statement shown to the student.</summary>
     public string Stem { get; set; } = "";
 
+    /// <summary>User-facing prompt text (alias for Stem used in seed data).</summary>
+    public string Prompt { get => Stem; set => Stem = value; }
+
     /// <summary>Subject slug (e.g., "math", "physics").</summary>
     public string Subject { get; set; } = "";
+
+    /// <summary>Topic within the subject (e.g., "algebra-linear-equations").</summary>
+    public string Topic { get; set; } = "";
+
+    /// <summary>Integer difficulty tier (1=easy, 2=medium, 3=hard).</summary>
+    public int Difficulty { get; set; }
 
     /// <summary>Concept being assessed (FK to concept graph).</summary>
     public string ConceptId { get; set; } = "";
@@ -86,6 +95,24 @@ public sealed class StepSolverQuestionDocument
 
     /// <summary>Ordered steps of the solution. Must have at least 2 steps.</summary>
     public IReadOnlyList<SolutionStep> Steps { get; set; } = Array.Empty<SolutionStep>();
+
+    /// <summary>
+    /// Flat list of canonical step expressions for seed data.
+    /// At runtime, prefer the rich Steps collection; CanonicalSteps is a convenience
+    /// setter that builds SolutionStep objects with just the expression.
+    /// </summary>
+    public string[] CanonicalSteps
+    {
+        get => Steps.Select(s => s.ExpectedExpression).ToArray();
+        set => Steps = value.Select((expr, i) => new SolutionStep
+        {
+            StepNumber = i + 1,
+            ExpectedExpression = expr
+        }).ToArray();
+    }
+
+    /// <summary>Curriculum track code (e.g., "MATH-BAGRUT-806").</summary>
+    public string? TrackCode { get; set; }
 
     /// <summary>The final answer expression (CAS-verifiable).</summary>
     public string FinalAnswer { get; set; } = "";
