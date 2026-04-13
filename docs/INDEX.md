@@ -12,8 +12,10 @@ Start with the **two master documents** — they consolidate everything else:
 
 | Document | Lines | What it covers |
 |----------|-------|----------------|
-| [Question Engine Architecture](research/cena-question-engine-architecture-2026-04-12.md) | 1,851 | 36 sections, 42 improvements: question types, ingestion, variants, figures, physics, step-solver, CAS engine, IRT, CAT, curriculum, RTL, motivation, security, privacy, accessibility, cost model |
+| [Question Engine Architecture](research/cena-question-engine-architecture-2026-04-12.md) | 2,500+ | 44 sections, 50 improvements: question types, ingestion, variants, figures, physics, step-solver, CAS engine, IRT, CAT, curriculum, RTL, motivation, security, privacy, accessibility, cost model, adversarial review, solution design |
 | [Game-Design Research Synthesis](research/cena-sexy-game-research-2026-04-11.md) | ~1,200 | 10-track research synthesis: Duolingo, Khan, Brilliant, competitors, gamification meta-analyses, SDT/flow, Israeli market, dark patterns, AI tutoring, game-design primitives |
+| [Mobile: PWA Approach](research/cena-mobile-pwa-approach.md) | ~250 | PWA architecture, capabilities, offline strategy, camera access, TWA wrapper, cost analysis, risks |
+| [Mobile: Flutter Approach](research/cena-mobile-flutter-approach.md) | ~250 | Flutter architecture, rendering parity challenge (Improvement #48), cost comparison, timeline impact |
 
 Everything below feeds into or is referenced by these two.
 
@@ -72,7 +74,7 @@ Everything below feeds into or is referenced by these two.
 
 | Document | Topic |
 |----------|-------|
-| [**research/cena-question-engine-architecture-2026-04-12.md**](research/cena-question-engine-architecture-2026-04-12.md) | **Master doc** — 36 sections, 42 improvements |
+| [**research/cena-question-engine-architecture-2026-04-12.md**](research/cena-question-engine-architecture-2026-04-12.md) | **Master doc** — 44 sections, 50 improvements |
 | [question-ingestion-specification.md](question-ingestion-specification.md) | Ingestion pipeline spec |
 | [question-quality-gate-research.md](question-quality-gate-research.md) | Question quality gate research |
 | [quality-gate-implementation.md](quality-gate-implementation.md) | Quality gate implementation |

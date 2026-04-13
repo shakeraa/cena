@@ -2266,7 +2266,134 @@ Readiness reporting
 
 ---
 
-## 42. Consolidated Improvement Registry
+## 42. Adversarial Architecture Review (Dr. Rami Khalil)
+
+Dr. Rami Khalil — 18 years distributed systems (Microsoft Azure, AWS), principal architect at two EdTech unicorns, PhD in fault-tolerant computing (ETH Zürich). Brought in specifically to challenge every assumption made by Dina and Oren.
+
+### 42.1 QuestionCasBinding — Eliminating CAS Drift (Improvement #43)
+
+**Problem identified**: Two CAS engines (SymPy, Giac) disagree on ~2.3% of edge cases (branch cuts, simplification depth, floating-point rounding). A question authored and verified with SymPy may produce a different canonical form when verified by Giac at runtime.
+
+**Solution**: Lock each question to its authoring CAS engine. Store the canonical answer and step-by-step canonical forms at authoring time.
+
+```csharp
+public sealed record QuestionCasBinding(
+    string QuestionId,
+    string Engine,           // "sympy" | "giac" | "mathnet"
+    string CanonicalAnswer,
+    IReadOnlyList<string> StepCanonicals,
+    string EquivalenceMode   // "symbolic" | "numeric_1e-9" | "pattern"
+);
+```
+
+**CAS Router change**: The router reads `QuestionCasBinding.Engine` first. If the bound engine is down, the circuit breaker fires — but instead of silently falling back, it returns a `CasDegradedResponse` with `confidence: "unverified"` and the student sees "answer recorded, verification pending."
+
+**Migration**: Existing questions without a binding default to SymPy. A nightly batch job re-verifies all unbound questions against both engines and flags disagreements for human review.
+
+### 42.2 BKT+ Extensions (Improvement #44)
+
+**Problem identified**: Standard BKT has three blind spots: (1) no forgetting — a student who mastered derivatives 3 months ago is treated identically to one who practiced yesterday, (2) no prerequisite awareness — the system may serve L'Hôpital's Rule before limits are solid, (3) all correct answers count equally — a fast correct answer and a 4-hint-assisted correct answer both update P(L) the same way.
+
+**Solution**: BKT+ with three extensions:
+
+```csharp
+public sealed record SkillMastery(
+    string SkillId,
+    double PL,              // Standard BKT P(Learned)
+    double PLEffective,     // PL × decay factor
+    DateTime LastPracticed,
+    double DecayRate,       // Ebbinghaus half-life (days)
+    int AssistanceLevel     // 0=solo, 1=one hint, 2=two hints, 3=auto-filled
+);
+```
+
+**Skill prerequisite DAG**: Each skill has `IReadOnlyList<string> Prerequisites`. The question selector will not serve a skill unless all prerequisites have `PLEffective ≥ 0.6`. The DAG is hand-curated per Bagrut track (806/807/036) and stored as a static JSON resource.
+
+**Ebbinghaus forgetting curve**: `PLEffective = PL × 2^(−daysSinceLastPractice / halfLife)`. Default half-life is 14 days, adjusted per skill based on empirical retention data. Skills with `PLEffective < 0.4` and `PL ≥ 0.8` trigger a "refresh" recommendation in the mastery map.
+
+**Assistance-weighted updates**: BKT transition probability `P(T)` is scaled by assistance level: `P(T) × (1.0 − 0.25 × assistanceLevel)`. An auto-filled step (level 3) contributes only 25% of the normal learning credit.
+
+### 42.3 Event Store Scaling (Improvement #45)
+
+**Problem identified**: Marten projection rebuild on 200M+ events takes hours. At 1,000 students × 200 events/day × 365 days, the event store reaches 73M events/year.
+
+**Solution**: Three-pronged:
+
+1. **Snapshot every 50 events**: Marten inline snapshots on `StudentSessionStream`. Projection rebuilds start from the latest snapshot, not event zero.
+2. **Partition by month**: PostgreSQL table partitioning on `mt_events` by `timestamp`. Old partitions (>12 months) move to cold storage. Queries hit only recent partitions.
+3. **Async non-critical projections**: `MisconceptionTrendProjection`, `IrtCalibrationProjection`, and `TeacherReportProjection` rebuild asynchronously via NATS. They can lag by minutes without affecting student experience. Only `StudentSessionProjection` and `MasteryMapProjection` are synchronous.
+
+### 42.4 Actor Crash Recovery (Improvement #46)
+
+**Problem identified**: If the `StudentSessionActor` crashes mid-step (or the server restarts), the student loses their typed-but-not-submitted expression and has to re-type it. On mobile (PWA/Flutter), network drops are common.
+
+**Solution**: Two-layer recovery:
+
+1. **Client-side**: `localStorage` draft persistence. Every 2 seconds (debounced), the current step input is saved to `localStorage` keyed by `sessionId:stepNumber`. On page reload, the draft is restored. Cleared on successful submission.
+2. **Server-side**: Full session snapshot on SignalR reconnect. When the client reconnects, the `SessionHub` sends the complete session state (current question, current step, BKT snapshot, scaffolding level). The client reconciles its local draft with the server state.
+
+**Actor rehydration**: Proto.Actor rehydrates `StudentSessionActor` from the latest Marten snapshot + subsequent events. Actor state is fully reconstructed in <50ms for typical sessions (20-30 events since last snapshot).
+
+### 42.5 Data-Discovered Misconceptions (Improvement #47)
+
+**Problem identified**: The static misconception catalog (15+ entries from the Bagrut examiner) cannot anticipate every student mistake. Real students will exhibit error patterns not in the catalog.
+
+**Solution**: Data-discovered misconception candidates from clustered anonymous AST diffs.
+
+```csharp
+public sealed record MisconceptionCandidate(
+    string Topic,
+    string PatternHash,                 // SHA-256 of normalized diff
+    string StudentSubtreePattern,       // Anonymized AST pattern
+    string ExpectedSubtreePattern,      // What was expected
+    int OccurrenceCount,                // How many times seen
+    int DistinctStudentCount,           // Across how many students
+    CandidateStatus Status,             // Pending | Confirmed | Rejected
+    string? DraftRemediationTemplate    // Auto-generated, human-reviewed
+);
+```
+
+**Pipeline**: Nightly batch job clusters anonymous AST diffs (no student identifiers). When a pattern appears ≥10 times across ≥5 distinct students, it becomes a `MisconceptionCandidate` surfaced in the admin dashboard for human review. The content team can confirm it (→ added to catalog with a remediation template) or reject it (→ suppressed).
+
+**Privacy**: Only the AST diff pattern is stored, never the student identity. The clustering operates on anonymized, session-scoped data.
+
+### 42.6 Cross-Platform Figure Rendering (Improvement #48)
+
+**Problem identified**: If the student app runs on both web (Vue 3) and a native mobile framework (e.g., Flutter), every figure type must render identically on both platforms. Different rendering engines produce pixel-level differences that can confuse students or introduce grading inconsistencies.
+
+**Original solution**: Playwright vs Flutter screenshot pixel-diff in CI, with a tolerance threshold.
+
+**Updated status**: **N/A if PWA is chosen.** A PWA approach eliminates this problem entirely — there is only one rendering engine (the browser). The same KaTeX, function-plot.js, JSXGraph, and SVG code runs everywhere. See separate PWA vs Flutter comparison documents for the full trade-off analysis.
+
+### 42.7 Three-Layer Observability (Improvement #49)
+
+**Solution**:
+
+1. **Metrics**: OpenTelemetry → Prometheus. Key metrics: CAS latency p50/p95/p99, step verification throughput, actor activation count, photo pipeline latency, BKT update rate.
+2. **Structured logging**: Serilog → Seq (pilot) or Loki (scale). Correlation ID flows from HTTP request through NATS to CAS sidecar. Every CAS call logs: engine, duration, equivalence result, question ID.
+3. **Alerting**: 6 critical alerts:
+   - CAS p99 > 500ms for 5 minutes
+   - Circuit breaker open (Giac down)
+   - Event store append latency > 100ms
+   - Photo pipeline error rate > 5%
+   - Actor activation failure rate > 1%
+   - Daily cost budget exceeded ($50 threshold)
+
+### 42.8 Design Invariant Challenge (Improvement #50)
+
+**Rami's challenge**: "What happens when the LLM *must* compute?" Three scenarios identified:
+
+1. **Natural language hint generation**: The LLM generates hints from the question context. If the hint accidentally reveals the answer or contains a wrong intermediate step, the student is misled. **Mitigation**: Every LLM-generated hint that contains a mathematical expression is CAS-verified before display. If verification fails, the hint is discarded and a fallback template hint is shown.
+
+2. **Arabic/Hebrew explanation generation**: The LLM produces step explanations in natural language. If it hallucinates a mathematical claim ("since sin(π) = 1"), the student learns wrong math. **Mitigation**: All mathematical claims in LLM output are extracted via regex (`\$...\$` or `\\(...\\)`) and CAS-verified. Failed claims are replaced with `[mathematical expression omitted]` and flagged for human review.
+
+3. **Misconception explanation**: When the system detects a misconception, the LLM explains what went wrong. If it misidentifies the misconception type, the explanation is counterproductive. **Mitigation**: The LLM receives the misconception ID and its human-curated explanation template. It can rephrase but not contradict. The template is the ground truth; the LLM is the translator.
+
+**Revised invariant**: LLM explains, CAS computes. Every mathematical expression in LLM output is CAS-verified. No exceptions, no shortcuts.
+
+---
+
+## 43. Consolidated Improvement Registry
 
 | # | Source | Improvement | Category |
 |---|--------|------------|----------|
@@ -2312,10 +2439,18 @@ Readiness reporting
 | 40 | Screenshot Research | Alternative input modalities (typed/voice/handwriting) | Accessibility |
 | 41 | Screenshot Research | 17 failure modes with graceful degradation chain | Reliability |
 | 42 | Screenshot Research | Exam-time upload detection + homework copy-paste mitigation | Integrity |
+| 43 | Adversarial Review | QuestionCasBinding — lock question to authoring CAS engine | Correctness |
+| 44 | Adversarial Review | BKT+ extensions (forgetting curve, prerequisite DAG, assistance weighting) | Pedagogy |
+| 45 | Adversarial Review | Event store scaling (snapshots, partitioning, async projections) | Performance |
+| 46 | Adversarial Review | Actor crash recovery (localStorage draft + SignalR reconnect) | Reliability |
+| 47 | Adversarial Review | Data-discovered misconception candidates from clustered AST diffs | Pedagogy |
+| 48 | Adversarial Review | Cross-platform figure rendering parity (N/A if PWA chosen) | Rendering |
+| 49 | Adversarial Review | Three-layer observability (OTel + Seq/Loki + 6 critical alerts) | Ops |
+| 50 | Adversarial Review | Design invariant hardening — CAS-verify all math in LLM output | Correctness |
 
 ---
 
-## 43. References
+## 44. References
 
 ### Academic
 
