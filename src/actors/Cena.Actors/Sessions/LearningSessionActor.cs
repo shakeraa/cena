@@ -131,6 +131,7 @@ public sealed class LearningSessionActor : IActor
         {
             InitSession init => HandleInit(context, init),
             ResumeSessionRequest req => HandleResumeSession(context, req),
+            GetSessionSnapshot req => HandleGetSessionSnapshot(context, req),
             EvaluateAnswerRequest req => HandleEvaluateAnswer(context, req),
             RequestNextQuestion req => HandleNextQuestion(context, req),
             RequestHintMessage req => HandleHint(context, req),
@@ -630,6 +631,35 @@ public sealed class LearningSessionActor : IActor
         if (context.Parent != null)
             context.Send(context.Parent, new DelegateEvent(new QuestionSkipped_V1(
                 _studentId, _sessionId, req.ConceptId, req.QuestionId, req.TimeSpentMs)));
+
+        return Task.CompletedTask;
+    }
+
+    // ── Get Session Snapshot ──
+    // PWA-BE-001: Return a non-mutating snapshot of the current session state.
+    private Task HandleGetSessionSnapshot(IContext context, GetSessionSnapshot req)
+    {
+        if (_sessionId != req.SessionId)
+        {
+            context.Respond(new SessionSnapshotResponse(
+                req.SessionId, 0, null, new(), "full", new(),
+                DateTimeOffset.UtcNow, 0, Error: "session_not_found"));
+            return Task.CompletedTask;
+        }
+
+        var durationSeconds = (int)(DateTimeOffset.UtcNow - _startedAt).TotalSeconds;
+        var currentStepNumber = _questionsAttempted;
+        if (_currentConceptId != "") currentStepNumber++;
+
+        context.Respond(new SessionSnapshotResponse(
+            _sessionId,
+            currentStepNumber,
+            null, // current question id not tracked in runtime actor
+            new Dictionary<string, SkillMasteryDto>(),
+            "exploratory",
+            new List<StepResultDto>(),
+            _startedAt,
+            durationSeconds));
 
         return Task.CompletedTask;
     }

@@ -70,6 +70,10 @@ public sealed record BusResumeSession(
     [property: Pii(PiiLevel.Low, "identity")] string StudentId,
     string SessionId);
 
+public sealed record BusGetSessionSnapshot(
+    [property: Pii(PiiLevel.Low, "identity")] string StudentId,
+    string SessionId);
+
 // ── Account Lifecycle (LCM-001) ──
 
 public sealed record BusAccountStatusChanged(

@@ -130,11 +130,12 @@ public sealed class NatsBusRouter : BackgroundService
             SubscribeAndRoute<BusConceptAttempt>(NatsSubjects.ConceptAttempt, HandleConceptAttempt, stoppingToken),
             SubscribeAndRoute<BusMethodologySwitch>(NatsSubjects.MethodologySwitch, HandleMethodologySwitch, stoppingToken),
             SubscribeAndRoute<BusAddAnnotation>(NatsSubjects.Annotation, HandleAnnotation, stoppingToken),
+            SubscribeAndReply<BusGetSessionSnapshot, SessionSnapshotResponse>(NatsSubjects.SessionSnapshotRequest, HandleGetSessionSnapshot, stoppingToken),
             SubscribeAccountStatusChanges(stoppingToken),
             LogStats(stoppingToken)
         };
 
-        _logger.LogInformation("NatsBusRouter ready — listening on 6 command subjects + account status");
+        _logger.LogInformation("NatsBusRouter ready — listening on 6 command subjects + account status + session snapshot request/reply");
 
         await Task.WhenAll(tasks);
     }
@@ -198,6 +199,67 @@ public sealed class NatsBusRouter : BackgroundService
                     };
                     RecordError(category, subject, ex.Message, null);
                     _logger.LogError(ex, "Error routing message from {Subject}", subject);
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+    }
+
+    /// <summary>
+    /// PWA-BE-001: Request/reply subscription for session snapshot queries.
+    /// Reads the request, routes to the actor, and publishes the response to the reply subject.
+    /// </summary>
+    private async Task SubscribeAndReply<TRequest, TResponse>(
+        string subject,
+        Func<BusEnvelope<TRequest>, CancellationToken, Task<TResponse>> handler,
+        CancellationToken ct)
+    {
+        try
+        {
+            _logger.LogInformation("NatsBusRouter subscribing to request/reply {Subject}...", subject);
+
+            await foreach (var msg in _nats.SubscribeAsync<byte[]>(subject, cancellationToken: ct))
+            {
+                try
+                {
+                    if (msg.Data is null || msg.Data.Length == 0)
+                    {
+                        _logger.LogWarning("Empty message on {Subject}", subject);
+                        continue;
+                    }
+
+                    var envelope = JsonSerializer.Deserialize<BusEnvelope<TRequest>>(msg.Data, _jsonOpts);
+                    if (envelope?.Payload is null)
+                    {
+                        _logger.LogWarning("Deserialization returned null for message on {Subject}", subject);
+                        continue;
+                    }
+
+                    var response = await handler(envelope, ct);
+
+                    if (!string.IsNullOrEmpty(msg.ReplyTo))
+                    {
+                        var responseEnvelope = BusEnvelope<TResponse>.Create(msg.ReplyTo, response, "actor-host");
+                        var responseBytes = JsonSerializer.SerializeToUtf8Bytes(responseEnvelope, _jsonOpts);
+                        await _nats.PublishAsync(msg.ReplyTo, responseBytes);
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Request on {Subject} has no ReplyTo subject", subject);
+                    }
+                }
+                catch (JsonException ex)
+                {
+                    _logger.LogWarning(ex, "Failed to deserialize message on {Subject}", subject);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    break;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error handling request/reply on {Subject}", subject);
+                    // Client will treat timeout as session_expired / session_not_found
                 }
             }
         }
@@ -598,6 +660,38 @@ public sealed class NatsBusRouter : BackgroundService
         await PublishEventAsync(NatsSubjects.EventMethodologySwitched,
             new { p.StudentId, p.SessionId, p.FromMethodology, p.ToMethodology, p.Reason,
                   Timestamp = DateTimeOffset.UtcNow });
+    }
+
+    // ── Session Snapshot Request/Reply (PWA-BE-001) ──
+
+    private async Task<SessionSnapshotResponse> HandleGetSessionSnapshot(BusEnvelope<BusGetSessionSnapshot> env, CancellationToken ct)
+    {
+        var p = env.Payload;
+
+        if (!BusMessageValidator.ValidateEnvelope(env).LogIfRejected(_logger, NatsSubjects.SessionSnapshotRequest, env.MessageId))
+        { return new SessionSnapshotResponse(p.SessionId, 0, null, new(), "full", new(), DateTimeOffset.UtcNow, 0, Error: "session_not_found"); }
+        if (!BusMessageValidator.Validate(p).LogIfRejected(_logger, NatsSubjects.SessionSnapshotRequest, env.MessageId))
+        { return new SessionSnapshotResponse(p.SessionId, 0, null, new(), "full", new(), DateTimeOffset.UtcNow, 0, Error: "session_not_found"); }
+
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(GetAdaptiveTimeout());
+
+        try
+        {
+            var result = await _actorSystem.Cluster()
+                .RequestAsync<SessionSnapshotResponse>(p.StudentId, "student", new GetSessionSnapshot(p.StudentId, p.SessionId), cts.Token);
+
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            return new SessionSnapshotResponse(p.SessionId, 0, null, new(), "full", new(), DateTimeOffset.UtcNow, 0, Error: "session_expired");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to get session snapshot for {StudentId}/{SessionId}", p.StudentId, p.SessionId);
+            return new SessionSnapshotResponse(p.SessionId, 0, null, new(), "full", new(), DateTimeOffset.UtcNow, 0, Error: "session_not_found");
+        }
     }
 
     // ── Event Publishing ──

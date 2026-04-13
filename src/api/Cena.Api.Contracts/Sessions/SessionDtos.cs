@@ -223,3 +223,17 @@ public sealed record QuestionHistoryItemDto(
     bool IsCorrect,
     int TimeSpentSeconds,
     string? SelectedOption);
+
+// =============================================================================
+// PWA-BE-001: Session Snapshot DTO for SignalR reconnect
+// =============================================================================
+
+public sealed record SessionSnapshotDto(
+    string SessionId,
+    Cena.Api.Contracts.Content.QuestionDto? CurrentQuestion,
+    int CurrentStepNumber,
+    Dictionary<string, Cena.Actors.Sessions.SkillMasteryDto> BktSnapshot,
+    string ScaffoldingLevel,
+    List<Cena.Actors.Sessions.StepResultDto> CompletedSteps,
+    DateTimeOffset SessionStartedAt,
+    int SessionDurationSeconds);
