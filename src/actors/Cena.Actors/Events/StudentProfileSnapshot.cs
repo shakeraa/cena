@@ -57,6 +57,25 @@ public class StudentProfileSnapshot
     public bool ParentalConsentGiven { get; set; }
     public string ConsentStatus { get; set; } = "unknown_needs_reverification"; // "verified" | "pending_parent" | "not_required" | "unknown_needs_reverification"
 
+    // ── Multi-Institute Tenancy (TENANCY-P1e) ──
+    // ==========================================================================
+    // WHY THESE FIELDS EXIST:
+    // Before multi-institute tenancy (Phase 1), students had no institute or
+    // curriculum track binding. The P1e stream upcaster prepends a synthetic
+    // EnrollmentCreated_V1 event to legacy student streams, binding them to
+    // cena-platform + BAGRUT-GENERAL (a placeholder track). When the student
+    // next starts a session, the topic selection screen determines their actual
+    // track and a follow-up migration moves them from BAGRUT-GENERAL to the
+    // real track. These fields use first-wins semantics — once set by the first
+    // EnrollmentCreated_V1, subsequent enrollments do NOT overwrite.
+    // ==========================================================================
+
+    /// <summary>Institute the student is enrolled at. Set once by first EnrollmentCreated_V1.</summary>
+    public string? DefaultInstituteId { get; set; }
+
+    /// <summary>Enrollment record ID. Set once by first EnrollmentCreated_V1.</summary>
+    public string? DefaultEnrollmentId { get; set; }
+
     // ── Account Lifecycle (LCM-001) ──
     public string AccountStatus { get; set; } = "Active";
 
@@ -290,6 +309,22 @@ public class StudentProfileSnapshot
         ParentEmail = e.ParentEmail;
         ParentalConsentGiven = e.ParentalConsentGiven;
         ConsentStatus = e.ConsentStatus;
+    }
+
+    /// <summary>
+    /// TENANCY-P1e: Apply enrollment event. First-wins semantics — only the
+    /// FIRST EnrollmentCreated_V1 in the stream sets the default institute and
+    /// enrollment. Subsequent enrollments (track upgrades, transfers) do NOT
+    /// overwrite, ensuring idempotency under replay.
+    /// </summary>
+    public void Apply(EnrollmentCreated_V1 e)
+    {
+        // First-wins: only set if not already populated
+        if (DefaultInstituteId is null)
+        {
+            DefaultInstituteId = e.InstituteId;
+            DefaultEnrollmentId = e.EnrollmentId;
+        }
     }
 }
 
