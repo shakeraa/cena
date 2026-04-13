@@ -81,12 +81,15 @@ var pgMaxPool = builder.Configuration.GetValue<int>("PostgreSQL:MaxPoolSize", 50
 var pgMinPool = builder.Configuration.GetValue<int>("PostgreSQL:MinPoolSize", 5);
 builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, pgMaxPool, pgMinPool);
 
+// DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
+var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
+
 builder.Services.AddMarten(opts =>
 {
     // Marten uses the NpgsqlDataSource registered above via DI.
     // Connection string fallback for Marten's internal pool init.
     var pgConnectionString = CenaConnectionStrings.GetPostgres(builder.Configuration, builder.Environment);
-    opts.ConfigureCenaEventStore(pgConnectionString);
+    opts.ConfigureCenaEventStore(pgConnectionString, martenAutoCreate);
 }).UseNpgsqlDataSource();
 
 // =============================================================================
@@ -411,6 +414,26 @@ builder.Services.AddHealthChecks()
 // =============================================================================
 
 var app = builder.Build();
+
+// DB-03: Fail fast on schema drift in non-Development environments.
+// If AutoCreate is "None" and the DB schema does not match Marten config,
+// AssertDatabaseMatchesConfigurationAsync throws with a detailed diff.
+// The host process crashes, Kubernetes restarts, logs show the mismatch.
+if (!app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var store = scope.ServiceProvider.GetRequiredService<Marten.IDocumentStore>();
+    try
+    {
+        await store.Storage.AssertDatabaseMatchesConfigurationAsync();
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogCritical(ex, "DB-03: Schema drift detected! Database does not match Marten configuration. Run the migrator first.");
+        throw; // Crash the host — Kubernetes will restart, logs show the diff
+    }
+}
 
 // ---- ERR-001.4: Correlation ID middleware (first — sets CorrelationContext for all downstream) ----
 app.UseMiddleware<CorrelationIdMiddleware>();

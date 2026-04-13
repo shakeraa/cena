@@ -32,25 +32,45 @@ public static class MartenConfiguration
     /// Configures Marten using a shared NpgsqlDataSource (preferred).
     /// Ensures Marten shares the same connection pool as pgvector and other services.
     /// </summary>
-    public static void ConfigureCenaEventStore(this StoreOptions opts, NpgsqlDataSource dataSource)
+    /// <param name="autoCreateMode">
+    /// DB-03: AutoCreate mode from config. Defaults to "CreateOrUpdate" for backwards compatibility.
+    /// Production/Staging/Test should use "None" — schema changes go through the migrator (DB-02).
+    /// </param>
+    public static void ConfigureCenaEventStore(this StoreOptions opts, NpgsqlDataSource dataSource, string autoCreateMode = "CreateOrUpdate")
     {
         opts.Connection(dataSource);
-        ConfigureCommon(opts);
+        ConfigureCommon(opts, autoCreateMode);
     }
 
     /// <summary>
     /// Configures Marten with a raw connection string (legacy fallback).
     /// Marten creates its own internal pool — use NpgsqlDataSource overload when possible.
     /// </summary>
-    public static void ConfigureCenaEventStore(this StoreOptions opts, string connectionString)
+    /// <param name="autoCreateMode">
+    /// DB-03: AutoCreate mode from config. Defaults to "CreateOrUpdate" for backwards compatibility.
+    /// Production/Staging/Test should use "None" — schema changes go through the migrator (DB-02).
+    /// </param>
+    public static void ConfigureCenaEventStore(this StoreOptions opts, string connectionString, string autoCreateMode = "CreateOrUpdate")
     {
         opts.Connection(connectionString);
-        ConfigureCommon(opts);
+        ConfigureCommon(opts, autoCreateMode);
     }
 
-    private static void ConfigureCommon(StoreOptions opts)
+    private static void ConfigureCommon(StoreOptions opts, string autoCreateMode = "CreateOrUpdate")
     {
-        opts.AutoCreateSchemaObjects = JasperFx.AutoCreate.CreateOrUpdate;
+        // DB-03: AutoCreate mode is now configurable per environment.
+        // Production/Staging/Test = "None" (schema changes via migrator only).
+        // Development = "CreateOrUpdate" (speeds local iteration).
+        opts.AutoCreateSchemaObjects = autoCreateMode switch
+        {
+            "None" => JasperFx.AutoCreate.None,
+            "CreateOnly" => JasperFx.AutoCreate.CreateOnly,
+            "CreateOrUpdate" => JasperFx.AutoCreate.CreateOrUpdate,
+            "All" => JasperFx.AutoCreate.All,
+            _ => throw new InvalidOperationException(
+                $"Unknown Marten AutoCreate mode: \'{autoCreateMode}\'. " +
+                "Valid values: None, CreateOnly, CreateOrUpdate, All.")
+        };
         opts.DatabaseSchemaName = "cena";
 
         // ── Event Store Settings ──
