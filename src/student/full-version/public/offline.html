@@ -1,10 +1,12 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Cena — offline</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#7367F0">
+  <title>Cena — Offline</title>
   <style>
+    *,*::before,*::after{box-sizing:border-box}
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
       background: #f8f7ff;
@@ -14,36 +16,99 @@
       align-items: center;
       justify-content: center;
       min-height: 100vh;
+      min-height: 100dvh;
       padding: 1.5rem;
+      padding-bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
     }
     .card {
       max-width: 420px;
+      width: 100%;
       text-align: center;
       background: white;
       border-radius: 16px;
       padding: 2rem;
       box-shadow: 0 12px 36px rgba(115, 103, 240, 0.12);
     }
-    h1 { color: #7367F0; margin-top: 0; }
-    p { line-height: 1.5; }
+    .icon {
+      width: 64px; height: 64px;
+      margin: 0 auto 1rem;
+      border-radius: 50%;
+      background: #f0eeff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .icon svg { width: 32px; height: 32px; color: #7367F0; }
+    h1 { color: #7367F0; margin: 0 0 0.5rem; font-size: 1.5rem; }
+    p { line-height: 1.6; margin: 0 0 1.5rem; color: #5c5c6f; }
     button {
       background: #7367F0;
       color: white;
       border: none;
-      padding: 0.75rem 1.5rem;
+      padding: 0.75rem 2rem;
       border-radius: 8px;
       font-size: 1rem;
       cursor: pointer;
-      margin-top: 1rem;
+      min-height: 44px;
+      min-width: 44px;
+      touch-action: manipulation;
+      transition: background 0.2s;
     }
-    button:hover { background: #5e52d8; }
+    button:hover, button:focus-visible { background: #5e52d8; outline: 2px solid #7367F0; outline-offset: 2px; }
+    [dir="rtl"] { text-align: center; }
+    .lang-switch { margin-top: 1rem; display: flex; gap: 0.5rem; justify-content: center; }
+    .lang-switch a {
+      font-size: 0.85rem; color: #7367F0; text-decoration: none; cursor: pointer;
+      padding: 0.25rem 0.5rem; border-radius: 4px;
+    }
+    .lang-switch a:hover { background: #f0eeff; }
+    .lang-switch a.active { font-weight: 600; background: #f0eeff; }
   </style>
 </head>
 <body>
   <div class="card">
-    <h1>You're offline</h1>
-    <p>Cena needs an internet connection to sync your progress and load new sessions. Your recent work is still saved and will upload when you reconnect.</p>
-    <button onclick="location.reload()">Retry</button>
+    <div class="icon">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="1" y1="1" x2="23" y2="23"/>
+        <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"/>
+        <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"/>
+        <path d="M10.71 5.05A16 16 0 0 1 22.56 9"/>
+        <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"/>
+        <path d="M8.53 16.11a6 6 0 0 1 6.95 0"/>
+        <line x1="12" y1="20" x2="12.01" y2="20"/>
+      </svg>
+    </div>
+    <h1 id="title">You're offline</h1>
+    <p id="body">Cena needs an internet connection to sync your progress. Your recent work is saved and will upload when you reconnect.</p>
+    <button onclick="location.reload()" id="retry">Retry</button>
+    <div class="lang-switch">
+      <a onclick="setLang('en')" id="lang-en" class="active">English</a>
+      <a onclick="setLang('ar')" id="lang-ar">العربية</a>
+      <a onclick="setLang('he')" id="lang-he">עברית</a>
+    </div>
   </div>
+  <script>
+    var strings = {
+      en: { title: "You're offline", body: "Cena needs an internet connection to sync your progress. Your recent work is saved and will upload when you reconnect.", retry: "Retry", dir: "ltr" },
+      ar: { title: "أنت غير متصل", body: "يحتاج تطبيق Cena إلى اتصال بالإنترنت لمزامنة تقدمك. تم حفظ عملك الأخير وسيتم رفعه عند إعادة الاتصال.", retry: "إعادة المحاولة", dir: "rtl" },
+      he: { title: "אתה לא מחובר", body: "Cena צריכה חיבור לאינטרנט כדי לסנכרן את ההתקדמות שלך. העבודה האחרונה שלך נשמרה ותועלה כשתתחבר מחדש.", retry: "נסה שוב", dir: "rtl" }
+    };
+    function setLang(lang) {
+      var s = strings[lang] || strings.en;
+      document.getElementById('title').textContent = s.title;
+      document.getElementById('body').textContent = s.body;
+      document.getElementById('retry').textContent = s.retry;
+      document.documentElement.dir = s.dir;
+      document.documentElement.lang = lang;
+      document.querySelectorAll('.lang-switch a').forEach(function(a) { a.classList.remove('active'); });
+      document.getElementById('lang-' + lang).classList.add('active');
+      try { localStorage.setItem('cena-offline-lang', lang); } catch(e) {}
+    }
+    // Restore saved language preference
+    try {
+      var saved = localStorage.getItem('cena-student-locale') || localStorage.getItem('cena-offline-lang');
+      if (saved && strings[saved]) setLang(saved);
+    } catch(e) {}
+  </script>
 </body>
 </html>
