@@ -3,6 +3,7 @@
 // Verifies the classify -> cache -> generate -> fallback chain.
 // =============================================================================
 
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Services;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -16,13 +17,15 @@ public sealed class ExplanationOrchestratorTests
     private readonly IExplanationGenerator _generator = Substitute.For<IExplanationGenerator>();
     private readonly IL3ExplanationGenerator _l3Generator = Substitute.For<IL3ExplanationGenerator>();
     private readonly IErrorClassificationService _classifier = Substitute.For<IErrorClassificationService>();
+    private readonly IClock _clock = Substitute.For<IClock>();
     private readonly ExplanationOrchestrator _orchestrator;
 
     public ExplanationOrchestratorTests()
     {
         _orchestrator = new ExplanationOrchestrator(
             _cache, _generator, _l3Generator, _classifier,
-            NullLogger<ExplanationOrchestrator>.Instance);
+            NullLogger<ExplanationOrchestrator>.Instance,
+            _clock);
     }
 
     // =========================================================================

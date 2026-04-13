@@ -3,6 +3,7 @@
 // =============================================================================
 
 using Cena.Actors.Infrastructure;
+using Cena.Actors.Projections;
 
 namespace Cena.Actors.Tests.Infrastructure;
 
@@ -63,7 +64,13 @@ public sealed class FeatureFlagTests
     [Fact]
     public void FeatureFlag_Record_Properties()
     {
-        var flag = new FeatureFlag("test", true, 75.0, DateTimeOffset.UtcNow);
+        var flag = new FeatureFlagDocument
+        {
+            Name = "test",
+            Enabled = true,
+            RolloutPercent = 75.0,
+            UpdatedAt = DateTimeOffset.UtcNow
+        };
         Assert.Equal("test", flag.Name);
         Assert.True(flag.Enabled);
         Assert.Equal(75.0, flag.RolloutPercent);

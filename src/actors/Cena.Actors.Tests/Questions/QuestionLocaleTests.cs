@@ -15,6 +15,7 @@ using Cena.Actors.Events;
 using Cena.Actors.Questions;
 using Cena.Api.Host.Endpoints;
 using Cena.Infrastructure.Documents;
+using Microsoft.Extensions.Logging.Abstractions;
 
 namespace Cena.Actors.Tests.Questions;
 
