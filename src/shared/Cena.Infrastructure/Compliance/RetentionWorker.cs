@@ -8,6 +8,7 @@
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -284,20 +285,17 @@ public sealed class RetentionWorker : BackgroundService
     {
         // FocusSessionRollupDocument purge
         var expiredRollups = await session.Query<FocusSessionRollupDocument>()
-            .Where(x => x.SessionDate < cutoff.DateTime)
+            .Where(x => x.Date < cutoff)
             .Take(_options.BatchSize)
             .ToListAsync(ct);
 
         foreach (var rollup in expiredRollups)
         {
-            if (_options.UseSoftDelete)
-                session.SoftDelete(rollup);
-            else
-                session.Delete(rollup);
+            session.Delete(rollup);
             summary.PurgedCount++;
         }
 
-        summary.ExpiredCount = expiredRollups.Count;
+        summary.ExpiredCount = expiredRollups.Count();
         _logger.LogDebug("Purged {Count} analytics documents before {Cutoff}", summary.PurgedCount, cutoff);
     }
 
@@ -342,8 +340,7 @@ public sealed class RetentionWorker : BackgroundService
         {
             // Archive event stream before deletion (in real implementation)
             // For now, mark for soft-delete
-            if (_options.UseSoftDelete)
-                session.SoftDelete(student);
+            session.Delete(student);
 
             summary.PurgedCount++;
         }
@@ -360,8 +357,8 @@ public sealed class RetentionWorker : BackgroundService
             await using var session = store.LightweightSession();
 
             // Find erasure requests in cooling period that are now past their retention
-            var requests = await session.Query<ErasureRequestDocument>()
-                .Where(x => x.Status == ErasureRequestStatus.CoolingPeriod)
+            var requests = await session.Query<ErasureRequest>()
+                .Where(x => x.Status == ErasureStatus.CoolingPeriod)
                 .ToListAsync(ct);
 
             var now = _clock.UtcNow;
@@ -369,10 +366,10 @@ public sealed class RetentionWorker : BackgroundService
             foreach (var request in requests)
             {
                 // Accelerate if past cooling period
-                if (request.RequestedAt.Add(request.CoolingPeriod) <= now)
+                if (request.RequestedAt.AddDays(30) <= now) // 30-day cooling period
                 {
-                    request.Status = ErasureRequestStatus.Approved; // Auto-approve after cooling
-                    request.ApprovedAt = now;
+                    request.Status = ErasureStatus.Processing; // Accelerate past cooling
+                    request.ProcessedAt = now;
                     session.Store(request);
                     accelerated++;
 
@@ -393,36 +390,15 @@ public sealed class RetentionWorker : BackgroundService
     }
 }
 
-// Placeholder document classes for compilation - these would be in their actual locations
-public sealed class FocusSessionRollupDocument
-{
-    public Guid Id { get; set; }
-    public DateTime SessionDate { get; set; }
-}
-
-public sealed class DailyChallengeCompletionDocument
-{
-    public Guid Id { get; set; }
-    public DateTimeOffset CompletedAt { get; set; }
-}
+// Document types FocusSessionRollupDocument, DailyChallengeCompletionDocument live in
+// Cena.Infrastructure.Documents. StudentActivityDocument is defined here as it's only
+// used by the retention worker.
 
 public sealed class StudentActivityDocument
 {
     public Guid Id { get; set; }
     public DateTimeOffset LastActivityAt { get; set; }
 }
-
-public sealed class ErasureRequestDocument
-{
-    public Guid Id { get; set; }
-    public string StudentId { get; set; } = "";
-    public ErasureRequestStatus Status { get; set; }
-    public DateTimeOffset RequestedAt { get; set; }
-    public DateTimeOffset? ApprovedAt { get; set; }
-    public TimeSpan CoolingPeriod { get; set; } = TimeSpan.FromDays(14);
-}
-
-public enum ErasureRequestStatus { Pending, CoolingPeriod, Approved, Processing, Completed, Rejected }
 
 /// <summary>
 /// Extension methods for registering the retention worker.

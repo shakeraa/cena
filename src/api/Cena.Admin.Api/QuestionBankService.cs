@@ -398,7 +398,8 @@ public sealed class QuestionBankService : IQuestionBankService
         var evt = new LanguageVersionAdded_V1(
             id, request.Language, request.Stem,
             request.StemHtml ?? $"<p>{request.Stem}</p>",
-            options, userId, DateTimeOffset.UtcNow);
+            options, null, null,
+            userId, DateTimeOffset.UtcNow);
 
         session.Events.Append(id, state.EventVersion + 1, evt);
         await session.SaveChangesAsync();

@@ -223,7 +223,7 @@ public sealed class NatsOutboxPublisher : BackgroundService
                 var headers = NatsTracePropagation.InjectTraceContext();
 
                 // FIND-arch-022: Publish to JetStream for durability
-                var js = _nats.CreateJetStreamContext();
+                var js = new NATS.Client.JetStream.NatsJSContext(_nats);
                 await js.PublishAsync(subject, payload, headers: headers, cancellationToken: ct);
 
                 highestSequence = eventWrapper.Sequence;

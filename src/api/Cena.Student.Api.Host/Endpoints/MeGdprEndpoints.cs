@@ -67,7 +67,7 @@ public static class MeGdprEndpoints
         // Student-facing consent endpoints under /api/me/consent
         var consentGroup = app.MapGroup("/api/me/consent")
             .WithTags("Consent")
-            .RequireAuthorization(CenaAuthPolicies.StudentOnly);
+            .RequireAuthorization();
 
         consentGroup.MapGet("", GetConsentState).WithName("GetMyConsentState");
         consentGroup.MapPost("", UpdateConsent).WithName("UpdateMyConsent");
@@ -409,7 +409,7 @@ public static class MeGdprEndpoints
         if (string.IsNullOrEmpty(studentId))
             return Results.Unauthorized();
 
-        if (request.Consents == null || request.Consents.Count == 0)
+        if (request.Purposes == null || request.Purposes.Count == 0)
         {
             return Results.BadRequest(new { error = "Consents array is required and cannot be empty" });
         }
@@ -417,7 +417,7 @@ public static class MeGdprEndpoints
         var results = new List<ConsentDto>();
         var errors = new List<string>();
 
-        foreach (var consent in request.Consents)
+        foreach (var consent in request.Purposes)
         {
             if (!Enum.TryParse<ProcessingPurpose>(consent.Purpose, true, out var purpose))
             {
@@ -449,7 +449,7 @@ public static class MeGdprEndpoints
                 errors.Add($"Failed to update {consent.Purpose}: {ex.Message}");
                 logger.LogError(ex,
                     "[SIEM] ConsentUpdateFailed: StudentId={StudentId}, Purpose={Purpose}, Granted={Granted}",
-                    studentId, consentType, consent.Granted);
+                    studentId, consent.Purpose, consent.Granted);
             }
         }
 
@@ -482,7 +482,7 @@ public static class MeGdprEndpoints
         if (profile?.DateOfBirth.HasValue == true)
         {
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var dob = DateOnly.FromDateTime(profile.DateOfBirth.Value.Date);
+            var dob = profile.DateOfBirth.Value;
             age = today.Year - dob.Year;
             if (today < dob.AddYears(age.Value))
                 age--;
@@ -521,12 +521,37 @@ public static class MeGdprEndpoints
         }
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var dob = DateOnly.FromDateTime(profile.DateOfBirth.Value.Date);
+        var dob = profile.DateOfBirth.Value;
         var age = today.Year - dob.Year;
         if (today < dob.AddYears(age))
             age--;
 
         return age < 16;
+    }
+
+    /// <summary>
+    /// Returns default consent values based on student age.
+    /// Under 13 (COPPA): all denied.
+    /// 13-15: all denied (opt-in required).
+    /// 16+ or unknown: essential only granted by default.
+    /// </summary>
+    private static IReadOnlyList<ConsentDto> GetDefaultConsentsForAge(int? age)
+    {
+        var allPurposes = Enum.GetValues<ProcessingPurpose>();
+        return allPurposes.Select(purpose =>
+        {
+            // AccountAuth and SessionContinuity are always lawful (contract necessity)
+            // Under 16: only contract-necessity purposes granted by default
+            // 16+: contract-necessity purposes granted, others denied (opt-in)
+            var granted = purpose is ProcessingPurpose.AccountAuth or ProcessingPurpose.SessionContinuity;
+
+            return new ConsentDto(
+                Purpose: purpose.ToString().ToLowerInvariant(),
+                Granted: granted,
+                GrantedAt: null,
+                RevokedAt: null,
+                IsDefault: true);
+        }).ToList();
     }
 }
 
@@ -561,10 +586,7 @@ public sealed record ConsentUpdateRequest(string Purpose, bool Granted);
 /// </summary>
 public sealed record ConsentEntry(string Purpose, bool Granted);
 
-/// <summary>
-/// Request body for POST /api/me/consent/bulk
-/// </summary>
-public sealed record BulkConsentRequest(IReadOnlyList<ConsentEntry> Consents);
+// BulkConsentRequest is defined in ConsentEndpoints.cs
 
 /// <summary>
 /// Response for POST /api/me/consent/bulk

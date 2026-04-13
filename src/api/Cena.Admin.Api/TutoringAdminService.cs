@@ -142,7 +142,7 @@ public sealed class TutoringAdminService : ITutoringAdminService
         // FIND-data-021: Use real token count from TutorMessageDocument instead of estimating
         var messageIds = sessionMessages.Select(e => e.Id.ToString()).ToList();
         var tutorMessages = await session.Query<TutorMessageDocument>()
-            .Where(m => m.SessionId == sessionId && m.TokensUsed.HasValue)
+            .Where(m => m.ThreadId == sessionId && m.TokensUsed.HasValue)
             .ToListAsync();
         var tokensUsed = tutorMessages.Sum(m => m.TokensUsed ?? 0);
 
@@ -205,9 +205,9 @@ public sealed class TutoringAdminService : ITutoringAdminService
             .ToListAsync();
 
         // FIND-data-021: Use real token counts from TutorMessageDocument
-        var today = DateTimeOffset.UtcNow.Date;
+        var todayDate = DateTimeOffset.UtcNow.Date;
         var messageDocs = await session.Query<TutorMessageDocument>()
-            .Where(m => m.SentAt >= today && m.SentAt < today.AddDays(1) && m.TokensUsed.HasValue)
+            .Where(m => m.CreatedAt >= todayDate && m.CreatedAt < todayDate.AddDays(1) && m.TokensUsed.HasValue)
             .ToListAsync();
         
         var studentTokens = messageDocs
@@ -336,9 +336,9 @@ public sealed class TutoringAdminService : ITutoringAdminService
 
         // FIND-data-021: Use real token counts from TutorMessageDocument
         var tokensUsed = await querySession.Query<TutorMessageDocument>()
-            .Where(m => m.StudentId == studentId 
-                && m.SentAt >= today 
-                && m.SentAt < today.AddDays(1) 
+            .Where(m => m.StudentId == studentId
+                && m.CreatedAt >= today
+                && m.CreatedAt < today.AddDays(1)
                 && m.TokensUsed.HasValue)
             .SumAsync(m => m.TokensUsed ?? 0);
 

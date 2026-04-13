@@ -17,6 +17,7 @@ using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
+using Cena.Infrastructure.Observability;
 using Marten;
 using Microsoft.AspNetCore.RateLimiting;
 using NATS.Client.Core;

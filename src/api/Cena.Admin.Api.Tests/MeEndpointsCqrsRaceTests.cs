@@ -117,7 +117,10 @@ public class MeEndpointsCqrsRaceTests
             Role: "student",
             Locale: "en",
             Subjects: new[] { "physics" },
-            DailyTimeGoalMinutes: 30);
+            DailyTimeGoalMinutes: 30,
+            WeeklySubjectTargets: new[] { new WeeklySubjectTarget("physics", 80) },
+            DiagnosticResults: null,
+            ClassroomCode: null);
 
         var capturedEvents = new List<object>();
         _session.When(s => s.Events.Append(_studentId, Arg.Any<object>()))
@@ -148,7 +151,10 @@ public class MeEndpointsCqrsRaceTests
             Role: "student",
             Locale: "en",
             Subjects: new[] { "math" },
-            DailyTimeGoalMinutes: 20);
+            DailyTimeGoalMinutes: 20,
+            WeeklySubjectTargets: new[] { new WeeklySubjectTarget("math", 80) },
+            DiagnosticResults: null,
+            ClassroomCode: null);
 
         _session.LoadAsync<StudentProfileSnapshot>(_studentId, Arg.Any<CancellationToken>())
             .Returns((StudentProfileSnapshot?)null);
@@ -158,7 +164,7 @@ public class MeEndpointsCqrsRaceTests
 
         // Assert: NO direct Store<StudentProfileSnapshot> call was made
         _session.DidNotReceive().Store(Arg.Any<StudentProfileSnapshot>());
-        
+
         // Verify SaveChanges was called (event persistence)
         await _session.Received(1).SaveChangesAsync();
     }
@@ -172,7 +178,10 @@ public class MeEndpointsCqrsRaceTests
             Role: "student",
             Locale: "en",
             Subjects: new[] { "physics" },
-            DailyTimeGoalMinutes: 30);
+            DailyTimeGoalMinutes: 30,
+            WeeklySubjectTargets: new[] { new WeeklySubjectTarget("physics", 80) },
+            DiagnosticResults: null,
+            ClassroomCode: null);
 
         var existingProfile = new StudentProfileSnapshot 
         { 

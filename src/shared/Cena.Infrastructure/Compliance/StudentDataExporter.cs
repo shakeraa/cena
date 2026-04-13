@@ -11,7 +11,6 @@
 
 using System.Reflection;
 using System.Text.Json.Serialization;
-using Cena.Actors.Events;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -99,56 +98,51 @@ public static class StudentDataExporter
 
         await using var session = store.QuerySession();
 
-        // 1. Profile snapshot
-        var snapshot = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-        var profileFields = snapshot != null 
-            ? ExtractFields(snapshot) 
+        // 1. Profile snapshot (use lightweight POCO — same table via Marten convention)
+        var snapshot = await session.LoadAsync<StudentProfileRef>(studentId);
+        var profileFields = snapshot != null
+            ? ExtractFields(snapshot)
             : new List<ExportedField>();
 
-        // 2. Tutoring sessions
-        var tutoringSessions = await session.Query<TutoringSessionDocument>()
+        // 2. Tutoring sessions (query TutorThreadDocument which lives in Infrastructure)
+        var tutorThreads = await session.Query<TutorThreadDocument>()
             .Where(t => t.StudentId == studentId)
-            .OrderByDescending(t => t.StartedAt)
+            .OrderByDescending(t => t.CreatedAt)
             .ToListAsync();
 
-        var tutoringExports = tutoringSessions.Select(t => new TutoringSessionExport(
-            t.SessionId,
-            t.Subject,
-            t.ConceptId,
-            t.StartedAt,
-            t.EndedAt,
-            t.TotalTurns,
-            t.EndedAt.HasValue ? "completed" : "active"
+        var tutoringExports = tutorThreads.Select(t => new TutoringSessionExport(
+            t.ThreadId,
+            t.Subject ?? "",
+            t.Topic ?? "",
+            new DateTimeOffset(t.CreatedAt, TimeSpan.Zero),
+            t.IsArchived ? new DateTimeOffset(t.UpdatedAt, TimeSpan.Zero) : null,
+            t.MessageCount,
+            t.IsArchived ? "completed" : "active"
         )).ToList();
 
-        // 3. Learning sessions from events
+        // 3. Learning sessions from events (use reflection to avoid Actors dependency)
         var events = await session.Events.FetchStreamAsync(studentId);
         var learningSessions = events
-            .Where(e => e.Data is LearningSessionStarted_V1)
-            .Select(e => (LearningSessionStarted_V1)e.Data)
-            .Select(ls => new LearningSessionExport(
-                ls.SessionId,
-                ls.Subjects,
-                ls.Mode,
-                ls.StartedAt,
-                null, // EndedAt from LearningSessionEnded_V1
-                null,
-                null))
+            .Where(e => e.Data?.GetType().Name == "LearningSessionStarted_V1")
+            .Select(e => ExtractLearningSession(e.Data!))
+            .Where(ls => ls != null)
+            .Select(ls => ls!)
             .ToList();
 
         // Match ends with starts
-        var endedSessions = events
-            .Where(e => e.Data is LearningSessionEnded_V1)
-            .Select(e => (LearningSessionEnded_V1)e.Data)
-            .ToDictionary(e => e.SessionId);
+        var endedMap = events
+            .Where(e => e.Data?.GetType().Name == "LearningSessionEnded_V1")
+            .Select(e => ExtractSessionEnd(e.Data!))
+            .Where(se => se != null)
+            .ToDictionary(se => se!.Value.SessionId, se => se!.Value);
 
         learningSessions = learningSessions.Select(ls =>
         {
-            if (endedSessions.TryGetValue(ls.SessionId, out var ended))
+            if (endedMap.TryGetValue(ls.SessionId, out var ended))
             {
-                return ls with 
-                { 
-                    EndedAt = ended.EndedAt, 
+                return ls with
+                {
+                    EndedAt = ended.EndedAt,
                     QuestionsAttempted = ended.QuestionsAttempted,
                     QuestionsCorrect = ended.QuestionsCorrect
                 };
@@ -247,5 +241,48 @@ public static class StudentDataExporter
         }
 
         return fields;
+    }
+
+    /// <summary>
+    /// Extracts LearningSessionExport from an event object using reflection.
+    /// Avoids compile-time dependency on Cena.Actors.Events.LearningSessionStarted_V1.
+    /// </summary>
+    private static LearningSessionExport? ExtractLearningSession(object data)
+    {
+        var type = data.GetType();
+        var sessionId = type.GetProperty("SessionId")?.GetValue(data) as string;
+        var subjects = type.GetProperty("Subjects")?.GetValue(data) as string[];
+        var mode = type.GetProperty("Mode")?.GetValue(data) as string;
+        var startedAt = type.GetProperty("StartedAt")?.GetValue(data);
+
+        if (sessionId == null) return null;
+
+        return new LearningSessionExport(
+            sessionId,
+            subjects ?? Array.Empty<string>(),
+            mode ?? "unknown",
+            startedAt is DateTimeOffset dto ? dto : DateTimeOffset.MinValue,
+            null, null, null);
+    }
+
+    /// <summary>
+    /// Extracts session-end data from an event object using reflection.
+    /// </summary>
+    private static (string SessionId, DateTimeOffset EndedAt, int QuestionsAttempted, int QuestionsCorrect)?
+        ExtractSessionEnd(object data)
+    {
+        var type = data.GetType();
+        var sessionId = type.GetProperty("SessionId")?.GetValue(data) as string;
+        var endedAt = type.GetProperty("EndedAt")?.GetValue(data);
+        var attempted = type.GetProperty("QuestionsAttempted")?.GetValue(data);
+        var correct = type.GetProperty("QuestionsCorrect")?.GetValue(data);
+
+        if (sessionId == null) return null;
+
+        return (
+            sessionId,
+            endedAt is DateTimeOffset dto ? dto : DateTimeOffset.MinValue,
+            attempted is int a ? a : 0,
+            correct is int c ? c : 0);
     }
 }

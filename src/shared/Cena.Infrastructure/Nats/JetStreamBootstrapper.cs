@@ -30,7 +30,7 @@ public sealed class JetStreamBootstrapper : IHostedService
             Retention = StreamConfigRetention.Limits,
             MaxAge = TimeSpan.FromDays(7),
             Storage = StreamConfigStorage.File,
-            Replicas = 1
+            NumReplicas = 1
         },
         new StreamConfig
         {
@@ -39,7 +39,7 @@ public sealed class JetStreamBootstrapper : IHostedService
             Retention = StreamConfigRetention.Limits,
             MaxAge = TimeSpan.FromDays(7),
             Storage = StreamConfigStorage.File,
-            Replicas = 1
+            NumReplicas = 1
         },
         new StreamConfig
         {
@@ -48,7 +48,7 @@ public sealed class JetStreamBootstrapper : IHostedService
             Retention = StreamConfigRetention.Limits,
             MaxAge = TimeSpan.FromDays(7),
             Storage = StreamConfigStorage.File,
-            Replicas = 1
+            NumReplicas = 1
         },
         new StreamConfig
         {
@@ -57,7 +57,7 @@ public sealed class JetStreamBootstrapper : IHostedService
             Retention = StreamConfigRetention.Limits,
             MaxAge = TimeSpan.FromDays(7),
             Storage = StreamConfigStorage.File,
-            Replicas = 1
+            NumReplicas = 1
         },
         new StreamConfig
         {
@@ -66,7 +66,7 @@ public sealed class JetStreamBootstrapper : IHostedService
             Retention = StreamConfigRetention.Limits,
             MaxAge = TimeSpan.FromDays(7),
             Storage = StreamConfigStorage.File,
-            Replicas = 1
+            NumReplicas = 1
         },
         new StreamConfig
         {
@@ -75,7 +75,7 @@ public sealed class JetStreamBootstrapper : IHostedService
             Retention = StreamConfigRetention.Limits,
             MaxAge = TimeSpan.FromDays(7),
             Storage = StreamConfigStorage.File,
-            Replicas = 1
+            NumReplicas = 1
         }
     };
 
@@ -91,7 +91,7 @@ public sealed class JetStreamBootstrapper : IHostedService
 
         try
         {
-            var js = _nats.CreateJetStreamContext();
+            var js = new NatsJSContext(_nats);
 
             foreach (var config in StreamDefinitions)
             {

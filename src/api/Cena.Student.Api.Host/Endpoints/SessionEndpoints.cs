@@ -29,6 +29,8 @@ namespace Cena.Api.Host.Endpoints;
 
 public static class SessionEndpoints
 {
+    private sealed class SessionLogMarker { }
+
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -53,7 +55,7 @@ public static class SessionEndpoints
             HttpContext ctx,
             IDocumentStore store,
             IAdaptiveQuestionPool adaptivePool,
-            ILogger<SessionEndpoints> logger,
+            ILogger<SessionLogMarker> logger,
             SessionStartRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -185,7 +187,7 @@ public static class SessionEndpoints
                 Mode: active.Mode,
                 StartedAt: active.StartedAt,
                 DurationMinutes: active.DurationMinutes,
-                ProgressPercent: active.GetProgressPercent(),
+                ProgressPercent: active.GetProgressPercent(DateTime.UtcNow),
                 CurrentQuestionId: active.CurrentQuestionId);
 
             return Results.Ok(dto);
@@ -284,6 +286,7 @@ public static class SessionEndpoints
                 QuestionsAttempted: questionsAttempted,
                 QuestionsCorrect: questionsCorrect,
                 Accuracy: Math.Round(accuracy, 3),
+                FatigueScore: 0.0,
                 DurationSeconds: durationSeconds,
                 StartedAt: doc.StartedAt,
                 EndedAt: doc.EndedAt,
@@ -474,7 +477,7 @@ public static class SessionEndpoints
             IQuestionBank questionBank,
             IScaffoldingService scaffoldingService,
             IAdaptiveQuestionPool adaptivePool,
-            ILogger<SessionEndpoints> logger) =>
+            ILogger<SessionLogMarker> logger) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -553,7 +556,7 @@ public static class SessionEndpoints
             }
 
             // Dequeue the question for display
-            queue!.DequeueNext();
+            queue!.DequeueNext(DateTime.UtcNow);
 
             // Load full question details from question bank
             var questionDoc = await questionBank.GetQuestionAsync(currentQuestion.QuestionId);
@@ -642,7 +645,7 @@ public static class SessionEndpoints
             var isCorrect = string.Equals(request.Answer?.Trim(), questionDoc.CorrectAnswer, StringComparison.OrdinalIgnoreCase);
 
             // Record answer in queue
-            queue.RecordAnswer(currentQuestion.QuestionId, isCorrect, TimeSpan.FromMilliseconds(request.TimeSpentMs), request.Answer);
+            queue.RecordAnswer(currentQuestion.QuestionId, isCorrect, TimeSpan.FromMilliseconds(request.TimeSpentMs), request.Answer, DateTime.UtcNow);
 
             // Append QuestionAnsweredInSession event
             var answeredEvent = new QuestionAnsweredInSession_V1(
@@ -810,7 +813,7 @@ public static class SessionEndpoints
             // ─── FIND-pedagogy-001: Formative feedback with explanation ───
             // FIND-pedagogy-013: Extract student locale from claims for localized content
             var studentLocale = ctx.User.FindFirstValue("locale") ?? "en";
-            var logger = loggerFactory.CreateLogger<SessionEndpoints>();
+            var logger = loggerFactory.CreateLogger<SessionLogMarker>();
             var response = BuildAnswerFeedback(
                 questionDoc: questionDoc,
                 studentAnswer: request.Answer,
@@ -904,7 +907,7 @@ public static class SessionEndpoints
             IDocumentStore store,
             IQuestionBank questionBank,
             IHintGenerator hintGenerator,
-            ILogger<SessionEndpoints> logger,
+            ILogger<SessionLogMarker> logger,
             SessionHintRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -980,11 +983,11 @@ public static class SessionEndpoints
 
             // Get student profile for ConceptState
             var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-            ConceptMasteryState? conceptState = null;
+            Cena.Actors.Mastery.ConceptMasteryState? conceptState = null;
             if (profile?.ConceptMastery.TryGetValue(questionDoc.ConceptId, out var state) == true)
             {
                 // Map from snapshot ConceptMasteryState to domain ConceptMasteryState
-                conceptState = new ConceptMasteryState
+                conceptState = new Cena.Actors.Mastery.ConceptMasteryState
                 {
                     MasteryProbability = (float)state.PKnown,
                     AttemptCount = state.TotalAttempts,
@@ -1152,10 +1155,10 @@ public static class SessionEndpoints
     /// per-concept slip / guess / learning rates from the question document
     /// when authored, otherwise falls back to the library default.
     /// </summary>
-    internal static BktParameters BuildBktParameters(QuestionDocument questionDoc)
+    internal static Cena.Actors.Services.BktParameters BuildBktParameters(QuestionDocument questionDoc)
     {
-        var defaults = BktParameters.Default;
-        return new BktParameters(
+        var defaults = Cena.Actors.Services.BktParameters.Default;
+        return new Cena.Actors.Services.BktParameters(
             PLearning: questionDoc.BktLearning ?? defaults.PLearning,
             PSlip: questionDoc.BktSlip ?? defaults.PSlip,
             PGuess: questionDoc.BktGuess ?? defaults.PGuess,

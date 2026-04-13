@@ -48,7 +48,7 @@ public class SessionAttemptHistoryProjection : MultiStreamProjection<SessionAtte
     {
         Identity<ConceptAttempted_V1>(e => e.SessionId);
         Identity<ConceptAttempted_V2>(e => e.SessionId);
-        ProjectionLifecycle = ProjectionLifecycle.Inline;
+        // Lifecycle configured at registration in MartenConfiguration
     }
 
     public void Apply(ConceptAttempted_V1 evt, SessionAttemptHistoryDocument doc)

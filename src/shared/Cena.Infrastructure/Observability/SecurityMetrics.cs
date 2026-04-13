@@ -14,6 +14,7 @@
 // =============================================================================
 
 using System.Diagnostics.Metrics;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Cena.Infrastructure.Observability;
 

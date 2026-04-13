@@ -161,7 +161,7 @@ public sealed class ErasureWorker : BackgroundService
             processedCount, failedCount, results.Count);
     }
 
-    private async Task<List<ErasureRequest>> GetEligibleErasureRequestsAsync(IDocumentStore store, CancellationToken ct)
+    private async Task<IReadOnlyList<ErasureRequest>> GetEligibleErasureRequestsAsync(IDocumentStore store, CancellationToken ct)
     {
         var cutoffTime = _clock.UtcNow - _options.CoolingPeriod;
 

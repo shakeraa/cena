@@ -65,11 +65,11 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
                     ProcessingPurpose.BehavioralAnalytics);
                 // Return empty overview when consent is missing
                 return new FocusOverviewResponse(
-                    TodaySessions: 0,
-                    TodayFocusScore: 0,
-                    WeeklyAverage: 0,
-                    WeeklyTrend: "insufficient_data",
-                    ComparisonToClass: null);
+                    AvgFocusScore: 0,
+                    MindWanderingRate: 0,
+                    MicrobreakCompliance: 0,
+                    ActiveStudents: 0,
+                    Trend: new List<FocusTrendPoint>());
             }
         }
 
@@ -104,12 +104,13 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
             // Return anonymized/empty data when consent is missing
             return new StudentFocusDetailResponse(
                 StudentId: studentId,
-                OverallFocusScore: 0,
-                SessionCount: 0,
-                TotalLearningTimeMinutes: 0,
-                DailyBreakdown: new List<DailyFocusSummary>(),
-                SubjectBreakdown: new List<SubjectFocusSummary>(),
-                AttentionPattern: "insufficient_data");
+                StudentName: "",
+                AvgFocusScore7d: 0,
+                AvgFocusScore30d: 0,
+                Sessions: new List<FocusSession>(),
+                MindWanderingEvents: new List<MindWanderingEvent>(),
+                MicrobreakHistory: new List<MicrobreakRecord>(),
+                Chronotype: new ChronotypeRecommendation("neutral", "", "insufficient_data"));
         }
 
         var schoolId = TenantScope.GetSchoolFilter(user);
@@ -157,11 +158,11 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
                 // Return empty response when consent is missing
                 return new ClassFocusResponse(
                     ClassId: classId,
-                    AverageFocusScore: 0,
-                    SessionCount: 0,
-                    StudentCount: 0,
-                    TopStudents: new List<StudentFocusSummary>(),
-                    AttentionTrend: "insufficient_data");
+                    ClassName: "",
+                    ClassAvgFocus: 0,
+                    Students: new List<StudentFocusSummary>(),
+                    FocusByTimeSlot: new List<TimeSlotFocus>(),
+                    FocusBySubject: new List<SubjectFocus>());
             }
         }
 
@@ -212,7 +213,7 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
                     studentId,
                     ProcessingPurpose.BehavioralAnalytics);
                 // Return empty degradation curve when consent is missing
-                return new FocusDegradationResponse(new List<DegradationPoint>());
+                return new FocusDegradationResponse(new List<Cena.Api.Contracts.Admin.Analytics.DegradationPoint>());
             }
         }
 
@@ -315,7 +316,7 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
                     requesterId,
                     ProcessingPurpose.BehavioralAnalytics);
                 // Return empty attention list when consent is missing
-                return new StudentsNeedingAttentionResponse(new List<AttentionAlert>());
+                return new StudentsNeedingAttentionResponse(new List<StudentAttentionAlert>());
             }
         }
 
@@ -450,7 +451,7 @@ public sealed partial class FocusAnalyticsService : IFocusAnalyticsService
             }
 
             var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            var dob = DateOnly.FromDateTime(profile.DateOfBirth.Value.Date);
+            var dob = profile.DateOfBirth.Value;
             var age = today.Year - dob.Year;
             if (today < dob.AddYears(age))
                 age--;

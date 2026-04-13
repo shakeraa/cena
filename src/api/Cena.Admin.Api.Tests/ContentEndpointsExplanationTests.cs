@@ -14,9 +14,11 @@
 
 using System.Reflection;
 using Cena.Actors.Questions;
+using Cena.Api.Host.Endpoints;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Cena.Admin.Api.Tests;
 

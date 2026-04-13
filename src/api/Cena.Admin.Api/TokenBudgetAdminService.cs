@@ -1,6 +1,7 @@
 // Cena Platform -- Token Budget Admin Service (ADM-023)
 
 using System.Text.Json;
+using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -41,7 +42,7 @@ public sealed class TokenBudgetAdminService : ITokenBudgetAdminService
 
         // FIND-data-021: Use real token counts from TutorMessageDocument
         var messageDocs = await session.Query<TutorMessageDocument>()
-            .Where(m => m.SentAt >= targetDate && m.SentAt < nextDay && m.TokensUsed.HasValue)
+            .Where(m => m.CreatedAt >= targetDate && m.CreatedAt < nextDay && m.TokensUsed.HasValue)
             .ToListAsync();
 
         var dailyLimit = _dailyLimitOverride;
@@ -87,11 +88,11 @@ public sealed class TokenBudgetAdminService : ITokenBudgetAdminService
 
         // FIND-data-021: Use real token counts from TutorMessageDocument
         var messageDocs = await session.Query<TutorMessageDocument>()
-            .Where(m => m.SentAt >= startDate && m.SentAt < endDate && m.TokensUsed.HasValue)
+            .Where(m => m.CreatedAt >= startDate && m.CreatedAt < endDate && m.TokensUsed.HasValue)
             .ToListAsync();
 
         var dailyData = messageDocs
-            .GroupBy(m => m.SentAt.Date)
+            .GroupBy(m => m.CreatedAt.Date)
             .OrderBy(g => g.Key)
             .Select(g =>
             {

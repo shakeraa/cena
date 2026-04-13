@@ -8,6 +8,7 @@
 
 using Cena.Actors.Events;
 using Cena.Infrastructure.Documents;
+using Marten;
 using Marten.Events.Projections;
 
 namespace Cena.Actors.Audit;

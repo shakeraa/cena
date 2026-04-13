@@ -10,6 +10,7 @@ using Amazon;
 using Amazon.S3;
 using Amazon.S3.Model;
 using Azure.Storage.Blobs;
+using Google.Apis.Auth.OAuth2;
 using Google.Cloud.Storage.V1;
 using MailKit.Net.Imap;
 using MailKit.Security;
@@ -473,9 +474,10 @@ public sealed class IngestionSettingsService : IIngestionSettingsService
 
             // Count blobs with prefix (limited to 1 to minimize data transfer)
             var blobCount = 0;
-            await foreach (var _ in containerClient.GetBlobsAsync(prefix: prefix).AsAsyncEnumerable().Take(1))
+            await foreach (var _ in containerClient.GetBlobsAsync(prefix: prefix))
             {
                 blobCount++;
+                break;
             }
 
             _logger.LogInformation("Azure Blob connection test succeeded for container '{Container}'. Access level: {Access}.",
@@ -540,9 +542,10 @@ public sealed class IngestionSettingsService : IIngestionSettingsService
 
             // Count objects with prefix (limited to 1)
             var objectCount = 0;
-            await foreach (var _ in storage.ListObjectsAsync(bucketName, prefix).AsAsyncEnumerable().Take(1))
+            await foreach (var _ in storage.ListObjectsAsync(bucketName, prefix))
             {
                 objectCount++;
+                break;
             }
 
             _logger.LogInformation("GCS connection test succeeded for bucket '{Bucket}'. Storage class: {StorageClass}.",

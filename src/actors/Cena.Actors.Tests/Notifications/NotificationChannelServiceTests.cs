@@ -15,6 +15,7 @@ using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Gamification;
 using Marten;
 using Marten.Linq;
+using Marten.Linq.Includes;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -414,7 +415,17 @@ public sealed class NotificationChannelServiceTests
             throw new NotImplementedException();
         public IMartenQueryable<T> Include<TInclude>(
             System.Linq.Expressions.Expression<Func<T, object>> idSource,
+            Action<TInclude> callback,
+            System.Linq.Expressions.Expression<Func<TInclude, bool>> filter) where TInclude : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryable<T> Include<TInclude>(
+            System.Linq.Expressions.Expression<Func<T, object>> idSource,
             IList<TInclude> list) where TInclude : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryable<T> Include<TInclude>(
+            System.Linq.Expressions.Expression<Func<T, object>> idSource,
+            IList<TInclude> list,
+            System.Linq.Expressions.Expression<Func<TInclude, bool>> filter) where TInclude : notnull =>
             throw new NotImplementedException();
         public IMartenQueryable<T> Include<TInclude>(
             System.Linq.Expressions.Expression<Func<T, object>> idSource,
@@ -431,6 +442,27 @@ public sealed class NotificationChannelServiceTests
         public IMartenQueryable<T> Include<TInclude>(
             System.Linq.Expressions.Expression<Func<T, object>> idSource,
             IDictionary<long, TInclude> dictionary) where TInclude : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryable<T> Include<TInclude, TKey>(
+            System.Linq.Expressions.Expression<Func<T, object>> idSource,
+            IDictionary<TKey, TInclude> dictionary) where TInclude : notnull where TKey : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryable<T> Include<TInclude, TKey>(
+            System.Linq.Expressions.Expression<Func<T, object>> idSource,
+            IDictionary<TKey, TInclude> dictionary,
+            System.Linq.Expressions.Expression<Func<TInclude, bool>> filter) where TInclude : notnull where TKey : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryableIncludeBuilder<T, TInclude> Include<TInclude>(Action<TInclude> callback) where TInclude : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryableIncludeBuilder<T, TInclude> Include<TInclude>(IList<TInclude> list) where TInclude : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryableIncludeBuilder<T, TKey, TInclude> Include<TKey, TInclude>(IDictionary<TKey, TInclude> dictionary) where TKey : notnull where TInclude : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryableIncludeBuilder<T, TKey, TInclude> Include<TKey, TInclude>(IDictionary<TKey, IList<TInclude>> dictionary) where TKey : notnull where TInclude : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryableIncludeBuilder<T, TKey, TInclude> Include<TKey, TInclude>(IDictionary<TKey, List<TInclude>> dictionary) where TKey : notnull where TInclude : notnull =>
+            throw new NotImplementedException();
+        public IMartenQueryable<T> WhereSub<TSub>(System.Linq.Expressions.Expression<Func<TSub, bool>> filter) where TSub : notnull =>
             throw new NotImplementedException();
         public IMartenQueryable<T> Stats(out QueryStatistics stats)
         {

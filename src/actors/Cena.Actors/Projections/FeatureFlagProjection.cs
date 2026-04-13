@@ -44,7 +44,7 @@ public class FeatureFlagProjection : MultiStreamProjection<FeatureFlagDocument, 
     {
         Identity<FeatureFlagSet_V1>(e => e.FlagName);
         Identity<FeatureFlagDeleted_V1>(e => e.FlagName);
-        ProjectionLifecycle = ProjectionLifecycle.Inline;
+        // Lifecycle configured at registration in MartenConfiguration
     }
 
     public void Apply(FeatureFlagSet_V1 evt, FeatureFlagDocument doc)

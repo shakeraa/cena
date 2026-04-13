@@ -207,6 +207,7 @@ public class QuestionStateTests
         state.Apply(new LanguageVersionAdded_V1("q-001", "ar",
             "Arabic stem text", "<p>Arabic stem</p>",
             new[] { new QuestionOptionData("A", "ar-opt", "<p>ar</p>", true, null) },
+            null, null,
             "translator-1", Now));
 
         Assert.Single(state.LanguageVersions);
@@ -222,9 +223,9 @@ public class QuestionStateTests
         state.Apply(MakeAuthored()); // Hebrew primary
 
         state.Apply(new LanguageVersionAdded_V1("q-001", "ar", "Arabic", "<p>ar</p>",
-            new[] { new QuestionOptionData("A", "a", "<p>a</p>", true, null) }, "t1", Now));
+            new[] { new QuestionOptionData("A", "a", "<p>a</p>", true, null) }, null, null, "t1", Now));
         state.Apply(new LanguageVersionAdded_V1("q-001", "en", "English", "<p>en</p>",
-            new[] { new QuestionOptionData("A", "a", "<p>a</p>", true, null) }, "t2", Now));
+            new[] { new QuestionOptionData("A", "a", "<p>a</p>", true, null) }, null, null, "t2", Now));
 
         Assert.Equal(2, state.LanguageVersions.Count);
         Assert.True(state.LanguageVersions.ContainsKey("ar"));

@@ -201,6 +201,8 @@ Rules:
 - One worktree per task. Fresh from `origin/main`. Never reuse.
 - Never edit files in the main worktree during a claimed task.
 - Run your full build + test suite **inside** the worktree.
+- **CRITICAL: Build the FULL SOLUTION, not just your project.** Run `dotnet build src/actors/Cena.Actors.sln` before completing. Per-project builds miss cross-project errors (missing usings, wrong property names, stale API calls). If the full sln doesn't build, fix it or report the failure — do NOT complete with a broken build.
+- Include the full-sln build result (error count) in your `--result` string.
 - Never prune or remove another worker's worktree.
 - `git worktree list` shows all active worktrees; you should see yours + the main. Don't touch others.
 

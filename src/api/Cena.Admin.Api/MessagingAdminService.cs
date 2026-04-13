@@ -5,6 +5,7 @@
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Actors.Events;
 using Cena.Actors.Messaging;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Tenancy;

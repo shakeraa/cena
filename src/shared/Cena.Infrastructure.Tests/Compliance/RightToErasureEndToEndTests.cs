@@ -118,7 +118,7 @@ public sealed class RightToErasureEndToEndTests
                 StudentId = TestStudentId,
                 Role = "user",
                 Content = "Help me solve this equation",
-                CreatedAt = _clock.UtcNow.AddDays(-20)
+                CreatedAt = _clock.UtcNow.AddDays(-20).UtcDateTime
             },
             new()
             {
@@ -128,7 +128,7 @@ public sealed class RightToErasureEndToEndTests
                 StudentId = TestStudentId,
                 Role = "assistant",
                 Content = "Sure! Let's break it down step by step.",
-                CreatedAt = _clock.UtcNow.AddDays(-20)
+                CreatedAt = _clock.UtcNow.AddDays(-20).UtcDateTime
             },
             new()
             {
@@ -138,7 +138,7 @@ public sealed class RightToErasureEndToEndTests
                 StudentId = TestStudentId,
                 Role = "user",
                 Content = "I don't understand this concept",
-                CreatedAt = _clock.UtcNow.AddDays(-10)
+                CreatedAt = _clock.UtcNow.AddDays(-10).UtcDateTime
             }
         };
 
@@ -153,7 +153,7 @@ public sealed class RightToErasureEndToEndTests
                 Title = "Math Help Session",
                 Subject = "math",
                 Topic = "algebra",
-                CreatedAt = _clock.UtcNow.AddDays(-20),
+                CreatedAt = _clock.UtcNow.AddDays(-20).UtcDateTime,
                 MessageCount = 2
             }
         };
@@ -170,8 +170,8 @@ public sealed class RightToErasureEndToEndTests
                 DeviceModel = "iPad Pro 12.9",
                 OsVersion = "iOS 17.0",
                 AppVersion = "2.5.1",
-                FirstSeenAt = _clock.UtcNow.AddDays(-60),
-                LastSeenAt = _clock.UtcNow.AddDays(-1),
+                FirstSeenAt = _clock.UtcNow.AddDays(-60).UtcDateTime,
+                LastSeenAt = _clock.UtcNow.AddDays(-1).UtcDateTime,
                 LastIpAddress = "192.168.1.0"  // FIND-privacy-015: truncated /24
             }
         };
@@ -185,8 +185,8 @@ public sealed class RightToErasureEndToEndTests
             Language = "en",
             EmailNotifications = true,
             ProfileVisibility = "class-only",
-            CreatedAt = _clock.UtcNow.AddDays(-365),
-            UpdatedAt = _clock.UtcNow.AddDays(-30)
+            CreatedAt = _clock.UtcNow.AddDays(-365).UtcDateTime,
+            UpdatedAt = _clock.UtcNow.AddDays(-30).UtcDateTime
         };
 
         // Create 1 ShareTokenDocument
@@ -199,8 +199,8 @@ public sealed class RightToErasureEndToEndTests
                 StudentId = TestStudentId,
                 Audience = "parent",
                 Scopes = new[] { "progress", "achievements" },
-                ExpiresAt = _clock.UtcNow.AddDays(30),
-                CreatedAt = _clock.UtcNow.AddDays(-5)
+                ExpiresAt = _clock.UtcNow.AddDays(30).UtcDateTime,
+                CreatedAt = _clock.UtcNow.AddDays(-5).UtcDateTime
             }
         };
 
@@ -309,20 +309,16 @@ public sealed class RightToErasureEndToEndTests
 
         var consentQueryable = Substitute.For<IMartenQueryable<ConsentRecord>>();
         documentSession.Query<ConsentRecord>().Returns(consentQueryable);
-        SubstituteExtensions.Returns(
-            consentQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<ConsentRecord, bool>>>())
-                .Returns(consentQueryable),
-            consentQueryable);
+        consentQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<ConsentRecord, bool>>>())
+            .Returns(consentQueryable);
         SubstituteExtensions.Returns(
             consentQueryable.ToListAsync(Arg.Any<CancellationToken>()),
             new List<ConsentRecord> { consentRecord });
 
         var logsQueryable = Substitute.For<IMartenQueryable<StudentRecordAccessLog>>();
         documentSession.Query<StudentRecordAccessLog>().Returns(logsQueryable);
-        SubstituteExtensions.Returns(
-            logsQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<StudentRecordAccessLog, bool>>>())
-                .Returns(logsQueryable),
-            logsQueryable);
+        logsQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<StudentRecordAccessLog, bool>>>())
+            .Returns(logsQueryable);
         SubstituteExtensions.Returns(
             logsQueryable.ToListAsync(Arg.Any<CancellationToken>()),
             accessLogs);
@@ -388,20 +384,16 @@ public sealed class RightToErasureEndToEndTests
 
         var consentQueryable = Substitute.For<IMartenQueryable<ConsentRecord>>();
         documentSession.Query<ConsentRecord>().Returns(consentQueryable);
-        SubstituteExtensions.Returns(
-            consentQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<ConsentRecord, bool>>>())
-                .Returns(consentQueryable),
-            consentQueryable);
+        consentQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<ConsentRecord, bool>>>())
+            .Returns(consentQueryable);
         SubstituteExtensions.Returns(
             consentQueryable.ToListAsync(Arg.Any<CancellationToken>()),
             consentRecords);
 
         var logsQueryable = Substitute.For<IMartenQueryable<StudentRecordAccessLog>>();
         documentSession.Query<StudentRecordAccessLog>().Returns(logsQueryable);
-        SubstituteExtensions.Returns(
-            logsQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<StudentRecordAccessLog, bool>>>())
-                .Returns(logsQueryable),
-            logsQueryable);
+        logsQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<StudentRecordAccessLog, bool>>>())
+            .Returns(logsQueryable);
         SubstituteExtensions.Returns(
             logsQueryable.ToListAsync(Arg.Any<CancellationToken>()),
             accessLogs);
@@ -497,20 +489,16 @@ public sealed class RightToErasureEndToEndTests
 
         var consentQueryable = Substitute.For<IMartenQueryable<ConsentRecord>>();
         documentSession.Query<ConsentRecord>().Returns(consentQueryable);
-        SubstituteExtensions.Returns(
-            consentQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<ConsentRecord, bool>>>())
-                .Returns(consentQueryable),
-            consentQueryable);
+        consentQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<ConsentRecord, bool>>>())
+            .Returns(consentQueryable);
         SubstituteExtensions.Returns(
             consentQueryable.ToListAsync(Arg.Any<CancellationToken>()),
             new List<ConsentRecord>());
 
         var logsQueryable = Substitute.For<IMartenQueryable<StudentRecordAccessLog>>();
         documentSession.Query<StudentRecordAccessLog>().Returns(logsQueryable);
-        SubstituteExtensions.Returns(
-            logsQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<StudentRecordAccessLog, bool>>>())
-                .Returns(logsQueryable),
-            logsQueryable);
+        logsQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<StudentRecordAccessLog, bool>>>())
+            .Returns(logsQueryable);
         SubstituteExtensions.Returns(
             logsQueryable.ToListAsync(Arg.Any<CancellationToken>()),
             accessLogs);
@@ -598,20 +586,16 @@ public sealed class RightToErasureEndToEndTests
 
         var consentQueryable = Substitute.For<IMartenQueryable<ConsentRecord>>();
         documentSession.Query<ConsentRecord>().Returns(consentQueryable);
-        SubstituteExtensions.Returns(
-            consentQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<ConsentRecord, bool>>>())
-                .Returns(consentQueryable),
-            consentQueryable);
+        consentQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<ConsentRecord, bool>>>())
+            .Returns(consentQueryable);
         SubstituteExtensions.Returns(
             consentQueryable.ToListAsync(Arg.Any<CancellationToken>()),
             consentRecords);
 
         var logsQueryable = Substitute.For<IMartenQueryable<StudentRecordAccessLog>>();
         documentSession.Query<StudentRecordAccessLog>().Returns(logsQueryable);
-        SubstituteExtensions.Returns(
-            logsQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<StudentRecordAccessLog, bool>>>())
-                .Returns(logsQueryable),
-            logsQueryable);
+        logsQueryable.Where(Arg.Any<System.Linq.Expressions.Expression<Func<StudentRecordAccessLog, bool>>>())
+            .Returns(logsQueryable);
         SubstituteExtensions.Returns(
             logsQueryable.ToListAsync(Arg.Any<CancellationToken>()),
             new List<StudentRecordAccessLog>());

@@ -149,25 +149,25 @@ public sealed class StudentInsightsService : IStudentInsightsService
         var streakEvents = studentEvents
             .Where(e => e.Data is StreakUpdated_V1)
             .Select(e => (StreakUpdated_V1)e.Data)
-            .OrderByDescending(e => e.Timestamp)
+            .OrderByDescending(e => e.LastActivityDate)
             .ToList();
 
         var latestStreak = streakEvents.FirstOrDefault();
         int currentStreak = latestStreak?.CurrentStreak ?? 0;
         int longestStreak = latestStreak?.LongestStreak ?? 0;
-        var lastActivity = latestStreak?.Timestamp;
+        var lastActivity = latestStreak?.LastActivityDate;
 
-        // XP events
+        // XP events (stream is chronological; reverse to get latest first)
         var xpEvents = studentEvents
             .Where(e => e.Data is XpAwarded_V1)
             .Select(e => (XpAwarded_V1)e.Data)
-            .OrderByDescending(e => e.Timestamp)
+            .Reverse()
             .ToList();
 
         int totalXp = xpEvents.FirstOrDefault()?.TotalXp ?? 0;
 
         var xpByDifficulty = xpEvents
-            .GroupBy(e => e.DifficultyLevel?.ToString() ?? "unknown")
+            .GroupBy(e => e.DifficultyLevel ?? "unknown")
             .Select(g => new XpByDifficulty(g.Key, g.Sum(e => e.XpAmount), g.Count()))
             .ToList();
 
@@ -323,24 +323,24 @@ public sealed class StudentInsightsService : IStudentInsightsService
         // FIND-data-025: Query only this student's events
         var studentEvents = await session.Events.FetchStreamAsync(studentId);
 
-        var stagnationEvents = studentEvents
+        var stagnationWrapped = studentEvents
             .Where(e => e.Data is StagnationDetected_V1)
-            .Select(e => (StagnationDetected_V1)e.Data)
+            .Select(e => new { Data = (StagnationDetected_V1)e.Data, e.Timestamp })
             .OrderByDescending(e => e.Timestamp)
             .ToList();
 
-        var concepts = stagnationEvents
-            .GroupBy(s => s.ConceptId)
+        var concepts = stagnationWrapped
+            .GroupBy(s => s.Data.ConceptId)
             .Select(g =>
             {
                 var latest = g.First();
                 return new StagnationConcept
                 {
                     ConceptId = g.Key,
-                    CompositeScore = latest.CompositeScore,
-                    ConsecutiveStagnantSessions = latest.ConsecutiveStagnantSessions,
-                    AccuracyPlateau = latest.AccuracyPlateau,
-                    ErrorRepetition = latest.ErrorRepetition,
+                    CompositeScore = latest.Data.CompositeScore,
+                    ConsecutiveStagnantSessions = latest.Data.ConsecutiveStagnantSessions,
+                    AccuracyPlateau = latest.Data.AccuracyPlateau,
+                    ErrorRepetition = latest.Data.ErrorRepetition,
                     LastDetected = latest.Timestamp,
                     TotalDetections = g.Count(),
                 };
@@ -369,7 +369,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         return new StudentStagnationResponse(
             StudentId: studentId,
             StagnatingConcepts: concepts,
-            TotalStagnationEvents: stagnationEvents.Count);
+            TotalStagnationEvents: stagnationWrapped.Count);
     }
 
     // ═══════════════════════════════════════════════════════════════
@@ -402,7 +402,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         var byHour = starts
             .GroupBy(s =>
             {
-                var ts = s.Timestamp.ToOffset(TimeSpan.FromHours(3));
+                var ts = s.ClientTimestamp.ToOffset(TimeSpan.FromHours(3));
                 return ts.Hour;
             })
             .Select(g => new SessionTimeSlot($"{g.Key:D2}:00", g.Count()))
@@ -413,7 +413,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
         var byDay = starts
             .GroupBy(s =>
             {
-                var ts = s.Timestamp.ToOffset(TimeSpan.FromHours(3));
+                var ts = s.ClientTimestamp.ToOffset(TimeSpan.FromHours(3));
                 return ts.DayOfWeek;
             })
             .Select(g => new SessionDayCount(g.Key.ToString(), g.Count()))
@@ -529,8 +529,7 @@ public sealed class StudentInsightsService : IStudentInsightsService
 public record StudentFocusHeatmapResponse(string StudentId, IReadOnlyList<FocusHeatmapCell> Cells);
 public record FocusHeatmapCell(int DayOfWeek, int Hour, float AvgFocusScore, int SampleCount);
 
-public record StudentDegradationCurveResponse(string StudentId, IReadOnlyList<DegradationPoint> Points);
-public record DegradationPoint(int MinutesIntoSession, float AvgFocusScore, int SampleSize);
+public record StudentDegradationCurveResponse(string StudentId, IReadOnlyList<Cena.Api.Contracts.Admin.Analytics.DegradationPoint> Points);
 
 public record StudentEngagementResponse(
     string StudentId,

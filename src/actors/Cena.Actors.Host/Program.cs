@@ -17,6 +17,7 @@ using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Nats;
+using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;

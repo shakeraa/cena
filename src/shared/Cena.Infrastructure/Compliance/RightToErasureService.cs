@@ -14,7 +14,6 @@
 
 using System.Security.Cryptography;
 using System.Text;
-using Cena.Actors.Events;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
@@ -191,6 +190,24 @@ public sealed class ErasureRequest
 }
 
 /// <summary>
+/// Lightweight POCO for loading StudentProfileSnapshot from Marten without
+/// pulling in the Cena.Actors assembly. Marten resolves by document type name
+/// at runtime, so we configure the table mapping via StoreOptions in the host.
+/// Contains only the fields needed for GDPR erasure anonymization.
+/// </summary>
+internal class StudentProfileRef
+{
+    public string Id { get; set; } = "";
+    public string? FullName { get; set; }
+    public string? DisplayName { get; set; }
+    public string? Bio { get; set; }
+    public DateOnly? DateOfBirth { get; set; }
+    public string? ParentEmail { get; set; }
+    public string? AccountStatus { get; set; }
+    public string? SchoolId { get; set; }
+}
+
+/// <summary>
 /// Service interface for GDPR Right to Erasure operations.
 /// </summary>
 public interface IRightToErasureService
@@ -304,7 +321,7 @@ public sealed class RightToErasureService : IRightToErasureService
             // 1. STUDENT PROFILE SNAPSHOT - ANONYMIZE (don't delete)
             // =============================================================================
             // Hash FullName with HMAC-SHA256, null out PII fields, keep StudentId for referential integrity
-            var profile = await session.LoadAsync<StudentProfileSnapshot>(studentId, ct);
+            var profile = await session.LoadAsync<StudentProfileRef>(studentId, ct);
             if (profile is not null)
             {
                 var originalName = profile.FullName;
@@ -433,31 +450,13 @@ public sealed class RightToErasureService : IRightToErasureService
             _logger.LogDebug("Preserved {Count} StudentRecordAccessLog for {StudentId} (FERPA)", accessLogCount, studentId);
 
             // =============================================================================
-            // 8. Emit StudentErasureCompleted_V1 event
+            // 8. Structured SIEM event for erasure completion
             // =============================================================================
-            var erasureEvent = new StudentErasureCompleted_V1(
-                StudentId: studentId,
-                RequestId: request.Id,
-                CompletedAt: completedAt,
-                Manifest: new ErasureManifest(
-                    RequestId: request.Id.ToString(),
-                    StudentId: studentId,
-                    StartedAt: request.RequestedAt,
-                    CompletedAt: completedAt,
-                    StoreActions: manifest.Actions.Select(a => new Cena.Actors.Events.ErasureManifestItem(
-                        StoreName: a.Store,
-                        ActionTaken: a.Action.ToString().ToLowerInvariant(),
-                        RowsAffected: a.Count,
-                        Details: a.Details
-                    )).ToList(),
-                    TotalRowsAffected: manifest.RowsAffected,
-                    IsComplete: true
-                ),
-                RowsAffected: manifest.RowsAffected
-            );
-
-            // Append to student's event stream if it exists
-            await session.Events.AppendAsync(studentId, erasureEvent, ct);
+            // Domain event (StudentErasureCompleted_V1) is emitted by the host layer
+            // which can reference Cena.Actors.Events. Infrastructure only logs + persists.
+            _logger.LogInformation(
+                "[SIEM] ErasureManifestReady: {RequestId} for {StudentId}, Stores={StoreCount}, Rows={TotalRows}",
+                request.Id, studentId, manifest.Actions.Count, manifest.RowsAffected);
 
             // =============================================================================
             // 9. Update request status and save

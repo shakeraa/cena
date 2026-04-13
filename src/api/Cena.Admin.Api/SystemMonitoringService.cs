@@ -290,30 +290,21 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
         // FIND-data-024: Use dedicated AuditEventDocument instead of all raw events
         var query = session.Query<AuditEventDocument>().AsQueryable();
 
-        // Apply filters from request (these were previously ignored!)
-        if (request.From.HasValue)
-            query = query.Where(e => e.Timestamp >= request.From.Value);
-        
-        if (request.To.HasValue)
-            query = query.Where(e => e.Timestamp <= request.To.Value);
-        
+        // Apply filters from request
+        if (request.StartDate.HasValue)
+            query = query.Where(e => e.Timestamp >= request.StartDate.Value);
+
+        if (request.EndDate.HasValue)
+            query = query.Where(e => e.Timestamp <= request.EndDate.Value);
+
         if (!string.IsNullOrEmpty(request.UserId))
             query = query.Where(e => e.UserId == request.UserId);
-        
-        if (!string.IsNullOrEmpty(request.TenantId))
-            query = query.Where(e => e.TenantId == request.TenantId);
-        
-        if (!string.IsNullOrEmpty(request.Action))
-            query = query.Where(e => e.Action == request.Action);
-        
+
+        if (!string.IsNullOrEmpty(request.ActionType))
+            query = query.Where(e => e.Action == request.ActionType);
+
         if (!string.IsNullOrEmpty(request.TargetType))
             query = query.Where(e => e.TargetType == request.TargetType);
-        
-        if (!string.IsNullOrEmpty(request.IpAddress))
-            query = query.Where(e => e.IpAddress == request.IpAddress);
-        
-        if (request.Success.HasValue)
-            query = query.Where(e => e.Success == request.Success.Value);
 
         // Order by timestamp descending
         query = query.OrderByDescending(e => e.Timestamp);
@@ -336,10 +327,9 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
             TargetType: e.TargetType,
             TargetId: e.TargetId,
             Details: e.Description,
-            IpAddress: e.IpAddress,
-            Success: e.Success
+            IpAddress: e.IpAddress
         )).ToList();
 
-        return new AuditLogResponse(entries, totalCount, page, pageSize);
+        return new AuditLogResponse(entries, (int)totalCount.TotalResults, page, pageSize);
     }
 }

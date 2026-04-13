@@ -116,6 +116,7 @@ public sealed class WebPushClient : IWebPushClient, IDisposable
 
     public void Dispose()
     {
-        _client.Dispose();
+        // PushServiceClient does not implement IDisposable directly;
+        // if the underlying HttpClient was injected, the DI container manages its lifetime.
     }
 }

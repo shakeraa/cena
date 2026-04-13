@@ -12,10 +12,12 @@ using Cena.Actors.Events;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Marten;
+using EventErasureManifest = Cena.Actors.Events.ErasureManifest;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api;
 
@@ -39,7 +41,7 @@ public static class GdprEndpoints
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger<GdprEndpoints> logger) =>
+            [FromServices] ILogger logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
@@ -58,7 +60,7 @@ public static class GdprEndpoints
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger<GdprEndpoints> logger) =>
+            [FromServices] ILogger logger) =>
         {
             if (!Enum.TryParse<ProcessingPurpose>(request.Purpose, true, out var purpose))
                 return Results.BadRequest(new { error = $"Invalid consent purpose: {request.Purpose}" });
@@ -81,7 +83,7 @@ public static class GdprEndpoints
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger<GdprEndpoints> logger) =>
+            [FromServices] ILogger logger) =>
         {
             if (!Enum.TryParse<ProcessingPurpose>(consentType, true, out var purpose))
                 return Results.BadRequest(new { error = $"Invalid consent purpose: {consentType}" });
@@ -104,7 +106,7 @@ public static class GdprEndpoints
             string studentId,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger<GdprEndpoints> logger) =>
+            [FromServices] ILogger logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
@@ -137,7 +139,7 @@ public static class GdprEndpoints
             [FromServices] IRightToErasureService erasureService,
             [FromServices] IDocumentStore store,
             HttpContext httpContext,
-            [FromServices] ILogger<GdprEndpoints> logger) =>
+            [FromServices] ILogger logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school (CRITICAL - destructive operation)
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, httpContext.User, store);
@@ -180,7 +182,7 @@ public static class GdprEndpoints
             [FromServices] IRightToErasureService erasureService,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger<GdprEndpoints> logger) =>
+            [FromServices] ILogger logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
@@ -200,11 +202,11 @@ public static class GdprEndpoints
             var coolingPeriodPassed = now >= scheduledProcessingAt;
 
             // Check for completed manifest if status is Completed
-            ErasureManifest? manifest = null;
+            EventErasureManifest? manifest = null;
             if (request.Status == ErasureStatus.Completed)
             {
                 await using var session = store.QuerySession();
-                manifest = await session.Query<ErasureManifest>()
+                manifest = await session.Query<EventErasureManifest>()
                     .FirstOrDefaultAsync(m => m.RequestId == request.Id.ToString());
             }
 
@@ -243,7 +245,7 @@ public static class GdprEndpoints
             [FromServices] IRightToErasureService erasureService,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger<GdprEndpoints> logger) =>
+            [FromServices] ILogger logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
@@ -272,7 +274,7 @@ public static class GdprEndpoints
             }
 
             await using var session = store.QuerySession();
-            var manifest = await session.Query<ErasureManifest>()
+            var manifest = await session.Query<EventErasureManifest>()
                 .FirstOrDefaultAsync(m => m.RequestId == request.Id.ToString());
 
             if (manifest is null)

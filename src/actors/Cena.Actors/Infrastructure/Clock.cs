@@ -6,6 +6,8 @@
 // to achieve deterministic, non-flaky time-based assertions.
 // =============================================================================
 
+using Microsoft.Extensions.DependencyInjection;
+
 namespace Cena.Actors.Infrastructure;
 
 /// <summary>
