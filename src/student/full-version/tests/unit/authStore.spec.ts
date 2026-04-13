@@ -96,4 +96,67 @@ describe('authStore', () => {
     expect(store.idToken).toBeNull()
     expect(store.ready).toBe(true) // still resolved, just signed out
   })
+
+  /**
+   * FIND-qa-006 / FIND-ux-010: Hard navigation rehydration test
+   *
+   * Simulates a full page reload (hard navigation) where:
+   * 1. User was signed in with mock auth
+   * 2. User refreshes the page (F5/cmd+R)
+   * 3. Store re-initializes and must rehydrate from localStorage
+   *
+   * This test verifies the mock auth survives the hard navigation.
+   */
+  it('rehydrates mock user after hard navigation (reset Pinia + re-init)', () => {
+    // Step 1: Sign in as a mock user
+    const store = useAuthStore()
+    store.__mockSignIn({
+      uid: 'u-hard-nav-test',
+      email: 'hardnav@example.com',
+      displayName: 'Hard Nav User',
+    })
+
+    // Verify the user is signed in
+    expect(store.isSignedIn).toBe(true)
+    expect(store.uid).toBe('u-hard-nav-test')
+
+    // Step 2: Simulate hard navigation - reset Pinia and re-create store
+    // This mimics what happens when the browser reloads the page
+    setActivePinia(createPinia())
+
+    // Step 3: Re-initialize the store (this happens in the new page load)
+    const newStore = useAuthStore()
+
+    // Step 4: Assert the store rehydrated from localStorage
+    expect(newStore.isSignedIn).toBe(true)
+    expect(newStore.uid).toBe('u-hard-nav-test')
+    expect(newStore.email).toBe('hardnav@example.com')
+    expect(newStore.displayName).toBe('Hard Nav User')
+    expect(newStore.idToken).toBe('mock-token-u-hard-nav-test')
+
+    // Note: `ready` stays false after hydration - firebase.ts flips it
+    expect(newStore.ready).toBe(false)
+  })
+
+  /**
+   * Synthetic regression test for FIND-ux-010:
+   * If localStorage persistence is broken, the store should NOT be
+   * signed in after a simulated hard navigation.
+   */
+  it('fails synthetic regression when localStorage persistence is broken', () => {
+    // Sign in
+    const store = useAuthStore()
+    store.__mockSignIn({ uid: 'u-regression-test', email: 'reg@example.com' })
+
+    // Corrupt the localStorage entry (simulate broken persistence)
+    window.localStorage.removeItem('cena-mock-auth')
+
+    // Simulate hard navigation
+    setActivePinia(createPinia())
+    const newStore = useAuthStore()
+
+    // Without localStorage persistence, the store should NOT be signed in
+    expect(newStore.isSignedIn).toBe(false)
+    expect(newStore.uid).toBeNull()
+  })
 })
