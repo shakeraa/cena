@@ -1,6 +1,6 @@
 # ADR-0001 — Multi-institute enrollment with per-track mastery state
 
-- **Status**: Decision 1 locked · Decision 2 under verification
+- **Status**: Decision 1 locked · Decision 2 locked (Model C — seepage with decay)
 - **Date proposed**: 2026-04-11
 - **Deciders**: Shaker (project owner), claude-code (coordinator)
 - **Supersedes**: none (first ADR)
@@ -96,7 +96,7 @@ public class Enrollment
 
 ---
 
-## Decision 2 — mastery-state sharing across tracks (**UNDER VERIFICATION**)
+## Decision 2 — mastery-state sharing across tracks (**LOCKED — Model C, 2026-04-13**)
 
 ### The question
 
@@ -149,11 +149,36 @@ The verification must produce a recommended concrete design:
 - If seeded: what's the seed function? `newPMastery = sharedConceptWeight * existingPMastery + (1 - sharedConceptWeight) * prior`
 - If seeded: where does `sharedConceptWeight` come from? Literature default? Authored by track designer? Learned from data?
 
-### Why UNDER VERIFICATION
+### Verification complete — Model C locked (2026-04-13)
 
-- Pedagogical decisions that affect every student's learning path should not be made by architectural gut-feeling. The 2026-04-11 review standard (see [docs/reviews/agent-4-pedagogy-findings.md](../reviews/agent-4-pedagogy-findings.md)) is: no unsourced pedagogy claims.
-- Getting Decision 2 wrong is expensive to undo — you'd have to back-migrate every student's mastery state AND explain to real users why their progress reset.
-- "Usually yes" is a prior, not a commitment.
+VERIFY-0001 literature review ([docs/research/VERIFY-0001-transfer-of-learning.md](../research/VERIFY-0001-transfer-of-learning.md)) confirmed the null hypothesis. **Model C (seepage with decay)** is the locked decision.
+
+#### Chosen design
+
+| Parameter | Value | Source |
+|-----------|-------|--------|
+| Key structure | `enrollmentId:conceptId` | TENANCY-P2a implementation |
+| Same-subject seepage factor | 0.60 | Thorndike & Woodworth (1901), Singley & Anderson (1989) |
+| Cross-subject seepage factor | 0.20 | Barnett & Ceci (2002), Perkins & Salomon (1992) |
+| Max seeded PKnown | 0.50 | Never skip prerequisite validation |
+| Time decay | Ebbinghaus (BKT+ half-life) | Schwartz, Bransford & Sears (2005) |
+| Seepage timing | One-time at enrollment | Then tracks evolve independently |
+| EloRating | Student-wide singleton (not re-keyed) | Elo measures overall ability, not per-track |
+
+#### Implementation (shipped)
+
+- `MasteryKeys.Key(enrollmentId, conceptId)` — composite key helper
+- `MasterySeepageService` — applies seepage at enrollment time
+- `ConceptAttempted_V3`, `ConceptMastered_V2` — events with EnrollmentId
+- V2→V3 and V1→V2 upcasters — legacy flat keys → `"default":conceptId`
+- `MasterySeepageApplied_V1` — audit event with full provenance
+- `ConceptMasteryState.SourceEnrollmentId` + `SeepageFactor` — audit fields
+
+#### Refutation criteria (for when we have real data)
+
+- **Refute Model C**: if per-concept optimal transfer weights show no convergence pattern (all over the place), the seeded model is overfit. Revisit with per-category weights.
+- **Refute 0.60 factor**: if cross-track first-attempt accuracy on shared concepts is >80% of intra-track accuracy, the discount is too aggressive — raise toward Model A.
+- **Refute 0.20 cross-subject factor**: if cross-subject students show zero benefit from prior mastery, lower to 0.0 (Model B for cross-subject).
 
 ---
 
@@ -165,13 +190,13 @@ The verification must produce a recommended concrete design:
 - Event upcasters: every existing stream gets a synthetic `EnrollmentCreated_V1(defaultEnrollmentId, studentId, defaultInstituteId, defaultTrackId)` replayed first so `Apply` handlers can rely on at least one enrollment existing.
 - `TenantScope.GetInstituteFilter` initially returns a single-element list: `[student.DefaultInstituteId]` — same semantics as today.
 - Every admin query keeps working against a single institute. No UI changes.
-- **Decision 2 is deferred in this phase.** Mastery state remains keyed by `conceptId` — equivalent to Model A by default, because there's still only one enrollment per student.
+- **Decision 2 is now locked (Model C).** Mastery state is re-keyed to `enrollmentId:conceptId` via TENANCY-P2a. Legacy streams upcasted to `"default":conceptId`.
 - Migration risk: **low**. Pure additive schema + upcasters.
 - Ships independently of Decisions 2 and 3.
 
-### Phase 2 — cross-enrollment reads (gated on Decision 2)
+### Phase 2 — cross-enrollment reads (Decision 2 locked, gate cleared)
 
-- Block on ADR-0002 (the verification report) that locks Decision 2.
+- ~~Block on ADR-0002 (the verification report) that locks Decision 2.~~ **Done**: VERIFY-0001 complete, Model C locked 2026-04-13.
 - Re-key mastery state per whatever Model 2 picks.
 - New student-side onboarding step: "pick your track" (bagrut / SAT / psychometry / other).
 - New `/api/me/enrollments` + `POST /api/me/enrollments/{trackId}` endpoints.
