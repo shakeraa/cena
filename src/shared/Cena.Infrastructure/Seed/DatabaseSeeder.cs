@@ -45,6 +45,10 @@ public static class DatabaseSeeder
         // 2. Demo users (admins, teachers, parents, hand-crafted students)
         await UserSeedData.SeedUsersAsync(store, logger);
 
+        // 2b. Platform institute + Bagrut curriculum tracks + classrooms (TENANCY-P1d)
+        //     Must run before classroom seed so demo classrooms can reference tracks.
+        await PlatformSeedData.SeedPlatformAsync(store, logger);
+
         // 3. Sample classrooms for testing join codes (STB-00b)
         await ClassroomSeedData.SeedClassroomsAsync(store, logger);
 
