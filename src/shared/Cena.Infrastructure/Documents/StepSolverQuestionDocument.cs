@@ -19,7 +19,15 @@ public enum StepScaffoldingLevel
     Faded = 1,
 
     /// <summary>Full worked example visible alongside the blank workspace.</summary>
-    Full = 2
+    Full = 2,
+
+    /// <summary>
+    /// SCAFFOLD-001: Productive failure mode (Kapur 2008/2014, d=0.37 on transfer).
+    /// Student sees only problem stem + figure. Free-form input, no step slots.
+    /// CAS verifies only the final answer. After 2 wrong attempts, re-renders
+    /// in Full mode with divergence highlight. Triggered when BKT PLEffective >= 0.8.
+    /// </summary>
+    Exploratory = 3
 }
 
 /// <summary>
