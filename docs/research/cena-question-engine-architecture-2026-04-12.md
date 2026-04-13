@@ -28,13 +28,21 @@
 17. [Cost Model](#17-cost-model)
 18. [Task Queue (Implementation Plan)](#18-task-queue-implementation-plan)
 19. [Open Decisions](#19-open-decisions)
-20. [References](#20-references)
+20. [Expert Architecture Review](#20-expert-architecture-review)
+21. [IRT Calibration & Adaptive Selection](#21-irt-calibration--adaptive-selection)
+22. [Bagrut Curriculum Alignment](#22-bagrut-curriculum-alignment)
+23. [RTL & Bidi Deep Engineering](#23-rtl--bidi-deep-engineering)
+24. [Motivation Design & Session UX](#24-motivation-design--session-ux)
+25. [Assessment Security & Integrity](#25-assessment-security--integrity)
+26. [Bagrut Readiness Reporting](#26-bagrut-readiness-reporting)
+27. [Consolidated Improvement Registry](#27-consolidated-improvement-registry)
+28. [References](#28-references)
 
 ---
 
 ## 1. Executive Summary
 
-Cena's question engine serves math and physics questions to Israeli Bagrut (4/5 unit), AP Calculus, and SAT students in English, Arabic, and Hebrew. The engine must:
+Cena's question engine serves math and physics questions to Israeli Bagrut (4/5 unit) students in Arabic and Hebrew. (English/AP Calculus/SAT deferred to a later phase.) The engine must:
 
 - **Ingest** questions from Bagrut PDF exams and student-submitted photos
 - **Generate variants** at different difficulty levels from the same base question
@@ -927,10 +935,567 @@ Student-web CI runs axe-core on session pages containing figures. Zero new viola
 | 5 | Step count per question: fixed vs student-extendable | Fixed (author-defined) vs "add a step" button for advanced students | No | UX |
 | 6 | Bagrut PDF copyright: seed-only vs direct use | Legal review needed | Yes — blocks production | Legal |
 | 7 | Client-side vs server-side figure rendering for physics | Client (interactive) vs server (cached SVG, matches mobile) | No — ADR FIGURE-001 | Engineering |
+| 8 | IRT estimation tooling: Python `girth` vs R `mirt` | Python fits CAS sidecar stack; R is more mature | No — CAS-001 decides | Engineering |
+| 9 | Exam simulation: reserved pool size (3× vs 5× exam size) | 3× = cheaper to populate; 5× = better exposure control | No | Psychometrics |
+| 10 | FBD Construct mode: drag-and-drop vs angle/magnitude input | Drag = more intuitive; numeric = more precise | No — user testing decides | UX |
 
 ---
 
-## 20. References
+## 20. Expert Architecture Review
+
+> Sections 20–27 are the product of structured review sessions by 7 domain experts.
+> These improvements are additive — none changes the fundamental design, they harden it.
+
+### 20.1 Review Panel
+
+| Persona | Domain | Key contributions |
+|---------|--------|-------------------|
+| **Dina** — Principal Architect (ex-Azure, ex-Wix) | Operational simplicity, failure modes | Routing table, circuit breaker, preload |
+| **Oren** — Staff Architect (ex-Google, ex-Check Point) | Latency, formal contracts | Equivalence mode, conformance suite, CAS audit |
+| **Dr. Nadia Karmi** — Learning Sciences (CMU LearnLab) | ITS pedagogy, misconception theory | AST-diff diagnosis, productive failure, remediation loops |
+| **Dr. Yael Stern** — Psychometrician (ex-NITE, ex-ETS) | IRT calibration, adaptive testing | Rasch model, CAT algorithm, DIF analysis |
+| **Prof. Amjad Halabi** — Bagrut Examiner (25 years Arab sector) | Curriculum, real misconceptions | Dual math tracks, misconception catalog, terminology |
+| **Tamar Ben-Ari** — RTL/i18n Engineer (ex-Google, Unicode BiDi) | Bidi, accessibility, screen readers | KaTeX isolation, SVG text direction, SRE aria-labels |
+| **Dr. Lior Ashkenazi** — Game/UX Psychologist (ex-King, ex-Khan) | Motivation, anti-dark-patterns | Session design, progress mechanics, cognitive load |
+| **Ran Shachar** — Assessment Security (ex-NITE, ex-Pearson VUE) | Anti-cheating, data integrity | Exam mode, variant seeding, anomaly detection |
+
+### 20.2 CAS Router Architecture (Improvements 1–6)
+
+**Decision**: Both SymPy (always-on safety net) and Giac (fast-path for 5-unit physics) via NATS, with MathNet in-process for arithmetic. Router lives in .NET Actor Host as a ~30-line subject selector.
+
+**Routing table** — externalized as JSON ConfigMap, hot-reloaded on file watch (no restart):
+
+```json
+{
+  "rules": [
+    {"level_max": 3, "operation": "*",             "engine": "mathnet"},
+    {"level_max": 4, "operation": "*",             "engine": "sympy"},
+    {"level_min": 5, "operation": "*",             "engine": "giac"},
+    {"operation": "numeric_eval",                   "engine": "mathnet"},
+    {"operation": "integrate|ode|matrix_solve",     "engine": "giac"}
+  ],
+  "fallback": "sympy"
+}
+```
+
+**Circuit breaker** on Giac: 3 consecutive timeouts (>200ms) → trip → route to SymPy for 30s → half-open.
+
+**Equivalence mode** on every CAS request:
+
+```json
+{
+  "student_expr": "x = 1",
+  "expected_expr": "x^3 - 1 = 0",
+  "mode": "real_field"
+}
+```
+
+Modes: `real_field`, `complex_field`, `numeric_approx`. Both engines must respect the mode.
+
+**Conformance test suite**: 500+ expression pairs that both SymPy and Giac must agree on. Runs in CI on every CAS sidecar image build.
+
+**CAS audit events**: every verification emits a structured event to Marten event store:
+
+```json
+{
+  "request_id": "uuid",
+  "question_id": "q_123",
+  "step": 3,
+  "student_expr": "x = -1 ± √2",
+  "expected_expr": "(x+1)² = 2",
+  "engine": "sympy",
+  "mode": "real_field",
+  "result": "equivalent",
+  "latency_ms": 12,
+  "canonical_form": "Eq(x, -1 + sqrt(2)) | Eq(x, -1 - sqrt(2))"
+}
+```
+
+Admin panel gets "CAS trace" button on disputed questions. Non-negotiable for parent/teacher trust.
+
+**Cold start mitigation**: `min-instances=1` for both sidecars. SymPy container runs dummy `simplify(1+1)` at startup to preload the engine. No cold-start penalty during exam spikes.
+
+### 20.3 Pedagogical Depth (Improvements 7–11)
+
+**AST-diff diagnosis**: when a step fails CAS verification, diff the student's expression tree against the expected one. Return the first divergent node:
+
+```csharp
+public sealed record StepDiagnosis(
+    string ErrorClass,           // sign_error, operation_error, conceptual, strategy, skip
+    string? StudentSubtree,      // the student's divergent sub-expression
+    string? ExpectedSubtree,     // what was expected at that node
+    int DivergenceDepth,         // how deep in the AST
+    string? MisconceptionId      // maps to misconception catalog, e.g. "ALG-M01"
+);
+```
+
+Error classes: `sign_error`, `operation_error`, `conceptual_error`, `strategy_error`, `correct_but_skipped`.
+
+The LLM uses the diagnosis to generate targeted feedback. "LLM explains, CAS computes" principle holds.
+
+**Productive failure** — 4th scaffolding level:
+
+```csharp
+public enum ScaffoldingLevel
+{
+    Full,         // Faded worked example — all steps visible
+    Partial,      // Step 1 given, student fills the rest
+    Minimal,      // Numbered slots only
+    Exploratory   // Blank canvas — problem + free-form input, verify final answer only
+}
+```
+
+In `Exploratory` mode: student sees only the problem. Free-form multi-line math input. CAS verifies final answer. If wrong → same problem re-renders in `Full` mode with divergence highlight.
+
+Kapur 2008/2014: productive failure yields d=0.37 additional gain on transfer tasks.
+
+**Misconception catalog**: static JSON per topic, human-curated from published research + examiner experience. CAS AST-diff maps student errors to catalog entries. Session-scoped tally drives targeted question selection.
+
+**Remediation micro-tasks**: parametric templates per misconception, injected immediately after detection:
+
+```json
+{
+  "id": "ALG-M01",
+  "name": "sqrt_linearity",
+  "pattern": "√(a+b) → √a + √b",
+  "remediation_type": "numeric_counterexample",
+  "template": "احسب √({a}+{b}) ثم √{a}+√{b}. هل هما متساويان؟",
+  "parameters": {"a": [9,16,25], "b": [16,9,4]},
+  "success_criteria": "student_states_not_equal"
+}
+```
+
+CAS-verified, no LLM needed. This closes the tutoring loop and is the mechanism that earns VanLehn's d=0.76.
+
+**FBD Construct mode**: `PhysicsDiagramSpec` gains `DiagramMode`:
+
+```csharp
+public enum DiagramMode { Display, Construct }
+```
+
+In `Construct` mode: render scene (plane, block, angle) but not forces. Student drags force arrows onto the body. CAS verifies force vectors (decomposition is algebra). Market differentiator — nobody in Hebrew/Arabic market has interactive FBD assessment.
+
+**SolutionStep update** (technique verification + input type):
+
+```csharp
+public sealed record SolutionStep(
+    int StepNumber,
+    string? Instruction,
+    string? FadedExample,
+    string ExpectedExpression,
+    string? ExpectedPattern,      // e.g. "(x + _)**2 = _" for technique check
+    StepInputType InputType,      // MathExpression, VerbalExplanation, NumericOnly
+    IReadOnlyList<string> Hints
+);
+```
+
+---
+
+## 21. IRT Calibration & Adaptive Selection
+
+### 21.1 Item Calibration (Improvement 12)
+
+Every question record gains IRT parameters:
+
+```csharp
+public sealed record ItemCalibration(
+    double? AuthorDifficulty,     // 1-5 scale, author's guess
+    double? IrtDifficulty,        // Rasch b-parameter, estimated from data
+    double? IrtDiscrimination,    // 2PL a-parameter, null until 500+ responses
+    double IrtStandardError,      // SE of the b estimate
+    int ResponseCount,            // how many students have attempted this item
+    CalibrationStatus Status      // Uncalibrated, Provisional, Calibrated
+);
+
+public enum CalibrationStatus
+{
+    Uncalibrated,     // < 50 responses, author label only
+    Provisional,      // 50-499 responses, IRT estimate with high SE
+    Calibrated        // 500+ responses, stable IRT parameters
+}
+```
+
+Three-phase transition: Day 1 uses `AuthorDifficulty`. After 50 responses, `IrtDifficulty` becomes available with high SE. After 500 responses, stable calibration.
+
+IRT estimation runs as a nightly batch job (Python `girth` or R `mirt`). Not real-time.
+
+### 21.2 Difficulty-Preserving Variant Constraints (Improvement 13)
+
+Parametric templates include constraints that prevent uncontrolled difficulty variance:
+
+```json
+{
+  "template": "{a}x + {b} = {c}",
+  "constraints": {
+    "a": {"range": [2,9], "type": "integer"},
+    "b": {"range": [1,9], "type": "integer"},
+    "c": {"range": [10,50], "type": "integer"},
+    "difficulty_constraints": [
+      "(c - b) % a == 0",
+      "abs((c - b) / a) <= 20",
+      "(c - b) / a > 0"
+    ]
+  }
+}
+```
+
+CAS validates constraints at generation time. Post-launch, IRT data validates that variants from the same template cluster around the same difficulty.
+
+### 21.3 Constrained CAT Algorithm (Improvement 15)
+
+Question selection uses a multi-objective algorithm that balances measurement efficiency with pedagogical goals:
+
+```
+Select item that:
+  1. Is within 1 logit of student's current θ (CAT efficiency)
+  2. Targets detected misconceptions if any (priority override)
+  3. Covers a topic not yet seen in this session (breadth)
+  4. Prefers calibrated items over uncalibrated (data quality)
+  5. Has not been seen by this student before (exposure control)
+```
+
+Priority: misconception targeting > exposure control > difficulty match > topic breadth > calibration preference.
+
+### 21.4 A-Stratified Exposure Control (Improvement 16)
+
+Items divided into strata by discrimination. Within each stratum, select randomly from items within 0.5 logits of θ. Within-student: no item repeats. Exam mode: cross-student exposure balancing via pool partitions.
+
+### 21.5 Item Bank Health Dashboard (Improvement 14)
+
+| Metric | Target | Red flag |
+|--------|--------|----------|
+| Coverage | ≥ 20 calibrated items per syllabus topic | < 10 per topic |
+| Difficulty distribution | Bell curve centered on target population | Bimodal or skewed |
+| Discrimination | a > 0.5 for 80%+ of items | a < 0.3 = noise item |
+| Distractor analysis | Every MCQ option chosen by ≥ 5% | < 2% = dead option |
+| DIF (Arabic vs Hebrew) | No item systematically harder for one language after ability control | DIF > 0.5 logits = biased |
+
+Quality gate: no topic goes live with fewer than 10 items. Nightly batch computation alongside IRT.
+
+---
+
+## 22. Bagrut Curriculum Alignment
+
+### 22.1 Math Track Structure (Improvement 17)
+
+| Track | Code | Content | Arab sector share |
+|-------|------|---------|-------------------|
+| 806 | שאלון 806 | Calculus + Analytic Geometry | ~85% |
+| 807 | שאלון 807 | Calculus + Probability & Statistics | ~10% |
+| Combined | 806+807 | Both | ~5% |
+
+806 and 807 share the calculus core. The system must support both to avoid losing 15% of the market. Physics is one track: 036 (mechanics, electricity, magnetism, optics, modern physics).
+
+**Content authoring**: questions authored natively in Arabic, not translated from Hebrew. Translation DIF is a known issue from Bagrut examiner experience.
+
+### 22.2 Bagrut Structural Alignment Tags (Improvement 19)
+
+```csharp
+public sealed record BagrutAlignment(
+    string ExamCode,           // "806", "807", "036"
+    ExamPart Part,             // A or B
+    int? TypicalPosition,      // Q1-Q5 in Part A, null for Part B
+    string TopicCluster,       // "function_investigation", "integral_application"
+    bool IsProofQuestion,      // Part B proof/show-that type
+    int EstimatedMinutes       // 10-25 min per question
+);
+```
+
+Math 806 Part A structure: Q1 = function investigation, Q2 = integral application, Q3 = analytic geometry, Q4 = sequence/series, Q5 = word problem (optimization/rate of change). Part B: harder versions + proof questions.
+
+Students practice by exam structure: "Train Part A Q1" or "Train Part B proofs." CAT operates within structural strata.
+
+### 22.3 Misconception Catalog (Improvement 18)
+
+Seeded with empirically validated entries from 25 years of Bagrut examiner experience:
+
+**Calculus**:
+
+| ID | Misconception | Detection pattern |
+|----|--------------|-------------------|
+| CALC-M01 | Product rule: f'(g·h) = f'(g)·f'(h) | AST: derivative node with multiply child missing sum |
+| CALC-M02 | ∫(1/x)dx = 1/ln(x) | Reciprocal of antiderivative |
+| CALC-M03 | Definite integral bounds reversed: F(a)-F(b) instead of F(b)-F(a) | Subtraction order |
+| CALC-M04 | Chain rule inner derivative omitted | d/dx[sin(3x)] = cos(3x) |
+| CALC-M05 | f'=0 means minimum (ignoring max/inflection) | Missing second derivative test |
+| CALC-M06 | Domain of ln(f(x)) — forget f(x) > 0 | No domain restriction |
+
+**Algebra**:
+
+| ID | Misconception | Detection pattern |
+|----|--------------|-------------------|
+| ALG-M01 | √(a²+b²) = a+b | Linearizing square root |
+| ALG-M02 | (a+b)² = a²+b² | Missing cross term 2ab |
+| ALG-M03 | (a+b)/a = b | Cancel across addition |
+| ALG-M04 | Negative × negative = negative | Sign error in multi-step |
+| ALG-M05 | log(a+b) = log(a)+log(b) | Linearizing logarithm |
+
+**Physics**:
+
+| ID | Misconception | Detection pattern |
+|----|--------------|-------------------|
+| PHY-M01 | Heavier objects fall faster | Uses m in free-fall acceleration |
+| PHY-M02 | Force in direction of motion always present | Extra forward force on friction-only |
+| PHY-M03 | Velocity = acceleration direction confusion | "Deceleration = zero acceleration" |
+| PHY-M04 | Current "used up" in circuit | Less current after resistor |
+
+Each entry includes a remediation micro-task template (see §20.3).
+
+### 22.4 Arabic Math Terminology (Improvement 20)
+
+| Concept | Primary (MoE) | Variant 1 | Variant 2 |
+|---------|---------------|-----------|-----------|
+| Derivative | مُشتقّة | اشتقاق | تفاضل |
+| Integral | تكامل | مكاملة | — |
+| Function | دالّة | تابع | اقتران |
+| Limit | نهاية | حدّ | غاية |
+
+One primary term per concept (MoE standard), all variants recognized in student input. Feedback uses primary + alternative in parentheses on first mention.
+
+Normalization runs at input boundary before CAS submission.
+
+---
+
+## 23. RTL & Bidi Deep Engineering
+
+### 23.1 Inline KaTeX Bidi Isolation (Improvement 21)
+
+Every inline KaTeX render wrapped in `<bdi dir="ltr">` to prevent:
+- Parenthesis mirroring: `f(x)` → `f)x(`
+- Negative sign drift: `-3x` → `x3-`
+- Operator reordering: `2x + 3 = 7` → `7 = 3 + x2`
+
+```html
+<!-- Correct pattern -->
+<p>أوجد قيمة <bdi dir="ltr"><span class="katex">x = 5</span></bdi> عندما</p>
+```
+
+Display math (block-level) does not need isolation — it occupies its own block context.
+
+### 23.2 SVG Text Direction (Improvement 22)
+
+SVG `<text>` elements auto-detect script via Unicode range check:
+- `[\u0590-\u05FF]` → Hebrew → `direction="rtl"`
+- `[\u0600-\u06FF]` → Arabic → `direction="rtl"`
+- Otherwise → LTR default
+
+Applies to function-plot axis labels, physics diagram force labels, geometry annotations.
+
+### 23.3 Eastern Arabic Numeral Handling (Improvement 23)
+
+Display: Western Arabic numerals (0-9) everywhere — KaTeX, plots, UI. KaTeX doesn't support Eastern Arabic natively.
+
+Input: accept Eastern Arabic (٠-٩), normalize at boundary:
+
+```typescript
+function normalizeDigits(input: string): string {
+  return input.replace(/[٠-٩]/g, d =>
+    String.fromCharCode(d.charCodeAt(0) - 0x0660 + 0x0030)
+  );
+}
+```
+
+Audit log stores both original and normalized for dispute resolution.
+
+### 23.4 Step-Solver Input Direction (Improvement 24)
+
+```csharp
+public enum StepInputType { MathExpression, VerbalExplanation, NumericOnly }
+```
+
+- `MathExpression` → `dir="ltr"` (always)
+- `VerbalExplanation` → `dir="rtl"` for Arabic/Hebrew
+- `NumericOnly` → `dir="ltr"` (always)
+
+### 23.5 Screen Reader Math (Improvement 25)
+
+Use `speech-rule-engine` (SRE) to generate Arabic/Hebrew aria-labels:
+
+```typescript
+import * as SRE from 'speech-rule-engine';
+SRE.setupEngine({locale: 'ar'});
+const label = SRE.toSpeech('x^2 + 3 = 7');
+// → "إكس تربيع زائد ثلاثة يساوي سبعة"
+```
+
+Cache per expression+locale. Wrap all KaTeX renders: `<span role="math" aria-label="...">`.
+
+---
+
+## 24. Motivation Design & Session UX
+
+### 24.1 Session Start (Improvement 26)
+
+Session start screen presents topic choices (autonomy) with a personalized suggestion from mastery/misconception data:
+
+```
+┌─────────────────────────────────────────┐
+│  ماذا تريد أن تتدرب اليوم؟              │
+│                                         │
+│  [📐 تحقيق دوال]    [∫ تكامل]          │
+│  [⚡ ميكانيكا]       [📊 هندسة تحليلية]  │
+│                                         │
+│  💡 اقتراح: "قاعدة السلسلة — كنت قريباً│
+│     في المرة الماضية، حاول مرة أخرى؟"   │
+│                        [نعم]  [لا]      │
+│                                         │
+│  📊 إتقانك: ████████░░ 78%              │
+└─────────────────────────────────────────┘
+```
+
+Student always chooses. No mandatory paths. No loss-framed prompts.
+
+### 24.2 Progress System (Improvement 27)
+
+**Allowed**:
+- Mastery map: visual grid of topics, BKT-colored (red → yellow → green)
+- Session summary: problems done, what was mastered, what needs work
+- Personal best: "Your derivatives accuracy: 60% → 85% this week"
+- Misconception resolution: "You fixed the chain rule confusion — last 5 correct"
+
+**Banned**: XP, streaks with loss penalty, public leaderboards by activity, inflated progress indicators.
+
+All progress tied to measured learning, not activity volume. Unfakeable.
+
+### 24.3 Progressive Disclosure in Step-Solver (Improvement 28)
+
+One active step visible. Previous collapsed (showing ✓/✗). Future locked.
+
+Failure gradient:
+| Attempt | Response |
+|---------|----------|
+| 1st wrong | CAS diagnosis feedback |
+| 2nd wrong | Hint button appears |
+| 3rd wrong | Step auto-fills, marked "assisted" |
+
+BKT update weighted by assistance:
+| Outcome | BKT P(L) update |
+|---------|-----------------|
+| Correct first try | Strong positive |
+| Correct after feedback | Moderate positive |
+| Correct after hint | Weak positive |
+| Auto-filled | No update / slight negative |
+
+### 24.4 Natural Session Boundaries (Improvement 29)
+
+Check-in every 5 problems or 15 minutes (whichever first):
+- Summary: problems done, accuracy, mastery change
+- Optional remediation micro-task if misconception detected
+- Clean exit with no guilt framing
+
+Compliant with dark-pattern ban (Point 7 ship-gate).
+
+---
+
+## 25. Assessment Security & Integrity
+
+### 25.1 Per-Student Variant Seeds (Improvement 30)
+
+```csharp
+int variantSeed = HashCode.Combine(questionTemplateId, studentId, DateTime.UtcNow.Date);
+```
+
+Same student gets same variant within a day (for session resume). Different students get different parameters for the same template. Daily rotation.
+
+Practice mode: **zero security theater**. No lockdown browser, no monitoring.
+
+### 25.2 Exam Simulation Mode (Improvement 31)
+
+| Control | Implementation |
+|---------|---------------|
+| Timer | Real countdown, auto-submit on expiry |
+| Reserved pool | Exam draws from items never used in practice |
+| No scaffolding | No hints, no step-solver, no CAS feedback |
+| Randomized order | Per-student within exam parts |
+| No back-navigation | Once submitted, can't revisit |
+| Delayed scoring | Results after exam closes |
+
+Pool sizing: ≥ 3× exam size per administration. Practice-seen items excluded from exam draws.
+
+### 25.3 Behavioral Anomaly Detection (Improvement 32)
+
+| Signal | Interpretation | Action |
+|--------|---------------|--------|
+| 2+ IP addresses within 30 min | Possible account sharing | Flag for teacher review |
+| Response time < 3s consistently | Someone who knows answers (tutor?) | Flag for review |
+| Mastery jumps 20% → 80% overnight | Different person or breakthrough | Flag for review |
+
+Flags stored, surfaced on teacher dashboard as informational (not punitive). Framed as care: "unusual patterns — you may want to check in with this student."
+
+---
+
+## 26. Bagrut Readiness Reporting
+
+### 26.1 Report Structure (Improvement 33)
+
+```
+Bagrut 806 Readiness — Student: أحمد
+────────────────────────────────────────────
+Part A:
+  Q1 Function Investigation:  ██████████░░ 83% ± 5%  (12 items)
+  Q2 Integral Application:    ████████░░░░ 67% ± 8%  (8 items)
+  Q3 Analytic Geometry:       ████░░░░░░░░ 35% ± 12% (4 items)  ⚠️
+  Q4 Sequences/Series:        ███████░░░░░ 58% ± 9%  (7 items)
+  Q5 Word Problems:           █████████░░░ 75% ± 7%  (10 items)
+
+Part B:
+  Proof Questions:            ██████░░░░░░ 50% ± 15% (3 items)  ⚠️
+
+Overall Readiness: 65% ± 4% (44 items)
+Recommendation: Focus on Analytic Geometry and Proof Questions
+
+Active Misconceptions:
+  ⚠️ ALG-M01 (√ linearity) — detected 3 times, not yet resolved
+  ✅ CALC-M04 (chain rule) — resolved after 2 remediation cycles
+```
+
+Built from existing data: BKT mastery per topic, IRT ability estimate θ, misconception tally, Bagrut alignment tags. Exportable PDF in Arabic/Hebrew.
+
+Major differentiator for tutor/program sales channel — no competitor produces this.
+
+---
+
+## 27. Consolidated Improvement Registry
+
+| # | Source | Improvement | Category |
+|---|--------|------------|----------|
+| 1 | Architects | External JSON routing table, hot-reloaded | Ops |
+| 2 | Architects | SymPy always-on safety net + Giac circuit breaker | Reliability |
+| 3 | Architects | Equivalence mode + 500-pair conformance suite | Correctness |
+| 4 | Architects | ExpectedPattern for technique verification | Pedagogy |
+| 5 | Architects | CAS audit events + admin CAS trace | Trust |
+| 6 | Architects | min-instances=1, SymPy preload at startup | Performance |
+| 7 | Learning Scientist | AST-diff diagnosis on failed steps | Pedagogy |
+| 8 | Learning Scientist | Exploratory scaffolding (productive failure) | Pedagogy |
+| 9 | Learning Scientist | Misconception catalog + session tally | Pedagogy |
+| 10 | Learning Scientist | FBD Construct mode for physics | Pedagogy |
+| 11 | Learning Scientist | Remediation micro-task templates | Pedagogy |
+| 12 | Psychometrician | IRT calibration (Rasch + 2PL) | Measurement |
+| 13 | Psychometrician | Difficulty-preserving variant constraints | Measurement |
+| 14 | Psychometrician | Item bank health dashboard + quality gate | Quality |
+| 15 | Psychometrician | Constrained CAT algorithm | Selection |
+| 16 | Psychometrician | A-stratified exposure control | Selection |
+| 17 | Bagrut Examiner | Dual math tracks (806/807) + physics 036 | Content |
+| 18 | Bagrut Examiner | 15+ empirical misconception entries | Content |
+| 19 | Bagrut Examiner | Bagrut structural alignment tags | Content |
+| 20 | Bagrut Examiner | Arabic terminology synonym table | Localization |
+| 21 | RTL Engineer | `<bdi dir="ltr">` for inline KaTeX | Localization |
+| 22 | RTL Engineer | SVG text auto-detect script direction | Localization |
+| 23 | RTL Engineer | Eastern Arabic digit normalization | Localization |
+| 24 | RTL Engineer | StepInputType (Math/Verbal/Numeric) | Localization |
+| 25 | RTL Engineer | SRE aria-labels for math in AR/HE | Accessibility |
+| 26 | UX Psychologist | Session start with topic choice + suggestion | Motivation |
+| 27 | UX Psychologist | Mastery map progress (no XP/streaks) | Motivation |
+| 28 | UX Psychologist | Progressive disclosure + assistance-weighted BKT | UX/Pedagogy |
+| 29 | UX Psychologist | Natural session boundaries (5 problems / 15 min) | UX/Ethics |
+| 30 | Security | Per-student variant seeds, daily rotation | Integrity |
+| 31 | Security | Exam simulation mode (reserved pool, timed, no hints) | Assessment |
+| 32 | Security | Behavioral anomaly detection (informational flags) | Integrity |
+| 33 | Security | Bagrut readiness report with confidence intervals | Reporting |
+
+---
+
+## 28. References
 
 ### Academic
 
@@ -941,6 +1506,11 @@ Student-web CI runs axe-core on session pages containing figures. Zero new viola
 - Finkelstein, N. D., et al. (2005). When learning about the real world is better done virtually. *Physical Review Special Topics*, 1(1). [PhET beats real lab on conceptual items]
 - Aleven, V., & Koedinger, K. R. (2000). The need for tutorial dialog to support self-explanation. *AAAI/IAAI*, 2000.
 - Sailer, M., & Homner, L. (2020). The gamification of learning: a meta-analysis. *Educational Psychology Review*, 32(1), 77–112. [g ≈ 0.49]
+- Kapur, M. (2008). Productive failure. *Cognition and Instruction*, 26(3), 379–424. [d ≈ 0.37 on transfer]
+- Kapur, M. (2014). Productive failure in learning math. *Cognitive Science*, 38(5), 1008–1022.
+- Hestenes, D., Wells, M., & Swackhamer, G. (1992). Force Concept Inventory. *The Physics Teacher*, 30(3), 141–158.
+- De Ayala, R. J. (2009). *The Theory and Practice of Item Response Theory*. Guilford Press. [IRT/Rasch reference]
+- Deci, E. L., & Ryan, R. M. (2000). Self-Determination Theory and the facilitation of intrinsic motivation. *American Psychologist*, 55(1), 68–78.
 
 ### Product & Industry
 
