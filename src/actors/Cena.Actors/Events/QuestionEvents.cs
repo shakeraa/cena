@@ -240,6 +240,19 @@ public sealed record QuestionForked_V1(
     string ForkedBy,
     DateTimeOffset Timestamp);
 
+// ── Figure Spec (FIGURE-002) ──
+
+/// <summary>
+/// FIGURE-002 — Sets or updates the figure specification on a question.
+/// The spec is a polymorphic FigureSpec (function_plot, physics_diagram,
+/// geometry, or raster). Null spec removes the figure.
+/// </summary>
+public sealed record QuestionFigureSpecUpdated_V1(
+    string QuestionId,
+    Cena.Infrastructure.Documents.FigureSpec? Spec,
+    string UpdatedBy,
+    DateTimeOffset UpdatedAt);
+
 // ── Explanation ──
 
 /// <summary>Adds or edits an explanation on any question (any creation path).</summary>

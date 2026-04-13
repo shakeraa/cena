@@ -152,6 +152,13 @@ public class QuestionDocument
     public string? LearningObjectiveId { get; set; }
 
     /// <summary>
+    /// FIGURE-002 — Structured figure specification for the question.
+    /// Stored as JSONB (polymorphic via STJ discriminator).
+    /// Null for text-only questions or legacy documents.
+    /// </summary>
+    public FigureSpec? FigureSpec { get; set; }
+
+    /// <summary>
     /// FIND-pedagogy-006 — list of prerequisite concept IDs that should be
     /// mastered before attempting this question. Used to calculate the
     /// Prerequisite Satisfaction Index (PSI) for scaffolding level determination.
