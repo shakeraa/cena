@@ -1,13 +1,14 @@
 // =============================================================================
-// Cena Platform — Content Moderation Pipeline for Minors (PHOTO-003)
+// Cena Platform — Content Moderation Pipeline for Minors (PHOTO-003 + PP-001)
 //
-// Multi-stage content moderation for uploaded images and text:
-//   1. Hash-based CSAM detection (PhotoDNA-compatible)
-//   2. AI classification (safe/unsafe/needs-review)
-//   3. Human review queue for edge cases
-//   4. Automatic blocking + incident reporting
+// Multi-stage content moderation for uploaded images:
+//   1. Hash-based CSAM detection via PhotoDNA (fail-closed)
+//   2. AI classification via Azure Content Safety
+//   3. Policy threshold + human review queue
+//   4. Incident reporting for CSAM detections
 //
-// All processing is logged. Minors' content has stricter thresholds.
+// CRITICAL: PhotoDNA unavailability BLOCKS uploads (fail-closed).
+// AI Safety unavailability routes to human review (fail-safe).
 // =============================================================================
 
 using Microsoft.Extensions.Logging;
@@ -60,18 +61,30 @@ public interface IContentModerationPipeline
         string contentType,
         string uploaderId,
         ModerationPolicy policy,
+        string? uploaderIpAddress = null,
         CancellationToken ct = default);
 }
 
 /// <summary>
-/// Multi-stage moderation pipeline for minors' content.
+/// Multi-stage moderation pipeline. Stage 1 (PhotoDNA) is fail-closed:
+/// if the service is unavailable, uploads are BLOCKED, not approved.
 /// </summary>
 public sealed class ContentModerationPipeline : IContentModerationPipeline
 {
+    private readonly IPhotoDnaClient _photoDna;
+    private readonly IContentSafetyClient _contentSafety;
+    private readonly IIncidentReportService _incidentReporter;
     private readonly ILogger<ContentModerationPipeline> _logger;
 
-    public ContentModerationPipeline(ILogger<ContentModerationPipeline> logger)
+    public ContentModerationPipeline(
+        IPhotoDnaClient photoDna,
+        IContentSafetyClient contentSafety,
+        IIncidentReportService incidentReporter,
+        ILogger<ContentModerationPipeline> logger)
     {
+        _photoDna = photoDna;
+        _contentSafety = contentSafety;
+        _incidentReporter = incidentReporter;
         _logger = logger;
     }
 
@@ -80,27 +93,54 @@ public sealed class ContentModerationPipeline : IContentModerationPipeline
         string contentType,
         string uploaderId,
         ModerationPolicy policy,
+        string? uploaderIpAddress = null,
         CancellationToken ct = default)
     {
         var contentId = GenerateContentId(content);
 
-        // Stage 1: Hash-based CSAM detection (instant, no AI)
-        var csamResult = await CheckCsamHashAsync(content, ct);
-        if (csamResult)
+        // ══════════════════════════════════════════════════════════════
+        // Stage 1: CSAM hash detection (PhotoDNA) — FAIL-CLOSED
+        // If PhotoDNA is unavailable, the upload is BLOCKED.
+        // ══════════════════════════════════════════════════════════════
+        try
         {
-            _logger.LogCritical("CSAM detected for content {ContentId}, uploader {Uploader}",
+            var csamResult = await _photoDna.CheckHashAsync(content, ct);
+            if (csamResult.IsMatch)
+            {
+                _logger.LogCritical(
+                    "CSAM detected for content {ContentId}, uploader {Uploader}, IP {IP}",
+                    contentId, uploaderId, uploaderIpAddress ?? "unknown");
+
+                await _incidentReporter.FileIncidentAsync(
+                    contentId, uploaderId, uploaderIpAddress, csamResult, ct);
+
+                return new ModerationResult(
+                    contentId, ModerationVerdict.CsamDetected, 1.0,
+                    ["csam"], RequiresHumanReview: false,
+                    IncidentReportFiled: true, DateTimeOffset.UtcNow);
+            }
+        }
+        catch (PhotoDnaUnavailableException ex)
+        {
+            // FAIL-CLOSED: PhotoDNA down → block the upload
+            _logger.LogCritical(ex,
+                "PhotoDNA unavailable — BLOCKING upload {ContentId} from {Uploader} (fail-closed policy)",
                 contentId, uploaderId);
-            // Mandatory incident reporting
+
             return new ModerationResult(
-                contentId, ModerationVerdict.CsamDetected, 1.0,
-                ["csam"], RequiresHumanReview: false,
-                IncidentReportFiled: true, DateTimeOffset.UtcNow);
+                contentId, ModerationVerdict.Blocked, 0.0,
+                ["csam_check_unavailable"], RequiresHumanReview: false,
+                IncidentReportFiled: false, DateTimeOffset.UtcNow);
         }
 
-        // Stage 2: AI safety classification
-        var aiScore = await ClassifyContentAsync(content, contentType, ct);
+        // ══════════════════════════════════════════════════════════════
+        // Stage 2: AI safety classification — fail-safe (human review)
+        // ══════════════════════════════════════════════════════════════
+        var aiScore = await _contentSafety.ClassifyAsync(content, contentType, ct);
 
+        // ══════════════════════════════════════════════════════════════
         // Stage 3: Apply policy thresholds (stricter for minors)
+        // ══════════════════════════════════════════════════════════════
         var effectiveApproveThreshold = policy.IsMinor
             ? policy.AutoApproveThreshold  // 0.95 for minors
             : policy.AutoApproveThreshold - 0.10; // 0.85 for adults
@@ -114,7 +154,8 @@ public sealed class ContentModerationPipeline : IContentModerationPipeline
 
         if (aiScore <= policy.AutoBlockThreshold)
         {
-            _logger.LogWarning("Content auto-blocked: {ContentId}, score={Score}, uploader={Uploader}",
+            _logger.LogWarning(
+                "Content auto-blocked: {ContentId}, score={Score}, uploader={Uploader}",
                 contentId, aiScore, uploaderId);
             return new ModerationResult(
                 contentId, ModerationVerdict.Blocked, aiScore,
@@ -127,24 +168,6 @@ public sealed class ContentModerationPipeline : IContentModerationPipeline
         return new ModerationResult(
             contentId, ModerationVerdict.NeedsReview, aiScore,
             ["uncertain"], RequiresHumanReview: true, false, DateTimeOffset.UtcNow);
-    }
-
-    private static Task<bool> CheckCsamHashAsync(byte[] content, CancellationToken ct)
-    {
-        // Production: integrate with PhotoDNA or similar hash-matching service
-        // This MUST be implemented before any image upload feature goes live
-        _ = ct;
-        return Task.FromResult(false);
-    }
-
-    private static Task<double> ClassifyContentAsync(byte[] content, string contentType, CancellationToken ct)
-    {
-        // Production: call Azure Content Safety API, Google Cloud Vision Safety, or similar
-        // Returns safety score 0.0 (unsafe) to 1.0 (safe)
-        _ = ct;
-        _ = content;
-        _ = contentType;
-        return Task.FromResult(0.98); // Default safe for now
     }
 
     private static string GenerateContentId(byte[] content)
