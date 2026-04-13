@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import type { SessionHintResponseDto, SessionQuestionDto } from '@/api/types/common'
+import QuestionFigure from '@/components/QuestionFigure.vue'
 
 // FIND-pedagogy-006 — QuestionCard now surfaces the ScaffoldingService
 // output that the backend computes from the student's real BKT mastery:
@@ -143,6 +144,14 @@ function handleHint() {
     >
       {{ question.prompt }}
     </h2>
+
+    <!-- FIGURE-004: Render question figure if present (function plot, geometry, physics, raster) -->
+    <QuestionFigure
+      v-if="question.figureSpec"
+      :spec="question.figureSpec"
+      class="mb-6"
+      data-testid="question-figure"
+    />
 
     <!--
       FIND-pedagogy-006 — Worked example block for novice learners
