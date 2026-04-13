@@ -318,7 +318,7 @@
       "title": "אישור הורה או אפוטרופוס",
       "subtitle": "מכיוון שאתה בן {age}, אנחנו צריכים שההורה או האפוטרופוס שלך יאשרו את החשבון.",
       "emailLabel": "דוא״ל הורה או אפוטרופוס",
-      "emailPlaceholder": "parent@example.com",
+      "emailPlaceholder": "parent{'@'}example.com",
       "emailRequired": "דוא״ל הורה או אפוטרופוס נדרש.",
       "emailInvalid": "אנא הזן כתובת דוא״ל תקינה.",
       "whatWeCollect": "איזה מידע אנחנו אוספים",
@@ -977,15 +977,15 @@
       "rightObject": "התנגדות — להתנגד לעיבוד המבוסס על אינטרס לגיטימי.",
       "rightComplain": "הגשת תלונה — להגיש תלונה לרשות להגנת הפרטיות.",
       "dsarTitle": "9. בקשות גישה לנתונים",
-      "dsarBody": "למימוש זכויותיך, שלח דוא\"ל ל-privacy@cena.edu עם נושא \"DSAR\". נשיב תוך 30 יום.",
+      "dsarBody": "למימוש זכויותיך, שלח דוא\"ל ל-privacy{'@'}cena.edu עם נושא \"DSAR\". נשיב תוך 30 יום.",
       "parentRightsTitle": "10. זכויות הורים ואפוטרופסים",
       "parentRightsIntro": "להורים ולאפוטרופסים של קטינים זכויות נוספות:",
       "parentReview": "סקירה — לבקש עותק של כל הנתונים שנאספו מילדכם.",
       "parentDelete": "מחיקה — לבקש מחיקת הנתונים של ילדכם וחשבונו.",
       "parentRevoke": "ביטול הסכמה — לשלול הסכמה לאיסוף נתונים נוסף.",
       "contactTitle": "11. צור קשר",
-      "contactBody": "לפניות פרטיות: privacy@cena.edu",
-      "dpoContact": "ממונה על הגנת מידע: dpo@cena.edu (מינוי בהמתנה).",
+      "contactBody": "לפניות פרטיות: privacy{'@'}cena.edu",
+      "dpoContact": "ממונה על הגנת מידע: dpo{'@'}cena.edu (מינוי בהמתנה).",
       "childrenNoticeLink": "הודעת פרטיות לילדים"
     },
     "children": {
@@ -1017,7 +1017,7 @@
       "retentionTitle": "8. כמה זמן אנחנו שומרים את המידע שלך",
       "retentionBody": "אנחנו שומרים את המידע שלך כל עוד יש לך חשבון. אם ההורה שלך מבקש מאיתנו למחוק, אנחנו עושים זאת תוך 30 יום. התשובות והצ'אטים שלך נשמרים עד 12 חודשים ואז אנחנו מוחקים אותם.",
       "contactTitle": "9. שאלות?",
-      "contactBody": "אם לך או להורה שלך יש שאלות, שלחו לנו דוא\"ל ל-privacy@cena.edu. נשיב תוך 30 יום."
+      "contactBody": "אם לך או להורה שלך יש שאלות, שלחו לנו דוא\"ל ל-privacy{'@'}cena.edu. נשיב תוך 30 יום."
     },
     "terms": {
       "title": "תנאי שימוש",
@@ -1053,13 +1053,42 @@
       "changesTitle": "12. שינויים בתנאים אלה",
       "changesBody": "אנו עשויים לעדכן תנאים אלה מעת לעת. נודיע למשתמשים רשומים על שינויים מהותיים 30 יום מראש לפחות.",
       "contactTitle": "13. צור קשר",
-      "contactBody": "לשאלות על תנאים אלה: legal@cena.edu. לפניות פרטיות: privacy@cena.edu."
+      "contactBody": "לשאלות על תנאים אלה: legal{'@'}cena.edu. לפניות פרטיות: privacy{'@'}cena.edu."
     },
     "footer": {
       "privacyLink": "מדיניות פרטיות",
       "termsLink": "תנאי שימוש",
       "childrenLink": "פרטיות ילדים",
       "agreementNotice": "בהרשמה, אתה מסכים ל{terms} ול{privacy}."
+    }
+  },
+  "pwa": {
+    "install": {
+      "title": "התקן את Cena",
+      "subtitle": "הוסף למסך הבית לגישה מהירה",
+      "installButton": "התקן",
+      "notNow": "לא עכשיו"
+    },
+    "ios": {
+      "title": "הוסף את Cena למסך הבית",
+      "description": "התקן את Cena לגישה מהירה ולעבודה אופליין:",
+      "step1": "לחץ על כפתור השיתוף ב-Safari",
+      "step2": "בחר \"הוסף למסך הבית\"",
+      "step3": "לחץ \"הוסף\" לאישור",
+      "gotIt": "הבנתי"
+    },
+    "update": {
+      "available": "גרסה חדשה זמינה — לחץ לעדכון",
+      "sessionActive": "העדכון יופעל בסיום השיעור",
+      "updateButton": "עדכן",
+      "laterButton": "אחר כך"
+    },
+    "connection": {
+      "offline": "אתה לא מחובר",
+      "reconnecting": "מתחבר מחדש…",
+      "disconnected": "מנותק",
+      "connected": "מחובר",
+      "queued": "{count} בתור"
     }
   }
 }

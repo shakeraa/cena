@@ -3,10 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <link rel="icon" href="/favicon.ico" />
-  <link rel="apple-touch-icon" href="/images/logo.png" />
+  <link rel="apple-touch-icon" href="/images/apple-touch-icon.png" />
   <meta name="robots" content="noindex, nofollow" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <!-- PWA-003: user-scalable=no prevents iOS zoom on <16px inputs (we enforce ≥16px);
+       viewport-fit=cover required for safe-area-inset-* on notched devices -->
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
   <meta name="theme-color" content="#7367F0" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Cena" />
   <link rel="manifest" href="/manifest.webmanifest" />
   <title>Cena — Student</title>
   <link rel="stylesheet" type="text/css" href="/loader.css" />

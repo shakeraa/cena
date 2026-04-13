@@ -318,7 +318,7 @@
       "title": "Parent or guardian permission",
       "subtitle": "Because you are {age} years old, we need your parent or guardian to approve your account.",
       "emailLabel": "Parent or guardian email",
-      "emailPlaceholder": "parent@example.com",
+      "emailPlaceholder": "parent{'@'}example.com",
       "emailRequired": "A parent or guardian email is required.",
       "emailInvalid": "Please enter a valid email address.",
       "whatWeCollect": "What information we collect",
@@ -980,15 +980,15 @@
       "rightObject": "Object — object to processing based on legitimate interest.",
       "rightComplain": "Lodge a complaint — file a complaint with your local data protection authority.",
       "dsarTitle": "9. Data Subject Access Requests",
-      "dsarBody": "To exercise any of your rights, email privacy@cena.edu with the subject line \"DSAR\". We will verify your identity and respond within 30 calendar days.",
+      "dsarBody": "To exercise any of your rights, email privacy{'@'}cena.edu with the subject line \"DSAR\". We will verify your identity and respond within 30 calendar days.",
       "parentRightsTitle": "10. Parent and Guardian Rights",
       "parentRightsIntro": "Parents and guardians of minor users have additional rights under COPPA and GDPR:",
       "parentReview": "Review — request a copy of all personal data collected from your child.",
       "parentDelete": "Delete — request deletion of your child's personal data and account.",
       "parentRevoke": "Revoke consent — withdraw consent for further data collection, which will result in account deactivation.",
       "contactTitle": "11. Contact",
-      "contactBody": "For privacy inquiries: privacy@cena.edu",
-      "dpoContact": "Data Protection Officer: dpo@cena.edu (appointment pending).",
+      "contactBody": "For privacy inquiries: privacy{'@'}cena.edu",
+      "dpoContact": "Data Protection Officer: dpo{'@'}cena.edu (appointment pending).",
       "childrenNoticeLink": "Children's Privacy Notice"
     },
     "children": {
@@ -1020,7 +1020,7 @@
       "retentionTitle": "8. How long we keep your info",
       "retentionBody": "We keep your info while you have an account. If your parent asks us to delete it, we do so within 30 days. Your answers and chats are kept for up to 12 months, then we erase them.",
       "contactTitle": "9. Questions?",
-      "contactBody": "If you or your parent have any questions, email us at privacy@cena.edu. We will write back within 30 days."
+      "contactBody": "If you or your parent have any questions, email us at privacy{'@'}cena.edu. We will write back within 30 days."
     },
     "terms": {
       "title": "Terms of Service",
@@ -1056,13 +1056,42 @@
       "changesTitle": "12. Changes to These Terms",
       "changesBody": "We may update these terms from time to time. We will notify registered users of material changes via email or in-app notification at least 30 days before they take effect.",
       "contactTitle": "13. Contact",
-      "contactBody": "For questions about these terms: legal@cena.edu. For privacy inquiries: privacy@cena.edu."
+      "contactBody": "For questions about these terms: legal{'@'}cena.edu. For privacy inquiries: privacy{'@'}cena.edu."
     },
     "footer": {
       "privacyLink": "Privacy Policy",
       "termsLink": "Terms of Service",
       "childrenLink": "Children's Privacy",
       "agreementNotice": "By registering, you agree to our {terms} and {privacy}."
+    }
+  },
+  "pwa": {
+    "install": {
+      "title": "Install Cena",
+      "subtitle": "Add to your home screen for quick access",
+      "installButton": "Install",
+      "notNow": "Not now"
+    },
+    "ios": {
+      "title": "Add Cena to Home Screen",
+      "description": "Install Cena for quick access and offline features:",
+      "step1": "Tap the Share button in Safari",
+      "step2": "Select \"Add to Home Screen\"",
+      "step3": "Tap \"Add\" to confirm",
+      "gotIt": "Got it"
+    },
+    "update": {
+      "available": "New version available — tap to update",
+      "sessionActive": "Update will apply after your session ends",
+      "updateButton": "Update",
+      "laterButton": "Later"
+    },
+    "connection": {
+      "offline": "You are offline",
+      "reconnecting": "Reconnecting…",
+      "disconnected": "Disconnected",
+      "connected": "Connected",
+      "queued": "{count} queued"
     }
   }
 }
