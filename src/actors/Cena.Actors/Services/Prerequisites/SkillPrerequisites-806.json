@@ -1,0 +1,31 @@
+{
+  "track": "MATH-BAGRUT-806",
+  "description": "Bagrut Mathematics 806 — Calculus & Analytic Geometry (5 units)",
+  "skills": {
+    "algebra-basics": { "prerequisites": [] },
+    "algebra-linear-equations": { "prerequisites": ["algebra-basics"] },
+    "algebra-quadratic-equations": { "prerequisites": ["algebra-linear-equations"] },
+    "algebra-polynomial-operations": { "prerequisites": ["algebra-basics"] },
+    "algebra-inequalities": { "prerequisites": ["algebra-linear-equations"] },
+    "functions-basics": { "prerequisites": ["algebra-basics"] },
+    "functions-linear": { "prerequisites": ["functions-basics", "algebra-linear-equations"] },
+    "functions-quadratic": { "prerequisites": ["functions-basics", "algebra-quadratic-equations"] },
+    "functions-exponential": { "prerequisites": ["functions-basics"] },
+    "functions-logarithmic": { "prerequisites": ["functions-exponential"] },
+    "functions-trigonometric": { "prerequisites": ["functions-basics", "trigonometry-basics"] },
+    "trigonometry-basics": { "prerequisites": ["algebra-basics"] },
+    "trigonometry-identities": { "prerequisites": ["trigonometry-basics"] },
+    "trigonometry-equations": { "prerequisites": ["trigonometry-identities", "algebra-quadratic-equations"] },
+    "analytic-geometry-lines": { "prerequisites": ["functions-linear"] },
+    "analytic-geometry-circles": { "prerequisites": ["analytic-geometry-lines", "algebra-quadratic-equations"] },
+    "analytic-geometry-parabolas": { "prerequisites": ["functions-quadratic", "analytic-geometry-lines"] },
+    "sequences-arithmetic": { "prerequisites": ["functions-linear"] },
+    "sequences-geometric": { "prerequisites": ["functions-exponential", "sequences-arithmetic"] },
+    "calculus-limits": { "prerequisites": ["functions-basics", "algebra-polynomial-operations"] },
+    "calculus-derivatives-basics": { "prerequisites": ["calculus-limits"] },
+    "calculus-derivatives-rules": { "prerequisites": ["calculus-derivatives-basics"] },
+    "calculus-derivatives-applications": { "prerequisites": ["calculus-derivatives-rules", "functions-quadratic"] },
+    "calculus-integrals-basics": { "prerequisites": ["calculus-derivatives-basics"] },
+    "calculus-integrals-applications": { "prerequisites": ["calculus-integrals-basics", "analytic-geometry-parabolas"] }
+  }
+}

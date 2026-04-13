@@ -1,0 +1,29 @@
+{
+  "track": "PHYSICS-BAGRUT-036",
+  "description": "Bagrut Physics 036 (5 units)",
+  "skills": {
+    "physics-units-measurement": { "prerequisites": [] },
+    "physics-vectors": { "prerequisites": ["physics-units-measurement"] },
+    "kinematics-1d": { "prerequisites": ["physics-units-measurement"] },
+    "kinematics-2d": { "prerequisites": ["kinematics-1d", "physics-vectors"] },
+    "newton-laws-1-2": { "prerequisites": ["kinematics-1d", "physics-vectors"] },
+    "newton-law-3": { "prerequisites": ["newton-laws-1-2"] },
+    "friction": { "prerequisites": ["newton-laws-1-2"] },
+    "inclined-planes": { "prerequisites": ["friction", "physics-vectors"] },
+    "circular-motion": { "prerequisites": ["newton-laws-1-2", "kinematics-2d"] },
+    "work-energy": { "prerequisites": ["newton-laws-1-2"] },
+    "energy-conservation": { "prerequisites": ["work-energy"] },
+    "momentum": { "prerequisites": ["newton-laws-1-2"] },
+    "momentum-conservation": { "prerequisites": ["momentum", "energy-conservation"] },
+    "gravitation": { "prerequisites": ["newton-laws-1-2", "circular-motion"] },
+    "electrostatics-charge": { "prerequisites": ["physics-units-measurement"] },
+    "electrostatics-field": { "prerequisites": ["electrostatics-charge", "physics-vectors"] },
+    "electric-potential": { "prerequisites": ["electrostatics-field", "work-energy"] },
+    "dc-circuits": { "prerequisites": ["electric-potential"] },
+    "magnetism": { "prerequisites": ["dc-circuits", "physics-vectors"] },
+    "electromagnetic-induction": { "prerequisites": ["magnetism"] },
+    "waves-basics": { "prerequisites": ["kinematics-1d"] },
+    "sound-waves": { "prerequisites": ["waves-basics"] },
+    "light-optics": { "prerequisites": ["waves-basics"] }
+  }
+}
