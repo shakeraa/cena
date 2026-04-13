@@ -2393,7 +2393,123 @@ public sealed record MisconceptionCandidate(
 
 ---
 
-## 43. Consolidated Improvement Registry
+## 43. Expert Review Round 2: Tenancy, Figures & Game-Design
+
+Panel: Dina Halevi (distributed systems), Oren Mizrahi (EdTech domain), Dr. Rami Khalil (adversarial), Dr. Nadia Mansour (learning science), Dr. Layla Khoury (RTL/bidi), Dr. Yoav Ben-Ari (psychometrics), Capt. Omar Farid (mobile UX).
+
+### 43.1 Tenancy: Track-Scoped Mastery (Improvement #56)
+
+Cross-track mastery transfer is unreliable (near transfer works, far transfer doesn't — Corbett & Anderson, 1995). `SkillMastery` must be keyed per-skill-per-track, not globally.
+
+```csharp
+public sealed record SkillMastery(
+    string SkillId,
+    string TrackId,          // Mastery is per-track
+    double PL,
+    double PLEffective,
+    DateTime LastPracticed,
+    double DecayRate,
+    int AssistanceLevel
+);
+```
+
+**Cross-track seepage**: When mastery updates in one track, a nightly batch calculates a seepage boost for the same skill in other tracks: `P(L₀) += 0.1` (capped). Conservative, not real-time.
+
+### 43.2 Tenancy: Schema Simplifications (Improvements #51, #52)
+
+**ContentReadiness** (#51): `CurriculumTrackDocument` gains a `Status` enum: `Draft | Seeding | Ready`. Only `Ready` tracks are enrollable by students. Prevents empty-track enrollment.
+
+**Defer ProgramDocument** (#52): Phase 1 creates 3 documents (Institute, CurriculumTrack, Enrollment), not 4. `EnrollmentDocument` binds Student directly to Track + Institute. No Program indirection until institutes need multi-track packaging.
+
+**Seed data correction**: P1d seeds only 3 Bagrut tracks (`MATH-BAGRUT-806`, `MATH-BAGRUT-807`, `PHYSICS-BAGRUT-036`) + one `BAGRUT-GENERAL` placeholder. No SAT, no psychometry — those are deferred scope.
+
+**Upcaster correction**: P1e upcaster assigns existing students to `BAGRUT-GENERAL` (not a specific track). Real track assignment happens at next session start via topic selection (§24, Improvement #26).
+
+### 43.3 Figures: Scaffolding-Adaptive Rendering (Improvement #57)
+
+Each element in `PhysicsDiagramSpec` gains a `visibleAtLevel` property:
+
+```json
+{
+  "type": "force_arrow",
+  "body": "block",
+  "direction": [0, -9.8],
+  "label": "mg",
+  "visibleAtLevel": ["full", "partial"]
+}
+```
+
+At `minimal` and `exploratory` scaffolding, this arrow is hidden — the student must identify forces themselves (Construct mode) or infer effects (Display mode). The spec is authored once with full detail; the renderer filters by scaffolding level.
+
+### 43.4 Figures: Admin Editor Phase 1 (Improvement #53)
+
+FIGURE-006 bumped to **high priority**. Phase 1 scope: JSON spec editor with syntax highlighting + live preview panel + validation with line-level errors + template library (inclined-plane, function-plot, geometry templates). Full visual WYSIWYG editor deferred to Phase 2. Unblocks content authoring pipeline.
+
+### 43.5 Figures: Script-Aware SVG Text (Improvement #61)
+
+`PhysicsDiagramSpec` text elements gain a `script` property: `latin | arabic | hebrew`. The SVG renderer sets `direction` and `unicode-bidi` accordingly. Default: `latin` (LTR) for physics/math symbols. Explicit `arabic` or `hebrew` for natural language labels (body names, instruction text).
+
+### 43.6 Figures: Difficulty-Aligned Quality Gate (Improvement #63)
+
+Quality gate FIGURE-007 checks figure information level vs. question target difficulty:
+- Warn if `full` scaffolding figure + high-difficulty target (figure makes question too easy)
+- Warn if `minimal` scaffolding figure + low-difficulty target (figure makes question too hard)
+- Equilibrium check runs at **each** scaffolding level to verify solvability with visible information
+
+### 43.7 RTL: MathLive Separation (Improvements #59, #60)
+
+MathLive has three RTL showstoppers in editable mixed-content fields: cursor direction at bidi boundaries, backspace behavior, iOS keyboard toggle. **Solution**: separate input types by field:
+
+- `StepInputType.MathExpression` → MathLive (math-only, LTR keyboard)
+- `StepInputType.VerbalExplanation` → `<textarea dir="rtl">` (system Arabic/Hebrew keyboard)
+- `StepInputType.NumericOnly` → `<input type="number">` (numeric keyboard)
+
+No mixed math-and-Arabic-text input in the same field. Display uses `<bdi dir="ltr">` around KaTeX (existing approach).
+
+Verbal textarea: soft 200-character limit, character count visible, Arabic placeholder modeling a good explanation: "أوجدت المشتقة باستخدام قاعدة السلسلة لأن الدالة مركبة" (I found the derivative using the chain rule because the function is composite).
+
+### 43.8 Arabic Math Input Normalization (Improvement #66)
+
+Between input field and CAS router, a static normalization layer translates Arabic math shorthand:
+
+| Student types | Normalized to | Note |
+|---|---|---|
+| س، ص، ع | x, y, z | Arabic variable names to Latin |
+| ٠١٢٣٤٥٦٧٨٩ | 0123456789 | Eastern Arabic to Western digits |
+| جذر | `\sqrt` | Arabic word for root |
+| جا، جتا، ظا | `\sin`, `\cos`, `\tan` | Arabic trig abbreviations |
+| × | `\times` | Arabic multiplication |
+| ÷ | `\div` | Arabic division |
+
+Static, human-curated, loaded at startup. Must be idempotent — running twice produces same output. Does not modify expressions already in LaTeX.
+
+### 43.9 Measurement: Multi-Level IRT Preparation (Improvement #62)
+
+Include `InstituteId` and `TrackId` in `StepVerified` and `StepFailed` events. Costs one field per event. Enables multi-level IRT calibration (De Ayala, 2009, Ch. 11) at scale — question difficulty parameters can account for student ability distribution differences across institutes.
+
+### 43.10 Privacy: Pseudonymous Misconception Persistence (Improvement #64)
+
+30-day rotating pseudonymous tracking enables cross-session misconception persistence detection without profile-scoped storage. Pseudonym = SHA-256(`studentId + monthKey`). Monthly key rotation automatically unlinks old pseudonyms. Within a 30-day window, the system detects "anonymous student X showed pattern Y in 3 of 5 sessions." Beyond rotation, no historical profile buildup. COPPA/GDPR-K safe.
+
+### 43.11 Social Learning: Anonymous Class Stats (Improvement #58)
+
+Anonymous class-level mastery percentages per topic, displayed on topic selector: "68% of students in your class mastered derivatives this week." Not a leaderboard — social proof without social comparison. k-anonymity threshold: class must have ≥10 students to show class stats; below that, show school-level; below that, platform-level. Updated hourly via `ClassMasteryProjection`.
+
+### 43.12 Mobile UX: Mini Figure Thumbnail (Improvement #65)
+
+On mobile, when the step input is focused (keyboard open), show a 48x48px figure thumbnail pinned to top-right of input area. Tappable to expand to full-size modal. Shows figure at current scaffolding level. Prevents cognitive context switching when the figure scrolls off-screen during typing. Same approach as Photomath.
+
+### 43.13 Dependencies Identified
+
+- **GD-006 (MathLive RTL spike)** blocks PWA-003 and PWA-008 (#54). Must complete first.
+- **GD-008 (Arabic-first physics decision)** determines whether FIGURE-005 is critical-path (#55). If physics is pilot-first, figure rendering for physics must ship before math figures.
+- **GD-001 title correction**: rename to "CAS engine is sole source of truth" (not SymPy specifically — architecture uses 3-tier CAS with QuestionCasBinding).
+- **GD-005 (compliance artifacts)**: coordination task requiring legal/DPO review, not engineering.
+- **Arabic parent install guide** (#67): content task for pilot onboarding, not engineering backlog.
+
+---
+
+## 44. Consolidated Improvement Registry
 
 | # | Source | Improvement | Category |
 |---|--------|------------|----------|
@@ -2447,10 +2563,27 @@ public sealed record MisconceptionCandidate(
 | 48 | Adversarial Review | Cross-platform figure rendering parity (N/A if PWA chosen) | Rendering |
 | 49 | Adversarial Review | Three-layer observability (OTel + Seq/Loki + 6 critical alerts) | Ops |
 | 50 | Adversarial Review | Design invariant hardening — CAS-verify all math in LLM output | Correctness |
+| 51 | Expert Panel R2 | `ContentReadiness` on CurriculumTrack — only Ready tracks enrollable | Data Integrity |
+| 52 | Expert Panel R2 | Defer ProgramDocument to Phase 2 — P1 binds directly to Track | Simplification |
+| 53 | Expert Panel R2 | FIGURE-006 bumped to high — JSON editor + live preview Phase 1 | Content Pipeline |
+| 54 | Expert Panel R2 | GD-006 (MathLive RTL spike) blocks PWA-003/008 | Dependency |
+| 55 | Expert Panel R2 | If Arabic-first physics → FIGURE-005 critical path | Priority |
+| 56 | Expert Panel R2 | Mastery per-skill-per-track with cross-track seepage (nightly batch) | Pedagogy |
+| 57 | Expert Panel R2 | `visibleAtLevel` on PhysicsDiagramSpec elements — scaffolding-adaptive figures | Pedagogy |
+| 58 | Expert Panel R2 | Anonymous class-level mastery stats (k≥10 anonymity) | Motivation |
+| 59 | Expert Panel R2 | MathLive for math-only input; textarea for verbal — no mixed bidi | RTL/Input |
+| 60 | Expert Panel R2 | Verbal textarea: RTL, char count, Arabic placeholder, 200-char soft limit | RTL/UX |
+| 61 | Expert Panel R2 | `script` property on diagram text elements for correct bidi rendering | RTL/Figures |
+| 62 | Expert Panel R2 | Include InstituteId + TrackId in step verification events (multi-level IRT) | Measurement |
+| 63 | Expert Panel R2 | Quality gate: figure info level vs target difficulty consistency | Measurement |
+| 64 | Expert Panel R2 | 30-day rotating pseudonymous misconception persistence tracking | Privacy |
+| 65 | Expert Panel R2 | Mini figure thumbnail on mobile during step input (48×48px, pinned) | Mobile UX |
+| 66 | Expert Panel R2 | Arabic math input normalizer (س→x, جذر→√, Eastern digits→Western) | Input/Arabic |
+| 67 | Expert Panel R2 | Arabic parent install guide PDF for pilot school distribution | Onboarding |
 
 ---
 
-## 44. References
+## 45. References
 
 ### Academic
 
@@ -2473,6 +2606,8 @@ public sealed record MisconceptionCandidate(
 - Pathade, S. (2024). Steganographic prompt injection against Gemini Pro Vision. [18.3% ASR]
 - OWASP (2025). Top 10 for LLM Applications. [Prompt injection #1 risk]
 - NIST (2023). AI Risk Management Framework (AI RMF 1.0). [Govern, Map, Measure, Manage]
+- Corbett, A. T., & Anderson, J. R. (1995). Knowledge tracing: Modeling the acquisition of procedural knowledge. *User Modeling and User-Adapted Interaction*, 4(4), 253–278. [Cross-track seepage model]
+- Vygotsky, L. S. (1978). *Mind in Society*. Harvard University Press. [Zone of Proximal Development, social learning]
 - CVE-2024-28243: KaTeX token expansion denial-of-service vulnerability.
 - COPPA 2025 Amended Rule: FTC Federal Register 2025-05904 (effective June 2025).
 - Israeli PPL Amendment 13 (effective August 2025): ISS classification for biometric data.
