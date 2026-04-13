@@ -20,6 +20,7 @@
 // =============================================================================
 
 using Cena.Actors.Infrastructure;
+using Cena.Actors.RateLimit;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Documents;
 using Microsoft.Extensions.Logging;
@@ -120,6 +121,7 @@ public sealed class TutorMessageService : ITutorMessageService
     private readonly ITutorPromptScrubber _scrubber;
     private readonly ISafeguardingClassifier _classifier;
     private readonly ISafeguardingEscalation _escalation;
+    private readonly ICostCircuitBreaker _costBreaker;
     private readonly ILogger<TutorMessageService> _logger;
     private readonly IClock _clock;
 
@@ -129,6 +131,7 @@ public sealed class TutorMessageService : ITutorMessageService
         ITutorPromptScrubber scrubber,
         ISafeguardingClassifier classifier,
         ISafeguardingEscalation escalation,
+        ICostCircuitBreaker costBreaker,
         ILogger<TutorMessageService> logger,
         IClock clock)
     {
@@ -137,6 +140,7 @@ public sealed class TutorMessageService : ITutorMessageService
         _scrubber = scrubber;
         _classifier = classifier;
         _escalation = escalation;
+        _costBreaker = costBreaker;
         _logger = logger;
         _clock = clock;
     }
@@ -211,6 +215,16 @@ public sealed class TutorMessageService : ITutorMessageService
         thread.MessageCount += 1;
         thread.UpdatedAt = now;
         await _repository.PersistUserMessageAsync(thread, userMessage, ct);
+
+        // RATE-001: Check global cost circuit breaker before LLM call
+        if (await _costBreaker.IsOpenAsync(ct))
+        {
+            _logger.LogWarning(
+                "Tutor LLM call blocked for student {StudentId}, thread {ThreadId} — global cost circuit breaker is open",
+                studentId, threadId);
+            return new SendTutorMessageResult.LlmError(
+                "The tutor is currently in degraded mode due to high demand. Please try again later.");
+        }
 
         // Build conversation history (last 10 messages) for LLM context.
         var history = await _repository.LoadRecentHistoryAsync(threadId, 10, ct);

@@ -320,9 +320,8 @@ public class StudentProfileSnapshot
     public void Apply(EnrollmentCreated_V1 e)
     {
         // First-wins: only set if not already populated
-        if (DefaultInstituteId is null)
+        if (DefaultEnrollmentId is null)
         {
-            DefaultInstituteId = e.InstituteId;
             DefaultEnrollmentId = e.EnrollmentId;
         }
     }

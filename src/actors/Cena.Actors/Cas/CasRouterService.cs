@@ -11,6 +11,7 @@
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Cena.Actors.RateLimit;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Cas;
@@ -30,6 +31,7 @@ public sealed class CasRouterService : ICasRouterService
 {
     private readonly IMathNetVerifier _mathNet;
     private readonly ISymPySidecarClient _symPy;
+    private readonly ICostCircuitBreaker _costBreaker;
     private readonly ILogger<CasRouterService> _logger;
 
     // Metrics (OpenTelemetry)
@@ -44,15 +46,24 @@ public sealed class CasRouterService : ICasRouterService
     public CasRouterService(
         IMathNetVerifier mathNet,
         ISymPySidecarClient symPy,
+        ICostCircuitBreaker costBreaker,
         ILogger<CasRouterService> logger)
     {
         _mathNet = mathNet;
         _symPy = symPy;
+        _costBreaker = costBreaker;
         _logger = logger;
     }
 
     public async Task<CasVerifyResult> VerifyAsync(CasVerifyRequest request, CancellationToken ct = default)
     {
+        if (await _costBreaker.IsOpenAsync(ct))
+        {
+            _logger.LogWarning("CAS verification blocked — global cost circuit breaker is open");
+            return CasVerifyResult.Error(request.Operation, "circuit-breaker", 0,
+                "CAS verification temporarily unavailable due to cost limits. Please try again later.");
+        }
+
         var sw = Stopwatch.StartNew();
 
         // Tier 1: Try MathNet first (in-process, fast)

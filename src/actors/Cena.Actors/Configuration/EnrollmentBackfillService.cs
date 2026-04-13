@@ -83,10 +83,8 @@ public sealed class EnrollmentBackfillService : IHostedService
                 // Append synthetic enrollment event to the student's existing stream
                 var enrollmentId = $"enroll-{profile.StudentId}-bagrut-general";
                 var syntheticEvent = new EnrollmentCreated_V1(
-                    StudentId: profile.StudentId,
                     EnrollmentId: enrollmentId,
-                    InstituteId: PlatformSeedData.PlatformInstituteId,
-                    TrackId: "track-bagrut-general",
+                    StudentId: profile.StudentId,
                     ClassroomId: "classroom-bagrut-general",
                     EnrolledAt: profile.CreatedAt != default ? profile.CreatedAt : DateTimeOffset.UtcNow
                 );

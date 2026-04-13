@@ -213,6 +213,7 @@ public sealed class NatsBusRouter : BackgroundService
         string subject,
         Func<BusEnvelope<TRequest>, CancellationToken, Task<TResponse>> handler,
         CancellationToken ct)
+        where TRequest : class
     {
         try
         {

@@ -6,8 +6,9 @@
 // =============================================================================
 
 using System.Runtime.CompilerServices;
-using Cena.Actors.Infrastructure;
 using Cena.Actors.Tutor;
+using Cena.Actors.Infrastructure;
+using Cena.Actors.RateLimit;
 using Cena.Infrastructure.Documents;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -47,6 +48,7 @@ public sealed class TutorMessageServiceTests
     private readonly ITutorPromptScrubber _scrubber;
     private readonly ISafeguardingClassifier _classifier;
     private readonly ISafeguardingEscalation _escalation = Substitute.For<ISafeguardingEscalation>();
+    private readonly ICostCircuitBreaker _costBreaker = Substitute.For<ICostCircuitBreaker>();
     private readonly IClock _clock = Substitute.For<IClock>();
     private readonly TutorMessageService _sut;
 
@@ -57,7 +59,7 @@ public sealed class TutorMessageServiceTests
         _scrubber = new TutorPromptScrubber(NullLogger<TutorPromptScrubber>.Instance);
         _classifier = new SafeguardingClassifier(NullLogger<SafeguardingClassifier>.Instance);
         _sut = new TutorMessageService(
-            _repo, _llm, _scrubber, _classifier, _escalation,
+            _repo, _llm, _scrubber, _classifier, _escalation, _costBreaker,
             NullLogger<TutorMessageService>.Instance,
             _clock);
     }
