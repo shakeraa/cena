@@ -130,6 +130,7 @@
     "unplugin-vue-components": "0.27.5",
     "unplugin-vue-router": "0.8.8",
     "vite": "7.1.12",
+    "vite-plugin-pwa": "^1.2.0",
     "vite-plugin-vue-devtools": "8.0.2",
     "vite-plugin-vue-meta-layouts": "0.6.1",
     "vite-plugin-vuetify": "2.1.2",

@@ -13,6 +13,7 @@ import VueDevTools from 'vite-plugin-vue-devtools'
 import MetaLayouts from 'vite-plugin-vue-meta-layouts'
 import vuetify from 'vite-plugin-vuetify'
 import svgLoader from 'vite-svg-loader'
+import { VitePWA } from 'vite-plugin-pwa'
 
 /**
  * FIND-ux-029: Vite plugin that validates PWA manifest icons exist at
@@ -191,6 +192,70 @@ export default defineConfig({
 
     // FIND-arch-017: strip mockServiceWorker.js from production dist/
     stripMswInProduction(),
+
+    // PWA-001: Workbox-powered service worker via vite-plugin-pwa
+    VitePWA({
+      registerType: 'prompt',
+      injectRegister: false,
+      workbox: {
+        globPatterns: ['**/*.{js,css,html,ico,woff2}'],
+        globIgnores: ['**/katex/**', '**/mockServiceWorker.js'],
+        runtimeCaching: [
+          {
+            urlPattern: /\/api\/questions\/.*/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'cena-questions',
+              expiration: { maxEntries: 50, maxAgeSeconds: 86400 },
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: /\/api\/progress\/.*/,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'cena-progress',
+              expiration: { maxEntries: 10, maxAgeSeconds: 3600 },
+              networkTimeoutSeconds: 3,
+            },
+          },
+          {
+            urlPattern: /\/api\/sessions\/.*/,
+            handler: 'NetworkOnly',
+          },
+          {
+            urlPattern: /\/katex\/.*/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'cena-katex',
+              expiration: { maxEntries: 50, maxAgeSeconds: 2592000 },
+            },
+          },
+          {
+            urlPattern: /\.(?:woff2?|ttf|otf)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'cena-fonts',
+              expiration: { maxEntries: 30, maxAgeSeconds: 2592000 },
+            },
+          },
+          {
+            urlPattern: /\.(?:png|svg|jpg|jpeg|webp|gif)$/,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'cena-images',
+              expiration: { maxEntries: 100, maxAgeSeconds: 604800 },
+            },
+          },
+        ],
+        navigateFallback: '/offline.html',
+        navigateFallbackDenylist: [/^\/api\//, /^\/mockServiceWorker/],
+      },
+      manifest: false,
+      devOptions: {
+        enabled: false,
+      },
+    }),
   ],
   define: { 'process.env': {} },
   resolve: {
