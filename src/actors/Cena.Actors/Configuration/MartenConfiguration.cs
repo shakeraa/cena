@@ -526,7 +526,10 @@ public static class MartenConfiguration
     {
         opts.Events.AddEventType<ConceptAttempted_V1>();
         opts.Events.AddEventType<ConceptAttempted_V2>(); // DATA-009: V2 with Duration field
+        opts.Events.AddEventType<ConceptAttempted_V3>(); // TENANCY-P2a: V3 with EnrollmentId
         opts.Events.AddEventType<ConceptMastered_V1>();
+        opts.Events.AddEventType<ConceptMastered_V2>(); // TENANCY-P2a: V2 with EnrollmentId
+        opts.Events.AddEventType<MasterySeepageApplied_V1>(); // TENANCY-P2a: cross-track seepage
         opts.Events.AddEventType<MasteryDecayed_V1>();
         opts.Events.AddEventType<MethodologySwitched_V1>();
         opts.Events.AddEventType<StagnationDetected_V1>();
@@ -680,5 +683,9 @@ public static class MartenConfiguration
         opts.RegisterUpcaster(QuestionAuthoredV1ToV2Upcaster.Instance);
         opts.RegisterUpcaster(QuestionIngestedV1ToV2Upcaster.Instance);
         opts.RegisterUpcaster(QuestionAiGeneratedV1ToV2Upcaster.Instance);
+
+        // TENANCY-P2a: Enrollment-scoped mastery upcasters
+        opts.RegisterUpcaster(ConceptAttemptedV2ToV3Upcaster.Instance);
+        opts.RegisterUpcaster(ConceptMasteredV1ToV2Upcaster.Instance);
     }
 }
