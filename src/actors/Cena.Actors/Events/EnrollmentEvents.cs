@@ -25,3 +25,19 @@ public record EnrollmentCreated_V1(
     string? ClassroomId,
     DateTimeOffset EnrolledAt
 ) : IDelegatedEvent;
+
+/// <summary>
+/// DATA-READY-001: Emitted when an admin changes a track's content readiness status.
+/// Captures old/new status for audit trail. Quality gate check should be enforced
+/// before allowing transition to Ready (QuestionsWithIrtCount >= MinQuestionsForReady).
+/// </summary>
+public record TrackReadinessChanged_V1(
+    string TrackId,
+    CurriculumTrackStatus OldStatus,
+    CurriculumTrackStatus NewStatus,
+    string ChangedBy,
+    string? Reason,
+    int QuestionsWithIrtCount,
+    bool PassedQualityGate,
+    DateTimeOffset ChangedAt
+) : IDelegatedEvent;
