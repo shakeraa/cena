@@ -1,19 +1,32 @@
 // =============================================================================
-// Cena Platform — Curriculum Track Document (TENANCY-P1a)
-// Marten document for curriculum track definitions
+// Cena Platform — Curriculum Track Document (TENANCY-P1a + DATA-READY-001)
+// Marten document for curriculum track definitions.
+// DATA-READY-001: Added ContentReadiness lifecycle + quality gate fields.
 // =============================================================================
 
 namespace Cena.Infrastructure.Documents;
 
 /// <summary>
-/// Content readiness status for a curriculum track.
+/// Content readiness lifecycle for a curriculum track (DATA-READY-001).
 /// Only <see cref="Ready"/> tracks are enrollable by students.
+/// Admins can see all statuses; students only see Ready tracks.
 /// </summary>
 public enum CurriculumTrackStatus
 {
-    Draft,
-    Seeding,
-    Ready
+    /// <summary>Initial authoring — not visible to students.</summary>
+    Draft = 0,
+
+    /// <summary>Content being seeded/imported — not enrollable yet.</summary>
+    Seeding = 1,
+
+    /// <summary>Under editorial/QA review before go-live.</summary>
+    InReview = 2,
+
+    /// <summary>Passed quality gate — enrollable by students.</summary>
+    Ready = 3,
+
+    /// <summary>Retired — read-only for existing enrollments, hidden from new enrollment.</summary>
+    Archived = 4
 }
 
 /// <summary>
@@ -67,4 +80,34 @@ public class CurriculumTrackDocument
     /// Content readiness status. Only <see cref="CurriculumTrackStatus.Ready"/> tracks are enrollable.
     /// </summary>
     public CurriculumTrackStatus Status { get; set; } = CurriculumTrackStatus.Draft;
+
+    // ── DATA-READY-001: Quality gate fields ──
+
+    /// <summary>
+    /// Number of questions with IRT parameters available for this track.
+    /// Updated by the question ingestion pipeline. Track must have >= 50
+    /// before it can transition to Ready.
+    /// </summary>
+    public int QuestionsWithIrtCount { get; set; }
+
+    /// <summary>
+    /// Minimum questions with IRT parameters required to move to Ready status.
+    /// Default 50 per the quality gate specification.
+    /// </summary>
+    public int MinQuestionsForReady { get; set; } = 50;
+
+    /// <summary>
+    /// Whether this track passes the quality gate (QuestionsWithIrtCount >= MinQuestionsForReady).
+    /// </summary>
+    public bool PassesQualityGate => QuestionsWithIrtCount >= MinQuestionsForReady;
+
+    /// <summary>
+    /// When the readiness status was last changed. Null for tracks that haven't changed since creation.
+    /// </summary>
+    public DateTimeOffset? ReadinessChangedAt { get; set; }
+
+    /// <summary>
+    /// Who changed the readiness status last (admin user ID).
+    /// </summary>
+    public string? ReadinessChangedBy { get; set; }
 }
