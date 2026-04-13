@@ -4,6 +4,7 @@
 // Both Cena.Actors.Host and Cena.Api.Host call these extension methods.
 // =============================================================================
 
+using Cena.Admin.Api.RateLimit;
 using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -71,6 +72,9 @@ public static class CenaAdminServiceRegistration
         // Stagnation Insights (job-based causal factor analysis)
         services.AddScoped<IStagnationInsightsService, StagnationInsightsService>();
 
+        // RATE-001: Rate limit admin dashboard
+        services.AddScoped<IRateLimitAdminService, RateLimitAdminService>();
+
         // FIND-arch-006: GDPR compliance services (SEC-005, Articles 17 & 20).
         // Both services depend only on Marten IDocumentStore + ILogger, which
         // are registered by the host's AddMarten() call before this method
@@ -126,6 +130,9 @@ public static class CenaAdminServiceRegistration
 
         // Stagnation Insights endpoints
         app.MapStagnationInsightsEndpoints();
+
+        // RATE-001: Rate limit admin dashboard
+        app.MapRateLimitAdminEndpoints();
 
         // FIND-arch-006: GDPR admin endpoints (SEC-005, Articles 17 & 20).
         // Previously defined in GdprEndpoints.cs but never wired — all six

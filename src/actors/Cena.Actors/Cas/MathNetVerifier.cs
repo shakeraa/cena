@@ -8,6 +8,7 @@
 // =============================================================================
 
 using System.Diagnostics;
+using MathNet.Symbolics;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Cas;

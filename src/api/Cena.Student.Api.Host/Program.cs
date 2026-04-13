@@ -10,6 +10,7 @@ using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
 using Cena.Actors.Notifications;
 using Cena.Actors.Mastery;
+using Cena.Actors.RateLimit;
 using Cena.Actors.Services;
 using Cena.Actors.Serving;
 using Cena.Actors.Tutor;
@@ -103,6 +104,11 @@ builder.Services.AddHostedService<NotificationDispatcher>();
 builder.Services.AddSingleton<IPushNotificationRateLimiter, PushNotificationRateLimiter>();
 builder.Services.AddScoped<IWebPushDispatchService, WebPushDispatchService>();
 builder.Services.AddHostedService<PushNotificationTriggerService>();
+
+// ---- RATE-001: Distributed rate limiting + cost circuit breaker ----
+builder.Services.AddSingleton<IRateLimitService, RedisRateLimitService>();
+builder.Services.AddSingleton<ICostBudgetService, RedisCostBudgetService>();
+builder.Services.AddSingleton<ICostCircuitBreaker, RedisCostCircuitBreaker>();
 
 // ---- HARDEN SessionEndpoints: Question Bank Service ----
 // ---- FIND-pedagogy-016: Adaptive Question Pool for REST session seeding ----
@@ -202,7 +208,7 @@ builder.Services.AddRateLimiter(options =>
 {
     options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    // General API: 100 req/min per user (partitioned by user id)
+    // RATE-001: General API: 60 req/min per user (partitioned by user id)
     options.AddPolicy("api", httpContext =>
     {
         var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -213,8 +219,26 @@ builder.Services.AddRateLimiter(options =>
             userId,
             _ => new FixedWindowRateLimiterOptions
             {
-                PermitLimit = 100,
+                PermitLimit = 60,
                 Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true,
+            });
+    });
+
+    // RATE-001: Photo uploads: 10 per hour per student
+    options.AddPolicy("photo", httpContext =>
+    {
+        var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? httpContext.User.FindFirstValue("sub")
+            ?? "anonymous";
+
+        return RateLimitPartition.GetFixedWindowLimiter(
+            $"photo:{userId}",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromHours(1),
                 QueueLimit = 0,
                 AutoReplenishment = true,
             });
@@ -434,6 +458,7 @@ app.UseAuthorization();
 app.UseMiddleware<TokenRevocationMiddleware>();
 app.UseConsentEnforcement(); // FIND-privacy-007: Consent gates data processing
 app.UseMiddleware<StudentDataAuditMiddleware>();
+app.UseMiddleware<RateLimitDegradationMiddleware>(); // RATE-001: distributed limits + degradation
 app.UseRateLimiter();
 
 // ---- Prometheus metrics endpoint ----
@@ -486,6 +511,9 @@ app.MapMeGdprEndpoints();
 // Granular Consent Management endpoints (SEC-006)
 // Per-purpose consent control with defaults and bulk operations
 app.MapConsentEndpoints();
+
+// RATE-001: Rate limit dashboard (real-time spend + status)
+app.MapRateLimitDashboardEndpoints();
 
 // ---- SignalR Hub ----
 app.MapCenaHub();

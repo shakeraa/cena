@@ -30,26 +30,26 @@ public sealed class SvgBuilder
     public SvgBuilder Line(double x1, double y1, double x2, double y2,
         string stroke = "#333", double strokeWidth = 1.5, string? dashArray = null)
     {
-        _content.AppendLine(string.Create(CultureInfo.InvariantCulture,
+        _content.AppendLine(
             $"  <line x1=\"{x1:F1}\" y1=\"{y1:F1}\" x2=\"{x2:F1}\" y2=\"{y2:F1}\" " +
             $"stroke=\"{stroke}\" stroke-width=\"{strokeWidth:F1}\"" +
-            (dashArray != null ? $" stroke-dasharray=\"{dashArray}\"" : "") + " />"));
+            (dashArray != null ? $" stroke-dasharray=\"{dashArray}\"" : "") + " />");
         return this;
     }
 
     public SvgBuilder Rect(double x, double y, double w, double h,
         string fill = "#4a90d9", string stroke = "#333", double strokeWidth = 1.5, double rx = 2)
     {
-        _content.AppendLine(string.Create(CultureInfo.InvariantCulture,
+        _content.AppendLine(
             $"  <rect x=\"{x:F1}\" y=\"{y:F1}\" width=\"{w:F1}\" height=\"{h:F1}\" " +
-            $"fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{strokeWidth:F1}\" rx=\"{rx:F1}\" />"));
+            $"fill=\"{fill}\" stroke=\"{stroke}\" stroke-width=\"{strokeWidth:F1}\" rx=\"{rx:F1}\" />");
         return this;
     }
 
     public SvgBuilder Circle(double cx, double cy, double r, string fill = "#333")
     {
-        _content.AppendLine(string.Create(CultureInfo.InvariantCulture,
-            $"  <circle cx=\"{cx:F1}\" cy=\"{cy:F1}\" r=\"{r:F1}\" fill=\"{fill}\" />"));
+        _content.AppendLine(
+            $"  <circle cx=\"{cx:F1}\" cy=\"{cy:F1}\" r=\"{r:F1}\" fill=\"{fill}\" />");
         return this;
     }
 
@@ -64,9 +64,9 @@ public sealed class SvgBuilder
         string color = "#c0392b", double strokeWidth = 2, string? label = null)
     {
         var markerId = $"arrow-{color.Replace("#", "")}";
-        _content.AppendLine(string.Create(CultureInfo.InvariantCulture,
+        _content.AppendLine(
             $"  <line x1=\"{x1:F1}\" y1=\"{y1:F1}\" x2=\"{x2:F1}\" y2=\"{y2:F1}\" " +
-            $"stroke=\"{color}\" stroke-width=\"{strokeWidth:F1}\" marker-end=\"url(#{markerId})\" />"));
+            $"stroke=\"{color}\" stroke-width=\"{strokeWidth:F1}\" marker-end=\"url(#{markerId})\" />");
 
         if (label != null)
         {
@@ -80,10 +80,10 @@ public sealed class SvgBuilder
     public SvgBuilder Text(double x, double y, string text, string fill = "#333",
         double fontSize = 14, string anchor = "start", string fontStyle = "normal")
     {
-        _content.AppendLine(string.Create(CultureInfo.InvariantCulture,
+        _content.AppendLine(
             $"  <text x=\"{x:F1}\" y=\"{y:F1}\" fill=\"{fill}\" font-size=\"{fontSize:F0}\" " +
             $"font-family=\"'Latin Modern Math', 'STIX Two Math', serif\" " +
-            $"text-anchor=\"{anchor}\" font-style=\"{fontStyle}\">{EscapeXml(text)}</text>"));
+            $"text-anchor=\"{anchor}\" font-style=\"{fontStyle}\">{EscapeXml(text)}</text>");
         return this;
     }
 
@@ -98,9 +98,9 @@ public sealed class SvgBuilder
         var y2 = cy - radius * Math.Sin(endRad);
         var largeArc = Math.Abs(endAngleDeg - startAngleDeg) > 180 ? 1 : 0;
 
-        _content.AppendLine(string.Create(CultureInfo.InvariantCulture,
+        _content.AppendLine(
             $"  <path d=\"M {x1:F1} {y1:F1} A {radius:F1} {radius:F1} 0 {largeArc} 0 {x2:F1} {y2:F1}\" " +
-            $"fill=\"none\" stroke=\"{stroke}\" stroke-width=\"{strokeWidth:F1}\" />"));
+            $"fill=\"none\" stroke=\"{stroke}\" stroke-width=\"{strokeWidth:F1}\" />");
         return this;
     }
 

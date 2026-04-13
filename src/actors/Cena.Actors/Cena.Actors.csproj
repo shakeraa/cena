@@ -32,6 +32,7 @@
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="StackExchange.Redis" Version="2.12.8" />
     <PackageReference Include="Lib.Net.Http.WebPush" Version="3.3.1" />
+    <PackageReference Include="MathNet.Symbolics" Version="0.25.0" />
   </ItemGroup>
 
 </Project>

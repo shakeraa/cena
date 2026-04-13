@@ -100,7 +100,8 @@ public sealed class StepVerifierService : IStepVerifierService
         var validityCheck = await _cas.VerifyAsync(new CasVerifyRequest(
             Operation: CasOperation.StepValidity,
             ExpressionA: fromExpr,
-            ExpressionB: studentStep.Expression
+            ExpressionB: studentStep.Expression,
+            Variable: null
         ), ct);
 
         if (!validityCheck.Verified)
@@ -128,7 +129,8 @@ public sealed class StepVerifierService : IStepVerifierService
             var equivalenceCheck = await _cas.VerifyAsync(new CasVerifyRequest(
                 Operation: CasOperation.Equivalence,
                 ExpressionA: studentStep.Expression,
-                ExpressionB: canonicalStep.Expression
+                ExpressionB: canonicalStep.Expression,
+                Variable: null
             ), ct);
             isCanonical = equivalenceCheck.Verified;
         }
@@ -152,7 +154,8 @@ public sealed class StepVerifierService : IStepVerifierService
         var result = await _cas.VerifyAsync(new CasVerifyRequest(
             Operation: CasOperation.Equivalence,
             ExpressionA: studentAnswer,
-            ExpressionB: canonicalAnswer
+            ExpressionB: canonicalAnswer,
+            Variable: null
         ), ct);
 
         if (result.Verified) return result;
@@ -162,6 +165,7 @@ public sealed class StepVerifierService : IStepVerifierService
             Operation: CasOperation.NumericalTolerance,
             ExpressionA: studentAnswer,
             ExpressionB: canonicalAnswer,
+            Variable: null,
             Tolerance: 1e-6
         ), ct);
     }
