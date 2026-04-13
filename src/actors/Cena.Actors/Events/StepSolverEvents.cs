@@ -34,6 +34,9 @@ public record StepAttempted_V1(
     bool UsedHint,
     int HintLevel,
     TimeSpan TimeTaken,
+    // STEP-IRT-001: Multi-level IRT dimensions for per-institute/track calibration
+    string? InstituteId,
+    string? TrackId,
     DateTimeOffset AttemptedAt
 ) : IDelegatedEvent;
 
@@ -52,5 +55,8 @@ public record StepVerified_V1(
     string? CasEngine,
     string? SimplifiedForm,
     string? ErrorMessage,
+    // STEP-IRT-001: Multi-level IRT dimensions for per-institute/track calibration
+    string? InstituteId,
+    string? TrackId,
     DateTimeOffset VerifiedAt
 ) : IDelegatedEvent;
