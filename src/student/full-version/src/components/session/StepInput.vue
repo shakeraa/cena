@@ -32,7 +32,7 @@ const emit = defineEmits<{
   (e: 'verified', correct: boolean, expression: string): void
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 
 const inputExpression = ref('')
 const currentHintLevel = ref(0)
@@ -50,6 +50,9 @@ const showFullExample = computed(() =>
 
 const availableHints = computed(() =>
   props.step.hints.slice(0, currentHintLevel.value))
+
+const textDirection = computed(() =>
+  locale.value === 'ar' || locale.value === 'he' ? 'rtl' : 'ltr')
 
 function showNextHint() {
   if (currentHintLevel.value < props.step.hints.length) {
@@ -109,7 +112,7 @@ async function verify() {
 
       <!-- Instruction (scaffolded) -->
       <p v-if="showInstruction" class="step-instruction">
-        {{ step.instruction }}
+        <bdi :dir="textDirection">{{ step.instruction }}</bdi>
       </p>
     </div>
 
@@ -169,7 +172,9 @@ async function verify() {
       </button>
 
       <ul v-if="availableHints.length > 0" class="step-hint-list">
-        <li v-for="(hint, i) in availableHints" :key="i">{{ hint }}</li>
+        <li v-for="(hint, i) in availableHints" :key="i">
+          <bdi :dir="textDirection">{{ hint }}</bdi>
+        </li>
       </ul>
     </div>
   </div>
