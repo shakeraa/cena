@@ -79,6 +79,18 @@ public sealed record FigureMarker(
     string MarkerType);
 
 /// <summary>
+/// FBD-001: Diagram interaction mode.
+/// </summary>
+public enum DiagramMode
+{
+    /// <summary>Complete diagram with all forces rendered (default).</summary>
+    Display,
+
+    /// <summary>Scene only — student drags force arrows onto the body.</summary>
+    Construct
+}
+
+/// <summary>
 /// Physics body type for programmatic SVG generation.
 /// </summary>
 public enum PhysicsBodyType
