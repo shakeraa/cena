@@ -235,6 +235,28 @@ public static class MartenConfiguration
             .Index(x => x.TeacherId)
             .Index(x => x.SchoolId);
 
+        // ── Tenancy Documents (TENANCY-P1a) ──
+        opts.Schema.For<InstituteDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.InstituteId)
+            .Index(x => x.Type)
+            .Index(x => x.Country);
+
+        opts.Schema.For<CurriculumTrackDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.TrackId)
+            .Index(x => x.Code)
+            .Index(x => x.Subject)
+            .Index(x => x.Status);
+
+        opts.Schema.For<EnrollmentDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.EnrollmentId)
+            .Index(x => x.StudentId)
+            .Index(x => x.InstituteId)
+            .Index(x => x.TrackId)
+            .Index(x => x.Status);
+
         // ── Device Session Document (STB-00b) ──
         opts.Schema.For<DeviceSessionDocument>()
             .Identity(x => x.Id)
