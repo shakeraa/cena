@@ -81,7 +81,6 @@ public class QuestionBank : IQuestionBank
         if (questions.Count == 0)
             return null;
         
-        var random = new Random();
-        return questions[random.Next(questions.Count)];
+        return questions[Random.Shared.Next(questions.Count)];
     }
 }

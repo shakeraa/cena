@@ -78,6 +78,64 @@ public sealed record FigureMarker(
     string? Label,
     string MarkerType);
 
+// ── FIG-RTL-001: Bidi script property for diagram text ──
+
+/// <summary>
+/// Script direction for text elements within diagrams.
+/// Math content is always LTR; labels may be RTL (Arabic/Hebrew).
+/// </summary>
+public enum TextScript
+{
+    /// <summary>Left-to-right (default for math, English).</summary>
+    Ltr,
+    /// <summary>Right-to-left (Arabic, Hebrew prose labels).</summary>
+    Rtl,
+    /// <summary>Auto-detect from content.</summary>
+    Auto
+}
+
+/// <summary>
+/// A text element in a physics/geometry diagram with explicit script direction.
+/// Ensures bidi rendering works correctly in RTL pages (FIG-RTL-001).
+/// </summary>
+public sealed record DiagramTextElement(
+    string Text,
+    double X,
+    double Y,
+    TextScript Script = TextScript.Auto,
+    string? FontSize = null,
+    string? Color = null);
+
+// ── FIG-VIS-001: Visibility per scaffolding level ──
+
+/// <summary>
+/// Controls which diagram elements are visible at each scaffolding level.
+/// Novice learners see simplified diagrams; experts see full detail.
+/// </summary>
+public sealed record VisibilityRule(
+    /// <summary>Element ID within the diagram spec.</summary>
+    string ElementId,
+    /// <summary>Minimum scaffolding level at which this element becomes visible.</summary>
+    string VisibleAtLevel,
+    /// <summary>Optional fade-in opacity for transitional levels.</summary>
+    double Opacity = 1.0);
+
+// ── FIG-QUAL-001: Figure quality gate metadata ──
+
+/// <summary>
+/// Quality gate metadata for figure consistency checks.
+/// Ensures figure complexity matches question difficulty.
+/// </summary>
+public sealed record FigureQualityMetadata(
+    /// <summary>Estimated information density (1-5 scale).</summary>
+    int InfoLevel,
+    /// <summary>Whether all forces in a physics diagram sum to equilibrium (or expected net force).</summary>
+    bool? EquilibriumVerified,
+    /// <summary>Whether all text elements have aria-labels.</summary>
+    bool AriaLabelsComplete,
+    /// <summary>Whether marker labels match the question's variable names.</summary>
+    bool MarkerConsistencyVerified);
+
 /// <summary>
 /// Physics body type for programmatic SVG generation.
 /// </summary>
