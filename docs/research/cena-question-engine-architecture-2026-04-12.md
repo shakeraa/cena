@@ -43,8 +43,15 @@
 32. [Graceful Degradation](#32-graceful-degradation)
 33. [Academic Integrity & Anti-Cheating](#33-academic-integrity--anti-cheating)
 34. [Pedagogical Integrity: Does Photo Input Help or Hurt?](#34-pedagogical-integrity-does-photo-input-help-or-hurt)
-35. [Consolidated Improvement Registry](#35-consolidated-improvement-registry)
-36. [References](#36-references)
+35. [Solution Design: Component Architecture](#35-solution-design-component-architecture)
+36. [Solution Design: Data Architecture](#36-solution-design-data-architecture)
+37. [Solution Design: CAS Verification Flow](#37-solution-design-cas-verification-flow)
+38. [Solution Design: Question Selection Algorithm](#38-solution-design-question-selection-algorithm)
+39. [Solution Design: Deployment Topology & Cost](#39-solution-design-deployment-topology--cost)
+40. [Solution Design: Non-Functional Requirements](#40-solution-design-non-functional-requirements)
+41. [Solution Design: Critical Path (8-Week Build)](#41-solution-design-critical-path-8-week-build)
+42. [Consolidated Improvement Registry](#42-consolidated-improvement-registry)
+43. [References](#43-references)
 
 ---
 
@@ -1743,7 +1750,523 @@ Cena measures **learning** (BKT mastery on calibrated items), not **engagement**
 
 ---
 
-## 35. Consolidated Improvement Registry
+## 35. Solution Design: Component Architecture
+
+### 35.1 System Context
+
+```
+                    ┌─────────────────────────────────────────────────┐
+                    │              STUDENT DEVICES                    │
+                    │  Vue 3 (Web) ←→ Flutter (iOS/Android)          │
+                    │  KaTeX · function-plot.js · JSXGraph · SVG     │
+                    └──────────────────┬──────────────────────────────┘
+                                       │ HTTPS / WSS (TLS 1.3)
+                                       │ Firebase Auth JWT
+                                       ▼
+                    ┌─────────────────────────────────────────────────┐
+                    │              EDGE / GATEWAY                     │
+                    │  NGINX (rate limit, geo-fence IL, TLS term)     │
+                    └──────────────────┬──────────────────────────────┘
+                                       │
+                     ┌─────────────────┼─────────────────┐
+                     ▼                 ▼                 ▼
+              ┌─────────────┐  ┌─────────────┐  ┌─────────────────┐
+              │ Student API │  │  Admin API  │  │  Actor Host     │
+              │ (.NET 8)    │  │  (.NET 8)   │  │  (Proto.Actor)  │
+              └──────┬──────┘  └──────┬──────┘  └────────┬────────┘
+                     │                │                   │
+                     └────────────────┼───────────────────┘
+                                      │ NATS JetStream
+                     ┌────────────────┼────────────────┐
+                     ▼                ▼                ▼
+              ┌───────────┐   ┌───────────┐   ┌───────────────┐
+              │ PostgreSQL │   │   Redis   │   │  CAS Sidecars │
+              │ (Marten)   │   │ (cache,   │   │ SymPy · Giac  │
+              │ Event Store│   │  budget)  │   └───────────────┘
+              └───────────┘   └───────────┘
+```
+
+Three .NET hosts, one message bus, two CAS sidecars, one database. No Kubernetes day one — Cloud Run or a single VM with Docker Compose for the pilot.
+
+### 35.2 Student API Host
+
+```
+Student API Host (.NET 8) — Stateless, horizontally scalable
+├── Controllers/
+│   ├── SessionController         — start/resume/end learning session
+│   ├── QuestionController        — get next question, submit answer
+│   ├── StepSolverController      — submit step, get diagnosis
+│   ├── PhotoUploadController     — screenshot → LaTeX pipeline
+│   └── ProgressController        — mastery map, readiness report
+│
+├── Middleware/
+│   ├── FirebaseAuthMiddleware    — JWT validation (RS256)
+│   ├── TenantScopeMiddleware     — extract instituteId from claims
+│   ├── RateLimitMiddleware       — 7 existing policies + photo upload
+│   └── SecurityHeadersMiddleware — CSP, HSTS, X-Frame-Options
+│
+├── SignalR/
+│   └── SessionHub               — real-time step feedback, timer sync
+│
+├── Services/
+│   ├── QuestionSelector          — constrained CAT (§21.3)
+│   │   ├── IrtAbilityEstimator   — θ estimate from response history
+│   │   ├── MisconceptionMatcher  — session-scoped tally → catalog lookup
+│   │   ├── ExposureController    — a-stratified, no repeats
+│   │   └── BagrutAlignmentFilter — structural strata (Q1-Q5, Part A/B)
+│   │
+│   ├── StepVerifier              — orchestrates CAS verification
+│   │   ├── CasRouter             — routes to MathNet/SymPy/Giac
+│   │   ├── AstDiffDiagnoser      — error class + divergent subtree
+│   │   └── MisconceptionDetector — maps diff → catalog entry
+│   │
+│   ├── PhotoIngestionService     — ephemeral image processing
+│   │   ├── ImageQualityGate      — blur/brightness/size checks
+│   │   ├── PrivacyPreprocessor   — EXIF strip, face blur, PII redact
+│   │   ├── ContentModerator      — PhotoDNA → Cloud Vision → custom
+│   │   ├── VisionExtractor       — Gemini 2.5 Flash → LaTeX
+│   │   ├── LatexSanitizer        — 200-command allowlist
+│   │   └── FallbackChain         — Gemini → Mathpix → manual input
+│   │
+│   ├── ScaffoldingService        — existing BKT-driven level selector
+│   ├── RemediationService        — injects micro-tasks on misconception
+│   └── DigitNormalizer           — Eastern Arabic → Western at boundary
+│
+└── Infrastructure/
+    ├── NatsPublisher             — events → NATS JetStream
+    ├── MartenRepository          — event sourcing read/write
+    └── RedisCache                — session state, token budget
+```
+
+### 35.3 Actor Host (Proto.Actor)
+
+Stateful brain. One actor per student session. Handles BKT updates, scaffolding decisions, session lifecycle.
+
+```
+Actor Host (Proto.Actor on .NET 8)
+├── StudentSessionActor
+│   ├── State: BKT mastery per skill, session misconception tally,
+│   │          current θ estimate, questions seen, scaffolding level
+│   ├── On(AnswerSubmitted)       → update BKT, persist event
+│   ├── On(StepVerified)          → update BKT (weighted by assistance)
+│   ├── On(MisconceptionDetected) → increment session tally
+│   ├── On(RemediationCompleted)  → clear misconception flag
+│   ├── On(SessionCheckIn)        → emit summary (5 problems / 15 min)
+│   └── On(SessionEnded)          → persist final state, clear tally
+│
+├── CasRouterActor
+│   ├── Routing table: JSON ConfigMap, hot-reloaded on file watch
+│   ├── Circuit breaker per engine (3 failures → 30s fallback)
+│   ├── On(VerifyRequest)  → route to NATS: cas.sympy.* or cas.giac.*
+│   ├── On(VerifyResponse) → emit CasAuditEvent to Marten
+│   └── Fallback: Giac timeout → SymPy; SymPy timeout → error
+│
+├── IrtBatchActor (triggered nightly)
+│   ├── Collects response matrix from read model
+│   ├── Calls Python IRT service (girth) via NATS
+│   ├── Updates ItemCalibration records
+│   └── Computes DIF (Arabic vs Hebrew), flags items
+│
+└── ExamSimulationActor
+    ├── Timer: countdown, auto-submit on expiry
+    ├── Reserved pool: draws from exam-only items
+    ├── No hints, no scaffolding, no CAS feedback
+    ├── Randomized order per student
+    └── Delayed scoring: results after exam closes
+```
+
+### 35.4 Admin API Host
+
+```
+Admin API Host (.NET 8)
+├── Controllers/
+│   ├── QuestionBankController    — CRUD questions, variants, figures
+│   ├── IngestionController       — PDF upload, batch OCR
+│   ├── FigureEditorController    — FigureSpec authoring
+│   ├── MisconceptionController   — catalog management
+│   ├── ItemHealthController      — IRT stats, DIF, coverage
+│   ├── ReportController          — readiness reports, export PDF
+│   └── ExamController            — exam pool management
+│
+├── Services/
+│   ├── AiGenerationService       — existing (885 lines)
+│   ├── VariantGenerator          — parametric + isomorph + laddering
+│   │   ├── ConstraintValidator   — difficulty-preserving constraints
+│   │   └── CasVerifier           — SymPy verifies every variant
+│   ├── FigureSpecBuilder         — construct FunctionPlot/Physics/Geometry specs
+│   └── BagrutAlignmentTagger     — auto-tag exam code, part, position
+│
+└── Background/
+    ├── IrtEstimationJob          — nightly Rasch + 2PL estimation
+    ├── ItemHealthJob             — coverage, discrimination, distractors
+    └── DifAnalysisJob            — Arabic vs Hebrew fairness check
+```
+
+### 35.5 CAS Sidecars
+
+Two stateless containers. Same NATS request/reply contract. Independently deployable.
+
+```
+cas-sympy (Docker — always-on safety net)
+┌──────────────────────────────────────────────────┐
+│ FastAPI + uvicorn (N workers = CPU cores)         │
+│ NATS subjects: cas.sympy.verify/simplify/solve/  │
+│                cas.sympy.diff/match/steps         │
+│ Startup: import sympy + dummy simplify(1+1)       │
+│ Memory: ~150MB/worker                             │
+│ Min instances: 1 (no cold start)                  │
+└──────────────────────────────────────────────────┘
+
+cas-giac (Docker — fast path for 5-unit physics)
+┌──────────────────────────────────────────────────┐
+│ FastAPI + giacpy (C++ bindings)                   │
+│ NATS subjects: cas.giac.*                         │
+│ 10× faster per operation than SymPy               │
+│ Memory: ~80MB/worker, cold start ~200ms           │
+│ Min instances: 1                                  │
+└──────────────────────────────────────────────────┘
+```
+
+### 35.6 CAS NATS Request/Reply Contract
+
+Both engines implement this identical contract:
+
+```json
+// Request (published to cas.sympy.verify or cas.giac.verify)
+{
+  "request_id": "uuid",
+  "operation": "verify | simplify | solve | diff | match | steps",
+  "student_expr": "x^2 + 2*x + 1",
+  "expected_expr": "(x + 1)^2",
+  "mode": "real_field | complex_field | numeric_approx",
+  "pattern": "(x + _)**2",
+  "step_chain": [
+    {"step": 1, "expr": "x^2 + 2x + 1 = 0"},
+    {"step": 2, "expr": "(x+1)^2 = 0"},
+    {"step": 3, "expr": "x = -1"}
+  ]
+}
+
+// Response
+{
+  "request_id": "uuid",
+  "result": "equivalent | not_equivalent | error",
+  "canonical_form": "Eq((x+1)**2, 0)",
+  "diagnosis": {
+    "error_class": "sign_error | operation_error | conceptual_error | strategy_error | correct_but_skipped",
+    "student_subtree": "x + 2",
+    "expected_subtree": "x - 2",
+    "divergence_depth": 2,
+    "misconception_id": "ALG-M02"
+  },
+  "latency_ms": 12,
+  "engine": "sympy | giac"
+}
+```
+
+Both engines must pass the 500-pair conformance test suite. CI blocks deployment if any pair disagrees.
+
+---
+
+## 36. Solution Design: Data Architecture
+
+### 36.1 Event Store (Marten on PostgreSQL)
+
+Everything is event-sourced. No update, no delete. Append-only.
+
+**Aggregate roots**: QuestionDocument, StudentSession, StudentProfile, ExamSimulation.
+
+**Key events**:
+
+```
+QuestionAuthored      { questionId, stem, figureSpec, steps, bagrutAlignment }
+VariantGenerated      { parentId, variantId, parameters, casVerified }
+ItemCalibrated        { questionId, irtB, irtA, se, responseCount, status }
+SessionStarted        { studentId, topicChoice, scaffoldingLevel }
+QuestionPresented     { questionId, variantSeed, catTheta, selectionReason }
+StepSubmitted         { stepNum, studentExpr, timestamp }
+StepVerified          { stepNum, result, diagnosis?, engine, latencyMs }
+MisconceptionDetected { misconceptionId, stepNum, remediationType }
+RemediationPresented  { misconceptionId, microTaskId }
+RemediationCompleted  { misconceptionId, correct }
+AnswerSubmitted       { questionId, correct, assistanceLevel, bktUpdate }
+SessionCheckIn        { problemCount, accuracy, masteryDelta, elapsed }
+SessionEnded          { problemCount, masterySnapshot, misconceptionsResolved }
+CasAuditEvent         { requestId, questionId, step, studentExpr, expected, engine, result, latencyMs }
+```
+
+### 36.2 Read Models (Marten Projections)
+
+```
+QuestionBankView       — published questions + IRT parameters + alignment tags
+StudentMasteryView     — current BKT per skill per student (for CAT)
+ItemResponseMatrix     — sparse (student × item × result) for IRT batch
+ItemHealthView         — coverage, discrimination, distractor stats, DIF flags
+BagrutReadinessView    — per-student readiness per exam section
+TeacherDashboardView   — class mastery, anomaly flags, misconception heatmap
+CasPerformanceView     — latency percentiles per engine, error rates, breaker status
+```
+
+### 36.3 What is NOT Persisted
+
+| Data | Lifecycle | Reason |
+|------|-----------|--------|
+| Student photos | Volatile memory, ~1.5s | COPPA 2025, GDPR-K, PPL Amendment 13 |
+| Misconception tally | Session-scoped, cleared on end | Edmodo consent decree precedent |
+| Raw CAS AST diffs | Logged as audit event only | Part of event stream |
+| Eastern Arabic original input | Audit event field | Dispute resolution |
+
+---
+
+## 37. Solution Design: CAS Verification Flow
+
+### 37.1 Successful Step Verification
+
+```
+Student types step 3: "(x+1)^2 = 0"
+  │
+  ▼
+POST /api/sessions/{sid}/question/{qid}/step/3
+  │
+  ▼
+Student API:
+  1. DigitNormalizer.normalize()     → no-op for Latin input
+  2. LatexSanitizer.validate()       → PASS
+  3. Load question from Marten       → expectedExpr, expectedPattern, mode
+  4. Publish to NATS: cas.verify
+  │
+  ▼
+CasRouter (Actor Host):
+  Route: level=5, operation=verify → routing table → cas.sympy.verify
+  │
+  ▼
+cas-sympy sidecar:
+  1. Parse student_expr and expected_expr
+  2. Solve (x+1)^2 = 0 → x = -1 (real_field)
+  3. Check equivalence: VALID intermediate step
+  4. Pattern match "(x + _)^2 = _": MATCH
+  5. Return: { result: "equivalent", latency_ms: 8 }
+  │
+  ▼
+Student API:
+  5. Emit CasAuditEvent to Marten
+  6. Emit StepVerified on StudentSession aggregate
+  7. Actor updates BKT: strong positive (first try, no hint)
+  8. Return via SignalR: { correct: true, nextStepUnlocked: true }
+```
+
+### 37.2 Failed Step with Misconception Detection
+
+```
+Student types: "√(9+16) = √9 + √16 = 7"    ← ALG-M01
+  │
+  ▼
+CAS returns: not_equivalent
+  diagnosis: { error_class: "conceptual_error",
+               misconception_id: "ALG-M01",
+               student_subtree: "sqrt(9) + sqrt(16)",
+               expected_subtree: "sqrt(25)" }
+  │
+  ▼
+LLM generates targeted feedback from diagnosis:
+  "تحقق — هل √(9+16) = √9 + √16؟ جرب حساب كل طرف"
+  │
+  ▼
+Session actor: increment misconception_tally["ALG-M01"] → count=2
+  │
+  ▼
+At next session check-in (5 problems or 15 min):
+  Inject remediation micro-task from catalog:
+  "احسب √(9+16) ثم √9+√16. هل هما متساويان؟"
+  │
+  ▼
+If remediation correct → clear ALG-M01 flag, emit RemediationCompleted
+If wrong → escalate to Full scaffolding for worked example on √(a+b)
+```
+
+---
+
+## 38. Solution Design: Question Selection Algorithm
+
+```python
+def select_next_question(session, bank):
+    """Constrained CAT with misconception priority."""
+    
+    θ = session.current_ability_estimate
+    seen = session.questions_seen
+    tally = session.misconception_tally
+    strata = session.bagrut_filter  # e.g. "806, Part A, Q1"
+    
+    # 1. Structural alignment filter
+    candidates = [q for q in bank if q.bagrut_alignment matches strata]
+    
+    # 2. Exposure control: no repeats
+    candidates = [q for q in candidates if q.id not in seen]
+    
+    # 3. PRIORITY: misconception targeting (overrides CAT)
+    active = {m: c for m, c in tally.items() if c >= 2}
+    if active:
+        top = max(active, key=active.get)
+        targeting = [q for q in candidates if top in q.targeted_misconceptions]
+        if targeting:
+            return min(targeting, key=lambda q: abs(q.irt_difficulty - θ))
+    
+    # 4. CAT: within 1 logit of θ
+    in_range = [q for q in candidates if abs(q.irt_difficulty - θ) <= 1.0]
+    
+    # 5. Prefer calibrated items
+    in_range.sort(key=lambda q: (
+        0 if q.calibration_status == 'calibrated' else
+        1 if q.calibration_status == 'provisional' else 2))
+    
+    # 6. A-stratified random (exposure control)
+    strata = group_by_discrimination(in_range)
+    return random.choice(strata[0])  # top discrimination stratum
+```
+
+---
+
+## 39. Solution Design: Deployment Topology & Cost
+
+### 39.1 Pilot (100 students, single city)
+
+```
+Docker Compose on 1 VM (4 vCPU, 16GB RAM)
+├── student-api     (1 instance,  port 5000)
+├── admin-api       (1 instance,  port 5001)
+├── actor-host      (1 instance,  port 5002)
+├── nats            (1 instance,  port 4222)
+├── postgres        (1 instance,  port 5432)
+├── redis           (1 instance,  port 6379)
+├── cas-sympy       (1 instance,  2 workers)
+└── cas-giac        (1 instance,  1 worker)
+```
+
+### 39.2 Scale (1,000+ students)
+
+```
+Cloud Run (or K8s)
+├── student-api     (2-8 instances, CPU-autoscale)
+├── admin-api       (1-2 instances)
+├── actor-host      (2-4 instances, consistent-hash by student)
+├── nats            (3-node JetStream cluster)
+├── postgres        (Cloud SQL, 2 vCPU, read replica)
+├── redis           (Memorystore, 1GB)
+├── cas-sympy       (2-6 instances, min=1, CPU-autoscale at 70%)
+└── cas-giac        (1-3 instances, min=1, CPU-autoscale at 70%)
+```
+
+### 39.3 Full System Cost Model
+
+| Component | Pilot (100 students) | Scale (1K students) | Notes |
+|-----------|---------------------|---------------------|-------|
+| VM / Cloud Run | $50 | $200 | Autoscale during exams |
+| PostgreSQL | $0 (on VM) | $50 (Cloud SQL) | Marten event store |
+| Redis | $0 (on VM) | $25 (Memorystore) | Cache + budget |
+| NATS | $0 (on VM) | $30 (cluster) | JetStream |
+| CAS sidecars | $0 (on VM) | $45 (SymPy + Giac) | Autoscale on spike |
+| Gemini Vision | $20 | $200 | $0.002/image × 100K/mo |
+| Cloud Vision (mod) | $15 | $150 | SafeSearch + labels |
+| Wolfram API | $0 | $25 | Admin-only, 2K/mo cap |
+| CDN (figures) | $5 | $20 | Raster only |
+| Firebase Auth | $0 | $0 | Free tier |
+| **Total** | **~$90/month** | **~$745/month** | |
+| **Per student** | **~$0.90/month** | **~$0.75/month** | Price: ₪69 → 92× margin |
+
+---
+
+## 40. Solution Design: Non-Functional Requirements
+
+### 40.1 Latency Budget
+
+| Operation | Target | How |
+|-----------|--------|-----|
+| Question load | < 100ms | Marten projection, cached in Redis |
+| Step verification (CAS) | < 200ms | SymPy 5-50ms, Giac 0.5-20ms, NATS 5ms |
+| Photo → LaTeX | < 3s | Quality gate 15ms, moderation 300ms, Gemini 1-2s |
+| Figure render (client) | < 500ms | function-plot.js <100ms, SVG <200ms |
+| BKT update (actor) | < 10ms | In-memory actor state |
+| Session start | < 500ms | Actor activation + first question |
+
+### 40.2 Availability Targets
+
+| Component | Target | Strategy |
+|-----------|--------|----------|
+| Student API | 99.5% | Stateless, multi-instance |
+| Actor Host | 99.5% | Actor relocation, snapshot recovery |
+| CAS (effective) | 99.9% | SymPy safety net + Giac breaker |
+| Photo ingestion | 99% | Gemini → Mathpix → manual fallback |
+| PostgreSQL | 99.9% | Cloud SQL + automated backups |
+
+### 40.3 Security Checklist
+
+| Layer | Control | Status |
+|-------|---------|--------|
+| Transport | TLS 1.3 everywhere | Required |
+| Auth | Firebase JWT (RS256), tenant-scoped | Implemented |
+| Input | LaTeX 200-command allowlist | Designed |
+| Privacy | Ephemeral image processing, no-disk | Designed |
+| Content | 4-tier moderation (PhotoDNA → CV) | Designed |
+| Rate | 4-tier limiting + cost circuit breaker | Designed |
+| CAS | Structured audit events + admin trace | Designed |
+| Anomaly | Behavioral flags (multi-IP, timing, spikes) | Designed |
+| Compliance | COPPA 2025, GDPR-K, Israeli PPL Amd 13 | DPIA done |
+| CSAM | PhotoDNA + mandatory reporting | Designed |
+
+---
+
+## 41. Solution Design: Critical Path (8-Week Build)
+
+### Week 1–2: CAS Foundation
+
+```
+CAS-001  SymPy sidecar + NATS integration
+FIGURE-001  ADR on rendering stack
+FIGURE-002  FigureSpec schema in Marten
+```
+
+### Week 3–4: Step Solver Core
+
+```
+STEP-001  StepSolverCard.vue + StepInput.vue
+STEP-003  StepSolverQuestion schema + events
+CAS-002   Step verifier endpoint wired to SymPy
+```
+
+### Week 5–6: Figures + Content
+
+```
+FIGURE-003  FunctionPlotFigure.vue component
+FIGURE-004  Wire into QuestionCard.vue
+STEP-005    Seed 10 step-solver questions (algebra, 806 Part A Q1)
+```
+
+### Week 7–8: Integration + Photo Input
+
+```
+Integration testing: step-solver + CAS + figures
+Photo ingestion: Gemini basic (no moderation tiers yet)
+BKT integration: step outcomes → mastery updates
+```
+
+### Post-Launch (rolling)
+
+```
+IRT calibration batch (needs 50+ responses/item)
+Misconception catalog seeding
+Giac sidecar (when physics step-solver ships)
+Content moderation tiers 2-3
+Exam simulation mode
+Readiness reporting
+```
+
+**Design invariant**: LLM explains, CAS computes. No exceptions.
+
+**Architecture invariant**: every improvement is additive. The system works with just SymPy and 10 seed questions. Everything else layers on without changing the foundation.
+
+---
+
+## 42. Consolidated Improvement Registry
 
 | # | Source | Improvement | Category |
 |---|--------|------------|----------|
@@ -1792,7 +2315,7 @@ Cena measures **learning** (BKT mastery on calibrated items), not **engagement**
 
 ---
 
-## 36. References
+## 43. References
 
 ### Academic
 
