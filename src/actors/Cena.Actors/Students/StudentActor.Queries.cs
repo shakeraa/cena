@@ -10,6 +10,7 @@ using System.Text;
 using Cena.Actors.Events;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Outreach;
+using Cena.Actors.Projections;
 using Cena.Actors.Services;
 using Cena.Actors.Sessions;
 using Cena.Actors.Stagnation;
@@ -218,6 +219,103 @@ public sealed partial class StudentActor
         context.Respond(new ActorResult<IReadOnlyList<ReviewItem>>(
             true, reviewItems.AsReadOnly()));
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// PWA-BE-001: Returns a complete session snapshot for SignalR reconnect.
+    /// Queries actor state and enriches with the LearningSessionQueueProjection.
+    /// </summary>
+    private async Task HandleGetSessionSnapshot(IContext context, GetSessionSnapshot query)
+    {
+        // 1. Verify the session is still active in actor state
+        if (_state.ActiveSessionId != query.SessionId)
+        {
+            await using var session = _documentStore.QuerySession();
+            var queue = await session.LoadAsync<LearningSessionQueueProjection>(query.SessionId);
+            if (queue is null)
+            {
+                context.Respond(new SessionSnapshotResponse(
+                    query.SessionId, 0, null, new(), "full", new(),
+                    DateTimeOffset.UtcNow, 0, Error: "session_not_found"));
+                return;
+            }
+
+            context.Respond(new SessionSnapshotResponse(
+                query.SessionId, 0, null, new(), "full", new(),
+                DateTimeOffset.UtcNow, 0, Error: "session_expired"));
+            return;
+        }
+
+        // 2. Expiry guard: >1h idle since last activity
+        var idleHours = (DateTimeOffset.UtcNow - _state.LastActivityDate).TotalHours;
+        if (idleHours > 1)
+        {
+            context.Respond(new SessionSnapshotResponse(
+                query.SessionId, 0, null, new(), "full", new(),
+                DateTimeOffset.UtcNow, 0, Error: "session_expired"));
+            return;
+        }
+
+        // 3. Load the queue projection to enrich the snapshot
+        await using var querySession = _documentStore.QuerySession();
+        var queue = await querySession.LoadAsync<LearningSessionQueueProjection>(query.SessionId);
+
+        var startedAt = queue?.StartedAt ?? _state.LastActivityDate;
+        var currentStepNumber = queue?.TotalQuestionsAttempted ?? 0;
+        if (queue?.PeekNext() != null)
+            currentStepNumber++;
+
+        var currentQuestionId = queue?.CurrentQuestionId;
+        if (string.IsNullOrEmpty(currentQuestionId) && queue?.PeekNext() is { } nextQ)
+            currentQuestionId = nextQ.QuestionId;
+
+        var bktSnapshot = _state.MasteryMap
+            .Select(kv => new SkillMasteryDto(
+                kv.Key,
+                kv.Value,
+                _state.MasteryOverlay.GetValueOrDefault(kv.Key)?.AttemptCount ?? 0,
+                _state.MasteryOverlay.GetValueOrDefault(kv.Key)?.CorrectCount ?? 0))
+            .ToDictionary(s => s.ConceptId);
+
+        var completedSteps = queue?.AnsweredQuestions
+            .Select((a, i) => new StepResultDto(
+                (i + 1).ToString(),
+                a.QuestionId,
+                "",
+                a.IsCorrect,
+                a.TimeSpentSeconds * 1000,
+                a.AnsweredAt))
+            .ToList() ?? new List<StepResultDto>();
+
+        var scaffoldingLevel = "exploratory";
+        if (queue != null && !string.IsNullOrEmpty(currentQuestionId))
+        {
+            var conceptId = queue.PeekNext()?.ConceptId
+                ?? queue.QuestionQueue.FirstOrDefault(q => q.QuestionId == currentQuestionId)?.ConceptId
+                ?? "";
+            var mastery = (float)_state.MasteryMap.GetValueOrDefault(conceptId, 0.5);
+            var level = ScaffoldingService.DetermineLevel(mastery, 1.0f);
+            scaffoldingLevel = level switch
+            {
+                Mastery.ScaffoldingLevel.Full => "full",
+                Mastery.ScaffoldingLevel.Partial => "partial",
+                Mastery.ScaffoldingLevel.HintsOnly => "minimal",
+                Mastery.ScaffoldingLevel.None => "exploratory",
+                _ => "exploratory"
+            };
+        }
+
+        var durationSeconds = (int)(DateTimeOffset.UtcNow - startedAt).TotalSeconds;
+
+        context.Respond(new SessionSnapshotResponse(
+            query.SessionId,
+            currentStepNumber,
+            currentQuestionId,
+            bktSnapshot,
+            scaffoldingLevel,
+            completedSteps,
+            startedAt,
+            durationSeconds));
     }
 
     // =========================================================================

@@ -16,6 +16,7 @@ using Cena.Actors.Events;
 using Cena.Actors.Hints;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Outreach;
+using Cena.Actors.Projections;
 using Cena.Actors.Services;
 using Cena.Actors.Sessions;
 using Cena.Actors.Stagnation;
@@ -200,6 +201,7 @@ public sealed partial class StudentActor : IActor
             GetReviewSchedule q  => HandleGetReviewSchedule(context, q),
             GetMasteryOverlayQuery q => HandleGetMasteryOverlay(context, q),
             GetMethodologyProfile q => HandleGetMethodologyProfile(context, q),
+            GetSessionSnapshot q => HandleGetSessionSnapshot(context, q),
 
             // ---- Internal ----
             StagnationDetected msg => HandleStagnationDetected(context, msg),

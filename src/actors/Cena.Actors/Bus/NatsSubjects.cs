@@ -79,6 +79,9 @@ public static class NatsSubjects
     public const string RequestClusterHealth  = "cena.request.cluster.health";
     public const string RequestActorStats     = "cena.request.actor.stats";
 
+    // ── Session Snapshot (SignalR Hub → Actor Host) ──
+    public const string SessionSnapshotRequest = "cena.request.session.snapshot";
+
     /// <summary>
     /// Get per-student subject for targeted events.
     /// </summary>

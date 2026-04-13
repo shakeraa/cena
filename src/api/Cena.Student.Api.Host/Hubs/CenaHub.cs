@@ -7,7 +7,11 @@
 using System.Collections.Concurrent;
 using System.Text.Json;
 using Cena.Actors.Bus;
+using Cena.Actors.Serving;
+using Cena.Actors.Sessions;
+using Cena.Api.Contracts.Content;
 using Cena.Api.Contracts.Hub;
+using Cena.Api.Contracts.Sessions;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using NATS.Client.Core;
@@ -19,6 +23,7 @@ public sealed class CenaHub : Hub<ICenaClient>
 {
     private readonly INatsConnection _nats;
     private readonly SignalRGroupManager _groupManager;
+    private readonly IQuestionBank _questionBank;
     private readonly ILogger<CenaHub> _logger;
 
     // Rate limiting: track command timestamps per connection
@@ -34,10 +39,12 @@ public sealed class CenaHub : Hub<ICenaClient>
     public CenaHub(
         INatsConnection nats,
         SignalRGroupManager groupManager,
+        IQuestionBank questionBank,
         ILogger<CenaHub> logger)
     {
         _nats = nats;
         _groupManager = groupManager;
+        _questionBank = questionBank;
         _logger = logger;
     }
 
@@ -277,6 +284,103 @@ public sealed class CenaHub : Hub<ICenaClient>
 
         await PublishToNats(NatsSubjects.Annotation, envelope);
         await Clients.Caller.CommandAck(new CommandAckEvent(correlationId, "RequestNextConcept", DateTimeOffset.UtcNow));
+    }
+
+    /// <summary>
+    /// PWA-BE-001: Request a complete session snapshot for SignalR reconnect.
+    /// Queries the StudentActor via NATS request/reply and enriches with the current question.
+    /// </summary>
+    public async Task<SessionSnapshotDto?> RequestSessionSnapshot(string sessionId)
+    {
+        var studentId = GetStudentIdOrThrow();
+        if (!CheckRateLimit()) return null;
+
+        var correlationId = Guid.NewGuid().ToString("N");
+
+        var busCmd = new BusGetSessionSnapshot(studentId, sessionId);
+        var envelope = BusEnvelope<BusGetSessionSnapshot>.Create(
+            NatsSubjects.SessionSnapshotRequest, busCmd, "signalr-hub", GetSchoolId());
+
+        var requestBytes = JsonSerializer.SerializeToUtf8Bytes(envelope, JsonOpts);
+
+        try
+        {
+            var reply = await _nats.RequestAsync<byte[], byte[]>(
+                NatsSubjects.SessionSnapshotRequest,
+                requestBytes,
+                timeout: TimeSpan.FromSeconds(5));
+
+            var responseEnvelope = JsonSerializer.Deserialize<BusEnvelope<SessionSnapshotResponse>>(reply.Data, JsonOpts);
+            var response = responseEnvelope?.Payload;
+
+            if (response?.Error == "session_expired")
+            {
+                await Clients.Caller.Error(new HubErrorEvent(
+                    correlationId, "SESSION_EXPIRED", "Session has expired.", DateTimeOffset.UtcNow));
+                return null;
+            }
+
+            if (response?.Error == "session_not_found")
+            {
+                await Clients.Caller.Error(new HubErrorEvent(
+                    correlationId, "SESSION_NOT_FOUND", "Session not found.", DateTimeOffset.UtcNow));
+                return null;
+            }
+
+            if (response is null)
+            {
+                await Clients.Caller.Error(new HubErrorEvent(
+                    correlationId, "SNAPSHOT_FAILED", "Failed to retrieve session snapshot.", DateTimeOffset.UtcNow));
+                return null;
+            }
+
+            // Enrich with current question from question bank
+            QuestionDto? currentQuestion = null;
+            if (!string.IsNullOrEmpty(response.CurrentQuestionId))
+            {
+                var questionDoc = await _questionBank.GetQuestionAsync(response.CurrentQuestionId);
+                if (questionDoc != null)
+                {
+                    currentQuestion = new QuestionDto(
+                        questionDoc.QuestionId,
+                        questionDoc.Subject,
+                        questionDoc.ConceptIds,
+                        questionDoc.Stem,
+                        questionDoc.Options.Select(o => new QuestionOptionDto(o.Id, o.Label, o.Text, o.IsCorrect)).ToList(),
+                        questionDoc.BloomsLevel,
+                        questionDoc.Difficulty,
+                        questionDoc.LanguageVersions.ToDictionary(
+                            kv => kv.Key,
+                            kv => new LanguageVersionDto(kv.Value.Language, kv.Value.Stem,
+                                kv.Value.Options.Select(o => new QuestionOptionDto(o.Id, o.Label, o.Text, o.IsCorrect)).ToList())),
+                        questionDoc.Explanation,
+                        questionDoc.Version);
+                }
+            }
+
+            return new SessionSnapshotDto(
+                response.SessionId,
+                currentQuestion,
+                response.CurrentStepNumber,
+                response.BktSnapshot,
+                response.ScaffoldingLevel,
+                response.CompletedSteps,
+                response.SessionStartedAt,
+                response.SessionDurationSeconds);
+        }
+        catch (TimeoutException)
+        {
+            await Clients.Caller.Error(new HubErrorEvent(
+                correlationId, "SESSION_EXPIRED", "Session query timed out. Session may have expired.", DateTimeOffset.UtcNow));
+            return null;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "RequestSessionSnapshot failed for {StudentId}/{SessionId}", studentId, sessionId);
+            await Clients.Caller.Error(new HubErrorEvent(
+                correlationId, "SNAPSHOT_FAILED", "Failed to retrieve session snapshot.", DateTimeOffset.UtcNow));
+            return null;
+        }
     }
 
     // ── Helpers ────────────────────────────────────────────────────────────
