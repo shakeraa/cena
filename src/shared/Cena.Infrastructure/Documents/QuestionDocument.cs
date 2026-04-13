@@ -126,6 +126,13 @@ public class QuestionDocument
     public bool IsActive { get; set; } = true;
 
     /// <summary>
+    /// BAGRUT-ALIGN-001: Structural alignment to a Bagrut exam section.
+    /// Enables "Train Part A Q1" or "Train Part B proofs" strata in the
+    /// question selector. Null for non-Bagrut or untagged questions.
+    /// </summary>
+    public BagrutAlignment? BagrutAlignment { get; set; }
+
+    /// <summary>
     /// FIND-pedagogy-008 — reference to the <see cref="LearningObjectiveDocument"/>
     /// that this question assesses. Nullable so existing seeded questions
     /// replay cleanly; authored questions produced after this change are
@@ -201,5 +208,36 @@ public class QuestionDocument
         // Legacy fallback
         return DistractorRationales?.GetValueOrDefault(choice);
     }
+}
+
+/// <summary>
+/// BAGRUT-ALIGN-001: Structural alignment metadata for Bagrut exam questions.
+/// Maps a question to a specific position and type within the Bagrut exam structure.
+/// Used by the question selector to build structural strata (e.g., "Train Part A Q1").
+/// </summary>
+public sealed record BagrutAlignment
+{
+    /// <summary>Bagrut exam code: "806" (Calc+Geometry), "807" (Calc+Probability), "036" (Physics).</summary>
+    public string ExamCode { get; init; } = "";
+
+    /// <summary>Exam part: "A" (short problems, ~10 min each) or "B" (long problems, ~20-25 min each).</summary>
+    public string Part { get; init; } = "";
+
+    /// <summary>Typical position in Part A: "Q1"-"Q5". Null for Part B (variable ordering).</summary>
+    public string? TypicalPosition { get; init; }
+
+    /// <summary>
+    /// Topic cluster for CAT stratification. Examples:
+    /// "function_investigation", "integral_application", "analytic_geometry",
+    /// "sequence_series", "word_problem", "probability", "vectors",
+    /// "mechanics", "electricity", "optics".
+    /// </summary>
+    public string TopicCluster { get; init; } = "";
+
+    /// <summary>Part B proof question flag. Part A questions are never proofs.</summary>
+    public bool IsProofQuestion { get; init; }
+
+    /// <summary>Estimated solve time in minutes (10-25). Used for session time budgeting.</summary>
+    public int EstimatedMinutes { get; init; } = 15;
 }
 

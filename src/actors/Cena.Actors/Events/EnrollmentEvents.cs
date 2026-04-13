@@ -25,3 +25,19 @@ public record EnrollmentCreated_V1(
     string? ClassroomId,
     DateTimeOffset EnrolledAt
 ) : IDelegatedEvent;
+
+/// <summary>
+/// BAGRUT-ALIGN-001: Emitted when a question's Bagrut structural alignment
+/// is set or updated by an admin or auto-tagging service.
+/// </summary>
+public record QuestionBagrutAlignmentSet_V1(
+    string QuestionId,
+    string ExamCode,
+    string Part,
+    string? TypicalPosition,
+    string TopicCluster,
+    bool IsProofQuestion,
+    int EstimatedMinutes,
+    string SetBy,
+    DateTimeOffset SetAt
+) : IDelegatedEvent;
