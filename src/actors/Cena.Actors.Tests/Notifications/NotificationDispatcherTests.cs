@@ -138,7 +138,7 @@ public sealed class NotificationDispatcherTests
     public void BuildNotification_ProducesStableShape()
     {
         var evt = new XpAwarded_V1("stu-1", 25, "practice", 100, "recall", 1);
-        var notification = NotificationDispatcher.BuildNotification("stu-1", evt);
+        var notification = NotificationDispatcher.BuildNotification("stu-1", evt, DateTime.UtcNow);
 
         Assert.Equal("stu-1", notification.StudentId);
         Assert.Equal("xp", notification.Kind);

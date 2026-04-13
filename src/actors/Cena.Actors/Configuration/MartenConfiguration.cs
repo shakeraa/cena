@@ -76,6 +76,7 @@ public static class MartenConfiguration
         RegisterFocusEvents(opts);
         RegisterNotificationEvents(opts); // FIND-data-002: Was defined but never called
         RegisterMessagingEvents(opts); // FIND-data-012: Register messaging events
+        RegisterEnrollmentEvents(opts); // TENANCY-P1c: Enrollment lifecycle events
 
         // ── Register Upcasters (V(N) -> V(N+1) schema evolution, DATA-009) ──
         RegisterUpcasters(opts);
@@ -625,6 +626,22 @@ public static class MartenConfiguration
         opts.Events.AddEventType<MicrobreakSuggested_V1>();
         opts.Events.AddEventType<MicrobreakTaken_V1>();
         opts.Events.AddEventType<MicrobreakSkipped_V1>();
+    }
+
+    /// <summary>
+    /// TENANCY-P1c: Registers enrollment lifecycle events for multi-institute tenancy.
+    /// All event type names use snake_case_v1 per FIND-data-005 convention.
+    /// </summary>
+    private static void RegisterEnrollmentEvents(StoreOptions opts)
+    {
+        opts.Events.MapEventType<InstituteCreated_V1>("institute_created_v1");
+        opts.Events.MapEventType<CurriculumTrackPublished_V1>("curriculum_track_published_v1");
+        opts.Events.MapEventType<ProgramCreated_V1>("program_created_v1");
+        opts.Events.MapEventType<ProgramForkedFromPlatform_V1>("program_forked_from_platform_v1");
+        opts.Events.MapEventType<ClassroomCreated_V1>("classroom_created_v1");
+        opts.Events.MapEventType<ClassroomStatusChanged_V1>("classroom_status_changed_v1");
+        opts.Events.MapEventType<EnrollmentCreated_V1>("enrollment_created_v1");
+        opts.Events.MapEventType<EnrollmentStatusChanged_V1>("enrollment_status_changed_v1");
     }
 
     private static void RegisterQuestionEvents(StoreOptions opts)

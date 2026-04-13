@@ -4,6 +4,7 @@
 // that GET /current-question never returns "completed" on first call.
 // =============================================================================
 
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Projections;
 using Cena.Actors.Serving;
 using Cena.Infrastructure.Documents;
@@ -26,6 +27,7 @@ public sealed class SessionQueueSeedingTests
     private readonly IDocumentSession _session = Substitute.For<IDocumentSession>();
     private readonly IQuerySession _querySession = Substitute.For<IQuerySession>();
     private readonly IQuestionSelector _selector = Substitute.For<IQuestionSelector>();
+    private readonly IClock _clock = Substitute.For<IClock>();
 
     public SessionQueueSeedingTests()
     {
@@ -40,7 +42,8 @@ public sealed class SessionQueueSeedingTests
         var pool = new AdaptiveQuestionPool(
             _store,
             _selector,
-            NullLogger<AdaptiveQuestionPool>.Instance);
+            NullLogger<AdaptiveQuestionPool>.Instance,
+            _clock);
 
         var studentId = "student-001";
         var sessionId = "session-001";
@@ -73,7 +76,8 @@ public sealed class SessionQueueSeedingTests
         var pool = new AdaptiveQuestionPool(
             _store,
             _selector,
-            NullLogger<AdaptiveQuestionPool>.Instance);
+            NullLogger<AdaptiveQuestionPool>.Instance,
+            _clock);
 
         var sessionId = "session-refill";
         var queue = new LearningSessionQueueProjection
@@ -116,7 +120,7 @@ public sealed class SessionQueueSeedingTests
                 SelectionReason: "ZPD match"));
 
         // Act
-        var result = await pool.GetNextQuestionAsync(sessionId, questionPool);
+        var result = await pool.GetNextQuestionAsync(sessionId, questionPool, CancellationToken.None);
 
         // Assert — a question was returned (not null / not "completed")
         Assert.NotNull(result);
@@ -220,7 +224,8 @@ public sealed class SessionQueueSeedingTests
         var pool = new AdaptiveQuestionPool(
             _store,
             _selector,
-            NullLogger<AdaptiveQuestionPool>.Instance);
+            NullLogger<AdaptiveQuestionPool>.Instance,
+            _clock);
 
         var sessionId = "session-answer";
         var queue = new LearningSessionQueueProjection
@@ -240,7 +245,7 @@ public sealed class SessionQueueSeedingTests
         // Act
         await pool.RecordAnswerAsync(
             sessionId, "q_001", isCorrect: true,
-            TimeSpan.FromSeconds(30), "A");
+            TimeSpan.FromSeconds(30), "A", CancellationToken.None);
 
         // Assert
         Assert.Equal(1, queue.TotalQuestionsAttempted);

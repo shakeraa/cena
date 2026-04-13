@@ -5,6 +5,7 @@
 // =============================================================================
 
 using Cena.Actors.Gateway;
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Mastery;
 using Cena.Actors.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -19,6 +20,7 @@ public sealed class PersonalizedExplanationServiceTests : IDisposable
     private readonly ILlmClient _llm = Substitute.For<ILlmClient>();
     private readonly IExplanationCacheService _cache = Substitute.For<IExplanationCacheService>();
     private readonly IMeterFactory _meterFactory = new PersonalizedMeterFactory();
+    private readonly IClock _clock = Substitute.For<IClock>();
     private readonly PersonalizedExplanationService _service;
 
     public PersonalizedExplanationServiceTests()
@@ -26,7 +28,8 @@ public sealed class PersonalizedExplanationServiceTests : IDisposable
         _service = new PersonalizedExplanationService(
             _llm, _cache,
             NullLogger<PersonalizedExplanationService>.Instance,
-            _meterFactory);
+            _meterFactory,
+            _clock);
 
         // Reset static token tracking between tests
         PersonalizedExplanationService.ResetDailyTokenTracking();
