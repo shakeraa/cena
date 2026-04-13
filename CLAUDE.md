@@ -15,6 +15,14 @@ node .agentdb/kimi-queue.js workers --active
 
 The `--peek` flag leaves messages unconsumed so you can decide whether to act on them before auto-acking. If other workers (Kimi, sub-agents, human operators) have questions or status updates waiting, address them before claiming new work.
 
+## Design Non-Negotiables (Research-Backed, ADR-Locked)
+
+These three rules are derived from the [game-design research synthesis](docs/research/cena-sexy-game-research-2026-04-11.md) and locked by ADRs. Violating them is a ship-blocker.
+
+1. **SymPy CAS is the sole correctness oracle** — the LLM explains, the CAS verifies. No math reaches students unverified. ([ADR-0002](docs/adr/0002-sympy-correctness-oracle.md))
+2. **Misconception data is session-scoped** — never on student profiles, never for ML training, 30-day retention max. ([ADR-0003](docs/adr/0003-misconception-session-scope.md))
+3. **Dark-pattern engagement mechanics are banned** — no streaks, no loss-aversion, no variable-ratio rewards. CI scanner enforces. ([docs/engineering/shipgate.md](docs/engineering/shipgate.md))
+
 ## Behavioral Rules (Always Enforced)
 
 - Do what has been asked; nothing more, nothing less
