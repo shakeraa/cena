@@ -258,15 +258,15 @@ public sealed partial class StudentActor
 
         // 3. Load the queue projection to enrich the snapshot
         await using var querySession = _documentStore.QuerySession();
-        var queue = await querySession.LoadAsync<LearningSessionQueueProjection>(query.SessionId);
+        var sessionQueue = await querySession.LoadAsync<LearningSessionQueueProjection>(query.SessionId);
 
-        var startedAt = queue?.StartedAt ?? _state.LastActivityDate;
-        var currentStepNumber = queue?.TotalQuestionsAttempted ?? 0;
-        if (queue?.PeekNext() != null)
+        var startedAt = sessionQueue?.StartedAt ?? _state.LastActivityDate;
+        var currentStepNumber = sessionQueue?.TotalQuestionsAttempted ?? 0;
+        if (sessionQueue?.PeekNext() != null)
             currentStepNumber++;
 
-        var currentQuestionId = queue?.CurrentQuestionId;
-        if (string.IsNullOrEmpty(currentQuestionId) && queue?.PeekNext() is { } nextQ)
+        var currentQuestionId = sessionQueue?.CurrentQuestionId;
+        if (string.IsNullOrEmpty(currentQuestionId) && sessionQueue?.PeekNext() is { } nextQ)
             currentQuestionId = nextQ.QuestionId;
 
         var bktSnapshot = _state.MasteryMap
@@ -277,7 +277,7 @@ public sealed partial class StudentActor
                 _state.MasteryOverlay.GetValueOrDefault(kv.Key)?.CorrectCount ?? 0))
             .ToDictionary(s => s.ConceptId);
 
-        var completedSteps = queue?.AnsweredQuestions
+        var completedSteps = sessionQueue?.AnsweredQuestions
             .Select((a, i) => new StepResultDto(
                 (i + 1).ToString(),
                 a.QuestionId,
@@ -288,13 +288,13 @@ public sealed partial class StudentActor
             .ToList() ?? new List<StepResultDto>();
 
         var scaffoldingLevel = "exploratory";
-        if (queue != null && !string.IsNullOrEmpty(currentQuestionId))
+        if (sessionQueue != null && !string.IsNullOrEmpty(currentQuestionId))
         {
-            var conceptId = queue.PeekNext()?.ConceptId
-                ?? queue.QuestionQueue.FirstOrDefault(q => q.QuestionId == currentQuestionId)?.ConceptId
+            var conceptId = sessionQueue.PeekNext()?.ConceptId
+                ?? sessionQueue.QuestionQueue.FirstOrDefault(q => q.QuestionId == currentQuestionId)?.ConceptId
                 ?? "";
             var mastery = (float)_state.MasteryMap.GetValueOrDefault(conceptId, 0.5);
-            var level = ScaffoldingService.DetermineLevel(mastery, 1.0f);
+            var level = Cena.Actors.Mastery.ScaffoldingService.DetermineLevel(mastery, 1.0f);
             scaffoldingLevel = level switch
             {
                 Mastery.ScaffoldingLevel.Full => "full",

@@ -308,7 +308,7 @@ public sealed class CenaHub : Hub<ICenaClient>
             var reply = await _nats.RequestAsync<byte[], byte[]>(
                 NatsSubjects.SessionSnapshotRequest,
                 requestBytes,
-                timeout: TimeSpan.FromSeconds(5));
+                replyOpts: new NatsSubOpts { Timeout = TimeSpan.FromSeconds(5) });
 
             var responseEnvelope = JsonSerializer.Deserialize<BusEnvelope<SessionSnapshotResponse>>(reply.Data, JsonOpts);
             var response = responseEnvelope?.Payload;
@@ -344,17 +344,16 @@ public sealed class CenaHub : Hub<ICenaClient>
                     currentQuestion = new QuestionDto(
                         questionDoc.QuestionId,
                         questionDoc.Subject,
-                        questionDoc.ConceptIds,
-                        questionDoc.Stem,
-                        questionDoc.Options.Select(o => new QuestionOptionDto(o.Id, o.Label, o.Text, o.IsCorrect)).ToList(),
-                        questionDoc.BloomsLevel,
-                        questionDoc.Difficulty,
-                        questionDoc.LanguageVersions.ToDictionary(
-                            kv => kv.Key,
-                            kv => new LanguageVersionDto(kv.Value.Language, kv.Value.Stem,
-                                kv.Value.Options.Select(o => new QuestionOptionDto(o.Id, o.Label, o.Text, o.IsCorrect)).ToList())),
+                        new[] { questionDoc.ConceptId },
+                        questionDoc.Prompt,
+                        (questionDoc.Choices ?? Array.Empty<string>())
+                            .Select((c, i) => new QuestionOptionDto(i.ToString(), ((char)('A' + i)).ToString(), c, c == questionDoc.CorrectAnswer))
+                            .ToList(),
+                        "",
+                        (float)questionDoc.DifficultyElo,
+                        new Dictionary<string, LanguageVersionDto>(),
                         questionDoc.Explanation,
-                        questionDoc.Version);
+                        1);
                 }
             }
 
