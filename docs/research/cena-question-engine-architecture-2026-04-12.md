@@ -35,8 +35,16 @@
 24. [Motivation Design & Session UX](#24-motivation-design--session-ux)
 25. [Assessment Security & Integrity](#25-assessment-security--integrity)
 26. [Bagrut Readiness Reporting](#26-bagrut-readiness-reporting)
-27. [Consolidated Improvement Registry](#27-consolidated-improvement-registry)
-28. [References](#28-references)
+27. [Photo Ingestion Security & Privacy](#27-photo-ingestion-security--privacy)
+28. [LaTeX Sanitization](#28-latex-sanitization)
+29. [Rate Limiting & Cost Protection](#29-rate-limiting--cost-protection)
+30. [Content Moderation for Minors](#30-content-moderation-for-minors)
+31. [Photo Input Accessibility](#31-photo-input-accessibility)
+32. [Graceful Degradation](#32-graceful-degradation)
+33. [Academic Integrity & Anti-Cheating](#33-academic-integrity--anti-cheating)
+34. [Pedagogical Integrity: Does Photo Input Help or Hurt?](#34-pedagogical-integrity-does-photo-input-help-or-hurt)
+35. [Consolidated Improvement Registry](#35-consolidated-improvement-registry)
+36. [References](#36-references)
 
 ---
 
@@ -1455,7 +1463,287 @@ Major differentiator for tutor/program sales channel — no competitor produces 
 
 ---
 
-## 27. Consolidated Improvement Registry
+## 27. Photo Ingestion Security & Privacy
+
+> Source: `docs/autoresearch/screenshot-analyzer/` — 10-iteration defense-in-depth research series (iterations 01–10, each with technical + controversy companion). Cumulative security score: 87/100.
+
+### 27.1 Threat Model
+
+When students photograph math/physics questions and upload them to Cena, the image flows through:
+
+```
+Student photo → EXIF strip → face blur → crop → Gemini 2.5 Flash → LaTeX → CAS validation → session
+```
+
+Attack surface: an adversary (student, script, or third party) could craft images that cause the vision model to extract incorrect math, execute prompt injection, bypass content moderation, or leak system instructions.
+
+**Critical mitigating factor**: the CAS engine independently verifies every extracted expression. An adversary who tricks Gemini into extracting "2+2=5" is caught by SymPy. This "LLM explains, CAS computes" principle provides a backstop that most vision-model deployments lack.
+
+### 27.2 10-Layer Defense Architecture
+
+```
+L1:  Client-side checks (file type, size, EXIF strip, CAPTCHA on repeats)
+L2:  Edge rate limiting (per-IP, per-user token bucket, geo-fence IL)
+L3:  Auth & tenant isolation (Firebase JWT, tenant-scoped claims)
+L4:  Privacy preprocessing (EXIF strip, face blur via MediaPipe, PII redaction)
+L5:  Content moderation (PhotoDNA CSAM → Cloud Vision SafeSearch → educational classifier)
+L6:  LaTeX sanitization (200-command allowlist, nesting/count limits)
+L7:  Prompt injection hardening (system prompt canary, structured output, dual-LLM)
+L8:  CAS verification (MathNet → SymPy → Wolfram backstop)
+L9:  Anomaly detection (response time, upload cadence, session patterns)
+L10: Audit logging + incident response (structured events, 90-day retention)
+```
+
+### 27.3 Ephemeral Image Processing (Improvement 34)
+
+The image exists in volatile memory for ~1.5 seconds during Gemini API call, then is irreversibly discarded. **No disk, no object storage, no cache.**
+
+Lifecycle:
+1. Upload via TLS 1.3
+2. EXIF strip (GPS, device serial, all metadata removed)
+3. Face detection + blur (MediaPipe BlazeFace)
+4. PII text detection + redaction (ID numbers, names)
+5. Gemini processing (inline base64, not stored)
+6. Result: LaTeX only persists
+7. Image garbage collected
+8. Audit trail: metadata only (timestamp, student_id, confidence, flags — no raw image)
+
+**Legal compliance**:
+- **COPPA 2025** (effective June 2025, compliance deadline April 2026): photos are biometric data; must not be retained beyond processing. Fines up to $51,744/child/violation.
+- **GDPR-K (Article 8)**: data minimization + purpose limitation. Cross-border transfer to Google requires SCCs or EU data residency (use `europe-west1`).
+- **Israeli PPL Amendment 13** (effective August 2025): ISS classification for biometric data; PPO requirement; DPIA mandatory.
+
+### 27.4 Adversarial Image Defense (Improvement 35)
+
+| Attack category | Success rate (researched) | Cena defense |
+|----------------|--------------------------|--------------|
+| White-box perturbations | N/A — requires Gemini weights | Google's responsibility |
+| Black-box transfer attacks | 8.7–16.4% cross-model | Image preprocessing (resize, JPEG recompress, Gaussian blur) destroys perturbations |
+| Typographic injection | Up to 64% on undefended CLIP | Structured output enforcement (JSON schema, not free text) |
+| Steganographic embedding | 18.3% against Gemini Pro | EXIF strip + format normalization destroys metadata channels |
+| Prompt injection via OCR | Variable | Canary tokens in system prompt + dual-LLM pattern + CAS backstop |
+
+CAS backstop catches all mathematically incorrect extractions. The remaining risk is extraction of a *different but valid* math problem — low consequence (student gets a different practice problem).
+
+---
+
+## 28. LaTeX Sanitization
+
+### 28.1 Threat: LaTeX is Turing-Complete (Improvement 36)
+
+Full TeX allows file I/O (`\input{/etc/passwd}`), shell execution (`\write18{}`), and macro programming. KaTeX supports 600+ commands. An attacker who controls the photo controls the LaTeX output.
+
+### 28.2 200-Command Allowlist
+
+Only ~200 math-safe commands are permitted. Blocked: `\input`, `\include`, `\write`, `\href`, `\url`, `\lstinputlisting`, all file I/O.
+
+**Limits**:
+- Nesting depth: max 10 levels
+- Command count: max 200 per expression
+- Unicode: NFKC normalization (prevents confusable character attacks)
+- CVE-2024-28243: KaTeX token expansion DoS — mitigated by command count limit
+
+### 28.3 Tiered Expression (Improvement 37)
+
+| Tier | Commands | Access | Rationale |
+|------|----------|--------|-----------|
+| Safe (default) | ~200 | All students | Covers all standard Bagrut/AP notation |
+| Advanced | ~400 | Mastery ≥ 85% | Adds matrix, piecewise, cases environments |
+| Custom | Teacher-defined | Per-course | Curated macro sets for specialized topics |
+
+Transparent rejection: if a student's expression uses a blocked command, show what was blocked and why, with suggestion to rephrase.
+
+---
+
+## 29. Rate Limiting & Cost Protection
+
+### 29.1 Cost Model
+
+Gemini 2.5 Flash: ~$0.002/image. Unprotected bot loop: $2,880/day. Each upload cascades to CAS + tutoring LLM: ~10× amplification → $0.02/upload total pipeline cost.
+
+### 29.2 Four-Tier Rate Limiting (Improvement 38)
+
+| Tier | Scope | Algorithm | Limit |
+|------|-------|-----------|-------|
+| Per-student | Token bucket | 5 burst, 1 token/12s = 5/min | Allows natural bursty session starts |
+| Per-institute | Sliding window | 500 + 2N/hour (N = enrolled) | Scales with school size |
+| Per-session | Fixed window | 20 per session | Hard cap per learning session |
+| Global cost | Circuit breaker | $50/day | Trips → rejects all uploads → pages ops |
+
+### 29.3 Existing Integration Points
+
+Cena's Student API Host already has 7 rate limiting policies (`api`, `ai`, `tutor`, `password-reset`, `gdpr-export`, `gdpr-erasure`, `tutor-global`). Photo upload gets its own dedicated multi-tier policy. `AiTokenBudgetService` (Redis-backed) provides cost tracking but needs extension for image-specific vectors.
+
+---
+
+## 30. Content Moderation for Minors
+
+### 30.1 Four-Tier Moderation Architecture (Improvement 39)
+
+| Tier | What | Cost | Latency |
+|------|------|------|---------|
+| 0: PhotoDNA | CSAM hash matching | Free (via NCMEC) | <100ms |
+| 1: Client pre-filter | File type, size, EXIF strip | Free | <10ms |
+| 2: Cloud Vision | SafeSearch + Face Detection + Label Detection | ~$150/mo at 100K images | ~200ms |
+| 3: Custom classifier | Educational content vs non-educational | ~$20/mo (inference) | ~100ms |
+
+Post-extraction validation (Tier 4) is already in the CAS pipeline.
+
+### 30.2 Over-Filtering Mitigation
+
+General-purpose filters block 20–30% of legitimate educational content ("Scunthorpe problem"). Mitigation:
+- Domain-aware classifier trained on Bagrut content, not social media
+- Teacher override per course
+- Cultural profiles per school type (Hebrew, Arabic, Druze, Bedouin contexts)
+- Appeal-and-learn loop with 15-minute SLA
+- Per-language/subject telemetry on rejection rates
+
+### 30.3 CSAM Reporting
+
+Mandatory reporting to NCMEC (US), Israel Police (IL). PhotoDNA hash matching at Tier 0 before any other processing. If match found: block upload, preserve evidence (exception to ephemeral rule per legal obligation), notify platform safety team. Zero tolerance.
+
+---
+
+## 31. Photo Input Accessibility
+
+### 31.1 Barriers (Improvement 40)
+
+| Disability | Barrier | Mitigation |
+|-----------|---------|------------|
+| Blind / low vision | Cannot frame camera shot | Auto-focus assistance, typed LaTeX input, voice-to-LaTeX |
+| Motor impairment | Difficulty holding phone steady | Tablet mount support, typed input as primary alternative |
+| Cognitive | May not understand how to photograph correctly | Guided capture UI with visual cues, retry with feedback |
+| Screen reader users | Cannot describe photo content | Voice-to-LaTeX via `speech-rule-engine` reverse pipeline |
+
+### 31.2 Alternative Input Modalities
+
+Photo input is a **convenience optimization**, not the only path. All alternatives must reach the same CAS verification pipeline:
+1. **Typed LaTeX** with KaTeX live preview (always available)
+2. **MathLive** structured math editor (post GD-006 spike)
+3. **Voice-to-LaTeX** transcription (future — SRE reverse)
+4. **Handwriting recognition** on tablet (Flutter canvas → Gemini)
+
+### 31.3 WCAG 2.2 AA Compliance
+
+- Upload button: focusable, activatable via Enter/Space
+- Step-solver steps: `<ol>` with `role="list"`, navigable via Tab
+- Focus indicators: 2px solid outline, 3:1 contrast ratio
+- Target size: minimum 24×24px (WCAG 2.5.8, new in 2.2)
+- ADA Title II deadline: April 2026 — Cena must be compliant
+
+---
+
+## 32. Graceful Degradation
+
+### 32.1 17 Failure Modes (Improvement 41)
+
+Classified by detection point (client/server/model), severity (blocking/degraded), and recovery.
+
+**Client-side (pre-upload)**:
+| Failure | Detection | Recovery |
+|---------|-----------|----------|
+| Too blurry | Laplacian variance < 100 | Retake guidance + focus tips |
+| Too dark | Mean brightness < 40 | Better lighting suggestion |
+| Too small | < 640×480 | Move camera closer |
+| Wrong format | Not JPEG/PNG/WebP/HEIC | List accepted formats |
+
+**Server-side (post-upload)**:
+| Failure | Detection | Recovery |
+|---------|-----------|----------|
+| No math detected | Gemini confidence < 0.3 | "We couldn't find math — try photographing just the question" |
+| Partial extraction | Confidence 0.3–0.7 | Show what was found, let student complete in editor |
+| Vision model timeout | No response in 8s | Retry with backoff → fallback to Mathpix → manual input |
+| Vision model down | HTTP 5xx | Immediate Mathpix fallback → manual input |
+| LaTeX parse fails | CAS error | Show raw LaTeX in editable field, student corrects |
+
+### 32.2 UX Framing
+
+Fallback to manual input is NOT degradation — it's the original modality. Photo input is a speed optimization. Frame accordingly: "OCR wasn't confident on this image. Here's what we read [show LaTeX]. Please verify or correct it."
+
+### 32.3 Fallback Chain
+
+```
+Gemini 2.5 Flash (primary) → Mathpix (backup) → Manual typed input (always available)
+```
+
+Each fallback preserves session state. Student never loses their place.
+
+---
+
+## 33. Academic Integrity & Anti-Cheating
+
+### 33.1 Three Attack Scenarios (Improvement 42)
+
+| Scenario | Severity | Description |
+|----------|----------|-------------|
+| **Live exam photography** | Critical | Student photographs Bagrut exam question during test |
+| **Homework copy-paste** | Medium | Student photographs every problem, copies solutions without engaging |
+| **Practice test harvesting** | Low | Student memorizes solutions to specific problems |
+
+### 33.2 Why Cena is Not Photomath
+
+Photomath shows the solution. Cena requires the student to **produce each step** and the CAS merely verifies. This is structurally different:
+- Photomath: camera → answer (zero student effort)
+- Cena: camera → structured problem → student works steps → CAS checks each step
+
+Per VanLehn 2011, step-level ITS (d=0.76) vs answer-only (d=0.31). The architecture choice is the anti-cheating mechanism.
+
+### 33.3 Guardrails
+
+| Guardrail | Implementation |
+|-----------|---------------|
+| Exam-time detection | Flag uploads during official Bagrut exam hours (known from MoE schedule) |
+| No direct answers | System verifies student steps, never shows the solution unprompted |
+| Question bank matching | Detect uploads matching known exam papers (hash + structural similarity) |
+| Rate limiting during exams | Institute-level rate limit drops to near-zero during scheduled exams |
+| Teacher notification | Suspicious patterns surfaced on teacher dashboard |
+| Step-solver only | During exam season, disable "show me the answer" — only step verification available |
+
+### 33.4 Homework Copy-Paste Mitigation
+
+Cena's step-solver inherently resists copy-paste: even if a student photographs the problem, they still must produce each step. If they can't produce the steps, they get scaffolding (which counts as "assisted" in BKT and doesn't inflate mastery). The mastery model is honest.
+
+---
+
+## 34. Pedagogical Integrity: Does Photo Input Help or Hurt?
+
+### 34.1 The Objection (Steel-Manned)
+
+Bjork (1994, 2011) "Desirable Difficulties": making learning easier often makes it worse. A screenshot tool that extracts, structures, and scaffolds is systematically removing desirable difficulties:
+- Question extraction removes parsing difficulty
+- Structured presentation removes problem-type identification
+- Scaffolded steps remove solution planning
+
+Kapur (2014) "Productive Failure": students who struggle before instruction outperform those who receive instruction first.
+
+Slamecka & Graf (1978) "Generation Effect": producing an answer creates stronger memory than recognizing one.
+
+### 34.2 Why Cena Escapes the Trap (Conditionally)
+
+1. **Student produces, CAS verifies** — the generation effect is preserved. The student must construct each step.
+2. **Exploratory scaffolding** (Improvement 8) — blank canvas first, Full mode only after failure. Productive failure is in the architecture.
+3. **Assistance-weighted BKT** (Improvement 28) — auto-filled steps don't count toward mastery. The model is honest about what the student can do.
+4. **Faded scaffolding** — as mastery increases, scaffolding withdraws (expertise reversal protection).
+
+### 34.3 Empirical Validation Required
+
+The architectural claims above are theoretically grounded but empirically untested for Cena specifically. Required measurements:
+- Within-student comparison: CAS-verified vs withheld feedback sessions
+- Self-assessment calibration: can students predict their own accuracy?
+- Transfer tests: paper-and-pencil without the system
+- OCR confirmation rates over time (do students develop verification skills?)
+
+This is the research agenda for the PhET-style interview protocol (GD-007).
+
+### 34.4 The Design Principle
+
+> "If your retention metric goes up but your learning metric stays flat, you've built an addiction engine, not an education product." — Lior (UX Psychologist)
+
+Cena measures **learning** (BKT mastery on calibrated items), not **engagement** (time-in-app, streaks, XP). If the photo input doesn't improve learning outcomes on transfer tests, it gets redesigned or removed.
+
+---
+
+## 35. Consolidated Improvement Registry
 
 | # | Source | Improvement | Category |
 |---|--------|------------|----------|
@@ -1492,10 +1780,19 @@ Major differentiator for tutor/program sales channel — no competitor produces 
 | 31 | Security | Exam simulation mode (reserved pool, timed, no hints) | Assessment |
 | 32 | Security | Behavioral anomaly detection (informational flags) | Integrity |
 | 33 | Security | Bagrut readiness report with confidence intervals | Reporting |
+| 34 | Screenshot Research | Ephemeral image processing (1.5s volatile, no disk) | Privacy |
+| 35 | Screenshot Research | Adversarial image defense (preprocessing + CAS backstop) | Security |
+| 36 | Screenshot Research | LaTeX sanitization (200-command allowlist, CVE-2024-28243) | Security |
+| 37 | Screenshot Research | Tiered LaTeX expression levels (safe/advanced/custom) | Security/UX |
+| 38 | Screenshot Research | 4-tier rate limiting (token bucket + cost circuit breaker) | Cost/Security |
+| 39 | Screenshot Research | 4-tier content moderation (PhotoDNA → Cloud Vision → custom) | Compliance |
+| 40 | Screenshot Research | Alternative input modalities (typed/voice/handwriting) | Accessibility |
+| 41 | Screenshot Research | 17 failure modes with graceful degradation chain | Reliability |
+| 42 | Screenshot Research | Exam-time upload detection + homework copy-paste mitigation | Integrity |
 
 ---
 
-## 28. References
+## 36. References
 
 ### Academic
 
@@ -1511,6 +1808,16 @@ Major differentiator for tutor/program sales channel — no competitor produces 
 - Hestenes, D., Wells, M., & Swackhamer, G. (1992). Force Concept Inventory. *The Physics Teacher*, 30(3), 141–158.
 - De Ayala, R. J. (2009). *The Theory and Practice of Item Response Theory*. Guilford Press. [IRT/Rasch reference]
 - Deci, E. L., & Ryan, R. M. (2000). Self-Determination Theory and the facilitation of intrinsic motivation. *American Psychologist*, 55(1), 68–78.
+- Bjork, R. A. (1994). Memory and metamemory considerations in the training of human beings. In *Metacognition* (MIT Press).
+- Bjork, E. L., & Bjork, R. A. (2011). Making things hard on yourself, but in a good way. In *Psychology and the Real World* (Worth Publishers).
+- Slamecka, N. J., & Graf, P. (1978). The generation effect. *Journal of Experimental Psychology: Human Learning and Memory*, 4(6), 592.
+- Goodfellow, I. J., et al. (2015). Explaining and harnessing adversarial examples. *ICLR 2015*. [FGSM]
+- Pathade, S. (2024). Steganographic prompt injection against Gemini Pro Vision. [18.3% ASR]
+- OWASP (2025). Top 10 for LLM Applications. [Prompt injection #1 risk]
+- NIST (2023). AI Risk Management Framework (AI RMF 1.0). [Govern, Map, Measure, Manage]
+- CVE-2024-28243: KaTeX token expansion denial-of-service vulnerability.
+- COPPA 2025 Amended Rule: FTC Federal Register 2025-05904 (effective June 2025).
+- Israeli PPL Amendment 13 (effective August 2025): ISS classification for biometric data.
 
 ### Product & Industry
 
@@ -1541,3 +1848,4 @@ Major differentiator for tutor/program sales channel — no competitor produces 
 - `examples/figure-sample/step-solver.html` — step-solver scaffolding samples
 - `tasks/figures/FIGURE-001..008` — figure rendering task queue
 - `tasks/game-design/GD-001..010` — game-design research task queue
+- `docs/autoresearch/screenshot-analyzer/iteration-01..10` — 10-iteration defense-in-depth security research (87/100 score)
