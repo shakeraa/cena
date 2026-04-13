@@ -22,7 +22,7 @@ If you are a non-Claude CLI agent and you skipped the required reading, stop now
 
 ## What this repo is
 
-Cena is an event-sourced adaptive learning platform (Marten on PostgreSQL 16 + pgvector, Proto.Actor cluster, NATS bus, Vue 3 Vuexy admin + student web, Flutter mobile, .NET 9 backend). Multiple agents work on it in parallel. There is a shared task queue so nobody steps on anyone else's work.
+Cena is an event-sourced adaptive learning platform (Marten on PostgreSQL 16 + pgvector, Proto.Actor cluster, NATS bus, Vue 3 Vuexy admin + student web + PWA mobile, .NET 9 backend). Multiple agents work on it in parallel. There is a shared task queue so nobody steps on anyone else's work.
 
 **Repository root**: `/Users/shaker/edu-apps/cena`
 **Task queue**: `.agentdb/kimi-queue.db` (SQLite, WAL mode, safe for concurrent access)
@@ -440,6 +440,8 @@ node .agentdb/kimi-queue.js workers --active
 | Student web UI | [tasks/student-web/](tasks/student-web/README.md) | Frontend |
 | Student backend | [tasks/student-backend/](tasks/student-backend/README.md) | Backend |
 | Student AI interaction (legacy) | [docs/tasks/student-ai-interaction/](docs/tasks/student-ai-interaction/README.md) | Backend (mostly done) |
+| PWA mobile + offline | [tasks/pwa/](tasks/pwa/README.md) | Frontend + Backend |
+| Multi-institute tenancy (Phase 1) | Queue tasks TENANCY-P1a through P1e | Backend |
 
 Every task file under those folders has a full scope, files-to-read list, definition of done, and risks. The task queue enqueues them one at a time with a compact body that points at the full spec.
 

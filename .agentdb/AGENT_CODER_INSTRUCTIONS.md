@@ -316,6 +316,7 @@ If you think a task should be re-prioritized, deleted, or rewritten, **do not do
 - Infra task bundle: [docs/tasks/infra-db-migration/README.md](../docs/tasks/infra-db-migration/README.md)
 - Student web task bundle: [tasks/student-web/README.md](../tasks/student-web/README.md)
 - Student backend task bundle: [tasks/student-backend/README.md](../tasks/student-backend/README.md)
+- PWA mobile + offline task bundle: [tasks/pwa/README.md](../tasks/pwa/README.md)
 
 ---
 
