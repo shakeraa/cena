@@ -8,6 +8,8 @@ import { $api } from '@/api/$api'
 import { useCelebration } from '@/composables/useCelebration'
 import { useFlowState } from '@/composables/useFlowState'
 import FlowAmbientBackground from '@/components/common/FlowAmbientBackground.vue'
+import SessionTimer from '@/components/session/SessionTimer.vue'
+import FatigueCheck from '@/components/session/FatigueCheck.vue'
 import type {
   SessionAnswerResponseDto,
   SessionHintResponseDto,
@@ -71,6 +73,24 @@ const {
   dismissBreakSuggestion,
   dismissDifficultyAdjustment,
 } = useFlowState()
+
+// RDY-022: Session timer + fatigue check state
+const sessionPaused = ref(false)
+const showFatigueCheck = ref(false)
+const questionsAnswered = ref(0)
+const FATIGUE_CHECK_INTERVAL = 10 // ask every 10 questions
+
+function togglePause() {
+  sessionPaused.value = !sessionPaused.value
+}
+
+function handleMilestone() {
+  // 25-minute milestone — flow state already handles break suggestion
+}
+
+function handleEnergyReport(level: 'energized' | 'okay' | 'tired') {
+  // Could send to backend CognitiveLoadService for fatigue model calibration
+}
 
 const question = ref<SessionQuestionDto | null>(null)
 const feedback = ref<SessionAnswerResponseDto | null>(null)
@@ -203,6 +223,12 @@ async function handleAnswer(answer: string, timeSpentMs: number) {
 
     feedback.value = resp
 
+    // RDY-022: Track questions answered for fatigue check
+    questionsAnswered.value++
+    if (questionsAnswered.value > 0 && questionsAnswered.value % FATIGUE_CHECK_INTERVAL === 0) {
+      showFatigueCheck.value = true
+    }
+
     // RDY-016: Trigger celebrations based on answer result
     if (resp.correct) {
       triggerCorrectAnswer(resp.xpAwarded ?? 10)
@@ -306,6 +332,13 @@ onBeforeUnmount(clearAutoAdvance)
         </VBtn>
       </template>
     </VSnackbar>
+    <!-- RDY-022: Fatigue check dialog -->
+    <FatigueCheck
+      v-model="showFatigueCheck"
+      @energy-reported="handleEnergyReport"
+      @take-break="handleExit"
+    />
+
     <div class="session-runner-page__header d-flex align-center justify-space-between pa-4">
       <VBtn
         variant="text"
@@ -316,6 +349,15 @@ onBeforeUnmount(clearAutoAdvance)
       >
         {{ t('session.runner.exit') }}
       </VBtn>
+
+      <!-- RDY-022: Session timer + pause -->
+      <SessionTimer
+        :paused="sessionPaused"
+        :milestone-minutes="25"
+        @milestone-reached="handleMilestone"
+        @pause="togglePause"
+      />
+
       <div class="text-caption text-medium-emphasis">
         {{ t('session.runner.sessionIdLabel') }} {{ sessionId.slice(0, 8) }}
       </div>
