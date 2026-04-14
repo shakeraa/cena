@@ -274,6 +274,41 @@ public static class StructuralValidator
             passedRules++;
         }
 
+        // Rule 18 (RDY-019): Concept must map to a known taxonomy node.
+        // Questions with unrecognized concept IDs can't be coverage-tracked.
+        totalRules++;
+        if (input.ConceptIds is { Count: > 0 })
+        {
+            // Known concept prefixes from the taxonomy
+            var knownPrefixes = new[] { "ALG-", "FUN-", "GEO-", "TRG-", "CAL-", "PRB-", "VEC-" };
+            var hasKnownConcept = input.ConceptIds.Any(c =>
+                knownPrefixes.Any(p => c.StartsWith(p, StringComparison.OrdinalIgnoreCase)));
+
+            if (!hasKnownConcept)
+            {
+                // Also accept seed-style concept names
+                var knownSeedConcepts = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+                {
+                    "linear-equations", "quadratic-equations", "inequalities", "polynomials",
+                    "sequences", "logarithms", "derivatives", "integrals", "limits",
+                    "probability", "combinatorics", "statistics", "trigonometry",
+                    "analytic-geometry", "vectors"
+                };
+                hasKnownConcept = input.ConceptIds.Any(c => knownSeedConcepts.Contains(c));
+            }
+
+            if (hasKnownConcept)
+                passedRules++;
+            else
+                violations.Add(new("StructuralValidity", "UNMAPPED_CONCEPT",
+                    $"Concept(s) [{string.Join(", ", input.ConceptIds)}] not in Bagrut taxonomy",
+                    ViolationSeverity.Info));
+        }
+        else
+        {
+            passedRules++; // No concepts = skip check
+        }
+
         // Calculate score: percentage of rules passed, scaled to 0-100
         int score = totalRules > 0 ? (int)Math.Round(100.0 * passedRules / totalRules) : 0;
 

@@ -1,0 +1,227 @@
+{
+  "$schema": "bagrut-taxonomy-schema",
+  "version": "1.0.0",
+  "description": "Formal topic taxonomy for Israeli Bagrut mathematics exams. Based on Ministry of Education syllabus (meyda.education.gov.il). All concept IDs match CurriculumSeedData and prerequisite-graph.json.",
+  "tracks": {
+    "math_5u": {
+      "name": "Mathematics 5-Unit (806/807)",
+      "examCodes": ["806", "807"],
+      "description": "Advanced track: calculus, analytic geometry, probability, vectors",
+      "topics": {
+        "algebra": {
+          "name": "Algebra",
+          "subtopics": {
+            "number_properties": { "conceptId": "ALG-001", "bloom_range": [1, 3] },
+            "linear_equations": { "conceptId": "ALG-002", "bloom_range": [1, 3] },
+            "inequalities": { "conceptId": "ALG-003", "bloom_range": [2, 4] },
+            "quadratic_equations": { "conceptId": "ALG-004", "bloom_range": [2, 4] },
+            "systems_of_equations": { "conceptId": "ALG-005", "bloom_range": [2, 4] },
+            "polynomials": { "conceptId": "ALG-006", "bloom_range": [3, 5] },
+            "rational_expressions": { "conceptId": "ALG-007", "bloom_range": [3, 5] },
+            "sequences_series": { "conceptId": "ALG-008", "bloom_range": [3, 5] }
+          }
+        },
+        "functions": {
+          "name": "Functions",
+          "subtopics": {
+            "function_basics": { "conceptId": "FUN-001", "bloom_range": [1, 3] },
+            "linear_functions": { "conceptId": "FUN-002", "bloom_range": [2, 3] },
+            "quadratic_functions": { "conceptId": "FUN-003", "bloom_range": [2, 4] },
+            "exponential_functions": { "conceptId": "FUN-004", "bloom_range": [3, 5] },
+            "logarithmic_functions": { "conceptId": "FUN-005", "bloom_range": [3, 5] },
+            "composite_functions": { "conceptId": "FUN-006", "bloom_range": [4, 6] },
+            "inverse_functions": { "conceptId": "FUN-007", "bloom_range": [4, 6] }
+          }
+        },
+        "calculus": {
+          "name": "Calculus",
+          "subtopics": {
+            "limits": { "conceptId": "CAL-001", "bloom_range": [2, 4] },
+            "derivative_definition": { "conceptId": "CAL-002", "bloom_range": [2, 4] },
+            "derivative_rules": { "conceptId": "CAL-003", "bloom_range": [3, 5] },
+            "applications_of_derivatives": { "conceptId": "CAL-004", "bloom_range": [4, 6] },
+            "integrals_intro": { "conceptId": "CAL-005", "bloom_range": [3, 5] },
+            "definite_integrals": { "conceptId": "CAL-006", "bloom_range": [4, 6] }
+          }
+        },
+        "geometry": {
+          "name": "Geometry",
+          "subtopics": {
+            "angles_lines": { "conceptId": "GEO-001", "bloom_range": [1, 2] },
+            "triangles": { "conceptId": "GEO-002", "bloom_range": [2, 4] },
+            "circle_properties": { "conceptId": "GEO-003", "bloom_range": [2, 4] },
+            "coordinate_geometry": { "conceptId": "GEO-004", "bloom_range": [2, 4] },
+            "trigonometric_ratios": { "conceptId": "GEO-005", "bloom_range": [2, 4] },
+            "area_volume": { "conceptId": "GEO-006", "bloom_range": [2, 4] },
+            "analytic_geometry": { "conceptId": "GEO-007", "bloom_range": [4, 6] }
+          }
+        },
+        "trigonometry": {
+          "name": "Trigonometry",
+          "subtopics": {
+            "trig_identities": { "conceptId": "TRG-001", "bloom_range": [3, 5] },
+            "trig_equations": { "conceptId": "TRG-002", "bloom_range": [3, 5] },
+            "sine_cosine_rules": { "conceptId": "TRG-003", "bloom_range": [3, 5] },
+            "radian_measure": { "conceptId": "TRG-004", "bloom_range": [2, 4] }
+          }
+        },
+        "probability": {
+          "name": "Probability & Statistics",
+          "subtopics": {
+            "counting_principles": { "conceptId": "PRB-001", "bloom_range": [1, 3] },
+            "basic_probability": { "conceptId": "PRB-002", "bloom_range": [2, 4] },
+            "conditional_probability": { "conceptId": "PRB-003", "bloom_range": [3, 5] },
+            "binomial_distribution": { "conceptId": "PRB-004", "bloom_range": [3, 5] },
+            "normal_distribution": { "conceptId": "PRB-005", "bloom_range": [4, 5] },
+            "statistical_inference": { "conceptId": "PRB-006", "bloom_range": [4, 6] }
+          }
+        },
+        "vectors": {
+          "name": "Vectors",
+          "subtopics": {
+            "vector_basics": { "conceptId": "VEC-001", "bloom_range": [2, 3] },
+            "dot_product": { "conceptId": "VEC-002", "bloom_range": [3, 4] },
+            "cross_product": { "conceptId": "VEC-003", "bloom_range": [3, 5] },
+            "vector_applications": { "conceptId": "VEC-004", "bloom_range": [4, 6] }
+          }
+        }
+      }
+    },
+    "math_4u": {
+      "name": "Mathematics 4-Unit",
+      "examCodes": ["804"],
+      "description": "Intermediate track: functions, geometry, probability — no calculus, no vectors",
+      "topics": {
+        "algebra": {
+          "name": "Algebra",
+          "subtopics": {
+            "linear_equations": { "conceptId": "ALG-002", "bloom_range": [1, 3] },
+            "inequalities": { "conceptId": "ALG-003", "bloom_range": [2, 4] },
+            "quadratic_equations": { "conceptId": "ALG-004", "bloom_range": [2, 4] },
+            "systems_of_equations": { "conceptId": "ALG-005", "bloom_range": [2, 4] },
+            "sequences_series": { "conceptId": "ALG-008", "bloom_range": [3, 5] }
+          }
+        },
+        "functions": {
+          "name": "Functions",
+          "subtopics": {
+            "linear_functions": { "conceptId": "FUN-002", "bloom_range": [2, 3] },
+            "quadratic_functions": { "conceptId": "FUN-003", "bloom_range": [2, 4] },
+            "exponential_functions": { "conceptId": "FUN-004", "bloom_range": [3, 4] },
+            "logarithmic_functions": { "conceptId": "FUN-005", "bloom_range": [3, 4] }
+          }
+        },
+        "geometry": {
+          "name": "Geometry",
+          "subtopics": {
+            "triangles": { "conceptId": "GEO-002", "bloom_range": [2, 4] },
+            "circle_properties": { "conceptId": "GEO-003", "bloom_range": [2, 4] },
+            "coordinate_geometry": { "conceptId": "GEO-004", "bloom_range": [2, 4] },
+            "trigonometric_ratios": { "conceptId": "GEO-005", "bloom_range": [2, 4] }
+          }
+        },
+        "probability": {
+          "name": "Probability & Statistics",
+          "subtopics": {
+            "counting_principles": { "conceptId": "PRB-001", "bloom_range": [1, 3] },
+            "basic_probability": { "conceptId": "PRB-002", "bloom_range": [2, 4] },
+            "conditional_probability": { "conceptId": "PRB-003", "bloom_range": [3, 4] },
+            "binomial_distribution": { "conceptId": "PRB-004", "bloom_range": [3, 4] }
+          }
+        }
+      }
+    },
+    "math_3u": {
+      "name": "Mathematics 3-Unit",
+      "examCodes": ["803"],
+      "description": "Foundation track: core algebra, basic geometry, basic probability — no trig, no calculus",
+      "topics": {
+        "algebra": {
+          "name": "Algebra",
+          "subtopics": {
+            "number_properties": { "conceptId": "ALG-001", "bloom_range": [1, 2] },
+            "linear_equations": { "conceptId": "ALG-002", "bloom_range": [1, 3] },
+            "inequalities": { "conceptId": "ALG-003", "bloom_range": [2, 3] },
+            "quadratic_equations": { "conceptId": "ALG-004", "bloom_range": [2, 3] },
+            "systems_of_equations": { "conceptId": "ALG-005", "bloom_range": [2, 3] }
+          }
+        },
+        "functions": {
+          "name": "Functions",
+          "subtopics": {
+            "function_basics": { "conceptId": "FUN-001", "bloom_range": [1, 2] },
+            "linear_functions": { "conceptId": "FUN-002", "bloom_range": [2, 3] },
+            "quadratic_functions": { "conceptId": "FUN-003", "bloom_range": [2, 3] }
+          }
+        },
+        "geometry": {
+          "name": "Geometry",
+          "subtopics": {
+            "angles_lines": { "conceptId": "GEO-001", "bloom_range": [1, 2] },
+            "triangles": { "conceptId": "GEO-002", "bloom_range": [2, 3] },
+            "area_volume": { "conceptId": "GEO-006", "bloom_range": [2, 3] },
+            "coordinate_geometry": { "conceptId": "GEO-004", "bloom_range": [2, 3] }
+          }
+        },
+        "probability": {
+          "name": "Probability",
+          "subtopics": {
+            "counting_principles": { "conceptId": "PRB-001", "bloom_range": [1, 2] },
+            "basic_probability": { "conceptId": "PRB-002", "bloom_range": [2, 3] }
+          }
+        }
+      }
+    }
+  },
+  "concept_to_seed_name_mapping": {
+    "ALG-001": "number-properties",
+    "ALG-002": "linear-equations",
+    "ALG-003": "inequalities",
+    "ALG-004": "quadratic-equations",
+    "ALG-005": "systems-of-equations",
+    "ALG-006": "polynomials",
+    "ALG-007": "rational-expressions",
+    "ALG-008": "sequences",
+    "FUN-001": "function-basics",
+    "FUN-002": "linear-functions",
+    "FUN-003": "quadratic-functions",
+    "FUN-004": "exponential-functions",
+    "FUN-005": "logarithms",
+    "FUN-006": "composite-functions",
+    "FUN-007": "inverse-functions",
+    "GEO-001": "angles-lines",
+    "GEO-002": "triangles",
+    "GEO-003": "circle-properties",
+    "GEO-004": "coordinate-geometry",
+    "GEO-005": "trigonometric-ratios",
+    "GEO-006": "area-volume",
+    "GEO-007": "analytic-geometry",
+    "TRG-001": "trigonometry",
+    "TRG-002": "trig-equations",
+    "TRG-003": "sine-cosine-rules",
+    "TRG-004": "radian-measure",
+    "CAL-001": "limits",
+    "CAL-002": "derivative-definition",
+    "CAL-003": "derivatives",
+    "CAL-004": "derivative-applications",
+    "CAL-005": "integrals",
+    "CAL-006": "definite-integrals",
+    "PRB-001": "combinatorics",
+    "PRB-002": "probability",
+    "PRB-003": "conditional-probability",
+    "PRB-004": "binomial-distribution",
+    "PRB-005": "normal-distribution",
+    "PRB-006": "statistics",
+    "VEC-001": "vectors",
+    "VEC-002": "dot-product",
+    "VEC-003": "cross-product",
+    "VEC-004": "vector-applications"
+  },
+  "validation": {
+    "tracks": 3,
+    "total_5u_subtopics": 42,
+    "total_4u_subtopics": 18,
+    "total_3u_subtopics": 14,
+    "all_concept_ids_match_prerequisite_graph": true
+  }
+}
