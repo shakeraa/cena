@@ -693,6 +693,13 @@
       "durationMinsSecs": "0 ד {secs} ש׳ | {mins} ד {secs} ש׳ | {mins} ד {secs} ש׳ | {mins} ד {secs} ש׳",
       "startAnother": "התחל עוד שיעור",
       "backToHome": "חזרה הביתה"
+    },
+    "mathInput": {
+      "enterExpression": "הזן ביטוי מתמטי",
+      "enterLatex": "הזן ביטוי LaTeX",
+      "verbalExplanation": "הסבר את הגישה שלך",
+      "verbalPlaceholder": "תאר את הדרך שלך…",
+      "normalizedAs": "הבנו את הקלט שלך בתור"
     }
   },
   "challenges": {

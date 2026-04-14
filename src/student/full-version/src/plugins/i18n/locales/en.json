@@ -696,6 +696,13 @@
       "durationMinsSecs": "{mins}m {secs}s | {mins}m {secs}s",
       "startAnother": "Start another",
       "backToHome": "Back to home"
+    },
+    "mathInput": {
+      "enterExpression": "Enter math expression",
+      "enterLatex": "Enter LaTeX expression",
+      "verbalExplanation": "Explain your reasoning",
+      "verbalPlaceholder": "Describe your approach…",
+      "normalizedAs": "We understood your input as"
     }
   },
   "challenges": {

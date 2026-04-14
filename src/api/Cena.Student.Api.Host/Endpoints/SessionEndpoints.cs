@@ -18,6 +18,7 @@ using Cena.Actors.Tutoring;
 using Cena.Api.Contracts.Sessions;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
+using Cena.Infrastructure.Localization;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Logging;
@@ -642,10 +643,31 @@ public static class SessionEndpoints
             if (questionDoc == null)
                 return Results.NotFound(new { error = "Question not found" });
 
-            var isCorrect = string.Equals(request.Answer?.Trim(), questionDoc.CorrectAnswer, StringComparison.OrdinalIgnoreCase);
+            // ─── RDY-026: Arabic input normalization ───
+            // Normalize Arabic letters/digits/operators before comparison.
+            // Preserve raw input for misconception analysis.
+            var rawStudentInput = request.Answer?.Trim() ?? "";
+            var normalizedAnswer = rawStudentInput;
+            if (ArabicMathNormalizer.NeedsNormalization(rawStudentInput))
+            {
+                var normContext = questionDoc.Subject?.Equals("physics", StringComparison.OrdinalIgnoreCase) == true
+                    ? NormalizationContext.Physics
+                    : NormalizationContext.Mathematics;
+                normalizedAnswer = ArabicMathNormalizer.Normalize(rawStudentInput, normContext);
+
+                // RDY-026: Structured log for analytics and debugging
+                var normLogger = loggerFactory.CreateLogger("SessionEndpoints.InputNormalization");
+                normLogger.LogInformation(
+                    "[INPUT_NORMALIZED] StudentId={StudentId} SessionId={SessionId} QuestionId={QuestionId} " +
+                    "Context={Context} Raw={RawInput} Normalized={NormalizedInput}",
+                    studentId, sessionId, currentQuestion.QuestionId,
+                    normContext, rawStudentInput, normalizedAnswer);
+            }
+
+            var isCorrect = string.Equals(normalizedAnswer, questionDoc.CorrectAnswer, StringComparison.OrdinalIgnoreCase);
 
             // Record answer in queue
-            queue.RecordAnswer(currentQuestion.QuestionId, isCorrect, TimeSpan.FromMilliseconds(request.TimeSpentMs), request.Answer, DateTime.UtcNow);
+            queue.RecordAnswer(currentQuestion.QuestionId, isCorrect, TimeSpan.FromMilliseconds(request.TimeSpentMs), normalizedAnswer, DateTime.UtcNow);
 
             // Append QuestionAnsweredInSession event
             var answeredEvent = new QuestionAnsweredInSession_V1(
@@ -695,7 +717,7 @@ public static class SessionEndpoints
             // LLM-based ErrorClassificationService. On correct answers, ErrorType is "None".
             var errorType = isCorrect 
                 ? "None" 
-                : await ClassifyErrorAsync(errorClassifier, questionDoc, request.Answer, priorMastery);
+                : await ClassifyErrorAsync(errorClassifier, questionDoc, normalizedAnswer, priorMastery);
 
             var conceptAttempt = BuildConceptAttempt(
                 studentId: studentId,
@@ -707,7 +729,8 @@ public static class SessionEndpoints
                 responseTimeMs: request.TimeSpentMs,
                 priorMastery: priorMastery,
                 posteriorMastery: posteriorMastery,
-                errorType: errorType);
+                errorType: errorType,
+                rawStudentInput: rawStudentInput != normalizedAnswer ? rawStudentInput : null);
 
             // STB-03b: Append XP event and concept attempt.
             //
@@ -816,7 +839,7 @@ public static class SessionEndpoints
             var logger = loggerFactory.CreateLogger<SessionLogMarker>();
             var response = BuildAnswerFeedback(
                 questionDoc: questionDoc,
-                studentAnswer: request.Answer,
+                studentAnswer: normalizedAnswer,
                 isCorrect: isCorrect,
                 priorMastery: priorMastery,
                 posteriorMastery: posteriorMastery,
@@ -1238,7 +1261,8 @@ public static class SessionEndpoints
         int responseTimeMs,
         double priorMastery,
         double posteriorMastery,
-        string errorType)
+        string errorType,
+        string? rawStudentInput = null)
     {
         return new ConceptAttempted_V1(
             StudentId: studentId,
@@ -1261,7 +1285,8 @@ public static class SessionEndpoints
             BackspaceCount: 0,
             AnswerChangeCount: 0,
             WasOffline: false,
-            Timestamp: DateTimeOffset.UtcNow);
+            Timestamp: DateTimeOffset.UtcNow,
+            RawStudentInput: rawStudentInput);
     }
 
     /// <summary>

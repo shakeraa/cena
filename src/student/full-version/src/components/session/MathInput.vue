@@ -19,8 +19,9 @@
  * - submit: Enter key pressed
  */
 
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { onBeforeUnmount, onMounted, ref, computed, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { needsNormalization, normalize } from '@/utils/arabicMathNormalizer'
 
 const props = withDefaults(defineProps<{
   modelValue?: string
@@ -56,6 +57,12 @@ const isMathLiveLoaded = ref(false)
 
 // RTL locale detection
 const isRtl = ['ar', 'he'].includes(props.locale)
+
+// RDY-026: Arabic input normalization preview
+const normalizedPreview = computed(() => {
+  if (!props.modelValue || !needsNormalization(props.modelValue)) return null
+  return normalize(props.modelValue)
+})
 
 onMounted(async () => {
   // Dynamically import MathLive to avoid SSR issues
@@ -133,6 +140,14 @@ onBeforeUnmount(() => {
         virtual-keyboard-mode="manual"
         smart-mode
       />
+      <!-- RDY-026: Normalization preview for Arabic input -->
+      <p
+        v-if="normalizedPreview"
+        class="math-input-normalized-preview"
+        data-testid="math-input-normalized-preview"
+      >
+        <bdi dir="ltr">{{ t('session.mathInput.normalizedAs') }}: {{ normalizedPreview }}</bdi>
+      </p>
       <p
         v-if="!isMathLiveLoaded"
         class="math-input-fallback"
@@ -177,3 +192,14 @@ onBeforeUnmount(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.math-input-normalized-preview {
+  margin-block-start: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.85rem;
+  color: rgb(var(--v-theme-primary));
+  background: rgba(var(--v-theme-primary), 0.06);
+  border-radius: 4px;
+}
+</style>

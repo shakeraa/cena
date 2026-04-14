@@ -694,6 +694,13 @@
       "durationMinsSecs": "{mins} د {secs} ث | {mins} د {secs} ث | {mins} د {secs} ث | {mins} د {secs} ث | {mins} د {secs} ث | {mins} د {secs} ث",
       "startAnother": "ابدأ جلسة أخرى",
       "backToHome": "العودة للرئيسية"
+    },
+    "mathInput": {
+      "enterExpression": "أدخل التعبير الرياضي",
+      "enterLatex": "أدخل تعبير LaTeX",
+      "verbalExplanation": "اشرح طريقتك في الحل",
+      "verbalPlaceholder": "صف أسلوبك…",
+      "normalizedAs": "فهمنا إجابتك على أنها"
     }
   },
   "challenges": {

@@ -39,7 +39,8 @@ public record ConceptAttempted_V1(
     float QuestionDifficulty = 0f,
     float DifficultyGap = 0f,           // question difficulty - prior mastery
     string? DifficultyFrame = null,     // Stretch/Challenge/Appropriate/Expected/Regression
-    string? FocusState = null           // Strong/Stable/Declining/Degrading/Critical at time of attempt
+    string? FocusState = null,          // Strong/Stable/Declining/Degrading/Critical at time of attempt
+    string? RawStudentInput = null       // Pre-normalization input (Arabic chars etc.) for misconception analysis
 ) : IDelegatedEvent;
 
 /// <summary>
