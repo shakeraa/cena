@@ -202,6 +202,33 @@ public sealed class NatsOutboxPublisher : BackgroundService
                     DeadLetteredAt = DateTimeOffset.UtcNow
                 });
 
+                // RDY-017: Publish to DLQ JetStream stream (not just log)
+                try
+                {
+                    var dlqSubject = $"cena.durable.dlq.{eventWrapper.EventTypeName}";
+                    var dlqPayload = JsonSerializer.SerializeToUtf8Bytes(new
+                    {
+                        eventWrapper.Sequence,
+                        StreamId = eventWrapper.StreamKey ?? "unknown",
+                        EventType = eventWrapper.EventTypeName,
+                        OriginalSubject = GetDurableSubject(eventWrapper.EventTypeName),
+                        Data = eventWrapper.Data,
+                        RetryCount = retryCount,
+                        DeadLetteredAt = DateTimeOffset.UtcNow,
+                    }, JsonOptions);
+                    await _nats.PublishAsync(dlqSubject, dlqPayload, cancellationToken: ct);
+                    _logger.LogWarning(
+                        "[DLQ] Event {Sequence} ({Type}) published to DLQ stream {Subject}",
+                        eventWrapper.Sequence, eventWrapper.EventTypeName, dlqSubject);
+                }
+                catch (Exception dlqEx)
+                {
+                    // DLQ publish failure should not block HWM advancement
+                    _logger.LogError(dlqEx,
+                        "[DLQ] Failed to publish event {Sequence} to DLQ — Marten record preserved",
+                        eventWrapper.Sequence);
+                }
+
                 // Skip past this event
                 _retryCountBySequence.Remove(eventWrapper.Sequence);
                 highestSequence = eventWrapper.Sequence;

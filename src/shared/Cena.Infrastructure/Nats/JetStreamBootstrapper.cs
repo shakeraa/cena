@@ -76,6 +76,16 @@ public sealed class JetStreamBootstrapper : IHostedService
             MaxAge = TimeSpan.FromDays(7),
             Storage = StreamConfigStorage.File,
             NumReplicas = 1
+        },
+        // RDY-017: Dead-letter queue stream — 30-day retention for investigation + replay
+        new StreamConfig
+        {
+            Name = "CENA_DLQ",
+            Subjects = new List<string> { "cena.durable.dlq.>" },
+            Retention = StreamConfigRetention.Limits,
+            MaxAge = TimeSpan.FromDays(30),
+            Storage = StreamConfigStorage.File,
+            NumReplicas = 1
         }
     };
 

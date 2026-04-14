@@ -11,10 +11,44 @@ using Microsoft.Extensions.Hosting;
 namespace Cena.Infrastructure.Configuration;
 
 /// <summary>
+/// RDY-017: TLS configuration for NATS connections.
+/// </summary>
+public sealed class CenaNatsTlsOptions
+{
+    /// <summary>Enable TLS for NATS connections (default: false for dev).</summary>
+    public bool Enabled { get; set; }
+
+    /// <summary>Path to CA certificate file (PEM) for server verification.</summary>
+    public string? CaCertPath { get; set; }
+
+    /// <summary>Path to client certificate file (PEM) for mutual TLS.</summary>
+    public string? ClientCertPath { get; set; }
+
+    /// <summary>Path to client private key file (PEM) for mutual TLS.</summary>
+    public string? ClientKeyPath { get; set; }
+
+    /// <summary>Skip server certificate verification (dev only, never in production).</summary>
+    public bool InsecureSkipVerify { get; set; }
+}
+
+/// <summary>
 /// Centralized NATS authentication resolution.
 /// </summary>
 public static class CenaNatsOptions
 {
+    /// <summary>
+    /// RDY-017: Resolve TLS configuration from IConfiguration.
+    /// Returns null if TLS is not configured (dev plaintext fallback).
+    /// </summary>
+    public static CenaNatsTlsOptions? GetTlsOptions(IConfiguration config)
+    {
+        var section = config.GetSection("NATS:TLS");
+        if (!section.Exists()) return null;
+
+        var opts = new CenaNatsTlsOptions();
+        section.Bind(opts);
+        return opts.Enabled ? opts : null;
+    }
     /// <summary>
     /// Resolves NATS API credentials from configuration.
     /// Falls back to dev defaults ONLY in Development environment.
