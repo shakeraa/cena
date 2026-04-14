@@ -6,6 +6,7 @@ import { useLocale } from 'vuetify'
 import OnboardingStepper from '@/components/onboarding/OnboardingStepper.vue'
 import RoleSelector from '@/components/onboarding/RoleSelector.vue'
 import LanguagePicker from '@/components/onboarding/LanguagePicker.vue'
+import DiagnosticQuiz from '@/components/onboarding/DiagnosticQuiz.vue'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useMeStore } from '@/stores/meStore'
 import { useApiMutation } from '@/composables/useApiMutation'
@@ -39,7 +40,7 @@ const { execute: submitOnboarding, loading: submitting } = useApiMutation<
     subjects: string[]
     dailyTimeGoalMinutes: number
     weeklySubjectTargets: { subject: string; accuracyTarget: number }[]
-    diagnosticResults: null
+    diagnosticResults: { questionId: string; correct: boolean; confidencePercent: number }[] | null
     classroomCode: null
   }
 >('/api/me/onboarding')
@@ -101,7 +102,13 @@ async function handleConfirm() {
       subjects: onboarding.subjects,
       dailyTimeGoalMinutes: onboarding.dailyTimeGoalMinutes,
       weeklySubjectTargets: [],
-      diagnosticResults: null,
+      diagnosticResults: onboarding.diagnosticSkipped
+        ? null
+        : onboarding.diagnosticResponses.map(r => ({
+          questionId: r.questionId,
+          correct: r.correct,
+          confidencePercent: 100,
+        })),
       classroomCode: null,
     })
 
@@ -195,7 +202,19 @@ async function handleConfirm() {
         />
       </section>
 
-      <!-- STEP 4: CONFIRM -->
+      <!-- STEP 4: DIAGNOSTIC QUIZ -->
+      <section
+        v-else-if="onboarding.step === 'diagnostic'"
+        data-testid="onboarding-step-diagnostic"
+      >
+        <DiagnosticQuiz
+          :subjects="onboarding.subjects"
+          @complete="(responses) => { onboarding.setDiagnosticResults(responses); onboarding.next() }"
+          @skip="() => { onboarding.skipDiagnostic(); onboarding.next() }"
+        />
+      </section>
+
+      <!-- STEP 5: CONFIRM -->
       <section
         v-else-if="onboarding.step === 'confirm'"
         data-testid="onboarding-step-confirm"

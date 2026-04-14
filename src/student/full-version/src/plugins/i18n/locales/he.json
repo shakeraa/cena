@@ -849,6 +849,14 @@
       "sampleAr": "استمر — أنت تبلي بلاءً حسنًا.",
       "sampleHe": "המשך — אתה עושה עבודה נהדרת."
     },
+    "diagnostic": {
+      "loading": "טוען שאלות אבחון…",
+      "questionCount": "שאלה {current} מתוך {total}",
+      "progressLabel": "שאלה {current} מתוך {total}",
+      "optionsLabel": "בחר תשובה",
+      "skipAll": "דלג על המבחן",
+      "confirm": "אישור"
+    },
     "confirm": {
       "title": "הכל מוכן",
       "subtitle": "סקור את הבחירות שלך ובוא נתחיל.",

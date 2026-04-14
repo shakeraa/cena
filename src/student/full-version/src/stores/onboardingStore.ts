@@ -12,7 +12,14 @@ import { sanitizeLocale } from '@/composables/useAvailableLocales'
 
 export type StudentRole = 'student' | 'self-learner' | 'test-prep' | 'homeschool'
 export type SupportedLocale = 'en' | 'ar' | 'he'
-export type WizardStep = 'welcome' | 'role' | 'language' | 'confirm'
+export type WizardStep = 'welcome' | 'role' | 'language' | 'diagnostic' | 'confirm'
+
+export interface DiagnosticResponseItem {
+  questionId: string
+  subject: string
+  correct: boolean
+  difficulty: number
+}
 
 export interface OnboardingState {
   step: WizardStep
@@ -20,6 +27,8 @@ export interface OnboardingState {
   locale: SupportedLocale
   dailyTimeGoalMinutes: number
   subjects: string[]
+  diagnosticResponses: DiagnosticResponseItem[]
+  diagnosticSkipped: boolean
   completedAt: string | null
 }
 
@@ -64,15 +73,17 @@ export const useOnboardingStore = defineStore('onboarding', () => {
 
   const dailyTimeGoalMinutes = ref<number>(persisted?.dailyTimeGoalMinutes ?? DEFAULT_DAILY_GOAL)
   const subjects = ref<string[]>(persisted?.subjects ?? [])
+  const diagnosticResponses = ref<DiagnosticResponseItem[]>((persisted as any)?.diagnosticResponses ?? [])
+  const diagnosticSkipped = ref<boolean>((persisted as any)?.diagnosticSkipped ?? false)
   const completedAt = ref<string | null>(persisted?.completedAt ?? null)
 
-  const stepIndex = computed(() => {
-    const order: WizardStep[] = ['welcome', 'role', 'language', 'confirm']
+  const STEP_ORDER: WizardStep[] = ['welcome', 'role', 'language', 'diagnostic', 'confirm']
 
-    return order.indexOf(step.value)
+  const stepIndex = computed(() => {
+    return STEP_ORDER.indexOf(step.value)
   })
 
-  const totalSteps = computed(() => 4) // Phase A: 4 steps total
+  const totalSteps = computed(() => STEP_ORDER.length)
 
   const progressPercent = computed(() => {
     return Math.round(((stepIndex.value + 1) / totalSteps.value) * 100)
@@ -83,23 +94,22 @@ export const useOnboardingStore = defineStore('onboarding', () => {
       case 'welcome': return true
       case 'role': return role.value !== null
       case 'language': return sanitizeLocale(locale.value) === locale.value
+      case 'diagnostic': return diagnosticResponses.value.length > 0 || diagnosticSkipped.value
       case 'confirm': return role.value !== null
       default: return false
     }
   })
 
   function next() {
-    const order: WizardStep[] = ['welcome', 'role', 'language', 'confirm']
-    const idx = order.indexOf(step.value)
-    if (idx < order.length - 1)
-      step.value = order[idx + 1]
+    const idx = STEP_ORDER.indexOf(step.value)
+    if (idx < STEP_ORDER.length - 1)
+      step.value = STEP_ORDER[idx + 1]
   }
 
   function back() {
-    const order: WizardStep[] = ['welcome', 'role', 'language', 'confirm']
-    const idx = order.indexOf(step.value)
+    const idx = STEP_ORDER.indexOf(step.value)
     if (idx > 0)
-      step.value = order[idx - 1]
+      step.value = STEP_ORDER[idx - 1]
   }
 
   function setRole(next: StudentRole) {
@@ -111,12 +121,24 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     locale.value = sanitizeLocale(next) as SupportedLocale
   }
 
+  function setDiagnosticResults(items: DiagnosticResponseItem[]) {
+    diagnosticResponses.value = items
+    diagnosticSkipped.value = false
+  }
+
+  function skipDiagnostic() {
+    diagnosticResponses.value = []
+    diagnosticSkipped.value = true
+  }
+
   function reset() {
     step.value = 'welcome'
     role.value = null
     locale.value = 'en'
     dailyTimeGoalMinutes.value = DEFAULT_DAILY_GOAL
     subjects.value = []
+    diagnosticResponses.value = []
+    diagnosticSkipped.value = false
     completedAt.value = null
     if (typeof localStorage !== 'undefined')
       localStorage.removeItem(STORAGE_KEY)
@@ -127,7 +149,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   }
 
   watch(
-    [step, role, locale, dailyTimeGoalMinutes, subjects, completedAt],
+    [step, role, locale, dailyTimeGoalMinutes, subjects, diagnosticResponses, diagnosticSkipped, completedAt],
     () => {
       writePersisted({
         step: step.value,
@@ -135,8 +157,10 @@ export const useOnboardingStore = defineStore('onboarding', () => {
         locale: locale.value,
         dailyTimeGoalMinutes: dailyTimeGoalMinutes.value,
         subjects: subjects.value,
+        diagnosticResponses: diagnosticResponses.value,
+        diagnosticSkipped: diagnosticSkipped.value,
         completedAt: completedAt.value,
-      })
+      } as any)
     },
     { deep: true },
   )
@@ -147,6 +171,8 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     locale,
     dailyTimeGoalMinutes,
     subjects,
+    diagnosticResponses,
+    diagnosticSkipped,
     completedAt,
     stepIndex,
     totalSteps,
@@ -156,6 +182,8 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     back,
     setRole,
     setLocale,
+    setDiagnosticResults,
+    skipDiagnostic,
     reset,
     markCompleted,
   }

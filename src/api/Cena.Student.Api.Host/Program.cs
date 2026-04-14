@@ -568,6 +568,9 @@ app.MapRateLimitDashboardEndpoints();
 app.MapPhotoUploadEndpoints();
 app.MapPhotoCaptureEndpoints();
 
+// ---- RDY-023: Diagnostic quiz endpoints ----
+app.MapDiagnosticEndpoints();
+
 // ---- SignalR Hub ----
 app.MapCenaHub();
 

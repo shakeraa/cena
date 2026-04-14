@@ -852,6 +852,14 @@
       "sampleAr": "استمر — أنت تبلي بلاءً حسنًا.",
       "sampleHe": "המשך — אתה עושה עבודה נהדרת."
     },
+    "diagnostic": {
+      "loading": "Loading diagnostic questions…",
+      "questionCount": "Question {current} of {total}",
+      "progressLabel": "Question {current} of {total}",
+      "optionsLabel": "Choose an answer",
+      "skipAll": "Skip quiz",
+      "confirm": "Confirm"
+    },
     "confirm": {
       "title": "You're all set",
       "subtitle": "Review your choices and jump right in.",

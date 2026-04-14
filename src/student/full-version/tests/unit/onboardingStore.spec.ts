@@ -22,7 +22,7 @@ describe('onboardingStore', () => {
     expect(store.role).toBeNull()
     expect(store.locale).toBe('en')
     expect(store.stepIndex).toBe(0)
-    expect(store.totalSteps).toBe(4)
+    expect(store.totalSteps).toBe(5)
   })
 
   it('cannot advance from role until a role is picked', () => {
@@ -36,7 +36,7 @@ describe('onboardingStore', () => {
     expect(store.canAdvance).toBe(true)
   })
 
-  it('walks through welcome → role → language → confirm with next/back', () => {
+  it('walks through welcome → role → language → diagnostic → confirm with next/back', () => {
     const store = useOnboardingStore()
 
     store.next()
@@ -47,11 +47,15 @@ describe('onboardingStore', () => {
     expect(store.step).toBe('language')
 
     store.next()
+    expect(store.step).toBe('diagnostic')
+
+    store.skipDiagnostic()
+    store.next()
     expect(store.step).toBe('confirm')
 
-    // back brings us back to language
+    // back brings us back to diagnostic
     store.back()
-    expect(store.step).toBe('language')
+    expect(store.step).toBe('diagnostic')
   })
 
   it('clamps next() at the final step', () => {
