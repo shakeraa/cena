@@ -5,6 +5,9 @@ import { useRoute, useRouter } from 'vue-router'
 import QuestionCard from '@/components/session/QuestionCard.vue'
 import AnswerFeedback from '@/components/session/AnswerFeedback.vue'
 import { $api } from '@/api/$api'
+import { useCelebration } from '@/composables/useCelebration'
+import { useFlowState } from '@/composables/useFlowState'
+import FlowAmbientBackground from '@/components/common/FlowAmbientBackground.vue'
 import type {
   SessionAnswerResponseDto,
   SessionHintResponseDto,
@@ -59,6 +62,15 @@ const route = useRoute()
 const router = useRouter()
 
 const sessionId = String(route.params.sessionId)
+const { triggerCorrectAnswer, triggerLevelUp, triggerMasteryMilestone } = useCelebration()
+const {
+  currentFlowState,
+  showBreakSuggestion,
+  showDifficultyAdjustment,
+  updateFromBackend: updateFlowState,
+  dismissBreakSuggestion,
+  dismissDifficultyAdjustment,
+} = useFlowState()
 
 const question = ref<SessionQuestionDto | null>(null)
 const feedback = ref<SessionAnswerResponseDto | null>(null)
@@ -191,6 +203,31 @@ async function handleAnswer(answer: string, timeSpentMs: number) {
 
     feedback.value = resp
 
+    // RDY-016: Trigger celebrations based on answer result
+    if (resp.correct) {
+      triggerCorrectAnswer(resp.xpAwarded ?? 10)
+
+      // Level-up check (backend includes levelUp flag when XP crosses threshold)
+      if ((resp as any).levelUp && (resp as any).newLevel) {
+        triggerLevelUp((resp as any).newLevel)
+      }
+
+      // Mastery milestone check (mastery crossed 0.85)
+      if ((resp as any).masteryMilestone && (resp as any).conceptName) {
+        triggerMasteryMilestone((resp as any).conceptName)
+      }
+    }
+
+    // RDY-016: Update flow state from backend response
+    if ((resp as any).flowState) {
+      updateFlowState({
+        fatigueLevel: (resp as any).flowState.fatigueLevel ?? 0,
+        accuracyTrend: (resp as any).flowState.accuracyTrend ?? 0,
+        consecutiveCorrect: (resp as any).flowState.consecutiveCorrect ?? 0,
+        sessionDurationMinutes: (resp as any).flowState.sessionDurationMinutes ?? 0,
+      })
+    }
+
     // FIND-pedagogy-005: NO hard-coded dismiss timeout. The student taps
     // the Continue button in AnswerFeedback (emits @continue) to advance.
     //
@@ -235,6 +272,40 @@ onBeforeUnmount(clearAutoAdvance)
     class="session-runner-page"
     data-testid="session-runner-page"
   >
+    <!-- RDY-016: Flow state ambient background -->
+    <FlowAmbientBackground :flow-state="currentFlowState" />
+
+    <!-- RDY-016: Flow state user feedback -->
+    <VSnackbar
+      v-model="showBreakSuggestion"
+      color="warning"
+      location="top"
+      timeout="-1"
+    >
+      {{ $t('session.flow.breakSuggestion', 'Good time for a break? You seem tired.') }}
+      <template #actions>
+        <VBtn variant="text" @click="dismissBreakSuggestion">
+          {{ $t('session.flow.continueStudying', 'Keep going') }}
+        </VBtn>
+        <VBtn variant="text" @click="handleExit">
+          {{ $t('session.flow.takeBreak', 'Take a break') }}
+        </VBtn>
+      </template>
+    </VSnackbar>
+
+    <VSnackbar
+      v-model="showDifficultyAdjustment"
+      color="info"
+      location="top"
+      timeout="5000"
+    >
+      {{ $t('session.flow.difficultyAdjustment', "Let's try something easier to rebuild momentum.") }}
+      <template #actions>
+        <VBtn variant="text" @click="dismissDifficultyAdjustment">
+          {{ $t('common.ok', 'OK') }}
+        </VBtn>
+      </template>
+    </VSnackbar>
     <div class="session-runner-page__header d-flex align-center justify-space-between pa-4">
       <VBtn
         variant="text"
