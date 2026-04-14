@@ -71,8 +71,8 @@ public sealed class RedisCostCircuitBreaker : ICostCircuitBreaker
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Redis cost circuit breaker check failed — failing closed (allowing requests)");
-            return false;
+            _logger.LogError(ex, "Redis cost circuit breaker check failed — failing closed (blocking requests)");
+            return true;
         }
     }
 
