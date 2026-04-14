@@ -140,15 +140,12 @@ public static class DiagnosticEndpoints
             if (selected.Count < 5)
                 selected = questions.Take(Math.Min(10, questions.Count)).ToList();
 
-            // Map DifficultyElo to IRT difficulty (logit scale) for theta estimation
-            // Elo 1500 = average (IRT b=0), each 200 Elo ≈ 1 logit
-            static double EloToIrt(double elo) => (elo - 1500.0) / 200.0;
-
             items.AddRange(selected.Select(q => new DiagnosticItem(
                 QuestionId: q.Id,
                 Subject: subject,
-                Difficulty: Math.Round(EloToIrt(q.DifficultyElo), 3),
-                Band: q.DifficultyElo < 1400 ? "easy" : q.DifficultyElo > 1600 ? "hard" : "medium",
+                Difficulty: Math.Round(Cena.Actors.Services.IrtEloConversion.EloToIrt(q.DifficultyElo), 3),
+                Band: Cena.Actors.Services.IrtEloConversion.DifficultyBand(
+                    Cena.Actors.Services.IrtEloConversion.EloToIrt(q.DifficultyElo)),
                 QuestionText: q.Prompt,
                 Options: q.Choices?.Select((c, i) => new DiagnosticOption($"opt_{i}", c)).ToArray()
                     ?? Array.Empty<DiagnosticOption>(),

@@ -144,9 +144,10 @@ public sealed class ConstrainedCatAlgorithm
     }
 
     /// <summary>
-    /// Converts Elo rating to IRT difficulty scale (roughly: Elo 1500 → b=0).
+    /// Converts Elo rating to IRT difficulty scale (Elo 1500 → b=0).
+    /// Delegates to <see cref="Services.IrtEloConversion"/> (single source of truth).
     /// </summary>
-    private static double EloToDifficulty(double elo) => (elo - 1500.0) / 200.0;
+    private static double EloToDifficulty(double elo) => Services.IrtEloConversion.EloToIrt(elo);
 
     /// <summary>
     /// Legacy Sympson-Hetter approximation: P(administer | selected).

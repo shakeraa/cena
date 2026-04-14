@@ -32,11 +32,16 @@ public sealed class ItemBankHealthService
 
     private readonly IDocumentStore _store;
     private readonly ILogger<ItemBankHealthService> _logger;
+    private readonly IBagrutAnchorProvider? _anchorProvider;
 
-    public ItemBankHealthService(IDocumentStore store, ILogger<ItemBankHealthService> logger)
+    public ItemBankHealthService(
+        IDocumentStore store,
+        ILogger<ItemBankHealthService> logger,
+        IBagrutAnchorProvider? anchorProvider = null)
     {
         _store = store;
         _logger = logger;
+        _anchorProvider = anchorProvider;
     }
 
     /// <summary>
@@ -223,6 +228,64 @@ public sealed class ItemBankHealthService
     }
 
     /// <summary>
+    /// RDY-028: Validates that anchor concept IDs exist in the question bank.
+    /// Returns matched and unmatched anchor IDs.
+    /// </summary>
+    public async Task<AnchorCoverageReport> GetAnchorCoverageAsync(
+        string trackId, CancellationToken ct = default)
+    {
+        if (_anchorProvider == null)
+            return new AnchorCoverageReport(trackId, 0, 0, [], []);
+
+        var anchors = _anchorProvider.GetAnchorsForTrack(trackId);
+        if (anchors.Count == 0)
+            return new AnchorCoverageReport(trackId, 0, 0, [], []);
+
+        await using var session = _store.QuerySession();
+        var allConceptIds = (await session.Query<QuestionDocument>()
+            .Where(q => q.IsActive)
+            .Select(q => q.ConceptId)
+            .ToListAsync(ct))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        var matched = anchors.Where(a => allConceptIds.Contains(a.ConceptId)).ToList();
+        var unmatched = anchors.Where(a => !allConceptIds.Contains(a.ConceptId)).ToList();
+
+        if (unmatched.Count > 0)
+            _logger.LogWarning("RDY-028: {Count} anchor concept IDs not found in question bank: {Ids}",
+                unmatched.Count, string.Join(", ", unmatched.Select(a => a.ConceptId)));
+
+        return new AnchorCoverageReport(
+            trackId, matched.Count, unmatched.Count,
+            matched.Select(a => a.AnchorId).ToList(),
+            unmatched.Select(a => $"{a.AnchorId} ({a.ConceptId})").ToList());
+    }
+
+    /// <summary>
+    /// RDY-028: Run IRT calibration using Bagrut anchors as priors to fix the
+    /// difficulty scale. Anchor items keep their Bagrut-derived difficulty;
+    /// non-anchor items are estimated relative to anchors.
+    /// </summary>
+    public IReadOnlyList<IrtItemParameters> CalibrateWithAnchors(
+        string trackId,
+        IReadOnlyList<IrtResponse> responses,
+        IIrtCalibrationPipeline pipeline)
+    {
+        var priors = _anchorProvider?.GetAnchorPriors(trackId);
+
+        if (priors == null || priors.Count == 0)
+        {
+            _logger.LogWarning("RDY-028: No anchor priors for track {Track}, running unanchored calibration", trackId);
+            return pipeline.Calibrate(responses);
+        }
+
+        _logger.LogInformation("RDY-028: Calibrating with {Count} anchor priors for track {Track}",
+            priors.Count, trackId);
+
+        return pipeline.Calibrate(responses, priors);
+    }
+
+    /// <summary>
     /// RDY-018: Recalibrates Sympson-Hetter exposure parameters for all items.
     /// Should be called periodically (e.g. daily or after every N sessions).
     /// </summary>
@@ -317,3 +380,11 @@ public sealed record ItemQualityGateResult
     public bool IsCalibrated { get; init; }
     public IReadOnlyList<string> Violations { get; init; } = Array.Empty<string>();
 }
+
+/// <summary>RDY-028: Anchor coverage — how many anchor concept IDs exist in the question bank.</summary>
+public sealed record AnchorCoverageReport(
+    string TrackId,
+    int MatchedCount,
+    int UnmatchedCount,
+    IReadOnlyList<string> MatchedAnchorIds,
+    IReadOnlyList<string> UnmatchedDescriptions);

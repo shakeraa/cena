@@ -52,6 +52,11 @@ const string ServiceName = "cena-learner-service";
 
 var builder = WebApplication.CreateBuilder(args);
 
+// RDY-024: Load BKT calibration config (version-controlled defaults + post-pilot overrides)
+builder.Configuration.AddJsonFile("../../../config/bkt-params.json", optional: true, reloadOnChange: true);
+// RDY-028: Load Bagrut anchor items for IRT calibration scale linking
+builder.Configuration.AddJsonFile("../../../config/bagrut-anchors.json", optional: true, reloadOnChange: true);
+
 // ---- Serilog structured logging ----
 builder.Host.UseSerilog((context, services, configuration) =>
 {
@@ -176,6 +181,12 @@ builder.Services.AddSingleton<Cena.Actors.Mastery.IConceptGraphCache>(
 // ACT-032: Register all domain services for DI
 builder.Services.AddSingleton<IMethodologySwitchService, MethodologySwitchService>();
 builder.Services.AddSingleton<IBktService, BktService>();
+// RDY-024: Configurable BKT parameters from config/bkt-params.json
+builder.Services.Configure<BktCalibrationOptions>(
+    builder.Configuration.GetSection(BktCalibrationOptions.SectionName));
+builder.Services.AddSingleton<IBktCalibrationProvider, ConfigurableBktCalibrationProvider>();
+// RDY-028: Bagrut anchor items for IRT scale linking
+builder.Services.AddSingleton<IBagrutAnchorProvider, BagrutAnchorProvider>();
 builder.Services.AddSingleton<IHlrService, HlrService>();
 builder.Services.AddSingleton<ICognitiveLoadService, CognitiveLoadService>();
 builder.Services.AddSingleton<IHintGenerator, HintGenerator>();
