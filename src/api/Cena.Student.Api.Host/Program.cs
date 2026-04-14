@@ -27,6 +27,7 @@ using Cena.Infrastructure.Health;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Moderation;
+using Cena.Infrastructure.Resilience;
 using Cena.Infrastructure.Seed;
 using Marten;
 using Polly;
@@ -176,21 +177,20 @@ builder.Services.AddSingleton<ISafeguardingClassifier, SafeguardingClassifier>()
 builder.Services.AddScoped<ISafeguardingEscalation, SafeguardingEscalation>();
 
 // ---- RDY-001: Content Moderation (CSAM + AI Safety) ----
+// RDY-012: Added Cena resilience policies (timeout + retry + circuit breaker + fallback)
 builder.Services.AddHttpClient<IPhotoDnaClient, PhotoDnaClient>(client =>
 {
     var timeout = builder.Configuration.GetValue<int>("Moderation:PhotoDna:TimeoutSeconds", 10);
     client.Timeout = TimeSpan.FromSeconds(timeout);
-});
+})
+.AddCenaResilience("PhotoDna");
 
 builder.Services.AddHttpClient<IContentSafetyClient, ContentSafetyClient>(client =>
 {
     var timeout = builder.Configuration.GetValue<int>("Moderation:ContentSafety:TimeoutSeconds", 15);
     client.Timeout = TimeSpan.FromSeconds(timeout);
 })
-.AddPolicyHandler(Policy
-    .Handle<HttpRequestException>()
-    .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)
-    .CircuitBreakerAsync(3, TimeSpan.FromSeconds(30)));
+.AddCenaResilience("ContentSafety");
 
 builder.Services.AddSingleton<IIncidentReportService, IncidentReportService>();
 builder.Services.AddSingleton<IContentModerationPipeline, ContentModerationPipeline>();
@@ -437,6 +437,7 @@ builder.Services.AddOpenTelemetry()
         .AddHttpClientInstrumentation()
         .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)))
     .WithMetrics(metrics => metrics
+        .AddMeter("Cena.HttpCircuitBreaker")
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddProcessInstrumentation()

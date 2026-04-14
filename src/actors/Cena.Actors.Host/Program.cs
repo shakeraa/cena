@@ -18,6 +18,7 @@ using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Nats;
 using Cena.Infrastructure.Observability;
+using Cena.Infrastructure.Resilience;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
@@ -229,12 +230,15 @@ builder.Services.AddHostedService<Cena.Actors.Explanations.ExplanationCacheInval
 builder.Services.AddCenaAdminServices();
 
 // CNT-008/009/010: Ingestion Pipeline, Moderation, Serving
+// RDY-012: Added Cena resilience policies (timeout + retry + circuit breaker + fallback)
 builder.Services.Configure<Cena.Actors.Ingest.GeminiOcrOptions>(
     builder.Configuration.GetSection("Ingestion:Gemini"));
 builder.Services.Configure<Cena.Actors.Ingest.MathpixOptions>(
     builder.Configuration.GetSection("Ingestion:Mathpix"));
-builder.Services.AddHttpClient<Cena.Actors.Ingest.GeminiOcrClient>();
-builder.Services.AddHttpClient<Cena.Actors.Ingest.MathpixClient>();
+builder.Services.AddHttpClient<Cena.Actors.Ingest.GeminiOcrClient>()
+    .AddCenaResilience("GeminiOcr");
+builder.Services.AddHttpClient<Cena.Actors.Ingest.MathpixClient>()
+    .AddCenaResilience("Mathpix");
 builder.Services.AddSingleton<Cena.Actors.Ingest.IOcrClient, Cena.Actors.Ingest.GeminiOcrClient>();
 builder.Services.AddSingleton<Cena.Actors.Ingest.IMathOcrClient, Cena.Actors.Ingest.MathpixClient>();
 builder.Services.AddSingleton<Cena.Actors.Ingest.IQuestionSegmenter, Cena.Actors.Ingest.GeminiQuestionSegmenter>();
@@ -245,7 +249,8 @@ builder.Services.AddSingleton<Cena.Actors.Serving.IQuestionSelector, Cena.Actors
 
 // SAI-06/07: Content extraction pipeline + embeddings + pgvector
 builder.Services.AddSingleton<Cena.Actors.Ingest.IContentSegmenter, Cena.Actors.Ingest.ContentSegmenter>();
-builder.Services.AddHttpClient<Cena.Actors.Services.EmbeddingService>();
+builder.Services.AddHttpClient<Cena.Actors.Services.EmbeddingService>()
+    .AddCenaResilience("Embedding");
 builder.Services.AddSingleton<Cena.Actors.Services.IEmbeddingService, Cena.Actors.Services.EmbeddingService>();
 builder.Services.AddSingleton<Cena.Actors.Services.IContentRetriever, Cena.Actors.Services.ContentRetriever>();
 
@@ -395,6 +400,7 @@ builder.Services.AddOpenTelemetry()
         .AddMeter("Cena.Actors.HealthAggregator")
         .AddMeter("Cena.Session.Nats")
         .AddMeter("Npgsql")
+        .AddMeter("Cena.HttpCircuitBreaker")
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddProcessInstrumentation()

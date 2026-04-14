@@ -4,6 +4,7 @@
 // Used by /health/ready to tell K8s whether the pod can serve traffic.
 // =============================================================================
 
+using Cena.Infrastructure.Resilience;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -138,19 +139,61 @@ public sealed class NatsHealthCheck : IHealthCheck
 }
 
 /// <summary>
+/// RDY-012: Checks HTTP client circuit breaker states.
+/// Reports degraded if any circuit is open or half-open.
+/// </summary>
+public sealed class HttpCircuitBreakerHealthCheck : IHealthCheck
+{
+    private readonly ILogger<HttpCircuitBreakerHealthCheck> _logger;
+
+    public HttpCircuitBreakerHealthCheck(ILogger<HttpCircuitBreakerHealthCheck> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var states = HttpPolicies.GetAllStates();
+        var openClients = states.Where(kv => kv.Value == 2).Select(kv => kv.Key).ToList();
+        var halfOpenClients = states.Where(kv => kv.Value == 1).Select(kv => kv.Key).ToList();
+
+        if (openClients.Count > 0)
+        {
+            var msg = $"Circuit OPEN for: {string.Join(", ", openClients)}";
+            _logger.LogWarning("[CIRCUIT_BREAKER] Health check: {Status}", msg);
+            return Task.FromResult(HealthCheckResult.Degraded(msg));
+        }
+
+        if (halfOpenClients.Count > 0)
+        {
+            var msg = $"Circuit HALF-OPEN for: {string.Join(", ", halfOpenClients)}";
+            _logger.LogInformation("[CIRCUIT_BREAKER] Health check: {Status}", msg);
+            return Task.FromResult(HealthCheckResult.Degraded(msg));
+        }
+
+        return Task.FromResult(HealthCheckResult.Healthy(
+            $"All {states.Count} HTTP circuits closed"));
+    }
+}
+
+/// <summary>
 /// RDY-011: Extension methods to register dependency health checks.
 /// </summary>
 public static class HealthCheckRegistration
 {
     /// <summary>
     /// Register Student API health checks: PostgreSQL (critical), Redis (critical), NATS (degraded).
+    /// RDY-012: Also monitors HTTP client circuit breaker states.
     /// </summary>
     public static IHealthChecksBuilder AddCenaStudentHealthChecks(this IHealthChecksBuilder builder)
     {
         return builder
             .AddCheck<PostgresHealthCheck>("postgresql", HealthStatus.Unhealthy, new[] { "ready", "db" })
             .AddCheck<RedisHealthCheck>("redis", HealthStatus.Unhealthy, new[] { "ready", "cache" })
-            .AddCheck<NatsHealthCheck>("nats", HealthStatus.Degraded, new[] { "ready", "messaging" });
+            .AddCheck<NatsHealthCheck>("nats", HealthStatus.Degraded, new[] { "ready", "messaging" })
+            .AddCheck<HttpCircuitBreakerHealthCheck>("http-circuit-breakers", HealthStatus.Degraded, new[] { "ready", "external" });
     }
 
     /// <summary>
