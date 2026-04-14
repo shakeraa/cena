@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import type { SessionHintResponseDto, SessionQuestionDto } from '@/api/types/common'
+import type { SessionHintResponseDto, SessionQuestionDto, WorkedExampleDto } from '@/api/types/common'
 import QuestionFigure from '@/components/QuestionFigure.vue'
+import WorkedExamplePanel from '@/components/session/WorkedExamplePanel.vue'
 
 // FIND-pedagogy-006 — QuestionCard now surfaces the ScaffoldingService
 // output that the backend computes from the student's real BKT mastery:
@@ -56,9 +57,27 @@ watch(() => props.question.questionId, () => {
   startedAt.value = Date.now()
 })
 
-const showWorkedExample = computed(() =>
-  props.question.scaffoldingLevel === 'Full'
-  && !!props.question.workedExample)
+const showWorkedExample = computed(() => {
+  const level = props.question.scaffoldingLevel
+  return (level === 'Full' || level === 'Partial')
+    && !!props.question.workedExample
+})
+
+/** RDY-013: Resolve worked example data — structured steps or legacy string fallback. */
+const workedExampleData = computed((): WorkedExampleDto | null => {
+  const we = props.question.workedExample
+  if (!we) return null
+
+  // Structured format: object with steps[]
+  if (typeof we === 'object' && 'steps' in we) return we
+
+  // Legacy string format: wrap in a single step
+  return { steps: [{ description: we }] }
+})
+
+const workedExampleMode = computed((): 'Full' | 'Partial' => {
+  return props.question.scaffoldingLevel === 'Partial' ? 'Partial' : 'Full'
+})
 
 const showHintButton = computed(() => {
   const level = props.question.scaffoldingLevel
@@ -159,32 +178,17 @@ function handleHint() {
     />
 
     <!--
-      FIND-pedagogy-006 — Worked example block for novice learners
-      (ScaffoldingLevel === 'Full'). The worked example body comes from
-      the authored QuestionDocument.Explanation, surfaced by the backend
-      only when the student's BKT mastery falls below the Full threshold
-      (< 0.20). Cite: Sweller et al. 1998 (worked example effect).
+      RDY-013 — Worked/faded example panel (Renkl & Atkinson 2003).
+      Full scaffolding: progressive reveal of all steps.
+      Partial scaffolding: faded — first steps shown, later steps blanked.
     -->
-    <VAlert
-      v-if="showWorkedExample"
-      type="info"
-      variant="tonal"
-      icon="tabler-bulb"
+    <WorkedExamplePanel
+      v-if="showWorkedExample && workedExampleData"
+      :steps="workedExampleData.steps"
+      :mode="workedExampleMode"
       class="mb-6"
       data-testid="question-worked-example"
-    >
-      <div class="text-subtitle-2 mb-2">
-        {{ t('session.runner.workedExampleLabel') }}
-      </div>
-      <div class="text-body-2">
-        <bdi
-          dir="ltr"
-          class="question-card__math-run"
-        >
-          {{ question.workedExample }}
-        </bdi>
-      </div>
-    </VAlert>
+    />
 
     <!--
       Last-requested hint lives above the choices so it doesn't fight

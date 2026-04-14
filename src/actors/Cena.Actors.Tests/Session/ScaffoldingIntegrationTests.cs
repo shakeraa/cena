@@ -123,7 +123,8 @@ public sealed class ScaffoldingIntegrationTests
         Assert.Equal("Partial", dto.ScaffoldingLevel);
         Assert.Equal(2, dto.HintsAvailable);
         Assert.Equal(2, dto.HintsRemaining);
-        Assert.False(metadata.ShowWorkedExample);
+        Assert.True(metadata.ShowWorkedExample); // Partial uses faded worked examples
+        Assert.NotNull(dto.WorkedExample);
         Assert.True(metadata.ShowHintButton);
         Assert.True(metadata.RevealAnswer);
     }

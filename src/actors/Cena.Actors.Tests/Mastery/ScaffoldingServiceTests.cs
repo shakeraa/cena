@@ -47,7 +47,7 @@ public sealed class ScaffoldingServiceTests
     {
         var meta = ScaffoldingService.GetScaffoldingMetadata(ScaffoldingLevel.Partial);
 
-        Assert.False(meta.ShowWorkedExample);
+        Assert.True(meta.ShowWorkedExample); // Partial uses faded worked examples (Renkl & Atkinson 2003)
         Assert.True(meta.ShowHintButton);
         Assert.Equal(2, meta.MaxHints);
         Assert.True(meta.RevealAnswer);

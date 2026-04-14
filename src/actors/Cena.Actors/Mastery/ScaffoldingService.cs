@@ -67,7 +67,10 @@ public static class ScaffoldingService
         ScaffoldingLevel.Full => new(level, "worked-example", ShowWorkedExample: true,
             ShowHintButton: true, MaxHints: 3, RevealAnswer: true),
 
-        ScaffoldingLevel.Partial => new(level, "faded-example", ShowWorkedExample: false,
+        // RDY-013: Faded worked examples ARE the Partial-level technique
+        // per Renkl & Atkinson (2003). ShowWorkedExample must be true so the
+        // frontend receives the workedExample payload and renders it in faded mode.
+        ScaffoldingLevel.Partial => new(level, "faded-example", ShowWorkedExample: true,
             ShowHintButton: true, MaxHints: 2, RevealAnswer: true),
 
         ScaffoldingLevel.HintsOnly => new(level, "hints-only", ShowWorkedExample: false,

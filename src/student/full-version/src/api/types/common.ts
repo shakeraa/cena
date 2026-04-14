@@ -274,6 +274,28 @@ export interface ActiveSessionDto {
  */
 export type ScaffoldingLevelDto = 'Full' | 'Partial' | 'HintsOnly' | 'None'
 
+/**
+ * RDY-013 — A single step in a worked or faded example.
+ */
+export interface WorkedExampleStepDto {
+  /** Human-readable description of the step. */
+  description: string
+  /** KaTeX math expression (rendered with KaTeX). */
+  math?: string | null
+  /** Short prose explanation of the step. */
+  explanation?: string | null
+}
+
+/**
+ * RDY-013 — Structured worked example with step-by-step breakdown.
+ * At Full scaffolding all steps are shown; at Partial later steps are
+ * faded (blanked) for the student to fill in.
+ */
+export interface WorkedExampleDto {
+  /** Steps of the worked example. */
+  steps: WorkedExampleStepDto[]
+}
+
 export interface SessionQuestionDto {
   questionId: string
   questionIndex: number
@@ -293,10 +315,11 @@ export interface SessionQuestionDto {
   scaffoldingLevel?: ScaffoldingLevelDto
 
   /**
-   * The authored worked example for this question, when available.
-   * Only populated (and only rendered) when scaffoldingLevel is 'Full'.
+   * RDY-013 — Worked example data. May be a legacy plain string or a
+   * structured object with steps[]. Only populated when
+   * scaffoldingLevel is 'Full' or 'Partial'.
    */
-  workedExample?: string | null
+  workedExample?: string | WorkedExampleDto | null
 
   /** Total hint budget granted for this scaffolding level. */
   hintsAvailable?: number
