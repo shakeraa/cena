@@ -114,9 +114,41 @@ const hasAnyAnalyticsKpi = computed(() =>
   || totalSessions.value != null,
 )
 
-// The resume-session card is hidden until the backend `GET /api/sessions/active`
-// wire-up lands. Explicitly typed as `null` so no stale shape ships.
-const activeSession = null as null | {
+// RDY-022: Check for a paused/recoverable session in localStorage.
+// Falls back to null if no recoverable session exists.
+// When `GET /api/sessions/active` lands, this should prefer the backend source.
+import { useSessionPersistence } from '@/composables/useSessionPersistence'
+
+const { hasRecoverableSession } = useSessionPersistence()
+
+const activeSession = (() => {
+  try {
+    // Scan localStorage for any session-state: keys
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i)
+      if (key?.startsWith('session-state:')) {
+        const raw = localStorage.getItem(key)
+        if (!raw) continue
+        const snapshot = JSON.parse(raw)
+        const lastActivity = new Date(snapshot.lastActivityAt).getTime()
+        // Only show if less than 24 hours old
+        if (Date.now() - lastActivity < 24 * 60 * 60 * 1000) {
+          return {
+            sessionId: snapshot.sessionId as string,
+            subject: 'Math', // snapshot doesn't store subject — default
+            startedAt: snapshot.startedAt as string,
+            progressPercent: snapshot.totalSteps > 0
+              ? Math.round(100 * snapshot.answeredSteps.length / snapshot.totalSteps)
+              : 0,
+          }
+        }
+      }
+    }
+  } catch {
+    // localStorage unavailable
+  }
+  return null
+})() as null | {
   sessionId: string
   subject: string
   startedAt: string

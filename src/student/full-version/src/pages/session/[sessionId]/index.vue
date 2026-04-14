@@ -10,6 +10,7 @@ import { useFlowState } from '@/composables/useFlowState'
 import FlowAmbientBackground from '@/components/common/FlowAmbientBackground.vue'
 import SessionTimer from '@/components/session/SessionTimer.vue'
 import FatigueCheck from '@/components/session/FatigueCheck.vue'
+import { useSessionPersistence } from '@/composables/useSessionPersistence'
 import type {
   SessionAnswerResponseDto,
   SessionHintResponseDto,
@@ -74,22 +75,68 @@ const {
   dismissDifficultyAdjustment,
 } = useFlowState()
 
-// RDY-022: Session timer + fatigue check state
+// RDY-022: Session timer + fatigue check + persistence
+const { saveSnapshot, restoreSnapshot, clearSession } = useSessionPersistence()
+
 const sessionPaused = ref(false)
 const showFatigueCheck = ref(false)
 const questionsAnswered = ref(0)
-const FATIGUE_CHECK_INTERVAL = 10 // ask every 10 questions
+const sessionStartedAt = ref(new Date().toISOString()) // overwritten by backend on first question load
+const pausedDurationSeconds = ref(0)
+const FATIGUE_CHECK_INTERVAL = 10
+
+// Restore session state on mount (survives refresh)
+const existingSnapshot = restoreSnapshot(sessionId)
+if (existingSnapshot) {
+  sessionStartedAt.value = existingSnapshot.startedAt
+  questionsAnswered.value = existingSnapshot.answeredSteps.length
+}
 
 function togglePause() {
   sessionPaused.value = !sessionPaused.value
+
+  if (sessionPaused.value) {
+    // Save snapshot on pause so state survives browser close
+    saveSnapshot({
+      sessionId,
+      currentStep: questionsAnswered.value,
+      startedAt: sessionStartedAt.value,
+      lastActivityAt: new Date().toISOString(),
+      totalSteps: 0, // unknown total
+      answeredSteps: Array.from({ length: questionsAnswered.value }, (_, i) => i),
+    })
+  }
+}
+
+function handleTimerTick(elapsed: number) {
+  // Periodic snapshot save (every 60 seconds of study time)
+  if (elapsed > 0 && elapsed % 60 === 0) {
+    saveSnapshot({
+      sessionId,
+      currentStep: questionsAnswered.value,
+      startedAt: sessionStartedAt.value,
+      lastActivityAt: new Date().toISOString(),
+      totalSteps: 0,
+      answeredSteps: Array.from({ length: questionsAnswered.value }, (_, i) => i),
+    })
+  }
 }
 
 function handleMilestone() {
-  // 25-minute milestone — flow state already handles break suggestion
+  // 25-minute milestone — also trigger break suggestion via flow state
+  showBreakSuggestion.value = true
 }
 
-function handleEnergyReport(level: 'energized' | 'okay' | 'tired') {
-  // Could send to backend CognitiveLoadService for fatigue model calibration
+async function handleEnergyReport(level: 'energized' | 'okay' | 'tired') {
+  // POST self-reported energy to backend for fatigue model calibration
+  try {
+    await $api(`/api/sessions/${sessionId}/fatigue-report`, {
+      method: 'POST' as any,
+      body: { energyLevel: level, questionsAnswered: questionsAnswered.value } as any,
+    })
+  } catch {
+    // Best-effort — don't block UX if backend rejects
+  }
 }
 
 const question = ref<SessionQuestionDto | null>(null)
@@ -115,6 +162,11 @@ async function loadCurrentQuestion() {
   lastHint.value = null
   try {
     question.value = await $api<SessionQuestionDto>(`/api/sessions/${sessionId}/current-question`)
+
+    // RDY-022: Get session start timestamp from backend for timer accuracy
+    if (question.value && (question.value as any).sessionStartedAt) {
+      sessionStartedAt.value = (question.value as any).sessionStartedAt
+    }
   }
   catch (err) {
     error.value = (err as Error).message || t('error.serverError')
@@ -286,6 +338,10 @@ async function handleAnswer(answer: string, timeSpentMs: number) {
 
 function handleExit() {
   clearAutoAdvance()
+  // RDY-022: Clear session persistence on intentional exit (not on pause)
+  if (!sessionPaused.value) {
+    clearSession(sessionId)
+  }
   router.push('/home')
 }
 
@@ -350,12 +406,15 @@ onBeforeUnmount(clearAutoAdvance)
         {{ t('session.runner.exit') }}
       </VBtn>
 
-      <!-- RDY-022: Session timer + pause -->
+      <!-- RDY-022: Session timer (driven by backend startedAt, survives refresh) -->
       <SessionTimer
+        :started-at="sessionStartedAt"
         :paused="sessionPaused"
         :milestone-minutes="25"
+        :paused-duration-seconds="pausedDurationSeconds"
         @milestone-reached="handleMilestone"
         @pause="togglePause"
+        @tick="handleTimerTick"
       />
 
       <div class="text-caption text-medium-emphasis">
