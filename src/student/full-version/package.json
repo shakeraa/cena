@@ -73,7 +73,7 @@
     "@antfu/utils": "0.7.10",
     "@axe-core/playwright": "^4.11.1",
     "axe-core": "^4.11.1",
-    "vitest-axe": "^0.1.0",
+    "vitest-axe": "0.1.0",
     "@fullcalendar/core": "6.1.19",
     "@fullcalendar/daygrid": "6.1.19",
     "@fullcalendar/interaction": "6.1.19",

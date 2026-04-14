@@ -47,12 +47,17 @@ Fix: add this block to each component's `<style>`:
 
 Or, better, add a global reset in `src/assets/styles/reduced-motion.css` and import once.
 
-### 2. `aria-live-on-dynamic` — 2 components missing aria-live region
+### 2. `aria-live-on-dynamic` — 3 components missing aria-live region
 
 - `src/components/session/QuestionCard.vue` — dynamic hint/progress updates need aria-live
+- `src/components/session/AnswerFeedback.vue` — correct/incorrect announcement needs aria-live (WCAG 4.1.3). Verified in test at `tests/unit/AnswerFeedback.a11y.spec.ts` (currently .skip — un-skip after fix).
 - `src/components/notifications/NotificationListItem.vue` — new notification arrival needs aria-live
 
 Fix: wrap the dynamically-updating region with `aria-live="polite"` (status) or `role="status"`.
+
+### 2b. QuestionCard a11y spec blocked on dompurify import
+
+The component-level axe spec `tests/unit/QuestionCard.a11y.spec.ts` is `.skip`-wrapped because `QuestionFigure.vue` has an unresolved `dompurify` import that breaks module loading. Same issue codex-coder reported during RDY-002 review. Fix the import (add `dompurify` dep or switch to browser-native `DOMPurify` global), then remove the `.skip` wrappers.
 
 ### 3. `math-ltr-wrapper` — 1 dev probe page missing bidi wrapper
 
