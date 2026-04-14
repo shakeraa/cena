@@ -85,8 +85,9 @@ public sealed class StudentActorPersistTimeoutTests
         var sessionEventPublisher = Substitute.For<Cena.Actors.Sessions.ISessionEventPublisher>();
 
         // Act
+        var bktCalibrationProvider = Substitute.For<Cena.Actors.Services.IBktCalibrationProvider>();
         var actor = new StudentActor(
-            store, nats, redis, logger, methodologySwitch, bkt, hintAdjustedBkt, syncHandler,
+            store, nats, redis, logger, methodologySwitch, bkt, bktCalibrationProvider, hintAdjustedBkt, syncHandler,
             explanationOrchestrator, deliveryGate, confusionDetector, disengagementClassifier,
             sessionEventPublisher, meterFactory);
 

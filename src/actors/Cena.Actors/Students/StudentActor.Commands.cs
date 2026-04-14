@@ -80,10 +80,11 @@ public sealed partial class StudentActor
 
                 // SAI-002: Use hint-adjusted BKT when hints were used.
                 // Credit curve: 0 hints = 1.0x, 1 = 0.7x, 2 = 0.4x, 3+ = 0.1x.
+                // RDY-024: Parameters from calibration provider (default or per-subject).
                 var bktInput = new BktUpdateInput(
                     PriorMastery: priorMastery,
                     IsCorrect: isCorrect,
-                    Parameters: BktParameters.Default);
+                    Parameters: _bktCalibrationProvider.GetParameters(cmd.ConceptId));
 
                 var bktResult = cmd.HintCountUsed > 0
                     ? _hintAdjustedBktService.UpdateWithHints(bktInput, cmd.HintCountUsed)

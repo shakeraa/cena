@@ -120,7 +120,9 @@ public sealed class FeatureFlagActor : IActor
             ("pedagogy.scaffolding", true, 100.0),
             ("session.max_minutes", true, 100.0),
             ("outreach.enabled", true, 100.0),
-            ("experimental.adaptive_difficulty", false, 0.0)
+            ("experimental.adaptive_difficulty", false, 0.0),
+            // RDY-024: BKT calibrated parameters — disabled until post-pilot EM calibration
+            ("bkt.calibrated_params", false, 0.0)
         };
 
         await using var session = _store.LightweightSession();

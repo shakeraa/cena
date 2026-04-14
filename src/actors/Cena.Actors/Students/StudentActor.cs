@@ -52,6 +52,7 @@ public sealed partial class StudentActor : IActor
     private readonly ILogger<StudentActor> _logger;
     private readonly IMethodologySwitchService _methodologySwitchService;
     private readonly IBktService _bktService;
+    private readonly IBktCalibrationProvider _bktCalibrationProvider;
     private readonly IHintAdjustedBktService _hintAdjustedBktService;
     private readonly Sync.OfflineSyncHandler _offlineSyncHandler;
     private readonly Infrastructure.GracefulShutdownCoordinator? _shutdownCoordinator;
@@ -123,6 +124,7 @@ public sealed partial class StudentActor : IActor
         ILogger<StudentActor> logger,
         IMethodologySwitchService methodologySwitchService,
         IBktService bktService,
+        IBktCalibrationProvider bktCalibrationProvider,
         IHintAdjustedBktService hintAdjustedBktService,
         Sync.OfflineSyncHandler offlineSyncHandler,
         IExplanationOrchestrator explanationOrchestrator,
@@ -139,6 +141,7 @@ public sealed partial class StudentActor : IActor
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _methodologySwitchService = methodologySwitchService ?? throw new ArgumentNullException(nameof(methodologySwitchService));
         _bktService = bktService ?? throw new ArgumentNullException(nameof(bktService));
+        _bktCalibrationProvider = bktCalibrationProvider ?? throw new ArgumentNullException(nameof(bktCalibrationProvider));
         _hintAdjustedBktService = hintAdjustedBktService ?? throw new ArgumentNullException(nameof(hintAdjustedBktService));
         _shutdownCoordinator = shutdownCoordinator;
         _offlineSyncHandler = offlineSyncHandler ?? throw new ArgumentNullException(nameof(offlineSyncHandler));
