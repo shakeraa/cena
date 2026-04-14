@@ -97,6 +97,7 @@ public static class MartenConfiguration
         RegisterNotificationEvents(opts); // FIND-data-002: Was defined but never called
         RegisterMessagingEvents(opts); // FIND-data-012: Register messaging events
         RegisterEnrollmentEvents(opts); // TENANCY-P1c: Enrollment lifecycle events
+        RegisterMisconceptionEvents(opts); // RDY-006 / ADR-0003: ML-excluded misconception events
 
         // ── Register Upcasters (V(N) -> V(N+1) schema evolution, DATA-009) ──
         RegisterUpcasters(opts);
@@ -665,6 +666,17 @@ public static class MartenConfiguration
         opts.Events.MapEventType<ClassroomStatusChanged_V1>("classroom_status_changed_v1");
         opts.Events.MapEventType<EnrollmentCreated_V1>("enrollment_created_v1");
         opts.Events.MapEventType<EnrollmentStatusChanged_V1>("enrollment_status_changed_v1");
+    }
+
+    /// <summary>
+    /// RDY-006 / ADR-0003: Register session-scoped misconception events.
+    /// All three types carry [MlExcluded] and are filtered from exports/training.
+    /// </summary>
+    private static void RegisterMisconceptionEvents(StoreOptions opts)
+    {
+        opts.Events.AddEventType<MisconceptionDetected_V1>();
+        opts.Events.AddEventType<MisconceptionRemediated_V1>();
+        opts.Events.AddEventType<SessionMisconceptionsScrubbed_V1>();
     }
 
     private static void RegisterQuestionEvents(StoreOptions opts)

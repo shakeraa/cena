@@ -16,7 +16,12 @@ public enum DataCategory
     StudentRecord,
     AuditLog,
     Analytics,
-    Engagement
+    Engagement,
+    /// <summary>
+    /// RDY-006 / ADR-0003: Session-scoped misconception events.
+    /// 30-day default retention, 90-day hard cap (COPPA data minimization).
+    /// </summary>
+    SessionMisconception
 }
 
 // DataRetentionPolicy is defined in DataRetentionPolicy.cs
@@ -43,6 +48,12 @@ public sealed class TenantRetentionPolicy
     public TimeSpan? AuditLogRetentionOverride { get; set; }
     public TimeSpan? AnalyticsRetentionOverride { get; set; }
     public TimeSpan? EngagementRetentionOverride { get; set; }
+
+    /// <summary>
+    /// RDY-006: Tenant override for session misconception retention.
+    /// Clamped to <see cref="DataRetentionPolicy.SessionMisconceptionHardCap"/> (90 days).
+    /// </summary>
+    public TimeSpan? SessionMisconceptionRetentionOverride { get; set; }
 }
 
 /// <summary>

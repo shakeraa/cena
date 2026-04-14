@@ -48,4 +48,19 @@ public static class DataRetentionPolicy
     /// Enforced by RetentionWorker (FIND-privacy-004).
     /// </summary>
     public static readonly TimeSpan TutorMessageRetention = TimeSpan.FromDays(90);
+
+    /// <summary>
+    /// RDY-006 / ADR-0003 Decision 2: Session misconception events — 30 days.
+    /// Active remediation window — student may return to similar problems.
+    /// Applies to: MisconceptionDetected_V1, MisconceptionRemediated_V1,
+    /// SessionMisconceptionsScrubbed_V1.
+    /// </summary>
+    public static readonly TimeSpan SessionMisconceptionRetention = TimeSpan.FromDays(30);
+
+    /// <summary>
+    /// RDY-006 / ADR-0003 Decision 2: Hard legal cap — 90 days.
+    /// COPPA data minimization ceiling. No misconception event may survive
+    /// beyond this regardless of tenant overrides.
+    /// </summary>
+    public static readonly TimeSpan SessionMisconceptionHardCap = TimeSpan.FromDays(90);
 }

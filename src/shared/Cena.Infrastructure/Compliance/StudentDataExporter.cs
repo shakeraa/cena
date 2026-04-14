@@ -150,12 +150,14 @@ public static class StudentDataExporter
             return ls;
         }).ToList();
 
-        // 4. All domain events
-        var eventExports = events.Select(e => new StudentEventExport(
-            e.Data?.GetType().Name ?? "Unknown",
-            e.Timestamp,
-            e.Data ?? new object()
-        )).ToList();
+        // 4. All domain events — excluding [MlExcluded] types per ADR-0003 Decision 4
+        var eventExports = events
+            .Where(e => e.Data == null || !IsMlExcluded(e.Data.GetType()))
+            .Select(e => new StudentEventExport(
+                e.Data?.GetType().Name ?? "Unknown",
+                e.Timestamp,
+                e.Data ?? new object()
+            )).ToList();
 
         logger?.LogInformation(
             "FIND-privacy-006: GDPR export for {StudentId}: Profile={ProfileFields}, " +
@@ -198,6 +200,16 @@ public static class StudentDataExporter
             EventCount: 0,
             Notice: PortabilityNotice + " [Legacy export - incomplete data]");
     }
+
+    /// <summary>
+    /// RDY-006 / ADR-0003 Decision 4: checks whether an event type carries the
+    /// <see cref="MlExcludedAttribute"/>, which also signals export exclusion.
+    /// Misconception events contain specific error patterns that are personally
+    /// identifiable when combined with a student ID — they must not appear in
+    /// GDPR portability exports.
+    /// </summary>
+    public static bool IsMlExcluded(Type eventType) =>
+        eventType.GetCustomAttribute<MlExcludedAttribute>() != null;
 
     private static List<ExportedField> ExtractFields(object dataObject)
     {
