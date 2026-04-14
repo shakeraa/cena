@@ -2,7 +2,7 @@
 // =============================================================================
 // Cena Platform — Glossary Validator (RDY-027)
 // Validates that seed questions use canonical glossary terminology.
-// Run: npx tsx scripts/glossary-validator.ts [--fix] [--verbose]
+// Run: npx tsx scripts/glossary-validator.ts [--verbose]
 // =============================================================================
 
 import { readFileSync, existsSync } from 'fs';
@@ -116,23 +116,57 @@ function containsArabic(text: string): boolean {
 }
 
 function checkAgainstGlossary(
-  _text: string,
-  _glossaryMap: Map<string, GlossaryTerm>,
-  _language: string,
-  _qid: string,
-  _field: string,
-  _issues: ValidationIssue[],
+  text: string,
+  glossaryMap: Map<string, GlossaryTerm>,
+  language: string,
+  qid: string,
+  field: string,
+  issues: ValidationIssue[],
 ): void {
-  // This is a structural check — at CI time, the glossary validator
-  // runs after question import and flags terms not in the glossary.
-  // The actual matching logic uses normalized term extraction, which
-  // depends on the NLP tokenizer for each language.
-  //
-  // For the initial version, we validate:
-  // 1. Glossary file is valid JSON with required fields
-  // 2. No duplicate IDs
-  // 3. All required fields present
-  // 4. Arabic gender field present for all terms
+  // Build a sorted list of glossary terms (longest first for greedy matching)
+  const terms = [...glossaryMap.keys()].sort((a, b) => b.length - a.length);
+  const lowerText = text.toLowerCase();
+  let matchCount = 0;
+
+  for (const term of terms) {
+    let idx = 0;
+    while ((idx = lowerText.indexOf(term, idx)) !== -1) {
+      // Word-boundary check: char before/after must not be a letter
+      const charBefore = idx > 0 ? lowerText[idx - 1] : ' ';
+      const charAfter = idx + term.length < lowerText.length
+        ? lowerText[idx + term.length] : ' ';
+
+      const isWordBound = (c: string) =>
+        /[\s\p{P}\p{S}\d]/u.test(c) || c === undefined;
+
+      if (isWordBound(charBefore) && isWordBound(charAfter)) {
+        matchCount++;
+        break; // one match per term per field
+      }
+      idx += term.length;
+    }
+  }
+
+  // Report: if the field contains text in this language but zero glossary terms,
+  // flag it as a warning (the question may use non-standard terminology)
+  if (matchCount === 0) {
+    const textLen = [...text].filter(c => {
+      if (language === 'hebrew') return /[\u0590-\u05FF]/.test(c);
+      if (language === 'arabic') return /[\u0600-\u06FF]/.test(c);
+      return false;
+    }).length;
+
+    // Only flag if there's substantial text in this language (>10 chars)
+    if (textLen > 10) {
+      issues.push({
+        questionId: qid,
+        field,
+        term: `(${language})`,
+        suggestion: `Field '${field}' contains ${textLen} ${language} characters but no canonical glossary terms were found. Review terminology.`,
+        severity: 'warning',
+      });
+    }
+  }
 }
 
 // ── Validate glossary integrity ──
