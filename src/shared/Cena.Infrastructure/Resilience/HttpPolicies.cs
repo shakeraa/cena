@@ -10,9 +10,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Http;
 using Microsoft.Extensions.Logging;
 using Polly;
-using Polly.CircuitBreaker;
 using Polly.Extensions.Http;
-using Polly.Timeout;
 
 namespace Cena.Infrastructure.Resilience;
 
@@ -83,12 +81,11 @@ public static class HttpPolicies
         SetState(clientName, 0); // closed
 
         var timeoutPolicy = Policy.TimeoutAsync<HttpResponseMessage>(
-            opts.Timeout,
-            TimeoutStrategy.Optimistic);
+            opts.Timeout);
 
         var retryPolicy = HttpPolicyExtensions
             .HandleTransientHttpError()
-            .Or<TimeoutRejectedException>()
+            .Or<OperationCanceledException>()
             .WaitAndRetryAsync(
                 opts.RetryCount,
                 attempt => TimeSpan.FromSeconds(opts.RetryBaseDelay.TotalSeconds * Math.Pow(2, attempt - 1)),
@@ -102,7 +99,7 @@ public static class HttpPolicies
 
         var circuitBreakerPolicy = HttpPolicyExtensions
             .HandleTransientHttpError()
-            .Or<TimeoutRejectedException>()
+            .Or<OperationCanceledException>()
             .AdvancedCircuitBreakerAsync(
                 failureThreshold: 0.5,
                 samplingDuration: opts.CircuitBreakerSamplingDuration,
@@ -132,9 +129,12 @@ public static class HttpPolicies
                 });
 
         // Fallback wraps the whole stack: returns 503 with structured body instead of throwing.
+        // Catch both BrokenCircuitException (Polly) and timeout exceptions.
+        // Using base Exception types to avoid Polly v7/v8 type ambiguity.
         var fallbackPolicy = Policy<HttpResponseMessage>
-            .Handle<BrokenCircuitException>()
-            .Or<TimeoutRejectedException>()
+            .Handle<Exception>(ex =>
+                ex.GetType().Name == "BrokenCircuitException" ||
+                ex is OperationCanceledException)
             .FallbackAsync(
                 fallbackAction: (_, _) =>
                 {
