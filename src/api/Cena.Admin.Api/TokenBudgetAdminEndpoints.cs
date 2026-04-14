@@ -4,6 +4,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -23,7 +24,11 @@ public static class TokenBudgetAdminEndpoints
         {
             var result = await service.GetBudgetStatusAsync(classId, date);
             return Results.Ok(result);
-        }).WithName("GetTokenBudgetStatus");
+        }).WithName("GetTokenBudgetStatus")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/trend", async (
             int? days,
@@ -31,7 +36,11 @@ public static class TokenBudgetAdminEndpoints
         {
             var result = await service.GetTrendAsync(days ?? 7);
             return Results.Ok(result);
-        }).WithName("GetTokenBudgetTrend");
+        }).WithName("GetTokenBudgetTrend")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPut("/limits", async (
             UpdateBudgetLimitsRequest request,
@@ -41,7 +50,11 @@ public static class TokenBudgetAdminEndpoints
             return success
                 ? Results.Ok(new { success = true, message = "Budget limits updated" })
                 : Results.Problem("Failed to update budget limits");
-        }).WithName("UpdateTokenBudgetLimits");
+        }).WithName("UpdateTokenBudgetLimits")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

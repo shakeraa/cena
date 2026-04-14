@@ -24,6 +24,12 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.0.0-alpha.5" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.11.0-beta.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
   </ItemGroup>
+
+  <!-- RDY-009: Generate OpenAPI document after build -->
+  <Target Name="GenerateOpenApi" AfterTargets="Build">
+    <Exec Command="dotnet swagger tofile --output $(OutputPath)openapi.json $(TargetPath) v1" EnvironmentVariables="CENA_OPENAPI_GEN=1;CENA_SKIP_SEED=1;ASPNETCORE_ENVIRONMENT=Development;Firebase__ProjectId=cena-openapi-gen" />
+  </Target>
 
 </Project>

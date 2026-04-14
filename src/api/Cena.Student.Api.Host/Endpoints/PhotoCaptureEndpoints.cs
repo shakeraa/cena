@@ -10,6 +10,7 @@ using System.Security.Claims;
 using Cena.Infrastructure.Moderation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Student.Api.Host.Endpoints;
 

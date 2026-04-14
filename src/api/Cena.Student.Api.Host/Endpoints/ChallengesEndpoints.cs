@@ -16,6 +16,7 @@ using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -29,20 +30,44 @@ public static class ChallengesEndpoints
 
         // Daily challenge endpoints
         group.MapGet("/daily", GetDailyChallenge).WithName("GetDailyChallenge");
-        group.MapPost("/daily/start", StartDailyChallenge).WithName("StartDailyChallenge");
+        group.MapPost("/daily/start", StartDailyChallenge).WithName("StartDailyChallenge")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapGet("/daily/leaderboard", GetDailyLeaderboard).WithName("GetDailyLeaderboard");
-        group.MapGet("/daily/history", GetDailyHistory).WithName("GetDailyHistory");
+        group.MapGet("/daily/history", GetDailyHistory).WithName("GetDailyHistory")
+    .Produces<DailyChallengeHistoryDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Boss battle endpoints
-        group.MapGet("/boss", GetBossBattles).WithName("GetBossBattles");
-        group.MapGet("/boss/{id}", GetBossBattleDetail).WithName("GetBossBattleDetail");
-        group.MapPost("/boss/{id}/start", StartBossBattle).WithName("StartBossBattle");
+        group.MapGet("/boss", GetBossBattles).WithName("GetBossBattles")
+    .Produces<BossBattleListDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/boss/{id}", GetBossBattleDetail).WithName("GetBossBattleDetail")
+    .Produces<BossBattleDetailDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/boss/{id}/start", StartBossBattle).WithName("StartBossBattle")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Card chain endpoints
-        group.MapGet("/chains", GetCardChains).WithName("GetCardChains");
+        group.MapGet("/chains", GetCardChains).WithName("GetCardChains")
+    .Produces<CardChainListDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Tournament endpoints
-        group.MapGet("/tournaments", GetTournaments).WithName("GetTournaments");
+        group.MapGet("/tournaments", GetTournaments).WithName("GetTournaments")
+    .Produces<TournamentListDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

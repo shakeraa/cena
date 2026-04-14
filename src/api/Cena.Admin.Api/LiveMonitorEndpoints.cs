@@ -10,6 +10,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -56,7 +57,10 @@ public static class LiveMonitorEndpoints
             return Results.Ok(result);
         })
         .WithName("LiveSessionsSnapshot")
-        .RequireRateLimiting("api");
+        .RequireRateLimiting("api")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

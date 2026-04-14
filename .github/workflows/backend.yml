@@ -30,6 +30,9 @@ jobs:
           dotnet restore src/api/Cena.Admin.Api.Tests/Cena.Admin.Api.Tests.csproj
           dotnet restore src/shared/Cena.Infrastructure.Tests/Cena.Infrastructure.Tests.csproj
 
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
       - name: Build (Release)
         run: |
           dotnet build src/actors/Cena.Actors.Host/ -c Release --no-restore
@@ -66,3 +69,11 @@ jobs:
         with:
           name: test-results
           path: '**/*.trx'
+
+      - name: Upload OpenAPI artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-specs
+          path: |
+            src/api/Cena.Student.Api.Host/bin/Release/net9.0/openapi.json
+            src/api/Cena.Admin.Api.Host/bin/Release/net9.0/openapi.json

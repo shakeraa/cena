@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -29,17 +30,26 @@ public static class SocialEndpoints
         // Social features require consent
         group.MapGet("/class-feed", GetClassFeed)
             .WithName("GetClassFeed")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<ClassFeedDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         
         // Peer comparison features require consent
         group.MapGet("/peers/solutions", GetPeerSolutions)
             .WithName("GetPeerSolutions")
-            .RequireConsent(ProcessingPurpose.PeerComparison);
+            .RequireConsent(ProcessingPurpose.PeerComparison)
+    .Produces<PeerSolutionListDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         
         // Social features require consent
         group.MapGet("/friends", GetFriends)
             .WithName("GetFriends")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         
         // Social features require consent
         group.MapGet("/study-rooms", GetStudyRooms)
@@ -49,37 +59,78 @@ public static class SocialEndpoints
         // STB-06b: Write endpoints - all require SocialFeatures consent
         group.MapPost("/reactions", AddReaction)
             .WithName("AddReaction")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<AddReactionResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapPost("/comments", AddComment)
             .WithName("AddComment")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<AddCommentResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapPost("/friends/request", SendFriendRequest)
             .WithName("SendFriendRequest")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<SendFriendRequestResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapPost("/friends/{id}/accept", AcceptFriendRequest)
             .WithName("AcceptFriendRequest")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<AcceptFriendRequestResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapPost("/study-rooms", CreateStudyRoom)
             .WithName("CreateStudyRoom")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<StudyRoom>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapPost("/study-rooms/{id}/join", JoinStudyRoom)
             .WithName("JoinStudyRoom")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<JoinStudyRoomResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapPost("/study-rooms/{id}/leave", LeaveStudyRoom)
             .WithName("LeaveStudyRoom")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // FIND-privacy-018: Content reporting & user blocking
         // ICO Children's Code Std 11 — safeguarding tools for minors
         group.MapPost("/report", SubmitReport)
             .WithName("SubmitReport")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<SubmitReportResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapPost("/block", BlockUser)
             .WithName("BlockUser")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<BlockUserResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapDelete("/block/{targetStudentId}", UnblockUser)
             .WithName("UnblockUser")
-            .RequireConsent(ProcessingPurpose.SocialFeatures);
+            .RequireConsent(ProcessingPurpose.SocialFeatures)
+    .Produces<UnblockUserResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

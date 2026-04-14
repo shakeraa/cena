@@ -25,58 +25,196 @@ from typing import Any
 
 HEBREW_MATH_GLOSSARY = """
 ## מילון מונחים מתמטיים (Hebrew Math Terminology)
+## Canonical source: config/glossary.json (RDY-027)
 
+### אלגברה (Algebra)
 | English | Hebrew | Transliteration |
 |---------|--------|----------------|
 | Equation | משוואה | Mishva'a |
 | Inequality | אי-שוויון | I-shivyon |
 | Variable | משתנה | Mishtane |
 | Coefficient | מקדם | Mekadem |
-| Function | פונקציה | Funktziya |
-| Derivative | נגזרת | Nigzeret |
-| Integral | אינטגרל | Integral |
-| Limit | גבול | Gvul |
-| Slope | שיפוע | Shipu'a |
-| Intercept | נקודת חיתוך | Nekudat Hituch |
+| Constant | קבוע | Kavu'a |
+| Expression | ביטוי | Bituy |
+| Term | איבר | Ever |
+| Polynomial | פולינום | Polinom |
+| Monomial | חד-איבר | Chad-Ever |
+| Binomial | דו-איבר | Du-Ever |
 | Quadratic | ריבועי/ת | Ribu'i/Ribu'it |
 | Linear | ליניארי/ת | Lineari/Linearit |
-| Polynomial | פולינום | Polinom |
+| Factoring | פירוק לגורמים | Piruk LeGormim |
+| Discriminant | דיסקרימיננטה | Diskriminanta |
+| Root (of equation) | שורש המשוואה | Shoresh HaMishva'a |
+| Solution | פתרון | Pitaron |
+| Substitution | הצבה | Hatzava |
+| Simplification | פישוט | Pishut |
+| Absolute value | ערך מוחלט | Erech Muchlat |
 | Fraction | שבר | Shever |
 | Common denominator | מכנה משותף | Mechane Meshutaf |
-| Factoring | פירוק לגורמים | Piruk LeGormim |
+| Numerator | מונה | Mone |
+| Denominator | מכנה | Mechane |
+| System of equations | מערכת משוואות | Ma'arechet Mishva'ot |
+| Arithmetic sequence | סדרה חשבונית | Sidra Cheshbonit |
+| Geometric sequence | סדרה הנדסית | Sidra Handasit |
+| Sequence | סדרה | Sidra |
+| Series | טור | Tur |
+| Common difference | הפרש | Hefresh |
+| Common ratio | מנה | Mana |
+| Exponent | מעריך (חזקה) | Ma'arich (Chezka) |
+| Power | חזקה | Chezka |
+| Logarithm | לוגריתם | Logaritm |
+| Natural logarithm | לוגריתם טבעי | Logaritm Tiv'i |
+
+### דוגמאות (Functions)
+| English | Hebrew | Transliteration |
+|---------|--------|----------------|
+| Function | פונקציה | Funktziya |
+| Domain | תחום | Tchum |
+| Range | טווח | Tavach |
+| Slope | שיפוע | Shipu'a |
+| Intercept | נקודת חיתוך | Nekudat Hituch |
+| Y-intercept | נקודת חיתוך עם ציר Y | Nekudat Hituch im Tzir Y |
+| Graph | גרף | Graf |
+| Increasing function | פונקציה עולה | Funktziya Ola |
+| Decreasing function | פונקציה יורדת | Funktziya Yoredet |
+| Maximum | מקסימום | Maksimum |
+| Minimum | מינימום | Minimum |
+| Vertex | קודקוד | Kodkod |
+| Parabola | פרבולה | Parabola |
+| Asymptote | אסימפטוטה | Asimptota |
+| Exponential function | פונקציה מעריכית | Funktziya Ma'arichit |
+| Inverse function | פונקציה הפוכה | Funktziya Hafucha |
+| Composite function | פונקציה מורכבת | Funktziya Murekevet |
+| Even function | פונקציה זוגית | Funktziya Zugit |
+| Odd function | פונקציה אי-זוגית | Funktziya I-Zugit |
+| Continuous | רציפה | Retzifa |
+
+### חשבון דיפרנציאלי ואינטגרלי (Calculus)
+| English | Hebrew | Transliteration |
+|---------|--------|----------------|
+| Limit | גבול | Gvul |
+| Derivative | נגזרת | Nigzeret |
+| Integral | אינטגרל | Integral |
+| Definite integral | אינטגרל מסוים | Integral Mesuyyam |
+| Indefinite integral | אינטגרל לא-מסוים | Integral Lo-Mesuyyam |
+| Differentiation | גזירה | Gzira |
+| Integration | אינטגרציה | Integratziya |
 | Chain rule | כלל השרשרת | Klal HaSharsheret |
 | Product rule | כלל המכפלה | Klal HaMachpela |
 | Quotient rule | כלל המנה | Klal HaMana |
+| Rate of change | קצב שינוי | Ketzev Shinuy |
+| Tangent line | משיק | Mashik |
+| Inflection point | נקודת פיתול | Nekudat Pitul |
+| Critical point | נקודה קריטית | Nekuda Kritit |
 | Integration by parts | אינטגרציה בחלקים | Integratziya BaChalakim |
+| Area under curve | שטח מתחת לעקומה | Shetach Mitachat La'akuma |
+
+### גיאומטריה (Geometry)
+| English | Hebrew | Transliteration |
+|---------|--------|----------------|
+| Angle | זווית | Zavit |
+| Triangle | משולש | Meshulash |
+| Circle | מעגל | Ma'agal |
+| Radius | רדיוס | Radius |
+| Diameter | קוטר | Koter |
+| Perpendicular | ניצב | Nitzav |
+| Parallel | מקביל | Makbil |
+| Area | שטח | Shetach |
+| Perimeter | היקף | Hekef |
+| Volume | נפח | Nefach |
+| Coordinate | קואורדינטה | Koordinata |
+| Point | נקודה | Nekuda |
+| Line | ישר | Yashar |
+| Midpoint | אמצע קטע | Emtza Keta |
+| Distance | מרחק | Merchak |
+| Congruent | חופף | Chofef |
+| Similar | דומה | Dome |
+| Isosceles triangle | משולש שווה-שוקיים | Meshulash Shave-Shokayim |
+| Right triangle | משולש ישר-זווית | Meshulash Yashar-Zavit |
+| Hypotenuse | יתר | Yeter |
+| Square | ריבוע | Ribu'a |
+| Rectangle | מלבן | Malben |
+| Rhombus | מעוין | Me'uyan |
+| Trapezoid | טרפז | Trapez |
+| Regular polygon | מצולע משוכלל | Metzula Meshuchlal |
+| Sector | גזרה | Gzera |
+| Arc | קשת | Keshet |
+| Tangent | משיק | Mashik |
+| Chord | מיתר | Metar |
+| Inscribed angle | זווית היקפית | Zavit Hekfit |
+| Central angle | זווית מרכזית | Zavit Merkazit |
+| Sphere | כדור | Kadur |
+| Cone | חרוט | Charut |
+| Cylinder | גליל | Galil |
+| Prism | מנסרה | Mansera |
+
+### טריגונומטריה (Trigonometry)
+| English | Hebrew | Transliteration |
+|---------|--------|----------------|
 | Trigonometric | טריגונומטרי/ת | Trigonometri/Trigonometrit |
+| Sine | סינוס | Sinus |
+| Cosine | קוסינוס | Kosinus |
+| Tangent | טנגנס | Tangens |
+| Radian | רדיאן | Radian |
 | Pythagorean theorem | משפט פיתגורס | Mishpat Pitagoras |
-| Proof | הוכחה | Hochacha |
-| Theorem | משפט | Mishpat |
-| Sequence | סדרה | Sidra |
-| Series | טור | Tur |
-| Arithmetic sequence | סדרה חשבונית | Sidra Cheshbonit |
-| Geometric sequence | סדרה הנדסית | Sidra Handasit |
+| Sine rule | כלל הסינוסים | Klal HaSinusim |
+| Cosine rule | כלל הקוסינוסים | Klal HaKosinusim |
+| Unit circle | מעגל היחידה | Ma'agal HaYechida |
+| Identity | זהות | Zehut |
+| Cotangent | קוטנגנס | Kotangens |
+| Secant | סיקנס | Sekans |
+| Cosecant | קוסיקנס | Kosekans |
+| Inverse trigonometric | פונקציה טריגונומטרית הפוכה | Funktziya Trigonometrit Hafucha |
+
+### הסתברות וסטטיסטיקה (Probability & Statistics)
+| English | Hebrew | Transliteration |
+|---------|--------|----------------|
 | Probability | הסתברות | Histabrut |
 | Permutation | תמורה | Tmura |
 | Combination | צירוף | Tzeruf |
-| Domain | תחום | Tchum |
-| Range | טווח | Tavach |
-| Asymptote | אסימפטוטה | Asimptota |
-| Vertex | קודקוד | Kodkod |
-| Parabola | פרבולה | Parabola |
-| Absolute value | ערך מוחלט | Erech Muchlat |
+| Sample space | מרחב המדגם | Merchav HaMidgam |
+| Event | מאורע | Me'ora |
+| Independent events | מאורעות בלתי-תלויים | Me'ora'ot Bilti-Tluyim |
+| Conditional probability | הסתברות מותנית | Histabrut Mutnit |
+| Binomial distribution | התפלגות בינומית | Hitpalgut Binomit |
+| Normal distribution | התפלגות נורמלית | Hitpalgut Normalit |
+| Mean | ממוצע | Memutza |
+| Standard deviation | סטיית תקן | Stiyyat Teken |
+| Variance | שונות | Shonut |
+
+### וקטורים (Vectors)
+| English | Hebrew | Transliteration |
+|---------|--------|----------------|
+| Vector | וקטור | Vektor |
+| Scalar | סקלר | Skalar |
+| Dot product | מכפלה סקלרית | Machpela Skalarit |
+| Cross product | מכפלה וקטורית | Machpela Vektorit |
+| Magnitude | גודל | Godel |
+
+### מונחים כלליים (General Terms)
+| English | Hebrew | Transliteration |
+|---------|--------|----------------|
+| Proof | הוכחה | Hochacha |
+| Theorem | משפט | Mishpat |
+| Axiom | אקסיומה | Aksioma |
+| Conjecture | השערה | Hash'ara |
+| Contradiction | סתירה | Stira |
 | Square root | שורש ריבועי | Shoresh Ribu'i |
-| Logarithm | לוגריתם | Logaritm |
-| Exponent | מעריך (חזקה) | Ma'arich (Chezka) |
+| Cube root | שורש שלישי | Shoresh Shlishi |
 | Matrix | מטריצה | Matritza |
 | Determinant | דטרמיננטה | Determinanta |
-| Vector | וקטור | Vektor |
+| Set | קבוצה | Kvutza |
+| Subset | תת-קבוצה | Tat-Kvutza |
+| Union | איחוד | Ichud |
+| Intersection | חיתוך | Hituch |
+| Empty set | קבוצה ריקה | Kvutza Reika |
 
 ### הערות חשובות (Important Notes):
 - Always use standard Bagrut exam terminology, not university-level terms.
 - Write mathematical expressions in standard notation, not Hebrew transliterations.
 - Example: Write "x² + 3x - 4 = 0" not "איקס בריבוע ועוד שלוש איקס פחות ארבע שווה אפס".
 - Fractions: use "½" or "1/2" notation, not "חצי" unless in natural language context.
+- Canonical glossary: config/glossary.json (RDY-027) is the source of truth.
 """.strip()
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -85,6 +223,7 @@ HEBREW_MATH_GLOSSARY = """
 
 ARABIC_MATH_GLOSSARY = """
 ## قاموس المصطلحات الرياضية (Arabic Math Terminology)
+## Canonical source: config/glossary.json (RDY-027)
 
 ### الجبر (Algebra)
 | English | Arabic | Transliteration |

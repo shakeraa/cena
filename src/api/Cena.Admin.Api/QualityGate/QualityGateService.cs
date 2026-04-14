@@ -69,15 +69,24 @@ public sealed class QualityGateService : IQualityGateService
         var (bloomScore, bloomViolations) = BloomAlignmentScorer.Score(input);
         allViolations.AddRange(bloomViolations);
 
+        // Stage 1: Glossary Term Check (RDY-027)
+        var (glossaryScore, glossaryViolations) = GlossaryTermChecker.Check(input);
+        allViolations.AddRange(glossaryViolations);
+
         // Stage 2: LLM-based scoring for FactualAccuracy, LanguageQuality, PedagogicalQuality
         var (factualAccuracy, languageQuality, pedagogicalQuality) =
             await EvaluateWithLlmAsync(input);
+
+        // Blend glossary coverage into LanguageQuality (30% glossary, 70% LLM)
+        // This rewards questions that use canonical terminology from the glossary.
+        int blendedLanguageQuality = (int)Math.Round(0.70 * languageQuality + 0.30 * glossaryScore);
+        blendedLanguageQuality = Math.Clamp(blendedLanguageQuality, 0, 100);
 
         int culturalSensitivity = 80; // Default until dedicated cultural sensitivity LLM stage
 
         var scores = new DimensionScores(
             FactualAccuracy: factualAccuracy,
-            LanguageQuality: languageQuality,
+            LanguageQuality: blendedLanguageQuality,
             PedagogicalQuality: pedagogicalQuality,
             DistractorQuality: distractorScore,
             StemClarity: stemScore,

@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -32,15 +33,25 @@ public static class TutorEndpoints
         // Thread endpoints - all require ThirdPartyAI consent
         group.MapGet("/threads", GetThreads)
             .WithName("GetTutorThreads")
-            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi)
+    .Produces<TutorThreadListDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapPost("/threads", CreateThread)
             .WithName("CreateTutorThread")
-            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi)
+    .Produces<CreateThreadResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         
         // Message endpoints - all require ThirdPartyAI consent
         group.MapGet("/threads/{threadId}/messages", GetMessages)
             .WithName("GetTutorMessages")
-            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi)
+    .Produces<TutorMessageListDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         
         // FIND-arch-004: SendMessage now calls the real LLM via ITutorMessageService,
         // so it must share the same rate limit as /stream (10 msg/min/student).
@@ -50,7 +61,12 @@ public static class TutorEndpoints
             .RequireRateLimiting("tutor")      // Per-user: 10 msg/min/student
             .RequireRateLimiting("tutor-tenant") // Per-tenant: 200 msg/min/school
             .RequireRateLimiting("tutor-global") // Global: 1000 msg/min across all users
-            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi)
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // SSE streaming endpoint (HARDEN: Real LLM with rate limiting)
         // Requires ThirdPartyAI consent

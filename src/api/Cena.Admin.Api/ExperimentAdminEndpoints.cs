@@ -6,6 +6,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -23,19 +24,33 @@ public static class ExperimentAdminEndpoints
         {
             var result = await service.GetExperimentsAsync(user);
             return Results.Ok(result);
-        }).WithName("GetExperiments");
+        }).WithName("GetExperiments")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/{experimentName}", async (string experimentName, ClaimsPrincipal user, IExperimentAdminService service) =>
         {
             var result = await service.GetExperimentDetailAsync(experimentName, user);
             return result is not null ? Results.Ok(result) : Results.NotFound();
-        }).WithName("GetExperimentDetail");
+        }).WithName("GetExperimentDetail")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/{experimentName}/funnel", async (string experimentName, ClaimsPrincipal user, IExperimentAdminService service) =>
         {
             var result = await service.GetFunnelAsync(experimentName, user);
             return result is not null ? Results.Ok(result) : Results.NotFound();
-        }).WithName("GetExperimentFunnel");
+        }).WithName("GetExperimentFunnel")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

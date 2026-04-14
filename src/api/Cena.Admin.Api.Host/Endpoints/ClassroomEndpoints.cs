@@ -10,7 +10,9 @@ using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -22,7 +24,12 @@ public static class ClassroomEndpoints
             .WithTags("Classrooms")
             .RequireAuthorization();
 
-        group.MapPost("/join", JoinClassroom).WithName("JoinClassroom");
+        group.MapPost("/join", JoinClassroom).WithName("JoinClassroom")
+    .Produces<ClassroomJoinResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -33,7 +40,7 @@ public static class ClassroomEndpoints
     // POST /api/classrooms/join
     private static async Task<IResult> JoinClassroom(
         HttpContext ctx,
-        IDocumentStore store,
+        [FromServices] IDocumentStore store,
         ClassroomJoinRequest request)
     {
         var studentId = GetStudentId(ctx.User);

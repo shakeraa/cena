@@ -10,7 +10,9 @@ using Cena.Infrastructure.Content;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -22,18 +24,48 @@ public static class KnowledgeEndpoints
             .RequireAuthorization();
 
         // Content/Concepts endpoints
-        group.MapGet("/api/content/concepts", GetConcepts).WithName("GetConcepts").WithTags("Content");
-        group.MapGet("/api/content/concepts/{id}", GetConceptDetail).WithName("GetConceptDetail").WithTags("Content");
-        group.MapGet("/api/content/concepts/{id}/graph", GetConceptGraph).WithName("GetConceptGraph").WithTags("Content");
-        group.MapGet("/api/content/search", SearchConcepts).WithName("SearchConcepts").WithTags("Content");
-        group.MapGet("/api/content/bagrut", GetBagrutConcepts).WithName("GetBagrutConcepts").WithTags("Content");
+        group.MapGet("/api/content/concepts", GetConcepts).WithName("GetConcepts").WithTags("Content")
+    .Produces<ConceptListDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/api/content/concepts/{id}", GetConceptDetail).WithName("GetConceptDetail").WithTags("Content")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/api/content/concepts/{id}/graph", GetConceptGraph).WithName("GetConceptGraph").WithTags("Content")
+    .Produces<ConceptGraphDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/api/content/search", SearchConcepts).WithName("SearchConcepts").WithTags("Content")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/api/content/bagrut", GetBagrutConcepts).WithName("GetBagrutConcepts").WithTags("Content")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         
         // Learning paths
-        group.MapGet("/api/content/paths", GetLearningPaths).WithName("GetLearningPaths").WithTags("Content");
-        group.MapGet("/api/content/paths/{id}", GetLearningPathDetail).WithName("GetLearningPathDetail").WithTags("Content");
+        group.MapGet("/api/content/paths", GetLearningPaths).WithName("GetLearningPaths").WithTags("Content")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/api/content/paths/{id}", GetLearningPathDetail).WithName("GetLearningPathDetail").WithTags("Content")
+    .Produces<LearningPathDetailDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Knowledge path endpoint
-        group.MapGet("/api/knowledge/path", GetKnowledgePath).WithName("GetKnowledgePath").WithTags("Knowledge");
+        group.MapGet("/api/knowledge/path", GetKnowledgePath).WithName("GetKnowledgePath").WithTags("Knowledge")
+    .Produces<PathDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -41,7 +73,7 @@ public static class KnowledgeEndpoints
     // GET /api/content/concepts — returns list of concepts
     private static async Task<IResult> GetConcepts(
         HttpContext ctx,
-        IContentCatalogService catalog,
+        [FromServices] IContentCatalogService catalog,
         string? subject = null)
     {
         var studentId = GetStudentId(ctx.User);
@@ -70,7 +102,7 @@ public static class KnowledgeEndpoints
     // GET /api/content/concepts/{id} — returns concept detail
     private static async Task<IResult> GetConceptDetail(
         HttpContext ctx,
-        IContentCatalogService catalog,
+        [FromServices] IContentCatalogService catalog,
         string id)
     {
         var studentId = GetStudentId(ctx.User);
@@ -90,7 +122,7 @@ public static class KnowledgeEndpoints
     // GET /api/content/concepts/{id}/graph — returns concept graph
     private static async Task<IResult> GetConceptGraph(
         HttpContext ctx,
-        IContentCatalogService catalog,
+        [FromServices] IContentCatalogService catalog,
         string id)
     {
         var studentId = GetStudentId(ctx.User);
@@ -116,7 +148,7 @@ public static class KnowledgeEndpoints
     // GET /api/content/search?q={query} — search concepts
     private static async Task<IResult> SearchConcepts(
         HttpContext ctx,
-        IContentCatalogService catalog,
+        [FromServices] IContentCatalogService catalog,
         string q,
         string? subject = null)
     {
@@ -138,7 +170,7 @@ public static class KnowledgeEndpoints
     // GET /api/content/bagrut — Bagrut-relevant concepts
     private static async Task<IResult> GetBagrutConcepts(
         HttpContext ctx,
-        IContentCatalogService catalog,
+        [FromServices] IContentCatalogService catalog,
         string? subject = null,
         int? limit = 20)
     {
@@ -163,7 +195,7 @@ public static class KnowledgeEndpoints
     // GET /api/content/paths — returns learning paths
     private static async Task<IResult> GetLearningPaths(
         HttpContext ctx,
-        IContentCatalogService catalog,
+        [FromServices] IContentCatalogService catalog,
         string? subject = null,
         string? grade = null)
     {
@@ -191,7 +223,7 @@ public static class KnowledgeEndpoints
     // GET /api/content/paths/{id} — returns learning path detail
     private static async Task<IResult> GetLearningPathDetail(
         HttpContext ctx,
-        IContentCatalogService catalog,
+        [FromServices] IContentCatalogService catalog,
         string id)
     {
         var studentId = GetStudentId(ctx.User);
@@ -227,7 +259,7 @@ public static class KnowledgeEndpoints
     // GET /api/knowledge/path?from={conceptA}&to={conceptB} — returns learning path
     private static async Task<IResult> GetKnowledgePath(
         HttpContext ctx,
-        IContentCatalogService catalog,
+        [FromServices] IContentCatalogService catalog,
         string? from = null,
         string? to = null)
     {

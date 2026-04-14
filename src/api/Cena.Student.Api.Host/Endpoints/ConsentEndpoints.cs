@@ -12,6 +12,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -26,19 +27,32 @@ public static class ConsentEndpoints
             .RequireAuthorization();
 
         // GET /api/me/consent - Get current student's consent status for all purposes
-        group.MapGet("", GetConsentStatus).WithName("GetMyConsentStatus");
+        group.MapGet("", GetConsentStatus).WithName("GetMyConsentStatus")
+    .Produces<ConsentOverviewDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/me/consent - Grant consent for a specific purpose
         group.MapPost("", GrantConsent).WithName("GrantMyConsent");
 
         // POST /api/me/consent/bulk - Bulk update consent for multiple purposes
-        group.MapPost("/bulk", BulkUpdateConsent).WithName("BulkUpdateMyConsent");
+        group.MapPost("/bulk", BulkUpdateConsent).WithName("BulkUpdateMyConsent")
+    .Produces<BulkConsentResultDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/me/consent/defaults - Get default consent values (adult vs minor)
-        group.MapGet("/defaults", GetConsentDefaults).WithName("GetConsentDefaults");
+        group.MapGet("/defaults", GetConsentDefaults).WithName("GetConsentDefaults")
+    .Produces<ConsentDefaultsDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // DELETE /api/me/consent/{purpose} - Revoke consent for a specific purpose
-        group.MapDelete("/{purpose}", RevokeConsent).WithName("RevokeMyConsent");
+        group.MapDelete("/{purpose}", RevokeConsent).WithName("RevokeMyConsent")
+    .Produces<ConsentGrantResultDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

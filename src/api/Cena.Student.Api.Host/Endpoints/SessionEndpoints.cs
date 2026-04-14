@@ -25,6 +25,8 @@ using Microsoft.Extensions.Logging;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using NATS.Client.Core;
+using Cena.Infrastructure.Errors;
+using Microsoft.AspNetCore.Mvc;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -52,12 +54,7 @@ public static class SessionEndpoints
 
         // POST /api/sessions/start — start a new learning session (STB-01)
         // FIND-pedagogy-016: inject IAdaptiveQuestionPool to seed the question queue
-        group.MapPost("/start", async (
-            HttpContext ctx,
-            IDocumentStore store,
-            IAdaptiveQuestionPool adaptivePool,
-            ILogger<SessionLogMarker> logger,
-            SessionStartRequest request) =>
+        group.MapPost("/start", async (HttpContext ctx, IDocumentStore store, [FromServices] IAdaptiveQuestionPool adaptivePool, ILogger<SessionLogMarker> logger, SessionStartRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -193,17 +190,15 @@ public static class SessionEndpoints
 
             return Results.Ok(dto);
         })
-        .WithName("GetActiveSessionV2");
+        .WithName("GetActiveSessionV2")
+    .Produces<ActiveSessionDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/sessions — list student's sessions (paginated, filterable)
-        group.MapGet("/", async (
-            HttpContext ctx,
-            IDocumentStore store,
-            string? subject,
-            DateTimeOffset? from,
-            DateTimeOffset? to,
-            int? page,
-            int? pageSize) =>
+        group.MapGet("/", async (HttpContext ctx, IDocumentStore store, string? subject, DateTimeOffset? from, DateTimeOffset? to, int? page, int? pageSize) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -238,7 +233,11 @@ public static class SessionEndpoints
             var dtos = items.Select(MapToSummary).ToList();
             return Results.Ok(new SessionListResponse(dtos, totalCount, validPage, validPageSize));
         })
-        .WithName("GetStudentSessions");
+        .WithName("GetStudentSessions")
+    .Produces<SessionListResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/sessions/{sessionId} — full session detail
         group.MapGet("/{sessionId}", async (
@@ -293,7 +292,12 @@ public static class SessionEndpoints
                 EndedAt: doc.EndedAt,
                 MasteryDeltas: masteryDeltas));
         })
-        .WithName("GetSessionDetail");
+        .WithName("GetSessionDetail")
+    .Produces<SessionDetailDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/sessions/{sessionId}/history — session question history (STB-01c)
         group.MapGet("/{sessionId}/history", async (
@@ -395,7 +399,12 @@ public static class SessionEndpoints
                 EndedAt: doc.EndedAt,
                 Attempts: attempts));
         })
-        .WithName("GetSessionReplay");
+        .WithName("GetSessionReplay")
+    .Produces<SessionReplayDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/sessions/{sessionId}/resume — resume an interrupted session
         group.MapPost("/{sessionId}/resume", async (
@@ -463,7 +472,13 @@ public static class SessionEndpoints
                 message    = "Resume command published. Connect via SignalR to receive the next question."
             });
         })
-        .WithName("ResumeSession");
+        .WithName("ResumeSession")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // ═════════════════════════════════════════════════════════════════════════
         // STB-01b: In-Session Question + Answer Endpoints
@@ -471,14 +486,7 @@ public static class SessionEndpoints
 
         // GET /api/sessions/{sessionId}/current-question — get current question
         // FIND-pedagogy-016: inject IAdaptiveQuestionPool for lazy refill
-        group.MapGet("/{sessionId}/current-question", async (
-            string sessionId,
-            HttpContext ctx,
-            IDocumentStore store,
-            IQuestionBank questionBank,
-            IScaffoldingService scaffoldingService,
-            IAdaptiveQuestionPool adaptivePool,
-            ILogger<SessionLogMarker> logger) =>
+        group.MapGet("/{sessionId}/current-question", async (string sessionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IScaffoldingService scaffoldingService, [FromServices] IAdaptiveQuestionPool adaptivePool, ILogger<SessionLogMarker> logger) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -600,19 +608,17 @@ public static class SessionEndpoints
                 HintsAvailable: metadata.MaxHints,
                 HintsRemaining: Math.Max(0, metadata.MaxHints - hintsUsed)));
         })
-        .WithName("GetCurrentQuestion");
+        .WithName("GetCurrentQuestion")
+    .Produces<SessionQuestionDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/sessions/{sessionId}/answer — submit an answer
-        group.MapPost("/{sessionId}/answer", async (
-            string sessionId,
-            HttpContext ctx,
-            IDocumentStore store,
-            IQuestionBank questionBank,
-            IBktService bktService,
-            IErrorClassificationService errorClassifier,
-            IEloDifficultyService eloService,
-            ILoggerFactory loggerFactory,
-            SessionAnswerRequest request) =>
+        group.MapPost("/{sessionId}/answer", async (string sessionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IBktService bktService, [FromServices] IErrorClassificationService errorClassifier, [FromServices] IEloDifficultyService eloService, [FromServices] ILoggerFactory loggerFactory, SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -920,18 +926,16 @@ public static class SessionEndpoints
                 AccuracyPercent: accuracyPercent,
                 DurationSeconds: durationSeconds));
         })
-        .WithName("CompleteSession");
+        .WithName("CompleteSession")
+    .Produces<SessionCompletedDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/sessions/{sessionId}/question/{questionId}/hint — request a progressive hint
-        group.MapPost("/{sessionId}/question/{questionId}/hint", async (
-            string sessionId,
-            string questionId,
-            HttpContext ctx,
-            IDocumentStore store,
-            IQuestionBank questionBank,
-            IHintGenerator hintGenerator,
-            ILogger<SessionLogMarker> logger,
-            SessionHintRequest request) =>
+        group.MapPost("/{sessionId}/question/{questionId}/hint", async (string sessionId, string questionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IHintGenerator hintGenerator, ILogger<SessionLogMarker> logger, SessionHintRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -1052,7 +1056,13 @@ public static class SessionEndpoints
 
             return Results.Ok(response);
         })
-        .WithName("RequestHint");
+        .WithName("RequestHint")
+    .Produces<SessionHintResponseDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

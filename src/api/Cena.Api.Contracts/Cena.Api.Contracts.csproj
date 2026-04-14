@@ -9,6 +9,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\actors\Cena.Actors\Cena.Actors.csproj" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
   </ItemGroup>
 
 </Project>

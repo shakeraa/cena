@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -53,7 +54,11 @@ public static class GdprEndpoints
                 studentId, consents.Count, ctx.User.Identity?.Name ?? "unknown");
 
             return Results.Ok(new { studentId, consents });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/consents", async (
             [FromBody] ConsentRequest request,
@@ -75,7 +80,11 @@ public static class GdprEndpoints
                 request.StudentId, purpose, ctx.User.Identity?.Name ?? "unknown");
 
             return Results.Ok(new { request.StudentId, purpose = purpose.ToString(), granted = true });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapDelete("/consents/{studentId}/{consentType}", async (
             string studentId,
@@ -98,7 +107,12 @@ public static class GdprEndpoints
                 studentId, purpose, ctx.User.Identity?.Name ?? "unknown");
 
             return Results.Ok(new { studentId, consentType = purpose.ToString(), granted = false });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // ── Data Export (Article 20) ──
 
@@ -130,7 +144,11 @@ public static class GdprEndpoints
                 studentId, export.Profile.Count, ctx.User.Identity?.Name ?? "unknown");
 
             return Results.Ok(export);
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // ── Right to Erasure (Article 17) ──
 
@@ -175,7 +193,10 @@ public static class GdprEndpoints
                 request.RequestedAt,
                 coolingPeriodEnds = request.RequestedAt.Add(CoolingPeriod)
             });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/erasure/{studentId}/status", async (
             string studentId,
@@ -237,7 +258,12 @@ public static class GdprEndpoints
                     }
                     : null
             });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /erasure/{studentId}/manifest - Returns the erasure manifest if completed
         group.MapGet("/erasure/{studentId}/manifest", async (

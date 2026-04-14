@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -29,50 +30,84 @@ public static class AdminApiEndpoints
         {
             var overview = await service.GetOverviewAsync(classId, user);
             return Results.Ok(overview);
-        }).WithName("GetFocusOverview");
+        }).WithName("GetFocusOverview")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}", async (string studentId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
             var detail = await service.GetStudentFocusAsync(studentId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
-        }).WithName("GetStudentFocus");
+        }).WithName("GetStudentFocus")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/classes/{classId}", async (string classId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
             var detail = await service.GetClassFocusAsync(classId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
-        }).WithName("GetClassFocus");
+        }).WithName("GetClassFocus")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/degradation-curve", async (ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
             var curve = await service.GetDegradationCurveAsync(user);
             return Results.Ok(curve);
-        }).WithName("GetFocusDegradationCurve");
+        }).WithName("GetFocusDegradationCurve")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/experiments", async (ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
             var experiments = await service.GetExperimentsAsync(user);
             return Results.Ok(experiments);
-        }).WithName("GetFocusExperiments");
+        }).WithName("GetFocusExperiments")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/alerts", async (ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
             var alerts = await service.GetStudentsNeedingAttentionAsync(user);
             return Results.Ok(alerts);
-        }).WithName("GetFocusAlerts");
+        }).WithName("GetFocusAlerts")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/timeline", async (string studentId, string? period, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
             var validPeriod = ParameterValidator.ValidatePeriod(period);
             var timeline = await service.GetStudentTimelineAsync(studentId, validPeriod, user);
             return Results.Ok(timeline);
-        }).WithName("GetStudentFocusTimeline");
+        }).WithName("GetStudentFocusTimeline")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/classes/{classId}/heatmap", async (string classId, ClaimsPrincipal user, IFocusAnalyticsService service) =>
         {
             var heatmap = await service.GetClassHeatmapAsync(classId, user);
             return Results.Ok(heatmap);
-        }).WithName("GetClassFocusHeatmap");
+        }).WithName("GetClassFocusHeatmap")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -88,25 +123,42 @@ public static class AdminApiEndpoints
         {
             var overview = await service.GetOverviewAsync(classId, user);
             return Results.Ok(overview);
-        }).WithName("GetMasteryOverview");
+        }).WithName("GetMasteryOverview")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/overview/distribution", async (string? classId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
             var overview = await service.GetOverviewAsync(classId, user);
             return Results.Ok(new { bands = overview.Distribution.Select(d => new { label = d.Level, count = d.Count }) });
-        }).WithName("GetMasteryDistribution");
+        }).WithName("GetMasteryDistribution")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/overview/subjects", async (string? classId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
             var overview = await service.GetOverviewAsync(classId, user);
             return Results.Ok(new { subjects = overview.SubjectBreakdown.Select(s => new { name = s.Subject, avgMastery = s.AvgMasteryLevel }) });
-        }).WithName("GetMasterySubjects");
+        }).WithName("GetMasterySubjects")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
             var detail = await service.GetStudentMasteryAsync(studentId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
-        }).WithName("GetStudentMastery");
+        }).WithName("GetStudentMastery")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/knowledge-map", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
@@ -129,7 +181,12 @@ public static class AdminApiEndpoints
                 subject = c.Subject
             });
             return Results.Ok(new { concepts });
-        }).WithName("GetStudentKnowledgeMap");
+        }).WithName("GetStudentKnowledgeMap")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/knowledge-map/graph", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
@@ -157,7 +214,12 @@ public static class AdminApiEndpoints
                 .SelectMany(c => c.UnlocksIds.Select(target => new { source = c.ConceptId, target }))
                 .Where(e => detail.KnowledgeMap.Any(c => c.ConceptId == e.target));
             return Results.Ok(new { nodes, edges });
-        }).WithName("GetStudentKnowledgeGraph");
+        }).WithName("GetStudentKnowledgeGraph")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/frontier", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
@@ -171,7 +233,12 @@ public static class AdminApiEndpoints
                 prerequisitesTotal = 2
             });
             return Results.Ok(new { concepts });
-        }).WithName("GetStudentFrontier");
+        }).WithName("GetStudentFrontier")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/history", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
@@ -191,7 +258,12 @@ public static class AdminApiEndpoints
                 return new { conceptName = c.ConceptName, points };
             });
             return Results.Ok(new { series });
-        }).WithName("GetStudentHistory");
+        }).WithName("GetStudentHistory")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/review-priority", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
@@ -206,19 +278,33 @@ public static class AdminApiEndpoints
                 lastPracticed = r.LastAttempted.ToString("yyyy-MM-dd")
             });
             return Results.Ok(new { items });
-        }).WithName("GetStudentReviewPriority");
+        }).WithName("GetStudentReviewPriority")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/classes/{classId}", async (string classId, ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
             var detail = await service.GetClassMasteryAsync(classId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
-        }).WithName("GetClassMastery");
+        }).WithName("GetClassMastery")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/at-risk", async (ClaimsPrincipal user, IMasteryTrackingService service) =>
         {
             var atRisk = await service.GetAtRiskStudentsAsync(user);
             return Results.Ok(atRisk);
-        }).WithName("GetAtRiskStudents");
+        }).WithName("GetAtRiskStudents")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/mastery/students/{studentId}/methodology-profile
         group.MapGet("/students/{studentId}/methodology-profile", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>
@@ -229,7 +315,12 @@ public static class AdminApiEndpoints
             // Build methodology hierarchy from snapshot data
             var profile = await service.GetMethodologyProfileAsync(studentId, user);
             return Results.Ok(profile);
-        }).WithName("GetStudentMethodologyProfile");
+        }).WithName("GetStudentMethodologyProfile")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/mastery/students/{studentId}/methodology-override
         group.MapPost("/students/{studentId}/methodology-override", async (
@@ -241,7 +332,12 @@ public static class AdminApiEndpoints
             var teacherId = ctx.User.FindFirst("sub")?.Value ?? "unknown";
             var result = await service.OverrideMethodologyAsync(studentId, body.Level, body.LevelId, body.Methodology, teacherId, ctx.User);
             return result ? Results.Ok(new { message = "Override applied" }) : Results.BadRequest(new { error = "Override failed" });
-        }).WithName("PostStudentMethodologyOverride");
+        }).WithName("PostStudentMethodologyOverride")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/mastery/students/{studentId}/methodology-overrides
         group.MapGet("/students/{studentId}/methodology-overrides", async (
@@ -261,7 +357,11 @@ public static class AdminApiEndpoints
                 createdAt = o.CreatedAt.ToString("o"),
             });
             return Results.Ok(new { overrides = result });
-        }).WithName("GetStudentMethodologyOverrides");
+        }).WithName("GetStudentMethodologyOverrides")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // DELETE /api/admin/mastery/students/{studentId}/methodology-overrides/{overrideId}
         group.MapDelete("/students/{studentId}/methodology-overrides/{overrideId}", async (
@@ -272,7 +372,12 @@ public static class AdminApiEndpoints
         {
             var removed = await service.RemoveOverrideAsync(studentId, Uri.UnescapeDataString(overrideId), user);
             return removed ? Results.Ok(new { message = "Override removed" }) : Results.NotFound(new { error = "Override not found" });
-        }).WithName("DeleteStudentMethodologyOverride");
+        }).WithName("DeleteStudentMethodologyOverride")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -301,7 +406,11 @@ public static class AdminApiEndpoints
                 lastCheckAt = now.ToString("o")
             });
             return Results.Ok(new { services });
-        }).WithName("GetSystemHealth");
+        }).WithName("GetSystemHealth")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/metrics", async (HttpContext ctx, ISystemMonitoringService service) =>
         {
@@ -341,26 +450,43 @@ public static class AdminApiEndpoints
             });
 
             return Results.Ok(new { errorRates, activeActors, messagesProcessed, sessionsStarted, eventsPublished, actorErrors, queueDepths });
-        }).WithName("GetSystemMetrics");
+        }).WithName("GetSystemMetrics")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/actors", async (ISystemMonitoringService service) =>
         {
             var health = await service.GetHealthAsync();
             return Results.Ok(health.ActorSystems);
-        }).WithName("GetActorSystemStatus");
+        }).WithName("GetActorSystemStatus")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/settings", async (ISystemMonitoringService service) =>
         {
             var settings = await service.GetSettingsAsync();
             return Results.Ok(settings);
-        }).WithName("GetPlatformSettings");
+        }).WithName("GetPlatformSettings")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPut("/settings", async (UpdateSettingsRequest request, HttpContext httpContext, ISystemMonitoringService service) =>
         {
             var userId = httpContext.User.Identity?.Name ?? "unknown";
             var success = await service.UpdateSettingsAsync(request, userId);
             return success ? Results.Ok() : Results.BadRequest();
-        }).WithName("UpdatePlatformSettings");
+        }).WithName("UpdatePlatformSettings")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/audit-log/query", async (AuditLogFilterRequest request, int? page, int? pageSize, ISystemMonitoringService service) =>
         {
@@ -368,7 +494,11 @@ public static class AdminApiEndpoints
             var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
             var result = await service.GetAuditLogAsync(request, validPage, validPageSize);
             return Results.Ok(result);
-        }).WithName("QueryAuditLog");
+        }).WithName("QueryAuditLog")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/audit-log — frontend-compatible query endpoint (maps query params to filter)
         app.MapGet("/api/admin/audit-log", async (
@@ -385,7 +515,10 @@ public static class AdminApiEndpoints
         })
         .WithTags("System Monitoring")
         .WithName("GetAuditLog")
-        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // GET /api/admin/system/nats-stats — real-time NATS monitoring stats (ADM-023)
         // Uses NATS monitoring HTTP endpoint (port 8222) for core pub/sub stats
@@ -445,7 +578,10 @@ public static class AdminApiEndpoints
         })
         .WithTags("System Monitoring")
         .WithName("GetNatsStats")
-        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // REV-011.4: Only register destructive seeding endpoints in Development
         if (env.IsDevelopment())
@@ -456,7 +592,11 @@ public static class AdminApiEndpoints
                 await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger,
                     additionalSeeds: QuestionBankSeedData.SeedQuestionsAsync);
                 return Results.Ok(new { success = true, message = "Database reseeded successfully" });
-            }).WithName("ReseedDatabase").RequireRateLimiting("destructive");
+            }).WithName("ReseedDatabase").RequireRateLimiting("destructive")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
             group.MapPost("/clean-reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
             {
@@ -474,7 +614,11 @@ public static class AdminApiEndpoints
                     QuestionBankSeedData.SeedQuestionsAsync);
 
                 return Results.Ok(new { success = true, message = "Database cleaned and reseeded successfully" });
-            }).WithName("CleanReseedDatabase").RequireRateLimiting("destructive");
+            }).WithName("CleanReseedDatabase").RequireRateLimiting("destructive")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         }
 
         return app;
@@ -491,7 +635,11 @@ public static class AdminApiEndpoints
         {
             var status = await service.GetPipelineStatusAsync();
             return Results.Ok(status);
-        }).WithName("GetPipelineStatus");
+        }).WithName("GetPipelineStatus")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/items", async (string? stage, int? page, int? pageSize, IIngestionPipelineService service) =>
         {
@@ -502,37 +650,64 @@ public static class AdminApiEndpoints
                 ? status.Stages.FirstOrDefault(s => s.StageId == stage)?.Items ?? new List<PipelineItem>()
                 : status.Stages.SelectMany(s => s.Items).ToList();
             return Results.Ok(new { Items = items, Total = items.Count });
-        }).WithName("GetPipelineItems");
+        }).WithName("GetPipelineItems")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/items/{id}/detail", async (string id, IIngestionPipelineService service) =>
         {
             var detail = await service.GetItemDetailAsync(id);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
-        }).WithName("GetPipelineItemDetail");
+        }).WithName("GetPipelineItemDetail")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/items/{id}/retry", async (string id, IIngestionPipelineService service) =>
         {
             var success = await service.RetryItemAsync(id);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("RetryPipelineItem");
+        }).WithName("RetryPipelineItem")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/items/{id}/reject", async (string id, RejectPipelineItemRequest request, IIngestionPipelineService service) =>
         {
             var success = await service.RejectPipelineItemAsync(id, request.Reason);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("RejectPipelineItem");
+        }).WithName("RejectPipelineItem")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/stats", async (IIngestionPipelineService service) =>
         {
             var stats = await service.GetStatsAsync();
             return Results.Ok(stats);
-        }).WithName("GetPipelineStats");
+        }).WithName("GetPipelineStats")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/items/{id}/move-to-review", async (string id, IIngestionPipelineService service) =>
         {
             var result = await service.MoveToReviewAsync(id);
             return Results.Ok(result);
-        }).WithName("MoveItemToReview");
+        }).WithName("MoveItemToReview")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/upload", async (HttpRequest request, IIngestionPipelineService service) =>
         {
@@ -559,21 +734,34 @@ public static class AdminApiEndpoints
 
             var result = await service.UploadFromRequestAsync(request);
             return Results.Ok(result);
-        }).WithName("UploadPipelineFile").DisableAntiforgery();
+        }).WithName("UploadPipelineFile").DisableAntiforgery()
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Cloud directory listing
         group.MapPost("/cloud-dir/list", async (CloudDirListRequest request, IIngestionPipelineService service) =>
         {
             var items = await service.ListCloudDirectoryAsync(request);
             return Results.Ok(items);
-        }).WithName("ListCloudDirectory");
+        }).WithName("ListCloudDirectory")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Cloud directory batch ingest
         group.MapPost("/cloud-dir/ingest", async (CloudDirIngestRequest request, IIngestionPipelineService service) =>
         {
             var result = await service.IngestCloudDirectoryAsync(request);
             return Results.Ok(result);
-        }).WithName("IngestCloudDirectory");
+        }).WithName("IngestCloudDirectory")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -606,43 +794,75 @@ public static class AdminApiEndpoints
                 subject, bloomsLevel, minDifficulty, maxDifficulty, status, language, conceptId, q,
                 validPage, validPageSize, sortBy ?? "qualityScore", orderBy ?? "desc");
             return Results.Ok(result);
-        }).WithName("GetQuestions");
+        }).WithName("GetQuestions")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/{id}", async (string id, IQuestionBankService service) =>
         {
             var question = await service.GetQuestionAsync(id);
             return question != null ? Results.Ok(question) : Results.NotFound();
-        }).WithName("GetQuestion");
+        }).WithName("GetQuestion")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPut("/{id}", async (string id, UpdateBankQuestionRequest request, IQuestionBankService service) =>
         {
             var question = await service.UpdateQuestionAsync(id, request);
             return question != null ? Results.Ok(question) : Results.NotFound();
-        }).WithName("UpdateQuestion");
+        }).WithName("UpdateQuestion")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/{id}/deprecate", async (string id, DeprecateBankQuestionRequest request, IQuestionBankService service) =>
         {
             var success = await service.DeprecateQuestionAsync(id, request);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("DeprecateQuestion");
+        }).WithName("DeprecateQuestion")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/filters", async (IQuestionBankService service) =>
         {
             var filters = await service.GetFiltersAsync();
             return Results.Ok(filters);
-        }).WithName("GetQuestionFilters");
+        }).WithName("GetQuestionFilters")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/concepts", async (string q, IQuestionBankService service) =>
         {
             var matches = await service.AutocompleteConceptsAsync(q);
             return Results.Ok(matches);
-        }).WithName("AutocompleteConcepts");
+        }).WithName("AutocompleteConcepts")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/{id}/performance", async (string id, IQuestionBankService service) =>
         {
             var perf = await service.GetPerformanceAsync(id);
             return perf != null ? Results.Ok(perf) : Results.NotFound();
-        }).WithName("GetQuestionPerformance");
+        }).WithName("GetQuestionPerformance")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/{id}/history", async (string id, Marten.IDocumentStore store) =>
         {
@@ -659,20 +879,35 @@ public static class AdminApiEndpoints
             }).OrderByDescending(e => e.timestamp).ToList();
 
             return Results.Ok(history);
-        }).WithName("GetQuestionHistory");
+        }).WithName("GetQuestionHistory")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/{id}/approve", async (string id, IQuestionBankService service) =>
         {
             var success = await service.ApproveAsync(id);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("ApproveQuestion");
+        }).WithName("ApproveQuestion")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/", async (CreateQuestionRequest request, HttpContext ctx, IQuestionBankService service) =>
         {
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
             var result = await service.CreateQuestionAsync(request, userId);
             return result != null ? Results.Created($"/api/admin/questions/{result.Id}", result) : Results.BadRequest();
-        }).WithName("CreateQuestion");
+        }).WithName("CreateQuestion")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPatch("/{id}/explanation", async (string id, UpdateExplanationRequest request, HttpContext ctx, IQuestionBankService service) =>
         {
@@ -684,21 +919,37 @@ public static class AdminApiEndpoints
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
             var result = await service.UpdateExplanationAsync(id, request.Explanation, userId);
             return result != null ? Results.Ok(result) : Results.NotFound();
-        }).WithName("UpdateQuestionExplanation");
+        }).WithName("UpdateQuestionExplanation")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/{id}/publish", async (string id, HttpContext ctx, IQuestionBankService service) =>
         {
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
             var success = await service.PublishAsync(id, userId);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("PublishQuestion");
+        }).WithName("PublishQuestion")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/{id}/language-versions", async (string id, AddLanguageVersionRequest request, HttpContext ctx, IQuestionBankService service) =>
         {
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
             var success = await service.AddLanguageVersionAsync(id, request, userId);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("AddLanguageVersion");
+        }).WithName("AddLanguageVersion")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -719,13 +970,22 @@ public static class AdminApiEndpoints
         {
             var result = await service.ListAsync(subject);
             return Results.Ok(result);
-        }).WithName("ListLearningObjectives");
+        }).WithName("ListLearningObjectives")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/{id}", async (string id, ILearningObjectiveService service) =>
         {
             var result = await service.GetByIdAsync(id);
             return result != null ? Results.Ok(result) : Results.NotFound();
-        }).WithName("GetLearningObjective");
+        }).WithName("GetLearningObjective")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -748,26 +1008,43 @@ public static class AdminApiEndpoints
             var clamped = request with { MinDifficulty = min, MaxDifficulty = max };
             var result = await service.GenerateQuestionsAsync(clamped);
             return Results.Ok(result);
-        }).WithName("AiGenerateQuestions");
+        }).WithName("AiGenerateQuestions")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/settings", async (IAiGenerationService service) =>
         {
             var settings = await service.GetSettingsAsync();
             return Results.Ok(settings);
-        }).WithName("GetAiSettings");
+        }).WithName("GetAiSettings")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPut("/settings", async (UpdateAiSettingsRequest request, HttpContext ctx, IAiGenerationService service) =>
         {
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
             var success = await service.UpdateSettingsAsync(request, userId);
             return success ? Results.Ok() : Results.BadRequest();
-        }).WithName("UpdateAiSettings");
+        }).WithName("UpdateAiSettings")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/test-connection", async (AiProvider provider, IAiGenerationService service) =>
         {
             var ok = await service.TestConnectionAsync(provider);
             return Results.Ok(new { connected = ok });
-        }).WithName("TestAiConnection");
+        }).WithName("TestAiConnection")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/ai/generate-batch (CNT-002)
         group.MapPost("/generate-batch", async (
@@ -780,7 +1057,12 @@ public static class AdminApiEndpoints
 
             var result = await aiService.BatchGenerateAsync(req, qualityGate);
             return Results.Ok(result);
-        }).WithName("AiBatchGenerateQuestions");
+        }).WithName("AiBatchGenerateQuestions")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/ai/generate-from-template (CNT-002)
         group.MapPost("/generate-from-template", async (
@@ -796,7 +1078,12 @@ public static class AdminApiEndpoints
 
             var result = await aiService.GenerateFromTemplateAsync(req, qualityGate);
             return Results.Ok(result);
-        }).WithName("AiGenerateFromTemplate");
+        }).WithName("AiGenerateFromTemplate")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -813,7 +1100,11 @@ public static class AdminApiEndpoints
         {
             var status = await service.GetStatusAsync();
             return Results.Ok(status);
-        }).WithName("GetQuestionPipelineStatus");
+        }).WithName("GetQuestionPipelineStatus")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/questions/pipeline/bulk-approve
         group.MapPost("/bulk-approve", async (
@@ -827,7 +1118,12 @@ public static class AdminApiEndpoints
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
             var result = await service.BulkApproveAsync(request, userId);
             return Results.Ok(result);
-        }).WithName("BulkApproveQuestions");
+        }).WithName("BulkApproveQuestions")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/questions/pipeline/bulk-reject
         group.MapPost("/bulk-reject", async (
@@ -844,7 +1140,12 @@ public static class AdminApiEndpoints
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
             var result = await service.BulkRejectAsync(request, userId);
             return Results.Ok(result);
-        }).WithName("BulkRejectQuestions");
+        }).WithName("BulkRejectQuestions")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -880,7 +1181,11 @@ public static class AdminApiEndpoints
                 lf.CreateLogger("MethodologyEndpoints").LogWarning(ex, "Methodology effectiveness query failed — returning empty");
                 return Results.Ok(new { rows = Array.Empty<object>(), methodologies = Array.Empty<string>() });
             }
-        }).WithName("GetMethodologyEffectiveness");
+        }).WithName("GetMethodologyEffectiveness")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/stagnation-trend", async (IMethodologyAnalyticsService service, ClaimsPrincipal user, ILoggerFactory lf) =>
         {
@@ -900,7 +1205,11 @@ public static class AdminApiEndpoints
                 lf.CreateLogger("MethodologyEndpoints").LogWarning(ex, "Stagnation trend query failed — returning empty");
                 return Results.Ok(new { points = Array.Empty<object>(), escalationRate = 0f });
             }
-        }).WithName("GetStagnationTrend");
+        }).WithName("GetStagnationTrend")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/switch-triggers", async (IMethodologyAnalyticsService service, ClaimsPrincipal user) =>
         {
@@ -921,7 +1230,11 @@ public static class AdminApiEndpoints
                 };
             }).Reverse().ToList();
             return Results.Ok(new { rows, reasons });
-        }).WithName("GetSwitchTriggers");
+        }).WithName("GetSwitchTriggers")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/mentor-resistant", async (IMethodologyAnalyticsService service, ClaimsPrincipal user) =>
         {
@@ -939,31 +1252,53 @@ public static class AdminApiEndpoints
                 mentorResistant = s.AttemptedMethodologies.Count >= 3
             });
             return Results.Ok(new { students });
-        }).WithName("GetMentorResistantConcepts");
+        }).WithName("GetMentorResistantConcepts")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/stagnation-monitor", async (IMethodologyAnalyticsService service, ClaimsPrincipal user) =>
         {
             var monitor = await service.GetStagnationMonitorAsync(user);
             return Results.Ok(monitor);
-        }).WithName("GetStagnationMonitor");
+        }).WithName("GetStagnationMonitor")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/mcm-graph", async (IMethodologyAnalyticsService service) =>
         {
             var graph = await service.GetMcmGraphAsync();
             return Results.Ok(graph);
-        }).WithName("GetMcmGraph");
+        }).WithName("GetMcmGraph")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPut("/mcm-graph/edge", async (UpdateMcmEdgeRequest request, IMethodologyAnalyticsService service) =>
         {
             var success = await service.UpdateMcmEdgeAsync(request.Source, request.Target, request.Confidence);
             return success ? Results.Ok() : Results.BadRequest();
-        }).WithName("UpdateMcmEdge");
+        }).WithName("UpdateMcmEdge")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/mcm-graph/edge", async (UpdateMcmEdgeRequest request, IMethodologyAnalyticsService service) =>
         {
             var success = await service.UpdateMcmEdgeAsync(request.Source, request.Target, request.Confidence);
             return success ? Results.Ok() : Results.BadRequest();
-        }).WithName("CreateMcmEdge");
+        }).WithName("CreateMcmEdge")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -980,14 +1315,22 @@ public static class AdminApiEndpoints
             var distribution = await service.GetDistributionAsync(user);
             var items = distribution.Groups.Select(g => new { context = g.Context, count = g.StudentCount, percentage = g.Percentage });
             return Results.Ok(new { items });
-        }).WithName("GetCulturalDistribution");
+        }).WithName("GetCulturalDistribution")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/resilience", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
             var distribution = await service.GetDistributionAsync(user);
             var items = distribution.ResilienceByGroup.Select(r => new { context = r.CulturalContext, avgScore = Math.Round(r.AvgResilienceScore * 100, 1) });
             return Results.Ok(new { items });
-        }).WithName("GetResilienceComparison");
+        }).WithName("GetResilienceComparison")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/method-effectiveness", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
@@ -998,14 +1341,22 @@ public static class AdminApiEndpoints
                 scores = m.ByCulture.ToDictionary(c => c.CulturalContext, c => Math.Round(c.SuccessRate * 100, 1))
             });
             return Results.Ok(new { methods });
-        }).WithName("GetMethodologyByContext");
+        }).WithName("GetMethodologyByContext")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/focus-patterns", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
             var distribution = await service.GetDistributionAsync(user);
             var items = distribution.FocusPatterns.Select(f => new { context = f.CulturalContext, avgFocusScore = f.AvgFocusScore, avgSessionMinutes = f.AvgSessionDuration });
             return Results.Ok(new { items });
-        }).WithName("GetFocusPatterns");
+        }).WithName("GetFocusPatterns")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/equity-alerts", async (ICulturalContextService service, ClaimsPrincipal user) =>
         {
@@ -1022,7 +1373,11 @@ public static class AdminApiEndpoints
                     .FirstOrDefault(r => r.Language == a.CulturalContext.Replace("Dominant", ""))?.GapDescription ?? "Review content balance"
             });
             return Results.Ok(new { alerts });
-        }).WithName("GetEquityAlerts");
+        }).WithName("GetEquityAlerts")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -1039,13 +1394,21 @@ public static class AdminApiEndpoints
             var validCount = ParameterValidator.ValidateLimit(count);
             var events = await service.GetRecentEventsAsync(validCount, continuationToken);
             return Results.Ok(events);
-        }).WithName("GetRecentEvents");
+        }).WithName("GetRecentEvents")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/rates", async (IEventStreamService service) =>
         {
             var rates = await service.GetEventRatesAsync();
             return Results.Ok(rates);
-        }).WithName("GetEventRates");
+        }).WithName("GetEventRates")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/dead-letters", async (int? page, int? pageSize, IEventStreamService service) =>
         {
@@ -1053,37 +1416,64 @@ public static class AdminApiEndpoints
             var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
             var dlq = await service.GetDeadLetterQueueAsync(validPage, validPageSize);
             return Results.Ok(dlq);
-        }).WithName("GetDeadLetterQueue");
+        }).WithName("GetDeadLetterQueue")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/dead-letters/{id}", async (string id, IEventStreamService service) =>
         {
             var detail = await service.GetDeadLetterDetailAsync(id);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
-        }).WithName("GetDeadLetterDetail");
+        }).WithName("GetDeadLetterDetail")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/dead-letters/{id}/retry", async (string id, IEventStreamService service) =>
         {
             var result = await service.RetryMessageAsync(id);
             return result.Success ? Results.Ok(result) : Results.BadRequest(result);
-        }).WithName("RetryDeadLetter");
+        }).WithName("RetryDeadLetter")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/dead-letters/bulk-retry", async (BulkRetryRequest request, IEventStreamService service) =>
         {
             var result = await service.BulkRetryAsync(request.MessageIds);
             return Results.Ok(result);
-        }).WithName("BulkRetryDeadLetters");
+        }).WithName("BulkRetryDeadLetters")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/dlq-alert", async (IEventStreamService service) =>
         {
             var alert = await service.CheckDlqDepthAsync();
             return Results.Ok(alert);
-        }).WithName("GetDlqAlert");
+        }).WithName("GetDlqAlert")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/dead-letters/{id}/discard", async (string id, IEventStreamService service) =>
         {
             var success = await service.DiscardDeadLetterAsync(id);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("DiscardDeadLetter");
+        }).WithName("DiscardDeadLetter")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -1099,7 +1489,11 @@ public static class AdminApiEndpoints
         {
             var summary = await service.GetSummaryAsync(user);
             return Results.Ok(summary);
-        }).WithName("GetOutreachSummary");
+        }).WithName("GetOutreachSummary")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/overview", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
@@ -1111,14 +1505,22 @@ public static class AdminApiEndpoints
                 reEngagementRate = summary.ReEngagementRate.FirstOrDefault()?.Rate ?? 0f,
                 channels = summary.ByChannel.Select(c => new { channel = c.Channel, sentToday = c.SentToday, deliveryRate = c.OpenRate, responseRate = c.ClickRate })
             });
-        }).WithName("GetOutreachOverview");
+        }).WithName("GetOutreachOverview")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/by-channel", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
             var summary = await service.GetSummaryAsync(user);
             var channels = summary.ByChannel.Select(c => new { channel = c.Channel, sentToday = c.SentToday, deliveryRate = c.OpenRate, responseRate = c.ClickRate });
             return Results.Ok(new { channels });
-        }).WithName("GetOutreachByChannel");
+        }).WithName("GetOutreachByChannel")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/by-trigger", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
@@ -1129,32 +1531,53 @@ public static class AdminApiEndpoints
                 triggers = new Dictionary<string, int> { [t.TriggerType] = t.Count }
             });
             return Results.Ok(new { series });
-        }).WithName("GetOutreachByTrigger");
+        }).WithName("GetOutreachByTrigger")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/send-times", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
             var effectiveness = await service.GetChannelEffectivenessAsync(user);
             var cells = effectiveness.SendTimeHeatmap.Select(s => new { hour = s.Hour, day = s.DayOfWeek, responseRate = s.ResponseRate });
             return Results.Ok(new { cells });
-        }).WithName("GetOutreachSendTimes");
+        }).WithName("GetOutreachSendTimes")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/re-engagement-rate", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
             var summary = await service.GetSummaryAsync(user);
             return Results.Ok(summary.ReEngagementRate);
-        }).WithName("GetReEngagementRate");
+        }).WithName("GetReEngagementRate")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/history", async (string studentId, IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
             var history = await service.GetStudentHistoryAsync(studentId, user);
             return history != null ? Results.Ok(history) : Results.NotFound();
-        }).WithName("GetStudentOutreachHistory");
+        }).WithName("GetStudentOutreachHistory")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/budget-alert", async (IOutreachEngagementService service, ClaimsPrincipal user) =>
         {
             var alert = await service.GetBudgetAlertAsync(user);
             return Results.Ok(alert);
-        }).WithName("GetBudgetAlert");
+        }).WithName("GetBudgetAlert")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -1175,49 +1598,89 @@ public static class AdminApiEndpoints
         {
             var result = await service.GetFocusHeatmapAsync(studentId, user);
             return result is null ? Results.NotFound() : Results.Ok(result);
-        }).WithName("GetStudentFocusHeatmap");
+        }).WithName("GetStudentFocusHeatmap")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/degradation", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
         {
             var result = await service.GetDegradationCurveAsync(studentId, user);
             return result is null ? Results.NotFound() : Results.Ok(result);
-        }).WithName("GetStudentDegradation");
+        }).WithName("GetStudentDegradation")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/engagement", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
         {
             var result = await service.GetEngagementAsync(studentId, user);
             return result is null ? Results.NotFound() : Results.Ok(result);
-        }).WithName("GetStudentEngagement");
+        }).WithName("GetStudentEngagement")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/error-types", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
         {
             var result = await service.GetErrorTypesAsync(studentId, user);
             return result is null ? Results.NotFound() : Results.Ok(result);
-        }).WithName("GetStudentErrorTypes");
+        }).WithName("GetStudentErrorTypes")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/hint-usage", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
         {
             var result = await service.GetHintUsageAsync(studentId, user);
             return result is null ? Results.NotFound() : Results.Ok(result);
-        }).WithName("GetStudentHintUsage");
+        }).WithName("GetStudentHintUsage")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/stagnation", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
         {
             var result = await service.GetStagnationAsync(studentId, user);
             return result is null ? Results.NotFound() : Results.Ok(result);
-        }).WithName("GetStudentStagnation");
+        }).WithName("GetStudentStagnation")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/session-patterns", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
         {
             var result = await service.GetSessionPatternsAsync(studentId, user);
             return result is null ? Results.NotFound() : Results.Ok(result);
-        }).WithName("GetStudentSessionPatterns");
+        }).WithName("GetStudentSessionPatterns")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/students/{studentId}/response-times", async (string studentId, ClaimsPrincipal user, IStudentInsightsService service) =>
         {
             var result = await service.GetResponseTimesAsync(studentId, user);
             return result is null ? Results.NotFound() : Results.Ok(result);
-        }).WithName("GetStudentResponseTimes");
+        }).WithName("GetStudentResponseTimes")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
