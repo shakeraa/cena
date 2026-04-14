@@ -1,0 +1,14 @@
+# RDY-025: Non-secret configuration. All secrets live in separate Secret resources
+# referenced by name via values.yaml (firebase.secretName, nats.secretName, etc.).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cena.fullname" . }}-config
+  labels:
+    {{- include "cena.labels" . | nindent 4 }}
+data:
+  firebase.projectId: {{ .Values.firebase.projectId | quote }}
+  cluster.name: {{ .Values.actors.cluster.name | quote }}
+  cluster.provider: {{ .Values.actors.cluster.provider | quote }}
+  logging.level: {{ .Values.logging.level | quote }}
+  aspnetcore.environment: {{ .Values.aspnetcoreEnvironment | quote }}

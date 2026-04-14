@@ -1,21 +1,83 @@
 # =============================================================================
-# Cena Platform — Helm Values
+# Cena Platform — Helm Values (RDY-025)
+# =============================================================================
+# Resource limits below are placeholder estimates until pilot metrics exist.
+# Tune after observing real workload via Prometheus. See deploy/DEPLOYMENT.md.
 # =============================================================================
 
 # -- Global settings ----------------------------------------------------------
 
 nameOverride: ""
 fullnameOverride: ""
+aspnetcoreEnvironment: Production
 
-# -- Database -----------------------------------------------------------------
+logging:
+  level: Information
+
+# -- External service secrets -------------------------------------------------
+# All secrets are REFERENCED by name, never embedded. Create these secrets out-
+# of-band (kubectl create secret, sealed-secrets, external-secrets-operator).
 
 database:
-  # Name of the Kubernetes Secret containing the connection strings.
-  # The secret must contain the following keys:
-  #   connection-string-migrator   — used by the migrator job
-  #   connection-string-student    — used by the student API host
-  #   connection-string-admin      — used by the admin API host
+  # Keys: connection-string-migrator, connection-string-student,
+  #       connection-string-admin, connection-string-actors
   secretName: cena-db-credentials
+
+redis:
+  # Keys: connection-string (format: "host:port,password=...,ssl=true")
+  secretName: cena-redis-credentials
+
+nats:
+  # Keys: connection-string, nats-user, nats-password
+  secretName: cena-nats-credentials
+
+firebase:
+  projectId: cena-platform
+  # Keys: credentials.json (full service-account JSON for Firebase Admin SDK)
+  secretName: cena-firebase-credentials
+
+# -- Actor Host ---------------------------------------------------------------
+# Proto.Actor cluster member. NOT horizontally autoscaled — cluster membership
+# stability is more valuable than quick scale. Use replicaCount + node sizing.
+
+actors:
+  replicaCount: 3
+  image:
+    repository: ghcr.io/cena-platform/cena-actors-host
+    tag: latest
+    pullPolicy: IfNotPresent
+  service:
+    httpPort: 5050
+    gossipPort: 8090
+  cluster:
+    name: cena-cluster
+    provider: kubernetes  # matches Cluster:Provider in appsettings; overrides via env
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi     # higher than APIs — event store + snapshot cache
+    limits:
+      cpu: "2"
+      memory: 4Gi
+  probes:
+    readiness:
+      path: /health/ready
+      initialDelaySeconds: 30    # gossip convergence + Marten warmup
+      periodSeconds: 10
+      failureThreshold: 3
+      timeoutSeconds: 5
+    liveness:
+      path: /health/live
+      initialDelaySeconds: 60    # lenient — cluster drift recovery takes time
+      periodSeconds: 30
+      failureThreshold: 5
+      timeoutSeconds: 10
+  pdb:
+    enabled: true
+    minAvailable: 2       # keep quorum during drains; scale with replicaCount
+  # Long grace period: drain in-flight actors + flush events
+  terminationGracePeriodSeconds: 60
+  env: []
 
 # -- Migrator Job (pre-install / pre-upgrade hook) ----------------------------
 
@@ -72,9 +134,10 @@ student:
     maxReplicas: 20
     targetCPUUtilizationPercentage: 60
     targetMemoryUtilizationPercentage: 80
+  pdb:
+    enabled: true
+    minAvailable: 1
   env: []
-  # - name: ASPNETCORE_ENVIRONMENT
-  #   value: Production
 
 # -- Admin API Host -----------------------------------------------------------
 
@@ -114,19 +177,21 @@ admin:
     maxReplicas: 5
     targetCPUUtilizationPercentage: 70
     targetMemoryUtilizationPercentage: 85
-  # Seconds to wait after student service is ready before starting admin pods.
+  pdb:
+    enabled: false          # single-replica admin tolerates full restarts
+    minAvailable: 0
   studentSoakSeconds: 60
   env: []
-  # - name: ASPNETCORE_ENVIRONMENT
-  #   value: Production
 
-# -- Ingress (optional) -------------------------------------------------------
+# -- Ingress (path-based routing) ---------------------------------------------
 
 ingress:
   enabled: false
   className: nginx
   annotations: {}
-  # kubernetes.io/tls-acme: "true"
+  # Production example:
+  #   nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  #   cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
     - host: cena.example.com
       paths:
