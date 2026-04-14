@@ -16,6 +16,7 @@ using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Health;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Observability;
 using Marten;
@@ -192,8 +193,9 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// ---- Health checks ----
-builder.Services.AddHealthChecks();
+// ---- Health checks (RDY-011: check real dependencies) ----
+builder.Services.AddHealthChecks()
+    .AddCenaAdminHealthChecks();
 
 // ---- OpenTelemetry ----
 var otlpEndpoint = builder.Configuration.GetValue<string>("Cluster:OtlpEndpoint")
