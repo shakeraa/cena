@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using System.Security.Claims;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -41,21 +42,34 @@ public static class ContentModerationEndpoints
                 sortBy ?? "submittedAt",
                 orderBy ?? "asc");
             return Results.Ok(result);
-        }).WithName("GetModerationQueue");
+        }).WithName("GetModerationQueue")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/moderation/queue/summary - Queue summary stats
         group.MapGet("/queue/summary", async (IContentModerationService service) =>
         {
             var summary = await service.GetQueueSummaryAsync();
             return Results.Ok(summary);
-        }).WithName("GetModerationQueueSummary");
+        }).WithName("GetModerationQueueSummary")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/moderation/items/{id} - Get item detail
         group.MapGet("/items/{id}", async (string id, IContentModerationService service) =>
         {
             var item = await service.GetItemDetailAsync(id);
             return item != null ? Results.Ok(item) : Results.NotFound();
-        }).WithName("GetModerationItem");
+        }).WithName("GetModerationItem")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/moderation/items/{id}/claim - Claim item for review
         group.MapPost("/items/{id}/claim", async (
@@ -66,7 +80,12 @@ public static class ContentModerationEndpoints
             var moderatorId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
             var success = await service.ClaimItemAsync(id, moderatorId);
             return success ? Results.Ok() : Results.Conflict("Item already claimed by another moderator");
-        }).WithName("ClaimModerationItem");
+        }).WithName("ClaimModerationItem")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/moderation/items/{id}/approve - Approve item
         group.MapPost("/items/{id}/approve", async (
@@ -77,7 +96,12 @@ public static class ContentModerationEndpoints
             var moderatorId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
             var success = await service.ApproveItemAsync(id, moderatorId);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("ApproveModerationItem");
+        }).WithName("ApproveModerationItem")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/moderation/items/{id}/reject - Reject item
         group.MapPost("/items/{id}/reject", async (
@@ -89,7 +113,12 @@ public static class ContentModerationEndpoints
             var moderatorId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
             var success = await service.RejectItemAsync(id, moderatorId, request.Reason);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("RejectModerationItem");
+        }).WithName("RejectModerationItem")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/moderation/items/{id}/flag - Flag item
         group.MapPost("/items/{id}/flag", async (
@@ -101,7 +130,12 @@ public static class ContentModerationEndpoints
             var moderatorId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
             var success = await service.FlagItemAsync(id, moderatorId, request.Reason);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("FlagModerationItem");
+        }).WithName("FlagModerationItem")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/moderation/items/{id}/comments - Add comment
         group.MapPost("/items/{id}/comments", async (
@@ -113,7 +147,12 @@ public static class ContentModerationEndpoints
             var moderatorId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
             var success = await service.AddCommentAsync(id, moderatorId, request.Text);
             return success ? Results.Ok() : Results.NotFound();
-        }).WithName("AddModerationComment");
+        }).WithName("AddModerationComment")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/moderation/bulk - Bulk actions
         group.MapPost("/bulk", async (
@@ -124,14 +163,23 @@ public static class ContentModerationEndpoints
             var moderatorId = httpContext.User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "unknown";
             var success = await service.BulkActionAsync(request.Action, request.ItemIds, moderatorId);
             return success ? Results.Ok() : Results.BadRequest();
-        }).WithName("BulkModerationAction");
+        }).WithName("BulkModerationAction")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/moderation/stats - Moderation statistics
         group.MapGet("/stats", async (IContentModerationService service) =>
         {
             var stats = await service.GetStatsAsync();
             return Results.Ok(stats);
-        }).WithName("GetModerationStats");
+        }).WithName("GetModerationStats")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

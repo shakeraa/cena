@@ -8,6 +8,7 @@ using Cena.Actors.RateLimit;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -46,7 +47,11 @@ public static class RateLimitDashboardEndpoints
                     lastRefill = photoState.LastRefill
                 }
             });
-        }).WithName("GetRateLimitStatus");
+        }).WithName("GetRateLimitStatus")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/ratelimit/spend — daily cost spend for tenant and global
         group.MapGet("/spend", async (
@@ -82,7 +87,11 @@ public static class RateLimitDashboardEndpoints
                     threshold = breakerStatus.Threshold
                 }
             });
-        }).WithName("GetRateLimitSpend");
+        }).WithName("GetRateLimitSpend")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

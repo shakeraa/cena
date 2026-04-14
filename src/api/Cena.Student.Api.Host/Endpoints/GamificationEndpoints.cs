@@ -12,7 +12,9 @@ using Cena.Infrastructure.Gamification;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -24,11 +26,23 @@ public static class GamificationEndpoints
             .WithTags("Gamification")
             .RequireAuthorization();
 
-        group.MapGet("/badges", GetBadges).WithName("GetBadges");
-        group.MapGet("/xp", GetXpStatus).WithName("GetXpStatus");
-        group.MapGet("/streak", GetStreakStatus).WithName("GetStreakStatus");
+        group.MapGet("/badges", GetBadges).WithName("GetBadges")
+    .Produces<XpStatusDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/xp", GetXpStatus).WithName("GetXpStatus")
+    .Produces<XpStatusDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/streak", GetStreakStatus).WithName("GetStreakStatus")
+    .Produces<StreakStatusDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         group.MapGet("/leaderboard", GetLeaderboard).WithName("GetLeaderboard");
-        group.MapGet("/leaderboard/ranks", GetLeaderboardRanks).WithName("GetLeaderboardRanks");
+        group.MapGet("/leaderboard/ranks", GetLeaderboardRanks).WithName("GetLeaderboardRanks")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -210,8 +224,8 @@ public static class GamificationEndpoints
     // GET /api/gamification/leaderboard?scope=global|class|friends (STB-03c)
     private static async Task<IResult> GetLeaderboard(
         HttpContext ctx,
-        ILeaderboardService leaderboardService,
-        IDocumentStore store,
+        [FromServices] ILeaderboardService leaderboardService,
+        [FromServices] IDocumentStore store,
         string? scope = "class",
         int? limit = 50)
     {
@@ -283,7 +297,7 @@ public static class GamificationEndpoints
     // GET /api/gamification/leaderboard/ranks (STB-03c)
     private static async Task<IResult> GetLeaderboardRanks(
         HttpContext ctx,
-        ILeaderboardService leaderboardService)
+        [FromServices] ILeaderboardService leaderboardService)
     {
         var studentId = GetStudentId(ctx.User);
         if (string.IsNullOrEmpty(studentId))

@@ -9,6 +9,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -34,7 +35,11 @@ public static class TutoringAdminEndpoints
             var result = await service.GetSessionsAsync(
                 studentId, status, validPage, validPageSize, user);
             return Results.Ok(result);
-        }).WithName("GetTutoringSessions");
+        }).WithName("GetTutoringSessions")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/sessions/{sessionId}", async (
             string sessionId,
@@ -43,7 +48,12 @@ public static class TutoringAdminEndpoints
         {
             var detail = await service.GetSessionDetailAsync(sessionId, user);
             return detail != null ? Results.Ok(detail) : Results.NotFound();
-        }).WithName("GetTutoringSessionDetail");
+        }).WithName("GetTutoringSessionDetail")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/budget-status", async (
             string? classId,
@@ -52,13 +62,21 @@ public static class TutoringAdminEndpoints
         {
             var result = await service.GetBudgetStatusAsync(classId, user);
             return Results.Ok(result);
-        }).WithName("GetTutoringBudgetStatus");
+        }).WithName("GetTutoringBudgetStatus")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapGet("/analytics", async (ClaimsPrincipal user, ITutoringAdminService service) =>
         {
             var result = await service.GetAnalyticsAsync(user);
             return Results.Ok(result);
-        }).WithName("GetTutoringAnalytics");
+        }).WithName("GetTutoringAnalytics")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

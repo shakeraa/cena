@@ -13,7 +13,9 @@ using Cena.Infrastructure.Auth;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -72,7 +74,11 @@ public static class StudentAnalyticsEndpoints
                 TotalXp: snapshot?.TotalXp ?? 0,
                 Level: ComputeLevel(snapshot?.TotalXp ?? 0)));
         })
-        .WithName("GetAnalyticsSummary");
+        .WithName("GetAnalyticsSummary")
+    .Produces<AnalyticsSummaryDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/analytics/mastery — per-concept mastery levels
         group.MapGet("/mastery", async (
@@ -108,7 +114,11 @@ public static class StudentAnalyticsEndpoints
 
             return Results.Ok(masteryDtos);
         })
-        .WithName("GetConceptMastery");
+        .WithName("GetConceptMastery")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/analytics/progress — daily progress over date range
         group.MapGet("/progress", async (
@@ -177,7 +187,7 @@ public static class StudentAnalyticsEndpoints
         // GET /api/analytics/time-breakdown — daily learning time (STB-09b)
         group.MapGet("/time-breakdown", async (
             HttpContext ctx,
-            IAnalyticsRollupService analytics,
+            [FromServices] IAnalyticsRollupService analytics,
             int? days = 30) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -205,12 +215,16 @@ public static class StudentAnalyticsEndpoints
 
             return Results.Ok(new TimeBreakdownDto(Items: items.ToArray()));
         })
-        .WithName("GetTimeBreakdown");
+        .WithName("GetTimeBreakdown")
+    .Produces<TimeBreakdownDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/analytics/time-breakdown/subjects — time by subject (STB-09b)
         group.MapGet("/time-breakdown/subjects", async (
             HttpContext ctx,
-            IAnalyticsRollupService analytics,
+            [FromServices] IAnalyticsRollupService analytics,
             int? days = 30) =>
         {
             var studentId = GetStudentId(ctx.User);
@@ -242,12 +256,16 @@ public static class StudentAnalyticsEndpoints
                 TotalMinutes = subjectTotals.Values.Sum()
             });
         })
-        .WithName("GetTimeBreakdownBySubject");
+        .WithName("GetTimeBreakdownBySubject")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/analytics/flow-vs-accuracy — flow score vs accuracy (STB-09b)
         group.MapGet("/flow-vs-accuracy", async (
             HttpContext ctx,
-            IAnalyticsRollupService analytics) =>
+            [FromServices] IAnalyticsRollupService analytics) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -293,7 +311,11 @@ public static class StudentAnalyticsEndpoints
 
             return Results.Ok(new FlowAccuracyDto(Points: points.ToArray(), Summary: summary));
         })
-        .WithName("GetFlowVsAccuracy");
+        .WithName("GetFlowVsAccuracy")
+    .Produces<FlowAccuracyDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

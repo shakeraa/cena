@@ -9,6 +9,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -26,7 +27,11 @@ public static class EmbeddingAdminEndpoints
         {
             var stats = await service.GetCorpusStatsAsync();
             return Results.Ok(stats);
-        }).WithName("GetEmbeddingCorpusStats");
+        }).WithName("GetEmbeddingCorpusStats")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/embeddings/search
         group.MapPost("/search", async (
@@ -35,7 +40,11 @@ public static class EmbeddingAdminEndpoints
         {
             var result = await service.SearchAsync(request);
             return Results.Ok(result);
-        }).WithName("SearchEmbeddings");
+        }).WithName("SearchEmbeddings")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/embeddings/duplicates?threshold=0.95&page=1&pageSize=20
         group.MapGet("/duplicates", async (
@@ -51,7 +60,11 @@ public static class EmbeddingAdminEndpoints
                 validPage,
                 validPageSize);
             return Results.Ok(result);
-        }).WithName("GetEmbeddingDuplicates");
+        }).WithName("GetEmbeddingDuplicates")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/embeddings/reindex
         group.MapPost("/reindex", async (
@@ -66,7 +79,11 @@ public static class EmbeddingAdminEndpoints
 
             var result = await service.RequestReindexAsync(request, userId);
             return Results.Ok(result);
-        }).WithName("RequestEmbeddingReindex");
+        }).WithName("RequestEmbeddingReindex")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

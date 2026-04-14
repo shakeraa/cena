@@ -19,6 +19,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -97,16 +98,28 @@ public static class AuthEndpoints
 
         group.MapPost("/password-reset", PasswordReset)
             .WithName("PostPasswordReset")
-            .WithSummary("Initiate a Firebase password-reset email for the supplied address.");
+            .WithSummary("Initiate a Firebase password-reset email for the supplied address.")
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // FIND-privacy-001: Age gate + parental consent endpoints
         group.MapPost("/age-check", AgeCheck)
             .WithName("PostAgeCheck")
-            .WithSummary("Check a date of birth and return the required consent path.");
+            .WithSummary("Check a date of birth and return the required consent path.")
+    .Produces<AgeCheckResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/parent-consent-challenge", ParentConsentChallenge)
             .WithName("PostParentConsentChallenge")
-            .WithSummary("Send a verifiable consent challenge email to a parent/guardian.");
+            .WithSummary("Send a verifiable consent challenge email to a parent/guardian.")
+    .Produces<ParentConsentChallengeResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/parent-consent-verify/{token}", ParentConsentVerify)
             .WithName("PostParentConsentVerify")

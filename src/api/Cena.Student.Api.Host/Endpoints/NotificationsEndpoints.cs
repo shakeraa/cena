@@ -14,6 +14,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -26,29 +27,73 @@ public static class NotificationsEndpoints
             .RequireAuthorization();
 
         // Phase 1 (STB-07): Read endpoints
-        group.MapGet("", GetNotifications).WithName("GetNotifications");
-        group.MapGet("/unread-count", GetUnreadCount).WithName("GetUnreadCount");
-        group.MapPost("/{id}/read", MarkAsRead).WithName("MarkNotificationRead");
-        group.MapPost("/mark-all-read", MarkAllAsRead).WithName("MarkAllNotificationsRead");
+        group.MapGet("", GetNotifications).WithName("GetNotifications")
+    .Produces<NotificationListDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/unread-count", GetUnreadCount).WithName("GetUnreadCount")
+    .Produces<UnreadCountDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/{id}/read", MarkAsRead).WithName("MarkNotificationRead")
+    .Produces<MarkReadResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/mark-all-read", MarkAllAsRead).WithName("MarkAllNotificationsRead")
+    .Produces<MarkAllReadResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Phase 1b (STB-07b): Write endpoints
-        group.MapDelete("/{id}", DeleteNotification).WithName("DeleteNotification");
-        group.MapPost("/{id}/snooze", SnoozeNotification).WithName("SnoozeNotification");
-        group.MapPost("/test", CreateTestNotification).WithName("CreateTestNotification");
+        group.MapDelete("/{id}", DeleteNotification).WithName("DeleteNotification")
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/{id}/snooze", SnoozeNotification).WithName("SnoozeNotification")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/test", CreateTestNotification).WithName("CreateTestNotification")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Web Push endpoints (PWA-BE-002)
-        group.MapPost("/web-push/subscribe", SubscribeWebPush).WithName("SubscribeWebPush");
-        group.MapPost("/web-push/unsubscribe", UnsubscribeWebPush).WithName("UnsubscribeWebPush");
+        group.MapPost("/web-push/subscribe", SubscribeWebPush).WithName("SubscribeWebPush")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/web-push/unsubscribe", UnsubscribeWebPush).WithName("UnsubscribeWebPush")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // PWA-BE-002: VAPID public key (unauthenticated, cacheable)
         app.MapGet("/api/notifications/vapid-key", GetVapidPublicKey)
             .WithName("GetVapidPublicKey")
             .WithTags("Notifications")
-            .AllowAnonymous();
+            .AllowAnonymous()
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // PWA-BE-002: Notification preferences
-        group.MapGet("/preferences", GetNotificationPreferences).WithName("GetNotificationPreferences");
-        group.MapPut("/preferences", UpdateNotificationPreferences).WithName("UpdateNotificationPreferences");
+        group.MapGet("/preferences", GetNotificationPreferences).WithName("GetNotificationPreferences")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPut("/preferences", UpdateNotificationPreferences).WithName("UpdateNotificationPreferences")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

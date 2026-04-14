@@ -13,7 +13,9 @@ using Cena.Infrastructure.Auth;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -23,15 +25,25 @@ public static class PlanEndpoints
     {
         app.MapGet("/api/me/plan/today", GetTodaysPlan)
             .WithName("GetTodaysPlan")
-            .RequireAuthorization();
+            .RequireAuthorization()
+    .Produces<TodaysPlanDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         app.MapGet("/api/review/due", GetReviewDue)
             .WithName("GetReviewDue")
-            .RequireAuthorization();
+            .RequireAuthorization()
+    .Produces<ReviewDueDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         app.MapGet("/api/recommendations/sessions", GetRecommendedSessions)
             .WithName("GetRecommendedSessions")
-            .RequireAuthorization();
+            .RequireAuthorization()
+    .Produces<RecommendedSessionsResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         return app;
     }
@@ -40,8 +52,8 @@ public static class PlanEndpoints
     private static async Task<IResult> GetTodaysPlan(
         HttpContext ctx,
         IDocumentStore store,
-        IAnalyticsRollupService analytics,
-        IRecommendationService recommendations)
+        [FromServices] IAnalyticsRollupService analytics,
+        [FromServices] IRecommendationService recommendations)
     {
         var studentId = GetStudentId(ctx.User);
         if (string.IsNullOrEmpty(studentId))
@@ -144,7 +156,7 @@ public static class PlanEndpoints
     // GET /api/recommendations/sessions — delegates to IRecommendationService
     private static async Task<IResult> GetRecommendedSessions(
         HttpContext ctx,
-        IRecommendationService recommendations,
+        [FromServices] IRecommendationService recommendations,
         int? max = 3)
     {
         var studentId = GetStudentId(ctx.User);

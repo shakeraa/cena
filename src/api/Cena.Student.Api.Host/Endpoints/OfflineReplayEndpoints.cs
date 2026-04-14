@@ -7,6 +7,7 @@
 
 using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Student.Api.Host.Endpoints;
 

@@ -9,6 +9,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -42,7 +43,11 @@ public static class StagnationInsightsEndpoints
                 "cached" => Results.Ok(result),
                 _ => Results.Accepted($"/api/admin/stagnation/jobs/{result.JobId}", result)
             };
-        }).WithName("SubmitStagnationAnalysis");
+        }).WithName("SubmitStagnationAnalysis")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/stagnation/jobs/{jobId} — poll job status + result
         group.MapGet("/jobs/{jobId}", async (
@@ -57,7 +62,12 @@ public static class StagnationInsightsEndpoints
                 "failed" => Results.Ok(result),
                 _ => Results.Ok(result) // queued or processing
             };
-        }).WithName("PollStagnationJob");
+        }).WithName("PollStagnationJob")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

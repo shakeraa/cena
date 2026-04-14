@@ -13,6 +13,7 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -28,27 +29,66 @@ public static class MeEndpoints
             .RequireAuthorization();
 
         // STB-00 Phase 1
-        group.MapGet("", GetBootstrap).WithName("GetMe");
-        group.MapGet("/profile", GetProfile).WithName("GetMeProfile");
-        group.MapPatch("/profile", UpdateProfile).WithName("UpdateMeProfile");
-        group.MapPost("/onboarding", SubmitOnboarding).WithName("SubmitOnboarding");
+        group.MapGet("", GetBootstrap).WithName("GetMe")
+    .Produces<MeBootstrapDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapGet("/profile", GetProfile).WithName("GetMeProfile")
+    .Produces<ProfileDto>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPatch("/profile", UpdateProfile).WithName("UpdateMeProfile")
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/onboarding", SubmitOnboarding).WithName("SubmitOnboarding")
+    .Produces<OnboardingResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // FIND-privacy-001: Record DOB + consent for authenticated users (adults)
-        group.MapPost("/age-consent", RecordAgeConsent).WithName("RecordAgeConsent");
+        group.MapPost("/age-consent", RecordAgeConsent).WithName("RecordAgeConsent")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // STB-00b: Settings
-        group.MapGet("/settings", GetSettings).WithName("GetSettings");
-        group.MapPatch("/settings", UpdateSettings).WithName("UpdateSettings");
+        group.MapGet("/settings", GetSettings).WithName("GetSettings")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPatch("/settings", UpdateSettings).WithName("UpdateSettings")
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // STB-00b: Home Layout
-        group.MapPut("/preferences/home-layout", UpdateHomeLayout).WithName("UpdateHomeLayout");
+        group.MapPut("/preferences/home-layout", UpdateHomeLayout).WithName("UpdateHomeLayout")
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // STB-00b: Devices
-        group.MapGet("/devices", GetDevices).WithName("GetDevices");
-        group.MapPost("/devices/{id}/revoke", RevokeDevice).WithName("RevokeDevice");
+        group.MapGet("/devices", GetDevices).WithName("GetDevices")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/devices/{id}/revoke", RevokeDevice).WithName("RevokeDevice")
+    .Produces<ShareTokenResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // STB-00b: Share Tokens
-        group.MapPost("/share-tokens", CreateShareToken).WithName("CreateShareToken");
+        group.MapPost("/share-tokens", CreateShareToken).WithName("CreateShareToken")
+    .Produces<ShareTokenResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

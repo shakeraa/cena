@@ -24,6 +24,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -38,21 +39,41 @@ public static class MeGdprEndpoints
             .RequireAuthorization();
 
         // ---- Consent Management (GDPR Art 7) ----
-        group.MapGet("/consents", GetConsents).WithName("GetMyConsents");
-        group.MapPost("/consents", RecordConsent).WithName("RecordMyConsent");
-        group.MapDelete("/consents/{purpose}", RevokeConsent).WithName("RevokeMyConsent");
+        group.MapGet("/consents", GetConsents).WithName("GetMyConsents")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapPost("/consents", RecordConsent).WithName("RecordMyConsent")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        group.MapDelete("/consents/{purpose}", RevokeConsent).WithName("RevokeMyConsent")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // ---- Data Export (GDPR Art 20 -- Portability) ----
         group.MapPost("/export", RequestExport)
             .WithName("RequestMyDataExport")
-            .RequireRateLimiting("gdpr-export");
+            .RequireRateLimiting("gdpr-export")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // ---- Right to Erasure (GDPR Art 17) ----
         group.MapPost("/erasure", RequestErasure)
             .WithName("RequestMyErasure")
-            .RequireRateLimiting("gdpr-erasure");
+            .RequireRateLimiting("gdpr-erasure")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-        group.MapGet("/erasure/status", GetErasureStatus).WithName("GetMyErasureStatus");
+        group.MapGet("/erasure/status", GetErasureStatus).WithName("GetMyErasureStatus")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // ---- DSAR (GDPR Art 12, Israel PPL 13) ----
         var dsarGroup = app.MapGroup("/api/me")
@@ -61,18 +82,11 @@ public static class MeGdprEndpoints
 
         dsarGroup.MapPost("/dsar", SubmitDsar)
             .WithName("SubmitMyDsar")
-            .RequireRateLimiting("gdpr-erasure");
-
-        // ---- Consent Management (privacy.vue) ----
-        // Student-facing consent endpoints under /api/me/consent
-        var consentGroup = app.MapGroup("/api/me/consent")
-            .WithTags("Consent")
-            .RequireAuthorization();
-
-        consentGroup.MapGet("", GetConsentState).WithName("GetMyConsentState");
-        consentGroup.MapPost("", UpdateConsent).WithName("UpdateMyConsent");
-        consentGroup.MapPost("/bulk", UpdateBulkConsents).WithName("UpdateMyBulkConsents");
-        consentGroup.MapGet("/defaults", GetDefaultConsents).WithName("GetMyDefaultConsents");
+            .RequireRateLimiting("gdpr-erasure")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

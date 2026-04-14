@@ -9,6 +9,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -26,7 +27,11 @@ public static class IngestionSettingsEndpoints
         {
             var settings = await service.GetSettingsAsync();
             return Results.Ok(settings);
-        }).WithName("GetIngestionSettings");
+        }).WithName("GetIngestionSettings")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // PUT — save full settings document
         group.MapPut("/", async (
@@ -48,7 +53,12 @@ public static class IngestionSettingsEndpoints
             {
                 return Results.BadRequest(new { error = ex.Message });
             }
-        }).WithName("UpdateIngestionSettings");
+        }).WithName("UpdateIngestionSettings")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST — test email connection
         group.MapPost("/test-email", async (
@@ -62,7 +72,11 @@ public static class IngestionSettingsEndpoints
                 error = result.Error,
                 details = result.Details
             });
-        }).WithName("TestEmailIngestionConnection");
+        }).WithName("TestEmailIngestionConnection")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST — test cloud directory connection
         group.MapPost("/test-cloud-dir", async (
@@ -76,7 +90,11 @@ public static class IngestionSettingsEndpoints
                 error = result.Error,
                 details = result.Details
             });
-        }).WithName("TestCloudDirConnection");
+        }).WithName("TestCloudDirConnection")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

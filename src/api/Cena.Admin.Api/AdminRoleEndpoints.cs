@@ -7,6 +7,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -25,7 +26,11 @@ public static class AdminRoleEndpoints
             return Results.Ok(roles);
         })
         .WithName("ListRoles")
-        .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+        .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // GET /api/admin/roles/{id} — ModeratorOrAbove
         rolesGroup.MapGet("/{id}", async (string id, IAdminRoleService service) =>
@@ -34,7 +39,12 @@ public static class AdminRoleEndpoints
             return role != null ? Results.Ok(role) : Results.NotFound();
         })
         .WithName("GetRole")
-        .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+        .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // POST /api/admin/roles — SuperAdminOnly
         rolesGroup.MapPost("/", async (CreateRoleRequest request, IAdminRoleService service) =>
@@ -54,7 +64,13 @@ public static class AdminRoleEndpoints
             }
         })
         .WithName("CreateRole")
-        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // PUT /api/admin/roles/{id}/permissions — SuperAdminOnly
         rolesGroup.MapPut("/{id}/permissions", async (string id, UpdatePermissionsRequest request, IAdminRoleService service) =>
@@ -70,7 +86,12 @@ public static class AdminRoleEndpoints
             }
         })
         .WithName("UpdateRolePermissions")
-        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // DELETE /api/admin/roles/{id} — SuperAdminOnly
         rolesGroup.MapDelete("/{id}", async (string id, IAdminRoleService service) =>
@@ -90,7 +111,13 @@ public static class AdminRoleEndpoints
             }
         })
         .WithName("DeleteRole")
-        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // GET /api/admin/permissions — ModeratorOrAbove (static data)
         app.MapGet("/api/admin/permissions", async (IAdminRoleService service) =>
@@ -100,7 +127,10 @@ public static class AdminRoleEndpoints
         })
         .WithTags("Admin Roles")
         .WithName("ListPermissions")
-        .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
+        .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // POST /api/admin/users/{id}/role — SuperAdminOnly (FIND-sec-010: privilege escalation fix)
         app.MapPost("/api/admin/users/{id}/role", async (string id, AssignRoleRequest request, IAdminRoleService service, HttpContext ctx) =>
@@ -129,7 +159,12 @@ public static class AdminRoleEndpoints
         })
         .WithTags("Admin Roles")
         .WithName("AssignRoleToUser")
-        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly);
+        .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
+    .Produces(StatusCodes.Status204NoContent)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // GET /api/admin/users/{id}/abilities — AdminOnly
         app.MapGet("/api/admin/users/{id}/abilities", async (string id, IAdminRoleService service) =>
@@ -146,7 +181,11 @@ public static class AdminRoleEndpoints
         })
         .WithTags("Admin Roles")
         .WithName("GetUserAbilities")
-        .RequireAuthorization(CenaAuthPolicies.AdminOnly);
+        .RequireAuthorization(CenaAuthPolicies.AdminOnly)
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         return app;
     }

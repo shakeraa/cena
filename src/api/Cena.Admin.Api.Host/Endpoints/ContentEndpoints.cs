@@ -11,7 +11,9 @@ using Cena.Actors.Questions;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Api.Host.Endpoints;
 
@@ -25,7 +27,7 @@ public static class ContentEndpoints
 
         // GET /api/content/questions/{id} — published question with translations
         group.MapGet("/questions/{id}", async (
-            string id, HttpContext httpContext, IDocumentStore store) =>
+            string id, HttpContext httpContext, [FromServices] IDocumentStore store) =>
         {
             await using var session = store.QuerySession();
             var question = await session.Query<QuestionState>()
@@ -56,12 +58,17 @@ public static class ContentEndpoints
                 question.Explanation,
                 version = question.EventVersion
             });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status304NotModified)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/content/questions/{id}/explanation — get explanation
         // FIND-sec-013: Only Published questions, never expose aiPrompt
         group.MapGet("/questions/{id}/explanation", async (
-            string id, IDocumentStore store, HttpContext httpContext) =>
+            string id, [FromServices] IDocumentStore store, HttpContext httpContext) =>
         {
             await using var session = store.QuerySession();
             var question = await session.Query<QuestionState>()
@@ -84,10 +91,15 @@ public static class ContentEndpoints
                 explanation = question.Explanation ?? "",
                 version = question.EventVersion
             });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status304NotModified)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/content/subjects — list available subjects with question counts
-        group.MapGet("/subjects", async (IDocumentStore store) =>
+        group.MapGet("/subjects", async ([FromServices] IDocumentStore store) =>
         {
             await using var session = store.QuerySession();
             var questions = await session.Query<QuestionState>()
@@ -101,11 +113,14 @@ public static class ContentEndpoints
                 .ToList();
 
             return Results.Ok(new { subjects });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/content/subjects/{subject}/topics — list topics for a subject
         group.MapGet("/subjects/{subject}/topics", async (
-            string subject, IDocumentStore store) =>
+            string subject, [FromServices] IDocumentStore store) =>
         {
             await using var session = store.QuerySession();
             var questions = await session.Query<QuestionState>()
@@ -121,7 +136,10 @@ public static class ContentEndpoints
                 .ToList();
 
             return Results.Ok(new { subject, topics });
-        });
+        })
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // FIND-arch-007: /api/content/diagrams/{id} was served from a
         // Marten-backed IDiagramCache that had no writer path and no DI

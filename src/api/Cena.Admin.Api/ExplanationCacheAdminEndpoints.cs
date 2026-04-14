@@ -7,6 +7,7 @@ using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -24,7 +25,11 @@ public static class ExplanationCacheAdminEndpoints
         {
             var stats = await service.GetCacheStatsAsync();
             return Results.Ok(stats);
-        }).WithName("GetExplanationCacheStats");
+        }).WithName("GetExplanationCacheStats")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/explanations/by-question/{questionId}
         group.MapGet("/by-question/{questionId}", async (
@@ -33,7 +38,12 @@ public static class ExplanationCacheAdminEndpoints
         {
             var result = await service.GetExplanationsByQuestionAsync(questionId);
             return result is not null ? Results.Ok(result) : Results.NotFound();
-        }).WithName("GetExplanationsByQuestion");
+        }).WithName("GetExplanationsByQuestion")
+    .Produces(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/explanations/invalidate
         group.MapPost("/invalidate", async (
@@ -42,7 +52,11 @@ public static class ExplanationCacheAdminEndpoints
         {
             var result = await service.InvalidateCacheAsync(request);
             return Results.Ok(result);
-        }).WithName("InvalidateExplanationCache");
+        }).WithName("InvalidateExplanationCache")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/explanations/quality-scores
         group.MapGet("/quality-scores", async (
@@ -60,7 +74,11 @@ public static class ExplanationCacheAdminEndpoints
                 validPage,
                 validPageSize);
             return Results.Ok(result);
-        }).WithName("GetExplanationQualityScores");
+        }).WithName("GetExplanationQualityScores")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }

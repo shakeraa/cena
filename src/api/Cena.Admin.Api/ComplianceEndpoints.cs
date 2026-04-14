@@ -11,6 +11,7 @@ using Marten.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
 
@@ -73,7 +74,11 @@ public static class ComplianceEndpoints
                 items
             });
         })
-        .WithName("QueryComplianceAuditLog");
+        .WithName("QueryComplianceAuditLog")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/compliance/audit-log/summary
         group.MapGet("/audit-log/summary", async (
@@ -126,7 +131,11 @@ public static class ComplianceEndpoints
                 periodTo = to
             });
         })
-        .WithName("AuditLogSummary");
+        .WithName("AuditLogSummary")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/compliance/data-retention
         group.MapGet("/data-retention", async (IQuerySession querySession) =>
@@ -269,7 +278,11 @@ public static class ComplianceEndpoints
                     : Array.Empty<object>()
             });
         })
-        .WithName("DataRetentionPolicy");
+        .WithName("DataRetentionPolicy")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
