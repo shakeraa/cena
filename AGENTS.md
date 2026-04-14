@@ -72,6 +72,30 @@ Pick one name for your entire session and use it consistently as `--worker <name
 
 ---
 
+## Environment Requirements (MUST verify before anything else)
+
+The task queue CLI (`node .agentdb/kimi-queue.js`) requires **native arm64 Node.js v18+** on this Mac. If you get `better-sqlite3` load errors or architecture mismatches, your Node is running under Rosetta (x64 emulation). Fix:
+
+```bash
+# Option 1: Use Homebrew's arm64 Node (preferred)
+export PATH="/opt/homebrew/bin:$PATH"
+node --version  # should be v18+ and: node -p process.arch → "arm64"
+
+# Option 2: nvm
+nvm install 22   # or: nvm use 22
+nvm alias default 22
+
+# Verify
+node -e "console.log(process.arch, process.version)"
+# Expected: arm64 v22.x.x (or v18+)
+```
+
+If `node -p process.arch` prints `x64` on an arm64 Mac, the queue CLI **will not work**. Fix this before proceeding to the checklist.
+
+**CRITICAL: Do NOT run `npm install`, `npm rebuild`, or `node-gyp rebuild` in this repo.** The native modules (better-sqlite3) are already compiled for the coordinator's Node version. Recompiling them will break the queue CLI for everyone. If the CLI does not work with your Node version, switch to the correct Node version — do not recompile the module.
+
+---
+
 ## 9-step first-session checklist (MANDATORY)
 
 Run every step, in order, before claiming any real task. If any step errors, stop and either ask the coordinator (via a message, see step 1) or call `fail` on the handshake task with a specific reason.

@@ -86,43 +86,175 @@ HEBREW_MATH_GLOSSARY = """
 ARABIC_MATH_GLOSSARY = """
 ## قاموس المصطلحات الرياضية (Arabic Math Terminology)
 
+### الجبر (Algebra)
 | English | Arabic | Transliteration |
 |---------|--------|----------------|
 | Equation | معادلة | Mu'adala |
 | Inequality | متباينة | Mutabayna |
 | Variable | متغير | Mutaghayyir |
 | Coefficient | معامل | Mu'amil |
-| Function | دالة | Dalla |
-| Derivative | مشتقة | Mushtaqqa |
-| Integral | تكامل | Takamul |
-| Limit | نهاية | Nihaya |
-| Slope | ميل | Mayl |
-| Intercept | نقطة تقاطع | Nuqtat Taqatu' |
+| Constant | ثابت | Thabit |
+| Expression | عبارة جبرية | 'Ibara Jabriyya |
+| Term | حد | Hadd |
+| Polynomial | كثير حدود | Kathir Hudud |
+| Monomial | وحيد الحد | Wahid al-Hadd |
+| Binomial | ذو الحدين | Dhu al-Haddayn |
 | Quadratic | تربيعي | Tarbi'i |
 | Linear | خطي | Khatti |
-| Polynomial | كثير حدود | Kathir Hudud |
+| Factoring | تحليل إلى عوامل | Tahlil ila 'Awamil |
+| Discriminant | المميز | al-Mumayyiz |
+| Root (of equation) | جذر المعادلة | Jidhr al-Mu'adala |
+| Solution | حل | Hall |
+| Substitution | تعويض | Ta'wid |
+| Simplification | تبسيط | Tabsit |
+| Absolute value | القيمة المطلقة | al-Qima al-Mutlaqa |
 | Fraction | كسر | Kasr |
 | Common denominator | مقام مشترك | Maqam Mushtarak |
-| Factoring | تحليل إلى عوامل | Tahlil ila Awamil |
-| Chain rule | قاعدة السلسلة | Qa'idat al-Silsila |
-| Product rule | قاعدة الضرب | Qa'idat al-Darb |
-| Trigonometric | مثلثي | Muthallathi |
-| Pythagorean theorem | نظرية فيثاغورس | Nazariyyat Fithaghuras |
-| Proof | برهان | Burhan |
-| Theorem | نظرية | Nazariyya |
+| Numerator | بسط | Bast |
+| Denominator | مقام | Maqam |
+| System of equations | جملة معادلات | Jumlat Mu'adalat |
+| Arithmetic sequence | متتالية حسابية | Mutataaliya Hisabiyya |
+| Geometric sequence | متتالية هندسية | Mutataaliya Handasiyya |
 | Sequence | متتالية | Mutataaliya |
 | Series | متسلسلة | Mutasalsila |
-| Probability | احتمال | Ihtimal |
+| Common difference | أساس المتتالية الحسابية | Asas al-Mutataaliya al-Hisabiyya |
+| Common ratio | أساس المتتالية الهندسية | Asas al-Mutataaliya al-Handasiyya |
+| Exponent | أس | Uss |
+| Power | قوة / أس | Quwwa / Uss |
+| Logarithm | لوغاريتم | Lugharitm |
+| Natural logarithm | لوغاريتم طبيعي | Lugharitm Tabi'i |
+
+### الدوال (Functions)
+| English | Arabic | Transliteration |
+|---------|--------|----------------|
+| Function | دالة | Dalla |
 | Domain | مجال | Majal |
 | Range | مدى | Mada |
-| Square root | جذر تربيعي | Jidhr Tarbi'i |
-| Logarithm | لوغاريتم | Lugharitm |
+| Slope | ميل | Mayl |
+| Intercept | نقطة تقاطع | Nuqtat Taqatu' |
+| Y-intercept | نقطة تقاطع مع محور الصادات | Nuqtat Taqatu' ma'a Mihwar al-Sadat |
+| Graph | رسم بياني | Rasm Bayani |
+| Increasing function | دالة تزايدية | Dalla Tazayudiyya |
+| Decreasing function | دالة تناقصية | Dalla Tanaqusiyya |
+| Maximum | قيمة عظمى | Qima 'Uzma |
+| Minimum | قيمة صغرى | Qima Sughra |
+| Vertex | رأس | Ra's |
+| Parabola | قطع مكافئ | Qat' Mukafi' |
+| Asymptote | خط مقارب | Khatt Muqarib |
+| Exponential function | دالة أسية | Dalla Ussiyya |
+| Inverse function | دالة عكسية | Dalla 'Aksiyya |
+| Composite function | دالة مركبة | Dalla Murakkaba |
+| Even function | دالة زوجية | Dalla Zawjiyya |
+| Odd function | دالة فردية | Dalla Fardiyya |
+| Continuous | مستمرة | Mustamirra |
+
+### التفاضل والتكامل (Calculus)
+| English | Arabic | Transliteration |
+|---------|--------|----------------|
+| Limit | نهاية | Nihaya |
+| Derivative | مشتقة | Mushtaqqa |
+| Integral | تكامل | Takamul |
+| Definite integral | تكامل محدد | Takamul Muhaddad |
+| Indefinite integral | تكامل غير محدد | Takamul Ghayr Muhaddad |
+| Differentiation | اشتقاق | Ishtiqaq |
+| Integration | تكامل | Takamul |
+| Chain rule | قاعدة السلسلة | Qa'idat al-Silsila |
+| Product rule | قاعدة الضرب | Qa'idat al-Darb |
+| Quotient rule | قاعدة القسمة | Qa'idat al-Qisma |
+| Rate of change | معدل التغير | Mu'addal al-Taghayyur |
+| Tangent line | خط المماس | Khatt al-Mumas |
+| Inflection point | نقطة انعطاف | Nuqtat In'itaf |
+| Critical point | نقطة حرجة | Nuqtat Harija |
+| Area under curve | المساحة تحت المنحنى | al-Masaha Taht al-Munhana |
+
+### الهندسة (Geometry)
+| English | Arabic | Transliteration |
+|---------|--------|----------------|
+| Angle | زاوية | Zawiya |
+| Triangle | مثلث | Muthallath |
+| Circle | دائرة | Da'ira |
+| Radius | نصف قطر | Nisf Qutr |
+| Diameter | قطر | Qutr |
+| Perpendicular | عمودي | 'Amudi |
+| Parallel | متوازي | Mutawazi |
+| Area | مساحة | Masaha |
+| Perimeter | محيط | Muhit |
+| Volume | حجم | Hajm |
+| Coordinate | إحداثي | Ihdathi |
+| Point | نقطة | Nuqta |
+| Line | مستقيم | Mustaqim |
+| Midpoint | نقطة المنتصف | Nuqtat al-Muntasaf |
+| Distance | مسافة | Masafa |
+| Congruent | متطابق | Mutatbiq |
+| Similar | متشابه | Mutashabih |
+| Isosceles triangle | مثلث متساوي الساقين | Muthallath Mutasawi al-Saqayn |
+| Right triangle | مثلث قائم الزاوية | Muthallath Qa'im al-Zawiya |
+| Hypotenuse | وتر | Watar |
+
+### حساب المثلثات (Trigonometry)
+| English | Arabic | Transliteration |
+|---------|--------|----------------|
+| Trigonometric | مثلثي | Muthallathi |
+| Sine | جيب | Jayb |
+| Cosine | جيب تمام | Jayb Tamam |
+| Tangent | ظل | Zill |
+| Radian | راديان | Radyan |
+| Pythagorean theorem | نظرية فيثاغورس | Nazariyyat Fithaghuras |
+| Sine rule | قانون الجيوب | Qanun al-Juyub |
+| Cosine rule | قانون جيب التمام | Qanun Jayb al-Tamam |
+| Unit circle | دائرة الوحدة | Da'irat al-Wahda |
+| Identity | متطابقة | Mutatbiqa |
+
+### الاحتمالات والإحصاء (Probability & Statistics)
+| English | Arabic | Transliteration |
+|---------|--------|----------------|
+| Probability | احتمال | Ihtimal |
+| Permutation | تباديل | Tabadil |
+| Combination | توافيق | Tawafiq |
+| Sample space | فضاء العينة | Fada' al-'Ayna |
+| Event | حدث | Hadath |
+| Independent events | أحداث مستقلة | Ahdath Mustaqilla |
+| Conditional probability | احتمال مشروط | Ihtimal Mashrut |
+| Binomial distribution | توزيع ذو الحدين | Tawzi' Dhu al-Haddayn |
+| Normal distribution | توزيع طبيعي | Tawzi' Tabi'i |
+| Mean | متوسط حسابي | Mutawassit Hisabi |
+| Standard deviation | انحراف معياري | Inhiraf Mi'yari |
+| Variance | تباين | Tabayun |
+
+### المتجهات (Vectors)
+| English | Arabic | Transliteration |
+|---------|--------|----------------|
 | Vector | متجه | Muttajih |
+| Scalar | كمية قياسية | Kammiyya Qiyasiyya |
+| Dot product | الجداء القياسي | al-Juda' al-Qiyasi |
+| Cross product | الجداء الاتجاهي | al-Juda' al-Ittijahi |
+| Magnitude | مقدار | Miqdar |
+
+### مصطلحات عامة (General Terms)
+| English | Arabic | Transliteration |
+|---------|--------|----------------|
+| Proof | برهان | Burhan |
+| Theorem | نظرية | Nazariyya |
+| Axiom | مسلّمة | Musallama |
+| Conjecture | حدس | Hads |
+| Contradiction | تناقض | Tanaqud |
+| Square root | جذر تربيعي | Jidhr Tarbi'i |
+| Cube root | جذر تكعيبي | Jidhr Tak'ibi |
+| Matrix | مصفوفة | Masfufa |
+| Determinant | محدد | Muhaddad |
+| Set | مجموعة | Majmu'a |
+| Subset | مجموعة جزئية | Majmu'a Juz'iyya |
+| Union | اتحاد | Ittihad |
+| Intersection | تقاطع | Taqatu' |
+| Empty set | مجموعة خالية | Majmu'a Khaliya |
 
 ### ملاحظات هامة (Important Notes):
 - Use Modern Standard Arabic (MSA) for Israeli Arab Bagrut students.
 - Aligns with Palestinian/Jordanian curriculum conventions.
 - Write math in standard notation, not Arabic transliterations.
+- Use Western Arabic numerals (0-9), not Eastern Arabic (٠-٩), as Israeli Arab students use Western.
+- Mathematical expressions remain LTR inside RTL text: wrap in <bdi dir="ltr">.
+- Gender agreement: دالة (f.), معادلة (f.), متغير (m.), معامل (m.) — adjectives must agree.
 """.strip()
 
 def get_math_glossary(locale: str = "he") -> str:

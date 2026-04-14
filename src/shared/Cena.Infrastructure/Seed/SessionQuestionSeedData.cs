@@ -47,6 +47,8 @@ public static class SessionQuestionSeedData
                 IsActive = true,
                 // FIND-pedagogy-008: explicit learning objective link
                 LearningObjectiveId = "lo-math-alg-linear-001",
+                // RDY-003: foundational concept — no prerequisites
+                Prerequisites = new List<string>(),
             },
             new QuestionDocument
             {
@@ -64,6 +66,8 @@ public static class SessionQuestionSeedData
                 Grade = 7,
                 IsActive = true,
                 LearningObjectiveId = "lo-math-alg-linear-001",
+                // RDY-003: linear equations require number properties
+                Prerequisites = new List<string> { "ALG-001" },
             },
             new QuestionDocument
             {
@@ -81,6 +85,8 @@ public static class SessionQuestionSeedData
                 Grade = 11,
                 IsActive = true,
                 LearningObjectiveId = "lo-math-calc-derivatives-001",
+                // RDY-003: derivatives require limits + derivative definition
+                Prerequisites = new List<string> { "CAL-001", "CAL-002" },
             }
         };
 

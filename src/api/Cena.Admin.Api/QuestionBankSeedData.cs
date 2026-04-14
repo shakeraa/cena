@@ -1422,4 +1422,193 @@ public static class QuestionBankSeedData
     };
 
     private sealed record SeedOption(string Label, string Text, bool IsCorrect, string? Rationale);
+
+    // ── RDY-003: Prerequisite Graph Backfill ────────────────────────────
+
+    /// <summary>
+    /// Maps seed question concept names (e.g., "linear-equations") to canonical
+    /// graph concept IDs (e.g., "ALG-002") from CurriculumSeedData.
+    /// </summary>
+    private static readonly Dictionary<string, string> ConceptNameToGraphId = new(StringComparer.OrdinalIgnoreCase)
+    {
+        // Algebra
+        ["number-properties"]   = "ALG-001",
+        ["linear-equations"]    = "ALG-002",
+        ["inequalities"]        = "ALG-003",
+        ["quadratic-equations"] = "ALG-004",
+        ["systems-of-equations"]= "ALG-005",
+        ["polynomials"]         = "ALG-006",
+        ["rational-expressions"]= "ALG-007",
+        ["sequences"]           = "ALG-008",
+
+        // Functions
+        ["function-basics"]     = "FUN-001",
+        ["linear-functions"]    = "FUN-002",
+        ["quadratic-functions"] = "FUN-003",
+        ["exponential-functions"]= "FUN-004",
+        ["logarithms"]          = "FUN-005",
+        ["composite-functions"] = "FUN-006",
+        ["inverse-functions"]   = "FUN-007",
+
+        // Geometry
+        ["angles-lines"]        = "GEO-001",
+        ["triangles"]           = "GEO-002",
+        ["circle-properties"]   = "GEO-003",
+        ["coordinate-geometry"] = "GEO-004",
+        ["trigonometric-ratios"]= "GEO-005",
+        ["area-volume"]         = "GEO-006",
+        ["analytic-geometry"]   = "GEO-007",
+
+        // Trigonometry
+        ["trigonometry"]        = "TRG-001",
+        ["trig-equations"]      = "TRG-002",
+        ["sine-cosine-rules"]   = "TRG-003",
+        ["radian-measure"]      = "TRG-004",
+
+        // Calculus
+        ["limits"]              = "CAL-001",
+        ["derivatives"]         = "CAL-003",
+        ["integrals"]           = "CAL-005",
+
+        // Probability & Statistics
+        ["combinatorics"]       = "PRB-001",
+        ["probability"]         = "PRB-002",
+        ["conditional-probability"] = "PRB-003",
+        ["binomial-distribution"]   = "PRB-004",
+        ["normal-distribution"]     = "PRB-005",
+        ["statistics"]          = "PRB-006",
+
+        // Vectors
+        ["vectors"]             = "VEC-001",
+        ["dot-product"]         = "VEC-002",
+    };
+
+    /// <summary>
+    /// Prerequisite edges keyed by target graph ID → list of prerequisite graph IDs.
+    /// Mirrors CurriculumSeedData.BuildBagrutMathCurriculum() edges.
+    /// </summary>
+    private static readonly Dictionary<string, string[]> GraphPrerequisites = new()
+    {
+        ["ALG-002"] = new[] { "ALG-001" },
+        ["ALG-003"] = new[] { "ALG-001" },
+        ["ALG-004"] = new[] { "ALG-002" },
+        ["ALG-005"] = new[] { "ALG-002" },
+        ["ALG-006"] = new[] { "ALG-004" },
+        ["ALG-007"] = new[] { "ALG-006" },
+        ["ALG-008"] = new[] { "ALG-004" },
+
+        ["FUN-001"] = new[] { "ALG-001" },
+        ["FUN-002"] = new[] { "FUN-001" },
+        ["FUN-003"] = new[] { "ALG-004", "FUN-002" },
+        ["FUN-004"] = new[] { "FUN-002" },
+        ["FUN-005"] = new[] { "FUN-004" },
+        ["FUN-006"] = new[] { "FUN-003", "FUN-004" },
+        ["FUN-007"] = new[] { "FUN-002" },
+
+        ["GEO-002"] = new[] { "GEO-001" },
+        ["GEO-003"] = new[] { "GEO-002" },
+        ["GEO-004"] = new[] { "GEO-001", "ALG-002" },
+        ["GEO-005"] = new[] { "GEO-002" },
+        ["GEO-006"] = new[] { "GEO-002" },
+        ["GEO-007"] = new[] { "GEO-004", "FUN-002" },
+
+        ["TRG-001"] = new[] { "GEO-005" },
+        ["TRG-002"] = new[] { "TRG-001" },
+        ["TRG-003"] = new[] { "GEO-005", "TRG-001" },
+        ["TRG-004"] = new[] { "GEO-005" },
+
+        ["CAL-001"] = new[] { "FUN-003", "ALG-006" },
+        ["CAL-002"] = new[] { "CAL-001" },
+        ["CAL-003"] = new[] { "CAL-002" },
+        ["CAL-004"] = new[] { "CAL-003" },
+        ["CAL-005"] = new[] { "CAL-003" },
+        ["CAL-006"] = new[] { "CAL-005" },
+
+        ["PRB-001"] = new[] { "ALG-001" },
+        ["PRB-002"] = new[] { "PRB-001" },
+        ["PRB-003"] = new[] { "PRB-002" },
+        ["PRB-004"] = new[] { "PRB-003" },
+        ["PRB-005"] = new[] { "PRB-004" },
+        ["PRB-006"] = new[] { "PRB-005" },
+
+        ["VEC-001"] = new[] { "GEO-004", "TRG-001" },
+        ["VEC-002"] = new[] { "VEC-001" },
+        ["VEC-003"] = new[] { "VEC-002" },
+        ["VEC-004"] = new[] { "VEC-002" },
+    };
+
+    /// <summary>
+    /// RDY-003: Given a list of seed concept names, resolve graph prerequisite IDs.
+    /// Returns distinct prerequisite IDs across all concepts.
+    /// </summary>
+    internal static List<string> ResolvePrerequisites(IEnumerable<string> conceptNames)
+    {
+        var prereqs = new HashSet<string>();
+
+        foreach (var name in conceptNames)
+        {
+            if (!ConceptNameToGraphId.TryGetValue(name, out var graphId))
+                continue;
+
+            if (GraphPrerequisites.TryGetValue(graphId, out var prereqIds))
+            {
+                foreach (var pid in prereqIds)
+                    prereqs.Add(pid);
+            }
+        }
+
+        return prereqs.OrderBy(p => p).ToList();
+    }
+
+    /// <summary>
+    /// RDY-003: Backfill prerequisites on QuestionDocuments based on their ConceptId.
+    /// Call after initial seeding to populate the Prerequisites field on all
+    /// existing QuestionDocuments that have empty prerequisites.
+    /// </summary>
+    public static async Task BackfillPrerequisitesAsync(IDocumentStore store, ILogger logger)
+    {
+        await using var querySession = store.QuerySession();
+        var docs = await querySession.Query<Cena.Infrastructure.Documents.QuestionDocument>()
+            .Where(q => q.IsActive)
+            .ToListAsync();
+
+        if (docs.Count == 0)
+        {
+            logger.LogInformation("RDY-003: No QuestionDocuments found, skipping prerequisite backfill");
+            return;
+        }
+
+        int updated = 0;
+        await using var writeSession = store.LightweightSession();
+
+        foreach (var doc in docs)
+        {
+            if (doc.Prerequisites is { Count: > 0 })
+                continue; // already populated
+
+            // Extract concept name from ConceptId (e.g., "concept:math:derivatives" → "derivatives")
+            var parts = doc.ConceptId.Split(':');
+            var conceptName = parts.Length > 0 ? parts[^1] : doc.ConceptId;
+
+            var prereqs = ResolvePrerequisites(new[] { conceptName });
+            if (prereqs.Count > 0)
+            {
+                doc.Prerequisites = prereqs;
+                writeSession.Store(doc);
+                updated++;
+            }
+        }
+
+        if (updated > 0)
+        {
+            await writeSession.SaveChangesAsync();
+            logger.LogInformation("RDY-003: Backfilled prerequisites on {Count}/{Total} QuestionDocuments",
+                updated, docs.Count);
+        }
+        else
+        {
+            logger.LogInformation("RDY-003: All {Total} QuestionDocuments already have prerequisites or no mapping found",
+                docs.Count);
+        }
+    }
 }

@@ -60,7 +60,9 @@ public sealed record QualityGateInput(
     int ClaimedBloomLevel, // 1-6
     float ClaimedDifficulty,
     string? Grade,         // "3 Units", "4 Units", "5 Units"
-    IReadOnlyList<string>? ConceptIds);
+    IReadOnlyList<string>? ConceptIds,
+    IReadOnlyList<string>? Prerequisites = null,
+    IReadOnlyList<string>? AvailableLanguages = null);
 
 public sealed record QualityGateOption(
     string Label,

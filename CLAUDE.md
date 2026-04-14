@@ -215,6 +215,15 @@ This repo runs multiple coding agents in parallel — Claude Code (this session)
 **Protocol doc**: [.agentdb/QUEUE.md](.agentdb/QUEUE.md) — **read this before assigning or claiming any task**
 **Coder agent instructions**: [.agentdb/AGENT_CODER_INSTRUCTIONS.md](.agentdb/AGENT_CODER_INSTRUCTIONS.md) — required reading for any agent that wants to pull work from the queue
 
+### Environment: Node.js for queue CLI
+
+The task queue CLI (`node .agentdb/kimi-queue.js`) requires **native arm64 Node.js v18+** on this Mac. Sub-agents and external workers (Kimi, Codex, claude-1, etc.) must verify `node -p process.arch` prints `arm64` — not `x64` (Rosetta). If a worker reports `better-sqlite3` load errors, tell them:
+
+```bash
+export PATH="/opt/homebrew/bin:$PATH"   # Homebrew arm64 Node
+# or: nvm use 22
+```
+
 ### Golden rules
 
 - **Claude Code main session** is the default coordinator. Worker name: `claude-code`. Owns enqueue, review, merge-to-main.

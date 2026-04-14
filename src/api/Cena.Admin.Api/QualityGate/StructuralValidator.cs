@@ -239,6 +239,41 @@ public static class StructuralValidator
             passedRules++;
         }
 
+        // Rule 16 (RDY-003): Bloom Level 3+ (Apply and above) must have at least
+        // one prerequisite. Without prerequisites the adaptive system cannot enforce
+        // prerequisite gating and students may encounter higher-order questions
+        // before mastering foundational concepts.
+        totalRules++;
+        if (input.ClaimedBloomLevel >= 3
+            && (input.Prerequisites is null || input.Prerequisites.Count == 0))
+        {
+            violations.Add(new("StructuralValidity", "BLOOM3_NO_PREREQS",
+                $"Bloom Level {input.ClaimedBloomLevel} (Apply+) requires at least one prerequisite concept",
+                ViolationSeverity.Warning));
+        }
+        else
+        {
+            passedRules++;
+        }
+
+        // Rule 17 (RDY-004): Arabic translation completeness.
+        // Arabic is the primary user language (80% of target users). Questions
+        // missing an Arabic translation are flagged as info-level (not blocker)
+        // so the quality gate surfaces translation gaps for prioritization.
+        totalRules++;
+        if (input.AvailableLanguages is not null
+            && input.AvailableLanguages.Count > 0
+            && !input.AvailableLanguages.Contains("ar"))
+        {
+            violations.Add(new("StructuralValidity", "MISSING_ARABIC",
+                "Question has no Arabic translation (primary user language)",
+                ViolationSeverity.Info));
+        }
+        else
+        {
+            passedRules++;
+        }
+
         // Calculate score: percentage of rules passed, scaled to 0-100
         int score = totalRules > 0 ? (int)Math.Round(100.0 * passedRules / totalRules) : 0;
 
