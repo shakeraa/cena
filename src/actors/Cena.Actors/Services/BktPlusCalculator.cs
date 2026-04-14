@@ -29,6 +29,15 @@ public record SkillMasteryState(
     /// <summary>Default half-life for Ebbinghaus forgetting curve (14 days).</summary>
     public const double DefaultHalfLifeDays = 14.0;
 
+    /// <summary>PP-010: Category-specific default half-life (days).</summary>
+    public static double DefaultHalfLifeForCategory(SkillCategory category) => category switch
+    {
+        SkillCategory.Procedural => 7.0,
+        SkillCategory.Conceptual => 21.0,
+        SkillCategory.MetaCognitive => 30.0,
+        _ => DefaultHalfLifeDays
+    };
+
     /// <summary>Threshold below which a previously-mastered skill triggers a refresh recommendation.</summary>
     public const double RefreshThreshold = 0.40;
 
@@ -37,6 +46,25 @@ public record SkillMasteryState(
 
     /// <summary>Prerequisite gate: downstream skills blocked until prerequisites reach this level.</summary>
     public const double PrerequisiteGateThreshold = 0.60;
+}
+
+/// <summary>
+/// PP-010: Skill category determines default forgetting curve half-life.
+/// Research: Bahrick &amp; Hall 1991, Cepeda et al. 2006.
+/// </summary>
+public enum SkillCategory
+{
+    /// <summary>Rote/mechanical skills (factoring, trig identities). Half-life: 7 days.</summary>
+    Procedural,
+
+    /// <summary>Understanding-based skills (what a function is, graph interpretation). Half-life: 21 days.</summary>
+    Conceptual,
+
+    /// <summary>Strategy skills (knowing which technique to apply). Half-life: 30 days.</summary>
+    MetaCognitive,
+
+    /// <summary>Mixed or uncategorized. Half-life: 14 days (default).</summary>
+    Mixed
 }
 
 /// <summary>
@@ -111,8 +139,11 @@ public sealed class BktPlusCalculator : IBktPlusCalculator
 {
     private readonly IBktService _bktService;
 
-    // Assistance credit multipliers: solo=1.0, 1 hint=0.75, 2 hints=0.50, auto-filled=0.25
-    private static readonly double[] AssistanceCreditMultipliers = [1.0, 0.75, 0.50, 0.25];
+    // Assistance credit multipliers: solo=1.0, 1 hint=0.75, 2 hints=0.50, auto-filled=0.05
+    // PP-006: AutoFilled reduced from 0.25 to 0.05 per Heffernan & Heffernan (2014)
+    // — auto-filled answers involve no cognitive work; 0.25 inflated mastery for
+    // students who game the hint ladder. 0.05 barely moves the needle, as intended.
+    private static readonly double[] AssistanceCreditMultipliers = [1.0, 0.75, 0.50, 0.05];
 
     // Half-life adjustment: good practice increases half-life, errors decrease it
     private const double HalfLifeGrowthFactor = 1.1;   // +10% on correct

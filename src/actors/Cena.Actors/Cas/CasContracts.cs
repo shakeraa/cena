@@ -42,6 +42,20 @@ public record CasVerifyRequest(
 );
 
 /// <summary>
+/// Status of the CAS engine itself (not the mathematical result).
+/// Ok = engine processed the request and gave a definitive answer.
+/// Error/Timeout/etc. = engine could not process; router should try next tier.
+/// </summary>
+public enum CasVerifyStatus
+{
+    Ok,
+    Error,
+    Timeout,
+    UnsupportedOperation,
+    CircuitBreakerOpen
+}
+
+/// <summary>
 /// CAS verification result.
 /// </summary>
 public record CasVerifyResult(
@@ -51,20 +65,21 @@ public record CasVerifyResult(
     string? SimplifiedA,
     string? SimplifiedB,
     string? ErrorMessage,
-    double LatencyMs
+    double LatencyMs,
+    CasVerifyStatus Status
 )
 {
     public static CasVerifyResult Success(CasOperation op, string engine, double latencyMs,
         string? simplifiedA = null, string? simplifiedB = null) =>
-        new(true, op, engine, simplifiedA, simplifiedB, null, latencyMs);
+        new(true, op, engine, simplifiedA, simplifiedB, null, latencyMs, CasVerifyStatus.Ok);
 
     public static CasVerifyResult Failure(CasOperation op, string engine, double latencyMs,
         string errorMessage) =>
-        new(false, op, engine, null, null, errorMessage, latencyMs);
+        new(false, op, engine, null, null, errorMessage, latencyMs, CasVerifyStatus.Ok);
 
     public static CasVerifyResult Error(CasOperation op, string engine, double latencyMs,
-        string errorMessage) =>
-        new(false, op, engine, null, null, $"[ERROR] {errorMessage}", latencyMs);
+        string errorMessage, CasVerifyStatus status = CasVerifyStatus.Error) =>
+        new(false, op, engine, null, null, errorMessage, latencyMs, status);
 }
 
 /// <summary>

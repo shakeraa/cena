@@ -19,7 +19,8 @@ public record AiFigureGenerationResult(
     string? FigureSpecJson,
     string? ValidationError,
     int AttemptsUsed,
-    double TotalLatencyMs
+    double TotalLatencyMs,
+    bool QualityGateVerified
 );
 
 public interface IAiFigureGenerator
@@ -72,23 +73,41 @@ public sealed class AiFigureGenerator : IAiFigureGenerator
             // Call LLM (simplified — in production this calls ClaudeTutorLlmService or AiGenerationService)
             var llmResponse = await CallLlmForFigureSpec(prompt, ct);
 
-            // Validate the response
+            // Validate the response — schema check
             var validationError = ValidateFigureSpec(llmResponse);
-            if (validationError is null)
+            if (validationError is not null)
             {
-                _logger.LogInformation(
-                    "AI figure generation succeeded on attempt {Attempt}/{Max} in {Ms:F0}ms",
-                    attempt, MaxAttempts, sw.Elapsed.TotalMilliseconds);
-
-                return new AiFigureGenerationResult(
-                    Success: true,
-                    FigureSpecJson: llmResponse,
-                    ValidationError: null,
-                    AttemptsUsed: attempt,
-                    TotalLatencyMs: sw.Elapsed.TotalMilliseconds);
+                lastError = validationError;
+                _logger.LogWarning(
+                    "AI figure generation attempt {Attempt}/{Max} failed schema validation: {Error}",
+                    attempt, MaxAttempts, validationError);
+                continue;
             }
 
-            lastError = validationError;
+            // PP-012: Run full FigureQualityGate after schema validation passes
+            var qualityResult = FigureQualityGate.ValidateJson(llmResponse!);
+            if (!qualityResult.Passed)
+            {
+                var violations = string.Join("; ",
+                    qualityResult.Violations.Select(v => $"[{v.RuleId}] {v.Message}"));
+                lastError = $"Quality gate failed: {violations}";
+                _logger.LogWarning(
+                    "AI figure generation attempt {Attempt}/{Max} failed quality gate: {Violations}",
+                    attempt, MaxAttempts, violations);
+                continue;
+            }
+
+            _logger.LogInformation(
+                "AI figure generation succeeded on attempt {Attempt}/{Max} in {Ms:F0}ms",
+                attempt, MaxAttempts, sw.Elapsed.TotalMilliseconds);
+
+            return new AiFigureGenerationResult(
+                Success: true,
+                FigureSpecJson: llmResponse,
+                ValidationError: null,
+                AttemptsUsed: attempt,
+                TotalLatencyMs: sw.Elapsed.TotalMilliseconds,
+                QualityGateVerified: true);
             _logger.LogWarning(
                 "AI figure generation attempt {Attempt}/{Max} failed validation: {Error}",
                 attempt, MaxAttempts, validationError);
@@ -100,7 +119,8 @@ public sealed class AiFigureGenerator : IAiFigureGenerator
             FigureSpecJson: null,
             ValidationError: lastError,
             AttemptsUsed: MaxAttempts,
-            TotalLatencyMs: sw.Elapsed.TotalMilliseconds);
+            TotalLatencyMs: sw.Elapsed.TotalMilliseconds,
+            QualityGateVerified: false);
     }
 
     private static string BuildPrompt(

@@ -67,6 +67,23 @@ public sealed class CasLlmOutputVerifier : ICasLlmOutputVerifier
     private static readonly Regex EquationRegex = new(
         @"(\b[a-zA-Z]\s*=\s*-?\d+\.?\d*\b)", RegexOptions.Compiled);
 
+    // PP-004: Expanded detection patterns for missed math categories
+    private static readonly Regex NumberWordRegex = new(
+        @"\b(?:the\s+answer\s+is\s+|equals?\s+|is\s+equal\s+to\s+)(?<num>zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|hundred|thousand)\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex BareLatexRegex = new(
+        @"(?<![\$])(?:\\frac\{[^}]+\}\{[^}]+\}|\\sqrt\{[^}]+\}|\\sum[_^]|\\int[_^]|\\lim[_{ ])",
+        RegexOptions.Compiled);
+    private static readonly Regex UnicodeMathRegex = new(
+        @"[√∑∫∏∂∇∆±×÷≈≠≤≥][^,;\n]{1,60}|[a-zA-Z\d]+\s*[²³⁴⁵⁶⁷⁸⁹⁰]+\s*[\+\-\*\/=][^\n]{1,60}",
+        RegexOptions.Compiled);
+    private static readonly Regex LatexEnvironmentRegex = new(
+        @"\\begin\{(align|equation|gather)\*?\}(.*?)\\end\{\1\*?\}",
+        RegexOptions.Compiled | RegexOptions.Singleline);
+    private static readonly Regex CodeFenceMathRegex = new(
+        @"`([^`]*(?:[=\+\-\*\/√∑∫][^`]*\d[^`]*))`",
+        RegexOptions.Compiled);
+
     private const string MaskedPlaceholder = "[try working through it yourself]";
     private const string AnswerMaskedPlaceholder = "[solution hidden — complete the steps first]";
 
@@ -107,10 +124,12 @@ public sealed class CasLlmOutputVerifier : ICasLlmOutputVerifier
             // Verify via CAS
             var result = await _cas.VerifyAsync(new CasVerifyRequest(
                 Operation: CasOperation.NormalForm,
-                ExpressionA: claim.Expression
+                ExpressionA: claim.Expression,
+                ExpressionB: null,
+                Variable: null
             ), ct);
 
-            if (result.ErrorMessage?.StartsWith("[ERROR]") == true)
+            if (result.Status != CasVerifyStatus.Ok)
             {
                 // CAS error — mask conservatively
                 verifiedText = MaskClaim(verifiedText, claim, MaskedPlaceholder);
@@ -131,7 +150,7 @@ public sealed class CasLlmOutputVerifier : ICasLlmOutputVerifier
             llmOutput, verifiedText, claims.Count, verified, failed, masked, processedClaims);
     }
 
-    private static List<MathClaim> ExtractMathClaims(string text)
+    internal static List<MathClaim> ExtractMathClaims(string text)
     {
         var claims = new List<MathClaim>();
 
@@ -156,16 +175,53 @@ public sealed class CasLlmOutputVerifier : ICasLlmOutputVerifier
             claims.Add(new MathClaim(m.Value, m.Index, m.Index + m.Length, false, null, null));
         }
 
+        // PP-004: LaTeX environments (\begin{align}...\end{align})
+        foreach (Match m in LatexEnvironmentRegex.Matches(text))
+        {
+            if (claims.Any(c => m.Index >= c.StartIndex && m.Index < c.EndIndex)) continue;
+            claims.Add(new MathClaim(m.Value, m.Index, m.Index + m.Length, false, null, null));
+        }
+
+        // PP-004: English number words ("the answer is three")
+        foreach (Match m in NumberWordRegex.Matches(text))
+        {
+            if (claims.Any(c => m.Index >= c.StartIndex && m.Index < c.EndIndex)) continue;
+            claims.Add(new MathClaim(m.Value, m.Index, m.Index + m.Length, false, null, null));
+        }
+
+        // PP-004: Bare LaTeX commands without dollar signs
+        foreach (Match m in BareLatexRegex.Matches(text))
+        {
+            if (claims.Any(c => m.Index >= c.StartIndex && m.Index < c.EndIndex)) continue;
+            claims.Add(new MathClaim(m.Value, m.Index, m.Index + m.Length, false, null, null));
+        }
+
+        // PP-004: Unicode math symbols (√, ², ∑, etc.)
+        foreach (Match m in UnicodeMathRegex.Matches(text))
+        {
+            if (claims.Any(c => m.Index >= c.StartIndex && m.Index < c.EndIndex)) continue;
+            claims.Add(new MathClaim(m.Value, m.Index, m.Index + m.Length, false, null, null));
+        }
+
+        // PP-004: Math in backtick code fences
+        foreach (Match m in CodeFenceMathRegex.Matches(text))
+        {
+            if (claims.Any(c => m.Index >= c.StartIndex && m.Index < c.EndIndex)) continue;
+            claims.Add(new MathClaim(m.Groups[1].Value, m.Index, m.Index + m.Length, false, null, null));
+        }
+
         return claims;
     }
 
-    private static bool IsAnswerLeak(string expression, string canonicalAnswer)
+    internal static bool IsAnswerLeak(string expression, string canonicalAnswer)
     {
-        // Simple containment check + numerical equivalence
+        // PP-004: Use word-boundary matching instead of substring containment
+        // to avoid false positives (e.g. answer "3" matching "x = 31")
         var exprNorm = expression.Replace(" ", "").ToLowerInvariant();
         var ansNorm = canonicalAnswer.Replace(" ", "").ToLowerInvariant();
 
-        if (exprNorm.Contains(ansNorm)) return true;
+        var pattern = $@"(?<!\d){Regex.Escape(ansNorm)}(?!\d)";
+        if (Regex.IsMatch(exprNorm, pattern)) return true;
 
         // Numerical check
         if (double.TryParse(expression.Trim(), out var exprVal)

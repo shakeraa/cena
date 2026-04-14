@@ -10,6 +10,7 @@
 // - Quality gate: reject items < 30 responses or fit outside range
 // =============================================================================
 
+using Cena.Actors.Services;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -65,6 +66,7 @@ public sealed class ItemBankHealthService
             .ToList();
 
         var exposureDistribution = BuildExposureDistribution(questions);
+        var confidenceDistribution = BuildConfidenceDistribution(questions);
 
         return new ItemBankHealthReport
         {
@@ -77,6 +79,7 @@ public sealed class ItemBankHealthService
             PoorFitItems = poorFitItems,
             UnderCalibratedItems = underCalibratedItems,
             ExposureDistribution = exposureDistribution,
+            ConfidenceDistribution = confidenceDistribution,
             GeneratedAt = DateTimeOffset.UtcNow
         };
     }
@@ -132,6 +135,17 @@ public sealed class ItemBankHealthService
             .ToList();
     }
 
+    /// <summary>PP-011: Confidence distribution across all items.</summary>
+    private static ConfidenceDistribution BuildConfidenceDistribution(IReadOnlyList<QuestionDocument> questions)
+    {
+        return new ConfidenceDistribution(
+            Default: questions.Count(q => IrtItemParameters.ConfidenceFromN(q.EloAttemptCount) == CalibrationConfidence.Default),
+            LowConfidence: questions.Count(q => IrtItemParameters.ConfidenceFromN(q.EloAttemptCount) == CalibrationConfidence.LowConfidence),
+            Moderate: questions.Count(q => IrtItemParameters.ConfidenceFromN(q.EloAttemptCount) == CalibrationConfidence.Moderate),
+            High: questions.Count(q => IrtItemParameters.ConfidenceFromN(q.EloAttemptCount) == CalibrationConfidence.High),
+            Production: questions.Count(q => IrtItemParameters.ConfidenceFromN(q.EloAttemptCount) == CalibrationConfidence.Production));
+    }
+
     private static ExposureDistribution BuildExposureDistribution(IReadOnlyList<QuestionDocument> questions)
     {
         var attempts = questions.Select(q => q.EloAttemptCount).OrderBy(a => a).ToList();
@@ -160,6 +174,7 @@ public sealed record ItemBankHealthReport
     public IReadOnlyList<PoorFitItem> PoorFitItems { get; init; } = Array.Empty<PoorFitItem>();
     public IReadOnlyList<UnderCalibratedItem> UnderCalibratedItems { get; init; } = Array.Empty<UnderCalibratedItem>();
     public ExposureDistribution ExposureDistribution { get; init; } = new(0, 0, 0, 0, 0);
+    public ConfidenceDistribution ConfidenceDistribution { get; init; } = new(0, 0, 0, 0, 0);
     public DateTimeOffset GeneratedAt { get; init; }
 }
 
@@ -175,6 +190,10 @@ public sealed record ConceptCoverageEntry
 public sealed record PoorFitItem(string ItemId, string ConceptId, double DifficultyElo, string Reason);
 public sealed record UnderCalibratedItem(string ItemId, string ConceptId, int ResponseCount);
 public sealed record ExposureDistribution(int Min, int P25, int Median, int P75, int Max);
+
+/// <summary>PP-011: How many items at each calibration confidence tier.</summary>
+public sealed record ConfidenceDistribution(
+    int Default, int LowConfidence, int Moderate, int High, int Production);
 
 public sealed record ItemQualityGateResult
 {

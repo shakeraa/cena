@@ -71,12 +71,17 @@ public sealed record InviteRedemptionResult
     public string? ClassroomId { get; init; }
     public string? InstituteId { get; init; }
     public string? Error { get; init; }
+    /// <summary>PP-016: Failed attempt count on this code (for rate limit feedback).</summary>
+    public int FailedAttempts { get; init; }
 
     public static InviteRedemptionResult Ok(string classroomId, string? instituteId) =>
         new() { Success = true, ClassroomId = classroomId, InstituteId = instituteId };
 
     public static InviteRedemptionResult Fail(string error) =>
         new() { Success = false, Error = error };
+
+    public static InviteRedemptionResult RateLimited(int retryAfterSeconds) =>
+        new() { Success = false, Error = $"Too many attempts. Retry after {retryAfterSeconds} seconds." };
 }
 
 /// <summary>
@@ -94,6 +99,70 @@ public sealed class InviteCodeDocument
     public DateTimeOffset CreatedAt { get; set; }
     public DateTimeOffset? ExpiresAt { get; set; }
     public bool IsRevoked { get; set; }
+}
+
+/// <summary>
+/// PP-016: In-memory invite code redemption rate limiter.
+/// Enforces per-IP and per-code limits to prevent brute-force guessing.
+/// Production: replace with Redis-backed counters via IRateLimitService.
+/// </summary>
+public sealed class InviteRedeemRateLimiter
+{
+    /// <summary>Max redemption attempts per IP per minute.</summary>
+    public const int MaxPerIpPerMinute = 10;
+
+    /// <summary>Max failed attempts per code before lockout.</summary>
+    public const int MaxFailedPerCode = 5;
+
+    /// <summary>Lockout duration after exceeding per-code failures.</summary>
+    public static readonly TimeSpan CodeLockoutDuration = TimeSpan.FromMinutes(15);
+
+    // Thread-safe counters (in production, use Redis)
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int Count, DateTimeOffset WindowStart)>
+        _ipCounters = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, (int FailCount, DateTimeOffset? LockedUntil)>
+        _codeCounters = new();
+
+    /// <summary>
+    /// Check if the redemption attempt is allowed.
+    /// Returns null if allowed, or an error string if rate-limited.
+    /// </summary>
+    public string? CheckLimit(string ipAddress, string code)
+    {
+        var now = DateTimeOffset.UtcNow;
+
+        // Per-code lockout
+        if (_codeCounters.TryGetValue(code, out var codeState) && codeState.LockedUntil.HasValue)
+        {
+            if (now < codeState.LockedUntil.Value)
+                return $"Code temporarily locked. Retry after {(int)(codeState.LockedUntil.Value - now).TotalSeconds} seconds.";
+            // Lockout expired — reset
+            _codeCounters.TryRemove(code, out _);
+        }
+
+        // Per-IP window
+        var ipKey = $"invite-ip:{ipAddress}";
+        var ipState = _ipCounters.GetOrAdd(ipKey, _ => (0, now));
+        if ((now - ipState.WindowStart).TotalMinutes >= 1)
+            ipState = (0, now);
+
+        if (ipState.Count >= MaxPerIpPerMinute)
+            return "Too many redemption attempts. Try again in a minute.";
+
+        _ipCounters[ipKey] = (ipState.Count + 1, ipState.WindowStart);
+        return null;
+    }
+
+    /// <summary>Record a failed redemption attempt for per-code lockout.</summary>
+    public void RecordFailure(string code)
+    {
+        var state = _codeCounters.GetOrAdd(code, _ => (0, null));
+        var newCount = state.FailCount + 1;
+        DateTimeOffset? lockedUntil = newCount >= MaxFailedPerCode
+            ? DateTimeOffset.UtcNow + CodeLockoutDuration
+            : null;
+        _codeCounters[code] = (newCount, lockedUntil);
+    }
 }
 
 /// <summary>

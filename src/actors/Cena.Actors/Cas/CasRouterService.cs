@@ -61,7 +61,8 @@ public sealed class CasRouterService : ICasRouterService
         {
             _logger.LogWarning("CAS verification blocked — global cost circuit breaker is open");
             return CasVerifyResult.Error(request.Operation, "circuit-breaker", 0,
-                "CAS verification temporarily unavailable due to cost limits. Please try again later.");
+                "CAS verification temporarily unavailable due to cost limits. Please try again later.",
+                CasVerifyStatus.CircuitBreakerOpen);
         }
 
         var sw = Stopwatch.StartNew();
@@ -73,7 +74,7 @@ public sealed class CasRouterService : ICasRouterService
             RecordMetrics(mathNetResult, sw);
 
             // If MathNet succeeded or gave a definitive answer, return it
-            if (!mathNetResult.ErrorMessage?.StartsWith("[ERROR]", StringComparison.Ordinal) ?? true)
+            if (mathNetResult.Status == CasVerifyStatus.Ok)
             {
                 _logger.LogDebug("CAS Tier 1 (MathNet): {Operation} → {Verified} in {Ms:F1}ms",
                     request.Operation, mathNetResult.Verified, mathNetResult.LatencyMs);
@@ -85,7 +86,7 @@ public sealed class CasRouterService : ICasRouterService
         var symPyResult = await _symPy.VerifyAsync(request, ct);
         RecordMetrics(symPyResult, sw);
 
-        if (!symPyResult.ErrorMessage?.StartsWith("[ERROR]", StringComparison.Ordinal) ?? true)
+        if (symPyResult.Status == CasVerifyStatus.Ok)
         {
             _logger.LogDebug("CAS Tier 2 (SymPy): {Operation} → {Verified} in {Ms:F1}ms",
                 request.Operation, symPyResult.Verified, symPyResult.LatencyMs);

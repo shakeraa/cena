@@ -215,9 +215,71 @@ public sealed class BktPlusCalculatorTests
     {
         // Verify the 806 track JSON can be loaded and passes validation
         var json = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..",
-                "src", "actors", "Cena.Actors", "Services", "Prerequisites", "SkillPrerequisites-806.json"));
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+                "Cena.Actors", "Services", "Prerequisites", "SkillPrerequisites-806.json"));
         var graph = SkillPrerequisiteGraph.LoadFromJson(json);
         Assert.True(graph.AllSkills.Count >= 20);
+    }
+
+    // ── PP-010: Category-specific half-lives ──
+
+    [Theory]
+    [InlineData(SkillCategory.Procedural, 7.0)]
+    [InlineData(SkillCategory.Conceptual, 21.0)]
+    [InlineData(SkillCategory.MetaCognitive, 30.0)]
+    [InlineData(SkillCategory.Mixed, 14.0)]
+    public void DefaultHalfLife_MatchesCategory(SkillCategory cat, double expectedDays)
+    {
+        Assert.Equal(expectedDays, SkillMasteryState.DefaultHalfLifeForCategory(cat));
+    }
+
+    [Fact]
+    public void ProceduralSkill_DecaysTo50Percent_In7Days()
+    {
+        var state = MakeState(pLearned: 1.0, halfLife: 7.0, daysSinceLastPractice: 7);
+        var effective = _calc.ComputeEffectiveMastery(state, BaseTime);
+        Assert.Equal(0.50, effective, precision: 4);
+    }
+
+    [Fact]
+    public void ConceptualSkill_DecaysTo50Percent_In21Days()
+    {
+        var state = MakeState(pLearned: 1.0, halfLife: 21.0, daysSinceLastPractice: 21);
+        var effective = _calc.ComputeEffectiveMastery(state, BaseTime);
+        Assert.Equal(0.50, effective, precision: 4);
+    }
+
+    [Fact]
+    public void Graph_ParsesCategories()
+    {
+        var json = """
+        {
+          "skills": {
+            "factoring": { "prerequisites": [], "category": "procedural" },
+            "functions": { "prerequisites": [], "category": "conceptual" },
+            "strategy":  { "prerequisites": [], "category": "metacognitive" },
+            "other":     { "prerequisites": [] }
+          }
+        }
+        """;
+        var graph = SkillPrerequisiteGraph.LoadFromJson(json);
+        Assert.Equal(SkillCategory.Procedural, graph.GetCategory("factoring"));
+        Assert.Equal(SkillCategory.Conceptual, graph.GetCategory("functions"));
+        Assert.Equal(SkillCategory.MetaCognitive, graph.GetCategory("strategy"));
+        Assert.Equal(SkillCategory.Mixed, graph.GetCategory("other"));
+        Assert.Equal(SkillCategory.Mixed, graph.GetCategory("nonexistent"));
+    }
+
+    [Fact]
+    public void RealTrack806_HasCategories()
+    {
+        var json = File.ReadAllText(
+            Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..",
+                "Cena.Actors", "Services", "Prerequisites", "SkillPrerequisites-806.json"));
+        var graph = SkillPrerequisiteGraph.LoadFromJson(json);
+
+        Assert.Equal(SkillCategory.Procedural, graph.GetCategory("algebra-linear-equations"));
+        Assert.Equal(SkillCategory.Conceptual, graph.GetCategory("algebra-basics"));
+        Assert.Equal(SkillCategory.MetaCognitive, graph.GetCategory("calculus-derivatives-applications"));
     }
 }

@@ -58,7 +58,8 @@ public sealed class MathNetVerifier : IMathNetVerifier
                 CasOperation.NormalForm => VerifyNormalForm(request, sw),
                 CasOperation.StepValidity => VerifyStepValidity(request, sw),
                 _ => CasVerifyResult.Error(request.Operation, EngineName, sw.Elapsed.TotalMilliseconds,
-                    $"Operation {request.Operation} not supported by MathNet")
+                    $"Operation {request.Operation} not supported by MathNet",
+                    CasVerifyStatus.UnsupportedOperation)
             };
         }
         catch (Exception ex)

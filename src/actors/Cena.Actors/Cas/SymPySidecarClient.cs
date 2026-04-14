@@ -60,7 +60,8 @@ public sealed class SymPySidecarClient : ISymPySidecarClient
         {
             _logger.LogWarning("SymPy circuit breaker is open, failing fast");
             return CasVerifyResult.Error(request.Operation, EngineName, 0,
-                "Circuit breaker open — SymPy sidecar unavailable");
+                "Circuit breaker open — SymPy sidecar unavailable",
+                CasVerifyStatus.CircuitBreakerOpen);
         }
 
         var sw = Stopwatch.StartNew();
@@ -99,7 +100,8 @@ public sealed class SymPySidecarClient : ISymPySidecarClient
             RecordFailure();
             _logger.LogWarning("SymPy request timed out after {Timeout}ms", RequestTimeout.TotalMilliseconds);
             return CasVerifyResult.Error(request.Operation, EngineName,
-                sw.Elapsed.TotalMilliseconds, "SymPy sidecar timeout");
+                sw.Elapsed.TotalMilliseconds, "SymPy sidecar timeout",
+                CasVerifyStatus.Timeout);
         }
         catch (Exception ex)
         {

@@ -5,6 +5,7 @@
 // =============================================================================
 
 using Cena.Actors.Events;
+using SnapshotMasteryState = Cena.Actors.Events.ConceptMasteryState;
 
 namespace Cena.Actors.Mastery;
 
@@ -64,7 +65,7 @@ public class MasterySeepageService : IMasterySeepageService
 
             var seededPKnown = Math.Min(sourceMastery.PKnown * factor, MaxSeededPKnown);
 
-            snapshot.ConceptMastery[targetKey] = new ConceptMasteryState
+            snapshot.ConceptMastery[targetKey] = new SnapshotMasteryState
             {
                 PKnown = seededPKnown,
                 SourceEnrollmentId = sourceEnrollmentId,

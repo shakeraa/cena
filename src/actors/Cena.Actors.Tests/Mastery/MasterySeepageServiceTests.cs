@@ -1,5 +1,6 @@
 using Cena.Actors.Events;
 using Cena.Actors.Mastery;
+using SnapshotMasteryState = Cena.Actors.Events.ConceptMasteryState;
 using Xunit;
 
 namespace Cena.Actors.Tests.Mastery;
@@ -51,7 +52,7 @@ public class MasterySeepageServiceTests
 
         // Source has mastered linear-equations at 0.95
         var sourceKey = MasteryKeys.Key(sourceEnrollment, "linear-equations");
-        snapshot.ConceptMastery[sourceKey] = new ConceptMasteryState { PKnown = 0.95 };
+        snapshot.ConceptMastery[sourceKey] = new SnapshotMasteryState { PKnown = 0.95 };
 
         var result = _sut.ApplySeepage(
             snapshot, sourceEnrollment, targetEnrollment,
@@ -83,7 +84,7 @@ public class MasterySeepageServiceTests
     {
         var snapshot = CreateSnapshot("student-1");
         var sourceKey = MasteryKeys.Key("enr-a", "quadratics");
-        snapshot.ConceptMastery[sourceKey] = new ConceptMasteryState { PKnown = 0.40 };
+        snapshot.ConceptMastery[sourceKey] = new SnapshotMasteryState { PKnown = 0.40 };
 
         var result = _sut.ApplySeepage(
             snapshot, "enr-a", "enr-b",
@@ -100,7 +101,7 @@ public class MasterySeepageServiceTests
     {
         var snapshot = CreateSnapshot("student-1");
         var sourceKey = MasteryKeys.Key("enr-math", "linear-equations");
-        snapshot.ConceptMastery[sourceKey] = new ConceptMasteryState { PKnown = 0.90 };
+        snapshot.ConceptMastery[sourceKey] = new SnapshotMasteryState { PKnown = 0.90 };
 
         var result = _sut.ApplySeepage(
             snapshot, "enr-math", "enr-physics",
@@ -119,11 +120,11 @@ public class MasterySeepageServiceTests
         var snapshot = CreateSnapshot("student-1");
 
         var sourceKey = MasteryKeys.Key("enr-a", "algebra");
-        snapshot.ConceptMastery[sourceKey] = new ConceptMasteryState { PKnown = 0.90 };
+        snapshot.ConceptMastery[sourceKey] = new SnapshotMasteryState { PKnown = 0.90 };
 
         // Target already has mastery data
         var targetKey = MasteryKeys.Key("enr-b", "algebra");
-        snapshot.ConceptMastery[targetKey] = new ConceptMasteryState { PKnown = 0.30 };
+        snapshot.ConceptMastery[targetKey] = new SnapshotMasteryState { PKnown = 0.30 };
 
         var result = _sut.ApplySeepage(
             snapshot, "enr-a", "enr-b",
@@ -155,7 +156,7 @@ public class MasterySeepageServiceTests
     {
         var snapshot = CreateSnapshot("student-1");
         var sourceKey = MasteryKeys.Key("enr-a", "trig");
-        snapshot.ConceptMastery[sourceKey] = new ConceptMasteryState { PKnown = 0.85 };
+        snapshot.ConceptMastery[sourceKey] = new SnapshotMasteryState { PKnown = 0.85 };
         snapshot.HalfLifeMap[sourceKey] = 48.0;
 
         _sut.ApplySeepage(
@@ -172,9 +173,9 @@ public class MasterySeepageServiceTests
     {
         var snapshot = CreateSnapshot("student-1");
 
-        snapshot.ConceptMastery[MasteryKeys.Key("enr-a", "c1")] = new ConceptMasteryState { PKnown = 0.80 };
-        snapshot.ConceptMastery[MasteryKeys.Key("enr-a", "c2")] = new ConceptMasteryState { PKnown = 0.60 };
-        snapshot.ConceptMastery[MasteryKeys.Key("enr-a", "c3")] = new ConceptMasteryState { PKnown = 0.30 };
+        snapshot.ConceptMastery[MasteryKeys.Key("enr-a", "c1")] = new SnapshotMasteryState { PKnown = 0.80 };
+        snapshot.ConceptMastery[MasteryKeys.Key("enr-a", "c2")] = new SnapshotMasteryState { PKnown = 0.60 };
+        snapshot.ConceptMastery[MasteryKeys.Key("enr-a", "c3")] = new SnapshotMasteryState { PKnown = 0.30 };
 
         var result = _sut.ApplySeepage(
             snapshot, "enr-a", "enr-b",
@@ -195,7 +196,7 @@ public class MasterySeepageServiceTests
     private static StudentProfileSnapshot CreateSnapshot(string studentId) => new()
     {
         StudentId = studentId,
-        ConceptMastery = new Dictionary<string, ConceptMasteryState>(),
+        ConceptMastery = new Dictionary<string, SnapshotMasteryState>(),
         HalfLifeMap = new Dictionary<string, double>()
     };
 }

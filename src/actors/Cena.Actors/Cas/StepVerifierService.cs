@@ -10,6 +10,7 @@
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Cena.Infrastructure.Documents;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Cas;
@@ -42,18 +43,22 @@ public record StepVerificationResult(
     bool IsCanonical,
     string? DivergenceDescription,
     string? SuggestedNextStep,
-    CasVerifyResult CasResult
+    CasVerifyResult CasResult,
+    /// <summary>PP-017: True when the student is on a valid non-canonical path at Exploratory level.</summary>
+    bool IsProductiveFailurePath = false
 );
 
 public interface IStepVerifierService
 {
     /// <summary>
     /// Verify a single student step against the canonical trace.
+    /// PP-017: scaffoldingLevel varies messaging for productive failure (Exploratory).
     /// </summary>
     Task<StepVerificationResult> VerifyStepAsync(
         SolutionStep studentStep,
         SolutionStep? previousStep,
         CanonicalTrace canonical,
+        StepScaffoldingLevel scaffoldingLevel = StepScaffoldingLevel.None,
         CancellationToken ct = default);
 
     /// <summary>
@@ -89,6 +94,7 @@ public sealed class StepVerifierService : IStepVerifierService
         SolutionStep studentStep,
         SolutionStep? previousStep,
         CanonicalTrace canonical,
+        StepScaffoldingLevel scaffoldingLevel = StepScaffoldingLevel.None,
         CancellationToken ct = default)
     {
         StepsVerified.Add(1);
@@ -135,13 +141,21 @@ public sealed class StepVerifierService : IStepVerifierService
             isCanonical = equivalenceCheck.Verified;
         }
 
+        // PP-017: At Exploratory level, celebrate valid non-canonical approaches
+        var isExploratoryDivergence = !isCanonical && scaffoldingLevel == StepScaffoldingLevel.Exploratory;
+        var divergenceDesc = isCanonical ? null
+            : isExploratoryDivergence
+                ? "Great approach! This is different from the standard method — keep going to see if it leads to the answer."
+                : "Valid but non-canonical approach";
+
         return new StepVerificationResult(
             StepNumber: studentStep.StepNumber,
             IsValid: true,
             IsCanonical: isCanonical,
-            DivergenceDescription: isCanonical ? null : "Valid but non-canonical approach",
-            SuggestedNextStep: null,
-            CasResult: validityCheck
+            DivergenceDescription: divergenceDesc,
+            SuggestedNextStep: isExploratoryDivergence ? null : null,
+            CasResult: validityCheck,
+            IsProductiveFailurePath: isExploratoryDivergence
         );
     }
 
@@ -174,8 +188,17 @@ public sealed class StepVerifierService : IStepVerifierService
     {
         if (stepNumber > 0 && stepNumber <= canonical.Steps.Count)
         {
-            var hint = canonical.Steps[stepNumber - 1];
-            return hint.Operation ?? hint.Justification;
+            // PP-009: Return ONLY the operation name (e.g. "factor", "simplify"),
+            // never the justification — it may leak the canonical answer.
+            var op = canonical.Steps[stepNumber - 1].Operation;
+            if (op is null) return null;
+
+            // Safety net: strip the canonical answer even from operation strings
+            var sanitized = op.Replace(canonical.FinalAnswer, "[answer]");
+            foreach (var step in canonical.Steps)
+                sanitized = sanitized.Replace(step.Expression, "[expression]");
+
+            return sanitized;
         }
         return null;
     }

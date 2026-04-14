@@ -23,6 +23,12 @@ public interface ISkillPrerequisiteGraph
     IReadOnlyList<string> GetDependents(string skillId);
 
     /// <summary>
+    /// PP-010: Get the skill category for forgetting curve half-life lookup.
+    /// Returns Mixed if unknown.
+    /// </summary>
+    SkillCategory GetCategory(string skillId);
+
+    /// <summary>
     /// Get all skill IDs in the graph.
     /// </summary>
     IReadOnlyList<string> AllSkills { get; }
@@ -43,12 +49,16 @@ public sealed class SkillPrerequisiteGraph : ISkillPrerequisiteGraph
 {
     private readonly Dictionary<string, List<string>> _prerequisites = new();
     private readonly Dictionary<string, List<string>> _dependents = new();
+    private readonly Dictionary<string, SkillCategory> _categories = new();
     private readonly List<string> _allSkills;
     private static readonly IReadOnlyList<string> Empty = Array.Empty<string>();
 
-    private SkillPrerequisiteGraph(Dictionary<string, List<string>> prerequisites)
+    private SkillPrerequisiteGraph(
+        Dictionary<string, List<string>> prerequisites,
+        Dictionary<string, SkillCategory> categories)
     {
         _prerequisites = prerequisites;
+        _categories = categories;
         _allSkills = prerequisites.Keys.ToList();
 
         // Build reverse index (dependents)
@@ -72,6 +82,9 @@ public sealed class SkillPrerequisiteGraph : ISkillPrerequisiteGraph
     public IReadOnlyList<string> GetDependents(string skillId) =>
         _dependents.TryGetValue(skillId, out var deps) ? deps : Empty;
 
+    public SkillCategory GetCategory(string skillId) =>
+        _categories.TryGetValue(skillId, out var cat) ? cat : SkillCategory.Mixed;
+
     public IReadOnlyList<string> AllSkills => _allSkills;
 
     /// <summary>
@@ -83,6 +96,7 @@ public sealed class SkillPrerequisiteGraph : ISkillPrerequisiteGraph
         using var doc = JsonDocument.Parse(json);
         var skills = doc.RootElement.GetProperty("skills");
         var prerequisites = new Dictionary<string, List<string>>();
+        var categories = new Dictionary<string, SkillCategory>();
 
         foreach (var skill in skills.EnumerateObject())
         {
@@ -95,6 +109,19 @@ public sealed class SkillPrerequisiteGraph : ISkillPrerequisiteGraph
                 }
             }
             prerequisites[skill.Name] = prereqs;
+
+            // PP-010: Parse optional skill category
+            if (skill.Value.TryGetProperty("category", out var catProp))
+            {
+                var catStr = catProp.GetString();
+                categories[skill.Name] = catStr?.ToLowerInvariant() switch
+                {
+                    "procedural" => SkillCategory.Procedural,
+                    "conceptual" => SkillCategory.Conceptual,
+                    "metacognitive" => SkillCategory.MetaCognitive,
+                    _ => SkillCategory.Mixed
+                };
+            }
         }
 
         // Validate: all referenced prerequisites must exist in the graph
@@ -111,7 +138,7 @@ public sealed class SkillPrerequisiteGraph : ISkillPrerequisiteGraph
         // Validate: no cycles (topological sort)
         ValidateNoCycles(prerequisites);
 
-        return new SkillPrerequisiteGraph(prerequisites);
+        return new SkillPrerequisiteGraph(prerequisites, categories);
     }
 
     private static void ValidateNoCycles(Dictionary<string, List<string>> graph)

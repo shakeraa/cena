@@ -27,6 +27,9 @@ public static class ClassroomEndpoints
         return app;
     }
 
+    // PP-016: Singleton rate limiter (register as singleton in DI for production)
+    private static readonly InviteRedeemRateLimiter _rateLimiter = new();
+
     // POST /api/classrooms/join
     private static async Task<IResult> JoinClassroom(
         HttpContext ctx,
@@ -45,6 +48,15 @@ public static class ClassroomEndpoints
             return Results.BadRequest(new { Error = "Join code is required" });
         }
 
+        // PP-016: Rate limit check before DB query
+        var ipAddress = ctx.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+        var rateLimitError = _rateLimiter.CheckLimit(ipAddress, request.Code);
+        if (rateLimitError is not null)
+        {
+            ctx.Response.Headers["Retry-After"] = "60";
+            return Results.Json(new { Error = rateLimitError }, statusCode: 429);
+        }
+
         await using var session = store.QuerySession();
 
         // Look up classroom by join code (case-insensitive)
@@ -53,6 +65,8 @@ public static class ClassroomEndpoints
 
         if (classroom is null)
         {
+            // PP-016: Track failed attempt for per-code lockout
+            _rateLimiter.RecordFailure(request.Code);
             return Results.NotFound(new { Error = "Invalid or expired join code" });
         }
 

@@ -9,7 +9,7 @@
  * RTL support: all math rendered in <bdi dir="ltr"> blocks.
  */
 
-import { ref, computed } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 interface SolutionStep {
@@ -32,11 +32,19 @@ const emit = defineEmits<{
   (e: 'verified', correct: boolean, expression: string): void
 }>()
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
+
+// PP-013: Compute text direction for non-math content
+const textDir = computed(() =>
+  locale.value === 'ar' || locale.value === 'he' ? 'rtl' : 'ltr')
 
 const inputExpression = ref('')
 const currentHintLevel = ref(0)
-const verificationResult = ref<{ correct: boolean; message?: string } | null>(null)
+const verificationResult = ref<{
+  correct: boolean
+  message?: string
+  isProductiveFailurePath?: boolean
+} | null>(null)
 const isVerifying = ref(false)
 
 const showInstruction = computed(() =>
@@ -79,6 +87,7 @@ async function verify() {
       message: result.isEquivalent
         ? t('session.stepSolver.stepCorrect')
         : t('session.stepSolver.stepIncorrect'),
+      isProductiveFailurePath: result.isProductiveFailurePath ?? false,
     }
 
     emit('verified', result.isEquivalent, inputExpression.value)
@@ -107,9 +116,9 @@ async function verify() {
     <div class="step-input-header">
       <span class="step-number" aria-hidden="true">{{ step.stepNumber }}</span>
 
-      <!-- Instruction (scaffolded) -->
+      <!-- PP-013: Instruction with RTL direction handling -->
       <p v-if="showInstruction" class="step-instruction">
-        {{ step.instruction }}
+        <bdi :dir="textDir">{{ step.instruction }}</bdi>
       </p>
     </div>
 
@@ -152,8 +161,14 @@ async function verify() {
       <span class="step-check-mark" aria-label="correct">&#x2713;</span>
     </div>
 
-    <!-- Verification result feedback -->
-    <div v-if="verificationResult && !isVerified" class="step-feedback"
+    <!-- PP-017: Productive failure exploration badge -->
+    <div v-if="verificationResult?.isProductiveFailurePath" class="step-feedback step-feedback--exploring">
+      <span class="step-exploring-badge">{{ t('session.stepSolver.exploring', 'Exploring!') }}</span>
+      {{ verificationResult.message }}
+    </div>
+
+    <!-- Verification result feedback (non-exploratory) -->
+    <div v-else-if="verificationResult && !isVerified" class="step-feedback"
       :class="verificationResult.correct ? 'step-feedback--correct' : 'step-feedback--incorrect'">
       {{ verificationResult.message }}
     </div>
@@ -168,8 +183,11 @@ async function verify() {
         {{ t('session.stepSolver.showHint', { n: currentHintLevel + 1, total: step.hints.length }) }}
       </button>
 
+      <!-- PP-013: Hints with RTL direction handling -->
       <ul v-if="availableHints.length > 0" class="step-hint-list">
-        <li v-for="(hint, i) in availableHints" :key="i">{{ hint }}</li>
+        <li v-for="(hint, i) in availableHints" :key="i">
+          <bdi :dir="textDir">{{ hint }}</bdi>
+        </li>
       </ul>
     </div>
   </div>

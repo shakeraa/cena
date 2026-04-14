@@ -6,10 +6,13 @@
 // 1. Content balance (Bagrut topic coverage across strata)
 // 2. Exposure rate cap (max 25% of students see any single item)
 // 3. Reserved pool exclusion (exam simulation items never shown in practice)
+// 4. PP-011: Calibration confidence weighting (prefer well-calibrated items)
 //
 // Exposure control: Sympson-Hetter method — each item has a probability
 // of being administered even when selected (exposure parameter 0.0-1.0).
 // =============================================================================
+
+using Cena.Actors.Services;
 
 namespace Cena.Actors.Assessment;
 
@@ -52,11 +55,14 @@ public sealed class ConstrainedCatAlgorithm
         if (eligible.Count == 0) return null;
 
         // Step 2: Compute Fisher information at theta for each item
+        // PP-011: Weight by calibration confidence so well-calibrated items
+        // are preferred for ability estimation.
         var scored = eligible
             .Select(item => new
             {
                 Item = item,
-                Information = ComputeFisherInformation(theta, item.DifficultyElo, item.Discrimination),
+                Information = ComputeFisherInformation(theta, item.DifficultyElo, item.Discrimination)
+                    * ConfidenceWeight(item.Confidence),
             })
             .OrderByDescending(x => x.Information)
             .ToList();
@@ -113,6 +119,19 @@ public sealed class ConstrainedCatAlgorithm
         return 1.0;
     }
 
+    /// <summary>
+    /// PP-011: Confidence weight for item selection.
+    /// Uncalibrated items are heavily penalized; Production items get full weight.
+    /// </summary>
+    private static double ConfidenceWeight(CalibrationConfidence confidence) => confidence switch
+    {
+        CalibrationConfidence.Production => 1.0,
+        CalibrationConfidence.High => 0.95,
+        CalibrationConfidence.Moderate => 0.80,
+        CalibrationConfidence.LowConfidence => 0.50,
+        _ => 0.10 // Default/uncalibrated — rarely selected for ability estimation
+    };
+
     private static bool MeetsContentBalance(CatItemCandidate item, CatConstraints constraints)
     {
         if (constraints.TopicQuotas.Count == 0) return true;
@@ -132,7 +151,8 @@ public sealed record CatItemCandidate(
     double DifficultyElo,
     double Discrimination,
     string TopicCluster,
-    double ExposureRate);
+    double ExposureRate,
+    CalibrationConfidence Confidence = CalibrationConfidence.Moderate);
 
 /// <summary>
 /// Content balance + exposure constraints for CAT.

@@ -232,7 +232,7 @@ if (!app.Environment.IsDevelopment())
     var store = scope.ServiceProvider.GetRequiredService<Marten.IDocumentStore>();
     try
     {
-        await store.Storage.AssertDatabaseMatchesConfigurationAsync();
+        await store.Storage.Database.AssertDatabaseMatchesConfigurationAsync();
     }
     catch (Exception ex)
     {

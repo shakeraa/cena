@@ -4,6 +4,7 @@
 // the question bank. No figure reaches students without passing all rules.
 // =============================================================================
 
+using System.Text.Json;
 using Cena.Infrastructure.Documents;
 
 namespace Cena.Admin.Api.Figures;
@@ -151,5 +152,121 @@ public static class FigureQualityGate
 
         if (string.IsNullOrWhiteSpace(spec.SourceAttribution))
             violations.Add(new("FIG-RF-003", "warning", "Source attribution is missing. Required for Bagrut exam figures."));
+    }
+
+    /// <summary>
+    /// PP-012: Validate a raw JSON figure spec string (from AI generation).
+    /// Parses the JSON, constructs the appropriate FigureSpec, and runs the full gate.
+    /// </summary>
+    public static FigureQualityResult ValidateJson(string json)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            var type = root.TryGetProperty("type", out var typeProp) ? typeProp.GetString() : null;
+            var ariaLabel = root.TryGetProperty("ariaLabel", out var alProp) ? alProp.GetString() ?? "" : "";
+
+            FigureSpec? spec = type switch
+            {
+                "functionPlot" => ParseFunctionPlotFromJson(root, ariaLabel),
+                "physics" => ParsePhysicsDiagramFromJson(root, ariaLabel),
+                "geometry" => new GeometryConstructionSpec(
+                    root.TryGetProperty("jsxGraphConfig", out var jsx) ? jsx.GetRawText() : "",
+                    root.TryGetProperty("caption", out var gc) ? gc.GetString() : null,
+                    ariaLabel),
+                "raster" => new RasterFigureSpec(
+                    root.TryGetProperty("imageUrl", out var url) ? url.GetString() ?? "" : "",
+                    root.TryGetProperty("width", out var w) ? w.GetInt32() : 0,
+                    root.TryGetProperty("height", out var h) ? h.GetInt32() : 0,
+                    root.TryGetProperty("caption", out var rc) ? rc.GetString() : null,
+                    ariaLabel,
+                    root.TryGetProperty("sourceAttribution", out var sa) ? sa.GetString() : null),
+                _ => null
+            };
+
+            if (spec is null)
+            {
+                return new FigureQualityResult
+                {
+                    Passed = false,
+                    Violations = [new("FIG-PARSE", "critical", $"Unknown figure type: {type}")]
+                };
+            }
+
+            return Validate(spec);
+        }
+        catch (JsonException ex)
+        {
+            return new FigureQualityResult
+            {
+                Passed = false,
+                Violations = [new("FIG-JSON", "critical", $"Invalid JSON: {ex.Message}")]
+            };
+        }
+    }
+
+    private static FunctionPlotSpec ParseFunctionPlotFromJson(JsonElement root, string ariaLabel)
+    {
+        var config = root.TryGetProperty("functionPlotConfig", out var cfg) ? cfg : root;
+        var markers = new List<FigureMarker>();
+        if (config.TryGetProperty("markers", out var mArr))
+        {
+            foreach (var m in mArr.EnumerateArray())
+            {
+                markers.Add(new FigureMarker(
+                    m.TryGetProperty("x", out var mx) ? mx.GetDouble() : 0,
+                    m.TryGetProperty("y", out var my) ? my.GetDouble() : 0,
+                    m.TryGetProperty("label", out var ml) ? ml.GetString() : null,
+                    m.TryGetProperty("type", out var mt) ? mt.GetString() ?? "point" : "point"));
+            }
+        }
+
+        return new FunctionPlotSpec(
+            config.TryGetProperty("expression", out var expr) ? expr.GetString() ?? "" : "",
+            config.TryGetProperty("xMin", out var xn) ? xn.GetDouble() : -10,
+            config.TryGetProperty("xMax", out var xx) ? xx.GetDouble() : 10,
+            config.TryGetProperty("yMin", out var yn) ? yn.GetDouble() : -10,
+            config.TryGetProperty("yMax", out var yx) ? yx.GetDouble() : 10,
+            markers,
+            root.TryGetProperty("caption", out var cap) ? cap.GetString() : null,
+            ariaLabel);
+    }
+
+    private static PhysicsDiagramSpec ParsePhysicsDiagramFromJson(JsonElement root, string ariaLabel)
+    {
+        var pdSpec = root.TryGetProperty("physicsDiagramSpec", out var pds) ? pds : root;
+        var forces = new List<PhysicsForce>();
+        if (pdSpec.TryGetProperty("forces", out var fArr))
+        {
+            foreach (var f in fArr.EnumerateArray())
+            {
+                forces.Add(new PhysicsForce(
+                    f.TryGetProperty("label", out var fl) ? fl.GetString() ?? "" : "",
+                    f.TryGetProperty("magnitude", out var fm) ? fm.GetDouble() : 0,
+                    f.TryGetProperty("angleDeg", out var fa) ? fa.GetDouble() : 0,
+                    f.TryGetProperty("color", out var fc) ? fc.GetString() : null));
+            }
+        }
+
+        var parameters = new Dictionary<string, double>();
+        if (pdSpec.TryGetProperty("parameters", out var pars))
+        {
+            foreach (var p in pars.EnumerateObject())
+            {
+                if (p.Value.ValueKind == JsonValueKind.Number)
+                    parameters[p.Name] = p.Value.GetDouble();
+            }
+        }
+
+        var body = PhysicsBodyType.FreeBody;
+        if (pdSpec.TryGetProperty("body", out var bodyProp))
+            Enum.TryParse<PhysicsBodyType>(bodyProp.GetString(), true, out body);
+
+        return new PhysicsDiagramSpec(body, forces, parameters,
+            CoordinateFrame.Inertial,
+            root.TryGetProperty("caption", out var cap) ? cap.GetString() : null,
+            ariaLabel);
     }
 }
