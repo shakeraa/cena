@@ -108,7 +108,7 @@ public sealed class ContentModerationPipeline : IContentModerationPipeline
             if (csamResult.IsMatch)
             {
                 _logger.LogCritical(
-                    "CSAM detected for content {ContentId}, uploader {Uploader}, IP {IP}",
+                    "[SIEM] CSAM detected for content {ContentId}, uploader {Uploader}, IP {IP}",
                     contentId, uploaderId, uploaderIpAddress ?? "unknown");
 
                 await _incidentReporter.FileIncidentAsync(
@@ -124,7 +124,7 @@ public sealed class ContentModerationPipeline : IContentModerationPipeline
         {
             // FAIL-CLOSED: PhotoDNA down → block the upload
             _logger.LogCritical(ex,
-                "PhotoDNA unavailable — BLOCKING upload {ContentId} from {Uploader} (fail-closed policy)",
+                "[SIEM] PhotoDNA unavailable — BLOCKING upload {ContentId} from {Uploader} (fail-closed policy)",
                 contentId, uploaderId);
 
             return new ModerationResult(

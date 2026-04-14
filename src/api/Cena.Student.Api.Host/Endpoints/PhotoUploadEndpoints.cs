@@ -1,11 +1,12 @@
 // =============================================================================
-// Cena Platform — Photo Upload Endpoint Hardening (PWA-BE-003)
+// Cena Platform — Photo Upload Endpoint Hardening (PWA-BE-003 + RDY-001)
 //
 // Validates uploaded images: EXIF strip, content-type verify, size limit,
-// circuit breaker for upstream processing (Gemini Vision).
+// content moderation (CSAM + AI safety), circuit breaker for upstream processing.
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Infrastructure.Moderation;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Cena.Student.Api.Host.Endpoints;
@@ -26,14 +27,20 @@ public static class PhotoUploadEndpoints
 
         group.MapPost("/upload", UploadPhoto)
             .WithName("UploadPhoto")
+            .RequireRateLimiting("photo")
+            .RequireImageUploadEnabled()
             .Produces<PhotoUploadResponse>(200)
             .Produces(400)
-            .Produces(413);
+            .Produces(403)
+            .Produces(413)
+            .Produces(503);
     }
 
-    private static async Task<IResult> UploadPhoto(
+    internal static async Task<IResult> UploadPhoto(
         HttpRequest request,
         ClaimsPrincipal user,
+        IContentModerationPipeline moderationPipeline,
+        ILogger<Program> logger,
         CancellationToken ct)
     {
         var studentId = user.FindFirstValue("sub");
@@ -66,13 +73,36 @@ public static class PhotoUploadEndpoints
         if (!VerifyMagicBytes(header, file.ContentType))
             return Results.BadRequest(new { error = "File content does not match declared content type" });
 
-        // Read file bytes (EXIF will be stripped during processing)
+        // Read file bytes
         using var ms = new MemoryStream();
         await stream.CopyToAsync(ms, ct);
         var imageBytes = ms.ToArray();
 
         // Strip EXIF metadata (privacy: remove GPS, camera info, timestamps)
         var strippedBytes = StripExifMetadata(imageBytes);
+
+        // Content moderation (RDY-001: CSAM + AI safety)
+        var ipAddress = request.HttpContext.Connection.RemoteIpAddress?.ToString();
+        var moderationResult = await moderationPipeline.ModerateAsync(
+            strippedBytes,
+            file.ContentType,
+            studentId,
+            new ModerationPolicy(IsMinor: true),
+            ipAddress,
+            ct);
+
+        if (moderationResult.Verdict == ModerationVerdict.CsamDetected)
+        {
+            logger.LogCritical("[SIEM] Photo upload blocked — CSAM detected. Student={StudentId}", studentId);
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        if (moderationResult.Verdict == ModerationVerdict.Blocked)
+        {
+            logger.LogWarning("Photo upload blocked by moderation. Student={StudentId}, Categories={Categories}",
+                studentId, moderationResult.FlaggedCategories);
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
 
         // TODO: Send to processing pipeline (Gemini Vision) via circuit breaker
         // For now, return success with metadata
@@ -84,7 +114,10 @@ public static class PhotoUploadEndpoints
             ProcessedSizeBytes: strippedBytes.Length,
             ExifStripped: true,
             ContentType: file.ContentType,
-            Status: "queued_for_processing"
+            Status: moderationResult.Verdict == ModerationVerdict.NeedsReview
+                ? "queued_for_review"
+                : "queued_for_processing",
+            ModerationVerdict: moderationResult.Verdict.ToString()
         ));
     }
 
@@ -122,5 +155,6 @@ public record PhotoUploadResponse(
     long ProcessedSizeBytes,
     bool ExifStripped,
     string ContentType,
-    string Status
+    string Status,
+    string? ModerationVerdict = null
 );

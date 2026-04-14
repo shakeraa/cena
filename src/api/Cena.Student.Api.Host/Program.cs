@@ -16,6 +16,7 @@ using Cena.Actors.Serving;
 using Cena.Actors.Tutor;
 using Cena.Api.Host.Endpoints;
 using Cena.Api.Host.Hubs;
+using Cena.Student.Api.Host.Endpoints;
 using Cena.Infrastructure.Ai;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
@@ -24,8 +25,10 @@ using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Observability;
+using Cena.Infrastructure.Moderation;
 using Cena.Infrastructure.Seed;
 using Marten;
+using Polly;
 using Microsoft.AspNetCore.RateLimiting;
 using NATS.Client.Core;
 using NatsEventSubscriber = Cena.Admin.Api.NatsEventSubscriber;
@@ -170,6 +173,26 @@ builder.Services.AddScoped<ITutorMessageService, TutorMessageService>();
 builder.Services.AddSingleton<ITutorPromptScrubber, TutorPromptScrubber>();
 builder.Services.AddSingleton<ISafeguardingClassifier, SafeguardingClassifier>();
 builder.Services.AddScoped<ISafeguardingEscalation, SafeguardingEscalation>();
+
+// ---- RDY-001: Content Moderation (CSAM + AI Safety) ----
+builder.Services.AddHttpClient<IPhotoDnaClient, PhotoDnaClient>(client =>
+{
+    var timeout = builder.Configuration.GetValue<int>("Moderation:PhotoDna:TimeoutSeconds", 10);
+    client.Timeout = TimeSpan.FromSeconds(timeout);
+});
+
+builder.Services.AddHttpClient<IContentSafetyClient, ContentSafetyClient>(client =>
+{
+    var timeout = builder.Configuration.GetValue<int>("Moderation:ContentSafety:TimeoutSeconds", 15);
+    client.Timeout = TimeSpan.FromSeconds(timeout);
+})
+.AddPolicyHandler(Policy
+    .Handle<HttpRequestException>()
+    .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)
+    .CircuitBreakerAsync(3, TimeSpan.FromSeconds(30)));
+
+builder.Services.AddSingleton<IIncidentReportService, IncidentReportService>();
+builder.Services.AddSingleton<IContentModerationPipeline, ContentModerationPipeline>();
 
 // ---- Firebase Auth + Authorization ----
 builder.Services.AddHttpContextAccessor();
@@ -537,6 +560,10 @@ app.MapConsentEndpoints();
 
 // RATE-001: Rate limit dashboard (real-time spend + status)
 app.MapRateLimitDashboardEndpoints();
+
+// ---- RDY-001: Photo endpoints (gated by CENA_IMAGE_UPLOAD_ENABLED) ----
+app.MapPhotoUploadEndpoints();
+app.MapPhotoCaptureEndpoints();
 
 // ---- SignalR Hub ----
 app.MapCenaHub();

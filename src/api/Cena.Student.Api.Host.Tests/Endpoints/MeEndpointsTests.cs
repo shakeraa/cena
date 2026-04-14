@@ -93,4 +93,3 @@ public class MeEndpointsTests : IClassFixture<StudentApiTestFactory>
     }
 }
 
-public record UpdateProfileRequest(string? DisplayName, string? Bio, string[]? Subjects, string? Visibility);

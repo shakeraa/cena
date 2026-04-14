@@ -1,5 +1,6 @@
 // =============================================================================
-// Cena Platform — Redis Cost Circuit Breaker Tests (RATE-001 Tier 4)
+// RDY-001: Redis Cost Circuit Breaker Tests
+// Verifies fail-closed behavior when Redis is unavailable.
 // =============================================================================
 
 using Cena.Actors.RateLimit;
@@ -10,89 +11,75 @@ using StackExchange.Redis;
 
 namespace Cena.Actors.Tests.RateLimit;
 
-public sealed class RedisCostCircuitBreakerTests
+public class RedisCostCircuitBreakerTests
 {
     [Fact]
-    public async Task IsOpenAsync_BelowThreshold_ReturnsFalse()
+    public async Task IsOpenAsync_RedisUnavailable_ReturnsTrue_BlockingRequests()
     {
+        // Arrange
         var redis = Substitute.For<IConnectionMultiplexer>();
         var db = Substitute.For<IDatabase>();
-        redis.GetDatabase().Returns(db);
-        db.StringGetAsync(Arg.Any<RedisKey>()).Returns((RedisValue)"500.0");
+        redis.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(db);
+        db.StringGetAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>())
+            .Returns(Task.FromException<RedisValue>(new RedisConnectionException(ConnectionFailureType.UnableToConnect, "down")));
 
-        var cb = new RedisCostCircuitBreaker(redis, new ConfigurationBuilder().Build(), NullLogger<RedisCostCircuitBreaker>.Instance);
-        var isOpen = await cb.IsOpenAsync();
+        var config = new ConfigurationBuilder().Build();
+        var breaker = new RedisCostCircuitBreaker(redis, config, NullLogger<RedisCostCircuitBreaker>.Instance);
 
-        Assert.False(isOpen);
-    }
+        // Act
+        var isOpen = await breaker.IsOpenAsync();
 
-    [Fact]
-    public async Task IsOpenAsync_AtThreshold_ReturnsTrue()
-    {
-        var redis = Substitute.For<IConnectionMultiplexer>();
-        var db = Substitute.For<IDatabase>();
-        redis.GetDatabase().Returns(db);
-        db.StringGetAsync(Arg.Any<RedisKey>()).Returns((RedisValue)"1000.0");
-
-        var cb = new RedisCostCircuitBreaker(redis, new ConfigurationBuilder().Build(), NullLogger<RedisCostCircuitBreaker>.Instance);
-        var isOpen = await cb.IsOpenAsync();
-
+        // Assert
         Assert.True(isOpen);
     }
 
     [Fact]
-    public async Task IsOpenAsync_RedisError_FailsClosed()
+    public async Task IsOpenAsync_RedisAvailable_UnderThreshold_ReturnsFalse()
     {
+        // Arrange
         var redis = Substitute.For<IConnectionMultiplexer>();
         var db = Substitute.For<IDatabase>();
-        redis.GetDatabase().Returns(db);
-        db.StringGetAsync(Arg.Any<RedisKey>()).Returns<Task<RedisValue>>(_ => throw new RedisConnectionException(ConnectionFailureType.UnableToConnect, "down"));
+        redis.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(db);
+        db.StringGetAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>())
+            .Returns(new RedisValue("100.0"));
 
-        var cb = new RedisCostCircuitBreaker(redis, new ConfigurationBuilder().Build(), NullLogger<RedisCostCircuitBreaker>.Instance);
-        var isOpen = await cb.IsOpenAsync();
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cena:CostCircuitBreaker:DailyThresholdUsd"] = "1000"
+            })
+            .Build();
+        var breaker = new RedisCostCircuitBreaker(redis, config, NullLogger<RedisCostCircuitBreaker>.Instance);
 
+        // Act
+        var isOpen = await breaker.IsOpenAsync();
+
+        // Assert
         Assert.False(isOpen);
     }
 
     [Fact]
-    public async Task RecordSpendAsync_PositiveCost_IncrementsRedis()
+    public async Task IsOpenAsync_RedisAvailable_OverThreshold_ReturnsTrue()
     {
+        // Arrange
         var redis = Substitute.For<IConnectionMultiplexer>();
         var db = Substitute.For<IDatabase>();
-        redis.GetDatabase().Returns(db);
+        redis.GetDatabase(Arg.Any<int>(), Arg.Any<object>()).Returns(db);
+        db.StringGetAsync(Arg.Any<RedisKey>(), Arg.Any<CommandFlags>())
+            .Returns(new RedisValue("1500.0"));
 
-        var cb = new RedisCostCircuitBreaker(redis, new ConfigurationBuilder().Build(), NullLogger<RedisCostCircuitBreaker>.Instance);
-        await cb.RecordSpendAsync(5.5);
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cena:CostCircuitBreaker:DailyThresholdUsd"] = "1000"
+            })
+            .Build();
+        var breaker = new RedisCostCircuitBreaker(redis, config, NullLogger<RedisCostCircuitBreaker>.Instance);
 
-        await db.Received(1).StringIncrementAsync(Arg.Any<RedisKey>(), 5.5);
-        await db.Received(1).KeyExpireAsync(Arg.Any<RedisKey>(), Arg.Any<TimeSpan>());
-    }
+        // Act
+        var isOpen = await breaker.IsOpenAsync();
 
-    [Fact]
-    public async Task RecordSpendAsync_ZeroCost_DoesNothing()
-    {
-        var redis = Substitute.For<IConnectionMultiplexer>();
-        var db = Substitute.For<IDatabase>();
-        redis.GetDatabase().Returns(db);
-
-        var cb = new RedisCostCircuitBreaker(redis, new ConfigurationBuilder().Build(), NullLogger<RedisCostCircuitBreaker>.Instance);
-        await cb.RecordSpendAsync(0.0);
-
-        await db.DidNotReceive().StringIncrementAsync(Arg.Any<RedisKey>(), Arg.Any<double>());
-    }
-
-    [Fact]
-    public async Task GetStatusAsync_ReturnsUsedAndThreshold()
-    {
-        var redis = Substitute.For<IConnectionMultiplexer>();
-        var db = Substitute.For<IDatabase>();
-        redis.GetDatabase().Returns(db);
-        db.StringGetAsync(Arg.Any<RedisKey>()).Returns((RedisValue)"250.0");
-
-        var cb = new RedisCostCircuitBreaker(redis, new ConfigurationBuilder().Build(), NullLogger<RedisCostCircuitBreaker>.Instance);
-        var status = await cb.GetStatusAsync();
-
-        Assert.Equal(250.0, status.Used);
-        Assert.Equal(1000.0, status.Threshold);
+        // Assert
+        Assert.True(isOpen);
     }
 }

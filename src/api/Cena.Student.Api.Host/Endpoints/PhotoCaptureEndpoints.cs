@@ -2,11 +2,12 @@
 // Cena Platform — Student Photo Capture + Gemini Vision (PHOTO-001)
 //
 // POST /api/photos/capture — student photographs a math problem
-// The image is moderated (PHOTO-003), then sent to Gemini Vision for OCR.
+// The image is moderated (PHOTO-003 + RDY-001), then sent to Gemini Vision for OCR.
 // Extracted LaTeX is sanitized (LATEX-001) and returned for step solving.
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Infrastructure.Moderation;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
@@ -23,14 +24,19 @@ public static class PhotoCaptureEndpoints
 
         group.MapPost("/capture", CaptureAndRecognize)
             .WithName("CaptureAndRecognize")
+            .RequireRateLimiting("photo")
+            .RequireImageUploadEnabled()
             .Produces<PhotoCaptureResponse>(200)
             .Produces(400)
-            .Produces(422);
+            .Produces(403)
+            .Produces(422)
+            .Produces(503);
     }
 
-    private static async Task<IResult> CaptureAndRecognize(
+    internal static async Task<IResult> CaptureAndRecognize(
         HttpRequest request,
         ClaimsPrincipal user,
+        IContentModerationPipeline moderationPipeline,
         ILogger<Program> logger,
         CancellationToken ct)
     {
@@ -52,10 +58,28 @@ public static class PhotoCaptureEndpoints
         await file.OpenReadStream().CopyToAsync(ms, ct);
         var imageBytes = ms.ToArray();
 
-        // Step 1: Content moderation (PHOTO-003)
-        // In production: call IContentModerationPipeline.ModerateAsync
-        logger.LogInformation("Photo capture: {Size}KB from student {StudentId}",
-            imageBytes.Length / 1024, studentId);
+        // Step 1: Content moderation (PHOTO-003 + RDY-001)
+        var ipAddress = request.HttpContext.Connection.RemoteIpAddress?.ToString();
+        var moderationResult = await moderationPipeline.ModerateAsync(
+            imageBytes,
+            file.ContentType,
+            studentId,
+            new ModerationPolicy(IsMinor: true),
+            ipAddress,
+            ct);
+
+        if (moderationResult.Verdict == ModerationVerdict.CsamDetected)
+        {
+            logger.LogCritical("[SIEM] Photo capture blocked — CSAM detected. Student={StudentId}", studentId);
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
+
+        if (moderationResult.Verdict == ModerationVerdict.Blocked)
+        {
+            logger.LogWarning("Photo capture blocked by moderation. Student={StudentId}, Categories={Categories}",
+                studentId, moderationResult.FlaggedCategories);
+            return Results.StatusCode(StatusCodes.Status403Forbidden);
+        }
 
         // Step 2: Send to Gemini Vision for math OCR
         var ocrResult = await RecognizeMathAsync(imageBytes, ct);
@@ -73,7 +97,8 @@ public static class PhotoCaptureEndpoints
             Confidence: ocrResult.Confidence,
             BoundingBoxes: ocrResult.BoundingBoxes,
             OriginalImageId: Guid.NewGuid().ToString("N")[..12],
-            Warnings: ocrResult.Warnings
+            Warnings: ocrResult.Warnings,
+            ModerationVerdict: moderationResult.Verdict.ToString()
         ));
     }
 
@@ -111,5 +136,6 @@ public record PhotoCaptureResponse(
     double Confidence,
     IReadOnlyList<BoundingBox> BoundingBoxes,
     string OriginalImageId,
-    string[] Warnings
+    string[] Warnings,
+    string? ModerationVerdict = null
 );
