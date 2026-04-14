@@ -7,7 +7,7 @@
  * entry for classroom enrollment.
  */
 
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 interface CurriculumTrack {
@@ -34,25 +34,26 @@ const joinCodeInput = ref('')
 const showJoinCode = ref(false)
 
 const availableTracks = computed(() =>
-  props.tracks.filter(t => t.status === 'ready')
+  props.tracks.filter(t => t.status === 'ready'),
 )
 
 function handleSelectTrack() {
-  if (selectedTrack.value) {
+  if (selectedTrack.value)
     emit('select', selectedTrack.value)
-  }
 }
 
 function handleJoinCode() {
   const code = joinCodeInput.value.trim().toUpperCase()
-  if (code.length >= 4) {
+  if (code.length >= 4)
     emit('joinCode', code)
-  }
 }
 </script>
 
 <template>
-  <VCard class="catalog-picker pa-6" variant="flat">
+  <VCard
+    class="catalog-picker pa-6"
+    variant="flat"
+  >
     <h2 class="text-h5 mb-2">
       {{ t('onboarding.catalog.title', 'Choose your learning track') }}
     </h2>
@@ -68,15 +69,20 @@ function handleJoinCode() {
         :variant="selectedTrack === track.trackId ? 'elevated' : 'outlined'"
         class="catalog-picker__card"
         :class="{ 'catalog-picker__card--selected': selectedTrack === track.trackId }"
-        @click="selectedTrack = track.trackId"
         role="radio"
         :aria-checked="selectedTrack === track.trackId"
         tabindex="0"
+        @click="selectedTrack = track.trackId"
         @keydown.enter="selectedTrack = track.trackId"
       >
-        <VCardTitle class="text-subtitle-1">{{ track.title }}</VCardTitle>
+        <VCardTitle class="text-subtitle-1">
+          {{ track.title }}
+        </VCardTitle>
         <VCardSubtitle>{{ track.code }}</VCardSubtitle>
-        <VCardText v-if="track.targetExam" class="text-caption">
+        <VCardText
+          v-if="track.targetExam"
+          class="text-caption"
+        >
           {{ t('onboarding.catalog.prepFor', 'Prepares for:') }} {{ track.targetExam }}
         </VCardText>
       </VCard>
@@ -105,7 +111,10 @@ function handleJoinCode() {
         {{ t('onboarding.catalog.haveJoinCode', 'Have a classroom join code?') }}
       </VBtn>
 
-      <div v-else class="d-flex gap-2 align-center">
+      <div
+        v-else
+        class="d-flex gap-2 align-center"
+      >
         <VTextField
           v-model="joinCodeInput"
           :label="t('onboarding.catalog.joinCodeLabel', 'Join code')"

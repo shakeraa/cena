@@ -2,7 +2,7 @@
 // Shared test utilities for Vue composable unit tests.
 // =============================================================================
 
-import { createApp, type App } from 'vue'
+import { type App, createApp } from 'vue'
 
 /**
  * Wraps a composable call inside a mini Vue app so lifecycle hooks fire.
@@ -14,6 +14,7 @@ export function withSetup<T>(composable: () => T): [T, App] {
   const app = createApp({
     setup() {
       result = composable()
+
       return () => null
     },
   })

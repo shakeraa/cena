@@ -39,8 +39,10 @@ const durationLabel = computed(() => {
 })
 
 const accuracyColor = computed(() => {
-  if (props.accuracyPercent >= 85) return 'success'
-  if (props.accuracyPercent >= 60) return 'warning'
+  if (props.accuracyPercent >= 85)
+    return 'success'
+  if (props.accuracyPercent >= 60)
+    return 'warning'
 
   return 'error'
 })
@@ -89,7 +91,7 @@ const accuracyColor = computed(() => {
       <VIcon
         icon="tabler-chevron-right"
         size="20"
-        class="text-medium-emphasis"
+        class="text-medium-emphasis flip-in-rtl"
         aria-hidden="true"
       />
     </div>

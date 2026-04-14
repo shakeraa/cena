@@ -32,13 +32,13 @@ const meStore = useMeStore()
 const submitError = ref<string | null>(null)
 
 const { execute: submitOnboarding, loading: submitting } = useApiMutation<
-  { success: boolean, redirectTo: string },
+  { success: boolean; redirectTo: string },
   {
     role: string
     locale: string
     subjects: string[]
     dailyTimeGoalMinutes: number
-    weeklySubjectTargets: { subject: string, accuracyTarget: number }[]
+    weeklySubjectTargets: { subject: string; accuracyTarget: number }[]
     diagnosticResults: null
     classroomCode: null
   }
@@ -246,6 +246,7 @@ async function handleConfirm() {
           <VIcon
             icon="tabler-arrow-left"
             start
+            class="flip-in-rtl"
             aria-hidden="true"
           />
           {{ t('onboarding.back') }}
@@ -262,6 +263,7 @@ async function handleConfirm() {
           <VIcon
             icon="tabler-arrow-right"
             end
+            class="flip-in-rtl"
             aria-hidden="true"
           />
         </VBtn>

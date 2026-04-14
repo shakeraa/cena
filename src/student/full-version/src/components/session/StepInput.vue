@@ -9,7 +9,7 @@
  * RTL support: all math rendered in <bdi dir="ltr"> blocks.
  */
 
-import { ref, computed, inject } from 'vue'
+import { computed, inject, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 interface SolutionStep {
@@ -40,11 +40,13 @@ const textDir = computed(() =>
 
 const inputExpression = ref('')
 const currentHintLevel = ref(0)
+
 const verificationResult = ref<{
   correct: boolean
   message?: string
   isProductiveFailurePath?: boolean
 } | null>(null)
+
 const isVerifying = ref(false)
 
 const showInstruction = computed(() =>
@@ -66,7 +68,8 @@ function showNextHint() {
 }
 
 async function verify() {
-  if (!inputExpression.value.trim() || isVerifying.value) return
+  if (!inputExpression.value.trim() || isVerifying.value)
+    return
 
   isVerifying.value = true
   try {
@@ -82,6 +85,7 @@ async function verify() {
     })
 
     const result = await response.json()
+
     verificationResult.value = {
       correct: result.isEquivalent,
       message: result.isEquivalent
@@ -91,12 +95,14 @@ async function verify() {
     }
 
     emit('verified', result.isEquivalent, inputExpression.value)
-  } catch {
+  }
+  catch {
     verificationResult.value = {
       correct: false,
       message: t('session.stepSolver.verificationError'),
     }
-  } finally {
+  }
+  finally {
     isVerifying.value = false
   }
 }
@@ -114,27 +120,42 @@ async function verify() {
   >
     <!-- Step number -->
     <div class="step-input-header">
-      <span class="step-number" aria-hidden="true">{{ step.stepNumber }}</span>
+      <span
+        class="step-number"
+        aria-hidden="true"
+      >{{ step.stepNumber }}</span>
 
       <!-- PP-013: Instruction with RTL direction handling -->
-      <p v-if="showInstruction" class="step-instruction">
+      <p
+        v-if="showInstruction"
+        class="step-instruction"
+      >
         <bdi :dir="textDir">{{ step.instruction }}</bdi>
       </p>
     </div>
 
     <!-- Faded example (partial scaffolding) -->
-    <div v-if="showFadedExample" class="step-faded-example">
+    <div
+      v-if="showFadedExample"
+      class="step-faded-example"
+    >
       <bdi dir="ltr">{{ step.fadedExample }}</bdi>
     </div>
 
     <!-- Full worked example (full scaffolding) -->
-    <div v-if="showFullExample && !isVerified" class="step-full-example">
+    <div
+      v-if="showFullExample && !isVerified"
+      class="step-full-example"
+    >
       <span class="step-example-label">{{ t('session.stepSolver.workedExample') }}</span>
       <bdi dir="ltr">{{ step.expectedExpression }}</bdi>
     </div>
 
     <!-- Input area (only when active and not yet verified) -->
-    <div v-if="isActive && !isVerified" class="step-input-area">
+    <div
+      v-if="isActive && !isVerified"
+      class="step-input-area"
+    >
       <bdi dir="ltr">
         <input
           v-model="inputExpression"
@@ -143,7 +164,7 @@ async function verify() {
           :placeholder="t('session.stepSolver.enterExpression')"
           :aria-label="t('session.stepSolver.expressionInput', { n: step.stepNumber })"
           @keydown.enter="verify"
-        />
+        >
       </bdi>
 
       <button
@@ -156,25 +177,40 @@ async function verify() {
     </div>
 
     <!-- Verified expression (show KaTeX-rendered after correct) -->
-    <div v-if="isVerified && verifiedExpression" class="step-verified-expression">
+    <div
+      v-if="isVerified && verifiedExpression"
+      class="step-verified-expression"
+    >
       <bdi dir="ltr">{{ verifiedExpression }}</bdi>
-      <span class="step-check-mark" aria-label="correct">&#x2713;</span>
+      <span
+        class="step-check-mark"
+        aria-label="correct"
+      >&#x2713;</span>
     </div>
 
     <!-- PP-017: Productive failure exploration badge -->
-    <div v-if="verificationResult?.isProductiveFailurePath" class="step-feedback step-feedback--exploring">
+    <div
+      v-if="verificationResult?.isProductiveFailurePath"
+      class="step-feedback step-feedback--exploring"
+    >
       <span class="step-exploring-badge">{{ t('session.stepSolver.exploring', 'Exploring!') }}</span>
       {{ verificationResult.message }}
     </div>
 
     <!-- Verification result feedback (non-exploratory) -->
-    <div v-else-if="verificationResult && !isVerified" class="step-feedback"
-      :class="verificationResult.correct ? 'step-feedback--correct' : 'step-feedback--incorrect'">
+    <div
+      v-else-if="verificationResult && !isVerified"
+      class="step-feedback"
+      :class="verificationResult.correct ? 'step-feedback--correct' : 'step-feedback--incorrect'"
+    >
       {{ verificationResult.message }}
     </div>
 
     <!-- Hints -->
-    <div v-if="isActive && !isVerified && step.hints.length > 0" class="step-hints">
+    <div
+      v-if="isActive && !isVerified && step.hints.length > 0"
+      class="step-hints"
+    >
       <button
         v-if="currentHintLevel < step.hints.length"
         class="step-hint-btn"
@@ -184,8 +220,14 @@ async function verify() {
       </button>
 
       <!-- PP-013: Hints with RTL direction handling -->
-      <ul v-if="availableHints.length > 0" class="step-hint-list">
-        <li v-for="(hint, i) in availableHints" :key="i">
+      <ul
+        v-if="availableHints.length > 0"
+        class="step-hint-list"
+      >
+        <li
+          v-for="(hint, i) in availableHints"
+          :key="i"
+        >
           <bdi :dir="textDir">{{ hint }}</bdi>
         </li>
       </ul>

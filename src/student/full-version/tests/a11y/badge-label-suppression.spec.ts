@@ -43,7 +43,7 @@ describe('FIND-ux-028: VBadge aria-label suppression', () => {
       // contain `>` inside attribute values like arrow functions). We match
       // from <VBadge up to the closing `>` that is followed by a newline and
       // either content or a child tag.
-      const vbadgeBlock = src.match(/<VBadge[\s\S]*?>\s*\n/m)
+      const vbadgeBlock = src.match(/<VBadge[\s\S]*?>\s*\n/)
 
       expect(vbadgeBlock).not.toBeNull()
       expect(vbadgeBlock![0]).toContain('aria-label=""')
@@ -51,7 +51,7 @@ describe('FIND-ux-028: VBadge aria-label suppression', () => {
 
     it('outer button uses i18n key nav.notificationsBell for its aria-label', () => {
       // The IconBtn must reference the i18n key, not a hardcoded string
-      expect(src).toMatch(/aria-label=.*\$?t\(['"]nav\.notificationsBell['"]\)/)
+      expect(src).toMatch(/aria-label=.*t\(['"]nav\.notificationsBell['"]\)/)
     })
 
     it('template does not contain the Hebrew word "תג" (badge default leak)', () => {
@@ -63,7 +63,7 @@ describe('FIND-ux-028: VBadge aria-label suppression', () => {
     const src = readSrc('layouts/components/UserProfile.vue')
 
     it('VBadge has aria-label="" to suppress Vuetify default', () => {
-      const vbadgeMatch = src.match(/<VBadge[\s\S]*?>/m)
+      const vbadgeMatch = src.match(/<VBadge[\s\S]*?>/)
 
       expect(vbadgeMatch).not.toBeNull()
 

@@ -4,7 +4,7 @@ import { useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 const route = useRoute()
-const { t, te } = useI18n()
+const { t, te, locale } = useI18n()
 
 interface Crumb {
   title: string
@@ -50,12 +50,20 @@ const shouldRender = computed(() => {
 
   return crumbs.value.length > 1
 })
+
+const displayedCrumbs = computed(() => {
+  const items = [...crumbs.value]
+
+  return locale.value === 'ar' || locale.value === 'he'
+    ? items.reverse()
+    : items
+})
 </script>
 
 <template>
   <VBreadcrumbs
     v-if="shouldRender"
-    :items="crumbs"
+    :items="displayedCrumbs"
     density="compact"
     class="student-breadcrumbs px-6 py-2"
     data-testid="student-breadcrumbs"
@@ -64,6 +72,7 @@ const shouldRender = computed(() => {
       <VIcon
         icon="tabler-chevron-right"
         size="14"
+        class="flip-in-rtl"
       />
     </template>
   </VBreadcrumbs>

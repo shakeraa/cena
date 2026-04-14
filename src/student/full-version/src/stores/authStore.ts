@@ -71,6 +71,7 @@ function writeAbilityCookie(rules: Rule[]): void {
   try {
     const value = encodeURIComponent(JSON.stringify(rules))
     const maxAge = 60 * 60 * 24 * 30 // 30 days
+
     document.cookie = `userAbilityRules=${value}; path=/; max-age=${maxAge}`
   }
   catch {
@@ -158,7 +159,6 @@ export const useAuthStore = defineStore('auth', () => {
     ability.update(studentAbilityRules)
     writeAbilityCookie(studentAbilityRules)
 
-    // eslint-disable-next-line no-console
     console.info('[auth] Firebase sign-in complete for', payload.uid)
   }
 
@@ -175,7 +175,6 @@ export const useAuthStore = defineStore('auth', () => {
     ability.update([])
     clearAbilityCookie()
 
-    // eslint-disable-next-line no-console
     console.info('[auth] Firebase sign-out complete')
   }
 
@@ -202,7 +201,6 @@ export const useAuthStore = defineStore('auth', () => {
     ability.update(studentAbilityRules)
     writeAbilityCookie(studentAbilityRules)
 
-    // eslint-disable-next-line no-console
     console.info('[auth] CASL ability rules seeded for student', payload.uid)
   }
 
@@ -218,7 +216,6 @@ export const useAuthStore = defineStore('auth', () => {
     ability.update([])
     clearAbilityCookie()
 
-    // eslint-disable-next-line no-console
     console.info('[auth] CASL ability rules cleared on sign-out')
   }
 

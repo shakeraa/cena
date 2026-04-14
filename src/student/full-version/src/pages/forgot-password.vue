@@ -45,11 +45,13 @@ function validateEmail(): boolean {
   const trimmed = email.value.trim()
   if (!trimmed) {
     emailError.value = t('auth.emailRequired')
+
     return false
   }
 
   if (!/^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(trimmed)) {
     emailError.value = t('auth.emailInvalid')
+
     return false
   }
 
@@ -79,15 +81,14 @@ async function handleSubmit() {
   catch (err: unknown) {
     const status = (err as any)?.statusCode ?? (err as any)?.status ?? (err as any)?.response?.status ?? 0
 
-    if (status === 429) {
+    if (status === 429)
       errorMessage.value = t('auth.resetRateLimited')
-    }
-    else if (status === 503) {
+
+    else if (status === 503)
       errorMessage.value = t('auth.resetServiceUnavailable')
-    }
-    else {
+
+    else
       errorMessage.value = t('auth.resetUnexpectedError')
-    }
 
     console.error('[forgot-password] POST /api/auth/password-reset failed', {
       status,

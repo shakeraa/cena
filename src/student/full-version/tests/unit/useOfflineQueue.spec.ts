@@ -58,6 +58,7 @@ describe('useOfflineQueue', () => {
     expect(stored[0].answer).toBe('persisted')
 
     dequeue(id)
+
     const afterDequeue = JSON.parse(localStorage.getItem('cena-offline-queue')!)
 
     expect(afterDequeue).toHaveLength(0)

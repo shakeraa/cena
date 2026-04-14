@@ -75,6 +75,7 @@ describe('AnswerFeedback', () => {
 
     expect(root.attributes('data-correct')).toBe('true')
     expect(wrapper.text()).toContain('Correct!')
+
     // FIND-pedagogy-017: the raw feedback.feedback field is no longer rendered
     expect(wrapper.find('[data-testid="feedback-xp"]').text()).toContain('10')
   })
@@ -96,6 +97,7 @@ describe('AnswerFeedback', () => {
     const root = wrapper.find('[data-testid="answer-feedback"]')
 
     expect(root.attributes('data-correct')).toBe('false')
+
     // The i18n heading "Not quite." renders via t('session.runner.wrong')
     expect(wrapper.text()).toContain('Not quite.')
     expect(wrapper.find('[data-testid="feedback-xp"]').exists()).toBe(false)
@@ -228,7 +230,7 @@ describe('AnswerFeedback', () => {
 // ─────────────────────────────────────────────────────────────────────
 
 /** Regex matching ASCII Latin letters (A-Z, a-z). */
-const LATIN_RE = /[A-Za-z]/
+const LATIN_RE = /[A-Z]/i
 
 describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
   it('HE locale — correct answer heading contains only Hebrew, no Latin text', () => {
@@ -248,7 +250,9 @@ describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
     })
 
     const heading = wrapper.find('.text-h6')
+
     expect(heading.exists()).toBe(true)
+
     // The heading must be the Hebrew "נכון!" — no Latin characters
     expect(heading.text()).toContain('\u05E0\u05DB\u05D5\u05DF')
     expect(heading.text()).not.toMatch(LATIN_RE)
@@ -271,6 +275,7 @@ describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
     })
 
     const heading = wrapper.find('.text-h6')
+
     expect(heading.exists()).toBe(true)
     expect(heading.text()).not.toMatch(LATIN_RE)
   })
@@ -292,6 +297,7 @@ describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
     })
 
     const heading = wrapper.find('.text-h6')
+
     expect(heading.exists()).toBe(true)
     expect(heading.text()).not.toMatch(LATIN_RE)
   })
@@ -315,6 +321,7 @@ describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
     })
 
     const cardText = wrapper.find('[data-testid="answer-feedback"]').text()
+
     expect(cardText).not.toContain('Correct')
   })
 
@@ -335,10 +342,12 @@ describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
     })
 
     const explanationBlock = wrapper.find('[data-testid="feedback-explanation"]')
+
     expect(explanationBlock.exists()).toBe(true)
 
     // Must have lang="en" on the explanation text wrapper
     const langEnDiv = explanationBlock.find('[lang="en"]')
+
     expect(langEnDiv.exists()).toBe(true)
 
     // Must show the Hebrew label
@@ -362,6 +371,7 @@ describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
     })
 
     const explanationBlock = wrapper.find('[data-testid="feedback-explanation"]')
+
     expect(explanationBlock.exists()).toBe(true)
     expect(explanationBlock.text()).not.toContain('Explanation (English)')
   })
@@ -383,9 +393,11 @@ describe('AnswerFeedback i18n (FIND-pedagogy-017)', () => {
     })
 
     const rationaleBlock = wrapper.find('[data-testid="feedback-distractor-rationale"]')
+
     expect(rationaleBlock.exists()).toBe(true)
 
     const langEnDiv = rationaleBlock.find('[lang="en"]')
+
     expect(langEnDiv.exists()).toBe(true)
     expect(langEnDiv.text()).toContain('You added numerators AND denominators.')
 

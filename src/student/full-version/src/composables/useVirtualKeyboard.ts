@@ -2,10 +2,13 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import type { Ref } from 'vue'
 
 export interface UseVirtualKeyboardReturn {
+
   /** Current keyboard height in pixels (0 when closed) */
   keyboardHeight: Ref<number>
+
   /** Whether the virtual keyboard is currently visible */
   isKeyboardOpen: Ref<boolean>
+
   /** Scroll the given element into view above the keyboard */
   scrollIntoView: (el: HTMLElement) => void
 }
@@ -15,8 +18,10 @@ export function useVirtualKeyboard(): UseVirtualKeyboardReturn {
   const isKeyboardOpen = ref(false)
 
   function handleResize() {
-    if (!window.visualViewport) return
+    if (!window.visualViewport)
+      return
     const height = window.innerHeight - window.visualViewport.height
+
     // Only treat as keyboard if height > 100px (avoid toolbar triggers)
     keyboardHeight.value = height > 100 ? height : 0
     isKeyboardOpen.value = keyboardHeight.value > 0
@@ -26,7 +31,9 @@ export function useVirtualKeyboard(): UseVirtualKeyboardReturn {
   }
 
   function scrollIntoView(el: HTMLElement) {
-    if (!isKeyboardOpen.value) return
+    if (!isKeyboardOpen.value)
+      return
+
     // Use scrollIntoView with block: 'center' to position above keyboard
     el.scrollIntoView({ behavior: 'smooth', block: 'center' })
   }

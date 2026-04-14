@@ -118,6 +118,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
     expect(homeTitle).toContain('Cena')
 
     await page.goto('/progress/mastery')
+
     // STU-W-09 made /progress/mastery a real page; wait on the new testid.
     await page.waitForSelector('[data-testid="progress-mastery-page"]')
     await page.waitForFunction(() => /Mastery/.test(document.title), null, { timeout: 5000 })
@@ -227,6 +228,7 @@ test.describe.serial('STU-W-02 navigation shell + guards', () => {
 
   test('E2E #10 placeholder page shows route metadata', async ({ page }) => {
     await seedAuth(page, { uid: 'u-placeholder' })
+
     // /challenges/daily is still a placeholder (STU-W-11 ships the hub,
     // 11b will ship the per-challenge subpages).
     await page.goto('/challenges/daily')

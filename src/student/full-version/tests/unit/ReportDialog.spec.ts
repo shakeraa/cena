@@ -2,7 +2,7 @@
  * FIND-privacy-018: ReportDialog unit test
  * Verifies the report dialog renders categories, accepts input, and submits.
  */
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 // eslint-disable-next-line no-restricted-imports
@@ -31,11 +31,11 @@ function makeI18n() {
             description: 'Help us keep the community safe. Select a reason for reporting this content.',
             categoryLabel: 'Why are you reporting this?',
             category: {
-              bullying: 'Bullying or harassment',
-              inappropriate: 'Inappropriate content',
-              spam: 'Spam',
+              'bullying': 'Bullying or harassment',
+              'inappropriate': 'Inappropriate content',
+              'spam': 'Spam',
               'self-harm-risk': 'Self-harm or safety concern',
-              other: 'Other',
+              'other': 'Other',
             },
             reasonLabel: 'Additional details (optional)',
             reasonPlaceholder: 'Tell us more about what happened…',
@@ -62,6 +62,7 @@ function makeVuetify() {
 describe('ReportDialog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+
     // Clean up teleported content from previous tests
     document.body.textContent = ''
   })
@@ -80,6 +81,7 @@ describe('ReportDialog', () => {
     })
 
     const body = document.body.textContent ?? ''
+
     expect(body).toContain('Report content')
     expect(body).toContain('Bullying or harassment')
     expect(body).toContain('Inappropriate content')
@@ -103,6 +105,7 @@ describe('ReportDialog', () => {
 
     const submitBtn = document.querySelector('[data-testid="report-submit-btn"]')
     const cancelBtn = document.querySelector('[data-testid="report-cancel-btn"]')
+
     expect(submitBtn).not.toBeNull()
     expect(cancelBtn).not.toBeNull()
   })
@@ -121,6 +124,7 @@ describe('ReportDialog', () => {
     })
 
     const submitBtn = document.querySelector('[data-testid="report-submit-btn"]')
+
     expect(submitBtn?.textContent).toContain('Submit report')
   })
 
@@ -138,6 +142,7 @@ describe('ReportDialog', () => {
     })
 
     const cancelBtn = document.querySelector('[data-testid="report-cancel-btn"]') as HTMLElement
+
     expect(cancelBtn).not.toBeNull()
     cancelBtn.click()
     await wrapper.vm.$nextTick()
@@ -160,10 +165,12 @@ describe('ReportDialog', () => {
     })
 
     const radioGroup = document.querySelector('[data-testid="report-category-group"]')
+
     expect(radioGroup).not.toBeNull()
 
     // Should have 5 radio options
     const radios = document.querySelectorAll('.v-radio')
+
     expect(radios.length).toBe(5)
   })
 

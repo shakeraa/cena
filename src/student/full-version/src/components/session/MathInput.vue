@@ -19,7 +19,7 @@
  * - submit: Enter key pressed
  */
 
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 const props = withDefaults(defineProps<{
@@ -68,9 +68,8 @@ onMounted(async () => {
       const mf = mathFieldRef.value as any
 
       // Set initial value
-      if (props.modelValue) {
+      if (props.modelValue)
         mf.setValue(props.modelValue)
-      }
 
       // Listen for input changes
       mf.addEventListener('input', () => {
@@ -85,26 +84,26 @@ onMounted(async () => {
         }
       })
     }
-  } catch (err) {
+  }
+  catch (err) {
     console.warn('MathLive failed to load:', err)
   }
 })
 
 // Sync external modelValue changes
-watch(() => props.modelValue, (newVal) => {
+watch(() => props.modelValue, newVal => {
   if (mathFieldRef.value && isMathLiveLoaded.value) {
     const mf = mathFieldRef.value as any
-    if (mf.value !== newVal) {
+    if (mf.value !== newVal)
       mf.setValue(newVal || '')
-    }
   }
 })
 
-watch(localVerbal, (val) => {
+watch(localVerbal, val => {
   emit('update:verbalInput', val)
 })
 
-watch(() => props.verbalInput, (val) => {
+watch(() => props.verbalInput, val => {
   localVerbal.value = val
 })
 
@@ -116,11 +115,17 @@ onBeforeUnmount(() => {
 <template>
   <div class="math-input-wrapper">
     <!-- Math expression input (always LTR) -->
-    <div class="math-input-field" dir="ltr">
-      <label v-if="placeholder" class="math-input-label">
+    <div
+      class="math-input-field"
+      dir="ltr"
+    >
+      <label
+        v-if="placeholder"
+        class="math-input-label"
+      >
         {{ placeholder }}
       </label>
-      <math-field
+      <MathField
         ref="mathFieldRef"
         class="math-input"
         :disabled="disabled"
@@ -128,7 +133,10 @@ onBeforeUnmount(() => {
         virtual-keyboard-mode="manual"
         smart-mode
       />
-      <p v-if="!isMathLiveLoaded" class="math-input-fallback">
+      <p
+        v-if="!isMathLiveLoaded"
+        class="math-input-fallback"
+      >
         <bdi dir="ltr">
           <input
             type="text"
@@ -137,13 +145,17 @@ onBeforeUnmount(() => {
             :placeholder="placeholder || t('session.mathInput.enterLatex')"
             @input="emit('update:modelValue', ($event.target as HTMLInputElement).value)"
             @keydown.enter="emit('submit')"
-          />
+          >
         </bdi>
       </p>
     </div>
 
     <!-- Verbal explanation textarea (RTL for Arabic/Hebrew) -->
-    <div v-if="showVerbalInput" class="verbal-input-field" :dir="isRtl ? 'rtl' : 'ltr'">
+    <div
+      v-if="showVerbalInput"
+      class="verbal-input-field"
+      :dir="isRtl ? 'rtl' : 'ltr'"
+    >
       <label class="verbal-input-label">
         {{ verbalPlaceholder || t('session.mathInput.verbalExplanation') }}
       </label>
@@ -156,7 +168,10 @@ onBeforeUnmount(() => {
         :aria-label="t('session.mathInput.verbalExplanation')"
         rows="3"
       />
-      <span class="verbal-char-count" :class="{ 'verbal-char-limit': localVerbal.length >= verbalMaxLength }">
+      <span
+        class="verbal-char-count"
+        :class="{ 'verbal-char-limit': localVerbal.length >= verbalMaxLength }"
+      >
         {{ localVerbal.length }}/{{ verbalMaxLength }}
       </span>
     </div>

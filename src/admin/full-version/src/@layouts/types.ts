@@ -27,7 +27,7 @@ export interface LayoutConfig {
     contentLayoutNav: typeof AppContentLayoutNav[keyof typeof AppContentLayoutNav]
     overlayNavFromBreakpoint: number
 
-    // isRTL: boolean
+    isRTL: boolean
     i18n: {
       enable: boolean
     }

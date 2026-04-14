@@ -33,9 +33,9 @@ const selectedSkill = ref<string | null>(null)
 
 const skillMap = computed(() => {
   const map = new Map<string, SkillNode>()
-  for (const skill of props.skills) {
+  for (const skill of props.skills)
     map.set(skill.id, skill)
-  }
+
   return map
 })
 
@@ -70,26 +70,35 @@ function selectSkill(skillId: string) {
 }
 
 const selectedSkillDetail = computed(() => {
-  if (!selectedSkill.value) return null
+  if (!selectedSkill.value)
+    return null
+
   return skillMap.value.get(selectedSkill.value) ?? null
 })
 </script>
 
 <template>
-  <div class="mastery-map" role="region" :aria-label="t('mastery.map.label', 'Mastery Map')">
+  <div
+    class="mastery-map"
+    role="region"
+    :aria-label="t('mastery.map.label', 'Mastery Map')"
+  >
     <h2 class="mastery-map__title">
       {{ t('mastery.map.title', 'Your Learning Map') }}
       <span class="mastery-map__track">{{ trackCode }}</span>
     </h2>
 
-    <div class="mastery-map__grid" role="list">
+    <div
+      class="mastery-map__grid"
+      role="list"
+    >
       <button
         v-for="skill in skills"
         :key="skill.id"
         class="mastery-map__node"
         :class="[
           `mastery-map__node--${skill.status}`,
-          { 'mastery-map__node--selected': selectedSkill === skill.id }
+          { 'mastery-map__node--selected': selectedSkill === skill.id },
         ]"
         :style="{ '--node-color': getStatusColor(skill.status) }"
         :aria-label="`${skill.name}: ${getMasteryPercent(skill)} ${getStatusLabel(skill.status)}`"
@@ -99,7 +108,10 @@ const selectedSkillDetail = computed(() => {
         @click="selectSkill(skill.id)"
       >
         <div class="mastery-map__node-ring">
-          <svg viewBox="0 0 36 36" class="mastery-map__progress-ring">
+          <svg
+            viewBox="0 0 36 36"
+            class="mastery-map__progress-ring"
+          >
             <path
               class="mastery-map__progress-bg"
               d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -121,7 +133,10 @@ const selectedSkillDetail = computed(() => {
           <span class="mastery-map__percent">{{ getMasteryPercent(skill) }}</span>
         </div>
         <span class="mastery-map__node-name">{{ skill.name }}</span>
-        <span class="mastery-map__node-status" :style="{ color: getStatusColor(skill.status) }">
+        <span
+          class="mastery-map__node-status"
+          :style="{ color: getStatusColor(skill.status) }"
+        >
           {{ getStatusLabel(skill.status) }}
         </span>
       </button>
@@ -165,7 +180,10 @@ const selectedSkillDetail = computed(() => {
           </template>
         </dl>
 
-        <div v-if="selectedSkillDetail.needsRefresh" class="mastery-map__refresh-banner">
+        <div
+          v-if="selectedSkillDetail.needsRefresh"
+          class="mastery-map__refresh-banner"
+        >
           {{ t('mastery.refresh', 'This skill has decayed. A quick review will restore it.') }}
         </div>
       </div>

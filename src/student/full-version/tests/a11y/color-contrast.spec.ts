@@ -11,6 +11,7 @@
  * Task: t_89e7d3c33286
  */
 import { describe, expect, it } from 'vitest'
+
 // Direct relative import — bypasses the global setup.ts which loads
 // every Vuetify component (slow + causes jsdom timeout in CI).
 import {
@@ -25,9 +26,9 @@ import {
  * @see https://www.w3.org/TR/WCAG22/#dfn-relative-luminance
  */
 function relativeLuminance(hex: string): number {
-  const r = parseInt(hex.slice(1, 3), 16) / 255
-  const g = parseInt(hex.slice(3, 5), 16) / 255
-  const b = parseInt(hex.slice(5, 7), 16) / 255
+  const r = Number.parseInt(hex.slice(1, 3), 16) / 255
+  const g = Number.parseInt(hex.slice(3, 5), 16) / 255
+  const b = Number.parseInt(hex.slice(5, 7), 16) / 255
 
   const [rs, gs, bs] = [r, g, b].map(c =>
     c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4,
@@ -72,6 +73,7 @@ describe('WCAG 2.2 AA color-contrast compliance (FIND-ux-019)', () => {
       const ratio = contrastRatio(primaryTextLight, LIGHT_SURFACE)
 
       expect(ratio).toBeGreaterThanOrEqual(AA_NORMAL_TEXT)
+
       // Log for CI visibility
       console.log(
         `[a11y] primary-text light (${primaryTextLight}) on ${LIGHT_SURFACE}: ${ratio.toFixed(2)}:1`,

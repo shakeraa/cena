@@ -116,6 +116,7 @@ describe('sanitizeLocale', () => {
 
   it('logs a warning when Hebrew is blocked', () => {
     vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
     sanitizeLocale('he')

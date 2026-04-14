@@ -181,8 +181,11 @@ export const useLayoutConfigStore = defineStore('layoutConfig', () => {
   })
 
   // 👉 RTL
-  // const isAppRTL = ref(layoutConfig.app.isRTL)
-  const isAppRTL = ref(false)
+  // RDY-002: RTL was hard-disabled here as a stop-gap while some student
+  // surfaces still had LTR-only assumptions. Keep the admin shell in sync
+  // with the real config default again now that direction is driven by the
+  // active locale instead of a permanent false override.
+  const isAppRTL = ref(layoutConfig.app.isRTL)
 
   watch(isAppRTL, val => {
     _setDirAttr(val ? 'rtl' : 'ltr')

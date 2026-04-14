@@ -26,6 +26,7 @@ test.describe.serial('STU-W-12 social pages', () => {
     await page.waitForSelector('[data-testid="social-feed-page"]')
 
     await expect(page.locator('[data-testid="feed-item-f1"]')).toBeVisible()
+
     const items = await page.locator('[data-testid^="feed-item-f"]').count()
 
     expect(items).toBe(8)

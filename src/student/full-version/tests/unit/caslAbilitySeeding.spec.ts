@@ -32,6 +32,7 @@ describe('FIND-ux-020: CASL ability seeding', () => {
 
     // After sign-in, manage-all should be granted
     expect(ability.can('manage', 'all')).toBe(true)
+
     // manage-all implies read on any subject
     expect(ability.can('read', 'Home')).toBe(true)
     expect(ability.can('read', 'Session')).toBe(true)
@@ -56,6 +57,7 @@ describe('FIND-ux-020: CASL ability seeding', () => {
 
     // The cookie should contain the encoded ability rules
     const cookies = document.cookie
+
     expect(cookies).toContain('userAbilityRules')
   })
 
@@ -66,6 +68,7 @@ describe('FIND-ux-020: CASL ability seeding', () => {
     expect(document.cookie).toContain('userAbilityRules')
 
     store.__signOut()
+
     // After sign-out, the cookie should be expired (max-age=-1)
     // jsdom may or may not fully honor max-age, but the write happened
     // We verify the ability object is cleared as the authoritative check

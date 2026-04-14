@@ -8,6 +8,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
 const emit = defineEmits<{
   markRead: [id: string]
 }>()
@@ -34,9 +35,12 @@ const relativeTime = computed(() => {
   const diffHour = Math.floor(diffMin / 60)
   const diffDay = Math.floor(diffHour / 24)
 
-  if (diffMin < 1) return t('notifications.justNow')
-  if (diffMin < 60) return t('notifications.minutesAgo', diffMin, { count: diffMin })
-  if (diffHour < 24) return t('notifications.hoursAgo', diffHour, { count: diffHour })
+  if (diffMin < 1)
+    return t('notifications.justNow')
+  if (diffMin < 60)
+    return t('notifications.minutesAgo', diffMin, { count: diffMin })
+  if (diffHour < 24)
+    return t('notifications.hoursAgo', diffHour, { count: diffHour })
 
   return t('notifications.daysAgo', diffDay, { count: diffDay })
 })

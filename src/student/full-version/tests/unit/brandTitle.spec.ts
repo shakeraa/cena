@@ -9,7 +9,7 @@
  * i18n, and sets document.title to "{localized} · Cena".
  */
 
-import { describe, expect, it, beforeEach, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createI18n } from 'vue-i18n'
 import { createRouter, createWebHistory } from 'vue-router'
@@ -62,12 +62,14 @@ function makeI18n() {
 describe('brand title (FIND-ux-008)', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
+
     // Reset document.title before each test
     document.title = 'Cena'
   })
 
   it('sets document.title to "{localized} · Cena" for routes with meta.title', async () => {
     const i18n = makeI18n()
+
     const router = createRouter({
       history: createWebHistory(),
       routes: testRoutes,
@@ -88,6 +90,7 @@ describe('brand title (FIND-ux-008)', () => {
 
   it('updates document.title on route change', async () => {
     const i18n = makeI18n()
+
     const router = createRouter({
       history: createWebHistory(),
       routes: testRoutes,
@@ -109,6 +112,7 @@ describe('brand title (FIND-ux-008)', () => {
 
   it('falls back to "Cena" when route has no meta.title', async () => {
     const i18n = makeI18n()
+
     const router = createRouter({
       history: createWebHistory(),
       routes: testRoutes,
@@ -161,6 +165,7 @@ describe('brand title (FIND-ux-008)', () => {
     router.beforeEach(() => true)
 
     const initialTitle = document.title
+
     await router.push('/')
     await router.isReady()
 

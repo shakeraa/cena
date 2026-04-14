@@ -38,12 +38,12 @@ const emailInput = ref(props.parentEmail)
 const consentChecked = ref(props.consentGiven)
 const emailError = ref('')
 
-watch(() => props.parentEmail, (val) => {
+watch(() => props.parentEmail, val => {
   if (val !== emailInput.value)
     emailInput.value = val
 })
 
-watch(() => props.consentGiven, (val) => {
+watch(() => props.consentGiven, val => {
   if (val !== consentChecked.value)
     consentChecked.value = val
 })
@@ -55,12 +55,14 @@ function handleEmailChange(val: string) {
   if (!val.trim()) {
     emailError.value = t('auth.parentConsent.emailRequired')
     emit('update:parentEmail', '')
+
     return
   }
 
   if (!/^[^\s@]+@[^\s@][^\s.@]*\.[^\s@]+$/.test(val.trim())) {
     emailError.value = t('auth.parentConsent.emailInvalid')
     emit('update:parentEmail', '')
+
     return
   }
 

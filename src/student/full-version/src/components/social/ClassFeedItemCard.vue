@@ -8,6 +8,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
 const emit = defineEmits<{
   react: [itemId: string]
   report: [contentId: string, contentType: 'feed-item']

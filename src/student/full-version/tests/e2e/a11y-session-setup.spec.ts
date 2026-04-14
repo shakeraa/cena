@@ -74,6 +74,7 @@ test.describe('FIND-ux-030: a11y session-setup subject chips', () => {
     await page.keyboard.press('Tab')
 
     const physicsChip = page.getByTestId('setup-subject-physics')
+
     const activeTestId = await page.evaluate(() =>
       document.activeElement?.getAttribute('data-testid'),
     )

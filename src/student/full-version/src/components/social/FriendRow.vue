@@ -7,9 +7,11 @@ interface Props {
 }
 
 defineProps<Props>()
+
 const emit = defineEmits<{
   block: [studentId: string, displayName: string]
 }>()
+
 const { t } = useI18n()
 </script>
 

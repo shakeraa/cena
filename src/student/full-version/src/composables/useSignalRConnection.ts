@@ -6,16 +6,22 @@ import type { HubConnection } from '@microsoft/signalr'
 export type ConnectionStatus = 'connected' | 'connecting' | 'reconnecting' | 'disconnected'
 
 export interface UseSignalRConnectionReturn {
+
   /** Current connection status */
   status: Ref<ConnectionStatus>
+
   /** Whether currently online (navigator.onLine) */
   isOnline: Ref<boolean>
+
   /** The raw HubConnection (for sending messages) */
   connection: ShallowRef<HubConnection | null>
+
   /** Start the connection */
   connect: (url: string) => Promise<void>
+
   /** Gracefully disconnect */
   disconnect: () => Promise<void>
+
   /** Number of reconnect attempts so far */
   reconnectAttempts: Ref<number>
 }

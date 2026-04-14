@@ -31,6 +31,7 @@ function readPersisted(): Partial<OnboardingState> | null {
     return null
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
+
     return raw ? JSON.parse(raw) : null
   }
   catch {
@@ -54,17 +55,20 @@ export const useOnboardingStore = defineStore('onboarding', () => {
 
   const step = ref<WizardStep>(persisted?.step ?? 'welcome')
   const role = ref<StudentRole | null>(persisted?.role ?? null)
+
   // FIND-pedagogy-010: sanitize persisted locale through the Hebrew gate
   // so a stale 'he' in localStorage doesn't survive a build-flag flip.
   const locale = ref<SupportedLocale>(
     sanitizeLocale((persisted?.locale as string) ?? 'en') as SupportedLocale,
   )
+
   const dailyTimeGoalMinutes = ref<number>(persisted?.dailyTimeGoalMinutes ?? DEFAULT_DAILY_GOAL)
   const subjects = ref<string[]>(persisted?.subjects ?? [])
   const completedAt = ref<string | null>(persisted?.completedAt ?? null)
 
   const stepIndex = computed(() => {
     const order: WizardStep[] = ['welcome', 'role', 'language', 'confirm']
+
     return order.indexOf(step.value)
   })
 

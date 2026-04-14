@@ -76,7 +76,7 @@ function cacheToStorage() {
 const { data: settingsData, loading: settingsLoading } = useApiQuery<SettingsDto>('/api/me/settings')
 
 // When server settings arrive, overwrite local state + cache
-watch(settingsData, (val) => {
+watch(settingsData, val => {
   if (val?.notifications) {
     Object.assign(prefs.value, val.notifications)
     cacheToStorage()
@@ -87,6 +87,7 @@ watch(settingsData, (val) => {
 const settingsMutation = useApiMutation<void, SettingsPatch>('/api/me/settings', 'PATCH')
 
 const saveError = ref(false)
+
 /** Tracks the pref key currently being saved, for optimistic revert. */
 let pendingSaveKey: keyof NotificationSettings | null = null
 

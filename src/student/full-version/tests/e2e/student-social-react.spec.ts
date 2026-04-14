@@ -28,7 +28,9 @@ test.describe.serial('FIND-ux-024 class-feed reaction toggle + error surface', (
 
     // Read the initial count from item f1 (should be 12)
     const reactBtn = page.locator('[data-testid="react-f1"]')
+
     await expect(reactBtn).toBeVisible()
+
     const initialText = await reactBtn.innerText()
     const initialCount = Number.parseInt(initialText.trim(), 10)
 
@@ -40,9 +42,11 @@ test.describe.serial('FIND-ux-024 class-feed reaction toggle + error surface', (
 
     // After refresh the feed re-renders; re-locate
     const afterFirst = page.locator('[data-testid="react-f1"]')
+
     await expect.poll(
       async () => {
         const text = await afterFirst.innerText()
+
         return Number.parseInt(text.trim(), 10)
       },
       { timeout: 5000 },
@@ -53,9 +57,11 @@ test.describe.serial('FIND-ux-024 class-feed reaction toggle + error surface', (
     await page.waitForTimeout(500)
 
     const afterSecond = page.locator('[data-testid="react-f1"]')
+
     await expect.poll(
       async () => {
         const text = await afterSecond.innerText()
+
         return Number.parseInt(text.trim(), 10)
       },
       { timeout: 5000 },
@@ -81,6 +87,7 @@ test.describe.serial('FIND-ux-024 class-feed reaction toggle + error surface', (
     await page.waitForSelector('[data-testid="peers-page"]')
 
     const upvoteBtn = page.locator('[data-testid="upvote-sol-1"]')
+
     await expect(upvoteBtn).toBeVisible()
 
     // Read initial count
@@ -92,9 +99,11 @@ test.describe.serial('FIND-ux-024 class-feed reaction toggle + error surface', (
     await page.waitForTimeout(500)
 
     const afterUpvote = page.locator('[data-testid="upvote-sol-1"]')
+
     await expect.poll(
       async () => {
         const text = await afterUpvote.innerText()
+
         return Number.parseInt(text.trim(), 10)
       },
       { timeout: 5000 },

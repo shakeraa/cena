@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiQuery } from '@/composables/useApiQuery'
 import { useApiMutation } from '@/composables/useApiMutation'
@@ -82,10 +82,12 @@ async function handleExport() {
   exportSuccess.value = false
   try {
     const result = await exportMutation.execute({} as never)
+
     // Trigger download
     const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
+
     a.href = url
     a.download = `cena-data-export-${new Date().toISOString().slice(0, 10)}.json`
     document.body.appendChild(a)
@@ -119,6 +121,7 @@ async function handleErasure() {
     await erasureMutation.execute({} as never)
     erasureSuccess.value = true
     showErasureDialog.value = false
+
     // Refresh erasure status
     await erasureStatus.refresh()
   }
@@ -138,12 +141,14 @@ const dsarMutation = useApiMutation<{
 }>('/api/me/dsar', 'POST')
 
 async function handleDsar() {
-  if (!dsarMessage.value.trim()) return
+  if (!dsarMessage.value.trim())
+    return
   dsarLoading.value = true
   dsarError.value = null
   dsarSuccess.value = false
   try {
     const result = await dsarMutation.execute({ message: dsarMessage.value } as never)
+
     dsarTrackingId.value = result.trackingId
     dsarSuccess.value = true
     dsarMessage.value = ''

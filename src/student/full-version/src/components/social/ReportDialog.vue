@@ -5,10 +5,10 @@
  * Opens when a student clicks "Report" on any social UGC surface.
  * Submits to POST /api/social/report.
  */
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { $api } from '@/api/$api'
-import type { ReportContentType, ReportCategory, SubmitReportResponse } from '@/api/types/common'
+import type { ReportCategory, ReportContentType, SubmitReportResponse } from '@/api/types/common'
 
 interface Props {
   modelValue: boolean
@@ -17,6 +17,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
   reported: [response: SubmitReportResponse]
@@ -34,6 +35,7 @@ const canSubmit = computed(() => selectedCategory.value !== null && !submitting.
 
 function close() {
   emit('update:modelValue', false)
+
   // Reset form state after close
   selectedCategory.value = null
   reasonText.value = ''

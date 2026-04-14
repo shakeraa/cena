@@ -134,6 +134,7 @@ describe('onboardingStore', () => {
   // Hebrew is disabled.
   it('setLocale("he") falls back to en when Hebrew is disabled', () => {
     vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+
     const store = useOnboardingStore()
 
     store.setLocale('he')
@@ -145,6 +146,7 @@ describe('onboardingStore', () => {
   // blocked, but belt-and-suspenders).
   it('canAdvance is true on language step when locale is valid (en)', () => {
     vi.stubEnv('VITE_ENABLE_HEBREW', 'false')
+
     const store = useOnboardingStore()
 
     store.next() // welcome -> role

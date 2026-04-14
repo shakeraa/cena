@@ -10,9 +10,9 @@
  * Does NOT mount the Vue component (avoids the full Vuetify + router
  * plugin chain). Uses only node:fs for source-level assertions.
  */
-import { beforeEach, describe, expect, it } from 'vitest'
 import * as fs from 'node:fs'
 import * as path from 'node:path'
+import { beforeEach, describe, expect, it } from 'vitest'
 
 const NOTIF_VUE_PATH = path.resolve(__dirname, '../../src/pages/settings/notifications.vue')
 const MSW_HANDLER_PATH = path.resolve(__dirname, '../../src/plugins/fake-api/handlers/student-me/index.ts')
@@ -33,11 +33,12 @@ describe('FIND-ux-032: notification settings persistence', () => {
 
   it('notifications.vue imports useApiMutation for PATCH /api/me/settings', () => {
     expect(notifSrc).toContain('useApiMutation')
-    expect(notifSrc).toContain("'/api/me/settings', 'PATCH'")
+    expect(notifSrc).toContain('\'/api/me/settings\', \'PATCH\'')
   })
 
   it('notifications.vue calls persistToggle on toggle change, not bare persist()', () => {
     expect(notifSrc).toContain('persistToggle')
+
     // The old localStorage-only pattern was a standalone `function persist()` that
     // only wrote to localStorage. The new pattern has `cacheToStorage` (cache) and
     // `persistToggle` (API call + cache). Ensure the old-style is gone.
@@ -47,7 +48,7 @@ describe('FIND-ux-032: notification settings persistence', () => {
   it('notifications.vue shows error snackbar on save failure', () => {
     expect(notifSrc).toContain('saveError')
     expect(notifSrc).toContain('notif-save-error-snackbar')
-    expect(notifSrc).toContain("t('settingsPage.notifications.saveError')")
+    expect(notifSrc).toContain('t(\'settingsPage.notifications.saveError\')')
   })
 
   it('notifications.vue emits structured log on error path for re-regression detection', () => {
@@ -61,11 +62,11 @@ describe('FIND-ux-032: notification settings persistence', () => {
   })
 
   it('MSW student-me handler includes GET /api/me/settings', () => {
-    expect(mswSrc).toContain("http.get('/api/me/settings'")
+    expect(mswSrc).toContain('http.get(\'/api/me/settings\'')
   })
 
   it('MSW student-me handler includes PATCH /api/me/settings', () => {
-    expect(mswSrc).toContain("http.patch('/api/me/settings'")
+    expect(mswSrc).toContain('http.patch(\'/api/me/settings\'')
   })
 
   it('MSW student-me handler returns 204 for PATCH (not 200 with body)', () => {

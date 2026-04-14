@@ -140,9 +140,8 @@ export const handlerStudentMe = [
     const patch = await request.json() as Record<string, Record<string, unknown>>
 
     for (const [section, values] of Object.entries(patch)) {
-      if (settingsStore[section] && typeof values === 'object' && values !== null) {
+      if (settingsStore[section] && typeof values === 'object' && values !== null)
         Object.assign(settingsStore[section] as Record<string, unknown>, values)
-      }
     }
 
     return new HttpResponse(null, { status: 204 })

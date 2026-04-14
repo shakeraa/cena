@@ -13,11 +13,11 @@
 
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { validateDateOfBirth, evaluateAgeGate } from '@/composables/useAgeGate'
+import { evaluateAgeGate, validateDateOfBirth } from '@/composables/useAgeGate'
 import type { AgeGateResult } from '@/composables/useAgeGate'
 
 interface Props {
-  modelValue: string | null  // ISO date string YYYY-MM-DD or null
+  modelValue: string | null // ISO date string YYYY-MM-DD or null
 }
 
 const props = defineProps<Props>()
@@ -35,14 +35,16 @@ const ageResult = ref<AgeGateResult | null>(null)
 
 // Date constraints for the picker
 const today = new Date()
+
 const maxDate = new Date(today.getFullYear() - 4, today.getMonth(), today.getDate())
   .toISOString()
   .split('T')[0]
+
 const minDate = new Date(today.getFullYear() - 120, 0, 1)
   .toISOString()
   .split('T')[0]
 
-watch(() => props.modelValue, (val) => {
+watch(() => props.modelValue, val => {
   if (val !== dobInput.value)
     dobInput.value = val ?? ''
 })
@@ -50,6 +52,7 @@ watch(() => props.modelValue, (val) => {
 const formattedAge = computed(() => {
   if (!ageResult.value)
     return ''
+
   return ageResult.value.age.toString()
 })
 
@@ -63,11 +66,13 @@ function handleDateChange(val: string) {
     dobError.value = t(validationError)
     emit('update:modelValue', null)
     emit('age-evaluated', null)
+
     return
   }
 
   const parsed = new Date(val)
   const result = evaluateAgeGate(parsed)
+
   ageResult.value = result
 
   emit('update:modelValue', val)

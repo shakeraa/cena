@@ -7,6 +7,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
 const emit = defineEmits<{
   'update:modelValue': [value: StudentRole]
 }>()

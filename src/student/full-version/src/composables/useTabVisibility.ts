@@ -1,4 +1,4 @@
-import { ref, onMounted, onBeforeUnmount } from 'vue'
+import { onBeforeUnmount, onMounted, ref } from 'vue'
 import type { Ref } from 'vue'
 
 export interface UseTabVisibilityReturn {
@@ -14,12 +14,11 @@ export function useTabVisibility(): UseTabVisibilityReturn {
 
   function handleVisibilityChange() {
     isVisible.value = !document.hidden
-    if (document.hidden) {
+    if (document.hidden)
       lastHiddenAt.value = new Date()
-    }
-    else if (lastHiddenAt.value) {
+
+    else if (lastHiddenAt.value)
       hiddenDurationMs.value = Date.now() - lastHiddenAt.value.getTime()
-    }
   }
 
   onMounted(() => {

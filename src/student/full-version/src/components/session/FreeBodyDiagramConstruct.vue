@@ -11,7 +11,7 @@
  * Mouse: click-to-place + drag-to-set-direction.
  */
 
-import { ref, computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 
 interface PlacedForce {
@@ -64,7 +64,8 @@ function selectForce(template: ForceTemplate) {
 }
 
 function handleSvgClick(event: MouseEvent | TouchEvent) {
-  if (!selectedTemplate.value || !svgRef.value) return
+  if (!selectedTemplate.value || !svgRef.value)
+    return
 
   const svg = svgRef.value
   const pt = svg.createSVGPoint()
@@ -74,6 +75,7 @@ function handleSvgClick(event: MouseEvent | TouchEvent) {
 
   pt.x = clientX
   pt.y = clientY
+
   const svgPt = pt.matrixTransform(svg.getScreenCTM()!.inverse())
 
   // Snap to body center
@@ -98,16 +100,19 @@ function removeForce(id: string) {
 
 function updateForceAngle(id: string, angleDeg: number) {
   const force = placedForces.value.find(f => f.id === id)
-  if (force) force.angleDeg = angleDeg
+  if (force)
+    force.angleDeg = angleDeg
 }
 
 function updateForceMagnitude(id: string, magnitude: number) {
   const force = placedForces.value.find(f => f.id === id)
-  if (force) force.magnitude = magnitude
+  if (force)
+    force.magnitude = magnitude
 }
 
 async function submitForVerification() {
-  if (isVerifying.value) return
+  if (isVerifying.value)
+    return
   isVerifying.value = true
 
   try {
@@ -125,6 +130,7 @@ async function submitForVerification() {
     })
 
     const result = await response.json()
+
     feedback.value = {
       correct: result.isCorrect,
       message: result.isCorrect
@@ -133,12 +139,14 @@ async function submitForVerification() {
     }
 
     emit('verified', result.isCorrect, result.feedback || '')
-  } catch {
+  }
+  catch {
     feedback.value = {
       correct: false,
       message: t('session.fbd.verificationError'),
     }
-  } finally {
+  }
+  finally {
     isVerifying.value = false
   }
 }
@@ -147,9 +155,17 @@ const arrowLength = 60
 </script>
 
 <template>
-  <div class="fbd-construct" role="application" :aria-label="ariaLabel">
+  <div
+    class="fbd-construct"
+    role="application"
+    :aria-label="ariaLabel"
+  >
     <!-- Force palette -->
-    <div class="fbd-palette" role="toolbar" :aria-label="t('session.fbd.forceToolbar')">
+    <div
+      class="fbd-palette"
+      role="toolbar"
+      :aria-label="t('session.fbd.forceToolbar')"
+    >
       <button
         v-for="tmpl in forceTemplates"
         :key="tmpl.label"
@@ -159,7 +175,10 @@ const arrowLength = 60
         :aria-label="t('session.fbd.selectForce', { label: tmpl.label })"
         @click="selectForce(tmpl)"
       >
-        <span class="fbd-force-icon" :style="{ color: tmpl.color }">→</span>
+        <span
+          class="fbd-force-icon"
+          :style="{ color: tmpl.color }"
+        >→</span>
         {{ tmpl.label }}
       </button>
     </div>
@@ -176,7 +195,11 @@ const arrowLength = 60
       <g v-html="sceneSvg" />
 
       <!-- Placed force arrows -->
-      <g v-for="force in placedForces" :key="force.id" class="fbd-placed-force">
+      <g
+        v-for="force in placedForces"
+        :key="force.id"
+        class="fbd-placed-force"
+      >
         <line
           :x1="force.x"
           :y1="force.y"
@@ -198,28 +221,61 @@ const arrowLength = 60
       </g>
 
       <defs>
-        <marker id="arrowhead" viewBox="0 0 10 10" refX="10" refY="5"
-          markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor" />
+        <marker
+          id="arrowhead"
+          viewBox="0 0 10 10"
+          refX="10"
+          refY="5"
+          markerWidth="8"
+          markerHeight="8"
+          orient="auto-start-reverse"
+        >
+          <path
+            d="M 0 0 L 10 5 L 0 10 z"
+            fill="currentColor"
+          />
         </marker>
       </defs>
     </svg>
 
     <!-- Placed forces list (for editing magnitude/angle) -->
-    <div v-if="placedForces.length > 0" class="fbd-placed-list">
-      <div v-for="force in placedForces" :key="force.id" class="fbd-placed-item">
+    <div
+      v-if="placedForces.length > 0"
+      class="fbd-placed-list"
+    >
+      <div
+        v-for="force in placedForces"
+        :key="force.id"
+        class="fbd-placed-item"
+      >
         <span :style="{ color: force.color }">{{ force.label }}</span>
         <label>
           {{ t('session.fbd.magnitude') }}:
-          <input type="number" :value="force.magnitude" min="0" step="0.5"
-            @input="updateForceMagnitude(force.id, +($event.target as HTMLInputElement).value)" />
+          <input
+            type="number"
+            :value="force.magnitude"
+            min="0"
+            step="0.5"
+            @input="updateForceMagnitude(force.id, +($event.target as HTMLInputElement).value)"
+          >
         </label>
         <label>
           {{ t('session.fbd.angle') }}:
-          <input type="number" :value="force.angleDeg" min="0" max="360" step="5"
-            @input="updateForceAngle(force.id, +($event.target as HTMLInputElement).value)" />°
+          <input
+            type="number"
+            :value="force.angleDeg"
+            min="0"
+            max="360"
+            step="5"
+            @input="updateForceAngle(force.id, +($event.target as HTMLInputElement).value)"
+          >°
         </label>
-        <button @click="removeForce(force.id)" :aria-label="t('session.fbd.removeForce', { label: force.label })">✕</button>
+        <button
+          :aria-label="t('session.fbd.removeForce', { label: force.label })"
+          @click="removeForce(force.id)"
+        >
+          ✕
+        </button>
       </div>
     </div>
 
@@ -234,8 +290,11 @@ const arrowLength = 60
       </button>
     </div>
 
-    <div v-if="feedback" class="fbd-feedback"
-      :class="feedback.correct ? 'fbd-feedback--correct' : 'fbd-feedback--incorrect'">
+    <div
+      v-if="feedback"
+      class="fbd-feedback"
+      :class="feedback.correct ? 'fbd-feedback--correct' : 'fbd-feedback--incorrect'"
+    >
       {{ feedback.message }}
     </div>
   </div>

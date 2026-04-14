@@ -13,7 +13,7 @@
  * Minimal (no guidance). Driven by BKT mastery.
  */
 
-import { ref, computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StepInput from './StepInput.vue'
 
@@ -62,6 +62,7 @@ const allStepsComplete = computed(() => {
 const progressPercent = computed(() => {
   const total = props.question.steps.length
   const done = Object.values(stepResults.value).filter(r => r.correct).length
+
   return Math.round((done / total) * 100)
 })
 
@@ -72,15 +73,19 @@ function handleStepVerified(stepNumber: number, isCorrect: boolean, expression: 
   if (isCorrect && stepNumber === currentStep.value) {
     if (currentStep.value < props.question.steps.length) {
       currentStep.value++
-    } else {
-      emit('all-steps-complete', props.question.finalAnswer)
     }
+    else
+      emit('all-steps-complete', props.question.finalAnswer)
   }
 }
 </script>
 
 <template>
-  <div class="step-solver-card" role="region" :aria-label="t('session.stepSolver.title')">
+  <div
+    class="step-solver-card"
+    role="region"
+    :aria-label="t('session.stepSolver.title')"
+  >
     <!-- Question stem -->
     <div class="step-solver-stem">
       <bdi dir="ltr">
@@ -89,11 +94,17 @@ function handleStepVerified(stepNumber: number, isCorrect: boolean, expression: 
     </div>
 
     <!-- Progress bar -->
-    <div class="step-solver-progress" role="progressbar"
+    <div
+      class="step-solver-progress"
+      role="progressbar"
       :aria-valuenow="progressPercent"
       :aria-valuemin="0"
-      :aria-valuemax="100">
-      <div class="step-solver-progress-fill" :style="{ width: `${progressPercent}%` }" />
+      :aria-valuemax="100"
+    >
+      <div
+        class="step-solver-progress-fill"
+        :style="{ width: `${progressPercent}%` }"
+      />
       <span class="step-solver-progress-label">
         {{ t('session.stepSolver.progress', { done: Object.values(stepResults).filter(r => r.correct).length, total: question.steps.length }) }}
       </span>
@@ -125,7 +136,10 @@ function handleStepVerified(stepNumber: number, isCorrect: boolean, expression: 
     </div>
 
     <!-- Completion -->
-    <div v-if="allStepsComplete" class="step-solver-complete">
+    <div
+      v-if="allStepsComplete"
+      class="step-solver-complete"
+    >
       <p>{{ t('session.stepSolver.allCorrect') }}</p>
     </div>
   </div>

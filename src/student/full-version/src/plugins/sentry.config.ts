@@ -87,6 +87,7 @@ export function scrubEvent(event: SentryEvent): SentryEvent | null {
     if (event.request.url) {
       try {
         const url = new URL(event.request.url)
+
         url.search = ''
         event.request.url = url.toString()
       }
@@ -97,6 +98,7 @@ export function scrubEvent(event: SentryEvent): SentryEvent | null {
     }
     if (event.request.headers) {
       const traceId = event.request.headers['sentry-trace'] || event.request.headers['traceparent']
+
       event.request.headers = {}
       if (traceId)
         event.request.headers['sentry-trace'] = traceId
@@ -105,15 +107,17 @@ export function scrubEvent(event: SentryEvent): SentryEvent | null {
 
   // --- Breadcrumbs: strip any that reference localStorage ---
   if (event.breadcrumbs) {
-    event.breadcrumbs = event.breadcrumbs.map((bc) => {
+    event.breadcrumbs = event.breadcrumbs.map(bc => {
       if (bc.data) {
         const cleaned = { ...bc.data }
         for (const key of Object.keys(cleaned)) {
           if (typeof cleaned[key] === 'string' && (cleaned[key] as string).includes('localStorage'))
             cleaned[key] = '[redacted:localStorage]'
         }
+
         return { ...bc, data: cleaned }
       }
+
       return bc
     })
   }
