@@ -179,6 +179,58 @@ public sealed class HttpCircuitBreakerHealthCheck : IHealthCheck
 }
 
 /// <summary>
+/// RDY-017: Checks NATS DLQ stream depth.
+/// Reports degraded if DLQ has unprocessed events above threshold.
+/// </summary>
+public sealed class NatsDlqHealthCheck : IHealthCheck
+{
+    private readonly Marten.IDocumentStore _store;
+    private readonly ILogger<NatsDlqHealthCheck> _logger;
+    private const int AlertThreshold = 50;
+
+    public NatsDlqHealthCheck(Marten.IDocumentStore store, ILogger<NatsDlqHealthCheck> logger)
+    {
+        _store = store;
+        _logger = logger;
+    }
+
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var session = _store.QuerySession();
+            // Query DLQ count via raw SQL — Infrastructure cannot reference Actors
+            var conn = session.Connection;
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM mt_doc_natsoutboxdeadletter";
+            cmd.CommandTimeout = 3;
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            var dlqCount = Convert.ToInt32(result ?? 0);
+
+            if (dlqCount >= AlertThreshold)
+            {
+                _logger.LogWarning("[DLQ] Health check: {Count} dead-lettered events (threshold={Threshold})",
+                    dlqCount, AlertThreshold);
+                return HealthCheckResult.Degraded(
+                    $"DLQ depth {dlqCount} exceeds threshold {AlertThreshold}",
+                    data: new Dictionary<string, object> { ["dlq_depth"] = dlqCount });
+            }
+
+            return HealthCheckResult.Healthy(
+                $"DLQ depth: {dlqCount}",
+                data: new Dictionary<string, object> { ["dlq_depth"] = dlqCount });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[DLQ] Health check query failed");
+            return HealthCheckResult.Degraded("DLQ depth check failed", ex);
+        }
+    }
+}
+
+/// <summary>
 /// RDY-011: Extension methods to register dependency health checks.
 /// </summary>
 public static class HealthCheckRegistration
@@ -193,7 +245,8 @@ public static class HealthCheckRegistration
             .AddCheck<PostgresHealthCheck>("postgresql", HealthStatus.Unhealthy, new[] { "ready", "db" })
             .AddCheck<RedisHealthCheck>("redis", HealthStatus.Unhealthy, new[] { "ready", "cache" })
             .AddCheck<NatsHealthCheck>("nats", HealthStatus.Degraded, new[] { "ready", "messaging" })
-            .AddCheck<HttpCircuitBreakerHealthCheck>("http-circuit-breakers", HealthStatus.Degraded, new[] { "ready", "external" });
+            .AddCheck<HttpCircuitBreakerHealthCheck>("http-circuit-breakers", HealthStatus.Degraded, new[] { "ready", "external" })
+            .AddCheck<NatsDlqHealthCheck>("nats-dlq", HealthStatus.Degraded, new[] { "ready", "messaging" });
     }
 
     /// <summary>
