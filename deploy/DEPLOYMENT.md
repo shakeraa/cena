@@ -2,6 +2,31 @@
 
 Zero-to-running-cluster procedure for staging and production.
 
+## Known Blockers (DO NOT DEPLOY UNTIL RESOLVED)
+
+### 1. Actor Host cluster provider (RDY-025b)
+
+`Cena.Actors.Host/Program.cs:334-338` explicitly throws when `Cluster:Provider=kubernetes`
+because the `Proto.Cluster.Kubernetes` NuGet package is not yet installed. The existing
+`Cena.Actors.Host.csproj` only references `Proto.Cluster.TestProvider` (dev-only).
+
+**Impact**: Actor Host pods will crashloop on startup in staging/production.
+
+**Fix path**:
+1. Add `<PackageReference Include="Proto.Cluster.Kubernetes" Version="1.8.0" />` to
+   `Cena.Actors.Host.csproj`
+2. In `Program.cs`, replace the `"kubernetes"` throw with:
+   ```csharp
+   "kubernetes" => new KubernetesProvider(new KubernetesProviderConfig { ... }),
+   ```
+3. Grant the pod service account RBAC to list/watch pods in its namespace
+4. Set `Cluster__Provider=kubernetes` env var on the Actor Host deployment
+5. Add to this chart's ConfigMap
+
+Tracked as **RDY-025b** — this Helm chart intentionally does NOT set
+`Cluster__Provider` so the error surfaces loudly rather than silently
+starting a single-pod cluster.
+
 ## Architecture
 
 Three hosts, deployed independently, talk via PostgreSQL (event store), Redis (cache), NATS (async bus):

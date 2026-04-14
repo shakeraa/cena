@@ -113,6 +113,13 @@ spec:
             {{- end }}
           resources:
             {{- toYaml .Values.admin.resources | nindent 12 }}
+          volumeMounts:
+            # RDY-025: ASP.NET Core needs writable /tmp even with readOnlyRootFilesystem
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
