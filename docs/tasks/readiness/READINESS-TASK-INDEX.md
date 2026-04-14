@@ -5,71 +5,74 @@
 
 ## Tier 0 — Ship-Blockers (blocks ALL deployment)
 
-| ID | Title | Effort (panel) | Effort (Rami) | Owner Personas | Status |
-|----|-------|----------------|---------------|----------------|--------|
-| [RDY-001](../../tasks/readiness/RDY-001-csam-moderation-failclosed.md) | CSAM Detection + Moderation Fail-Closed | 1 week | **2-3 weeks** | Ran, Dina | Pending |
-| [RDY-002](../../tasks/readiness/RDY-002-rtl-enable-regression.md) | Enable RTL + Visual Regression | 2-3 days | **5-7 days** | Tamar, Amjad, Lior | Pending |
-| [RDY-003](../../tasks/readiness/RDY-003-prerequisite-graph.md) | Populate Prerequisite Graph | 1-2 weeks | **2-3 weeks** | Amjad, Nadia, Yael | Pending |
-| [RDY-004](../../tasks/readiness/RDY-004-arabic-translations.md) | Arabic Translations (Top 200) | 4-6 weeks | **4-8 weeks** | Amjad | Pending |
-| [RDY-032](../../tasks/readiness/RDY-032-pilot-data-export.md) | Pilot Data Export Pipeline | — | **1 week** | Dina | Pending |
+| ID | Title | Effort (Rami) | Depends On | Status |
+|----|-------|---------------|------------|--------|
+| [RDY-001](../../tasks/readiness/done/RDY-001-csam-moderation-failclosed.md) | CSAM Detection + Moderation Fail-Closed | 2-3 weeks | — | **Done** |
+| [RDY-002](../../tasks/readiness/done/RDY-002-rtl-enable-regression.md) | Enable RTL + Visual Regression | 5-7 days | — | **Done** |
+| [RDY-003](../../tasks/readiness/done/RDY-003-prerequisite-graph.md) | Populate Prerequisite Graph | 2-3 weeks | — | **Done** |
+| [RDY-004](../../tasks/readiness/RDY-004-arabic-translations.md) | Arabic Translations (Top 200) | 4-8 weeks | RDY-027 | Pending |
+| [RDY-032](../../tasks/readiness/RDY-032-pilot-data-export.md) | Pilot Data Export Pipeline | 1 week | — | Pending |
 
 > **Rami additions**: RDY-032 (pilot data export) added as Tier 0 — it's a prerequisite for RDY-007, RDY-024, and RDY-028. All effort estimates revised upward per adversarial review.
 
 ## Tier 1 — Critical (blocks launch with real students)
 
-| ID | Title | Effort (panel) | Effort (Rami) | Owner Personas | Status |
-|----|-------|----------------|---------------|----------------|--------|
-| [RDY-005](../../tasks/readiness/RDY-005-legal-compliance-docs.md) | Legal Compliance Docs (expanded) | 4-8 weeks | **8-16 weeks** | Ran (legal) | Pending |
-| [RDY-006](../../tasks/readiness/RDY-006-ml-exclusion-tag.md) | ML Exclusion Tag + Runtime Enforcement | 2 days | 2 days | Ran | Pending |
-| [RDY-007](../../tasks/readiness/RDY-007-dif-analysis-pipeline.md) | DIF Analysis Pipeline | 2-3 weeks | **3-4 weeks** | Yael, Amjad | Pending |
-| [RDY-008](../../tasks/readiness/RDY-008-aggregate-decomposition-adr.md) | Aggregate Decomposition ADR | 3 days | 3 days + workshop | Dina, Oren | Pending |
-| [RDY-026](../../tasks/readiness/RDY-026-arabic-input-normalization.md) | Arabic Variable Input Normalization | 3-5 days | 3-5 days | Amjad | Pending |
-| [RDY-027](../../tasks/readiness/RDY-027-glossary-validation.md) | Math/Physics Glossary Curation & Validation | 2-3 weeks | 2-3 weeks | Amjad | Pending |
-| [RDY-033](../../tasks/readiness/RDY-033-error-pattern-matching.md) | Error Pattern Matching Infrastructure | — | **2-3 weeks** | Nadia | Pending |
+| ID | Title | Effort (Rami) | Depends On | Status |
+|----|-------|---------------|------------|--------|
+| [RDY-005](../../tasks/readiness/RDY-005-legal-compliance-docs.md) | Legal Compliance Docs (expanded) | 8-16 weeks | — | Pending |
+| [RDY-006](../../tasks/readiness/done/RDY-006-ml-exclusion-tag.md) | ML Exclusion Tag + Runtime Enforcement | 2 days | — | **Done** |
+| [RDY-007](../../tasks/readiness/done/RDY-007-dif-analysis-pipeline.md) | DIF Analysis Pipeline | 3-4 weeks | RDY-003 | **Done** |
+| [RDY-008](../../tasks/readiness/done/RDY-008-aggregate-decomposition-adr.md) | Aggregate Decomposition ADR | 3 days | — | **Done** |
+| [RDY-011](../../tasks/readiness/done/RDY-011-health-probes.md) | Health Probes Check Dependencies | 3-4 days | — | **Done** |
+| [RDY-012](../../tasks/readiness/done/RDY-012-http-circuit-breakers.md) | HTTP Client Circuit Breakers | 1 week | — | **Done** |
+| [RDY-026](../../tasks/readiness/RDY-026-arabic-input-normalization.md) | Arabic Variable Input Normalization | 3-5 days | — | In Progress |
+| [RDY-027](../../tasks/readiness/RDY-027-glossary-validation.md) | Math/Physics Glossary Curation | 2-3 weeks | — | Pending |
+| [RDY-033](../../tasks/readiness/RDY-033-error-pattern-matching.md) | Error Pattern Matching Infrastructure | 2-3 weeks | — | Pending |
 
 > **Rami additions**: RDY-033 (error pattern matching) is a prerequisite for RDY-014. RDY-005 effort doubled after legal cost analysis ($15-30K). RDY-007 is data-dependent — consider splitting into implementation + post-pilot calibration.
 
 ## Tier 2 — High (blocks quality, not launch)
 
-| ID | Title | Effort (panel) | Effort (Rami) | Owner Personas | Status |
-|----|-------|----------------|---------------|----------------|--------|
-| [RDY-009](../../tasks/readiness/RDY-009-openapi-swagger.md) | OpenAPI/Swagger | 2-3 days | 2-3 days | Oren | Pending |
-| [RDY-010](../../tasks/readiness/RDY-010-api-versioning.md) | REST API Versioning | 3-5 days | **5-7 days** | Oren | Pending |
-| [RDY-011](../../tasks/readiness/RDY-011-health-probes.md) | Health Probes Check Dependencies | 2 days | **3-4 days** | Dina | Pending |
-| [RDY-012](../../tasks/readiness/RDY-012-http-circuit-breakers.md) | HTTP Client Circuit Breakers | 1 week | 1 week | Dina | Pending |
-| [RDY-013](../../tasks/readiness/RDY-013-worked-examples-ui.md) | Worked Examples UI | 3-5 days | **1-2 weeks** | Nadia, Lior, Tamar | Pending |
-| [RDY-014](../../tasks/readiness/RDY-014-misconception-detection-pipeline.md) | Misconception Detection Pipeline | 1-2 weeks | **2-3 weeks** | Nadia | Pending |
-| [RDY-015](../../tasks/readiness/RDY-015-a11y-sweep.md) | A11y Sweep (2 sprints) | 3d + 1w | **2-3 weeks** | Tamar | Pending |
-| [RDY-016](../../tasks/readiness/RDY-016-celebration-flow-state.md) | Celebration + Flow State UX | 1 week | **2 weeks** | Lior | Pending |
-| [RDY-017](../../tasks/readiness/RDY-017-nats-dlq-tls.md) | NATS DLQ Stream + TLS | 1 week | 1 week | Dina | Pending |
-| [RDY-018](../../tasks/readiness/RDY-018-sympson-hetter-exposure.md) | Sympson-Hetter Full Implementation | 1-2 weeks | **2-3 weeks** | Yael | Pending |
-| [RDY-028](../../tasks/readiness/RDY-028-bagrut-calibration-baseline.md) | Bagrut Calibration Baseline | 2-3 weeks | 2-3 weeks | Amjad, Yael | Pending |
-| [RDY-029](../../tasks/readiness/RDY-029-security-hardening.md) | Security Hardening Bundle (12 sub-tasks) | 3-4 weeks | 3-4 weeks | Ran, Dina | Pending |
-| [RDY-030](../../tasks/readiness/RDY-030-a11y-test-automation.md) | A11y Test Automation | 3-5 days | 3-5 days | Tamar | Pending |
-| [RDY-034](../../tasks/readiness/RDY-034-flow-state-backend-api.md) | Flow State Backend API | — | **1-2 weeks** | Lior, Dina | Pending |
-
-> **Rami additions**: RDY-034 (flow state backend API) is a prerequisite for RDY-016. Multiple effort estimates revised upward.
+| ID | Title | Effort (Rami) | Depends On | Status |
+|----|-------|---------------|------------|--------|
+| [RDY-009](../../tasks/readiness/RDY-009-openapi-swagger.md) | OpenAPI/Swagger | 2-3 days | — | In Progress |
+| [RDY-010](../../tasks/readiness/RDY-010-api-versioning.md) | REST API Versioning | 5-7 days | RDY-009 | Pending |
+| [RDY-013](../../tasks/readiness/done/RDY-013-worked-examples-ui.md) | Worked Examples UI | 1-2 weeks | — | **Done** |
+| [RDY-014](../../tasks/readiness/done/RDY-014-misconception-detection-pipeline.md) | Misconception Detection Pipeline | 2-3 weeks | RDY-006, RDY-013 | **Done** (enhanced by RDY-033) |
+| [RDY-015](../../tasks/readiness/done/RDY-015-a11y-sweep.md) | A11y Sweep (2 sprints) | 2-3 weeks | RDY-002 | **Done** |
+| [RDY-016](../../tasks/readiness/done/RDY-016-celebration-flow-state.md) | Celebration + Flow State UX | 2 weeks | — | **Done** (enhanced by RDY-034) |
+| [RDY-017](../../tasks/readiness/done/RDY-017-nats-dlq-tls.md) | NATS DLQ Stream + TLS | 1 week | — | **Done** |
+| [RDY-018](../../tasks/readiness/done/RDY-018-sympson-hetter-exposure.md) | Sympson-Hetter Full Implementation | 2-3 weeks | RDY-003 | **Done** |
+| [RDY-028](../../tasks/readiness/RDY-028-bagrut-calibration-baseline.md) | Bagrut Calibration Baseline | 2-3 weeks | RDY-019, RDY-032 | Pending |
+| [RDY-029](../../tasks/readiness/RDY-029-security-hardening.md) | Security Hardening Bundle (12 sub-tasks) | 3-4 weeks | — | Pending |
+| [RDY-030](../../tasks/readiness/RDY-030-a11y-test-automation.md) | A11y Test Automation | 3-5 days | RDY-015 | Pending |
+| [RDY-034](../../tasks/readiness/RDY-034-flow-state-backend-api.md) | Flow State Backend API | 1-2 weeks | RDY-020 | Pending |
 
 ## Tier 3 — Medium (polish, calibration, DX)
 
-| ID | Title | Effort (panel) | Effort (Rami) | Owner Personas | Status |
-|----|-------|----------------|---------------|----------------|--------|
-| [RDY-019](../../tasks/readiness/RDY-019-bagrut-corpus-ingestion.md) | Bagrut Corpus Ingestion + Taxonomy | 3-4 weeks | **4-6 weeks** | Amjad | Pending |
-| [RDY-020](../../tasks/readiness/RDY-020-signalr-event-bridge.md) | SignalR Event Push-Back Bridge | 3-5 days | **1 week** | Oren | Pending |
-| [RDY-021](../../tasks/readiness/RDY-021-projection-idempotence.md) | Projection Idempotence Tests | 2-3 days | **3-5 days** | Oren, Dina | Pending |
-| [RDY-022](../../tasks/readiness/RDY-022-session-timer-fatigue.md) | Session Timer + Fatigue UI | 3 days | 3 days | Lior, Nadia | Pending |
-| [RDY-023](../../tasks/readiness/RDY-023-diagnostic-onboarding.md) | Diagnostic Quiz (IRT theta init) | 1 week | 1 week | Nadia, Lior | Pending |
-| [RDY-024](../../tasks/readiness/RDY-024-bkt-calibration.md) | BKT Parameter Calibration (2 phases) | 2-3 weeks | **3-4 weeks** | Nadia | Pending |
-| [RDY-025](../../tasks/readiness/RDY-025-deployment-manifests.md) | Deployment Manifests (K8s/Docker) | 1-2 weeks | **3-4 weeks** | Dina | Pending |
-| [RDY-031](../../tasks/readiness/RDY-031-task-dependency-graph.md) | Task Dependency Graph | 1 day | 1 day | Nadia | Pending |
+| ID | Title | Effort (Rami) | Depends On | Status |
+|----|-------|---------------|------------|--------|
+| [RDY-017a](../../tasks/readiness/RDY-017a-dlq-followups.md) | DLQ Follow-ups | 2-3 days | RDY-017 | Pending |
+| [RDY-019](../../tasks/readiness/RDY-019-bagrut-corpus-ingestion.md) | Bagrut Corpus Ingestion + Taxonomy | 4-6 weeks | — | Pending |
+| [RDY-019a](../../tasks/readiness/RDY-019a-bagrut-content-followups.md) | Bagrut Content Follow-ups | 1 week | RDY-019 | Pending |
+| [RDY-020](../../tasks/readiness/done/RDY-020-signalr-event-bridge.md) | SignalR Event Push-Back Bridge | 1 week | — | **Done** |
+| [RDY-021](../../tasks/readiness/done/RDY-021-projection-idempotence.md) | Projection Idempotence Tests | 3-5 days | — | **Done** |
+| [RDY-022](../../tasks/readiness/done/RDY-022-session-timer-fatigue.md) | Session Timer + Fatigue UI | 3 days | — | **Done** |
+| [RDY-023](../../tasks/readiness/done/RDY-023-diagnostic-onboarding.md) | Diagnostic Quiz (IRT theta init) | 1 week | — | **Done** |
+| [RDY-024](../../tasks/readiness/done/RDY-024-bkt-calibration.md) | BKT Calibration Phase A | 3-4 weeks | RDY-023 | **Done** |
+| [RDY-024b](../../tasks/readiness/RDY-024b-bkt-calibration-phase-b.md) | BKT Calibration Phase B | 1-2 weeks | RDY-024, RDY-032 | Pending (blocked on pilot data) |
+| [RDY-025](../../tasks/readiness/RDY-025-deployment-manifests.md) | Deployment Manifests (K8s/Docker) | 3-4 weeks | — | Pending |
+| [RDY-031](../../tasks/readiness/done/RDY-031-task-dependency-graph.md) | Task Dependency Graph | 1 day | — | **Done** |
 
 ## Summary
 
-- **Total tasks**: 34 (was 25 → 31 from cross-review → 34 from Rami)
-- **Tier 0 (ship-blockers)**: 5 tasks (+RDY-032 pilot data export)
-- **Tier 1 (critical)**: 7 tasks (+RDY-033 error pattern matching)
-- **Tier 2 (high)**: 14 tasks (+RDY-034 flow state backend API)
-- **Tier 3 (medium)**: 8 tasks
+- **Total tasks**: 37 (25 original + 6 cross-review + 3 Rami + 3 sub-tasks)
+- **Done**: 20 (54%) | **In Progress**: 2 | **Pending**: 15
+- **Tier 0 (ship-blockers)**: 5 tasks (3 done, 2 pending)
+- **Tier 1 (critical)**: 9 tasks (4 done, 1 in-progress, 4 pending)
+- **Tier 2 (high)**: 12 tasks (7 done, 1 in-progress, 4 pending)
+- **Tier 3 (medium)**: 11 tasks (6 done, 5 pending)
+- **Dependency graph**: [READINESS-DEPENDENCY-GRAPH.md](READINESS-DEPENDENCY-GRAPH.md) | `npx tsx scripts/readiness-dependency-check.ts`
 
 ## Effort Comparison: Panel vs. Rami
 
