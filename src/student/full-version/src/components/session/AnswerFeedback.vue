@@ -58,6 +58,9 @@ function handleContinue() {
     variant="flat"
     data-testid="answer-feedback"
     :data-correct="feedback.correct"
+    role="status"
+    aria-live="assertive"
+    :aria-label="feedback.correct ? $t('session.feedback.correct') : $t('session.feedback.incorrect')"
   >
     <div class="d-flex align-center mb-2">
       <VIcon

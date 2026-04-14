@@ -107,15 +107,18 @@ watch([isFallbackStateActive, refLoadingIndicator], () => {
 
       <StudentBreadcrumbs />
 
-      <RouterView v-slot="{ Component }">
-        <Suspense
-          :timeout="0"
-          @fallback="isFallbackStateActive = true"
-          @resolve="isFallbackStateActive = false"
-        >
-          <Component :is="Component" />
-        </Suspense>
-      </RouterView>
+      <!-- RDY-015: Skip link target -->
+      <main id="main-content">
+        <RouterView v-slot="{ Component }">
+          <Suspense
+            :timeout="0"
+            @fallback="isFallbackStateActive = true"
+            @resolve="isFallbackStateActive = false"
+          >
+            <Component :is="Component" />
+          </Suspense>
+        </RouterView>
+      </main>
     </Component>
 
     <StudentBottomNav />
