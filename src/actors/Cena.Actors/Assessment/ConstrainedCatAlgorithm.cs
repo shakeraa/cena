@@ -57,12 +57,15 @@ public sealed class ConstrainedCatAlgorithm
         // Step 2: Compute Fisher information at theta for each item
         // PP-011: Weight by calibration confidence so well-calibrated items
         // are preferred for ability estimation.
+        // RDY-007: Weight by DIF category — Category C items are heavily
+        // penalized when student is in the focal group (Arabic speakers).
         var scored = eligible
             .Select(item => new
             {
                 Item = item,
                 Information = ComputeFisherInformation(theta, item.DifficultyElo, item.Discrimination)
-                    * ConfidenceWeight(item.Confidence),
+                    * ConfidenceWeight(item.Confidence)
+                    * DifWeight(item.DifCategory, constraints.StudentLocale),
             })
             .OrderByDescending(x => x.Information)
             .ToList();
@@ -132,6 +135,27 @@ public sealed class ConstrainedCatAlgorithm
         _ => 0.10 // Default/uncalibrated — rarely selected for ability estimation
     };
 
+    /// <summary>
+    /// RDY-007: DIF weight for item selection.
+    /// Category C items are heavily penalized when the student is in the focal
+    /// group (Arabic speakers). For reference group or when locale is unknown,
+    /// no penalty is applied — the item's DIF status doesn't affect Hebrew students.
+    /// </summary>
+    private static double DifWeight(DifCategory difCategory, string? studentLocale)
+    {
+        // DIF only matters for the focal group (Arabic speakers)
+        if (studentLocale is not "ar") return 1.0;
+
+        return difCategory switch
+        {
+            DifCategory.C => 0.05,       // Effectively removed from selection
+            DifCategory.B => 0.60,       // Moderate penalty
+            DifCategory.A => 1.0,        // No penalty — item is fair
+            DifCategory.Pending => 0.80, // Mild caution until analyzed
+            _ => 1.0
+        };
+    }
+
     private static bool MeetsContentBalance(CatItemCandidate item, CatConstraints constraints)
     {
         if (constraints.TopicQuotas.Count == 0) return true;
@@ -152,7 +176,9 @@ public sealed record CatItemCandidate(
     double Discrimination,
     string TopicCluster,
     double ExposureRate,
-    CalibrationConfidence Confidence = CalibrationConfidence.Moderate);
+    CalibrationConfidence Confidence = CalibrationConfidence.Moderate,
+    /// <summary>RDY-007: DIF category for this item. Category C items are deprioritized for focal-group students.</summary>
+    DifCategory DifCategory = DifCategory.Pending);
 
 /// <summary>
 /// Content balance + exposure constraints for CAT.
@@ -165,6 +191,9 @@ public sealed record CatConstraints
 
     /// <summary>Item IDs reserved for exam simulation — never shown in practice.</summary>
     public IReadOnlySet<string> ReservedPoolIds { get; init; } = new HashSet<string>();
+
+    /// <summary>RDY-007: Student locale for DIF-aware item selection. Null = ignore DIF.</summary>
+    public string? StudentLocale { get; init; }
 }
 
 public sealed record TopicQuota(int Target, int Current);

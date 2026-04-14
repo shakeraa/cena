@@ -175,8 +175,28 @@ public sealed record ItemBankHealthReport
     public IReadOnlyList<UnderCalibratedItem> UnderCalibratedItems { get; init; } = Array.Empty<UnderCalibratedItem>();
     public ExposureDistribution ExposureDistribution { get; init; } = new(0, 0, 0, 0, 0);
     public ConfidenceDistribution ConfidenceDistribution { get; init; } = new(0, 0, 0, 0, 0);
+    /// <summary>RDY-007: DIF analysis summary (null if no response data available).</summary>
+    public DifReportSection? DifAnalysis { get; init; }
     public DateTimeOffset GeneratedAt { get; init; }
 }
+
+/// <summary>RDY-007: DIF analysis section for the health report.</summary>
+public sealed record DifReportSection(
+    int TotalAnalyzed,
+    int CategoryA,
+    int CategoryB,
+    int CategoryC,
+    int Pending,
+    IReadOnlyList<DifFlaggedItem> FlaggedItems);
+
+/// <summary>RDY-007: An item flagged for DIF review.</summary>
+public sealed record DifFlaggedItem(
+    string ItemId,
+    string ConceptId,
+    string DifCategory,
+    double DeltaDif,
+    int ResponseCountHe,
+    int ResponseCountAr);
 
 public sealed record ConceptCoverageEntry
 {
