@@ -137,4 +137,13 @@
       }
     }
   }
+
+  [dir="rtl"] & {
+    .v-pagination__prev .v-icon,
+    .v-pagination__next .v-icon,
+    .v-pagination__first .v-icon,
+    .v-pagination__last .v-icon {
+      transform: scaleX(-1);
+    }
+  }
 }

@@ -10,7 +10,7 @@ export const layoutConfig: LayoutConfig = {
     contentLayoutNav: AppContentLayoutNav.Vertical,
     overlayNavFromBreakpoint: breakpointsVuetify.md,
 
-    // isRTL: false,
+    isRTL: false,
     i18n: {
       enable: true,
     },

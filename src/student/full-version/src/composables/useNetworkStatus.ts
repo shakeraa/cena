@@ -79,6 +79,7 @@ const pendingCount = ref(0)
 function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION)
+
     req.onupgradeneeded = () => {
       const db = req.result
       if (!db.objectStoreNames.contains(STORE_NAME))
@@ -96,6 +97,7 @@ async function enqueueSubmission(
   headers: Record<string, string> = {},
 ): Promise<string> {
   const id = `sub_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
   const entry: QueuedSubmission = {
     id,
     url,
@@ -107,8 +109,10 @@ async function enqueueSubmission(
   }
 
   const db = await openDb()
+
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readwrite')
+
     tx.objectStore(STORE_NAME).put(entry)
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
@@ -116,19 +120,24 @@ async function enqueueSubmission(
   db.close()
 
   pendingCount.value++
+
   return id
 }
 
 async function countPending(): Promise<number> {
   try {
     const db = await openDb()
+
     const count = await new Promise<number>((resolve, reject) => {
       const tx = db.transaction(STORE_NAME, 'readonly')
       const req = tx.objectStore(STORE_NAME).count()
+
       req.onsuccess = () => resolve(req.result)
       req.onerror = () => reject(req.error)
     })
+
     db.close()
+
     return count
   }
   catch {
@@ -138,9 +147,11 @@ async function countPending(): Promise<number> {
 
 async function drainQueue(): Promise<{ sent: number; failed: number }> {
   const db = await openDb()
+
   const entries = await new Promise<QueuedSubmission[]>((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, 'readonly')
     const req = tx.objectStore(STORE_NAME).getAll()
+
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
   })
@@ -159,6 +170,7 @@ async function drainQueue(): Promise<{ sent: number; failed: number }> {
       if (res.ok || res.status === 409 /* idempotent duplicate */) {
         // Remove from queue
         const tx = db.transaction(STORE_NAME, 'readwrite')
+
         tx.objectStore(STORE_NAME).delete(entry.id)
         await new Promise<void>((resolve, reject) => {
           tx.oncomplete = () => resolve()
@@ -177,6 +189,7 @@ async function drainQueue(): Promise<{ sent: number; failed: number }> {
 
   db.close()
   pendingCount.value = await countPending()
+
   return { sent, failed }
 }
 
@@ -196,6 +209,7 @@ export function useNetworkStatus() {
 
   function onReconnect(cb: () => void) {
     reconnectCallbacks.push(cb)
+
     // Return unsubscribe
     return () => {
       const idx = reconnectCallbacks.indexOf(cb)

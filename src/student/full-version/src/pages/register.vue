@@ -82,12 +82,11 @@ function handleAgeGateNext() {
   if (!ageResult.value || !dateOfBirth.value)
     return
 
-  if (ageResult.value.requiresParentalConsent) {
+  if (ageResult.value.requiresParentalConsent)
     currentStep.value = 'parental-consent'
-  }
-  else {
+
+  else
     currentStep.value = 'credentials'
-  }
 }
 
 function handleConsentNext() {
@@ -101,12 +100,11 @@ function handleBack() {
     currentStep.value = 'age-gate'
   }
   else if (currentStep.value === 'credentials') {
-    if (ageResult.value?.requiresParentalConsent) {
+    if (ageResult.value?.requiresParentalConsent)
       currentStep.value = 'parental-consent'
-    }
-    else {
+
+    else
       currentStep.value = 'age-gate'
-    }
   }
 }
 
@@ -124,6 +122,7 @@ async function handleMockSubmit(payload: { email: string; password: string; disp
   if (payload.email === 'exists@test.com') {
     errorMessage.value = t('auth.emailAlreadyExists')
     loading.value = false
+
     return
   }
 
@@ -155,6 +154,7 @@ async function handleMockSubmit(payload: { email: string; password: string; disp
         : 'not_required',
       recordedAt: new Date().toISOString(),
     }
+
     try {
       localStorage.setItem(`cena-consent-${uid}`, JSON.stringify(consentData))
     }
@@ -206,6 +206,7 @@ async function handleSubmit(payload: { email: string; password: string; displayN
 
   if (useMockAuth) {
     await handleMockSubmit(payload)
+
     return
   }
 
@@ -296,7 +297,7 @@ async function handleSubmit(payload: { email: string; password: string; displayN
         class="text-caption text-medium-emphasis text-center mt-3"
         data-testid="register-agreement-notice"
       >
-        <i18n-t
+        <I18nT
           keypath="legal.footer.agreementNotice"
           tag="span"
         >
@@ -318,7 +319,7 @@ async function handleSubmit(payload: { email: string; password: string; displayN
               {{ t('legal.footer.privacyLink') }}
             </RouterLink>
           </template>
-        </i18n-t>
+        </I18nT>
       </p>
       <AuthProviderButtons mode="register" />
     </template>

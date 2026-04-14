@@ -9,6 +9,7 @@ interface Props {
 }
 
 defineProps<Props>()
+
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
@@ -17,6 +18,7 @@ const { t } = useI18n()
 
 const grouped = computed(() => {
   const shortcuts = listShortcuts()
+
   const groups: Record<ShortcutScope, Shortcut[]> = {
     global: [],
     session: [],

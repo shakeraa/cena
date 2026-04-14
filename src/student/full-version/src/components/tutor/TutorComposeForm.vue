@@ -8,6 +8,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), { disabled: false, loading: false })
+
 const emit = defineEmits<{
   submit: [content: string]
 }>()

@@ -12,7 +12,7 @@
  * SVG content is sanitized via DOMPurify to prevent XSS.
  */
 
-import { computed, onMounted, ref, watch, nextTick } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import DOMPurify from 'dompurify'
 
 type FigureType = 'functionPlot' | 'geometry' | 'physics' | 'raster'
@@ -41,10 +41,32 @@ const error = ref<string>()
 const PURIFY_CONFIG = {
   USE_PROFILES: { svg: true, mathMl: true },
   ADD_TAGS: ['foreignObject'],
-  ADD_ATTR: ['xmlns', 'viewBox', 'preserveAspectRatio', 'fill', 'stroke', 'stroke-width',
-    'd', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'width', 'height',
-    'transform', 'font-size', 'text-anchor', 'dominant-baseline', 'marker-end',
-    'marker-start', 'opacity', 'stroke-dasharray'],
+  ADD_ATTR: ['xmlns',
+    'viewBox',
+    'preserveAspectRatio',
+    'fill',
+    'stroke',
+    'stroke-width',
+    'd',
+    'cx',
+    'cy',
+    'r',
+    'x',
+    'y',
+    'x1',
+    'y1',
+    'x2',
+    'y2',
+    'width',
+    'height',
+    'transform',
+    'font-size',
+    'text-anchor',
+    'dominant-baseline',
+    'marker-end',
+    'marker-start',
+    'opacity',
+    'stroke-dasharray'],
 }
 
 const containerStyle = computed(() => ({
@@ -62,7 +84,8 @@ watch(() => props.spec, async () => {
 }, { deep: true })
 
 async function renderFigure() {
-  if (!containerRef.value) return
+  if (!containerRef.value)
+    return
   error.value = undefined
   loaded.value = false
 
@@ -83,7 +106,8 @@ async function renderFigure() {
       default:
         error.value = `Unknown figure type: ${props.spec.type}`
     }
-  } catch (e) {
+  }
+  catch (e) {
     error.value = e instanceof Error ? e.message : String(e)
   }
 }
@@ -91,6 +115,7 @@ async function renderFigure() {
 async function renderFunctionPlot() {
   const { default: functionPlot } = await import('function-plot')
   const el = containerRef.value!
+
   clearElement(el)
 
   functionPlot({
@@ -103,17 +128,19 @@ async function renderFunctionPlot() {
 }
 
 async function renderGeometry() {
-  if (!window.JXG) {
+  if (!window.JXG)
     await loadScript('https://cdn.jsdelivr.net/npm/jsxgraph/distrib/jsxgraphcore.js')
-  }
 
   const el = containerRef.value!
+
   clearElement(el)
 
   const boardId = `jxg-${Math.random().toString(36).slice(2, 10)}`
+
   el.id = boardId
 
   const config = props.spec.jsxGraphConfig || {}
+
   window.JXG.JSXGraph.initBoard(boardId, {
     boundingbox: [-5, 5, 5, -5],
     axis: true,
@@ -129,6 +156,7 @@ function renderPhysicsSvg() {
 
   if (!spec) {
     error.value = 'No physics diagram spec provided'
+
     return
   }
 
@@ -138,18 +166,21 @@ function renderPhysicsSvg() {
     // Sanitize SVG via DOMPurify to prevent XSS
     const sanitized = DOMPurify.sanitize(spec.svg, PURIFY_CONFIG)
     const wrapper = document.createElement('div')
+
     wrapper.textContent = '' // clear
+
     // Parse sanitized SVG safely
     const parser = new DOMParser()
     const doc = parser.parseFromString(sanitized, 'image/svg+xml')
     const svgEl = doc.documentElement
-    if (svgEl.tagName === 'svg') {
+    if (svgEl.tagName === 'svg')
       el.appendChild(document.importNode(svgEl, true))
-    } else {
+    else
       error.value = 'Invalid SVG content'
-    }
-  } else {
+  }
+  else {
     const placeholder = document.createElement('div')
+
     placeholder.className = 'figure-placeholder'
     placeholder.textContent = `Physics diagram: ${JSON.stringify(spec).slice(0, 100)}...`
     el.appendChild(placeholder)
@@ -158,18 +189,19 @@ function renderPhysicsSvg() {
 }
 
 function clearElement(el: HTMLElement) {
-  while (el.firstChild) {
+  while (el.firstChild)
     el.removeChild(el.firstChild)
-  }
 }
 
 function loadScript(src: string): Promise<void> {
   return new Promise((resolve, reject) => {
     if (document.querySelector(`script[src="${src}"]`)) {
       resolve()
+
       return
     }
     const script = document.createElement('script')
+
     script.src = src
     script.onload = () => resolve()
     script.onerror = () => reject(new Error(`Failed to load: ${src}`))
@@ -196,7 +228,7 @@ declare global {
       :alt="spec.ariaLabel"
       class="question-figure__raster"
       loading="lazy"
-    />
+    >
 
     <div
       v-else
@@ -205,15 +237,25 @@ declare global {
       :style="containerStyle"
     />
 
-    <div v-if="!loaded && !error && spec.type !== 'raster'" class="question-figure__loading">
+    <div
+      v-if="!loaded && !error && spec.type !== 'raster'"
+      class="question-figure__loading"
+    >
       Loading figure...
     </div>
 
-    <div v-if="error" class="question-figure__error" role="alert">
+    <div
+      v-if="error"
+      class="question-figure__error"
+      role="alert"
+    >
       Figure error: {{ error }}
     </div>
 
-    <figcaption v-if="spec.caption" class="question-figure__caption">
+    <figcaption
+      v-if="spec.caption"
+      class="question-figure__caption"
+    >
       {{ spec.caption }}
     </figcaption>
   </figure>

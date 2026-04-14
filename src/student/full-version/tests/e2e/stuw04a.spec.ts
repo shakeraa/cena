@@ -88,8 +88,9 @@ test.describe.serial('STU-W-04A auth UI', () => {
     const passwordResetRequests: { url: string; method: string; status: number }[] = []
 
     // Intercept the POST and return 204 No Content (the backend contract).
-    await page.route('**/api/auth/password-reset', async (route) => {
+    await page.route('**/api/auth/password-reset', async route => {
       const request = route.request()
+
       passwordResetRequests.push({
         url: request.url(),
         method: request.method(),

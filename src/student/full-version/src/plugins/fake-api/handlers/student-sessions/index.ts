@@ -38,13 +38,18 @@ const BKT_MIN_P = 0.01
 const BKT_MAX_P = 0.99
 
 function clampBkt(value: number): number {
-  if (value < BKT_MIN_P) return BKT_MIN_P
-  if (value > BKT_MAX_P) return BKT_MAX_P
+  if (value < BKT_MIN_P)
+    return BKT_MIN_P
+  if (value > BKT_MAX_P)
+    return BKT_MAX_P
+
   return value
 }
 
 function clampDenominator(value: number): number {
-  if (value < BKT_MIN_P) return BKT_MIN_P
+  if (value < BKT_MIN_P)
+    return BKT_MIN_P
+
   return value
 }
 
@@ -73,12 +78,11 @@ export function bktUpdate(
 
   // Step 2: Posterior given observation (Bayes update)
   let pLearned: number
-  if (isCorrect) {
+  if (isCorrect)
     pLearned = prior * (1.0 - pSlip) / pCorrect
-  }
-  else {
+
+  else
     pLearned = prior * pSlip / pIncorrect
-  }
 
   // Step 3: Account for learning transition
   let posterior = pLearned + (1.0 - pLearned) * pLearning
@@ -101,8 +105,10 @@ interface DevQuestion {
   choices: string[]
   correctAnswer: string
   subject: string
+
   /** Authored worked explanation (QuestionDocument.Explanation). */
   explanation: string
+
   /**
    * Per-distractor rationale map. Keys are option values; values are
    * the rationale string shown when the student picks that wrong option.
@@ -114,15 +120,15 @@ interface DevQuestion {
 const devQuestions: DevQuestion[] = [
   {
     questionId: 'q_001',
-    prompt: 'What is 12 \u00d7 8?',
+    prompt: 'What is 12 \u00D7 8?',
     choices: ['92', '96', '104', '108'],
     correctAnswer: '96',
     subject: 'Mathematics',
-    explanation: 'To multiply 12 by 8, break it into (10 \u00d7 8) + (2 \u00d7 8) = 80 + 16 = 96. This uses the distributive property of multiplication over addition.',
+    explanation: 'To multiply 12 by 8, break it into (10 \u00D7 8) + (2 \u00D7 8) = 80 + 16 = 96. This uses the distributive property of multiplication over addition.',
     distractorRationales: {
-      '92': 'You may have computed 12 \u00d7 8 as 12 \u00d7 7 + 4 = 88, then added 4 by mistake. Double-check each partial product.',
-      '104': 'This is 13 \u00d7 8. Make sure you are multiplying 12, not 13.',
-      '108': 'This is 12 \u00d7 9. Check that you used 8 as the multiplier, not 9.',
+      92: 'You may have computed 12 \u00D7 8 as 12 \u00D7 7 + 4 = 88, then added 4 by mistake. Double-check each partial product.',
+      104: 'This is 13 \u00D7 8. Make sure you are multiplying 12, not 13.',
+      108: 'This is 12 \u00D7 9. Check that you used 8 as the multiplier, not 9.',
     },
   },
   {
@@ -133,22 +139,22 @@ const devQuestions: DevQuestion[] = [
     subject: 'Mathematics',
     explanation: 'Subtract 5 from both sides: 2x = 10. Then divide both sides by 2: x = 5. Always isolate the variable by performing inverse operations.',
     distractorRationales: {
-      '10': 'You found 2x = 10 correctly but forgot to divide by 2. The equation is 2x = 10, so x = 10 / 2 = 5.',
-      '15': 'You may have subtracted 5 from the wrong side or not subtracted at all. Start by subtracting 5 from both sides.',
-      '20': 'You added 5 to 15 instead of subtracting. To isolate 2x, subtract 5 from both sides, giving 2x = 10.',
+      10: 'You found 2x = 10 correctly but forgot to divide by 2. The equation is 2x = 10, so x = 10 / 2 = 5.',
+      15: 'You may have subtracted 5 from the wrong side or not subtracted at all. Start by subtracting 5 from both sides.',
+      20: 'You added 5 to 15 instead of subtracting. To isolate 2x, subtract 5 from both sides, giving 2x = 10.',
     },
   },
   {
     questionId: 'q_003',
-    prompt: 'What is the derivative of x\u00b2?',
-    choices: ['x', '2x', 'x\u00b2', '2'],
+    prompt: 'What is the derivative of x\u00B2?',
+    choices: ['x', '2x', 'x\u00B2', '2'],
     correctAnswer: '2x',
     subject: 'Mathematics',
-    explanation: 'Using the power rule d/dx[x^n] = n\u00b7x^(n-1), with n = 2: d/dx[x\u00b2] = 2\u00b7x^(2-1) = 2x. The power rule is the fundamental differentiation rule for polynomial terms.',
+    explanation: 'Using the power rule d/dx[x^n] = n\u00B7x^(n-1), with n = 2: d/dx[x\u00B2] = 2\u00B7x^(2-1) = 2x. The power rule is the fundamental differentiation rule for polynomial terms.',
     distractorRationales: {
       'x': 'You reduced the exponent but forgot to bring it down as a coefficient. The power rule requires multiplying by the original exponent.',
-      'x\u00b2': 'The derivative of x\u00b2 is not x\u00b2 itself \u2014 that would mean the function equals its own rate of change (which is the property of e^x, not x\u00b2).',
-      '2': 'You applied the power rule coefficient correctly (2) but dropped the x term. The derivative is 2\u00b7x^1 = 2x, not just 2.',
+      'x\u00B2': 'The derivative of x\u00B2 is not x\u00B2 itself \u2014 that would mean the function equals its own rate of change (which is the property of e^x, not x\u00B2).',
+      '2': 'You applied the power rule coefficient correctly (2) but dropped the x term. The derivative is 2\u00B7x^1 = 2x, not just 2.',
     },
   },
   {
@@ -157,11 +163,11 @@ const devQuestions: DevQuestion[] = [
     choices: ['H2O', 'CO2', 'O2', 'NaCl'],
     correctAnswer: 'H2O',
     subject: 'Chemistry',
-    explanation: 'Water is composed of two hydrogen atoms and one oxygen atom bonded covalently, giving the molecular formula H\u2082O. The H\u2013O\u2013H bond angle is approximately 104.5\u00b0.',
+    explanation: 'Water is composed of two hydrogen atoms and one oxygen atom bonded covalently, giving the molecular formula H\u2082O. The H\u2013O\u2013H bond angle is approximately 104.5\u00B0.',
     distractorRationales: {
-      'CO2': 'CO\u2082 is carbon dioxide, a gas exhaled during respiration. Water contains hydrogen and oxygen, not carbon.',
-      'O2': 'O\u2082 is molecular oxygen (the gas we breathe). Water requires hydrogen atoms bonded to oxygen.',
-      'NaCl': 'NaCl is sodium chloride (table salt), an ionic compound. Water is a covalent molecule of hydrogen and oxygen.',
+      CO2: 'CO\u2082 is carbon dioxide, a gas exhaled during respiration. Water contains hydrogen and oxygen, not carbon.',
+      O2: 'O\u2082 is molecular oxygen (the gas we breathe). Water requires hydrogen atoms bonded to oxygen.',
+      NaCl: 'NaCl is sodium chloride (table salt), an ionic compound. Water is a covalent molecule of hydrogen and oxygen.',
     },
   },
   {
@@ -170,11 +176,11 @@ const devQuestions: DevQuestion[] = [
     choices: ['300,000 km/s', '150,000 km/s', '1,000,000 km/s', '100,000 km/s'],
     correctAnswer: '300,000 km/s',
     subject: 'Physics',
-    explanation: 'The speed of light in a vacuum is approximately 299,792 km/s, commonly rounded to 300,000 km/s (or 3 \u00d7 10\u2078 m/s). This is a fundamental constant denoted c in physics equations like E = mc\u00b2.',
+    explanation: 'The speed of light in a vacuum is approximately 299,792 km/s, commonly rounded to 300,000 km/s (or 3 \u00D7 10\u2078 m/s). This is a fundamental constant denoted c in physics equations like E = mc\u00B2.',
     distractorRationales: {
       '150,000 km/s': 'This is half the actual value. The speed of light is approximately 300,000 km/s, not 150,000 km/s.',
       '1,000,000 km/s': 'This is more than three times the actual value. Nothing with mass can even reach 300,000 km/s, let alone exceed it.',
-      '100,000 km/s': 'This is one-third of the actual value. The speed of light is approximately 3 \u00d7 10\u2075 km/s = 300,000 km/s.',
+      '100,000 km/s': 'This is one-third of the actual value. The speed of light is approximately 3 \u00D7 10\u2075 km/s = 300,000 km/s.',
     },
   },
 ]
@@ -193,6 +199,7 @@ interface SessionState {
   subjects: string[]
   mode: string
   durationMinutes: number
+
   /** Current BKT mastery estimate for this session (starts at P_Initial). */
   currentMastery: number
 }
@@ -341,7 +348,9 @@ export const handlerStudentSessions = [
     // BKT mastery update — deterministic, matches BktService.Update
     const priorMastery = state.currentMastery
     const posteriorMastery = bktUpdate(priorMastery, correct)
+
     state.currentMastery = posteriorMastery
+
     const masteryDelta = posteriorMastery - priorMastery
 
     // FIND-pedagogy-017: Feedback field is deprecated — the UI renders its own

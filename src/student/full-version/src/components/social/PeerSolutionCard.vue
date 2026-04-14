@@ -7,6 +7,7 @@ interface Props {
 }
 
 defineProps<Props>()
+
 const emit = defineEmits<{
   vote: [solutionId: string, direction: 'up' | 'down']
   report: [contentId: string, contentType: 'peer-solution']

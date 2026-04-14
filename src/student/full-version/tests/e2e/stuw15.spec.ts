@@ -56,6 +56,7 @@ test.describe.serial('STU-W-15 Phase A web enhancements', () => {
     await page.locator('[data-testid="command-palette-input"]').fill('tutor')
 
     await expect(page.locator('[data-testid="command-nav.tutor"]')).toBeVisible()
+
     // Only matching commands visible
     await expect(page.locator('[data-testid="command-nav.home"]')).toHaveCount(0)
   })
@@ -107,6 +108,7 @@ test.describe.serial('STU-W-15 Phase A web enhancements', () => {
     const response = await page.request.get('/manifest.webmanifest')
 
     expect(response.ok()).toBe(true)
+
     const manifest = await response.json()
 
     expect(manifest.name).toBe('Cena Student')
@@ -119,6 +121,7 @@ test.describe.serial('STU-W-15 Phase A web enhancements', () => {
     const response = await page.request.get('/offline.html')
 
     expect(response.ok()).toBe(true)
+
     const body = await response.text()
 
     expect(body).toContain('offline')

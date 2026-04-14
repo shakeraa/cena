@@ -25,14 +25,19 @@ const CHROME_DISMISS_DAYS = 7
 const IOS_DISMISS_DAYS = 14
 
 export interface UseInstallPromptReturn {
+
   /** Whether the install banner should be shown */
   canShow: Ref<boolean>
+
   /** Whether the app is already installed (standalone mode) */
   isInstalled: Ref<boolean>
+
   /** Whether this is an iOS device without beforeinstallprompt */
   isIOS: Ref<boolean>
+
   /** Trigger the native install prompt (Chrome/Edge) */
   install: () => Promise<void>
+
   /** Dismiss the prompt for N days */
   dismiss: () => void
 }
@@ -48,6 +53,7 @@ export function useInstallPrompt(): UseInstallPromptReturn {
   function checkInstalled(): boolean {
     if (typeof window === 'undefined')
       return false
+
     return window.matchMedia('(display-mode: standalone)').matches
       || (navigator as any).standalone === true
   }
@@ -57,6 +63,7 @@ export function useInstallPrompt(): UseInstallPromptReturn {
     if (typeof navigator === 'undefined')
       return false
     const ua = navigator.userAgent
+
     return /iPad|iPhone|iPod/.test(ua)
       || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
   }
@@ -70,6 +77,7 @@ export function useInstallPrompt(): UseInstallPromptReturn {
       const dismissedAt = Number.parseInt(raw, 10)
       const days = checkIOS() ? IOS_DISMISS_DAYS : CHROME_DISMISS_DAYS
       const expiresAt = dismissedAt + (days * 24 * 60 * 60 * 1000)
+
       return Date.now() < expiresAt
     }
     catch {
@@ -81,7 +89,9 @@ export function useInstallPrompt(): UseInstallPromptReturn {
   function trackVisit(): number {
     try {
       const count = Number.parseInt(localStorage.getItem(VISIT_COUNT_KEY) || '0', 10) + 1
+
       localStorage.setItem(VISIT_COUNT_KEY, String(count))
+
       return count
     }
     catch {
@@ -96,6 +106,7 @@ export function useInstallPrompt(): UseInstallPromptReturn {
       return false
     if (visitCount.value < 2)
       return false
+
     // For Chrome/Edge: need the deferred prompt event
     // For iOS: show the manual guide
     return isIOS.value || deferredPrompt.value !== null
@@ -111,6 +122,7 @@ export function useInstallPrompt(): UseInstallPromptReturn {
     if (!deferredPrompt.value)
       return
     await deferredPrompt.value.prompt()
+
     const result = await deferredPrompt.value.userChoice
     if (result.outcome === 'accepted')
       isInstalled.value = true

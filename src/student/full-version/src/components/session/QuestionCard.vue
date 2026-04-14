@@ -142,7 +142,12 @@ function handleHint() {
       class="text-h5 mb-6"
       data-testid="question-prompt"
     >
-      {{ question.prompt }}
+      <bdi
+        dir="ltr"
+        class="question-card__math-run"
+      >
+        {{ question.prompt }}
+      </bdi>
     </h2>
 
     <!-- FIGURE-004: Render question figure if present (function plot, geometry, physics, raster) -->
@@ -172,7 +177,12 @@ function handleHint() {
         {{ t('session.runner.workedExampleLabel') }}
       </div>
       <div class="text-body-2">
-        {{ question.workedExample }}
+        <bdi
+          dir="ltr"
+          class="question-card__math-run"
+        >
+          {{ question.workedExample }}
+        </bdi>
       </div>
     </VAlert>
 
@@ -193,7 +203,12 @@ function handleHint() {
         {{ t('session.runner.hintLevel', { level: lastHint.hintLevel }) }}
       </div>
       <div class="text-body-2">
-        {{ lastHint.hintText }}
+        <bdi
+          dir="ltr"
+          class="question-card__math-run"
+        >
+          {{ lastHint.hintText }}
+        </bdi>
       </div>
     </VAlert>
 
@@ -223,7 +238,12 @@ function handleHint() {
             class="me-3"
             aria-hidden="true"
           />
-          <span class="text-body-1">{{ choice }}</span>
+          <bdi
+            dir="ltr"
+            class="text-body-1 question-card__math-run"
+          >
+            {{ choice }}
+          </bdi>
         </div>
       </VCard>
     </div>
@@ -284,5 +304,9 @@ function handleHint() {
 .question-card__choice:focus-visible {
   outline: 2px solid rgb(var(--v-theme-primary));
   outline-offset: 2px;
+}
+
+.question-card__math-run {
+  unicode-bidi: isolate;
 }
 </style>

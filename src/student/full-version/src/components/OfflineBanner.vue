@@ -11,9 +11,9 @@ const showReconnected = ref(false)
 const drainResult = ref<{ sent: number; failed: number } | null>(null)
 
 onReconnect(async () => {
-  if (pendingCount.value > 0) {
+  if (pendingCount.value > 0)
     drainResult.value = await drainQueue()
-  }
+
   showReconnected.value = true
   setTimeout(() => { showReconnected.value = false }, 4000)
 })
@@ -32,7 +32,10 @@ const { t } = useI18n()
     class="offline-banner"
   >
     <div class="d-flex align-center gap-3">
-      <VIcon icon="ri-wifi-off-line" size="24" />
+      <VIcon
+        icon="ri-wifi-off-line"
+        size="24"
+      />
       <div>
         <div class="text-subtitle-1 font-weight-medium">
           {{ t('pwa.connection.offline') }}
@@ -56,7 +59,10 @@ const { t } = useI18n()
     class="reconnected-toast"
   >
     <div class="d-flex align-center gap-2">
-      <VIcon icon="ri-wifi-line" size="20" />
+      <VIcon
+        icon="ri-wifi-line"
+        size="20"
+      />
       <span>{{ t('pwa.connection.connected') }}</span>
       <span
         v-if="drainResult && drainResult.sent > 0"

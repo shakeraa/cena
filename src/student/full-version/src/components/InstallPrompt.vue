@@ -36,7 +36,10 @@ const { t } = useI18n()
         color="primary"
         variant="tonal"
       >
-        <VIcon icon="tabler-download" size="24" />
+        <VIcon
+          icon="tabler-download"
+          size="24"
+        />
       </VAvatar>
       <div class="flex-grow-1">
         <p class="text-body-1 font-weight-medium mb-0">
@@ -64,14 +67,21 @@ const { t } = useI18n()
         :aria-label="t('pwa.install.installButton')"
         @click="install"
       >
-        <VIcon icon="tabler-download" start size="16" />
+        <VIcon
+          icon="tabler-download"
+          start
+          size="16"
+        />
         {{ t('pwa.install.installButton') }}
       </VBtn>
     </template>
   </VSnackbar>
 
   <!-- iOS Safari install guide -->
-  <IOSInstallGuide v-else-if="isIOS && canShow" @dismiss="dismiss" />
+  <IOSInstallGuide
+    v-else-if="isIOS && canShow"
+    @dismiss="dismiss"
+  />
 </template>
 
 <style scoped>

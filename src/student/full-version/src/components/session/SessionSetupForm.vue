@@ -8,6 +8,7 @@ interface Props {
 }
 
 withDefaults(defineProps<Props>(), { loading: false })
+
 const emit = defineEmits<{
   submit: [payload: SessionStartRequest]
 }>()

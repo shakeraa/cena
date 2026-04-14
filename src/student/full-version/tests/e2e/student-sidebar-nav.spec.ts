@@ -42,6 +42,7 @@ test.describe('FIND-ux-020: student sidebar nav items render after login', () =>
 
     // Wait for the sidebar to fully render
     const sidebar = page.locator('aside.layout-vertical-nav')
+
     await expect(sidebar).toBeVisible({ timeout: 10_000 })
 
     // Count visible <li> children inside the nav-items list.
@@ -61,17 +62,21 @@ test.describe('FIND-ux-020: student sidebar nav items render after login', () =>
     await page.goto('/home')
 
     const sidebar = page.locator('aside.layout-vertical-nav')
+
     await expect(sidebar).toBeVisible({ timeout: 10_000 })
 
     // First load: count nav items
     const firstCount = await sidebar.locator('.nav-items > li').count()
+
     expect(firstCount).toBeGreaterThanOrEqual(14)
 
     // Hard refresh
     await page.reload()
 
     await expect(sidebar).toBeVisible({ timeout: 10_000 })
+
     const secondCount = await sidebar.locator('.nav-items > li').count()
+
     expect(secondCount).toBeGreaterThanOrEqual(14)
   })
 
@@ -80,6 +85,7 @@ test.describe('FIND-ux-020: student sidebar nav items render after login', () =>
     await page.goto('/home')
 
     const sidebar = page.locator('aside.layout-vertical-nav')
+
     await expect(sidebar).toBeVisible({ timeout: 10_000 })
 
     // Clear auth and nav to login
@@ -93,6 +99,7 @@ test.describe('FIND-ux-020: student sidebar nav items render after login', () =>
     // not exist (auth layout hides it) or have zero nav items.
     const sidebarAfterLogout = page.locator('aside.layout-vertical-nav .nav-items > li')
     const afterCount = await sidebarAfterLogout.count()
+
     expect(afterCount).toBe(0)
   })
 })

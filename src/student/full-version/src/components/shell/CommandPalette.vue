@@ -10,6 +10,7 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
 }>()
@@ -43,13 +44,22 @@ const commands = computed<Command[]>(() => {
     { id: 'nav.notifications', title: t('commandPalette.cmds.notifications'), icon: 'tabler-bell', category: 'navigate', run: () => router.push('/notifications') },
     { id: 'nav.profile', title: t('commandPalette.cmds.profile'), icon: 'tabler-user', category: 'navigate', run: () => router.push('/profile') },
     { id: 'nav.settings', title: t('commandPalette.cmds.settings'), icon: 'tabler-settings', category: 'navigate', run: () => router.push('/settings') },
+
     // Actions
-    { id: 'act.toggleTheme', title: t('commandPalette.cmds.toggleTheme'), icon: 'tabler-contrast', category: 'action', keywords: ['dark', 'light', 'mode'], run: () => {
-      const next = vuetifyTheme.global.name.value === 'dark' ? 'light' : 'dark'
-      vuetifyTheme.global.name.value = next
-      if (typeof localStorage !== 'undefined')
-        localStorage.setItem('cena-student-theme', next)
-    } },
+    {
+      id: 'act.toggleTheme',
+      title: t('commandPalette.cmds.toggleTheme'),
+      icon: 'tabler-contrast',
+      category: 'action',
+      keywords: ['dark', 'light', 'mode'],
+      run: () => {
+        const next = vuetifyTheme.global.name.value === 'dark' ? 'light' : 'dark'
+
+        vuetifyTheme.global.name.value = next
+        if (typeof localStorage !== 'undefined')
+          localStorage.setItem('cena-student-theme', next)
+      },
+    },
     { id: 'act.signOut', title: t('commandPalette.cmds.signOut'), icon: 'tabler-logout', category: 'action', run: () => authStore.__signOut() },
   ]
 

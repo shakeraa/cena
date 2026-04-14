@@ -13,16 +13,22 @@ import { onBeforeUnmount, onMounted } from 'vue'
 export type ShortcutScope = 'global' | 'session' | 'tutor' | 'graph' | 'palette'
 
 export interface Shortcut {
+
   /** Unique id, e.g. 'global.palette' or 'session.submit' */
   id: string
+
   /** Keyboard combo: a string like 'cmd+k', '?', 'g h', 'shift+/' */
   keys: string
+
   /** Human-readable label shown in cheatsheet */
   label: string
+
   /** Group the shortcut belongs to */
   scope: ShortcutScope
+
   /** The callback when the combo fires */
   handler: (event: KeyboardEvent) => void
+
   /**
    * When true, the shortcut will NOT fire while an input/textarea/contenteditable
    * is focused. Default true. Global shortcuts like `?` and Cmd+K should set
@@ -37,7 +43,7 @@ const registry = new Map<string, Shortcut>()
  * Sequence buffer for 2-key combos like `g h`. Holds the first key for
  * up to 1 second waiting for the second.
  */
-let pendingPrefix: { key: string, until: number } | null = null
+let pendingPrefix: { key: string; until: number } | null = null
 
 function isEditable(target: EventTarget | null): boolean {
   if (!target || !(target instanceof HTMLElement))
@@ -123,6 +129,7 @@ function handleKeydown(e: KeyboardEvent) {
     const hasSequenceStartingWith = Array.from(registry.values()).some(
       s => s.keys.startsWith(`${e.key.toLowerCase()} `),
     )
+
     if (hasSequenceStartingWith)
       pendingPrefix = { key: e.key.toLowerCase(), until: Date.now() + 1000 }
   }

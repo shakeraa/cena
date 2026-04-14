@@ -76,7 +76,7 @@ const SECTIONS: SectionCard[] = [
           <VIcon
             icon="tabler-chevron-right"
             size="20"
-            class="text-medium-emphasis"
+            class="text-medium-emphasis flip-in-rtl"
             aria-hidden="true"
           />
         </div>

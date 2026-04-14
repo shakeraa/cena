@@ -64,9 +64,7 @@ function formatDate(iso: string): string {
         </div>
       </div>
       <div class="text-end">
-        <div
-          class="text-caption text-medium-emphasis"
-        >
+        <div class="text-caption text-medium-emphasis">
           {{ t('progress.time.avgPerDay') }}
         </div>
         <div

@@ -46,6 +46,7 @@ export function useCamera() {
 
     if (!isSupported.value) {
       error.value = 'camera_not_supported'
+
       return null
     }
 
@@ -62,6 +63,7 @@ export function useCamera() {
 
       stream.value = s
       isActive.value = true
+
       return s
     }
     catch (err: unknown) {
@@ -74,15 +76,18 @@ export function useCamera() {
 
         stream.value = s
         isActive.value = true
+
         return s
       }
       catch (fallbackErr: unknown) {
         const e = fallbackErr as DOMException
+
         error.value = e.name === 'NotAllowedError'
           ? 'camera_permission_denied'
           : e.name === 'NotFoundError'
             ? 'camera_not_found'
             : 'camera_error'
+
         return null
       }
     }
@@ -103,15 +108,18 @@ export function useCamera() {
   async function captureFromVideo(video: HTMLVideoElement): Promise<CaptureResult | null> {
     if (!video.videoWidth || !video.videoHeight) {
       error.value = 'video_not_ready'
+
       return null
     }
 
     const canvas = document.createElement('canvas')
     const { width, height } = fitDimensions(video.videoWidth, video.videoHeight)
+
     canvas.width = width
     canvas.height = height
 
     const ctx = canvas.getContext('2d')!
+
     ctx.drawImage(video, 0, 0, width, height)
 
     return await canvasToResult(canvas, width, height)
@@ -124,22 +132,28 @@ export function useCamera() {
   async function processFile(file: File): Promise<CaptureResult | null> {
     if (!file.type.startsWith('image/')) {
       error.value = 'invalid_file_type'
+
       return null
     }
 
     return new Promise((resolve, reject) => {
       const img = new Image()
+
       img.onload = async () => {
         URL.revokeObjectURL(img.src)
+
         const { width, height } = fitDimensions(img.naturalWidth, img.naturalHeight)
         const canvas = document.createElement('canvas')
+
         canvas.width = width
         canvas.height = height
 
         const ctx = canvas.getContext('2d')!
+
         ctx.drawImage(img, 0, 0, width, height)
 
         const result = await canvasToResult(canvas, width, height)
+
         resolve(result)
       }
       img.onerror = () => {
@@ -162,18 +176,18 @@ export function useCamera() {
   ): Promise<Response | null> {
     try {
       const formData = new FormData()
+
       formData.append('photo', capture.blob, `capture-${Date.now()}.jpg`)
 
-      const res = await fetch(url, {
+      return await fetch(url, {
         method: 'POST',
         headers,
         body: formData,
       })
-
-      return res
     }
     catch {
       error.value = 'upload_failed'
+
       return null
     }
   }
@@ -187,6 +201,7 @@ export function useCamera() {
       return { width: w, height: h }
 
     const ratio = Math.min(MAX_DIMENSION / w, MAX_DIMENSION / h)
+
     return {
       width: Math.round(w * ratio),
       height: Math.round(h * ratio),
@@ -199,7 +214,7 @@ export function useCamera() {
 
     // Iterative compression if over target size
     do {
-      blob = await new Promise<Blob>((resolve) => {
+      blob = await new Promise<Blob>(resolve => {
         canvas.toBlob(
           b => resolve(b!),
           'image/jpeg',
@@ -214,6 +229,7 @@ export function useCamera() {
     } while (quality > 0.3)
 
     const dataUrl = URL.createObjectURL(blob)
+
     const result: CaptureResult = {
       blob,
       dataUrl,
@@ -223,6 +239,7 @@ export function useCamera() {
     }
 
     lastCapture.value = result
+
     return result
   }
 
@@ -232,30 +249,38 @@ export function useCamera() {
 
   onUnmounted(() => {
     stopCamera()
-    if (lastCapture.value?.dataUrl) {
+    if (lastCapture.value?.dataUrl)
       URL.revokeObjectURL(lastCapture.value.dataUrl)
-    }
   })
 
   return {
     /** Whether getUserMedia is available */
     isSupported,
+
     /** Active camera stream */
     stream: computed(() => stream.value),
+
     /** Whether the camera is currently active */
     isActive: computed(() => isActive.value),
+
     /** Last error code */
     error: computed(() => error.value),
+
     /** Last captured image */
     lastCapture: computed(() => lastCapture.value),
+
     /** Start the camera stream */
     startCamera,
+
     /** Stop the camera stream */
     stopCamera,
+
     /** Capture a photo from a <video> element */
     captureFromVideo,
+
     /** Process a File from <input type="file"> */
     processFile,
+
     /** Upload a capture result via fetch */
     uploadCapture,
   }

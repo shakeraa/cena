@@ -121,12 +121,16 @@ watch([isFallbackStateActive, refLoadingIndicator], () => {
     <StudentBottomNav />
   </template>
 
-  <!-- Global command palette + cheatsheet + keyboard shortcuts. Mounted
-       across both embed and normal layouts (STU-W-15 Phase A). -->
+  <!--
+    Global command palette + cheatsheet + keyboard shortcuts. Mounted
+    across both embed and normal layouts (STU-W-15 Phase A).
+  -->
   <ShellShortcuts v-if="!isEmbedMode" />
 
-  <!-- PWA-002: Install prompt shown after 2nd visit, respects dismiss cooldown.
-       Handles Chrome/Edge (beforeinstallprompt) and iOS Safari (manual guide). -->
+  <!--
+    PWA-002: Install prompt shown after 2nd visit, respects dismiss cooldown.
+    Handles Chrome/Edge (beforeinstallprompt) and iOS Safari (manual guide).
+  -->
   <InstallPrompt v-if="!isEmbedMode" />
 
   <!-- PWA-005: Offline banner + reconnect toast with auto-replay of queued submissions. -->

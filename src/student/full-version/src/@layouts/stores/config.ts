@@ -90,8 +90,12 @@ export const useLayoutConfigStore = defineStore('layoutConfig', () => {
   })
 
   // 👉 RTL
-  // const isAppRTL = ref(layoutConfig.app.isRTL)
-  const isAppRTL = ref(false)
+  // RDY-002: this was temporarily hard-disabled while mixed-direction
+  // question content and directional icons were still LTR-only. The real
+  // fix is to patch those components, not keep RTL permanently off, so the
+  // store now binds back to the config default and lets locale sync drive
+  // runtime direction changes.
+  const isAppRTL = ref(layoutConfig.app.isRTL)
 
   watch(isAppRTL, val => {
     _setDirAttr(val ? 'rtl' : 'ltr')

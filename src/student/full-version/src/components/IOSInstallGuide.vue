@@ -39,7 +39,10 @@ function handleDismiss() {
           variant="tonal"
           class="mb-3"
         >
-          <VIcon icon="tabler-device-mobile-plus" size="32" />
+          <VIcon
+            icon="tabler-device-mobile-plus"
+            size="32"
+          />
         </VAvatar>
         <div class="text-h6">
           {{ t('pwa.ios.title') }}
@@ -51,7 +54,10 @@ function handleDismiss() {
           {{ t('pwa.ios.description') }}
         </p>
 
-        <VList density="compact" class="text-start">
+        <VList
+          density="compact"
+          class="text-start"
+        >
           <VListItem prepend-icon="tabler-share">
             <VListItemTitle>
               {{ t('pwa.ios.step1') }}

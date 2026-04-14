@@ -17,6 +17,7 @@ import { getSentryConfig } from './sentry.config'
 
 /** Hashed-only user identifier. No email, no username, no IP. */
 export interface SentryUser {
+
   /** SHA-256(tenantPepper + studentId). Never a raw ID or email. */
   id_hash: string
 }
@@ -25,6 +26,7 @@ export interface SentryShim {
   captureException: (err: unknown, context?: Record<string, unknown>) => void
   addBreadcrumb: (breadcrumb: Record<string, unknown>) => void
   setTag: (key: string, value: string) => void
+
   /**
    * Set the current user context using ONLY a hashed identifier.
    * Pass `null` to clear. Email/username/IP are NOT accepted.
@@ -40,6 +42,7 @@ export interface SentryShim {
 export function hasObservabilityConsent(): boolean {
   try {
     const raw = globalThis.localStorage?.getItem('cena-consent-observability')
+
     return raw === 'true'
   }
   catch {
@@ -65,7 +68,7 @@ function createNoOpSentry(): SentryShim {
 }
 
 /** The singleton Sentry facade. Always safe to call; no-op until initialized. */
-export let Sentry: SentryShim = createNoOpSentry()
+export const Sentry: SentryShim = createNoOpSentry()
 
 /**
  * Vue plugin install function.
@@ -84,12 +87,14 @@ export default function installSentry(_app: App) {
     // No DSN provisioned — stay no-op.
     if ((import.meta as any).env?.DEV)
       console.info('[sentry] No DSN configured. Sentry disabled.')
+
     return
   }
 
   if (!hasObservabilityConsent()) {
     // User has not consented to observability tracking.
     console.info('[sentry] Observability consent not granted. Sentry disabled.')
+
     return
   }
 
@@ -101,6 +106,7 @@ export default function installSentry(_app: App) {
   //
   // The config from sentry.config.ts enforces all privacy constraints.
   const _config = getSentryConfig(dsn)
+
   void _config // Will be consumed by the real init in STU-W-OBS-SENTRY
 
   if ((import.meta as any).env?.DEV)

@@ -8,6 +8,7 @@ interface Props {
 }
 
 withDefaults(defineProps<Props>(), { locked: false })
+
 const { t } = useI18n()
 </script>
 

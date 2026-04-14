@@ -11,8 +11,8 @@
  *  7. URL query parameters are stripped
  *  8. Headers are stripped except trace-id
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { scrubEvent, getSentryConfig } from '@/plugins/sentry.config'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { getSentryConfig, scrubEvent } from '@/plugins/sentry.config'
 import type { SentryEvent } from '@/plugins/sentry.config'
 
 describe('FIND-privacy-016: Sentry privacy lockdown', () => {
@@ -67,6 +67,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       }
 
       const result = scrubEvent(event)
+
       expect(result).not.toBeNull()
       expect(result!.user).toEqual({ id_hash: 'safe-hash' })
       expect(result!.user?.email).toBeUndefined()
@@ -80,6 +81,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       }
 
       const result = scrubEvent(event)
+
       expect(result!.user?.username).toBeUndefined()
     })
 
@@ -91,6 +93,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       }
 
       const result = scrubEvent(event)
+
       expect(result!.user?.ip_address).toBeUndefined()
     })
 
@@ -102,7 +105,9 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       })
 
       expect(warnSpy).toHaveBeenCalledOnce()
+
       const logArg = warnSpy.mock.calls[0][1]
+
       expect(logArg).toContain('sentry_pii_scrub')
       expect(logArg).toContain('email')
       expect(logArg).toContain('ip_address')
@@ -117,6 +122,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       }
 
       const result = scrubEvent(event)
+
       expect(result!.request!.query_string).toBe('')
       expect(result!.request!.url).not.toContain('student_id')
       expect(result!.request!.url).not.toContain('token')
@@ -134,6 +140,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       }
 
       const result = scrubEvent(event)
+
       expect(Object.keys(result!.request!.headers!)).toEqual(['sentry-trace'])
       expect(result!.request!.headers!['sentry-trace']).toBe('trace-123')
     })
@@ -151,6 +158,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       }
 
       const result = scrubEvent(event)
+
       expect(result!.breadcrumbs![0].data!.key).toBe('[redacted:localStorage]')
       expect(result!.breadcrumbs![0].data!.safe).toBe('clicked button')
     })
@@ -164,6 +172,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       }
 
       const result = scrubEvent(event)
+
       expect(result!.extra!.dump).toBe('[redacted:localStorage]')
       expect(result!.extra!.safe).toBe('normal value')
     })
@@ -171,6 +180,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
     it('handles null user gracefully', () => {
       const event: SentryEvent = {}
       const result = scrubEvent(event)
+
       expect(result).not.toBeNull()
       expect(result!.user).toBeUndefined()
     })
@@ -190,6 +200,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
       }
 
       const result = scrubEvent(event)
+
       expect(result!.user).toEqual({ id_hash: 'sha256-hash' })
     })
   })
@@ -197,11 +208,13 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
   describe('getSentryConfig', () => {
     it('sets defaultPii to false', () => {
       const config = getSentryConfig('https://key@sentry.io/123')
+
       expect(config.defaultPii).toBe(false)
     })
 
     it('disables session replay entirely', () => {
       const config = getSentryConfig('https://key@sentry.io/123')
+
       expect(config.replaysSessionSampleRate).toBe(0)
       expect(config.replaysOnErrorSampleRate).toBe(0)
     })
@@ -212,18 +225,21 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
 
       // Must include localhost
       expect(targets).toContain('localhost')
+
       // Must have at least the Cena API pattern
       expect(targets.length).toBeGreaterThanOrEqual(2)
     })
 
     it('uses scrubEvent as beforeSend', () => {
       const config = getSentryConfig('https://key@sentry.io/123')
+
       expect(config.beforeSend).toBe(scrubEvent)
     })
 
     it('passes through the provided DSN', () => {
       const dsn = 'https://examplePublicKey@o0.ingest.sentry.io/0'
       const config = getSentryConfig(dsn)
+
       expect(config.dsn).toBe(dsn)
     })
   })
@@ -231,19 +247,25 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
   describe('consent gating', () => {
     it('hasObservabilityConsent returns false when not set', async () => {
       localStorage.clear()
+
       const { hasObservabilityConsent } = await import('@/plugins/sentry')
+
       expect(hasObservabilityConsent()).toBe(false)
     })
 
     it('hasObservabilityConsent returns true when consent granted', async () => {
       localStorage.setItem('cena-consent-observability', 'true')
+
       const { hasObservabilityConsent } = await import('@/plugins/sentry')
+
       expect(hasObservabilityConsent()).toBe(true)
     })
 
     it('hasObservabilityConsent returns false for any non-true value', async () => {
       localStorage.setItem('cena-consent-observability', 'false')
+
       const { hasObservabilityConsent } = await import('@/plugins/sentry')
+
       expect(hasObservabilityConsent()).toBe(false)
     })
   })
@@ -295,6 +317,7 @@ describe('FIND-privacy-016: Sentry privacy lockdown', () => {
         ingestedEvents.push(scrubbed)
 
       expect(ingestedEvents).toHaveLength(1)
+
       const event = ingestedEvents[0]
 
       // Assertions matching the DoD Pact contract

@@ -31,12 +31,14 @@ describe('FIND-arch-017: MSW production gate', () => {
     it('does not have top-level static import of msw/browser', () => {
       // Top-level imports appear at the start of lines (possibly with whitespace).
       // Dynamic imports inside if-blocks are fine (they are tree-shaken).
-      const topLevelMswImport = /^import\s+.*from\s+['"]msw\/browser['"]/m
+      const topLevelMswImport = /^import\s+(?:\S.*)?from\s+['"]msw\/browser['"]/m
+
       expect(src).not.toMatch(topLevelMswImport)
     })
 
     it('does not have top-level static imports of @db/ handlers', () => {
-      const topLevelDbImport = /^import\s+.*from\s+['"]@db\//m
+      const topLevelDbImport = /^import\s+(?:\S.*)?from\s+['"]@db\//m
+
       expect(src).not.toMatch(topLevelDbImport)
     })
 
@@ -51,7 +53,7 @@ describe('FIND-arch-017: MSW production gate', () => {
     })
 
     it('uses dynamic imports for msw/browser inside DEV block', () => {
-      expect(src).toContain("await import('msw/browser')")
+      expect(src).toContain('await import(\'msw/browser\')')
     })
   })
 

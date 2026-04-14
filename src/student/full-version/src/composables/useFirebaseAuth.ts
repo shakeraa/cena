@@ -78,9 +78,8 @@ export function useFirebaseAuth() {
    * Returns the user's UID on success, throws on failure.
    */
   async function loginWithEmail(email: string, password: string): Promise<string> {
-    if (useMockAuth) {
+    if (useMockAuth)
       throw new Error('[useFirebaseAuth] loginWithEmail called in mock auth mode. This should not happen.')
-    }
 
     errorKey.value = null
     isLoading.value = true
@@ -89,7 +88,6 @@ export function useFirebaseAuth() {
       const auth = getFirebaseAuth()
       const credential = await signInWithEmailAndPassword(auth, email, password)
 
-      // eslint-disable-next-line no-console
       console.info('[useFirebaseAuth] loginWithEmail success:', credential.user.uid)
 
       return credential.user.uid
@@ -113,9 +111,8 @@ export function useFirebaseAuth() {
    * Returns the user's UID on success.
    */
   async function registerWithEmail(email: string, password: string, displayName?: string): Promise<string> {
-    if (useMockAuth) {
+    if (useMockAuth)
       throw new Error('[useFirebaseAuth] registerWithEmail called in mock auth mode.')
-    }
 
     errorKey.value = null
     isLoading.value = true
@@ -124,11 +121,9 @@ export function useFirebaseAuth() {
       const auth = getFirebaseAuth()
       const credential = await createUserWithEmailAndPassword(auth, email, password)
 
-      if (displayName) {
+      if (displayName)
         await updateProfile(credential.user, { displayName })
-      }
 
-      // eslint-disable-next-line no-console
       console.info('[useFirebaseAuth] registerWithEmail success:', credential.user.uid)
 
       return credential.user.uid
@@ -152,9 +147,8 @@ export function useFirebaseAuth() {
    * Returns the user's UID on success.
    */
   async function loginWithProvider(providerName: 'google' | 'apple' | 'microsoft'): Promise<string> {
-    if (useMockAuth) {
+    if (useMockAuth)
       throw new Error(`[useFirebaseAuth] loginWithProvider(${providerName}) called in mock auth mode.`)
-    }
 
     errorKey.value = null
     isLoading.value = true
@@ -179,7 +173,6 @@ export function useFirebaseAuth() {
       const auth = getFirebaseAuth()
       const credential = await signInWithPopup(auth, provider)
 
-      // eslint-disable-next-line no-console
       console.info('[useFirebaseAuth] loginWithProvider success:', providerName, credential.user.uid)
 
       return credential.user.uid
@@ -229,6 +222,7 @@ export function useFirebaseAuth() {
     }
     catch (err) {
       console.error('[useFirebaseAuth] getIdToken error:', err)
+
       return null
     }
   }

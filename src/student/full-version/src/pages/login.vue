@@ -94,6 +94,7 @@ async function handleMockSubmit(payload: { email: string; password: string }) {
     else {
       errorMessage.value = t('auth.invalidCredentials')
     }
+
     return
   }
 
@@ -145,6 +146,7 @@ async function handleFirebaseSubmit(payload: { email: string; password: string }
         failedAttempts: failedAttempts.value,
         firebaseCode: err.code,
       })
+
       return
     }
 
@@ -178,6 +180,7 @@ async function handleSubmit(payload: { email: string; password: string }) {
 
   if (useMockAuth) {
     await handleMockSubmit(payload)
+
     return
   }
 

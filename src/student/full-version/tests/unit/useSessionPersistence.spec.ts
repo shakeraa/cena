@@ -108,6 +108,7 @@ describe('useSessionPersistence', () => {
       const { saveSnapshot, restoreSnapshot } = useSessionPersistence()
 
       saveSnapshot(snapshot)
+
       const restored = restoreSnapshot('s1')
 
       expect(restored).toEqual(snapshot)
@@ -132,12 +133,14 @@ describe('useSessionPersistence', () => {
 
     it('returns null and cleans up for a stale snapshot (>24h)', () => {
       const { saveSnapshot, restoreSnapshot } = useSessionPersistence()
+
       const stale: SessionSnapshot = {
         ...snapshot,
         lastActivityAt: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString(),
       }
 
       saveSnapshot(stale)
+
       const result = restoreSnapshot('s1')
 
       expect(result).toBeNull()
@@ -146,6 +149,7 @@ describe('useSessionPersistence', () => {
 
     it('returns null and cleans up for corrupted JSON', () => {
       localStorage.setItem('session-state:corrupt', '{not valid json')
+
       const { restoreSnapshot } = useSessionPersistence()
 
       expect(restoreSnapshot('corrupt')).toBeNull()
@@ -239,6 +243,7 @@ describe('useSessionPersistence', () => {
 
     it('does not remove drafts from other sessions', () => {
       localStorage.setItem('session-draft:other:1', 'keep me')
+
       const { clearSession } = useSessionPersistence()
 
       clearSession('s1')

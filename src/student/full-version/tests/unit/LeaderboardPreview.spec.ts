@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createI18n } from 'vue-i18n'
 // eslint-disable-next-line no-restricted-imports
@@ -112,6 +112,7 @@ describe('LeaderboardPreview', () => {
       currentStudentRank: 2,
       entries: [
         { rank: 1, studentId: 'u-1', displayName: 'Alex', xp: 2400, avatarUrl: null },
+
         // Note: displayName is "Custom User", not "Dev Student"
         { rank: 2, studentId: 'u-custom', displayName: 'Custom User', xp: 2200, avatarUrl: null },
         { rank: 3, studentId: 'u-3', displayName: 'Sam', xp: 1800, avatarUrl: null },
@@ -125,6 +126,7 @@ describe('LeaderboardPreview', () => {
 
     // Should highlight rank 2 (the matching entry), not look for "Dev Student"
     const myEntry = wrapper.find('[data-testid="leaderboard-entry-2"]')
+
     expect(myEntry.classes()).toContain('leaderboard-preview__you')
     expect(myEntry.text()).toContain('Custom User') // NOT "Dev Student"
     expect(myEntry.text()).toContain('You') // The chip still says "You"
@@ -142,6 +144,7 @@ describe('LeaderboardPreview', () => {
 
     // No entry should have the "you" class
     const youEntries = wrapper.findAll('.leaderboard-preview__you')
+
     expect(youEntries).toHaveLength(0)
   })
 

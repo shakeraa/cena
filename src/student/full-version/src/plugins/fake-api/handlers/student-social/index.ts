@@ -262,6 +262,7 @@ export const handlerStudentSocial = [
       return new HttpResponse(null, { status: 429 })
 
     reportTimestamps.push(Date.now())
+
     const severity = inferSeverity(body.category)
     const now = new Date().toISOString()
     const reportId = `report_${Date.now()}`
@@ -304,6 +305,7 @@ export const handlerStudentSocial = [
 
   http.delete('/api/social/block/:targetStudentId', ({ params }) => {
     const targetStudentId = params.targetStudentId as string
+
     blockedUsers.delete(targetStudentId)
 
     return HttpResponse.json({

@@ -192,6 +192,57 @@ describe('QuestionCard', () => {
     }
   })
 
+  it('wraps authored question content in explicit LTR bdi blocks for RTL pages', () => {
+    const wrapper = mount(QuestionCard, {
+      props: {
+        question: {
+          ...question,
+          prompt: 'احسب 3x + 2 عندما x = 4',
+          choices: ['3x + 2', '14', '16', '18'],
+          scaffoldingLevel: 'Full',
+          workedExample: '3(4) + 2 = 14',
+          hintsAvailable: 1,
+          hintsRemaining: 0,
+        },
+        lastHint: {
+          hintLevel: 1,
+          hintText: 'ابدأ من 3x + 2',
+          hasMoreHints: false,
+          hintsRemaining: 0,
+        },
+      },
+      global: {
+        plugins: [
+          createI18n({
+            legacy: false,
+            locale: 'ar',
+            messages: {
+              ar: {
+                session: {
+                  runner: {
+                    questionProgress: 'السؤال {current} من {total}',
+                    progressAria: 'السؤال {current} من {total}',
+                    choicesAria: 'الخيارات',
+                    submitAnswer: 'إرسال',
+                    workedExampleLabel: 'مثال محلول',
+                    hintLevel: 'تلميح {level}',
+                    requestHint: 'اعرض تلميحا ({remaining} متبقية)',
+                  },
+                },
+              },
+            },
+          }),
+          makeVuetify(),
+        ],
+      },
+    })
+
+    expect(wrapper.find('[data-testid="question-prompt"] bdi[dir="ltr"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="question-worked-example"] bdi[dir="ltr"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="question-hint-display"] bdi[dir="ltr"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="choice-14"] bdi[dir="ltr"]').exists()).toBe(true)
+  })
+
   it('hides the hint button at ScaffoldingLevel.None (expertise reversal)', () => {
     const wrapper = mount(QuestionCard, {
       props: {

@@ -12,6 +12,7 @@ import { nextTick } from 'vue'
 // lifecycle hooks wired up.
 async function loadComposable() {
   const mod = await import('@/composables/useInstallPrompt')
+
   return mod.useInstallPrompt
 }
 
@@ -41,34 +42,42 @@ describe('useInstallPrompt', () => {
 
     // After trackVisit (called in onMounted), count should be 2
     const count = Number.parseInt(localStorage.getItem('cena-install-visit-count') || '0', 10) + 1
+
     localStorage.setItem('cena-install-visit-count', String(count))
     expect(localStorage.getItem('cena-install-visit-count')).toBe('2')
   })
 
   it('dismiss stores timestamp in localStorage', () => {
     const now = Date.now()
+
     localStorage.setItem('cena-install-dismissed-at', String(now))
+
     const stored = Number.parseInt(localStorage.getItem('cena-install-dismissed-at') || '0', 10)
+
     expect(stored).toBe(now)
   })
 
   it('dismiss cooldown expires after 7 days for non-iOS', () => {
     const eightDaysAgo = Date.now() - (8 * 24 * 60 * 60 * 1000)
+
     localStorage.setItem('cena-install-dismissed-at', String(eightDaysAgo))
 
     const raw = localStorage.getItem('cena-install-dismissed-at')
     const dismissedAt = Number.parseInt(raw || '0', 10)
     const expiresAt = dismissedAt + (7 * 24 * 60 * 60 * 1000)
+
     expect(Date.now() > expiresAt).toBe(true)
   })
 
   it('dismiss cooldown still active within 7 days', () => {
     const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000)
+
     localStorage.setItem('cena-install-dismissed-at', String(threeDaysAgo))
 
     const raw = localStorage.getItem('cena-install-dismissed-at')
     const dismissedAt = Number.parseInt(raw || '0', 10)
     const expiresAt = dismissedAt + (7 * 24 * 60 * 60 * 1000)
+
     expect(Date.now() < expiresAt).toBe(true)
   })
 
@@ -80,6 +89,7 @@ describe('useInstallPrompt', () => {
     }))
 
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+
     expect(isStandalone).toBe(true)
   })
 
@@ -91,6 +101,7 @@ describe('useInstallPrompt', () => {
     }))
 
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+
     expect(isStandalone).toBe(false)
   })
 })

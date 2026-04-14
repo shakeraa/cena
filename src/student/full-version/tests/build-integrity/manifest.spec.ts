@@ -9,8 +9,8 @@
  * This test reads the manifest and verifies every icon entry has a corresponding
  * file in public/ that begins with a valid PNG signature.
  */
-import { readFileSync, existsSync } from 'node:fs'
-import { resolve, join } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const STUDENT_ROOT = resolve(__dirname, '../..')
@@ -42,11 +42,13 @@ describe('FIND-ux-029: PWA manifest icon integrity', () => {
 
   it('manifest declares a 192x192 icon', () => {
     const has192 = manifest.icons!.some(i => i.sizes === '192x192')
+
     expect(has192).toBe(true)
   })
 
   it('manifest declares a 512x512 icon', () => {
     const has512 = manifest.icons!.some(i => i.sizes === '512x512')
+
     expect(has512).toBe(true)
   })
 
@@ -66,24 +68,26 @@ describe('FIND-ux-029: PWA manifest icon integrity', () => {
       it('file has valid PNG signature', () => {
         const buf = readFileSync(filePath)
         const header = buf.subarray(0, 8)
+
         expect(Buffer.compare(header, PNG_SIGNATURE)).toBe(0)
       })
 
       it('file is at least 100 bytes (not a stub)', () => {
         const buf = readFileSync(filePath)
+
         expect(buf.length).toBeGreaterThan(100)
       })
     })
   }
 
   it('every icon entry declares type image/png', () => {
-    for (const icon of manifest.icons!) {
+    for (const icon of manifest.icons!)
       expect(icon.type).toBe('image/png')
-    }
   })
 
   it('includes at least one maskable icon for Android home screen', () => {
     const hasMaskable = manifest.icons!.some(i => i.purpose === 'maskable')
+
     expect(hasMaskable).toBe(true)
   })
 })

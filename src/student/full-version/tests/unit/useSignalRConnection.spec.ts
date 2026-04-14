@@ -28,6 +28,7 @@ const mockBuilder = {
   withUrl: vi.fn().mockReturnThis(),
   withAutomaticReconnect: vi.fn((policy: IRetryPolicy) => {
     capturedRetryPolicy = policy
+
     return mockBuilder
   }),
   configureLogging: vi.fn().mockReturnThis(),
@@ -84,6 +85,7 @@ describe('useSignalRConnection', () => {
 
   it('transitions to disconnected on connection failure', async () => {
     startMock.mockRejectedValueOnce(new Error('network error'))
+
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
 
     const wrapper = mount(makeHost())
@@ -177,6 +179,7 @@ describe('useSignalRConnection', () => {
     await vm.connect('https://hub.example.com/session')
 
     expect(capturedRetryPolicy).toBeDefined()
+
     const policy = capturedRetryPolicy!
 
     // Attempt 0 → 0ms

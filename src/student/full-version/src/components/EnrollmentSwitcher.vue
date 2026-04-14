@@ -7,7 +7,7 @@
  */
 
 import { computed, ref, watch } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 
 interface Enrollment {
@@ -35,11 +35,11 @@ const selected = ref(
   props.currentEnrollmentId
   || (route.query.enrollment as string)
   || props.enrollments[0]?.enrollmentId
-  || ''
+  || '',
 )
 
 const selectedEnrollment = computed(() =>
-  props.enrollments.find(e => e.enrollmentId === selected.value)
+  props.enrollments.find(e => e.enrollmentId === selected.value),
 )
 
 const enrollmentItems = computed(() =>
@@ -49,11 +49,12 @@ const enrollmentItems = computed(() =>
       title: `${e.trackTitle} — ${e.instituteName}`,
       value: e.enrollmentId,
       subtitle: e.trackCode,
-    }))
+    })),
 )
 
-watch(selected, (newId) => {
+watch(selected, newId => {
   emit('update:currentEnrollmentId', newId)
+
   // Persist in URL for deep-linking
   router.replace({ query: { ...route.query, enrollment: newId } })
 })

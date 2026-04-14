@@ -27,9 +27,11 @@ describe('authStore', () => {
     store.__mockSignIn({ uid: 'u-persist', email: 'p@example.com', displayName: 'P' })
 
     const raw = window.localStorage.getItem('cena-mock-auth')
+
     expect(raw).not.toBeNull()
 
     const parsed = JSON.parse(raw as string)
+
     expect(parsed.uid).toBe('u-persist')
     expect(parsed.email).toBe('p@example.com')
     expect(parsed.displayName).toBe('P')
@@ -55,6 +57,7 @@ describe('authStore', () => {
     setActivePinia(createPinia())
 
     const store = useAuthStore()
+
     expect(store.isSignedIn).toBe(true)
     expect(store.uid).toBe('u-hydrate')
     expect(store.email).toBe('h@example.com')
@@ -110,6 +113,7 @@ describe('authStore', () => {
   it('rehydrates mock user after hard navigation (reset Pinia + re-init)', () => {
     // Step 1: Sign in as a mock user
     const store = useAuthStore()
+
     store.__mockSignIn({
       uid: 'u-hard-nav-test',
       email: 'hardnav@example.com',
@@ -146,6 +150,7 @@ describe('authStore', () => {
   it('fails synthetic regression when localStorage persistence is broken', () => {
     // Sign in
     const store = useAuthStore()
+
     store.__mockSignIn({ uid: 'u-regression-test', email: 'reg@example.com' })
 
     // Corrupt the localStorage entry (simulate broken persistence)
@@ -153,6 +158,7 @@ describe('authStore', () => {
 
     // Simulate hard navigation
     setActivePinia(createPinia())
+
     const newStore = useAuthStore()
 
     // Without localStorage persistence, the store should NOT be signed in

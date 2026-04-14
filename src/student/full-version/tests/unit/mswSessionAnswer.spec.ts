@@ -23,6 +23,7 @@ describe('MSW session answer handler contract (FIND-pedagogy-011)', () => {
       resolve(process.cwd(), 'src/plugins/fake-api/handlers/student-sessions/index.ts'),
       'utf8',
     )
+
     // The literal `CANNED` constant must be removed entirely
     expect(src).not.toMatch(/\bCANNED\b/)
   })
@@ -32,6 +33,7 @@ describe('MSW session answer handler contract (FIND-pedagogy-011)', () => {
       resolve(process.cwd(), 'src/plugins/fake-api/handlers/student-sessions/index.ts'),
       'utf8',
     )
+
     expect(src).not.toContain('Correct! Great work.')
   })
 
@@ -40,6 +42,7 @@ describe('MSW session answer handler contract (FIND-pedagogy-011)', () => {
       resolve(process.cwd(), 'src/plugins/fake-api/handlers/student-sessions/index.ts'),
       'utf8',
     )
+
     // No `0.05` or `-0.02` as literal return values for masteryDelta
     expect(src).not.toMatch(/masteryDelta:\s*(?:correct\s*\?\s*)?0\.05/)
     expect(src).not.toMatch(/masteryDelta:\s*(?:correct\s*\?\s*0\.05\s*:\s*)?-0\.02/)
@@ -50,6 +53,7 @@ describe('MSW session answer handler contract (FIND-pedagogy-011)', () => {
       resolve(process.cwd(), 'src/plugins/fake-api/handlers/student-sessions/index.ts'),
       'utf8',
     )
+
     // The return body must include all 7 fields from the DTO
     const requiredFields = [
       'correct',
@@ -60,9 +64,9 @@ describe('MSW session answer handler contract (FIND-pedagogy-011)', () => {
       'explanation',
       'distractorRationale',
     ]
-    for (const field of requiredFields) {
+
+    for (const field of requiredFields)
       expect(src, `Response must include field "${field}"`).toContain(field)
-    }
   })
 
   it('dev questions include explanation and distractorRationales', () => {
@@ -70,6 +74,7 @@ describe('MSW session answer handler contract (FIND-pedagogy-011)', () => {
       resolve(process.cwd(), 'src/plugins/fake-api/handlers/student-sessions/index.ts'),
       'utf8',
     )
+
     // Every dev question must have an explanation property with real content
     expect(src).toContain('explanation:')
     expect(src).toContain('distractorRationales:')
@@ -84,22 +89,26 @@ describe('BKT shim (FIND-pedagogy-011)', () => {
   it('correct answer increases mastery', () => {
     const prior = 0.10
     const posterior = bktUpdate(prior, true)
+
     expect(posterior).toBeGreaterThan(prior)
   })
 
   it('wrong answer decreases mastery', () => {
     const prior = 0.50
     const posterior = bktUpdate(prior, false)
+
     expect(posterior).toBeLessThan(prior)
   })
 
   it('mastery is always clamped to [0.01, 0.99]', () => {
     // Very low prior + wrong answer should not go below 0.01
     const veryLow = bktUpdate(0.01, false)
+
     expect(veryLow).toBeGreaterThanOrEqual(0.01)
 
     // Very high prior + correct answer should not exceed 0.99
     const veryHigh = bktUpdate(0.99, true)
+
     expect(veryHigh).toBeLessThanOrEqual(0.99)
   })
 
@@ -113,6 +122,7 @@ describe('BKT shim (FIND-pedagogy-011)', () => {
     for (let i = 0; i < 5; i++) {
       const posterior = bktUpdate(mastery, true)
       const delta = posterior - mastery
+
       deltas.push(delta)
       mastery = posterior
     }
@@ -123,6 +133,7 @@ describe('BKT shim (FIND-pedagogy-011)', () => {
 
     // NOT all deltas are the same — BKT produces diminishing returns
     const allSame = deltas.every(d => Math.abs(d - deltas[0]) < 1e-10)
+
     expect(allSame, 'BKT deltas must not all be identical (non-linear curve)').toBe(false)
 
     // Specifically: later deltas should be smaller than earlier ones
@@ -140,6 +151,7 @@ describe('BKT shim (FIND-pedagogy-011)', () => {
     //   posterior = 0.34545 + (1 - 0.34545) * 0.10 = 0.34545 + 0.06545 = 0.41091
     //   with forget: 0.41091 * 0.98 = 0.40269...
     const result = bktUpdate(0.10, true)
+
     expect(result).toBeCloseTo(0.40269, 3)
   })
 
@@ -151,6 +163,7 @@ describe('BKT shim (FIND-pedagogy-011)', () => {
     //   posterior = 0.058824 + (1 - 0.058824) * 0.10 = 0.058824 + 0.094118 = 0.152941
     //   with forget: 0.152941 * 0.98 = 0.149882
     const result = bktUpdate(0.50, false)
+
     expect(result).toBeCloseTo(0.14988, 3)
   })
 })
@@ -168,9 +181,11 @@ describe('MSW answer handler behavior (FIND-pedagogy-011)', () => {
       resolve(process.cwd(), 'src/plugins/fake-api/handlers/student-sessions/index.ts'),
       'utf8',
     )
+
     // Must have the conditional guard for wrong-answer distractor lookup
     expect(src).toContain('!correct')
     expect(src).toContain('distractorRationale')
+
     // Must NOT return null unconditionally
     expect(src).not.toMatch(/distractorRationale:\s*null\s*[,}]/)
   })

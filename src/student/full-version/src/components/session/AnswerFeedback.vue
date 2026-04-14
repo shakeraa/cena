@@ -108,7 +108,10 @@ function handleContinue() {
       >
         {{ t('session.runner.explanationLangNote') }}
       </div>
-      <div lang="en" dir="ltr">
+      <div
+        lang="en"
+        dir="ltr"
+      >
         {{ feedback.distractorRationale }}
       </div>
     </div>
@@ -123,7 +126,10 @@ function handleContinue() {
       >
         {{ t('session.runner.explanationLangNote') }}
       </div>
-      <div lang="en" dir="ltr">
+      <div
+        lang="en"
+        dir="ltr"
+      >
         {{ feedback.explanation }}
       </div>
     </div>
@@ -141,6 +147,7 @@ function handleContinue() {
         :disabled="loading"
         :loading="loading"
         append-icon="tabler-arrow-right"
+        class="answer-feedback__continue"
         data-testid="feedback-continue"
         @click="handleContinue"
       >
@@ -159,5 +166,9 @@ function handleContinue() {
 .answer-feedback--wrong {
   background-color: rgb(var(--v-theme-error) / 0.12);
   border-inline-start: 4px solid rgb(var(--v-theme-error));
+}
+
+:deep([dir="rtl"] .answer-feedback__continue .tabler-arrow-right) {
+  transform: scaleX(-1);
 }
 </style>

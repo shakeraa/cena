@@ -76,6 +76,7 @@ test.describe.serial('STU-W-09 progress subpages', () => {
     for (const path of ['/progress/time', '/progress/mastery', '/progress/sessions']) {
       await page.goto(path)
       await page.waitForLoadState('domcontentloaded')
+
       // Just verify the page testid is present without horizontal scroll
       const testId = `progress-${path.split('/').pop()}-page`
 

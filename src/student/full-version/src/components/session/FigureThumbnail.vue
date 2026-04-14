@@ -17,6 +17,7 @@ interface FigureSpec {
 
 defineProps<{
   spec: FigureSpec
+
   /** Thumbnail height in px (default 80) */
   thumbnailHeight?: number
 }>()
@@ -39,7 +40,10 @@ function toggleExpand() {
       @click="toggleExpand"
     >
       <div class="figure-thumbnail__preview">
-        <VIcon icon="tabler-chart-line" size="24" />
+        <VIcon
+          icon="tabler-chart-line"
+          size="24"
+        />
         <span class="figure-thumbnail__label">View figure</span>
       </div>
     </button>

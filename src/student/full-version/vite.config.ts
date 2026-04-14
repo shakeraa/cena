@@ -40,7 +40,6 @@ function validateManifestIcons() {
         if (isBuild)
           throw new Error(msg)
 
-        // eslint-disable-next-line no-console
         console.warn(msg)
 
         return
@@ -62,13 +61,11 @@ function validateManifestIcons() {
       if (missing.length > 0) {
         const msg = `[validate-manifest-icons] Missing icon files in public/:\n${missing.map(m => `  - ${m}`).join('\n')}\nBrowsers will receive the SPA HTML fallback instead of the icon image.`
 
-        // eslint-disable-next-line no-console
         console.error(msg)
         if (isBuild)
           throw new Error(msg)
       }
       else {
-        // eslint-disable-next-line no-console
         console.log(`[validate-manifest-icons] All ${icons.length} manifest icon(s) verified.`)
       }
     },
@@ -98,7 +95,7 @@ function stripMswInProduction() {
       const mswPath = resolve(outDir, 'mockServiceWorker.js')
       if (existsSync(mswPath)) {
         unlinkSync(mswPath)
-        // eslint-disable-next-line no-console
+
         console.log('[strip-msw-production] Removed mockServiceWorker.js from dist/')
       }
     },

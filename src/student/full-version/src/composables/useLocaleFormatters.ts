@@ -137,7 +137,8 @@ export function formatDateWithLocale(
   formatting: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric', year: 'numeric' },
   localeCode = 'en',
 ): string {
-  if (!value) return value
+  if (!value)
+    return value
 
   const bcp47 = toBcp47(localeCode)
 

@@ -10,13 +10,14 @@
  * Regression: if any key is reverted to a non-pluralized form, these
  * tests will fail.
  */
-import { describe, it, expect } from 'vitest'
-import { createI18n } from 'vue-i18n'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+import { createI18n } from 'vue-i18n'
 
 function loadLocale(locale: string) {
   const filePath = resolve(__dirname, '../../src/plugins/i18n/locales', `${locale}.json`)
+
   return JSON.parse(readFileSync(filePath, 'utf8'))
 }
 
@@ -30,6 +31,7 @@ function getT(locale: string, messages: Record<string, any>) {
     locale,
     messages: { [locale]: messages },
   })
+
   return i18n.global.t
 }
 
@@ -37,9 +39,10 @@ const COUNTS = [0, 1, 2, 5, 10, 100] as const
 
 describe('i18n plural forms', () => {
   describe('progress.mastery.questionsAttempted', () => {
-    it.each(COUNTS)('en count=%i renders with plural syntax', (count) => {
+    it.each(COUNTS)('en count=%i renders with plural syntax', count => {
       const t = getT('en', en)
       const result = t('progress.mastery.questionsAttempted', count)
+
       expect(result).toContain(String(count))
       if (count === 1) {
         expect(result).toContain('question attempted')
@@ -50,131 +53,142 @@ describe('i18n plural forms', () => {
       }
     })
 
-    it.each(COUNTS)('ar count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('ar count=%i renders non-raw', count => {
       const t = getT('ar', ar)
       const result = t('progress.mastery.questionsAttempted', count)
+
       expect(result).not.toBe('progress.mastery.questionsAttempted')
     })
 
-    it.each(COUNTS)('he count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('he count=%i renders non-raw', count => {
       const t = getT('he', he)
       const result = t('progress.mastery.questionsAttempted', count)
+
       expect(result).not.toBe('progress.mastery.questionsAttempted')
     })
   })
 
   describe('profile.streakLabel', () => {
-    it.each(COUNTS)('en count=%i renders with {count}', (count) => {
+    it.each(COUNTS)('en count=%i renders with {count}', count => {
       const t = getT('en', en)
       const result = t('profile.streakLabel', count)
+
       expect(result).toContain('day streak')
       expect(result).toContain(String(count))
     })
 
-    it.each(COUNTS)('ar count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('ar count=%i renders non-raw', count => {
       const t = getT('ar', ar)
       const result = t('profile.streakLabel', count)
+
       expect(result).not.toBe('profile.streakLabel')
     })
 
-    it.each(COUNTS)('he count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('he count=%i renders non-raw', count => {
       const t = getT('he', he)
       const result = t('profile.streakLabel', count)
+
       expect(result).not.toBe('profile.streakLabel')
     })
   })
 
   describe('home.kpi.sessionsValue', () => {
-    it.each(COUNTS)('en count=%i renders grammatically', (count) => {
+    it.each(COUNTS)('en count=%i renders grammatically', count => {
       const t = getT('en', en)
       const result = t('home.kpi.sessionsValue', count)
-      if (count === 1) {
+      if (count === 1)
         expect(result).toBe('1 session')
-      }
-      else {
+
+      else
         expect(result).toContain('sessions')
-      }
     })
 
-    it.each(COUNTS)('ar count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('ar count=%i renders non-raw', count => {
       const t = getT('ar', ar)
       const result = t('home.kpi.sessionsValue', count)
+
       expect(result).not.toBe('home.kpi.sessionsValue')
     })
 
-    it.each(COUNTS)('he count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('he count=%i renders non-raw', count => {
       const t = getT('he', he)
       const result = t('home.kpi.sessionsValue', count)
+
       expect(result).not.toBe('home.kpi.sessionsValue')
     })
   })
 
   describe('tutor.threadList.messageCount', () => {
-    it.each(COUNTS)('en count=%i renders grammatically', (count) => {
+    it.each(COUNTS)('en count=%i renders grammatically', count => {
       const t = getT('en', en)
       const result = t('tutor.threadList.messageCount', count)
-      if (count === 1) {
+      if (count === 1)
         expect(result).toBe('1 message')
-      }
-      else {
+
+      else
         expect(result).toContain('messages')
-      }
     })
 
-    it.each(COUNTS)('ar count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('ar count=%i renders non-raw', count => {
       const t = getT('ar', ar)
       const result = t('tutor.threadList.messageCount', count)
+
       expect(result).not.toBe('tutor.threadList.messageCount')
     })
 
-    it.each(COUNTS)('he count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('he count=%i renders non-raw', count => {
       const t = getT('he', he)
       const result = t('tutor.threadList.messageCount', count)
+
       expect(result).not.toBe('tutor.threadList.messageCount')
     })
   })
 
   describe('challenges.tournaments.participants', () => {
-    it.each(COUNTS)('en count=%i renders grammatically', (count) => {
+    it.each(COUNTS)('en count=%i renders grammatically', count => {
       const t = getT('en', en)
       const result = t('challenges.tournaments.participants', count)
-      if (count === 1) {
+      if (count === 1)
         expect(result).toBe('1 participant')
-      }
-      else {
+
+      else
         expect(result).toContain('participants')
-      }
     })
 
-    it.each(COUNTS)('ar count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('ar count=%i renders non-raw', count => {
       const t = getT('ar', ar)
       const result = t('challenges.tournaments.participants', count)
+
       expect(result).not.toBe('challenges.tournaments.participants')
     })
 
-    it.each(COUNTS)('he count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('he count=%i renders non-raw', count => {
       const t = getT('he', he)
       const result = t('challenges.tournaments.participants', count)
+
       expect(result).not.toBe('challenges.tournaments.participants')
     })
   })
 
   describe('notifications.unreadCount', () => {
-    it.each(COUNTS)('en count=%i renders unread', (count) => {
+    it.each(COUNTS)('en count=%i renders unread', count => {
       const t = getT('en', en)
       const result = t('notifications.unreadCount', count)
+
       expect(result).toContain('unread')
     })
 
-    it.each(COUNTS)('ar count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('ar count=%i renders non-raw', count => {
       const t = getT('ar', ar)
       const result = t('notifications.unreadCount', count)
+
       expect(result).not.toBe('notifications.unreadCount')
     })
 
-    it.each(COUNTS)('he count=%i renders non-raw', (count) => {
+    it.each(COUNTS)('he count=%i renders non-raw', count => {
       const t = getT('he', he)
       const result = t('notifications.unreadCount', count)
+
       expect(result).not.toBe('notifications.unreadCount')
     })
   })
@@ -196,7 +210,9 @@ describe('i18n plural forms', () => {
         for (const p of parts)
           val = val?.[p]
         expect(typeof val).toBe('string')
+
         const forms = (val as string).split(' | ')
+
         expect(forms.length).toBe(6)
       })
     }
@@ -219,7 +235,9 @@ describe('i18n plural forms', () => {
         for (const p of parts)
           val = val?.[p]
         expect(typeof val).toBe('string')
+
         const forms = (val as string).split(' | ')
+
         expect(forms.length).toBe(4)
       })
     }
@@ -243,7 +261,9 @@ describe('i18n plural forms', () => {
         for (const p of parts)
           val = val?.[p]
         expect(typeof val).toBe('string')
+
         const forms = (val as string).split(' | ')
+
         expect(forms.length).toBeGreaterThanOrEqual(2)
       })
     }

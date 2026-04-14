@@ -17,10 +17,10 @@ function makeI18n() {
         session: { setup: { subjects: { math: 'Math' } } },
         knowledgeGraph: {
           status: {
-            locked: 'Locked',
-            available: 'Available',
+            'locked': 'Locked',
+            'available': 'Available',
             'in-progress': 'In progress',
-            mastered: 'Mastered',
+            'mastered': 'Mastered',
           },
           difficulty: {
             beginner: 'Beginner',

@@ -18,6 +18,7 @@ import { useFirebaseAuth } from '@/composables/useFirebaseAuth'
  */
 
 interface Props {
+
   /** 'login' lands onboarded users on /home; 'register' lands fresh users on /onboarding. */
   mode: 'login' | 'register'
 }
@@ -137,9 +138,8 @@ async function handleFirebaseProvider(provider: 'google' | 'apple' | 'microsoft'
     loadingProvider.value = null
 
     // Don't show error for user-cancelled popups
-    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+    if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request')
       return
-    }
 
     providerError.value = errorKey.value
       ? t(errorKey.value)
@@ -161,11 +161,13 @@ async function handleProvider(provider: Provider) {
   if (provider === 'phone') {
     phoneAuthMessage.value = t('auth.providers.phoneComingSoon')
     loadingProvider.value = null
+
     return
   }
 
   if (useMockAuth) {
     await handleMockProvider(provider)
+
     return
   }
 

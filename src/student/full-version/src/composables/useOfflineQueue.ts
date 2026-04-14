@@ -10,16 +10,22 @@ export interface QueuedSubmission {
 }
 
 export interface UseOfflineQueueReturn {
+
   /** Queued submissions waiting to be sent */
   queue: Ref<QueuedSubmission[]>
+
   /** Add a submission to the offline queue */
   enqueue: (submission: Omit<QueuedSubmission, 'clientSubmissionId' | 'queuedAt'>) => string
+
   /** Remove a submission after successful send */
   dequeue: (clientSubmissionId: string) => void
+
   /** Get all queued submissions for replay */
   getAll: () => QueuedSubmission[]
+
   /** Clear the entire queue */
   clear: () => void
+
   /** Number of pending submissions */
   pendingCount: Ref<number>
 }

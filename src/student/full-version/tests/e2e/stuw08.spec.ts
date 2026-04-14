@@ -85,6 +85,7 @@ test.describe.serial('STU-W-08 tutor UI', () => {
     })
 
     await page.waitForSelector('[data-testid="tutor-thread-page"]')
+
     // Empty state should be visible
     await expect(page.locator('[data-testid="tutor-messages-empty"]')).toBeVisible()
   })

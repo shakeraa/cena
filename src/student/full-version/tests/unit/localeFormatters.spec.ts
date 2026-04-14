@@ -13,7 +13,7 @@
  *   - kFormatter used regex-based ',' separator with no locale awareness
  *   - TimeBreakdownChart used `undefined` (browser locale) instead of i18n locale
  */
-import { describe, it, expect } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createI18n } from 'vue-i18n'
 import { mount } from '@vue/test-utils'
 // eslint-disable-next-line no-restricted-imports
@@ -21,10 +21,10 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { createVuetify } from 'vuetify'
 import {
-  toBcp47,
   LOCALE_BCP47_MAP,
   formatDateWithLocale,
   formatNumberWithLocale,
+  toBcp47,
 } from '@/composables/useLocaleFormatters'
 import TimeBreakdownChart from '@/components/progress/TimeBreakdownChart.vue'
 
@@ -150,6 +150,7 @@ describe('Intl.NumberFormat locale-aware output', () => {
 describe('formatDateWithLocale', () => {
   it('formats date in en locale as en-US', () => {
     const result = formatDateWithLocale('2026-04-11', undefined, 'en')
+
     const expected = new Intl.DateTimeFormat('en-US', {
       month: 'short',
       day: 'numeric',

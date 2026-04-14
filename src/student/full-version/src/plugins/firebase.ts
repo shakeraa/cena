@@ -34,8 +34,8 @@ import { ability, studentAbilityRules } from '@/plugins/casl/ability'
  * Whether the current environment should use mock auth instead of real Firebase.
  * Exported for use by other modules that need to check the mode.
  */
-export const useMockAuth: boolean =
-  import.meta.env.DEV === true
+export const useMockAuth: boolean
+  = import.meta.env.DEV === true
   && import.meta.env.VITE_USE_MOCK_AUTH === 'true'
 
 let _firebaseApp: FirebaseApp | null = null
@@ -77,7 +77,7 @@ function initFirebase(): Auth | null {
   const emulatorHost = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST
   if (emulatorHost) {
     connectAuthEmulator(_firebaseAuth, emulatorHost, { disableWarnings: true })
-    // eslint-disable-next-line no-console
+
     console.info('[firebase] Connected to Auth emulator at', emulatorHost)
   }
 
@@ -108,8 +108,10 @@ export function getFirebaseAuth(): Auth {
 export const googleProvider = new GoogleAuthProvider()
 export const appleProvider = (() => {
   const p = new OAuthProvider('apple.com')
+
   p.addScope('email')
   p.addScope('name')
+
   return p
 })()
 export const microsoftProvider = new OAuthProvider('microsoft.com')
@@ -152,12 +154,12 @@ export default function install(_app: App) {
   // SSR guard
   if (typeof window === 'undefined') {
     authStore.__setReady()
+
     return
   }
 
   // ── Mock auth path (dev only, explicit opt-in) ──
   if (useMockAuth) {
-    // eslint-disable-next-line no-console
     console.info('[firebase] Mock auth mode enabled (VITE_USE_MOCK_AUTH=true)')
 
     const mockAuth = localStorage.getItem('cena-mock-auth')
@@ -197,10 +199,11 @@ export default function install(_app: App) {
     // Should not happen — initFirebase throws when config is missing
     // and useMockAuth is false. Belt-and-suspenders.
     authStore.__setReady()
+
     return
   }
 
-  onAuthStateChanged(auth, async (firebaseUser) => {
+  onAuthStateChanged(auth, async firebaseUser => {
     if (firebaseUser) {
       try {
         const tokenResult = await firebaseUser.getIdTokenResult()
@@ -217,7 +220,6 @@ export default function install(_app: App) {
         ability.update(studentAbilityRules)
         writeAbilityCookie(studentAbilityRules)
 
-        // eslint-disable-next-line no-console
         console.info('[firebase] Auth state: signed in as', firebaseUser.uid)
       }
       catch (err) {
@@ -233,7 +235,6 @@ export default function install(_app: App) {
       ability.update([])
       clearAbilityCookie()
 
-      // eslint-disable-next-line no-console
       console.info('[firebase] Auth state: signed out')
     }
 

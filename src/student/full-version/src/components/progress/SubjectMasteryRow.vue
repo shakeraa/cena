@@ -13,9 +13,12 @@ const props = defineProps<Props>()
 const { t } = useI18n()
 
 const masteryTier = computed<'novice' | 'learning' | 'proficient' | 'mastered'>(() => {
-  if (props.masteryPercent >= 85) return 'mastered'
-  if (props.masteryPercent >= 60) return 'proficient'
-  if (props.masteryPercent >= 30) return 'learning'
+  if (props.masteryPercent >= 85)
+    return 'mastered'
+  if (props.masteryPercent >= 60)
+    return 'proficient'
+  if (props.masteryPercent >= 30)
+    return 'learning'
 
   return 'novice'
 })
