@@ -11,6 +11,7 @@
 // =============================================================================
 
 using Cena.Actors.Services;
+using Cena.Infrastructure.Assessment;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -159,6 +160,98 @@ public sealed class ItemBankHealthService
             P75: attempts[3 * attempts.Count / 4],
             Max: attempts.Last());
     }
+
+    /// <summary>
+    /// RDY-018: Generates a Sympson-Hetter exposure analytics report.
+    /// Returns distribution of exposure rates, over-exposed items, and unused items.
+    /// </summary>
+    public async Task<ExposureAnalyticsReport> GetExposureAnalyticsAsync(CancellationToken ct = default)
+    {
+        await using var session = _store.QuerySession();
+
+        var exposureDocs = await session.Query<ItemExposureDocument>().ToListAsync(ct);
+
+        if (exposureDocs.Count == 0)
+        {
+            return new ExposureAnalyticsReport
+            {
+                GeneratedAt = DateTimeOffset.UtcNow
+            };
+        }
+
+        var overExposed = exposureDocs
+            .Where(d => d.ObservedExposureRate > d.TargetExposureRate * 2 && d.TotalEligible >= 10)
+            .Select(d => new OverExposedItem(d.ItemId, d.ObservedExposureRate, d.TargetExposureRate, d.TotalAdministrations))
+            .OrderByDescending(d => d.ObservedRate)
+            .ToList();
+
+        var unused = exposureDocs
+            .Where(d => d.TotalAdministrations == 0)
+            .Select(d => d.ItemId)
+            .ToList();
+
+        var rates = exposureDocs
+            .Where(d => d.TotalEligible > 0)
+            .Select(d => d.ObservedExposureRate)
+            .OrderBy(r => r)
+            .ToList();
+
+        var distribution = rates.Count > 0
+            ? new ExposureRateDistribution
+            {
+                Min = rates.First(),
+                P25 = rates[rates.Count / 4],
+                Median = rates[rates.Count / 2],
+                P75 = rates[3 * rates.Count / 4],
+                Max = rates.Last(),
+                Mean = rates.Average()
+            }
+            : new ExposureRateDistribution();
+
+        _logger.LogInformation(
+            "RDY-018: Exposure analytics — {Total} tracked, {OverExposed} over-exposed, {Unused} unused",
+            exposureDocs.Count, overExposed.Count, unused.Count);
+
+        return new ExposureAnalyticsReport
+        {
+            TotalTrackedItems = exposureDocs.Count,
+            OverExposedItems = overExposed,
+            UnusedItemIds = unused,
+            Distribution = distribution,
+            GeneratedAt = DateTimeOffset.UtcNow
+        };
+    }
+
+    /// <summary>
+    /// RDY-018: Recalibrates Sympson-Hetter exposure parameters for all items.
+    /// Should be called periodically (e.g. daily or after every N sessions).
+    /// </summary>
+    public async Task RecalibrateExposureParametersAsync(CancellationToken ct = default)
+    {
+        await using var session = _store.LightweightSession();
+
+        var exposureDocs = await session.Query<ItemExposureDocument>().ToListAsync(ct);
+
+        var recalibrated = 0;
+        foreach (var doc in exposureDocs)
+        {
+            var oldParam = doc.ExposureParameter;
+            doc.RecalibrateExposureParameter();
+
+            if (Math.Abs(oldParam - doc.ExposureParameter) > 0.001)
+            {
+                session.Store(doc);
+                recalibrated++;
+            }
+        }
+
+        if (recalibrated > 0)
+        {
+            await session.SaveChangesAsync(ct);
+            _logger.LogInformation(
+                "RDY-018: Recalibrated {Count} item exposure parameters", recalibrated);
+        }
+    }
 }
 
 // ── Report DTOs ──
@@ -177,6 +270,8 @@ public sealed record ItemBankHealthReport
     public ConfidenceDistribution ConfidenceDistribution { get; init; } = new(0, 0, 0, 0, 0);
     /// <summary>RDY-007: DIF analysis summary (null if no response data available).</summary>
     public DifReportSection? DifAnalysis { get; init; }
+    /// <summary>RDY-018: Sympson-Hetter exposure analytics (null if not yet computed).</summary>
+    public ExposureAnalyticsReport? ExposureAnalytics { get; init; }
     public DateTimeOffset GeneratedAt { get; init; }
 }
 

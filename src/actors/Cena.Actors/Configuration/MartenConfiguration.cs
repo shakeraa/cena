@@ -365,6 +365,13 @@ public static class MartenConfiguration
             .Index(x => x.Subject)
             .Index(x => x.IsActive);
 
+        // ── Item Exposure Document (RDY-018: Sympson-Hetter exposure control) ──
+        opts.Schema.For<Cena.Infrastructure.Assessment.ItemExposureDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.ItemId)
+            .Index(x => x.ObservedExposureRate)
+            .Index(x => x.LastAdministeredAt);
+
         // ── Boss Attempt Document (STB-05b) ──
         opts.Schema.For<BossAttemptDocument>()
             .Identity(x => x.Id)

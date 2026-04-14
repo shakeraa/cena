@@ -1,15 +1,17 @@
 // =============================================================================
-// Cena Platform — Constrained CAT Algorithm (IRT-003)
+// Cena Platform — Constrained CAT Algorithm (IRT-003 + RDY-018)
 // A-stratified exposure control with content balance constraints.
 //
 // Item selection: maximize Fisher information at current theta, subject to:
 // 1. Content balance (Bagrut topic coverage across strata)
-// 2. Exposure rate cap (max 25% of students see any single item)
+// 2. Sympson-Hetter exposure control (per-item probability parameter)
 // 3. Reserved pool exclusion (exam simulation items never shown in practice)
 // 4. PP-011: Calibration confidence weighting (prefer well-calibrated items)
 //
-// Exposure control: Sympson-Hetter method — each item has a probability
-// of being administered even when selected (exposure parameter 0.0-1.0).
+// Exposure control: Full Sympson-Hetter method (Sympson & Hetter, 1985).
+// Each item has a calibrated probability p_i of being administered when
+// selected. If rejected (1 - p_i), the next-best item is tried. Parameters
+// are recalibrated periodically to maintain a configurable target exposure rate.
 // =============================================================================
 
 using Cena.Actors.Services;
@@ -17,12 +19,46 @@ using Cena.Actors.Services;
 namespace Cena.Actors.Assessment;
 
 /// <summary>
-/// IRT-003: Constrained CAT item selector with exposure control.
+/// RDY-018: Interface for looking up per-item Sympson-Hetter exposure parameters.
+/// Implemented by the service that reads/writes ItemExposureDocument.
+/// </summary>
+public interface IItemExposureProvider
+{
+    /// <summary>
+    /// Gets the Sympson-Hetter exposure parameter for an item.
+    /// Returns 1.0 if no tracking data exists (new/unseen item).
+    /// </summary>
+    double GetExposureParameter(string itemId);
+}
+
+/// <summary>
+/// Default exposure provider that uses CatItemCandidate.ExposureRate (legacy behavior).
+/// Used when no IItemExposureProvider is registered.
+/// </summary>
+public sealed class LegacyExposureProvider : IItemExposureProvider
+{
+    public double GetExposureParameter(string itemId) => 1.0;
+}
+
+/// <summary>
+/// IRT-003 + RDY-018: Constrained CAT item selector with full Sympson-Hetter exposure control.
 /// </summary>
 public sealed class ConstrainedCatAlgorithm
 {
-    /// <summary>Maximum exposure rate for any single item.</summary>
+    /// <summary>Default target exposure rate per item (20%).</summary>
+    public const double DefaultTargetExposureRate = 0.20;
+
+    /// <summary>Legacy maximum exposure rate cap (kept for backwards compatibility).</summary>
     public const double MaxExposureRate = 0.25;
+
+    private readonly IItemExposureProvider _exposureProvider;
+
+    public ConstrainedCatAlgorithm() : this(new LegacyExposureProvider()) { }
+
+    public ConstrainedCatAlgorithm(IItemExposureProvider exposureProvider)
+    {
+        _exposureProvider = exposureProvider ?? throw new ArgumentNullException(nameof(exposureProvider));
+    }
 
     /// <summary>
     /// Selects the next item for a CAT session, subject to constraints.
@@ -70,13 +106,14 @@ public sealed class ConstrainedCatAlgorithm
             .OrderByDescending(x => x.Information)
             .ToList();
 
-        // Step 3: A-stratified selection with Sympson-Hetter exposure control
+        // Step 3: A-stratified selection with full Sympson-Hetter exposure control
+        // RDY-018: Use stored per-item exposure parameter from calibration,
+        // not the simplistic maxRate/currentRate heuristic.
         foreach (var candidate in scored)
         {
-            // Sympson-Hetter: accept with probability = exposure parameter
-            var exposureParam = ComputeExposureParameter(
-                candidate.Item.ExposureRate, MaxExposureRate);
+            var exposureParam = _exposureProvider.GetExposureParameter(candidate.Item.ItemId);
 
+            // Sympson-Hetter: accept with probability = exposure parameter
             if (Random.Shared.NextDouble() <= exposureParam)
             {
                 return new CatItemSelection(
@@ -112,10 +149,11 @@ public sealed class ConstrainedCatAlgorithm
     private static double EloToDifficulty(double elo) => (elo - 1500.0) / 200.0;
 
     /// <summary>
-    /// Sympson-Hetter exposure parameter: P(administer | selected).
-    /// If current exposure rate exceeds max, reduce probability proportionally.
+    /// Legacy Sympson-Hetter approximation: P(administer | selected).
+    /// Kept for backwards compatibility. Full S-H uses stored per-item parameters
+    /// from ItemExposureDocument via IItemExposureProvider (RDY-018).
     /// </summary>
-    private static double ComputeExposureParameter(double currentRate, double maxRate)
+    internal static double ComputeExposureParameter(double currentRate, double maxRate)
     {
         if (currentRate <= 0) return 1.0;
         if (currentRate >= maxRate) return maxRate / currentRate;
