@@ -208,6 +208,39 @@ public partial class Program
     // Wilson et al. (2019): "The Eighty Five Percent Rule for optimal learning."
     builder.Services.AddScoped<IEloDifficultyService, EloDifficultyService>();
     
+    // ---- RDY-033b: Error classification + CAS-backed pattern matching ----
+    //
+    // SessionEndpoints.POST /answer injects IErrorClassificationService and
+    // IMisconceptionDetectionService via [FromServices]. The Actor Host
+    // registers these for its own pipeline; the Student API Host runs in a
+    // separate DI container, so the same bindings are required here, or the
+    // /answer endpoint throws "Unable to resolve service" at runtime.
+    //
+    // CAS-grounded matchers (ADR-0031) back the misconception detector: each
+    // buggy rule is an IErrorPatternMatcher that goes through ICasRouterService
+    // (ADR-0002). Matchers short-circuit by subject, so registering the full
+    // set here has near-zero cost on non-math/physics paths.
+    builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
+
+    builder.Services.AddSingleton<Cena.Actors.Cas.IMathNetVerifier, Cena.Actors.Cas.MathNetVerifier>();
+    builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
+    builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
+
+    builder.Services.AddSingleton<Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcher,
+        Cena.Actors.Services.ErrorPatternMatching.BuggyRuleMatchers.DistExpSumMatcher>();
+    builder.Services.AddSingleton<Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcher,
+        Cena.Actors.Services.ErrorPatternMatching.BuggyRuleMatchers.CancelCommonMatcher>();
+    builder.Services.AddSingleton<Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcher,
+        Cena.Actors.Services.ErrorPatternMatching.BuggyRuleMatchers.SignNegativeMatcher>();
+    builder.Services.AddSingleton<Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcher,
+        Cena.Actors.Services.ErrorPatternMatching.BuggyRuleMatchers.OrderOpsMatcher>();
+    builder.Services.AddSingleton<Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcher,
+        Cena.Actors.Services.ErrorPatternMatching.BuggyRuleMatchers.FractionAddMatcher>();
+    builder.Services.AddSingleton<Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcherEngine,
+        Cena.Actors.Services.ErrorPatternMatching.ErrorPatternMatcherEngine>();
+
+    builder.Services.AddSingleton<IMisconceptionDetectionService, MisconceptionDetectionService>();
+
     // ---- FIND-privacy-003: GDPR self-service compliance services ----
     // Students must be able to exercise data rights (consent, export, erasure, DSAR)
     // without going through an admin. GDPR Art 12-22, COPPA 312.6, Israel PPL 13.
