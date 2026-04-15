@@ -5,18 +5,43 @@
 // Distribution: Math 350, Physics 200, Chemistry 150, Biology 100, CS 100, English 100
 // =============================================================================
 
+using Cena.Actors.Cas;
 using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Questions;
 using Cena.Infrastructure.Seed;
 using Marten;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api;
 
 public static class QuestionBankSeedData
 {
-    public static async Task SeedQuestionsAsync(IDocumentStore store, ILogger logger)
+    /// <summary>
+    /// RDY-037: new entry point. Uses the CAS-gated persister resolved from
+    /// <see cref="SeedContext.Services"/>. The previous signature is kept
+    /// below for callers that still pass <see cref="IDocumentStore"/> +
+    /// <see cref="ILogger"/> directly — those callers must also provide a
+    /// persister via an outer closure.
+    /// </summary>
+    public static Task SeedQuestionsAsync(SeedContext ctx)
+    {
+        var persister = ctx.Services.GetService<ICasGatedQuestionPersister>();
+        if (persister is null)
+        {
+            throw new InvalidOperationException(
+                "QuestionBankSeedData requires ICasGatedQuestionPersister to be registered in DI. " +
+                "RDY-037 closed the legacy bypass — pass a service-provider with the persister "
+                + "to DatabaseSeeder.SeedAllAsync.");
+        }
+        return SeedQuestionsAsync(ctx.Store, ctx.Logger, persister);
+    }
+
+    public static async Task SeedQuestionsAsync(
+        IDocumentStore store,
+        ILogger logger,
+        ICasGatedQuestionPersister persister)
     {
         await using var session = store.QuerySession();
         var existingCount = await session.Query<QuestionReadModel>().CountAsync();
@@ -56,7 +81,6 @@ public static class QuestionBankSeedData
             .ToHashSet();
         logger.LogInformation("Found {Count} existing question streams", existingStreamKeys.Count);
 
-        await using var writeSession = store.LightweightSession();
         var now = DateTimeOffset.UtcNow;
         var auditRng = new Random(Seed); // seeded for reproducible audit data
         int seeded = 0;
@@ -119,8 +143,6 @@ public static class QuestionBankSeedData
                     loId)
             };
 
-            writeSession.Events.StartStream<QuestionState>(id, creationEvent);
-
             // Quality score: normally distributed around 75, stddev 12
             var qualityScore = ClampInt(NextGaussian(auditRng, 75.0, 12.0), 10, 100);
 
@@ -146,14 +168,42 @@ public static class QuestionBankSeedData
                 SubmittedAt = now.AddDays(-auditRng.Next(0, 30)).AddHours(-auditRng.Next(0, 24)),
                 UpdatedAt = now,
             };
-            writeSession.Store(auditDoc);
 
-            seeded++;
+            // RDY-037 / ADR-0002: route through the CAS-gated persister. The
+            // correct option's text is the authoritative answer; the gate
+            // produces a Verified binding when the CAS sidecar is reachable,
+            // Unverifiable otherwise (seed questions then flow through
+            // NeedsReview). Companion audit doc stores atomically in the
+            // same session.
+            var correctAnswer = q.Options.FirstOrDefault(o => o.IsCorrect)?.Text
+                                ?? string.Empty;
+            try
+            {
+                await persister.PersistAsync(
+                    questionId: id,
+                    creationEvent: creationEvent,
+                    context: new GatedPersistContext(
+                        Subject: q.Subject,
+                        Stem: q.Stem,
+                        CorrectAnswerRaw: correctAnswer,
+                        Language: q.Language,
+                        Variable: null),
+                    companionDocuments: new object[] { auditDoc });
+                seeded++;
+            }
+            catch (CasVerificationFailedException ex)
+            {
+                // Seed is best-effort — log and move on. Hard CAS failures in
+                // seed data are author-time bugs to fix, not runtime-fatal.
+                logger.LogWarning(
+                    "[SEED_CAS_FAILED] questionId={Qid} subject={Subject} reason={Reason}",
+                    id, q.Subject, ex.Details);
+                skipped++;
+            }
         }
 
-        await writeSession.SaveChangesAsync();
         logger.LogInformation(
-            "Seeded {Count} new questions (skipped {Skipped} existing, {WithLo} tagged with LearningObjective), total now ~{Total}",
+            "Seeded {Count} new questions (skipped {Skipped} existing/failed, {WithLo} tagged with LearningObjective), total now ~{Total}",
             seeded, skipped, withLo, seeded + skipped);
     }
 

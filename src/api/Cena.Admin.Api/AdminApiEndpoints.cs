@@ -586,10 +586,10 @@ public static class AdminApiEndpoints
         // REV-011.4: Only register destructive seeding endpoints in Development
         if (env.IsDevelopment())
         {
-            group.MapPost("/reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
+            group.MapPost("/reseed", async (IDocumentStore store, IServiceProvider sp, ILoggerFactory loggerFactory) =>
             {
                 var logger = loggerFactory.CreateLogger("DatabaseSeeder");
-                await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger,
+                await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger, sp,
                     additionalSeeds: QuestionBankSeedData.SeedQuestionsAsync);
                 return Results.Ok(new { success = true, message = "Database reseeded successfully" });
             }).WithName("ReseedDatabase").RequireRateLimiting("destructive")
@@ -598,7 +598,7 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-            group.MapPost("/clean-reseed", async (IDocumentStore store, ILoggerFactory loggerFactory) =>
+            group.MapPost("/clean-reseed", async (IDocumentStore store, IServiceProvider sp, ILoggerFactory loggerFactory) =>
             {
                 var logger = loggerFactory.CreateLogger("DatabaseSeeder");
 
@@ -609,8 +609,9 @@ public static class AdminApiEndpoints
                 logger.LogInformation("All data cleaned.");
 
                 // 2. Re-seed everything from scratch
-                await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(store, logger, 100,
-                    (s, l) => SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
+                await Cena.Infrastructure.Seed.DatabaseSeeder.SeedAllAsync(
+                    store, logger, sp, 100,
+                    ctx => SimulationEventSeeder.SeedSimulationEventsAsync(ctx.Store, ctx.Logger),
                     QuestionBankSeedData.SeedQuestionsAsync);
 
                 return Results.Ok(new { success = true, message = "Database cleaned and reseeded successfully" });
@@ -893,7 +894,7 @@ public static class AdminApiEndpoints
                 var success = await service.ApproveAsync(id);
                 return success ? Results.Ok() : Results.NotFound();
             }
-            catch (Cena.Admin.Api.QualityGate.CasApprovalRejectedException ex)
+            catch (Cena.Actors.Cas.CasApprovalRejectedException ex)
             {
                 // RDY-034: math/physics question missing Verified CAS binding.
                 return Results.Conflict(new CenaError(ex.ErrorCode, ex.Message, ErrorCategory.Conflict, null, null));
@@ -914,7 +915,7 @@ public static class AdminApiEndpoints
                 var result = await service.CreateQuestionAsync(request, userId);
                 return result != null ? Results.Created($"/api/admin/questions/{result.Id}", result) : Results.BadRequest();
             }
-            catch (Cena.Admin.Api.QualityGate.CasVerificationFailedException ex)
+            catch (Cena.Actors.Cas.CasVerificationFailedException ex)
             {
                 // RDY-034: authored answer rejected by CAS oracle.
                 return Results.BadRequest(new CenaError(ex.ErrorCode, ex.Message, ErrorCategory.Validation, null, null));

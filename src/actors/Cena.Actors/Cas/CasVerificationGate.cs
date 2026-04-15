@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — CAS Verification Gate (RDY-034 / RDY-036, ADR-0002)
+// Cena Platform — CAS Verification Gate (RDY-034 / RDY-036 / RDY-037, ADR-0002)
 //
 // Single entry point used by question ingestion paths (manual author, AI
 // generation, OCR template, backfill) to run the authored answer through
@@ -17,17 +17,20 @@
 // CircuitOpen (binding.Status=Unverifiable, Engine="none"). The caller
 // MUST NOT auto-approve; admin queue decides. Never fail-open into "looks
 // verified."
+//
+// RDY-037: relocated from Cena.Admin.Api.QualityGate → Cena.Actors.Cas. The
+// gate is a domain invariant per ADR-0002; it belongs in the domain layer
+// alongside ICasRouterService so every adapter (Admin.Api, Actors ingest,
+// future hosts) can enforce it without reverse-layer dependencies.
 // =============================================================================
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using Cena.Actors.Cas;
-using Cena.Admin.Api.Services;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
 
-namespace Cena.Admin.Api.QualityGate;
+namespace Cena.Actors.Cas;
 
 /// <summary>
 /// RDY-034: Outcome categories returned by the CAS ingestion gate.
@@ -88,8 +91,8 @@ public interface ICasVerificationGate
 }
 
 /// <summary>
-/// RDY-034: Default gate implementation used by QuestionBankService and
-/// AiGenerationService.
+/// RDY-034: Default gate implementation used by QuestionBankService,
+/// AiGenerationService, and the bulk-ingest persister.
 /// </summary>
 public sealed class CasVerificationGate : ICasVerificationGate
 {

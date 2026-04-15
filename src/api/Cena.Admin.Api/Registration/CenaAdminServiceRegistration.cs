@@ -4,10 +4,10 @@
 // Both Cena.Actors.Host and Cena.Api.Host call these extension methods.
 // =============================================================================
 
+using Cena.Actors.Cas;
 using Cena.Admin.Api.Endpoints;
 using Cena.Admin.Api.QualityGate;
 using Cena.Admin.Api.RateLimit;
-using Cena.Admin.Api.Services;
 using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -42,6 +42,9 @@ public static class CenaAdminServiceRegistration
         services.AddSingleton<IMathContentDetector, MathContentDetector>();
         services.AddSingleton<ICasGateModeProvider, CasGateModeProvider>();
         services.AddScoped<ICasVerificationGate, CasVerificationGate>();
+        // RDY-037: single gated-write site (see CasGatedQuestionPersister)
+        // — every question creation path routes through this persister.
+        services.AddScoped<ICasGatedQuestionPersister, CasGatedQuestionPersister>();
 
         // ADM-004 through ADM-016: Admin API services
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();

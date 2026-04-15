@@ -23,23 +23,18 @@ public class SeedLoaderMustUseQuestionBankServiceTest
         RegexOptions.Compiled);
 
     // Files allowed to write QuestionState streams directly.
+    // RDY-037 / ADR-0032: the CAS-gated persister is the single legitimate
+    // StartStream<QuestionState> site in the repository. No other file is
+    // permitted to append directly to a new QuestionState stream — every
+    // creation path (admin UI, AI generation, ingestion, seed, test fixtures)
+    // routes through ICasGatedQuestionPersister.PersistAsync so the ADR-0002
+    // correctness invariant is globally enforced, not locally suggested.
     private static readonly string[] AllowList = new[]
     {
-        // The gated entry point itself.
-        Path.Combine("Cena.Admin.Api", "QuestionBankService.cs"),
-        // The gated backfill surface (resolves existing streams; does not
-        // StartStream, but we keep it here as an approved CAS-adjacent surface).
-        Path.Combine("Cena.Admin.Api", "Endpoints", "CasBackfillEndpoint.cs"),
+        // THE gated writer.
+        Path.Combine("Cena.Actors", "Cas", "CasGatedQuestionPersister.cs"),
         // This test.
         "SeedLoaderMustUseQuestionBankServiceTest.cs",
-        // KNOWN_VIOLATION_TODO (ADR-0032 follow-up): these two files predate
-        // the CAS gate and write QuestionState streams directly. They must be
-        // refactored to route through QuestionBankService.CreateQuestion before
-        // the pilot ships. Tracked as CAS-GATE-SEED-REFACTOR.
-        // The allow-list entry here keeps CI green while any NEW bypass
-        // (files not listed here) still fails the build.
-        Path.Combine("Cena.Admin.Api", "QuestionBankSeedData.cs"),
-        Path.Combine("Cena.Actors", "Ingest", "IngestionOrchestrator.cs"),
     };
 
     [Fact]
@@ -67,7 +62,7 @@ public class SeedLoaderMustUseQuestionBankServiceTest
 
         Assert.True(violations.Count == 0,
             "The following files write QuestionState events directly, bypassing the CAS gate. " +
-            "Route through QuestionBankService.CreateQuestion instead:\n  - " +
+            "Route through ICasGatedQuestionPersister.PersistAsync (Cena.Actors.Cas) instead:\n  - " +
             string.Join("\n  - ", violations));
     }
 

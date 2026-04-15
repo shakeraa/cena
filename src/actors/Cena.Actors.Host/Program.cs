@@ -656,10 +656,12 @@ lifetime.ApplicationStarted.Register(async () =>
     var ffPid = actorSystem.Root.SpawnNamed(ffProps, "feature-flags");
     appLogger.LogInformation("RES-010: Feature flag service spawned at {Pid}", ffPid);
 
-    // Seed all demo data via single entry point
+    // Seed all demo data via single entry point.
+    // RDY-037: pass the service provider so QuestionBankSeedData can resolve
+    // the CAS-gated persister.
     var store = app.Services.GetRequiredService<IDocumentStore>();
-    await DatabaseSeeder.SeedAllAsync(store, appLogger, 300,
-        (s, l) => Cena.Admin.Api.SimulationEventSeeder.SeedSimulationEventsAsync(s, l),
+    await DatabaseSeeder.SeedAllAsync(store, appLogger, app.Services, 300,
+        ctx => Cena.Admin.Api.SimulationEventSeeder.SeedSimulationEventsAsync(ctx.Store, ctx.Logger),
         Cena.Admin.Api.QuestionBankSeedData.SeedQuestionsAsync);
 });
 

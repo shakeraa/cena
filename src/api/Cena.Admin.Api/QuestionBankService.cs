@@ -6,10 +6,10 @@
 
 using System.Globalization;
 using System.Text.Json;
+using Cena.Actors.Cas;
 using Cena.Actors.Events;
 using Cena.Actors.Questions;
 using Cena.Admin.Api.QualityGate;
-using Cena.Admin.Api.Services;
 using Cena.Infrastructure.Documents;
 using QualityGateServices = Cena.Admin.Api.QualityGate;
 
@@ -46,6 +46,7 @@ public sealed class QuestionBankService : IQuestionBankService
     private readonly QualityGateServices.IQualityGateService _qualityGate;
     private readonly ICasVerificationGate _casGate;
     private readonly ICasGateModeProvider _casGateMode;
+    private readonly ICasGatedQuestionPersister _persister;
     private readonly ILogger<QuestionBankService> _logger;
 
     public QuestionBankService(
@@ -53,12 +54,14 @@ public sealed class QuestionBankService : IQuestionBankService
         QualityGateServices.IQualityGateService qualityGate,
         ICasVerificationGate casGate,
         ICasGateModeProvider casGateMode,
+        ICasGatedQuestionPersister persister,
         ILogger<QuestionBankService> logger)
     {
         _store = store;
         _qualityGate = qualityGate;
         _casGate = casGate;
         _casGateMode = casGateMode;
+        _persister = persister;
         _logger = logger;
     }
 
@@ -386,74 +389,77 @@ public sealed class QuestionBankService : IQuestionBankService
                 request.LearningObjectiveId)
         };
 
-        var events = new List<object> { creationEvent };
-
-        // RDY-034 / ADR-0002: Run CAS ingestion gate before quality gate. The
-        // authored answer must be verified by the CAS oracle (or flagged
-        // Unverifiable) before the question may be stored. In Enforce mode we
-        // reject Failed/CircuitOpen; in Shadow mode we record and continue;
-        // Off skips the gate call entirely.
-        CasGateResult? casResult = null;
-        if (_casGateMode.CurrentMode != CasGateMode.Off)
-        {
-            var correctAnswerRaw = request.Options.FirstOrDefault(o => o.IsCorrect)?.Text
-                                   ?? string.Empty;
-            casResult = await _casGate.VerifyForCreateAsync(
-                id, request.Subject, request.Stem, correctAnswerRaw, variable: null);
-
-            if (_casGateMode.CurrentMode == CasGateMode.Enforce)
-            {
-                if (casResult.Outcome == CasGateOutcome.Failed)
-                {
-                    _logger.LogWarning(
-                        "[CAS_GATE_REJECT] questionId={Qid} engine={Engine} reason={Reason}",
-                        id, casResult.Engine, casResult.FailureReason);
-                    throw new CasVerificationFailedException(
-                        casResult.FailureReason ?? "CAS verification failed for authored answer.");
-                }
-                if (casResult.Outcome == CasGateOutcome.CircuitOpen)
-                {
-                    _logger.LogWarning(
-                        "[CAS_GATE_CIRCUIT_OPEN] questionId={Qid} reason={Reason} — allowing draft, approval blocked",
-                        id, casResult.FailureReason);
-                    // Allow the draft to land but binding status=Unverifiable; approval path will enforce.
-                }
-            }
-        }
-
-        // Run quality gate
+        // RDY-037: Run quality gate first so the creation event batch we hand
+        // to the gated persister is final. The CAS gate decision (inside the
+        // persister) may still throw in Enforce mode — that is intentional.
         var gateInput = BuildGateInput(id, request.Stem, request.Options,
             request.Subject, request.Language, request.BloomsLevel,
             request.Difficulty, request.Grade, request.ConceptIds);
-        var gateResult = await _qualityGate.EvaluateAsync(gateInput);
-        events.Add(MapGateEvent(id, gateResult, now));
+        var qualityGateResult = await _qualityGate.EvaluateAsync(gateInput);
 
-        // Auto-approve if quality gate passes AND CAS verification is Verified
-        // (or subject is non-math/Unverifiable). Never auto-approve on
-        // CircuitOpen or Failed.
-        bool casAllowsAutoApprove =
-            casResult is null
-            || casResult.Outcome == CasGateOutcome.Verified
-            || casResult.Outcome == CasGateOutcome.Unverifiable;
+        var correctAnswerRaw = request.Options.FirstOrDefault(o => o.IsCorrect)?.Text
+                               ?? string.Empty;
 
-        if (gateResult.Decision == GateDecision.AutoApproved && casAllowsAutoApprove)
-            events.Add(new QuestionApproved_V1(id, "quality-gate", now));
-
-        await using var session = _store.LightweightSession();
-        session.Events.StartStream<QuestionState>(id, events.ToArray());
-
-        // RDY-034: Persist CAS binding in the same session as the event stream
-        // so the question + binding land atomically.
-        if (casResult is not null)
+        // We must know CAS outcome before deciding on auto-approval. The
+        // persister runs the gate for us and returns the outcome — we use it
+        // to conditionally append QuestionApproved_V1 on the same stream
+        // atomically via `extraEventsOnNewStream`. Because the persister
+        // needs the events up-front, we first probe the gate, then persist.
+        // In Enforce mode a Failed outcome throws from the probe as well, so
+        // we short-circuit before building the auto-approval path.
+        CasGateResult? probe = null;
+        if (_casGateMode.CurrentMode != CasGateMode.Off)
         {
-            session.Store(casResult.Binding);
+            probe = await _casGate.VerifyForCreateAsync(
+                id, request.Subject, request.Stem, correctAnswerRaw, variable: null);
+
+            if (_casGateMode.CurrentMode == CasGateMode.Enforce
+                && probe.Outcome == CasGateOutcome.Failed)
+            {
+                _logger.LogWarning(
+                    "[CAS_GATE_REJECT] questionId={Qid} engine={Engine} reason={Reason}",
+                    id, probe.Engine, probe.FailureReason);
+                throw new CasVerificationFailedException(
+                    probe.FailureReason ?? "CAS verification failed for authored answer.");
+            }
+            if (_casGateMode.CurrentMode == CasGateMode.Enforce
+                && probe.Outcome == CasGateOutcome.CircuitOpen)
+            {
+                _logger.LogWarning(
+                    "[CAS_GATE_CIRCUIT_OPEN] questionId={Qid} reason={Reason} — allowing draft, approval blocked",
+                    id, probe.FailureReason);
+            }
         }
 
-        await session.SaveChangesAsync();
+        var extras = new List<object> { MapGateEvent(id, qualityGateResult, now) };
+
+        bool casAllowsAutoApprove =
+            probe is null
+            || probe.Outcome == CasGateOutcome.Verified
+            || probe.Outcome == CasGateOutcome.Unverifiable;
+
+        if (qualityGateResult.Decision == GateDecision.AutoApproved && casAllowsAutoApprove)
+            extras.Add(new QuestionApproved_V1(id, "quality-gate", now));
+
+        // RDY-037: single gated-write site — routed through the persister
+        // (see CasGatedQuestionPersister). We pass the probe result so the
+        // persister does not re-run CAS; binding is persisted atomically
+        // with the event stream.
+        var persistOutcome = await _persister.PersistAsync(
+            questionId: id,
+            creationEvent: creationEvent,
+            context: new GatedPersistContext(
+                Subject: request.Subject,
+                Stem: request.Stem,
+                CorrectAnswerRaw: correctAnswerRaw,
+                Language: request.Language,
+                Variable: null),
+            extraEventsOnNewStream: extras,
+            preComputedGateResult: probe);
 
         _logger.LogInformation(
             "Created question {QuestionId} ({SourceType}) — qualityGate: {Decision} casGate: {CasOutcome}",
-            id, request.SourceType, gateResult.Decision, casResult?.Outcome.ToString() ?? "skipped");
+            id, request.SourceType, qualityGateResult.Decision, persistOutcome.Outcome);
 
         return await GetQuestionAsync(id);
     }

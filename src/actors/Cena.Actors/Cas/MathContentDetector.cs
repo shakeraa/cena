@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — Math Content Detector (RDY-034, ADR-0002)
+// Cena Platform — Math Content Detector (RDY-034 / RDY-037, ADR-0002)
 // Decides whether a question body (stem + options) contains math that must
 // be verified by the CAS oracle before the question may be ingested.
 //
@@ -8,11 +8,14 @@
 //   - Language/history/other → detect LaTeX delimiters ($…$, \(…\), \[…\])
 //     OR an equation-like heuristic (digit/operator/=/inequality/sqrt/sin/...).
 //     Hit == "word problem with math content" → gate must verify.
+//
+// RDY-037: relocated from Cena.Admin.Api.Services → Cena.Actors.Cas so the
+// detector lives alongside the CAS gate it feeds.
 // =============================================================================
 
 using System.Text.RegularExpressions;
 
-namespace Cena.Admin.Api.Services;
+namespace Cena.Actors.Cas;
 
 /// <summary>
 /// RDY-034: Result of analyzing a question body for math content.
