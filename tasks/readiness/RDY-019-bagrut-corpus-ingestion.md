@@ -1,67 +1,35 @@
-# RDY-019: Bagrut Corpus Ingestion + Topic Taxonomy
+# RDY-019: Bagrut Corpus Ingestion + Topic Taxonomy (Parent Index)
 
 - **Priority**: Medium — blocks content validity and calibration
 - **Complexity**: Senior engineer + curriculum expert
 - **Source**: Expert panel audit — Amjad (Curriculum), Yael (Psychometrics)
 - **Tier**: 3
-- **Effort**: 3-4 weeks
+- **Effort**: 3–4 weeks aggregated across splits
 
-## Problem
+> **This file is an index.** The work has been split into independently
+> claimable subtasks so multiple agents can work in parallel without
+> stepping on each other. Pick a subtask below and follow its file.
 
-### 1. No real Bagrut items
-All 1,000 questions are programmatically generated. Zero items come from actual Bagrut exams. The Ministry exam archive (640 pages at `meyda.education.gov.il/sheeloney_bagrut/`) has not been scraped or ingested.
+## Problem (summary)
 
-### 2. No formal topic taxonomy
-Concepts are implicit string IDs (e.g., `math_5u_derivatives_chain_rule`). No formal hierarchy matches the official Ministry syllabus. Cannot verify: "Have we covered all topics on the 5-unit exam?"
+1. All 1,000 seed questions are programmatically generated — zero items reflect the actual Ministry Bagrut structure.
+2. Concepts are implicit string IDs with no formal hierarchy matching the official syllabus — coverage gaps are invisible.
+3. 3-unit track: absent. 4-unit track: mentioned but no ontology.
 
-### 3. Missing tracks
-3-unit math: completely absent. 4-unit math: mentioned in research but no curriculum ontology.
+## Subtasks
 
-## Scope
+| File | Scope | Blocker |
+|------|-------|---------|
+| [RDY-019-ocr-spike.md](RDY-019-ocr-spike.md) | Evaluate offline OCR stacks (Tesseract / Nougat / Marker / Surya / pix2tex) against 10 real Bagrut pages; produce ADR + recommended pipeline | None — unblocks RDY-019b's tooling choice |
+| [RDY-019a-bagrut-taxonomy.md](RDY-019a-bagrut-taxonomy.md) | Create `scripts/bagrut-taxonomy.json` (5u/4u/3u hierarchy), remap existing questions, add CI validator | None — can start immediately |
+| [RDY-019b-ministry-reference-scrape-recreation.md](RDY-019b-ministry-reference-scrape-recreation.md) | Reference-only scrape of Ministry archive + coverage-calibrated AI recreation pipeline (CAS-gated, never ships raw Ministry text) | Blocked on RDY-019a + RDY-034 (merged) |
+| [RDY-019c-3u4u-seed-coverage-review.md](RDY-019c-3u4u-seed-coverage-review.md) | 10+ seed items per 3u/4u track, coverage report endpoint, curriculum-expert sign-off | Blocked on RDY-019a + curriculum expert availability |
+| [RDY-019d-bagrut-content-expert-followups.md](RDY-019d-bagrut-content-expert-followups.md) | Legacy expert-followups doc (Amjad-dependent) — retained as historical context | Blocked on Amjad |
 
-### 1. Scrape Ministry exam archive
+## Legal posture (user decision, 2026-04-15)
 
-- Download Bagrut exam PDFs from Ministry website
-- Extract questions using OCR (Gemini/Mathpix pipeline exists)
-- Structure as `QuestionDocument` events
-- Target: 100+ real exam items across Math 5-unit topics
+Ministry exams at `meyda.education.gov.il/sheeloney_bagrut/` are **reference material only**, not redistributed. We scrape to analyze structure (topics, difficulty distribution, Bloom levels, item formats), then **recreate** fresh items via the AI pipeline, all CAS-gated per ADR-0002. Raw PDFs and raw extracted questions never enter the student-facing corpus. See the `bagrut-reference-only` memory record for the authoritative framing.
 
-### 2. Formalize topic taxonomy
+## Done definition
 
-Create `scripts/bagrut-taxonomy.json`:
-```json
-{
-  "math_5u": {
-    "algebra": ["equations", "inequalities", "polynomials", "sequences"],
-    "calculus": ["limits", "derivatives", "integrals", "applications"],
-    "geometry": ["euclidean", "analytic", "trigonometry"],
-    "probability": ["combinatorics", "probability", "statistics"]
-  }
-}
-```
-
-Map every existing question to this taxonomy. Identify coverage gaps.
-
-### 3. Coverage tracking
-
-Add to quality gate: per-topic coverage report showing question count, difficulty distribution, and coverage percentage against taxonomy.
-
-### 4. 3-unit and 4-unit track stubs
-
-Create taxonomy entries for 3-unit and 4-unit math. Populate with at least 10 seed questions each to validate the schema.
-
-## Files to Modify
-
-- New: `scripts/bagrut-taxonomy.json` — canonical taxonomy
-- New: `scripts/bagrut-scraper.py` — Ministry exam scraper
-- `src/api/Cena.Admin.Api/QuestionBankSeedData.cs` — add real Bagrut items
-- `src/shared/Cena.Infrastructure/Content/QualityGateService.cs` — topic coverage report
-
-## Acceptance Criteria
-
-- [ ] 100+ real Bagrut exam items ingested and structured
-- [ ] Topic taxonomy formalized as version-controlled JSON
-- [ ] Every question mapped to taxonomy node
-- [ ] Coverage report shows questions per topic with gap identification
-- [ ] 3-unit and 4-unit tracks have taxonomy entries + 10 seed questions each
-- [ ] Taxonomy reviewed by curriculum expert
+This index can be moved to `done/` once all five child files are in `done/`.
