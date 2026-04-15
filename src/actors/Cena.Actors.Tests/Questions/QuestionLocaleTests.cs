@@ -361,7 +361,11 @@ public sealed class QuestionLocaleTests
             }
         };
 
-        // Act — BuildAnswerFeedback now uses locale-aware retrieval via GetExplanationForLocale
+        // Act — BuildAnswerFeedback uses locale-aware retrieval. Test name
+        // says WithArLocale/ReturnsArExplanation — drive it with studentLocale
+        // "ar" so the assertion matches. (RDY-054e: the prior studentLocale="en"
+        // with expected "Legacy English explanation" was self-contradictory
+        // since ExplanationByLocale["en"] is present.)
         var response = SessionEndpoints.BuildAnswerFeedback(
             questionDoc: doc,
             studentAnswer: "1/2",
@@ -369,12 +373,11 @@ public sealed class QuestionLocaleTests
             priorMastery: 0.4,
             posteriorMastery: 0.55,
             nextQuestionId: null,
-            studentLocale: "en",
+            studentLocale: "ar",
             logger: NullLogger.Instance);
 
-        // Assert — BuildAnswerFeedback now uses GetExplanationForLocale which falls back
-        // from requested locale → en → legacy Explanation property
-        Assert.Equal("Legacy English explanation", response.Explanation);
+        // Assert — Arabic requested, Arabic present in map → return Arabic.
+        Assert.Equal("Arabic explanation", response.Explanation);
         Assert.True(response.Correct);
     }
 
