@@ -618,7 +618,7 @@ public static class SessionEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/sessions/{sessionId}/answer — submit an answer
-        group.MapPost("/{sessionId}/answer", async (string sessionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IBktService bktService, [FromServices] IErrorClassificationService errorClassifier, [FromServices] IEloDifficultyService eloService, [FromServices] ILoggerFactory loggerFactory, SessionAnswerRequest request) =>
+        group.MapPost("/{sessionId}/answer", async (string sessionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IBktService bktService, [FromServices] IErrorClassificationService errorClassifier, [FromServices] IMisconceptionDetectionService misconceptionDetector, [FromServices] IEloDifficultyService eloService, [FromServices] ILoggerFactory loggerFactory, SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -777,10 +777,41 @@ public static class SessionEndpoints
             }
             else
             {
-                // Wrong path: ConceptAttempted only (no XP award). This is the
-                // fix for FIND-pedagogy-002 — the event is emitted with
-                // IsCorrect=false so BKT projections see failure signals.
-                session.Events.Append(studentId, conceptAttempt);
+                // RDY-033b + ADR-0003: On a wrong answer, run the CAS-backed
+                // misconception detector against the question/answer triple.
+                // When a buggy rule fires with confidence ≥ threshold, append
+                // a MisconceptionDetected_V1 event alongside ConceptAttempted.
+                //
+                // The event is [MlExcluded] and session-scoped (ADR-0003);
+                // the 100 ms budget inside the matcher engine bounds any
+                // latency impact on the /answer path.
+                var misconception = DetectMisconception(
+                    misconceptionDetector,
+                    questionDoc,
+                    rawStudentInput,
+                    normalizedAnswer,
+                    errorType,
+                    loggerFactory.CreateLogger("SessionEndpoints.Misconception"));
+
+                if (misconception is { Detected: true, BuggyRuleId: not null })
+                {
+                    var misconceptionEvent = new MisconceptionDetected_V1(
+                        StudentId: studentId,
+                        SessionId: sessionId,
+                        BuggyRuleId: misconception.BuggyRuleId,
+                        TopicId: questionDoc.ConceptId ?? string.Empty,
+                        QuestionId: currentQuestion.QuestionId,
+                        StudentAnswer: rawStudentInput ?? normalizedAnswer ?? string.Empty,
+                        ExpectedPattern: misconception.CounterExample ?? string.Empty,
+                        DetectedAt: DateTimeOffset.UtcNow);
+
+                    session.Events.Append(studentId, conceptAttempt, misconceptionEvent);
+                }
+                else
+                {
+                    // Wrong path (no misconception detected): ConceptAttempted only.
+                    session.Events.Append(studentId, conceptAttempt);
+                }
             }
 
             // FIND-pedagogy-009 (enriched): dual Elo update on the SAME
@@ -1297,6 +1328,58 @@ public static class SessionEndpoints
             WasOffline: false,
             Timestamp: DateTimeOffset.UtcNow,
             RawStudentInput: rawStudentInput);
+    }
+
+    /// <summary>
+    /// RDY-033b + ADR-0003 — Run the CAS-backed misconception detector on a
+    /// wrong answer. Delegates to <see cref="IMisconceptionDetectionService"/>
+    /// which internally fans out to the registered
+    /// <see cref="Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcherEngine"/>.
+    /// Returns null if the detector throws or degrades.
+    ///
+    /// Subject is mapped to the detector's vocabulary ("math" / "physics") —
+    /// <see cref="QuestionDocument.Subject"/> may ship in either case form or
+    /// with a different casing convention, so we lowercase for safety.
+    /// </summary>
+    internal static MisconceptionDetectionResult? DetectMisconception(
+        IMisconceptionDetectionService detector,
+        QuestionDocument questionDoc,
+        string? rawStudentInput,
+        string? normalizedAnswer,
+        string errorType,
+        ILogger logger)
+    {
+        try
+        {
+            var studentAnswer = !string.IsNullOrWhiteSpace(rawStudentInput)
+                ? rawStudentInput
+                : normalizedAnswer ?? string.Empty;
+
+            var mappedErrorType = errorType switch
+            {
+                "Conceptual" => ExplanationErrorType.ConceptualMisunderstanding,
+                "Procedural" => ExplanationErrorType.ProceduralError,
+                "Careless" => ExplanationErrorType.CarelessMistake,
+                "Motivational" => ExplanationErrorType.Guessing,
+                "Transfer" => ExplanationErrorType.PartialUnderstanding,
+                _ => (ExplanationErrorType?)null
+            };
+
+            return detector.Detect(
+                questionStem: questionDoc.Prompt ?? string.Empty,
+                correctAnswer: questionDoc.CorrectAnswer ?? string.Empty,
+                studentAnswer: studentAnswer,
+                subject: (questionDoc.Subject ?? "math").ToLowerInvariant(),
+                conceptId: questionDoc.ConceptId,
+                errorType: mappedErrorType);
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "Misconception detection failed for question {QuestionId}; continuing without misconception event",
+                questionDoc.QuestionId);
+            return null;
+        }
     }
 
     /// <summary>
