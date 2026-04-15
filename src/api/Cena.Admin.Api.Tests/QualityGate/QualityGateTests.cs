@@ -123,6 +123,61 @@ public class QualityGateTests
         Assert.True(score >= 70, $"Correct Bloom alignment scored only {score}");
     }
 
+    [Fact]
+    public void StructuralValidator_MissingArabicTranslation_EmitsWarning()
+    {
+        var input = new QualityGateInput(
+            QuestionId: "q-translation-gap",
+            Stem: "Solve 2x + 4 = 10",
+            Options: new[]
+            {
+                new QualityGateOption("A", "3", true, null),
+                new QualityGateOption("B", "2", false, null),
+                new QualityGateOption("C", "4", false, null),
+                new QualityGateOption("D", "6", false, null),
+            },
+            CorrectOptionIndex: 0,
+            Subject: "Math",
+            Language: "he",
+            ClaimedBloomLevel: 2,
+            ClaimedDifficulty: 0.3f,
+            Grade: "3 Units",
+            ConceptIds: new[] { "ALG-002" },
+            AvailableLanguages: new[] { "he", "en" });
+
+        var (_, violations) = QualityGateServices.StructuralValidator.Validate(input);
+        var violation = Assert.Single(violations, v => v.RuleId == "MISSING_ARABIC");
+        Assert.Equal(ViolationSeverity.Warning, violation.Severity);
+    }
+
+    [Fact]
+    public async Task QualityGate_EvaluateAsync_MissingArabicTranslation_SurfacesViolation()
+    {
+        var input = new QualityGateInput(
+            QuestionId: "q-translation-gap-service",
+            Stem: "Solve 2x + 4 = 10",
+            Options: new[]
+            {
+                new QualityGateOption("A", "3", true, null),
+                new QualityGateOption("B", "2", false, null),
+                new QualityGateOption("C", "4", false, null),
+                new QualityGateOption("D", "6", false, null),
+            },
+            CorrectOptionIndex: 0,
+            Subject: "Math",
+            Language: "he",
+            ClaimedBloomLevel: 2,
+            ClaimedDifficulty: 0.3f,
+            Grade: "3 Units",
+            ConceptIds: new[] { "ALG-002" },
+            AvailableLanguages: new[] { "he", "en" });
+
+        var result = await _service.EvaluateAsync(input);
+
+        Assert.Contains(result.Violations, v =>
+            v.RuleId == "MISSING_ARABIC" && v.Severity == ViolationSeverity.Warning);
+    }
+
     // Data providers
     public static IEnumerable<object[]> GetGoodQuestions() =>
         QualityGateTestData.GetGoodQuestions().Select(tc => new object[] { tc });

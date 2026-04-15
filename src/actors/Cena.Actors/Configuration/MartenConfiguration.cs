@@ -583,6 +583,7 @@ public static class MartenConfiguration
         // STB-01: Session lifecycle events
         opts.Events.AddEventType<LearningSessionStarted_V1>();
         opts.Events.AddEventType<LearningSessionEnded_V1>();
+        opts.Events.AddEventType<QuestionFallbackLanguage_V1>();
         opts.Events.AddEventType<OnboardingCompleted_V1>(); // STB-00
         opts.Events.AddEventType<AgeAndConsentRecorded_V1>(); // FIND-privacy-001
 

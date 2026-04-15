@@ -267,7 +267,7 @@ public static class StructuralValidator
         {
             violations.Add(new("StructuralValidity", "MISSING_ARABIC",
                 "Question has no Arabic translation (primary user language)",
-                ViolationSeverity.Info));
+                ViolationSeverity.Warning));
         }
         else
         {

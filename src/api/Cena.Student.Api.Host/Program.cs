@@ -730,6 +730,7 @@ public class SwaggerHostFactory
         Environment.SetEnvironmentVariable("CENA_OPENAPI_GEN", "1");
         Environment.SetEnvironmentVariable("CENA_SKIP_SEED", "1");
         Environment.SetEnvironmentVariable("Firebase__ProjectId", "cena-openapi-gen");
+        Environment.SetEnvironmentVariable("Kestrel__Endpoints__Http__Url", "http://127.0.0.1:0");
         var app = Program.BuildApp(Array.Empty<string>());
         app.StartAsync().GetAwaiter().GetResult();
         return app;

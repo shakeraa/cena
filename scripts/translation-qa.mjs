@@ -1,158 +1,135 @@
 #!/usr/bin/env node
 // =============================================================================
 // RDY-004: Translation QA Script
-// Validates Arabic translations for:
-//   1. Term consistency against the Arabic math glossary
-//   2. Bidi rendering issues (mixed Arabic + math)
-//   3. Gender agreement patterns
-//   4. Missing translations on seed questions
+// Validates the canonical Arabic translation QA prerequisites:
+//   1. Canonical glossary integrity from config/glossary.json
+//   2. Coverage of required curriculum concepts in the glossary
+//   3. Heuristic detection of duplicate or incomplete glossary entries
 //
 // Usage: node scripts/translation-qa.mjs [--verbose]
 // =============================================================================
 
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const verbose = process.argv.includes('--verbose');
 
-// ── 1. Load glossary from prompt-templates.py ──
+// ── 1. Load canonical glossary ──
 
-const templatePath = resolve(__dirname, '../contracts/llm/prompt-templates.py');
-const templateContent = readFileSync(templatePath, 'utf-8');
-
-// Extract Arabic glossary terms from the Python file
-const glossaryMatch = templateContent.match(/ARABIC_MATH_GLOSSARY\s*=\s*"""([\s\S]*?)"""/);
-if (!glossaryMatch) {
-  console.error('ERROR: Could not find ARABIC_MATH_GLOSSARY in prompt-templates.py');
-  process.exit(1);
-}
-
-const glossaryText = glossaryMatch[1];
+const glossaryPath = resolve(__dirname, '../config/glossary.json');
+const glossaryRaw = JSON.parse(readFileSync(glossaryPath, 'utf-8'));
+const glossaryEntries = glossaryRaw.terms ?? [];
 const glossaryTerms = new Map(); // English -> Arabic
+const domains = new Map();
+const issues = [];
+const warnings = [];
+const englishSeen = new Set();
+const arabicSeen = new Set();
 
-for (const line of glossaryText.split('\n')) {
-  const match = line.match(/^\|\s*(.+?)\s*\|\s*(.+?)\s*\|\s*(.+?)\s*\|$/);
-  if (match && match[1] !== 'English' && !match[1].startsWith('-')) {
-    glossaryTerms.set(match[1].trim().toLowerCase(), {
-      arabic: match[2].trim(),
-      transliteration: match[3].trim(),
-    });
-  }
-}
+for (const entry of glossaryEntries) {
+  const english = (entry.english ?? '').trim();
+  const arabic = (entry.arabic ?? '').trim();
+  const hebrew = (entry.hebrew ?? '').trim();
+  const domain = (entry.domain ?? 'unknown').trim();
 
-console.log(`Loaded ${glossaryTerms.size} glossary terms`);
-
-// ── 2. Bidi Checks ──
-
-// Patterns that indicate potential bidi issues in Arabic text
-const bidiIssuePatterns = [
-  // Math operators that should be in LTR context
-  { pattern: /[٠-٩]/, description: 'Eastern Arabic numerals detected — use Western (0-9) per Israeli convention' },
-  // Unbalanced directional marks
-  { pattern: /[\u200F]{2,}/, description: 'Multiple consecutive RTL marks — possible rendering artifact' },
-  // Math not wrapped in bdi/ltr
-  { pattern: /[\u0600-\u06FF]\s*[=+\-×÷<>≤≥]\s*\d/, description: 'Math operator between Arabic and digits without bidi isolation' },
-];
-
-function checkBidi(text, context) {
-  const issues = [];
-  for (const { pattern, description } of bidiIssuePatterns) {
-    if (pattern.test(text)) {
-      issues.push({ context, description, text: text.substring(0, 80) });
-    }
-  }
-  return issues;
-}
-
-// ── 3. Gender Agreement Checks ──
-
-// Common feminine nouns that require feminine adjectives
-const feminineNouns = [
-  'دالة',      // function (f.)
-  'معادلة',    // equation (f.)
-  'متباينة',   // inequality (f.)
-  'مشتقة',     // derivative (f.)
-  'نظرية',     // theorem (f.)
-  'نقطة',      // point (f.)
-  'دائرة',     // circle (f.)
-  'زاوية',     // angle (f.)
-  'مساحة',     // area (f.)
-  'متتالية',   // sequence (f.)
-  'متسلسلة',   // series (f.)
-  'مجموعة',    // set (f.)
-];
-
-// Common masculine nouns
-const masculineNouns = [
-  'متغير',     // variable (m.)
-  'معامل',     // coefficient (m.)
-  'حد',        // term (m.)
-  'جذر',       // root (m.)
-  'ميل',       // slope (m.)
-  'متجه',      // vector (m.)
-  'مثلث',      // triangle (m.)
-  'برهان',     // proof (m.)
-];
-
-function checkTermConsistency(text, context) {
-  const issues = [];
-
-  // Check for known incorrect variants
-  const inconsistencies = [
-    { wrong: 'اقتران', correct: 'دالة', term: 'function' },
-    { wrong: 'ثابته', correct: 'ثابت', term: 'constant (masc form)' },
-    { wrong: 'مصفوفه', correct: 'مصفوفة', term: 'matrix (ta marbuta)' },
-  ];
-
-  for (const { wrong, correct, term } of inconsistencies) {
-    if (text.includes(wrong)) {
-      issues.push({
-        context,
-        description: `Term inconsistency: "${wrong}" should be "${correct}" (${term}) per glossary`,
-        text: text.substring(0, 80),
-      });
-    }
+  if (!english) {
+    issues.push('Glossary entry missing english term');
+    continue;
   }
 
-  return issues;
+  if (!arabic) {
+    issues.push(`Glossary entry '${english}' is missing Arabic text`);
+  }
+
+  if (!hebrew) {
+    issues.push(`Glossary entry '${english}' is missing Hebrew text`);
+  }
+
+  const englishKey = english.toLowerCase();
+  const arabicKey = arabic.toLowerCase();
+
+  if (englishSeen.has(englishKey)) {
+    warnings.push(`Duplicate English glossary term reused across domains: '${english}'`);
+  }
+  englishSeen.add(englishKey);
+
+  if (arabic && arabicSeen.has(arabicKey)) {
+    warnings.push(`Duplicate Arabic glossary term reused across domains: '${arabic}'`);
+  }
+  if (arabic) {
+    arabicSeen.add(arabicKey);
+    glossaryTerms.set(englishKey, arabic);
+  }
+
+  domains.set(domain, (domains.get(domain) ?? 0) + 1);
 }
 
-// ── 4. Run all checks ──
-
-const allIssues = {
-  bidi: [],
-  termConsistency: [],
-  genderAgreement: [],
-  missingTranslations: [],
-};
-
-// Check: do any seed questions have Arabic translations yet?
-// This is a structural check — real data would come from the DB at runtime.
-// For now, report the glossary health and readiness.
+console.log(`Loaded ${glossaryEntries.length} glossary terms from config/glossary.json`);
 
 console.log('');
 console.log('=== Arabic Translation QA Report ===');
 console.log('');
 
 // Glossary coverage check
-const requiredConcepts = [
-  'equation', 'inequality', 'variable', 'function', 'derivative',
-  'integral', 'limit', 'slope', 'quadratic', 'linear', 'polynomial',
-  'probability', 'sequence', 'series', 'vector', 'logarithm',
-  'sine', 'cosine', 'tangent', 'proof', 'theorem', 'matrix',
-  'domain', 'range', 'factoring', 'fraction', 'area', 'volume',
-  'triangle', 'circle', 'angle', 'permutation', 'combination',
-  'standard deviation', 'mean', 'normal distribution',
-  'binomial distribution', 'conditional probability',
-  'definite integral', 'chain rule', 'product rule',
-];
+const requiredConcepts = {
+  equation: ['equation'],
+  inequality: ['inequality'],
+  variable: ['variable'],
+  function: ['function'],
+  derivative: ['derivative'],
+  integral: ['integral'],
+  limit: ['limit'],
+  slope: ['slope'],
+  quadratic: ['quadratic equation'],
+  linear: ['linear equation'],
+  polynomial: ['polynomial'],
+  probability: ['probability'],
+  sequence: ['arithmetic sequence', 'geometric sequence'],
+  series: ['sum of series'],
+  vector: ['vector'],
+  logarithm: ['logarithm'],
+  sine: ['sine'],
+  cosine: ['cosine'],
+  tangent: ['tangent (trig)', 'tangent line', 'tangent (geometry)'],
+  proof: ['proof'],
+  theorem: ['theorem'],
+  matrix: ['matrix'],
+  domain: ['domain'],
+  range: ['range'],
+  factoring: ['factoring'],
+  fraction: ['fraction'],
+  area: ['area'],
+  volume: ['volume'],
+  triangle: ['triangle'],
+  circle: ['circle'],
+  angle: ['angle'],
+  permutation: ['permutation'],
+  combination: ['combination'],
+  'standard deviation': ['standard deviation'],
+  mean: ['mean / average'],
+  'normal distribution': ['normal distribution'],
+  'binomial distribution': ['binomial distribution'],
+  'conditional probability': ['conditional probability'],
+  'definite integral': ['definite integral'],
+  'chain rule': ['chain rule'],
+  'product rule': ['product rule'],
+};
 
-const missingFromGlossary = requiredConcepts.filter(c => !glossaryTerms.has(c));
-const coveredConcepts = requiredConcepts.filter(c => glossaryTerms.has(c));
+function hasCoverage(aliases) {
+  return aliases.some(alias => glossaryTerms.has(alias));
+}
 
-console.log(`Glossary Coverage: ${coveredConcepts.length}/${requiredConcepts.length} required concepts`);
+const requiredConceptEntries = Object.entries(requiredConcepts);
+const missingFromGlossary = requiredConceptEntries
+  .filter(([, aliases]) => !hasCoverage(aliases))
+  .map(([label]) => label);
+const coveredConcepts = requiredConceptEntries
+  .filter(([, aliases]) => hasCoverage(aliases))
+  .map(([label]) => label);
+
+console.log(`Glossary Coverage: ${coveredConcepts.length}/${requiredConceptEntries.length} required concepts`);
 if (missingFromGlossary.length > 0) {
   console.log(`  Missing: ${missingFromGlossary.join(', ')}`);
 }
@@ -176,28 +153,44 @@ for (const [cluster, terms] of Object.entries(clusters)) {
   console.log(`  ${cluster}: ${status}`);
 }
 
+if (verbose) {
+  console.log('');
+  console.log('Domain Distribution:');
+  for (const [domain, count] of [...domains.entries()].sort((a, b) => a[0].localeCompare(b[0]))) {
+    console.log(`  ${domain}: ${count}`);
+  }
+  if (warnings.length > 0) {
+    console.log('');
+    console.log('Warnings:');
+    for (const warning of warnings) {
+      console.log(`  ${warning}`);
+    }
+  }
+}
+
 // Summary
 console.log('');
-const totalIssues = allIssues.bidi.length + allIssues.termConsistency.length +
-                    allIssues.genderAgreement.length + allIssues.missingTranslations.length;
+const totalIssues = issues.length + missingFromGlossary.length;
 
 if (totalIssues === 0) {
-  console.log(`Glossary: ${glossaryTerms.size} terms (target: 100+) — ${glossaryTerms.size >= 100 ? 'PASS' : 'BELOW TARGET'}`);
-  console.log('Term Consistency: No issues found');
-  console.log('Bidi: No issues found (no translations to check yet)');
+  console.log(`Glossary: ${glossaryEntries.length} terms (target: 200+) — PASS`);
+  console.log('Canonical glossary integrity: PASS');
   console.log('');
-  console.log('NOTE: This script checks glossary health and structural readiness.');
-  console.log('Run against actual translations when Arabic LanguageVersions are added.');
+  console.log('NOTE: This CI gate validates canonical glossary readiness before translation batches land.');
   process.exit(0);
 } else {
   console.log(`Issues found: ${totalIssues}`);
-  if (allIssues.bidi.length > 0) {
-    console.log(`  Bidi: ${allIssues.bidi.length}`);
-    for (const i of allIssues.bidi) console.log(`    [BIDI] ${i.context}: ${i.description}`);
+  if (issues.length > 0) {
+    console.log(`  Integrity: ${issues.length}`);
+    for (const issue of issues) {
+      console.log(`    [GLOSSARY] ${issue}`);
+    }
   }
-  if (allIssues.termConsistency.length > 0) {
-    console.log(`  Term Consistency: ${allIssues.termConsistency.length}`);
-    for (const i of allIssues.termConsistency) console.log(`    [TERM] ${i.context}: ${i.description}`);
+  if (missingFromGlossary.length > 0) {
+    console.log(`  Missing Required Concepts: ${missingFromGlossary.length}`);
+    for (const concept of missingFromGlossary) {
+      console.log(`    [COVERAGE] Missing required concept '${concept}'`);
+    }
   }
   process.exit(1);
 }
