@@ -160,7 +160,7 @@ public partial class Program
 
     // RDY-034 / ADR-0002: CAS engine stack is required by the ingestion gate.
     // CasRouterService depends on MathNet + SymPy sidecar + ICostCircuitBreaker.
-    // Mirrors the Student.Api.Host registrations (lines 231-238 + 182 there).
+    // Mirrors the Student.Api.Host registrations.
     builder.Services.AddSingleton<Cena.Actors.RateLimit.ICostCircuitBreaker,
         Cena.Actors.RateLimit.RedisCostCircuitBreaker>();
     builder.Services.AddSingleton<Cena.Actors.Cas.IMathNetVerifier, Cena.Actors.Cas.MathNetVerifier>();
