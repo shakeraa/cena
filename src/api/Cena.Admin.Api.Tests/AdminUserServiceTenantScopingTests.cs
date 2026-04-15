@@ -161,10 +161,15 @@ public class AdminUserServiceTenantScopingTests
     [Fact]
     public void Implementation_LogsCrossTenantAccessAttempts()
     {
-        // Verify that cross-tenant access attempts are logged for security monitoring
+        // Verify that cross-tenant access attempts are logged for security monitoring.
+        // RDY-054b: accept either the Serilog static shape (Log.Warning) or the
+        // Microsoft.Extensions.Logging DI shape (_logger.LogWarning) — both are
+        // security-observable in the same Serilog pipeline.
         var serviceFile = File.ReadAllText(
             Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/AdminUserService.cs"));
         Assert.Contains("Cross-tenant", serviceFile);
-        Assert.Contains("Log.Warning", serviceFile);
+        Assert.True(
+            serviceFile.Contains("Log.Warning") || serviceFile.Contains("LogWarning"),
+            "AdminUserService must call a Warning-level log on cross-tenant attempts (Log.Warning or _logger.LogWarning).");
     }
 }
