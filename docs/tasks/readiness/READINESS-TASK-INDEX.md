@@ -28,6 +28,7 @@
 | [RDY-026](../../tasks/readiness/RDY-026-arabic-input-normalization.md) | Arabic Variable Input Normalization | 3-5 days | — | In Progress |
 | [RDY-027](../../tasks/readiness/RDY-027-glossary-validation.md) | Math/Physics Glossary Curation | 2-3 weeks | — | Pending |
 | [RDY-033](../../tasks/readiness/done/RDY-033-error-pattern-matching.md) | Error Pattern Matching Infrastructure | 2-3 weeks | — | **Done** (RDY-033 + 033b + 033c merged; ADR-0031) |
+| [RDY-034](../../tasks/readiness/RDY-034-cas-gated-question-ingestion.md) | CAS-Gated Question Ingestion (ADR-0002 enforcement) | 3-5 days | RDY-033 | **Critical / ship-blocker** — no CAS verification runs on question creation today |
 
 > **Rami additions**: RDY-033 (error pattern matching) is a prerequisite for RDY-014. RDY-005 effort doubled after legal cost analysis ($15-30K). RDY-007 is data-dependent — consider splitting into implementation + post-pilot calibration.
 
