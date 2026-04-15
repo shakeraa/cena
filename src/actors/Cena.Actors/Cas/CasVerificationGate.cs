@@ -98,6 +98,7 @@ public sealed class CasVerificationGate : ICasVerificationGate
 {
     private readonly ICasRouterService _casRouter;
     private readonly IMathContentDetector _mathDetector;
+    private readonly IStemSolutionExtractor _stemExtractor;
     private readonly IDocumentStore _store;
     private readonly ILogger<CasVerificationGate> _logger;
 
@@ -120,11 +121,13 @@ public sealed class CasVerificationGate : ICasVerificationGate
     public CasVerificationGate(
         ICasRouterService casRouter,
         IMathContentDetector mathDetector,
+        IStemSolutionExtractor stemExtractor,
         IDocumentStore store,
         ILogger<CasVerificationGate> logger)
     {
         _casRouter = casRouter;
         _mathDetector = mathDetector;
+        _stemExtractor = stemExtractor;
         _store = store;
         _logger = logger;
     }
@@ -196,16 +199,80 @@ public sealed class CasVerificationGate : ICasVerificationGate
                 "[CAS_GATE_CACHE_MISS_ERROR] questionId={Qid} — falling through to CAS call", questionId);
         }
 
-        // 3. Route to CAS. We use NormalForm — SymPy/MathNet simplify the
-        // answer and return its canonical form; failure to parse/evaluate
-        // is treated as an engine error (CircuitOpen category), not Failed.
+        // 3. RDY-038 / ADR-0002: determine what we're actually verifying.
+        // Parseability alone is NOT correctness. We extract the expected
+        // solution from the stem when we can, and send an Equivalence /
+        // Solve request to the router. When the stem is not extractable,
+        // we still probe with NormalForm to catch unparseable answers,
+        // BUT we persist the binding as Unverifiable — never Verified —
+        // because we cannot prove the answer is correct, only that it
+        // parses. Admin queue decides.
+        var extraction = _stemExtractor.Extract(stem ?? string.Empty, subject);
+        string operationUsed = "NormalForm";
+        bool stemBasedVerification = false;
+
         var sw = Stopwatch.StartNew();
-        var request = new CasVerifyRequest(
-            Operation: CasOperation.NormalForm,
-            ExpressionA: correctAnswerRaw,
-            ExpressionB: null,
-            Variable: variable,
-            Tolerance: 1e-9);
+        CasVerifyRequest request;
+        switch (extraction)
+        {
+            case StemExtraction.ExpressionOnly expr:
+                // The stem asks the student to produce the canonical form of
+                // `expr`. Author answer must be CAS-equivalent to it.
+                request = new CasVerifyRequest(
+                    Operation: CasOperation.Equivalence,
+                    ExpressionA: correctAnswerRaw,
+                    ExpressionB: expr.Expression,
+                    Variable: variable ?? expr.Variable,
+                    Tolerance: 1e-9);
+                operationUsed = "Equivalence";
+                stemBasedVerification = true;
+                break;
+
+            case StemExtraction.Equation eq:
+                // Build a residual expression: (lhs) - (rhs). The author's
+                // answer is a proposed root; substituting it into the
+                // residual MUST collapse to zero. We encode that as an
+                // Equivalence check between (lhs - rhs) evaluated at the
+                // author's answer and the literal 0 — SymPy handles the
+                // substitution symbolically.
+                //
+                // Concretely we send `(lhs) - (rhs)` vs `0`, with the
+                // variable pinned to the author's answer via a simple
+                // textual substitution. If no variable was identified we
+                // fall through to parseability-Unverifiable.
+                var varName = variable ?? eq.Variable;
+                if (string.IsNullOrWhiteSpace(varName))
+                {
+                    request = new CasVerifyRequest(
+                        Operation: CasOperation.NormalForm,
+                        ExpressionA: correctAnswerRaw,
+                        ExpressionB: null,
+                        Variable: null,
+                        Tolerance: 1e-9);
+                    break;
+                }
+                // Build `(lhs) - (rhs)` substituted with author answer, compared to 0.
+                var substituted = $"(({eq.Lhs}) - ({eq.Rhs}))".Replace(
+                    varName, $"({correctAnswerRaw})", StringComparison.Ordinal);
+                request = new CasVerifyRequest(
+                    Operation: CasOperation.Equivalence,
+                    ExpressionA: substituted,
+                    ExpressionB: "0",
+                    Variable: varName,
+                    Tolerance: 1e-9);
+                operationUsed = "Equivalence(equation-residual)";
+                stemBasedVerification = true;
+                break;
+
+            default:
+                request = new CasVerifyRequest(
+                    Operation: CasOperation.NormalForm,
+                    ExpressionA: correctAnswerRaw,
+                    ExpressionB: null,
+                    Variable: variable,
+                    Tolerance: 1e-9);
+                break;
+        }
 
         CasVerifyResult casResult;
         try
@@ -215,8 +282,9 @@ public sealed class CasVerificationGate : ICasVerificationGate
         catch (Exception ex)
         {
             sw.Stop();
-            _logger.LogWarning(ex, "[CAS_GATE_UNEXPECTED] questionId={Qid}", questionId);
-            casResult = CasVerifyResult.Error(CasOperation.NormalForm, "none",
+            _logger.LogWarning(ex, "[CAS_GATE_UNEXPECTED] questionId={Qid} op={Op}",
+                questionId, operationUsed);
+            casResult = CasVerifyResult.Error(request.Operation, "none",
                 sw.Elapsed.TotalMilliseconds, ex.Message, CasVerifyStatus.Error);
         }
         sw.Stop();
@@ -252,6 +320,39 @@ public sealed class CasVerificationGate : ICasVerificationGate
                 {
                     var canonical = casResult.SimplifiedA ?? correctAnswerRaw;
                     var engine = MapEngine(casResult.Engine ?? string.Empty);
+
+                    // ★ RDY-038 / ADR-0002: Parseability is NOT correctness.
+                    // Only mark Verified if we actually ran an Equivalence /
+                    // Solve check driven by the stem. A bare NormalForm
+                    // simplify only tells us the author's answer string is
+                    // well-formed math — it says nothing about whether it
+                    // is the right answer for this question. Such questions
+                    // must be persisted Unverifiable and routed to manual
+                    // review; they must not auto-approve.
+                    if (!stemBasedVerification)
+                    {
+                        var passiveBinding = BuildBinding(questionId, correctAnswerRaw, hash,
+                            canonical: canonical,
+                            engine: engine,
+                            status: CasBindingStatus.Unverifiable,
+                            latencyMs: casResult.LatencyMs,
+                            failureReason: "stem_non_extractable_parseability_only",
+                            verifiedAt: now);
+
+                        VerificationTotal.Add(1,
+                            new KeyValuePair<string, object?>("result", "unverifiable"),
+                            new KeyValuePair<string, object?>("engine", engine.ToString()));
+
+                        _logger.LogInformation(
+                            "[CAS_GATE_UNVERIFIABLE_PROSE] questionId={Qid} — stem not extractable; " +
+                            "parseability OK but correctness unproven; NeedsReview", questionId);
+
+                        return new CasGateResult(
+                            CasGateOutcome.Unverifiable, engine.ToString(),
+                            canonical, hash, casResult.LatencyMs,
+                            "stem_non_extractable_parseability_only", passiveBinding);
+                    }
+
                     var binding = BuildBinding(questionId, correctAnswerRaw, hash,
                         canonical: canonical,
                         engine: engine,

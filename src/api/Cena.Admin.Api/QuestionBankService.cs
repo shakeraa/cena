@@ -441,10 +441,13 @@ public sealed class QuestionBankService : IQuestionBankService
         if (qualityGateResult.Decision == GateDecision.AutoApproved && casAllowsAutoApprove)
             extras.Add(new QuestionApproved_V1(id, "quality-gate", now));
 
-        // RDY-037: single gated-write site — routed through the persister
-        // (see CasGatedQuestionPersister). We pass the probe result so the
-        // persister does not re-run CAS; binding is persisted atomically
-        // with the event stream.
+        // RDY-037 / RDY-041: single gated-write site — routed through the
+        // persister (see CasGatedQuestionPersister). The persister runs the
+        // gate itself; we already invoked it above to decide on
+        // auto-approval, so the persister's call hits the idempotency cache
+        // (keyed on QuestionId + CorrectAnswerHash) and incurs no extra CAS
+        // round-trip. We no longer pass a pre-computed result — that
+        // parameter was removed to close the trust-the-caller bypass.
         var persistOutcome = await _persister.PersistAsync(
             questionId: id,
             creationEvent: creationEvent,
@@ -454,8 +457,7 @@ public sealed class QuestionBankService : IQuestionBankService
                 CorrectAnswerRaw: correctAnswerRaw,
                 Language: request.Language,
                 Variable: null),
-            extraEventsOnNewStream: extras,
-            preComputedGateResult: probe);
+            extraEventsOnNewStream: extras);
 
         _logger.LogInformation(
             "Created question {QuestionId} ({SourceType}) — qualityGate: {Decision} casGate: {CasOutcome}",

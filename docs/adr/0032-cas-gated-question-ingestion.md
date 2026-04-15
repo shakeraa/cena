@@ -116,6 +116,79 @@ unchanged.
   missed call equals a new bypass — the exact failure mode this addendum
   closes. Rejected.
 
+## §17 — Correctness vs parseability (RDY-038)
+
+The initial RDY-034 implementation only issued `CasOperation.NormalForm` on
+the author's raw answer string. NormalForm simplifies the string and
+returns its canonical form — it does not compare the answer to anything.
+For stem `"Solve 2x+3=7"` with author answer `"x=99"`, NormalForm returns
+`"x=99"` and the gate marked the binding `Verified`. ADR-0002 says "no
+math reaches students unverified"; what shipped proved the answer *parsed*,
+not that it was *correct*.
+
+`IStemSolutionExtractor` (regex-backed, best-effort) now extracts the
+stem's expected solution. The gate routes:
+
+- **Extracted equation** — builds residual `(lhs) − (rhs)` substituted
+  with the author's answer, sends `CasOperation.Equivalence` vs `0`.
+  Substitution is symbolic (SymPy), not numeric.
+- **Extracted direct expression** — sends `CasOperation.Equivalence`
+  between author answer and the extracted expression.
+- **Non-extractable stem** (prose / word problem) — falls through to
+  NormalForm as a parseability probe, **but the binding status is
+  `Unverifiable`, not `Verified`**. Such questions cannot auto-approve
+  and must be routed to manual review.
+
+Rule: the gate only marks a binding `Verified` when it ran a stem-driven
+Equivalence check. Parseability alone is never enough.
+
+## §18 — Transactional boundary (RDY-039)
+
+`ICasGatedQuestionPersister` now exposes a session-aware overload:
+
+```csharp
+Task<GatedPersistOutcome> PersistAsync(
+    IDocumentSession session,         // caller-owned
+    string questionId,
+    object creationEvent,
+    GatedPersistContext context, ...);
+```
+
+The session-aware overload appends events, stores the binding, and stores
+companion documents on the caller's session, then **returns without
+calling `SaveChangesAsync`**. Caller owns the commit — so the question
+stream + binding + any pipeline document (e.g. `PipelineItemDocument`
+from `IngestionOrchestrator`) commit atomically or roll back together.
+
+The session-less overload is preserved as a thin wrapper that opens + saves
+its own session for callers without composable writes (admin UI authoring,
+seed data). It delegates to the session-aware overload internally.
+
+## §19 — No caller-supplied gate results (RDY-041)
+
+`preComputedGateResult` is removed from `ICasGatedQuestionPersister`.
+Callers that already invoked `ICasVerificationGate` (e.g.
+`QuestionBankService.CreateQuestionAsync`, which needs the outcome to
+decide on auto-approval events) now rely on the gate's own idempotency
+cache — the second call against the same `(QuestionId, CorrectAnswerHash)`
+hits `CacheHits` and returns without a sidecar round-trip. Net: +0 CAS
+calls, forgery surface closed.
+
+## §20 — Binding coverage startup check (RDY-040)
+
+`CasBindingStartupCheck` (pre-RDY-040) probed the CAS engine with `x + 1`
+— it checked *liveness*, not *data*. `CasBindingCoverageStartupCheck`
+(new) additionally queries `QuestionState` + `QuestionCasBinding`:
+
+- In **Enforce** mode, `published_math > verified_bindings` calls
+  `IHostApplicationLifetime.StopApplication()` — the Admin API refuses
+  to serve traffic.
+- In **Shadow** mode, same condition logs `[STARTUP_WARN]` and continues.
+- `CENA_CAS_STARTUP_CHECK=skip` bypasses both checks with a `LogCritical`.
+
+Gauge `cena_cas_binding_coverage_ratio` (verified / published) is emitted
+on every successful query and should live on the Grafana CAS dashboard.
+
 ## Open items
 
 - k6 load test for sustained ingestion with CAS enforcement — deferred to post-pilot.

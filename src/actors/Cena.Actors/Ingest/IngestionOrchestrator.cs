@@ -285,13 +285,22 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                     ImportedBy: request.SubmittedBy,
                     Timestamp: DateTimeOffset.UtcNow);
 
-                // RDY-037 / ADR-0002: route through the CAS-gated persister.
+                // RDY-037 / RDY-039 / ADR-0002: route through the CAS-gated
+                // persister using the SESSION-AWARE overload so the question
+                // stream, CAS binding, and pipeline item commit atomically
+                // with the single SaveChangesAsync at the end of this
+                // method. The old session-less overload opened a second
+                // session and could leave orphan question streams if the
+                // pipeline save failed afterwards.
+                //
                 // Bagrut ingestion is open-ended — the correct answer is not
                 // yet known, so CorrectAnswerRaw is empty and the gate
-                // produces an Unverifiable binding with NeedsReview semantics.
-                // Classification/authoring adds the answer later; a CAS
-                // backfill run upgrades the binding to Verified.
+                // produces an Unverifiable binding with NeedsReview
+                // semantics. Classification/authoring adds the answer
+                // later; a CAS backfill run upgrades the binding to
+                // Verified.
                 await _persister.PersistAsync(
+                    session: session,
                     questionId: questionId,
                     creationEvent: ingestedEvent,
                     context: new GatedPersistContext(

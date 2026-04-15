@@ -82,7 +82,8 @@ public class CasGatingTests
     public async Task EnforceMode_FailedOutcome_ThrowsCasVerificationFailedException()
     {
         _mode.CurrentMode.Returns(CasGateMode.Enforce);
-        _gate.VerifyForCreateAsync("q-test", "math", Arg.Any<string>(), "wrong", null, Arg.Any<CancellationToken>())
+        _gate.VerifyForCreateAsync(Arg.Any<string>(), Arg.Any<string>(), Arg.Any<string>(),
+                                   Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
              .Returns(Result(CasGateOutcome.Failed, "answer contradicts canonical form"));
 
         await Assert.ThrowsAsync<CasVerificationFailedException>(async () =>

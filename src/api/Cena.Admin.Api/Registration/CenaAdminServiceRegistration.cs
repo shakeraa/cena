@@ -41,6 +41,11 @@ public static class CenaAdminServiceRegistration
         // registered by the host Program.cs (Admin + Actor hosts both).
         services.AddSingleton<IMathContentDetector, MathContentDetector>();
         services.AddSingleton<ICasGateModeProvider, CasGateModeProvider>();
+        // RDY-038 / ADR-0002: stem-solution extractor lets the gate run
+        // Equivalence checks against the stem's own expected answer, not
+        // just a NormalForm parseability probe. Without this registration
+        // the gate degrades every question to Unverifiable.
+        services.AddSingleton<IStemSolutionExtractor, StemSolutionExtractor>();
         services.AddScoped<ICasVerificationGate, CasVerificationGate>();
         // RDY-037: single gated-write site (see CasGatedQuestionPersister)
         // — every question creation path routes through this persister.

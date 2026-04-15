@@ -83,13 +83,15 @@ public interface ICasGatedQuestionPersister
     /// new QuestionState stream, persist the CAS binding and any companion
     /// documents atomically in the same session.
     /// </summary>
-    /// <param name="preComputedGateResult">
-    /// Optional: if the caller has already invoked <see cref="ICasVerificationGate"/>
-    /// (e.g. to decide on conditional auto-approval events before calling
-    /// this method), pass the result here to avoid a redundant CAS round-trip.
-    /// When provided, the persister trusts it and does not re-run the gate.
-    /// Passing Null causes the persister to run the gate itself.
-    /// </param>
+    /// <remarks>
+    /// RDY-041: there is deliberately no way for the caller to supply a
+    /// pre-computed <see cref="CasGateResult"/>. The persister always runs
+    /// the gate itself — the gate's own idempotency cache (keyed on
+    /// QuestionId + CorrectAnswerHash) absorbs the duplicate cost when a
+    /// caller has already called the gate to decide on auto-approval
+    /// events. This forecloses the trust-the-caller bypass where a
+    /// forged result could sidestep ADR-0002.
+    /// </remarks>
     /// <exception cref="CasVerificationFailedException">
     /// Thrown only in Enforce mode on <see cref="CasGateOutcome.Failed"/>.
     /// </exception>
@@ -99,7 +101,23 @@ public interface ICasGatedQuestionPersister
         GatedPersistContext context,
         IReadOnlyList<object>? extraEventsOnNewStream = null,
         IReadOnlyList<object>? companionDocuments = null,
-        CasGateResult? preComputedGateResult = null,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// RDY-039: Session-aware overload. When supplied, the persister uses
+    /// the caller's <see cref="IDocumentSession"/> for the event append,
+    /// binding store, and companion-document writes — and does NOT call
+    /// <c>SaveChangesAsync</c>. Caller owns the unit-of-work so the
+    /// question + binding commit atomically with the caller's other
+    /// document writes (e.g. ingestion pipeline item).
+    /// </summary>
+    Task<GatedPersistOutcome> PersistAsync(
+        IDocumentSession session,
+        string questionId,
+        object creationEvent,
+        GatedPersistContext context,
+        IReadOnlyList<object>? extraEventsOnNewStream = null,
+        IReadOnlyList<object>? companionDocuments = null,
         CancellationToken ct = default);
 }
 
@@ -130,16 +148,39 @@ public sealed class CasGatedQuestionPersister : ICasGatedQuestionPersister
         GatedPersistContext context,
         IReadOnlyList<object>? extraEventsOnNewStream = null,
         IReadOnlyList<object>? companionDocuments = null,
-        CasGateResult? preComputedGateResult = null,
         CancellationToken ct = default)
     {
+        // Session-less overload: open + commit our own session.
+        await using var session = _store.LightweightSession();
+        var outcome = await PersistAsync(session, questionId, creationEvent, context,
+            extraEventsOnNewStream, companionDocuments, ct);
+        await session.SaveChangesAsync(ct);
+        return outcome;
+    }
+
+    /// <inheritdoc />
+    public async Task<GatedPersistOutcome> PersistAsync(
+        IDocumentSession session,
+        string questionId,
+        object creationEvent,
+        GatedPersistContext context,
+        IReadOnlyList<object>? extraEventsOnNewStream = null,
+        IReadOnlyList<object>? companionDocuments = null,
+        CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(session);
         if (string.IsNullOrWhiteSpace(questionId))
             throw new ArgumentException("questionId is required", nameof(questionId));
         ArgumentNullException.ThrowIfNull(creationEvent);
         ArgumentNullException.ThrowIfNull(context);
 
-        CasGateResult? gateResult = preComputedGateResult;
-        if (gateResult is null && _mode.CurrentMode != CasGateMode.Off)
+        // RDY-041: the persister always runs the gate itself. No caller-
+        // supplied result is accepted — a forged Verified outcome would
+        // silently bypass ADR-0002. The gate's own idempotency cache (in
+        // CasVerificationGate) absorbs duplicate cost when a caller has
+        // already called the gate to decide on auto-approval events.
+        CasGateResult? gateResult = null;
+        if (_mode.CurrentMode != CasGateMode.Off)
         {
             gateResult = await _gate.VerifyForCreateAsync(
                 questionId,
@@ -161,8 +202,6 @@ public sealed class CasGatedQuestionPersister : ICasGatedQuestionPersister
                 gateResult.FailureReason
                 ?? $"CAS verification failed for question {questionId}.");
         }
-
-        await using var session = _store.LightweightSession();
 
         // Build the event batch. Creation event MUST lead — it bootstraps
         // the QuestionState aggregate.
@@ -189,7 +228,9 @@ public sealed class CasGatedQuestionPersister : ICasGatedQuestionPersister
             }
         }
 
-        await session.SaveChangesAsync(ct);
+        // RDY-039: caller owns SaveChangesAsync. The session-aware overload
+        // intentionally does not commit here — the caller composes question
+        // + binding + pipeline item into one transaction.
 
         _logger.LogInformation(
             "[CAS_GATED_PERSIST] questionId={Qid} outcome={Outcome} engine={Engine} mode={Mode}",
