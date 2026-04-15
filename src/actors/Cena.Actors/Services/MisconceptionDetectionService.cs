@@ -1,19 +1,22 @@
 // =============================================================================
-// Cena Platform — Misconception Detection Service (RDY-014)
+// Cena Platform — Misconception Detection Service (RDY-014 + RDY-033)
 //
 // Connects wrong answers → error patterns → MisconceptionCatalog buggy rules.
-// When a match is found, emits MisconceptionDetected_V1 and queues a
-// remediation micro-task from RemediationTemplates.
+// When a match is found, returns a MisconceptionDetectionResult including the
+// appropriate RemediationTask from RemediationTemplates.
 //
-// Pattern matching approach: keyword + structural patterns derived from
-// each buggy rule's StudentManifestation. LLM-assisted classification
-// via ErrorClassificationService provides additional signal.
+// Pattern matching approach (RDY-033, ADR-0031):
+//   1. Delegate to IErrorPatternMatcherEngine — CAS-grounded matchers that
+//      check symbolic equivalence via ICasRouterService (ADR-0002).
+//   2. Fallback: legacy inline string heuristics for buggy rules not yet
+//      covered by a first-class IErrorPatternMatcher.
 //
 // All misconception data is session-scoped per ADR-0003.
 // Events carry [MlExcluded] per RDY-006.
 // =============================================================================
 
 using Cena.Actors.Events;
+using Cena.Actors.Services.ErrorPatternMatching;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Services;
@@ -55,6 +58,7 @@ public interface IMisconceptionDetectionService
 public sealed class MisconceptionDetectionService : IMisconceptionDetectionService
 {
     private readonly ILogger<MisconceptionDetectionService> _logger;
+    private readonly IErrorPatternMatcherEngine? _matcherEngine;
 
     // Pattern matchers: each maps a buggy rule ID to a detection function.
     // The function receives (questionStem, correctAnswer, studentAnswer, subject)
@@ -163,8 +167,19 @@ public sealed class MisconceptionDetectionService : IMisconceptionDetectionServi
     };
 
     public MisconceptionDetectionService(ILogger<MisconceptionDetectionService> logger)
+        : this(logger, null) { }
+
+    /// <summary>
+    /// RDY-033 constructor: engine-first detection. The matcher engine runs the
+    /// CAS-backed IErrorPatternMatcher registry (ADR-0031); the legacy string
+    /// heuristics remain as a fallback for rules the engine does not yet cover.
+    /// </summary>
+    public MisconceptionDetectionService(
+        ILogger<MisconceptionDetectionService> logger,
+        IErrorPatternMatcherEngine? matcherEngine)
     {
         _logger = logger;
+        _matcherEngine = matcherEngine;
     }
 
     public MisconceptionDetectionResult Detect(
@@ -175,7 +190,32 @@ public sealed class MisconceptionDetectionService : IMisconceptionDetectionServi
         string? conceptId,
         ExplanationErrorType? errorType)
     {
-        // Try each matcher for the student's subject
+        // RDY-033: Prefer the CAS-grounded matcher engine when registered.
+        // We run the engine synchronously from this sync interface by awaiting
+        // the task without SyncContext — the engine's 100 ms budget caps the wait.
+        if (_matcherEngine is not null)
+        {
+            var engineResult = RunEngineSync(questionStem, correctAnswer, studentAnswer, subject, conceptId);
+            if (engineResult is { Matched: true, BuggyRuleId: not null })
+            {
+                var entry = MisconceptionCatalog.GetById(engineResult.BuggyRuleId);
+                if (entry is not null)
+                {
+                    _logger.LogInformation(
+                        "[MISCONCEPTION] Engine-matched {RuleId} (confidence {Confidence:F2}, engine={Engine}, elapsed_ms={Elapsed:F1})",
+                        engineResult.BuggyRuleId, engineResult.Confidence, engineResult.Engine, engineResult.ElapsedMs);
+
+                    return new MisconceptionDetectionResult(
+                        Detected: true,
+                        BuggyRuleId: engineResult.BuggyRuleId,
+                        Confidence: engineResult.Confidence,
+                        CounterExample: entry.CounterExample,
+                        RemediationTask: GetRemediation(engineResult.BuggyRuleId));
+                }
+            }
+        }
+
+        // Legacy string-heuristic fallback (covers rules not yet lifted to IErrorPatternMatcher).
         foreach (var (ruleId, matcher) in Matchers)
         {
             var entry = MisconceptionCatalog.GetById(ruleId);
@@ -224,5 +264,33 @@ public sealed class MisconceptionDetectionService : IMisconceptionDetectionServi
     public RemediationTask? GetRemediation(string buggyRuleId)
     {
         return RemediationTemplates.GetTemplate(buggyRuleId);
+    }
+
+    /// <summary>
+    /// Bridge between the sync Detect() contract (kept for source compatibility with
+    /// RDY-014 call sites) and the async IErrorPatternMatcherEngine. Safe because the
+    /// engine caps itself at a 100 ms budget; we do not hold any async context here.
+    /// </summary>
+    private ErrorPatternMatchResult? RunEngineSync(
+        string questionStem,
+        string correctAnswer,
+        string studentAnswer,
+        string subject,
+        string? conceptId)
+    {
+        try
+        {
+            var context = new ErrorPatternMatchContext(
+                questionStem, correctAnswer, studentAnswer, subject, conceptId);
+            return _matcherEngine!
+                .ClassifyAsync(context, CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Matcher engine threw; falling back to legacy heuristics");
+            return null;
+        }
     }
 }

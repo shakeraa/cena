@@ -22,7 +22,10 @@ using Cena.Infrastructure.Resilience;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
+using Cena.Actors.Cas;
 using Cena.Actors.Services;
+using Cena.Actors.Services.ErrorPatternMatching;
+using Cena.Actors.Services.ErrorPatternMatching.BuggyRuleMatchers;
 using Cena.Actors.Students;
 using Cena.Actors.Sync;
 using Cena.Actors.Tutoring;
@@ -204,6 +207,23 @@ builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>
 builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
 builder.Services.AddSingleton<IL3ExplanationGenerator, L3ExplanationGenerator>();
 builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
+
+// RDY-033 + ADR-0002/0031: CAS stack + CAS-backed error pattern matchers.
+// The CAS router is the sole correctness oracle; misconception matchers go through it.
+builder.Services.AddSingleton<IMathNetVerifier, MathNetVerifier>();
+builder.Services.AddSingleton<ISymPySidecarClient, SymPySidecarClient>();
+builder.Services.AddSingleton<ICasRouterService, CasRouterService>();
+
+builder.Services.AddSingleton<IErrorPatternMatcher, DistExpSumMatcher>();
+builder.Services.AddSingleton<IErrorPatternMatcher, CancelCommonMatcher>();
+builder.Services.AddSingleton<IErrorPatternMatcher, SignNegativeMatcher>();
+builder.Services.AddSingleton<IErrorPatternMatcher, OrderOpsMatcher>();
+builder.Services.AddSingleton<IErrorPatternMatcher, FractionAddMatcher>();
+builder.Services.AddSingleton<IErrorPatternMatcherEngine, ErrorPatternMatcherEngine>();
+
+// RDY-014 + RDY-033: Misconception detection service, now powered by the matcher engine.
+builder.Services.AddSingleton<IMisconceptionDetectionService, MisconceptionDetectionService>();
+
 builder.Services.AddSingleton<IExplanationOrchestrator, ExplanationOrchestrator>();
 builder.Services.AddSingleton<IPersonalizedExplanationService, PersonalizedExplanationService>();
 builder.Services.AddSingleton<OfflineSyncHandler>();

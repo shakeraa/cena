@@ -32,7 +32,8 @@ public record SessionMisconceptionTally(
 );
 
 /// <summary>
-/// Catalog of 15 empirically-documented misconceptions across math and physics.
+/// Catalog of 18 empirically-documented misconceptions across math and physics.
+/// (15 original + 3 added by RDY-033: CANCEL-COMMON, SIGN-NEGATIVE, ORDER-OPS)
 /// </summary>
 public static class MisconceptionCatalog
 {
@@ -73,6 +74,28 @@ public static class MisconceptionCatalog
             "2⁻³ = 1/2³ = 1/8 = 0.125",
             "x⁻ⁿ = 1/xⁿ (reciprocal, not negation)",
             "Pitta-Pantazi & Christou 2011"),
+
+        // ── Algebra (3 added by RDY-033) ──
+        new("CANCEL-COMMON", "math", "algebra",
+            "Cancelling a summand as if it were a factor: (a+b)/a → b",
+            "Student writes (x+5)/x = 5",
+            "(2+5)/2 = 3.5, not 5",
+            "Only factors (multiplicative) cancel; summands (additive) cannot be cancelled.",
+            "Matz 1982 (mal-rules); ASSISTments error logs"),
+
+        new("SIGN-NEGATIVE", "math", "algebra",
+            "Failing to distribute a leading negative across all summands: -(a+b) → -a+b",
+            "Student writes -(x+5) = -x+5",
+            "-(2+5) = -7, not -2+5 = 3",
+            "A leading minus multiplies every term inside the parentheses: -(a+b) = -a - b.",
+            "Booth & Koedinger 2008"),
+
+        new("ORDER-OPS", "math", "arithmetic",
+            "Evaluating arithmetic left-to-right instead of PEMDAS: 2+3·4 → 20",
+            "Student writes 2 + 3 × 4 = 20 (treated as (2+3)·4)",
+            "PEMDAS says multiplication binds tighter: 2 + (3·4) = 14",
+            "Parentheses, Exponents, Multiplication/Division, Addition/Subtraction.",
+            "Kieran 2007 (order-of-operations misconceptions)"),
 
         // ── Trigonometry (2) ──
         new("TRIG-INVERSE-RECIPROCAL", "math", "trigonometry",
