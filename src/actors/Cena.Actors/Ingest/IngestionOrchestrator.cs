@@ -265,8 +265,12 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                 var questionId = $"q-{Guid.NewGuid():N}";
                 questionIds.Add(questionId);
 
-                // Create question event
-                var ingestedEvent = new QuestionIngested_V1(
+                // RDY-050: emit V2 directly. Pre-fix emitted V1 + relied on
+                // the EventUpcaster. Both V1 and V2 remain registered in
+                // MartenConfiguration so historical streams still read,
+                // but new writes standardize on V2 to match ADR-0032 and
+                // the authoring path.
+                var ingestedEvent = new QuestionIngested_V2(
                     QuestionId: questionId,
                     Stem: q.StemText,
                     StemHtml: $"<p>{q.StemText}</p>",
@@ -283,7 +287,9 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                     SourceFilename: request.Filename,
                     OriginalText: q.StemText,
                     ImportedBy: request.SubmittedBy,
-                    Timestamp: DateTimeOffset.UtcNow);
+                    Timestamp: DateTimeOffset.UtcNow,
+                    Explanation: null,
+                    LearningObjectiveId: null);
 
                 // RDY-037 / RDY-039 / ADR-0002: route through the CAS-gated
                 // persister using the SESSION-AWARE overload so the question

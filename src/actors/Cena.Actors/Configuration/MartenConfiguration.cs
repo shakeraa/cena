@@ -146,6 +146,22 @@ public static class MartenConfiguration
             .Index(x => x.ContentHash)
             .Index(x => x.SubmittedAt);
 
+        // ── Question CAS Binding (ADR-0032 §4 / RDY-049) ──
+        // Unique index on (QuestionId, CorrectAnswerHash) gives us
+        // concurrency-safe idempotency: two racing verify calls on the
+        // same (question, answer-hash) cannot both insert. The second
+        // write hits the unique constraint and the caller falls back to
+        // the already-stored binding.
+        opts.Schema.For<Cena.Infrastructure.Documents.QuestionCasBinding>()
+            .Identity(x => x.Id)
+            .Index(x => x.QuestionId)
+            .Index(x => x.Status)
+            .UniqueIndex(
+                Marten.Schema.UniqueIndexType.Computed,
+                "uniq_question_cas_binding_qid_hash",
+                x => x.QuestionId,
+                x => x.CorrectAnswerHash);
+
         // ── Moderation Audit Document (CNT-009: Moderation) ──
         opts.Schema.For<ModerationAuditDocument>()
             .Identity(x => x.Id)

@@ -51,6 +51,27 @@ public static class CenaAdminServiceRegistration
         // — every question creation path routes through this persister.
         services.AddScoped<ICasGatedQuestionPersister, CasGatedQuestionPersister>();
 
+        // RDY-045: Security notifier for CAS overrides (and future
+        // high-impact security events). Falls back to the logs-only null
+        // implementation when CENA_SECURITY_SLACK_WEBHOOK is unset so dev
+        // and CI are not blocked on a webhook URL.
+        services.AddHttpClient("SecurityNotifier");
+        services.AddSingleton<Services.ISecurityNotifier>(sp =>
+        {
+            var webhook = Environment.GetEnvironmentVariable(
+                Services.SlackWebhookSecurityNotifier.WebhookEnvVar);
+            if (string.IsNullOrWhiteSpace(webhook))
+            {
+                return new Services.NullSecurityNotifier(
+                    sp.GetRequiredService<ILogger<Services.NullSecurityNotifier>>());
+            }
+            var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
+            return new Services.SlackWebhookSecurityNotifier(
+                httpFactory.CreateClient("SecurityNotifier"),
+                webhook,
+                sp.GetRequiredService<ILogger<Services.SlackWebhookSecurityNotifier>>());
+        });
+
         // ADM-004 through ADM-016: Admin API services
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
         services.AddScoped<IAdminUserService, AdminUserService>();

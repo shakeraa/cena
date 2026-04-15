@@ -22,6 +22,7 @@
 using System.Diagnostics.Metrics;
 using System.Security.Claims;
 using Cena.Actors.Events;
+using Cena.Admin.Api.Services;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Errors;
@@ -117,6 +118,7 @@ public static class CasOverrideEndpoint
         CasOverrideRequest request,
         HttpContext ctx,
         IDocumentStore store,
+        ISecurityNotifier securityNotifier,
         ILoggerFactory loggerFactory)
     {
         var logger = loggerFactory.CreateLogger("CasOverride");
@@ -164,6 +166,22 @@ public static class CasOverrideEndpoint
         logger.LogWarning(
             "[CAS_OVERRIDE_APPLIED] questionId={Qid} previous={Previous} operator={Operator} ticket={Ticket}",
             id, previous, operatorUserId, request.Ticket);
+
+        // RDY-045 / RDY-036 §9: fire-and-forget security-team notification
+        // on every override. Webhook errors do NOT fail the request — the
+        // SIEM log above is the durable audit record.
+        _ = securityNotifier.NotifyAsync(new SecurityNotification(
+            Title: "CAS Binding Override Applied",
+            Summary: $"Question {id} CAS binding overridden by {operatorUserId}.",
+            Fields: new Dictionary<string, string>
+            {
+                ["question_id"] = id,
+                ["previous_status"] = previous.ToString(),
+                ["operator"] = operatorUserId,
+                ["ticket"] = request.Ticket,
+                ["reason"] = request.Reason
+            },
+            Severity: SecuritySeverity.High));
 
         return Results.Ok(new CasOverrideResponse(
             id, previous.ToString(), nameof(CasBindingStatus.OverriddenByOperator),

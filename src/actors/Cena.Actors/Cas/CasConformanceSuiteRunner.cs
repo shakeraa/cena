@@ -37,6 +37,43 @@ public interface ICasConformanceSuiteRunner
     /// for iterative debugging. Placeholder pairs are still excluded.
     /// </summary>
     Task<ConformanceSuiteResult> RunCategoryAsync(string category, CancellationToken ct = default);
+
+    /// <summary>
+    /// RDY-043: Run each pair through <see cref="ICasRouterService.VerifyAsync"/>
+    /// (instead of hitting MathNet + SymPy directly). Measures router-level
+    /// correctness — fallback ordering, circuit-breaker interaction, cost
+    /// breaker — which the engine-direct mode bypasses. Nightly publishes
+    /// both numbers; ADR-0032 §Enforcement names which one is the CI gate.
+    /// </summary>
+    Task<RouterConformanceSuiteResult> RunThroughRouterAsync(CancellationToken ct = default);
+}
+
+/// <summary>
+/// RDY-043: Aggregate for the router-mode run. The router returns a single
+/// verified/not-verified verdict per pair, so we compare against the
+/// <c>ExpectedEquivalent</c> label.
+/// </summary>
+public sealed record RouterConformanceSuiteResult
+{
+    public int TotalPairs { get; init; }
+    public int CorrectCount { get; init; }
+    public double PassRate => TotalPairs > 0 ? (double)CorrectCount / TotalPairs : 0;
+    public bool PassesThreshold => PassRate >= 0.99;
+    public IReadOnlyList<RouterConformanceResult> Mismatches { get; init; } =
+        Array.Empty<RouterConformanceResult>();
+    public TimeSpan TotalDuration { get; init; }
+    public DateTimeOffset RunAt { get; init; }
+}
+
+public sealed record RouterConformanceResult
+{
+    public int PairId { get; init; }
+    public bool RouterVerified { get; init; }
+    public bool ExpectedEquivalent { get; init; }
+    public bool Correct => RouterVerified == ExpectedEquivalent;
+    public string? EngineUsed { get; init; }
+    public string? Error { get; init; }
+    public TimeSpan Latency { get; init; }
 }
 
 /// <inheritdoc />
@@ -44,16 +81,19 @@ public sealed class CasConformanceSuiteRunner : ICasConformanceSuiteRunner
 {
     private readonly IMathNetVerifier _mathNet;
     private readonly ISymPySidecarClient _sympy;
+    private readonly ICasRouterService? _router;
     private readonly ILogger<CasConformanceSuiteRunner> _logger;
 
     public CasConformanceSuiteRunner(
         IMathNetVerifier mathNet,
         ISymPySidecarClient sympy,
-        ILogger<CasConformanceSuiteRunner> logger)
+        ILogger<CasConformanceSuiteRunner> logger,
+        ICasRouterService? router = null)
     {
         _mathNet = mathNet;
         _sympy = sympy;
         _logger = logger;
+        _router = router;
     }
 
     public Task<ConformanceSuiteResult> RunAsync(CancellationToken ct = default) =>
@@ -62,6 +102,86 @@ public sealed class CasConformanceSuiteRunner : ICasConformanceSuiteRunner
     public Task<ConformanceSuiteResult> RunCategoryAsync(string category, CancellationToken ct = default) =>
         RunCoreAsync(pair => pair.Category.Equals(category, StringComparison.OrdinalIgnoreCase)
                              && pair.Category != "placeholder", ct);
+
+    /// <inheritdoc />
+    public async Task<RouterConformanceSuiteResult> RunThroughRouterAsync(CancellationToken ct = default)
+    {
+        if (_router is null)
+        {
+            throw new InvalidOperationException(
+                "RunThroughRouterAsync requires ICasRouterService — pass it to the constructor.");
+        }
+
+        var pairs = ConformancePairs.All.Where(p => p.Category != "placeholder").ToArray();
+        var mismatches = new List<RouterConformanceResult>();
+        var sw = Stopwatch.StartNew();
+        int correct = 0;
+
+        _logger.LogInformation(
+            "[CAS_CONFORMANCE_ROUTER_START] total_pairs={Count}", pairs.Length);
+
+        foreach (var pair in pairs)
+        {
+            ct.ThrowIfCancellationRequested();
+            var pairSw = Stopwatch.StartNew();
+            CasVerifyResult res;
+            try
+            {
+                res = await _router.VerifyAsync(new CasVerifyRequest(
+                    Operation: CasOperation.Equivalence,
+                    ExpressionA: pair.ExpressionA,
+                    ExpressionB: pair.ExpressionB,
+                    Variable: null,
+                    Tolerance: 1e-9), ct);
+            }
+            catch (Exception ex)
+            {
+                pairSw.Stop();
+                mismatches.Add(new RouterConformanceResult
+                {
+                    PairId = pair.Id,
+                    RouterVerified = false,
+                    ExpectedEquivalent = pair.ExpectedEquivalent,
+                    EngineUsed = "none",
+                    Error = ex.Message,
+                    Latency = pairSw.Elapsed
+                });
+                continue;
+            }
+            pairSw.Stop();
+
+            var verified = res.Verified && res.Status == CasVerifyStatus.Ok;
+            if (verified == pair.ExpectedEquivalent) correct++;
+            else
+            {
+                mismatches.Add(new RouterConformanceResult
+                {
+                    PairId = pair.Id,
+                    RouterVerified = verified,
+                    ExpectedEquivalent = pair.ExpectedEquivalent,
+                    EngineUsed = res.Engine,
+                    Error = res.ErrorMessage,
+                    Latency = pairSw.Elapsed
+                });
+            }
+        }
+
+        sw.Stop();
+        var agg = new RouterConformanceSuiteResult
+        {
+            TotalPairs = pairs.Length,
+            CorrectCount = correct,
+            Mismatches = mismatches,
+            TotalDuration = sw.Elapsed,
+            RunAt = DateTimeOffset.UtcNow
+        };
+
+        _logger.LogInformation(
+            "[CAS_CONFORMANCE_ROUTER_DONE] pairs={Total} correct={Correct} rate={Rate:P2} threshold_pass={Pass}",
+            agg.TotalPairs, agg.CorrectCount, agg.PassRate, agg.PassesThreshold);
+
+        return agg;
+    }
 
     private async Task<ConformanceSuiteResult> RunCoreAsync(
         Func<ConformancePair, bool> selector,

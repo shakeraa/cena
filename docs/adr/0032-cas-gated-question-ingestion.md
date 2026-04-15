@@ -65,12 +65,22 @@ result was two pre-existing direct writes to new `QuestionState` streams
 allow-listed via `KNOWN_VIOLATION_TODO` markers in the architecture test —
 ADR-0002 was locally enforced but globally bypassable.
 
-RDY-037 moves the CAS gate primitives down to `Cena.Actors.Cas`, where
-`ICasRouterService`, `IMathNetVerifier`, and `SymPySidecarClient` already
-live. This placement reflects the domain status of CAS verification: per
-ADR-0002, CAS is a platform-level correctness invariant, not an HTTP-adapter
-concern. Every adapter (Admin.Api, Actors ingest pipeline, future hosts) can
-now reach the gate without a reverse-layer reference.
+RDY-037 moves the CAS gate primitives down to the `Cena.Actors.Cas`
+**namespace** (inside the `Cena.Actors` project, under `src/actors/Cena.Actors/Cas/`),
+where `ICasRouterService`, `IMathNetVerifier`, and `SymPySidecarClient`
+already live. This placement reflects the domain status of CAS
+verification: per ADR-0002, CAS is a platform-level correctness
+invariant, not an HTTP-adapter concern. Every adapter (Admin.Api, Actors
+ingest pipeline, future hosts) can now reach the gate without a
+reverse-layer reference.
+
+**RDY-047 clarification (2026-04-15):** There is no separate
+`Cena.Actors.Cas.csproj` assembly — the gate primitives live inside
+`Cena.Actors` alongside the aggregates. Any consumer that references
+`Cena.Actors` gets the full aggregates surface. Separation into a
+dedicated project remains an option if a future adapter needs the
+invariant without the aggregates surface; until then, the "namespace
+inside the same project" shape is the load-bearing structure.
 
 ### §16.1 — The single-writer invariant
 

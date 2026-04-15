@@ -61,6 +61,20 @@ public sealed class MathContentDetector : IMathContentDetector
         new(@"\d\s*[+\-*/=<>≤≥]\s*\d|=\s*\d|\d\s*=|\\frac|\\sqrt|\bsin\s*\(|\bcos\s*\(|\btan\s*\(|\blog\s*\(|\bln\s*\(|\bint\s*\(|\bintegrate\s*\(|\bsqrt\s*\(|\^\s*\d|x\^\d|\by\s*=",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    // RDY-048: Word-problem language hints. Only counts when coupled with
+    // a digit-adjacent token elsewhere in the stem — the cue ALONE cannot
+    // declare math, because "What is the capital of France?" contains
+    // "what is the" but is not math.
+    private static readonly Regex WordProblemVerb = new(
+        @"\b(calculate|compute|evaluate|solve|simplify|factor|expand|differentiate|integrate)\b" +
+        @"|اِحسُب|احسب|اوجد|أوجد|احسبوا" +
+        @"|חשב|חשבו|מצא|מצאו|פתור|פתרו",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // A math-adjacent indicator must accompany the verb for the cue to fire.
+    private static readonly Regex DigitOrVariable = new(
+        @"\d|\b[a-z]\b", RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     /// <inheritdoc />
     public MathContentDetectionResult Analyze(string body, string subject)
     {
@@ -76,10 +90,17 @@ public sealed class MathContentDetector : IMathContentDetector
 
         bool hasLatex = expressions.Count > 0;
         bool hasEquation = EquationLike.IsMatch(body);
+        // RDY-048: word-problem verb ("solve", "calculate", Arabic/Hebrew
+        // equivalents) only counts when paired with a digit or variable
+        // token — the verb alone is too broad.
+        bool hasWordProblemCue =
+            WordProblemVerb.IsMatch(body) && DigitOrVariable.IsMatch(body);
 
         // Subject is authoritative. For non-math subjects, fall back to
-        // heuristic detection (word-problem safety-net).
-        bool hasMath = subjectIsMath || hasLatex || hasEquation;
+        // heuristic detection (word-problem safety-net). For math subjects
+        // with purely prose stems, word-problem cues keep the gate engaged
+        // instead of silently dropping to Unverifiable.
+        bool hasMath = subjectIsMath || hasLatex || hasEquation || hasWordProblemCue;
 
         return new MathContentDetectionResult(hasMath, expressions);
     }
