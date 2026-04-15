@@ -118,6 +118,31 @@ public static class RemediationTemplates
             "Differentiate f(x) = (3x+1)⁵. Don't forget the inner derivative.",
             "Chain rule: d/dx[f(g(x))] = f'(g(x))·g'(x). The inner derivative matters.",
             RemediationDifficulty.Targeted, 3),
+
+        // RDY-033 additions
+        ["CANCEL-COMMON"] = new(
+            "CANCEL-COMMON",
+            "Cancelling summands like factors",
+            "Is (a+b)/a the same as b? Try a=2, b=5.",
+            "Simplify (x+5)/x by splitting into two fractions first. Which part simplifies?",
+            "Only factors cancel. Split (a+b)/a = a/a + b/a = 1 + b/a.",
+            RemediationDifficulty.Targeted, 3),
+
+        ["SIGN-NEGATIVE"] = new(
+            "SIGN-NEGATIVE",
+            "Distributing a leading negative sign",
+            "Is -(a+b) the same as -a+b? Try a=2, b=5.",
+            "Expand: -(x+5). The leading minus multiplies every term inside.",
+            "-(a+b) = -a - b. Every term inside the parentheses flips sign.",
+            RemediationDifficulty.Targeted, 2),
+
+        ["ORDER-OPS"] = new(
+            "ORDER-OPS",
+            "Order of operations (PEMDAS)",
+            "Evaluate 2 + 3 × 4. Which operation comes first?",
+            "Compute: 5 + 6 × 2 - 1. Show each step in PEMDAS order.",
+            "Multiplication and division bind tighter than addition and subtraction.",
+            RemediationDifficulty.Warmup, 2),
     };
 
     /// <summary>

@@ -9,8 +9,13 @@ namespace Cena.Actors.Tests.Services;
 
 public class MisconceptionDetectionServiceTests
 {
+    // These tests cover the legacy string-heuristic fallback path (RDY-014).
+    // The RDY-033 engine-first path is exercised separately in
+    // BuggyRuleMatcherTests + ErrorPatternMatcherEngineTests. Passing null for
+    // the engine here preserves legacy behavior for backwards-compat verification.
     private readonly MisconceptionDetectionService _service = new(
-        NullLogger<MisconceptionDetectionService>.Instance);
+        NullLogger<MisconceptionDetectionService>.Instance,
+        matcherEngine: null);
 
     [Fact]
     public void Detect_DistExpSum_MatchesWhenSquaredTermsMissMiddle()
