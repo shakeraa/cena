@@ -8,6 +8,8 @@ using System.Globalization;
 using System.Text.Json;
 using Cena.Actors.Events;
 using Cena.Actors.Questions;
+using Cena.Admin.Api.QualityGate;
+using Cena.Admin.Api.Services;
 using Cena.Infrastructure.Documents;
 using QualityGateServices = Cena.Admin.Api.QualityGate;
 
@@ -42,15 +44,21 @@ public sealed class QuestionBankService : IQuestionBankService
 {
     private readonly IDocumentStore _store;
     private readonly QualityGateServices.IQualityGateService _qualityGate;
+    private readonly ICasVerificationGate _casGate;
+    private readonly ICasGateModeProvider _casGateMode;
     private readonly ILogger<QuestionBankService> _logger;
 
     public QuestionBankService(
         IDocumentStore store,
         QualityGateServices.IQualityGateService qualityGate,
+        ICasVerificationGate casGate,
+        ICasGateModeProvider casGateMode,
         ILogger<QuestionBankService> logger)
     {
         _store = store;
         _qualityGate = qualityGate;
+        _casGate = casGate;
+        _casGateMode = casGateMode;
         _logger = logger;
     }
 
@@ -286,11 +294,43 @@ public sealed class QuestionBankService : IQuestionBankService
         if (state == null) return false;
         if (state.Status == DomainStatus.Published) return true;
 
+        // RDY-034 / ADR-0002: In Enforce mode, a math/physics question cannot
+        // be approved without a Verified (or OverriddenByOperator) CAS binding.
+        if (_casGateMode.CurrentMode == CasGateMode.Enforce)
+        {
+            var binding = await session.LoadAsync<QuestionCasBinding>(id);
+            var needsVerify = IsMathLikeSubject(state.Subject);
+            if (needsVerify)
+            {
+                if (binding is null)
+                {
+                    throw new CasApprovalRejectedException(
+                        $"Question {id} has no CAS binding; cannot approve in Enforce mode.");
+                }
+                if (binding.Status != CasBindingStatus.Verified
+                    && binding.Status != CasBindingStatus.OverriddenByOperator)
+                {
+                    throw new CasApprovalRejectedException(
+                        $"Question {id} CAS binding status={binding.Status}; cannot approve in Enforce mode.");
+                }
+            }
+        }
+
         var evt = new QuestionApproved_V1(id, "admin", DateTimeOffset.UtcNow);
         session.Events.Append(id, state.EventVersion + 1, evt);
         await session.SaveChangesAsync();
         _logger.LogInformation("Approved question {QuestionId}", id);
         return true;
+    }
+
+    private static bool IsMathLikeSubject(string? subject)
+    {
+        if (string.IsNullOrWhiteSpace(subject)) return false;
+        return subject.Equals("math", StringComparison.OrdinalIgnoreCase)
+            || subject.Equals("mathematics", StringComparison.OrdinalIgnoreCase)
+            || subject.Equals("maths", StringComparison.OrdinalIgnoreCase)
+            || subject.Equals("physics", StringComparison.OrdinalIgnoreCase)
+            || subject.Equals("chemistry", StringComparison.OrdinalIgnoreCase);
     }
 
     public async Task<QuestionBankDetailResponse?> CreateQuestionAsync(
@@ -348,6 +388,39 @@ public sealed class QuestionBankService : IQuestionBankService
 
         var events = new List<object> { creationEvent };
 
+        // RDY-034 / ADR-0002: Run CAS ingestion gate before quality gate. The
+        // authored answer must be verified by the CAS oracle (or flagged
+        // Unverifiable) before the question may be stored. In Enforce mode we
+        // reject Failed/CircuitOpen; in Shadow mode we record and continue;
+        // Off skips the gate call entirely.
+        CasGateResult? casResult = null;
+        if (_casGateMode.CurrentMode != CasGateMode.Off)
+        {
+            var correctAnswerRaw = request.Options.FirstOrDefault(o => o.IsCorrect)?.Text
+                                   ?? string.Empty;
+            casResult = await _casGate.VerifyForCreateAsync(
+                id, request.Subject, request.Stem, correctAnswerRaw, variable: null);
+
+            if (_casGateMode.CurrentMode == CasGateMode.Enforce)
+            {
+                if (casResult.Outcome == CasGateOutcome.Failed)
+                {
+                    _logger.LogWarning(
+                        "[CAS_GATE_REJECT] questionId={Qid} engine={Engine} reason={Reason}",
+                        id, casResult.Engine, casResult.FailureReason);
+                    throw new CasVerificationFailedException(
+                        casResult.FailureReason ?? "CAS verification failed for authored answer.");
+                }
+                if (casResult.Outcome == CasGateOutcome.CircuitOpen)
+                {
+                    _logger.LogWarning(
+                        "[CAS_GATE_CIRCUIT_OPEN] questionId={Qid} reason={Reason} — allowing draft, approval blocked",
+                        id, casResult.FailureReason);
+                    // Allow the draft to land but binding status=Unverifiable; approval path will enforce.
+                }
+            }
+        }
+
         // Run quality gate
         var gateInput = BuildGateInput(id, request.Stem, request.Options,
             request.Subject, request.Language, request.BloomsLevel,
@@ -355,17 +428,32 @@ public sealed class QuestionBankService : IQuestionBankService
         var gateResult = await _qualityGate.EvaluateAsync(gateInput);
         events.Add(MapGateEvent(id, gateResult, now));
 
-        // Auto-approve if gate passes
-        if (gateResult.Decision == GateDecision.AutoApproved)
+        // Auto-approve if quality gate passes AND CAS verification is Verified
+        // (or subject is non-math/Unverifiable). Never auto-approve on
+        // CircuitOpen or Failed.
+        bool casAllowsAutoApprove =
+            casResult is null
+            || casResult.Outcome == CasGateOutcome.Verified
+            || casResult.Outcome == CasGateOutcome.Unverifiable;
+
+        if (gateResult.Decision == GateDecision.AutoApproved && casAllowsAutoApprove)
             events.Add(new QuestionApproved_V1(id, "quality-gate", now));
 
         await using var session = _store.LightweightSession();
         session.Events.StartStream<QuestionState>(id, events.ToArray());
+
+        // RDY-034: Persist CAS binding in the same session as the event stream
+        // so the question + binding land atomically.
+        if (casResult is not null)
+        {
+            session.Store(casResult.Binding);
+        }
+
         await session.SaveChangesAsync();
 
         _logger.LogInformation(
-            "Created question {QuestionId} ({SourceType}) — gate: {Decision}",
-            id, request.SourceType, gateResult.Decision);
+            "Created question {QuestionId} ({SourceType}) — qualityGate: {Decision} casGate: {CasOutcome}",
+            id, request.SourceType, gateResult.Decision, casResult?.Outcome.ToString() ?? "skipped");
 
         return await GetQuestionAsync(id);
     }

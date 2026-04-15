@@ -888,11 +888,20 @@ public static class AdminApiEndpoints
 
         group.MapPost("/{id}/approve", async (string id, IQuestionBankService service) =>
         {
-            var success = await service.ApproveAsync(id);
-            return success ? Results.Ok() : Results.NotFound();
+            try
+            {
+                var success = await service.ApproveAsync(id);
+                return success ? Results.Ok() : Results.NotFound();
+            }
+            catch (Cena.Admin.Api.QualityGate.CasApprovalRejectedException ex)
+            {
+                // RDY-034: math/physics question missing Verified CAS binding.
+                return Results.Conflict(new CenaError(ex.ErrorCode, ex.Message, ErrorCategory.Conflict, null, null));
+            }
         }).WithName("ApproveQuestion")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces<CenaError>(StatusCodes.Status409Conflict)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
@@ -900,8 +909,16 @@ public static class AdminApiEndpoints
         group.MapPost("/", async (CreateQuestionRequest request, HttpContext ctx, IQuestionBankService service) =>
         {
             var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
-            var result = await service.CreateQuestionAsync(request, userId);
-            return result != null ? Results.Created($"/api/admin/questions/{result.Id}", result) : Results.BadRequest();
+            try
+            {
+                var result = await service.CreateQuestionAsync(request, userId);
+                return result != null ? Results.Created($"/api/admin/questions/{result.Id}", result) : Results.BadRequest();
+            }
+            catch (Cena.Admin.Api.QualityGate.CasVerificationFailedException ex)
+            {
+                // RDY-034: authored answer rejected by CAS oracle.
+                return Results.BadRequest(new CenaError(ex.ErrorCode, ex.Message, ErrorCategory.Validation, null, null));
+            }
         }).WithName("CreateQuestion")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)

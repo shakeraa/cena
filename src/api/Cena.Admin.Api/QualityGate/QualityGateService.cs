@@ -9,6 +9,8 @@ using System.Text.Json;
 using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
+using Cena.Infrastructure.Documents;
+using Marten;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -28,6 +30,10 @@ public sealed class QualityGateService : IQualityGateService
     private readonly QualityGateThresholds _thresholds;
     private readonly IConfiguration? _configuration;
     private readonly ILogger<QualityGateService>? _logger;
+    // RDY-034 §13: when present, the gate sources FactualAccuracy from the
+    // persisted QuestionCasBinding for math/physics subjects. Optional so
+    // existing seed paths and unit tests that don't have Marten still work.
+    private readonly IDocumentStore? _store;
 
     // Lazily created Anthropic client for LLM-based scoring
     private AnthropicClient? _client;
@@ -42,11 +48,13 @@ public sealed class QualityGateService : IQualityGateService
     public QualityGateService(
         QualityGateThresholds? thresholds = null,
         IConfiguration? configuration = null,
-        ILogger<QualityGateService>? logger = null)
+        ILogger<QualityGateService>? logger = null,
+        IDocumentStore? store = null)
     {
         _thresholds = thresholds ?? QualityGateThresholds.Default;
         _configuration = configuration;
         _logger = logger;
+        _store = store;
     }
 
     public async Task<QualityGateResult> EvaluateAsync(QualityGateInput input)
@@ -74,8 +82,33 @@ public sealed class QualityGateService : IQualityGateService
         allViolations.AddRange(glossaryViolations);
 
         // Stage 2: LLM-based scoring for FactualAccuracy, LanguageQuality, PedagogicalQuality
-        var (factualAccuracy, languageQuality, pedagogicalQuality) =
+        var (llmFactualAccuracy, languageQuality, pedagogicalQuality) =
             await EvaluateWithLlmAsync(input);
+
+        // RDY-034 §13: For math/physics subjects, the CAS binding is the
+        // authoritative source for FactualAccuracy. Heuristic LLM scoring is
+        // ignored — we don't want a chatty LLM to overrule the oracle.
+        //   - Verified                → 100
+        //   - OverriddenByOperator    → 90 (intentional human override; flagged)
+        //   - Unverifiable            → fall back to LLM score
+        //   - Failed                  → 0  (forces AutoRejected)
+        //   - Missing binding entirely → fall back to LLM score (legacy data)
+        int factualAccuracy = llmFactualAccuracy;
+        var binding = await TryLoadBindingAsync(input.QuestionId);
+        if (IsMathOrPhysicsSubject(input.Subject) && binding is not null)
+        {
+            factualAccuracy = binding.Status switch
+            {
+                CasBindingStatus.Verified => 100,
+                CasBindingStatus.OverriddenByOperator => 90,
+                CasBindingStatus.Failed => 0,
+                CasBindingStatus.Unverifiable => llmFactualAccuracy,
+                _ => llmFactualAccuracy
+            };
+            _logger?.LogDebug(
+                "[QG_FACTUAL_FROM_BINDING] questionId={Qid} bindingStatus={Status} factual={Score}",
+                input.QuestionId, binding.Status, factualAccuracy);
+        }
 
         // Blend glossary coverage into LanguageQuality (30% glossary, 70% LLM)
         // This rewards questions that use canonical terminology from the glossary.
@@ -295,5 +328,34 @@ public sealed class QualityGateService : IQualityGateService
         }
 
         return GateDecision.NeedsReview;
+    }
+
+    // RDY-034 §13: Best-effort binding lookup. Never throws — falls back to
+    // null on Marten errors so the gate continues to function in degraded mode.
+    private async Task<QuestionCasBinding?> TryLoadBindingAsync(string questionId)
+    {
+        if (_store is null || string.IsNullOrEmpty(questionId)) return null;
+        try
+        {
+            await using var session = _store.QuerySession();
+            return await session.LoadAsync<QuestionCasBinding>(questionId);
+        }
+        catch (Exception ex)
+        {
+            _logger?.LogDebug(ex,
+                "[QG_BINDING_LOOKUP_FAILED] questionId={Qid}; falling back to LLM factual score",
+                questionId);
+            return null;
+        }
+    }
+
+    private static bool IsMathOrPhysicsSubject(string? subject)
+    {
+        if (string.IsNullOrWhiteSpace(subject)) return false;
+        return subject.Equals("math", StringComparison.OrdinalIgnoreCase)
+            || subject.Equals("mathematics", StringComparison.OrdinalIgnoreCase)
+            || subject.Equals("maths", StringComparison.OrdinalIgnoreCase)
+            || subject.Equals("physics", StringComparison.OrdinalIgnoreCase)
+            || subject.Equals("chemistry", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -157,8 +157,22 @@ public partial class Program
     
     // ---- Admin Services ----
     builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminService>();
+
+    // RDY-034 / ADR-0002: CAS engine stack is required by the ingestion gate.
+    // CasRouterService depends on MathNet + SymPy sidecar + ICostCircuitBreaker.
+    // Mirrors the Student.Api.Host registrations (lines 231-238 + 182 there).
+    builder.Services.AddSingleton<Cena.Actors.RateLimit.ICostCircuitBreaker,
+        Cena.Actors.RateLimit.RedisCostCircuitBreaker>();
+    builder.Services.AddSingleton<Cena.Actors.Cas.IMathNetVerifier, Cena.Actors.Cas.MathNetVerifier>();
+    builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
+    builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
+
     builder.Services.AddCenaAdminServices();
-    
+
+    // RDY-036: CAS startup probe — fails fast in Enforce mode if the CAS
+    // engine stack is unreachable. Hosted service runs once at boot.
+    builder.Services.AddHostedService<Cena.Admin.Api.Startup.CasBindingStartupCheck>();
+
     // ---- Firebase Auth + Authorization ----
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddFirebaseAuth(builder.Configuration);

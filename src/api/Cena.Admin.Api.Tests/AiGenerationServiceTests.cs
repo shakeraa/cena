@@ -4,8 +4,11 @@
 
 using System.Diagnostics.Metrics;
 using Cena.Admin.Api;
+using Cena.Admin.Api.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 
 namespace Cena.Admin.Api.Tests;
 
@@ -17,8 +20,13 @@ public class AiGenerationServiceTests
             .AddInMemoryCollection(configValues ?? new Dictionary<string, string?>())
             .Build();
         var meterFactory = new TestMeterFactory();
+        // Tests don't exercise the CAS-gate path; stub scopeFactory + mode provider.
+        var scopeFactory = Substitute.For<IServiceScopeFactory>();
+        var gateMode = Substitute.For<ICasGateModeProvider>();
+        gateMode.CurrentMode.Returns(CasGateMode.Off);
         return new AiGenerationService(
-            NullLogger<AiGenerationService>.Instance, config, meterFactory);
+            NullLogger<AiGenerationService>.Instance, config, meterFactory,
+            scopeFactory, gateMode);
     }
 
     [Fact]
