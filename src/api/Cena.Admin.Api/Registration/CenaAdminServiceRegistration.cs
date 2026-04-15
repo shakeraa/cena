@@ -4,7 +4,10 @@
 // Both Cena.Actors.Host and Cena.Api.Host call these extension methods.
 // =============================================================================
 
+using Cena.Admin.Api.Endpoints;
+using Cena.Admin.Api.QualityGate;
 using Cena.Admin.Api.RateLimit;
+using Cena.Admin.Api.Services;
 using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -21,11 +24,24 @@ public static class CenaAdminServiceRegistration
     /// </summary>
     public static IServiceCollection AddCenaAdminServices(this IServiceCollection services)
     {
-        // Quality Gate service (needed by QuestionBankService)
+        // Quality Gate service (needed by QuestionBankService).
+        // RDY-034 §13: pass IDocumentStore so the gate can source FactualAccuracy
+        // from the persisted CAS binding for math/physics subjects.
         services.AddSingleton<QualityGate.IQualityGateService>(sp =>
             new QualityGate.QualityGateService(
                 configuration: sp.GetRequiredService<IConfiguration>(),
-                logger: sp.GetRequiredService<ILogger<QualityGate.QualityGateService>>()));
+                logger: sp.GetRequiredService<ILogger<QualityGate.QualityGateService>>(),
+                store: sp.GetService<Marten.IDocumentStore>()));
+
+        // RDY-034 / ADR-0002: CAS ingestion gate services.
+        // - MathContentDetector: boundary probe for question bodies.
+        // - CasGateModeProvider:  Off | Shadow | Enforce rollout.
+        // - CasVerificationGate:  runs ICasRouterService + builds binding doc.
+        // The CAS engine stack (ICasRouterService + circuit breaker) is
+        // registered by the host Program.cs (Admin + Actor hosts both).
+        services.AddSingleton<IMathContentDetector, MathContentDetector>();
+        services.AddSingleton<ICasGateModeProvider, CasGateModeProvider>();
+        services.AddScoped<ICasVerificationGate, CasVerificationGate>();
 
         // ADM-004 through ADM-016: Admin API services
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
@@ -100,6 +116,11 @@ public static class CenaAdminServiceRegistration
         app.MapSystemMonitoringEndpoints();
         app.MapIngestionPipelineEndpoints();
         app.MapQuestionBankEndpoints();
+        // RDY-036: CAS operator surfaces — override (super-admin only) +
+        // backfill (admin only). Wired here so both Actor.Host and Admin.Host
+        // pick them up via the shared registration.
+        app.MapCasOverrideEndpoint();
+        app.MapCasBackfillEndpoint();
         // FIND-pedagogy-008: learning-objective picker (read-only)
         app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();

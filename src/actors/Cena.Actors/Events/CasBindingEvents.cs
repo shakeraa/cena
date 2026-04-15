@@ -33,3 +33,18 @@ public record CasDisagreementDetected_V1(
     string StudentExpression,
     DateTimeOffset DetectedAt
 ) : IDelegatedEvent;
+
+/// <summary>
+/// RDY-036 §14: Emitted when a super-admin overrides a Failed/Unverifiable
+/// CAS binding with a documented reason + external ticket. The override
+/// must be auditable — operator id, ≥20-char justification, and a ticket
+/// reference are mandatory at the API boundary.
+/// </summary>
+public record QuestionCasBindingOverridden_V1(
+    string QuestionId,
+    string OperatorUserId,
+    string Reason,
+    string Ticket,
+    CasBindingStatus PreviousStatus,
+    DateTimeOffset OverriddenAt
+) : IDelegatedEvent;

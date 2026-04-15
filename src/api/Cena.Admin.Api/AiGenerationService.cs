@@ -13,7 +13,10 @@ using System.Text.Json.Serialization;
 using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
+using Cena.Admin.Api.QualityGate;
+using Cena.Admin.Api.Services;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using QualityGateServices = Cena.Admin.Api.QualityGate;
 
@@ -135,7 +138,18 @@ public sealed record BatchGenerateRequest(
 public sealed record BatchGenerateResult(
     AiGeneratedQuestion Question,
     QualityGateResult QualityGate,
-    bool PassedQualityGate);
+    bool PassedQualityGate,
+    // RDY-034 / ADR-0002: per-candidate CAS gate outcome. Null means the gate
+    // was not run (Off mode or non-math content path early-exit).
+    string? CasOutcome = null,
+    string? CasEngine = null,
+    string? CasFailureReason = null);
+
+public sealed record CasDropReason(
+    string QuestionStem,
+    string Engine,
+    string Reason,
+    double LatencyMs);
 
 public sealed record BatchGenerateResponse(
     bool Success,
@@ -145,7 +159,11 @@ public sealed record BatchGenerateResponse(
     int NeedsReview,
     int AutoRejected,
     string ModelUsed,
-    string? Error);
+    string? Error,
+    // RDY-034: how many candidates were dropped because the CAS gate
+    // contradicted the authored answer (Enforce mode only).
+    int DroppedForCasFailure = 0,
+    IReadOnlyList<CasDropReason>? CasDropReasons = null);
 
 // ── Template (OCR) Generation Request/Response (CNT-002) ──
 
@@ -172,7 +190,9 @@ public sealed record TemplateGenerateResponse(
     int NeedsReview,
     int AutoRejected,
     string ModelUsed,
-    string? Error);
+    string? Error,
+    int DroppedForCasFailure = 0,
+    IReadOnlyList<CasDropReason>? CasDropReasons = null);
 
 // ── Circuit Breaker (in-process, mirrors LlmCircuitBreakerActor thresholds) ──
 
@@ -199,6 +219,12 @@ public sealed class AiGenerationService : IAiGenerationService
 {
     private readonly ILogger<AiGenerationService> _logger;
     private readonly IConfiguration _configuration;
+    // RDY-034 / ADR-0002: AiGenerationService is registered as a Singleton,
+    // but ICasVerificationGate is Scoped (it depends on Marten IDocumentStore).
+    // Use IServiceScopeFactory to create a scope per generation request so the
+    // CAS gate can be resolved correctly.
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ICasGateModeProvider _casGateMode;
 
     // Observability — routing-config.yaml section 9
     private readonly Histogram<double> _requestDuration;
@@ -240,10 +266,14 @@ public sealed class AiGenerationService : IAiGenerationService
     public AiGenerationService(
         ILogger<AiGenerationService> logger,
         IConfiguration configuration,
-        IMeterFactory meterFactory)
+        IMeterFactory meterFactory,
+        IServiceScopeFactory scopeFactory,
+        ICasGateModeProvider casGateMode)
     {
         _logger = logger;
         _configuration = configuration;
+        _scopeFactory = scopeFactory;
+        _casGateMode = casGateMode;
 
         var meter = meterFactory.Create("Cena.Admin.LlmMetrics", "1.0.0");
         _requestDuration = meter.CreateHistogram<double>(
@@ -749,6 +779,14 @@ public sealed class AiGenerationService : IAiGenerationService
         }
 
         var results = new List<BatchGenerateResult>();
+        var drops = new List<CasDropReason>();
+
+        // RDY-034 / ADR-0002: One scope per batch — the gate uses Marten
+        // sessions so it must run inside a DI scope.
+        using var casScope = _scopeFactory.CreateScope();
+        var casGate = _casGateMode.CurrentMode == CasGateMode.Off
+            ? null
+            : casScope.ServiceProvider.GetService<ICasVerificationGate>();
 
         foreach (var question in generateResponse.Questions)
         {
@@ -756,6 +794,28 @@ public sealed class AiGenerationService : IAiGenerationService
             var correctIndex = question.Options
                 .Select((o, i) => (o, i))
                 .FirstOrDefault(x => x.o.IsCorrect).i;
+
+            // ── CAS gate call ────────────────────────────────────────────
+            CasGateResult? casResult = null;
+            if (casGate is not null)
+            {
+                var correctText = question.Options.FirstOrDefault(o => o.IsCorrect)?.Text ?? "";
+                casResult = await casGate.VerifyForCreateAsync(
+                    questionId, req.Subject, question.Stem, correctText, variable: null);
+
+                if (_casGateMode.CurrentMode == CasGateMode.Enforce
+                    && casResult.Outcome == CasGateOutcome.Failed)
+                {
+                    _logger.LogWarning(
+                        "[AI_GEN_CAS_REJECT] questionId={Qid} engine={Engine} reason={Reason} latencyMs={Latency}",
+                        questionId, casResult.Engine, casResult.FailureReason, casResult.LatencyMs);
+                    drops.Add(new CasDropReason(
+                        question.Stem, casResult.Engine,
+                        casResult.FailureReason ?? "CAS contradicted authored answer",
+                        casResult.LatencyMs));
+                    continue; // skip — do not include in results
+                }
+            }
 
             var gateInput = new QualityGateInput(
                 QuestionId:       questionId,
@@ -774,7 +834,11 @@ public sealed class AiGenerationService : IAiGenerationService
             var gateResult = await qualityGate.EvaluateAsync(gateInput);
             var passed = gateResult.Decision != GateDecision.AutoRejected;
 
-            results.Add(new BatchGenerateResult(question, gateResult, passed));
+            results.Add(new BatchGenerateResult(
+                question, gateResult, passed,
+                CasOutcome: casResult?.Outcome.ToString(),
+                CasEngine: casResult?.Engine,
+                CasFailureReason: casResult?.FailureReason));
         }
 
         return new BatchGenerateResponse(
@@ -785,7 +849,9 @@ public sealed class AiGenerationService : IAiGenerationService
             NeedsReview:       results.Count(r => r.QualityGate.Decision == GateDecision.NeedsReview),
             AutoRejected:      results.Count(r => r.QualityGate.Decision == GateDecision.AutoRejected),
             ModelUsed:         generateResponse.ModelUsed,
-            Error:             null);
+            Error:             null,
+            DroppedForCasFailure: drops.Count,
+            CasDropReasons:    drops);
     }
 
     // ── Template (OCR) Generation (CNT-002) ──
@@ -844,6 +910,12 @@ public sealed class AiGenerationService : IAiGenerationService
         }
 
         var results = new List<BatchGenerateResult>();
+        var drops = new List<CasDropReason>();
+
+        using var casScope = _scopeFactory.CreateScope();
+        var casGate = _casGateMode.CurrentMode == CasGateMode.Off
+            ? null
+            : casScope.ServiceProvider.GetService<ICasVerificationGate>();
 
         foreach (var question in generateResponse.Questions)
         {
@@ -851,6 +923,27 @@ public sealed class AiGenerationService : IAiGenerationService
             var correctIndex = question.Options
                 .Select((o, i) => (o, i))
                 .FirstOrDefault(x => x.o.IsCorrect).i;
+
+            CasGateResult? casResult = null;
+            if (casGate is not null)
+            {
+                var correctText = question.Options.FirstOrDefault(o => o.IsCorrect)?.Text ?? "";
+                casResult = await casGate.VerifyForCreateAsync(
+                    questionId, req.Subject, question.Stem, correctText, variable: null);
+
+                if (_casGateMode.CurrentMode == CasGateMode.Enforce
+                    && casResult.Outcome == CasGateOutcome.Failed)
+                {
+                    _logger.LogWarning(
+                        "[AI_GEN_CAS_REJECT] questionId={Qid} engine={Engine} reason={Reason} latencyMs={Latency}",
+                        questionId, casResult.Engine, casResult.FailureReason, casResult.LatencyMs);
+                    drops.Add(new CasDropReason(
+                        question.Stem, casResult.Engine,
+                        casResult.FailureReason ?? "CAS contradicted authored answer",
+                        casResult.LatencyMs));
+                    continue;
+                }
+            }
 
             var gateInput = new QualityGateInput(
                 QuestionId:       questionId,
@@ -869,7 +962,11 @@ public sealed class AiGenerationService : IAiGenerationService
             var gateResult = await qualityGate.EvaluateAsync(gateInput);
             var passed = gateResult.Decision != GateDecision.AutoRejected;
 
-            results.Add(new BatchGenerateResult(question, gateResult, passed));
+            results.Add(new BatchGenerateResult(
+                question, gateResult, passed,
+                CasOutcome: casResult?.Outcome.ToString(),
+                CasEngine: casResult?.Engine,
+                CasFailureReason: casResult?.FailureReason));
         }
 
         return new TemplateGenerateResponse(
@@ -880,6 +977,8 @@ public sealed class AiGenerationService : IAiGenerationService
             NeedsReview:       results.Count(r => r.QualityGate.Decision == GateDecision.NeedsReview),
             AutoRejected:      results.Count(r => r.QualityGate.Decision == GateDecision.AutoRejected),
             ModelUsed:         generateResponse.ModelUsed,
-            Error:             null);
+            Error:             null,
+            DroppedForCasFailure: drops.Count,
+            CasDropReasons:    drops);
     }
 }
