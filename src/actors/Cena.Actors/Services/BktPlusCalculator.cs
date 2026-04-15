@@ -182,13 +182,35 @@ public sealed class BktPlusCalculator : IBktPlusCalculator
             PLearning = input.Parameters.PLearning * creditMultiplier
         };
 
-        // Step 3: Run standard BKT update with adjusted parameters
-        var bktInput = new BktUpdateInput(
-            PriorMastery: effectivePrior,
-            IsCorrect: input.IsCorrect,
-            Parameters: adjustedParams
-        );
-        var bktResult = _bktService.Update(bktInput);
+        // Step 3: Run BKT update.
+        // RDY-054e / PP-006 follow-up: auto-filled answers are NOT
+        // evidence of correctness — the student clicked "show me" and
+        // the system filled it in. Running a Bayesian correctness-update
+        // on the prior inflates P(L) from 0.3 → ~0.8 regardless of the
+        // scaled P(T) because guess/slip dominate the ratio. For
+        // creditMultiplier ≤ 0.1 (only AutoFilled today), skip the
+        // evidence step and compute a pure-transition posterior:
+        //     P(L_next) = P(L) + (1 - P(L)) * P(T_scaled)
+        // so the result barely moves off the prior, as intended.
+        BktUpdateResult bktResult;
+        if (creditMultiplier <= 0.1)
+        {
+            var transitionDelta = (1.0 - effectivePrior) * adjustedParams.PLearning;
+            var noEvidencePosterior = Math.Clamp(effectivePrior + transitionDelta, 0.0, 1.0);
+            bktResult = new BktUpdateResult(
+                PosteriorMastery: noEvidencePosterior,
+                CrossedProgressionThreshold: false,
+                MeetsPrerequisiteGate: noEvidencePosterior >= SkillMasteryState.MasteredThreshold);
+        }
+        else
+        {
+            var bktInput = new BktUpdateInput(
+                PriorMastery: effectivePrior,
+                IsCorrect: input.IsCorrect,
+                Parameters: adjustedParams
+            );
+            bktResult = _bktService.Update(bktInput);
+        }
 
         // Step 4: Adjust half-life based on outcome
         var newHalfLife = input.IsCorrect

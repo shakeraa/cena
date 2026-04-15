@@ -45,12 +45,18 @@ public class AnalysisJobActorTests
         // Marten's default naming converts PascalCase to snake_case
         // This test documents the expected alias
         Assert.Equal("ConceptAttempted_V1", eventType.Name);
-        
+
         // The alias used in event store queries should be snake_case
-        // This is the convention Marten uses with default configuration
-        var computedAlias = string.Concat(eventType.Name.Select((c, i) => 
-            i > 0 && char.IsUpper(c) ? "_" + char.ToLower(c) : char.ToLower(c).ToString()));
-        
+        // (RDY-054c): the naive pre-fix algorithm double-underscored
+        // transitions like `d_V` in `Attempted_V1` — the inserted `_`
+        // was added on top of an existing one. Fix: suppress the
+        // inserted underscore when the previous char is already `_`.
+        var chars = eventType.Name.ToCharArray();
+        var computedAlias = string.Concat(chars.Select((c, i) =>
+            i > 0 && char.IsUpper(c) && chars[i - 1] != '_'
+                ? "_" + char.ToLower(c)
+                : char.ToLower(c).ToString()));
+
         Assert.Equal(expectedAlias, computedAlias);
     }
 }

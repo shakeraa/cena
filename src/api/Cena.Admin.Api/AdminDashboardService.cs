@@ -1,6 +1,13 @@
 // =============================================================================
 // Cena Platform -- Admin Dashboard Service
 // BKD-004: Aggregation + caching for dashboard widgets
+//
+// Tenancy (RDY-054b / FIND-qa-004): every aggregation query resolves the
+// caller's SchoolId via TenantScope.GetSchoolFilter(user) and filters
+// downstream queries on u.School / profile.SchoolId. SuperAdmin callers
+// bypass the filter (null SchoolId → see all). See TopicsMastery,
+// Activity, and Overview methods below — each holds a `var schoolId =
+// TenantScope.GetSchoolFilter(user)` line.
 // =============================================================================
 
 using System.Security.Claims;

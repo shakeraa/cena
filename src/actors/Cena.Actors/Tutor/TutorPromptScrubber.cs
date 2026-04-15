@@ -95,7 +95,31 @@ public sealed class TutorPromptScrubber : ITutorPromptScrubber
         var categories = new List<string>();
         int redactionCount = 0;
 
+        // ── 0. Generic PII patterns that are more specific than a bare
+        //      name must run FIRST, otherwise an email like
+        //      `yael.cohen@school.edu` gets chopped into
+        //      `<redacted:name>.<redacted:name>@school.edu` by the
+        //      name-match pass and the email-pattern no longer matches.
+        //      (RDY-054e)
+
+        var (e0, ec0) = ReplaceRegex(text, EmailPattern, "<redacted:email>");
+        if (ec0 > 0) { text = e0; redactionCount += ec0; categories.Add("email"); }
+
+        var (p0, pc0) = ReplaceRegex(text, PhonePattern, "<redacted:phone>");
+        if (pc0 > 0) { text = p0; redactionCount += pc0; categories.Add("phone"); }
+
         // ── 1. Student-specific PII (exact matches, case-insensitive) ──
+
+        // ParentName FIRST — a parent's name can share a surname with the
+        // student (e.g. "David Cohen" vs student "Yael Cohen"). Scrubbing
+        // `LastName="Cohen"` before `ParentName="David Cohen"` mutates
+        // the text and the parent-name match fails. Redact the more
+        // specific parent-name pattern first. (RDY-054e)
+        if (!string.IsNullOrWhiteSpace(studentPii.ParentName))
+        {
+            var (tp, cp) = ReplaceIgnoreCase(text, studentPii.ParentName, "<redacted:parent>");
+            if (cp > 0) { text = tp; redactionCount += cp; categories.Add("parent"); }
+        }
 
         // Full name (last + first together, or separately)
         if (!string.IsNullOrWhiteSpace(studentPii.LastName))
@@ -131,11 +155,7 @@ public sealed class TutorPromptScrubber : ITutorPromptScrubber
             if (c5 > 0) { text = t5; redactionCount += c5; categories.Add("school"); }
         }
 
-        if (!string.IsNullOrWhiteSpace(studentPii.ParentName))
-        {
-            var (t6, c6) = ReplaceIgnoreCase(text, studentPii.ParentName, "<redacted:parent>");
-            if (c6 > 0) { text = t6; redactionCount += c6; categories.Add("parent"); }
-        }
+        // ParentName already handled above (RDY-054e re-ordering).
 
         if (!string.IsNullOrWhiteSpace(studentPii.City))
         {

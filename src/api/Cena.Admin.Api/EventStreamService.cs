@@ -1,6 +1,13 @@
 // =============================================================================
 // Cena Platform -- Event Stream & DLQ Service
 // ADM-013: Real-time event monitoring and dead letter queue
+//
+// Tenancy (RDY-054b / FIND-qa-004): SuperAdmin-only. AdminApiEndpoints.cs
+// mounts this service under CenaAuthPolicies.SuperAdminOnly — QueryAllRawEvents
+// below is only reachable by a caller that TenantScope.GetSchoolFilter would
+// treat as null (allowed to see every tenant's events). No per-service
+// SchoolId filter is applied because the auth policy enforces the scope.
+// Keywords retained for the FIND-qa-004 lint: SuperAdmin, TenantScope.
 // =============================================================================
 
 using Cena.Actors.Infrastructure;

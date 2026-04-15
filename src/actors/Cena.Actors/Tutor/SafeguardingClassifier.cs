@@ -99,6 +99,7 @@ public sealed class SafeguardingClassifier : ISafeguardingClassifier
         "i don't want to be alive",
         "end my life",
         "commit suicide",
+        "committing suicide",
         "kill myself",
         "cutting myself",
         "self harm",
