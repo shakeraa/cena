@@ -571,6 +571,20 @@ public static class SessionEndpoints
             var questionDoc = await questionBank.GetQuestionAsync(currentQuestion.QuestionId);
             if (questionDoc == null)
                 return Results.NotFound(new { error = "Question not found" });
+            var questionMeta = await session.LoadAsync<QuestionReadModel>(currentQuestion.QuestionId);
+
+            var localeDecision = LocaleFallback.Resolve(
+                ctx.User.FindFirstValue("locale"),
+                questionMeta);
+            if (localeDecision.UsedFallback)
+            {
+                await AppendQuestionFallbackLanguageAsync(
+                    store,
+                    studentId,
+                    sessionId,
+                    currentQuestion.QuestionId,
+                    localeDecision);
+            }
 
             // Get student's concept mastery from queue.ConceptMasterySnapshot
             var effectiveMastery = (float)queue.ConceptMasterySnapshot.GetValueOrDefault(questionDoc.ConceptId, 0.0);
@@ -1500,5 +1514,23 @@ public static class SessionEndpoints
             NextQuestionId: nextQuestionId,
             Explanation: explanation,
             DistractorRationale: distractorRationale);
+    }
+
+    private static async Task AppendQuestionFallbackLanguageAsync(
+        IDocumentStore store,
+        string studentId,
+        string sessionId,
+        string questionId,
+        LocaleFallbackDecision localeDecision)
+    {
+        await using var writeSession = store.LightweightSession();
+        writeSession.Events.Append(studentId, new QuestionFallbackLanguage_V1(
+            StudentId: studentId,
+            SessionId: sessionId,
+            QuestionId: questionId,
+            RequestedLocale: localeDecision.RequestedLocale,
+            ServedLocale: localeDecision.ServedLocale,
+            Timestamp: DateTimeOffset.UtcNow));
+        await writeSession.SaveChangesAsync();
     }
 }

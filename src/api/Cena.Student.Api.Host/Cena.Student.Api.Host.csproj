@@ -39,7 +39,7 @@
 
   <!-- RDY-009: Generate OpenAPI document after build -->
   <Target Name="GenerateOpenApi" AfterTargets="Build">
-    <Exec Command="dotnet swagger tofile --output $(OutputPath)openapi.json $(TargetPath) v1" EnvironmentVariables="CENA_OPENAPI_GEN=1;CENA_SKIP_SEED=1;ASPNETCORE_ENVIRONMENT=Development;Firebase__ProjectId=cena-openapi-gen" />
+    <Exec Command="dotnet swagger tofile --output $(OutputPath)openapi.json $(TargetPath) v1" EnvironmentVariables="CENA_OPENAPI_GEN=1;CENA_SKIP_SEED=1;ASPNETCORE_ENVIRONMENT=Development;Firebase__ProjectId=cena-openapi-gen;Kestrel__Endpoints__Http__Url=http://127.0.0.1:0" />
   </Target>
 
 </Project>
