@@ -14,7 +14,7 @@ public static class ExperimentAdminEndpoints
 {
     public static IEndpointRouteBuilder MapExperimentAdminEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/experiments")
+        var group = app.MapGroup("/api/v1/admin/experiments")
             .WithTags("Experiment Admin")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");

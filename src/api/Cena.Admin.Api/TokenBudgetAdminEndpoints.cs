@@ -12,7 +12,7 @@ public static class TokenBudgetAdminEndpoints
 {
     public static IEndpointRouteBuilder MapTokenBudgetEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/system/token-budget")
+        var group = app.MapGroup("/api/v1/admin/system/token-budget")
             .WithTags("Token Budget")
             .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
             .RequireRateLimiting("api");

@@ -23,7 +23,7 @@ public static class StudentAnalyticsEndpoints
 {
     public static IEndpointRouteBuilder MapStudentAnalyticsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/analytics")
+        var group = app.MapGroup("/api/v1/analytics")
             .WithTags("Student Analytics")
             .RequireAuthorization()
             .RequireRateLimiting("api");

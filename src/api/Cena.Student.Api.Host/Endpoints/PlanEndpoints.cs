@@ -23,7 +23,7 @@ public static class PlanEndpoints
 {
     public static IEndpointRouteBuilder MapPlanEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/me/plan/today", GetTodaysPlan)
+        app.MapGet("/api/v1/me/plan/today", GetTodaysPlan)
             .WithName("GetTodaysPlan")
             .RequireAuthorization()
     .Produces<TodaysPlanDto>(StatusCodes.Status200OK)
@@ -31,14 +31,14 @@ public static class PlanEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
-        app.MapGet("/api/review/due", GetReviewDue)
+        app.MapGet("/api/v1/review/due", GetReviewDue)
             .WithName("GetReviewDue")
             .RequireAuthorization()
     .Produces<ReviewDueDto>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
-        app.MapGet("/api/recommendations/sessions", GetRecommendedSessions)
+        app.MapGet("/api/v1/recommendations/sessions", GetRecommendedSessions)
             .WithName("GetRecommendedSessions")
             .RequireAuthorization()
     .Produces<RecommendedSessionsResponse>(StatusCodes.Status200OK)

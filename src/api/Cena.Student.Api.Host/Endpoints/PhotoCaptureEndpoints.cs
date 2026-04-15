@@ -18,7 +18,7 @@ public static class PhotoCaptureEndpoints
 {
     public static void MapPhotoCaptureEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/photos")
+        var group = app.MapGroup("/api/v1/photos")
             .RequireAuthorization()
             .WithTags("PhotoCapture")
             .DisableAntiforgery();

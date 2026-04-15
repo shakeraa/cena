@@ -45,7 +45,7 @@ public class ContentEndpointsExplanationTests
         return routeBuilder.DataSources
             .SelectMany(ds => ds.Endpoints)
             .OfType<RouteEndpoint>()
-            .Where(e => e.RoutePattern.RawText?.StartsWith("/api/content/") == true)
+            .Where(e => e.RoutePattern.RawText?.StartsWith("/api/v1/content/") == true)
             .ToList();
     }
 
@@ -56,7 +56,7 @@ public class ContentEndpointsExplanationTests
         var endpoints = EnumerateContentEndpoints(app);
 
         var explanationEndpoint = endpoints
-            .FirstOrDefault(e => e.RoutePattern.RawText == "/api/content/questions/{id}/explanation");
+            .FirstOrDefault(e => e.RoutePattern.RawText == "/api/v1/content/questions/{id}/explanation");
 
         Assert.NotNull(explanationEndpoint);
 
@@ -76,7 +76,7 @@ public class ContentEndpointsExplanationTests
         var endpoints = EnumerateContentEndpoints(app);
 
         var explanationEndpoint = endpoints
-            .FirstOrDefault(e => e.RoutePattern.RawText == "/api/content/questions/{id}/explanation");
+            .FirstOrDefault(e => e.RoutePattern.RawText == "/api/v1/content/questions/{id}/explanation");
 
         Assert.NotNull(explanationEndpoint);
 
@@ -92,7 +92,7 @@ public class ContentEndpointsExplanationTests
         var endpoints = EnumerateContentEndpoints(app);
 
         var questionEndpoint = endpoints
-            .FirstOrDefault(e => e.RoutePattern.RawText == "/api/content/questions/{id}");
+            .FirstOrDefault(e => e.RoutePattern.RawText == "/api/v1/content/questions/{id}");
 
         Assert.NotNull(questionEndpoint);
     }
@@ -118,7 +118,7 @@ public class ContentEndpointsExplanationTests
         var endpoints = EnumerateContentEndpoints(app);
 
         var explanationEndpoint = endpoints
-            .FirstOrDefault(e => e.RoutePattern.RawText == "/api/content/questions/{id}/explanation");
+            .FirstOrDefault(e => e.RoutePattern.RawText == "/api/v1/content/questions/{id}/explanation");
 
         Assert.NotNull(explanationEndpoint);
 

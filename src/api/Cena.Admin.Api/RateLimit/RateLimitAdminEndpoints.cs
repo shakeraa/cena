@@ -14,7 +14,7 @@ public static class RateLimitAdminEndpoints
 {
     public static IEndpointRouteBuilder MapRateLimitAdminEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/system/rate-limits")
+        var group = app.MapGroup("/api/v1/admin/system/rate-limits")
             .WithTags("Rate Limits")
             .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
             .RequireRateLimiting("api");

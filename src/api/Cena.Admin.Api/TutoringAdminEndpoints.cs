@@ -17,7 +17,7 @@ public static class TutoringAdminEndpoints
 {
     public static IEndpointRouteBuilder MapTutoringAdminEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/tutoring")
+        var group = app.MapGroup("/api/v1/admin/tutoring")
             .WithTags("Tutoring Admin")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");

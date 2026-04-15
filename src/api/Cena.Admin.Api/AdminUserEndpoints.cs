@@ -16,7 +16,7 @@ public static class AdminUserEndpoints
 {
     public static IEndpointRouteBuilder MapAdminUserEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/users")
+        var group = app.MapGroup("/api/v1/admin/users")
             .WithTags("Admin Users")
             .RequireAuthorization(CenaAuthPolicies.AdminOnly)
             .RequireRateLimiting("api");
@@ -70,7 +70,7 @@ public static class AdminUserEndpoints
             try
             {
                 var user = await service.CreateUserAsync(request, ctx.User);
-                return Results.Created($"/api/admin/users/{user.Id}", user);
+                return Results.Created($"/api/v1/admin/users/{user.Id}", user);
             }
             catch (ArgumentException ex)
             {
@@ -165,7 +165,7 @@ public static class AdminUserEndpoints
             try
             {
                 var user = await service.InviteUserAsync(request, ctx.User);
-                return Results.Created($"/api/admin/users/{user.Id}", user);
+                return Results.Created($"/api/v1/admin/users/{user.Id}", user);
             }
             catch (ArgumentException ex)
             {

@@ -22,7 +22,7 @@ public static class ConsentEndpoints
 
     public static IEndpointRouteBuilder MapConsentEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/me/consent")
+        var group = app.MapGroup("/api/v1/me/consent")
             .WithTags("Consent Management")
             .RequireAuthorization();
 

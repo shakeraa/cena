@@ -17,7 +17,7 @@ public static class EmbeddingAdminEndpoints
 {
     public static IEndpointRouteBuilder MapEmbeddingAdminEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/embeddings")
+        var group = app.MapGroup("/api/v1/admin/embeddings")
             .WithTags("Embedding Admin")
             .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
             .RequireRateLimiting("api");

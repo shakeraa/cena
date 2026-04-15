@@ -91,7 +91,7 @@ public static class AuthEndpoints
         // Anonymous group — these routes back public forms on the unauthed
         // student web (login, forgot-password). Rate limiting is the primary
         // abuse guard since there is no user identity to attach quotas to.
-        var group = app.MapGroup("/api/auth")
+        var group = app.MapGroup("/api/v1/auth")
             .WithTags("Auth")
             .AllowAnonymous()
             .RequireRateLimiting("password-reset");

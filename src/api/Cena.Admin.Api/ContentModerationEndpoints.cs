@@ -17,7 +17,7 @@ public static class ContentModerationEndpoints
 {
     public static IEndpointRouteBuilder MapContentModerationEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/moderation")
+        var group = app.MapGroup("/api/v1/admin/moderation")
             .WithTags("Content Moderation")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");

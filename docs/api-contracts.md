@@ -19,9 +19,16 @@ All IDs are **UUIDv7** (time-sortable) unless explicitly noted.
 
 **GraphQL schema**: Additive-only by default — new fields and types can be added without breaking existing queries. Field removal follows a deprecation cycle: mark `@deprecated(reason: "Use X instead")` → 90-day warning period → remove in next major release. The mobile app uses persisted queries pinned to specific schema versions.
 
-**REST API** (auth, settings, onboarding): Versioned via URL prefix (`/api/v1/`, `/api/v2/`). Old versions are supported for a minimum of 6 months after the new version ships, ensuring mobile clients on older app versions continue to work.
+**REST API** (auth, settings, onboarding, admin): Versioned via URL prefix (`/api/v1/`, `/api/v2/`). Version 1 is current and active. All endpoints are registered under `/api/v1/...`. Unversioned `/api/...` requests are redirected to `/api/v1/...` with `Sunset` and `Deprecation` headers (6-month sunset overlap). Old versions are supported for a minimum of 6 months after the new version ships, ensuring mobile clients on older app versions continue to work.
 
-**Deprecation policy**: All deprecated endpoints/fields/events emit a `Deprecation-Warning` header or metadata tag. The operations dashboard (see `docs/operations.md` Section 3) tracks deprecated endpoint usage. An endpoint is eligible for removal when < 1% of traffic uses it, or after the minimum overlap period, whichever is later.
+**Version lifecycle**:
+- Version 1 is current and active.
+- New versions are created only for breaking changes.
+- Minimum 6-month overlap between versions.
+- Deprecated routes emit `Sunset: Mon, 15 Oct 2026 00:00:00 GMT` and `Deprecation: Sun, 15 Oct 2026 00:00:00 GMT` headers.
+- Usage of deprecated routes is logged for analytics.
+
+**Deprecation policy**: All deprecated endpoints/fields/events emit a `Deprecation` header or metadata tag. The operations dashboard (see `docs/operations.md` Section 3) tracks deprecated endpoint usage. An endpoint is eligible for removal when < 1% of traffic uses it, or after the minimum overlap period, whichever is later.
 
 ---
 

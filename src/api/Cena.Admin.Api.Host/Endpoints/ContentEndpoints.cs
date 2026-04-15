@@ -21,7 +21,7 @@ public static class ContentEndpoints
 {
     public static IEndpointRouteBuilder MapContentEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/content")
+        var group = app.MapGroup("/api/v1/content")
             .WithTags("Content")
             .RequireAuthorization();
 

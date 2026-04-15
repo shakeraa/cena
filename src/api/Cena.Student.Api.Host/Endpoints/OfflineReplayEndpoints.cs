@@ -21,7 +21,7 @@ public static class OfflineReplayEndpoints
 
     public static void MapOfflineReplayEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/offline")
+        var group = app.MapGroup("/api/v1/offline")
             .RequireAuthorization()
             .WithTags("OfflineReplay");
 

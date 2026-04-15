@@ -18,7 +18,7 @@ public static class LiveMonitorEndpoints
 {
     public static IEndpointRouteBuilder MapLiveMonitorEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/live")
+        var group = app.MapGroup("/api/v1/admin/live")
             .WithTags("Live Monitor")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove);
         // No rate-limiting on SSE — it is a long-lived streaming connection

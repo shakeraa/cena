@@ -23,7 +23,7 @@ public static class SocialEndpoints
 {
     public static IEndpointRouteBuilder MapSocialEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/social")
+        var group = app.MapGroup("/api/v1/social")
             .WithTags("Social")
             .RequireAuthorization();
 

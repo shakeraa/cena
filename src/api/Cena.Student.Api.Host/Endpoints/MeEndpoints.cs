@@ -24,7 +24,7 @@ public static class MeEndpoints
 
     public static IEndpointRouteBuilder MapMeEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/me")
+        var group = app.MapGroup("/api/v1/me")
             .WithTags("Me")
             .RequireAuthorization();
 

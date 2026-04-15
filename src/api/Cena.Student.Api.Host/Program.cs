@@ -27,6 +27,7 @@ using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Moderation;
 using Cena.Infrastructure.Seed;
+using Cena.Infrastructure.ApiVersioning;
 using Marten;
 using Polly;
 using Microsoft.AspNetCore.RateLimiting;
@@ -526,6 +527,9 @@ public partial class Program
         };
     });
     
+    // ---- API Versioning (RDY-010) ----
+    builder.Services.AddCenaApiVersioning();
+
     // ---- Health checks ----
     builder.Services.AddHealthChecks();
     
@@ -637,7 +641,10 @@ public partial class Program
     app.UseMiddleware<StudentDataAuditMiddleware>();
     app.UseMiddleware<RateLimitDegradationMiddleware>(); // RATE-001: distributed limits + degradation
     app.UseRateLimiter();
-    
+
+    // ---- RDY-010: Redirect deprecated /api/... to /api/v1/... ----
+    app.UseDeprecatedApiRedirect();
+
     // ---- Swagger / OpenAPI (RDY-009) ----
     app.UseSwagger();
     if (!app.Environment.IsProduction())

@@ -17,7 +17,7 @@ public static class StagnationInsightsEndpoints
 {
     public static IEndpointRouteBuilder MapStagnationInsightsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/stagnation")
+        var group = app.MapGroup("/api/v1/admin/stagnation")
             .WithTags("Stagnation Insights")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -41,7 +41,7 @@ public static class StagnationInsightsEndpoints
             {
                 "rate_limited" => Results.StatusCode(429),
                 "cached" => Results.Ok(result),
-                _ => Results.Accepted($"/api/admin/stagnation/jobs/{result.JobId}", result)
+                _ => Results.Accepted($"/api/v1/admin/stagnation/jobs/{result.JobId}", result)
             };
         }).WithName("SubmitStagnationAnalysis")
     .Produces(StatusCodes.Status200OK)

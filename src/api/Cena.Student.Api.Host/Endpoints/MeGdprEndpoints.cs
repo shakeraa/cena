@@ -34,7 +34,7 @@ public static class MeGdprEndpoints
 
     public static IEndpointRouteBuilder MapMeGdprEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/me/gdpr")
+        var group = app.MapGroup("/api/v1/me/gdpr")
             .WithTags("GDPR Self-Service")
             .RequireAuthorization();
 
@@ -76,7 +76,7 @@ public static class MeGdprEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // ---- DSAR (GDPR Art 12, Israel PPL 13) ----
-        var dsarGroup = app.MapGroup("/api/me")
+        var dsarGroup = app.MapGroup("/api/v1/me")
             .WithTags("GDPR Self-Service")
             .RequireAuthorization();
 

@@ -47,7 +47,7 @@ public static class SessionEndpoints
 
     public static IEndpointRouteBuilder MapSessionEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/sessions")
+        var group = app.MapGroup("/api/v1/sessions")
             .WithTags("Sessions")
             .RequireAuthorization()
             .RequireRateLimiting("api");

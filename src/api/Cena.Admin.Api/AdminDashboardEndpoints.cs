@@ -17,7 +17,7 @@ public static class AdminDashboardEndpoints
 {
     public static IEndpointRouteBuilder MapAdminDashboardEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/dashboard")
+        var group = app.MapGroup("/api/v1/admin/dashboard")
             .WithTags("Admin Dashboard")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");

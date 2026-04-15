@@ -17,7 +17,7 @@ public static class IngestionSettingsEndpoints
 {
     public static IEndpointRouteBuilder MapIngestionSettingsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/ingestion-settings")
+        var group = app.MapGroup("/api/v1/admin/ingestion-settings")
             .WithTags("Ingestion Settings")
             .RequireAuthorization(CenaAuthPolicies.AdminOnly)
             .RequireRateLimiting("api");

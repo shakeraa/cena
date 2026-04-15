@@ -15,7 +15,7 @@ public static class AdminRoleEndpoints
 {
     public static IEndpointRouteBuilder MapAdminRoleEndpoints(this IEndpointRouteBuilder app)
     {
-        var rolesGroup = app.MapGroup("/api/admin/roles")
+        var rolesGroup = app.MapGroup("/api/v1/admin/roles")
             .WithTags("Admin Roles")
             .RequireRateLimiting("api");
 
@@ -52,7 +52,7 @@ public static class AdminRoleEndpoints
             try
             {
                 var role = await service.CreateRoleAsync(request);
-                return Results.Created($"/api/admin/roles/{role.Id}", role);
+                return Results.Created($"/api/v1/admin/roles/{role.Id}", role);
             }
             catch (InvalidOperationException ex)
             {
@@ -120,7 +120,7 @@ public static class AdminRoleEndpoints
     .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // GET /api/admin/permissions — ModeratorOrAbove (static data)
-        app.MapGet("/api/admin/permissions", async (IAdminRoleService service) =>
+        app.MapGet("/api/v1/admin/permissions", async (IAdminRoleService service) =>
         {
             var permissions = await service.ListPermissionsAsync();
             return Results.Ok(permissions);
@@ -133,7 +133,7 @@ public static class AdminRoleEndpoints
     .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // POST /api/admin/users/{id}/role — SuperAdminOnly (FIND-sec-010: privilege escalation fix)
-        app.MapPost("/api/admin/users/{id}/role", async (string id, AssignRoleRequest request, IAdminRoleService service, HttpContext ctx) =>
+        app.MapPost("/api/v1/admin/users/{id}/role", async (string id, AssignRoleRequest request, IAdminRoleService service, HttpContext ctx) =>
         {
             try
             {
@@ -167,7 +167,7 @@ public static class AdminRoleEndpoints
     .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // GET /api/admin/users/{id}/abilities — AdminOnly
-        app.MapGet("/api/admin/users/{id}/abilities", async (string id, IAdminRoleService service) =>
+        app.MapGet("/api/v1/admin/users/{id}/abilities", async (string id, IAdminRoleService service) =>
         {
             try
             {

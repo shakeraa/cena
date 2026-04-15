@@ -31,7 +31,7 @@ public static class GdprEndpoints
         // FIND-arch-006: the original policy name "AdminPolicy" did not match
         // any policy registered in CenaAuthPolicies. Use the canonical constant
         // so the authorization middleware can resolve it at runtime.
-        var group = app.MapGroup("/api/admin/gdpr")
+        var group = app.MapGroup("/api/v1/admin/gdpr")
             .WithTags("GDPR")
             .RequireAuthorization(CenaAuthPolicies.AdminOnly);
 
@@ -246,7 +246,7 @@ public static class GdprEndpoints
                 coolingPeriodPassed,
                 scheduledProcessingAt,
                 manifestLink = request.Status == ErasureStatus.Completed
-                    ? $"/api/admin/gdpr/erasure/{studentId}/manifest"
+                    ? $"/api/v1/admin/gdpr/erasure/{studentId}/manifest"
                     : null,
                 manifestSummary = manifest is not null
                     ? new

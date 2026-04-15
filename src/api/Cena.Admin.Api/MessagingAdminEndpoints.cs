@@ -27,7 +27,7 @@ public static class MessagingAdminEndpoints
 
     public static IEndpointRouteBuilder MapMessagingAdminEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/messaging")
+        var group = app.MapGroup("/api/v1/admin/messaging")
             .WithTags("Messaging Admin")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -153,7 +153,7 @@ public static class MessagingAdminEndpoints
                     JsonSerializer.SerializeToUtf8Bytes(sendCmd, JsonOpts));
             }
 
-            return Results.Created($"/api/admin/messaging/threads/{threadId}",
+            return Results.Created($"/api/v1/admin/messaging/threads/{threadId}",
                 new { ThreadId = threadId });
         }).WithName("CreateMessagingThread")
     .Produces<object>(StatusCodes.Status200OK)

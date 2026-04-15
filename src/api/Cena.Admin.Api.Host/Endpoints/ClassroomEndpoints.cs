@@ -20,7 +20,7 @@ public static class ClassroomEndpoints
 {
     public static IEndpointRouteBuilder MapClassroomEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/classrooms")
+        var group = app.MapGroup("/api/v1/classrooms")
             .WithTags("Classrooms")
             .RequireAuthorization();
 

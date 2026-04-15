@@ -21,7 +21,7 @@ public static class AdminApiEndpoints
 {
     public static IEndpointRouteBuilder MapFocusAnalyticsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/focus")
+        var group = app.MapGroup("/api/v1/admin/focus")
             .WithTags("Focus Analytics")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -114,7 +114,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapMasteryTrackingEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/mastery")
+        var group = app.MapGroup("/api/v1/admin/mastery")
             .WithTags("Mastery Tracking")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -388,7 +388,7 @@ public static class AdminApiEndpoints
     {
         var env = app.ServiceProvider.GetRequiredService<IHostEnvironment>();
 
-        var group = app.MapGroup("/api/admin/system")
+        var group = app.MapGroup("/api/v1/admin/system")
             .WithTags("System Monitoring")
             .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
             .RequireRateLimiting("api");
@@ -501,7 +501,7 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // GET /api/admin/audit-log — frontend-compatible query endpoint (maps query params to filter)
-        app.MapGet("/api/admin/audit-log", async (
+        app.MapGet("/api/v1/admin/audit-log", async (
             int? page, int? itemsPerPage, string? user, string? action, string? startDate, string? endDate,
             ISystemMonitoringService service) =>
         {
@@ -522,7 +522,7 @@ public static class AdminApiEndpoints
 
         // GET /api/admin/system/nats-stats — real-time NATS monitoring stats (ADM-023)
         // Uses NATS monitoring HTTP endpoint (port 8222) for core pub/sub stats
-        app.MapGet("/api/admin/system/nats-stats", async (ILoggerFactory lf) =>
+        app.MapGet("/api/v1/admin/system/nats-stats", async (ILoggerFactory lf) =>
         {
             var logger = lf.CreateLogger("NatsStats");
             try
@@ -627,7 +627,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapIngestionPipelineEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/ingestion")
+        var group = app.MapGroup("/api/v1/admin/ingestion")
             .WithTags("Ingestion Pipeline")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -769,7 +769,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapQuestionBankEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/questions")
+        var group = app.MapGroup("/api/v1/admin/questions")
             .WithTags("Question Bank")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -913,7 +913,7 @@ public static class AdminApiEndpoints
             try
             {
                 var result = await service.CreateQuestionAsync(request, userId);
-                return result != null ? Results.Created($"/api/admin/questions/{result.Id}", result) : Results.BadRequest();
+                return result != null ? Results.Created($"/api/v1/admin/questions/{result.Id}", result) : Results.BadRequest();
             }
             catch (Cena.Actors.Cas.CasVerificationFailedException ex)
             {
@@ -979,7 +979,7 @@ public static class AdminApiEndpoints
     /// </summary>
     public static IEndpointRouteBuilder MapLearningObjectiveEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/learning-objectives")
+        var group = app.MapGroup("/api/v1/admin/learning-objectives")
             .WithTags("Learning Objectives")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -1010,7 +1010,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapAiGenerationEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/ai")
+        var group = app.MapGroup("/api/v1/admin/ai")
             .WithTags("AI Generation")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("ai");
@@ -1108,7 +1108,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapQuestionPipelineEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/questions/pipeline")
+        var group = app.MapGroup("/api/v1/admin/questions/pipeline")
             .WithTags("Question Pipeline")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -1170,7 +1170,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapMethodologyAnalyticsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/pedagogy")
+        var group = app.MapGroup("/api/v1/admin/pedagogy")
             .WithTags("Methodology Analytics")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -1323,7 +1323,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapCulturalContextEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/cultural")
+        var group = app.MapGroup("/api/v1/admin/cultural")
             .WithTags("Cultural Context")
             .RequireAuthorization(CenaAuthPolicies.AdminOnly)
             .RequireRateLimiting("api");
@@ -1402,7 +1402,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapEventStreamEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/events")
+        var group = app.MapGroup("/api/v1/admin/events")
             .WithTags("Event Stream")
             .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
             .RequireRateLimiting("api");
@@ -1498,7 +1498,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapOutreachEngagementEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/outreach")
+        var group = app.MapGroup("/api/v1/admin/outreach")
             .WithTags("Outreach & Engagement")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");
@@ -1606,7 +1606,7 @@ public static class AdminApiEndpoints
 
     public static IEndpointRouteBuilder MapStudentInsightsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/insights")
+        var group = app.MapGroup("/api/v1/admin/insights")
             .WithTags("Student Insights")
             .RequireAuthorization(CenaAuthPolicies.ModeratorOrAbove)
             .RequireRateLimiting("api");

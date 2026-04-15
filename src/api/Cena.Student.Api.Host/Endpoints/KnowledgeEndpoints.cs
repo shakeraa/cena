@@ -24,43 +24,43 @@ public static class KnowledgeEndpoints
             .RequireAuthorization();
 
         // Content/Concepts endpoints
-        group.MapGet("/api/content/concepts", GetConcepts).WithName("GetConcepts").WithTags("Content")
+        group.MapGet("/api/v1/content/concepts", GetConcepts).WithName("GetConcepts").WithTags("Content")
     .Produces<ConceptListDto>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
-        group.MapGet("/api/content/concepts/{id}", GetConceptDetail).WithName("GetConceptDetail").WithTags("Content")
+        group.MapGet("/api/v1/content/concepts/{id}", GetConceptDetail).WithName("GetConceptDetail").WithTags("Content")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
-        group.MapGet("/api/content/concepts/{id}/graph", GetConceptGraph).WithName("GetConceptGraph").WithTags("Content")
+        group.MapGet("/api/v1/content/concepts/{id}/graph", GetConceptGraph).WithName("GetConceptGraph").WithTags("Content")
     .Produces<ConceptGraphDto>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
-        group.MapGet("/api/content/search", SearchConcepts).WithName("SearchConcepts").WithTags("Content")
+        group.MapGet("/api/v1/content/search", SearchConcepts).WithName("SearchConcepts").WithTags("Content")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
-        group.MapGet("/api/content/bagrut", GetBagrutConcepts).WithName("GetBagrutConcepts").WithTags("Content")
+        group.MapGet("/api/v1/content/bagrut", GetBagrutConcepts).WithName("GetBagrutConcepts").WithTags("Content")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
         
         // Learning paths
-        group.MapGet("/api/content/paths", GetLearningPaths).WithName("GetLearningPaths").WithTags("Content")
+        group.MapGet("/api/v1/content/paths", GetLearningPaths).WithName("GetLearningPaths").WithTags("Content")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
-        group.MapGet("/api/content/paths/{id}", GetLearningPathDetail).WithName("GetLearningPathDetail").WithTags("Content")
+        group.MapGet("/api/v1/content/paths/{id}", GetLearningPathDetail).WithName("GetLearningPathDetail").WithTags("Content")
     .Produces<LearningPathDetailDto>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // Knowledge path endpoint
-        group.MapGet("/api/knowledge/path", GetKnowledgePath).WithName("GetKnowledgePath").WithTags("Knowledge")
+        group.MapGet("/api/v1/knowledge/path", GetKnowledgePath).WithName("GetKnowledgePath").WithTags("Knowledge")
     .Produces<PathDto>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
     .Produces<CenaError>(StatusCodes.Status404NotFound)

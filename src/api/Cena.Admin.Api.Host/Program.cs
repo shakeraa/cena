@@ -18,6 +18,7 @@ using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Observability;
+using Cena.Infrastructure.ApiVersioning;
 using Marten;
 using Microsoft.AspNetCore.RateLimiting;
 using NATS.Client.Core;
@@ -278,6 +279,9 @@ public partial class Program
         };
     });
     
+    // ---- API Versioning (RDY-010) ----
+    builder.Services.AddCenaApiVersioning();
+
     // ---- Health checks ----
     builder.Services.AddHealthChecks();
     
@@ -387,7 +391,10 @@ public partial class Program
     app.UseMiddleware<TokenRevocationMiddleware>();
     app.UseMiddleware<StudentDataAuditMiddleware>();
     app.UseRateLimiter();
-    
+
+    // ---- RDY-010: Redirect deprecated /api/... to /api/v1/... ----
+    app.UseDeprecatedApiRedirect();
+
     // ---- Swagger / OpenAPI (RDY-009) ----
     app.UseSwagger();
     if (!app.Environment.IsProduction())

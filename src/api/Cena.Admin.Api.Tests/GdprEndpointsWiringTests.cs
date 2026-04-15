@@ -70,16 +70,16 @@ public class GdprEndpointsWiringTests
 
         var patterns = EnumerateEndpoints(app)
             .Select(e => e.RoutePattern.RawText)
-            .Where(p => p is not null && p.StartsWith("/api/admin/gdpr", StringComparison.Ordinal))
+            .Where(p => p is not null && p.StartsWith("/api/v1/admin/gdpr", StringComparison.Ordinal))
             .ToHashSet();
 
-        Assert.Contains("/api/admin/gdpr/consents/{studentId}", patterns);
-        Assert.Contains("/api/admin/gdpr/consents",             patterns);
-        Assert.Contains("/api/admin/gdpr/consents/{studentId}/{consentType}", patterns);
-        Assert.Contains("/api/admin/gdpr/export/{studentId}",   patterns);
-        Assert.Contains("/api/admin/gdpr/erasure/{studentId}",  patterns);
-        Assert.Contains("/api/admin/gdpr/erasure/{studentId}/status", patterns);
-        Assert.Contains("/api/admin/gdpr/erasure/{studentId}/manifest", patterns);
+        Assert.Contains("/api/v1/admin/gdpr/consents/{studentId}", patterns);
+        Assert.Contains("/api/v1/admin/gdpr/consents",             patterns);
+        Assert.Contains("/api/v1/admin/gdpr/consents/{studentId}/{consentType}", patterns);
+        Assert.Contains("/api/v1/admin/gdpr/export/{studentId}",   patterns);
+        Assert.Contains("/api/v1/admin/gdpr/erasure/{studentId}",  patterns);
+        Assert.Contains("/api/v1/admin/gdpr/erasure/{studentId}/status", patterns);
+        Assert.Contains("/api/v1/admin/gdpr/erasure/{studentId}/manifest", patterns);
     }
 
     [Fact]
@@ -90,7 +90,7 @@ public class GdprEndpointsWiringTests
 
         var gdprEndpoints = EnumerateEndpoints(app)
             .Where(e => e.RoutePattern.RawText is not null &&
-                        e.RoutePattern.RawText.StartsWith("/api/admin/gdpr", StringComparison.Ordinal))
+                        e.RoutePattern.RawText.StartsWith("/api/v1/admin/gdpr", StringComparison.Ordinal))
             .ToList();
 
         Assert.NotEmpty(gdprEndpoints);

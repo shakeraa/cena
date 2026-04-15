@@ -23,7 +23,7 @@ public static class DiagnosticEndpoints
 {
     public static void MapDiagnosticEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/diagnostic")
+        var group = app.MapGroup("/api/v1/diagnostic")
             .RequireAuthorization()
             .WithTags("Diagnostic");
 

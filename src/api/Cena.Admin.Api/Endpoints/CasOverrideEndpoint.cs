@@ -99,7 +99,7 @@ public static class CasOverrideEndpoint
         // we can require the SuperAdminOnly policy independently and preserve
         // the principle that operator overrides are a different surface from
         // normal moderator workflows.
-        app.MapPost("/api/admin/questions/{id}/cas-override", HandleAsync)
+        app.MapPost("/api/v1/admin/questions/{id}/cas-override", HandleAsync)
             .WithName("OverrideCasBinding")
             .WithTags("Question Bank", "CAS")
             .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)

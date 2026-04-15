@@ -16,7 +16,7 @@ public static class RateLimitDashboardEndpoints
 {
     public static IEndpointRouteBuilder MapRateLimitDashboardEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/ratelimit")
+        var group = app.MapGroup("/api/v1/ratelimit")
             .WithTags("Rate Limiting")
             .RequireAuthorization()
             .RequireRateLimiting("api");

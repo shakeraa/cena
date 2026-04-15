@@ -26,7 +26,7 @@ public static class TutorEndpoints
 {
     public static IEndpointRouteBuilder MapTutorEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/tutor")
+        var group = app.MapGroup("/api/v1/tutor")
             .WithTags("Tutor")
             .RequireAuthorization();
 

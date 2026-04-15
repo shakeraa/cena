@@ -186,12 +186,12 @@ public class StudentAuthEndpointsTests
             .SelectMany(ds => ds.Endpoints)
             .OfType<RouteEndpoint>()
             .Where(e => e.RoutePattern.RawText is not null &&
-                        e.RoutePattern.RawText.StartsWith("/api/auth", System.StringComparison.Ordinal))
+                        e.RoutePattern.RawText.StartsWith("/api/v1/auth", System.StringComparison.Ordinal))
             .ToList();
 
-        Assert.Contains(endpoints, e => e.RoutePattern.RawText == "/api/auth/password-reset");
+        Assert.Contains(endpoints, e => e.RoutePattern.RawText == "/api/v1/auth/password-reset");
 
-        var passwordReset = endpoints.Single(e => e.RoutePattern.RawText == "/api/auth/password-reset");
+        var passwordReset = endpoints.Single(e => e.RoutePattern.RawText == "/api/v1/auth/password-reset");
 
         // Must be anonymous — students using the forgot-password form are
         // by definition unauthenticated.

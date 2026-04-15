@@ -24,7 +24,7 @@ public static class ChallengesEndpoints
 {
     public static IEndpointRouteBuilder MapChallengesEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/challenges")
+        var group = app.MapGroup("/api/v1/challenges")
             .WithTags("Challenges")
             .RequireAuthorization();
 

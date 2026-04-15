@@ -56,7 +56,7 @@ public static class CasBackfillEndpoint
 
     public static IEndpointRouteBuilder MapCasBackfillEndpoint(this IEndpointRouteBuilder app)
     {
-        app.MapPost("/api/admin/questions/cas-backfill", HandleAsync)
+        app.MapPost("/api/v1/admin/questions/cas-backfill", HandleAsync)
             .WithName("BackfillCasBindings")
             .WithTags("Question Bank", "CAS")
             .RequireAuthorization(CenaAuthPolicies.AdminOnly)

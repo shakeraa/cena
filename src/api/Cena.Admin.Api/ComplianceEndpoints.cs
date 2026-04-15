@@ -19,7 +19,7 @@ public static class ComplianceEndpoints
 {
     public static IEndpointRouteBuilder MapComplianceEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/compliance")
+        var group = app.MapGroup("/api/v1/admin/compliance")
             .WithTags("Compliance")
             .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
             .RequireRateLimiting("api");

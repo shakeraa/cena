@@ -22,7 +22,7 @@ public static class NotificationsEndpoints
 {
     public static IEndpointRouteBuilder MapNotificationsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/notifications")
+        var group = app.MapGroup("/api/v1/notifications")
             .WithTags("Notifications")
             .RequireAuthorization();
 
@@ -77,7 +77,7 @@ public static class NotificationsEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // PWA-BE-002: VAPID public key (unauthenticated, cacheable)
-        app.MapGet("/api/notifications/vapid-key", GetVapidPublicKey)
+        app.MapGet("/api/v1/notifications/vapid-key", GetVapidPublicKey)
             .WithName("GetVapidPublicKey")
             .WithTags("Notifications")
             .AllowAnonymous()

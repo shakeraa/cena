@@ -25,6 +25,7 @@
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.11.0-beta.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
+    <PackageReference Include="Asp.Versioning.Http" Version="8.1.0" />
   </ItemGroup>
 
   <!-- RDY-009: Generate OpenAPI document after build -->

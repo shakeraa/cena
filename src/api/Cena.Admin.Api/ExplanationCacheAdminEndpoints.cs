@@ -15,7 +15,7 @@ public static class ExplanationCacheAdminEndpoints
 {
     public static IEndpointRouteBuilder MapExplanationCacheEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/admin/explanations")
+        var group = app.MapGroup("/api/v1/admin/explanations")
             .WithTags("Explanation Cache Admin")
             .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
             .RequireRateLimiting("api");

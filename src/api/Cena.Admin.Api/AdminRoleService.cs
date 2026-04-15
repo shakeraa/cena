@@ -228,7 +228,7 @@ public sealed class AdminRoleService : IAdminRoleService
             AccessorRole = callerRole,
             AccessorSchool = callerSchool,
             StudentId = userId,
-            Endpoint = "/api/admin/users/{id}/role",
+            Endpoint = "/api/v1/admin/users/{id}/role",
             HttpMethod = "POST",
             StatusCode = 204,
             Category = "privileged_action"

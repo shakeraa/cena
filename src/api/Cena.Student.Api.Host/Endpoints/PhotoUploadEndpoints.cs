@@ -21,7 +21,7 @@ public static class PhotoUploadEndpoints
 
     public static void MapPhotoUploadEndpoints(this WebApplication app)
     {
-        var group = app.MapGroup("/api/photos")
+        var group = app.MapGroup("/api/v1/photos")
             .RequireAuthorization()
             .WithTags("PhotoUpload")
             .DisableAntiforgery();

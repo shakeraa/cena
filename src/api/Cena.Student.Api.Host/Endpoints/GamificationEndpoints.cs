@@ -22,7 +22,7 @@ public static class GamificationEndpoints
 {
     public static IEndpointRouteBuilder MapGamificationEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/gamification")
+        var group = app.MapGroup("/api/v1/gamification")
             .WithTags("Gamification")
             .RequireAuthorization();
 
