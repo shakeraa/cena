@@ -12,6 +12,7 @@
 
 using System.Security.Claims;
 using System.Text.Json;
+using Cena.Actors.Questions;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Tenancy;
 using Marten;
@@ -84,16 +85,33 @@ public sealed class AdminDashboardService : IAdminDashboardService
         // Calculate average focus score from student states (if available)
         float avgFocusScore = 0f;
         float avgFocusScoreChange = 0f;
+        var questions = await session.Query<QuestionReadModel>().ToListAsync();
+        var totalQuestions = questions.Count;
+        var questionsWithArabic = questions.Count(HasArabicCoverage);
+        var questionsMissingArabic = Math.Max(0, totalQuestions - questionsWithArabic);
+        var fallbackServedLast7Days = await session.Events.QueryAllRawEvents()
+            .Where(e => e.EventTypeName == "question_fallback_language_v1")
+            .Where(e => e.Timestamp >= weekAgo)
+            .CountAsync();
+        var translationCoverage = new TranslationCoverageSummary(
+            TotalQuestions: totalQuestions,
+            QuestionsWithArabic: questionsWithArabic,
+            QuestionsMissingArabic: questionsMissingArabic,
+            FallbackServedLast7Days: fallbackServedLast7Days,
+            ArabicCoveragePercent: totalQuestions == 0
+                ? 0f
+                : MathF.Round((float)questionsWithArabic / totalQuestions * 100f, 1));
 
         var response = new DashboardOverviewResponse(
             ActiveUsers: activeToday,
             ActiveUsersChange: activeDelta,
             TotalStudents: totalStudents,
             TotalStudentsChange: studentsDelta,
-            ContentItems: 0,  // Will be populated when content pipeline is wired
+            ContentItems: totalQuestions,
             PendingReview: pendingReview,
             AvgFocusScore: avgFocusScore,
-            AvgFocusScoreChange: avgFocusScoreChange);
+            AvgFocusScoreChange: avgFocusScoreChange,
+            TranslationCoverage: translationCoverage);
 
         await SetCacheAsync(cacheKey, response, TimeSpan.FromSeconds(60));
         return response;
@@ -456,5 +474,13 @@ public sealed class AdminDashboardService : IAdminDashboardService
         {
             // Redis down — skip cache
         }
+    }
+
+    private static bool HasArabicCoverage(QuestionReadModel question)
+    {
+        if (string.Equals(question.Language, "ar", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        return question.Languages?.Contains("ar", StringComparer.OrdinalIgnoreCase) == true;
     }
 }

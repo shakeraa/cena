@@ -524,12 +524,18 @@ public sealed class QuestionBankService : IQuestionBankService
     {
         var gateOptions = state.Options.Select(o =>
             new QualityGateOption(o.Label, o.Text, o.IsCorrect, o.DistractorRationale)).ToList();
+        var availableLanguages = state.LanguageVersions.Keys
+            .Append(state.PrimaryLanguage)
+            .Where(static language => !string.IsNullOrWhiteSpace(language))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
 
         int correctIdx = gateOptions.FindIndex(o => o.IsCorrect);
         var input = new QualityGateInput(
             state.Id, stem, gateOptions, Math.Max(0, correctIdx),
             state.Subject, state.PrimaryLanguage, state.BloomsLevel,
-            state.Difficulty, state.Grade, state.ConceptIds);
+            state.Difficulty, state.Grade, state.ConceptIds,
+            AvailableLanguages: availableLanguages);
 
         return await _qualityGate.EvaluateAsync(input);
     }

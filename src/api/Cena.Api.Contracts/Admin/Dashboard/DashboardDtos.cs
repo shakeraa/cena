@@ -5,6 +5,13 @@
 
 namespace Cena.Api.Contracts.Admin.Dashboard;
 
+public sealed record TranslationCoverageSummary(
+    int TotalQuestions,
+    int QuestionsWithArabic,
+    int QuestionsMissingArabic,
+    int FallbackServedLast7Days,
+    float ArabicCoveragePercent);
+
 // Overview Widgets
 public sealed record DashboardOverviewResponse(
     int ActiveUsers,
@@ -14,7 +21,8 @@ public sealed record DashboardOverviewResponse(
     int ContentItems,
     int PendingReview,
     float AvgFocusScore,
-    float AvgFocusScoreChange);
+    float AvgFocusScoreChange,
+    TranslationCoverageSummary TranslationCoverage);
 
 // Activity Time Series
 public sealed record ActivityDataPoint(
