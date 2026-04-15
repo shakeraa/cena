@@ -36,7 +36,7 @@ public class QueryAllRawEventsTenantTests
     {
         // Verify GamificationEndpoints.cs has tenant scoping on QueryAllRawEvents
         var endpointFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Student.Api.Host/Endpoints/GamificationEndpoints.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Student.Api.Host/Endpoints/GamificationEndpoints.cs"));
         
         // Should have ResourceOwnershipGuard or school_id check
         Assert.Contains("ResourceOwnershipGuard", endpointFile);
@@ -47,7 +47,7 @@ public class QueryAllRawEventsTenantTests
     {
         // Verify FocusAnalyticsService filters by SchoolId before QueryAllRawEvents
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/FocusAnalyticsService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/FocusAnalyticsService.cs"));
         
         // Check that TenantScope.GetSchoolFilter is called
         Assert.Contains("TenantScope.GetSchoolFilter", serviceFile);
@@ -58,7 +58,7 @@ public class QueryAllRawEventsTenantTests
     {
         // Verify AdminDashboardService has tenant scoping
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/AdminDashboardService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/AdminDashboardService.cs"));
         
         // Should have SchoolId filtering
         Assert.Contains("SchoolId", serviceFile);
@@ -69,7 +69,7 @@ public class QueryAllRawEventsTenantTests
     {
         // Verify EventStreamService limits by tenant
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/EventStreamService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/EventStreamService.cs"));
         
         // Should be SuperAdmin-only or have tenant limits
         Assert.True(
@@ -82,7 +82,7 @@ public class QueryAllRawEventsTenantTests
     {
         // Verify TutoringAdminService uses document queries instead of QueryAllRawEvents where possible
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/TutoringAdminService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/TutoringAdminService.cs"));
         
         // Should use TutorMessageDocument with SchoolId filter
         Assert.Contains("TutorMessageDocument", serviceFile);
@@ -95,9 +95,11 @@ public class QueryAllRawEventsTenantTests
     [Fact]
     public void LintScript_Exists_AndIsExecutable()
     {
-        var lintScript = Path.Combine(AppContext.BaseDirectory, "../../../../../scripts/lint-query-all-raw-events.sh");
-        Assert.True(File.Exists(lintScript), "lint-query-all-raw-events.sh should exist");
-        
+        // RDY-037 fix: path corrected (5→6 ups) and the lint script
+        // landed alongside this fix at scripts/lint-query-all-raw-events.sh.
+        var lintScript = Path.Combine(AppContext.BaseDirectory, "../../../../../../scripts/lint-query-all-raw-events.sh");
+        Assert.True(File.Exists(lintScript), $"lint-query-all-raw-events.sh should exist at {lintScript}");
+
         var content = File.ReadAllText(lintScript);
         Assert.Contains("QueryAllRawEvents", content);
         Assert.Contains("SchoolId", content);
@@ -139,7 +141,9 @@ public class QueryAllRawEventsTenantTests
     {
         // This test documents the current count of QueryAllRawEvents calls.
         // If the count increases significantly, a human should review.
-        var repoRoot = Path.Combine(AppContext.BaseDirectory, "../../../../..");
+        // RDY-037 fix: 6 ups to repo root (was 5, which landed at src/
+        // and made the "/src/" substring filter below always miss).
+        var repoRoot = Path.Combine(AppContext.BaseDirectory, "../../../../../..");
         
         // Count occurrences in src/ directory
         var csFiles = Directory.GetFiles(repoRoot, "*.cs", SearchOption.AllDirectories)

@@ -153,7 +153,7 @@ public class AdminUserServiceTenantScopingTests
     {
         // Verify the service file references TenantScope namespace
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/AdminUserService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/AdminUserService.cs"));
         Assert.Contains("using Cena.Infrastructure.Tenancy;", serviceFile);
         Assert.Contains("TenantScope.GetSchoolFilter", serviceFile);
     }
@@ -163,7 +163,7 @@ public class AdminUserServiceTenantScopingTests
     {
         // Verify that cross-tenant access attempts are logged for security monitoring
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/AdminUserService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/AdminUserService.cs"));
         Assert.Contains("Cross-tenant", serviceFile);
         Assert.Contains("Log.Warning", serviceFile);
     }
