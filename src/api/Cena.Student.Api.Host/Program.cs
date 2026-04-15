@@ -208,7 +208,7 @@ public partial class Program
     // Wilson et al. (2019): "The Eighty Five Percent Rule for optimal learning."
     builder.Services.AddScoped<IEloDifficultyService, EloDifficultyService>();
     
-    // ---- RDY-033b: Error classification + CAS-backed pattern matching ----
+    // ---- RDY-033b / RDY-033c: Error classification + CAS-backed pattern matching ----
     //
     // SessionEndpoints.POST /answer injects IErrorClassificationService and
     // IMisconceptionDetectionService via [FromServices]. The Actor Host
@@ -216,10 +216,21 @@ public partial class Program
     // separate DI container, so the same bindings are required here, or the
     // /answer endpoint throws "Unable to resolve service" at runtime.
     //
+    // RDY-033c — ErrorClassificationService's ctor takes ILlmClient. Without
+    // the two registrations below, DI could not construct it and we'd still
+    // throw at runtime despite the RDY-033b service binding. Mirrors the
+    // Actor Host's SAI-000 registrations. AnthropicLlmClient takes only
+    // IConfiguration (built-in) and logs a warning if the API key is missing
+    // so DI resolution always succeeds — runtime failure is bounded to the
+    // LLM call itself, which ClassifyAsync already catches.
+    //
     // CAS-grounded matchers (ADR-0031) back the misconception detector: each
     // buggy rule is an IErrorPatternMatcher that goes through ICasRouterService
     // (ADR-0002). Matchers short-circuit by subject, so registering the full
     // set here has near-zero cost on non-math/physics paths.
+    builder.Services.AddSingleton<Cena.Actors.Gateway.AnthropicLlmClient>();
+    builder.Services.AddSingleton<Cena.Actors.Gateway.ILlmClient, Cena.Actors.Gateway.LlmClientRouter>();
+
     builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
 
     builder.Services.AddSingleton<Cena.Actors.Cas.IMathNetVerifier, Cena.Actors.Cas.MathNetVerifier>();
