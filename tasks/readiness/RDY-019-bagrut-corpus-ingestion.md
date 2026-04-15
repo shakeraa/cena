@@ -25,6 +25,7 @@
 | [RDY-019b-ministry-reference-scrape-recreation.md](RDY-019b-ministry-reference-scrape-recreation.md) | Reference-only scrape of Ministry archive + coverage-calibrated AI recreation pipeline (CAS-gated, never ships raw Ministry text) | Blocked on RDY-019a + RDY-034 (merged) |
 | [RDY-019c-3u4u-seed-coverage-review.md](RDY-019c-3u4u-seed-coverage-review.md) | 10+ seed items per 3u/4u track, coverage report endpoint, curriculum-expert sign-off | Blocked on RDY-019a + curriculum expert availability |
 | [RDY-019d-bagrut-content-expert-followups.md](RDY-019d-bagrut-content-expert-followups.md) | Legacy expert-followups doc (Amjad-dependent) — retained as historical context | Blocked on Amjad |
+| [RDY-019e-curator-ingestion-metadata.md](RDY-019e-curator-ingestion-metadata.md) | Admin curator metadata: auto-extract + review/edit/remove UI, CuratorMetadata on PipelineItemDocument, operator-gated cascade dispatch | None — can run in parallel with OCR spike |
 
 ## Legal posture (user decision, 2026-04-15)
 

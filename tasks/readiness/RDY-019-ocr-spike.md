@@ -42,12 +42,13 @@ Today `RecognizeMathAsync` in `PhotoCaptureEndpoints.cs` returns `null` (placeho
 
 ### Surface B — Admin ingestion (public / curator-sourced material)
 
-Admin has two ingestion modes that share the OCR cascade:
+Admin has three ingestion modes that share the OCR cascade:
 
 - **B1 — Batch Bagrut scrape** (covered by [RDY-019b](RDY-019b-ministry-reference-scrape-recreation.md)). Batch-processes 640 public Ministry PDFs from `meyda.education.gov.il/sheeloney_bagrut/` to extract structural metadata. No CSAM gate — public government publication. Throughput > latency.
 - **B2 — Interactive admin upload** (existing [`BagrutPdfIngestionService.cs`](../../src/api/Cena.Admin.Api/Ingestion/BagrutPdfIngestionService.cs) + [`IngestionPipelineService.UploadFromRequestAsync`](../../src/api/Cena.Admin.Api/IngestionPipelineService.cs)). A curator uploads a PDF or image in the admin UI and expects per-file feedback. Latency matters. No CSAM gate required (admin-authenticated) but safety moderation still runs.
+- **B3 — Cloud-directory drop-zone** (existing [`IngestionPipelineCloudDir.cs`](../../src/api/Cena.Admin.Api/IngestionPipelineCloudDir.cs)). Admin points the ingester at an S3/GCS/Azure/local path, lists files, and batch-queues them. Today `CloudDirIngestRequest` has no per-file metadata fields — the curator metadata gap is tracked separately in [RDY-019e](RDY-019e-curator-ingestion-metadata.md). The OCR cascade itself treats B3 the same as B1 (batch throughput), and consumes whatever hints RDY-019e eventually surfaces.
 
-OCR cascade for B1 and B2 is identical to Surface A Layers A2–A5 — what differs is throughput tuning and that the output feeds `QuestionDocument` drafts for curator review, not a live student response.
+OCR cascade for B1, B2, and B3 is identical to Surface A Layers A2–A5 — what differs is throughput tuning and that the output feeds `QuestionDocument` drafts for curator review, not a live student response.
 
 ### Why unified
 
@@ -163,6 +164,20 @@ Why this layout:
   - Replace the placeholder in `PhotoCaptureEndpoints.RecognizeMathAsync` with a call to the shared cascade service
   - Wire `PhotoUploadEndpoints` to the same service
   - Leave PhotoDNA at Layer A0 untouched — it is not part of this spike
+
+### 7. Curator-metadata hint interface (schema + review loop deferred to RDY-019e)
+
+Admin-sourced ingestion (B1/B2/B3) benefits from curator hints before OCR runs: knowing the document is Math 5u Hebrew-primary lets the cascade pick the right glossary, the right CAS subject, the right difficulty prior, and the right language-model for the fallback layer.
+
+The full feature lives in [RDY-019e](RDY-019e-curator-ingestion-metadata.md): a two-phase handshake where (a) the system auto-extracts metadata from filename / path / embedded PDF metadata / a 1-page OCR preview, (b) the curator reviews in an admin UI, edits / adds / **removes** any auto-extracted field, then confirms — only confirmed items enter the full cascade. That's out of spike scope because it touches contract DTOs, `PipelineItemDocument`, and admin UI.
+
+What the spike *must* do:
+
+- Define an `OcrContextHints` record (in `scripts/ocr-spike/pipeline-prototype.py` and later as the C# interface) with fields: `subject`, `language`, `track`, `sourceType`, `taxonomyNode?`. This record is the *consumer-side* contract that RDY-019e's `CuratorMetadata` will eventually satisfy.
+- Show that the cascade works two ways:
+  - **Hints absent** (today's state for B1/B2/B3, and always for Surface A student upload) — cascade infers language/subject from content, writes confidence scores, returns.
+  - **Hints present** (future state once RDY-019e lands) — cascade uses hints to pick glossary + CAS router + confidence threshold, and validates the extraction against the hint (e.g. if hint says Hebrew but OCR returns Arabic, surface as `InconsistentMetadata` violation).
+- Benchmark the delta: how much does accuracy improve when hints are supplied? This quantifies the ROI of RDY-019e and tells us whether to enforce hints as required or keep them optional.
 
 ## Acceptance Criteria
 
