@@ -59,14 +59,17 @@ public class MeEndpointsCqrsRaceTests
         ctx.User = new ClaimsPrincipal(new ClaimsIdentity(new[]
         {
             new Claim(ClaimTypes.NameIdentifier, _studentId),
-            new Claim("sub", _studentId)
+            new Claim("sub", _studentId),
+            // RDY-054a: role claim required by ResourceOwnershipGuard.
+            new Claim(ClaimTypes.Role, "STUDENT"),
+            new Claim("role", "STUDENT")
         }, "TestAuth"));
         return ctx;
     }
 
     // ---- UpdateProfile tests -------------------------------------------------
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task UpdateProfile_Appends_ProfileUpdated_V1_Event()
     {
         // Arrange
@@ -77,26 +80,30 @@ public class MeEndpointsCqrsRaceTests
             FavoriteSubjects: new[] { "physics", "math" },
             Visibility: "public");
 
-        var capturedEvents = new List<object>();
-        _session.When(s => s.Events.Append(_studentId, Arg.Any<object>()))
-            .Do(call => capturedEvents.Add(call.ArgAt<object>(1)));
-
         _session.LoadAsync<StudentProfileSnapshot>(_studentId, Arg.Any<CancellationToken>())
             .Returns(new StudentProfileSnapshot { StudentId = _studentId });
 
         // Act
         var result = await UpdateProfileEndpoint.Invoke(ctx, _store, patch);
 
-        // Assert: Event was appended
-        Assert.Single(capturedEvents);
-        var profileEvent = Assert.IsType<ProfileUpdated_V1>(capturedEvents[0]);
+        // Assert: Event was appended — capture via Received + argument matcher
+        // on the _events substitute directly (RDY-054a: avoids the
+        // nested-property .When lambda trap).
+        var calls = _events.ReceivedCalls()
+            .Where(c => c.GetMethodInfo().Name == "Append")
+            .ToList();
+        Assert.Single(calls);
+        var args = calls[0].GetArguments();
+        Assert.Equal(_studentId, args[0]);
+        var appended = (args[1] as object[])?.FirstOrDefault() ?? args[1];
+        var profileEvent = Assert.IsType<ProfileUpdated_V1>(appended);
         Assert.Equal(_studentId, profileEvent.StudentId);
         Assert.Equal("New Display Name", profileEvent.DisplayName);
         Assert.Equal("Test bio", profileEvent.Bio);
         Assert.Equal("public", profileEvent.Visibility);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task UpdateProfile_DoesNot_Call_DirectSnapshotStore()
     {
         // Arrange: This catches the regression where someone calls session.Store(snapshot)
@@ -123,7 +130,7 @@ public class MeEndpointsCqrsRaceTests
 
     // ---- SubmitOnboarding tests -----------------------------------------------
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task SubmitOnboarding_Appends_OnboardingCompleted_V1_Event()
     {
         // Arrange
@@ -137,26 +144,28 @@ public class MeEndpointsCqrsRaceTests
             DiagnosticResults: null,
             ClassroomCode: null);
 
-        var capturedEvents = new List<object>();
-        _session.When(s => s.Events.Append(_studentId, Arg.Any<object>()))
-            .Do(call => capturedEvents.Add(call.ArgAt<object>(1)));
-
         _session.LoadAsync<StudentProfileSnapshot>(_studentId, Arg.Any<CancellationToken>())
             .Returns((StudentProfileSnapshot?)null);
 
         // Act
         var result = await SubmitOnboardingEndpoint.Invoke(ctx, _store, request);
 
-        // Assert: Event was appended
-        Assert.Single(capturedEvents);
-        var onboardingEvent = Assert.IsType<OnboardingCompleted_V1>(capturedEvents[0]);
+        // Assert: Event was appended — RDY-054a Received-call inspection.
+        var calls = _events.ReceivedCalls()
+            .Where(c => c.GetMethodInfo().Name == "Append")
+            .ToList();
+        Assert.Single(calls);
+        var args = calls[0].GetArguments();
+        Assert.Equal(_studentId, args[0]);
+        var appended = (args[1] as object[])?.FirstOrDefault() ?? args[1];
+        var onboardingEvent = Assert.IsType<OnboardingCompleted_V1>(appended);
         Assert.Equal(_studentId, onboardingEvent.StudentId);
         Assert.Equal("student", onboardingEvent.Role);
         Assert.Equal("en", onboardingEvent.Locale);
         Assert.Equal(30, onboardingEvent.DailyTimeGoalMinutes);
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task SubmitOnboarding_DoesNot_Call_DirectSnapshotStore()
     {
         // Arrange: This catches the regression where someone calls session.Store(profile)
@@ -184,7 +193,7 @@ public class MeEndpointsCqrsRaceTests
         await _session.Received(1).SaveChangesAsync();
     }
 
-    [Fact(Skip = SkipReason)]
+    [Fact]
     public async Task SubmitOnboarding_Idempotent_DoesNot_Reappend_WhenAlreadyOnboarded()
     {
         // Arrange: Student already onboarded
@@ -198,8 +207,8 @@ public class MeEndpointsCqrsRaceTests
             DiagnosticResults: null,
             ClassroomCode: null);
 
-        var existingProfile = new StudentProfileSnapshot 
-        { 
+        var existingProfile = new StudentProfileSnapshot
+        {
             StudentId = _studentId,
             OnboardedAt = DateTime.UtcNow.AddDays(-1)
         };
@@ -210,8 +219,9 @@ public class MeEndpointsCqrsRaceTests
         // Act
         var result = await SubmitOnboardingEndpoint.Invoke(ctx, _store, request);
 
-        // Assert: No event appended when already onboarded (idempotent)
-        _session.DidNotReceive().Events.Append(_studentId, Arg.Any<OnboardingCompleted_V1>());
+        // Assert: No Append call on _events (RDY-054a).
+        Assert.DoesNotContain(_events.ReceivedCalls(),
+            c => c.GetMethodInfo().Name == "Append");
         await _session.DidNotReceive().SaveChangesAsync();
     }
 }
