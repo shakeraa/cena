@@ -2,6 +2,23 @@
 
 Target: ≥99% pass rate across the cases below via `ICasRouterService.VerifyAsync`. Used by `CasConformanceSuiteRunner` (nightly CI).
 
+**RDY-037 update (2026-04-15):** the runner is now implemented in
+`src/actors/Cena.Actors/Cas/CasConformanceSuiteRunner.cs`. It calls
+`IMathNetVerifier` + `ISymPySidecarClient` directly and measures cross-engine
+agreement on the 50 concrete pairs in `CasConformanceSuite.cs` (the remaining
+450 pairs are placeholders, filtered out until the Bagrut corpus ingestion
+replaces them). The runner is covered by `CasConformanceSuiteRunnerTests`
+using substituted engines; the nightly workflow
+`.github/workflows/cas-nightly.yml` runs it against real engines — the
+measured baseline will be published here after the first green nightly
+against a reachable SymPy sidecar.
+
+Until that first nightly lands, treat the target below as the design
+threshold, not the measured baseline. If the first nightly run reports
+<99% agreement, update this doc with the measured number plus an ADR-0032
+addendum explaining the chosen CI gate (tune the threshold or drop
+disagreeing pairs — never silently lower the gate).
+
 Format: `id | operation | expressionA | expressionB | variable | expected_status`
 
 ## Algebra — equivalence
