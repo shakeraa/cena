@@ -7,6 +7,7 @@
 // =============================================================================
 
 using System.Security.Cryptography;
+using Cena.Actors.Cas;
 using Cena.Actors.Events;
 using Cena.Actors.Questions;
 using Marten;
@@ -48,6 +49,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
     private readonly IDeduplicationService _dedup;
     private readonly IDocumentStore _store;
     private readonly INatsConnection _nats;
+    private readonly ICasGatedQuestionPersister _persister;
     private readonly ILogger<IngestionOrchestrator> _logger;
 
     public IngestionOrchestrator(
@@ -58,6 +60,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
         IDeduplicationService dedup,
         IDocumentStore store,
         INatsConnection nats,
+        ICasGatedQuestionPersister persister,
         ILogger<IngestionOrchestrator> logger)
     {
         _ocrClient = ocrClient;
@@ -67,6 +70,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
         _dedup = dedup;
         _store = store;
         _nats = nats;
+        _persister = persister;
         _logger = logger;
     }
 
@@ -261,8 +265,12 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                 var questionId = $"q-{Guid.NewGuid():N}";
                 questionIds.Add(questionId);
 
-                // Create question event
-                var ingestedEvent = new QuestionIngested_V1(
+                // RDY-050: emit V2 directly. Pre-fix emitted V1 + relied on
+                // the EventUpcaster. Both V1 and V2 remain registered in
+                // MartenConfiguration so historical streams still read,
+                // but new writes standardize on V2 to match ADR-0032 and
+                // the authoring path.
+                var ingestedEvent = new QuestionIngested_V2(
                     QuestionId: questionId,
                     Stem: q.StemText,
                     StemHtml: $"<p>{q.StemText}</p>",
@@ -279,9 +287,35 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                     SourceFilename: request.Filename,
                     OriginalText: q.StemText,
                     ImportedBy: request.SubmittedBy,
-                    Timestamp: DateTimeOffset.UtcNow);
+                    Timestamp: DateTimeOffset.UtcNow,
+                    Explanation: null,
+                    LearningObjectiveId: null);
 
-                session.Events.StartStream<QuestionState>(questionId, ingestedEvent);
+                // RDY-037 / RDY-039 / ADR-0002: route through the CAS-gated
+                // persister using the SESSION-AWARE overload so the question
+                // stream, CAS binding, and pipeline item commit atomically
+                // with the single SaveChangesAsync at the end of this
+                // method. The old session-less overload opened a second
+                // session and could leave orphan question streams if the
+                // pipeline save failed afterwards.
+                //
+                // Bagrut ingestion is open-ended — the correct answer is not
+                // yet known, so CorrectAnswerRaw is empty and the gate
+                // produces an Unverifiable binding with NeedsReview
+                // semantics. Classification/authoring adds the answer
+                // later; a CAS backfill run upgrades the binding to
+                // Verified.
+                await _persister.PersistAsync(
+                    session: session,
+                    questionId: questionId,
+                    creationEvent: ingestedEvent,
+                    context: new GatedPersistContext(
+                        Subject: "math",
+                        Stem: q.StemText,
+                        CorrectAnswerRaw: string.Empty,
+                        Language: ocrResult.DetectedLanguage,
+                        Variable: null),
+                    ct: ct);
 
                 // Register in dedup index
                 await _dedup.RegisterAsync(questionId, dedupResult.ExactHash, dedupResult.StructuralHash, ct);

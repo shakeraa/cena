@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Cena.Actors.Tests" />
+    <InternalsVisibleTo Include="Cena.Admin.Api.Tests" />
   </ItemGroup>
 
 </Project>

@@ -4,10 +4,10 @@
 // Both Cena.Actors.Host and Cena.Api.Host call these extension methods.
 // =============================================================================
 
+using Cena.Actors.Cas;
 using Cena.Admin.Api.Endpoints;
 using Cena.Admin.Api.QualityGate;
 using Cena.Admin.Api.RateLimit;
-using Cena.Admin.Api.Services;
 using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
@@ -41,7 +41,36 @@ public static class CenaAdminServiceRegistration
         // registered by the host Program.cs (Admin + Actor hosts both).
         services.AddSingleton<IMathContentDetector, MathContentDetector>();
         services.AddSingleton<ICasGateModeProvider, CasGateModeProvider>();
+        // RDY-038 / ADR-0002: stem-solution extractor lets the gate run
+        // Equivalence checks against the stem's own expected answer, not
+        // just a NormalForm parseability probe. Without this registration
+        // the gate degrades every question to Unverifiable.
+        services.AddSingleton<IStemSolutionExtractor, StemSolutionExtractor>();
         services.AddScoped<ICasVerificationGate, CasVerificationGate>();
+        // RDY-037: single gated-write site (see CasGatedQuestionPersister)
+        // — every question creation path routes through this persister.
+        services.AddScoped<ICasGatedQuestionPersister, CasGatedQuestionPersister>();
+
+        // RDY-045: Security notifier for CAS overrides (and future
+        // high-impact security events). Falls back to the logs-only null
+        // implementation when CENA_SECURITY_SLACK_WEBHOOK is unset so dev
+        // and CI are not blocked on a webhook URL.
+        services.AddHttpClient("SecurityNotifier");
+        services.AddSingleton<Services.ISecurityNotifier>(sp =>
+        {
+            var webhook = Environment.GetEnvironmentVariable(
+                Services.SlackWebhookSecurityNotifier.WebhookEnvVar);
+            if (string.IsNullOrWhiteSpace(webhook))
+            {
+                return new Services.NullSecurityNotifier(
+                    sp.GetRequiredService<ILogger<Services.NullSecurityNotifier>>());
+            }
+            var httpFactory = sp.GetRequiredService<IHttpClientFactory>();
+            return new Services.SlackWebhookSecurityNotifier(
+                httpFactory.CreateClient("SecurityNotifier"),
+                webhook,
+                sp.GetRequiredService<ILogger<Services.SlackWebhookSecurityNotifier>>());
+        });
 
         // ADM-004 through ADM-016: Admin API services
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();

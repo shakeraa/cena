@@ -173,6 +173,12 @@ public partial class Program
     // engine stack is unreachable. Hosted service runs once at boot.
     builder.Services.AddHostedService<Cena.Admin.Api.Startup.CasBindingStartupCheck>();
 
+    // RDY-040 / RDY-036 §5: Binding-coverage startup check — refuses to
+    // serve traffic when published math/physics questions outnumber
+    // Verified CAS bindings. Engine liveness (above) and data coverage
+    // (this) are distinct failure modes; both must pass in Enforce.
+    builder.Services.AddHostedService<Cena.Admin.Api.Startup.CasBindingCoverageStartupCheck>();
+
     // ---- Firebase Auth + Authorization ----
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddFirebaseAuth(builder.Configuration);

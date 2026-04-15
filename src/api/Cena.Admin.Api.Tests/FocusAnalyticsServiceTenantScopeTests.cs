@@ -64,7 +64,7 @@ public class FocusAnalyticsServiceTenantScopeTests
     public void FocusAnalyticsService_HasNineSchoolIdFilters()
     {
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/FocusAnalyticsService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/FocusAnalyticsService.cs"));
         
         // Count the 9 .Where(r => r.SchoolId == schoolId) patterns
         var filterCount = serviceFile.Split("r.SchoolId == schoolId").Length - 1;
@@ -79,7 +79,7 @@ public class FocusAnalyticsServiceTenantScopeTests
     public void FocusAnalyticsService_UsesTenantScopeGetSchoolFilter()
     {
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/FocusAnalyticsService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/FocusAnalyticsService.cs"));
         
         Assert.Contains("TenantScope.GetSchoolFilter(user)", serviceFile);
     }
@@ -104,7 +104,7 @@ public class FocusAnalyticsServiceTenantScopeTests
         // If this test fails due to line number drift, update the line numbers
         // but VERIFY each filter still exists.
         var serviceFile = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Admin.Api/FocusAnalyticsService.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Admin.Api/FocusAnalyticsService.cs"));
         
         // All 9 locations should have the SchoolId filter pattern
         Assert.Contains("r.SchoolId == schoolId", serviceFile);

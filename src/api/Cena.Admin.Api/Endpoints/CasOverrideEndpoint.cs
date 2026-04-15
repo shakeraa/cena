@@ -22,6 +22,7 @@
 using System.Diagnostics.Metrics;
 using System.Security.Claims;
 using Cena.Actors.Events;
+using Cena.Admin.Api.Services;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Errors;
@@ -54,6 +55,44 @@ public static class CasOverrideEndpoint
     public const string EnvFlag = "CENA_CAS_OVERRIDE_ENABLED";
     public const int MinReasonLength = 20;
 
+    /// <summary>
+    /// RDY-036 §14: pre-persist validation. Extracted so tests can exercise
+    /// the audit-rule contract (env gate + length/format rules) without
+    /// spinning up a WebApplicationFactory. Returns null on success or an
+    /// <see cref="IResult"/> representing the first-hit failure.
+    /// </summary>
+    internal static IResult? ValidateOverrideRequest(
+        string id,
+        CasOverrideRequest request,
+        bool envEnabled)
+    {
+        if (!envEnabled)
+            return Results.Json(
+                new CenaError("CAS_OVERRIDE_DISABLED",
+                    $"CAS overrides are disabled in this environment. Set {EnvFlag}=true to enable.",
+                    ErrorCategory.Authorization, null, null),
+                statusCode: StatusCodes.Status403Forbidden);
+
+        if (string.IsNullOrWhiteSpace(id))
+            return Results.BadRequest(new CenaError(
+                "INVALID_QUESTION_ID", "Question id is required.",
+                ErrorCategory.Validation, null, null));
+
+        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length < MinReasonLength)
+            return Results.BadRequest(new CenaError(
+                "INVALID_OVERRIDE_REASON",
+                $"Override reason must be at least {MinReasonLength} characters.",
+                ErrorCategory.Validation, null, null));
+
+        if (string.IsNullOrWhiteSpace(request.Ticket))
+            return Results.BadRequest(new CenaError(
+                "INVALID_OVERRIDE_TICKET",
+                "Override ticket reference is required (e.g. JIRA-123).",
+                ErrorCategory.Validation, null, null));
+
+        return null;
+    }
+
     public static IEndpointRouteBuilder MapCasOverrideEndpoint(this IEndpointRouteBuilder app)
     {
         // Mounted as a top-level route (separate from the questions group) so
@@ -79,39 +118,19 @@ public static class CasOverrideEndpoint
         CasOverrideRequest request,
         HttpContext ctx,
         IDocumentStore store,
+        ISecurityNotifier securityNotifier,
         ILoggerFactory loggerFactory)
     {
         var logger = loggerFactory.CreateLogger("CasOverride");
 
         // Hard env gate — overrides are off by default in any environment.
         var enabled = Environment.GetEnvironmentVariable(EnvFlag);
-        if (!string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase))
-        {
+        var envEnabled = string.Equals(enabled, "true", StringComparison.OrdinalIgnoreCase);
+        if (!envEnabled)
             logger.LogWarning("[CAS_OVERRIDE_DISABLED] {EnvFlag} not set", EnvFlag);
-            return Results.Json(
-                new CenaError("CAS_OVERRIDE_DISABLED",
-                    $"CAS overrides are disabled in this environment. Set {EnvFlag}=true to enable.",
-                    ErrorCategory.Authorization, null, null),
-                statusCode: StatusCodes.Status403Forbidden);
-        }
 
-        // Input validation at boundary.
-        if (string.IsNullOrWhiteSpace(id))
-            return Results.BadRequest(new CenaError(
-                "INVALID_QUESTION_ID", "Question id is required.",
-                ErrorCategory.Validation, null, null));
-
-        if (string.IsNullOrWhiteSpace(request.Reason) || request.Reason.Trim().Length < MinReasonLength)
-            return Results.BadRequest(new CenaError(
-                "INVALID_OVERRIDE_REASON",
-                $"Override reason must be at least {MinReasonLength} characters.",
-                ErrorCategory.Validation, null, null));
-
-        if (string.IsNullOrWhiteSpace(request.Ticket))
-            return Results.BadRequest(new CenaError(
-                "INVALID_OVERRIDE_TICKET",
-                "Override ticket reference is required (e.g. JIRA-123).",
-                ErrorCategory.Validation, null, null));
+        var validation = ValidateOverrideRequest(id, request, envEnabled);
+        if (validation is not null) return validation;
 
         var operatorUserId = ctx.User.FindFirstValue("sub")
                              ?? ctx.User.FindFirstValue(ClaimTypes.NameIdentifier)
@@ -147,6 +166,22 @@ public static class CasOverrideEndpoint
         logger.LogWarning(
             "[CAS_OVERRIDE_APPLIED] questionId={Qid} previous={Previous} operator={Operator} ticket={Ticket}",
             id, previous, operatorUserId, request.Ticket);
+
+        // RDY-045 / RDY-036 §9: fire-and-forget security-team notification
+        // on every override. Webhook errors do NOT fail the request — the
+        // SIEM log above is the durable audit record.
+        _ = securityNotifier.NotifyAsync(new SecurityNotification(
+            Title: "CAS Binding Override Applied",
+            Summary: $"Question {id} CAS binding overridden by {operatorUserId}.",
+            Fields: new Dictionary<string, string>
+            {
+                ["question_id"] = id,
+                ["previous_status"] = previous.ToString(),
+                ["operator"] = operatorUserId,
+                ["ticket"] = request.Ticket,
+                ["reason"] = request.Reason
+            },
+            Severity: SecuritySeverity.High));
 
         return Results.Ok(new CasOverrideResponse(
             id, previous.ToString(), nameof(CasBindingStatus.OverriddenByOperator),

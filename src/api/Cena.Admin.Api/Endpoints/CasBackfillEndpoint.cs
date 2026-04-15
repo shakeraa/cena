@@ -15,6 +15,7 @@
 //     the response body.
 // =============================================================================
 
+using Cena.Actors.Cas;
 using Cena.Actors.Questions;
 using Cena.Admin.Api.QualityGate;
 using Cena.Infrastructure.Auth;

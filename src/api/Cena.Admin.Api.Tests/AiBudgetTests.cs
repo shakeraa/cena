@@ -12,6 +12,7 @@ using System.Net;
 using Cena.Infrastructure.Ai;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 using StackExchange.Redis;
 
@@ -62,10 +63,15 @@ public class AiBudgetTests
     [Fact]
     public void AiTokenBudgetService_IsRegistered()
     {
-        // Verify IAiTokenBudgetService can be resolved from a minimal DI container
+        // Verify IAiTokenBudgetService can be resolved from a minimal DI container.
+        // RDY-037 fix: the service's ctor needs IConfiguration for default-limit
+        // resolution — the previous test omitted it and NRE'd on resolution.
         var services = new ServiceCollection();
         var redis = Substitute.For<IConnectionMultiplexer>();
         services.AddSingleton(redis);
+        services.AddSingleton<IConfiguration>(
+            new ConfigurationBuilder().Build());
+        services.AddLogging();
         services.AddAiTokenBudget();
         var provider = services.BuildServiceProvider();
         var budgetService = provider.GetService<IAiTokenBudgetService>();

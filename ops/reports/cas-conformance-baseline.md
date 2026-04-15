@@ -1,6 +1,29 @@
 # CAS Conformance Baseline
 
-Target: ≥99% pass rate across the cases below via `ICasRouterService.VerifyAsync`. Used by `CasConformanceSuiteRunner` (nightly CI).
+**Target**: ≥99% pass rate across the concrete pairs below.
+**Enforced by**: `CasConformanceSuiteRunner` (nightly CI).
+**Status**: unmeasured — awaits first green nightly run against a reachable SymPy sidecar.
+
+---
+
+## Scope of the corpus (RDY-044 reconciliation)
+
+The conformance suite file `src/actors/Cena.Actors/Cas/CasConformanceSuite.cs` declares a **500-slot** skeleton. Of those slots:
+
+- **27 concrete pairs** are the hand-enumerated corpus below, each with a well-defined expected outcome (Ok / Failed / Unverifiable).
+- **~23 additional concrete pairs** live inside the suite file across the algebra/calculus/trig/unverifiable categories but are not yet listed here — they are part of the 50-pair "real" set the runner advertises.
+- **450 placeholders** are auto-generated slots filtered out by `CasConformanceSuiteRunner.RunCoreAsync(p => p.Category != "placeholder")`. They exist to reserve budget for Bagrut corpus ingestion.
+
+Effective runnable size today: **~50 pairs**. The 27 below are the durable written contract the runner's CI gate measures against; the remaining ~23 are implementation-file-resident and not yet promoted into this doc.
+
+## Runner modes (RDY-043)
+
+1. **Engine-agreement mode** — `RunAsync` / `RunCategoryAsync` hits MathNet and SymPy directly, measures **cross-engine agreement**. This is a platform-invariant check (two independent CASes must agree on simplifiable math).
+2. **Router mode** — `RunThroughRouterAsync` hits `ICasRouterService.VerifyAsync`, measures **correctness against the expected label**. This exercises the fallback ordering + circuit-breaker integration that the direct-engine mode bypasses.
+
+ADR-0032 §Enforcement names **router-mode** as the CI gate. Engine-agreement runs alongside as a leading indicator — a persistent engine-agreement drift flags an ADR-0032 §7 review before router-mode flips red.
+
+---
 
 Format: `id | operation | expressionA | expressionB | variable | expected_status`
 
@@ -53,6 +76,8 @@ Format: `id | operation | expressionA | expressionB | variable | expected_status
 
 ## Pass-rate target
 
-- Total: 27 cases
-- Required: ≥27 (100% for v1 baseline; drift to 99% acceptable once >100 cases land)
-- Enforced by: `CasConformanceSuiteRunner` (see `src/actors/Cena.Actors.Tests/Cas/`)
+- **Total written cases**: 27
+- **Runnable pairs (incl. file-resident)**: ~50
+- **Required**: 100% on the 27 written cases for v1; ≥99% on the full runnable set before Enforce flips in prod
+- **CI gate (ADR-0032)**: router-mode pass rate ≥99%, enforced by `.github/workflows/cas-nightly.yml`
+- **Measured baseline**: awaits first green nightly run — update this field with `<measured rate> @ <run id> <timestamp>` on first pass

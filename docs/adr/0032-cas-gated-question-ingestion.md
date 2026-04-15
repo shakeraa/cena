@@ -53,6 +53,152 @@ Two endpoints ship together:
 - **Negative**: CAS latency (p99 currently ≤150ms SymPy, ≤800ms NATS fallback) adds to ingestion path.
 - **Operational**: environments without a CAS engine must explicitly set `CENA_CAS_GATE_MODE=Off` or `Shadow`; default is `Enforce`.
 
+## §16 — Layering (RDY-037 addendum)
+
+The initial RDY-034/036 implementation placed the CAS gate contract
+(`ICasVerificationGate`, `CasVerificationGate`, `CasGateMode`,
+`MathContentDetector`, `CasGateExceptions`) in `Cena.Admin.Api` alongside the
+`QualityGate` service. That worked for the admin authoring path but left the
+ingestion path (`IngestionOrchestrator` in `Cena.Actors`) unable to reach the
+gate — `Cena.Actors` does not (and must not) reference `Cena.Admin.Api`. The
+result was two pre-existing direct writes to new `QuestionState` streams
+allow-listed via `KNOWN_VIOLATION_TODO` markers in the architecture test —
+ADR-0002 was locally enforced but globally bypassable.
+
+RDY-037 moves the CAS gate primitives down to the `Cena.Actors.Cas`
+**namespace** (inside the `Cena.Actors` project, under `src/actors/Cena.Actors/Cas/`),
+where `ICasRouterService`, `IMathNetVerifier`, and `SymPySidecarClient`
+already live. This placement reflects the domain status of CAS
+verification: per ADR-0002, CAS is a platform-level correctness
+invariant, not an HTTP-adapter concern. Every adapter (Admin.Api, Actors
+ingest pipeline, future hosts) can now reach the gate without a
+reverse-layer reference.
+
+**RDY-047 clarification (2026-04-15):** There is no separate
+`Cena.Actors.Cas.csproj` assembly — the gate primitives live inside
+`Cena.Actors` alongside the aggregates. Any consumer that references
+`Cena.Actors` gets the full aggregates surface. Separation into a
+dedicated project remains an option if a future adapter needs the
+invariant without the aggregates surface; until then, the "namespace
+inside the same project" shape is the load-bearing structure.
+
+### §16.1 — The single-writer invariant
+
+`ICasGatedQuestionPersister` (new, in `Cena.Actors.Cas`) is the ONE
+legitimate writer of new `QuestionState` streams in the repository. The
+architecture test `SeedLoaderMustUseQuestionBankServiceTest` now allow-lists
+only `CasGatedQuestionPersister.cs` plus the test file itself. Every other
+caller — `QuestionBankService.CreateQuestionAsync`, `IngestionOrchestrator`,
+`QuestionBankSeedData`, future AI-batch persistence, test fixtures — routes
+through `persister.PersistAsync`.
+
+The persister owns: (a) the CAS gate call (optional skip via
+`preComputedGateResult` when the caller already ran the gate to drive
+conditional auto-approval), (b) the event-stream append, (c) atomic storage
+of the `QuestionCasBinding` document in the same session, (d) optional
+companion documents (e.g., `ModerationAuditDocument`).
+
+### §16.2 — Ingestion-stage semantics
+
+The Bagrut OCR ingestion path produces open-ended questions whose correct
+answer is not yet known at ingestion time — classification/authoring fills
+that in later. The persister is called with `CorrectAnswerRaw = string.Empty`;
+the gate produces an `Unverifiable` binding. These questions cannot
+auto-approve (approval gate rejects missing/non-`Verified` bindings). A
+follow-up `CasBackfillEndpoint` run or manual re-author upgrades the binding
+to `Verified` once the answer lands.
+
+### §16.3 — SeedContext delegate
+
+`DatabaseSeeder.SeedAllAsync` gained a `Func<SeedContext, Task>[]` overload
+(legacy `Func<IDocumentStore, ILogger, Task>[]` kept as a thin wrapper) so
+seed delegates that need the CAS persister can resolve it via
+`ctx.Services.GetRequiredService<ICasGatedQuestionPersister>()`. Callers
+that don't need extra services (legacy seeds) use the old shape
+unchanged.
+
+### §16.4 — Rejected alternatives
+
+- **Leave primitives in `Cena.Admin.Api`, allow-list violations**: ships a
+  documented architectural hole. Rejected.
+- **New writer in `Cena.Infrastructure`, CAS gate call duplicated at each
+  caller**: pragmatic but leaks invariant enforcement to the edge. One
+  missed call equals a new bypass — the exact failure mode this addendum
+  closes. Rejected.
+
+## §17 — Correctness vs parseability (RDY-038)
+
+The initial RDY-034 implementation only issued `CasOperation.NormalForm` on
+the author's raw answer string. NormalForm simplifies the string and
+returns its canonical form — it does not compare the answer to anything.
+For stem `"Solve 2x+3=7"` with author answer `"x=99"`, NormalForm returns
+`"x=99"` and the gate marked the binding `Verified`. ADR-0002 says "no
+math reaches students unverified"; what shipped proved the answer *parsed*,
+not that it was *correct*.
+
+`IStemSolutionExtractor` (regex-backed, best-effort) now extracts the
+stem's expected solution. The gate routes:
+
+- **Extracted equation** — builds residual `(lhs) − (rhs)` substituted
+  with the author's answer, sends `CasOperation.Equivalence` vs `0`.
+  Substitution is symbolic (SymPy), not numeric.
+- **Extracted direct expression** — sends `CasOperation.Equivalence`
+  between author answer and the extracted expression.
+- **Non-extractable stem** (prose / word problem) — falls through to
+  NormalForm as a parseability probe, **but the binding status is
+  `Unverifiable`, not `Verified`**. Such questions cannot auto-approve
+  and must be routed to manual review.
+
+Rule: the gate only marks a binding `Verified` when it ran a stem-driven
+Equivalence check. Parseability alone is never enough.
+
+## §18 — Transactional boundary (RDY-039)
+
+`ICasGatedQuestionPersister` now exposes a session-aware overload:
+
+```csharp
+Task<GatedPersistOutcome> PersistAsync(
+    IDocumentSession session,         // caller-owned
+    string questionId,
+    object creationEvent,
+    GatedPersistContext context, ...);
+```
+
+The session-aware overload appends events, stores the binding, and stores
+companion documents on the caller's session, then **returns without
+calling `SaveChangesAsync`**. Caller owns the commit — so the question
+stream + binding + any pipeline document (e.g. `PipelineItemDocument`
+from `IngestionOrchestrator`) commit atomically or roll back together.
+
+The session-less overload is preserved as a thin wrapper that opens + saves
+its own session for callers without composable writes (admin UI authoring,
+seed data). It delegates to the session-aware overload internally.
+
+## §19 — No caller-supplied gate results (RDY-041)
+
+`preComputedGateResult` is removed from `ICasGatedQuestionPersister`.
+Callers that already invoked `ICasVerificationGate` (e.g.
+`QuestionBankService.CreateQuestionAsync`, which needs the outcome to
+decide on auto-approval events) now rely on the gate's own idempotency
+cache — the second call against the same `(QuestionId, CorrectAnswerHash)`
+hits `CacheHits` and returns without a sidecar round-trip. Net: +0 CAS
+calls, forgery surface closed.
+
+## §20 — Binding coverage startup check (RDY-040)
+
+`CasBindingStartupCheck` (pre-RDY-040) probed the CAS engine with `x + 1`
+— it checked *liveness*, not *data*. `CasBindingCoverageStartupCheck`
+(new) additionally queries `QuestionState` + `QuestionCasBinding`:
+
+- In **Enforce** mode, `published_math > verified_bindings` calls
+  `IHostApplicationLifetime.StopApplication()` — the Admin API refuses
+  to serve traffic.
+- In **Shadow** mode, same condition logs `[STARTUP_WARN]` and continues.
+- `CENA_CAS_STARTUP_CHECK=skip` bypasses both checks with a `LogCritical`.
+
+Gauge `cena_cas_binding_coverage_ratio` (verified / published) is emitted
+on every successful query and should live on the Grafana CAS dashboard.
+
 ## Open items
 
 - k6 load test for sustained ingestion with CAS enforcement — deferred to post-pilot.

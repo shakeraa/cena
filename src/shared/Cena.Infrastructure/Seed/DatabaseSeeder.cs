@@ -28,13 +28,34 @@ public static class DatabaseSeeder
     /// <param name="simulatedStudentCount">Number of simulated students (default 300).</param>
     /// <param name="additionalSeeds">
     /// Optional extra seed functions (e.g., QuestionBankSeedData.SeedQuestionsAsync)
-    /// that depend on types not available in Cena.Infrastructure.
+    /// that depend on types not available in Cena.Infrastructure. Legacy
+    /// signature that only needs store + logger.
     /// </param>
-    public static async Task SeedAllAsync(
+    public static Task SeedAllAsync(
         IDocumentStore store,
         ILogger logger,
         int simulatedStudentCount = 300,
         params Func<IDocumentStore, ILogger, Task>[] additionalSeeds)
+        => SeedAllAsync(
+            store,
+            logger,
+            services: null,
+            simulatedStudentCount: simulatedStudentCount,
+            additionalSeeds: additionalSeeds.Select<Func<IDocumentStore, ILogger, Task>, Func<SeedContext, Task>>(
+                legacy => ctx => legacy(ctx.Store, ctx.Logger)).ToArray());
+
+    /// <summary>
+    /// RDY-037: overload that accepts an <see cref="IServiceProvider"/> so
+    /// optional seed delegates that need extra services (e.g.
+    /// <c>ICasGatedQuestionPersister</c> for the question bank seeder) can
+    /// resolve them via <see cref="SeedContext.Services"/>.
+    /// </summary>
+    public static async Task SeedAllAsync(
+        IDocumentStore store,
+        ILogger logger,
+        IServiceProvider? services,
+        int simulatedStudentCount = 300,
+        params Func<SeedContext, Task>[] additionalSeeds)
     {
         logger.LogInformation("=== Database seeding started ===");
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -74,14 +95,26 @@ public static class DatabaseSeeder
         await AdminAnalyticsSeedData.SeedAllAsync(store, logger);
 
         // 7. Additional seeds (simulation events, questions, etc.)
+        //    RDY-037: seeds receive SeedContext so they can resolve services
+        //    (e.g. the CAS-gated question persister) via Services when needed.
+        var ctx = new SeedContext(
+            store,
+            services ?? EmptyServiceProvider.Instance,
+            logger);
         foreach (var seed in additionalSeeds)
         {
-            await seed(store, logger);
+            await seed(ctx);
         }
 
         sw.Stop();
         logger.LogInformation(
             "=== Database seeding complete in {Duration}ms ===",
             sw.ElapsedMilliseconds);
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public static readonly EmptyServiceProvider Instance = new();
+        public object? GetService(Type serviceType) => null;
     }
 }

@@ -23,7 +23,7 @@ public class AnalysisJobActorTests
         // because Marten stores events with snake_case aliases.
         
         var actorSource = File.ReadAllText(
-            Path.Combine(AppContext.BaseDirectory, "../../../../../Cena.Actors/Services/AnalysisJobActor.cs"));
+            Path.Combine(AppContext.BaseDirectory, "../../../../Cena.Actors/Services/AnalysisJobActor.cs"));
         
         // Should contain the snake_case version
         Assert.Contains("\"concept_attempted_v1\"", actorSource);

@@ -13,7 +13,6 @@
 
 using System.Diagnostics.Metrics;
 using Cena.Actors.Cas;
-using Cena.Admin.Api.Services;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 

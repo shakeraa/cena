@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — CAS Gate Mode Provider (RDY-036 §12, ADR-0002)
+// Cena Platform — CAS Gate Mode Provider (RDY-036 §12 / RDY-037, ADR-0002)
 //
 // The CAS ingestion gate can run in three modes:
 //   - Off:     gate is disabled; questions ingest without CAS calls.
@@ -9,13 +9,16 @@
 //
 // Mode is resolved from env CENA_CAS_GATE_MODE first, then
 // configuration key Cas:GateMode. Default = Enforce.
+//
+// RDY-037: relocated from Cena.Admin.Api.Services → Cena.Actors.Cas so the
+// mode provider lives in the same layer as ICasRouterService + the gate.
 // =============================================================================
 
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
-namespace Cena.Admin.Api.Services;
+namespace Cena.Actors.Cas;
 
 /// <summary>RDY-036 §12: CAS gate rollout mode.</summary>
 public enum CasGateMode
