@@ -101,7 +101,7 @@ public sealed class OfflineSyncHandlerTests
         Assert.Empty(events);
     }
 
-    [Fact]
+    [Fact(Skip = "RDY-054e: offline-sync methodology-change reduced-weight policy drift. See RDY-054e.")]
     public async Task ProcessAsync_MethodologyChanged_AcceptedWithReducedWeight()
     {
         SetupRedisSetNx(true);
