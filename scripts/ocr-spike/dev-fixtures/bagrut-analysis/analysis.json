@@ -1,0 +1,33 @@
+{
+  "schema_version": "1.0",
+  "analysis_kind": "bagrut_structural_aggregate",
+  "generated_at": "2026-04-16T12:00:00Z",
+  "source": "scripts/ocr-spike/results/real_corpus_triage.json",
+  "summary": {
+    "total_pdfs": 151,
+    "total_pages": 3490,
+    "text_extractable_chars": 475009,
+    "by_pdf_type": {
+      "mixed": 40,
+      "scanned_bad_ocr": 30,
+      "text": 81
+    },
+    "by_unit": {
+      "3u": 39,
+      "4u": 40,
+      "5u": 68,
+      "unknown": 4
+    }
+  },
+  "text_shortcut_rate": 0.536,
+  "requires_ocr_rate": 0.464,
+  "recreation_inputs": {
+    "note": "Feed this aggregate into ReferenceCalibratedGenerationService. Per-question topic/difficulty/Bloom will be filled in by the structural analyzer (RDY-019b §2); this fixture is the outer shell + cost-model data.",
+    "topic_weights": {
+      "_pending": "Populated by the structural analyzer once it runs on extracted text. Shape will be { topic: { share, difficulty_dist, bloom_dist, format_dist } }"
+    }
+  },
+  "_dev_fixture": {
+    "notes": "Aggregate only — no question-level content. Safe to commit. The detailed analysis.json produced by the admin ingestion pipeline stays git-ignored under corpus/bagrut/reference/."
+  }
+}

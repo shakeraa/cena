@@ -1,0 +1,45 @@
+{
+  "schema_version": "1.0",
+  "description": "PDF triage verdict samples — one per PdfType. Hand to pdf-triage unit tests.",
+  "samples": [
+    {
+      "pdf_type": "mixed",
+      "pages": 20,
+      "text_chars": 8877,
+      "image_count": 1,
+      "hebrew_ratio": 0.644,
+      "gibberish_ratio": 0.258,
+      "source_filename_hash": "9b87c90ff259"
+    },
+    {
+      "pdf_type": "scanned_bad_ocr",
+      "pages": 2,
+      "text_chars": 2579,
+      "image_count": 2,
+      "hebrew_ratio": 0.351,
+      "gibberish_ratio": 0.557,
+      "source_filename_hash": "80d95667f286"
+    },
+    {
+      "pdf_type": "text",
+      "pages": 5,
+      "text_chars": 4424,
+      "image_count": 0,
+      "hebrew_ratio": 0.847,
+      "gibberish_ratio": 0.0,
+      "source_filename_hash": "c1c73a9539bf"
+    },
+    {
+      "pdf_type": "encrypted",
+      "pages": 0,
+      "text_chars": 0,
+      "image_count": 0,
+      "hebrew_ratio": 0.0,
+      "gibberish_ratio": 0.0,
+      "source_filename_hash": "synthetic_"
+    }
+  ],
+  "_dev_fixture": {
+    "notes": "Sourced from live triage of 151 user-provided PDFs; filenames are SHA-256 prefixed so nothing identifiable leaks."
+  }
+}
