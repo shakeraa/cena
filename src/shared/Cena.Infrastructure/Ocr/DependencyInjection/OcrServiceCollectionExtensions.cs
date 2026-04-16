@@ -43,13 +43,24 @@ public static class OcrServiceCollectionExtensions
     {
         services.TryAddSingleton<IPdfTriage, Cena.Infrastructure.Ocr.PdfTriage.PdfTriage>();
 
+        // Real concrete layers — no stubs.
+        services.TryAddSingleton<ILayer0Preprocess, Layer0Preprocess>();
+        services.TryAddSingleton<ILayer2cFigureExtraction, Layer2cFigureExtraction>();
         services.TryAddSingleton<ILayer3Reassemble, Layer3Reassemble>();
         services.TryAddSingleton<ILayer4ConfidenceGate, Layer4ConfidenceGate>();
         services.TryAddSingleton<ILayer5CasValidation, Layer5CasValidation>();
 
-        var options = new ConfidenceGateOptions();
-        configuration?.GetSection("Ocr:ConfidenceGate").Bind(options);
-        services.TryAddSingleton(options);
+        var gateOptions = new ConfidenceGateOptions();
+        configuration?.GetSection("Ocr:ConfidenceGate").Bind(gateOptions);
+        services.TryAddSingleton(gateOptions);
+
+        var layer0Options = new Layer0PreprocessOptions();
+        configuration?.GetSection("Ocr:Layer0").Bind(layer0Options);
+        services.TryAddSingleton(layer0Options);
+
+        var figureStorage = new FigureStorageOptions();
+        configuration?.GetSection("Ocr:FigureStorage").Bind(figureStorage);
+        services.TryAddSingleton(figureStorage);
 
         services.TryAddScoped<IOcrCascadeService, OcrCascadeService>();
         services.TryAddSingleton(TimeProvider.System);

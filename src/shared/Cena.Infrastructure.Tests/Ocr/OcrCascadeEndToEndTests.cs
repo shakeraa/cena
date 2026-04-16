@@ -280,18 +280,22 @@ public class OcrCascadeEndToEndTests
 
         // The dep-free brain services resolve (no construction-time deps).
         Assert.NotNull(provider.GetRequiredService<IPdfTriage>());
+        Assert.NotNull(provider.GetRequiredService<ILayer0Preprocess>());
+        Assert.NotNull(provider.GetRequiredService<ILayer2cFigureExtraction>());
         Assert.NotNull(provider.GetRequiredService<ILayer3Reassemble>());
         Assert.NotNull(provider.GetRequiredService<ConfidenceGateOptions>());
 
-        // ILatexValidator is not registered — this is the no-stub rule.
+        // External-dependency services are NOT registered by core — callers
+        // must supply real impls for:
+        //   - ILatexValidator           → CasRouterLatexValidator (Actors)
+        //   - ILayer1Layout             → SuryaSidecarClient (needs OcrSidecarOptions)
+        //   - ILayer2aTextOcr           → TesseractLocalRunner
+        //   - ILayer2bMathOcr           → Pix2TexSidecarClient
+        //   - IMathpixRunner / IGemini… → MathpixRunner / GeminiVisionRunner
         Assert.Null(provider.GetService<ILatexValidator>());
-
-        // Neither are the wrapper layers — caller must supply real impls.
-        Assert.Null(provider.GetService<ILayer0Preprocess>());
         Assert.Null(provider.GetService<ILayer1Layout>());
         Assert.Null(provider.GetService<ILayer2aTextOcr>());
         Assert.Null(provider.GetService<ILayer2bMathOcr>());
-        Assert.Null(provider.GetService<ILayer2cFigureExtraction>());
 
         // Resolving ILayer5CasValidation or the orchestrator must throw —
         // intentional fail-fast: no silent stubs, no zombie cascades.
