@@ -26,6 +26,12 @@ using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Moderation;
+using Cena.Infrastructure.Ocr;
+using Cena.Infrastructure.Ocr.DependencyInjection;
+using Cena.Infrastructure.Ocr.Layers;
+using Cena.Infrastructure.Ocr.Runners;
+using Cena.Actors.Cas;
+using Microsoft.Extensions.Options;
 using Cena.Infrastructure.Seed;
 using Marten;
 using Polly;
@@ -302,7 +308,64 @@ public partial class Program
     
     builder.Services.AddSingleton<IIncidentReportService, IncidentReportService>();
     builder.Services.AddSingleton<IContentModerationPipeline, ContentModerationPipeline>();
-    
+
+    // ---- OCR cascade (ADR-0033, RDY-OCR-PORT) ----
+    // Real implementations across the board. NO STUBS.
+    //   - AddOcrCascadeCore wires: PdfTriage, Layer0, Layer2c, Layer3/4/5,
+    //     ConfidenceGateOptions, Layer0PreprocessOptions, FigureStorageOptions,
+    //     TimeProvider, IOcrCascadeService (scoped).
+    //   - AddOcrCascadeWithCasValidation bridges ILatexValidator → the existing
+    //     3-tier CasRouterService registered above (line ~238).
+    //   - Wrapper layers registered per deps:
+    //       Layer 2a Tesseract  — local binary (always available in our envs)
+    //       Layer 1 Surya gRPC  — sidecar channel
+    //       Layer 2b Pix2Tex    — sidecar channel
+    //       Mathpix / Gemini    — opt-in per configured credentials
+    builder.Services.AddOcrCascadeCore(builder.Configuration);
+    builder.Services.AddOcrCascadeWithCasValidation();
+
+    builder.Services.Configure<TesseractOptions>(builder.Configuration.GetSection("Ocr:Tesseract"));
+    builder.Services.AddSingleton<ILayer2aTextOcr>(sp =>
+    {
+        var opts = sp.GetRequiredService<IOptions<TesseractOptions>>().Value;
+        var log  = sp.GetService<ILogger<TesseractLocalRunner>>();
+        return new TesseractLocalRunner(opts, log);
+    });
+
+    builder.Services.Configure<OcrSidecarOptions>(builder.Configuration.GetSection("Ocr:Sidecar"));
+    builder.Services.AddSingleton<ILayer1Layout, SuryaSidecarClient>();
+    builder.Services.AddSingleton<ILayer2bMathOcr, Pix2TexSidecarClient>();
+
+    var mathpixAppId = builder.Configuration["Ocr:Mathpix:AppId"];
+    if (!string.IsNullOrWhiteSpace(mathpixAppId))
+    {
+        builder.Services.Configure<MathpixOptions>(builder.Configuration.GetSection("Ocr:Mathpix"));
+        builder.Services.AddHttpClient<IMathpixRunner, MathpixRunner>()
+            .AddPolicyHandler(Policy
+                .Handle<HttpRequestException>()
+                .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)
+                .WaitAndRetryAsync(3, a => TimeSpan.FromMilliseconds(250 * Math.Pow(2, a))))
+            .AddPolicyHandler(Policy
+                .Handle<HttpRequestException>()
+                .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)
+                .CircuitBreakerAsync(3, TimeSpan.FromSeconds(30)));
+    }
+
+    var geminiApiKey = builder.Configuration["Ocr:Gemini:ApiKey"];
+    if (!string.IsNullOrWhiteSpace(geminiApiKey))
+    {
+        builder.Services.Configure<GeminiVisionOptions>(builder.Configuration.GetSection("Ocr:Gemini"));
+        builder.Services.AddHttpClient<IGeminiVisionRunner, GeminiVisionRunner>()
+            .AddPolicyHandler(Policy
+                .Handle<HttpRequestException>()
+                .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)
+                .WaitAndRetryAsync(3, a => TimeSpan.FromMilliseconds(250 * Math.Pow(2, a))))
+            .AddPolicyHandler(Policy
+                .Handle<HttpRequestException>()
+                .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)
+                .CircuitBreakerAsync(3, TimeSpan.FromSeconds(30)));
+    }
+
     // ---- Firebase Auth + Authorization ----
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddFirebaseAuth(builder.Configuration);

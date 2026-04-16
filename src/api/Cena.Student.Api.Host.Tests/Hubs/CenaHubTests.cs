@@ -10,6 +10,7 @@ using Cena.Actors.Sessions;
 using Cena.Api.Contracts.Hub;
 using Cena.Api.Host.Hubs;
 using Microsoft.AspNetCore.SignalR;
+using Microsoft.Extensions.Logging;
 using Moq;
 using NATS.Client.Core;
 
