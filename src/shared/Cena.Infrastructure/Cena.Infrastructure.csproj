@@ -22,4 +22,26 @@
     <PackageReference Include="StackExchange.Redis" Version="2.12.8" />
   </ItemGroup>
 
+  <!-- ADR-0033 OCR cascade runtime deps -->
+  <ItemGroup>
+    <!-- PDF triage (Layer 0) — pure C#, no native bindings -->
+    <PackageReference Include="PdfPig" Version="0.1.9" />
+    <!-- gRPC client for the OCR sidecar (Layer 1 + 2b) -->
+    <PackageReference Include="Grpc.Net.Client" Version="2.66.0" />
+    <PackageReference Include="Google.Protobuf" Version="3.28.2" />
+    <PackageReference Include="Grpc.Tools" Version="2.66.0">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <!-- gRPC stubs generated from the sidecar's proto at build time. Single
+       source of truth: docker/ocr-sidecar/app/ocr.proto. -->
+  <ItemGroup>
+    <Protobuf Include="..\..\..\docker\ocr-sidecar\app\ocr.proto"
+              GrpcServices="Client"
+              ProtoRoot="..\..\..\docker\ocr-sidecar\app\"
+              Link="Ocr\Grpc\ocr.proto" />
+  </ItemGroup>
+
 </Project>
