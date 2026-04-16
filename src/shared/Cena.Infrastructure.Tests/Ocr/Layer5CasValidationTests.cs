@@ -143,10 +143,17 @@ public class Layer5CasValidationTests
     }
 
     [Fact]
-    public async Task NullLatexValidator_Marks_Every_Block_Failed()
+    public async Task Validator_That_Rejects_Everything_Marks_All_Failed()
     {
-        // Validates our fail-closed default.
-        var layer = new Layer5CasValidation(new NullLatexValidator());
+        // Regression guard for the CAS-backed validator: when CAS returns
+        // Parsed=false for every block (e.g. circuit breaker open), Layer 5
+        // must mark them all CAS-failed so the cascade's human-review path
+        // kicks in. No mocks in production — only here, test-side.
+        var validator = Substitute.For<ILatexValidator>();
+        validator.ValidateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new LatexValidationResult(false, null, "cas_circuit_open"));
+
+        var layer = new Layer5CasValidation(validator);
 
         var result = await layer.RunAsync(
             new[] { Math("3x+5=14"), Math(@"\sin(x)+\cos(x)") },

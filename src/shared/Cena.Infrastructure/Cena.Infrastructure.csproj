@@ -26,6 +26,9 @@
   <ItemGroup>
     <!-- PDF triage (Layer 0) — pure C#, no native bindings -->
     <PackageReference Include="PdfPig" Version="0.1.9" />
+    <!-- Image preprocessing (Layer 0) + figure cropping (Layer 2c) — pure managed -->
+    <PackageReference Include="SixLabors.ImageSharp" Version="3.1.10" />
+    <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
     <!-- gRPC client for the OCR sidecar (Layer 1 + 2b) -->
     <PackageReference Include="Grpc.Net.Client" Version="2.66.0" />
     <PackageReference Include="Google.Protobuf" Version="3.28.2" />

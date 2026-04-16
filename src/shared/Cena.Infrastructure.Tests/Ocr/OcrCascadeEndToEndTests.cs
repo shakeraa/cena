@@ -52,15 +52,14 @@ public class OcrCascadeEndToEndTests
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.AddOcrCascadeCore();   // registers brain + NullLatexValidator
+        services.AddOcrCascadeCore();   // registers brain (no stub ILatexValidator)
 
-        // Override NullLatexValidator if the test supplies one
-        if (validatorFactory is not null)
-        {
-            services.Replace(ServiceDescriptor.Singleton<ILatexValidator>(_ => validatorFactory()));
-        }
+        // Tests supply an ILatexValidator — production code wires the real
+        // CasRouterLatexValidator via AddOcrCascadeWithCasValidation().
+        var validator = validatorFactory?.Invoke() ?? Substitute.For<ILatexValidator>();
+        services.AddSingleton(validator);
 
-        // Register the mock wrapper layers
+        // Register mock wrapper layers — tests-only mocks, not production stubs.
         var l0 = layer0Factory?.Invoke() ?? Substitute.For<ILayer0Preprocess>();
         var l1 = layer1Factory?.Invoke() ?? Substitute.For<ILayer1Layout>();
         var l2a = layer2aFactory?.Invoke() ?? Substitute.For<ILayer2aTextOcr>();
@@ -76,9 +75,9 @@ public class OcrCascadeEndToEndTests
         var provider = services.BuildServiceProvider();
         using var scope = provider.CreateScope();
         var svc = scope.ServiceProvider.GetRequiredService<IOcrCascadeService>();
-        var validator = scope.ServiceProvider.GetRequiredService<ILatexValidator>();
+        var resolvedValidator = scope.ServiceProvider.GetRequiredService<ILatexValidator>();
 
-        return new Wiring(svc, l0, l1, l2a, l2b, l2c, validator);
+        return new Wiring(svc, l0, l1, l2a, l2b, l2c, resolvedValidator);
     }
 
     // -------------------------------------------------------------------------
@@ -218,11 +217,17 @@ public class OcrCascadeEndToEndTests
     }
 
     [Fact]
-    public async Task End_To_End_With_NullLatexValidator_Marks_CAS_Failures()
+    public async Task End_To_End_With_Rejecting_Validator_Marks_CAS_Failures()
     {
-        // Uses the AddOcrCascadeCore() default (NullLatexValidator) — proves
-        // the fail-closed wiring actually reaches Layer 5.
-        var w = BuildWiring();
+        // Validator rejects every block — simulates the CAS circuit open state.
+        // Proves Layer 5 → orchestrator → human_review_required wire-up.
+        var w = BuildWiring(validatorFactory: () =>
+        {
+            var v = Substitute.For<ILatexValidator>();
+            v.ValidateAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+                .Returns(new LatexValidationResult(false, null, "cas_circuit_open"));
+            return v;
+        });
         WireHappyPathLayers(w);
 
         var result = await w.Service.RecognizeAsync(
@@ -262,29 +267,39 @@ public class OcrCascadeEndToEndTests
     }
 
     [Fact]
-    public void DI_AddOcrCascadeCore_Registers_Expected_Services()
+    public void DI_AddOcrCascadeCore_Registers_Brain_Without_Stub_Defaults()
     {
+        // AddOcrCascadeCore() must register ONLY the pure-C# brain. It MUST
+        // NOT register any stub defaults (NO STUBS rule). Callers supply the
+        // remaining real implementations.
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddOcrCascadeCore();
 
-        // Must register stubs for wrapper layers to build the service
-        services.AddSingleton(Substitute.For<ILayer0Preprocess>());
-        services.AddSingleton(Substitute.For<ILayer1Layout>());
-        services.AddSingleton(Substitute.For<ILayer2aTextOcr>());
-        services.AddSingleton(Substitute.For<ILayer2bMathOcr>());
-        services.AddSingleton(Substitute.For<ILayer2cFigureExtraction>());
-
         var provider = services.BuildServiceProvider();
 
+        // The dep-free brain services resolve (no construction-time deps).
         Assert.NotNull(provider.GetRequiredService<IPdfTriage>());
         Assert.NotNull(provider.GetRequiredService<ILayer3Reassemble>());
-        Assert.NotNull(provider.GetRequiredService<ILayer4ConfidenceGate>());
-        Assert.NotNull(provider.GetRequiredService<ILayer5CasValidation>());
-        Assert.NotNull(provider.GetRequiredService<ILatexValidator>());
         Assert.NotNull(provider.GetRequiredService<ConfidenceGateOptions>());
 
+        // ILatexValidator is not registered — this is the no-stub rule.
+        Assert.Null(provider.GetService<ILatexValidator>());
+
+        // Neither are the wrapper layers — caller must supply real impls.
+        Assert.Null(provider.GetService<ILayer0Preprocess>());
+        Assert.Null(provider.GetService<ILayer1Layout>());
+        Assert.Null(provider.GetService<ILayer2aTextOcr>());
+        Assert.Null(provider.GetService<ILayer2bMathOcr>());
+        Assert.Null(provider.GetService<ILayer2cFigureExtraction>());
+
+        // Resolving ILayer5CasValidation or the orchestrator must throw —
+        // intentional fail-fast: no silent stubs, no zombie cascades.
+        Assert.Throws<InvalidOperationException>(() =>
+            provider.GetRequiredService<ILayer5CasValidation>());
+
         using var scope = provider.CreateScope();
-        Assert.NotNull(scope.ServiceProvider.GetRequiredService<IOcrCascadeService>());
+        Assert.Throws<InvalidOperationException>(() =>
+            scope.ServiceProvider.GetRequiredService<IOcrCascadeService>());
     }
 }
