@@ -22,6 +22,20 @@ Thumbs.db
 # ── Docs assets (large/binary) ──
 docs/example-images/
 
+# ── OCR spike fixtures (reference-only, never committed) ──
+# Bagrut Ministry PDFs are public but copyright stays with MoE — per the
+# `bagrut-reference-only` memory (2026-04-15) student-facing items are
+# AI-authored CAS-gated recreations, never raw Ministry text. Fixtures
+# used for the OCR evaluation spike (RDY-019-OCR-SPIKE / t_a617c472e9f6)
+# are kept local-only.
+corpus/ocr-fixtures/
+scripts/ocr-spike/fixtures/
+scripts/ocr-spike/.venv/
+scripts/ocr-spike/results/
+scripts/ocr-spike/cache/
+scripts/ocr-spike/**/__pycache__/
+scripts/ocr-spike/.claude-flow/
+
 # ── Playwright MCP snapshots (review reference, not source) ──
 docs/reviews/playwright-mcp-snapshots/
 .playwright-mcp/

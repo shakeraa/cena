@@ -24,12 +24,23 @@ New file: `scripts/bagrut-scraper.py`
 - Store raw PDFs under `corpus/bagrut/reference/<year>/<track>/<paper>.pdf` — **git-ignored, local-only, never shipped**
 - Checkpointed so partial runs resume
 
-### 2. OCR + structural extraction
+### 2. Text extraction + OCR fallback
 
-- Use existing Gemini/Mathpix HTTP clients (resilience via `HttpPolicies.cs` from RDY-012)
-- Env vars: `GEMINI_API_KEY`, `MATHPIX_APP_ID`, `MATHPIX_APP_KEY`
-- Extract per-question: topic cluster, difficulty signal, Bloom level, item format (multiple choice / free response / proof / computation)
-- Output `corpus/bagrut/reference/analysis.json` — structural summary **only**. Exam text is NOT persisted to Marten, NOT ingested into QuestionBank.
+**Architecture change (2026-04-16)**: per [RDY-019-OCR-SPIKE](RDY-019-ocr-spike.md) findings, the Ministry PDFs already ship with clean Hebrew text layers in ~90 % of cases (spike measured 9/10 real PDFs at 80–87 % Hebrew, 0 % gibberish). Extraction therefore runs the OCR cascade only as a fallback, not as the default path. The cascade is defined in [ADR-0033](../../docs/adr/0033-cena-ocr-stack.md) and shared with Surface A (student photos).
+
+Per-file flow:
+
+1. **Triage**: `scripts/ocr-spike/pdf_triage.py` classifies each PDF as `text` / `image_only` / `mixed` / `scanned_bad_ocr` / `encrypted`.
+2. **If `text`**: extract via `pypdf` — no OCR, no cloud calls.
+3. **Else**: hand to the cascade service (`OcrCascadeService` — C# port of `scripts/ocr-spike/pipeline_prototype.py`).
+4. **Cascade internals**: Surya layout → Tesseract/Surya text + pix2tex math → confidence gate at τ=0.65 → Mathpix/Gemini fallback for low-confidence regions only → SymPy CAS validation (ADR-0002).
+
+Cloud dependencies become **opt-in** rather than blocking:
+- Mathpix / Gemini keys are used *only when* Layer 4 fires. Projected to fire on <5 % of pages.
+- Projected spend for the 640-page scrape: **< $1** (vs ~$2.56 cloud-first).
+- RDY-019b no longer blocks on API-key provisioning.
+
+Extract per-question: topic cluster, difficulty signal, Bloom level, item format (multiple choice / free response / proof / computation). Output `corpus/bagrut/reference/analysis.json` — structural summary **only**. Exam text is NOT persisted to Marten, NOT ingested into QuestionBank.
 
 ### 3. Coverage-calibrated recreation pipeline
 
@@ -44,12 +55,14 @@ New file: `scripts/bagrut-scraper.py`
 
 ## Files to Modify
 
-- New: `scripts/bagrut-scraper.py`
+- New: `scripts/bagrut-scraper.py` (network-mode scraper — a superset of `scripts/ocr-spike/bagrut_scrape.py` already in main)
 - New: `scripts/bagrut-reference-analyzer.py`
-- New: `corpus/bagrut/reference/` (git-ignored; add `.gitignore` entry)
+- New: `corpus/bagrut/reference/` (git-ignored; `.gitignore` already covers `corpus/` from RDY-019-OCR-SPIKE)
+- New: `src/shared/Cena.Infrastructure/Ocr/OcrCascadeService.cs` — C# port of [`scripts/ocr-spike/pipeline_prototype.py`](../../scripts/ocr-spike/pipeline_prototype.py); shared with Surface A
+- New: `src/shared/Cena.Infrastructure/Ocr/OcrContextHints.cs` — DTO mirroring the Python `OcrContextHints` dataclass
 - New: `src/shared/Cena.Infrastructure/Content/ReferenceCalibratedGenerationService.cs`
-- Edit: `src/api/Cena.Admin.Api/Program.cs` (register service)
-- Tests: scraper unit, analyzer fixture test, recreation pipeline integration (mock CAS router)
+- Edit: `src/api/Cena.Admin.Api/Program.cs` (register cascade + recreation services)
+- Tests: scraper unit, analyzer fixture test, recreation pipeline integration (mock CAS router), cascade integration on frozen fixture subset
 
 ## Acceptance Criteria
 
