@@ -110,11 +110,18 @@ public sealed record Layer3Output(
 public interface ILayer4ConfidenceGate
 {
     /// <summary>
-    /// Inspect per-region confidence. Blocks below τ go through cloud fallback
-    /// (Mathpix for math, Gemini for text). Catastrophic failure surfaces as
-    /// human-review required + catastrophic reason.
+    /// Inspect per-region confidence. Blocks below τ are cropped from the
+    /// corresponding page (<paramref name="pageBytes"/>) using the block's
+    /// BoundingBox.Page + coordinates, then routed through the cloud fallback
+    /// runners (Mathpix for math, Gemini for text). Catastrophic failure
+    /// surfaces as human-review required + catastrophic reason.
     /// </summary>
+    /// <param name="pageBytes">
+    /// Preprocessed page images from Layer 0, 1-indexed by BoundingBox.Page.
+    /// Empty list is valid (no rescue possible — runners are skipped).
+    /// </param>
     Task<Layer4Output> RunAsync(
+        IReadOnlyList<byte[]> pageBytes,
         IReadOnlyList<OcrTextBlock> textBlocks,
         IReadOnlyList<OcrMathBlock> mathBlocks,
         CascadeSurface surface,

@@ -101,7 +101,7 @@ public class OcrCascadeServiceTests
         l3.Run(default!, default!, default!)
             .ReturnsForAnyArgs(new Layer3Output(textBlocks, mathBlocks, figures, 0.01));
 
-        l4.RunAsync(default!, default!, default, default)
+        l4.RunAsync(default!, default!, default!, default, default)
             .ReturnsForAnyArgs(new Layer4Output(
                 textBlocks, mathBlocks,
                 FallbacksFired: Array.Empty<string>(),
@@ -189,6 +189,7 @@ public class OcrCascadeServiceTests
             Arg.Any<IReadOnlyList<OcrMathBlock>>(),
             Arg.Any<IReadOnlyList<OcrFigureRef>>());
         await l4.Received(1).RunAsync(
+            Arg.Any<IReadOnlyList<byte[]>>(),
             Arg.Any<IReadOnlyList<OcrTextBlock>>(),
             Arg.Any<IReadOnlyList<OcrMathBlock>>(),
             Arg.Any<CascadeSurface>(), Arg.Any<CancellationToken>());
@@ -236,6 +237,7 @@ public class OcrCascadeServiceTests
             Arg.Any<IReadOnlyList<OcrMathBlock>>(),
             Arg.Any<IReadOnlyList<OcrFigureRef>>());
         await l4.DidNotReceiveWithAnyArgs().RunAsync(
+            Arg.Any<IReadOnlyList<byte[]>>(),
             Arg.Any<IReadOnlyList<OcrTextBlock>>(),
             Arg.Any<IReadOnlyList<OcrMathBlock>>(),
             Arg.Any<CascadeSurface>(), Arg.Any<CancellationToken>());

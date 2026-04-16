@@ -127,7 +127,10 @@ public sealed class OcrCascadeService : IOcrCascadeService
         timings["layer_3_reassemble"] = layer3.LatencySeconds;
 
         // ── Layer 4 confidence gate ──────────────────────────────────────
+        // Pass page bytes so Layer 4 can crop bboxes and feed them to the
+        // cloud fallback runners (Mathpix / Gemini).
         var layer4 = await _layer4.RunAsync(
+            layer0.PreprocessedPageBytes,
             layer3.OrderedTextBlocks,
             layer3.OrderedMathBlocks,
             surface, ct).ConfigureAwait(false);

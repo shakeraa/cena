@@ -2,24 +2,25 @@
 // Cena Platform — Layer 4 Confidence Gate (ADR-0033)
 //
 // Inspects per-region confidence. Regions below τ get rescued via the
-// corresponding cloud runner (Mathpix for math, Gemini for text). If the
-// runner's circuit breaker is open (OcrCircuitOpenException) we pass the
-// original block through untouched — a degraded cascade is still a
-// functional one.
+// corresponding cloud runner (Mathpix for math, Gemini for text). To rescue,
+// Layer 4 crops the bbox from the appropriate preprocessed page bytes via
+// ImageSharp, then hands the crop to the runner.
 //
-// Catastrophic-failure verdict is surface-aware:
-//   Student (A): avg < 0.30 → return 422 at the endpoint
-//   Admin   (B): avg < 0.40 → flag for human review
+// If a runner's circuit breaker is open (OcrCircuitOpenException) we pass
+// the original block through untouched — a degraded cascade is still a
+// functional one. Same for any transient runner exception.
 //
 // Runners are optional — if IMathpixRunner isn't registered, math rescue
-// is simply skipped. Same for text. That keeps the cascade booting before
-// RDY-012 lands.
+// is skipped. Same for text.
 // =============================================================================
 
 using System.Diagnostics;
 using Cena.Infrastructure.Ocr.Contracts;
 using Cena.Infrastructure.Ocr.Runners;
 using Microsoft.Extensions.Logging;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
 
 namespace Cena.Infrastructure.Ocr.Layers;
 
@@ -43,6 +44,7 @@ public sealed class Layer4ConfidenceGate : ILayer4ConfidenceGate
     }
 
     public async Task<Layer4Output> RunAsync(
+        IReadOnlyList<byte[]> pageBytes,
         IReadOnlyList<OcrTextBlock> textBlocks,
         IReadOnlyList<OcrMathBlock> mathBlocks,
         CascadeSurface surface,
@@ -51,8 +53,8 @@ public sealed class Layer4ConfidenceGate : ILayer4ConfidenceGate
         var sw = Stopwatch.StartNew();
         var fallbacks = new List<string>();
 
-        var rescuedMath = await RescueMathAsync(mathBlocks, fallbacks, ct).ConfigureAwait(false);
-        var rescuedText = await RescueTextAsync(textBlocks, fallbacks, ct).ConfigureAwait(false);
+        var rescuedMath = await RescueMathAsync(pageBytes, mathBlocks, fallbacks, ct).ConfigureAwait(false);
+        var rescuedText = await RescueTextAsync(pageBytes, textBlocks, fallbacks, ct).ConfigureAwait(false);
 
         double avg = ComputeAverageConfidence(rescuedText, rescuedMath);
         bool catastrophic = avg < CatastrophicThresholdFor(surface);
@@ -77,6 +79,7 @@ public sealed class Layer4ConfidenceGate : ILayer4ConfidenceGate
     // Math rescue
     // -------------------------------------------------------------------------
     private async Task<IReadOnlyList<OcrMathBlock>> RescueMathAsync(
+        IReadOnlyList<byte[]> pageBytes,
         IReadOnlyList<OcrMathBlock> blocks,
         List<string> fallbacks,
         CancellationToken ct)
@@ -92,15 +95,23 @@ public sealed class Layer4ConfidenceGate : ILayer4ConfidenceGate
                 continue;
             }
 
+            if (!TryCropRegion(pageBytes, block.Bbox, out var crop))
+            {
+                // No crop available → nothing to send Mathpix. Pass original through.
+                result.Add(block);
+                _log?.LogDebug(
+                    "[OCR_CASCADE] Layer4a skipping math rescue — bbox unavailable or page missing");
+                continue;
+            }
+
             try
             {
-                var rescued = await _mathpix.RescueMathAsync(block, ct).ConfigureAwait(false);
+                var rescued = await _mathpix.RescueMathAsync(crop, block, ct).ConfigureAwait(false);
                 result.Add(rescued);
                 fallbacks.Add($"mathpix:{Truncate(block.Latex)}");
             }
             catch (OcrCircuitOpenException)
             {
-                // Breaker open — not fatal, just drop rescue for this region.
                 result.Add(block);
                 _log?.LogInformation(
                     "[OCR_CASCADE] Layer4a Mathpix circuit open — passing math block through untouched");
@@ -123,6 +134,7 @@ public sealed class Layer4ConfidenceGate : ILayer4ConfidenceGate
     // Text rescue
     // -------------------------------------------------------------------------
     private async Task<IReadOnlyList<OcrTextBlock>> RescueTextAsync(
+        IReadOnlyList<byte[]> pageBytes,
         IReadOnlyList<OcrTextBlock> blocks,
         List<string> fallbacks,
         CancellationToken ct)
@@ -138,9 +150,17 @@ public sealed class Layer4ConfidenceGate : ILayer4ConfidenceGate
                 continue;
             }
 
+            if (!TryCropRegion(pageBytes, block.Bbox, out var crop))
+            {
+                result.Add(block);
+                _log?.LogDebug(
+                    "[OCR_CASCADE] Layer4b skipping text rescue — bbox unavailable or page missing");
+                continue;
+            }
+
             try
             {
-                var rescued = await _gemini.RescueTextAsync(block, ct).ConfigureAwait(false);
+                var rescued = await _gemini.RescueTextAsync(crop, block, ct).ConfigureAwait(false);
                 result.Add(rescued);
                 fallbacks.Add($"gemini:{Truncate(block.Text)}");
             }
@@ -162,6 +182,50 @@ public sealed class Layer4ConfidenceGate : ILayer4ConfidenceGate
             }
         }
         return result;
+    }
+
+    // -------------------------------------------------------------------------
+    // Image cropping — ImageSharp-based. Returns PNG bytes.
+    // -------------------------------------------------------------------------
+    private bool TryCropRegion(
+        IReadOnlyList<byte[]> pageBytes,
+        BoundingBox? bbox,
+        out ReadOnlyMemory<byte> crop)
+    {
+        crop = default;
+        if (bbox is null) return false;
+
+        // bbox.Page is 1-indexed (0 = unknown); normalise to 0-indexed.
+        int pageIdx = Math.Max(0, bbox.Page - 1);
+        if (pageIdx >= pageBytes.Count) return false;
+
+        var bytes = pageBytes[pageIdx];
+        if (bytes.Length == 0) return false;
+
+        try
+        {
+            using var img = Image.Load(bytes);
+
+            // Clamp the crop rectangle to image bounds so malformed bboxes
+            // don't blow up the rescue path.
+            int x = Math.Clamp((int)bbox.X, 0, Math.Max(0, img.Width - 1));
+            int y = Math.Clamp((int)bbox.Y, 0, Math.Max(0, img.Height - 1));
+            int w = Math.Clamp((int)bbox.W, 1, Math.Max(1, img.Width - x));
+            int h = Math.Clamp((int)bbox.H, 1, Math.Max(1, img.Height - y));
+
+            img.Mutate(ctx => ctx.Crop(new Rectangle(x, y, w, h)));
+
+            using var ms = new MemoryStream();
+            img.SaveAsPng(ms, new PngEncoder());
+            crop = ms.ToArray();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            _log?.LogWarning(ex,
+                "[OCR_CASCADE] Layer4 crop failed for bbox {Bbox}", bbox);
+            return false;
+        }
     }
 
     // -------------------------------------------------------------------------
