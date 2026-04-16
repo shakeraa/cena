@@ -1,45 +1,147 @@
 {
-  "schema_version": "1.0",
-  "description": "PDF triage verdict samples — one per PdfType. Hand to pdf-triage unit tests.",
+  "schema_version": "1.1",
+  "description": "PDF triage verdict samples — one per (category, PdfType). Hand to pdf-triage unit tests.",
+  "categories_covered": [
+    "bagrut",
+    "geva_downloads",
+    "psychometric",
+    "sat"
+  ],
   "samples": [
     {
+      "category": "bagrut",
       "pdf_type": "mixed",
       "pages": 20,
       "text_chars": 8877,
       "image_count": 1,
       "hebrew_ratio": 0.644,
+      "latin_ratio": 0.098,
       "gibberish_ratio": 0.258,
       "source_filename_hash": "9b87c90ff259"
     },
     {
+      "category": "bagrut",
       "pdf_type": "scanned_bad_ocr",
       "pages": 2,
       "text_chars": 2579,
       "image_count": 2,
       "hebrew_ratio": 0.351,
+      "latin_ratio": 0.092,
       "gibberish_ratio": 0.557,
       "source_filename_hash": "80d95667f286"
     },
     {
+      "category": "bagrut",
       "pdf_type": "text",
       "pages": 5,
       "text_chars": 4424,
       "image_count": 0,
       "hebrew_ratio": 0.847,
+      "latin_ratio": 0.152,
       "gibberish_ratio": 0.0,
       "source_filename_hash": "c1c73a9539bf"
     },
     {
+      "category": "sat",
+      "pdf_type": "mixed",
+      "pages": 56,
+      "text_chars": 89169,
+      "image_count": 66,
+      "hebrew_ratio": 0.0,
+      "latin_ratio": 0.995,
+      "gibberish_ratio": 0.005,
+      "source_filename_hash": "5ffc967ee7d0"
+    },
+    {
+      "category": "sat",
+      "pdf_type": "text",
+      "pages": 5,
+      "text_chars": 14486,
+      "image_count": 0,
+      "hebrew_ratio": 0.0,
+      "latin_ratio": 0.996,
+      "gibberish_ratio": 0.004,
+      "source_filename_hash": "d8068c09dfbd"
+    },
+    {
+      "category": "psychometric",
+      "pdf_type": "text",
+      "pages": 123,
+      "text_chars": 210777,
+      "image_count": 0,
+      "hebrew_ratio": 0.231,
+      "latin_ratio": 0.723,
+      "gibberish_ratio": 0.045,
+      "source_filename_hash": "b9e6a0ca084e"
+    },
+    {
+      "category": "psychometric",
+      "pdf_type": "scanned_bad_ocr",
+      "pages": 63,
+      "text_chars": 95890,
+      "image_count": 0,
+      "hebrew_ratio": 0.017,
+      "latin_ratio": 0.37,
+      "gibberish_ratio": 0.613,
+      "source_filename_hash": "077f8be78422"
+    },
+    {
+      "category": "psychometric",
       "pdf_type": "encrypted",
       "pages": 0,
       "text_chars": 0,
       "image_count": 0,
-      "hebrew_ratio": 0.0,
-      "gibberish_ratio": 0.0,
-      "source_filename_hash": "synthetic_"
+      "hebrew_ratio": 0,
+      "latin_ratio": 0,
+      "gibberish_ratio": 0,
+      "source_filename_hash": "d2c99ee2e657"
+    },
+    {
+      "category": "psychometric",
+      "pdf_type": "mixed",
+      "pages": 63,
+      "text_chars": 93081,
+      "image_count": 1,
+      "hebrew_ratio": 0.622,
+      "latin_ratio": 0.37,
+      "gibberish_ratio": 0.008,
+      "source_filename_hash": "635a4c8903c1"
+    },
+    {
+      "category": "geva_downloads",
+      "pdf_type": "mixed",
+      "pages": 28,
+      "text_chars": 6254,
+      "image_count": 40,
+      "hebrew_ratio": 0.825,
+      "latin_ratio": 0.137,
+      "gibberish_ratio": 0.038,
+      "source_filename_hash": "be7570617095"
+    },
+    {
+      "category": "geva_downloads",
+      "pdf_type": "text",
+      "pages": 20,
+      "text_chars": 12281,
+      "image_count": 0,
+      "hebrew_ratio": 0.688,
+      "latin_ratio": 0.101,
+      "gibberish_ratio": 0.211,
+      "source_filename_hash": "b616caca8ae6"
+    },
+    {
+      "category": "geva_downloads",
+      "pdf_type": "scanned_bad_ocr",
+      "pages": 3,
+      "text_chars": 942,
+      "image_count": 10,
+      "hebrew_ratio": 0.367,
+      "latin_ratio": 0.605,
+      "gibberish_ratio": 0.015,
+      "source_filename_hash": "a95fc1dcd744"
     }
   ],
   "_dev_fixture": {
-    "notes": "Sourced from live triage of 151 user-provided PDFs; filenames are SHA-256 prefixed so nothing identifiable leaks."
+    "notes": "Sourced from live triage of 182 user-provided PDFs across bagrut/sat/psychometric/geva_downloads. Filenames are SHA-256 prefixed so nothing identifiable leaks."
   }
 }

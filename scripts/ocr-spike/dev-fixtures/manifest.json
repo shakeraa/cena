@@ -5,8 +5,8 @@
   "files": [
     {
       "path": "bagrut-analysis/analysis.json",
-      "bytes": 1207,
-      "sha256_prefix": "1e47baa1f5030ba6"
+      "bytes": 2787,
+      "sha256_prefix": "1c39af5599516dba"
     },
     {
       "path": "cascade-results/bagrut-3u-text-shortcut.json",
@@ -19,6 +19,11 @@
       "sha256_prefix": "dc18290edd0b9a8b"
     },
     {
+      "path": "cascade-results/geva-hebrew-solutions.json",
+      "bytes": 54097,
+      "sha256_prefix": "b8daa11849d53833"
+    },
+    {
       "path": "cascade-results/pdf-encrypted-422.json",
       "bytes": 1049,
       "sha256_prefix": "79bd3eb83b330d82"
@@ -27,6 +32,21 @@
       "path": "cascade-results/pdf-scanned-bad-ocr.json",
       "bytes": 3104,
       "sha256_prefix": "29b68914819d275b"
+    },
+    {
+      "path": "cascade-results/psychometric-english-text.json",
+      "bytes": 41894,
+      "sha256_prefix": "dd3db913eb779c61"
+    },
+    {
+      "path": "cascade-results/psychometric-hebrew-mixed.json",
+      "bytes": 31793,
+      "sha256_prefix": "962b9693eae2c829"
+    },
+    {
+      "path": "cascade-results/sat-english-text.json",
+      "bytes": 19643,
+      "sha256_prefix": "5b062a7e1d7c8e1f"
     },
     {
       "path": "cascade-results/student-photo-algebra-3u.json",
@@ -50,9 +70,9 @@
     },
     {
       "path": "triage-verdicts/samples.json",
-      "bytes": 1160,
-      "sha256_prefix": "09e014028eaf1987"
+      "bytes": 3762,
+      "sha256_prefix": "521083f55e116a63"
     }
   ],
-  "count": 10
+  "count": 14
 }

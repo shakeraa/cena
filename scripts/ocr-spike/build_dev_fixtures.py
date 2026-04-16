@@ -29,7 +29,10 @@ from pathlib import Path
 ROOT = Path(__file__).parent
 DEV = ROOT / "dev-fixtures"
 CASCADE_RUNS = ROOT / "results" / "cascade_runs"
-TRIAGE_JSON = ROOT / "results" / "real_corpus_triage.json"
+# Prefer the full 4-category triage if present; fall back to the bagrut-only snapshot
+TRIAGE_JSON = ROOT / "results" / "full_corpus_triage.json"
+if not TRIAGE_JSON.exists():
+    TRIAGE_JSON = ROOT / "results" / "real_corpus_triage.json"
 GT_DIR = ROOT / "fixtures" / "ground_truth"
 
 # Stable-ish pseudo-UUIDs for pipeline samples so re-runs produce the same ids
@@ -313,6 +316,53 @@ def build_encrypted_fixture() -> dict:
     }
 
 
+def build_from_live_run(
+    live_path: Path,
+    *,
+    schema_source: str,
+    hints: dict,
+    triage: str,
+    scenario: str,
+    scrub: bool,
+) -> dict:
+    """Wrap a real cascade_runs/*.json output into a dev-fixture with optional scrubbing."""
+    live = json.loads(live_path.read_text())
+    text_blocks = live.get("text_blocks", [])
+    math_blocks = live.get("math_blocks", [])
+    if scrub:
+        text_blocks = [scrub_text_block(b) for b in text_blocks]
+        math_blocks = [scrub_math_block(b) for b in math_blocks]
+    t = live.get("layer_timings", {})
+    return {
+        "schema_version": "1.0",
+        "runner": "cascade_prototype",
+        "source": schema_source,
+        "hints": hints,
+        "pdf_triage": triage,
+        "text_blocks": text_blocks,
+        "math_blocks": math_blocks,
+        "figures": live.get("figures", []),
+        "overall_confidence": round(live.get("overall_confidence", 0.0), 3),
+        "fallbacks_fired": live.get("fallbacks_fired", []),
+        "cas_validated_math": live.get("cas_validated_math", 0),
+        "cas_failed_math": live.get("cas_failed_math", 0),
+        "human_review_required": live.get("human_review_required", False),
+        "reasons_for_review": live.get("reasons_for_review", []),
+        "layer_timings_seconds": {k: round(v, 3) for k, v in t.items()},
+        "total_latency_seconds": round(sum(t.values()), 3),
+        "captured_at": _iso(),
+        "_dev_fixture": {
+            "scenario": scenario,
+            "source_kind": hints.get("source_type") or "unknown",
+            "notes": (
+                f"Wrapped from live cascade run on {live_path.name}. "
+                f"{'Text + math scrubbed (reference-only).' if scrub else 'Text + math retained (safe to ship).'}"
+            ),
+            "scrubbing": "text/latex redacted; length+hash+bbox+confidence retained" if scrub else "none",
+        },
+    }
+
+
 def build_scanned_bad_ocr_fixture() -> dict:
     return {
         "schema_version": "1.0",
@@ -357,7 +407,7 @@ def build_scanned_bad_ocr_fixture() -> dict:
     }
 
 
-# ── Bagrut analysis (RDY-019b §2 output shape) ─────────────────────────────
+# ── Corpus analysis (4 categories — RDY-019b §2 output shape) ──────────────
 def build_bagrut_analysis() -> dict:
     if TRIAGE_JSON.exists():
         triage = json.loads(TRIAGE_JSON.read_text())
@@ -368,7 +418,6 @@ def build_bagrut_analysis() -> dict:
     total_pages = sum(r.get("pages", 0) or 0 for r in triage if r.get("type"))
     total_chars = sum(r.get("chars", 0) or 0 for r in triage if r.get("type") == "text")
 
-    # Per-unit breakdown (best-effort from filename)
     def unit_of(path: str) -> str:
         if "3_units" in path or "0353" in path or "0373" in path:
             return "3u"
@@ -378,35 +427,70 @@ def build_bagrut_analysis() -> dict:
             return "5u"
         return "unknown"
 
-    by_unit: dict[str, int] = Counter()
+    # Per-category breakdown (only populated when triage JSON has `category` field)
+    per_category: dict[str, dict] = {}
     for r in triage:
-        by_unit[unit_of(r.get("path", ""))] += 1
+        cat = r.get("category", "unknown")
+        if cat not in per_category:
+            per_category[cat] = {
+                "count": 0,
+                "pages": 0,
+                "text_chars": 0,
+                "by_pdf_type": Counter(),
+                "avg_hebrew_ratio": 0.0,
+                "avg_latin_ratio": 0.0,
+                "avg_gibberish": 0.0,
+            }
+        b = per_category[cat]
+        b["count"] += 1
+        b["pages"] += (r.get("pages") or 0)
+        if r.get("type") == "text":
+            b["text_chars"] += (r.get("chars") or 0)
+        b["by_pdf_type"][r.get("type", "error")] += 1
+        b["avg_hebrew_ratio"] += (r.get("he_ratio") or 0)
+        b["avg_latin_ratio"] += (r.get("latin_ratio") or 0)
+        b["avg_gibberish"] += (r.get("gibberish") or 0)
+
+    # Finalise averages + convert Counters to dicts
+    for cat, b in per_category.items():
+        n = max(1, b["count"])
+        b["avg_hebrew_ratio"] = round(b["avg_hebrew_ratio"] / n, 3)
+        b["avg_latin_ratio"] = round(b["avg_latin_ratio"] / n, 3)
+        b["avg_gibberish"] = round(b["avg_gibberish"] / n, 3)
+        b["by_pdf_type"] = dict(b["by_pdf_type"])
+        b["text_shortcut_rate"] = round(b["by_pdf_type"].get("text", 0) / n, 3)
+
+    # Bagrut-specific unit breakdown preserved
+    bagrut_rows = [r for r in triage if r.get("category") == "bagrut" or not r.get("category")]
+    by_unit = Counter(unit_of(r.get("path", "")) for r in bagrut_rows)
 
     return {
-        "schema_version": "1.0",
-        "analysis_kind": "bagrut_structural_aggregate",
+        "schema_version": "1.1",
+        "analysis_kind": "corpus_structural_aggregate",
         "generated_at": _iso(),
-        "source": "scripts/ocr-spike/results/real_corpus_triage.json",
+        "source": "scripts/ocr-spike/results/full_corpus_triage.json",
         "summary": {
             "total_pdfs": len(triage),
             "total_pages": total_pages,
             "text_extractable_chars": total_chars,
             "by_pdf_type": dict(by_type),
-            "by_unit": dict(by_unit),
+            "categories": list(per_category.keys()),
         },
+        "per_category": per_category,
+        "bagrut_unit_breakdown": dict(by_unit),
         "text_shortcut_rate": round(by_type.get("text", 0) / max(1, len(triage)), 3),
         "requires_ocr_rate": round(
             (by_type.get("mixed", 0) + by_type.get("scanned_bad_ocr", 0)) / max(1, len(triage)),
             3,
         ),
         "recreation_inputs": {
-            "note": "Feed this aggregate into ReferenceCalibratedGenerationService. Per-question topic/difficulty/Bloom will be filled in by the structural analyzer (RDY-019b §2); this fixture is the outer shell + cost-model data.",
+            "note": "Feed this aggregate into ReferenceCalibratedGenerationService (bagrut category only — SAT/psychometric/geva are out-of-scope for Cena recreations). Per-question topic/difficulty/Bloom will be filled in by the structural analyzer (RDY-019b §2); this fixture is the outer shell + cost-model data.",
             "topic_weights": {
-                "_pending": "Populated by the structural analyzer once it runs on extracted text. Shape will be { topic: { share, difficulty_dist, bloom_dist, format_dist } }",
+                "_pending": "Populated by the structural analyzer. Shape: { topic: { share, difficulty_dist, bloom_dist, format_dist } }",
             },
         },
         "_dev_fixture": {
-            "notes": "Aggregate only — no question-level content. Safe to commit. The detailed analysis.json produced by the admin ingestion pipeline stays git-ignored under corpus/bagrut/reference/.",
+            "notes": "Aggregate only — no question-level content. Covers bagrut + sat + psychometric + geva_downloads so downstream teams can see the full language/category diversity. Detailed analysis.json produced by the admin ingestion pipeline stays git-ignored under corpus/bagrut/reference/.",
         },
     }
 
@@ -637,39 +721,49 @@ def build_triage_samples() -> dict:
         return {"schema_version": "1.0", "samples": []}
 
     triage = json.loads(TRIAGE_JSON.read_text())
-    picks: dict[str, dict] = {}
+    # Pick one example per (category, pdf_type) combo — richer than the old 1-per-type
+    picks: list[dict] = []
+    seen: set[tuple[str, str]] = set()
     for r in triage:
         t = r.get("type")
-        if t and t not in picks and t != "error":
-            picks[t] = {
-                "pdf_type": t,
-                "pages": r.get("pages"),
-                "text_chars": r.get("chars"),
-                "image_count": r.get("imgs"),
-                "hebrew_ratio": r.get("he_ratio"),
-                "gibberish_ratio": r.get("gibberish"),
-                # Filename is reference-only metadata, keep it anonymized
-                "source_filename_hash": hashlib.sha256((r.get("path", "")).encode()).hexdigest()[:12],
-            }
+        cat = r.get("category", "unknown")
+        key = (cat, t)
+        if not t or t == "error" or key in seen:
+            continue
+        picks.append({
+            "category": cat,
+            "pdf_type": t,
+            "pages": r.get("pages"),
+            "text_chars": r.get("chars"),
+            "image_count": r.get("imgs"),
+            "hebrew_ratio": r.get("he_ratio"),
+            "latin_ratio": r.get("latin_ratio"),
+            "gibberish_ratio": r.get("gibberish"),
+            "source_filename_hash": hashlib.sha256((r.get("path", "")).encode()).hexdigest()[:12],
+        })
+        seen.add(key)
 
-    # Make sure we have encrypted even if corpus didn't include one
-    if "encrypted" not in picks:
-        picks["encrypted"] = {
+    # Ensure encrypted category exists even if corpus didn't surface one
+    if not any(p["pdf_type"] == "encrypted" for p in picks):
+        picks.append({
+            "category": "synthetic",
             "pdf_type": "encrypted",
             "pages": 0,
             "text_chars": 0,
             "image_count": 0,
             "hebrew_ratio": 0.0,
+            "latin_ratio": 0.0,
             "gibberish_ratio": 0.0,
             "source_filename_hash": "synthetic_",
-        }
+        })
 
     return {
-        "schema_version": "1.0",
-        "description": "PDF triage verdict samples — one per PdfType. Hand to pdf-triage unit tests.",
-        "samples": list(picks.values()),
+        "schema_version": "1.1",
+        "description": "PDF triage verdict samples — one per (category, PdfType). Hand to pdf-triage unit tests.",
+        "categories_covered": sorted({p["category"] for p in picks}),
+        "samples": picks,
         "_dev_fixture": {
-            "notes": "Sourced from live triage of 151 user-provided PDFs; filenames are SHA-256 prefixed so nothing identifiable leaks.",
+            "notes": "Sourced from live triage of 182 user-provided PDFs across bagrut/sat/psychometric/geva_downloads. Filenames are SHA-256 prefixed so nothing identifiable leaks.",
         },
     }
 
@@ -727,6 +821,64 @@ def main() -> int:
     out = cr / "pdf-scanned-bad-ocr.json"
     write_json(out, build_scanned_bad_ocr_fixture())
     emitted.append(out)
+
+    # Per-category fixtures from live cascade runs (when available)
+    per_category_fixtures = [
+        ("sat-english-text.json",
+         CASCADE_RUNS / "sat_text_sample.json",
+         {
+             "scenario": "sat_english_text",
+             "triage": "text",
+             "hints": {"subject": "math", "language": "en", "track": None,
+                       "source_type": "admin_upload", "taxonomy_node": None, "expected_figures": False},
+             "source": "admin-upload://sat/psat_10_2023_english_solution.pdf",
+             "scrub": False,   # English SAT text — safe to ship verbatim
+         }),
+        ("psychometric-hebrew-mixed.json",
+         CASCADE_RUNS / "psychometric_mixed_sample.json",
+         {
+             "scenario": "psychometric_hebrew_mixed",
+             "triage": "mixed",
+             "hints": {"subject": "verbal_quantitative", "language": "he", "track": None,
+                       "source_type": "admin_upload", "taxonomy_node": None, "expected_figures": True},
+             "source": "admin-upload://psychometric/full_2022_winter_hebrew_sample.pdf",
+             "scrub": True,   # NITE content — treat with same reference-only caution
+         }),
+        ("psychometric-english-text.json",
+         CASCADE_RUNS / "psychometric_text_sample.json",
+         {
+             "scenario": "psychometric_english_text",
+             "triage": "text",
+             "hints": {"subject": "verbal_quantitative", "language": "en", "track": None,
+                       "source_type": "admin_upload", "taxonomy_node": None, "expected_figures": False},
+             "source": "admin-upload://psychometric/full_2019_spring_english_sample.pdf",
+             "scrub": True,
+         }),
+        ("geva-hebrew-solutions.json",
+         CASCADE_RUNS / "geva_downloads_text_sample.json",
+         {
+             "scenario": "geva_hebrew_solutions",
+             "triage": "text",
+             "hints": {"subject": "math", "language": "he", "track": "3u",
+                       "source_type": "admin_upload", "taxonomy_node": None, "expected_figures": False},
+             "source": "admin-upload://geva/35371_shaalon_35371.pdf",
+             "scrub": True,   # Geva is third-party copyrighted — redact text
+         }),
+    ]
+    for filename, live_path, meta in per_category_fixtures:
+        if not live_path.exists():
+            print(f"  skip {filename}: no live cascade run at {live_path.name}")
+            continue
+        out = cr / filename
+        write_json(out, build_from_live_run(
+            live_path,
+            schema_source=meta["source"],
+            hints=meta["hints"],
+            triage=meta["triage"],
+            scenario=meta["scenario"],
+            scrub=meta["scrub"],
+        ))
+        emitted.append(out)
 
     # Analysis
     out = DEV / "bagrut-analysis" / "analysis.json"
