@@ -243,7 +243,9 @@ public static class SessionEndpoints
         group.MapGet("/{sessionId}", async (
             string sessionId,
             HttpContext ctx,
-            IDocumentStore store) =>
+            IDocumentStore store,
+            [FromServices] IFlowStateService flowState,
+            [FromServices] ICognitiveLoadService cognitiveLoad) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -264,7 +266,7 @@ public static class SessionEndpoints
 
             // FIND-arch-023: Use projection instead of event stream query
             var attemptHistory = await session.LoadAsync<SessionAttemptHistoryDocument>(doc.SessionId);
-            
+
             var questionsAttempted = attemptHistory?.TotalAttempts ?? 0;
             var questionsCorrect = attemptHistory?.CorrectAttempts ?? 0;
             var accuracy = attemptHistory?.Accuracy ?? 0;
@@ -276,6 +278,17 @@ public static class SessionEndpoints
 
             var status = doc.EndedAt.HasValue ? "completed" : "active";
 
+            // RDY-034 slice 2: compute real fatigue + flow state from session signals.
+            // Replaces the hardcoded FatigueScore=0.0 with the ICognitiveLoadService
+            // 3-factor model, and surfaces the authoritative flow state so clients
+            // agree with the backend instead of recomputing locally.
+            var (flowAssessment, fatigueScore) = ComputeSessionFlowState(
+                attemptHistory,
+                doc.StartedAt,
+                doc.EndedAt,
+                flowState,
+                cognitiveLoad);
+
             return Results.Ok(new SessionDetailDto(
                 Id: doc.Id,
                 SessionId: doc.SessionId,
@@ -286,11 +299,12 @@ public static class SessionEndpoints
                 QuestionsAttempted: questionsAttempted,
                 QuestionsCorrect: questionsCorrect,
                 Accuracy: Math.Round(accuracy, 3),
-                FatigueScore: 0.0,
+                FatigueScore: Math.Round(fatigueScore, 3),
                 DurationSeconds: durationSeconds,
                 StartedAt: doc.StartedAt,
                 EndedAt: doc.EndedAt,
-                MasteryDeltas: masteryDeltas));
+                MasteryDeltas: masteryDeltas,
+                FlowState: FlowStateEndpoints.ToResponse(flowAssessment)));
         })
         .WithName("GetSessionDetail")
     .Produces<SessionDetailDto>(StatusCodes.Status200OK)
@@ -1532,5 +1546,96 @@ public static class SessionEndpoints
             ServedLocale: localeDecision.ServedLocale,
             Timestamp: DateTimeOffset.UtcNow));
         await writeSession.SaveChangesAsync();
+    }
+
+    // =============================================================================
+    // RDY-034 slice 2 — Session flow-state assessment
+    //
+    // Pure computation over the attempt-history projection; no IO. Exposed as
+    // internal static so SessionEndpointsFlowStateTests can drive the exact
+    // same path without standing up a full HTTP harness.
+    //
+    // Signals consumed:
+    //   • baselineAccuracy — overall session accuracy (all attempts)
+    //   • rollingAccuracy5 — accuracy of the last 5 attempts
+    //   • baselineRt       — mean response time across all attempts (ms)
+    //   • rollingRt5       — mean response time over last 5 attempts (ms)
+    //   • elapsedMin       — minutes from session start to now (or EndedAt)
+    //   • maxSessionMin    — 45 (FlowStateService.MaxSessionMinutes parity)
+    //   • consecutiveCorrect — trailing correct-answer streak
+    //   • accuracyTrend    — rollingAccuracy5 − baselineAccuracy, clamped
+    //
+    // Returns both the full FlowStateAssessment AND the raw FatigueScore so
+    // the caller can populate the existing SessionDetailDto.FatigueScore
+    // field (previously hardcoded 0.0) without recomputing.
+    // =============================================================================
+    internal static (FlowStateAssessment Assessment, double FatigueScore) ComputeSessionFlowState(
+        SessionAttemptHistoryDocument? history,
+        DateTimeOffset sessionStartedAt,
+        DateTimeOffset? sessionEndedAt,
+        IFlowStateService flowState,
+        ICognitiveLoadService cognitiveLoad)
+    {
+        // No attempts recorded yet → brand-new session; let the state machine
+        // produce the canonical Warming result without synthetic fatigue.
+        var attempts = history?.Attempts;
+        if (attempts is null || attempts.Count == 0)
+        {
+            var warmingAssessment = flowState.Assess(
+                fatigueLevel: 0.0,
+                accuracyTrend: 0.0,
+                consecutiveCorrect: 0,
+                sessionDurationMinutes: ElapsedMinutes(sessionStartedAt, sessionEndedAt));
+            return (warmingAssessment, 0.0);
+        }
+
+        // Ordered view so "last 5" really means the 5 most recent.
+        var ordered = attempts.OrderBy(a => a.Timestamp).ToList();
+        var total = ordered.Count;
+
+        var baselineAccuracy = ordered.Count(a => a.IsCorrect) / (double)total;
+        var baselineRt = ordered.Average(a => (double)a.ResponseTimeMs);
+
+        var last5 = ordered.Skip(Math.Max(0, total - 5)).ToList();
+        var rollingAccuracy5 = last5.Count(a => a.IsCorrect) / (double)last5.Count;
+        var rollingRt5 = last5.Average(a => (double)a.ResponseTimeMs);
+
+        var elapsedMin = ElapsedMinutes(sessionStartedAt, sessionEndedAt);
+        const double maxSessionMin = 45.0; // FlowStateService.MaxSessionMinutes parity
+
+        // 3-factor fatigue model (ICognitiveLoadService owns the formula).
+        var fatigue = cognitiveLoad.ComputeFatigue(
+            baselineAccuracy: baselineAccuracy,
+            rollingAccuracy5: rollingAccuracy5,
+            baselineRt: baselineRt,
+            rollingRt5: rollingRt5,
+            elapsedMin: elapsedMin,
+            maxSessionMin: maxSessionMin);
+
+        // Trailing correct-streak. Walk from the newest attempt back.
+        var consecutiveCorrect = 0;
+        for (int i = ordered.Count - 1; i >= 0; i--)
+        {
+            if (ordered[i].IsCorrect) consecutiveCorrect++;
+            else break;
+        }
+
+        // Accuracy trend: simple rolling-vs-baseline delta, clamped to [-1, 1].
+        var trend = Math.Clamp(rollingAccuracy5 - baselineAccuracy, -1.0, 1.0);
+
+        var assessment = flowState.Assess(
+            fatigueLevel: fatigue.FatigueScore,
+            accuracyTrend: trend,
+            consecutiveCorrect: consecutiveCorrect,
+            sessionDurationMinutes: elapsedMin);
+
+        return (assessment, fatigue.FatigueScore);
+    }
+
+    private static double ElapsedMinutes(DateTimeOffset startedAt, DateTimeOffset? endedAt)
+    {
+        var end = endedAt ?? DateTimeOffset.UtcNow;
+        var delta = (end - startedAt).TotalMinutes;
+        return delta < 0 ? 0.0 : delta;
     }
 }

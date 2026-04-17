@@ -43,7 +43,12 @@ public sealed record SessionDetailDto(
     int DurationSeconds,
     DateTimeOffset StartedAt,
     DateTimeOffset? EndedAt,
-    IReadOnlyDictionary<string, double> MasteryDeltas);
+    IReadOnlyDictionary<string, double> MasteryDeltas,
+    // RDY-034 slice 2: flow-state assessment computed from session signals.
+    // Null only if the caller explicitly opts out (no such opt-out exists
+    // yet) — always populated on the main session read, including for
+    // brand-new sessions (state == "warming").
+    FlowStateAssessmentResponse? FlowState = null);
 
 public sealed record SessionReplayDto(
     string SessionId,

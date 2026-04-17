@@ -142,4 +142,25 @@ public static class FlowStateEndpoints
         DifficultyAdjustment.Increase => "increase",
         _                             => "maintain",
     };
+
+    /// <summary>
+    /// RDY-034 slice 2 helper — maps an in-process <see cref="FlowStateAssessment"/>
+    /// to the wire-format <see cref="FlowStateAssessmentResponse"/>. Shared by
+    /// the standalone /assess endpoint and the session-detail read so both
+    /// surfaces emit identical JSON shapes.
+    /// </summary>
+    public static FlowStateAssessmentResponse ToResponse(FlowStateAssessment assessment)
+    {
+        return new FlowStateAssessmentResponse(
+            State: MapStateCamelCase(assessment.State),
+            FatigueLevel: assessment.FatigueLevel,
+            AccuracyTrend: assessment.AccuracyTrend,
+            ConsecutiveCorrect: assessment.ConsecutiveCorrect,
+            SessionDurationMinutes: assessment.SessionDurationMinutes,
+            RecommendedAction: MapActionSnakeCase(assessment.RecommendedAction),
+            CooldownMinutes: assessment.CooldownMinutes,
+            DifficultyAdjustment: assessment.DifficultyAdjustmentAdvice is null
+                ? null
+                : MapDifficultyAdjustmentLowercase(assessment.DifficultyAdjustmentAdvice.Value));
+    }
 }
