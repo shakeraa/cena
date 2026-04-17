@@ -122,3 +122,6 @@ logs/
 corpus/bagrut/reference/**
 !corpus/bagrut/reference/analysis.json
 !corpus/bagrut/reference/.gitkeep
+
+# CAS gate operator config (RDY-036): real values never ship
+config/cas-gate/cas-gate.env

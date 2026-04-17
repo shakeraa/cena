@@ -1,0 +1,22 @@
+# Strategic-merge patch that wires the ConfigMap + Secret above into any
+# deployment with a container named `api`. Apply with:
+#
+#   kubectl patch deploy cena-admin-api -n cena-platform \
+#     --patch-file k8s/cas-gate-config/deployment-patch.yaml
+#
+# Or reference from a kustomization.yaml in the parent overlay.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: PATCH_TARGET_DEPLOYMENT      # override via kustomize patchesStrategicMerge
+  namespace: cena-platform
+spec:
+  template:
+    spec:
+      containers:
+        - name: api
+          envFrom:
+            - configMapRef:
+                name: cena-cas-gate
+            - secretRef:
+                name: cena-cas-gate-operator
