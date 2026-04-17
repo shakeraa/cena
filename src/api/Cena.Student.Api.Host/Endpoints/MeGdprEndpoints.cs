@@ -48,7 +48,7 @@ public static class MeGdprEndpoints
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
-        group.MapDelete("/consents/{purpose}", RevokeConsent).WithName("RevokeMyConsent")
+        group.MapDelete("/consents/{purpose}", RevokeConsent).WithName("RevokeMyGdprConsent")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)

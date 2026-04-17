@@ -71,6 +71,14 @@ builder.Host.UseSerilog((context, services, configuration) =>
         .Destructure.With<Cena.Infrastructure.Compliance.PiiDestructuringPolicy>();
 });
 
+// RDY-056 §1.2: In Development the actor host runs with partial DI graphs
+// (not every admin-shared service is active here). Skip eager validation so
+// runtime resolution errors surface on first call instead of failing startup.
+if (builder.Environment.IsDevelopment())
+{
+    builder.Host.UseDefaultServiceProvider(o => o.ValidateOnBuild = false);
+}
+
 // ---- Read configuration ----
 var redisConnectionString = CenaConnectionStrings.GetRedis(builder.Configuration, builder.Environment);
 var natsUrl = builder.Configuration.GetConnectionString("NATS")
@@ -709,6 +717,23 @@ app.MapComplianceEndpoints();
 var lifetime = app.Services.GetRequiredService<IHostApplicationLifetime>();
 var actorSystem = app.Services.GetRequiredService<ActorSystem>();
 var appLogger = app.Services.GetRequiredService<ILogger<Program>>();
+
+// RDY-056 §1.1: Warm Marten schema before hosted services + cluster start.
+if (app.Environment.IsDevelopment())
+{
+    using var warmScope = app.Services.CreateScope();
+    var warmStore = warmScope.ServiceProvider.GetRequiredService<Marten.IDocumentStore>();
+    try
+    {
+        appLogger.LogInformation("[MARTEN_SCHEMA_WARM] applying configured changes...");
+        await warmStore.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
+        appLogger.LogInformation("[MARTEN_SCHEMA_READY] schema warm complete");
+    }
+    catch (Exception ex)
+    {
+        appLogger.LogError(ex, "[MARTEN_SCHEMA_WARM] failed — host will still start");
+    }
+}
 
 lifetime.ApplicationStarted.Register(async () =>
 {

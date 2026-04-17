@@ -16,6 +16,7 @@ using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api.Registration;
@@ -28,6 +29,17 @@ public static class CenaAdminServiceRegistration
     /// </summary>
     public static IServiceCollection AddCenaAdminServices(this IServiceCollection services)
     {
+        // RDY-056 §1.3: Shared admin services registered here depend on a
+        // handful of infrastructure services that used to be registered by
+        // each host individually. Use TryAdd* so hosts that already register
+        // them win, while hosts that forgot (Student, Actor) pick them up.
+        // This removes the "which host is calling us today?" guessing game
+        // and lets every host consume the shared admin surface safely.
+        services.TryAddSingleton<Cena.Actors.RateLimit.ICostCircuitBreaker,
+            Cena.Actors.RateLimit.RedisCostCircuitBreaker>();
+        services.TryAddSingleton<Cena.Actors.RateLimit.ICostBudgetService,
+            Cena.Actors.RateLimit.RedisCostBudgetService>();
+
         // Quality Gate service (needed by QuestionBankService).
         // RDY-034 §13: pass IDocumentStore so the gate can source FactualAccuracy
         // from the persisted CAS binding for math/physics subjects.
@@ -157,10 +169,16 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<IRateLimitAdminService, RateLimitAdminService>();
 
         // FIND-arch-006: GDPR compliance services (SEC-005, Articles 17 & 20).
-        // Both services depend only on Marten IDocumentStore + ILogger, which
-        // are registered by the host's AddMarten() call before this method
-        // runs. Scoped lifetime matches the host-scoped HTTP request.
+        // Services depend on Marten IDocumentStore, ILogger, and IClock.
+        // RightToErasureService also needs IErasureCryptoConfig + IErasureManifestBuilder.
         services.AddScoped<IGdprConsentManager, GdprConsentManager>();
+        services.TryAddSingleton<Cena.Infrastructure.Compliance.IClock, Cena.Infrastructure.Compliance.SystemClock>();
+        services.TryAddSingleton<Cena.Infrastructure.Compliance.IErasureCryptoConfig>(
+            new Cena.Infrastructure.Compliance.ErasureCryptoConfig(
+                System.Environment.GetEnvironmentVariable("CENA_ERASURE_PEPPER")
+                    ?? "dev-erasure-pepper-32-bytes-minimum!!"));
+        services.TryAddSingleton<Cena.Infrastructure.Compliance.IErasureManifestBuilder,
+            Cena.Infrastructure.Compliance.ErasureManifestBuilder>();
         services.AddScoped<IRightToErasureService, RightToErasureService>();
 
         return services;

@@ -27,8 +27,11 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
   </ItemGroup>
 
-  <!-- RDY-009: Generate OpenAPI document after build -->
-  <Target Name="GenerateOpenApi" AfterTargets="Build">
+  <!-- RDY-009: Generate OpenAPI document after build.
+       Skipped in container builds (SkipOpenApiGeneration=true) — the docker
+       image runs the app; openapi.json is a dev-host artifact consumed by
+       the CI openapi-diff check, not by the runtime container. -->
+  <Target Name="GenerateOpenApi" AfterTargets="Build" Condition="'$(SkipOpenApiGeneration)' != 'true'">
     <Exec Command="dotnet swagger tofile --output $(OutputPath)openapi.json $(TargetPath) v1" EnvironmentVariables="CENA_OPENAPI_GEN=1;CENA_SKIP_SEED=1;ASPNETCORE_ENVIRONMENT=Development;Firebase__ProjectId=cena-openapi-gen" />
   </Target>
 

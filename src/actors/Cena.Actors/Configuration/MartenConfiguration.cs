@@ -478,7 +478,11 @@ public static class MartenConfiguration
             .Index(x => x.SchoolId)
             .Index(x => x.Context);
 
+        // RDY-056 §1.1: alias to short doc name — full type name "MethodologyEffectivenessByCultureDocument"
+        // overflows Postgres NAMEDATALEN (63 chars) when combined with Marten's
+        // `mt_doc_<alias>_idx_<column>` naming convention.
         opts.Schema.For<MethodologyEffectivenessByCultureDocument>()
+            .DocumentAlias("method_effect_by_culture")
             .Identity(x => x.Id)
             .Index(x => x.SchoolId)
             .Index(x => x.Methodology);

@@ -8,8 +8,10 @@
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS restore
 WORKDIR /src
 
-# Copy csproj + shared project files first for NuGet restore caching
+# Copy csproj + shared project files first for NuGet restore caching.
+# Student.Api.Host transitively references Cena.Admin.Api, so include it too.
 COPY ["src/api/Cena.Student.Api.Host/Cena.Student.Api.Host.csproj", "src/api/Cena.Student.Api.Host/"]
+COPY ["src/api/Cena.Admin.Api/Cena.Admin.Api.csproj", "src/api/Cena.Admin.Api/"]
 COPY ["src/api/Cena.Api.Contracts/Cena.Api.Contracts.csproj", "src/api/Cena.Api.Contracts/"]
 COPY ["src/actors/Cena.Actors/Cena.Actors.csproj", "src/actors/Cena.Actors/"]
 COPY ["src/shared/Cena.Infrastructure/Cena.Infrastructure.csproj", "src/shared/Cena.Infrastructure/"]
@@ -24,7 +26,8 @@ RUN dotnet publish src/api/Cena.Student.Api.Host/Cena.Student.Api.Host.csproj \
     -c Release \
     -o /app/publish \
     --no-restore \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:SkipOpenApiGeneration=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app

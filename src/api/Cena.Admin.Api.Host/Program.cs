@@ -53,6 +53,28 @@ if (!app.Environment.IsDevelopment())
 }
 
 
+// RDY-056 §1.1: Warm Marten schema BEFORE hosted services start so seeders
+// (CulturalContextSeeder et al.) don't all race on Weasel's TimedLock.
+// In Development with AutoCreate=CreateOrUpdate, concurrent first-touch
+// queries time out at the schema-ensure lock; warming up-front serialises
+// the DDL and lets IHostedService.StartAsync run against a ready schema.
+if (app.Environment.IsDevelopment())
+{
+    using var warmScope = app.Services.CreateScope();
+    var warmLogger = warmScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var warmStore = warmScope.ServiceProvider.GetRequiredService<Marten.IDocumentStore>();
+    try
+    {
+        warmLogger.LogInformation("[MARTEN_SCHEMA_WARM] applying configured changes...");
+        await warmStore.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
+        warmLogger.LogInformation("[MARTEN_SCHEMA_READY] schema warm complete");
+    }
+    catch (Exception ex)
+    {
+        warmLogger.LogError(ex, "[MARTEN_SCHEMA_WARM] failed — host will still start; seeders may retry");
+    }
+}
+
 app.Lifetime.ApplicationStarted.Register(async () =>
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
@@ -163,6 +185,8 @@ public partial class Program
     // Mirrors the Student.Api.Host registrations.
     builder.Services.AddSingleton<Cena.Actors.RateLimit.ICostCircuitBreaker,
         Cena.Actors.RateLimit.RedisCostCircuitBreaker>();
+    builder.Services.AddSingleton<Cena.Actors.RateLimit.ICostBudgetService,
+        Cena.Actors.RateLimit.RedisCostBudgetService>();
     builder.Services.AddSingleton<Cena.Actors.Cas.IMathNetVerifier, Cena.Actors.Cas.MathNetVerifier>();
     builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
     builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
@@ -307,8 +331,12 @@ public partial class Program
     // =============================================================================
     
     
-    // RDY-009: Disable DI validation on build when generating OpenAPI artifacts
-    if (Environment.GetEnvironmentVariable("CENA_OPENAPI_GEN") == "1")
+    // RDY-009: Disable DI validation on build when generating OpenAPI artifacts.
+    // Also disabled in Development so the app starts with partial DI graphs
+    // (Admin Host doesn't instantiate every actor-host-only service); runtime
+    // resolution errors surface on first call rather than blocking startup.
+    if (Environment.GetEnvironmentVariable("CENA_OPENAPI_GEN") == "1"
+        || builder.Environment.IsDevelopment())
     {
         builder.Host.UseDefaultServiceProvider(o => o.ValidateOnBuild = false);
     }

@@ -57,6 +57,7 @@ services:
       - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
       - NATS_EMU_PASSWORD=${NATS_EMU_PASSWORD:-dev_emu_pass}
       - NATS_SETUP_PASSWORD=${NATS_SETUP_PASSWORD:-dev_setup_pass}
+      - NATS_SYMPY_PASSWORD=${NATS_SYMPY_PASSWORD:-dev_sympy_pass}
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
       interval: 5s

@@ -1,0 +1,173 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — Application Services Overlay
+#
+# Extends docker-compose.yml with the backend services, SymPy CAS sidecar,
+# and DB migrator. Run with:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build
+#
+# Infra services (postgres/redis/nats/neo4j/dynamodb) come from the base
+# compose file. This overlay adds:
+#   - sympy-sidecar: Python NATS worker for CAS Tier-2 verification
+#   - db-migrator:  one-shot DbUp migration runner
+#   - admin-api:    question bank + AI generation + role administration
+#   - student-api:  sessions + answers + hints + SignalR push
+#   - actor-host:   LearningSession/Student/Question actors on Proto.Cluster
+#
+# Auth note: APIs validate Firebase JWT. For local dev, set
+#   CENA_CAS_GATE_MODE=shadow and interact via admin endpoints that bypass
+#   auth (health + metrics). Full user-log-in requires Firebase emulator
+#   wiring — tracked separately.
+# ═══════════════════════════════════════════════════════════════════════
+
+services:
+  # ── SymPy CAS Sidecar (Python, NATS request/reply) ──
+  sympy-sidecar:
+    build:
+      context: ./docker/sympy-sidecar
+      dockerfile: Dockerfile
+    container_name: cena-sympy-sidecar
+    depends_on:
+      nats:
+        condition: service_healthy
+    environment:
+      - NATS_URL=nats://cena-nats:4222
+      - NATS_USER=sympy-sidecar
+      - NATS_PASSWORD=${NATS_SYMPY_PASSWORD:-dev_sympy_pass}
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(2); s.connect(('cena-nats',4222)); s.close()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Database Migrator (one-shot) ──
+  db-migrator:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Db.Migrator/Dockerfile
+    container_name: cena-db-migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - CENA_MIGRATOR_CONNECTION_STRING=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password
+    restart: "no"
+
+  # ── Admin API ──
+  admin-api:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Admin.Api.Host/Dockerfile
+    container_name: cena-admin-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+    ports:
+      - "5052:5052"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5052
+      # appsettings.Development.json pins localhost:5433 etc; override via
+      # ConnectionStrings__ so the container talks to the sibling services
+      # on the compose network.
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
+      - NATS_SETUP_PASSWORD=${NATS_SETUP_PASSWORD:-dev_setup_pass}
+      # ADR-0032: shadow mode while bootstrapping — gate runs but does not
+      # block writes on CAS failure. Flip to `enforce` after sympy is green.
+      - CENA_CAS_GATE_MODE=shadow
+      - Marten__AutoCreate=CreateOrUpdate
+      # Firebase: project id only. Token validation points to Google; local
+      # dev without a Firebase project hits unauth endpoints only.
+      - Firebase__ProjectId=cena-platform
+      - CENA_SKIP_SEED=0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5052/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  # ── Student API ──
+  student-api:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Student.Api.Host/Dockerfile
+    container_name: cena-student-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+    ports:
+      - "5050:5050"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5050
+      # Override the appsettings.json Kestrel endpoint (which pins port 5051)
+      # so the container listens on the port compose maps (5050).
+      - Kestrel__Endpoints__Http__Url=http://0.0.0.0:5050
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
+      - CENA_CAS_GATE_MODE=shadow
+      - Firebase__ProjectId=cena-platform
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  # ── Actor Host (Proto.Actor cluster) ──
+  actor-host:
+    build:
+      context: .
+      dockerfile: src/actors/Cena.Actors.Host/Dockerfile
+    container_name: cena-actor-host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_ACTOR_PASSWORD=${NATS_ACTOR_PASSWORD:-dev_actor_pass}
+      - PROTO_CLUSTER_PROVIDER=test
+      - CENA_CAS_GATE_MODE=shadow
+      - CENA_SKIP_SEED=1
+    restart: unless-stopped

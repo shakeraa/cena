@@ -24,7 +24,8 @@ RUN dotnet publish src/api/Cena.Admin.Api.Host/Cena.Admin.Api.Host.csproj \
     -c Release \
     -o /app/publish \
     --no-restore \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:SkipOpenApiGeneration=true
 
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app

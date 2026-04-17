@@ -70,6 +70,24 @@ if (!app.Environment.IsDevelopment())
 }
 
 
+// RDY-056 §1.1: Warm Marten schema before hosted services start (see Admin Host).
+if (app.Environment.IsDevelopment())
+{
+    using var warmScope = app.Services.CreateScope();
+    var warmLogger = warmScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    var warmStore = warmScope.ServiceProvider.GetRequiredService<Marten.IDocumentStore>();
+    try
+    {
+        warmLogger.LogInformation("[MARTEN_SCHEMA_WARM] applying configured changes...");
+        await warmStore.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
+        warmLogger.LogInformation("[MARTEN_SCHEMA_READY] schema warm complete");
+    }
+    catch (Exception ex)
+    {
+        warmLogger.LogError(ex, "[MARTEN_SCHEMA_WARM] failed — host will still start");
+    }
+}
+
 app.Lifetime.ApplicationStarted.Register(async () =>
 {
     var logger = app.Services.GetRequiredService<ILogger<Program>>();
@@ -80,7 +98,7 @@ app.Lifetime.ApplicationStarted.Register(async () =>
         logger.LogInformation("Skipping seed for OpenAPI generation");
         return;
     }
-    
+
     try
     {
         // Seed database (roles, users, classrooms, social data, etc.)
@@ -179,6 +197,9 @@ public partial class Program
     
     // ---- PWA-BE-002: Web Push dispatch + rate limiting ----
     builder.Services.AddSingleton<IPushNotificationRateLimiter, PushNotificationRateLimiter>();
+    // RDY-056 §1.3: WebPushDispatchService depends on IWebPushClient.
+    // Singleton: WebPushClient holds one PushServiceClient + VAPID auth.
+    builder.Services.AddSingleton<IWebPushClient, WebPushClient>();
     builder.Services.AddScoped<IWebPushDispatchService, WebPushDispatchService>();
     builder.Services.AddHostedService<PushNotificationTriggerService>();
     
@@ -627,7 +648,9 @@ public partial class Program
     
     
     // RDY-009: Disable DI validation on build when generating OpenAPI artifacts
-    if (Environment.GetEnvironmentVariable("CENA_OPENAPI_GEN") == "1")
+    // or in Development (partial DI graphs across hosts are expected in dev).
+    if (Environment.GetEnvironmentVariable("CENA_OPENAPI_GEN") == "1"
+        || builder.Environment.IsDevelopment())
     {
         builder.Host.UseDefaultServiceProvider(o => o.ValidateOnBuild = false);
     }

@@ -21,6 +21,8 @@ COPY ["src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj", "src/actors/Cena.Ac
 COPY ["src/actors/Cena.Actors/Cena.Actors.csproj", "src/actors/Cena.Actors/"]
 COPY ["src/shared/Cena.Infrastructure/Cena.Infrastructure.csproj", "src/shared/Cena.Infrastructure/"]
 COPY ["src/api/Cena.Api.Contracts/Cena.Api.Contracts.csproj", "src/api/Cena.Api.Contracts/"]
+# Actor host references Cena.Admin.Api for shared service contracts.
+COPY ["src/api/Cena.Admin.Api/Cena.Admin.Api.csproj", "src/api/Cena.Admin.Api/"]
 
 RUN dotnet restore src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj
 
@@ -33,7 +35,8 @@ RUN dotnet publish src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj \
     -c Release \
     -o /app/publish \
     --no-restore \
-    /p:UseAppHost=false
+    /p:UseAppHost=false \
+    /p:SkipOpenApiGeneration=true
 
 # ── Stage 3: runtime ──────────────────────────────────────────────────────────
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
