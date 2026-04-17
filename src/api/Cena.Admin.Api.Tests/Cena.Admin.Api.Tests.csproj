@@ -23,6 +23,15 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- RDY-019b: ship the analysis.json fixture next to the test dll so
+       ReferenceCalibratedGenerationServiceTests can load it from
+       AppContext.BaseDirectory without being tied to a repo-relative path. -->
+  <ItemGroup>
+    <None Include="Content\fixtures\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\Cena.Admin.Api\Cena.Admin.Api.csproj" />
     <ProjectReference Include="..\Cena.Admin.Api.Host\Cena.Admin.Api.Host.csproj" />

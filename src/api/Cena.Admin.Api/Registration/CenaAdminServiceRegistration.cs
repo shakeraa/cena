@@ -100,6 +100,14 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<Content.IContentCoverageQuestionSource, Content.MartenQuestionSource>();
         services.AddScoped<Content.IContentCoverageService, Content.ContentCoverageService>();
 
+        // RDY-019b (Phase 3.2): Reference-calibrated recreation service —
+        // reads corpus/bagrut/reference/analysis.json, builds per-cluster
+        // AiGenerateRequest bundles, and drives BatchGenerateAsync (which
+        // already routes through CAS gate + CasGatedQuestionPersister).
+        // No new write path — pure coordinator on top of existing gated gen.
+        services.AddScoped<Content.IReferenceCalibratedGenerationService,
+            Content.ReferenceCalibratedGenerationService>();
+
         // RDY-059: Corpus expander source-selector (real Marten-backed).
         services.AddScoped<Questions.ICorpusSourceProvider, Questions.MartenCorpusSourceProvider>();
         services.AddScoped<IQuestionBankService, QuestionBankService>();
@@ -185,6 +193,13 @@ public static class CenaAdminServiceRegistration
 
         // RDY-019c (Phase 3): GET /api/v1/admin/content/coverage
         app.MapContentCoverageEndpoints();
+
+        // RDY-019b (Phase 3.2): POST /api/admin/content/recreate-from-reference
+        // SuperAdmin-only, dry-run default. Ministry-reference → AI-authored
+        // CAS-gated recreations. Routes through BatchGenerateAsync so every
+        // candidate passes CAS gate + CasGatedQuestionPersister.
+        app.MapReferenceRecreationEndpoints();
+
         app.MapQuestionBankEndpoints();
         // RDY-036: CAS operator surfaces — override (super-admin only) +
         // backfill (admin only). Wired here so both Actor.Host and Admin.Host

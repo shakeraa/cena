@@ -41,3 +41,25 @@ public sealed record CorpusExpansionRun_V1(
     string StartedBy,
     DateTimeOffset StartedAt,
     DateTimeOffset CompletedAt);
+
+/// <summary>
+/// RDY-019b: Reference-calibrated recreation run audit event. Appended once
+/// per <c>ReferenceRecreationRequest</c> execution (stream:
+/// <c>bagrut-recreation:{runId}</c>). Feeds the ministry-reference-only
+/// legal posture (memory:bagrut_reference_only): the event records operator
+/// identity, analysis source, and CAS drop counts — never any raw ministry
+/// question text. All candidate persistence still flows through
+/// CasGatedQuestionPersister (child events live on each child's stream).
+/// </summary>
+public sealed record ReferenceRecreationRun_V1(
+    string RunId,
+    string AnalysisPath,
+    int PapersAnalyzed,
+    int ClustersPlanned,
+    int TotalAttempted,
+    int TotalPassedCas,
+    int TotalDropped,
+    bool DryRun,
+    string StartedBy,
+    DateTimeOffset StartedAt,
+    DateTimeOffset CompletedAt);
