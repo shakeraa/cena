@@ -134,9 +134,16 @@ function handleHint() {
       >
         {{ question.subject }}
       </VChip>
+      <!-- RDY-030b: aria-live on the question-progress counter so screen
+           readers announce "Question 3 of 10" on transition without the
+           user refocusing. polite (not assertive) — the new question's
+           prompt fires before this update, and we don't want to interrupt
+           the reader mid-stem. WCAG 4.1.3 Status Messages. -->
       <div
         class="text-caption text-medium-emphasis"
         data-testid="question-progress"
+        role="status"
+        aria-live="polite"
       >
         {{ t('session.runner.questionProgress', {
           current: question.questionIndex + 1,

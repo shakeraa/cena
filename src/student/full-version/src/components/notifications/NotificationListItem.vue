@@ -52,6 +52,10 @@ function handleClick() {
 </script>
 
 <template>
+  <!-- RDY-030b: aria-live on the notification list item so a new
+       unread notification arriving via SignalR / WebSocket reaches
+       screen readers. role="status" = polite by default, appropriate
+       for non-urgent content. WCAG 4.1.3 Status Messages. -->
   <VCard
     :variant="notification.read ? 'outlined' : 'flat'"
     :color="notification.read ? undefined : 'surface-variant'"
@@ -59,6 +63,8 @@ function handleClick() {
     :class="{ 'notification-item--unread': !notification.read }"
     :data-testid="`notification-${notification.notificationId}`"
     :data-read="notification.read"
+    role="status"
+    aria-live="polite"
     @click="handleClick"
   >
     <div class="d-flex align-start">
