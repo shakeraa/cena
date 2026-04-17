@@ -13,15 +13,29 @@ Spike complete, scaffold complete, **every OCR layer has a real implementation.*
 RDY-OCR-PORT closed 2026-04-17 (`adb706d`). 111/111 OCR tests pass.
 This doc is the single source of truth — update on every merge to main.
 
-**Phase status (commit `907ca6c`, 2026-04-17)**:
+**Phase status (commit `f52066f`, 2026-04-17)**:
 - Phase 1A ✅ — C# OCR cascade complete
 - Phase 1B ✅ — CAS production-readiness: all 4 slices landed
 - Phase 1C ✅ — Curator metadata handshake live
 - Phase 2  ✅ — Photo capture + upload + admin ingestion trio all on real IOcrCascadeService
-- Phase 3  🚧 — 3.1 / 3.3 / 3.4 partial/done; 3.2 recreation loop remains
+- Phase 3  ✅ — 3.1 / 3.2 / 3.3 all done; 3.4 admin pipeline.vue review screen still scaffold-heavy
 - Phase 4  🚧 — 4.2 sidecar + 4.3 observability done; 4.1 regression harness + 4.4 load test remain
 
-**Next ship**: RDY-019b recreation loop (Phase 3.2), then 4.1 / 4.4 hardening.
+**RDY-034 flow-state tri-slice**: ALL LANDED
+  - slice 1 (`907ca6c`) — `FlowStateService` + `POST /api/sessions/flow-state/assess`
+  - slice 2 (`8f87838`) — `GET /api/sessions/{id}` carries `FlowState` field
+  - slice 3 (`f52066f`) — `LearningSessionActor` emits `[FLOW_STATE_TRANSITION]`
+
+**RDY-019b recreation loop landed** (`870f6e0`): SuperAdmin-only
+`POST /api/admin/content/recreate-from-reference`. Reads
+`corpus/bagrut/reference/analysis.json` (produced by the existing Python
+analyzer), plans per-cluster `AiGenerateRequest` bundles weighted by
+the ministry reference distribution, drives the existing
+`BatchGenerateAsync` (CAS-gated). NO new write paths.
+
+**Next ship**: Phase 4.1 OCR regression harness (needs tesseract+poppler
+binaries + baseline generation — environment-gated), then Phase 4.4 E2E
+load test.
 
 ## 2. OCR layer scoreboard (as of commit `adb706d`)
 
@@ -98,7 +112,7 @@ All 9 slices shipped. See §3 for commit list.
 | # | Task | Landed / Queue | State |
 |---|---|---|---|
 | 3.1 | RDY-019a — Bagrut topic taxonomy + remap existing questions | taxonomy.json shipped | ✅ done |
-| 3.2 | RDY-019b — Ministry scrape + AI recreation (unblocked: cost now <$1) | scaffold `ba0fca6`, recreation loop pending | 🚧 partial |
+| 3.2 | RDY-019b — Ministry scrape + AI recreation (unblocked: cost now <$1) | scraper scaffold `ba0fca6`; recreation loop + admin endpoint `870f6e0` | ✅ done |
 | 3.3 | RDY-019c — 3u/4u seed + coverage report | `f442b0e` | ✅ done |
 | 3.4 | Admin UI `pipeline.vue` + CuratorMetadata review screen | CuratorMetadataPanel `524ff28` (review screen exists; full pipeline.vue still scaffold-heavy) | 🚧 partial |
 
