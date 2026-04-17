@@ -51,6 +51,71 @@ const isUploadOpen = ref(false)
 const isBagrutOpen = ref(false)   // RDY-057 — Bagrut-specific ingest dialog
 let refreshInterval: ReturnType<typeof setInterval> | null = null
 
+// ── Phase 3.4: review-screen filters (pure client-side on cached data) ──
+type SourceType = PipelineItem['sourceType']
+const SOURCE_TYPES: readonly SourceType[] = ['url', 's3', 'photo', 'batch']
+const sourceFilter  = ref<SourceType[]>([])        // empty = all
+const errorOnly     = ref(false)
+const stuckOnly     = ref(false)                   // > 30 min in current stage
+const searchText    = ref('')
+const STUCK_THRESHOLD_MIN = 30
+
+const isStuck = (item: PipelineItem): boolean => {
+  const minutes = (Date.now() - new Date(item.stageEnteredAt).getTime()) / 60_000
+
+  return minutes > STUCK_THRESHOLD_MIN
+}
+
+const matchesFilters = (item: PipelineItem): boolean => {
+  if (sourceFilter.value.length && !sourceFilter.value.includes(item.sourceType as SourceType))
+    return false
+  if (errorOnly.value && !item.hasFailed)
+    return false
+  if (stuckOnly.value && !isStuck(item))
+    return false
+
+  const q = searchText.value.trim().toLowerCase()
+  if (q && !item.sourceFilename.toLowerCase().includes(q))
+    return false
+
+  return true
+}
+
+const filteredPipeline = computed<PipelineStage[]>(() =>
+  pipelineData.value.map(stage => ({
+    name: stage.name,
+    key: stage.key,
+    items: stage.items.filter(matchesFilters),
+  })),
+)
+
+const activeFilterCount = computed(() => {
+  let count = 0
+  if (sourceFilter.value.length) count++
+  if (errorOnly.value) count++
+  if (stuckOnly.value) count++
+  if (searchText.value.trim()) count++
+
+  return count
+})
+
+const resetFilters = () => {
+  sourceFilter.value = []
+  errorOnly.value = false
+  stuckOnly.value = false
+  searchText.value = ''
+}
+
+// ── Aggregate health snapshot across the whole board ────────────────────
+const totalsSummary = computed(() => {
+  const all = pipelineData.value.flatMap(s => s.items)
+  const failed = all.filter(i => i.hasFailed).length
+  const stuck  = all.filter(i => !i.hasFailed && isStuck(i)).length
+  const visible = filteredPipeline.value.flatMap(s => s.items).length
+
+  return { total: all.length, visible, failed, stuck }
+})
+
 const fetchPipeline = async () => {
   try {
     const response = await $api('/admin/ingestion/pipeline-status') as Record<string, PipelineItem[]>
@@ -148,15 +213,32 @@ const formatTimeAgo = (timestamp: string): string => {
     <!-- Stats Section -->
     <PipelineStats class="mb-6" />
 
-    <!-- Pipeline Board Header -->
+    <!-- Pipeline Board Header + Filter Bar (Phase 3.4 review screen) -->
     <VCard class="mb-6">
-      <VCardText class="d-flex align-center justify-space-between py-3">
+      <VCardText class="d-flex align-center justify-space-between py-3 flex-wrap gap-3">
         <div>
           <h5 class="text-h5">
             Content Ingestion Pipeline
           </h5>
           <span class="text-body-2 text-medium-emphasis">
             Auto-refreshes every 30 seconds
+            <span v-if="totalsSummary.total > 0" class="ms-2">
+              —
+              <strong>{{ totalsSummary.total }}</strong> items,
+              <span v-if="totalsSummary.failed" class="text-error">
+                <strong>{{ totalsSummary.failed }}</strong> failed
+              </span>
+              <span v-if="totalsSummary.failed && totalsSummary.stuck"> · </span>
+              <span v-if="totalsSummary.stuck" class="text-warning">
+                <strong>{{ totalsSummary.stuck }}</strong> stuck &gt; {{ STUCK_THRESHOLD_MIN }}m
+              </span>
+              <span
+                v-if="activeFilterCount > 0"
+                class="ms-2"
+              >
+                · showing <strong>{{ totalsSummary.visible }}</strong>
+              </span>
+            </span>
           </span>
         </div>
         <VBtn
@@ -170,6 +252,64 @@ const formatTimeAgo = (timestamp: string): string => {
             start
           />
           Refresh
+        </VBtn>
+      </VCardText>
+
+      <VDivider />
+
+      <VCardText class="d-flex align-center flex-wrap gap-3 py-3">
+        <VTextField
+          v-model="searchText"
+          density="compact"
+          variant="outlined"
+          prepend-inner-icon="ri-search-line"
+          placeholder="Search filename…"
+          hide-details
+          clearable
+          style="max-inline-size: 260px;"
+        />
+
+        <VSelect
+          v-model="sourceFilter"
+          :items="SOURCE_TYPES"
+          label="Source type"
+          density="compact"
+          variant="outlined"
+          multiple
+          chips
+          closable-chips
+          hide-details
+          clearable
+          style="min-inline-size: 220px;"
+        />
+
+        <VCheckbox
+          v-model="errorOnly"
+          label="Errors only"
+          density="compact"
+          hide-details
+          color="error"
+        />
+
+        <VCheckbox
+          v-model="stuckOnly"
+          :label="`Stuck > ${STUCK_THRESHOLD_MIN}m`"
+          density="compact"
+          hide-details
+          color="warning"
+        />
+
+        <VSpacer />
+
+        <VBtn
+          v-if="activeFilterCount > 0"
+          variant="text"
+          size="small"
+          color="secondary"
+          @click="resetFilters"
+        >
+          <VIcon icon="ri-close-line" start />
+          Clear ({{ activeFilterCount }})
         </VBtn>
       </VCardText>
     </VCard>
@@ -191,7 +331,7 @@ const formatTimeAgo = (timestamp: string): string => {
       class="pipeline-board"
     >
       <div
-        v-for="stage in pipelineData"
+        v-for="stage in filteredPipeline"
         :key="stage.key"
         class="pipeline-column"
       >
@@ -257,16 +397,35 @@ const formatTimeAgo = (timestamp: string): string => {
                 </template>
               </div>
 
-              <div class="d-flex align-center justify-space-between mt-1">
+              <div class="d-flex align-center justify-space-between mt-1 gap-1">
                 <span class="text-caption text-disabled">
                   {{ formatTimeAgo(item.stageEnteredAt) }}
                 </span>
-                <VIcon
-                  v-if="item.hasFailed"
-                  icon="ri-error-warning-fill"
-                  color="error"
-                  size="16"
-                />
+                <div class="d-flex align-center gap-1">
+                  <VIcon
+                    v-if="!item.hasFailed && isStuck(item)"
+                    icon="ri-time-line"
+                    color="warning"
+                    size="16"
+                    :title="`Stuck > ${STUCK_THRESHOLD_MIN}m`"
+                  />
+                  <VIcon
+                    v-if="item.hasFailed"
+                    icon="ri-error-warning-fill"
+                    color="error"
+                    size="16"
+                    :title="item.errorSummary ?? 'Ingest failure — open for details'"
+                  />
+                </div>
+              </div>
+
+              <!-- Inline error summary preview (one-liner, truncated) -->
+              <div
+                v-if="item.hasFailed && item.errorSummary"
+                class="text-caption text-error text-truncate mt-1"
+                :title="item.errorSummary"
+              >
+                {{ item.errorSummary }}
               </div>
             </VCardText>
           </VCard>
