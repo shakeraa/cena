@@ -24,7 +24,8 @@ jobs:
   static-rules:
     name: Static a11y rules (vitest node)
     runs-on: ubuntu-latest
-    continue-on-error: true  # advisory until RDY-030b fixes baseline gaps
+    # RDY-030b sub-task 4: baseline now clean across all three rules
+    # (reduced-motion, aria-live-on-dynamic, math-ltr-wrapper). Blocking.
     defaults:
       run:
         working-directory: src/student/full-version
