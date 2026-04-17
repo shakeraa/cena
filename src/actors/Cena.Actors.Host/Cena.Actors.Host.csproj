@@ -14,6 +14,12 @@
 
   <ItemGroup>
     <PackageReference Include="Proto.Cluster.TestProvider" Version="1.8.0" />
+    <!-- RDY-025b: Proto.Actor Kubernetes-based service discovery. Watches
+         pods labeled with the configured selector and seeds the cluster
+         membership list from their pod IPs. Requires the pod's service
+         account to have list/watch on pods in its namespace — provisioned
+         by deploy/helm/cena/templates/actors-rbac.yaml. -->
+    <PackageReference Include="Proto.Cluster.Kubernetes" Version="1.8.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />

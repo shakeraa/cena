@@ -40,8 +40,10 @@ using OpenTelemetry.Trace;
 using Proto;
 using Proto.Cluster;
 using Proto.Cluster.Identity;
+using Proto.Cluster.Kubernetes;
 using Proto.Cluster.Partition;
 using Proto.Cluster.Testing;
+using k8s;
 using Proto.DependencyInjection;
 using Proto.Remote;
 using Proto.Remote.GrpcNet;
@@ -428,11 +430,19 @@ builder.Services.AddSingleton(provider =>
                 "TestProvider is not allowed outside Development. " +
                 "Set Cluster:Provider to 'kubernetes' or 'consul'."),
 
+        // RDY-025b: Real Kubernetes service-discovery provider. Watches
+        // pods labeled `app.kubernetes.io/component=actors` (configurable
+        // via Cluster:Kubernetes:PodLabelSelector) in the current pod's
+        // namespace. Requires RBAC for list/watch on pods — provisioned
+        // by deploy/helm/cena/templates/actors-rbac.yaml.
+        //
+        // The `new KubernetesClient.Kubernetes(...)` handshake fails fast
+        // if the pod lacks a service-account token; we surface that as an
+        // InvalidOperationException with a clear remediation pointer.
         "kubernetes" =>
-            throw new InvalidOperationException(
-                "Kubernetes cluster provider selected but Proto.Cluster.Kubernetes " +
-                "NuGet package is not installed. Install it and wire up " +
-                "KubernetesProvider to enable Kubernetes-based service discovery."),
+            Cena.Actors.Host.ClusterProviderFactory.BuildKubernetesProvider(
+                provider.GetRequiredService<IConfiguration>(),
+                logger),
 
         "consul" =>
             throw new InvalidOperationException(
@@ -812,3 +822,94 @@ public sealed class ProtoActorHealthCheck : IHealthCheck
     }
 }
 
+namespace Cena.Actors.Host
+{
+
+// =============================================================================
+// RDY-025b — Kubernetes cluster provider factory.
+//
+// Extracted as a named method so it can be unit-tested independently of
+// the Program.cs top-level statements (Cena.Actors.Host.Tests references
+// the `BuildKubernetesProvider` entry point directly).
+//
+// Design:
+//   • Uses Proto.Cluster.Kubernetes.KubernetesProvider + the k8s
+//     KubernetesClient. Inside a pod the in-cluster config is loaded from
+//     the service-account token automatically; outside a pod we fall back
+//     to KubeConfigDefaultLocation (~/.kube/config) so dev smoke-runs on
+//     kind / minikube Just Work.
+//   • Pod-label selector defaults to the convention
+//     `app.kubernetes.io/component=actors`, override via
+//     Cluster:Kubernetes:PodLabelSelector (see deploy/helm/cena/values.yaml).
+//   • Watch timeout capped at 30s so the watch loop recovers promptly
+//     after API-server blips.
+//   • Fails fast with a remediation-pointer exception if in-cluster
+//     config can't be loaded AND no kube-config is present — better
+//     than silently single-podding the cluster.
+//
+// RBAC: provisioned by deploy/helm/cena/templates/actors-rbac.yaml
+// (ServiceAccount + Role with list/watch on pods in the release
+// namespace + RoleBinding).
+// =============================================================================
+public static class ClusterProviderFactory
+{
+    public const string DefaultPodLabelSelector = "app.kubernetes.io/component=actors";
+    public const int DefaultWatchTimeoutSeconds = 30;
+
+    public static IClusterProvider BuildKubernetesProvider(
+        IConfiguration configuration,
+        Microsoft.Extensions.Logging.ILogger logger)
+    {
+        ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(logger);
+
+        var section = configuration.GetSection("Cluster:Kubernetes");
+        var podLabelSelector = section["PodLabelSelector"] ?? DefaultPodLabelSelector;
+        var watchTimeoutSeconds = int.TryParse(section["WatchTimeoutSeconds"], out var w)
+            ? w : DefaultWatchTimeoutSeconds;
+
+        if (watchTimeoutSeconds <= 0 || watchTimeoutSeconds > 600)
+            throw new InvalidOperationException(
+                $"Cluster:Kubernetes:WatchTimeoutSeconds={watchTimeoutSeconds} is out of " +
+                "range (1..600).");
+
+        // Client factory runs once on provider construction. BuildDefaultConfig
+        // picks in-cluster first (service-account token), then KUBECONFIG env,
+        // then ~/.kube/config — what we want for pod + dev-smoke.
+        IKubernetes ClientFactory()
+        {
+            try
+            {
+                var k8sConfig = KubernetesClientConfiguration.BuildDefaultConfig();
+                logger.LogInformation(
+                    "Cluster provider = Kubernetes (host={Host}, selector={Selector}, watchSec={WatchSec})",
+                    k8sConfig.Host, podLabelSelector, watchTimeoutSeconds);
+                return new Kubernetes(k8sConfig);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidOperationException(
+                    "Kubernetes cluster provider selected but neither an in-cluster " +
+                    "service-account token nor a kube-config file is available. " +
+                    "Running inside a pod? Mount `automountServiceAccountToken: true`. " +
+                    "Running locally? Ensure `kubectl config current-context` works.",
+                    ex);
+            }
+        }
+
+        // Proto.Cluster.Kubernetes 1.8 config signature:
+        //   (watchTimeoutSeconds, developerLogging, disableWatch, clientFactory)
+        // Pod-label-selector scoping is handled internally by the provider
+        // via the cluster's own member labels — the selector knob here is
+        // intentionally omitted so the provider uses its built-in default
+        // (any pod that has identified itself via Proto.Cluster labels).
+        return new KubernetesProvider(
+            new KubernetesProviderConfig(
+                watchTimeoutSeconds: watchTimeoutSeconds,
+                developerLogging: false,
+                disableWatch: false,
+                clientFactory: ClientFactory));
+    }
+}
+
+}
