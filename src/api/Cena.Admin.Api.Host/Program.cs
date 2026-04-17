@@ -380,12 +380,18 @@ public partial class Program
         await next();
     });
     
-    // Middleware order: CORS → Auth → Revocation → FERPA Audit → RateLimiter → Endpoints
+    // Middleware order:
+    //   CORS → Auth → Revocation → FERPA read audit → Admin write audit → RateLimiter → Endpoints
+    // RDY-029 sub-task 5: AdminActionAuditMiddleware captures every
+    // POST/PUT/PATCH/DELETE on /api/admin/* into AuditEventDocument +
+    // a [AUDIT] structured log (shipped to Loki/ELK via the Serilog sink
+    // configured in appsettings.Production.json).
     app.UseCors();
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseMiddleware<TokenRevocationMiddleware>();
     app.UseMiddleware<StudentDataAuditMiddleware>();
+    app.UseMiddleware<AdminActionAuditMiddleware>();
     app.UseRateLimiter();
     
     // ---- Swagger / OpenAPI (RDY-009) ----
