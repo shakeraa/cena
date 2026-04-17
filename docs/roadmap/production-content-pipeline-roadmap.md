@@ -13,13 +13,28 @@ Spike complete, scaffold complete, **every OCR layer has a real implementation.*
 RDY-OCR-PORT closed 2026-04-17 (`adb706d`). 111/111 OCR tests pass.
 This doc is the single source of truth — update on every merge to main.
 
-**Phase status (commit `d65a802`, 2026-04-17)**:
+**Phase status (commit `3641516`, 2026-04-17)**:
 - Phase 1A ✅ — C# OCR cascade complete
 - Phase 1B ✅ — CAS production-readiness: all 4 slices landed
 - Phase 1C ✅ — Curator metadata handshake live
 - Phase 2  ✅ — Photo capture + upload + admin ingestion trio all on real IOcrCascadeService
-- Phase 3  ✅ — 3.1 / 3.2 / 3.3 / 3.4 all done (3.4 review screen shipped `d65a802`)
-- Phase 4  🚧 — 4.2 sidecar + 4.3 observability + 4.4 k6 E2E load (`dc85875`) done; only 4.1 OCR regression harness remains (environment-gated on tesseract + poppler)
+- Phase 3  ✅ — 3.1 / 3.2 / 3.3 / 3.4 all done
+- Phase 4  🚧 — 4.2 / 4.3 / 4.4 done; only 4.1 OCR regression harness remains (environment-gated on tesseract + poppler)
+
+**Readiness-folder shipped the same session**:
+  - RDY-017a (`170c00d`) — DLQ replay script CLI-version header,
+    NatsDlqHealthCheck unit tests, admin system-health DLQ depth widget
+  - RDY-025b (`da47899`) — Proto.Cluster.Kubernetes provider wiring +
+    ServiceAccount/Role/RoleBinding Helm template + 12 factory tests
+  - RDY-029 sub-task 1 (`fb1b4a4`) — CycloneDX SBOM workflow for 4 hosts
+  - RDY-029 sub-task 5 (`1526e41`) — AdminActionAuditMiddleware:
+    structured [AUDIT] log + AuditEventDocument for every admin write
+  - RDY-030b sub-tasks 1–4 (`5e243d9` + `d5382a7` + `1056cc4`) —
+    reduced-motion on 18 components, aria-live on 2 components,
+    math-ltr probe fix, a11y CI flipped from advisory to blocking
+  - RDY-032 (`3641516`) — pilot data exporter service + SuperAdmin
+    endpoint + SHA-256 pseudonymization + ADR-0003 filtering +
+    referential-integrity quality checks
 
 **RDY-034 flow-state tri-slice**: ALL LANDED
   - slice 1 (`907ca6c`) — `FlowStateService` + `POST /api/sessions/flow-state/assess`
@@ -33,9 +48,14 @@ analyzer), plans per-cluster `AiGenerateRequest` bundles weighted by
 the ministry reference distribution, drives the existing
 `BatchGenerateAsync` (CAS-gated). NO new write paths.
 
-**Next ship**: Phase 4.1 OCR regression harness (needs tesseract+poppler
-binaries + baseline generation — environment-gated). Every other slice
-is green on origin/main.
+**Next ship (code-reachable)**: none — every readiness task that doesn't
+require cluster infra, pilot data, or human content work has landed.
+**Environment-gated remainder**:
+  - Phase 4.1 OCR regression harness (needs tesseract + poppler locally)
+  - RDY-025c deploy validation (needs kind/staging cluster)
+  - RDY-024b BKT Phase B (needs pilot-completion data)
+**Non-code remainder**: RDY-004b translation, RDY-005 legal docs,
+RDY-019d Bagrut curriculum expert review (Amjad).
 
 ## 2. OCR layer scoreboard (as of commit `adb706d`)
 
