@@ -56,12 +56,18 @@ public class SessionEndpointsNormalizationTests
 
     // ── Normalization produces correct answer match ──
 
+    // Invariant: normalized output is ASCII-safe — digits become ASCII
+    // digits, variables become ASCII letters, Arabic math terms become
+    // ASCII keywords ("جذر" → "sqrt"), and math operators are flattened
+    // to their ASCII equivalents (× → *, ÷ → /, − → -). This keeps JSON,
+    // SymPy inputs, logs, and correct-answer comparisons all on the
+    // same narrow character set downstream.
     [Theory]
     [InlineData("س+١", "x+1", "math", true)]       // Arabic var + digit → Latin
-    [InlineData("ص²+٣", "y²+3", "math", true)]     // Arabic var + superscript + digit
+    [InlineData("ص²+٣", "y²+3", "math", true)]     // Arabic var + superscript + digit (² is not an Arabic digit — preserved)
     [InlineData("x+1", "x+1", "math", false)]       // Latin input → no normalization needed
-    [InlineData("ت×م", "a×m", "physics", true)]     // Physics context: ت→a (acceleration)
-    [InlineData("ت×م", "t×m", "math", true)]        // Math context: ت→t
+    [InlineData("ت×م", "a*m", "physics", true)]     // Physics context: ت→a (acceleration), × → * (ASCII invariant)
+    [InlineData("ت×م", "t*m", "math", true)]        // Math context:    ت→t, × → * (ASCII invariant)
     public void NormalizationProducesCorrectAnswerMatch(
         string studentInput, string expectedNormalized, string subject, bool expectsNormalization)
     {
