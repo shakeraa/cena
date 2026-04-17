@@ -115,3 +115,10 @@ firebase-debug.log
 logs/
 
 .fake
+# RDY-019b: Ministry Bagrut reference corpus — NEVER shipped (reference-only).
+# See memory:bagrut_reference_only and ADR-0033. The scraper at
+# scripts/bagrut-scraper.py writes here; analysis.json may be committed
+# (structural summary only), but raw PDFs and extracted text must stay local.
+corpus/bagrut/reference/**
+!corpus/bagrut/reference/analysis.json
+!corpus/bagrut/reference/.gitkeep

@@ -1,207 +1,169 @@
 #!/usr/bin/env python3
 """
-RDY-019: Bagrut Exam Corpus Scraper Framework
+Cena Platform — Bagrut Reference Scraper (RDY-019b / Phase 3)
 
-Downloads Bagrut exam PDFs from the Ministry of Education archive,
-extracts questions using OCR, and structures them as QuestionDocument
-events for ingestion into the Cena question bank.
+Downloads Israeli Ministry of Education Bagrut mathematics exam PDFs from
+the public archive at meyda.education.gov.il/sheeloney_bagrut/ for
+**reference-only** structural analysis. Raw PDFs stay local (under
+corpus/bagrut/reference/, git-ignored) — student-facing items are
+AI-authored CAS-gated recreations per ADR-0033 + memory:bagrut_reference_only.
 
-Source: https://meyda.education.gov.il/sheeloney_bagrut/
+Polite-crawl defaults:
+  * 2-second delay between requests
+  * respects robots.txt (checked at startup)
+  * resumes from checkpoint file (corpus/bagrut/reference/.checkpoint.json)
 
 Usage:
-    python scripts/bagrut-scraper.py --exam-code 806 --year 2024
-    python scripts/bagrut-scraper.py --list-available
-    python scripts/bagrut-scraper.py --extract --input exams/806_2024.pdf --output questions/
+    python scripts/bagrut-scraper.py --track 5u --year 2020 --year 2021
+    python scripts/bagrut-scraper.py --dry-run        # list URLs, download nothing
+    python scripts/bagrut-scraper.py --resume          # pick up from checkpoint
 
-Prerequisites:
-    pip install requests pdfplumber
+Requires: requests, beautifulsoup4  (install via: pip install -r requirements.txt)
 
-NOTE: Actual OCR integration requires Gemini Vision or Mathpix API keys.
-      This script provides the framework; math OCR uses the existing
-      GeminiOcrClient / MathpixClient from the Cena pipeline.
+IMPORTANT — legal posture
+=========================
+This script does NOT redistribute Ministry content. PDFs are downloaded to
+a local git-ignored directory and used only as input to the structural
+analyzer at scripts/bagrut-reference-analyzer.py, which emits aggregate
+topic × difficulty × format distributions. Individual question text is
+NEVER persisted to Marten or published to students — see ADR-0033.
 """
 
+from __future__ import annotations
+
 import argparse
+import hashlib
 import json
+import logging
 import sys
+import time
+import urllib.parse
+import urllib.robotparser
+from dataclasses import dataclass
 from pathlib import Path
-from datetime import datetime
 
-# Bagrut exam codes for math tracks
-EXAM_CODES = {
-    "803": {"name": "Mathematics 3-Unit", "track": "math_3u"},
-    "804": {"name": "Mathematics 4-Unit", "track": "math_4u"},
-    "806": {"name": "Mathematics 5-Unit (Calc+Geometry)", "track": "math_5u"},
-    "807": {"name": "Mathematics 5-Unit (Calc+Probability)", "track": "math_5u"},
-    "036": {"name": "Physics", "track": "physics"},
-}
+try:
+    import requests
+    from bs4 import BeautifulSoup
+except ImportError:
+    sys.stderr.write(
+        "bagrut-scraper.py: requests + beautifulsoup4 required. "
+        "Install: pip install requests beautifulsoup4\n")
+    sys.exit(2)
 
-# Ministry archive base URL
-ARCHIVE_BASE = "https://meyda.education.gov.il/sheeloney_bagrut"
+BASE_URL = "https://meyda.education.gov.il/sheeloney_bagrut/"
+USER_AGENT = "Cena-Bagrut-Reference-Crawler/1.0 (+https://github.com/shakeraa/cena; bagrut-reference-only)"
+POLITE_DELAY_SECONDS = 2.0
+TIMEOUT_SECONDS = 30
 
-# Load taxonomy for topic mapping
-TAXONOMY_PATH = Path(__file__).parent / "bagrut-taxonomy.json"
-
-
-def load_taxonomy():
-    """Load the Bagrut topic taxonomy."""
-    if not TAXONOMY_PATH.exists():
-        print(f"ERROR: Taxonomy file not found at {TAXONOMY_PATH}")
-        sys.exit(1)
-    with open(TAXONOMY_PATH) as f:
-        return json.load(f)
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+log = logging.getLogger("bagrut-scraper")
 
 
-def list_available():
-    """List available exam codes and their tracks."""
-    print("Available Bagrut exam codes:")
-    print(f"{'Code':<8} {'Name':<45} {'Track'}")
-    print("-" * 70)
-    for code, info in EXAM_CODES.items():
-        print(f"{code:<8} {info['name']:<45} {info['track']}")
+@dataclass
+class ExamPaper:
+    year: int
+    track: str          # "3u" | "4u" | "5u"
+    exam_code: str
+    url: str
+    local_path: Path
 
 
-def generate_download_url(exam_code: str, year: int, moed: str = "A") -> str:
-    """Generate the expected URL for a Bagrut exam PDF."""
-    # Ministry URL pattern (may vary by year)
-    return f"{ARCHIVE_BASE}/{exam_code}_{year}_{moed}.pdf"
+def check_robots(session: requests.Session) -> bool:
+    rp = urllib.robotparser.RobotFileParser()
+    rp.set_url(urllib.parse.urljoin(BASE_URL, "/robots.txt"))
+    try:
+        rp.read()
+    except Exception as ex:
+        log.warning("robots.txt fetch failed: %s — aborting out of caution", ex)
+        return False
+    ok = rp.can_fetch(USER_AGENT, BASE_URL)
+    log.info("robots.txt allows crawl=%s", ok)
+    return ok
 
 
-def extract_questions_from_pdf(pdf_path: str, exam_code: str) -> list[dict]:
-    """
-    Extract questions from a Bagrut exam PDF.
-
-    This is the framework — actual implementation requires:
-    1. pdfplumber for text extraction
-    2. Gemini Vision / Mathpix for math OCR
-    3. Heuristic page/question boundary detection
-
-    Returns a list of structured question dicts.
-    """
-    questions = []
-
-    # Framework: each extracted question should have this structure
-    template = {
-        "stem": "",           # Question text (Hebrew)
-        "stemHtml": "",       # HTML-formatted stem
-        "subject": "Math",
-        "topic": "",          # Mapped from taxonomy
-        "grade": "",          # "3 Units" / "4 Units" / "5 Units"
-        "bloomLevel": 3,      # Estimated from question type
-        "difficulty": 0.5,    # Calibrated later via IRT
-        "concepts": [],       # Concept IDs from taxonomy
-        "language": "he",
-        "source": "ingested",
-        "sourceDocument": pdf_path,
-        "sourceUrl": "",
-        "examCode": exam_code,
-        "examYear": 0,
-        "bagrutAlignment": {
-            "examCode": exam_code,
-            "part": "",       # "A" or "B"
-            "typicalPosition": None,
-            "topicCluster": "",
-            "isProofQuestion": False,
-            "estimatedMinutes": 15,
-        },
-        "options": [],        # For MCQ: [{label, text, isCorrect, rationale}]
-        "explanation": "",    # Solution explanation
-    }
-
-    print(f"  Framework: Would extract questions from {pdf_path}")
-    print(f"  Exam code: {exam_code}")
-    print(f"  NOTE: Actual OCR requires Gemini Vision or Mathpix API keys")
-    print(f"  Template structure: {list(template.keys())}")
-
-    return questions
+def discover_papers(session: requests.Session, tracks: list[str], years: list[int]) -> list[ExamPaper]:
+    """Placeholder: the Ministry site's directory structure changes per
+    academic year. The real implementation walks the index pages and
+    filters by track + year. Kept as a stub loop to document the shape —
+    run in DRY-RUN mode first to confirm URL patterns before committing."""
+    log.warning(
+        "discover_papers: NOT YET CONFIGURED for the current Ministry site "
+        "layout. Populate via manual URL list or extend with the site-"
+        "specific directory walker before production crawls.")
+    return []
 
 
-def map_to_taxonomy(question: dict, taxonomy: dict) -> dict:
-    """Map an extracted question to the formal taxonomy."""
-    track = EXAM_CODES.get(question.get("examCode", ""), {}).get("track", "math_5u")
-    track_data = taxonomy.get("tracks", {}).get(track, {})
-
-    # TODO: Use NLP / keyword matching to map question stem to taxonomy topic
-    # For now, return the question with empty concept mapping
-    return question
-
-
-def coverage_report(taxonomy: dict, questions: list[dict]) -> dict:
-    """Generate a coverage report: questions per taxonomy node."""
-    report = {}
-
-    for track_id, track_data in taxonomy.get("tracks", {}).items():
-        track_report = {"name": track_data["name"], "topics": {}}
-
-        for topic_id, topic_data in track_data.get("topics", {}).items():
-            topic_report = {"name": topic_data["name"], "subtopics": {}}
-
-            for subtopic_id, subtopic_data in topic_data.get("subtopics", {}).items():
-                concept_id = subtopic_data.get("conceptId", "")
-                count = sum(1 for q in questions if concept_id in q.get("concepts", []))
-                topic_report["subtopics"][subtopic_id] = {
-                    "conceptId": concept_id,
-                    "questionCount": count,
-                    "gap": count == 0,
-                }
-
-            topic_report["totalQuestions"] = sum(
-                s["questionCount"] for s in topic_report["subtopics"].values()
-            )
-            topic_report["gaps"] = [
-                s_id for s_id, s in topic_report["subtopics"].items() if s["gap"]
-            ]
-            track_report["topics"][topic_id] = topic_report
-
-        report[track_id] = track_report
-
-    return report
+def download_pdf(session: requests.Session, paper: ExamPaper) -> bool:
+    paper.local_path.parent.mkdir(parents=True, exist_ok=True)
+    if paper.local_path.exists():
+        log.info("skip existing %s", paper.local_path)
+        return True
+    log.info("download %s → %s", paper.url, paper.local_path)
+    r = session.get(paper.url, timeout=TIMEOUT_SECONDS)
+    if r.status_code != 200:
+        log.error("HTTP %s on %s", r.status_code, paper.url)
+        return False
+    paper.local_path.write_bytes(r.content)
+    time.sleep(POLITE_DELAY_SECONDS)
+    return True
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Bagrut Exam Corpus Scraper")
-    parser.add_argument("--list-available", action="store_true", help="List exam codes")
-    parser.add_argument("--exam-code", type=str, help="Exam code (e.g., 806)")
-    parser.add_argument("--year", type=int, help="Exam year")
-    parser.add_argument("--extract", action="store_true", help="Extract from local PDF")
-    parser.add_argument("--input", type=str, help="Input PDF path")
-    parser.add_argument("--output", type=str, default="questions/", help="Output directory")
-    parser.add_argument("--coverage", action="store_true", help="Show coverage report")
-    args = parser.parse_args()
+def load_checkpoint(path: Path) -> dict:
+    return json.loads(path.read_text()) if path.exists() else {"downloaded": []}
 
-    if args.list_available:
-        list_available()
-        return
 
-    taxonomy = load_taxonomy()
+def save_checkpoint(path: Path, state: dict) -> None:
+    path.write_text(json.dumps(state, indent=2))
 
-    if args.coverage:
-        # Generate coverage report with current seed data (empty for now)
-        report = coverage_report(taxonomy, [])
-        print(json.dumps(report, indent=2, ensure_ascii=False))
-        return
 
-    if args.extract and args.input:
-        exam_code = args.exam_code or "806"
-        questions = extract_questions_from_pdf(args.input, exam_code)
+def main() -> int:
+    ap = argparse.ArgumentParser(description="Cena Bagrut reference scraper")
+    ap.add_argument("--track", action="append", default=[], help="Tracks: 3u | 4u | 5u (repeatable)")
+    ap.add_argument("--year", action="append", type=int, default=[], help="Years (repeatable)")
+    ap.add_argument("--dry-run", action="store_true", help="Discover URLs only, no downloads")
+    ap.add_argument("--resume", action="store_true", help="Resume from checkpoint")
+    ap.add_argument("--out", type=Path, default=Path("corpus/bagrut/reference"))
+    args = ap.parse_args()
 
-        if questions:
-            output_dir = Path(args.output)
-            output_dir.mkdir(parents=True, exist_ok=True)
-            output_file = output_dir / f"bagrut_{exam_code}_{datetime.now():%Y%m%d}.json"
-            with open(output_file, "w", encoding="utf-8") as f:
-                json.dump(questions, f, indent=2, ensure_ascii=False)
-            print(f"Extracted {len(questions)} questions to {output_file}")
-        return
+    tracks = args.track or ["3u", "4u", "5u"]
+    years = args.year or list(range(2018, 2025))
 
-    if args.exam_code and args.year:
-        url = generate_download_url(args.exam_code, args.year)
-        print(f"Download URL: {url}")
-        print("NOTE: Automatic download not implemented. Download manually and use --extract.")
-        return
+    session = requests.Session()
+    session.headers["User-Agent"] = USER_AGENT
 
-    parser.print_help()
+    if not check_robots(session):
+        log.error("robots.txt disallows crawl — aborting.")
+        return 1
+
+    checkpoint_path = args.out / ".checkpoint.json"
+    state = load_checkpoint(checkpoint_path) if args.resume else {"downloaded": []}
+
+    papers = discover_papers(session, tracks, years)
+    if not papers:
+        log.warning("No papers discovered — scraper needs site-layout configuration before production runs.")
+        return 2
+
+    ok = 0
+    for paper in papers:
+        key = hashlib.sha256(paper.url.encode()).hexdigest()
+        if key in state["downloaded"]:
+            continue
+        if args.dry_run:
+            log.info("DRY-RUN %s", paper.url)
+            ok += 1
+            continue
+        if download_pdf(session, paper):
+            state["downloaded"].append(key)
+            save_checkpoint(checkpoint_path, state)
+            ok += 1
+
+    log.info("done: %d/%d papers processed", ok, len(papers))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
