@@ -203,6 +203,12 @@ public partial class Program
     // ---- MST-011: Scaffolding Service (stateless pure function wrapper) ----
     builder.Services.AddSingleton<IScaffoldingService, ScaffoldingServiceWrapper>();
     
+    // ---- RDY-034: Flow state service (consumes ICognitiveLoadService) ----
+    // Registered in both actor + student hosts so the assessment endpoint
+    // and any in-process actor consumer resolve the same implementation.
+    builder.Services.AddSingleton<ICognitiveLoadService, CognitiveLoadService>();
+    builder.Services.AddSingleton<IFlowStateService, FlowStateService>();
+
     // ---- FIND-pedagogy-003: Real BKT posterior for session answer endpoint ----
     // BktService is stateless, allocation-free on the hot path, and cheap to
     // instantiate — singleton is fine. The student API host used to compute
@@ -731,6 +737,11 @@ public partial class Program
     
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();
+
+    // RDY-034: Flow state assessment endpoint — computes state + action
+    // from session signals supplied by the caller. Frontend parity with
+    // src/student/full-version/src/composables/useFlowState.ts.
+    app.MapFlowStateEndpoints();
     
     // Plan/Recommendation endpoints (STB-02)
     app.MapPlanEndpoints();

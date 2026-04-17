@@ -193,6 +193,9 @@ builder.Services.AddSingleton<IBktCalibrationProvider, ConfigurableBktCalibratio
 builder.Services.AddSingleton<IBagrutAnchorProvider, BagrutAnchorProvider>();
 builder.Services.AddSingleton<IHlrService, HlrService>();
 builder.Services.AddSingleton<ICognitiveLoadService, CognitiveLoadService>();
+// RDY-034: Flow state service — maps session signals to the 5-state flow
+// machine shared with the student PWA useFlowState composable.
+builder.Services.AddSingleton<IFlowStateService, FlowStateService>();
 builder.Services.AddSingleton<IHintGenerator, HintGenerator>();
 builder.Services.AddSingleton<IHintAdjustedBktService, HintAdjustedBktService>();
 builder.Services.AddSingleton<IHintGenerationService, HintGenerationService>();
