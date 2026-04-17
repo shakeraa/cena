@@ -28,6 +28,7 @@ public sealed class LearningSessionActor : IActor
     private readonly IBktService _bkt;
     private readonly IHintAdjustedBktService _hintAdjustedBkt;
     private readonly ICognitiveLoadService _cognitiveLoad;
+    private readonly IFlowStateService _flowState;
     private readonly IHintGenerator _hintGenerator;
     private readonly IHintGenerationService _hintGenerationService;
     private readonly IConfusionDetector _confusionDetector;
@@ -51,6 +52,15 @@ public sealed class LearningSessionActor : IActor
     private int _consecutiveHighFatigue;
     private readonly Queue<double> _recentAccuracies = new();
     private readonly Queue<double> _recentResponseTimes = new();
+
+    // ── RDY-034 slice 3: flow-state transition tracking ──
+    // _lastFlowState is null until the first answer fires. On each answer
+    // we recompute the state and emit [FLOW_STATE_TRANSITION] only when
+    // the state differs from the previous one, so analytics collapsers
+    // don't have to dedupe. Keeps server-side authority on the state
+    // machine; clients just render what the backend reports.
+    private FlowStateKind? _lastFlowState;
+    private int _consecutiveCorrect;
 
     // ── Cached cognitive state (SAI-005: reused by DeliveryGate in both hint and explanation paths) ──
     private ConfusionState _lastConfusionState = ConfusionState.NotConfused;
@@ -96,6 +106,7 @@ public sealed class LearningSessionActor : IActor
         IBktService bkt,
         IHintAdjustedBktService hintAdjustedBkt,
         ICognitiveLoadService cognitiveLoad,
+        IFlowStateService flowState,
         IHintGenerator hintGenerator,
         IHintGenerationService hintGenerationService,
         IConfusionDetector confusionDetector,
@@ -110,6 +121,7 @@ public sealed class LearningSessionActor : IActor
         _bkt = bkt;
         _hintAdjustedBkt = hintAdjustedBkt;
         _cognitiveLoad = cognitiveLoad;
+        _flowState = flowState ?? throw new ArgumentNullException(nameof(flowState));
         _hintGenerator = hintGenerator;
         _hintGenerationService = hintGenerationService;
         _confusionDetector = confusionDetector;
@@ -243,6 +255,13 @@ public sealed class LearningSessionActor : IActor
         _fatigueScore = ComputeFatigueScore();
         _fatigueHistogram.Record(_fatigueScore);
 
+        // RDY-034 slice 3: emit [FLOW_STATE_TRANSITION] when the
+        // authoritative backend state changes. Consumes the same fatigue
+        // score + rolling-window signals so server-side, client-side
+        // (useFlowState composable), and the GET /api/sessions/{id}
+        // response all agree.
+        EmitFlowStateIfTransitioned(req.IsCorrect);
+
         // Check fatigue threshold
         bool shouldEndSession = false;
         if (_fatigueScore > FatigueThreshold)
@@ -305,6 +324,65 @@ public sealed class LearningSessionActor : IActor
         ));
 
         return Task.CompletedTask;
+    }
+
+    // ── RDY-034 slice 3: flow-state transition emission ──
+    //
+    // Called once per answer after _fatigueScore is refreshed. Updates the
+    // consecutive-correct streak, asks IFlowStateService for the canonical
+    // state, and logs a structured transition record when the state
+    // differs from the previously observed one. Idempotent: repeated
+    // calls in the same state are silent (only transitions are logged).
+    internal void EmitFlowStateIfTransitioned(bool lastAnswerCorrect)
+    {
+        _consecutiveCorrect = lastAnswerCorrect ? _consecutiveCorrect + 1 : 0;
+
+        var rolling5 = _recentAccuracies.Count >= 5
+            ? _recentAccuracies.TakeLast(5).Sum() / 5.0
+            : _recentAccuracies.Count > 0
+                ? _recentAccuracies.Sum() / _recentAccuracies.Count
+                : 0.0;
+        var trend = Math.Clamp(rolling5 - _baselineAccuracy, -1.0, 1.0);
+        var elapsedMin = (DateTimeOffset.UtcNow - _startedAt).TotalMinutes;
+
+        var assessment = _flowState.Assess(
+            fatigueLevel: _fatigueScore,
+            accuracyTrend: trend,
+            consecutiveCorrect: _consecutiveCorrect,
+            sessionDurationMinutes: elapsedMin);
+
+        if (_lastFlowState != assessment.State)
+        {
+            var trigger = ResolveTransitionTrigger(_lastFlowState, assessment);
+            _logger.LogInformation(
+                "[FLOW_STATE_TRANSITION] session={SessionId} student={StudentId} from={From} to={To} trigger={Trigger} fatigue={Fatigue:F2} trend={Trend:F2} streak={Streak} duration_min={DurationMin:F1}",
+                _sessionId, _studentId,
+                _lastFlowState?.ToString() ?? "initial",
+                assessment.State,
+                trigger,
+                _fatigueScore,
+                trend,
+                _consecutiveCorrect,
+                elapsedMin);
+            _lastFlowState = assessment.State;
+        }
+    }
+
+    // Translates the (from, to, assessment) triple into a short human trigger
+    // that analytics can group by without reverse-engineering the state machine.
+    private static string ResolveTransitionTrigger(FlowStateKind? from, FlowStateAssessment a)
+    {
+        return a.State switch
+        {
+            FlowStateKind.Fatigued    when a.SessionDurationMinutes > 45 => "session_timeout",
+            FlowStateKind.Fatigued                                       => "fatigue_threshold",
+            FlowStateKind.Disrupted                                      => "accuracy_decline",
+            FlowStateKind.InFlow                                         => "streak_in_flow",
+            FlowStateKind.Approaching when from == FlowStateKind.Warming => "first_correct",
+            FlowStateKind.Approaching                                    => "momentum_rebuild",
+            FlowStateKind.Warming                                        => "session_start",
+            _                                                            => "unspecified",
+        };
     }
 
     // ── Fatigue Score (delegates to ICognitiveLoadService — single source of truth) ──

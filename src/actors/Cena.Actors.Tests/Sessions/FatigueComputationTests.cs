@@ -21,6 +21,12 @@ public sealed class FatigueComputationTests
         var bkt = Substitute.For<IBktService>();
         var hintAdjustedBkt = Substitute.For<IHintAdjustedBktService>();
         var cognitiveLoad = new CognitiveLoadService();
+        // RDY-034 slice 3: real FlowStateService so the fatigue tests keep
+        // exercising the production path end-to-end (actor now depends on
+        // IFlowStateService for per-answer transition emission).
+        var flowState = new FlowStateService(
+            cognitiveLoad,
+            Substitute.For<ILogger<FlowStateService>>());
         var logger = Substitute.For<ILogger<LearningSessionActor>>();
         var meterFactory = Substitute.For<IMeterFactory>();
         meterFactory.Create(Arg.Any<MeterOptions>()).Returns(new Meter("test"));
@@ -33,7 +39,8 @@ public sealed class FatigueComputationTests
         var personalizedExplanation = Substitute.For<IPersonalizedExplanationService>();
         Func<Cena.Actors.Tutoring.TutorActor> tutorFactory = () => throw new InvalidOperationException("TutorActor not expected in fatigue tests");
         _actor = new LearningSessionActor(
-            bkt, hintAdjustedBkt, cognitiveLoad, hintGenerator, hintGenerationService,
+            bkt, hintAdjustedBkt, cognitiveLoad, flowState,
+            hintGenerator, hintGenerationService,
             confusionDetector, disengagementClassifier, deliveryGate, personalizedExplanation,
             tutorFactory, graphCache, logger, meterFactory);
     }
