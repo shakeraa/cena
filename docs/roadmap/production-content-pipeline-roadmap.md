@@ -13,13 +13,13 @@ Spike complete, scaffold complete, **every OCR layer has a real implementation.*
 RDY-OCR-PORT closed 2026-04-17 (`adb706d`). 111/111 OCR tests pass.
 This doc is the single source of truth — update on every merge to main.
 
-**Phase status (commit `f52066f`, 2026-04-17)**:
+**Phase status (commit `d65a802`, 2026-04-17)**:
 - Phase 1A ✅ — C# OCR cascade complete
 - Phase 1B ✅ — CAS production-readiness: all 4 slices landed
 - Phase 1C ✅ — Curator metadata handshake live
 - Phase 2  ✅ — Photo capture + upload + admin ingestion trio all on real IOcrCascadeService
-- Phase 3  ✅ — 3.1 / 3.2 / 3.3 all done; 3.4 admin pipeline.vue review screen still scaffold-heavy
-- Phase 4  🚧 — 4.2 sidecar + 4.3 observability done; 4.1 regression harness + 4.4 load test remain
+- Phase 3  ✅ — 3.1 / 3.2 / 3.3 / 3.4 all done (3.4 review screen shipped `d65a802`)
+- Phase 4  🚧 — 4.2 sidecar + 4.3 observability + 4.4 k6 E2E load (`dc85875`) done; only 4.1 OCR regression harness remains (environment-gated on tesseract + poppler)
 
 **RDY-034 flow-state tri-slice**: ALL LANDED
   - slice 1 (`907ca6c`) — `FlowStateService` + `POST /api/sessions/flow-state/assess`
@@ -34,8 +34,8 @@ the ministry reference distribution, drives the existing
 `BatchGenerateAsync` (CAS-gated). NO new write paths.
 
 **Next ship**: Phase 4.1 OCR regression harness (needs tesseract+poppler
-binaries + baseline generation — environment-gated), then Phase 4.4 E2E
-load test.
+binaries + baseline generation — environment-gated). Every other slice
+is green on origin/main.
 
 ## 2. OCR layer scoreboard (as of commit `adb706d`)
 
@@ -114,16 +114,16 @@ All 9 slices shipped. See §3 for commit list.
 | 3.1 | RDY-019a — Bagrut topic taxonomy + remap existing questions | taxonomy.json shipped | ✅ done |
 | 3.2 | RDY-019b — Ministry scrape + AI recreation (unblocked: cost now <$1) | scraper scaffold `ba0fca6`; recreation loop + admin endpoint `870f6e0` | ✅ done |
 | 3.3 | RDY-019c — 3u/4u seed + coverage report | `f442b0e` | ✅ done |
-| 3.4 | Admin UI `pipeline.vue` + CuratorMetadata review screen | CuratorMetadataPanel `524ff28` (review screen exists; full pipeline.vue still scaffold-heavy) | 🚧 partial |
+| 3.4 | Admin UI `pipeline.vue` + CuratorMetadata review screen | CuratorMetadataPanel `524ff28` + filter bar / stuck-item indicators / inline error previews `d65a802` | ✅ done |
 
 ### Phase 4 — Production hardening
 
 | # | Slice | Landed | State |
 |---|---|---|---|
-| 4.1 | Integration tests + frozen fixture regression (fail CI on > 5 pp WER/math drop) | — | ⬜ pending |
+| 4.1 | Integration tests + frozen fixture regression (fail CI on > 5 pp WER/math drop) | — | ⬜ pending (env-gated) |
 | 4.2 | OCR sidecar container + K8s manifest + HF pre-warm init-container | `docker/ocr-sidecar/` + `k8s/ocr-sidecar/` + `docker-compose.ocr-sidecar.yml` | ✅ done |
 | 4.3 | Observability — `[OCR_CASCADE]` metrics, Prometheus alerts, Grafana dashboard | `370276e` (OcrMetrics + alerts) + dashboard JSON on main | ✅ done |
-| 4.4 | End-to-end load test (subsumes 1B.4) | — | ⬜ pending |
+| 4.4 | End-to-end load test (subsumes 1B.4) | `tests/load/e2e-student-journey.js` + `tests/load/e2e-admin-corpus.js` + `.github/workflows/e2e-load-nightly.yml` shipped `dc85875` | ✅ done |
 
 ## 5. Architectural decisions
 
