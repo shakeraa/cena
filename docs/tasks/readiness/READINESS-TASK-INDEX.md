@@ -28,7 +28,7 @@
 | [RDY-026](../../tasks/readiness/RDY-026-arabic-input-normalization.md) | Arabic Variable Input Normalization | 3-5 days | — | In Progress |
 | [RDY-027](../../tasks/readiness/RDY-027-glossary-validation.md) | Math/Physics Glossary Curation | 2-3 weeks | — | Pending |
 | [RDY-033](../../tasks/readiness/done/RDY-033-error-pattern-matching.md) | Error Pattern Matching Infrastructure | 2-3 weeks | — | **Done** (RDY-033 + 033b + 033c merged; ADR-0031) |
-| [RDY-034](../../tasks/readiness/RDY-034-cas-gated-question-ingestion.md) | CAS-Gated Question Ingestion (ADR-0002 enforcement) | 3-5 days | RDY-033 | **Critical / ship-blocker** — no CAS verification runs on question creation today |
+| [RDY-034](../../tasks/readiness/done/RDY-034-cas-gated-question-ingestion.md) | CAS-Gated Question Ingestion (ADR-0002 enforcement) | 3-5 days | RDY-033 | **Done** (ADR-0032; CasVerificationGate + CasGatedQuestionPersister + SeedLoaderMustUseQuestionBankServiceTest guardrail) |
 
 > **Rami additions**: RDY-033 (error pattern matching) is a prerequisite for RDY-014. RDY-005 effort doubled after legal cost analysis ($15-30K). RDY-007 is data-dependent — consider splitting into implementation + post-pilot calibration.
 
@@ -47,7 +47,7 @@
 | [RDY-028](../../tasks/readiness/RDY-028-bagrut-calibration-baseline.md) | Bagrut Calibration Baseline | 2-3 weeks | RDY-019, RDY-032 | Pending |
 | [RDY-029](../../tasks/readiness/RDY-029-security-hardening.md) | Security Hardening Bundle (12 sub-tasks) | 3-4 weeks | — | Pending |
 | [RDY-030](../../tasks/readiness/RDY-030-a11y-test-automation.md) | A11y Test Automation | 3-5 days | RDY-015 | Pending |
-| [RDY-034](../../tasks/readiness/RDY-034-flow-state-backend-api.md) | Flow State Backend API | 1-2 weeks | RDY-020 | Pending |
+| [RDY-034b](../../tasks/readiness/done/RDY-034-flow-state-backend-api.md) | Flow State Backend API | 1-2 weeks | RDY-020 | **Done** (slice 1 assess endpoint + slice 2 session fold + slice 3 actor transitions) |
 
 ## Tier 3 — Medium (polish, calibration, DX)
 
@@ -68,10 +68,10 @@
 ## Summary
 
 - **Total tasks**: 37 (25 original + 6 cross-review + 3 Rami + 3 sub-tasks)
-- **Done**: 20 (54%) | **In Progress**: 2 | **Pending**: 15
+- **Done**: 22 (59%) | **In Progress**: 2 | **Pending**: 13
 - **Tier 0 (ship-blockers)**: 5 tasks (3 done, 2 pending)
-- **Tier 1 (critical)**: 9 tasks (4 done, 1 in-progress, 4 pending)
-- **Tier 2 (high)**: 12 tasks (7 done, 1 in-progress, 4 pending)
+- **Tier 1 (critical)**: 9 tasks (5 done, 1 in-progress, 3 pending)
+- **Tier 2 (high)**: 12 tasks (8 done, 1 in-progress, 3 pending)
 - **Tier 3 (medium)**: 11 tasks (6 done, 5 pending)
 - **Dependency graph**: [READINESS-DEPENDENCY-GRAPH.md](READINESS-DEPENDENCY-GRAPH.md) | `npx tsx scripts/readiness-dependency-check.ts`
 
