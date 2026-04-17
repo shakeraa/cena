@@ -125,3 +125,7 @@ corpus/bagrut/reference/**
 
 # CAS gate operator config (RDY-036): real values never ship
 config/cas-gate/cas-gate.env
+
+# RDY-032: pilot data export output (GDPR — never commit)
+data/pilot/
+

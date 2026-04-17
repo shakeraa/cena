@@ -8,6 +8,7 @@ using Cena.Actors.Cas;
 using Cena.Admin.Api.Content;
 using Cena.Admin.Api.Endpoints;
 using Cena.Admin.Api.Ingestion;
+using Cena.Admin.Api.Pilot;
 using Cena.Admin.Api.QualityGate;
 using Cena.Admin.Api.Questions;
 using Cena.Admin.Api.RateLimit;
@@ -108,6 +109,12 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<Content.IReferenceCalibratedGenerationService,
             Content.ReferenceCalibratedGenerationService>();
 
+        // RDY-032: Pilot data exporter — Marten-backed CSV export for
+        // post-pilot BKT / DIF / Bagrut calibration. Pseudonymizes student
+        // IDs via CENA_PILOT_EXPORT_SALT; ADR-0003 MlExcluded filtering
+        // honored; test/emu students filtered by prefix.
+        services.AddScoped<Cena.Actors.Pilot.IPilotDataExporter, Cena.Actors.Pilot.PilotDataExporter>();
+
         // RDY-059: Corpus expander source-selector (real Marten-backed).
         services.AddScoped<Questions.ICorpusSourceProvider, Questions.MartenCorpusSourceProvider>();
         services.AddScoped<IQuestionBankService, QuestionBankService>();
@@ -199,6 +206,11 @@ public static class CenaAdminServiceRegistration
         // CAS-gated recreations. Routes through BatchGenerateAsync so every
         // candidate passes CAS gate + CasGatedQuestionPersister.
         app.MapReferenceRecreationEndpoints();
+
+        // RDY-032: POST /api/admin/pilot/export — SuperAdmin-only CSV export
+        // for post-pilot calibration. Dry-run default; wet runs write to
+        // data/pilot/ (git-ignored).
+        app.MapPilotExportEndpoints();
 
         app.MapQuestionBankEndpoints();
         // RDY-036: CAS operator surfaces — override (super-admin only) +
