@@ -18,6 +18,7 @@ using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Nats;
 using Cena.Infrastructure.Observability;
+using Cena.Infrastructure.Ocr.DependencyInjection;
 using Cena.Infrastructure.Resilience;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
@@ -261,17 +262,90 @@ builder.Services.AddHostedService<Cena.Actors.Explanations.ExplanationCacheInval
 builder.Services.AddCenaAdminServices();
 
 // CNT-008/009/010: Ingestion Pipeline, Moderation, Serving
-// RDY-012: Added Cena resilience policies (timeout + retry + circuit breaker + fallback)
+// RDY-012 + RDY-OCR-WIREUP-C (Phase 2.3):
+//   - The OCR cascade (ADR-0033) is now the sole OCR path for Surface B.
+//     IOcrClient + IMathOcrClient resolve to CascadeOcrClient, which
+//     delegates to IOcrCascadeService. The legacy GeminiOcrClient /
+//     MathpixClient are still registered as fallback HttpClients so
+//     existing cost/audit wiring stays intact, but they are no longer
+//     the IOcrClient implementations.
+//   - AddOcrCascadeCore wires PdfTriage, Layer0–5, options bindings, the
+//     IOcrCascadeService orchestrator (scoped), and TimeProvider.
+//   - AddOcrCascadeWithCasValidation bridges ILatexValidator → the
+//     existing 3-tier CasRouterService registered above.
+//   - Tesseract + Surya + pix2tex wrappers are registered alongside,
+//     mirroring the Student Host wiring so both hosts use identical
+//     cascade infrastructure.
+//   - Mathpix / Gemini Vision runners are opt-in per configured credentials.
 builder.Services.Configure<Cena.Actors.Ingest.GeminiOcrOptions>(
     builder.Configuration.GetSection("Ingestion:Gemini"));
 builder.Services.Configure<Cena.Actors.Ingest.MathpixOptions>(
     builder.Configuration.GetSection("Ingestion:Mathpix"));
+
+// Real OCR cascade (ADR-0033). NO STUBS.
+builder.Services.AddOcrCascadeCore(builder.Configuration);
+builder.Services.AddOcrCascadeWithCasValidation();
+
+builder.Services.Configure<Cena.Infrastructure.Ocr.Runners.TesseractOptions>(
+    builder.Configuration.GetSection("Ocr:Tesseract"));
+builder.Services.AddSingleton<Cena.Infrastructure.Ocr.Layers.ILayer2aTextOcr>(sp =>
+{
+    var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
+        Cena.Infrastructure.Ocr.Runners.TesseractOptions>>().Value;
+    var log  = sp.GetService<ILogger<Cena.Infrastructure.Ocr.Runners.TesseractLocalRunner>>();
+    return new Cena.Infrastructure.Ocr.Runners.TesseractLocalRunner(opts, log);
+});
+
+builder.Services.Configure<Cena.Infrastructure.Ocr.Runners.OcrSidecarOptions>(
+    builder.Configuration.GetSection("Ocr:Sidecar"));
+builder.Services.AddSingleton<Cena.Infrastructure.Ocr.Layers.ILayer1Layout,
+    Cena.Infrastructure.Ocr.Runners.SuryaSidecarClient>();
+builder.Services.AddSingleton<Cena.Infrastructure.Ocr.Layers.ILayer2bMathOcr,
+    Cena.Infrastructure.Ocr.Runners.Pix2TexSidecarClient>();
+
+// Mathpix and Gemini Vision runners are opt-in via Ocr:Mathpix:AppId /
+// Ocr:Gemini:ApiKey. Resilience is handled by the shared AddCenaResilience
+// pipeline (RDY-012: timeout + retry + circuit breaker + fallback).
+var mathpixAppIdActor = builder.Configuration["Ocr:Mathpix:AppId"];
+if (!string.IsNullOrWhiteSpace(mathpixAppIdActor))
+{
+    builder.Services.Configure<Cena.Infrastructure.Ocr.Runners.MathpixOptions>(
+        builder.Configuration.GetSection("Ocr:Mathpix"));
+    builder.Services.AddHttpClient<
+        Cena.Infrastructure.Ocr.Runners.IMathpixRunner,
+        Cena.Infrastructure.Ocr.Runners.MathpixRunner>()
+        .AddCenaResilience("OcrMathpix");
+}
+
+var geminiApiKeyActor = builder.Configuration["Ocr:Gemini:ApiKey"];
+if (!string.IsNullOrWhiteSpace(geminiApiKeyActor))
+{
+    builder.Services.Configure<Cena.Infrastructure.Ocr.Runners.GeminiVisionOptions>(
+        builder.Configuration.GetSection("Ocr:Gemini"));
+    builder.Services.AddHttpClient<
+        Cena.Infrastructure.Ocr.Runners.IGeminiVisionRunner,
+        Cena.Infrastructure.Ocr.Runners.GeminiVisionRunner>()
+        .AddCenaResilience("OcrGeminiVision");
+}
+
+// Legacy HttpClients kept registered for typed-client wiring; the
+// concrete classes no longer satisfy IOcrClient/IMathOcrClient — the
+// CascadeOcrClient adapter does, so every OCR call routes through the
+// ADR-0033 cascade.
 builder.Services.AddHttpClient<Cena.Actors.Ingest.GeminiOcrClient>()
     .AddCenaResilience("GeminiOcr");
 builder.Services.AddHttpClient<Cena.Actors.Ingest.MathpixClient>()
     .AddCenaResilience("Mathpix");
-builder.Services.AddSingleton<Cena.Actors.Ingest.IOcrClient, Cena.Actors.Ingest.GeminiOcrClient>();
-builder.Services.AddSingleton<Cena.Actors.Ingest.IMathOcrClient, Cena.Actors.Ingest.MathpixClient>();
+
+// RDY-OCR-WIREUP-C: replace direct Gemini/Mathpix with the cascade adapter.
+// IngestionOrchestrator still injects IOcrClient + IMathOcrClient; it now
+// transparently runs the full cascade for every file it processes.
+builder.Services.AddSingleton<Cena.Actors.Ingest.CascadeOcrClient>();
+builder.Services.AddSingleton<Cena.Actors.Ingest.IOcrClient>(
+    sp => sp.GetRequiredService<Cena.Actors.Ingest.CascadeOcrClient>());
+builder.Services.AddSingleton<Cena.Actors.Ingest.IMathOcrClient>(
+    sp => sp.GetRequiredService<Cena.Actors.Ingest.CascadeOcrClient>());
+
 builder.Services.AddSingleton<Cena.Actors.Ingest.IQuestionSegmenter, Cena.Actors.Ingest.GeminiQuestionSegmenter>();
 builder.Services.AddSingleton<Cena.Actors.Ingest.IDeduplicationService, Cena.Actors.Ingest.DeduplicationService>();
 builder.Services.AddSingleton<Cena.Actors.Ingest.IContentExtractorService, Cena.Actors.Ingest.ContentExtractorService>();

@@ -81,6 +81,9 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<IMasteryTrackingService, MasteryTrackingService>();
         services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
         services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
+        // RDY-OCR-WIREUP-C (Phase 2.3): Bagrut PDF ingestion routes through
+        // the real OCR cascade (IOcrCascadeService, ADR-0033). No stubs.
+        services.AddScoped<Ingestion.IBagrutPdfIngestionService, Ingestion.BagrutPdfIngestionService>();
         services.AddScoped<IQuestionBankService, QuestionBankService>();
         // FIND-pedagogy-008: read API for the admin LO picker
         services.AddScoped<ILearningObjectiveService, LearningObjectiveService>();
