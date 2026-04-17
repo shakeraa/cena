@@ -506,6 +506,8 @@ builder.Services.AddOpenTelemetry()
         .AddMeter("Cena.Session.Nats")
         .AddMeter("Npgsql")
         .AddMeter("Cena.HttpCircuitBreaker")
+        // RDY-OCR-OBSERVABILITY (Phase 4): OCR cascade metrics
+        .AddMeter(Cena.Infrastructure.Ocr.Observability.OcrMetrics.MeterName)
         .AddAspNetCoreInstrumentation()
         .AddRuntimeInstrumentation()
         .AddProcessInstrumentation()

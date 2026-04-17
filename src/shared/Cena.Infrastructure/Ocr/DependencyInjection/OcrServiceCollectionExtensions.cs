@@ -28,6 +28,7 @@
 // =============================================================================
 
 using Cena.Infrastructure.Ocr.Layers;
+using Cena.Infrastructure.Ocr.Observability;
 using Cena.Infrastructure.Ocr.PdfTriage;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -64,6 +65,12 @@ public static class OcrServiceCollectionExtensions
 
         services.TryAddScoped<IOcrCascadeService, OcrCascadeService>();
         services.TryAddSingleton(TimeProvider.System);
+
+        // RDY-OCR-OBSERVABILITY (Phase 4): OcrMetrics Meter registration.
+        // Hosts must ALSO call .AddMeter("Cena.Infrastructure.Ocr") on their
+        // OpenTelemetry MeterProvider so the counters+histograms are
+        // exported. The Meter name is OcrMetrics.MeterName.
+        services.TryAddSingleton<OcrMetrics>();
 
         return services;
     }

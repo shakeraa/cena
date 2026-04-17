@@ -607,6 +607,8 @@ public partial class Program
             .AddHttpClientInstrumentation()
             .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)))
         .WithMetrics(metrics => metrics
+            // RDY-OCR-OBSERVABILITY (Phase 4): OCR cascade metrics
+            .AddMeter(Cena.Infrastructure.Ocr.Observability.OcrMetrics.MeterName)
             .AddAspNetCoreInstrumentation()
             .AddRuntimeInstrumentation()
             .AddProcessInstrumentation()

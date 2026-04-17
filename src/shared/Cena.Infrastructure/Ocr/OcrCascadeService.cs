@@ -24,6 +24,7 @@
 using System.Diagnostics;
 using Cena.Infrastructure.Ocr.Contracts;
 using Cena.Infrastructure.Ocr.Layers;
+using Cena.Infrastructure.Ocr.Observability;
 using Cena.Infrastructure.Ocr.PdfTriage;
 using Microsoft.Extensions.Logging;
 
@@ -45,6 +46,7 @@ public sealed class OcrCascadeService : IOcrCascadeService
     private readonly ILayer5CasValidation _layer5;
     private readonly ILogger<OcrCascadeService> _log;
     private readonly TimeProvider _time;
+    private readonly OcrMetrics? _metrics;
 
     public OcrCascadeService(
         IPdfTriage pdfTriage,
@@ -57,7 +59,8 @@ public sealed class OcrCascadeService : IOcrCascadeService
         ILayer4ConfidenceGate layer4,
         ILayer5CasValidation layer5,
         ILogger<OcrCascadeService> log,
-        TimeProvider? time = null)
+        TimeProvider? time = null,
+        OcrMetrics? metrics = null)
     {
         _pdfTriage = pdfTriage;
         _layer0 = layer0;
@@ -70,6 +73,7 @@ public sealed class OcrCascadeService : IOcrCascadeService
         _layer5 = layer5;
         _log = log;
         _time = time ?? TimeProvider.System;
+        _metrics = metrics;
     }
 
     public async Task<OcrCascadeResult> RecognizeAsync(
@@ -79,10 +83,30 @@ public sealed class OcrCascadeService : IOcrCascadeService
         CascadeSurface surface,
         CancellationToken ct)
     {
+        // RDY-OCR-OBSERVABILITY: every call gets a unique request id that
+        // appears on every log line (via BeginScope) and in any downstream
+        // span. The scope dictionary mirrors the metrics tag set so Loki
+        // logfmt queries can be joined back to Prometheus metrics.
+        var cascadeRequestId = Guid.NewGuid().ToString("N");
+        using var scope = _log.BeginScope(new Dictionary<string, object?>
+        {
+            ["cascade_request_id"] = cascadeRequestId,
+            ["surface"]            = surface.ToString(),
+            ["content_type"]       = contentType,
+        });
+
+        // Input-validation failures still record a metric (outcome=input_err)
+        // so dashboards see the noise floor.
         if (bytes.IsEmpty)
+        {
+            _metrics?.RecordRequest(surface, contentType, "input_err");
             throw new OcrInputException("Input byte buffer is empty.");
+        }
         if (string.IsNullOrWhiteSpace(contentType))
+        {
+            _metrics?.RecordRequest(surface, "", "input_err");
             throw new OcrInputException("Missing content type.");
+        }
 
         var totalStopwatch = Stopwatch.StartNew();
         var timings = new Dictionary<string, double>(capacity: 7);
@@ -90,6 +114,7 @@ public sealed class OcrCascadeService : IOcrCascadeService
         // ── Layer 0 preprocess ───────────────────────────────────────────
         var layer0 = await _layer0.RunAsync(bytes, contentType, ct).ConfigureAwait(false);
         timings["layer_0_preprocess"] = layer0.LatencySeconds;
+        _metrics?.RecordLayerLatency("layer_0_preprocess", surface, layer0.LatencySeconds * 1000.0);
 
         // PDF triage shortcut — if we already have a clean text layer, skip
         // the ML layers. Encrypted PDFs exit as a structured 422-like result.
@@ -98,12 +123,17 @@ public sealed class OcrCascadeService : IOcrCascadeService
             _log.LogInformation(
                 "[OCR_CASCADE] triage=encrypted layer=Layer0 surface={Surface} verdict=human_review",
                 surface);
+            totalStopwatch.Stop();
+            _metrics?.RecordRequest(surface, contentType, "encrypted_pdf");
+            _metrics?.RecordTotalLatency(surface, "encrypted_pdf", totalStopwatch.Elapsed.TotalMilliseconds);
+            _metrics?.RecordHumanReviewFlagged(surface, "encrypted_pdf");
             return BuildEncryptedResult(hints, timings, totalStopwatch.Elapsed.TotalSeconds);
         }
 
         // ── Layer 1 layout ───────────────────────────────────────────────
         var layer1 = await _layer1.RunAsync(layer0.PreprocessedPageBytes, hints, ct).ConfigureAwait(false);
         timings["layer_1_layout"] = layer1.LatencySeconds;
+        _metrics?.RecordLayerLatency("layer_1_layout", surface, layer1.LatencySeconds * 1000.0);
 
         // ── Layer 2a / 2b / 2c — parallel ────────────────────────────────
         var textRegions = layer1.Regions.Where(r => r.Kind == "text").ToList();
@@ -121,10 +151,14 @@ public sealed class OcrCascadeService : IOcrCascadeService
         timings["layer_2a_text"] = layer2a.LatencySeconds;
         timings["layer_2b_math"] = layer2b.LatencySeconds;
         timings["layer_2c_figures"] = layer2c.LatencySeconds;
+        _metrics?.RecordLayerLatency("layer_2a_text",    surface, layer2a.LatencySeconds * 1000.0);
+        _metrics?.RecordLayerLatency("layer_2b_math",    surface, layer2b.LatencySeconds * 1000.0);
+        _metrics?.RecordLayerLatency("layer_2c_figures", surface, layer2c.LatencySeconds * 1000.0);
 
         // ── Layer 3 reassembly ───────────────────────────────────────────
         var layer3 = _layer3.Run(layer2a.TextBlocks, layer2b.MathBlocks, layer2c.Figures);
         timings["layer_3_reassemble"] = layer3.LatencySeconds;
+        _metrics?.RecordLayerLatency("layer_3_reassemble", surface, layer3.LatencySeconds * 1000.0);
 
         // ── Layer 4 confidence gate ──────────────────────────────────────
         // Pass page bytes so Layer 4 can crop bboxes and feed them to the
@@ -135,10 +169,26 @@ public sealed class OcrCascadeService : IOcrCascadeService
             layer3.OrderedMathBlocks,
             surface, ct).ConfigureAwait(false);
         timings["layer_4_gate"] = layer4.LatencySeconds;
+        _metrics?.RecordLayerLatency("layer_4_gate", surface, layer4.LatencySeconds * 1000.0);
+
+        // Per-fallback counter increment. FallbacksFired is a flat list of
+        // runner names; the "reason" is currently inferred as "low_conf"
+        // since Layer 4 fires fallbacks when primary confidence < τ. Future
+        // work can lift the reason into Layer4Result; for now we tag with
+        // the primary trigger documented in ADR-0033.
+        foreach (var fb in layer4.FallbacksFired)
+            _metrics?.RecordFallbackFired(fb, reason: "low_conf");
 
         // ── Layer 5 CAS validation ───────────────────────────────────────
         var layer5 = await _layer5.RunAsync(layer4.MathBlocks, ct).ConfigureAwait(false);
         timings["layer_5_cas"] = layer5.LatencySeconds;
+        _metrics?.RecordLayerLatency("layer_5_cas", surface, layer5.LatencySeconds * 1000.0);
+
+        // CAS verdict counters.
+        for (var i = 0; i < layer5.Validated; i++) _metrics?.RecordCasVerdict("verified");
+        for (var i = 0; i < layer5.Failed; i++)    _metrics?.RecordCasVerdict("failed");
+        var unverifiable = Math.Max(0, layer5.MathBlocks.Count - layer5.Validated - layer5.Failed);
+        for (var i = 0; i < unverifiable; i++)     _metrics?.RecordCasVerdict("unverifiable");
 
         totalStopwatch.Stop();
 
@@ -152,14 +202,27 @@ public sealed class OcrCascadeService : IOcrCascadeService
             // Surface A returns 422 up-stack; Surface B flags to human-review
             && (surface == CascadeSurface.StudentInteractive || surface == CascadeSurface.AdminBatch);
 
+        // Classify outcome for request/latency metrics.
+        string outcome;
+        if (layer4.CatastrophicFailure)                                outcome = "low_conf";
+        else if (layer5.Failed > 0 && layer5.Validated == 0)           outcome = "cas_fail";
+        else                                                            outcome = "ok";
+        _metrics?.RecordRequest(surface, contentType, outcome);
+        _metrics?.RecordTotalLatency(surface, outcome, totalStopwatch.Elapsed.TotalMilliseconds);
+        if (humanReview)
+        {
+            foreach (var r in reasons)
+                _metrics?.RecordHumanReviewFlagged(surface, r);
+        }
+
         _log.LogInformation(
             "[OCR_CASCADE] runner={Runner} surface={Surface} triage={Triage} " +
             "textBlocks={TextBlocks} mathBlocks={MathBlocks} casOk={CasOk} casFail={CasFail} " +
-            "fallbacks={Fallbacks} avgConf={AvgConf:F3} humanReview={HumanReview} totalMs={TotalMs}",
+            "fallbacks={Fallbacks} avgConf={AvgConf:F3} humanReview={HumanReview} outcome={Outcome} totalMs={TotalMs}",
             RunnerName, surface, layer0.Triage,
             layer3.OrderedTextBlocks.Count, layer5.MathBlocks.Count,
             layer5.Validated, layer5.Failed, layer4.FallbacksFired.Count,
-            layer4.AverageConfidence, humanReview,
+            layer4.AverageConfidence, humanReview, outcome,
             totalStopwatch.Elapsed.TotalMilliseconds);
 
         return new OcrCascadeResult(
