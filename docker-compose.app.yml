@@ -116,6 +116,9 @@ services:
       # honours this env var natively.
       - Firebase__ProjectId=cena-platform
       - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+      # RDY-056 §3: CORS allows both SPAs' Vite dev ports.
+      - Cors__AllowedOrigins__0=http://localhost:5174
+      - Cors__AllowedOrigins__1=http://localhost:5175
       - CENA_SKIP_SEED=0
     restart: unless-stopped
     healthcheck:
@@ -166,6 +169,58 @@ services:
       timeout: 5s
       retries: 5
       start_period: 90s
+
+  # ── Admin SPA (Vuexy Vue 3, Vite dev server) ──
+  admin-spa:
+    build:
+      context: ./src/admin/full-version
+      dockerfile: dev.Dockerfile
+    container_name: cena-admin-spa
+    depends_on:
+      firebase-emulator:
+        condition: service_started
+      admin-api:
+        condition: service_started
+    # Admin SPA's vite.config.ts pins port 5174 (strictPort). Map host 5174.
+    ports:
+      - "5174:5174"
+    environment:
+      - VITE_FIREBASE_API_KEY=fake-api-key
+      - VITE_FIREBASE_AUTH_DOMAIN=cena-platform.firebaseapp.com
+      - VITE_FIREBASE_PROJECT_ID=cena-platform
+      - VITE_FIREBASE_STORAGE_BUCKET=cena-platform.appspot.com
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
+      - VITE_FIREBASE_APP_ID=1:000000000000:web:dev
+      # Scheme REQUIRED by connectAuthEmulator. SPA runs in the browser, so
+      # we point at the host-visible port 9099, not the container DNS name.
+      - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
+      - VITE_ADMIN_API_BASE_URL=http://localhost:5052
+    restart: unless-stopped
+
+  # ── Student SPA (Vuexy Vue 3 PWA, Vite dev server) ──
+  student-spa:
+    build:
+      context: ./src/student/full-version
+      dockerfile: dev.Dockerfile
+    container_name: cena-student-spa
+    depends_on:
+      firebase-emulator:
+        condition: service_started
+      student-api:
+        condition: service_started
+    # Student SPA's vite.config.ts pins port 5175 (strictPort). Map host 5175.
+    ports:
+      - "5175:5175"
+    environment:
+      - VITE_FIREBASE_API_KEY=fake-api-key
+      - VITE_FIREBASE_AUTH_DOMAIN=cena-platform.firebaseapp.com
+      - VITE_FIREBASE_PROJECT_ID=cena-platform
+      - VITE_FIREBASE_STORAGE_BUCKET=cena-platform.appspot.com
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
+      - VITE_FIREBASE_APP_ID=1:000000000000:web:dev
+      - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
+      - VITE_STUDENT_API_BASE_URL=http://localhost:5050
+    restart: unless-stopped
 
   # ── Actor Host (Proto.Actor cluster) ──
   actor-host:

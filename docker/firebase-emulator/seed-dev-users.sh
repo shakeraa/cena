@@ -85,6 +85,11 @@ echo "────────────────────────�
 # ResourceOwnershipGuard.cs expects UPPER_SNAKE_CASE role names:
 # SUPER_ADMIN, ADMIN, MODERATOR, TEACHER, STUDENT, PARENT.
 
+# Primary super-admin — matches the Marten seed row (AdminUser sa-001) so
+# this account owns the admin backend on login.
+create_user "shaker.abuayoub@gmail.com" "ShakerMain2026!" "Shaker Abu Ayoub" \
+  "\"{\\\"role\\\":\\\"SUPER_ADMIN\\\",\\\"tenant_id\\\":\\\"cena\\\",\\\"school_id\\\":\\\"${SCHOOL_ID}\\\"}\""
+
 create_user "admin@cena.local"        "DevAdmin123!"   "Dev Admin"       \
   "\"{\\\"role\\\":\\\"SUPER_ADMIN\\\",\\\"tenant_id\\\":\\\"cena\\\",\\\"school_id\\\":\\\"${SCHOOL_ID}\\\"}\""
 
