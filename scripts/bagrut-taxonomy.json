@@ -220,7 +220,7 @@
   "validation": {
     "tracks": 3,
     "total_5u_subtopics": 42,
-    "total_4u_subtopics": 18,
+    "total_4u_subtopics": 17,
     "total_3u_subtopics": 14,
     "all_concept_ids_match_prerequisite_graph": true
   }
