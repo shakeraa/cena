@@ -9,6 +9,7 @@ using Cena.Admin.Api.Content;
 using Cena.Admin.Api.Endpoints;
 using Cena.Admin.Api.Ingestion;
 using Cena.Admin.Api.QualityGate;
+using Cena.Admin.Api.Questions;
 using Cena.Admin.Api.RateLimit;
 using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Routing;
@@ -168,6 +169,12 @@ public static class CenaAdminServiceRegistration
         // RDY-057 (Phase 3): POST /api/admin/ingestion/bagrut — SuperAdmin-only
         // PDF ingest trigger that routes to BagrutPdfIngestionService.
         app.MapBagrutIngestEndpoints();
+
+        // RDY-058: POST /api/admin/questions/{id}/generate-similar — one-click
+        // variant generation from an existing question. Routes through
+        // AiGenerationService.BatchGenerateAsync so every candidate passes the
+        // CAS gate + QualityGate.
+        app.MapGenerateSimilarEndpoints();
 
         // RDY-019c (Phase 3): GET /api/v1/admin/content/coverage
         app.MapContentCoverageEndpoints();

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { sanitizeHtml } from '@/utils/sanitize'
 import QuestionDetail from '@/views/apps/questions/QuestionDetail.vue'
+import GenerateSimilarDialog from '@/views/apps/questions/GenerateSimilarDialog.vue'
 
 definePage({ meta: { action: 'read', subject: 'Questions' } })
 
@@ -54,6 +55,7 @@ const headers = [
   { title: 'Quality', key: 'qualityScore', width: 90 },
   { title: 'Usage', key: 'usageCount', width: 80 },
   { title: 'Success %', key: 'successRate', width: 100 },
+  { title: '', key: 'actions', sortable: false, width: 72, align: 'end' as const },
 ]
 
 // Fetch questions via useApi + createUrl (reactive server-side query)
@@ -202,6 +204,19 @@ const shortId = (id: string) => {
 // Detail drawer
 const selectedQuestionId = ref<string | null>(null)
 const isDetailDrawerOpen = ref(false)
+
+// RDY-058: one-click "generate similar" from a row in the question list.
+const similarSource = ref<{ id: string; difficulty: number | null; subject: string | null; bloom: number | null } | null>(null)
+const isSimilarDialogOpen = ref(false)
+function openGenerateSimilar(q: { id: string; difficulty?: number | null; subject?: string | null; bloomLevel?: number | null }) {
+  similarSource.value = {
+    id:         q.id,
+    difficulty: q.difficulty ?? null,
+    subject:    q.subject ?? null,
+    bloom:      q.bloomLevel ?? null,
+  }
+  isSimilarDialogOpen.value = true
+}
 
 const openDetail = (questionId: string) => {
   selectedQuestionId.value = questionId
@@ -907,6 +922,17 @@ const exportCsv = () => {
           >--</span>
         </template>
 
+        <!-- RDY-058: per-row "Generate similar" action -->
+        <template #item.actions="{ item }">
+          <VBtn
+            icon="tabler-wand"
+            variant="text"
+            size="small"
+            :title="'Generate similar questions'"
+            @click.stop="openGenerateSimilar(item as any)"
+          />
+        </template>
+
         <!-- Pagination -->
         <template #bottom>
           <TablePagination
@@ -923,6 +949,16 @@ const exportCsv = () => {
       v-model:is-open="isDetailDrawerOpen"
       :question-id="selectedQuestionId"
       @updated="fetchQuestions"
+    />
+
+    <!-- RDY-058: one-click generate similar -->
+    <GenerateSimilarDialog
+      v-model="isSimilarDialogOpen"
+      :question-id="similarSource?.id ?? null"
+      :source-difficulty="similarSource?.difficulty ?? null"
+      :source-subject="similarSource?.subject ?? null"
+      :source-bloom="similarSource?.bloom ?? null"
+      @generated="fetchQuestions"
     />
 
     <!-- Create Question Wizard Dialog -->
