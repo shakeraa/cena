@@ -21,6 +21,25 @@
 # ═══════════════════════════════════════════════════════════════════════
 
 services:
+  # ── Firebase Auth Emulator (RDY-056 §2.1) ──
+  firebase-emulator:
+    build:
+      context: ./docker/firebase-emulator
+      dockerfile: Dockerfile
+    container_name: cena-firebase-emulator
+    ports:
+      - "9099:9099"   # Auth emulator
+      - "4000:4000"   # Emulator UI
+    volumes:
+      - ./docker/firebase-emulator/seed-dev-users.sh:/seed/seed-dev-users.sh:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9099/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
   # ── SymPy CAS Sidecar (Python, NATS request/reply) ──
   sympy-sidecar:
     build:
@@ -91,9 +110,12 @@ services:
       # block writes on CAS failure. Flip to `enforce` after sympy is green.
       - CENA_CAS_GATE_MODE=shadow
       - Marten__AutoCreate=CreateOrUpdate
-      # Firebase: project id only. Token validation points to Google; local
-      # dev without a Firebase project hits unauth endpoints only.
+      # Firebase: project id + emulator host (RDY-056 §2.2). When
+      # FIREBASE_AUTH_EMULATOR_HOST is set, AddFirebaseAuth swaps to the
+      # emulator issuer and disables signature validation. The Admin SDK
+      # honours this env var natively.
       - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
       - CENA_SKIP_SEED=0
     restart: unless-stopped
     healthcheck:
@@ -136,6 +158,7 @@ services:
       - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
       - CENA_CAS_GATE_MODE=shadow
       - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/live"]
