@@ -136,4 +136,17 @@ function formatDate(iso: string): string {
 .time-breakdown-chart__bar:hover {
   background-color: rgb(var(--v-theme-primary) / 0.8);
 }
+
+/* RDY-030b: prefers-reduced-motion guard (WCAG 2.3.3).
+   Component-local animations/transitions reduced to an imperceptible
+   0.01ms so vestibular-sensitive users don't trigger motion-related
+   symptoms. Complements the global reset in styles.scss. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 </style>

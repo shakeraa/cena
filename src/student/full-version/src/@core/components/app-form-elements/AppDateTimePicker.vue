@@ -545,4 +545,17 @@ input[altinputclass="inlinePicker"] {
     }
   }
 }
+
+/* RDY-030b: prefers-reduced-motion guard (WCAG 2.3.3).
+   Component-local animations/transitions reduced to an imperceptible
+   0.01ms so vestibular-sensitive users don't trigger motion-related
+   symptoms. Complements the global reset in styles.scss. */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 </style>
