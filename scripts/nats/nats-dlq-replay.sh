@@ -4,12 +4,29 @@
 # Replays dead-lettered events from the CENA_DLQ stream back to their
 # original durable stream subjects.
 #
-# Prerequisites: nats CLI (https://github.com/nats-io/natscli)
+# Prerequisites:
+#   nats CLI >= 0.1.4 (https://github.com/nats-io/natscli)
+#
+#   Earlier versions lack `nats stream get` sub-command and the `--raw`
+#   JSON flag used below. On Ubuntu:
+#     curl -L https://github.com/nats-io/natscli/releases/download/v0.1.5/nats-0.1.5-linux-amd64.zip -o nats.zip
+#     unzip nats.zip && sudo mv nats*/nats /usr/local/bin/nats
+#
+#   Verify with:  nats --version   (should print 0.1.4 or newer)
+#
+# Environment (optional):
+#   NATS_URL       — override server URL (default: nats://localhost:4222)
+#   NATS_CREDS     — path to .creds file for auth
 #
 # Usage:
 #   ./scripts/nats/nats-dlq-replay.sh                    # replay all
 #   ./scripts/nats/nats-dlq-replay.sh --filter learner    # filter by subject
 #   ./scripts/nats/nats-dlq-replay.sh --dry-run           # preview only
+#
+# RDY-017a: CLI version pinned in header so operators know which tool
+# release is validated against the script's `nats stream get --count N
+# --raw` usage. Earlier versions silently return a different JSON
+# envelope and the parse fails non-obviously.
 # =============================================================================
 
 set -euo pipefail

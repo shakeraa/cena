@@ -211,9 +211,46 @@ const formatNatsBytes = (bytes: number) => {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
 }
 
+// RDY-017a sub-task 3: DLQ depth widget on the system health page.
+// Mirrors the NatsDlqHealthCheck threshold (50 → Degraded) exactly so the
+// dashboard banner agrees with what /health/ready reports to Prometheus.
+interface DlqSnapshot { items: unknown[], total: number }
+const DLQ_ALERT_THRESHOLD = 50
+const dlqDepth = ref(0)
+const dlqLoading = ref(true)
+const dlqError = ref(false)
+
+const fetchDlqDepth = async () => {
+  try {
+    const data = await $api<DlqSnapshot>('/admin/events/dead-letters', {
+      query: { page: 1, itemsPerPage: 1 },
+    })
+    dlqDepth.value = data?.total ?? 0
+    dlqError.value = false
+  }
+  catch (err) {
+    console.error('Failed to fetch DLQ depth:', err)
+    dlqError.value = true
+  }
+  finally {
+    dlqLoading.value = false
+  }
+}
+
+const dlqStatus = computed(() => {
+  if (dlqError.value)
+    return { color: 'error', label: 'Check failed', icon: 'tabler-alert-triangle' }
+  if (dlqDepth.value >= DLQ_ALERT_THRESHOLD)
+    return { color: 'error', label: 'Degraded', icon: 'tabler-alert-circle' }
+  if (dlqDepth.value > 0)
+    return { color: 'warning', label: 'Non-zero', icon: 'tabler-alert-square-rounded' }
+
+  return { color: 'success', label: 'Healthy', icon: 'tabler-circle-check' }
+})
+
 const fetchAll = async () => {
   loading.value = true
-  await Promise.all([fetchHealth(), fetchMetrics(), fetchActorNodes(), fetchNatsStats()])
+  await Promise.all([fetchHealth(), fetchMetrics(), fetchActorNodes(), fetchNatsStats(), fetchDlqDepth()])
   loading.value = false
 }
 
@@ -410,6 +447,76 @@ onUnmounted(() => {
             </VBtn>
           </VCardText>
         </VCard>
+
+        <!-- RDY-017a sub-task 3: DLQ depth widget ─────────────────── -->
+        <VCard
+          :loading="dlqLoading"
+          class="mb-4"
+        >
+          <VCardItem>
+            <template #title>
+              <div class="d-flex align-center gap-2">
+                <VIcon icon="tabler-inbox-off" size="20" />
+                NATS Dead-Letter Queue
+              </div>
+            </template>
+            <template #append>
+              <VChip
+                :color="dlqStatus.color"
+                :prepend-icon="dlqStatus.icon"
+                label
+                size="small"
+              >
+                {{ dlqStatus.label }}
+              </VChip>
+            </template>
+          </VCardItem>
+          <VCardText>
+            <div class="d-flex align-center justify-space-between mb-3">
+              <div>
+                <div class="text-h4">
+                  {{ dlqDepth }}
+                </div>
+                <div class="text-body-2 text-medium-emphasis">
+                  dead-lettered events
+                </div>
+              </div>
+              <div class="text-end">
+                <div class="text-body-2 text-medium-emphasis">
+                  Alert threshold
+                </div>
+                <div class="text-body-1 font-weight-medium">
+                  ≥ {{ DLQ_ALERT_THRESHOLD }}
+                </div>
+              </div>
+            </div>
+
+            <VAlert
+              v-if="dlqDepth >= DLQ_ALERT_THRESHOLD"
+              type="error"
+              variant="tonal"
+              density="compact"
+              class="mb-3"
+            >
+              DLQ depth at or above the {{ DLQ_ALERT_THRESHOLD }}-event
+              threshold — investigate and run
+              <code>scripts/nats/nats-dlq-replay.sh</code> after fixing
+              the upstream failure.
+            </VAlert>
+
+            <VBtn
+              variant="tonal"
+              color="primary"
+              size="small"
+              block
+              :to="{ name: 'apps-system-dead-letters' }"
+            >
+              <VIcon icon="tabler-external-link" start />
+              Open dead-letter queue
+            </VBtn>
+          </VCardText>
+        </VCard>
+        <!-- ────────────────────────────────────────────────────────── -->
 
         <VCard :loading="loading">
           <VCardItem title="Queue Depths" />

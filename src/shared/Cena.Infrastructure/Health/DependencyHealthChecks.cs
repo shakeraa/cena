@@ -181,12 +181,18 @@ public sealed class HttpCircuitBreakerHealthCheck : IHealthCheck
 /// <summary>
 /// RDY-017: Checks NATS DLQ stream depth.
 /// Reports degraded if DLQ has unprocessed events above threshold.
+/// RDY-017a: threshold logic extracted to <see cref="BuildResult"/> so the
+/// alert boundary + <c>dlq_depth</c> data-key contract can be unit-tested
+/// without a live Postgres instance (the raw COUNT(*) query is validated
+/// end-to-end by the nightly NATS staging sweep).
 /// </summary>
 public sealed class NatsDlqHealthCheck : IHealthCheck
 {
+    internal const int AlertThreshold = 50;
+    internal const string DepthKey = "dlq_depth";
+
     private readonly Marten.IDocumentStore _store;
     private readonly ILogger<NatsDlqHealthCheck> _logger;
-    private const int AlertThreshold = 50;
 
     public NatsDlqHealthCheck(Marten.IDocumentStore store, ILogger<NatsDlqHealthCheck> logger)
     {
@@ -209,24 +215,36 @@ public sealed class NatsDlqHealthCheck : IHealthCheck
             var result = await cmd.ExecuteScalarAsync(cancellationToken);
             var dlqCount = Convert.ToInt32(result ?? 0);
 
-            if (dlqCount >= AlertThreshold)
-            {
-                _logger.LogWarning("[DLQ] Health check: {Count} dead-lettered events (threshold={Threshold})",
-                    dlqCount, AlertThreshold);
-                return HealthCheckResult.Degraded(
-                    $"DLQ depth {dlqCount} exceeds threshold {AlertThreshold}",
-                    data: new Dictionary<string, object> { ["dlq_depth"] = dlqCount });
-            }
-
-            return HealthCheckResult.Healthy(
-                $"DLQ depth: {dlqCount}",
-                data: new Dictionary<string, object> { ["dlq_depth"] = dlqCount });
+            return BuildResult(dlqCount, _logger);
         }
         catch (Exception ex)
         {
             _logger.LogWarning(ex, "[DLQ] Health check query failed");
             return HealthCheckResult.Degraded("DLQ depth check failed", ex);
         }
+    }
+
+    /// <summary>
+    /// Pure threshold-to-result mapping. Returned for dlqCount &gt;=
+    /// <see cref="AlertThreshold"/>: <c>Degraded</c> with data.<c>dlq_depth</c>.
+    /// Otherwise: <c>Healthy</c> with data.<c>dlq_depth</c>. Emits a
+    /// structured warning log on the degraded branch so ops can correlate
+    /// with Prometheus alerts.
+    /// </summary>
+    internal static HealthCheckResult BuildResult(int dlqCount, ILogger<NatsDlqHealthCheck>? logger = null)
+    {
+        if (dlqCount >= AlertThreshold)
+        {
+            logger?.LogWarning("[DLQ] Health check: {Count} dead-lettered events (threshold={Threshold})",
+                dlqCount, AlertThreshold);
+            return HealthCheckResult.Degraded(
+                $"DLQ depth {dlqCount} exceeds threshold {AlertThreshold}",
+                data: new Dictionary<string, object> { [DepthKey] = dlqCount });
+        }
+
+        return HealthCheckResult.Healthy(
+            $"DLQ depth: {dlqCount}",
+            data: new Dictionary<string, object> { [DepthKey] = dlqCount });
     }
 }
 
