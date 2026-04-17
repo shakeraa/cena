@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { $api } from '@/utils/api'
+import CuratorMetadataPanel from './CuratorMetadataPanel.vue'
 
 interface ProcessingStage {
   name: string
@@ -231,6 +232,15 @@ const moveToReview = async () => {
               Updated: {{ formatTimestamp(item.updatedAt) }}
             </p>
           </div>
+
+          <VDivider class="mb-4" />
+
+          <!-- RDY-019e Curator Metadata handshake -->
+          <CuratorMetadataPanel
+            :item-id="props.itemId"
+            class="mb-4"
+            @confirmed="() => emit('item-updated')"
+          />
 
           <VDivider class="mb-4" />
 
