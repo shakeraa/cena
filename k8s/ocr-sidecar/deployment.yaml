@@ -1,0 +1,112 @@
+# RDY-OCR-SIDECAR-CONTAINER (Phase 4) — production Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cena-ocr-sidecar
+  namespace: cena-platform
+  labels:
+    app: cena-ocr-sidecar
+    tier: infrastructure
+    owner: ocr-cascade
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: cena-ocr-sidecar
+  template:
+    metadata:
+      labels:
+        app: cena-ocr-sidecar
+        tier: infrastructure
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: ocr-sidecar
+          image: ghcr.io/shakeraa/cena-ocr-sidecar:latest   # replace per env / tag
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: grpc
+              containerPort: 50051
+              protocol: TCP
+          env:
+            - name: HF_HOME
+              value: /hf-cache
+            - name: TRANSFORMERS_CACHE
+              value: /hf-cache
+            - name: SURYA_MODEL_REVISION
+              valueFrom:
+                configMapKeyRef:
+                  name: cena-ocr-sidecar-config
+                  key: surya_model_revision
+                  optional: true
+            - name: PIX2TEX_MODEL_REVISION
+              valueFrom:
+                configMapKeyRef:
+                  name: cena-ocr-sidecar-config
+                  key: pix2tex_model_revision
+                  optional: true
+          resources:
+            requests:
+              cpu: "2"
+              memory: "3Gi"
+            limits:
+              cpu: "4"
+              memory: "6Gi"
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /hf-cache
+            - name: tmp
+              mountPath: /tmp
+          # Model weights download on first run (~2-5 min). After the
+          # initial warm the healthcheck fires and K8s marks the pod ready.
+          startupProbe:
+            exec:
+              command: ["python", "/app/healthcheck.py"]
+            periodSeconds: 15
+            failureThreshold: 30     # 15 * 30 = 7.5 min grace
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["python", "/app/healthcheck.py"]
+            periodSeconds: 30
+            timeoutSeconds: 8
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["python", "/app/healthcheck.py"]
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 2
+      volumes:
+        - name: hf-cache
+          emptyDir:
+            sizeLimit: 4Gi
+        - name: tmp
+          emptyDir:
+            sizeLimit: 1Gi
+      # Schedule away from other OCR sidecars so we survive a node loss.
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: cena-ocr-sidecar

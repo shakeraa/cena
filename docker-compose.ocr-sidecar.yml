@@ -1,0 +1,27 @@
+# Local dev: bring up the OCR sidecar alongside the .NET hosts.
+#   docker compose -f docker-compose.ocr-sidecar.yml up --build
+version: '3.9'
+services:
+  ocr-sidecar:
+    build:
+      context: ./docker/ocr-sidecar
+      dockerfile: Dockerfile
+    image: cena-ocr-sidecar:local
+    container_name: cena-ocr-sidecar
+    ports:
+      - "50051:50051"
+    environment:
+      HF_HOME: /hf-cache
+      TRANSFORMERS_CACHE: /hf-cache
+    volumes:
+      - ocr-hf-cache:/hf-cache
+    healthcheck:
+      test: ["CMD", "python", "/app/healthcheck.py"]
+      interval: 30s
+      timeout: 8s
+      start_period: 180s
+      retries: 3
+    restart: unless-stopped
+volumes:
+  ocr-hf-cache:
+    driver: local
