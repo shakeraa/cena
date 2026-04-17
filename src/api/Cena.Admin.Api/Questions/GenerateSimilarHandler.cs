@@ -65,15 +65,54 @@ public static class GenerateSimilarHandler
             return Error("invalid_id", "questionId is required.",
                 ErrorCategory.Validation, StatusCodes.Status400BadRequest);
 
+        var core = await RunCoreAsync(questionId, body, store, ai, qualityGate, generatedBy, logger, ct);
+        return core.ErrorCode switch
+        {
+            "question_not_found" => Error(core.ErrorCode,
+                core.ErrorMessage ?? "source question not found.",
+                ErrorCategory.NotFound, StatusCodes.Status404NotFound),
+            null when core.Response is not null => Results.Ok(core.Response),
+            _ => Error(core.ErrorCode ?? "error",
+                core.ErrorMessage ?? "unknown error",
+                ErrorCategory.Internal, StatusCodes.Status500InternalServerError),
+        };
+    }
+
+    /// <summary>
+    /// Core routine that returns the structured outcome (no IResult wrapper)
+    /// so higher-level coordinators (corpus expander, batch jobs) can call
+    /// it in a loop without paying the HTTP-result encoding cost.
+    /// </summary>
+    public sealed record GenerateSimilarCoreResult(
+        BatchGenerateResponse? Response,
+        string? ErrorCode,
+        string? ErrorMessage,
+        QuestionReadModel? Source,
+        BatchGenerateRequest? EffectiveRequest);
+
+    public static async Task<GenerateSimilarCoreResult> RunCoreAsync(
+        string questionId,
+        GenerateSimilarRequest body,
+        IDocumentStore store,
+        IAiGenerationService ai,
+        IQualityGateService qualityGate,
+        string generatedBy,
+        ILogger logger,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(questionId))
+            return new GenerateSimilarCoreResult(null, "invalid_id", "questionId is required.", null, null);
+
         QuestionReadModel? source;
         await using (var session = store.QuerySession())
         {
             source = await session.LoadAsync<QuestionReadModel>(questionId, ct);
         }
         if (source is null)
-            return Error("question_not_found",
+            return new GenerateSimilarCoreResult(
+                null, "question_not_found",
                 $"QuestionReadModel '{questionId}' does not exist.",
-                ErrorCategory.NotFound, StatusCodes.Status404NotFound);
+                null, null);
 
         var count = Math.Clamp(body.Count, MinCount, MaxCount);
         var (min, max) = ResolveDifficultyBand(source, body);
@@ -96,12 +135,19 @@ public static class GenerateSimilarHandler
             questionId, batchRequest.Subject, batchRequest.Topic, batchRequest.BloomsLevel,
             min, max, count, generatedBy);
 
-        var response = await ai.BatchGenerateAsync(batchRequest, qualityGate);
+        BatchGenerateResponse response;
+        try
+        {
+            response = await ai.BatchGenerateAsync(batchRequest, qualityGate);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "[GENERATE_SIMILAR] BatchGenerateAsync failed for parent={ParentId}", questionId);
+            return new GenerateSimilarCoreResult(
+                null, "generation_failed", ex.Message, source, batchRequest);
+        }
 
-        // Provenance: append one event to the PARENT stream so curators can
-        // see how many variants a question has seeded, and when, and by whom.
-        // Children live on their own streams and carry their own creation
-        // events via CasGatedQuestionPersister.
+        // Best-effort provenance on the parent stream.
         try
         {
             await using var writeSession = store.LightweightSession();
@@ -119,15 +165,12 @@ public static class GenerateSimilarHandler
         }
         catch (Exception ex)
         {
-            // Event emission is best-effort. The candidates are already
-            // generated + returned to the curator; losing the provenance
-            // event must NOT mask a successful generation run.
             logger.LogWarning(ex,
                 "[GENERATE_SIMILAR] failed to append QuestionSimilarGenerated_V1 for parent={ParentId}",
                 questionId);
         }
 
-        return Results.Ok(response);
+        return new GenerateSimilarCoreResult(response, null, null, source, batchRequest);
     }
 
     internal static (float Min, float Max) ResolveDifficultyBand(

@@ -2,6 +2,7 @@
 import { sanitizeHtml } from '@/utils/sanitize'
 import QuestionDetail from '@/views/apps/questions/QuestionDetail.vue'
 import GenerateSimilarDialog from '@/views/apps/questions/GenerateSimilarDialog.vue'
+import CorpusExpanderDialog from '@/views/apps/questions/CorpusExpanderDialog.vue'
 
 definePage({ meta: { action: 'read', subject: 'Questions' } })
 
@@ -204,6 +205,9 @@ const shortId = (id: string) => {
 // Detail drawer
 const selectedQuestionId = ref<string | null>(null)
 const isDetailDrawerOpen = ref(false)
+
+// RDY-059: bulk corpus expander dialog.
+const isCorpusExpanderOpen = ref(false)
 
 // RDY-058: one-click "generate similar" from a row in the question list.
 const similarSource = ref<{ id: string; difficulty: number | null; subject: string | null; bloom: number | null } | null>(null)
@@ -750,6 +754,16 @@ const exportCsv = () => {
             </VMenu>
           </VBtn>
 
+          <!-- RDY-059: Populate bank (corpus expander) -->
+          <VBtn
+            color="secondary"
+            variant="tonal"
+            prepend-icon="tabler-bolt"
+            @click="isCorpusExpanderOpen = true"
+          >
+            Populate bank
+          </VBtn>
+
           <!-- Create Question -->
           <VBtn
             color="primary"
@@ -959,6 +973,12 @@ const exportCsv = () => {
       :source-subject="similarSource?.subject ?? null"
       :source-bloom="similarSource?.bloom ?? null"
       @generated="fetchQuestions"
+    />
+
+    <!-- RDY-059: bulk corpus expander -->
+    <CorpusExpanderDialog
+      v-model="isCorpusExpanderOpen"
+      @expanded="fetchQuestions"
     />
 
     <!-- Create Question Wizard Dialog -->

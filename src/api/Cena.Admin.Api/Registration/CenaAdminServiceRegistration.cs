@@ -99,6 +99,9 @@ public static class CenaAdminServiceRegistration
         services.AddSingleton<Content.TaxonomyCache>(_ => Content.TaxonomyCache.LoadFromDisk());
         services.AddScoped<Content.IContentCoverageQuestionSource, Content.MartenQuestionSource>();
         services.AddScoped<Content.IContentCoverageService, Content.ContentCoverageService>();
+
+        // RDY-059: Corpus expander source-selector (real Marten-backed).
+        services.AddScoped<Questions.ICorpusSourceProvider, Questions.MartenCorpusSourceProvider>();
         services.AddScoped<IQuestionBankService, QuestionBankService>();
         // FIND-pedagogy-008: read API for the admin LO picker
         services.AddScoped<ILearningObjectiveService, LearningObjectiveService>();
@@ -175,6 +178,10 @@ public static class CenaAdminServiceRegistration
         // AiGenerationService.BatchGenerateAsync so every candidate passes the
         // CAS gate + QualityGate.
         app.MapGenerateSimilarEndpoints();
+
+        // RDY-059: POST /api/admin/questions/expand-corpus — batch corpus
+        // expander (SuperAdminOnly, dry-run by default).
+        app.MapCorpusExpanderEndpoints();
 
         // RDY-019c (Phase 3): GET /api/v1/admin/content/coverage
         app.MapContentCoverageEndpoints();

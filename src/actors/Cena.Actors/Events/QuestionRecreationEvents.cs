@@ -21,3 +21,23 @@ public sealed record QuestionSimilarGenerated_V1(
     string? Language,
     string GeneratedBy,
     DateTimeOffset Timestamp);
+
+/// <summary>
+/// RDY-059: Batch corpus-expansion run audit event. Appended once per
+/// CorpusExpansionRequest execution (stream: <c>corpus-expansion:{runId}</c>).
+/// Children emitted by the run carry their own per-question provenance via
+/// <see cref="QuestionSimilarGenerated_V1"/>; this event is the operator-
+/// level audit trail answering "who ran what selector, when, and what did
+/// it cost us in CAS drops?".
+/// </summary>
+public sealed record CorpusExpansionRun_V1(
+    string RunId,
+    string Selector,
+    int SourceCount,
+    int TotalAttempted,
+    int TotalPassedCas,
+    int TotalDropped,
+    bool DryRun,
+    string StartedBy,
+    DateTimeOffset StartedAt,
+    DateTimeOffset CompletedAt);
