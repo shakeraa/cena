@@ -1,8 +1,9 @@
 # CAS Conformance Baseline
 
 **Target**: ≥99% pass rate across the concrete pairs below.
-**Enforced by**: `CasConformanceSuiteRunner` (nightly CI).
-**Status**: unmeasured — awaits first green nightly run against a reachable SymPy sidecar.
+**Enforced by**: `CasConformanceBaselineRunnerTests.Router_Runs_Every_Baseline_Case_And_Writes_Artifact` (nightly CI, `.github/workflows/cas-nightly.yml`).
+**Runner artifact**: `ops/reports/cas-conformance-last-run.json` (uploaded by CI).
+**Strict 99% gate** activates automatically when the test environment has a reachable SymPy sidecar (`sympy_reachable=true` in the artifact). Otherwise the MathNet-only floor (≥ 35%) applies so the runner still exercises the parse + execution path in dev + PR builds.
 
 ---
 
