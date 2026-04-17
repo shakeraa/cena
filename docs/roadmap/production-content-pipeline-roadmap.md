@@ -10,10 +10,18 @@
 ## 1. Executive summary
 
 Spike complete, scaffold complete, **every OCR layer has a real implementation.**
-RDY-OCR-PORT closed as of 2026-04-17 with commit `adb706d`. 111/111 OCR tests pass.
+RDY-OCR-PORT closed 2026-04-17 (`adb706d`). 111/111 OCR tests pass.
 This doc is the single source of truth — update on every merge to main.
 
-Phase 1A (C# OCR cascade) done. 10 slices remain across Phases 1B–4.
+**Phase status (commit `907ca6c`, 2026-04-17)**:
+- Phase 1A ✅ — C# OCR cascade complete
+- Phase 1B ✅ — CAS production-readiness: all 4 slices landed
+- Phase 1C ✅ — Curator metadata handshake live
+- Phase 2  ✅ — Photo capture + upload + admin ingestion trio all on real IOcrCascadeService
+- Phase 3  🚧 — 3.1 / 3.3 / 3.4 partial/done; 3.2 recreation loop remains
+- Phase 4  🚧 — 4.2 sidecar + 4.3 observability done; 4.1 regression harness + 4.4 load test remain
+
+**Next ship**: RDY-019b recreation loop (Phase 3.2), then 4.1 / 4.4 hardening.
 
 ## 2. OCR layer scoreboard (as of commit `adb706d`)
 
@@ -62,46 +70,46 @@ Port (RDY-OCR-PORT):
 
 All 9 slices shipped. See §3 for commit list.
 
-#### Phase 1B — CAS production-readiness (originally Kimi's; I take)
+#### Phase 1B — CAS production-readiness ✅ COMPLETE
 
-| # | Task | Queue ID | State |
+| # | Task | Landed | State |
 |---|---|---|---|
-| 1B.1 | CAS-GATE-TESTS — P5 unit+integration suite | `t_c8a44ae4f0b2` | ⬜ pending |
-| 1B.2 | CAS-CONFORMANCE-RUNNER — xUnit runner for cas-conformance-baseline | `t_b952e9b9a7cb` | ⬜ pending |
-| 1B.3 | CAS-GATE-SEED-REFACTOR — route seed+ingestion writers through QuestionBankService | `t_d995fe1da366` | ⬜ pending |
-| 1B.4 | CAS-DEFERRED-OPS — k6 load + SIGKILL chaos + Grafana + k8s/compose | `t_8c82e49e06bc` | ⬜ pending |
+| 1B.1 | CAS-GATE-TESTS — P5 unit+integration suite (144 Actors + 24 Admin tests) | `fd4a2a0` | ✅ done |
+| 1B.2 | CAS-CONFORMANCE-RUNNER — baseline.md parser + runner + artifact + CI | `378a493` | ✅ done |
+| 1B.3 | CAS-GATE-SEED-REFACTOR — single gated write site via CasGatedQuestionPersister | (RDY-037) | ✅ done |
+| 1B.4 | CAS-DEFERRED-OPS — k8s ConfigMap+Secret + compose env for CAS gate envs | `7b5b8d8` | ✅ done |
 
-#### Phase 1C — Curator metadata
+#### Phase 1C — Curator metadata ✅ COMPLETE
 
-| # | Slice | Queue ID | State |
+| # | Slice | Landed | State |
 |---|---|---|---|
-| 1C.1 | RDY-019e-IMPL — OcrContextHints DTO + admin UI two-phase handshake | `t_f0e2f038a8a2` | ⬜ queued |
+| 1C.1 | RDY-019e-IMPL — OcrContextHints DTO + admin UI two-phase handshake | `524ff28` + `d22af1c` | ✅ done |
 
-### Phase 2 — Wire OCR into real endpoints
+### Phase 2 — Wire OCR into real endpoints ✅ COMPLETE
 
 | # | Slice | Target | State |
 |---|---|---|---|
-| 2.1 | PhotoCaptureEndpoints.RecognizeMathAsync → IOcrCascadeService | `src/api/Cena.Student.Api.Host/Endpoints/PhotoCaptureEndpoints.cs` | ⬜ next |
-| 2.2 | PhotoUploadEndpoints + pdf_triage shortcut | `PhotoUploadEndpoints.cs` | ⬜ pending |
-| 2.3 | Kill Gemini/Mathpix TODOs in admin ingestion trio | `BagrutPdfIngestionService.cs` + `IngestionPipelineService.cs` + `IngestionPipelineCloudDir.cs` | ⬜ pending |
+| 2.1 | PhotoCaptureEndpoints.RecognizeMathAsync → IOcrCascadeService | `src/api/Cena.Student.Api.Host/Endpoints/PhotoCaptureEndpoints.cs` | ✅ done |
+| 2.2 | PhotoUploadEndpoints + pdf_triage shortcut (Triage=Encrypted → 422) | `PhotoUploadEndpoints.cs` | ✅ done |
+| 2.3 | Kill Gemini/Mathpix TODOs in admin ingestion trio — real IOcrCascadeService | `BagrutPdfIngestionService.cs` + `IngestionPipelineService.cs` + `IngestionPipelineCloudDir.cs` | ✅ done (S3 stub in CloudDir tracked separately as cloud-ops) |
 
 ### Phase 3 — Content flow
 
-| # | Task | Queue ID | State |
+| # | Task | Landed / Queue | State |
 |---|---|---|---|
-| 3.1 | RDY-019a — Bagrut topic taxonomy + remap existing questions | `t_4cd083b88087` | ⬜ pending |
-| 3.2 | RDY-019b — Ministry scrape + AI recreation (unblocked: cost now <$1) | `t_712e553197c9` | ⬜ pending |
-| 3.3 | RDY-019c — 3u/4u seed + coverage report | `t_cf4918bfdff6` | ⬜ pending |
-| 3.4 | Admin UI `pipeline.vue` + CuratorMetadata review screen | — | ⬜ not queued |
+| 3.1 | RDY-019a — Bagrut topic taxonomy + remap existing questions | taxonomy.json shipped | ✅ done |
+| 3.2 | RDY-019b — Ministry scrape + AI recreation (unblocked: cost now <$1) | scaffold `ba0fca6`, recreation loop pending | 🚧 partial |
+| 3.3 | RDY-019c — 3u/4u seed + coverage report | `f442b0e` | ✅ done |
+| 3.4 | Admin UI `pipeline.vue` + CuratorMetadata review screen | CuratorMetadataPanel `524ff28` (review screen exists; full pipeline.vue still scaffold-heavy) | 🚧 partial |
 
 ### Phase 4 — Production hardening
 
-| # | Slice | State |
-|---|---|---|
-| 4.1 | Integration tests + frozen fixture regression (fail CI on > 5 pp WER/math drop) | ⬜ pending |
-| 4.2 | OCR sidecar container + K8s manifest + HF pre-warm init-container | ⬜ pending |
-| 4.3 | Observability — `[OCR_CASCADE]` metrics, log parsing, alerts (p99, fallback rate, CAS-fail, breaker state) | ⬜ pending |
-| 4.4 | End-to-end load test (subsumes 1B.4) | ⬜ pending |
+| # | Slice | Landed | State |
+|---|---|---|---|
+| 4.1 | Integration tests + frozen fixture regression (fail CI on > 5 pp WER/math drop) | — | ⬜ pending |
+| 4.2 | OCR sidecar container + K8s manifest + HF pre-warm init-container | `docker/ocr-sidecar/` + `k8s/ocr-sidecar/` + `docker-compose.ocr-sidecar.yml` | ✅ done |
+| 4.3 | Observability — `[OCR_CASCADE]` metrics, Prometheus alerts, Grafana dashboard | `370276e` (OcrMetrics + alerts) + dashboard JSON on main | ✅ done |
+| 4.4 | End-to-end load test (subsumes 1B.4) | — | ⬜ pending |
 
 ## 5. Architectural decisions
 
