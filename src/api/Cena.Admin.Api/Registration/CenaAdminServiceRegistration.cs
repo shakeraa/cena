@@ -5,6 +5,7 @@
 // =============================================================================
 
 using Cena.Actors.Cas;
+using Cena.Admin.Api.Content;
 using Cena.Admin.Api.Endpoints;
 using Cena.Admin.Api.Ingestion;
 using Cena.Admin.Api.QualityGate;
@@ -91,6 +92,12 @@ public static class CenaAdminServiceRegistration
         // confirmed state feeds OcrContextHints into the cascade.
         services.AddSingleton<Ingestion.ICuratorMetadataExtractor, Ingestion.CuratorMetadataExtractor>();
         services.AddScoped<Ingestion.ICuratorMetadataService, Ingestion.CuratorMetadataService>();
+
+        // RDY-019c (Phase 3): Content coverage report keyed by
+        // scripts/bagrut-taxonomy.json. Real Marten query + taxonomy walk.
+        services.AddSingleton<Content.TaxonomyCache>(_ => Content.TaxonomyCache.LoadFromDisk());
+        services.AddScoped<Content.IContentCoverageQuestionSource, Content.MartenQuestionSource>();
+        services.AddScoped<Content.IContentCoverageService, Content.ContentCoverageService>();
         services.AddScoped<IQuestionBankService, QuestionBankService>();
         // FIND-pedagogy-008: read API for the admin LO picker
         services.AddScoped<ILearningObjectiveService, LearningObjectiveService>();
@@ -157,6 +164,9 @@ public static class CenaAdminServiceRegistration
         // RDY-019e-IMPL (Phase 1C): CuratorMetadata handshake endpoints
         // under /api/admin/ingestion/pipeline/{id}/metadata (GET/PATCH/DELETE).
         app.MapCuratorMetadataEndpoints();
+
+        // RDY-019c (Phase 3): GET /api/v1/admin/content/coverage
+        app.MapContentCoverageEndpoints();
         app.MapQuestionBankEndpoints();
         // RDY-036: CAS operator surfaces — override (super-admin only) +
         // backfill (admin only). Wired here so both Actor.Host and Admin.Host
