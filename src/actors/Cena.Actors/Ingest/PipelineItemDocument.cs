@@ -72,6 +72,43 @@ public sealed class PipelineItemDocument
     public DateTimeOffset SubmittedAt { get; set; }
     public DateTimeOffset? CompletedAt { get; set; }
     public DateTimeOffset UpdatedAt { get; set; }
+
+    // RDY-019e-IMPL (Phase 1C): CuratorMetadata handshake.
+    // The auto-extractor runs on upload and fills AutoExtractedMetadata;
+    // the curator reviews via the admin UI and writes CuratorMetadata
+    // through PATCH /metadata. MetadataState transitions:
+    //
+    //   pending          — item registered, extractor hasn't run yet
+    //   auto_extracted   — extractor produced values, curator hasn't seen them
+    //   awaiting_review  — curator opened the item; one or more fields missing
+    //   confirmed        — all required fields set; cascade may use the hints
+    //   skipped          — curator explicitly opted out of the handshake
+    //
+    // Kept as string for Marten schema stability; validated in the service.
+    public PipelineCuratorMetadata? AutoExtractedMetadata { get; set; }
+    public PipelineCuratorMetadata? CuratorMetadata { get; set; }
+    public string MetadataState { get; set; } = "pending";
+    public string? MetadataExtractionStrategy { get; set; }
+    public Dictionary<string, double> MetadataFieldConfidences { get; set; } = new();
+    public DateTimeOffset? MetadataConfirmedAt { get; set; }
+    public string? MetadataConfirmedBy { get; set; }
+}
+
+/// <summary>
+/// Persisted shape of CuratorMetadata (document side). Contract DTO
+/// <c>Cena.Api.Contracts.Admin.Ingestion.CuratorMetadata</c> projects onto
+/// this and vice versa. Kept as a class rather than a record so Marten can
+/// evolve the schema additively (record structural typing is brittle across
+/// Marten upcasts).
+/// </summary>
+public sealed class PipelineCuratorMetadata
+{
+    public string? Subject { get; set; }
+    public string? Language { get; set; }
+    public string? Track { get; set; }
+    public string? SourceType { get; set; }
+    public string? TaxonomyNode { get; set; }
+    public bool?   ExpectedFigures { get; set; }
 }
 
 public sealed class StageRecord

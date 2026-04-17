@@ -35,6 +35,7 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
     private readonly IIngestionOrchestrator? _orchestrator;
+    private readonly Cena.Admin.Api.Ingestion.ICuratorMetadataService? _metadataService;
     private readonly ILogger<IngestionPipelineService> _logger;
     private readonly IReadOnlyList<string> _allowedCloudDirs;
 
@@ -43,11 +44,13 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
         IConnectionMultiplexer redis,
         ILogger<IngestionPipelineService> logger,
         IConfiguration configuration,
-        IIngestionOrchestrator? orchestrator = null)
+        IIngestionOrchestrator? orchestrator = null,
+        Cena.Admin.Api.Ingestion.ICuratorMetadataService? metadataService = null)
     {
         _store = store;
         _redis = redis;
         _orchestrator = orchestrator;
+        _metadataService = metadataService;
         _logger = logger;
         _allowedCloudDirs = configuration.GetSection("Ingestion:CloudWatchDirs")
             .Get<string[]>() ?? Array.Empty<string>();
@@ -221,15 +224,49 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
         if (_orchestrator is null)
             return new IngestionDto.UploadFileResponse("", "error", null);
 
-        using var stream = file.OpenReadStream();
+        // Read into buffer so we can hand the same bytes to (a) the
+        // orchestrator pipeline and (b) the RDY-019e CuratorMetadata
+        // auto-extractor. Orchestrator copies to its own MemoryStream so
+        // we're safe passing the underlying array.
+        using var buffer = new MemoryStream();
+        await using (var upstream = file.OpenReadStream())
+        {
+            await upstream.CopyToAsync(buffer);
+        }
+        var bytes = buffer.ToArray();
+        buffer.Position = 0;
+
+        var contentType = file.ContentType ?? "application/octet-stream";
         var result = await _orchestrator.ProcessFileAsync(new IngestionRequest(
-            FileStream: stream,
+            FileStream: buffer,
             Filename: file.FileName,
-            ContentType: file.ContentType ?? "application/octet-stream",
+            ContentType: contentType,
             SourceType: "upload",
             SourceUrl: null,
             SubmittedBy: "admin"
         ));
+
+        // RDY-019e-IMPL: run the CuratorMetadata auto-extractor on every
+        // successful upload. Failures are swallowed with a warning —
+        // auto-extract never blocks the upload path. If the service is
+        // not wired (legacy configuration), skip silently.
+        if (_metadataService is not null && !string.IsNullOrEmpty(result.PipelineItemId))
+        {
+            try
+            {
+                await _metadataService.AutoExtractAsync(
+                    itemId: result.PipelineItemId,
+                    filename: file.FileName,
+                    fileBytes: bytes,
+                    contentType: contentType);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex,
+                    "CuratorMetadata auto-extract failed for pipeline item {ItemId}; curator will fill manually.",
+                    result.PipelineItemId);
+            }
+        }
 
         return new IngestionDto.UploadFileResponse(
             UploadId: result.PipelineItemId,

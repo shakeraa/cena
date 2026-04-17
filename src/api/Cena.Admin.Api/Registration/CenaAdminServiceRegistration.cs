@@ -6,6 +6,7 @@
 
 using Cena.Actors.Cas;
 using Cena.Admin.Api.Endpoints;
+using Cena.Admin.Api.Ingestion;
 using Cena.Admin.Api.QualityGate;
 using Cena.Admin.Api.RateLimit;
 using Cena.Infrastructure.Compliance;
@@ -84,6 +85,12 @@ public static class CenaAdminServiceRegistration
         // RDY-OCR-WIREUP-C (Phase 2.3): Bagrut PDF ingestion routes through
         // the real OCR cascade (IOcrCascadeService, ADR-0033). No stubs.
         services.AddScoped<Ingestion.IBagrutPdfIngestionService, Ingestion.BagrutPdfIngestionService>();
+
+        // RDY-019e-IMPL (Phase 1C): Curator metadata handshake — auto-extract
+        // on upload, curator review + confirm via three REST endpoints,
+        // confirmed state feeds OcrContextHints into the cascade.
+        services.AddSingleton<Ingestion.ICuratorMetadataExtractor, Ingestion.CuratorMetadataExtractor>();
+        services.AddScoped<Ingestion.ICuratorMetadataService, Ingestion.CuratorMetadataService>();
         services.AddScoped<IQuestionBankService, QuestionBankService>();
         // FIND-pedagogy-008: read API for the admin LO picker
         services.AddScoped<ILearningObjectiveService, LearningObjectiveService>();
@@ -147,6 +154,9 @@ public static class CenaAdminServiceRegistration
         app.MapMasteryTrackingEndpoints();
         app.MapSystemMonitoringEndpoints();
         app.MapIngestionPipelineEndpoints();
+        // RDY-019e-IMPL (Phase 1C): CuratorMetadata handshake endpoints
+        // under /api/admin/ingestion/pipeline/{id}/metadata (GET/PATCH/DELETE).
+        app.MapCuratorMetadataEndpoints();
         app.MapQuestionBankEndpoints();
         // RDY-036: CAS operator surfaces — override (super-admin only) +
         // backfill (admin only). Wired here so both Actor.Host and Admin.Host

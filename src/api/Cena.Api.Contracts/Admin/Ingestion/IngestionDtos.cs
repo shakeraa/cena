@@ -1,9 +1,53 @@
 // =============================================================================
 // Cena Platform -- Content Ingestion Pipeline DTOs
 // ADM-009: Pipeline dashboard and management
+// RDY-019e-IMPL (Phase 1C): CuratorMetadata handshake DTOs
 // =============================================================================
 
 namespace Cena.Api.Contracts.Admin.Ingestion;
+
+// ---------------------------------------------------------------------------
+// CuratorMetadata handshake (RDY-019e-IMPL).
+//
+// These records map 1:1 to Cena.Infrastructure.Ocr.Contracts.OcrContextHints.
+// The admin UI captures them during the review handshake (or the extractor
+// auto-fills them); the cascade then consumes the confirmed values when
+// recognising the item.
+//
+// Field names are snake_case on the wire to match the Python fixtures in
+// scripts/ocr-spike/dev-fixtures/context-hints/examples.json.
+// ---------------------------------------------------------------------------
+public sealed record CuratorMetadata(
+    string? Subject,           // "math" | "physics" | ...
+    string? Language,          // "he" | "en" | "ar"
+    string? Track,             // "3u" | "4u" | "5u"
+    string? SourceType,        // matches OcrContextHints.SourceType enum value (lowercase_snake)
+    string? TaxonomyNode,      // e.g. "algebra.polynomials"
+    bool?   ExpectedFigures);
+
+public sealed record AutoExtractedMetadata(
+    CuratorMetadata Extracted,
+    IReadOnlyDictionary<string, double> FieldConfidences,
+    string ExtractionStrategy);    // "filename" | "pdf_metadata" | "one_page_preview" | "combined"
+
+public sealed record CuratorMetadataResponse(
+    string ItemId,
+    string MetadataState,          // "pending" | "auto_extracted" | "awaiting_review" | "confirmed" | "skipped"
+    AutoExtractedMetadata? AutoExtracted,
+    CuratorMetadata? Current,
+    IReadOnlyList<string> MissingRequired);
+
+/// <summary>
+/// Partial PATCH body — only non-null fields are applied; null means "leave alone".
+/// Explicit field clearance uses the DELETE /metadata/{field} endpoint.
+/// </summary>
+public sealed record CuratorMetadataPatch(
+    string? Subject = null,
+    string? Language = null,
+    string? Track = null,
+    string? SourceType = null,
+    string? TaxonomyNode = null,
+    bool?   ExpectedFigures = null);
 
 // Pipeline Kanban View
 public sealed record PipelineStatusResponse(
