@@ -165,6 +165,10 @@ public static class CenaAdminServiceRegistration
         // under /api/admin/ingestion/pipeline/{id}/metadata (GET/PATCH/DELETE).
         app.MapCuratorMetadataEndpoints();
 
+        // RDY-057 (Phase 3): POST /api/admin/ingestion/bagrut — SuperAdmin-only
+        // PDF ingest trigger that routes to BagrutPdfIngestionService.
+        app.MapBagrutIngestEndpoints();
+
         // RDY-019c (Phase 3): GET /api/v1/admin/content/coverage
         app.MapContentCoverageEndpoints();
         app.MapQuestionBankEndpoints();

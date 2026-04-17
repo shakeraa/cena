@@ -20,6 +20,18 @@ const navItems: VerticalNavItems = [
     icon: { icon: 'tabler-message-chatbot' },
     to: { name: 'tutor' },
   },
+  // RDY-056: student photo + PDF upload flows drive the Phase 2.1 / 2.2
+  // ingestion endpoints.
+  {
+    title: 'Snap Problem',
+    icon: { icon: 'tabler-camera' },
+    to: { name: 'tutor-photo-capture' },
+  },
+  {
+    title: 'Upload Problem',
+    icon: { icon: 'tabler-upload' },
+    to: { name: 'tutor-pdf-upload' },
+  },
 
   { heading: 'Practice' },
   {

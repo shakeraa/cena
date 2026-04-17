@@ -2,6 +2,7 @@
 import PipelineStats from '@/views/apps/ingestion/PipelineStats.vue'
 import ItemDetailPanel from '@/views/apps/ingestion/ItemDetailPanel.vue'
 import UploadDialog from '@/views/apps/ingestion/UploadDialog.vue'
+import BagrutUploadDialog from '@/views/apps/ingestion/BagrutUploadDialog.vue'
 import { $api } from '@/utils/api'
 
 definePage({
@@ -47,6 +48,7 @@ const loading = ref(true)
 const selectedItemId = ref('')
 const isDetailOpen = ref(false)
 const isUploadOpen = ref(false)
+const isBagrutOpen = ref(false)   // RDY-057 — Bagrut-specific ingest dialog
 let refreshInterval: ReturnType<typeof setInterval> | null = null
 
 const fetchPipeline = async () => {
@@ -307,8 +309,41 @@ const formatTimeAgo = (timestamp: string): string => {
       @update:is-open="isUploadOpen = $event"
       @uploaded="handleUploaded"
     />
+
+    <!-- RDY-057: Bagrut-specific PDF ingest (super-admin only on the server) -->
+    <BagrutUploadDialog
+      v-model="isBagrutOpen"
+      @ingested="fetchPipeline"
+    />
+
+    <!-- Secondary FAB for Bagrut ingest -->
+    <VBtn
+      icon
+      color="secondary"
+      size="small"
+      class="pipeline-bagrut-fab"
+      elevation="4"
+      @click="isBagrutOpen = true"
+    >
+      <VIcon icon="ri-file-pdf-2-line" size="22" />
+      <VTooltip
+        activator="parent"
+        location="start"
+      >
+        Upload Bagrut PDF
+      </VTooltip>
+    </VBtn>
   </div>
 </template>
+
+<style scoped>
+.pipeline-bagrut-fab {
+  position: fixed;
+  bottom: 6rem;
+  inset-inline-end: 2rem;
+  z-index: 9;
+}
+</style>
 
 <style lang="scss" scoped>
 .pipeline-board {
