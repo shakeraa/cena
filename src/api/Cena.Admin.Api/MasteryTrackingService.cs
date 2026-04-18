@@ -7,6 +7,7 @@
 
 using System.Security.Claims;
 using Cena.Actors.Events;
+using Cena.Api.Contracts.Admin.Mastery;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Tenancy;
 using Marten;
@@ -65,10 +66,38 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         await using var session = _store.QuerySession();
 
         var snapshot = await session.LoadAsync<StudentProfileSnapshot>(studentId);
-        if (snapshot is null) return null;
+        if (snapshot is null)
+        {
+            // Student snapshot is built after their first session. For a
+            // known-but-never-played student (e.g. pending invite, freshly
+            // seeded roster), returning null makes every mastery endpoint
+            // 404 and the admin profile page renders a red error card.
+            // Instead: if the student is a known AdminUser (or any
+            // StudentRoster row), return an empty-state detail so the
+            // Insights tab shows "no data yet" panels. Truly unknown ids
+            // still return null → 404.
+            var known = await session.LoadAsync<AdminUser>(studentId);
+            if (known is null) return null;
+            if (schoolId is not null && !string.IsNullOrEmpty(known.School)
+                && known.School != schoolId) return null;
+
+            return BuildEmptyStudentMasteryDetail(studentId, known);
+        }
         if (schoolId is not null && snapshot.SchoolId != schoolId) return null;
 
         return BuildStudentMasteryDetail(studentId, snapshot);
+    }
+
+    private static StudentMasteryDetailResponse BuildEmptyStudentMasteryDetail(string studentId, AdminUser known)
+    {
+        return new StudentMasteryDetailResponse(
+            StudentId: studentId,
+            StudentName: known.FullName ?? studentId,
+            KnowledgeMap: Array.Empty<ConceptMasteryNode>(),
+            LearningFrontier: Array.Empty<LearningFrontierItem>(),
+            MasteryHistory: Array.Empty<MasteryHistoryPoint>(),
+            Scaffolding: Array.Empty<ScaffoldingRecommendation>(),
+            ReviewQueue: Array.Empty<ReviewPriorityItem>());
     }
 
     public async Task<ClassMasteryResponse?> GetClassMasteryAsync(string classId, ClaimsPrincipal user)
