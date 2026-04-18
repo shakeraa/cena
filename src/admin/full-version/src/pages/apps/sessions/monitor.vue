@@ -25,11 +25,21 @@ const sortBy = ref('startedAt')
 
 const fetchSessions = async () => {
   try {
-    const data = await $api<{ sessions: ActiveSession[] }>('/admin/tutoring/sessions?status=active&itemsPerPage=100')
-    sessions.value = data.sessions ?? data ?? []
+    // Server returns { items: [...] } (admin paged-list envelope).
+    // Also accept { sessions: [...] } and a raw array for forward-compat
+    // with any future contract tweaks; fall back to [] so computed
+    // helpers like .filter / .length never blow up on an object.
+    const data = await $api<{ items?: ActiveSession[]; sessions?: ActiveSession[] } | ActiveSession[]>(
+      '/admin/tutoring/sessions?status=active&itemsPerPage=100',
+    )
+    const arr = Array.isArray(data)
+      ? data
+      : (data.items ?? data.sessions ?? [])
+    sessions.value = Array.isArray(arr) ? arr : []
   }
   catch (e) {
     console.error('Failed to fetch active sessions:', e)
+    sessions.value = []
   }
   finally {
     loading.value = false
