@@ -191,14 +191,31 @@ public partial class Program
     builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
     builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
 
-    // RDY-056 §4: OCR cascade services for BagrutPdfIngestionService. Core
-    // brain (layers 0–5 + CasRouterLatexValidator) + pure-C# runners.
-    // External runners (Gemini/Mathpix/pix2tex/Surya) remain optional; the
-    // cascade degrades gracefully when their keys/sidecars aren't configured.
-    Cena.Infrastructure.Ocr.DependencyInjection.OcrServiceCollectionExtensions
-        .AddOcrCascadeCore(builder.Services, builder.Configuration);
-    builder.Services.AddSingleton<Cena.Infrastructure.Ocr.Cas.ILatexValidator,
-        Cena.Actors.Cas.CasRouterLatexValidator>();
+    // RDY-056 §4 / Phase 5: OCR cascade wiring. Admin-only consumers take
+    // IOcrCascadeService as an OPTIONAL (`? = null`) dependency; registering
+    // OcrCascadeService here without the pluggable runner layers
+    // (ILayer1Layout / ILayer2aTextOcr / ILayer2bMathOcr) would cause every
+    // consumer to blow up at construction with "Unable to resolve
+    // ILayer1Layout". The runners require either Surya + pix2tex sidecars
+    // or Gemini / Mathpix API keys. Until at least one runner is wired in
+    // appsettings, leave the cascade UNREGISTERED so `? = null` consumers
+    // (CuratorMetadataExtractor, curator metadata service) fall back
+    // cleanly. The non-optional consumer (BagrutPdfIngestionService) will
+    // throw only when someone actually POSTs a PDF — which is the honest
+    // signal that OCR isn't configured for this environment.
+    //
+    // To enable: uncomment both lines + wire at least one runner, e.g.
+    //   builder.Services.Configure<GeminiVisionOptions>(
+    //     builder.Configuration.GetSection("Ocr:Gemini"));
+    //   builder.Services.AddSingleton<ILayer1Layout, SuryaLayer1Layout>();
+    //   builder.Services.AddSingleton<ILayer2aTextOcr, TesseractLocalRunner>();
+    //   builder.Services.AddSingleton<ILayer2bMathOcr, Pix2TexLayer2bMathOcr>();
+    // See tasks/readiness/RDY-056-dev-stack-boot.md §"Still pending".
+    //
+    // Cena.Infrastructure.Ocr.DependencyInjection.OcrServiceCollectionExtensions
+    //     .AddOcrCascadeCore(builder.Services, builder.Configuration);
+    // builder.Services.AddSingleton<Cena.Infrastructure.Ocr.Cas.ILatexValidator,
+    //     Cena.Actors.Cas.CasRouterLatexValidator>();
 
     builder.Services.AddCenaAdminServices();
 
