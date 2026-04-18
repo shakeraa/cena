@@ -107,13 +107,19 @@ export default defineConfig({
     strictPort: true,
     // COOP header removed — it blocks Firebase Google OAuth popup's window.close()
     // Only needed for SharedArrayBuffer/WASM which Cena doesn't use
+    // RDY-056 §3: Vite dev proxy. `/api/*` targets are env-overridable so
+    // the admin SPA container can point at the sibling admin-api container
+    // (http://cena-admin-api:5052) in docker compose, while a host-run
+    // `vite dev` still defaults to localhost:5052.
+    // Default changed 5050 → 5052 because /api/* on the Admin SPA is the
+    // Admin API surface, not the Student API.
     proxy: {
       '/api/actors': {
-        target: 'http://localhost:5119',
+        target: process.env.VITE_ACTOR_API_TARGET ?? 'http://localhost:5119',
         changeOrigin: true,
       },
       '/api': {
-        target: 'http://localhost:5050',
+        target: process.env.VITE_ADMIN_API_PROXY_TARGET ?? 'http://localhost:5052',
         changeOrigin: true,
       },
     },

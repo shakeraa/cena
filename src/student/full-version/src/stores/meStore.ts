@@ -77,10 +77,24 @@ export const useMeStore = defineStore('me', () => {
   }
 
   function __setOnboardedAt(iso: string | null) {
-    if (profile.value) {
-      profile.value.onboardedAt = iso
-      writeMeToStorage(profile.value)
+    // If profile hasn't been fetched yet (fresh sign-in, mock handlers
+    // still warming up), create a minimal stub so the guard's
+    // `isOnboarded` check actually flips. Without this, the onboarding
+    // form submits successfully but the router guard bounces the user
+    // right back to /onboarding because profile was still null.
+    if (!profile.value) {
+      profile.value = {
+        uid: '',
+        displayName: '',
+        email: '',
+        locale: 'en',
+        onboardedAt: iso,
+      }
     }
+    else {
+      profile.value.onboardedAt = iso
+    }
+    writeMeToStorage(profile.value)
   }
 
   function __setActiveSession(sessionId: string | null) {

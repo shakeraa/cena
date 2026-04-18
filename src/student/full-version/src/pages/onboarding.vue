@@ -225,7 +225,16 @@ async function handleConfirm() {
         <p class="text-body-2 text-medium-emphasis mb-5">
           {{ t('onboarding.confirm.subtitle') }}
         </p>
-        <VList class="mb-4 rounded-lg bg-surface-variant">
+        <!-- FIND-ux-onboarding: confirm-step summary. Use a bordered,
+             transparent surface so the card inherits the outer VCard's
+             theme color instead of the Material 'surface-variant' token
+             which renders as light-grey on both light AND dark themes
+             and fails contrast for the subtitle text. -->
+        <VList
+          class="mb-4 rounded-lg onboarding-summary-list"
+          :bg-color="'transparent'"
+          border
+        >
           <VListItem
             prepend-icon="tabler-user"
             :title="t('onboarding.confirm.roleLabel')"
@@ -314,5 +323,14 @@ async function handleConfirm() {
 .onboarding-page__card {
   inline-size: 100%;
   max-inline-size: 640px;
+}
+
+/* Lift subtitle contrast on the confirm-step summary so "Self-learner"
+   and "English" read cleanly on both themes. Vuetify's default subtitle
+   opacity (0.6) is too faint when the list bg is transparent. */
+.onboarding-summary-list :deep(.v-list-item-subtitle) {
+  --v-medium-emphasis-opacity: 0.85;
+
+  opacity: var(--v-medium-emphasis-opacity);
 }
 </style>

@@ -191,6 +191,15 @@ public partial class Program
     builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
     builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
 
+    // RDY-056 §4: OCR cascade services for BagrutPdfIngestionService. Core
+    // brain (layers 0–5 + CasRouterLatexValidator) + pure-C# runners.
+    // External runners (Gemini/Mathpix/pix2tex/Surya) remain optional; the
+    // cascade degrades gracefully when their keys/sidecars aren't configured.
+    Cena.Infrastructure.Ocr.DependencyInjection.OcrServiceCollectionExtensions
+        .AddOcrCascadeCore(builder.Services, builder.Configuration);
+    builder.Services.AddSingleton<Cena.Infrastructure.Ocr.Cas.ILatexValidator,
+        Cena.Actors.Cas.CasRouterLatexValidator>();
+
     builder.Services.AddCenaAdminServices();
 
     // RDY-036: CAS startup probe — fails fast in Enforce mode if the CAS

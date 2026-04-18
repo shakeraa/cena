@@ -195,6 +195,10 @@ services:
       # we point at the host-visible port 9099, not the container DNS name.
       - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
       - VITE_ADMIN_API_BASE_URL=http://localhost:5052
+      # Vite dev-server proxy target: inside the SPA container, localhost
+      # is the container itself. Forward /api/* to the admin-api service
+      # on the compose network.
+      - VITE_ADMIN_API_PROXY_TARGET=http://cena-admin-api:5052
     restart: unless-stopped
 
   # ── Student SPA (Vuexy Vue 3 PWA, Vite dev server) ──
@@ -221,6 +225,31 @@ services:
       - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
       - VITE_STUDENT_API_BASE_URL=http://localhost:5050
     restart: unless-stopped
+
+  # ── Student Emulator (simulated-traffic load tool) ──
+  # Runs N simulated students against the actor cluster via NATS. Off by
+  # default — bring up with an explicit `--profile emulator` so it doesn't
+  # flood the dev stack on `docker compose up`.
+  emulator:
+    build:
+      context: .
+      dockerfile: src/emulator/Dockerfile
+    container_name: cena-emulator
+    profiles: ["emulator"]
+    depends_on:
+      nats:
+        condition: service_healthy
+      actor-host:
+        condition: service_started
+    environment:
+      - NATS_EMU_USER=emulator
+      - NATS_EMU_PASSWORD=${NATS_EMU_PASSWORD:-dev_emu_pass}
+    command:
+      - "--students=${EMU_STUDENTS:-50}"
+      - "--speed=${EMU_SPEED:-25}"
+      - "--duration=${EMU_DURATION:-300}"
+      - "--nats=nats://cena-nats:4222"
+    restart: "no"
 
   # ── Actor Host (Proto.Actor cluster) ──
   actor-host:
