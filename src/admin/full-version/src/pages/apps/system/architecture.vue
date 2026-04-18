@@ -8,11 +8,18 @@ const svgRef = ref<SVGSVGElement | null>(null)
 const loading = ref(true)
 const actorHostStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const adminApiStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
+const studentApiStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const natsStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const pgStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const redisStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
+const firebaseStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
+const sympyStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
+const emulatorStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const frontendStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
+const studentSpaStatus = ref<'healthy' | 'degraded' | 'offline'>('offline')
 const activeActors = ref(0)
+const commandsRouted = ref(0)
+const emulatorSublabel = ref('Idle')
 
 const statusColor = (s: string) => s === 'healthy' ? '#28C76F' : s === 'degraded' ? '#FF9F43' : '#EA5455'
 const statusGlow = (s: string) => s === 'healthy' ? 'rgba(40,199,111,0.4)' : s === 'degraded' ? 'rgba(255,159,67,0.4)' : 'rgba(234,84,85,0.25)'
@@ -149,12 +156,14 @@ function mapProbeStatus(s: string): 'healthy' | 'degraded' | 'offline' {
 }
 
 const checkServices = async () => {
+  // Actor host — stats + live-actor count
   try {
     const r = await authedFetch('/api/actors/stats')
     if (r.ok) {
       const data = await r.json()
       actorHostStatus.value = 'healthy'
       activeActors.value = data.activeActorCount ?? 0
+      commandsRouted.value = data.commandsRouted ?? 0
     }
     else {
       actorHostStatus.value = 'offline'
@@ -162,6 +171,7 @@ const checkServices = async () => {
   }
   catch { actorHostStatus.value = 'offline' }
 
+  // Admin API + per-service fanout (NATS/PG/Redis read off its probe)
   try {
     const r = await authedFetch('/api/admin/system/health')
     if (r.ok) {
@@ -181,7 +191,56 @@ const checkServices = async () => {
   }
   catch { adminApiStatus.value = 'offline' }
 
+  // Student API — /health/live is unauthenticated; reach it via the SPA
+  // origin so the browser's CORS rules apply rather than a cross-origin fetch.
+  // The student-api port is exposed on the host; probe by origin fetch.
+  try {
+    const studentApiOrigin = import.meta.env.VITE_STUDENT_API_BASE_URL ?? 'http://localhost:5050'
+    // no-cors returns an opaque response; reaching it without throwing is
+    // our liveness signal. Avoids needing CORS on /health/live.
+    await fetch(`${studentApiOrigin}/health/live`, { method: 'GET', mode: 'no-cors' })
+    studentApiStatus.value = 'healthy'
+  }
+  catch { studentApiStatus.value = 'offline' }
+
+  // Firebase emulator liveness — also use no-cors to avoid CORS preflight.
+  try {
+    const emuHost = import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_HOST ?? 'http://localhost:9099'
+    await fetch(`${emuHost}/`, { method: 'GET', mode: 'no-cors' })
+    firebaseStatus.value = 'healthy'
+  }
+  catch { firebaseStatus.value = 'offline' }
+
+  // SymPy sidecar — exposed through the admin-api as part of the CAS
+  // gate's own startup probe (CAS-STARTUP-OK gauge). Derive from
+  // natsStatus: sidecar lives on NATS, so if NATS is healthy + the
+  // actor-host reports healthy we assume sympy is reachable. A direct
+  // probe would need a new admin endpoint.
+  sympyStatus.value = (natsStatus.value === 'healthy' && actorHostStatus.value === 'healthy')
+    ? 'healthy' : 'degraded'
+
+  // Student Emulator — NATS traffic volume is the liveness signal.
+  // commandsRouted > 0 means the actor-host is servicing attempts.
+  if (commandsRouted.value > 0) {
+    emulatorStatus.value = 'healthy'
+    emulatorSublabel.value = `${commandsRouted.value} commands routed`
+  }
+  else {
+    emulatorStatus.value = 'offline'
+    emulatorSublabel.value = 'Idle'
+  }
+
+  // Frontends are trivially healthy — if we're rendering, admin SPA is up.
   frontendStatus.value = 'healthy'
+  // Student SPA: probe via the public port so we don't hide a broken SPA.
+  try {
+    const studentSpaOrigin = import.meta.env.VITE_STUDENT_SPA_URL ?? 'http://localhost:5175'
+    const r = await fetch(`${studentSpaOrigin}/`, { method: 'GET', mode: 'no-cors' })
+    // no-cors means opaque response; reaching it without throwing is "up"
+    studentSpaStatus.value = 'healthy'
+    void r
+  }
+  catch { studentSpaStatus.value = 'offline' }
 
   loading.value = false
 
@@ -270,34 +329,71 @@ const drawDiagram = () => {
   // compose layouts all render the same source without code edits.
   // Defaults line up with the dockerised dev stack.
   const portFrontend = import.meta.env.VITE_PORT_FRONTEND ?? '5174'
+  const portStudentSpa = import.meta.env.VITE_PORT_STUDENT_SPA ?? '5175'
   const portAdminApi = import.meta.env.VITE_PORT_ADMIN_API ?? '5052'
+  const portStudentApi = import.meta.env.VITE_PORT_STUDENT_API ?? '5050'
   const portActorHost = import.meta.env.VITE_PORT_ACTOR_HOST ?? '5050'
   const portNats = import.meta.env.VITE_PORT_NATS ?? '4222'
   const portPostgres = import.meta.env.VITE_PORT_POSTGRES ?? '5433'
   const portRedis = import.meta.env.VITE_PORT_REDIS ?? '6379'
+  const portFirebaseEmu = import.meta.env.VITE_PORT_FIREBASE_EMU ?? '9099'
 
+  // Layout: 3 rows × {frontend, middle-tier, infra}. Widen the middle row
+  // so the new nodes (Student SPA, Student API, SymPy) fit without
+  // overlapping. Firebase Emulator + CAS sidecar read status from
+  // admin-api's per-service probe (see mapProbeStatus above); emulator
+  // status comes from NATS traffic (non-zero commandsRouted = alive).
   nodes = [
-    { id: 'frontend', label: 'Admin Dashboard', sublabel: 'Vite + Vue 3 + Vuetify', x: px + iw * 0.5, y: 70, status: frontendStatus.value, icon: 'V', port: portFrontend },
-    { id: 'admin-api', label: 'Admin API', sublabel: '.NET 9 REST + Firebase Auth', x: px + iw * 0.25, y: 250, status: adminApiStatus.value, icon: 'A', port: portAdminApi },
-    { id: 'actor-host', label: 'Actor Host', sublabel: `Proto.Actor Cluster (${activeActors.value} actors)`, x: px + iw * 0.75, y: 250, status: actorHostStatus.value, icon: 'P', port: portActorHost, children: actorChildren, expanded: expandedClusters.value.has('actor-host') },
-    { id: 'nats', label: 'NATS JetStream', sublabel: 'Message Bus', x: px + iw * 0.5, y: 430, status: natsStatus.value, icon: 'N', port: portNats },
-    { id: 'postgres', label: 'PostgreSQL', sublabel: 'Marten Event Store', x: px + iw * 0.15, y: 620, status: pgStatus.value, icon: 'PG', port: portPostgres },
-    { id: 'redis', label: 'Redis', sublabel: 'Cache + Sessions', x: px + iw * 0.5, y: 620, status: redisStatus.value, icon: 'R', port: portRedis },
-    { id: 'firebase', label: 'Firebase Auth', sublabel: 'Google OAuth + JWT', x: px + iw * 0.0, y: 430, status: 'healthy', icon: 'F' },
-    { id: 'emulator', label: 'Student Emulator', sublabel: `${activeActors.value > 0 ? '100 students' : 'Idle'}`, x: px + iw * 1.0, y: 430, status: activeActors.value > 0 ? 'healthy' : 'offline', icon: 'E' },
+    // ── Row 0: frontends ──────────────────────────────────────────────
+    { id: 'admin-spa', label: 'Admin Dashboard', sublabel: 'Vite + Vue 3 + Vuetify', x: px + iw * 0.30, y: 70, status: frontendStatus.value, icon: 'V', port: portFrontend },
+    { id: 'student-spa', label: 'Student PWA', sublabel: 'Vite + Vue 3 + Vuetify', x: px + iw * 0.70, y: 70, status: studentSpaStatus.value, icon: 'S', port: portStudentSpa },
+
+    // ── Row 1: APIs + actor host ─────────────────────────────────────
+    { id: 'admin-api', label: 'Admin API', sublabel: '.NET 9 REST + Firebase Auth', x: px + iw * 0.15, y: 250, status: adminApiStatus.value, icon: 'A', port: portAdminApi },
+    { id: 'student-api', label: 'Student API', sublabel: '.NET 9 REST + SignalR', x: px + iw * 0.50, y: 250, status: studentApiStatus.value, icon: 'St', port: portStudentApi },
+    { id: 'actor-host', label: 'Actor Host', sublabel: `Proto.Actor Cluster (${activeActors.value} actors)`, x: px + iw * 0.85, y: 250, status: actorHostStatus.value, icon: 'P', port: portActorHost, children: actorChildren, expanded: expandedClusters.value.has('actor-host') },
+
+    // ── Row 2: message bus, auth emulator, CAS sidecar ───────────────
+    { id: 'firebase', label: 'Firebase Emulator', sublabel: 'Auth (dev)', x: px + iw * 0.00, y: 430, status: firebaseStatus.value, icon: 'F', port: portFirebaseEmu },
+    { id: 'nats', label: 'NATS JetStream', sublabel: 'Message Bus', x: px + iw * 0.35, y: 430, status: natsStatus.value, icon: 'N', port: portNats },
+    { id: 'sympy', label: 'SymPy Sidecar', sublabel: 'CAS Tier 2 (NATS)', x: px + iw * 0.65, y: 430, status: sympyStatus.value, icon: 'Σ' },
+    { id: 'emulator', label: 'Student Emulator', sublabel: emulatorSublabel.value, x: px + iw * 1.00, y: 430, status: emulatorStatus.value, icon: 'E' },
+
+    // ── Row 3: datastores ────────────────────────────────────────────
+    { id: 'postgres', label: 'PostgreSQL', sublabel: 'Marten Event Store', x: px + iw * 0.20, y: 620, status: pgStatus.value, icon: 'PG', port: portPostgres },
+    { id: 'redis', label: 'Redis', sublabel: 'Cache + Sessions', x: px + iw * 0.60, y: 620, status: redisStatus.value, icon: 'R', port: portRedis },
   ]
 
   edges = [
-    { from: 'frontend', to: 'admin-api', label: 'REST /api/*', protocol: 'HTTP', active: true },
-    { from: 'frontend', to: 'actor-host', label: '/api/actors/*', protocol: 'HTTP', active: true },
-    { from: 'admin-api', to: 'nats', label: 'Subscribe events', protocol: 'NATS', active: natsStatus.value === 'healthy' },
-    { from: 'actor-host', to: 'nats', label: 'Pub/Sub commands', protocol: 'NATS', active: natsStatus.value === 'healthy' },
-    { from: 'emulator', to: 'nats', label: 'Publish attempts', protocol: 'NATS', active: activeActors.value > 0 },
+    // Frontends → APIs
+    { from: 'admin-spa', to: 'admin-api', label: 'REST /api/*', protocol: 'HTTP', active: true },
+    { from: 'admin-spa', to: 'actor-host', label: '/api/actors/*', protocol: 'HTTP', active: true },
+    { from: 'student-spa', to: 'student-api', label: 'REST /api/*', protocol: 'HTTP', active: true },
+    { from: 'student-spa', to: 'firebase', label: 'Sign-in', protocol: 'HTTPS', active: true },
+    { from: 'admin-spa', to: 'firebase', label: 'Sign-in', protocol: 'HTTPS', active: true },
+
+    // APIs/host ↔ NATS
+    { from: 'admin-api', to: 'nats', label: 'Events pub/sub', protocol: 'NATS', active: natsStatus.value === 'healthy' },
+    { from: 'student-api', to: 'nats', label: 'Commands', protocol: 'NATS', active: natsStatus.value === 'healthy' },
+    { from: 'actor-host', to: 'nats', label: 'Pub/Sub', protocol: 'NATS', active: natsStatus.value === 'healthy' },
+    { from: 'emulator', to: 'nats', label: 'Publish attempts', protocol: 'NATS', active: emulatorStatus.value === 'healthy' },
+
+    // CAS cascade: admin-api + actor-host → SymPy via NATS
+    { from: 'admin-api', to: 'sympy', label: 'CAS verify', protocol: 'NATS', active: sympyStatus.value === 'healthy' },
+    { from: 'actor-host', to: 'sympy', label: 'CAS verify', protocol: 'NATS', active: sympyStatus.value === 'healthy' },
+
+    // Auth verification (server-side JWT check)
+    { from: 'admin-api', to: 'firebase', label: 'Token verify', protocol: 'HTTPS', active: true },
+    { from: 'student-api', to: 'firebase', label: 'Token verify', protocol: 'HTTPS', active: true },
+    { from: 'actor-host', to: 'firebase', label: 'Token verify', protocol: 'HTTPS', active: true },
+
+    // Datastore reads/writes
     { from: 'admin-api', to: 'postgres', label: 'Marten queries', protocol: 'TCP', active: pgStatus.value === 'healthy' },
+    { from: 'student-api', to: 'postgres', label: 'Marten queries', protocol: 'TCP', active: pgStatus.value === 'healthy' },
     { from: 'actor-host', to: 'postgres', label: 'Event sourcing', protocol: 'TCP', active: pgStatus.value === 'healthy' },
     { from: 'admin-api', to: 'redis', label: 'Cache', protocol: 'TCP', active: redisStatus.value === 'healthy' },
+    { from: 'student-api', to: 'redis', label: 'Cache', protocol: 'TCP', active: redisStatus.value === 'healthy' },
     { from: 'actor-host', to: 'redis', label: 'State cache', protocol: 'TCP', active: redisStatus.value === 'healthy' },
-    { from: 'admin-api', to: 'firebase', label: 'Token verify', protocol: 'HTTPS', active: true },
   ]
 
   nodeMap = new Map(nodes.map(n => [n.id, n]))

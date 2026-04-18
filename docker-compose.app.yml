@@ -206,11 +206,19 @@ services:
       - VITE_ACTOR_API_PROXY_TARGET=http://cena-actor-host:5050
       # Architecture-diagram port labels (user-visible via the SPA build).
       - VITE_PORT_FRONTEND=5174
+      - VITE_PORT_STUDENT_SPA=5175
       - VITE_PORT_ADMIN_API=5052
+      - VITE_PORT_STUDENT_API=5050
       - VITE_PORT_ACTOR_HOST=5050
       - VITE_PORT_NATS=4222
       - VITE_PORT_POSTGRES=5433
       - VITE_PORT_REDIS=6379
+      - VITE_PORT_FIREBASE_EMU=9099
+      # Browser-facing URLs for cross-service health probes (Student API
+      # /health/live, Student SPA origin). The Firebase emulator host is
+      # already set above for the auth SDK.
+      - VITE_STUDENT_API_BASE_URL=http://localhost:5050
+      - VITE_STUDENT_SPA_URL=http://localhost:5175
     restart: unless-stopped
 
   # ── Student SPA (Vuexy Vue 3 PWA, Vite dev server) ──
