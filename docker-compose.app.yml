@@ -188,6 +188,16 @@ services:
     # Admin SPA's vite.config.ts pins port 5174 (strictPort). Map host 5174.
     ports:
       - "5174:5174"
+    # Bind-mount the host source so Vite's HMR picks up edits without a
+    # container rebuild. node_modules stays inside the container (an
+    # anonymous volume masks any host node_modules) so SDK-bound deps
+    # keep working across host/container architecture differences.
+    volumes:
+      - ./src/admin/full-version/src:/app/src
+      - ./src/admin/full-version/public:/app/public
+      - ./src/admin/full-version/package.json:/app/package.json
+      - ./src/admin/full-version/vite.config.ts:/app/vite.config.ts
+      - /app/node_modules
     environment:
       - VITE_FIREBASE_API_KEY=fake-api-key
       - VITE_FIREBASE_AUTH_DOMAIN=cena-platform.firebaseapp.com
@@ -235,6 +245,14 @@ services:
     # Student SPA's vite.config.ts pins port 5175 (strictPort). Map host 5175.
     ports:
       - "5175:5175"
+    # Host source → container for Vite HMR. node_modules anonymous volume
+    # keeps the container's installed packages (SDK-bound binaries).
+    volumes:
+      - ./src/student/full-version/src:/app/src
+      - ./src/student/full-version/public:/app/public
+      - ./src/student/full-version/package.json:/app/package.json
+      - ./src/student/full-version/vite.config.ts:/app/vite.config.ts
+      - /app/node_modules
     environment:
       - VITE_FIREBASE_API_KEY=fake-api-key
       - VITE_FIREBASE_AUTH_DOMAIN=cena-platform.firebaseapp.com
