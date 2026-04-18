@@ -61,6 +61,9 @@ public class StudentAuthEndpointsTests
         public Task EnableUserAsync(string uid) => throw new System.NotSupportedException();
         public Task DeleteUserAsync(string uid) => throw new System.NotSupportedException();
         public Task<string> GenerateSignInLinkAsync(string email) => throw new System.NotSupportedException();
+        public Task UpdateDisplayNameAsync(string uid, string? displayName) => throw new System.NotSupportedException();
+        public Task RevokeRefreshTokensAsync(string uid) => throw new System.NotSupportedException();
+        public Task<Cena.Infrastructure.Firebase.FirebaseUserSummary?> GetUserAsync(string uid) => Task.FromResult<Cena.Infrastructure.Firebase.FirebaseUserSummary?>(null);
     }
 
     private static ILogger<AuthEndpoints.AuthLoggerMarker> NullLogger() =>

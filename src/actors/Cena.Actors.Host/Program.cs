@@ -363,6 +363,12 @@ builder.Services.AddSingleton<Cena.Actors.Ingest.IQuestionSegmenter, Cena.Actors
 builder.Services.AddSingleton<Cena.Actors.Ingest.IDeduplicationService, Cena.Actors.Ingest.DeduplicationService>();
 builder.Services.AddSingleton<Cena.Actors.Ingest.IContentExtractorService, Cena.Actors.Ingest.ContentExtractorService>();
 builder.Services.AddScoped<Cena.Actors.Ingest.IIngestionOrchestrator, Cena.Actors.Ingest.IngestionOrchestrator>();
+
+// RDY-061 Phase 2: student advancement aggregate + NATS subscriber that
+// cascades chapter transitions from ConceptMastered events.
+builder.Services.AddScoped<Cena.Actors.Advancement.IStudentAdvancementService,
+    Cena.Actors.Advancement.StudentAdvancementService>();
+builder.Services.AddHostedService<Cena.Actors.Advancement.AdvancementEventSubscriber>();
 builder.Services.AddSingleton<Cena.Actors.Serving.IQuestionSelector, Cena.Actors.Serving.QuestionSelector>();
 
 // SAI-06/07: Content extraction pipeline + embeddings + pgvector

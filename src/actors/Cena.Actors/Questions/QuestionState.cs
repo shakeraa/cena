@@ -82,7 +82,44 @@ public sealed class QuestionState
     // Classification
     public string Subject { get; set; } = "";
     public string Topic { get; set; } = "";
+    /// <summary>
+    /// Legacy string tag. Historically held Bagrut track values
+    /// ("3 Units", "4 Units", "5 Units") that don't describe a
+    /// calendar-year grade at all (RDY-061 lying-label finding).
+    /// New code SHOULD use <see cref="BagrutTrack"/>. We keep the field
+    /// for upcaster compatibility and for non-Bagrut content that
+    /// continues to use free-form tagging.
+    /// </summary>
     public string Grade { get; set; } = "";
+
+    /// <summary>
+    /// RDY-061 Phase 5: typed replacement for the overloaded
+    /// <see cref="Grade"/> string. Parsed at write-time from the
+    /// incoming request or from a legacy Grade value by
+    /// <see cref="ParseBagrutTrackFromGradeString"/>.
+    /// </summary>
+    public Cena.Infrastructure.Documents.BagrutTrack BagrutTrack { get; set; }
+        = Cena.Infrastructure.Documents.BagrutTrack.None;
+
+    /// <summary>
+    /// Translate the legacy Grade string (e.g. <c>"5 Units"</c> or
+    /// <c>"5U"</c>) into the typed enum. Returns
+    /// <see cref="BagrutTrack.None"/> for unrecognised values so non-
+    /// Bagrut content keeps flowing through.
+    /// </summary>
+    public static Cena.Infrastructure.Documents.BagrutTrack ParseBagrutTrackFromGradeString(string? grade)
+    {
+        if (string.IsNullOrWhiteSpace(grade))
+            return Cena.Infrastructure.Documents.BagrutTrack.None;
+        var normalised = grade.Trim().ToLowerInvariant();
+        return normalised switch
+        {
+            "3 units" or "3u" or "3-unit" or "3unit" => Cena.Infrastructure.Documents.BagrutTrack.ThreeUnit,
+            "4 units" or "4u" or "4-unit" or "4unit" => Cena.Infrastructure.Documents.BagrutTrack.FourUnit,
+            "5 units" or "5u" or "5-unit" or "5unit" => Cena.Infrastructure.Documents.BagrutTrack.FiveUnit,
+            _ => Cena.Infrastructure.Documents.BagrutTrack.None,
+        };
+    }
     public int BloomsLevel { get; set; }
     public float Difficulty { get; set; }
     public List<string> ConceptIds { get; set; } = new();

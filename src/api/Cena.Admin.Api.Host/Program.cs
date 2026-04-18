@@ -191,6 +191,10 @@ public partial class Program
     builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
     builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
 
+    // RDY-061: syllabus advancement — read-side + teacher-override writes.
+    builder.Services.AddScoped<Cena.Actors.Advancement.IStudentAdvancementService,
+        Cena.Actors.Advancement.StudentAdvancementService>();
+
     // RDY-056 §4 / Phase 5: OCR cascade wiring. Admin-only consumers take
     // IOcrCascadeService as an OPTIONAL (`? = null`) dependency; registering
     // OcrCascadeService here without the pluggable runner layers
@@ -472,6 +476,9 @@ public partial class Program
     // RDY-058: /api/admin/me/* — admin self-service account management
     // (profile, sign-out-everywhere, sign-in history, GDPR self-delete).
     Cena.Admin.Api.AdminMeEndpoints.MapAdminMeEndpoints(app);
+
+    // RDY-061: syllabus + student advancement endpoints
+    Cena.Admin.Api.Syllabus.SyllabusEndpoints.MapSyllabusEndpoints(app);
     
     // ---- Classroom endpoints (STB-00b) ----
     app.MapClassroomEndpoints();

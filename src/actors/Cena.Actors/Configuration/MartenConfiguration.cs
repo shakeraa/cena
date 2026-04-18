@@ -222,6 +222,9 @@ public static class MartenConfiguration
         // document on every SaveChangesAsync when event count crosses the threshold.
         opts.Projections.Snapshot<StudentProfileSnapshot>(SnapshotLifecycle.Inline);
 
+        // RDY-061 Phase 2: student advancement aggregate (per enrollment)
+        opts.Projections.Snapshot<Cena.Actors.Advancement.StudentAdvancementState>(SnapshotLifecycle.Inline);
+
         // REV-014: Index SchoolId for efficient tenant-scoped queries
         opts.Schema.For<StudentProfileSnapshot>().Index(x => x.SchoolId);
 
@@ -743,6 +746,15 @@ public static class MartenConfiguration
         opts.Events.AddEventType<QuestionExplanationUpdated_V1>();
         opts.Events.AddEventType<LanguageVersionAdded_V1>();
         opts.Events.AddEventType<LearningObjectiveAssigned_V1>(); // FIND-pedagogy-008
+
+        // RDY-061 Phase 2: syllabus advancement events.
+        opts.Events.AddEventType<AdvancementStarted_V1>();
+        opts.Events.AddEventType<ChapterUnlocked_V1>();
+        opts.Events.AddEventType<ChapterStarted_V1>();
+        opts.Events.AddEventType<ChapterMastered_V1>();
+        opts.Events.AddEventType<ChapterDecayDetected_V1>();
+        opts.Events.AddEventType<SpiralReviewCompleted_V1>();
+        opts.Events.AddEventType<ChapterOverriddenByTeacher_V1>();
     }
 
     /// <summary>
