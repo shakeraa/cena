@@ -157,3 +157,73 @@ Acceptance: script exits 0; produces a user/password table in terminal.
 - The SymPy sidecar + `.dockerignore` + `docker-compose.app.yml` + Dockerfile fixes from this session are the load-bearing prerequisite. Commit those before starting Phase 1.
 - The DI gaps found in this session (`IClock`, `ICostBudgetService`) are symptoms of a broader pattern: `AddCenaAdminServices()` is called from multiple hosts but assumes host-specific registrations exist. Phase 1.3 should audit `AddCenaAdminServices` / `AddCenaStudentServices` for implicit host dependencies and either fold the missing registrations in, or refactor into per-host extension methods with explicit dependency lists.
 - Don't bypass the crashes with `ValidateOnBuild=false` in Production — that's a stub pattern. Development-only override is the honest fix; production should validate.
+
+---
+
+## Execution Log (2026-04-17 → 2026-04-18)
+
+### Phase 1 — .NET containers boot (commit `62f98c3`)
+- SymPy Python/NATS sidecar (docker/sympy-sidecar/): real worker for all 5 CasOperation types, `sympy==1.13.3`. NATS user `sympy-sidecar` added.
+- `.dockerignore` prunes `.agentdb/worktrees`, `bin`, `obj`, SPA bundles (build context was 30+ GB → <1 GB).
+- Marten pre-`app.Run()` warm-up (admin + student + actor hosts): `ApplyAllConfiguredChangesToDatabaseAsync` serialises DDL before hosted-service seeders race the `TimedLock`.
+- `MethodologyEffectivenessByCultureDocument.DocumentAlias("method_effect_by_culture")` — full type name overflowed Postgres NAMEDATALEN.
+- `AddCenaAdminServices` TryAdd's shared infra (`ICostBudgetService`, `ICostCircuitBreaker`, `IClock`, `IErasureCryptoConfig`, `IErasureManifestBuilder`). Caller hosts no longer need to remember them.
+- `IWebPushClient` registered as singleton in Student host.
+- `ValidateOnBuild=false` in Development across all three hosts (production path untouched).
+- Kestrel + PostgreSQL connection strings overridable via `Kestrel__Endpoints__Http__Url` + `ConnectionStrings__PostgreSQL` env; baked `appsettings.Development.json` was pinning `localhost:5433`/`5051`.
+- Duplicate `RevokeMyConsent` endpoint name renamed to `RevokeMyGdprConsent`.
+- Dockerfile fixes: student-api + actor-host Dockerfiles copy `Cena.Admin.Api.csproj` for restore; `SkipOpenApiGeneration=true` condition + MSBuild flag.
+
+### Phase 2 — Firebase emulator + dev users (commit `d86ba66`)
+- `firebase-emulator` service (firebase-tools v13, Auth on :9099, UI on :4000).
+- `FirebaseAuthExtensions` emulator branch guarded by `FIREBASE_AUTH_EMULATOR_HOST`. Uses `UseSecurityTokenValidators=true` + `SignatureValidator` bypass + `RequireSignedTokens=false` to accept the emulator's alg=none JWTs. Production path untouched.
+- `seed-dev-users.sh` creates 10 accounts via the emulator REST API with UPPER_SNAKE_CASE roles matching `ResourceOwnershipGuard.cs`:
+  - `shaker.abuayoub@gmail.com` / `ShakerMain2026!` — SUPER_ADMIN (primary, matches Marten `sa-001`)
+  - `admin@cena.local` / `DevAdmin123!` — SUPER_ADMIN
+  - `curriculum@cena.local` / `DevCur123!` — ADMIN
+  - `teacher1..2@cena.local` / `DevTeacher123!` — TEACHER
+  - `student1..5@cena.local` / `DevStudent123!` — STUDENT (mixed 5U/4U, he/ar)
+  - `parent1@cena.local` / `DevParent123!` — PARENT
+- Verified end-to-end: admin sign-in → idToken → `GET /api/admin/users` returns 200.
+
+### Phase 3 — SPAs in docker (commit `36401b4`)
+- `admin-spa` (:5174) + `student-spa` (:5175) compose entries.
+- Admin SPA Firebase plugin: added `connectAuthEmulator` branch.
+- Admin i18n (ar/en/he): escape `@` in email addresses as `{'@'}` so vue-i18n's linked-message parser doesn't choke on `privacy@cena.edu`.
+- Student SPA `package.json`: added missing `dompurify`, `function-plot`, `mathlive` deps.
+- Onboarding redirect bug (commit `36401b4` + `714895c`): `meStore.__setOnboardedAt` no-op'd when profile was null (fresh sign-in race). Fixed to create a minimal profile stub so `isOnboarded` actually flips.
+- Onboarding confirm-step contrast: `bg-surface-variant` → bordered transparent list; subtitle opacity `0.6 → 0.85`.
+
+### Phase 4 — Student emulator + OCR wiring (commit `714895c`)
+- `src/emulator/Dockerfile` + `emulator` compose service under `profiles: ["emulator"]` (opt-in). Defaults: 50 students, 25× speed, 300s.
+- Verified: 15 simulated students pushed 8350+ events through NATS to actor-host.
+- `AddOcrCascadeCore` + `CasRouterLatexValidator` wired into admin-api DI so `BagrutPdfIngestionService` resolves.
+- **PDF ingestion gap tracked**: the runner layers (`ILayer1Layout` / `ILayer2aTextOcr` / `ILayer2bMathOcr`) need either the Surya + pix2tex sidecars or Gemini / Mathpix API keys to actually ingest. Core brain is wired; runners intentionally pluggable.
+
+### Phase 5 — Compose-network reachability (commits `045f146`, `1173a2b`, `cc1da59`, this one)
+Every dashboard page painted services red because of a chain of hardcoded / stale URLs:
+- Admin API's NATS probe hit `localhost:8222` instead of `cena-nats:8222`; Actor-Host probe hit `localhost:5119` instead of `cena-actor-host:5050`. Both now read from `CENA_NATS_MONITORING_URL` / `CENA_ACTOR_STATS_URL`.
+- Actor-Host probe converted to two-step: liveness via unauth `/health/live`, stats (SuperAdmin-gated) best-effort. 401 on stats no longer flips the card to "down".
+- Admin SPA Vite proxy default `5050 → 5052` for `/api/*` and `5119 → 5050` for `/api/actors/*`; both overridable via `VITE_ADMIN_API_PROXY_TARGET` / `VITE_ACTOR_API_PROXY_TARGET` (compose points them at sibling containers).
+- Actor-Host `AllowedHosts=*` override — was pinned to `localhost`, returning `400 Bad Request — Invalid Hostname` to sibling calls.
+- Actor-Host Firebase emulator env added (`Firebase__ProjectId` + `FIREBASE_AUTH_EMULATOR_HOST`) so it accepts the same tokens admin-api does.
+- `OfflineBanner.vue` `v-model="!isOnline"` was a compile error — wrapped in a computed with a no-op setter.
+- Architecture diagram page:
+  - Ports read from `VITE_PORT_*` env vars (six-pack: FRONTEND / STUDENT_SPA / ADMIN_API / STUDENT_API / ACTOR_HOST / NATS / POSTGRES / REDIS / FIREBASE_EMU).
+  - Probes now attach the Firebase bearer (`authedFetch` helper matching `useApi` pattern); plain `fetch()` was hitting 401 → painting everything red.
+  - Per-service health read from admin-api's probe array instead of mirroring admin-api status transitively.
+  - Added Student SPA, Student API, SymPy Sidecar, Firebase Emulator nodes (8 → 11 services).
+  - Emulator liveness: `commandsRouted > 0` (monotonic) instead of `activeActors > 0` (short-lived).
+  - `getNodeStatus` + `getEdgeActive` switch maps updated for new node IDs (the bug that painted V / S / St red after the node rename).
+
+### What's green
+All 11 services report correctly when the dockerised stack is up and the user is signed in as a SuperAdmin.
+
+### Still pending
+- **PDF ingestion runners**: Surya / pix2tex sidecars or Gemini / Mathpix API keys needed for `ILayer1Layout` / `ILayer2aTextOcr` / `ILayer2bMathOcr` concrete impls.
+- **Emulator answer-processing**: pre-existing `Index was outside the bounds of the array` warnings in the sim's answer path. Non-blocking; traffic still flows.
+- **`/health/live` endpoint on actor-host**: returns HTTP 200 but I've not added a dedicated admin-api → actor-host internal service-token path; stats counters stay at zero on the admin-api probe (populated only when the browser hits `/api/actors/stats` directly).
+
+### Accounts file
+A canonical list of dev accounts lives in [docker/firebase-emulator/seed-dev-users.sh](../../docker/firebase-emulator/seed-dev-users.sh). Re-run with
+`docker exec cena-firebase-emulator /seed/seed-dev-users.sh` after any emulator reset.

@@ -99,33 +99,47 @@ const actorChildren: ClusterChild[] = [
 
 const getNodeStatus = (id: string): 'healthy' | 'degraded' | 'offline' => {
   switch (id) {
-    case 'frontend': return frontendStatus.value
+    case 'admin-spa': return frontendStatus.value
+    case 'student-spa': return studentSpaStatus.value
     case 'admin-api': return adminApiStatus.value
+    case 'student-api': return studentApiStatus.value
     case 'actor-host': return actorHostStatus.value
     case 'nats': return natsStatus.value
     case 'postgres': return pgStatus.value
     case 'redis': return redisStatus.value
-    case 'firebase': return 'healthy'
-    case 'emulator': return activeActors.value > 0 ? 'healthy' : 'offline'
+    case 'firebase': return firebaseStatus.value
+    case 'sympy': return sympyStatus.value
+    case 'emulator': return emulatorStatus.value
     default: return 'offline'
   }
 }
 
 const getEdgeActive = (edge: ServiceEdge): boolean => {
   switch (`${edge.from}-${edge.to}`) {
-    case 'frontend-admin-api':
-    case 'frontend-actor-host':
+    case 'admin-spa-admin-api':
+    case 'admin-spa-actor-host':
+    case 'student-spa-student-api':
+    case 'admin-spa-firebase':
+    case 'student-spa-firebase':
     case 'admin-api-firebase':
+    case 'student-api-firebase':
+    case 'actor-host-firebase':
       return true
     case 'admin-api-nats':
+    case 'student-api-nats':
     case 'actor-host-nats':
       return natsStatus.value === 'healthy'
     case 'emulator-nats':
-      return activeActors.value > 0
+      return emulatorStatus.value === 'healthy'
+    case 'admin-api-sympy':
+    case 'actor-host-sympy':
+      return sympyStatus.value === 'healthy'
     case 'admin-api-postgres':
+    case 'student-api-postgres':
     case 'actor-host-postgres':
       return pgStatus.value === 'healthy'
     case 'admin-api-redis':
+    case 'student-api-redis':
     case 'actor-host-redis':
       return redisStatus.value === 'healthy'
     default:
