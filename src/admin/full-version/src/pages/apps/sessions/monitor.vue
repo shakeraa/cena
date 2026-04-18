@@ -1,17 +1,34 @@
 <script setup lang="ts">
 definePage({ meta: { action: 'read', subject: 'Tutoring' } })
 
+// Matches the server's TutoringSessionSummaryDto exactly. Accuracy + focus
+// scores are NOT on this DTO — computing them requires joining session
+// answer events + focus metrics and is tracked as a follow-up in
+// RDY-058-follow-up. Until then, we show what we actually have:
+// TurnCount, DurationSeconds, TokensUsed.
 interface ActiveSession {
+  id: string
   sessionId: string
   studentId: string
   studentName: string
+  conceptId: string
   subject: string
-  questionCount: number
-  accuracy: number
-  focusScore: number
-  startedAt: string
   methodology: string
-  status: 'healthy' | 'struggling' | 'confused' | 'stagnation'
+  status: 'active' | 'completed' | 'budget_exhausted' | string
+  turnCount: number
+  durationSeconds: number
+  tokensUsed: number
+  startedAt: string
+  endedAt: string | null
+}
+
+function formatDuration(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds <= 0) return '—'
+  const h = Math.floor(seconds / 3600)
+  const m = Math.floor((seconds % 3600) / 60)
+  if (h > 0) return `${h}h ${m}m`
+  if (m > 0) return `${m}m`
+  return `${seconds}s`
 }
 
 const sessions = ref<ActiveSession[]>([])
@@ -79,10 +96,14 @@ onUnmounted(() => stopPolling())
 
 const statusColor = (status: string) => {
   switch (status) {
-    case 'healthy': return 'success'
-    case 'struggling': return 'warning'
-    case 'confused': return 'error'
-    case 'stagnation': return 'error'
+    case 'active': return 'success'
+    case 'completed': return 'info'
+    case 'budget_exhausted': return 'error'
+    case 'confused':
+    case 'stagnation':
+      return 'error'
+    case 'healthy': return 'success'       // legacy mapping, kept for forward-compat
+    case 'struggling': return 'warning'    // legacy mapping
     default: return 'default'
   }
 }
@@ -99,11 +120,17 @@ const filteredSessions = computed(() => {
 })
 
 const totalActive = computed(() => sessions.value.length)
-const avgFocus = computed(() => {
-  if (!sessions.value.length) return 0
-  return Math.round(sessions.value.reduce((sum, s) => sum + (s.focusScore ?? 0), 0) / sessions.value.length)
-})
-const confusedCount = computed(() => sessions.value.filter(s => s.status === 'confused' || s.status === 'stagnation').length)
+
+// Until accuracy + focus are surfaced on the server DTO, the summary
+// cards show metrics we actually have:
+//   - Total turns across all active sessions (engagement signal)
+//   - Budget-exhausted / stalled session count (the "something's wrong" signal)
+const totalTurns = computed(() =>
+  sessions.value.reduce((sum, s) => sum + (s.turnCount ?? 0), 0),
+)
+const stalledCount = computed(() =>
+  sessions.value.filter(s => s.status === 'budget_exhausted' || s.status === 'confused' || s.status === 'stagnation').length,
+)
 </script>
 
 <template>
@@ -124,10 +151,10 @@ const confusedCount = computed(() => sessions.value.filter(s => s.status === 'co
       <VCol cols="12" md="3">
         <VCard>
           <VCardText class="d-flex align-center gap-3">
-            <VAvatar color="info" variant="tonal" size="42"><VIcon icon="tabler-eye" /></VAvatar>
+            <VAvatar color="info" variant="tonal" size="42"><VIcon icon="tabler-messages" /></VAvatar>
             <div>
-              <div class="text-h5">{{ avgFocus }}%</div>
-              <div class="text-body-2 text-medium-emphasis">Avg Focus Score</div>
+              <div class="text-h5">{{ totalTurns }}</div>
+              <div class="text-body-2 text-medium-emphasis">Total Turns</div>
             </div>
           </VCardText>
         </VCard>
@@ -135,12 +162,12 @@ const confusedCount = computed(() => sessions.value.filter(s => s.status === 'co
       <VCol cols="12" md="3">
         <VCard>
           <VCardText class="d-flex align-center gap-3">
-            <VAvatar :color="confusedCount > 0 ? 'error' : 'success'" variant="tonal" size="42">
-              <VIcon :icon="confusedCount > 0 ? 'tabler-alert-triangle' : 'tabler-check'" />
+            <VAvatar :color="stalledCount > 0 ? 'error' : 'success'" variant="tonal" size="42">
+              <VIcon :icon="stalledCount > 0 ? 'tabler-alert-triangle' : 'tabler-check'" />
             </VAvatar>
             <div>
-              <div class="text-h5">{{ confusedCount }}</div>
-              <div class="text-body-2 text-medium-emphasis">Confused / Stagnation</div>
+              <div class="text-h5">{{ stalledCount }}</div>
+              <div class="text-body-2 text-medium-emphasis">Budget Exhausted / Stalled</div>
             </div>
           </VCardText>
         </VCard>
@@ -204,24 +231,20 @@ const confusedCount = computed(() => sessions.value.filter(s => s.status === 'co
                 <span>{{ session.subject }}</span>
               </div>
               <div class="d-flex justify-space-between text-body-2">
-                <span class="text-medium-emphasis">Questions</span>
-                <span>{{ session.questionCount }}</span>
+                <span class="text-medium-emphasis">Concept</span>
+                <span class="text-truncate" style="max-inline-size: 140px">{{ session.conceptId || '—' }}</span>
               </div>
               <div class="d-flex justify-space-between text-body-2">
-                <span class="text-medium-emphasis">Accuracy</span>
-                <span :class="session.accuracy >= 70 ? 'text-success' : session.accuracy >= 40 ? 'text-warning' : 'text-error'">
-                  {{ Math.round(session.accuracy) }}%
-                </span>
+                <span class="text-medium-emphasis">Turns</span>
+                <span>{{ session.turnCount ?? 0 }}</span>
               </div>
               <div class="d-flex justify-space-between text-body-2">
-                <span class="text-medium-emphasis">Focus</span>
-                <VProgressLinear
-                  :model-value="session.focusScore"
-                  :color="session.focusScore >= 70 ? 'success' : session.focusScore >= 40 ? 'warning' : 'error'"
-                  height="6"
-                  rounded
-                  style="max-inline-size: 100px"
-                />
+                <span class="text-medium-emphasis">Duration</span>
+                <span>{{ formatDuration(session.durationSeconds) }}</span>
+              </div>
+              <div class="d-flex justify-space-between text-body-2">
+                <span class="text-medium-emphasis">Tokens</span>
+                <span>{{ session.tokensUsed ?? 0 }}</span>
               </div>
               <div class="d-flex justify-space-between text-body-2">
                 <span class="text-medium-emphasis">Method</span>
