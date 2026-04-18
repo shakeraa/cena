@@ -94,6 +94,13 @@ export default [
     action: 'read',
     subject: 'Pedagogy',
   },
+  {
+    title: 'Stuck-Type Diagnostics',
+    icon: { icon: 'tabler-brain' },
+    to: 'apps-diagnostics-stuck-types',
+    action: 'read',
+    subject: 'Pedagogy',
+  },
 
   { heading: 'Communication' },
   {
