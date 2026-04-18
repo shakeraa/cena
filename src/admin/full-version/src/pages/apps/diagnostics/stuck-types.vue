@@ -333,12 +333,16 @@ const formatDate = (iso: string) => {
           <VCardText class="d-flex align-center ga-3">
             <VIcon icon="tabler-info-circle" />
             <div class="text-body-2">
-              <strong>Shadow mode.</strong> The classifier runs alongside
-              hint requests but never alters student-facing responses.
-              Data retention: 30 days; anon ids only (salt rotation
-              severs cross-session linkability). Phase 2b (flipping
-              classifier output into hint selection) requires
-              &ge; 2 weeks of pilot distribution data per ADR-0036.
+              <strong>Two flags, two phases.</strong>
+              <code>Cena:StuckClassifier:Enabled</code> turns the
+              classifier on (reads + logs + persists).
+              <code>HintAdjustmentEnabled</code> turns hint-level
+              adjustment on (clamps/bumps the level the student sees,
+              per ADR-0036 rules). Both default OFF in production;
+              adjustment respects a 500&nbsp;ms internal timeout and a
+              0.65 min-confidence threshold. Data retention: 30 days;
+              anon ids only (salt rotation severs cross-session
+              linkability).
             </div>
           </VCardText>
         </VCard>
