@@ -1,4 +1,7 @@
 <script lang="ts" setup>
+import AccountSettingsAccount from '@/views/apps/account-settings/AccountSettingsAccount.vue'
+import AccountSettingsSecurity from '@/views/apps/account-settings/AccountSettingsSecurity.vue'
+
 const route = useRoute('pages-account-settings-tab')
 
 const activeTab = computed({
@@ -45,14 +48,10 @@ definePage({
       :touch="false"
     >
       <VWindowItem value="account">
-        <VCard>
-          <VCardText>Account settings coming soon.</VCardText>
-        </VCard>
+        <AccountSettingsAccount />
       </VWindowItem>
       <VWindowItem value="security">
-        <VCard>
-          <VCardText>Security settings coming soon.</VCardText>
-        </VCard>
+        <AccountSettingsSecurity />
       </VWindowItem>
     </VWindow>
   </div>

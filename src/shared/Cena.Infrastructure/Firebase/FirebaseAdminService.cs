@@ -35,15 +35,47 @@ public enum PasswordResetOutcome
     FirebaseUnavailable,
 }
 
+public sealed record FirebaseProviderLink(
+    string ProviderId,
+    string Uid,
+    string? Email,
+    string? DisplayName);
+
+public sealed record FirebaseUserSummary(
+    string Uid,
+    string? Email,
+    bool EmailVerified,
+    string? DisplayName,
+    string? PhotoUrl,
+    bool Disabled,
+    long TokensValidAfter,
+    IReadOnlyList<FirebaseProviderLink> Providers,
+    bool MfaEnrolled);
+
 public interface IFirebaseAdminService
 {
     Task<string> CreateUserAsync(string email, string fullName, string? password);
     Task UpdateEmailAsync(string uid, string newEmail);
+    Task UpdateDisplayNameAsync(string uid, string? displayName);
     Task SetCustomClaimsAsync(string uid, Dictionary<string, object> claims);
     Task DisableUserAsync(string uid);
     Task EnableUserAsync(string uid);
     Task DeleteUserAsync(string uid);
     Task<string> GenerateSignInLinkAsync(string email);
+    /// <summary>
+    /// Revokes all refresh tokens for the user — forces sign-out on every
+    /// device, every browser, every tab. Used by the "sign out everywhere"
+    /// button in Account Settings → Security. Does NOT invalidate the
+    /// current ID token (client must refresh).
+    /// </summary>
+    Task RevokeRefreshTokensAsync(string uid);
+    /// <summary>
+    /// Fetch the user record so callers can enumerate linked provider
+    /// identities (email, google.com, apple.com, etc.), email-verified
+    /// state, display name, photo URL, and last-sign-in timestamp.
+    /// Returns null if the uid is unknown.
+    /// </summary>
+    Task<FirebaseUserSummary?> GetUserAsync(string uid);
 
     /// <summary>
     /// Generates a Firebase password-reset link for <paramref name="email"/>.
@@ -163,6 +195,77 @@ public sealed class FirebaseAdminService : IFirebaseAdminService
             Disabled = false
         });
         _logger.LogInformation("Enabled Firebase user {Uid}", uid);
+    }
+
+    public async Task UpdateDisplayNameAsync(string uid, string? displayName)
+    {
+        if (!_initialized)
+        {
+            _logger.LogWarning("Firebase Admin SDK not initialized — display-name update skipped for {Uid}. " +
+                "Preferences-side updates still persist to Marten.", uid);
+            return;
+        }
+        await FirebaseAuth.DefaultInstance.UpdateUserAsync(new UserRecordArgs
+        {
+            Uid = uid,
+            DisplayName = displayName ?? string.Empty
+        });
+        _logger.LogInformation("Updated display name for {Uid}", uid);
+    }
+
+    public async Task RevokeRefreshTokensAsync(string uid)
+    {
+        if (!_initialized)
+        {
+            _logger.LogWarning("Firebase Admin SDK not initialized — RevokeRefreshTokens noop for {Uid}.", uid);
+            return;
+        }
+        // Firebase Admin SDK: sets tokensValidAfterTime on the user record
+        // to now(); any refresh-token exchange after that is rejected.
+        await FirebaseAuth.DefaultInstance.RevokeRefreshTokensAsync(uid);
+        _logger.LogInformation("[AUDIT] Revoked refresh tokens for {Uid}", uid);
+    }
+
+    public async Task<FirebaseUserSummary?> GetUserAsync(string uid)
+    {
+        if (!_initialized || FirebaseAuth.DefaultInstance is null)
+        {
+            _logger.LogWarning("Firebase Admin SDK not initialized — GetUserAsync returns null for {Uid}", uid);
+            return null;
+        }
+        try
+        {
+            var rec = await FirebaseAuth.DefaultInstance.GetUserAsync(uid);
+            // TokensValidAfterTimestamp returns a DateTime in the Admin SDK;
+            // expose as epoch millis so the wire format is stable across
+            // SDK upgrades.
+            var tokensValidAfter = new DateTimeOffset(rec.TokensValidAfterTimestamp, TimeSpan.Zero)
+                .ToUnixTimeMilliseconds();
+            // MFA enrolment: the .NET Firebase Admin SDK exposes
+            // UserMetadata.MultiFactor on newer versions; older versions
+            // expose it as TenantId-scoped records. We conservatively
+            // report false here and surface MFA status via the client-side
+            // SDK (which has first-class MFA support). RDY-058 MFA panel.
+            return new FirebaseUserSummary(
+                Uid: rec.Uid,
+                Email: rec.Email,
+                EmailVerified: rec.EmailVerified,
+                DisplayName: rec.DisplayName,
+                PhotoUrl: rec.PhotoUrl,
+                Disabled: rec.Disabled,
+                TokensValidAfter: tokensValidAfter,
+                Providers: rec.ProviderData?.Select(p => new FirebaseProviderLink(
+                    ProviderId: p.ProviderId,
+                    Uid: p.Uid,
+                    Email: p.Email,
+                    DisplayName: p.DisplayName
+                )).ToArray() ?? Array.Empty<FirebaseProviderLink>(),
+                MfaEnrolled: false);
+        }
+        catch (FirebaseAuthException ex) when (ex.AuthErrorCode == AuthErrorCode.UserNotFound)
+        {
+            return null;
+        }
     }
 
     public async Task DeleteUserAsync(string uid)

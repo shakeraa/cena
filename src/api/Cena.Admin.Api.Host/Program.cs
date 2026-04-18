@@ -468,6 +468,10 @@ public partial class Program
     
     // ---- Admin REST API endpoints (migrated from Cena.Api.Host) ----
     app.MapCenaAdminEndpoints();
+
+    // RDY-058: /api/admin/me/* — admin self-service account management
+    // (profile, sign-out-everywhere, sign-in history, GDPR self-delete).
+    Cena.Admin.Api.AdminMeEndpoints.MapAdminMeEndpoints(app);
     
     // ---- Classroom endpoints (STB-00b) ----
     app.MapClassroomEndpoints();
