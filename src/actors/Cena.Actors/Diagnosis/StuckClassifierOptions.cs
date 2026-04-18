@@ -80,4 +80,43 @@ public sealed class StuckClassifierOptions
     /// the charge (useful in tests).
     /// </summary>
     public double PerCallCostUsd { get; set; } = 0.001;
+
+    // ── Phase 2b: hint-level adjustment (default OFF) ─────────────────
+
+    /// <summary>
+    /// Phase 2b flag. When false, the classifier runs in shadow mode
+    /// only — observed + persisted, never alters the student-facing
+    /// hint response. When true, the classifier's suggested strategy
+    /// maps to a hint-level adjustment (clamp up / down) before the
+    /// pre-authored hint text is generated. Default OFF.
+    /// <br/>
+    /// Safety layers preserved even when ON:
+    /// <list type="bullet">
+    /// <item>Hint text still comes from the pre-authored ladder
+    /// (no LLM-generated copy reaches the student).</item>
+    /// <item>Adjustment happens AFTER the MaxHints budget check.</item>
+    /// <item>Low-confidence diagnoses (below
+    /// <see cref="HintAdjustmentMinConfidence"/>) produce no change.</item>
+    /// <item>If the classifier exceeds
+    /// <see cref="HintAdjustmentTimeoutMs"/>, the original level is
+    /// used (hint never blocks on classifier).</item>
+    /// </list>
+    /// </summary>
+    public bool HintAdjustmentEnabled { get; set; } = false;
+
+    /// <summary>
+    /// Max time (ms) the endpoint will wait on the classifier before
+    /// abandoning the call and using the requested hint level unchanged.
+    /// 500ms default: heuristic-only path p95 is &lt;50ms; LLM path p95
+    /// with warm prompt cache is ~800ms — so a 500ms budget will
+    /// occasionally fall back to heuristic only, which is acceptable.
+    /// </summary>
+    public int HintAdjustmentTimeoutMs { get; set; } = 500;
+
+    /// <summary>
+    /// Minimum primary-confidence required before the adjuster is
+    /// allowed to change the hint level. Diagnoses below this threshold
+    /// are treated as low-signal; original level is preserved.
+    /// </summary>
+    public float HintAdjustmentMinConfidence { get; set; } = 0.65f;
 }

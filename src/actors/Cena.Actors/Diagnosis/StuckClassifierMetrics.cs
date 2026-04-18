@@ -23,6 +23,8 @@ public sealed class StuckClassifierMetrics : IDisposable
     private readonly Histogram<int> _latencyMs;
     private readonly Counter<long> _persistedTotal;
     private readonly Counter<long> _persistFailureTotal;
+    private readonly Counter<long> _adjustmentsAppliedTotal;
+    private readonly Counter<long> _adjustmentsSkippedTotal;
 
     public StuckClassifierMetrics(IMeterFactory meterFactory)
     {
@@ -46,6 +48,12 @@ public sealed class StuckClassifierMetrics : IDisposable
         _persistFailureTotal = _meter.CreateCounter<long>(
             "cena.stuck.persist_failure_total",
             description: "Persistence failures (non-fatal; classifier output still returned).");
+        _adjustmentsAppliedTotal = _meter.CreateCounter<long>(
+            "cena.stuck.adjustments_applied_total",
+            description: "Phase 2b: hint-level adjustments that changed the level.");
+        _adjustmentsSkippedTotal = _meter.CreateCounter<long>(
+            "cena.stuck.adjustments_skipped_total",
+            description: "Phase 2b: classifier fired but adjuster kept the original level.");
     }
 
     public void RecordDiagnosis(StuckDiagnosisSource source, StuckType primary, bool actionable)
@@ -69,6 +77,12 @@ public sealed class StuckClassifierMetrics : IDisposable
 
     public void RecordPersistFailure(string reason) =>
         _persistFailureTotal.Add(1, new TagList { { "reason", reason } });
+
+    public void RecordAdjustment(bool changed, StuckType primary)
+    {
+        var tags = new TagList { { "primary", primary.ToString() } };
+        (changed ? _adjustmentsAppliedTotal : _adjustmentsSkippedTotal).Add(1, tags);
+    }
 
     public void Dispose() => _meter.Dispose();
 }

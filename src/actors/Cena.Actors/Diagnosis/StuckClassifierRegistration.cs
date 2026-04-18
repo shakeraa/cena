@@ -118,6 +118,17 @@ public static class StuckClassifierRegistration
         // StuckClassifier:Enabled flips to true.
         services.AddSingleton<IHintStuckShadowService, HintStuckShadowService>();
 
+        // ── Hint-level adjustment (Phase 2b) ───────────────────────────
+        // Pure-function rule engine; no I/O. Used by decision service
+        // when HintAdjustmentEnabled=true.
+        services.AddSingleton<IHintLevelAdjuster, DiagnosisHintLevelAdjuster>();
+
+        // ── Decision service (Phase 2b endpoint entry point) ───────────
+        // Chooses Phase 2a (shadow) vs Phase 2b (adjust) mode based on
+        // the HintAdjustmentEnabled flag read fresh each call via
+        // IOptionsMonitor.
+        services.AddSingleton<IHintStuckDecisionService, HintStuckDecisionService>();
+
         return services;
     }
 }
