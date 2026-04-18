@@ -13,6 +13,7 @@ using Marten.Storage;
 using Npgsql;
 using Weasel.Core;
 using Cena.Actors.Audit;
+using Cena.Actors.Diagnosis;
 using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Projections;
@@ -313,6 +314,21 @@ public static class MartenConfiguration
             .Index(x => x.InstituteId)
             .Index(x => x.TrackId)
             .Index(x => x.Status);
+
+        // ── Stuck Diagnosis Document (RDY-063 Phase 1) ──
+        // Session-scoped classifier output. 30-day retention per ADR-0003.
+        // NO raw studentId — anon only. Indexed for item-quality queries
+        // ("top N questions by encoding-stuck rate over last 7 days").
+        opts.Schema.For<StuckDiagnosisDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SessionId)
+            .Index(x => x.StudentAnonId)
+            .Index(x => x.QuestionId)
+            .Index(x => x.ChapterId!)
+            .Index(x => x.Primary)
+            .Index(x => x.Source)
+            .Index(x => x.DayBucket)
+            .Index(x => x.ExpiresAt);
 
         // ── Device Session Document (STB-00b) ──
         opts.Schema.For<DeviceSessionDocument>()
