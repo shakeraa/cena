@@ -156,9 +156,11 @@ onMounted(loadProfile)
 
 <template>
   <VCard>
-    <VCardTitle>{{ $t ? $t('accountSettings.profile.title') : 'Profile' }}</VCardTitle>
+    <!-- Hardcoded English: the admin SPA is English-only per the
+         language-strategy memory. Student SPA handles he/ar/en i18n. -->
+    <VCardTitle>Profile</VCardTitle>
     <VCardSubtitle>
-      {{ $t ? $t('accountSettings.profile.subtitle') : 'Your account information and preferences. Changes are saved to Firebase and the admin directory.' }}
+      Your account information and preferences. Changes are saved to Firebase and the admin directory.
     </VCardSubtitle>
 
     <VCardText v-if="loading">

@@ -128,10 +128,15 @@ public sealed class CulturalContextService : ICulturalContextService
                 DetectedAt: a.DetectedAt))
             .ToList();
 
-        var recDocs = await session.Query<ContentBalanceRecommendationDocument>()
+        // Marten's LINQ provider can't translate arithmetic in OrderBy
+        // (RecommendedCount - CurrentCount), so fetch then sort in-memory.
+        // Dataset is bounded (recs per school × subject × language) — small
+        // enough that a client-side sort is fine.
+        var recDocs = (await session.Query<ContentBalanceRecommendationDocument>()
             .Where(r => r.SchoolId == schoolId)
+            .ToListAsync())
             .OrderByDescending(r => r.RecommendedCount - r.CurrentCount)
-            .ToListAsync();
+            .ToList();
 
         var recommendations = recDocs
             .Select(r => new ContentBalanceRecommendation(
