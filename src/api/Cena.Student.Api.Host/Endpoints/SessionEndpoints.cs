@@ -995,7 +995,7 @@ public static class SessionEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/sessions/{sessionId}/question/{questionId}/hint — request a progressive hint
-        group.MapPost("/{sessionId}/question/{questionId}/hint", async (string sessionId, string questionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IHintGenerator hintGenerator, [FromServices] IHintStuckShadowService stuckShadow, ILogger<SessionLogMarker> logger, SessionHintRequest request) =>
+        group.MapPost("/{sessionId}/question/{questionId}/hint", async (string sessionId, string questionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IHintGenerator hintGenerator, [FromServices] IHintStuckDecisionService stuckDecision, ILogger<SessionLogMarker> logger, SessionHintRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -1085,9 +1085,35 @@ public static class SessionEndpoints
             // Build prerequisite edges (empty for REST path - no graph lookup)
             IReadOnlyList<MasteryPrerequisiteEdge> prerequisites = Array.Empty<MasteryPrerequisiteEdge>();
 
+            // RDY-063 Phase 2b: classifier-driven hint-level adjustment.
+            // Synchronous call with bounded internal timeout (default
+            // 500ms); NEVER throws. When Cena:StuckClassifier:Enabled is
+            // false, returns request.HintLevel immediately. When Enabled
+            // but HintAdjustmentEnabled is false (Phase 2a shadow mode),
+            // kicks off fire-and-forget persistence and returns unchanged
+            // level. When both flags true, awaits the classifier within
+            // the timeout and may clamp/bump the level per ADR-0036
+            // rules (e.g., MetaStuck → 1, Misconception → max(req, 2)).
+            // Architecture test `DecisionService_IsAwaited_WithRequestCancellation`
+            // locks the await pattern + cancellation-token plumbing.
+            var locale = ctx.Request.Headers.AcceptLanguage.ToString().Split(',').FirstOrDefault()?.Split(';').FirstOrDefault()?.Trim() ?? "en";
+            var decision = await stuckDecision.DecideAsync(
+                studentId, sessionId, questionId, queue, questionDoc,
+                request.HintLevel, metadata.MaxHints, locale, ctx.RequestAborted);
+            var effectiveHintLevel = decision.AdjustedLevel;
+
+            if (decision.Adjusted)
+            {
+                logger.LogInformation(
+                    "[HINT_LEVEL_ADJUSTED] student={StudentId} session={SessionId} q={QuestionId} " +
+                    "from={From} to={To} reason={Reason} primary={Primary}",
+                    studentId, sessionId, questionId, request.HintLevel, decision.AdjustedLevel,
+                    decision.ReasonCode, decision.Primary);
+            }
+
             // 10. Call IHintGenerator.Generate()
             var hintRequest = new HintRequest(
-                HintLevel: request.HintLevel,
+                HintLevel: effectiveHintLevel,
                 QuestionId: questionId,
                 ConceptId: questionDoc.ConceptId,
                 PrerequisiteConceptNames: Array.Empty<string>(), // REST path doesn't resolve prereq names
@@ -1100,20 +1126,10 @@ public static class SessionEndpoints
             var hintContent = hintGenerator.Generate(hintRequest);
 
             logger.LogInformation("[SIEM] HintGenerated: Student {StudentId}, session {SessionId}, question {QuestionId}, level {HintLevel}",
-                studentId, sessionId, questionId, request.HintLevel);
+                studentId, sessionId, questionId, effectiveHintLevel);
 
             logger.LogInformation("[SIEM] HintRequested: Student {StudentId}, session {SessionId}, question {QuestionId}, level {HintLevel}, hintsUsed {HintsUsed}",
-                studentId, sessionId, questionId, request.HintLevel, hintsUsed + 1);
-
-            // RDY-063 Phase 2a: Shadow-mode stuck-type classifier. Runs only
-            // when Cena:StuckClassifier:Enabled=true. Never mutates the hint
-            // response. Fire-and-forget: the user's hint ships regardless of
-            // classifier latency or failure. Architecture test
-            // `ShadowDoesNotMutateHintResponse` locks this invariant.
-            var locale = ctx.Request.Headers.AcceptLanguage.ToString().Split(',').FirstOrDefault()?.Split(';').FirstOrDefault()?.Trim() ?? "en";
-            _ = stuckShadow.RecordShadowDiagnosisAsync(
-                studentId, sessionId, questionId, queue, questionDoc,
-                request.HintLevel, locale, ctx.RequestAborted);
+                studentId, sessionId, questionId, effectiveHintLevel, hintsUsed + 1);
 
             // 11. Return SessionHintResponseDto
             var response = new SessionHintResponseDto(

@@ -149,37 +149,47 @@ public class StuckClassifierArchitectureTests
     }
 
     [Fact]
-    public void ShadowServiceEndpointCall_UsesDiscardAssignment()
+    public void DecisionService_IsAwaited_WithRequestCancellation()
     {
-        // Architecture contract: the classifier call in the hint endpoint
-        // must be fire-and-forget so a slow/broken classifier never
-        // blocks the hint response. We enforce this by scanning for the
-        // `_ = stuckShadow.RecordShadowDiagnosisAsync(` pattern — an
-        // `await` would be a regression.
+        // Architecture contract: the hint endpoint must await the
+        // decision service (to consume the adjusted level) AND pass
+        // `ctx.RequestAborted` as the cancellation token so a
+        // disconnected client cancels the classifier call.
+        //
+        // Safety is preserved by the decision service's internal
+        // timeout (HintAdjustmentTimeoutMs, default 500ms); we don't
+        // need Task.WhenAny here.
         var repoRoot = FindRepoRoot();
         var endpointFile = Path.Combine(
             repoRoot, "src", "api", "Cena.Student.Api.Host", "Endpoints", "SessionEndpoints.cs");
         Assert.True(File.Exists(endpointFile), $"Endpoint file missing: {endpointFile}");
 
         var text = File.ReadAllText(endpointFile);
-        Assert.Contains("stuckShadow.RecordShadowDiagnosisAsync", text);
-        Assert.DoesNotContain(
-            "await stuckShadow.RecordShadowDiagnosisAsync",
-            text);
-        Assert.Contains("_ = stuckShadow.RecordShadowDiagnosisAsync", text);
+        Assert.Contains("stuckDecision.DecideAsync", text);
+        Assert.Contains("await stuckDecision.DecideAsync", text);
+        Assert.Contains("ctx.RequestAborted", text);
+        Assert.Contains("decision.AdjustedLevel", text);
+
+        // Shadow-service is no longer the endpoint-facing surface —
+        // but it's still registered (used by decision service internally
+        // and by future non-hint paths).
+        Assert.DoesNotContain("_ = stuckShadow.RecordShadowDiagnosisAsync", text);
     }
 
     [Fact]
-    public void ShadowServiceIsRegistered_AsSingleton_InStudentHost()
+    public void DecisionService_And_Shadow_RegisteredAsSingletons()
     {
-        // Ensures the DI registration doesn't slip to Scoped or Transient —
-        // the service carries no request state and is hot-path sensitive.
+        // Both are stateless + hot-path sensitive; DI lifetime must
+        // stay singleton. Transient registration would allocate on
+        // every hint call.
         var repoRoot = FindRepoRoot();
         var registrationFile = Path.Combine(
             repoRoot, "src", "actors", "Cena.Actors", "Diagnosis", "StuckClassifierRegistration.cs");
         var text = File.ReadAllText(registrationFile);
 
         Assert.Contains("AddSingleton<IHintStuckShadowService, HintStuckShadowService>", text);
+        Assert.Contains("AddSingleton<IHintStuckDecisionService, HintStuckDecisionService>", text);
+        Assert.Contains("AddSingleton<IHintLevelAdjuster, DiagnosisHintLevelAdjuster>", text);
 
         var studentProgram = Path.Combine(
             repoRoot, "src", "api", "Cena.Student.Api.Host", "Program.cs");
