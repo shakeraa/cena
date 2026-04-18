@@ -113,9 +113,12 @@ export default defineConfig({
     // `vite dev` still defaults to localhost:5052.
     // Default changed 5050 → 5052 because /api/* on the Admin SPA is the
     // Admin API surface, not the Student API.
+    // All proxy targets are env-overridable. Defaults match a host-run dev
+    // session (`./scripts/start.sh`). Compose wires container DNS names via
+    // the corresponding env vars on the SPA service.
     proxy: {
       '/api/actors': {
-        target: process.env.VITE_ACTOR_API_TARGET ?? 'http://localhost:5119',
+        target: process.env.VITE_ACTOR_API_PROXY_TARGET ?? 'http://localhost:5050',
         changeOrigin: true,
       },
       '/api': {

@@ -227,13 +227,23 @@ const drawDiagram = () => {
   const px = 100
   const iw = width - px * 2
 
+  // RDY-056 §5: diagram labels are driven by Vite env vars so prod / dev /
+  // compose layouts all render the same source without code edits.
+  // Defaults line up with the dockerised dev stack.
+  const portFrontend = import.meta.env.VITE_PORT_FRONTEND ?? '5174'
+  const portAdminApi = import.meta.env.VITE_PORT_ADMIN_API ?? '5052'
+  const portActorHost = import.meta.env.VITE_PORT_ACTOR_HOST ?? '5050'
+  const portNats = import.meta.env.VITE_PORT_NATS ?? '4222'
+  const portPostgres = import.meta.env.VITE_PORT_POSTGRES ?? '5433'
+  const portRedis = import.meta.env.VITE_PORT_REDIS ?? '6379'
+
   nodes = [
-    { id: 'frontend', label: 'Admin Dashboard', sublabel: 'Vite + Vue 3 + Vuetify', x: px + iw * 0.5, y: 70, status: frontendStatus.value, icon: 'V', port: '5174' },
-    { id: 'admin-api', label: 'Admin API', sublabel: '.NET 9 REST + Firebase Auth', x: px + iw * 0.25, y: 250, status: adminApiStatus.value, icon: 'A', port: '5000' },
-    { id: 'actor-host', label: 'Actor Host', sublabel: `Proto.Actor Cluster (${activeActors.value} actors)`, x: px + iw * 0.75, y: 250, status: actorHostStatus.value, icon: 'P', port: '5001', children: actorChildren, expanded: expandedClusters.value.has('actor-host') },
-    { id: 'nats', label: 'NATS JetStream', sublabel: 'Message Bus', x: px + iw * 0.5, y: 430, status: natsStatus.value, icon: 'N', port: '4222' },
-    { id: 'postgres', label: 'PostgreSQL', sublabel: 'Marten Event Store', x: px + iw * 0.15, y: 620, status: pgStatus.value, icon: 'PG', port: '5433' },
-    { id: 'redis', label: 'Redis', sublabel: 'Cache + Sessions', x: px + iw * 0.5, y: 620, status: redisStatus.value, icon: 'R', port: '6379' },
+    { id: 'frontend', label: 'Admin Dashboard', sublabel: 'Vite + Vue 3 + Vuetify', x: px + iw * 0.5, y: 70, status: frontendStatus.value, icon: 'V', port: portFrontend },
+    { id: 'admin-api', label: 'Admin API', sublabel: '.NET 9 REST + Firebase Auth', x: px + iw * 0.25, y: 250, status: adminApiStatus.value, icon: 'A', port: portAdminApi },
+    { id: 'actor-host', label: 'Actor Host', sublabel: `Proto.Actor Cluster (${activeActors.value} actors)`, x: px + iw * 0.75, y: 250, status: actorHostStatus.value, icon: 'P', port: portActorHost, children: actorChildren, expanded: expandedClusters.value.has('actor-host') },
+    { id: 'nats', label: 'NATS JetStream', sublabel: 'Message Bus', x: px + iw * 0.5, y: 430, status: natsStatus.value, icon: 'N', port: portNats },
+    { id: 'postgres', label: 'PostgreSQL', sublabel: 'Marten Event Store', x: px + iw * 0.15, y: 620, status: pgStatus.value, icon: 'PG', port: portPostgres },
+    { id: 'redis', label: 'Redis', sublabel: 'Cache + Sessions', x: px + iw * 0.5, y: 620, status: redisStatus.value, icon: 'R', port: portRedis },
     { id: 'firebase', label: 'Firebase Auth', sublabel: 'Google OAuth + JWT', x: px + iw * 0.0, y: 430, status: 'healthy', icon: 'F' },
     { id: 'emulator', label: 'Student Emulator', sublabel: `${activeActors.value > 0 ? '100 students' : 'Idle'}`, x: px + iw * 1.0, y: 430, status: activeActors.value > 0 ? 'healthy' : 'offline', icon: 'E' },
   ]

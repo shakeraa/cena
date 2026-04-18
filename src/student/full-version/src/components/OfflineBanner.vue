@@ -3,9 +3,19 @@
 // PWA-005: Offline banner — shows a persistent snackbar when the user loses
 // connectivity, auto-replays queued submissions on reconnect.
 // =============================================================================
+import { computed } from 'vue'
 import { useNetworkStatus } from '@/composables/useNetworkStatus'
 
 const { isOnline, pendingCount, onReconnect, drainQueue } = useNetworkStatus()
+
+// VSnackbar's v-model needs a member expression (writable ref) — Vite/Vue
+// compiler rejects `!isOnline`. Wrap the negation in a computed with a
+// no-op setter; the snackbar's "close" action simply ignores user dismissal
+// (timeout=-1) so the setter never needs to flip the source.
+const isOffline = computed<boolean>({
+  get: () => !isOnline.value,
+  set: () => { /* no-op: offline state is network-driven */ },
+})
 
 const showReconnected = ref(false)
 const drainResult = ref<{ sent: number; failed: number } | null>(null)
@@ -24,7 +34,7 @@ const { t } = useI18n()
 <template>
   <!-- Offline banner -->
   <VSnackbar
-    v-model="!isOnline"
+    v-model="isOffline"
     :timeout="-1"
     location="bottom"
     color="warning"

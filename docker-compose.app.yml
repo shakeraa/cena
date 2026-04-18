@@ -119,6 +119,10 @@ services:
       # RDY-056 §3: CORS allows both SPAs' Vite dev ports.
       - Cors__AllowedOrigins__0=http://localhost:5174
       - Cors__AllowedOrigins__1=http://localhost:5175
+      # RDY-056 §5: service-monitoring probe URLs — admin-api container
+      # reaches siblings via compose DNS, not its own localhost.
+      - CENA_NATS_MONITORING_URL=http://cena-nats:8222/varz
+      - CENA_ACTOR_STATS_URL=http://cena-actor-host:5050/api/actors/stats
       - CENA_SKIP_SEED=0
     restart: unless-stopped
     healthcheck:
@@ -195,10 +199,18 @@ services:
       # we point at the host-visible port 9099, not the container DNS name.
       - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
       - VITE_ADMIN_API_BASE_URL=http://localhost:5052
-      # Vite dev-server proxy target: inside the SPA container, localhost
-      # is the container itself. Forward /api/* to the admin-api service
-      # on the compose network.
+      # Vite dev-server proxy targets: inside the SPA container, localhost
+      # is the container itself. Forward /api/* to sibling services on the
+      # compose network by DNS name.
       - VITE_ADMIN_API_PROXY_TARGET=http://cena-admin-api:5052
+      - VITE_ACTOR_API_PROXY_TARGET=http://cena-actor-host:5050
+      # Architecture-diagram port labels (user-visible via the SPA build).
+      - VITE_PORT_FRONTEND=5174
+      - VITE_PORT_ADMIN_API=5052
+      - VITE_PORT_ACTOR_HOST=5050
+      - VITE_PORT_NATS=4222
+      - VITE_PORT_POSTGRES=5433
+      - VITE_PORT_REDIS=6379
     restart: unless-stopped
 
   # ── Student SPA (Vuexy Vue 3 PWA, Vite dev server) ──
@@ -277,4 +289,13 @@ services:
       - PROTO_CLUSTER_PROVIDER=test
       - CENA_CAS_GATE_MODE=shadow
       - CENA_SKIP_SEED=1
+      # appsettings.json pins AllowedHosts=localhost — override so sibling
+      # compose services (admin-api, emulator) can hit /health/live via the
+      # compose DNS name cena-actor-host.
+      - AllowedHosts=*
+      # Firebase JWT validation — match admin-api so the same emulator
+      # token is accepted by both /api/admin/* (admin-api) and
+      # /api/actors/* (actor-host).
+      - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
     restart: unless-stopped

@@ -11,6 +11,7 @@
 using Cena.Api.Contracts.Admin.System;
 using Cena.Infrastructure.Documents;
 using Marten;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
@@ -31,15 +32,29 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
     private readonly IDocumentStore _store;
     private readonly IConnectionMultiplexer _redis;
     private readonly ILogger<SystemMonitoringService> _logger;
+    private readonly string _natsMonitoringUrl;
+    private readonly string _actorStatsUrl;
 
     public SystemMonitoringService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
-        ILogger<SystemMonitoringService> logger)
+        ILogger<SystemMonitoringService> logger,
+        IConfiguration? configuration = null)
     {
         _store = store;
         _redis = redis;
         _logger = logger;
+
+        // RDY-056 §5: health-probe URLs are configurable so the admin-api
+        // container reaches siblings over the compose network rather than
+        // its own localhost. Env wins over config wins over localhost
+        // fallback (dev-run-on-host).
+        _natsMonitoringUrl = Environment.GetEnvironmentVariable("CENA_NATS_MONITORING_URL")
+            ?? configuration?["Monitoring:NatsUrl"]
+            ?? "http://localhost:8222/varz";
+        _actorStatsUrl = Environment.GetEnvironmentVariable("CENA_ACTOR_STATS_URL")
+            ?? configuration?["Monitoring:ActorStatsUrl"]
+            ?? "http://localhost:5119/api/actors/stats";
     }
 
     public async Task<SystemHealthResponse> GetHealthAsync()
@@ -93,7 +108,7 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
         try
         {
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            var varz = await http.GetStringAsync("http://localhost:8222/varz");
+            var varz = await http.GetStringAsync(_natsMonitoringUrl);
             natsLatency.Stop();
             var natsDoc = System.Text.Json.JsonDocument.Parse(varz);
             var natsConns = natsDoc.RootElement.GetProperty("connections").GetInt32();
@@ -107,28 +122,54 @@ public sealed class SystemMonitoringService : ISystemMonitoringService
                 natsLatency.Elapsed, now, ex.Message));
         }
 
-        // Actor Host — real probe
+        // Actor Host — two-step probe: liveness via the unauth /health/live
+        // endpoint, then stats via the SuperAdmin-gated /api/actors/stats.
+        // Liveness is what the dashboard's Up/Down card reports; stats fill
+        // the counters. Server-to-server can't mint a SuperAdmin token
+        // from here, so stats are optional and degrade to 0 when the stats
+        // endpoint rejects us — but the service still reports "healthy" as
+        // long as the liveness probe passes. This eliminates the false
+        // "Actor Host Down" that 401-on-stats was producing.
         var actorLatency = System.Diagnostics.Stopwatch.StartNew();
         int actorCount = 0;
         long actorMessages = 0;
         long actorErrors = 0;
-        try
+        using (var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) })
         {
-            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(2) };
-            var statsJson = await http.GetStringAsync("http://localhost:5119/api/actors/stats");
-            actorLatency.Stop();
-            var statsDoc = System.Text.Json.JsonDocument.Parse(statsJson);
-            actorCount = statsDoc.RootElement.GetProperty("activeActorCount").GetInt32();
-            actorMessages = statsDoc.RootElement.GetProperty("commandsRouted").GetInt64();
-            actorErrors = statsDoc.RootElement.GetProperty("errorsCount").GetInt64();
-            services.Add(new("Actor Host", "healthy", "1.8.0",
-                actorLatency.Elapsed, now, null));
-        }
-        catch (Exception ex)
-        {
-            actorLatency.Stop();
-            services.Add(new("Actor Host", "down", null,
-                actorLatency.Elapsed, now, ex.Message));
+            try
+            {
+                var liveUrl = _actorStatsUrl.Replace("/api/actors/stats", "/health/live");
+                using var liveResp = await http.GetAsync(liveUrl);
+                actorLatency.Stop();
+                if (liveResp.IsSuccessStatusCode)
+                {
+                    services.Add(new("Actor Host", "healthy", "1.8.0",
+                        actorLatency.Elapsed, now, null));
+
+                    // Best-effort stats — 401 is expected (SuperAdmin-gated),
+                    // treat as "stats unavailable, not a health failure".
+                    try
+                    {
+                        var statsJson = await http.GetStringAsync(_actorStatsUrl);
+                        var statsDoc = System.Text.Json.JsonDocument.Parse(statsJson);
+                        actorCount = statsDoc.RootElement.GetProperty("activeActorCount").GetInt32();
+                        actorMessages = statsDoc.RootElement.GetProperty("commandsRouted").GetInt64();
+                        actorErrors = statsDoc.RootElement.GetProperty("errorsCount").GetInt64();
+                    }
+                    catch { /* stats gated, counters stay 0 */ }
+                }
+                else
+                {
+                    services.Add(new("Actor Host", "down", null,
+                        actorLatency.Elapsed, now, $"HTTP {(int)liveResp.StatusCode}"));
+                }
+            }
+            catch (Exception ex)
+            {
+                actorLatency.Stop();
+                services.Add(new("Actor Host", "down", null,
+                    actorLatency.Elapsed, now, ex.Message));
+            }
         }
 
         // Process metrics
