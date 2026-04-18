@@ -30,4 +30,33 @@ public interface IStuckDiagnosisRepository
     /// </summary>
     Task<IReadOnlyList<StuckDiagnosisDocument>> GetRecentByQuestionAsync(
         string questionId, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Top items by stuck-type rate within a time window. Returns one
+    /// row per (questionId, primary) grouping, ordered by total count
+    /// descending. Admin-only: intended for curriculum review ("which
+    /// questions are triggering the most encoding-stuck signals?").
+    /// </summary>
+    Task<IReadOnlyList<StuckItemAggregate>> GetTopItemsAsync(
+        StuckType? filterType, int days, int limit, CancellationToken ct = default);
+
+    /// <summary>
+    /// Overall stuck-type distribution within a time window. Returns one
+    /// count per StuckType. Used by the admin distribution bar chart.
+    /// </summary>
+    Task<IReadOnlyDictionary<StuckType, int>> GetDistributionAsync(
+        int days, CancellationToken ct = default);
 }
+
+/// <summary>
+/// Aggregate row returned by <see cref="IStuckDiagnosisRepository.GetTopItemsAsync"/>.
+/// Contains NO PII (anon ids are never surfaced either).
+/// </summary>
+public sealed record StuckItemAggregate(
+    string QuestionId,
+    StuckType Primary,
+    int Count,
+    int DistinctStudentsCount,
+    float AvgConfidence,
+    DateTimeOffset FirstSeenAt,
+    DateTimeOffset LastSeenAt);

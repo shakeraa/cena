@@ -91,4 +91,70 @@ public sealed class MartenStuckDiagnosisRepository : IStuckDiagnosisRepository
             .ToListAsync(ct);
         return docs.ToList();
     }
+
+    public async Task<IReadOnlyList<StuckItemAggregate>> GetTopItemsAsync(
+        StuckType? filterType, int days, int limit, CancellationToken ct = default)
+    {
+        if (limit <= 0) return Array.Empty<StuckItemAggregate>();
+        var since = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, days));
+
+        await using var session = _store.QuerySession();
+
+        // We materialise then aggregate in-memory. Marten's LINQ over
+        // jsonb supports the filter + Where; GroupBy on nested fields
+        // with aggregates is finicky and we're operating on a window
+        // bounded by retention (≤30 days) — counts are small.
+        IEnumerable<StuckDiagnosisDocument> window;
+        if (filterType.HasValue && filterType.Value != StuckType.Unknown)
+        {
+            var type = filterType.Value;
+            window = await session.Query<StuckDiagnosisDocument>()
+                .Where(d => d.DiagnosedAt >= since && d.Primary == type)
+                .ToListAsync(ct);
+        }
+        else
+        {
+            window = await session.Query<StuckDiagnosisDocument>()
+                .Where(d => d.DiagnosedAt >= since && d.Primary != StuckType.Unknown)
+                .ToListAsync(ct);
+        }
+
+        var aggregates = window
+            .GroupBy(d => new { d.QuestionId, d.Primary })
+            .Select(g => new StuckItemAggregate(
+                QuestionId: g.Key.QuestionId,
+                Primary: g.Key.Primary,
+                Count: g.Count(),
+                DistinctStudentsCount: g.Select(d => d.StudentAnonId).Distinct().Count(),
+                AvgConfidence: g.Average(d => d.PrimaryConfidence),
+                FirstSeenAt: g.Min(d => d.DiagnosedAt),
+                LastSeenAt: g.Max(d => d.DiagnosedAt)))
+            .OrderByDescending(a => a.Count)
+            .Take(limit)
+            .ToList();
+
+        return aggregates;
+    }
+
+    public async Task<IReadOnlyDictionary<StuckType, int>> GetDistributionAsync(
+        int days, CancellationToken ct = default)
+    {
+        var since = DateTimeOffset.UtcNow.AddDays(-Math.Max(1, days));
+        await using var session = _store.QuerySession();
+
+        var window = await session.Query<StuckDiagnosisDocument>()
+            .Where(d => d.DiagnosedAt >= since)
+            .ToListAsync(ct);
+
+        var dict = window.GroupBy(d => d.Primary)
+            .ToDictionary(g => g.Key, g => g.Count());
+
+        // Ensure all categories appear (with zero if absent) so the
+        // downstream chart doesn't have missing bars.
+        foreach (StuckType t in Enum.GetValues(typeof(StuckType)))
+        {
+            if (!dict.ContainsKey(t)) dict[t] = 0;
+        }
+        return dict;
+    }
 }

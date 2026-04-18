@@ -8,6 +8,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
+using Cena.Actors.Diagnosis;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
 using Cena.Api.Host.Endpoints;
@@ -222,6 +223,13 @@ public partial class Program
     //     Cena.Actors.Cas.CasRouterLatexValidator>();
 
     builder.Services.AddCenaAdminServices();
+
+    // RDY-063 Phase 2a: stuck-type classifier services (for admin
+    // diagnostics read endpoints). Behaviour-gated by
+    // Cena:StuckClassifier:Enabled; when off, the repository still
+    // functions (returns empty distributions) and the admin pages
+    // show "no data yet" without errors.
+    builder.Services.AddStuckClassifier(builder.Configuration);
 
     // RDY-036: CAS startup probe — fails fast in Enforce mode if the CAS
     // engine stack is unreachable. Hosted service runs once at boot.
@@ -479,6 +487,9 @@ public partial class Program
 
     // RDY-061: syllabus + student advancement endpoints
     Cena.Admin.Api.Syllabus.SyllabusEndpoints.MapSyllabusEndpoints(app);
+
+    // RDY-063 Phase 2a: stuck-type diagnostics (admin aggregate reads)
+    Cena.Admin.Api.Diagnostics.StuckDiagnosticsEndpoints.MapStuckDiagnosticsEndpoints(app);
     
     // ---- Classroom endpoints (STB-00b) ----
     app.MapClassroomEndpoints();

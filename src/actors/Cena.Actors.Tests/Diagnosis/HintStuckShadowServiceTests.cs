@@ -212,6 +212,15 @@ public class HintStuckShadowServiceTests
         public Task<IReadOnlyList<StuckDiagnosisDocument>> GetRecentByQuestionAsync(
             string questionId, int limit, CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<StuckDiagnosisDocument>>(Array.Empty<StuckDiagnosisDocument>());
+
+        public Task<IReadOnlyList<StuckItemAggregate>> GetTopItemsAsync(
+            StuckType? filterType, int days, int limit, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyList<StuckItemAggregate>>(Array.Empty<StuckItemAggregate>());
+
+        public Task<IReadOnlyDictionary<StuckType, int>> GetDistributionAsync(
+            int days, CancellationToken ct = default)
+            => Task.FromResult<IReadOnlyDictionary<StuckType, int>>(
+                new Dictionary<StuckType, int>());
     }
 
     private sealed class DummyMeterFactory : System.Diagnostics.Metrics.IMeterFactory
