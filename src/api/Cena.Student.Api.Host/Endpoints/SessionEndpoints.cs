@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Bus;
+using Cena.Actors.Diagnosis;
 using Cena.Actors.Events;
 using Cena.Actors.Mastery;
 using Cena.Actors.Projections;
@@ -994,7 +995,7 @@ public static class SessionEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/sessions/{sessionId}/question/{questionId}/hint — request a progressive hint
-        group.MapPost("/{sessionId}/question/{questionId}/hint", async (string sessionId, string questionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IHintGenerator hintGenerator, ILogger<SessionLogMarker> logger, SessionHintRequest request) =>
+        group.MapPost("/{sessionId}/question/{questionId}/hint", async (string sessionId, string questionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IHintGenerator hintGenerator, [FromServices] IHintStuckShadowService stuckShadow, ILogger<SessionLogMarker> logger, SessionHintRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -1103,6 +1104,16 @@ public static class SessionEndpoints
 
             logger.LogInformation("[SIEM] HintRequested: Student {StudentId}, session {SessionId}, question {QuestionId}, level {HintLevel}, hintsUsed {HintsUsed}",
                 studentId, sessionId, questionId, request.HintLevel, hintsUsed + 1);
+
+            // RDY-063 Phase 2a: Shadow-mode stuck-type classifier. Runs only
+            // when Cena:StuckClassifier:Enabled=true. Never mutates the hint
+            // response. Fire-and-forget: the user's hint ships regardless of
+            // classifier latency or failure. Architecture test
+            // `ShadowDoesNotMutateHintResponse` locks this invariant.
+            var locale = ctx.Request.Headers.AcceptLanguage.ToString().Split(',').FirstOrDefault()?.Split(';').FirstOrDefault()?.Trim() ?? "en";
+            _ = stuckShadow.RecordShadowDiagnosisAsync(
+                studentId, sessionId, questionId, queue, questionDoc,
+                request.HintLevel, locale, ctx.RequestAborted);
 
             // 11. Return SessionHintResponseDto
             var response = new SessionHintResponseDto(

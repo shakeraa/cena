@@ -8,6 +8,7 @@
 
 using System.Diagnostics.Metrics;
 using Cena.Actors.Api;
+using Cena.Actors.Diagnosis;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
 using Cena.Actors.Configuration;
@@ -251,6 +252,11 @@ builder.Services.AddHostedService<Cena.Actors.Services.AnalysisJobProcessor>();
 
 // SAI-05: A/B Experiment Service
 builder.Services.AddSingleton<IExperimentService, ExperimentService>();
+
+// RDY-063 Phase 2a: Stuck-type classifier (shadow mode).
+// Registered unconditionally; runtime behaviour gated by
+// Cena:StuckClassifier:Enabled (default false).
+builder.Services.AddStuckClassifier(builder.Configuration);
 
 // SAI-07/08: Conversational Tutoring (TutorActor is transient — spawned per conversation)
 builder.Services.AddSingleton<ITutorPromptBuilder, TutorPromptBuilder>();

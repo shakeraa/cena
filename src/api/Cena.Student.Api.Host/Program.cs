@@ -8,6 +8,7 @@ using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
+using Cena.Actors.Diagnosis;
 using Cena.Actors.Notifications;
 using Cena.Actors.Mastery;
 using Cena.Actors.RateLimit;
@@ -220,6 +221,13 @@ public partial class Program
     
     // ---- SAI-002: Hint Generation (stateless pure function) ----
     builder.Services.AddSingleton<IHintGenerator, HintGenerator>();
+
+    // ---- RDY-063 Phase 2a: Stuck-type classifier (shadow mode) ----
+    // Registered unconditionally; the feature flag
+    // Cena:StuckClassifier:Enabled (default false) gates runtime
+    // behaviour. When disabled, HintStuckShadowService returns
+    // Task.CompletedTask immediately — zero-cost no-op.
+    builder.Services.AddStuckClassifier(builder.Configuration);
     
     // ---- MST-011: Scaffolding Service (stateless pure function wrapper) ----
     builder.Services.AddSingleton<IScaffoldingService, ScaffoldingServiceWrapper>();

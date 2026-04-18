@@ -149,6 +149,45 @@ public class StuckClassifierArchitectureTests
     }
 
     [Fact]
+    public void ShadowServiceEndpointCall_UsesDiscardAssignment()
+    {
+        // Architecture contract: the classifier call in the hint endpoint
+        // must be fire-and-forget so a slow/broken classifier never
+        // blocks the hint response. We enforce this by scanning for the
+        // `_ = stuckShadow.RecordShadowDiagnosisAsync(` pattern — an
+        // `await` would be a regression.
+        var repoRoot = FindRepoRoot();
+        var endpointFile = Path.Combine(
+            repoRoot, "src", "api", "Cena.Student.Api.Host", "Endpoints", "SessionEndpoints.cs");
+        Assert.True(File.Exists(endpointFile), $"Endpoint file missing: {endpointFile}");
+
+        var text = File.ReadAllText(endpointFile);
+        Assert.Contains("stuckShadow.RecordShadowDiagnosisAsync", text);
+        Assert.DoesNotContain(
+            "await stuckShadow.RecordShadowDiagnosisAsync",
+            text);
+        Assert.Contains("_ = stuckShadow.RecordShadowDiagnosisAsync", text);
+    }
+
+    [Fact]
+    public void ShadowServiceIsRegistered_AsSingleton_InStudentHost()
+    {
+        // Ensures the DI registration doesn't slip to Scoped or Transient —
+        // the service carries no request state and is hot-path sensitive.
+        var repoRoot = FindRepoRoot();
+        var registrationFile = Path.Combine(
+            repoRoot, "src", "actors", "Cena.Actors", "Diagnosis", "StuckClassifierRegistration.cs");
+        var text = File.ReadAllText(registrationFile);
+
+        Assert.Contains("AddSingleton<IHintStuckShadowService, HintStuckShadowService>", text);
+
+        var studentProgram = Path.Combine(
+            repoRoot, "src", "api", "Cena.Student.Api.Host", "Program.cs");
+        var programText = File.ReadAllText(studentProgram);
+        Assert.Contains("AddStuckClassifier(builder.Configuration)", programText);
+    }
+
+    [Fact]
     public async Task FlagOff_ReturnsUnknownNone_WithoutCallingLlm()
     {
         var opts = new StuckClassifierOptions { Enabled = false };

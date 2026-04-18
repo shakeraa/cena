@@ -112,6 +112,12 @@ public static class StuckClassifierRegistration
         // ── Repository ─────────────────────────────────────────────────
         services.AddSingleton<IStuckDiagnosisRepository, MartenStuckDiagnosisRepository>();
 
+        // ── Shadow-mode hint integration (Phase 2a) ────────────────────
+        // Wrapped around the live hint endpoint; never changes the
+        // response, just logs + persists a diagnosis. Activated when
+        // StuckClassifier:Enabled flips to true.
+        services.AddSingleton<IHintStuckShadowService, HintStuckShadowService>();
+
         return services;
     }
 }
