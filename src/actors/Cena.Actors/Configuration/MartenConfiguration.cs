@@ -287,6 +287,22 @@ public static class MartenConfiguration
             .Index(x => x.Subject)
             .Index(x => x.Status);
 
+        // RDY-061 Phase 1: syllabus projection layer over the LO graph.
+        // Defined in YAML (config/syllabi/*.yaml), ingested via the
+        // DbAdmin `syllabus-ingest` command. Re-ingestion is idempotent.
+        opts.Schema.For<SyllabusDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.TrackId)
+            .Index(x => x.Track)
+            .Index(x => x.Version);
+
+        opts.Schema.For<ChapterDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SyllabusId)
+            .Index(x => x.Order)
+            .Index(x => x.Slug)
+            .Index(x => x.MinistryCode);
+
         opts.Schema.For<EnrollmentDocument>()
             .Identity(x => x.Id)
             .Index(x => x.EnrollmentId)

@@ -1,0 +1,170 @@
+# =============================================================================
+# Cena Syllabus — Math Bagrut 5-Unit (806 + 807)
+#
+# Status: DRAFT. Structure derived from standard Bagrut 806/807 chapter
+# ordering as published in Yoel Geva textbooks (2019-2024). Curriculum-
+# expert (Amjad) review required before student-visibility.
+#
+# Learning-objective ids below MUST resolve to existing
+# LearningObjectiveDocument rows. If a referenced LO doesn't exist, the
+# ingest tool rejects the manifest (it doesn't create LOs — that's the
+# question-bank pipeline's job).
+# =============================================================================
+
+track: track-math-bagrut-806
+version: 0.1.0-draft
+bagrutTrack: FiveUnit
+ministryCodes: ["806", "807"]
+
+chapters:
+  - slug: algebra-review
+    order: 1
+    title:
+      en: Algebra Review
+      he: חזרה באלגברה
+      ar: مراجعة الجبر
+    learningObjectiveIds:
+      - lo-alg-linear-equations
+      - lo-alg-quadratic-equations
+      - lo-alg-inequalities
+      - lo-alg-absolute-value
+    prerequisiteChapterSlugs: []
+    expectedWeeks: 3
+    ministryCode: "806.1"
+
+  - slug: functions-and-graphs
+    order: 2
+    title:
+      en: Functions & Graphs
+      he: פונקציות וגרפים
+      ar: الدوال والرسوم البيانية
+    learningObjectiveIds:
+      - lo-fn-definition
+      - lo-fn-domain-range
+      - lo-fn-composition
+      - lo-fn-inverse
+    prerequisiteChapterSlugs: [algebra-review]
+    expectedWeeks: 4
+    ministryCode: "806.2"
+
+  - slug: analytic-geometry
+    order: 3
+    title:
+      en: Analytic Geometry
+      he: גיאומטריה אנליטית
+      ar: الهندسة التحليلية
+    learningObjectiveIds:
+      - lo-geom-line-equations
+      - lo-geom-circle-equations
+      - lo-geom-distance-formulas
+      - lo-geom-slope-tangent
+    prerequisiteChapterSlugs: [functions-and-graphs]
+    expectedWeeks: 4
+    ministryCode: "806.3"
+
+  - slug: trigonometry
+    order: 4
+    title:
+      en: Trigonometry
+      he: טריגונומטריה
+      ar: علم المثلثات
+    learningObjectiveIds:
+      - lo-trig-unit-circle
+      - lo-trig-identities
+      - lo-trig-equations
+      - lo-trig-graphs
+    prerequisiteChapterSlugs: [functions-and-graphs]
+    expectedWeeks: 4
+    ministryCode: "807.1"
+
+  - slug: sequences-and-series
+    order: 5
+    title:
+      en: Sequences & Series
+      he: סדרות וטורים
+      ar: المتواليات والسلاسل
+    learningObjectiveIds:
+      - lo-seq-arithmetic
+      - lo-seq-geometric
+      - lo-seq-infinite-series
+      - lo-seq-limits
+    prerequisiteChapterSlugs: [functions-and-graphs]
+    expectedWeeks: 3
+    ministryCode: "807.2"
+
+  - slug: limits-and-continuity
+    order: 6
+    title:
+      en: Limits & Continuity
+      he: גבולות ורציפות
+      ar: النهايات والاتصال
+    learningObjectiveIds:
+      - lo-calc-limits-algebraic
+      - lo-calc-limits-trig
+      - lo-calc-continuity
+      - lo-calc-asymptotes
+    prerequisiteChapterSlugs: [trigonometry, sequences-and-series]
+    expectedWeeks: 3
+    ministryCode: "807.3"
+
+  - slug: derivatives
+    order: 7
+    title:
+      en: Derivatives
+      he: נגזרות
+      ar: المشتقات
+    learningObjectiveIds:
+      - lo-calc-derivative-definition
+      - lo-calc-derivative-rules
+      - lo-calc-chain-rule
+      - lo-calc-derivative-trig
+      - lo-calc-implicit
+    prerequisiteChapterSlugs: [limits-and-continuity]
+    expectedWeeks: 5
+    ministryCode: "807.4"
+
+  - slug: applications-of-derivatives
+    order: 8
+    title:
+      en: Applications of Derivatives
+      he: יישומי הנגזרת
+      ar: تطبيقات المشتقات
+    learningObjectiveIds:
+      - lo-calc-optimization
+      - lo-calc-related-rates
+      - lo-calc-curve-sketching
+      - lo-calc-mean-value-theorem
+    prerequisiteChapterSlugs: [derivatives, analytic-geometry]
+    expectedWeeks: 4
+    ministryCode: "807.5"
+
+  - slug: integrals
+    order: 9
+    title:
+      en: Integrals
+      he: אינטגרלים
+      ar: التكاملات
+    learningObjectiveIds:
+      - lo-calc-antiderivative
+      - lo-calc-definite-integral
+      - lo-calc-fundamental-theorem
+      - lo-calc-integration-techniques
+      - lo-calc-area-volume
+    prerequisiteChapterSlugs: [derivatives]
+    expectedWeeks: 5
+    ministryCode: "807.6"
+
+  - slug: probability-and-statistics
+    order: 10
+    title:
+      en: Probability & Statistics
+      he: הסתברות וסטטיסטיקה
+      ar: الاحتمالات والإحصاء
+    learningObjectiveIds:
+      - lo-prob-basics
+      - lo-prob-conditional
+      - lo-prob-combinatorics
+      - lo-stats-distributions
+    prerequisiteChapterSlugs: [functions-and-graphs]
+    expectedWeeks: 3
+    ministryCode: "806.4"

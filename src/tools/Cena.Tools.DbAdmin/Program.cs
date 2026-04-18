@@ -27,6 +27,7 @@ if (args.Length == 0)
     Console.Error.WriteLine("Usage: Cena.Tools.DbAdmin <command> [options]");
     Console.Error.WriteLine("Commands:");
     Console.Error.WriteLine("  wipe-questions --confirm \"I UNDERSTAND\"");
+    Console.Error.WriteLine("  syllabus-ingest --manifest <path.yaml> [--author <id>] [--prune]");
     return 2;
 }
 
@@ -38,6 +39,7 @@ try
     return command switch
     {
         "wipe-questions" => await WipeQuestionsCommand.RunAsync(rest, config, logger),
+        "syllabus-ingest" => await SyllabusIngestCommand.RunAsync(rest, config, logger),
         _ => Unknown(command)
     };
 }
