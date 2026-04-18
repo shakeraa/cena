@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import * as d3 from 'd3'
+import { firebaseAuth } from '@/plugins/firebase'
 
 definePage({ meta: { action: 'read', subject: 'System' } })
 
@@ -125,24 +126,62 @@ const getEdgeActive = (edge: ServiceEdge): boolean => {
   }
 }
 
+// RDY-056 §5: attach the Firebase bearer so admin-api + actor-host accept
+// the probe calls. Plain fetch() was firing unauthenticated, producing a
+// 401 cascade that painted every node red even when every backend was up.
+async function authedFetch(url: string): Promise<Response> {
+  const user = firebaseAuth.currentUser
+  const headers: Record<string, string> = { Accept: 'application/json' }
+  if (user) {
+    const token = await user.getIdToken()
+    headers.Authorization = `Bearer ${token}`
+  }
+  return fetch(url, { headers })
+}
+
+// Health status is also sourced from admin-api's per-service probe —
+// the dashboard's pg/redis/nats cards should reflect what the server
+// reports, not just "same as admin-api".
+function mapProbeStatus(s: string): 'healthy' | 'degraded' | 'offline' {
+  if (s === 'up' || s === 'healthy') return 'healthy'
+  if (s === 'degraded') return 'degraded'
+  return 'offline'
+}
+
 const checkServices = async () => {
   try {
-    const data = await fetch('/api/actors/stats').then(r => r.json())
-    actorHostStatus.value = 'healthy'
-    activeActors.value = data.activeActorCount ?? 0
+    const r = await authedFetch('/api/actors/stats')
+    if (r.ok) {
+      const data = await r.json()
+      actorHostStatus.value = 'healthy'
+      activeActors.value = data.activeActorCount ?? 0
+    }
+    else {
+      actorHostStatus.value = 'offline'
+    }
   }
   catch { actorHostStatus.value = 'offline' }
 
   try {
-    const r = await fetch('/api/admin/system/health')
-    adminApiStatus.value = r.ok ? 'healthy' : 'offline'
+    const r = await authedFetch('/api/admin/system/health')
+    if (r.ok) {
+      adminApiStatus.value = 'healthy'
+      const data = await r.json() as { services: { name: string; status: string }[] }
+      for (const s of data.services ?? []) {
+        const st = mapProbeStatus(s.status)
+        if (s.name === 'NATS') natsStatus.value = st
+        else if (s.name === 'PostgreSQL') pgStatus.value = st
+        else if (s.name === 'Redis') redisStatus.value = st
+        else if (s.name === 'Actor Host' && actorHostStatus.value !== 'healthy') actorHostStatus.value = st
+      }
+    }
+    else {
+      adminApiStatus.value = 'offline'
+    }
   }
   catch { adminApiStatus.value = 'offline' }
 
   frontendStatus.value = 'healthy'
-  natsStatus.value = actorHostStatus.value === 'healthy' ? 'healthy' : 'offline'
-  pgStatus.value = adminApiStatus.value === 'healthy' ? 'healthy' : 'offline'
-  redisStatus.value = adminApiStatus.value === 'healthy' ? 'healthy' : 'offline'
 
   loading.value = false
 
