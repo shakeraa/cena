@@ -284,7 +284,15 @@ services:
       - NATS_EMU_PASSWORD=${NATS_EMU_PASSWORD:-dev_emu_pass}
     command:
       - "--students=${EMU_STUDENTS:-50}"
-      - "--speed=${EMU_SPEED:-25}"
+      # Default 5× (was 25×). At 25× with 50 students the event firehose
+      # overwhelms Marten's event-sequence allocator + Postgres I/O,
+      # producing the pkey_mt_events_seq_id duplicate-key collision
+      # tracked in docs/postmortems/mt-events-seq-collision-2026-04-19.md
+      # and has, on separate occasions, hung the host Docker Desktop VM.
+      # 5× gives realistic emulation throughput without overload.
+      # Override via `EMU_SPEED=25 docker compose up -d emulator` when
+      # specifically load-testing the seq-collision reproduction.
+      - "--speed=${EMU_SPEED:-5}"
       - "--duration=${EMU_DURATION:-300}"
       - "--nats=nats://cena-nats:4222"
     restart: "no"

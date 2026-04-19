@@ -30,8 +30,21 @@ public static class BusMessageValidator
     private static readonly HashSet<string> ValidSessionEndReasons =
         new(StringComparer.OrdinalIgnoreCase) { "completed", "timeout", "user_exit", "error", "session_expired" };
 
+    // Accepts snake_case, kebab-case, and concatenated forms so emitters
+    // don't all need to canonicalise on the way in. The emulator +
+    // SimulationEventSeeder use the underscore form; earlier content
+    // code used the no-underscore form. Both are valid here.
     private static readonly HashSet<string> ValidQuestionTypes =
-        new(StringComparer.OrdinalIgnoreCase) { "multiplechoice", "shortanswer", "truefalse", "numeric", "ordering" };
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "multiple_choice", "multiplechoice", "multiple-choice",
+            "short_answer",    "shortanswer",    "short-answer",
+            "true_false",      "truefalse",      "true-false",
+            "numeric",
+            "ordering",
+            "free_response",   "freeresponse",   "free-response",
+            "proof",
+        };
 
     // ── Public validate methods ──
 
