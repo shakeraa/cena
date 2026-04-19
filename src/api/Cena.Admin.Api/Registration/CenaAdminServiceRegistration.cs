@@ -7,12 +7,14 @@
 using Cena.Actors.Cas;
 using Cena.Admin.Api.Content;
 using Cena.Admin.Api.Endpoints;
+using Cena.Admin.Api.Features.TeacherConsole;
 using Cena.Admin.Api.Ingestion;
 using Cena.Admin.Api.Pilot;
 using Cena.Admin.Api.QualityGate;
 using Cena.Admin.Api.Questions;
 using Cena.Admin.Api.RateLimit;
 using Cena.Infrastructure.Compliance;
+using Cena.Infrastructure.Syllabus;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -181,6 +183,32 @@ public static class CenaAdminServiceRegistration
             Cena.Infrastructure.Compliance.ErasureManifestBuilder>();
         services.AddScoped<IRightToErasureService, RightToErasureService>();
 
+        // RDY-070 (F6 teacher heatmap): Ministry topic hierarchy, loaded once
+        // from config/syllabi at application start. Path is overridable via
+        // CENA_SYLLABUS_DIR for tests + local dev; we fall back to the repo's
+        // canonical location so a fresh clone works out of the box.
+        services.TryAddSingleton<IMinistryTopicHierarchy>(_ =>
+        {
+            var configured = Environment.GetEnvironmentVariable("CENA_SYLLABUS_DIR");
+            var candidates = new List<string>();
+            if (!string.IsNullOrWhiteSpace(configured)) candidates.Add(configured);
+
+            var contentRoot = AppContext.BaseDirectory;
+            candidates.Add(Path.Combine(contentRoot, "config", "syllabi"));
+            // Walk up looking for <repo>/config/syllabi — handles bin/Debug/net9.0 depth.
+            var cursor = new DirectoryInfo(contentRoot);
+            for (int i = 0; i < 6 && cursor is not null; i++, cursor = cursor.Parent)
+            {
+                var probe = Path.Combine(cursor.FullName, "config", "syllabi");
+                if (Directory.Exists(probe)) candidates.Add(probe);
+            }
+
+            var dir = candidates.FirstOrDefault(Directory.Exists)
+                ?? throw new DirectoryNotFoundException(
+                    "[MinistryTopicHierarchy] no config/syllabi directory found; set CENA_SYLLABUS_DIR.");
+            return MinistryTopicHierarchy.LoadFromDirectory(dir);
+        });
+
         return services;
     }
 
@@ -236,6 +264,9 @@ public static class CenaAdminServiceRegistration
         // pick them up via the shared registration.
         app.MapCasOverrideEndpoint();
         app.MapCasBackfillEndpoint();
+        // RDY-070 Phase 1A: Teacher console mastery heatmap (read-only, GET).
+        // Vue view + "Assign 15 min" homework action land in Phase 1B/2.
+        app.MapHeatmapEndpoint();
         // FIND-pedagogy-008: learning-objective picker (read-only)
         app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();
