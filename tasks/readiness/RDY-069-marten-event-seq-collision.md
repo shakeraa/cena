@@ -1,4 +1,4 @@
-# RDY-065: Marten event-sequence collision under high-throughput append
+# RDY-069: Marten event-sequence collision under high-throughput append
 
 - **Status**: Proposed — investigation task
 - **Priority**: Medium (production-realistic traffic unaffected; manifests only

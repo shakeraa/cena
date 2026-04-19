@@ -52,6 +52,24 @@ public class LearningSessionQueueProjection
     public Dictionary<string, int> HintsUsedByQuestion { get; set; } = new();
 
     /// <summary>
+    /// RDY-057c — Concept ids the student self-reported as anxious in
+    /// onboarding (TopicFeelings == Anxious). Captured at session start
+    /// from OnboardingSelfAssessmentDocument when present. Empty list =
+    /// student skipped the self-assessment OR has no anxious concepts.
+    ///
+    /// Consumed as a tie-breaker signal in ZPD selection (per
+    /// LearningSessionActor.HandleNextQuestion) — never as a primary
+    /// decision and never to BLOCK a concept. Affective self-signal
+    /// is weaker than observed BKT data; this field nudges selection
+    /// when two concepts have similar ZPD scores.
+    ///
+    /// Privacy: session-scoped per ADR-0003 — copied into the queue
+    /// doc at session start, never retained beyond session lifetime,
+    /// never joined with cross-session profile fields.
+    /// </summary>
+    public List<string> AnxiousConceptIds { get; set; } = new();
+
+    /// <summary>
     /// Check if queue needs refill (empty or low)
     /// </summary>
     public bool NeedsRefill => QuestionQueue.Count < 3 && EndedAt == null;

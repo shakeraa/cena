@@ -128,6 +128,39 @@ public static class SessionEndpoints
                 var queueProjection = await adaptivePool.InitializeSessionAsync(
                     studentId, sessionId, request.Subjects, request.Mode);
 
+                // RDY-057c — load onboarding self-assessment and copy any
+                // self-reported anxious concepts onto the session queue
+                // so the selection path can tie-break with them. Empty
+                // list = no assessment / no anxious topics. Failure here
+                // is non-fatal — the session continues without the
+                // affective signal.
+                try
+                {
+                    var selfAssessment = await session.LoadAsync<Cena.Infrastructure.Documents.OnboardingSelfAssessmentDocument>(studentId);
+                    if (selfAssessment is not null && !selfAssessment.Skipped)
+                    {
+                        var anxious = selfAssessment.TopicFeelings
+                            .Where(kvp => kvp.Value == Cena.Infrastructure.Documents.TopicFeeling.Anxious)
+                            .Select(kvp => kvp.Key)
+                            .ToList();
+                        if (anxious.Count > 0)
+                        {
+                            queueProjection.AnxiousConceptIds = anxious;
+                            session.Store(queueProjection);
+                            await session.SaveChangesAsync();
+                            logger.LogInformation(
+                                "[RDY-057c] Session {SessionId} inherited {Count} anxious concept(s) from self-assessment",
+                                sessionId, anxious.Count);
+                        }
+                    }
+                }
+                catch (Exception sxErr)
+                {
+                    logger.LogWarning(sxErr,
+                        "[RDY-057c] Failed to load self-assessment for session {SessionId} (non-fatal)",
+                        sessionId);
+                }
+
                 // Load a Marten-backed question pool for the requested subjects
                 var pool = await MartenQuestionPool.LoadAsync(
                     store, request.Subjects, logger);
