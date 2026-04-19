@@ -12,13 +12,27 @@ import { sanitizeLocale } from '@/composables/useAvailableLocales'
 
 export type StudentRole = 'student' | 'self-learner' | 'test-prep' | 'homeschool'
 export type SupportedLocale = 'en' | 'ar' | 'he'
-export type WizardStep = 'welcome' | 'role' | 'language' | 'diagnostic' | 'confirm'
+export type WizardStep = 'welcome' | 'role' | 'language' | 'diagnostic' | 'self-assessment' | 'confirm'
 
 export interface DiagnosticResponseItem {
   questionId: string
   subject: string
   correct: boolean
   difficulty: number
+}
+
+// RDY-057: self-reported affective state captured after the diagnostic.
+// TopicFeeling values: 'Solid' | 'Unsure' | 'Anxious' | 'New'.
+// The store keeps these as loose strings so the server-side enum remains
+// the single source of truth; conversion happens on POST.
+export interface SelfAssessmentState {
+  skipped: boolean
+  subjectConfidence: Record<string, number>  // subject → 1..5 Likert
+  strengths: string[]                         // lowercase-kebab tag ids
+  frictionPoints: string[]
+  topicFeelings: Record<string, string>       // concept-id → TopicFeeling string
+  freeText: string                            // ≤200 chars
+  optInPersistent: boolean
 }
 
 export interface OnboardingState {
@@ -29,6 +43,7 @@ export interface OnboardingState {
   subjects: string[]
   diagnosticResponses: DiagnosticResponseItem[]
   diagnosticSkipped: boolean
+  selfAssessment: SelfAssessmentState
   completedAt: string | null
 }
 
@@ -75,9 +90,18 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   const subjects = ref<string[]>(persisted?.subjects ?? [])
   const diagnosticResponses = ref<DiagnosticResponseItem[]>((persisted as any)?.diagnosticResponses ?? [])
   const diagnosticSkipped = ref<boolean>((persisted as any)?.diagnosticSkipped ?? false)
+  const selfAssessment = ref<SelfAssessmentState>({
+    skipped: (persisted as any)?.selfAssessment?.skipped ?? false,
+    subjectConfidence: (persisted as any)?.selfAssessment?.subjectConfidence ?? {},
+    strengths: (persisted as any)?.selfAssessment?.strengths ?? [],
+    frictionPoints: (persisted as any)?.selfAssessment?.frictionPoints ?? [],
+    topicFeelings: (persisted as any)?.selfAssessment?.topicFeelings ?? {},
+    freeText: (persisted as any)?.selfAssessment?.freeText ?? '',
+    optInPersistent: (persisted as any)?.selfAssessment?.optInPersistent ?? false,
+  })
   const completedAt = ref<string | null>(persisted?.completedAt ?? null)
 
-  const STEP_ORDER: WizardStep[] = ['welcome', 'role', 'language', 'diagnostic', 'confirm']
+  const STEP_ORDER: WizardStep[] = ['welcome', 'role', 'language', 'diagnostic', 'self-assessment', 'confirm']
 
   const stepIndex = computed(() => {
     return STEP_ORDER.indexOf(step.value)
@@ -95,6 +119,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
       case 'role': return role.value !== null
       case 'language': return sanitizeLocale(locale.value) === locale.value
       case 'diagnostic': return diagnosticResponses.value.length > 0 || diagnosticSkipped.value
+      case 'self-assessment': return true  // always advanceable; skip is a valid outcome
       case 'confirm': return role.value !== null
       default: return false
     }
@@ -131,6 +156,22 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     diagnosticSkipped.value = true
   }
 
+  function setSelfAssessment(patch: Partial<SelfAssessmentState>) {
+    selfAssessment.value = { ...selfAssessment.value, ...patch, skipped: false }
+  }
+
+  function skipSelfAssessment() {
+    selfAssessment.value = {
+      skipped: true,
+      subjectConfidence: {},
+      strengths: [],
+      frictionPoints: [],
+      topicFeelings: {},
+      freeText: '',
+      optInPersistent: false,
+    }
+  }
+
   function reset() {
     step.value = 'welcome'
     role.value = null
@@ -139,6 +180,15 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     subjects.value = []
     diagnosticResponses.value = []
     diagnosticSkipped.value = false
+    selfAssessment.value = {
+      skipped: false,
+      subjectConfidence: {},
+      strengths: [],
+      frictionPoints: [],
+      topicFeelings: {},
+      freeText: '',
+      optInPersistent: false,
+    }
     completedAt.value = null
     if (typeof localStorage !== 'undefined')
       localStorage.removeItem(STORAGE_KEY)
@@ -149,7 +199,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   }
 
   watch(
-    [step, role, locale, dailyTimeGoalMinutes, subjects, diagnosticResponses, diagnosticSkipped, completedAt],
+    [step, role, locale, dailyTimeGoalMinutes, subjects, diagnosticResponses, diagnosticSkipped, selfAssessment, completedAt],
     () => {
       writePersisted({
         step: step.value,
@@ -159,6 +209,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
         subjects: subjects.value,
         diagnosticResponses: diagnosticResponses.value,
         diagnosticSkipped: diagnosticSkipped.value,
+        selfAssessment: selfAssessment.value,
         completedAt: completedAt.value,
       } as any)
     },
@@ -173,6 +224,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     subjects,
     diagnosticResponses,
     diagnosticSkipped,
+    selfAssessment,
     completedAt,
     stepIndex,
     totalSteps,
@@ -184,6 +236,8 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     setLocale,
     setDiagnosticResults,
     skipDiagnostic,
+    setSelfAssessment,
+    skipSelfAssessment,
     reset,
     markCompleted,
   }

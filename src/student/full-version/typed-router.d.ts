@@ -35,6 +35,8 @@ declare module 'vue-router/auto-routes' {
     'login': RouteRecordInfo<'login', '/login', Record<never, never>, Record<never, never>>,
     'notifications': RouteRecordInfo<'notifications', '/notifications', Record<never, never>, Record<never, never>>,
     'onboarding': RouteRecordInfo<'onboarding', '/onboarding', Record<never, never>, Record<never, never>>,
+    'privacy': RouteRecordInfo<'privacy', '/privacy', Record<never, never>, Record<never, never>>,
+    'privacy-children': RouteRecordInfo<'privacy-children', '/privacy/children', Record<never, never>, Record<never, never>>,
     'profile': RouteRecordInfo<'profile', '/profile', Record<never, never>, Record<never, never>>,
     'profile-edit': RouteRecordInfo<'profile-edit', '/profile/edit', Record<never, never>, Record<never, never>>,
     'progress': RouteRecordInfo<'progress', '/progress', Record<never, never>, Record<never, never>>,
@@ -56,7 +58,10 @@ declare module 'vue-router/auto-routes' {
     'social-friends': RouteRecordInfo<'social-friends', '/social/friends', Record<never, never>, Record<never, never>>,
     'social-leaderboard': RouteRecordInfo<'social-leaderboard', '/social/leaderboard', Record<never, never>, Record<never, never>>,
     'social-peers': RouteRecordInfo<'social-peers', '/social/peers', Record<never, never>, Record<never, never>>,
+    'terms': RouteRecordInfo<'terms', '/terms', Record<never, never>, Record<never, never>>,
     'tutor': RouteRecordInfo<'tutor', '/tutor', Record<never, never>, Record<never, never>>,
     'tutor-thread-id': RouteRecordInfo<'tutor-thread-id', '/tutor/:threadId', { threadId: ParamValue<true> }, { threadId: ParamValue<false> }>,
+    'tutor-pdf-upload': RouteRecordInfo<'tutor-pdf-upload', '/tutor/pdf-upload', Record<never, never>, Record<never, never>>,
+    'tutor-photo-capture': RouteRecordInfo<'tutor-photo-capture', '/tutor/photo-capture', Record<never, never>, Record<never, never>>,
   }
 }

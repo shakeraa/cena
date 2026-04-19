@@ -871,6 +871,57 @@
       "languageLabel": "שפה",
       "cta": "התחל ללמוד"
     },
+    "selfAssessment": {
+      "title": "ספר לנו קצת על עצמך",
+      "subtitle": "זה עוזר לנו להתאים עצמנו אליך. השדות אופציונליים — אפשר לדלג.",
+      "confidenceTitle": "כמה בטוח אתה מרגיש בכל נושא?",
+      "confidenceSubtitle": "1 = בכלל לא, 5 = בטוח מאוד",
+      "strengthsTitle": "במה אתה חזק?",
+      "frictionTitle": "מה מקשה עליך?",
+      "feelingsTitle": "איך אתה מרגיש לגבי כל נושא?",
+      "feelingsSubtitle": "בחר את ההתאמה הקרובה ביותר לכל אחד.",
+      "freeTextTitle": "יש עוד משהו שכדאי שנדע?",
+      "freeTextPlaceholder": "אופציונלי — עד 200 תווים.",
+      "freeTextTooLong": "נא לקצר מתחת ל-{max} תווים.",
+      "skip": "דלג בינתיים",
+      "continue": "המשך",
+      "subject": {
+        "algebra": "אלגברה",
+        "functions": "פונקציות",
+        "calculus": "חשבון דיפרנציאלי",
+        "geometry": "גיאומטריה",
+        "trigonometry": "טריגונומטריה",
+        "probability": "הסתברות",
+        "statistics": "סטטיסטיקה",
+        "vectors": "וקטורים"
+      },
+      "strengthTag": {
+        "visualizer": "אני טוב בהמחשה חזותית",
+        "step-by-step": "אני עובד שלב אחר שלב",
+        "formula-memorizer": "אני זוכר נוסחאות היטב",
+        "real-examples": "אני מחבר לדוגמאות מהחיים",
+        "enjoys-proofs": "אני אוהב הוכחות",
+        "pattern-finder": "אני מזהה דפוסים",
+        "verbal-explainer": "אני מסביר בקול",
+        "patient-practice": "אני סבלני עם תרגול"
+      },
+      "frictionTag": {
+        "word-problems": "שאלות מילוליות מבלבלות אותי",
+        "test-anxiety": "אני נתקע במבחנים",
+        "no-starting-point": "אני לא יודע מאיפה להתחיל",
+        "loses-track": "אני מאבד את החוט בבעיות ארוכות",
+        "memorization": "קשה לי לשנן",
+        "symbolic-notation": "סמלים ונוסחאות מבלבלים אותי",
+        "time-pressure": "עבודה בלחץ זמן מלחיצה אותי",
+        "multi-step": "בעיות רב-שלביות קשות לי"
+      },
+      "feeling": {
+        "solid": "מרגיש בטוח",
+        "unsure": "לא בטוח",
+        "anxious": "לחוץ",
+        "new": "לא ראיתי"
+      }
+    },
     "next": "הבא",
     "back": "הקודם",
     "getStarted": "בואו נתחיל"

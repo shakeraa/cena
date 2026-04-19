@@ -874,6 +874,57 @@
       "languageLabel": "Language",
       "cta": "Start learning"
     },
+    "selfAssessment": {
+      "title": "Tell us about yourself",
+      "subtitle": "This helps us meet you where you are. It's optional — you can skip anything.",
+      "confidenceTitle": "How confident do you feel in each subject?",
+      "confidenceSubtitle": "1 = not at all, 5 = very confident",
+      "strengthsTitle": "What are you good at?",
+      "frictionTitle": "What trips you up?",
+      "feelingsTitle": "How do you feel about each topic?",
+      "feelingsSubtitle": "Pick the closest match for each one.",
+      "freeTextTitle": "Anything else you'd like us to know?",
+      "freeTextPlaceholder": "Optional — up to 200 characters.",
+      "freeTextTooLong": "Please keep it under {max} characters.",
+      "skip": "Skip for now",
+      "continue": "Continue",
+      "subject": {
+        "algebra": "Algebra",
+        "functions": "Functions",
+        "calculus": "Calculus",
+        "geometry": "Geometry",
+        "trigonometry": "Trigonometry",
+        "probability": "Probability",
+        "statistics": "Statistics",
+        "vectors": "Vectors"
+      },
+      "strengthTag": {
+        "visualizer": "I'm good at visualizing",
+        "step-by-step": "I work step by step",
+        "formula-memorizer": "I memorize formulas well",
+        "real-examples": "I connect to real examples",
+        "enjoys-proofs": "I enjoy proofs",
+        "pattern-finder": "I spot patterns",
+        "verbal-explainer": "I explain things out loud",
+        "patient-practice": "I'm patient with practice"
+      },
+      "frictionTag": {
+        "word-problems": "Word problems confuse me",
+        "test-anxiety": "I freeze on tests",
+        "no-starting-point": "I don't know where to start",
+        "loses-track": "I lose track in long problems",
+        "memorization": "Memorizing is hard",
+        "symbolic-notation": "Symbols/notation trip me up",
+        "time-pressure": "Timed work stresses me",
+        "multi-step": "Multi-step problems are tough"
+      },
+      "feeling": {
+        "solid": "Solid",
+        "unsure": "Unsure",
+        "anxious": "Anxious",
+        "new": "Haven't seen it"
+      }
+    },
     "next": "Next",
     "back": "Back",
     "getStarted": "Let's get started"

@@ -7,9 +7,11 @@ import OnboardingStepper from '@/components/onboarding/OnboardingStepper.vue'
 import RoleSelector from '@/components/onboarding/RoleSelector.vue'
 import LanguagePicker from '@/components/onboarding/LanguagePicker.vue'
 import DiagnosticQuiz from '@/components/onboarding/DiagnosticQuiz.vue'
+import SelfAssessmentStep from '@/components/onboarding/SelfAssessmentStep.vue'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useMeStore } from '@/stores/meStore'
 import { useApiMutation } from '@/composables/useApiMutation'
+import { $api } from '@/utils/api'
 
 definePage({
   meta: {
@@ -90,6 +92,31 @@ function handleBack() {
   onboarding.back()
 }
 
+// RDY-057: post the self-assessment separately from onboarding completion.
+// Best-effort — a failure here does NOT block the user's onboarding; we
+// log it and let the student reach /home. The self-assessment can be
+// resubmitted later via /api/me/self-assessment POST.
+async function submitSelfAssessment() {
+  try {
+    const sa = onboarding.selfAssessment
+    await $api('/api/me/self-assessment', {
+      method: 'POST',
+      body: {
+        skipped: sa.skipped,
+        subjectConfidence: sa.subjectConfidence,
+        strengths: sa.strengths,
+        frictionPoints: sa.frictionPoints,
+        topicFeelings: sa.topicFeelings,
+        freeText: sa.freeText || null,
+        optInPersistent: sa.optInPersistent,
+      },
+    })
+  }
+  catch (err) {
+    console.warn('[ONBOARDING] self-assessment submit failed (non-blocking):', err)
+  }
+}
+
 async function handleConfirm() {
   submitError.value = null
   if (!onboarding.role)
@@ -111,6 +138,13 @@ async function handleConfirm() {
         })),
       classroomCode: null,
     })
+
+    // Fire the self-assessment POST AFTER the onboarding POST succeeds so
+    // the caller has a valid `student_id` scope on the JWT. Awaited (not
+    // fire-and-forget) so any validation error is surfaced to the user,
+    // but wrapped in its own try/catch so a server-side 500 doesn't block
+    // the happy path.
+    await submitSelfAssessment()
 
     const nowIso = new Date().toISOString()
 
@@ -214,7 +248,14 @@ async function handleConfirm() {
         />
       </section>
 
-      <!-- STEP 5: CONFIRM -->
+      <!-- STEP 5: SELF-ASSESSMENT (RDY-057) -->
+      <SelfAssessmentStep
+        v-else-if="onboarding.step === 'self-assessment'"
+        @skip="() => onboarding.next()"
+        @complete="() => onboarding.next()"
+      />
+
+      <!-- STEP 6: CONFIRM -->
       <section
         v-else-if="onboarding.step === 'confirm'"
         data-testid="onboarding-step-confirm"

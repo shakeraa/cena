@@ -872,6 +872,57 @@
       "languageLabel": "اللغة",
       "cta": "ابدأ التعلم"
     },
+    "selfAssessment": {
+      "title": "أخبرنا عن نفسك",
+      "subtitle": "يساعدنا هذا على الانطلاق من نقطتك. الخطوة اختيارية — يمكنك تخطّيها.",
+      "confidenceTitle": "ما مدى ثقتك في كل مادة؟",
+      "confidenceSubtitle": "1 = ضعيفة جدًا، 5 = واثق جدًا",
+      "strengthsTitle": "ما نقاط قوّتك؟",
+      "frictionTitle": "ما الذي يعيقك؟",
+      "feelingsTitle": "كيف تشعر تجاه كل موضوع؟",
+      "feelingsSubtitle": "اختر الأقرب لكل موضوع.",
+      "freeTextTitle": "هل ثمّة شيء آخر تودّ إخبارنا به؟",
+      "freeTextPlaceholder": "اختياري — بحدّ أقصى 200 حرف.",
+      "freeTextTooLong": "يرجى الاختصار إلى أقل من {max} حرف.",
+      "skip": "تخطٍّ الآن",
+      "continue": "متابعة",
+      "subject": {
+        "algebra": "الجبر",
+        "functions": "الدوال",
+        "calculus": "التفاضل والتكامل",
+        "geometry": "الهندسة",
+        "trigonometry": "حساب المثلثات",
+        "probability": "الاحتمال",
+        "statistics": "الإحصاء",
+        "vectors": "المتّجهات"
+      },
+      "strengthTag": {
+        "visualizer": "أجيد التصوّر البصري",
+        "step-by-step": "أعمل خطوة بخطوة",
+        "formula-memorizer": "أحفظ الصيغ جيدًا",
+        "real-examples": "أربط بأمثلة من الحياة",
+        "enjoys-proofs": "أستمتع بالبراهين",
+        "pattern-finder": "ألاحظ الأنماط",
+        "verbal-explainer": "أشرح بصوت عالٍ",
+        "patient-practice": "أتمرّن بصبر"
+      },
+      "frictionTag": {
+        "word-problems": "المسائل الكلامية تُربكني",
+        "test-anxiety": "أتجمّد في الامتحانات",
+        "no-starting-point": "لا أعرف من أين أبدأ",
+        "loses-track": "أفقد الخيط في المسائل الطويلة",
+        "memorization": "الحفظ صعب عليّ",
+        "symbolic-notation": "الرموز والصيغ تُشوّش عليّ",
+        "time-pressure": "العمل تحت ضغط الوقت يُرهقني",
+        "multi-step": "المسائل متعدّدة الخطوات صعبة عليّ"
+      },
+      "feeling": {
+        "solid": "مرتاح",
+        "unsure": "غير متأكد",
+        "anxious": "قلق",
+        "new": "لم أرَه من قبل"
+      }
+    },
     "next": "التالي",
     "back": "السابق",
     "getStarted": "لنبدأ"

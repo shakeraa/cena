@@ -765,6 +765,7 @@ public partial class Program
     
     // Me/Profile endpoints (STB-00, STB-00b)
     app.MapMeEndpoints();
+    app.MapSelfAssessmentEndpoints();
     
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();

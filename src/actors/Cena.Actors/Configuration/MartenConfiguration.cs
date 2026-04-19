@@ -315,6 +315,16 @@ public static class MartenConfiguration
             .Index(x => x.TrackId)
             .Index(x => x.Status);
 
+        // ── Onboarding Self-Assessment (RDY-057) ──
+        // Per-student affective snapshot captured during onboarding.
+        // 90-day retention by default (reaper sweeps on ExpiresAt).
+        // [MlExcluded] per ADR-0003; excluded from training corpora.
+        opts.Schema.For<OnboardingSelfAssessmentDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.CapturedAt)
+            .Index(x => x.ExpiresAt!);
+
         // ── Stuck Diagnosis Document (RDY-063 Phase 1) ──
         // Session-scoped classifier output. 30-day retention per ADR-0003.
         // NO raw studentId — anon only. Indexed for item-quality queries
