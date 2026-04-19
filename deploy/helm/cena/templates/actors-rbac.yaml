@@ -8,7 +8,7 @@
 # Scope is deliberately tight: only pods, only in the release namespace,
 # no cluster-wide access. Follows principle of least privilege.
 # =============================================================================
-{{- if eq (.Values.cluster.provider | default "test") "kubernetes" }}
+{{- if eq (((.Values.actors).cluster).provider | default "test") "kubernetes" }}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
