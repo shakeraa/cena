@@ -28,7 +28,8 @@ public sealed record SchedulerInputs(
     DateTimeOffset? DeadlineUtc,
     TimeSpan WeeklyTimeBudget,
     MotivationProfile MotivationProfile,
-    DateTimeOffset NowUtc);
+    DateTimeOffset NowUtc,
+    TopicPrerequisiteGraph? PrerequisiteGraph = null);
 
 /// <summary>
 /// Student's self-reported stance toward surfacing weaknesses, from
@@ -123,13 +124,14 @@ public static class AdaptiveScheduler
     {
         ArgumentNullException.ThrowIfNull(inputs);
 
+        var graph = inputs.PrerequisiteGraph ?? TopicPrerequisiteGraph.Empty;
         var scored = new List<(PlanEntry entry, double score)>();
         foreach (var (topic, estimate) in inputs.PerTopicEstimates)
         {
             var weight = BagrutTopicWeights.ForFiveUnit(topic);
             if (weight is null) continue;
 
-            var breakdown = ComputeBreakdown(estimate, weight);
+            var breakdown = ComputeBreakdown(estimate, weight, graph.PrerequisiteUrgency(topic));
             var rationale = BuildRationale(topic, estimate, weight, breakdown, inputs.MotivationProfile);
 
             var entry = new PlanEntry(
@@ -152,7 +154,8 @@ public static class AdaptiveScheduler
 
     internal static PriorityBreakdown ComputeBreakdown(
         AbilityEstimate estimate,
-        BagrutTopicWeight weight)
+        BagrutTopicWeight weight,
+        double prerequisiteUrgency = 1.0)
     {
         // Weakness: normalised gap between current θ and the mastery
         // target. Clamped to [0, 2] so a far-below student doesn't
@@ -161,12 +164,10 @@ public static class AdaptiveScheduler
         var raw = MasteryTargetTheta - estimate.Theta;
         var weakness = Math.Clamp(raw, 0, 2);
 
-        // PrerequisiteUrgency is a phase-1A placeholder: 1.0 for every
-        // topic since we haven't wired the prerequisite DAG here yet.
-        // Phase 1B reads the SyllabusDocument prerequisite links and
-        // computes the real urgency.
-        const double prerequisiteUrgency = 1.0;
-
+        // PrerequisiteUrgency is provided by the caller (phase 1B
+        // wires the SyllabusDocument DAG through
+        // TopicPrerequisiteGraph.PrerequisiteUrgency()). Defaults to
+        // 1.0 for backward-compat with phase 1A tests.
         return new PriorityBreakdown(
             Weakness: weakness,
             TopicWeight: weight.Weight,
