@@ -14,6 +14,18 @@ static class Log
         Console.WriteLine($"[{DateTime.Now:HH:mm:ss} WRN] {formatted}");
     }
 
+    /// <summary>
+    /// Serilog-style overload that prints the full exception + stack trace
+    /// alongside the warning. Keep this explicit so the homegrown
+    /// formatter doesn't coerce the Exception into a template arg.
+    /// </summary>
+    public static void Warning(Exception ex, string msg, params object[] args)
+    {
+        var formatted = args.Length > 0 ? FormatMsg(msg, args) : msg;
+        Console.WriteLine($"[{DateTime.Now:HH:mm:ss} WRN] {formatted}");
+        Console.WriteLine(ex.ToString());
+    }
+
     static string FormatMsg(string template, object[] args)
     {
         var result = template;

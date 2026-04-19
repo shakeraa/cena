@@ -206,8 +206,12 @@ public sealed class SessionSimulator
             catch (Exception ex)
             {
                 stats.TotalErrors++;
-                Log.Warning("Error processing attempt for {StudentId}: {Error}",
-                    member.Profile.StudentId, ex.Message);
+                // Pass the exception as the first arg so Serilog emits the
+                // stack trace — without it "Index was outside the bounds of
+                // the array" swallowed the actual source site and masked
+                // the bug for weeks.
+                Log.Warning(ex, "Error processing attempt for {StudentId}",
+                    member.Profile.StudentId);
             }
         }
 
@@ -255,8 +259,12 @@ public sealed class SessionSimulator
             catch (Exception ex)
             {
                 stats.TotalErrors++;
-                Log.Warning("Error processing attempt for {StudentId}: {Error}",
-                    member.Profile.StudentId, ex.Message);
+                // Pass the exception as the first arg so Serilog emits the
+                // stack trace — without it "Index was outside the bounds of
+                // the array" swallowed the actual source site and masked
+                // the bug for weeks.
+                Log.Warning(ex, "Error processing attempt for {StudentId}",
+                    member.Profile.StudentId);
             }
         }
 
