@@ -393,9 +393,6 @@
       "youChip": "You",
       "xpLabel": "{xp} XP | {xp} XP",
       "xpValue": "{xp} XP | {xp} XP"
-    },
-    "streak": {
-      "atRisk": "Your streak is at risk — complete a session today!"
     }
   },
   "leaderboard": {

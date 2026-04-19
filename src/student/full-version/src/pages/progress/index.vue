@@ -128,13 +128,13 @@ function retry() {
             :days="streak.currentDays"
             :is-new-best="streak.currentDays > 0 && streak.currentDays >= streak.longestDays"
           />
-          <div
-            v-if="streak.isAtRisk"
-            class="text-caption text-warning mt-2 text-center"
-            data-testid="streak-at-risk"
-          >
-            {{ t('gamification.streak.atRisk') }}
-          </div>
+          <!--
+            RDY-082 / GD-004: removed the "at risk" banner per the
+            ship-gate loss-aversion ban. The {{ streak }} value still
+            renders above as an informational counter (pending the
+            larger streak-deprecation decision); the banner that
+            triggered urgency + loss-aversion is gone.
+          -->
         </VCol>
       </VRow>
 
