@@ -21,6 +21,7 @@
     "@casl/vue": "2.2.2",
     "@floating-ui/dom": "1.6.8",
     "@formkit/drag-and-drop": "0.1.6",
+    "@microsoft/signalr": "^8.0.17",
     "@sindresorhus/is": "7.1.0",
     "@tiptap/extension-highlight": "^2.27.1",
     "@tiptap/extension-image": "^2.27.1",

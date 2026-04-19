@@ -137,7 +137,13 @@ public sealed class SessionSimulator
     private readonly Random _rng;
     private readonly float _speedMultiplier;
 
-    private readonly Dictionary<string, StudentSessionState> _sessions = new();
+    // RDY-056: concurrent — RunSingleStudentAsync is invoked in parallel
+    // from the arrival scheduler, so _sessions must be thread-safe.
+    // Earlier: mysterious "Index was outside the bounds of the array" +
+    // "InvalidOperationException" from Dictionary<T>.FindValue — both
+    // signatures of concurrent-mutation corruption on the non-concurrent
+    // Dictionary. ConcurrentDictionary fixes both.
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, StudentSessionState> _sessions = new();
 
     // ── Constructor ──────────────────────────────────────────────────────────
 
@@ -287,15 +293,22 @@ public sealed class SessionSimulator
         var schoolId  = member.Profile.SchoolId;
 
         // ── Open session if not active ────────────────────────────────────────
-        if (!_sessions.TryGetValue(studentId, out var state))
+        // RDY-056: GetOrAdd is atomic on ConcurrentDictionary, so two
+        // parallel tasks for the same studentId can't both publish a
+        // SessionStart. `opened` guards the side-effect publish.
+        var opened = false;
+        var state = _sessions.GetOrAdd(studentId, _ =>
         {
-            state = new StudentSessionState
+            opened = true;
+            return new StudentSessionState
             {
-                SessionId   = $"sess-{Guid.NewGuid():N}"[..16],
+                SessionId = $"sess-{Guid.NewGuid():N}"[..16],
                 Methodology = InitialMethodology(archetype),
                 SessionStart = DateTimeOffset.UtcNow,
             };
-            _sessions[studentId] = state;
+        });
+        if (opened)
+        {
 
             var startMsg = BusEnvelope<BusStartSession>.Create(
                 NatsSubjects.SessionStart,
@@ -612,7 +625,7 @@ public sealed class SessionSimulator
             "emulator");
 
         await PublishAsync(NatsSubjects.SessionEnd, endMsg, cancellationToken);
-        _sessions.Remove(studentId);
+        _sessions.TryRemove(studentId, out _);
     }
 
     private async Task CloseAllSessionsAsync(CancellationToken cancellationToken)
