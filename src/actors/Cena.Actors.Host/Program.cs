@@ -19,6 +19,7 @@ using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Nats;
 using Cena.Infrastructure.Observability;
+using Cena.Infrastructure.Observability.ErrorAggregator;
 using Cena.Infrastructure.Ocr.DependencyInjection;
 using Cena.Infrastructure.Resilience;
 using Cena.Infrastructure.Seed;
@@ -166,6 +167,9 @@ builder.Services.AddCenaAuthorization();
 
 // FIND-sec-014: Security metrics for observability
 builder.Services.AddSecurityMetrics();
+
+// RDY-064: Error aggregator scaffold — Null aggregator by default.
+builder.Services.AddCenaErrorAggregator(builder.Configuration);
 
 // IClock for deterministic time-based testing (FIND-qa-007)
 builder.Services.AddClock();

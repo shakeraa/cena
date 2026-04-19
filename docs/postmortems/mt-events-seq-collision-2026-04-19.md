@@ -68,7 +68,7 @@ Quick-append retry hazard, or a Marten v8 regression is still unknown.
 `docker-compose.app.yml`. The bug is not fixed; it's parked behind a
 gentler default.
 
-**Tracked**: RDY-069 for root-cause investigation.
+**Tracked**: RDY-081 for root-cause investigation.
 
 ### Contributing factor — Docker Desktop VM
 
@@ -112,7 +112,7 @@ channel backlogs past 60 seconds.
 
 - The validator drift went undetected for an unknown period because
   there's no test that round-trips an emulator `BusConceptAttempt`
-  through `BusMessageValidator.Validate`. Added to RDY-069's
+  through `BusMessageValidator.Validate`. Added to RDY-081's
   regression test list.
 - Running the emulator at 25× was a repo default, not an explicit
   load-test flag. A contributor could trigger (B) just by running
@@ -123,8 +123,8 @@ channel backlogs past 60 seconds.
 1. ✅ Widen `BusMessageValidator.ValidQuestionTypes` to accept all
    common naming forms (shipped).
 2. ✅ Lower default `EMU_SPEED` 25 → 5 (shipped).
-3. ✅ File RDY-069 for Marten sequence-collision investigation.
+3. ✅ File RDY-081 for Marten sequence-collision investigation.
 4. ☐ Add a round-trip test: emulator-generated `BusConceptAttempt`
    payload → validator → actor dispatch, asserting acceptance. Catches
-   future validator drift. (Tracked in RDY-069.)
-5. ☐ Investigate the Marten v8 sequence path (RDY-069 Scope §2).
+   future validator drift. (Tracked in RDY-081.)
+5. ☐ Investigate the Marten v8 sequence path (RDY-081 Scope §2).
