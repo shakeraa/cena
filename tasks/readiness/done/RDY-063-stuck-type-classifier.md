@@ -1,6 +1,6 @@
 # RDY-063: Stuck-Type Classifier (precursor to live-help pipeline)
 
-- **Status**: Proposed — not started
+- **Status**: ✅ **Shipped 2026-04-19** — Phase 1 (classifier core: `HybridStuckClassifier` + heuristic + Haiku LLM), Phase 2a (shadow mode on `/hint` path), Phase 2b (`HintStuckDecisionService` + hint-level adjuster wired into `/hint` endpoint), Phase 4 (ADR-0036 accepted at `docs/adr/0036-stuck-type-ontology.md`), admin stuck-diagnostics page with en/he/ar/fr i18n. Verified by artifact check, not full acceptance-criteria audit. Phase 3 observability (Grafana dashboard) not independently verified.
 - **Priority**: High — unblocks RDY-062 redesign, improves existing hint ladder independently
 - **Source**: Shaker 2026-04-19 — ULTRATHINK pass on RDY-062 surfaced that "I need help" is 7 different signals. Routing decisions without stuck-type diagnosis are structurally wrong. Build the classifier first, let its data drive the v2 of RDY-062.
 - **Tier**: 2 (quality — pedagogical fidelity + data flywheel for live-help)

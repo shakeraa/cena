@@ -1,6 +1,6 @@
 # RDY-060: Admin SignalR — Replace Poll-Based Dashboards
 
-- **Status**: Requested — not started
+- **Status**: ✅ **Shipped 2026-04-19** — Phase 1 (admin hub foundation), Phases 5a–5e (5 pages migrated to SignalR), Redis backplane wired (`AddStackExchangeRedis` in `src/api/Cena.Admin.Api.Host/Hubs/AdminSignalRConfiguration.cs`), `useAdminLiveStream.ts` composable live. Verified by artifact check, not full acceptance-criteria audit. Observability dashboards (Section 7) not independently verified.
 - **Priority**: Medium-High (admin UX + server load)
 - **Source**: Shaker question 2026-04-18: "why auto-refresh instead of SignalR?"
 - **Answer**: we never wired SignalR admin-side. Polling is the lazy fallback.
