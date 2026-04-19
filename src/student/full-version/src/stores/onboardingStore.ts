@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { computed, ref, watch } from 'vue'
-import { sanitizeLocale } from '@/composables/useAvailableLocales'
+import { sanitizeLocale, useAvailableLocales } from '@/composables/useAvailableLocales'
+import { inferLocale } from '@/composables/useLocaleInference'
 
 /**
  * `onboardingStore` — Pinia store backing the 3-step wizard from
@@ -82,9 +83,17 @@ export const useOnboardingStore = defineStore('onboarding', () => {
 
   // FIND-pedagogy-010: sanitize persisted locale through the Hebrew gate
   // so a stale 'he' in localStorage doesn't survive a build-flag flip.
-  const locale = ref<SupportedLocale>(
-    sanitizeLocale((persisted?.locale as string) ?? 'en') as SupportedLocale,
-  )
+  //
+  // RDY-068 (F2): when no locale is persisted yet (first visit), infer
+  // from navigator.languages with an Arabic-first bias. This removes the
+  // "pick your flag" friction screen for the Arab-sector cohort per
+  // Dr. Lior's panel critique (2026-04-17).
+  const { locales: availableForInference } = useAvailableLocales()
+  const availableCodesForInference = new Set(availableForInference.value.map(l => l.code))
+  const initialLocale: SupportedLocale = persisted?.locale
+    ? (sanitizeLocale(persisted.locale as string) as SupportedLocale)
+    : inferLocale({ availableCodes: availableCodesForInference })
+  const locale = ref<SupportedLocale>(initialLocale)
 
   const dailyTimeGoalMinutes = ref<number>(persisted?.dailyTimeGoalMinutes ?? DEFAULT_DAILY_GOAL)
   const subjects = ref<string[]>(persisted?.subjects ?? [])
