@@ -413,6 +413,11 @@ public partial class Program
     // RDY-064: Error aggregator scaffold — Null aggregator by default.
     builder.Services.AddCenaErrorAggregator(builder.Configuration);
 
+    // RDY-075 Phase 1B: Marten-backed offline sync ledger (60-day TTL
+    // enforced by the retention worker).
+    builder.Services.AddSingleton<Cena.Actors.Sessions.IOfflineSyncLedger,
+        Cena.Actors.Sessions.MartenOfflineSyncLedger>();
+
     // FIND-ux-006b: the student host needs the Firebase Admin SDK wrapper to
     // back the anonymous POST /api/auth/password-reset endpoint. The admin host
     // already registers this as a singleton; mirror that here so the student
@@ -773,6 +778,10 @@ public partial class Program
     
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();
+
+    // RDY-075 Phase 1B: offline PWA reconnect sync — accepts batched
+    // offline answer events with ItemVersionFreeze guards.
+    app.MapOfflineSyncEndpoints();
 
     // RDY-034: Flow state assessment endpoint — computes state + action
     // from session signals supplied by the caller. Frontend parity with
