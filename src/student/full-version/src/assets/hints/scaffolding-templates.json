@@ -1,0 +1,112 @@
+{
+  "$schema": "./scaffolding-templates.schema.json",
+  "version": "0.1.0-draft",
+  "status": "DRAFT",
+  "reviewLifecycle": "DRAFT -> PROF_AMJAD_REVIEW -> LOCKED",
+  "description": "RDY-065b phase 1B — 8-topic × 5-rung hint scaffolding stubs for the Arabic/Hebrew/English math tutor. The 5 rungs follow Sweller+Renkl progressive disclosure: metacognitive prompt, concept recall, structural hint, procedural hint, worked example. All templates DRAFT status; Prof. Amjad review required before any student sees them in production. Content-generation pipelines treat status=DRAFT as dev-only (flag) and status=PROF_AMJAD_REVIEW as pilot-only (warn). Only LOCKED templates may reach production content surfaces.",
+  "rungs": {
+    "1": { "labelKey": "session.runner.hintStep.1", "purpose": "metacognitive-prompt" },
+    "2": { "labelKey": "session.runner.hintStep.2", "purpose": "concept-recall" },
+    "3": { "labelKey": "session.runner.hintStep.3", "purpose": "structural-hint" },
+    "4": { "labelKey": "session.runner.hintStep.4", "purpose": "procedural-hint" },
+    "5": { "labelKey": "session.runner.hintStep.5", "purpose": "worked-example" }
+  },
+  "topics": [
+    {
+      "family": "algebra",
+      "lexiconKeys": ["polynomial", "equation", "inequality", "root", "solution"],
+      "status": "DRAFT",
+      "rungs": {
+        "1": "Before solving, ask: what kind of equation is this — linear, quadratic, higher-degree?",
+        "2": "Recall: every polynomial equation can be written in the form p(x) = 0. What is p(x) here?",
+        "3": "Move every term to one side to match p(x) = 0. What stays on the other side?",
+        "4": "Factor p(x) or apply the quadratic formula. Which one fits the degree you identified?",
+        "5": "Worked example: for 2x + 6 = 14, subtract 6 from both sides to get 2x = 8, then divide by 2."
+      }
+    },
+    {
+      "family": "functions",
+      "lexiconKeys": ["function", "domain", "range", "intersection point", "extremum"],
+      "status": "DRAFT",
+      "rungs": {
+        "1": "What is the question asking about the function — a value, a location, or a behaviour?",
+        "2": "Recall the definition: a function f(x) pairs each input x with exactly one output.",
+        "3": "Identify the structure: is this asking for f(a), for x such that f(x) = 0, or for a max/min?",
+        "4": "Apply the rule: substitute the input, solve for x where f(x) meets a condition, or set f'(x) = 0.",
+        "5": "Worked example: given f(x) = x² − 4, f(0) = −4 and the zeros are x = ±2."
+      }
+    },
+    {
+      "family": "calculus",
+      "lexiconKeys": ["derivative", "integral", "limit", "chain rule", "tangent line"],
+      "status": "DRAFT",
+      "rungs": {
+        "1": "Is this a rate-of-change question (derivative) or a total-accumulation question (integral)?",
+        "2": "Recall: f'(x) measures how f changes per unit change in x. ∫ f(x) dx sums infinitesimal pieces.",
+        "3": "Choose the rule: power rule for polynomials, chain rule for composites, product/quotient for ratios.",
+        "4": "Apply one step at a time. Keep the constants separate and bring exponents down before reducing.",
+        "5": "Worked example: d/dx [x³ − 3x² + 2x − 1] = 3x² − 6x + 2 by applying the power rule term by term."
+      }
+    },
+    {
+      "family": "trigonometry",
+      "lexiconKeys": ["sine", "cosine", "tangent", "angle", "identity"],
+      "status": "DRAFT",
+      "rungs": {
+        "1": "Is the angle in degrees or radians? Is this a right-triangle problem or a unit-circle question?",
+        "2": "Recall SOH-CAH-TOA: sin = opposite/hypotenuse, cos = adjacent/hypotenuse, tan = opposite/adjacent.",
+        "3": "Sketch the triangle or unit circle. Mark the known sides or reference angle.",
+        "4": "Apply the identity. sin²θ + cos²θ = 1 rearranges many problems; double-angle formulas handle 2θ cases.",
+        "5": "Worked example: for sin(30°), the unit circle gives 1/2 exactly; cos(30°) = √3/2."
+      }
+    },
+    {
+      "family": "geometry",
+      "lexiconKeys": ["triangle", "quadrilateral", "circle", "area", "perimeter"],
+      "status": "DRAFT",
+      "rungs": {
+        "1": "Which shape is this, and is the question asking about its perimeter, area, or a specific angle?",
+        "2": "Recall the formula: rectangle area = length × width, triangle = ½ × base × height, circle = π r².",
+        "3": "Label the diagram. Are the sides congruent? Are any angles right, acute, or obtuse?",
+        "4": "Substitute known values into the formula. Watch units — mixing cm and m is a common slip.",
+        "5": "Worked example: a triangle with base 6 and height 4 has area ½ × 6 × 4 = 12 square units."
+      }
+    },
+    {
+      "family": "statistics",
+      "lexiconKeys": ["mean", "standard deviation", "probability", "distribution", "sample"],
+      "status": "DRAFT",
+      "rungs": {
+        "1": "Is this a descriptive question (mean, median, spread) or a probabilistic one (likelihood of an event)?",
+        "2": "Recall: the mean is the sum divided by n; standard deviation measures spread from the mean.",
+        "3": "List the data points. For probabilities, identify favourable outcomes and the total sample space.",
+        "4": "Apply the formula: mean = Σxᵢ / n; P(A) = favourable / total.",
+        "5": "Worked example: for {2, 4, 6, 8}, the mean is (2+4+6+8)/4 = 5."
+      }
+    },
+    {
+      "family": "sequences",
+      "lexiconKeys": ["arithmetic sequence", "geometric sequence", "sum", "term"],
+      "status": "DRAFT",
+      "rungs": {
+        "1": "Is the pattern adding the same number each step (arithmetic) or multiplying by the same ratio (geometric)?",
+        "2": "Recall: arithmetic has a constant difference d; geometric has a constant ratio r.",
+        "3": "Write the recurrence: aₙ = a₁ + (n − 1)d for arithmetic; aₙ = a₁ · r^(n−1) for geometric.",
+        "4": "Use the sum formula: Sₙ = n/2 × (a₁ + aₙ) for arithmetic; Sₙ = a₁(1 − rⁿ)/(1 − r) for geometric.",
+        "5": "Worked example: for a₁ = 3, d = 4, n = 20, the 20th term is 3 + 19×4 = 79 and the sum is 20/2 × (3 + 79) = 820."
+      }
+    },
+    {
+      "family": "vectors",
+      "lexiconKeys": ["vector", "magnitude", "direction", "dot product"],
+      "status": "DRAFT",
+      "rungs": {
+        "1": "Is this asking for magnitude (length), direction (angle), or an operation between two vectors?",
+        "2": "Recall: a vector has components (x, y) [or (x, y, z) in 3D]. Magnitude = √(x² + y² [+ z²]).",
+        "3": "Set up the operation: vector sum adds components; dot product is Σ(xᵢ · yᵢ); cross product (3D) gives a perpendicular vector.",
+        "4": "Substitute and compute one component at a time. Check: is the result a vector or a scalar?",
+        "5": "Worked example: |⟨3, 4⟩| = √(9 + 16) = 5."
+      }
+    }
+  ]
+}
