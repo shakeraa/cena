@@ -67,6 +67,7 @@ onMounted(async () => {
   })
 
   // Poll thread detail every 5s for new messages
+  // arch-test-allow: setInterval-fast  (messaging-over-SignalR not yet in scope — separate future task, messaging events don't currently publish to cena.events.* so there's no stream to migrate to)
   threadPollTimer = setInterval(async () => {
     await store.fetchThreadDetail(threadId.value)
     nextTick(() => {

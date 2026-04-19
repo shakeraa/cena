@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import { $api } from '@/utils/api'
+import { useAdminLiveStream } from '@/composables/useAdminLiveStream'
 
 definePage({ meta: { action: 'read', subject: 'System' } })
+
+// RDY-060 Phase 5c: SignalR-driven actor dashboard. Drop 3s poll to
+// 30s safety poll; stream handles live updates.
+const SAFETY_POLL_INTERVAL_MS = 30_000
 
 interface ActorInfo {
   studentId: string
@@ -59,15 +64,39 @@ const fetchStats = async () => {
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
-onMounted(() => {
+// RDY-060 Phase 5c: live updates via admin SignalR `system` group.
+// Actor-host lifecycle events (cena.system.*) + session + focus
+// events all feed in; any of them can alter actor stats, so we
+// refetch on every envelope. Coarse refresh is fine for a ≤100-row
+// table; per-actor reducers aren't worth the complexity until we
+// see pilot-scale event rates.
+const stream = useAdminLiveStream()
+const streamStatus = stream.status
+let unsubscribeStream: (() => void) | null = null
+
+function onAnyEnvelope() {
+  if (autoRefresh.value) fetchStats()
+}
+
+onMounted(async () => {
   fetchStats()
   pollInterval = setInterval(() => {
     if (autoRefresh.value) fetchStats()
-  }, 3000)
+  }, SAFETY_POLL_INTERVAL_MS)
+  try {
+    await stream.connect()
+    await stream.join('system')
+    unsubscribeStream = stream.on(onAnyEnvelope)
+  }
+  catch (err) {
+    console.warn('[actors] admin-hub unavailable; 30s poll covers it:', err)
+  }
 })
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
+  unsubscribeStream?.()
+  void stream.leave('system')
 })
 
 const headers = [
