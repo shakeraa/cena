@@ -95,13 +95,24 @@ const showHintButton = computed(() => {
 })
 
 const hintsRemaining = computed(() => {
-  // The parent page refreshes this after every /hint call by feeding
-  // lastHint.hintsRemaining back into the question prop, but while the
-  // round-trip is in flight we show the optimistic value.
+  // RDY-065 (F11): used internally to drive button visibility (hide at 0).
+  // NEVER surfaced to the student UI as a count — that is a penalty-style
+  // counter banned by GD-004 (shipgate.md).
   if (props.lastHint)
     return props.lastHint.hintsRemaining
 
   return props.question.hintsRemaining ?? props.question.hintsAvailable ?? 0
+})
+
+const hintStepLabel = computed(() => {
+  // RDY-065 (F11): map the backend hint index (1-3) to a qualitative rung
+  // label. Never render numbered labels like ordinal-N-of-M — that frames
+  // hint use as quantified help-seeking, which raises anxiety for LD and
+  // under-confident cohorts. Qualitative labels are neutral descriptions.
+  const level = props.lastHint?.hintLevel
+  if (level === 1 || level === 2 || level === 3)
+    return t(`session.runner.hintStep.${level}`)
+  return ''
 })
 
 function handleSubmit() {
@@ -198,20 +209,25 @@ function handleHint() {
     />
 
     <!--
-      Last-requested hint lives above the choices so it doesn't fight
-      with the Submit button for focus. Only rendered when the parent
-      passes one back via `lastHint`.
+      RDY-065 (F11) — Anxiety-safe hint ladder.
+      - Neutral info color (not warning) — hints are learning aids, not penalties.
+      - Qualitative rung labels (t('session.runner.hintStep.N')), never "Hint 1 of 3".
+      - No hint counter displayed. No countdown. No percentage-credit penalty surfaced.
+      - Cite: Chi (1994) self-explanation; Renkl & Atkinson (2003) faded worked examples.
+      - Last-requested hint sits above the choices so it doesn't compete
+        with the Submit button for focus. Only rendered when the parent
+        passes one back via `lastHint`.
     -->
     <VAlert
       v-if="lastHint"
-      type="warning"
+      type="info"
       variant="tonal"
-      icon="tabler-help-hexagon"
+      icon="tabler-bulb"
       class="mb-4"
       data-testid="question-hint-display"
     >
       <div class="text-caption text-medium-emphasis mb-1">
-        {{ t('session.runner.hintLevel', { level: lastHint.hintLevel }) }}
+        {{ hintStepLabel }}
       </div>
       <div class="text-body-2">
         <bdi
@@ -265,18 +281,26 @@ function handleHint() {
         scaffolding level is 'None' (experts) or when hintsRemaining
         reaches zero (expertise reversal effect — never burden
         higher-mastery students with extra scaffolds).
+
+        RDY-065 (F11) — Anxiety-safe CTA. The button says "I'm stuck"
+        in the student's locale — never anything like Show-a-hint-parens-N-left.
+        The hintsRemaining value drives visibility (hide at 0) but is
+        NEVER surfaced to the student. BKT assisted-credit discount
+        is applied internally by HintAdjustedBktService; the student
+        UI never exposes a negative percentage credit or similar
+        penalty framing.
       -->
       <VBtn
         v-if="showHintButton"
         variant="tonal"
-        color="warning"
-        prepend-icon="tabler-bulb-filled"
+        color="info"
+        prepend-icon="tabler-bulb"
         :disabled="locked || hintLoading"
         :loading="hintLoading"
         data-testid="question-hint-request"
         @click="handleHint"
       >
-        {{ t('session.runner.requestHint', { remaining: hintsRemaining }) }}
+        {{ t('session.runner.stuckCta') }}
       </VBtn>
       <span
         v-else

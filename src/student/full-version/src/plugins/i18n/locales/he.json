@@ -678,8 +678,12 @@
       "fadedStepCheck": "בדוק",
       "fadedStepCorrect": "!נכון",
       "fadedStepIncorrect": "צפוי: {expected}",
-      "hintLevel": "רמז {level}",
-      "requestHint": "הצג רמז (נותרו {remaining})",
+      "hintStep": {
+        "1": "הכוונה עדינה",
+        "2": "בונים את הרעיון",
+        "3": "הולכים צעד-צעד"
+      },
+      "stuckCta": "עזרה בבקשה",
       "explanationLangNote": "הסבר (באנגלית)"
     },
     "summary": {
