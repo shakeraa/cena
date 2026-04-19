@@ -13,6 +13,8 @@ public sealed record TutoringSessionListResponse(
     int PageSize);
 
 // Summary row for session list table
+// RDY-059: QuestionsAnswered / AccuracyPercent / FocusScore are nullable
+// so zero-answer sessions render "—" instead of a false-zero signal.
 public sealed record TutoringSessionSummaryDto(
     string Id,
     string StudentId,
@@ -26,7 +28,10 @@ public sealed record TutoringSessionSummaryDto(
     int DurationSeconds,
     int TokensUsed,
     DateTimeOffset StartedAt,
-    DateTimeOffset? EndedAt);
+    DateTimeOffset? EndedAt,
+    int? QuestionsAnswered = null,   // RDY-059 — count of answer rows in the joined learning session
+    float? AccuracyPercent = null,   // RDY-059 — correct / answered * 100 (0..100), null when no answers
+    float? FocusScore = null);       // RDY-059 — latest FocusRollupDocument score (0..100), null when no rollup
 
 // Full detail view for a single session
 public sealed record TutoringSessionDetailDto(

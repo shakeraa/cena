@@ -6,6 +6,7 @@
 using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Events;
+using Cena.Actors.Projections;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Tenancy;
@@ -84,7 +85,113 @@ public sealed class TutoringAdminService : ITutoringAdminService
         var totalCount = mapped.Count;
         var paged = mapped.Skip((page - 1) * pageSize).Take(pageSize).ToList();
 
+        // RDY-059: enrich page rows with accuracy + focus score. Two
+        // batched queries keep this O(1) in session opens regardless of
+        // page size; the N+1 guard in tests counts `_store.QuerySession()`
+        // opens and asserts ≤ 5 for a 100-row page.
+        paged = await EnrichWithAccuracyAndFocusAsync(session, paged, allDocs);
+
         return new TutoringSessionListResponse(paged, totalCount, page, pageSize);
+    }
+
+    /// <summary>
+    /// RDY-059: attach QuestionsAnswered / AccuracyPercent / FocusScore
+    /// fields to the paged session summaries. Runs two batched queries
+    /// (one per collection) — the pure enrichment logic is delegated to
+    /// <see cref="MergeAccuracyAndFocus"/> so it can be unit-tested
+    /// without a live session.
+    /// </summary>
+    private static async Task<List<TutoringSessionSummaryDto>> EnrichWithAccuracyAndFocusAsync(
+        IQuerySession session,
+        IReadOnlyList<TutoringSessionSummaryDto> paged,
+        IReadOnlyList<TutoringSessionDocument> allDocs)
+    {
+        if (paged.Count == 0) return new List<TutoringSessionSummaryDto>();
+
+        var studentIds = paged.Select(p => p.StudentId).Distinct().ToList();
+
+        // Batch 1: learning-session queue projections for the page's
+        // students. We load ALL rows per student (retention caps size);
+        // per-row window filtering happens in-memory below.
+        var queues = await session.Query<LearningSessionQueueProjection>()
+            .Where(q => studentIds.Contains(q.StudentId))
+            .ToListAsync();
+
+        // Batch 2: focus rollups for the same students. We take all rows
+        // then pick the latest per student in memory (single pass).
+        var rollups = await session.Query<FocusSessionRollupDocument>()
+            .Where(r => studentIds.Contains(r.StudentId))
+            .ToListAsync();
+
+        return MergeAccuracyAndFocus(paged, allDocs, queues, rollups, DateTimeOffset.UtcNow);
+    }
+
+    /// <summary>
+    /// RDY-059: pure, deterministic enrichment. Exposed <c>internal</c>
+    /// so admin-api tests can assert the join logic without a Marten
+    /// connection. Inputs are immutable; outputs are a fresh list.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="now"/> is injected (not DateTimeOffset.UtcNow)
+    /// so tests can seed an active-session window deterministically.
+    /// </remarks>
+    internal static List<TutoringSessionSummaryDto> MergeAccuracyAndFocus(
+        IReadOnlyList<TutoringSessionSummaryDto> paged,
+        IReadOnlyList<TutoringSessionDocument> allDocs,
+        IReadOnlyList<LearningSessionQueueProjection> queues,
+        IReadOnlyList<FocusSessionRollupDocument> rollups,
+        DateTimeOffset now)
+    {
+        if (paged.Count == 0) return new List<TutoringSessionSummaryDto>();
+
+        var latestRollupByStudent = rollups
+            .GroupBy(r => r.StudentId)
+            .ToDictionary(g => g.Key, g => g.OrderByDescending(r => r.Date).First());
+
+        var queuesByStudent = queues
+            .GroupBy(q => q.StudentId)
+            .ToDictionary(g => g.Key, g => g.ToList());
+
+        var docById = allDocs.ToDictionary(d => d.Id, d => d);
+
+        var enriched = new List<TutoringSessionSummaryDto>(paged.Count);
+        foreach (var row in paged)
+        {
+            int? answered = null;
+            float? accuracy = null;
+
+            if (docById.TryGetValue(row.Id, out var doc) &&
+                queuesByStudent.TryGetValue(row.StudentId, out var studentQueues))
+            {
+                var windowStart = doc.StartedAt.UtcDateTime;
+                var windowEnd = (doc.EndedAt ?? now).UtcDateTime;
+
+                var relevantAttempts = studentQueues
+                    .SelectMany(q => q.AnsweredQuestions)
+                    .Where(a => a.AnsweredAt >= windowStart && a.AnsweredAt <= windowEnd)
+                    .ToList();
+
+                if (relevantAttempts.Count > 0)
+                {
+                    answered = relevantAttempts.Count;
+                    var correct = relevantAttempts.Count(a => a.IsCorrect);
+                    accuracy = (float)Math.Round(correct * 100.0 / relevantAttempts.Count, 1);
+                }
+            }
+
+            float? focusScore = null;
+            if (latestRollupByStudent.TryGetValue(row.StudentId, out var rollup))
+                focusScore = rollup.AvgFocusScore;
+
+            enriched.Add(row with
+            {
+                QuestionsAnswered = answered,
+                AccuracyPercent = accuracy,
+                FocusScore = focusScore,
+            });
+        }
+
+        return enriched;
     }
 
     // ── Session Detail ──

@@ -20,6 +20,7 @@ declare module 'vue-router/auto-routes' {
   export interface RouteNamedMap {
     '$error': RouteRecordInfo<'$error', '/:error(.*)', { error: ParamValue<true> }, { error: ParamValue<false> }>,
     'apps-cultural-dashboard': RouteRecordInfo<'apps-cultural-dashboard', '/apps/cultural/dashboard', Record<never, never>, Record<never, never>>,
+    'apps-diagnostics-stuck-types': RouteRecordInfo<'apps-diagnostics-stuck-types', '/apps/diagnostics/stuck-types', Record<never, never>, Record<never, never>>,
     'apps-experiments': RouteRecordInfo<'apps-experiments', '/apps/experiments', Record<never, never>, Record<never, never>>,
     'apps-experiments-id': RouteRecordInfo<'apps-experiments-id', '/apps/experiments/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'apps-focus-class-id': RouteRecordInfo<'apps-focus-class-id', '/apps/focus/class/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
@@ -62,7 +63,10 @@ declare module 'vue-router/auto-routes' {
     'apps-user-view-id': RouteRecordInfo<'apps-user-view-id', '/apps/user/view/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'dashboards-admin': RouteRecordInfo<'dashboards-admin', '/dashboards/admin', Record<never, never>, Record<never, never>>,
     'forgot-password': RouteRecordInfo<'forgot-password', '/forgot-password', Record<never, never>, Record<never, never>>,
+    'instructor': RouteRecordInfo<'instructor', '/instructor', Record<never, never>, Record<never, never>>,
     'login': RouteRecordInfo<'login', '/login', Record<never, never>, Record<never, never>>,
+    'mentor': RouteRecordInfo<'mentor', '/mentor', Record<never, never>, Record<never, never>>,
+    'mentor-institutes-id': RouteRecordInfo<'mentor-institutes-id', '/mentor/institutes/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
     'not-authorized': RouteRecordInfo<'not-authorized', '/not-authorized', Record<never, never>, Record<never, never>>,
     'pages-account-settings-tab': RouteRecordInfo<'pages-account-settings-tab', '/pages/account-settings/:tab', { tab: ParamValue<true> }, { tab: ParamValue<false> }>,
     'privacy': RouteRecordInfo<'privacy', '/privacy', Record<never, never>, Record<never, never>>,

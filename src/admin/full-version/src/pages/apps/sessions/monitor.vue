@@ -1,11 +1,10 @@
 <script setup lang="ts">
 definePage({ meta: { action: 'read', subject: 'Tutoring' } })
 
-// Matches the server's TutoringSessionSummaryDto exactly. Accuracy + focus
-// scores are NOT on this DTO — computing them requires joining session
-// answer events + focus metrics and is tracked as a follow-up in
-// RDY-058-follow-up. Until then, we show what we actually have:
-// TurnCount, DurationSeconds, TokensUsed.
+// Matches the server's TutoringSessionSummaryDto exactly. RDY-059 adds
+// QuestionsAnswered / AccuracyPercent / FocusScore — all nullable on
+// the server so fresh sessions with no joined data render "—" rather
+// than a false-zero signal.
 interface ActiveSession {
   id: string
   sessionId: string
@@ -20,6 +19,22 @@ interface ActiveSession {
   tokensUsed: number
   startedAt: string
   endedAt: string | null
+  questionsAnswered: number | null
+  accuracyPercent: number | null
+  focusScore: number | null
+}
+
+// "—" sentinel — used wherever the server explicitly returned null for
+// an optional metric. Never display NaN%; that was the 2026-04-18 bug.
+const DASH = '\u2014'
+function fmtAccuracy(v: number | null): string {
+  return v === null || v === undefined || Number.isNaN(v) ? DASH : `${Math.round(v)}%`
+}
+function fmtFocus(v: number | null): string {
+  return v === null || v === undefined || Number.isNaN(v) ? DASH : `${Math.round(v)}`
+}
+function fmtCount(v: number | null): string {
+  return v === null || v === undefined ? DASH : String(v)
 }
 
 function formatDuration(seconds: number): string {
@@ -121,16 +136,29 @@ const filteredSessions = computed(() => {
 
 const totalActive = computed(() => sessions.value.length)
 
-// Until accuracy + focus are surfaced on the server DTO, the summary
-// cards show metrics we actually have:
-//   - Total turns across all active sessions (engagement signal)
-//   - Budget-exhausted / stalled session count (the "something's wrong" signal)
 const totalTurns = computed(() =>
   sessions.value.reduce((sum, s) => sum + (s.turnCount ?? 0), 0),
 )
 const stalledCount = computed(() =>
   sessions.value.filter(s => s.status === 'budget_exhausted' || s.status === 'confused' || s.status === 'stagnation').length,
 )
+
+// RDY-059: summary-card aggregates across sessions that actually have
+// data. Sessions without joined data (null) are excluded from the
+// average rather than dragging it to zero.
+const avgAccuracy = computed(() => {
+  const withData = sessions.value.filter(s => typeof s.accuracyPercent === 'number')
+  if (withData.length === 0) return null
+  const sum = withData.reduce((acc, s) => acc + (s.accuracyPercent ?? 0), 0)
+  return sum / withData.length
+})
+
+const avgFocusScore = computed(() => {
+  const withData = sessions.value.filter(s => typeof s.focusScore === 'number')
+  if (withData.length === 0) return null
+  const sum = withData.reduce((acc, s) => acc + (s.focusScore ?? 0), 0)
+  return sum / withData.length
+})
 </script>
 
 <template>
@@ -155,6 +183,28 @@ const stalledCount = computed(() =>
             <div>
               <div class="text-h5">{{ totalTurns }}</div>
               <div class="text-body-2 text-medium-emphasis">Total Turns</div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol cols="12" md="3">
+        <VCard>
+          <VCardText class="d-flex align-center gap-3">
+            <VAvatar color="success" variant="tonal" size="42"><VIcon icon="tabler-target" /></VAvatar>
+            <div>
+              <div class="text-h5">{{ fmtAccuracy(avgAccuracy) }}</div>
+              <div class="text-body-2 text-medium-emphasis">Avg Accuracy</div>
+            </div>
+          </VCardText>
+        </VCard>
+      </VCol>
+      <VCol cols="12" md="3">
+        <VCard>
+          <VCardText class="d-flex align-center gap-3">
+            <VAvatar color="warning" variant="tonal" size="42"><VIcon icon="tabler-brain" /></VAvatar>
+            <div>
+              <div class="text-h5">{{ fmtFocus(avgFocusScore) }}</div>
+              <div class="text-body-2 text-medium-emphasis">Avg Focus Score</div>
             </div>
           </VCardText>
         </VCard>
@@ -245,6 +295,18 @@ const stalledCount = computed(() =>
               <div class="d-flex justify-space-between text-body-2">
                 <span class="text-medium-emphasis">Tokens</span>
                 <span>{{ session.tokensUsed ?? 0 }}</span>
+              </div>
+              <div class="d-flex justify-space-between text-body-2">
+                <span class="text-medium-emphasis">Answered</span>
+                <span>{{ fmtCount(session.questionsAnswered) }}</span>
+              </div>
+              <div class="d-flex justify-space-between text-body-2">
+                <span class="text-medium-emphasis">Accuracy</span>
+                <span>{{ fmtAccuracy(session.accuracyPercent) }}</span>
+              </div>
+              <div class="d-flex justify-space-between text-body-2">
+                <span class="text-medium-emphasis">Focus</span>
+                <span>{{ fmtFocus(session.focusScore) }}</span>
               </div>
               <div class="d-flex justify-space-between text-body-2">
                 <span class="text-medium-emphasis">Method</span>
