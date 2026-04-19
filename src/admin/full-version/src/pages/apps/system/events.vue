@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import EventCard from '@/views/apps/system/events/EventCard.vue'
+import { useAdminLiveStream } from '@/composables/useAdminLiveStream'
 
 definePage({
   meta: {
@@ -7,6 +8,13 @@ definePage({
     subject: 'System',
   },
 })
+
+// RDY-060 Phase 5e: live-tail via admin SignalR. Initial /admin/events/recent
+// hydrates the list; stream envelopes prepend rows as they arrive. The 5s
+// poll is replaced by a 30s safety poll for degraded-mode consistency.
+const SAFETY_POLL_INTERVAL_MS = 30_000
+// Cap in-memory to prevent unbounded growth on a busy prod stream.
+const MAX_VISIBLE_EVENTS = 500
 
 interface EventData {
   id: string
@@ -69,14 +77,73 @@ const filteredEvents = computed(() => {
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
-onMounted(() => {
+// ── RDY-060 Phase 5e: SignalR live-tail ─────────────────────────────
+const stream = useAdminLiveStream()
+const streamStatus = stream.status
+let unsubscribeStream: (() => void) | null = null
+
+function streamEnvelopeToEvent(env: {
+  subject: string
+  payloadJson: string
+  serverTimestamp: string
+}): EventData | null {
+  if (!env.subject) return null
+  // Last segment of the NATS subject is the event type.
+  // cena.events.student.stu-1.answer_evaluated_v1 → answer_evaluated_v1
+  const parts = env.subject.split('.')
+  const type = parts[parts.length - 1] || env.subject
+  const summary = env.subject
+  let payload: Record<string, unknown> | undefined
+  try {
+    payload = env.payloadJson ? JSON.parse(env.payloadJson) : undefined
+  }
+  catch {
+    payload = { raw: env.payloadJson }
+  }
+  return {
+    // Unique per envelope — subject + timestamp + random tail guards
+    // against rapid identical bursts (tick collision).
+    id: `${env.subject}-${env.serverTimestamp}-${Math.random().toString(36).slice(2, 8)}`,
+    timestamp: env.serverTimestamp,
+    type,
+    summary,
+    payload,
+  }
+}
+
+function onStreamEnvelope(env: { subject: string; payloadJson: string; serverTimestamp: string }) {
+  if (isPaused.value) return
+  // Apply the current filter at ingress so paused-state filtering
+  // matches post-unpause exactly.
+  if (filterType.value && !env.subject.includes(filterType.value)) return
+
+  const mapped = streamEnvelopeToEvent(env)
+  if (!mapped) return
+
+  // Prepend; cap the tail so long sessions don't leak memory.
+  const next = [mapped, ...events.value]
+  events.value = next.length > MAX_VISIBLE_EVENTS ? next.slice(0, MAX_VISIBLE_EVENTS) : next
+}
+
+onMounted(async () => {
   fetchEvents()
-  // arch-test-allow: setInterval-fast  (RDY-060 Phase 5e pending — event-stream migration to SignalR live-tail)
-  pollInterval = setInterval(fetchEvents, 5000)
+  // 30-second safety poll — reconciles any events the stream missed
+  // (reconnect gap, message loss).
+  pollInterval = setInterval(fetchEvents, SAFETY_POLL_INTERVAL_MS)
+  try {
+    await stream.connect()
+    await stream.join('system')
+    unsubscribeStream = stream.on(onStreamEnvelope)
+  }
+  catch (err) {
+    console.warn('[event-stream] admin-hub unavailable; 30s poll covers it:', err)
+  }
 })
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
+  unsubscribeStream?.()
+  void stream.leave('system')
 })
 
 watch(filterType, () => {
@@ -97,6 +164,14 @@ watch(filterType, () => {
         </p>
       </div>
       <div class="d-flex align-center gap-3">
+        <VChip
+          :color="streamStatus === 'connected' ? 'success' : 'warning'"
+          variant="tonal"
+          size="small"
+          :prepend-icon="streamStatus === 'connected' ? 'tabler-bolt' : 'tabler-bolt-off'"
+        >
+          {{ streamStatus === 'connected' ? 'Live' : streamStatus }}
+        </VChip>
         <VChip
           color="info"
           variant="tonal"
