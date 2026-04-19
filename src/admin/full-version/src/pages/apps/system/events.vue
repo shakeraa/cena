@@ -71,6 +71,7 @@ let pollInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   fetchEvents()
+  // arch-test-allow: setInterval-fast  (RDY-060 Phase 5e pending — event-stream migration to SignalR live-tail)
   pollInterval = setInterval(fetchEvents, 5000)
 })
 

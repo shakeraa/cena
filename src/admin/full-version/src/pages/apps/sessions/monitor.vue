@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useAdminLiveStream } from '@/composables/useAdminLiveStream'
+
 definePage({ meta: { action: 'read', subject: 'Tutoring' } })
 
 // Matches the server's TutoringSessionSummaryDto exactly. RDY-059 adds
@@ -48,12 +50,22 @@ function formatDuration(seconds: number): string {
 
 const sessions = ref<ActiveSession[]>([])
 const loading = ref(true)
+// RDY-060 Phase 5a: primary update path is now the admin SignalR stream.
+// `autoRefresh` still controls the 30s safety poll that backstops stream
+// degradation (spec §6 graceful degradation — never regress to offline).
 const autoRefresh = ref(true)
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+// RDY-060: poll interval raised from 3s to 30s — stream does the fast work.
+const SAFETY_POLL_INTERVAL_MS = 30_000
 const refreshInterval = ref<ReturnType<typeof setInterval>>()
-const countdown = ref(3)
 const searchQuery = ref('')
 const subjectFilter = ref<string | null>(null)
 const sortBy = ref('startedAt')
+
+// ── RDY-060: admin SignalR live stream ──────────────────────────────
+const stream = useAdminLiveStream()
+const streamStatus = stream.status
+const streamConnected = computed(() => streamStatus.value === 'connected')
 
 const fetchSessions = async () => {
   try {
@@ -78,16 +90,15 @@ const fetchSessions = async () => {
   }
 }
 
+// RDY-060 Phase 5a: 30s safety poll (not 3s). The stream does the
+// fast-path live updates; this interval only catches missed events in
+// degraded mode. The arch test AdminSpaPagesHaveNoFastPolling validates
+// that setInterval callbacks at <30s on admin pages carry an allowlist
+// comment, so future dashboards don't re-introduce 3s churn.
 const startPolling = () => {
   stopPolling()
-  countdown.value = 3
-  refreshInterval.value = setInterval(() => {
-    countdown.value--
-    if (countdown.value <= 0) {
-      fetchSessions()
-      countdown.value = 3
-    }
-  }, 1000)
+  // 30s safety-poll: belt-and-suspenders for stream outages. Allowlisted.
+  refreshInterval.value = setInterval(fetchSessions, SAFETY_POLL_INTERVAL_MS)
 }
 
 const stopPolling = () => {
@@ -97,17 +108,51 @@ const stopPolling = () => {
   }
 }
 
+// Stream handler: session / focus events mutate local rows in place.
+// Initial hydrate still comes from the REST fetchSessions — the stream
+// only handles deltas.
+function applyStreamEnvelope(env: {
+  subject: string
+  payloadJson: string
+}) {
+  if (!env.subject.startsWith('cena.events.session.') &&
+      !env.subject.startsWith('cena.events.focus.'))
+    return
+  // Coalesce: easiest safe thing is to refetch (cheap at ≤100 active
+  // rows). Stream still delivers the signal that something changed —
+  // we just don't try to patch rows in-place in v1. A later commit can
+  // swap this for a fine-grained reducer when we add per-event handlers.
+  fetchSessions()
+}
+
 watch(autoRefresh, (val) => {
   if (val) startPolling()
   else stopPolling()
 })
 
-onMounted(() => {
+let unsubscribeStream: (() => void) | null = null
+
+onMounted(async () => {
   fetchSessions()
   if (autoRefresh.value) startPolling()
+  // Open the shared admin hub + join the system group so we receive
+  // session/focus events fanned in by NatsAdminBridge. Failures here
+  // are non-fatal — safety poll still runs.
+  try {
+    await stream.connect()
+    await stream.join('system')
+    unsubscribeStream = stream.on(applyStreamEnvelope)
+  }
+  catch (err) {
+    console.warn('[live-monitor] admin-hub unavailable; 30s poll covers it:', err)
+  }
 })
 
-onUnmounted(() => stopPolling())
+onUnmounted(() => {
+  stopPolling()
+  unsubscribeStream?.()
+  void stream.leave('system')
+})
 
 const statusColor = (status: string) => {
   switch (status) {
@@ -224,18 +269,28 @@ const avgFocusScore = computed(() => {
       </VCol>
       <VCol cols="12" md="3">
         <VCard>
-          <VCardText class="d-flex align-center gap-3">
-            <VSwitch v-model="autoRefresh" label="Auto-refresh" density="compact" hide-details />
-            <VProgressCircular
-              v-if="autoRefresh"
-              :model-value="((3 - countdown) / 3) * 100"
-              size="32"
-              width="3"
-              color="primary"
+          <VCardText class="d-flex align-center gap-3 flex-wrap">
+            <VChip
+              size="small"
+              :color="streamConnected ? 'success' : 'warning'"
+              variant="tonal"
+              :prepend-icon="streamConnected ? 'tabler-bolt' : 'tabler-bolt-off'"
             >
-              <span class="text-caption">{{ countdown }}</span>
-            </VProgressCircular>
-            <VBtn v-else icon size="small" @click="fetchSessions"><VIcon icon="tabler-refresh" /></VBtn>
+              {{ streamConnected ? 'Live' : streamStatus }}
+            </VChip>
+            <VSwitch
+              v-model="autoRefresh"
+              label="30s safety poll"
+              density="compact"
+              hide-details
+            />
+            <VBtn
+              size="small"
+              variant="text"
+              @click="fetchSessions"
+            >
+              <VIcon icon="tabler-refresh" />
+            </VBtn>
           </VCardText>
         </VCard>
       </VCol>

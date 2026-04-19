@@ -676,6 +676,7 @@ let pollInterval: ReturnType<typeof setInterval> | null = null
 
 onMounted(() => {
   checkServices()
+  // arch-test-allow: setInterval-fast  (RDY-060 Phase 5b pending — architecture.vue migration to cena.system.* stream)
   pollInterval = setInterval(checkServices, 5000)
 })
 
