@@ -1,5 +1,7 @@
 # RDY-056: Dockerized Dev Stack — Bootable End-to-End
 
+- **Status**: ✅ **VERIFIED 2026-04-19** — cold `docker compose down && up` passes.
+  See "Verification log (2026-04-19)" section at the bottom.
 - **Priority**: High (unblocks local product testing and UAT)
 - **Complexity**: Senior engineer, ~1 full day focused
 - **Source**: Session 2026-04-17 — SymPy sidecar + compose overlay shipped, .NET hosts crashed at boot on DI + Marten schema races
@@ -227,3 +229,43 @@ All 11 services report correctly when the dockerised stack is up and the user is
 ### Accounts file
 A canonical list of dev accounts lives in [docker/firebase-emulator/seed-dev-users.sh](../../docker/firebase-emulator/seed-dev-users.sh). Re-run with
 `docker exec cena-firebase-emulator /seed/seed-dev-users.sh` after any emulator reset.
+
+## Verification log (2026-04-19)
+
+After shipping the earlier fixes in this session (including `7bc77bf`
+ConcurrentDictionary fix for the emulator), a fresh cold-boot sweep was
+run:
+
+```
+docker compose -f docker-compose.yml -f docker-compose.app.yml \
+               -f docker-compose.hotreload.yml down
+docker compose -f docker-compose.yml -f docker-compose.app.yml \
+               -f docker-compose.hotreload.yml up -d
+```
+
+Results against the three original failure modes + the Firebase
+cross-cutting concern:
+
+| # | Failure mode | Status |
+|---|---|---|
+| 1 | Admin API Marten schema-creation deadlock (`TaskCanceledException` from `TimedLock`) | ✅ Resolved. `[MARTEN_SCHEMA_READY]` logs before any seeder; zero `TaskCanceled` on boot. |
+| 2 | Student API DI validation | ✅ Boots clean; `/health` → 200. |
+| 3 | Actor Host DI validation | ✅ Boots; no crash loop. |
+| × | Firebase emulator not wired | ✅ `FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099` env set in both admin-api and student-api containers. |
+
+Post-boot health:
+
+```
+cena-admin-api           Up (healthy) — /health 200
+cena-student-api         Up (healthy) — /health 200
+cena-actor-host          Up (no healthcheck by design)
+cena-sympy-sidecar       Up (healthy)
+cena-postgres/redis/nats/neo4j/firebase-emulator — all healthy
+cena-dynamodb            Up but healthcheck flaky (functional per init log)
+cena-emulator            Up, steady-state 15% CPU, 0 errors
+```
+
+Acceptance criteria confirmed met for Phase 1. Phase 2 (dev UX polish)
+and Phase 3 (CI integration) are out of scope for this verification —
+they ship when the relevant tasks do.
+
