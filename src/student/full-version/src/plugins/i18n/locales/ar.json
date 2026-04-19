@@ -679,8 +679,12 @@
       "fadedStepCheck": "تحقق",
       "fadedStepCorrect": "!صحيح",
       "fadedStepIncorrect": "المتوقع: {expected}",
-      "hintLevel": "تلميح {level}",
-      "requestHint": "أظهر تلميحاً (تبقى {remaining})",
+      "hintStep": {
+        "1": "إرشاد لطيف",
+        "2": "نبني الفكرة معاً",
+        "3": "نسير خطوة بخطوة"
+      },
+      "stuckCta": "أحتاج مساعدة",
       "explanationLangNote": "تفسير (بالإنجليزية)"
     },
     "summary": {

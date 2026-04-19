@@ -33,16 +33,32 @@ const BANNED = {
     { pattern: /you['']ll lose/i, reason: "loss-aversion threat" },
     { pattern: /don['']t miss/i, reason: "FOMO urgency" },
     { pattern: /running out of time/i, reason: "artificial urgency" },
+    // RDY-065 (F11): anxiety-safe hint ladder — student-facing hint UI must
+    // never display penalty counters, numeric hint levels, or comparative
+    // shame. Backend adjusts BKT assisted credit internally; UI stays silent.
+    { pattern: /\(\s*\{?\s*(remaining|hintsRemaining|hintsLeft)\s*\}?\s+(left|remaining|to go)\s*\)/i, reason: "penalty-style hint counter (RDY-065)" },
+    { pattern: /\bhint\s+\{?level\}?\b/i, reason: "numeric hint level display (RDY-065 — use qualitative labels)" },
+    { pattern: /you['']re\s+behind/i, reason: "comparative shame (RDY-065)" },
+    { pattern: /slower than (\d+%|\w+ of)/i, reason: "comparative percentile shame (RDY-065)" },
+    { pattern: /behind\s+\d+%\s+of/i, reason: "comparative percentile shame (RDY-065)" },
+    { pattern: /-\s*\d+%\s*(credit|score|mastery|points)/i, reason: "visible BKT penalty (RDY-065 — must stay internal)" },
+    { pattern: /\bhints?\s+used\b/i, reason: "hints-used counter (RDY-065)" },
   ],
   ar: [
     { pattern: /سلسلة(?!.*كهرب)/u, reason: "سلسلة as streak (not electrical chain)" },
     { pattern: /لا تفقد/u, reason: "loss-aversion copy (Arabic)" },
     { pattern: /ستخسر/u, reason: "you will lose (Arabic)" },
+    // RDY-065 (F11) Arabic patterns
+    { pattern: /\(\s*(تبقى|متبقي)\s+\{?[^)]*\}?\s*\)/u, reason: "Arabic hint counter (RDY-065)" },
+    { pattern: /أنت\s+متأخر/u, reason: "comparative shame Arabic (RDY-065)" },
   ],
   he: [
     { pattern: /רצף יומי/u, reason: "daily streak (Hebrew)" },
     { pattern: /אל תשבור/u, reason: "don't break streak (Hebrew)" },
     { pattern: /תפסיד/u, reason: "you will lose (Hebrew)" },
+    // RDY-065 (F11) Hebrew patterns
+    { pattern: /\(\s*נותרו?\s+\{?[^)]*\}?\s*\)/u, reason: "Hebrew hint counter (RDY-065)" },
+    { pattern: /אתה\s+מפגר/u, reason: "comparative shame Hebrew (RDY-065)" },
   ],
 };
 
