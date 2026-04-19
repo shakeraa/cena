@@ -10,6 +10,7 @@ using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
 using Cena.Admin.Api;
+using Cena.Admin.Api.Host.Hubs;
 using Cena.Admin.Api.Registration;
 using Cena.Api.Host.Endpoints;
 using Cena.Infrastructure.Auth;
@@ -245,6 +246,12 @@ public partial class Program
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddFirebaseAuth(builder.Configuration);
     builder.Services.AddCenaAuthorization();
+
+    // RDY-060 — Admin SignalR hub + NATS bridge + Redis backplane.
+    // Token-extraction chain MUST be added AFTER AddFirebaseAuth so it
+    // can wrap the existing JwtBearerEvents.OnMessageReceived handler.
+    builder.Services.AddCenaAdminSignalR(builder.Configuration);
+    builder.Services.AddAdminSignalRTokenExtraction();
     
     // FIND-sec-014: Security metrics for observability
     builder.Services.AddSecurityMetrics();
@@ -490,6 +497,9 @@ public partial class Program
 
     // RDY-063 Phase 2a: stuck-type diagnostics (admin aggregate reads)
     Cena.Admin.Api.Diagnostics.StuckDiagnosticsEndpoints.MapStuckDiagnosticsEndpoints(app);
+
+    // RDY-060: admin SignalR hub + health probe
+    app.MapCenaAdminHub();
     
     // ---- Classroom endpoints (STB-00b) ----
     app.MapClassroomEndpoints();

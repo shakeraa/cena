@@ -8,6 +8,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Cena.Admin.Api.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\actors\Cena.Actors\Cena.Actors.csproj" />
     <ProjectReference Include="..\..\shared\Cena.Infrastructure\Cena.Infrastructure.csproj" />
     <ProjectReference Include="..\Cena.Admin.Api\Cena.Admin.Api.csproj" />
@@ -16,6 +20,8 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+    <!-- RDY-060: SignalR + Redis backplane for multi-replica admin hub -->
+    <PackageReference Include="Microsoft.AspNetCore.SignalR.StackExchangeRedis" Version="9.0.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />
