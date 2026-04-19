@@ -43,6 +43,23 @@ const BANNED = {
     { pattern: /behind\s+\d+%\s+of/i, reason: "comparative percentile shame (RDY-065)" },
     { pattern: /-\s*\d+%\s*(credit|score|mastery|points)/i, reason: "visible BKT penalty (RDY-065 — must stay internal)" },
     { pattern: /\bhints?\s+used\b/i, reason: "hints-used counter (RDY-065)" },
+    // RDY-071 (F8): honest-framing contract. Until RDY-080 concordance
+    // study produces an approved ConcordanceMapping with
+    // F8PointEstimateEnabled=true, student-facing surfaces MUST NOT
+    // claim a numeric Bagrut prediction. See
+    // docs/engineering/mastery-trajectory-honest-framing.md.
+    { pattern: /predicted\s+bagrut/i, reason: "predicted Bagrut score (RDY-071 — blocked until RDY-080 calibration approved)" },
+    { pattern: /your\s+bagrut\s+score/i, reason: "possessive Bagrut score framing (RDY-071)" },
+    { pattern: /bagrut\s+score\s+will\s+be/i, reason: "future-tense Bagrut assertion (RDY-071)" },
+    { pattern: /expected\s+(grade|score)/i, reason: "expected-grade/score forward extrapolation (RDY-071)" },
+    { pattern: /we\s+predict\s+you['']ll\s+score/i, reason: "conversational score prediction (RDY-071)" },
+    { pattern: /your\s+score\s+will\s+be/i, reason: "future-tense score assertion (RDY-071)" },
+    { pattern: /you\s+will\s+score/i, reason: "future-tense score prediction (RDY-071)" },
+    { pattern: /you['']ll\s+get\s+a?\s*\d/i, reason: "numeric score prediction (RDY-071)" },
+    { pattern: /predicted\s+score\s*:?/i, reason: "predicted score label (RDY-071)" },
+    { pattern: /bagrut\s+prediction/i, reason: "Bagrut prediction label (RDY-071)" },
+    { pattern: /grade\s+prediction/i, reason: "grade prediction label (RDY-071)" },
+    { pattern: /\d{2,3}\s+on\s+(your|the)\s+bagrut/i, reason: "numeric on-the-Bagrut prediction (RDY-071)" },
   ],
   ar: [
     { pattern: /سلسلة(?!.*كهرب)/u, reason: "سلسلة as streak (not electrical chain)" },
@@ -51,6 +68,11 @@ const BANNED = {
     // RDY-065 (F11) Arabic patterns
     { pattern: /\(\s*(تبقى|متبقي)\s+\{?[^)]*\}?\s*\)/u, reason: "Arabic hint counter (RDY-065)" },
     { pattern: /أنت\s+متأخر/u, reason: "comparative shame Arabic (RDY-065)" },
+    // RDY-071 (F8) honest-framing Arabic patterns
+    { pattern: /علامة\s+البجروت\s+المتوقعة/u, reason: "predicted Bagrut score Arabic (RDY-071)" },
+    { pattern: /درجتك\s+ستكون/u, reason: "your-score-will-be Arabic (RDY-071)" },
+    { pattern: /نتوقع\s+أن\s+تحصل\s+على/u, reason: "we-predict-you-will-get Arabic (RDY-071)" },
+    { pattern: /درجتك\s+المتوقعة/u, reason: "your-expected-grade Arabic (RDY-071)" },
   ],
   he: [
     { pattern: /רצף יומי/u, reason: "daily streak (Hebrew)" },
@@ -59,6 +81,11 @@ const BANNED = {
     // RDY-065 (F11) Hebrew patterns
     { pattern: /\(\s*נותרו?\s+\{?[^)]*\}?\s*\)/u, reason: "Hebrew hint counter (RDY-065)" },
     { pattern: /אתה\s+מפגר/u, reason: "comparative shame Hebrew (RDY-065)" },
+    // RDY-071 (F8) honest-framing Hebrew patterns
+    { pattern: /ציון\s+הבגרות\s+החזוי/u, reason: "predicted Bagrut score Hebrew (RDY-071)" },
+    { pattern: /הציון\s+שלך\s+יהיה/u, reason: "your-score-will-be Hebrew (RDY-071)" },
+    { pattern: /אנו\s+צופים\s+שתקבל/u, reason: "we-predict-you-will-get Hebrew (RDY-071)" },
+    { pattern: /הציון\s+הצפוי\s+שלך/u, reason: "your-expected-grade Hebrew (RDY-071)" },
   ],
 };
 
@@ -169,9 +196,24 @@ function scan() {
     scanFile(resolve(ROOT, f));
   }
 
+  // Test folders legitimately reference banned phrases to assert they do
+  // NOT appear in production renders (RDY-065b, RDY-071 regression suites).
+  // Excluding them from the scan keeps the shipgate signal focused on the
+  // production paths it actually guards.
+  const testPathExcludes = [
+    /[\\/]tests[\\/]/i,
+    /[\\/]Tests[\\/]/,
+    /\.Tests[\\/]/,
+    /[\\/]test[\\/]/i,
+  ];
+  function isTestPath(filepath) {
+    return testPathExcludes.some((rx) => rx.test(filepath));
+  }
+
   // Scan Vue and TS files
   for (const pattern of [...vuePatterns, ...codePatterns]) {
     for (const f of findFiles([pattern])) {
+      if (isTestPath(f)) continue;
       scanFile(f);
     }
   }
