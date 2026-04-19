@@ -1,6 +1,16 @@
 <script setup lang="ts">
 import StagnationInsightsPanel from '@/views/apps/pedagogy/StagnationInsightsPanel.vue'
 import { $api } from '@/utils/api'
+import { useAdminLiveStream } from '@/composables/useAdminLiveStream'
+
+// RDY-060 Phase 5d: per-student insights panels refetch on live events
+// via the admin SignalR hub's student-insights group. NatsAdminBridge
+// fans cena.events.student.{studentId}.* and cena.events.focus.{studentId}.*
+// into admin:student-insights:{studentId}. We debounce the refetch-all
+// callback so rapid event bursts (e.g. a student mid-session getting
+// answer+focus+mastery events in quick succession) don't generate 12×
+// fetches back-to-back.
+const LIVE_REFETCH_DEBOUNCE_MS = 1500
 
 interface Props {
   userId: string
@@ -521,23 +531,57 @@ const fetchOutreach = async () => {
   finally { outreachLoading.value = false }
 }
 
-onMounted(() => {
-  if (isStudent.value) {
-    // ROW 1-5 (existing)
-    fetchFocus()
-    fetchMastery()
-    fetchMethodology()
-    // ROW 6-9 (new)
-    fetchSessionPatterns()
-    fetchHeatmap()
-    fetchDegradation()
-    fetchEngagement()
-    fetchErrorTypes()
-    fetchHintUsage()
-    fetchStagnation()
-    fetchResponseTimes()
-    fetchOutreach()
+// RDY-060 Phase 5d: live subscription + debounced refetch-all.
+const stream = useAdminLiveStream()
+let unsubscribeStream: (() => void) | null = null
+let debounceHandle: ReturnType<typeof setTimeout> | null = null
+
+function refetchAllPanels() {
+  fetchFocus()
+  fetchMastery()
+  fetchMethodology()
+  fetchSessionPatterns()
+  fetchHeatmap()
+  fetchDegradation()
+  fetchEngagement()
+  fetchErrorTypes()
+  fetchHintUsage()
+  fetchStagnation()
+  fetchResponseTimes()
+  fetchOutreach()
+}
+
+function onStudentEnvelope(env: { subject: string }) {
+  // The student-insights group only receives events for THIS student,
+  // so subject-scoping is already done server-side. We still inspect
+  // the subject prefix to short-circuit non-relevant fan-ins (e.g. if
+  // future subject families land in this group).
+  if (!env.subject.startsWith('cena.events.student.') &&
+      !env.subject.startsWith('cena.events.focus.'))
+    return
+  if (debounceHandle) clearTimeout(debounceHandle)
+  debounceHandle = setTimeout(refetchAllPanels, LIVE_REFETCH_DEBOUNCE_MS)
+}
+
+onMounted(async () => {
+  if (!isStudent.value) return
+
+  refetchAllPanels()
+
+  try {
+    await stream.connect()
+    await stream.join(`student:${props.userId}`)
+    unsubscribeStream = stream.on(onStudentEnvelope)
   }
+  catch (err) {
+    console.warn('[user-insights] admin-hub unavailable; panels remain static until next navigation:', err)
+  }
+})
+
+onUnmounted(() => {
+  if (debounceHandle) clearTimeout(debounceHandle)
+  unsubscribeStream?.()
+  if (isStudent.value) void stream.leave(`student:${props.userId}`)
 })
 </script>
 
