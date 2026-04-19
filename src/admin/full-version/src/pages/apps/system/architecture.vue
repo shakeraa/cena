@@ -1,8 +1,15 @@
 <script setup lang="ts">
 import * as d3 from 'd3'
 import { firebaseAuth } from '@/plugins/firebase'
+import { useAdminLiveStream } from '@/composables/useAdminLiveStream'
 
 definePage({ meta: { action: 'read', subject: 'System' } })
+
+// RDY-060 Phase 5b: primary update path is the admin SignalR stream
+// (cena.system.*). The 5-second poll is replaced by a 30-second
+// safety poll — still belt-and-suspenders in case the stream is down,
+// but 6× less request traffic when the stream is up.
+const SAFETY_POLL_INTERVAL_MS = 30_000
 
 const svgRef = ref<SVGSVGElement | null>(null)
 const loading = ref(true)
@@ -674,14 +681,39 @@ const drawExpandedCluster = (g: d3.Selection<SVGGElement, any, any, any>, node: 
 
 let pollInterval: ReturnType<typeof setInterval> | null = null
 
-onMounted(() => {
+// RDY-060 Phase 5b: admin SignalR live stream for cena.system.* events.
+// System-level events (actor-host lifecycle, circuit-breaker trips,
+// DLQ state) fan into the `system` group which SUPER_ADMIN consumes.
+// On receive we refresh the service status map — this is a ~10-node
+// view so a coarse re-check is safe; a finer-grained per-event
+// reducer can follow if we start caring about sub-second latency on
+// individual node transitions.
+const stream = useAdminLiveStream()
+let unsubscribeStream: (() => void) | null = null
+
+function onSystemEvent(env: { subject: string }) {
+  if (env.subject.startsWith('cena.system.'))
+    checkServices()
+}
+
+onMounted(async () => {
   checkServices()
-  // arch-test-allow: setInterval-fast  (RDY-060 Phase 5b pending — architecture.vue migration to cena.system.* stream)
-  pollInterval = setInterval(checkServices, 5000)
+  // 30-second safety poll — covers the WebSocket-down path.
+  pollInterval = setInterval(checkServices, SAFETY_POLL_INTERVAL_MS)
+  try {
+    await stream.connect()
+    await stream.join('system')
+    unsubscribeStream = stream.on(onSystemEvent)
+  }
+  catch (err) {
+    console.warn('[architecture] admin-hub unavailable; 30s poll covers it:', err)
+  }
 })
 
 onUnmounted(() => {
   if (pollInterval) clearInterval(pollInterval)
+  unsubscribeStream?.()
+  void stream.leave('system')
   diagramDrawn = false
 })
 </script>
