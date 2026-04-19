@@ -684,7 +684,13 @@
       "hintStep": {
         "1": "A gentle nudge",
         "2": "Building the idea",
-        "3": "Walking through it"
+        "3": "Walking through it",
+        "4": "The key step",
+        "5": "A worked example"
+      },
+      "hintLadder": {
+        "moreHint": "More help",
+        "previousRungs": "Earlier suggestions"
       },
       "stuckCta": "I'm stuck",
       "explanationLangNote": "Explanation (English)"
