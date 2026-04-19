@@ -18,8 +18,8 @@
 // ProgressIndicatorToggle (blocked by the Vuexy #7367F0 contrast audit).
 //
 // Privacy (ADR-0003 + GDPR Art 9): disability status is a sensitive
-// special-category datum. The profile is session-scoped (lives with the
-// session snapshot, not the persistent student profile) and flows
+// special-category datum. The profile is session-scoped (stored with
+// the session snapshot, not the persistent student profile) and flows
 // through an AccommodationProfileAssignedV1 event so an audit trail
 // exists for parental-consent verification — but never to long-term
 // analytics exports (enforced by an ML-exclusion tag).
