@@ -60,6 +60,15 @@ const BANNED = {
     { pattern: /bagrut\s+prediction/i, reason: "Bagrut prediction label (RDY-071)" },
     { pattern: /grade\s+prediction/i, reason: "grade prediction label (RDY-071)" },
     { pattern: /\d{2,3}\s+on\s+(your|the)\s+bagrut/i, reason: "numeric on-the-Bagrut prediction (RDY-071)" },
+    // RDY-077 (F12): parent time-budget soft-cap UI MUST NOT use FOMO /
+    // scarcity / red-countdown framing. See
+    // docs/design/parent-time-budget-design.md when it ships.
+    { pattern: /only\s+\d+\s+min(ute)?s?\s+left/i, reason: "FOMO countdown on time budget (RDY-077)" },
+    { pattern: /\bout of time\b/i, reason: "scarcity framing on time budget (RDY-077)" },
+    { pattern: /time['']s\s+up/i, reason: "lockout framing on time budget (RDY-077)" },
+    { pattern: /hurry\s+(up|before)/i, reason: "urgency framing (RDY-077)" },
+    { pattern: /don['']t\s+waste/i, reason: "loss-aversion on time budget (RDY-077)" },
+    { pattern: /you\s+must\s+stop\s+now/i, reason: "hard-cap lockout framing (RDY-077)" },
   ],
   ar: [
     { pattern: /سلسلة(?!.*كهرب)/u, reason: "سلسلة as streak (not electrical chain)" },
