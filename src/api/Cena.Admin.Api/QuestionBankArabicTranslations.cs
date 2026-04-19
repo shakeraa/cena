@@ -1,8 +1,10 @@
 // =============================================================================
 // Cena Platform — Arabic Translation Corpus for Seed Questions (RDY-004b)
 //
-// PILOT BATCH — 15 hand-crafted Math questions (3U/4U/5U span) translated
-// into Modern Standard Arabic (MSA) for the Israeli-Arab student cohort.
+// PILOT BATCH — 25 hand-crafted questions translated into Modern Standard
+// Arabic (MSA) for the Israeli-Arab student cohort:
+//   * Batch 1 (2026-04-19): 15 Math questions (3U/4U/5U span)
+//   * Batch 2 (2026-04-19): 10 Physics + Chemistry 5U questions
 // Follows the canonical glossary at config/glossary.json.
 //
 // Provenance:
@@ -206,6 +208,104 @@ public static class QuestionBankArabicTranslations
                 new("B", "5.83", "هذا هو المتوسط"),
                 new("C", "7", "هذا هو المدى"),
                 new("D", "35", "هذا هو المجموع")
+            ),
+
+            // ── Batch 2 (2026-04-19): Physics + Chemistry 5-Units ──────
+            // Terminology follows Palestinian / Israeli-Arab curriculum
+            // conventions (المنهاج الفلسطيني — المعتمد في المدارس العربية
+            // بإسرائيل): الفيزياء / الكيمياء preferred over العلوم الطبيعية;
+            // Latin variable symbols (x, v₀, R, n) stay LTR inside a
+            // Western-Arabic numeric context per the file's rendering
+            // convention (see header comment).
+
+            // ── Physics — Kinematics / Projectile (5 Units) ─────────────
+            ["Projectile at 45\u00B0 with v\u2080=30 m/s. Find the range."] = Draft(
+                "مقذوف أُطلق بزاوية 45\u00B0 وبسرعة ابتدائية v\u2080=30 م/ث. أوجد المدى الأفقي.",
+                new("A", "\u224890 m", null),
+                new("B", "45 m", "قسم الناتج على 2"),
+                new("C", "180 m", "ضاعَف الناتج"),
+                new("D", "30 m", "اعتبر المدى يساوي v\u2080")
+            ),
+
+            // ── Physics — Magnetism (5 Units) ───────────────────────────
+            ["Magnetic force on a 2m wire carrying 5A in 0.3T field at 90\u00B0"] = Draft(
+                "أوجد القوة المغناطيسية المؤثّرة على سلكٍ طوله 2 م يمرّ فيه تيارٌ شدّته 5 A داخل مجالٍ مغناطيسيّ مقداره 0.3 T، وزاوية السلك مع المجال 90\u00B0.",
+                new("A", "3 N", null),
+                new("B", "30 N", "خطأ في تحويل الوحدات"),
+                new("C", "0.3 N", "نسي ضرب الطول"),
+                new("D", "10 N", "استخدم I\u00D7B فقط")
+            ),
+
+            // ── Physics — Waves / Optics (5 Units) ──────────────────────
+            ["Calculate wavelength of light at 6\u00D710\u00B9\u2074 Hz (c=3\u00D710\u2078)"] = Draft(
+                "احسب طول موجة ضوءٍ ترددها 6\u00D710\u00B9\u2074 Hz، علماً بأنّ سرعة الضوء c = 3\u00D710\u2078 م/ث.",
+                new("A", "5\u00D710\u207B\u2077 m", null),
+                new("B", "2\u00D710\u2076 m", "ضرب بدلاً من القسمة"),
+                new("C", "5\u00D710\u2077 m", "أسٌّ خاطئ"),
+                new("D", "1.8\u00D710\u00B2\u00B3 m", "ضرب f\u00D7c")
+            ),
+
+            // ── Physics — Gravitation (5 Units) ─────────────────────────
+            ["Satellite at 400km. Find orbital velocity. (R=6400km, g=10)"] = Draft(
+                "قمرٌ صناعيٌّ يدور حول الأرض على ارتفاع 400 كم. أوجد سرعته المدارية (علماً بأنّ نصف قطر الأرض R = 6400 كم وتسارع الجاذبية g = 10 م/ث\u00B2).",
+                new("A", "\u22487.67 km/s", null),
+                new("B", "\u22483.8 km/s", "نسي الجذر التربيعي"),
+                new("C", "\u224811.2 km/s", "استخدم سرعة الإفلات"),
+                new("D", "\u22480.4 km/s", "استخدم h فقط")
+            ),
+
+            // ── Physics — Gravitation (5 Units) ─────────────────────────
+            ["Calculate acceleration on planet with mass 2M and radius 3R vs Earth"] = Draft(
+                "احسب تسارع الجاذبية على سطح كوكبٍ كتلته 2M ونصف قطره 3R مقارنةً بالأرض (g هي جاذبية الأرض).",
+                new("A", "2g/9", null),
+                new("B", "6g", "ضَرَب الثابتين"),
+                new("C", "2g/3", "نسي تربيع R"),
+                new("D", "g/3", "أهمل تأثير الكتلة")
+            ),
+
+            // ── Physics — Modern Physics (5 Units) ──────────────────────
+            ["De Broglie wavelength of electron at 1.5\u00D710\u2076 m/s"] = Draft(
+                "أوجد طول موجة دي برولي لإلكترونٍ يتحرّك بسرعة 1.5\u00D710\u2076 م/ث.",
+                new("A", "\u22484.85\u00D710\u207B\u00B9\u00B9 m", null),
+                new("B", "\u22481\u00D710\u207B\u00B9\u2070 m", "استخدم كتلةً خاطئة"),
+                new("C", "\u22480.5 m", "نسي ثابت بلانك"),
+                new("D", "\u22481.5\u00D710\u207B\u00B3\u2074 m", "خطأ حسابيّ")
+            ),
+
+            // ── Physics — Optics (5 Units) ──────────────────────────────
+            ["Convex lens focal length from R\u2081=20cm, R\u2082=-30cm (n=1.5)"] = Draft(
+                "عدسةٌ محدّبة نصفا قطريها R\u2081 = 20 سم وR\u2082 = −30 سم ومعامل انكسارها n = 1.5. أوجد بُعدها البؤريّ.",
+                new("A", "24 cm", null),
+                new("B", "12 cm", "اصطلاح إشارة خاطئ"),
+                new("C", "50 cm", "جمع نصفَي القطر"),
+                new("D", "10 cm", "قسم الناتج على 2")
+            ),
+
+            // ── Chemistry — Electrochemistry (5 Units) ──────────────────
+            ["Calculate voltage of a Zn/Cu galvanic cell"] = Draft(
+                "احسب جهد خليةٍ غلفانية مكوّنة من قطبَي الزنك والنحاس (Zn/Cu) في الظروف القياسية.",
+                new("A", "1.10 V", null),
+                new("B", "0.34 V", "استخدم نصف خلية النحاس فقط"),
+                new("C", "-1.10 V", "إشارة خاطئة"),
+                new("D", "0.76 V", "استخدم نصف خلية الزنك فقط")
+            ),
+
+            // ── Chemistry — Organic Chemistry (5 Units) ─────────────────
+            ["Name IUPAC: CH\u2083CH\u2082CH(CH\u2083)CH\u2082OH"] = Draft(
+                "اكتب التسمية النظامية (IUPAC) للمركّب: CH\u2083CH\u2082CH(CH\u2083)CH\u2082OH",
+                new("A", "3-methylbutan-1-ol", null),
+                new("B", "2-methylbutan-4-ol", "ترقيم خاطئ للسلسلة"),
+                new("C", "3-methylbutanol", "نسي موقع مجموعة الهيدروكسيل"),
+                new("D", "isopentanol", "الاسم الشائع، ليس التسمية النظامية")
+            ),
+
+            // ── Chemistry — Solutions (5 Units) ─────────────────────────
+            ["Calculate boiling point elevation of 1m glucose solution (Kb=0.512)"] = Draft(
+                "احسب مقدار الارتفاع في درجة الغليان لمحلولٍ من الجلوكوز تركيزه المولالي 1 mol/kg (علماً بأنّ ثابت الغليان Kb = 0.512).",
+                new("A", "0.512\u00B0C", null),
+                new("B", "1.024\u00B0C", "ضاعَف Kb"),
+                new("C", "0.256\u00B0C", "قسم Kb على 2"),
+                new("D", "5.12\u00B0C", "خطأ في رتبة المقدار")
             ),
         };
 
