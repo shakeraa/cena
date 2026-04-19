@@ -271,6 +271,10 @@ public static class CenaAdminServiceRegistration
         // GET reads the latest assigned profile; PUT appends a new
         // AccommodationProfileAssignedV1 event with consent-doc hash.
         Features.ParentConsole.AccommodationsEndpoints.MapAccommodationsEndpoints(app);
+        // RDY-077 Phase 1B: Parent console time-budget control (soft
+        // cap; no lockout). GET reads, PUT emits
+        // ParentalControlsConfiguredV1.
+        Features.ParentConsole.TimeBudgetEndpoint.MapTimeBudgetEndpoint(app);
         // FIND-pedagogy-008: learning-objective picker (read-only)
         app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();
