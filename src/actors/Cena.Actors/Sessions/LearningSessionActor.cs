@@ -49,6 +49,11 @@ public sealed class LearningSessionActor : IActor
     private int _questionsAttempted;
     private int _questionsCorrect;
     private double _fatigueScore;
+
+    // RDY-057b: concepts the student self-reported as anxious in
+    // onboarding. Used as a tie-breaker signal in ZPD item selection —
+    // never the primary decision. Empty / null = cold-start behaviour.
+    private HashSet<string> _anxiousConceptIds = new(StringComparer.Ordinal);
     private int _consecutiveHighFatigue;
     private readonly Queue<double> _recentAccuracies = new();
     private readonly Queue<double> _recentResponseTimes = new();
@@ -169,6 +174,13 @@ public sealed class LearningSessionActor : IActor
         _startedAt = DateTimeOffset.UtcNow;
         _baselineAccuracy = init.BaselineAccuracy;
         _baselineResponseTimeMs = init.BaselineResponseTimeMs;
+
+        // RDY-057b: copy the anxious-concepts set if the parent actor
+        // passed one. Defensive copy so the caller's collection can
+        // mutate without affecting our session state.
+        _anxiousConceptIds = init.AnxiousConceptIds is null
+            ? new HashSet<string>(StringComparer.Ordinal)
+            : new HashSet<string>(init.AnxiousConceptIds, StringComparer.Ordinal);
 
         _logger.LogInformation(
             "Session {SessionId} started for {StudentId}, subject={Subject}, methodology={Methodology}",
@@ -417,6 +429,7 @@ public sealed class LearningSessionActor : IActor
         // This maximizes information gain per question
         string? bestConcept = null;
         double bestScore = double.MaxValue;
+        bool bestIsAnxious = false;
 
         foreach (var (conceptId, mastery) in req.MasteryMap)
         {
@@ -432,11 +445,35 @@ public sealed class LearningSessionActor : IActor
             if (req.ReviewDueConcepts.Contains(conceptId))
                 zpdScore *= 0.5; // 50% priority boost
 
+            // RDY-057b: anxious-topic penalty — if the student
+            // self-reported as anxious on this concept and there's a
+            // comparably-good alternative, prefer the alternative. We
+            // apply a ~15% ZPD penalty (higher score = less preferred
+            // under `<` comparison below). This is a TIE-BREAKER:
+            // strong ZPD signal beats the penalty, so a genuinely
+            // high-information-gain anxious concept still gets picked.
+            // See ADR-0003 §misconception-scope + RDY-057 spec notes
+            // on affective signal never being the primary driver.
+            var isAnxious = _anxiousConceptIds.Contains(conceptId);
+            if (isAnxious) zpdScore *= 1.15;
+
             if (zpdScore < bestScore)
             {
                 bestScore = zpdScore;
                 bestConcept = conceptId;
+                bestIsAnxious = isAnxious;
             }
+        }
+
+        if (bestConcept is not null && bestIsAnxious)
+        {
+            // Structured log so downstream analytics can compute "how
+            // often does the anxious-signal actually alter selection?"
+            // The log line is structured, not the decision — PII-safe.
+            _logger.LogInformation(
+                "[ANXIOUS_OPENER] session={SessionId} concept={Concept} " +
+                "rationale=faded-worked-example-preferred",
+                _sessionId, bestConcept);
         }
 
         context.Respond(new NextQuestionResponse(
@@ -814,7 +851,15 @@ public sealed class LearningSessionActor : IActor
 public record InitSession(
     string SessionId, string StudentId, string Subject, string Methodology,
     double BaselineAccuracy, double BaselineResponseTimeMs,
-    string? Language = "he");
+    string? Language = "he",
+    // RDY-057b: anxious concepts come from the student's self-assessment.
+    // Passed in at session-init so the opener can bias toward faded
+    // worked-examples for topics the student self-reported as anxious,
+    // without LearningSessionActor reaching across aggregates to load
+    // a document at pick-question time. Null when self-assessment was
+    // skipped or doesn't exist — opener falls back to the cold-start
+    // path.
+    IReadOnlyCollection<string>? AnxiousConceptIds = null);
 
 public record EvaluateAnswerRequest(
     string ConceptId, string QuestionId, string QuestionType,

@@ -498,6 +498,10 @@ public partial class Program
     // RDY-063 Phase 2a: stuck-type diagnostics (admin aggregate reads)
     Cena.Admin.Api.Diagnostics.StuckDiagnosticsEndpoints.MapStuckDiagnosticsEndpoints(app);
 
+    // RDY-057b: teacher classroom-level roll-up over onboarding self-assessment
+    Cena.Admin.Api.SelfAssessmentRollup.SelfAssessmentRollupEndpoints
+        .MapSelfAssessmentRollupEndpoints(app);
+
     // RDY-060: admin SignalR hub + health probe
     app.MapCenaAdminHub();
     
