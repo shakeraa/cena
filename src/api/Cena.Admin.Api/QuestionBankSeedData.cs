@@ -190,6 +190,18 @@ public static class QuestionBankSeedData
                         Variable: null),
                     companionDocuments: new object[] { auditDoc });
                 seeded++;
+
+                // RDY-004b: attach Arabic translation as a LanguageVersionAdded_V1
+                // event when one exists in the AI-draft corpus. The corpus is
+                // stem-keyed; pilot batch is 15 Math questions. Translations
+                // are tagged "ai-draft — pending native-speaker review" via
+                // TranslatedBy so admin analytics + FallbackLanguageService
+                // can filter them out of "approved" counts.
+                if (QuestionBankArabicTranslations.TryGet(q.Stem, out var arabic))
+                {
+                    await AttachArabicLanguageVersionAsync(
+                        store, id, arabic, now, logger);
+                }
             }
             catch (CasVerificationFailedException ex)
             {
@@ -1400,6 +1412,57 @@ public static class QuestionBankSeedData
     };
 
     // ── Helpers ──
+
+    /// <summary>
+    /// RDY-004b: appends a LanguageVersionAdded_V1 event to an existing
+    /// question stream carrying an Arabic translation. Best-effort: if the
+    /// append fails (concurrency, stream-not-found) we log and continue —
+    /// the question still exists in its original language, so no loss of
+    /// seed integrity.
+    /// </summary>
+    private static async Task AttachArabicLanguageVersionAsync(
+        IDocumentStore store,
+        string questionId,
+        ArabicTranslation translation,
+        DateTimeOffset timestamp,
+        ILogger logger)
+    {
+        try
+        {
+            var options = translation.Options.Select(o => new QuestionOptionData(
+                Label: o.Label,
+                Text: o.Text,
+                TextHtml: $"<p>{o.Text}</p>",
+                IsCorrect: o.Label == "A",     // option A is the correct answer in the seed convention
+                DistractorRationale: o.Rationale)).ToList();
+
+            // Only non-null rationales participate; keyed by option label.
+            var rationales = translation.Options
+                .Where(o => !string.IsNullOrWhiteSpace(o.Rationale))
+                .ToDictionary(o => o.Label, o => o.Rationale!);
+
+            var evt = new LanguageVersionAdded_V1(
+                QuestionId: questionId,
+                Language: "ar",
+                Stem: translation.Stem,
+                StemHtml: $"<p>{translation.Stem}</p>",
+                Options: options,
+                Explanation: translation.Explanation,
+                DistractorRationales: rationales.Count > 0 ? rationales : null,
+                TranslatedBy: $"{translation.TranslatedBy}|status={translation.ReviewStatus}",
+                Timestamp: timestamp);
+
+            await using var session = store.LightweightSession();
+            session.Events.Append(questionId, evt);
+            await session.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex,
+                "[RDY-004b] Failed to attach Arabic LanguageVersion for {QuestionId} (non-fatal)",
+                questionId);
+        }
+    }
 
     private static SeedQuestion Q(string stem, string subject, string topic, string grade,
         int bloom, float difficulty, string[] concepts, string language, string source,
