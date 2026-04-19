@@ -26,6 +26,7 @@ using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Observability;
+using Cena.Infrastructure.Observability.ErrorAggregator;
 using Cena.Infrastructure.Moderation;
 using Cena.Infrastructure.Ocr;
 using Cena.Infrastructure.Ocr.DependencyInjection;
@@ -408,7 +409,10 @@ public partial class Program
     
     // FIND-sec-014: Security metrics for observability
     builder.Services.AddSecurityMetrics();
-    
+
+    // RDY-064: Error aggregator scaffold — Null aggregator by default.
+    builder.Services.AddCenaErrorAggregator(builder.Configuration);
+
     // FIND-ux-006b: the student host needs the Firebase Admin SDK wrapper to
     // back the anonymous POST /api/auth/password-reset endpoint. The admin host
     // already registers this as a singleton; mirror that here so the student

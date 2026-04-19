@@ -20,6 +20,7 @@ using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
 using Cena.Infrastructure.Observability;
+using Cena.Infrastructure.Observability.ErrorAggregator;
 using Marten;
 using Microsoft.AspNetCore.RateLimiting;
 using NATS.Client.Core;
@@ -255,7 +256,11 @@ public partial class Program
     
     // FIND-sec-014: Security metrics for observability
     builder.Services.AddSecurityMetrics();
-    
+
+    // RDY-064: Error aggregator scaffold — registers Null aggregator by
+    // default. Switching to Sentry / AppInsights is blocked on the RDY-064 ADR.
+    builder.Services.AddCenaErrorAggregator(builder.Configuration);
+
     // ---- CORS ----
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
         ?? new[] { "http://localhost:5175" };
