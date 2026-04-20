@@ -79,20 +79,108 @@ class Response:
         ).encode("utf-8")
 
 
-def _parse(expr: str) -> sp.Expr:
-    """Parse a SymPy expression using a safe transformation set.
+# ── prr-010: SymPy sandbox hardening (Layer 2) ────────────────────────────
+# This is the SECOND wall of the sandbox. The first wall is SymPyTemplateGuard
+# in the .NET client (src/actors/Cena.Actors/Cas/SymPyTemplateGuard.cs) which
+# screens requests before they reach NATS. We re-apply a matching whitelist
+# here as defense-in-depth — the Python process is the one that would execute
+# a compromised expression, so it must not trust any upstream caller.
+#
+# Rationale (source: AXIS_8_Content_Authoring_Quality_Research.md L92/L98,
+# persona-redteam review 2026-04-20):
+#   * LLM templates are untrusted. A compromised template could contain
+#     `__subclasses__` escape chains, `__import__('os')`, `exec`, `eval`, or
+#     `sympy.printing.preview` (SSRF via LaTeX→PNG external call).
+#   * sympify(..., strict=True) restricts parsing to SymPy-recognised tokens
+#     and a caller-supplied local namespace. We pass an empty locals dict
+#     here so no Python builtins leak in.
+#   * We pre-scan the expression string for a banned-token list that mirrors
+#     the .NET guard so the two walls move together.
 
-    Uses implicit multiplication and standard transformations so `2x` is
-    accepted. Sanitises obvious nasties by refusing expressions containing
-    Python keywords like `import` or `__`.
+# Mirror of SymPyTemplateGuard.BannedTokens. If you add a token here, add it
+# there (and vice versa) — the CI arch test SymPyTemplateGateTest pins the
+# .NET side; this comment is the convention pin for the Python side.
+_BANNED_TOKENS = (
+    "__",
+    "import",
+    "exec",
+    "eval",
+    "compile",
+    "lambda",
+    "open(",
+    "os.",
+    "sys.",
+    "subprocess",
+    "preview(",
+    "printing.preview",
+    "globals(",
+    "locals(",
+    "getattr(",
+    "file(",
+)
+
+_MAX_EXPR_LEN = 2048
+
+
+def _prescreen(expr: str) -> None:
+    """Raise ValueError if the expression contains a banned token.
+
+    Case-sensitive (Python is) and checked against both the raw string and a
+    whitespace-stripped copy to catch spacing-based bypasses like
+    ``__ subclasses __``.
     """
     if not isinstance(expr, str):
         raise ValueError("expression must be a string")
-    dangerous = ("__", "import", "eval", "exec", "lambda ", "open(")
-    low = expr.lower()
-    for token in dangerous:
-        if token in low:
+    if not expr or not expr.strip():
+        raise ValueError("expression is empty or whitespace")
+    if len(expr) > _MAX_EXPR_LEN:
+        raise ValueError(f"expression exceeds max length {_MAX_EXPR_LEN}")
+
+    for token in _BANNED_TOKENS:
+        if token in expr:
             raise ValueError(f"disallowed token in expression: {token!r}")
+
+    # Whitespace-normalised scan.
+    normalised = "".join(c for c in expr if not c.isspace())
+    if normalised != expr:
+        for token in _BANNED_TOKENS:
+            if token in normalised:
+                raise ValueError(
+                    f"disallowed token after whitespace normalisation: {token!r}"
+                )
+
+
+# Block sympy.printing.preview at import time — it is the primary SSRF
+# primitive (LaTeX → PNG via external latex+convert invocation) and no
+# correctness-oracle code path uses it. If the module is already loaded
+# (SymPy imports lazily), we monkey-patch the function to raise.
+try:
+    import sympy.printing.preview as _preview_mod  # type: ignore[import-not-found]
+
+    def _preview_blocked(*_args, **_kwargs):  # noqa: ANN002, ANN003
+        raise RuntimeError(
+            "sympy.printing.preview is disabled in the CAS sidecar (prr-010 SSRF block)"
+        )
+
+    _preview_mod.preview = _preview_blocked  # type: ignore[attr-defined]
+    # Also clobber the top-level alias if it was re-exported.
+    if hasattr(sp, "preview"):
+        sp.preview = _preview_blocked  # type: ignore[attr-defined]
+except Exception:  # noqa: BLE001 — if the module isn't there, we're already safe
+    pass
+
+
+def _parse(expr: str) -> sp.Expr:
+    """Parse a SymPy expression using a safe transformation set.
+
+    Applies the prr-010 banned-token pre-screen, then uses
+    :func:`sympy.parsing.sympy_parser.parse_expr` with an explicit local
+    namespace (no builtins) and ``evaluate=True``. Implicit multiplication
+    and ``^`` → ``**`` transforms are retained so school-level expressions
+    (``2x``, ``x^2``) still parse.
+    """
+    _prescreen(expr)
+
     from sympy.parsing.sympy_parser import (
         parse_expr,
         standard_transformations,
@@ -104,7 +192,17 @@ def _parse(expr: str) -> sp.Expr:
         implicit_multiplication_application,
         convert_xor,
     )
-    return parse_expr(expr, transformations=transformations, evaluate=True)
+    # Pass an empty local_dict so no host-level names leak into the parse
+    # context. We leave global_dict at its default (SymPy's own namespace)
+    # so legitimate SymPy functions (sin, cos, diff, integrate, solve, ...)
+    # still resolve — the pre-screen above has already rejected dunder
+    # chains, `__import__`, `exec`, `eval`, etc. before we reach here.
+    return parse_expr(
+        expr,
+        transformations=transformations,
+        evaluate=True,
+        local_dict={},
+    )
 
 
 def verify_equivalence(a: str, b: str, variable: str | None) -> Response:

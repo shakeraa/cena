@@ -202,6 +202,8 @@ public partial class Program
     builder.Services.AddSingleton<Cena.Actors.RateLimit.ICostBudgetService,
         Cena.Actors.RateLimit.RedisCostBudgetService>();
     builder.Services.AddSingleton<Cena.Actors.Cas.IMathNetVerifier, Cena.Actors.Cas.MathNetVerifier>();
+    // prr-010: SymPy template guard runs on every CAS request before NATS marshalling.
+    builder.Services.AddSingleton<Cena.Actors.Cas.ISymPyTemplateGuard, Cena.Actors.Cas.SymPyTemplateGuard>();
     builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
     builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
 

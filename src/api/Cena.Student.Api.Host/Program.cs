@@ -298,7 +298,8 @@ public partial class Program
     builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
 
     builder.Services.AddSingleton<Cena.Actors.Cas.IMathNetVerifier, Cena.Actors.Cas.MathNetVerifier>();
-    builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
+    // prr-010: SymPy template guard runs on every CAS request before NATS marshalling.
+    builder.Services.AddSingleton<Cena.Actors.Cas.ISymPyTemplateGuard, Cena.Actors.Cas.SymPyTemplateGuard>(); builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
     builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
 
     builder.Services.AddSingleton<Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcher,

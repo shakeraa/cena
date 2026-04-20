@@ -238,6 +238,8 @@ builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationSe
 // RDY-033 + ADR-0002/0031: CAS stack + CAS-backed error pattern matchers.
 // The CAS router is the sole correctness oracle; misconception matchers go through it.
 builder.Services.AddSingleton<IMathNetVerifier, MathNetVerifier>();
+// prr-010: SymPy template guard runs on every CAS request before NATS marshalling.
+builder.Services.AddSingleton<ISymPyTemplateGuard, SymPyTemplateGuard>();
 builder.Services.AddSingleton<ISymPySidecarClient, SymPySidecarClient>();
 builder.Services.AddSingleton<ICasRouterService, CasRouterService>();
 

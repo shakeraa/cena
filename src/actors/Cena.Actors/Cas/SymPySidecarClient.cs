@@ -26,10 +26,19 @@ public interface ISymPySidecarClient
 /// <summary>
 /// Tier 2 CAS client that sends verification requests to the SymPy sidecar via NATS.
 /// Includes circuit breaker: after N consecutive failures, falls back to MathNet.
+///
+/// prr-010 hardening (2026-04-20): every request is screened by an
+/// <see cref="ISymPyTemplateGuard"/> before it is marshalled to NATS.
+/// Rejected requests never touch the sidecar process — the banned-token list
+/// catches dunder chains, SSRF via <c>printing.preview</c>, and injected
+/// <c>import</c>/<c>exec</c> payloads. The Python sidecar re-applies a
+/// matching whitelist as defense-in-depth (see
+/// <c>docker/sympy-sidecar/sympy_worker.py</c>).
 /// </summary>
 public sealed class SymPySidecarClient : ISymPySidecarClient
 {
     private readonly INatsConnection _nats;
+    private readonly ISymPyTemplateGuard _guard;
     private readonly ILogger<SymPySidecarClient> _logger;
     private const string VerifySubject = "cena.cas.verify.sympy";
     private const string HealthSubject = "cena.cas.health.sympy";
@@ -47,14 +56,35 @@ public sealed class SymPySidecarClient : ISymPySidecarClient
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public SymPySidecarClient(INatsConnection nats, ILogger<SymPySidecarClient> logger)
+    public SymPySidecarClient(
+        INatsConnection nats,
+        ILogger<SymPySidecarClient> logger,
+        ISymPyTemplateGuard? guard = null)
     {
         _nats = nats;
         _logger = logger;
+        _guard = guard ?? new SymPyTemplateGuard();
     }
 
     public async Task<CasVerifyResult> VerifyAsync(CasVerifyRequest request, CancellationToken ct = default)
     {
+        // prr-010: Parse-side guard runs BEFORE NATS marshalling. A rejected
+        // template never reaches the sidecar — this is the first wall of the
+        // sandbox. The sidecar re-applies a matching whitelist as defense-
+        // in-depth, but we short-circuit here for fail-fast behaviour and to
+        // pin a test-friendly seam (SymPySandbox.CanarySuiteTests).
+        var guard = _guard.Screen(request);
+        if (!guard.Allowed)
+        {
+            _logger.LogWarning(
+                "SymPy template rejected at guard (pre-sidecar): {Reason} [token={Token}]",
+                guard.Reason, guard.BannedToken ?? "n/a");
+            return CasVerifyResult.Error(
+                request.Operation, EngineName, 0,
+                $"SymPy template rejected: {guard.Reason}",
+                CasVerifyStatus.Error);
+        }
+
         // Circuit breaker: if open, fail fast
         if (IsCircuitOpen())
         {
