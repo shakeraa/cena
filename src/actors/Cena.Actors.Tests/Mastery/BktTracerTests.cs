@@ -17,9 +17,10 @@ public sealed class BktTracerTests
         var updated = BktTracer.Update(pL, isCorrect: true, DefaultParams);
 
         Assert.True(updated > pL, $"Expected > {pL}, got {updated}");
-        // Worked example: P(L|correct) = 0.95*0.50 / (0.95*0.50 + 0.25*0.50) = 0.7917
-        // P(L_next) = 0.7917 + (1-0.7917)*0.20 = 0.8333
-        Assert.InRange(updated, 0.82f, 0.84f);
+        // Updated 2026-04-20 per ADR-0039 (Koedinger defaults pLearn=0.15, pSlip=0.10, pGuess=0.15).
+        // Worked example: P(L|correct) = 0.90*0.50 / (0.90*0.50 + 0.15*0.50) = 0.8571
+        // P(L_next) = 0.8571 + (1-0.8571)*0.15 = 0.8786
+        Assert.InRange(updated, 0.87f, 0.89f);
     }
 
     [Fact]

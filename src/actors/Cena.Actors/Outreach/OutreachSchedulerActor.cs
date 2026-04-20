@@ -8,6 +8,7 @@ using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
 using Proto;
 using Cena.Actors.Services;
+using Cena.Infrastructure.Time;
 using System.Diagnostics;
 
 namespace Cena.Actors.Outreach;
@@ -26,17 +27,7 @@ public sealed class OutreachSchedulerActor : IActor
     private const int MaxMessagesPerDay = 3;
 
     // ── Quiet Hours (Israel time: UTC+2 or UTC+3 depending on DST) ──
-    private static readonly TimeZoneInfo IsraelTz = ResolveIsraelTimeZone();
-
-    private static TimeZoneInfo ResolveIsraelTimeZone()
-    {
-        // Linux/macOS use IANA IDs; Windows uses "Israel"
-        try { return TimeZoneInfo.FindSystemTimeZoneById("Asia/Jerusalem"); }
-        catch (TimeZoneNotFoundException)
-        {
-            return TimeZoneInfo.FindSystemTimeZoneById("Israel");
-        }
-    }
+    // prr-157: TZ resolution lives in IsraelTimeZoneResolver (shared utility).
     private const int QuietHourStart = 22; // 10 PM
     private const int QuietHourEnd = 7;     // 7 AM
 
@@ -272,7 +263,7 @@ public sealed class OutreachSchedulerActor : IActor
 
     private bool IsQuietHours()
     {
-        var israelNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, IsraelTz);
+        var israelNow = IsraelTimeZoneResolver.ConvertFromUtc(DateTimeOffset.UtcNow);
         var hour = israelNow.Hour;
         return hour >= QuietHourStart || hour < QuietHourEnd;
     }
@@ -280,9 +271,9 @@ public sealed class OutreachSchedulerActor : IActor
     // ACT-032: Use Israel timezone for daily throttle reset, matching quiet hours
     private void ResetDailyThrottleIfNeeded()
     {
-        var israelNow = TimeZoneInfo.ConvertTime(DateTimeOffset.UtcNow, IsraelTz);
+        var israelNow = IsraelTimeZoneResolver.ConvertFromUtc(DateTimeOffset.UtcNow);
         var today = israelNow.Date;
-        if (TimeZoneInfo.ConvertTime(_lastResetDate, IsraelTz).Date != today)
+        if (IsraelTimeZoneResolver.ConvertFromUtc(_lastResetDate).Date != today)
         {
             _messagesSentToday = 0;
             _lastResetDate = DateTimeOffset.UtcNow;

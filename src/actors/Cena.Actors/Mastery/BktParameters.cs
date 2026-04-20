@@ -1,6 +1,7 @@
 // =============================================================================
-// Cena Platform -- BKT Parameters
-// MST-002: Bayesian Knowledge Tracing parameter set per knowledge component
+// BktParameters — parameter policy per ADR-0039 (Koedinger defaults).
+// Per-student parameter learning is forbidden. Changes require new ADR.
+// Enforced by `BktParametersLockedTest` in Cena.Actors.Tests/Architecture/.
 // =============================================================================
 
 namespace Cena.Actors.Mastery;
@@ -12,8 +13,26 @@ namespace Cena.Actors.Mastery;
 /// </summary>
 public readonly record struct BktParameters(float P_L0, float P_T, float P_S, float P_G)
 {
-    /// <summary>Default parameters for launch (before trainer calibrates).</summary>
-    public static readonly BktParameters Default = new(P_L0: 0.10f, P_T: 0.20f, P_S: 0.05f, P_G: 0.25f);
+    // Per ADR-0039 — locked Koedinger literature defaults. Any change requires a new ADR.
+    /// <summary>Initial mastery probability at first exposure (Koedinger default).</summary>
+    public const double PInit = 0.3;
+
+    /// <summary>Probability of transitioning unmastered → mastered per correct attempt (Koedinger default).</summary>
+    public const double PLearn = 0.15;
+
+    /// <summary>Probability of incorrect response despite mastery (Koedinger default).</summary>
+    public const double PSlip = 0.10;
+
+    /// <summary>Probability of correct response without mastery (Koedinger default).</summary>
+    public const double PGuess = 0.15;
+
+    // Per ADR-0039 — Default uses the locked Koedinger constants above (cast to float for struct storage).
+    /// <summary>Default parameters locked to Koedinger literature defaults per ADR-0039.</summary>
+    public static readonly BktParameters Default = new(
+        P_L0: (float)PInit,
+        P_T: (float)PLearn,
+        P_S: (float)PSlip,
+        P_G: (float)PGuess);
 
     /// <summary>
     /// Validates identifiability constraint: P_S + P_G must be less than 1.

@@ -355,8 +355,7 @@ public sealed partial class StudentActor
 
             var sessionId = Guid.CreateVersion7().ToString();
             var startingConceptId = cmd.ConceptId ?? SelectNextConcept();
-            var methodology = _state.MethodologyMap.GetValueOrDefault(
-                startingConceptId, Methodology.Socratic);
+            var methodology = _state.MethodologyMap.GetValueOrDefault(startingConceptId, Methodology.Socratic);
 
             // Persist session started event
             var @event = new SessionStarted_V1(
@@ -368,6 +367,8 @@ public sealed partial class StudentActor
             StageEvent(@event);
             await FlushEvents();
             _state.Apply(@event);
+            // EPIC-PRR-A Sprint 1 (ADR-0012): shadow-write V2 to session-{id} stream. Best-effort, V1 above is source of truth.
+            await _learningSessionShadowWriter.AppendSessionStartedAsync(@event);
 
             // ACT-020: Reset session-level stagnation accumulators
             ResetSessionAccumulators();

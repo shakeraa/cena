@@ -12,11 +12,13 @@ namespace Cena.Actors.Services;
 /// </summary>
 public sealed class SubjectBktParams
 {
-    public double PLearning { get; set; } = 0.10;
-    public double PSlip { get; set; } = 0.05;
-    public double PGuess { get; set; } = 0.20;
+    // Defaults updated 2026-04-20 per ADR-0039 (Koedinger literature defaults).
+    // Must match BktParameters.Default in BktService.cs.
+    public double PLearning { get; set; } = 0.15;
+    public double PSlip { get; set; } = 0.10;
+    public double PGuess { get; set; } = 0.15;
     public double PForget { get; set; } = 0.02;
-    public double PInitial { get; set; } = 0.10;
+    public double PInitial { get; set; } = 0.30;
 
     /// <summary>
     /// Convert to the immutable <see cref="BktParameters"/> struct used by

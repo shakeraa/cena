@@ -22,17 +22,19 @@ public readonly record struct BktParameters(
     double PrerequisiteGateThreshold
 )
 {
+    // Per ADR-0039 — BKT parameters locked to Koedinger literature defaults.
+    // Per-student parameter learning is forbidden; any change requires a new ADR.
+    // PForget=0.02 reflects slow forgetting during active learning; spaced repetition
+    // (HLR) handles longer-term decay separately and is orthogonal to the BKT constants.
     /// <summary>
-    /// Default BKT parameters calibrated for K-12 adaptive math.
-    /// PForget=0.02 reflects slow forgetting during active learning;
-    /// spaced repetition (HLR) handles longer-term decay separately.
+    /// Default BKT parameters per ADR-0039 (Koedinger defaults).
     /// </summary>
     public static BktParameters Default => new(
-        PLearning: 0.10,
-        PSlip: 0.05,
-        PGuess: 0.20,
+        PLearning: 0.15,
+        PSlip: 0.10,
+        PGuess: 0.15,
         PForget: 0.02,
-        PInitial: 0.10,
+        PInitial: 0.30,
         ProgressionThreshold: MasteryConstants.ProgressionThreshold,
         PrerequisiteGateThreshold: MasteryConstants.PrerequisiteGateThreshold
     );

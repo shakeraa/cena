@@ -5,6 +5,7 @@
 
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Cena.Infrastructure.Time;
 
 namespace Cena.Actors.Notifications;
 
@@ -56,8 +57,8 @@ public sealed class PushNotificationTriggerService : BackgroundService
     {
         var now = DateTimeOffset.UtcNow;
 
-        // Weekly summary: Sunday 08:00 Israel time
-        var ilTime = TimeZoneInfo.ConvertTimeBySystemTimeZoneId(now, "Israel Standard Time");
+        // Weekly summary: Sunday 08:00 Israel time (prr-157: cross-platform resolver)
+        var ilTime = IsraelTimeZoneResolver.ConvertFromUtc(now);
         if (ilTime.DayOfWeek == DayOfWeek.Sunday && ilTime.Hour == 8 && ilTime.Minute < 5)
         {
             await SendWeeklySummariesAsync(ct);

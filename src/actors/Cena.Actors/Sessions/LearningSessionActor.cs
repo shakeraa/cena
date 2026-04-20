@@ -944,7 +944,9 @@ public record PersonalizedExplanationResponse(
     int OutputTokens);
 
 /// <summary>Wrapper for events delegated from child actors to parent StudentActor.</summary>
-public record DelegateEvent(Events.IDelegatedEvent Event);
+// Fully-qualify to avoid collision with the sibling Cena.Actors.Sessions.Events
+// sub-namespace that contains per-session event types (e.g. SessionStarted_V2).
+public record DelegateEvent(Cena.Actors.Events.IDelegatedEvent Event);
 
 // ── Task 07 stubs (TutorActor entry points) ──
 

@@ -270,6 +270,8 @@ builder.Services.AddSingleton<Func<TutorActor>>(sp => () => sp.GetRequiredServic
 
 // ACT-010: Session event publisher — per-student NATS subjects for SignalR bridge
 builder.Services.AddSingleton<Cena.Actors.Sessions.ISessionEventPublisher, Cena.Actors.Sessions.SessionNatsPublisher>();
+// EPIC-PRR-A Sprint 1 (ADR-0012): LearningSession shadow-write (V2 → session-{id}); flag CENA_LEARNING_SESSION_SHADOW_WRITE.
+builder.Services.AddSingleton<Cena.Actors.Sessions.Shadow.ILearningSessionShadowWriter, Cena.Actors.Sessions.Shadow.LearningSessionShadowWriter>();
 
 // NATS Bus Router: bridges NATS commands ↔ Proto.Actor virtual actors
 builder.Services.AddSingleton<Cena.Actors.Bus.NatsBusRouter>();
@@ -487,9 +489,8 @@ builder.Services.AddSingleton(provider =>
         ? (IIdentityLookup)new Proto.Cluster.PartitionActivator.PartitionActivatorLookup()
         : new PartitionIdentityLookup();
 
-    // Register Virtual Actor Kinds (Grains)
-    var studentKind = new ClusterKind("student", Props.FromProducer(() =>
-        ActivatorUtilities.CreateInstance<StudentActor>(provider)));
+    // Register Virtual Actor Kinds (Grains) — EPIC-PRR-A Sprint 1 (ADR-0012): shadow writer attached post-construction.
+    var studentKind = new ClusterKind("student", Props.FromProducer(() => ActivatorUtilities.CreateInstance<StudentActor>(provider).UseLearningSessionShadowWriter(provider.GetRequiredService<Cena.Actors.Sessions.Shadow.ILearningSessionShadowWriter>())));
 
     // Cluster Configuration
     var clusterConfig = ClusterConfig

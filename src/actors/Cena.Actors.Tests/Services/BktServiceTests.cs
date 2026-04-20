@@ -185,13 +185,15 @@ public sealed class BktServiceTests
     {
         var p = BktParameters.Default;
 
-        // These are the canonical values. If someone changes them,
-        // the inline BKT fallback (which hardcodes its own) will diverge further.
-        Assert.Equal(0.10, p.PLearning);
-        Assert.Equal(0.05, p.PSlip);
-        Assert.Equal(0.20, p.PGuess);
+        // Updated 2026-04-20 per ADR-0039 (Koedinger literature defaults).
+        // If someone changes them, they must also update ADR-0039 + the
+        // inline BKT fallback in StudentActor.Commands.cs + BktCalibrationOptions
+        // defaults to match.
+        Assert.Equal(0.15, p.PLearning);
+        Assert.Equal(0.10, p.PSlip);
+        Assert.Equal(0.15, p.PGuess);
         Assert.Equal(0.02, p.PForget);
-        Assert.Equal(0.10, p.PInitial);
+        Assert.Equal(0.30, p.PInitial);
         Assert.Equal(0.85, p.ProgressionThreshold);
         Assert.Equal(0.95, p.PrerequisiteGateThreshold);
     }
