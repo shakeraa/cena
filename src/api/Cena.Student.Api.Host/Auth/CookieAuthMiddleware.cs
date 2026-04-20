@@ -1,13 +1,18 @@
 // =============================================================================
 // Cena Platform — Cookie Auth Middleware (prr-011)
 //
-// Reads the httpOnly `cena_session` cookie, validates the server-minted JWT
+// Reads the httpOnly `__Host-cena_session` cookie (or legacy `cena_session`
+// during the Phase 1A→1B rollout window), validates the server-minted JWT
 // signature + lifetime + revocation, and — if all three pass — populates
-// HttpContext.User with the subject claim. Runs AFTER the standard
-// UseAuthentication() call so it is additive: endpoints that still present
-// Authorization: Bearer (Firebase ID tokens) during the migration window are
-// authenticated by the JwtBearer scheme; endpoints presenting the cookie are
-// authenticated here. Post-cutover the Firebase Bearer path is removed.
+// HttpContext.User with the subject claim.
+//
+// WHY: cookie runs AFTER UseAuthentication() (Firebase bearer) during the
+// transition window. If a request arrives with BOTH a Firebase bearer AND
+// a cookie, the bearer-scheme principal takes precedence and this
+// middleware becomes a no-op. This is correct for the Phase 1B backend:
+// once the Vue SPA migration (sibling task prr-011f) lands, the bearer
+// path shrinks to just the exchange endpoint, and this middleware becomes
+// the sole authoritative source. See ADR-0046 §3.
 //
 // This middleware short-circuits on:
 //   • Missing cookie  → no user attached, pipeline continues so
@@ -66,7 +71,13 @@ public sealed class CookieAuthMiddleware
             return;
         }
 
-        if (!context.Request.Cookies.TryGetValue(SessionExchangeEndpoint.CookieName, out var sessionJwt)
+        // WHY: try the new __Host- name first, then fall back to the legacy
+        // name for in-flight Phase 1A cookies during the rollout window.
+        // Once the rollout window closes, the legacy read is removed by
+        // prr-011i. Do NOT reverse the order — we want new-name clients to
+        // skip the legacy lookup entirely.
+        if (!(context.Request.Cookies.TryGetValue(SessionExchangeEndpoint.CookieName, out var sessionJwt)
+              || context.Request.Cookies.TryGetValue(SessionExchangeEndpoint.LegacyCookieName, out sessionJwt))
             || string.IsNullOrWhiteSpace(sessionJwt))
         {
             await _next(context).ConfigureAwait(false);
