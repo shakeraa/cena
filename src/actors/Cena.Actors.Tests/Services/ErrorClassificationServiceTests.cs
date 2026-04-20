@@ -5,6 +5,7 @@
 
 using Cena.Actors.Gateway;
 using Cena.Actors.Services;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -24,7 +25,7 @@ public sealed class ErrorClassificationServiceTests
     public ErrorClassificationServiceTests()
     {
         _meterFactory = new ClassificationMeterFactory();
-        _service = new ErrorClassificationService(_llm, _logger, _meterFactory);
+        _service = new ErrorClassificationService(_llm, _logger, _meterFactory, NullLlmCostMetric.Instance);
     }
 
     // =========================================================================

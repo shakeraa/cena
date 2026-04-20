@@ -21,6 +21,7 @@ using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
+using Cena.Infrastructure.Llm;
 using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Observability.ErrorAggregator;
 using Marten;
@@ -248,6 +249,12 @@ public partial class Program
     //     Cena.Actors.Cas.CasRouterLatexValidator>();
 
     builder.Services.AddCenaAdminServices();
+
+    // prr-046: per-feature LLM cost metric (fail-loud pricing from routing-config.yaml).
+    // AiGenerationService + QualityGateService + AiFigureGenerator depend on ILlmCostMetric.
+    builder.Services.AddLlmCostMetric(Path.Combine(
+        builder.Environment.ContentRootPath,
+        Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
 
     // RDY-063 Phase 2a: stuck-type classifier services (for admin
     // diagnostics read endpoints). Behaviour-gated by

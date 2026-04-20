@@ -49,7 +49,11 @@ public static class CenaAdminServiceRegistration
             new QualityGate.QualityGateService(
                 configuration: sp.GetRequiredService<IConfiguration>(),
                 logger: sp.GetRequiredService<ILogger<QualityGate.QualityGateService>>(),
-                store: sp.GetService<Marten.IDocumentStore>()));
+                store: sp.GetService<Marten.IDocumentStore>(),
+                // prr-046: per-feature cost metric is registered by the host's
+                // AddLlmCostMetric() call; nullable so unit tests can construct
+                // the service without a DI container.
+                featureCost: sp.GetService<Cena.Infrastructure.Llm.ILlmCostMetric>()));
 
         // RDY-034 / ADR-0002: CAS ingestion gate services.
         // - MathContentDetector: boundary probe for question bodies.

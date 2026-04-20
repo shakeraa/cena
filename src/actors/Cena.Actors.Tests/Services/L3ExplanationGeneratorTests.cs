@@ -6,6 +6,7 @@
 using Cena.Actors.Gateway;
 using Cena.Actors.Mastery;
 using Cena.Actors.Services;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 
@@ -19,7 +20,7 @@ public sealed class L3ExplanationGeneratorTests
     public L3ExplanationGeneratorTests()
     {
         _generator = new L3ExplanationGenerator(
-            _llm, NullLogger<L3ExplanationGenerator>.Instance);
+            _llm, NullLogger<L3ExplanationGenerator>.Instance, NullLlmCostMetric.Instance);
     }
 
     // =========================================================================

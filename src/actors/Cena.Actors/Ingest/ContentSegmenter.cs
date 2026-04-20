@@ -33,12 +33,15 @@ public interface IContentSegmenter
 // response-level cache would be ~0% hits. The ingest pipeline itself
 // deduplicates on content hash before reaching this service, so the same
 // page is never segmented twice.
+// prr-046: finops cost-center "content-segmentation". Batch ingest path.
 [TaskRouting("tier3", "knowledge_graph_extraction")]
+[FeatureTag("content-segmentation")]
 [AllowsUncachedLlm("Unique per OCR'd page; upstream ingest pipeline dedupes on content hash so the same page is never segmented twice.")]
 public sealed class ContentSegmenter : IContentSegmenter
 {
     private readonly ILlmClient _llm;
     private readonly ILogger<ContentSegmenter> _logger;
+    private readonly ILlmCostMetric _costMetric;
 
     private const float MinConfidence = 0.5f;
 
@@ -75,10 +78,14 @@ public sealed class ContentSegmenter : IContentSegmenter
         ]
         """;
 
-    public ContentSegmenter(ILlmClient llm, ILogger<ContentSegmenter> logger)
+    public ContentSegmenter(
+        ILlmClient llm,
+        ILogger<ContentSegmenter> logger,
+        ILlmCostMetric costMetric)
     {
         _llm = llm;
         _logger = logger;
+        _costMetric = costMetric;
     }
 
     public async Task<IReadOnlyList<ContentDocument>> SegmentAsync(
@@ -109,6 +116,15 @@ public sealed class ContentSegmenter : IContentSegmenter
                 UserPrompt: userPrompt,
                 MaxTokens: 4096,
                 Temperature: 0.1f), ct);
+
+            // prr-046: per-feature cost tag on success path.
+            _costMetric.Record(
+                feature: "content-segmentation",
+                tier: "tier3",
+                task: "knowledge_graph_extraction",
+                modelId: response.ModelId,
+                inputTokens: response.InputTokens,
+                outputTokens: response.OutputTokens);
 
             var segments = ParseSegments(response.Content);
             var now = DateTimeOffset.UtcNow;

@@ -62,17 +62,26 @@ public interface IExplanationGenerator
 // orchestrator) are responsible for the IExplanationCacheService lookup BEFORE
 // invoking this service, so the cache guard lives at the call site, not here.
 // Downstream we still cache the output back into L2 Redis via the orchestrator.
+// prr-046: finops cost-center "explanation-l2". Shares the `full_explanation`
+// routing row with L3ExplanationGenerator but bills separately so finops can
+// see the L2/L3 split in the cost-projection dashboard.
 [TaskRouting("tier3", "full_explanation")]
+[FeatureTag("explanation-l2")]
 [AllowsUncachedLlm("Caller performs IExplanationCacheService.GetAsync before invoking this generator; result is cached by the orchestrator on success.")]
 public sealed class ExplanationGenerator : IExplanationGenerator
 {
     private readonly ILlmClient _llm;
     private readonly ILogger<ExplanationGenerator> _logger;
+    private readonly ILlmCostMetric _costMetric;
 
-    public ExplanationGenerator(ILlmClient llm, ILogger<ExplanationGenerator> logger)
+    public ExplanationGenerator(
+        ILlmClient llm,
+        ILogger<ExplanationGenerator> logger,
+        ILlmCostMetric costMetric)
     {
         _llm = llm;
         _logger = logger;
+        _costMetric = costMetric;
     }
 
     public async Task<GeneratedExplanation> GenerateAsync(ExplanationContext context, CancellationToken ct)
@@ -93,6 +102,15 @@ public sealed class ExplanationGenerator : IExplanationGenerator
             context.ErrorType, context.Methodology, context.Language);
 
         var response = await _llm.CompleteAsync(request, ct);
+
+        // prr-046: per-feature cost tag on success path.
+        _costMetric.Record(
+            feature: "explanation-l2",
+            tier: "tier3",
+            task: "full_explanation",
+            modelId: response.ModelId,
+            inputTokens: response.InputTokens,
+            outputTokens: response.OutputTokens);
 
         return new GeneratedExplanation(response.Content, response.ModelId, response.OutputTokens);
     }

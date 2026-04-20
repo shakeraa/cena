@@ -369,6 +369,40 @@ cost_caps:
 
 
 # ─────────────────────────────────────────────────────────────────────
+# 4B. PER-FEATURE MONTHLY SPEND CEILINGS (prr-046)
+# ─────────────────────────────────────────────────────────────────────
+#
+# Cost-center ceilings for every feature emitted by [FeatureTag]. The
+# projected-monthly-spend alert (deploy/observability/alerting-rules.yaml
+# → CenaLlmFeatureProjectedMonthlySpendOverCeiling) fires when the rolling
+# 7-day spend × (30/7) exceeds the ceiling below. A missing entry fires an
+# operator alert so phantom features cannot silently spend.
+#
+# TODO(product/finops): Numbers below are deliberate placeholders, sized
+#   as globalMonthlyCap ($30k) split by the pre-launch feature-mix
+#   estimate from the 2026-04-20 finops review. Product + finops MUST
+#   replace these with real per-feature budgets before general
+#   availability. The ceilings are not enforced by the circuit breaker
+#   (ADR-0026 §6 does that at per-student / per-global tier); they govern
+#   the cost-drift alert only.
+# ─────────────────────────────────────────────────────────────────────
+
+feature_monthly_ceiling_usd:
+  socratic:              12000.00   # TODO(product): real Socratic volume projection
+  hint-l1:                  10.00   # TODO(product): template-only path; any LLM call is a regression
+  hint-l2:                 500.00   # TODO(product): Haiku @ <150 tokens × hint-ladder volume
+  hint-l3:                2000.00   # TODO(product): Sonnet @ 500 tokens × hint-ladder volume
+  explanation-l2:         3000.00   # TODO(product): Sonnet @ 512 tokens × non-personalised fallback volume
+  explanation-l3:         5000.00   # TODO(product): Sonnet @ 512 tokens × personalised volume
+  classification:          300.00   # TODO(product): Haiku/Kimi @ 200 tokens × every-wrong-answer volume
+  question-generation:    2500.00   # TODO(product): Sonnet @ 4096 tokens × admin-initiated volume
+  quality-gate:            500.00   # TODO(product): Haiku @ 1024 tokens × every-generated-question volume
+  figure-generation:       800.00   # TODO(product): Kimi/Sonnet @ 1500 tokens × diagram volume
+  content-segmentation:    600.00   # TODO(product): Kimi @ 4096 tokens × batch-ingest volume
+  stuck-classification:    400.00   # TODO(product): Sonnet @ classification volume
+
+
+# ─────────────────────────────────────────────────────────────────────
 # 5. CIRCUIT BREAKER CONFIGURATION
 # ─────────────────────────────────────────────────────────────────────
 
@@ -571,6 +605,21 @@ observability:
     - name: "llm_cost_usd"
       type: "counter"
       labels: ["model_id", "task_type", "student_id_hash"]
+
+    # prr-046: canonical per-feature cost counter. Emitted by
+    # Cena.Infrastructure.Llm.LlmCostMetric on every success-path LLM call
+    # in a class carrying [TaskRouting]. Powers
+    # deploy/observability/dashboards/llm-cost-projection.json and the
+    # CenaLlmFeatureProjectedMonthlySpendOverCeiling alert.
+    - name: "cena_llm_call_cost_usd_total"
+      type: "counter"
+      labels: ["feature", "tier", "task", "institute_id", "model_id"]
+
+    # prr-046: per-call cost distribution, same labels as the counter.
+    - name: "cena_llm_call_cost_usd"
+      type: "histogram"
+      labels: ["feature", "tier", "task", "institute_id", "model_id"]
+      buckets: [0.0001, 0.001, 0.003, 0.01, 0.03, 0.1, 0.3, 1.0]
 
     - name: "llm_cache_hits_total"
       type: "counter"

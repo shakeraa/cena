@@ -220,7 +220,11 @@ public interface IAiGenerationService
 // tokens, Bagrut-curriculum-aligned prompts with ephemeral cache_control on
 // the system block). New routing row: contracts/llm/routing-config.yaml
 // §task_routing.question_generation. Tier 3.
+// prr-046: finops cost-center "question-generation". Legacy per-service
+// llm_cost_usd counter is preserved for backward compat; the canonical
+// cross-feature dashboard uses cena_llm_call_cost_usd_total via ILlmCostMetric.
 [TaskRouting("tier3", "question_generation")]
+[FeatureTag("question-generation")]
 public sealed class AiGenerationService : IAiGenerationService
 {
     private readonly ILogger<AiGenerationService> _logger;
@@ -236,6 +240,8 @@ public sealed class AiGenerationService : IAiGenerationService
     private readonly Histogram<double> _requestDuration;
     private readonly Counter<long> _tokensTotal;
     private readonly Counter<double> _costUsd;
+    // prr-046: canonical per-feature cost counter (cena_llm_call_cost_usd_total).
+    private readonly ILlmCostMetric _featureCost;
 
     // In-process circuit breaker state (mirrors LlmCircuitBreakerActor: Sonnet 3/90s)
     private int _failureCount;
@@ -274,12 +280,14 @@ public sealed class AiGenerationService : IAiGenerationService
         IConfiguration configuration,
         IMeterFactory meterFactory,
         IServiceScopeFactory scopeFactory,
-        ICasGateModeProvider casGateMode)
+        ICasGateModeProvider casGateMode,
+        ILlmCostMetric featureCost)
     {
         _logger = logger;
         _configuration = configuration;
         _scopeFactory = scopeFactory;
         _casGateMode = casGateMode;
+        _featureCost = featureCost;
 
         var meter = meterFactory.Create("Cena.Admin.LlmMetrics", "1.0.0");
         _requestDuration = meter.CreateHistogram<double>(
@@ -736,6 +744,17 @@ public sealed class AiGenerationService : IAiGenerationService
 
         var cost = (inputTokens * CostPerInputMTok + outputTokens * CostPerOutputMTok) / 1_000_000.0;
         _costUsd.Add(cost, modelTag, taskTag);
+
+        // prr-046: canonical per-feature cost counter. Pricing re-resolved
+        // from routing-config.yaml (may differ from local constants above if
+        // YAML has been updated — fail-loud vs. stale constants).
+        _featureCost.Record(
+            feature: "question-generation",
+            tier: "tier3",
+            task: "question_generation",
+            modelId: model,
+            inputTokens: inputTokens,
+            outputTokens: outputTokens);
 
         _logger.LogInformation(
             "LLM call completed: model={Model}, task={Task}, duration={DurationMs}ms, " +

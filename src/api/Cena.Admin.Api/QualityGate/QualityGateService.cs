@@ -31,7 +31,11 @@ public interface IQualityGateService
 // pinned to tier 2 — this evaluator runs on every AI-generated question and
 // must not drift to Sonnet cost. New routing row:
 // contracts/llm/routing-config.yaml §task_routing.quality_gate.
+// prr-046: finops cost-center "quality-gate". Runs on every AI-generated
+// question; cost-center split lets finops verify that Haiku pricing is
+// holding (ceiling is tier-2 per ADR-0045 §2).
 [TaskRouting("tier2", "quality_gate")]
+[FeatureTag("quality-gate")]
 public sealed class QualityGateService : IQualityGateService
 {
     private readonly QualityGateThresholds _thresholds;
@@ -41,6 +45,10 @@ public sealed class QualityGateService : IQualityGateService
     // persisted QuestionCasBinding for math/physics subjects. Optional so
     // existing seed paths and unit tests that don't have Marten still work.
     private readonly IDocumentStore? _store;
+    // prr-046: optional per-feature cost metric. Nullable so existing tests
+    // that construct the service without DI still work; the production path
+    // registers ILlmCostMetric via AddLlmCostMetric() in the host Program.cs.
+    private readonly ILlmCostMetric? _featureCost;
 
     // Lazily created Anthropic client for LLM-based scoring
     private AnthropicClient? _client;
@@ -56,12 +64,14 @@ public sealed class QualityGateService : IQualityGateService
         QualityGateThresholds? thresholds = null,
         IConfiguration? configuration = null,
         ILogger<QualityGateService>? logger = null,
-        IDocumentStore? store = null)
+        IDocumentStore? store = null,
+        ILlmCostMetric? featureCost = null)
     {
         _thresholds = thresholds ?? QualityGateThresholds.Default;
         _configuration = configuration;
         _logger = logger;
         _store = store;
+        _featureCost = featureCost;
     }
 
     public async Task<QualityGateResult> EvaluateAsync(QualityGateInput input)
@@ -219,6 +229,18 @@ public sealed class QualityGateService : IQualityGateService
                 Tools = new List<ToolUnion> { tool },
                 ToolChoice = new ToolChoiceTool { Name = "score_question" },
             });
+
+            // prr-046: per-feature cost tag on success path. Feature tag
+            // "quality-gate" is deliberately pinned to tier-2 (Haiku) per
+            // ADR-0045 §2 — the cost dashboard surfaces drift if the
+            // evaluator silently migrates to Sonnet.
+            _featureCost?.Record(
+                feature: "quality-gate",
+                tier: "tier2",
+                task: "quality_gate",
+                modelId: "claude-haiku-4-5-20260101",
+                inputTokens: response.Usage?.InputTokens ?? 0,
+                outputTokens: response.Usage?.OutputTokens ?? 0);
 
             foreach (var block in response.Content)
             {

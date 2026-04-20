@@ -28,12 +28,15 @@ namespace Cena.Actors.Diagnosis;
 // StuckContext JSON. Matches the tier-2 (Haiku) pattern per
 // contracts/llm/routing-config.yaml §2 (task_routing.stagnation_analysis /
 // error_classification family). Low temperature, small max_tokens.
+// prr-046: finops cost-center "stuck-classification". Shadow-mode classifier.
 [TaskRouting("tier2", "stagnation_analysis")]
+[FeatureTag("stuck-classification")]
 public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
 {
     private readonly AnthropicClient _client;
     private readonly StuckClassifierOptions _options;
     private readonly ILogger<ClaudeStuckClassifierLlm> _logger;
+    private readonly ILlmCostMetric? _featureCost;
 
     // Haiku 4.5 typical pricing (USD per 1M tokens). Kept local rather
     // than in config so we can reason about cost at compile time; update
@@ -50,11 +53,13 @@ public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
     public ClaudeStuckClassifierLlm(
         AnthropicClient client,
         IOptions<StuckClassifierOptions> options,
-        ILogger<ClaudeStuckClassifierLlm> logger)
+        ILogger<ClaudeStuckClassifierLlm> logger,
+        ILlmCostMetric? featureCost = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _featureCost = featureCost;
     }
 
     public async Task<LlmClassificationResult> ClassifyAsync(
@@ -98,6 +103,17 @@ public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
             var output = (int)(response.Usage?.OutputTokens ?? 0);
             var cost = (input / 1_000_000.0 * HaikuInputPerMillion) +
                        (output / 1_000_000.0 * HaikuOutputPerMillion);
+
+            // prr-046: per-feature cost tag on success path. Model_id from
+            // options so the label reflects reality even if the config is
+            // swapped mid-deploy.
+            _featureCost?.Record(
+                feature: "stuck-classification",
+                tier: "tier2",
+                task: "stagnation_analysis",
+                modelId: _options.LlmModel,
+                inputTokens: input,
+                outputTokens: output);
 
             return parsed with
             {

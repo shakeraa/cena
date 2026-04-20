@@ -1,0 +1,261 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Cena LLM cost projection per feature (prr-046 / ADR-0026 §7). Tracks rolling 7-day spend per feature, 30-day projected spend, top-10 institutes by spend, and tier mix over time. Source metric: cena_llm_call_cost_usd_total{feature,tier,task,institute_id,model_id}.",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "tags": ["cena", "llm", "cost", "finops", "prr-046"],
+  "timezone": "browser",
+  "title": "Cena — LLM Cost Projection (per feature)",
+  "uid": "cena-llm-cost-projection",
+  "schemaVersion": 38,
+  "version": 1,
+  "time": { "from": "now-7d", "to": "now" },
+  "refresh": "5m",
+  "templating": {
+    "list": [
+      {
+        "name": "institute",
+        "label": "Institute",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(cena_llm_call_cost_usd_total, institute_id)",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 2
+      },
+      {
+        "name": "feature",
+        "label": "Feature",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(cena_llm_call_cost_usd_total, feature)",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 2
+      },
+      {
+        "name": "tier",
+        "label": "Tier",
+        "type": "custom",
+        "query": "tier1,tier2,tier3",
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Rolling 7-day spend — total (USD)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 0 },
+      "description": "Sum of cost emitted over the past 7 days. Compare to $30k/month global cap (ADR-0026 §6): the 7-day rolling figure should sit at roughly 7/30 of the monthly cap target.",
+      "targets": [
+        {
+          "expr": "sum(increase(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[7d]))",
+          "legendFormat": "7d spend",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 3500 },
+              { "color": "red", "value": 7000 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name",
+        "colorMode": "background"
+      }
+    },
+    {
+      "title": "Projected monthly spend — total (USD)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 0 },
+      "description": "7-day spend × (30/7). If this exceeds the configured per-feature ceiling, the CenaLlmFeatureProjectedMonthlySpendOverCeiling alert fires.",
+      "targets": [
+        {
+          "expr": "sum(increase(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[7d])) * 30/7",
+          "legendFormat": "projected 30d",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "orange", "value": 20000 },
+              { "color": "red", "value": 30000 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name",
+        "colorMode": "background"
+      }
+    },
+    {
+      "title": "Live cost rate (USD / hr)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[5m])) * 3600",
+          "legendFormat": "USD/hr",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD", "decimals": 2 }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "title": "Calls / sec (success rate)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 0 },
+      "description": "Volume sanity: cost over $0 with zero calls means the counter's labels drifted.",
+      "targets": [
+        {
+          "expr": "sum(rate(cena_llm_call_cost_usd_count{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[5m]))",
+          "legendFormat": "calls/s",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "reqps", "decimals": 2 }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name"
+      }
+    },
+    {
+      "title": "7-day rolling spend per feature (USD)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 6 },
+      "description": "Time-series of 7-day rolling spend per feature. A steep rise on a single feature is the first symptom of silent Sonnet drift (ADR-0026 §Context).",
+      "targets": [
+        {
+          "expr": "sum by (feature) (increase(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[7d]))",
+          "legendFormat": "{{feature}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 15 }
+        }
+      }
+    },
+    {
+      "title": "Projected monthly spend per feature (USD)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 6 },
+      "description": "Per-feature projection: 7d rolling × 30/7. Configure per-feature ceilings in contracts/llm/routing-config.yaml §feature_monthly_ceiling_usd.",
+      "targets": [
+        {
+          "expr": "sum by (feature) (increase(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[7d])) * 30/7",
+          "legendFormat": "{{feature}} projected",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "decimals": 2,
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "Top 10 institutes by 7-day spend (USD)",
+      "type": "bargauge",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 16 },
+      "description": "Highest-spending institutes over the past 7 days. \"unknown\" bucket catches calls from services that have not yet threaded institute_id through — closing the gap is tracked under prr-084.",
+      "targets": [
+        {
+          "expr": "topk(10, sum by (institute_id) (increase(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[7d])))",
+          "legendFormat": "{{institute_id}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD", "decimals": 2 }
+      },
+      "options": {
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      }
+    },
+    {
+      "title": "Tier mix over time (% of spend)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 16 },
+      "description": "Share of spend by tier. A shift from tier2 (Haiku) to tier3 (Sonnet) for a feature tagged as tier2 is a silent-drift symptom (ADR-0045 §5).",
+      "targets": [
+        {
+          "expr": "sum by (tier) (rate(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[5m])) / ignoring(tier) group_left sum(rate(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[5m]))",
+          "legendFormat": "{{tier}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "stacking": { "mode": "percent" }, "fillOpacity": 60 }
+        }
+      }
+    },
+    {
+      "title": "Feature × model mix (5m rate)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 26 },
+      "description": "Per-(feature, model_id) rate — surfaces when a tier-2 feature starts landing on a tier-3 model after a routing-config change.",
+      "targets": [
+        {
+          "expr": "sum by (feature, model_id) (rate(cena_llm_call_cost_usd_total{institute_id=~\"$institute\",feature=~\"$feature\",tier=~\"$tier\"}[5m]))",
+          "legendFormat": "{{feature}} — {{model_id}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "cpuCostPerSecond", "decimals": 6 }
+      }
+    }
+  ]
+}

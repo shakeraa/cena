@@ -17,6 +17,7 @@ using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Llm;
 using Cena.Infrastructure.Nats;
 using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Observability.ErrorAggregator;
@@ -231,6 +232,10 @@ builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>
 // INF-019: Redis circuit breaker — protects explanation cache and messaging from Redis outages
 builder.Services.AddSingleton<Cena.Actors.Infrastructure.IRedisCircuitBreaker, Cena.Actors.Infrastructure.RedisCircuitBreaker>();
 builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>().AddSingleton<Cena.Infrastructure.Llm.IPromptCache, Cena.Infrastructure.Llm.RedisPromptCache>(); // prr-047 unified seam
+// prr-046: per-feature cost metric. Pricing loaded fail-loud from routing-config.yaml.
+builder.Services.AddLlmCostMetric(Path.Combine(
+    builder.Environment.ContentRootPath,
+    Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
 builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
 builder.Services.AddSingleton<IL3ExplanationGenerator, L3ExplanationGenerator>();
 builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();

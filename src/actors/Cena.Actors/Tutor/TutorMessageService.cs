@@ -118,7 +118,12 @@ public interface ITutorMessageService
 // ADR-0045: Non-streaming tutor-reply wrapper around ITutorLlmService (Claude
 // Sonnet). Same pedagogical surface as the /stream endpoint; same tier-3.
 // Routing row: contracts/llm/routing-config.yaml §task_routing.socratic_question.
+// prr-046: delegates the LLM call (and the cost-metric emission) to
+// ClaudeTutorLlmService. Emitting here would double-count the same Anthropic
+// call.
 [TaskRouting("tier3", "socratic_question")]
+[FeatureTag("socratic")]
+[DelegatesLlmCost("ClaudeTutorLlmService")]
 public sealed class TutorMessageService : ITutorMessageService
 {
     private readonly ITutorMessageRepository _repository;

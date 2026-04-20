@@ -119,7 +119,11 @@ public interface IPersonalizedExplanationService
 // ADR-0026: L3 personalized explanations are Sonnet-grade (complex reasoning
 // over full student context). Primary model is claude_sonnet_4_6 per
 // contracts/llm/routing-config.yaml §2 (task_routing.answer_evaluation).
+// prr-046: finops cost-center "explanation-l3" — shares the cost-center
+// with L3ExplanationGenerator (both are L3 personalised paths from different
+// orchestrators). Same rationale in ADR-0045 §3 applies.
 [TaskRouting("tier3", "answer_evaluation")]
+[FeatureTag("explanation-l3")]
 public sealed class PersonalizedExplanationService : IPersonalizedExplanationService
 {
     private const string GenericFallback =
@@ -143,18 +147,21 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
     private readonly Counter<long> _generationCounter;
     private readonly Counter<long> _budgetExhaustedCounter;
     private readonly Counter<long> _confusionSuppressedCounter;
+    private readonly ILlmCostMetric _featureCost;
 
     public PersonalizedExplanationService(
         ILlmClient llm,
         IExplanationCacheService cache,
         ILogger<PersonalizedExplanationService> logger,
         IMeterFactory meterFactory,
-        IClock clock)
+        IClock clock,
+        ILlmCostMetric featureCost)
     {
         _llm = llm;
         _cache = cache;
         _logger = logger;
         _clock = clock;
+        _featureCost = featureCost;
 
         var meter = meterFactory.Create("Cena.Actors.PersonalizedExplanation", "1.0.0");
         _latencyHistogram = meter.CreateHistogram<double>(
@@ -249,6 +256,15 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
                 new KeyValuePair<string, object?>("model_id", response.ModelId));
             _generationCounter.Add(1,
                 new KeyValuePair<string, object?>("tier", "L3"));
+
+            // prr-046: per-feature cost tag on success path.
+            _featureCost.Record(
+                feature: "explanation-l3",
+                tier: "tier3",
+                task: "answer_evaluation",
+                modelId: response.ModelId,
+                inputTokens: response.InputTokens,
+                outputTokens: response.OutputTokens);
 
             _logger.LogDebug(
                 "L3 generated for question {QuestionId}, model={ModelId}, tokens={Tokens}, " +

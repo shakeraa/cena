@@ -8,6 +8,7 @@ using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Mastery;
 using Cena.Actors.Services;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
@@ -29,7 +30,8 @@ public sealed class PersonalizedExplanationServiceTests : IDisposable
             _llm, _cache,
             NullLogger<PersonalizedExplanationService>.Instance,
             _meterFactory,
-            _clock);
+            _clock,
+            NullLlmCostMetric.Instance);
 
         // Reset static token tracking between tests
         PersonalizedExplanationService.ResetDailyTokenTracking();

@@ -44,7 +44,13 @@ public interface IAiFigureGenerator
 // ADR-0045: Multi-attempt figure-spec JSON generation with quality-gate retry
 // loop (≤3 attempts). Shares the `diagram_generation` routing row (Kimi K2.5
 // primary, Sonnet fallback) in contracts/llm/routing-config.yaml. Tier 3.
+// prr-046: finops cost-center "figure-generation". The LLM call is currently
+// scaffolded (CallLlmForFigureSpec returns null); when wired to
+// AiGenerationService (future work), it will delegate cost emission to that
+// service — same diagram-generation row.
 [TaskRouting("tier3", "diagram_generation")]
+[FeatureTag("figure-generation")]
+[DelegatesLlmCost("AiGenerationService (when wired); currently scaffolded")]
 public sealed class AiFigureGenerator : IAiFigureGenerator
 {
     private readonly ILogger<AiFigureGenerator> _logger;

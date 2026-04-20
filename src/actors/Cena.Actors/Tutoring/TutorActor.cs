@@ -116,7 +116,12 @@ public sealed record TutoringRejected(string Methodology, string Reason);
 // yield ~0% hits. The system prompt IS cached via Anthropic's 5-min
 // cache_control (routing-config §6.student_context), which is the right
 // caching tier for this workload. No Redis-level response cache possible.
+// prr-046: finops cost-center "socratic" — TutorActor shares the same
+// cost-center as ClaudeTutorLlmService because both are the Socratic
+// conversational surface. The SpendPerTurn difference between the two is
+// visible via the model_id label on the counter.
 [TaskRouting("tier3", "socratic_question")]
+[FeatureTag("socratic")]
 [AllowsUncachedLlm("Multi-turn dialogue: each turn uniquely conditioned on conversation history and student message. System-prompt cache handled by CacheSystemPrompt flag on LlmRequest.")]
 public sealed class TutorActor : IActor
 {
@@ -140,6 +145,7 @@ public sealed class TutorActor : IActor
     private readonly IExplanationCacheService _explanationCache;
     private readonly ILogger<TutorActor> _logger;
     private readonly IClock _clock;
+    private readonly ILlmCostMetric _costMetric;
 
     // Per-student daily token tracking (shared across all TutorActor instances).
     // Key: "tutor:{studentId}:{yyyy-MM-dd}", Value: cumulative output tokens.
@@ -171,7 +177,8 @@ public sealed class TutorActor : IActor
         IContentRetriever contentRetriever,
         IExplanationCacheService explanationCache,
         ILogger<TutorActor> logger,
-        IClock clock)
+        IClock clock,
+        ILlmCostMetric costMetric)
     {
         _llm = llm;
         _promptBuilder = promptBuilder;
@@ -180,6 +187,7 @@ public sealed class TutorActor : IActor
         _explanationCache = explanationCache;
         _logger = logger;
         _clock = clock;
+        _costMetric = costMetric;
     }
 
     public Task ReceiveAsync(IContext context)
@@ -481,6 +489,15 @@ public sealed class TutorActor : IActor
 
             TrackTokenUsage(llmResponse.OutputTokens);
 
+            // prr-046: per-feature cost tag on success path.
+            _costMetric.Record(
+                feature: "socratic",
+                tier: "tier3",
+                task: "socratic_question",
+                modelId: llmResponse.ModelId,
+                inputTokens: llmResponse.InputTokens,
+                outputTokens: llmResponse.OutputTokens);
+
             var safetyResult = _safetyGuard.Validate(llmResponse.Content, _subject, _conceptId);
             if (!safetyResult.IsAllowed)
             {
@@ -556,6 +573,15 @@ public sealed class TutorActor : IActor
                 CacheSystemPrompt: true));
 
             TrackTokenUsage(llmResponse.OutputTokens);
+
+            // prr-046: per-feature cost tag on success path.
+            _costMetric.Record(
+                feature: "socratic",
+                tier: "tier3",
+                task: "socratic_question",
+                modelId: llmResponse.ModelId,
+                inputTokens: llmResponse.InputTokens,
+                outputTokens: llmResponse.OutputTokens);
 
             var safetyResult = _safetyGuard.Validate(llmResponse.Content, _subject, _conceptId);
             if (!safetyResult.IsAllowed)
