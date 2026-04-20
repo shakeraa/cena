@@ -361,6 +361,9 @@ public partial class Program
 
     builder.Services.AddSingleton<IMisconceptionDetectionService, MisconceptionDetectionService>();
 
+    // prr-015 / ADR-0003: misconception PII registry + canonical Marten store.
+    builder.Services.AddMisconceptionPiiStoreRegistry().AddCanonicalMartenMisconceptionStore();
+
     // ---- FIND-privacy-003: GDPR self-service compliance services ----
     // Students must be able to exercise data rights (consent, export, erasure, DSAR)
     // without going through an admin. GDPR Art 12-22, COPPA 312.6, Israel PPL 13.

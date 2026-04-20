@@ -261,6 +261,9 @@ builder.Services.AddSingleton<IErrorPatternMatcherEngine, ErrorPatternMatcherEng
 // RDY-014 + RDY-033: Misconception detection service, now powered by the matcher engine.
 builder.Services.AddSingleton<IMisconceptionDetectionService, MisconceptionDetectionService>();
 
+// prr-015 / ADR-0003: central registry + retention worker for misconception PII.
+builder.Services.AddMisconceptionPiiStoreRegistry().AddCanonicalMartenMisconceptionStore();
+
 builder.Services.AddSingleton<IExplanationOrchestrator, ExplanationOrchestrator>();
 builder.Services.AddSingleton<IPersonalizedExplanationService, PersonalizedExplanationService>();
 builder.Services.AddSingleton<OfflineSyncHandler>();
