@@ -1,12 +1,15 @@
 // =============================================================================
 // Cena Platform -- Admin User Management Service
 // BKD-002: Business logic for user CRUD, suspension, invites
+// prr-021: BulkInviteAsync delegates to RosterImportProcessor (size, injection,
+//   UTF-8, bidi, homoglyph, tenant binding, audit log).
 // =============================================================================
 
 using System.Globalization;
 using System.Security.Claims;
 using System.Text.Json;
 using Cena.Actors.Bus;
+using Cena.Admin.Api.RosterImport;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Firebase;
@@ -14,6 +17,7 @@ using Cena.Infrastructure.Security;
 using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using NATS.Client.Core;
 using StackExchange.Redis;
 
@@ -48,6 +52,7 @@ public sealed class AdminUserService : IAdminUserService
     private readonly IConnectionMultiplexer _redis;
     private readonly INatsConnection _nats;
     private readonly ILogger<AdminUserService> _logger;
+    private readonly RosterImportOptions _rosterImport;
     private static readonly JsonSerializerOptions JsonOpts = new() { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     public AdminUserService(
@@ -55,13 +60,15 @@ public sealed class AdminUserService : IAdminUserService
         IFirebaseAdminService firebase,
         IConnectionMultiplexer redis,
         INatsConnection nats,
-        ILogger<AdminUserService> logger)
+        ILogger<AdminUserService> logger,
+        IOptions<RosterImportOptions>? rosterImport = null)
     {
         _store = store;
         _firebase = firebase;
         _redis = redis;
         _nats = nats;
         _logger = logger;
+        _rosterImport = rosterImport?.Value ?? new RosterImportOptions();
     }
 
     public async Task<UserListResponse> ListUsersAsync(
@@ -411,44 +418,18 @@ public sealed class AdminUserService : IAdminUserService
         return AdminUserDto.From(user);
     }
 
-    public async Task<BulkInviteResult> BulkInviteAsync(Stream csvStream, ClaimsPrincipal caller)
-    {
-        var created = 0;
-        var failed = new List<BulkInviteFailure>();
-
-        // FIND-sec-008: Determine the target school for all bulk invites
-        var schoolId = TenantScope.GetSchoolFilter(caller);
-        var targetSchool = schoolId ?? ""; // SUPER_ADMIN can invite to any school (empty means no school restriction)
-
-        using var reader = new StreamReader(csvStream);
-        var header = await reader.ReadLineAsync(); // skip header
-
-        while (await reader.ReadLineAsync() is { } line)
-        {
-            var parts = line.Split(',');
-            if (parts.Length < 3)
-            {
-                failed.Add(new BulkInviteFailure(line, "Invalid CSV row — expected: name,email,role"));
-                continue;
-            }
-
-            var name = parts[0].Trim().Trim('"');
-            var email = parts[1].Trim().Trim('"');
-            var role = parts[2].Trim().Trim('"');
-
-            try
-            {
-                await InviteUserAsync(new InviteUserRequest(email, role, targetSchool), caller);
-                created++;
-            }
-            catch (Exception ex)
-            {
-                failed.Add(new BulkInviteFailure(email, ex.Message));
-            }
-        }
-
-        return new BulkInviteResult(created, failed);
-    }
+    /// <summary>
+    /// prr-021: Hardened roster-import entry point. Delegates to
+    /// <see cref="RosterImportProcessor"/> which owns sanitizer + audit.
+    /// </summary>
+    public Task<BulkInviteResult> BulkInviteAsync(Stream csvStream, ClaimsPrincipal caller) =>
+        RosterImportProcessor.RunAsync(
+            csvStream,
+            caller,
+            _rosterImport,
+            _store,
+            _logger,
+            async (req, c) => await InviteUserAsync(req, c));
 
     public async Task<UserStatsResponse> GetStatsAsync(ClaimsPrincipal caller)
     {
