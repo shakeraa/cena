@@ -58,7 +58,7 @@ public sealed class SocraticCapTests
     [Fact]
     public async Task UnderCap_ChecksBudgetAndDailyTime_BeforeLlm()
     {
-        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new DailyTutorTimeCheck(true, 0, 1800, 1800));
         _budget.CanMakeLlmCallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(true);
@@ -73,7 +73,7 @@ public sealed class SocraticCapTests
         await foreach (var chunk in sut.StreamCompletionAsync(ctx, CancellationToken.None))
             chunks.Add(chunk);
 
-        await _dailyBudget.Received(1).CheckAsync("stu-1", Arg.Any<CancellationToken>());
+        await _dailyBudget.Received(1).CheckAsync("stu-1", Arg.Any<string?>(), Arg.Any<CancellationToken>());
         await _budget.Received(1).CanMakeLlmCallAsync("thread-1", Arg.Any<CancellationToken>());
         // Fallback is NOT invoked when budget is under cap.
         _fallback.DidNotReceive().GetHint(Arg.Any<TutorContext>(), Arg.Any<int>());
@@ -86,7 +86,7 @@ public sealed class SocraticCapTests
     [Fact]
     public async Task CapHit_EmitsStaticHint_DoesNotCallLlm()
     {
-        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new DailyTutorTimeCheck(true, 0, 1800, 1800));
         _budget.CanMakeLlmCallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(false); // 4th call
@@ -120,7 +120,7 @@ public sealed class SocraticCapTests
     [Fact]
     public async Task DailyCapHit_ReturnsRestMessage_NoLlm_NoBudgetCheck()
     {
-        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new DailyTutorTimeCheck(
                 Allowed: false,
                 UsedSeconds: 1800,
@@ -146,7 +146,7 @@ public sealed class SocraticCapTests
     [Fact]
     public async Task CapHit_AdvancesLadderIndex_AcrossTurns()
     {
-        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
             .Returns(new DailyTutorTimeCheck(true, 0, 1800, 1800));
         _budget.CanMakeLlmCallAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
             .Returns(false);
