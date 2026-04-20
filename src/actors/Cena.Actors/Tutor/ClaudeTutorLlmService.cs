@@ -87,9 +87,12 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
         var turnStopwatch = Stopwatch.StartNew();
 
         // ── prr-012 gate 1: daily tutor-time cap ──
-        // 30-min/student/day hard stop. On cap-hit, return the "take a break"
-        // response without touching any LLM or static ladder.
-        var dailyCheck = await _dailyBudget.CheckAsync(context.StudentId, ct);
+        // 30-min/student/day hard stop (tenant-overridable per prr-048).
+        // On cap-hit, return the "take a break" response without touching any
+        // LLM or static ladder. instituteId is threaded through for per-tenant
+        // cap override + per-tenant metric labels (cena_student_daily_*).
+        var dailyCheck = await _dailyBudget.CheckAsync(
+            context.StudentId, context.InstituteId, ct);
         if (!dailyCheck.Allowed)
         {
             yield return new LlmChunk(
@@ -139,7 +142,10 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
 
             turnStopwatch.Stop();
             await _dailyBudget.RecordUsageAsync(
-                context.StudentId, (int)turnStopwatch.Elapsed.TotalSeconds, ct);
+                context.StudentId,
+                (int)turnStopwatch.Elapsed.TotalSeconds,
+                context.InstituteId,
+                ct);
             yield break;
         }
 
@@ -200,7 +206,10 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
                 Model: _model);
             turnStopwatch.Stop();
             await _dailyBudget.RecordUsageAsync(
-                context.StudentId, (int)turnStopwatch.Elapsed.TotalSeconds, ct);
+                context.StudentId,
+                (int)turnStopwatch.Elapsed.TotalSeconds,
+                context.InstituteId,
+                ct);
             yield break;
         }
 
@@ -225,7 +234,10 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
 
         turnStopwatch.Stop();
         await _dailyBudget.RecordUsageAsync(
-            context.StudentId, (int)turnStopwatch.Elapsed.TotalSeconds, ct);
+            context.StudentId,
+            (int)turnStopwatch.Elapsed.TotalSeconds,
+            context.InstituteId,
+            ct);
     }
 
     private string BuildSystemPrompt(TutorContext context)
