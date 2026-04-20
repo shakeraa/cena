@@ -6,7 +6,7 @@
 **Source docs**: `retired.md R-01`, `R-03`, `R-08`, `R-09`, `R-13`, `R-15`, `R-22`
 **Assignee hint**: claude-subagent-code-audit
 **Tags**: source=pre-release-review-2026-04-20, lens=enterprise, type=audit
-**Status**: Not Started
+**Status**: Done — 2026-04-20
 **Source**: R-01 generalization — if the scheduler substrate is orphaned from its production caller, other Group A substrates may share the gap
 **Tier**: mvp
 **Epic**: EPIC-PRR-A — ADR-0012 StudentActor decomposition

@@ -6,7 +6,7 @@
 **Source docs**: `axis1_pedagogy_mechanics_cena.md:L441`
 **Assignee hint**: human-architect
 **Tags**: source=pre-release-review-2026-04-20, lens=cogsci
-**Status**: Not Started
+**Status**: Done — 2026-04-20
 **Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
 **Tier**: mvp
 **Epic**: EPIC-PRR-A — ADR-0012 StudentActor decomposition

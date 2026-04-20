@@ -6,7 +6,7 @@
 **Source docs**: `axis9_data_privacy_trust_mechanics.md:L176`, `retired.md R-09`, `retired.md R-16`, SYNTHESIS.md outstanding ADR gap #13, conflicts.md C-03
 **Assignee hint**: human-architect (decision) + persona-privacy review before acceptance
 **Tags**: source=pre-release-review-2026-04-20, lens=privacy, type=adr-authoring, user-decision=2026-04-20-split-with-crypto-shred-preference, decision-gate=true
-**Status**: Not Started
+**Status**: Done — 2026-04-20
 **Source**: Split from prr-003 during user walkthrough 2026-04-20. Originally a single "hard-delete" task; walkthrough surfaced that Marten's append-only event store doesn't support selective event deletion, so erasure strategy is a design decision with four incompatible options — must be resolved by ADR before any implementation starts.
 **Tier**: mvp
 **Epic**: EPIC-PRR-A — ADR-0012 StudentActor decomposition (same erasure policy shapes the decomposed aggregates; coordinate with epic's ADR)

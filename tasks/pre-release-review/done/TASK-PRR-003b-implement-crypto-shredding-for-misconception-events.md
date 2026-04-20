@@ -6,7 +6,7 @@
 **Source docs**: `axis9_data_privacy_trust_mechanics.md:L176`, see `src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs:334-357` for the read-filter gap the comment self-documents
 **Assignee hint**: kimi-coder (if crypto-shred chosen) OR claude-subagent-events-rewrite (if stream-rewrite chosen)
 **Tags**: source=pre-release-review-2026-04-20, lens=privacy, blocked-by=prr-003a, user-decision=2026-04-20-split-with-crypto-shred-preference
-**Status**: Blocked on prr-003a (ADR)
+**Status**: Done — 2026-04-20
 **Source**: Split from prr-003 during user walkthrough 2026-04-20. The implementation half of the original task. Cannot start until prr-003a lands the chosen erasure model.
 **Tier**: mvp
 **Split-sibling**: prr-003a (ADR)

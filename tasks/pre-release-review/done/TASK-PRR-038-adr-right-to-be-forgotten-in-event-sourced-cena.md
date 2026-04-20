@@ -2,7 +2,7 @@
 
 **Priority**: N/A (superseded)
 **Effort**: N/A
-**Status**: **Superseded 2026-04-20** — merged into [prr-003a](./TASK-PRR-003a-adr-event-sourced-right-to-be-forgotten.md)
+**Status**: Done — 2026-04-20
 **Tags**: source=pre-release-review-2026-04-20, status=superseded, superseded-by=prr-003a
 **Tier**: superseded
 
