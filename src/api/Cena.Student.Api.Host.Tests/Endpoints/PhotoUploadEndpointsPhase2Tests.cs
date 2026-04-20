@@ -17,6 +17,7 @@
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Infrastructure.Media;
 using Cena.Infrastructure.Moderation;
 using Cena.Infrastructure.Ocr;
 using Cena.Infrastructure.Ocr.Contracts;
@@ -25,14 +26,36 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.PixelFormats;
 
 namespace Cena.Student.Api.Host.Tests.Endpoints;
 
 public class PhotoUploadEndpointsPhase2Tests
 {
-    private static readonly byte[] PngMagic = { 0x89, 0x50, 0x4E, 0x47 };
+    // prr-001: the real ExifStripper needs valid image bytes to succeed.
+    // RealPng is a minimally-valid 2x2 PNG produced by ImageSharp; it
+    // satisfies both the magic-byte gate (first 4 bytes = 0x89 P N G)
+    // and the re-encode round-trip inside ExifStripper.Strip.
+    private static readonly byte[] RealPng = MakeTinyPng();
+    private static readonly byte[] PngMagic = RealPng; // alias for legacy test names
     private static readonly byte[] PdfMagic = { 0x25, 0x50, 0x44, 0x46 }; // "%PDF"
     private static readonly byte[] JpegMagic = { 0xFF, 0xD8, 0xFF, 0xE0 };
+
+    // Shared real stripper — prr-001 dictates a real EXIF strip at every
+    // test call; a lie-flag would regress the lying-label bug this ticket
+    // fixes. Individual tests that want to simulate strip failure
+    // substitute a subclass via the ScopedExifStripper helper.
+    private static readonly ExifStripper Stripper = new();
+
+    private static byte[] MakeTinyPng()
+    {
+        using var img = new Image<Rgba32>(2, 2);
+        using var ms = new MemoryStream();
+        img.Save(ms, new PngEncoder());
+        return ms.ToArray();
+    }
 
     // -------------------------------------------------------------------------
     // Validation
@@ -45,7 +68,7 @@ public class PhotoUploadEndpointsPhase2Tests
             req.Object, AStudent(),
             new Mock<IContentModerationPipeline>().Object,
             new Mock<IOcrCascadeService>().Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
     }
@@ -58,7 +81,7 @@ public class PhotoUploadEndpointsPhase2Tests
             req.Object, AStudent(),
             new Mock<IContentModerationPipeline>().Object,
             new Mock<IOcrCascadeService>().Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
     }
@@ -72,7 +95,7 @@ public class PhotoUploadEndpointsPhase2Tests
             req.Object, AStudent(),
             new Mock<IContentModerationPipeline>().Object,
             new Mock<IOcrCascadeService>().Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
     }
@@ -89,7 +112,7 @@ public class PhotoUploadEndpointsPhase2Tests
 
         var result = await PhotoUploadEndpoints.UploadPhoto(
             req.Object, AStudent(), moderation.Object, cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         var status = Assert.IsType<StatusCodeHttpResult>(result);
         Assert.Equal(403, status.StatusCode);
@@ -105,7 +128,7 @@ public class PhotoUploadEndpointsPhase2Tests
 
         var result = await PhotoUploadEndpoints.UploadPhoto(
             req.Object, AStudent(), moderation.Object, cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         var status = Assert.IsType<StatusCodeHttpResult>(result);
         Assert.Equal(403, status.StatusCode);
@@ -120,7 +143,7 @@ public class PhotoUploadEndpointsPhase2Tests
 
         var result = await PhotoUploadEndpoints.UploadPhoto(
             req.Object, AStudent(), moderation.Object, cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         Assert.IsType<Ok<PhotoUploadResponse>>(result);
         moderation.VerifyNoOtherCalls();
@@ -146,7 +169,7 @@ public class PhotoUploadEndpointsPhase2Tests
 
         var result = await PhotoUploadEndpoints.UploadPhoto(
             req.Object, AStudent(), moderation.Object, cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         Assert.IsType<Ok<PhotoUploadResponse>>(result);
         Assert.NotNull(captured);
@@ -171,7 +194,7 @@ public class PhotoUploadEndpointsPhase2Tests
             req.Object, AStudent(),
             new Mock<IContentModerationPipeline>(MockBehavior.Strict).Object,
             cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         Assert.NotNull(captured);
         Assert.Equal(SourceType.StudentPdf, captured!.SourceType);
@@ -187,7 +210,7 @@ public class PhotoUploadEndpointsPhase2Tests
             req.Object, AStudent(),
             new Mock<IContentModerationPipeline>(MockBehavior.Strict).Object,
             cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
     }
@@ -201,7 +224,7 @@ public class PhotoUploadEndpointsPhase2Tests
 
         var result = await PhotoUploadEndpoints.UploadPhoto(
             req.Object, AStudent(), moderation.Object, cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
     }
@@ -220,7 +243,7 @@ public class PhotoUploadEndpointsPhase2Tests
 
         var result = await PhotoUploadEndpoints.UploadPhoto(
             req.Object, AStudent(), moderation.Object, cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         var status = Assert.IsType<StatusCodeHttpResult>(result);
         Assert.Equal(503, status.StatusCode);
@@ -235,7 +258,7 @@ public class PhotoUploadEndpointsPhase2Tests
 
         var result = await PhotoUploadEndpoints.UploadPhoto(
             req.Object, AStudent(), moderation.Object, cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         var ok = Assert.IsType<Ok<PhotoUploadResponse>>(result);
         Assert.NotNull(ok.Value);
@@ -255,7 +278,7 @@ public class PhotoUploadEndpointsPhase2Tests
             req.Object, AStudent(),
             new Mock<IContentModerationPipeline>(MockBehavior.Strict).Object,
             cascade.Object,
-            NullLogger<Program>.Instance, CancellationToken.None);
+            Stripper, NullLogger<Program>.Instance, CancellationToken.None);
 
         var ok = Assert.IsType<Ok<PhotoUploadResponse>>(result);
         Assert.Equal("processed_text_shortcut", ok.Value!.Status);

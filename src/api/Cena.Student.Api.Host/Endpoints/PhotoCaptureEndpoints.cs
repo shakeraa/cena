@@ -17,6 +17,7 @@
 
 using System.Security.Claims;
 using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Media;
 using Cena.Infrastructure.Moderation;
 using Cena.Infrastructure.Ocr;
 using Cena.Infrastructure.Ocr.Contracts;
@@ -50,6 +51,7 @@ public static class PhotoCaptureEndpoints
         ClaimsPrincipal user,
         IContentModerationPipeline moderationPipeline,
         IOcrCascadeService ocrCascade,
+        ExifStripper exifStripper,
         ILogger<Program> logger,
         CancellationToken ct)
     {
@@ -69,7 +71,24 @@ public static class PhotoCaptureEndpoints
         // Read image bytes
         using var ms = new MemoryStream();
         await file.OpenReadStream().CopyToAsync(ms, ct);
-        var imageBytes = ms.ToArray();
+        var rawBytes = ms.ToArray();
+
+        // prr-001: Strip EXIF / IPTC / XMP / GPS before any downstream
+        // consumer (moderation, OCR) touches the image. Strip failure →
+        // 422; we refuse to persist or process bytes we couldn't scrub.
+        var stripResult = exifStripper.Strip(rawBytes);
+        if (!stripResult.Success)
+        {
+            logger.LogWarning(
+                "[EXIF_STRIP_FAILED] Rejecting capture Student={StudentId} Reason={Reason}",
+                studentId, stripResult.FailureReason);
+            return Results.UnprocessableEntity(new
+            {
+                error = "exif_strip_failed",
+                detail = stripResult.FailureReason,
+            });
+        }
+        var imageBytes = stripResult.Scrubbed;
 
         // Step 1 — CSAM + content moderation (upstream of OCR, always runs)
         var ipAddress = request.HttpContext.Connection.RemoteIpAddress?.ToString();

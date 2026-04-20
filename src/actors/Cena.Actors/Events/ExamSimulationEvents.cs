@@ -16,6 +16,8 @@
 //     SessionRiskAssessment, it stays session-scoped.
 // =============================================================================
 
+using Cena.Actors.Content;
+
 namespace Cena.Actors.Events;
 
 public record ExamSimulationStarted_V1(
@@ -73,4 +75,20 @@ public record ExamVisibilityWarning_V1(
     string VisibilityState,
     TimeSpan DurationAway,
     DateTimeOffset DetectedAt
+) : IDelegatedEvent;
+
+/// <summary>
+/// prr-008: audit event emitted when an item has been successfully delivered
+/// to the student through the `IItemDeliveryGate`. Records the item's
+/// `ProvenanceKind` (never the raw body) so the event stream is auditable
+/// for Bagrut-reference-only compliance. Blocked deliveries do NOT emit
+/// this event — by construction, a `MinistryBagrut` attempt throws at the
+/// gate before reaching the event-store write.
+/// </summary>
+public record ExamSimulationItemDelivered_V1(
+    string StudentId,
+    string SimulationId,
+    string ItemId,
+    ProvenanceKind Provenance,
+    DateTimeOffset DeliveredAt
 ) : IDelegatedEvent;

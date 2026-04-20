@@ -363,8 +363,7 @@ public partial class Program
         .OrResult<HttpResponseMessage>(r => (int)r.StatusCode >= 500)
         .CircuitBreakerAsync(3, TimeSpan.FromSeconds(30)));
     
-    builder.Services.AddSingleton<IIncidentReportService, IncidentReportService>();
-    builder.Services.AddSingleton<IContentModerationPipeline, ContentModerationPipeline>();
+    builder.Services.AddSingleton<IIncidentReportService, IncidentReportService>().AddSingleton<IContentModerationPipeline, ContentModerationPipeline>();
 
     // ---- OCR cascade (ADR-0033, RDY-OCR-PORT) ----
     // Real implementations across the board. NO STUBS.
@@ -426,7 +425,7 @@ public partial class Program
     // ---- Firebase Auth + Authorization ----
     builder.Services.AddHttpContextAccessor();
     builder.Services.AddFirebaseAuth(builder.Configuration);
-    builder.Services.AddCenaAuthorization();
+    Cena.Student.Api.Host.Auth.StudentApiExtrasRegistration.AddStudentApiExtras(builder.Services.AddCenaAuthorization()); // prr-001 + prr-011
     
     // FIND-sec-014: Security metrics for observability
     builder.Services.AddSecurityMetrics();
@@ -767,9 +766,10 @@ public partial class Program
         await next();
     });
     
-    // Middleware order: CORS → Auth → Revocation → Consent → FERPA Audit → RateLimiter → Endpoints
+    // Middleware order: CORS → Auth → Cookie → Revocation → Consent → FERPA Audit → RateLimiter → Endpoints
     app.UseCors();
     app.UseAuthentication();
+    Cena.Student.Api.Host.Auth.StudentApiExtrasRegistration.UseStudentApiAuthPipeline(app); // prr-011
     app.UseAuthorization();
     app.UseMiddleware<TokenRevocationMiddleware>();
     app.UseConsentEnforcement(); // FIND-privacy-007: Consent gates data processing
@@ -799,7 +799,8 @@ public partial class Program
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
     app.MapAuthEndpoints();
-    
+    // prr-011 MapSessionExchangeEndpoints wired earlier via UseStudentApiAuthPipeline().
+
     // Me/Profile endpoints (STB-00, STB-00b)
     app.MapMeEndpoints();
     app.MapSelfAssessmentEndpoints();

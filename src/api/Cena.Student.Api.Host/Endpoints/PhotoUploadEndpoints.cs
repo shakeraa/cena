@@ -1,10 +1,15 @@
 // =============================================================================
-// Cena Platform — Photo / PDF Upload (PWA-BE-003 + RDY-001 + ADR-0033)
+// Cena Platform — Photo / PDF Upload (PWA-BE-003 + RDY-001 + ADR-0033 + prr-001)
 //
 // Validates and processes student-submitted images OR PDFs:
 //   1. Magic-byte + content-type + size validation
-//   2. EXIF metadata strip (images only)
-//   3. CSAM + AI-safety moderation (RDY-001, runs on image bytes)
+//   2. Real EXIF / IPTC / XMP / GPS strip via ExifStripper (images only) —
+//      prr-001 (2026-04-20): previous documented-stub returned input bytes
+//      unchanged while the response falsely advertised ExifStripped=true.
+//      Now: injection-provided ExifStripper produces a scrubbed buffer; on
+//      strip failure the endpoint returns 422 and persists nothing ("better
+//      reject than leak" — user decision 2026-04-20).
+//   3. CSAM + AI-safety moderation (RDY-001, runs on scrubbed image bytes)
 //   4. OCR cascade (ADR-0033, Layers 0–5) — for PDFs, Layer 0 runs
 //      pdf_triage first; `text` short-circuits to pypdf extraction,
 //      `encrypted` returns 422 via the cascade's structured result.
@@ -17,6 +22,7 @@
 
 using System.Security.Claims;
 using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Media;
 using Cena.Infrastructure.Moderation;
 using Cena.Infrastructure.Ocr;
 using Cena.Infrastructure.Ocr.Contracts;
@@ -59,6 +65,7 @@ public static class PhotoUploadEndpoints
         ClaimsPrincipal user,
         IContentModerationPipeline moderationPipeline,
         IOcrCascadeService ocrCascade,
+        ExifStripper exifStripper,
         ILogger<Program> logger,
         CancellationToken ct)
     {
@@ -97,9 +104,37 @@ public static class PhotoUploadEndpoints
 
         bool isPdf = file.ContentType == "application/pdf";
 
-        // Images: strip EXIF before moderating / OCR-ing (GPS + device metadata).
-        // PDFs: not applicable.
-        var processedBytes = isPdf ? fileBytes : StripExifMetadata(fileBytes);
+        // prr-001: Images MUST have EXIF / IPTC / XMP / GPS stripped before
+        // any downstream consumer (moderation, OCR, persistence) sees them.
+        // If the strip fails for any reason we refuse to persist — better
+        // reject than leak GPS coordinates of a minor's home.
+        //
+        // PDFs: EXIF is image-specific; the strip does not apply. The
+        // response's ExifStripped flag is `false` for PDFs, which is the
+        // honest answer ("no strip was performed because no EXIF exists on
+        // this format") — not the old lying "!isPdf" shortcut.
+        byte[] processedBytes;
+        StripResult? stripResult = null;
+        if (isPdf)
+        {
+            processedBytes = fileBytes;
+        }
+        else
+        {
+            stripResult = exifStripper.Strip(fileBytes);
+            if (!stripResult.Success)
+            {
+                logger.LogWarning(
+                    "[EXIF_STRIP_FAILED] Rejecting upload Student={StudentId} Reason={Reason}",
+                    studentId, stripResult.FailureReason);
+                return Results.UnprocessableEntity(new
+                {
+                    error = "exif_strip_failed",
+                    detail = stripResult.FailureReason,
+                });
+            }
+            processedBytes = stripResult.Scrubbed;
+        }
 
         // ── Moderation ──────────────────────────────────────────────────────
         // PDFs don't flow through PhotoDNA (no image). Content-safety still
@@ -208,7 +243,10 @@ public static class PhotoUploadEndpoints
             PhotoId: photoId,
             OriginalSizeBytes: file.Length,
             ProcessedSizeBytes: processedBytes.Length,
-            ExifStripped: !isPdf,
+            // prr-001: ExifStripped must reflect what actually happened,
+            // not file-type. PDFs never strip (no EXIF) → false. Images
+            // reach this line only via the success branch → true.
+            ExifStripped: stripResult?.Success ?? false,
             ContentType: file.ContentType,
             Status: status,
             ModerationVerdict: moderationResult?.Verdict.ToString(),
@@ -238,14 +276,11 @@ public static class PhotoUploadEndpoints
         };
     }
 
-    private static byte[] StripExifMetadata(byte[] imageBytes)
-    {
-        // Simplified: full EXIF scrub requires MetadataExtractor + re-encode.
-        // Tracked in privacy-hardening follow-up; current path preserves the
-        // image untouched, relying on the downstream processing pipeline to
-        // re-encode before any persistence that outlives the request scope.
-        return imageBytes;
-    }
+    // prr-001 (2026-04-20): StripExifMetadata stub removed. The real
+    // EXIF / IPTC / XMP / GPS scrub now lives in
+    // Cena.Infrastructure.Media.ExifStripper and is injected into the
+    // endpoint via FromServices. The architecture test
+    // NoUnstrippedImageBytesTest keeps external consumers honest.
 }
 
 public record PhotoUploadResponse(

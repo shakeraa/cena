@@ -8,7 +8,16 @@
 // - No hints, no scaffolding, no step-by-step feedback
 // - Feedback only shown after submission of entire exam
 // - Visibility API detection for tab-switch/minimize events
+//
+// prr-008 (2026-04-20): Every item surfaced during an exam simulation MUST
+// be routed through `IItemDeliveryGate.AssertDeliverable` at the last moment
+// before serialisation. `ExamSimulationDelivery.AssertDeliverable` below is
+// the ergonomic wrapper used by the HTTP delivery seam; the underlying gate
+// enforces the Bagrut-reference-only invariant (CLAUDE.md non-negotiable
+// "Bagrut reference-only", ADR-0032, ADR-0043 bagrut-reference-only-enforcement).
 // =============================================================================
+
+using Cena.Actors.Content;
 
 namespace Cena.Actors.Assessment;
 
@@ -134,4 +143,49 @@ public sealed record ExamSimulationResult
 
     /// <summary>Number of tab-switch events detected.</summary>
     public int VisibilityWarnings { get; init; }
+}
+
+/// <summary>
+/// prr-008 delivery seam for exam-simulation items. The HTTP endpoint that
+/// serves a next-question payload to the student MUST call
+/// <see cref="AssertDeliverable"/> immediately before serialising the item
+/// onto the wire. Callers that type their payload as
+/// <see cref="Deliverable{T}"/> get compile-time enforcement too.
+/// </summary>
+/// <remarks>
+/// Threading <see cref="Provenance"/> through every item-bank read path is
+/// Sprint-2 scope (prr-008 "scope cuts"). Today, exam-simulation callers
+/// construct the <see cref="Provenance"/> at the delivery seam from the
+/// item's on-disk metadata (BagrutRecreationAggregate.RecreationId →
+/// AiRecreated, teacher upload id → TeacherAuthoredOriginal, Ministry
+/// code → MinistryBagrut). The gate then decides whether to let it
+/// through. Any path that loses provenance visibility is expected to
+/// default-fail closed by constructing a MinistryBagrut provenance so
+/// the gate throws loudly rather than silently leaking.
+/// </remarks>
+public static class ExamSimulationDelivery
+{
+    /// <summary>
+    /// Chokepoint call that enforces the Bagrut-reference-only invariant
+    /// at exam-simulation delivery. Thin wrapper around
+    /// <see cref="IItemDeliveryGate.AssertDeliverable"/> with context
+    /// derived from <see cref="ExamSimulationState"/>.
+    /// </summary>
+    public static void AssertDeliverable(
+        IItemDeliveryGate gate,
+        ExamSimulationState state,
+        string itemId,
+        Provenance provenance,
+        string tenantId,
+        string actorId)
+    {
+        ArgumentNullException.ThrowIfNull(gate);
+        ArgumentNullException.ThrowIfNull(state);
+        gate.AssertDeliverable(
+            provenance: provenance,
+            itemId: itemId,
+            sessionId: state.SimulationId,
+            tenantId: tenantId,
+            actorId: actorId);
+    }
 }
