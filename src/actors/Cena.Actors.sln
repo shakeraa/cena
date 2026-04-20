@@ -29,6 +29,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cena.LlmAcl", "..\llm-acl\C
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cena.Tools.DbAdmin", "..\tools\Cena.Tools.DbAdmin\Cena.Tools.DbAdmin.csproj", "{D55DB812-F567-44DD-A4CF-8A19D9B0C53D}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Cena.Tools.QuestionGen", "..\tools\Cena.Tools.QuestionGen\Cena.Tools.QuestionGen.csproj", "{63989BD7-5C47-4024-86ED-982B7F8A0EDA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -195,6 +197,18 @@ Global
 		{D55DB812-F567-44DD-A4CF-8A19D9B0C53D}.Release|x64.Build.0 = Release|Any CPU
 		{D55DB812-F567-44DD-A4CF-8A19D9B0C53D}.Release|x86.ActiveCfg = Release|Any CPU
 		{D55DB812-F567-44DD-A4CF-8A19D9B0C53D}.Release|x86.Build.0 = Release|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Debug|x64.Build.0 = Debug|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Debug|x86.Build.0 = Debug|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Release|Any CPU.Build.0 = Release|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Release|x64.ActiveCfg = Release|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Release|x64.Build.0 = Release|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Release|x86.ActiveCfg = Release|Any CPU
+		{63989BD7-5C47-4024-86ED-982B7F8A0EDA}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

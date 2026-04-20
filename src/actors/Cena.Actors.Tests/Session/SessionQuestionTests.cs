@@ -90,7 +90,10 @@ public sealed class SessionQuestionTests
     [Fact]
     public void QuestionBank_Constructor_SetsStore()
     {
-        var bank = new QuestionBank(_store);
+        // prr-200: the bare identifier 'QuestionBank' is ambiguous now that the
+        // parametric engine introduced a Cena.Actors.QuestionBank.Templates
+        // namespace. Qualify to the Serving-layer type so C# picks the class.
+        var bank = new Cena.Actors.Serving.QuestionBank(_store);
         Assert.NotNull(bank);
     }
 

@@ -5,8 +5,10 @@
 // =============================================================================
 
 using Cena.Actors.Cas;
+using Cena.Actors.QuestionBank.Templates;
 using Cena.Admin.Api.Content;
 using Cena.Admin.Api.Endpoints;
+using Cena.Admin.Api.Templates;
 using Cena.Admin.Api.Features.TeacherConsole;
 using Cena.Admin.Api.Ingestion;
 using Cena.Admin.Api.Pilot;
@@ -155,6 +157,13 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
         services.AddSingleton<IAiGenerationService, AiGenerationService>();
 
+        // prr-200 (ADR-0002, ADR-0032): Deterministic parametric template
+        // engine (Strategy 1). Renderer calls ICasRouterService; compiler
+        // wraps the renderer with determinism + dedupe. No LLM import — the
+        // architecture test NoLlmInParametricPipelineTest enforces.
+        services.AddScoped<IParametricRenderer, SymPyParametricRenderer>();
+        services.AddScoped<ParametricCompiler>();
+
         // CNT-002: Question pipeline orchestration
         services.AddScoped<IQuestionPipelineService, QuestionPipelineService>();
 
@@ -255,6 +264,11 @@ public static class CenaAdminServiceRegistration
         // AiGenerationService.BatchGenerateAsync so every candidate passes the
         // CAS gate + QualityGate.
         app.MapGenerateSimilarEndpoints();
+
+        // prr-200: POST /api/admin/templates/generate — deterministic no-LLM
+        // variant batch generation (Strategy 1, ADR-0002). Dry-run only in
+        // prr-200; wet-run ingestion lands with prr-201.
+        app.MapParametricTemplateEndpoints();
 
         // RDY-059: POST /api/admin/questions/expand-corpus — batch corpus
         // expander (SuperAdminOnly, dry-run by default).
