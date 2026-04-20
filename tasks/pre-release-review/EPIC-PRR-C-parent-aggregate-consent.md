@@ -67,6 +67,18 @@ The absorbed task files remain in place as the executable unit-of-work; this epi
 
 ---
 
+## Coordination with EPIC-PRR-A Sprint 1 (user decision 2026-04-20)
+
+**ConsentAggregate ownership**: designed inside EPIC-PRR-A (prr-155) because it shares the DDD-aggregate design substrate being established for StudentActor successors. This epic retains **event-schema review authority** — parent-consent event semantics must match EPIC-PRR-C's parent-engagement contract before the aggregate is committed.
+
+**Review gate**: EPIC-PRR-A cannot commit ConsentAggregate events without an explicit sign-off PR comment from EPIC-PRR-C owner attesting that parent-consent purposes, age-band enforcement, and unsubscribe-all semantics are correctly represented.
+
+**Consequence**: EPIC-PRR-C's ADR (prr-014: parent auth role + age-band + multi-institute visibility) must land **before** EPIC-PRR-A Sprint 1 commits ConsentAggregate events, OR the ConsentAggregate schema ships with an explicit "pending prr-014" versioning marker so later refinement is non-breaking.
+
+**Tags**: user-decision=2026-04-20-consent-coordination-with-epic-a
+
+---
+
 ## Implementation Protocol — Senior Architect
 
 Implementation of this epic must be driven by a senior-architect mindset, not a checklist. Before writing any code, the implementer (human or agent) must answer both sets of questions in writing — either in a task-comment, the PR description, or a `docs/decisions/` note:

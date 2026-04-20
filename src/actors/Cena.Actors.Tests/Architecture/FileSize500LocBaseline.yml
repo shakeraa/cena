@@ -1,0 +1,95 @@
+# =============================================================================
+# Generated 2026-04-20 per ADR-0012 Schedule Lock
+# (docs/adr/0012-aggregate-decomposition.md — "Enforcement" section)
+#
+# Grandfathered files are permitted to exceed the 500-LOC rule at the specified
+# baseline. LOC here is measured by FileSize500LocTest.CountLoc:
+#   LOC = total_lines − blank_lines − single_line_comment_only_lines
+# (A line is "single-line-comment-only" iff its trimmed content starts with
+# "//"; block comments are intentionally not special-cased.) This is the
+# canonical counter used by the test, so numbers here DO NOT match raw
+# `wc -l` output; they match what the rule actually enforces.
+#
+# Rules (enforced by FileSize500LocTest):
+#   - A PR MAY lower a baseline_loc value (the file shrank — record the new
+#     lower value in this file in the same PR). A separate stale-entry test
+#     FAILS if the file is now at or below 500; in that case remove the entry.
+#   - A PR MUST NOT raise a baseline_loc value.
+#   - A PR MUST NOT add a new entry here unless the file was already > 500 LOC
+#     as of a prior commit; the grandfather list is monotonically shrinking.
+#   - Any non-grandfathered .cs file under src/ must be <= 500 LOC.
+#
+# Paths are relative to the repository root (the directory containing CLAUDE.md).
+# =============================================================================
+grandfathered:
+  # ---- StudentActor god-aggregate (ADR-0012, Sprint 1 extraction target) ----
+  # Note: ADR-0012 cites wc-l values (1036 / 764); the heuristic values below
+  # are what the test enforces and what this baseline tracks.
+  - path: src/actors/Cena.Actors/Students/StudentActor.Commands.cs
+    baseline_loc: 779
+    reason: "ADR-0012 StudentActor god-aggregate (wc-l 1036); migrating to LearningSessionActor Sprint 1 (2026-04-27)"
+  - path: src/actors/Cena.Actors/Students/StudentActor.cs
+    baseline_loc: 519
+    reason: "ADR-0012 StudentActor god-aggregate (wc-l 764); migrating to LearningSessionActor Sprint 1 (2026-04-27)"
+
+  # ---- Admin API surface (pre-2026-04-20 legacy; refactor candidates) ----
+  - path: src/api/Cena.Admin.Api/AdminApiEndpoints.cs
+    baseline_loc: 1496
+    reason: "Admin minimal-API surface; split into per-domain endpoint groups is a follow-up refactor"
+  - path: src/api/Cena.Admin.Api/QuestionBankSeedData.cs
+    baseline_loc: 1429
+    reason: "Historical seed data; will be replaced by CAS-gated pipeline output (ADR-0032)"
+  - path: src/api/Cena.Admin.Api/AiGenerationService.cs
+    baseline_loc: 783
+    reason: "Pre-2026-04-20 legacy; split into Prompt/Compose/Verify pipelines is a follow-up"
+  - path: src/api/Cena.Admin.Api/AdminUserService.cs
+    baseline_loc: 530
+    reason: "Pre-2026-04-20 legacy; extract tenant-scoping helpers is a follow-up"
+  - path: src/api/Cena.Admin.Api/QuestionBankService.cs
+    baseline_loc: 502
+    reason: "Pre-2026-04-20 legacy; extract versioning + locale handlers is a follow-up"
+
+  # ---- Student API endpoint surface (pre-2026-04-20 legacy) ----
+  - path: src/api/Cena.Student.Api.Host/Endpoints/SessionEndpoints.cs
+    baseline_loc: 1197
+    reason: "Student session minimal-API surface; split post EPIC-PRR-A LearningSession extraction"
+  - path: src/api/Cena.Student.Api.Host/Endpoints/SocialEndpoints.cs
+    baseline_loc: 743
+    reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"
+  - path: src/api/Cena.Student.Api.Host/Program.cs
+    baseline_loc: 576
+    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up"
+
+  # ---- Actor runtime (pre-2026-04-20 legacy) ----
+  - path: src/actors/Cena.Actors.Host/Program.cs
+    baseline_loc: 632
+    reason: "Actor-host composition root; extract DI/Proto bootstrap helpers is a follow-up"
+  - path: src/actors/Cena.Actors/Sessions/LearningSessionActor.cs
+    baseline_loc: 699
+    reason: "Pre-2026-04-20 legacy; EPIC-PRR-A Sprint 1 extraction will absorb most of this"
+  - path: src/actors/Cena.Actors/Tutoring/TutorActor.cs
+    baseline_loc: 616
+    reason: "Pre-2026-04-20 legacy; split by conversation-phase handler is a follow-up"
+  - path: src/actors/Cena.Actors/Bus/NatsBusRouter.cs
+    baseline_loc: 594
+    reason: "Pre-2026-04-20 legacy; split by subject-group router is a follow-up"
+  - path: src/actors/Cena.Actors/Configuration/MartenConfiguration.cs
+    baseline_loc: 560
+    reason: "Pre-2026-04-20 legacy; split by aggregate-config group is a follow-up"
+  - path: src/actors/Cena.Actors/Ingest/ContentExtractorService.cs
+    baseline_loc: 523
+    reason: "Pre-2026-04-20 legacy; split by content-type extractor is a follow-up"
+  - path: src/actors/Cena.Actors/Services/EmbeddingService.cs
+    baseline_loc: 509
+    reason: "Pre-2026-04-20 legacy; split provider adapters is a follow-up"
+
+  # ---- Test fixtures (oversize but allowlisted; tests may shrink naturally) ----
+  - path: src/actors/Cena.Actors.Tests/Compliance/RetentionWorkerTests.cs
+    baseline_loc: 711
+    reason: "Comprehensive retention coverage; split by scenario group is a follow-up"
+  - path: src/shared/Cena.Infrastructure.Tests/Compliance/RightToErasureEndToEndTests.cs
+    baseline_loc: 593
+    reason: "E2E erasure coverage; split by phase is a follow-up"
+  - path: src/api/Cena.Admin.Api.Tests/QualityGate/QualityGateTestData.cs
+    baseline_loc: 548
+    reason: "Test-data fixtures; static data, refactor into per-category partials is a follow-up"

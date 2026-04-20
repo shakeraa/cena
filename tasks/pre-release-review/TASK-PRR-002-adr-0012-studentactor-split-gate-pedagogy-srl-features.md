@@ -6,7 +6,7 @@
 **Source docs**: `axis1_pedagogy_mechanics_cena.md:L44`, `axis2_motivation_self_regulation_findings.md:L43`
 **Assignee hint**: human-architect
 **Tags**: source=pre-release-review-2026-04-20, lens=enterprise
-**Status**: Not Started
+**Status**: In Progress — Sprint 1 kickoff deliverables complete 2026-04-20 (ADR Schedule Lock, arch tests green, epic cross-refs); Sprint 1 code begins 2026-04-27 per locked schedule
 **Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
 **Tier**: mvp
 **Epic**: EPIC-PRR-A — ADR-0012 StudentActor decomposition
@@ -14,16 +14,52 @@
 ---
 
 ## Goal
-Author ADR-0012 decomposing StudentActor (>2969 LOC partial classes) into LearningSession, SelfRegulation, Accommodations bounded aggregates. No new pedagogy/SRL feature lands until split schedule is locked.
+
+Lock the schedule on existing [ADR-0012](../../docs/adr/0012-aggregate-decomposition.md) and bring enforcement online. The ADR itself was accepted 2026-04-14 with implementation deferred — this task ends the deferral.
+
+### Code-reality correction (2026-04-20 verification)
+
+ADR-0012 **already exists** (171 lines, 3 bounded contexts defined, 6-sprint plan). Missing from it: calendar dates, 500-LOC arch test, no-new-handler arch test, first-aggregate decision. StudentActor has grown from ~2,969L at ADR acceptance to **3,532L by 2026-04-20** (6 days) — deferral cost is compounding.
+
+### User decision 2026-04-20 — 5 Sprint-1 kickoff decisions (all adopted)
+
+1. **Sprint 1 start**: 2026-04-27. Full schedule: 6 weeks, completion 2026-06-07.
+2. **First aggregate**: LearningSession (lowest coupling, highest new-feature magnet).
+3. **500-LOC test**: git-blame-aware grandfather whitelist; PRs may only lower baselines, never raise; new files ≤500L.
+4. **No new StudentActor state**: arch test caps event-handler count in `Students/StudentActor*.cs` at 2026-04-20 baseline.
+5. **ConsentAggregate**: designed in EPIC-PRR-A with event-schema review by EPIC-PRR-C owner.
+
+See [ADR-0012 Schedule Lock section](../../docs/adr/0012-aggregate-decomposition.md) for full locked schedule, enforcement specification, grandfather baselines, and kill switch.
 
 ## Files
-- docs/adr/0012-studentactor-decomposition.md
-- migration plan doc
+
+- `docs/adr/0012-aggregate-decomposition.md` — **DONE 2026-04-20** (Schedule Lock section appended)
+- `tests/architecture/FileSize500LocTest.cs` (new) — grandfather-whitelist file-size gate
+- `tests/architecture/FileSize500LocBaseline.yml` (new) — grandfathered baselines
+- `tests/architecture/NoNewStudentActorStateTest.cs` (new) — event-handler count baseline gate
+- `tests/architecture/NoNewStudentActorStateBaseline.yml` (new) — handler-count baseline
+- `.github/workflows/architecture-gates.yml` — wire both arch tests into CI (may already exist for similar tests)
+- Sprint 1 branch: `claude-code/epic-prr-a-sprint-1` — interface contracts + LearningSession extraction begins 2026-04-27
 
 ## Definition of Done
-- ADR accepted; split schedule published; architecture tests enforce 500-LOC cap; first aggregate extracted.
+
+1. ADR-0012 Schedule Lock section merged ✅ (2026-04-20)
+2. `FileSize500LocTest` + baseline YAML green on current HEAD; CI wired
+3. `NoNewStudentActorStateTest` + baseline YAML green on current HEAD; CI wired
+4. Both tests fail when tested against a synthetic PR that violates the rule (validation of the gate itself)
+5. Sprint 1 branch opened on 2026-04-27 with first commit: interface contracts for LearningSession aggregate
+6. EPIC-PRR-A task file + EPIC-PRR-C task file cross-refs updated with user-locked decisions ✅ (2026-04-20)
+7. Full `Cena.Actors.sln` builds cleanly with new arch tests
+8. Kill switch documented — if Sprint 1 fails the LOC rule itself, pause, do not stub
+
+### Task status
+
+- **Substeps 1, 6 landed 2026-04-20** (ADR Schedule Lock + epic cross-refs).
+- **Substeps 2-4 next** — arch tests (delegated to focused coder subagent 2026-04-20).
+- **Substep 5 awaits 2026-04-27** — Sprint 1 kickoff per locked schedule.
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
 
 ---

@@ -66,6 +66,20 @@ The absorbed task files remain in place as the executable unit-of-work; this epi
 
 ---
 
+## Sprint 1 kickoff decisions 2026-04-20 (user adopted all 5)
+
+1. **Sprint 1 start date locked**: 2026-04-27 (Monday). 6-week plan to 2026-06-07.
+2. **First aggregate extracted**: LearningSession (lowest coupling, highest new-feature magnet).
+3. **500-LOC test strictness**: git-blame-aware with grandfather whitelist. Existing oversize files baselined; PRs may only lower baselines, never raise. New files ≤500L from creation.
+4. **No new StudentActor state**: arch test fails if a PR increases the event-handler count inside `src/actors/Cena.Actors/Students/StudentActor*.cs` beyond the 2026-04-20 baseline. New handlers route to LearningSessionActor (post-extraction) or a documented `StudentActor.Pending` seam.
+5. **ConsentAggregate**: designed in this epic, event schema reviewed by EPIC-PRR-C owner before commit.
+
+See [ADR-0012 Schedule Lock section](../../docs/adr/0012-aggregate-decomposition.md) for full locked schedule, enforcement specification, grandfather baselines, and kill switch.
+
+**Tags**: user-decision=2026-04-20-sprint-1-locked
+
+---
+
 ## Implementation Protocol — Senior Architect
 
 Implementation of this epic must be driven by a senior-architect mindset, not a checklist. Before writing any code, the implementer (human or agent) must answer both sets of questions in writing — either in a task-comment, the PR description, or a `docs/decisions/` note:
