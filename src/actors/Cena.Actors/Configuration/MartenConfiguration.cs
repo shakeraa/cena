@@ -635,6 +635,9 @@ public static class MartenConfiguration
         opts.Events.AddEventType<QuestionFallbackLanguage_V1>();
         opts.Events.AddEventType<OnboardingCompleted_V1>(); // STB-00
         opts.Events.AddEventType<AgeAndConsentRecorded_V1>(); // FIND-privacy-001
+        // prr-052: student parent-visibility veto / restore events.
+        opts.Events.AddEventType<Cena.Actors.Consent.Events.StudentVisibilityVetoed_V1>();
+        opts.Events.AddEventType<Cena.Actors.Consent.Events.StudentVisibilityRestored_V1>();
 
         // STB-05b: Challenge events
         opts.Events.AddEventType<ChallengeStarted_V1>();
