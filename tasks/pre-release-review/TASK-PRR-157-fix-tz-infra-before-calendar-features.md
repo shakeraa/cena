@@ -14,18 +14,46 @@
 ---
 
 ## Goal
-Fix TZ infra before calendar features
 
-## Source
-Raised by persona-enterprise in persona YAMLs — see source docs above. Promoted from tight-match audit confirmed-orphans (prior audit ID O-056).
+Fix `FindSystemTimeZoneById("Israel Standard Time")` in [`PushNotificationTriggerService.cs:60`](../../src/actors/Cena.Actors/Notifications/PushNotificationTriggerService.cs#L60) that throws on Linux (actor-system-review L1). Extract shared TZ resolver. Prevent regression across repo.
+
+### Code-reality 2026-04-20 verification
+
+- [`OutreachSchedulerActor.cs:34-37`](../../src/actors/Cena.Actors/Outreach/OutreachSchedulerActor.cs#L34-L37) already has correct try/catch (`Asia/Jerusalem` IANA → `Israel` Windows-fallback)
+- [`PushNotificationTriggerService.cs:60`](../../src/actors/Cena.Actors/Notifications/PushNotificationTriggerService.cs#L60) uses Windows-only ID `"Israel Standard Time"` directly — throws on Linux (every CI run, every prod container)
+
+### User decision 2026-04-20 — tightened DoD
+
+1. Extract `src/shared/Cena.Infrastructure/Time/IsraelTimeZoneResolver.cs` — single source of truth with try/catch pattern
+2. Fix `PushNotificationTriggerService.cs:60` to consume resolver
+3. Refactor `OutreachSchedulerActor.cs:29-39` to consume resolver (remove duplicated try/catch)
+4. Linux-container integration test validates resolver on every CI run
+5. Architecture test: no direct `FindSystemTimeZoneById` / `ConvertTimeBySystemTimeZoneId` calls outside the resolver
+6. Repo-wide grep during implementation — fix any additional unguarded sites
+
+## Files
+
+- `src/shared/Cena.Infrastructure/Time/IsraelTimeZoneResolver.cs` (new)
+- `src/actors/Cena.Actors/Notifications/PushNotificationTriggerService.cs`
+- `src/actors/Cena.Actors/Outreach/OutreachSchedulerActor.cs`
+- `tests/integration/IsraelTimeZoneResolverLinuxTests.cs`
+- `tests/architecture/NoDirectSystemTimeZoneCallsTest.cs`
 
 ## Definition of Done
-- Proposal translated to concrete code / copy / policy change.
-- Tied to an existing ADR or a new micro-ADR if policy-level.
-- Tested where testable; otherwise reviewed by the raising lens.
+
+1. Resolver utility exists; both call sites consume it
+2. Linux integration test green
+3. Architecture test green (no direct TZ calls outside resolver)
+4. Repo grep confirms zero additional unguarded sites
+5. Full `Cena.Actors.sln` builds cleanly; all tests pass
+
+## Rolls up into EPIC-PRR-A Sprint 1 parallel track
+
+Ships alongside LearningSession extraction — calendar/session-start features depend on this primitive.
 
 ## Reporting
-complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-code --result "<branch>"
+
+complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
 
 ---
 

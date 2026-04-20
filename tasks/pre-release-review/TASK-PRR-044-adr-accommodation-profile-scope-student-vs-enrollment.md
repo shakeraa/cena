@@ -14,15 +14,53 @@
 ---
 
 ## Goal
-ADR deciding whether accommodations ride on student profile or per-enrollment; blocks AXIS-3 F1 dyscalculia + parent-visible accommodations.
+
+ADR for Accommodations aggregate scope + Ministry-parity claim. Accommodations are **durable profile settings** (NOT misconception data per ADR-0003 — Ministry lens confirmed: mirror Ministry-recognized diagnoses, audit-logged, persist across sessions).
+
+### Ministry lens read (2026-04-20, persona-ministry/axis3_accessibility_accommodations_findings.yaml)
+
+- Accommodations are durable, not session-scoped — ADR-0003 does not apply
+- **Parity claim required**: Cena runtime accommodations must be a superset of Ministry-recognized Bagrut exam accommodations (extended time, TTS, MathML, enlarged print, graph-paper overlay)
+- Arabic RTL math (F7) is shipping precondition for Arabic cohort (non-negotiable #6)
+- MathML pipeline (F6) understated in axis3 doc — Ministry wants ship-tier for blind/low-vision students
+
+### User decision 2026-04-20 — hybrid scope, Ministry-informed mandatory sections
+
+**Hybrid scope**:
+- **Student-profile-scoped** (follows institute transfers): core disability-backed accommodations — dyscalculia, dyslexia, ADHD, visual impairment, hearing impairment, physical/motor. Mirror Ministry-recognized diagnoses. Audit-logged with authorization source (diagnosis certificate / teacher / parent / student).
+- **Enrollment-scoped**: institute-specific variants — teacher-approved seating, institute's extra-time variant (25% vs 50%), language-of-instruction preference, institute-specific assistive-tech preferences.
+
+**ADR mandatory sections (all 6 required)**:
+
+1. Scope decision + rationale (hybrid per above)
+2. **Parity-claim matrix**: row per Ministry-recognized Bagrut accommodation; column mapping to Cena runtime accommodation; any Cena-only enhancement labeled "Cena-only, not Bagrut-certified"
+3. **Storage distinction**: Accommodations → durable aggregate (`StudentAccommodations` in student-profile context post Sprint 2); misconception data → session-scoped (ADR-0003); arch test enforces categories not co-located
+4. **Audit log requirement**: every accommodation change logged with authorization source; append-only; erasure via prr-003a crypto-shred preserves structure
+5. **Cross-tenant transfer semantics**: ADR-0001 Phase 2+ — profile-scoped accommodations follow, enrollment-scoped reset to defaults
+6. **Diagnosis-certificate attachment protocol** (if required by MoE) or explicit "pending MoE clarification" marker
 
 ## Files
-- docs/adr/NNNN-accommodation-profile-scope.md
+
+- `docs/adr/NNNN-accommodation-scope-and-bagrut-parity.md`
+- `docs/compliance/bagrut-accommodations-parity-matrix.md`
+- Cross-ref updates: ADR-0001 (multi-institute tenancy) + ADR-0003 (session-scope)
+- `tests/architecture/AccommodationStorageDistinctionTest.cs`
 
 ## Definition of Done
-- ADR accepted.
+
+1. ADR accepted with all 6 mandatory sections
+2. Parity matrix signed off by human-architect + Ministry-lens reviewer
+3. Storage-distinction arch test green
+4. Cross-references to ADR-0001 and ADR-0003 updated
+5. Diagnosis-certificate attachment protocol documented or explicitly deferred
+6. Full `Cena.Actors.sln` builds cleanly
+
+## Rolls up into EPIC-PRR-A
+
+Sprint 2+ scope — ADR must land before Accommodations aggregate is extracted from StudentActor (one of the three successor contexts per ADR-0012).
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
 
 ---

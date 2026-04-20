@@ -14,13 +14,29 @@
 ---
 
 ## Goal
-Ensure no persistent 'emotional state' field on student profile; session-only per ADR-0037.
+
+R-37 retirement follow-through: no persistent `emotional_state` / `mood` / `affect` field on any student-profile persistence surface. Affective signals are ADR-0037 session-scoped. Scanner + arch test prevent regression; no new feature work.
+
+### User decision 2026-04-20 — adopt as R-37 follow-through, no new design
+
+Minimal delta — the retirement was already decided. This task is the enforcement:
+
+1. **Arch test** (post Sprint 2 StudentProfile extraction): no `emotional_state*`, `mood*`, `affect*`, `feelings*`, `emotional*` field on any type in the StudentProfile aggregate tree or any DTO reachable from it. Session-scoped affective signals remain OK inside `LearningSession` aggregate scope only.
+2. **Scanner rule** (EPIC-PRR-D cluster D3): reject any locale/doc/code comment proposing "track student emotion" / "emotional profile" / "mood persistence" / "emotional state over time" framing. Adds to the banned-copy rule pack.
+3. **Sweep existing code**: grep `StudentState.cs`, `StudentProfileSnapshot.cs`, `MeStore.ts` for any current affective-state fields; retire each with a migration note.
 
 ## Files
-- StudentState + tests
+
+- `tests/architecture/NoEmotionalStateOnProfileTest.cs` (new, Sprint 2 timing)
+- `scripts/shipgate/banned-copy.yml` (EPIC-PRR-D cluster D3 — add emotional-profile terms)
+- Any currently-shipped affective-state fields on profile — to be swept and retired
 
 ## Definition of Done
-- Schema audited; arch test.
+
+1. Arch test green (no emotional-state fields on profile)
+2. Scanner rule active; fixture covers the banned terms
+3. Repo sweep report: zero remaining fields, or fields retired with migration notes
+4. Full `Cena.Actors.sln` builds cleanly
 
 ## Reporting
 complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-adr-authoring --result "<branch>"

@@ -14,18 +14,62 @@
 ---
 
 ## Goal
-Design ConsentAggregate + events
 
-## Source
-Raised by persona-enterprise in persona YAMLs — see source docs above. Promoted from tight-match audit confirmed-orphans (prior audit ID O-062).
+Design `ConsentAggregate` + its events as new bounded context replacing scattered consent state on `StudentActor` / `GdprConsentManager`. Lives in EPIC-PRR-A aggregate-design substrate; event schema reviewed by EPIC-PRR-C owner before commit.
+
+### User decision 2026-04-20 — design sketch + blocked-by + cross-review gate
+
+**Blocked-by (hard)**:
+
+- [prr-003a](./TASK-PRR-003a-adr-event-sourced-right-to-be-forgotten.md) — erasure model must be known before event schema commit; consent events carry subject-id + purpose strings = PII under erasure-field-classification map
+- prr-014 (EPIC-PRR-C parent auth role ADR) — age-band rules govern which actor roles can grant/revoke which purposes
+
+**Event schema sketch** (minimum 4 — ADR refines):
+
+| Event | Payload (minimum) |
+|---|---|
+| `ConsentGranted_V1` | subjectId, purpose, scope, grantedByRole, grantedByActorId, timestamp, expiresAt |
+| `ConsentRevoked_V1` | subjectId, purpose, revokedByRole, revokedByActorId, timestamp, reason |
+| `ConsentPurposeAdded_V1` | consentId, newPurpose, addedByRole, timestamp |
+| `ConsentReviewedByParent_V1` | studentSubjectId, parentActorId, purposesReviewed, outcome, timestamp |
+
+**Stream key**: `consent-{subjectId}` — subject is student OR parent (independent streams).
+
+**Relation to existing [`GdprConsentManager`](../../src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs)**: ConsentAggregate is new primitive (source of truth); GdprConsentManager refactored to thin read-side facade projecting events into existing DTO shape. Preserves API contract with current consumers.
+
+**Age-band interaction**: every event carries `ActorRole`; aggregate command-handler enforces age-band authorization invariants from prr-014. A 14-year-old cannot grant consent for purposes that require a parent. Invariant enforced in aggregate code, not at API edge.
+
+**Cross-review gate**: EPIC-PRR-C owner must sign off on event schema via PR comment before merge. Non-negotiable per EPIC-PRR-C coordination contract.
+
+## Files
+
+- `src/actors/Cena.Actors/Consent/ConsentAggregate.cs` (new)
+- `src/actors/Cena.Actors/Consent/Events/` — 4 events above
+- `src/actors/Cena.Actors/Consent/ConsentCommands.cs`
+- `src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs` (refactor to facade)
+- `docs/adr/NNNN-consent-aggregate.md` (micro-ADR)
+- `tests/unit/Consent/` + `tests/integration/Consent/`
+- `tests/architecture/ConsentAggregateNoProfileCouplingTest.cs`
 
 ## Definition of Done
-- Proposal translated to concrete code / copy / policy change.
-- Tied to an existing ADR or a new micro-ADR if policy-level.
-- Tested where testable; otherwise reviewed by the raising lens.
+
+1. prr-003a accepted (blocker) — erasure model known
+2. prr-014 accepted (blocker) — age-band rules known
+3. ConsentAggregate + 4 events implemented; command handlers enforce age-band invariants
+4. GdprConsentManager refactored to facade; DTO API unchanged (arch test asserts)
+5. PII fields wired through `EncryptedFieldAccessor` per prr-003a erasure contract
+6. **EPIC-PRR-C owner PR sign-off** on event schema recorded in merge commit
+7. No consent state on StudentActor/StudentProfile post-merge (arch test)
+8. Full `Cena.Actors.sln` builds cleanly; all tests pass
+9. Micro-ADR committed cross-referencing prr-003a + prr-014
+
+## Rolls up into EPIC-PRR-A Sprint 2-3
+
+Coordinate with Parent Aggregate work in EPIC-PRR-C (same sprint window).
 
 ## Reporting
-complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-code --result "<branch>"
+
+complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-consent-aggregate --result "<branch>"
 
 ---
 
