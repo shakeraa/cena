@@ -50,7 +50,57 @@ public sealed class CenaClaimsTransformer : IClaimsTransformation
             }
         }
 
+        // prr-009 / ADR-0041: parent_of carries per-(student, institute)
+        // binding entries. Wire shape from Firebase is a JSON array of
+        // objects; explode into individual per-entry claims so
+        // ParentAuthorizationGuard can FindAll("parent_of") and parse
+        // one object per call.
+        ExtractParentOfClaims(identity);
+
         return Task.FromResult(principal);
+    }
+
+    /// <summary>
+    /// ADR-0041: parent_of is a per-(student, institute) binding cache.
+    /// Input shapes accepted from Firebase custom claims:
+    ///   - JSON array of objects: [{"studentId":"s1","instituteId":"i1"}, ...]
+    ///   - Single JSON object: {"studentId":"s1","instituteId":"i1"}
+    /// Array input is exploded into one-per-entry claims. Single-object
+    /// and pre-exploded inputs are left untouched. Malformed input is
+    /// dropped so downstream cannot mistake garbage for a valid binding.
+    /// </summary>
+    private static void ExtractParentOfClaims(ClaimsIdentity identity)
+    {
+        var claims = identity.FindAll("parent_of").ToList();
+        if (claims.Count == 0) return;
+
+        // Already exploded (>1 entry) — assume claims were added directly
+        // by a test harness or an earlier transformer pass.
+        if (claims.Count > 1) return;
+
+        var raw = claims[0];
+        try
+        {
+            using var doc = JsonDocument.Parse(raw.Value);
+            var root = doc.RootElement;
+
+            if (root.ValueKind != JsonValueKind.Array)
+                return; // Single-object / scalar — leave as-is.
+
+            identity.RemoveClaim(raw);
+            foreach (var el in root.EnumerateArray())
+            {
+                if (el.ValueKind != JsonValueKind.Object) continue;
+                identity.AddClaim(new Claim("parent_of", el.GetRawText()));
+            }
+        }
+        catch (JsonException)
+        {
+            // Malformed parent_of — drop so downstream cannot mistake it
+            // for a valid binding. No logging (non-PII structural error,
+            // log spam gives no operator value).
+            identity.RemoveClaim(raw);
+        }
     }
 
     private static void ExtractClaim(

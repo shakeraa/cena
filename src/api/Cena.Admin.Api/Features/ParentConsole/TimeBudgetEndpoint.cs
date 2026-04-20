@@ -16,10 +16,14 @@
 using System.Security.Claims;
 using Cena.Actors.ParentalControls;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Security;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api.Features.ParentConsole;
@@ -76,8 +80,11 @@ public static class TimeBudgetEndpoint
         if (string.IsNullOrWhiteSpace(studentAnonId))
             return Results.BadRequest(new { error = "missing-studentAnonId" });
 
-        if (!CallerCanReadParentalControls(http))
-            return Results.Forbid();
+        // prr-009 / ADR-0041: PARENT callers MUST go through
+        // ParentAuthorizationGuard. ADMIN / SUPER_ADMIN rely on the
+        // institute-scope gate below + Marten's TenantScope at query time.
+        var authResult = await AuthorizeParentOrAdminAsync(http, studentAnonId, ct).ConfigureAwait(false);
+        if (authResult is not null) return authResult;
 
         using var session = store.QuerySession();
         var latest = await session.Events
@@ -128,12 +135,23 @@ public static class TimeBudgetEndpoint
         if (request is null)
             return Results.BadRequest(new { error = "missing-body" });
 
-        var parentAnonId = http.User.FindFirst("parentAnonId")?.Value
-            ?? http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrWhiteSpace(parentAnonId))
-            return Results.Unauthorized();
+        // prr-009 / ADR-0041: writes are PARENT-only. The guard enforces
+        // (parentActorId, studentAnonId, instituteId) binding — any
+        // mismatch throws ForbiddenException which we render as 403.
         if (!http.User.IsInRole("PARENT"))
             return Results.Forbid();
+
+        ParentChildBindingResolution binding;
+        try
+        {
+            binding = await RequireParentBindingAsync(http, studentAnonId, ct).ConfigureAwait(false);
+        }
+        catch (ForbiddenException ex) when (ex.ErrorCode == ErrorCodes.CENA_AUTH_IDOR_VIOLATION)
+        {
+            return Results.Forbid();
+        }
+
+        var parentAnonId = binding.ParentActorId;
 
         if (request.WeeklyMinutes < 0)
             return Results.BadRequest(new { error = "negative-weekly-minutes" });
@@ -197,5 +215,68 @@ public static class TimeBudgetEndpoint
            || http.User.IsInRole("ADMIN")
            || http.User.IsInRole("SUPER_ADMIN");
 
-    private sealed class TimeBudgetEndpointMarker { }
+    /// <summary>
+    /// Reads the institute that the guard should check the binding
+    /// against. Source: the caller's JWT <c>institute_id</c> claim
+    /// (populated at login / session-refresh). A parent with multi-institute
+    /// visibility uses separate sessions per institute — switching
+    /// institutes for the same session is out of scope for prr-009 and
+    /// tracked in ADR-0041 "multi-institute parent visibility".
+    /// </summary>
+    internal static string ResolveInstituteId(HttpContext http)
+    {
+        var claims = TenantScope.GetInstituteFilter(http.User, defaultInstituteId: null);
+        return claims.Count == 0 ? string.Empty : claims[0];
+    }
+
+    /// <summary>
+    /// prr-009: call ParentAuthorizationGuard on a PARENT caller; return
+    /// null on success; return a 403 IResult on any IDOR-violation throw.
+    /// Non-PARENT callers that legitimately read the route (ADMIN /
+    /// SUPER_ADMIN) fall through the <c>CallerCanReadParentalControls</c>
+    /// role gate. Any other caller gets 403.
+    /// </summary>
+    internal static async Task<IResult?> AuthorizeParentOrAdminAsync(
+        HttpContext http, string studentAnonId, CancellationToken ct)
+    {
+        if (http.User.IsInRole("PARENT"))
+        {
+            try
+            {
+                await RequireParentBindingAsync(http, studentAnonId, ct).ConfigureAwait(false);
+                return null;
+            }
+            catch (ForbiddenException ex) when (ex.ErrorCode == ErrorCodes.CENA_AUTH_IDOR_VIOLATION)
+            {
+                return Results.Forbid();
+            }
+        }
+        return CallerCanReadParentalControls(http) ? null : Results.Forbid();
+    }
+
+    /// <summary>
+    /// Invokes <see cref="ParentAuthorizationGuard.AssertCanAccessAsync"/>
+    /// with the per-request DI-resolved service + logger. Callers handle
+    /// the thrown <see cref="ForbiddenException"/> themselves. Keeps the
+    /// architecture ratchet's regex on exactly one well-known call site.
+    /// </summary>
+    internal static async Task<ParentChildBindingResolution> RequireParentBindingAsync(
+        HttpContext http, string studentAnonId, CancellationToken ct)
+    {
+        var services = http.RequestServices;
+        var bindingService = services.GetRequiredService<IParentChildBindingService>();
+        var logger = services.GetRequiredService<ILogger<TimeBudgetEndpointMarker>>();
+        var instituteId = ResolveInstituteId(http);
+        if (string.IsNullOrWhiteSpace(instituteId))
+        {
+            throw new ForbiddenException(
+                ErrorCodes.CENA_AUTH_IDOR_VIOLATION,
+                "PARENT caller is missing a required institute_id claim.");
+        }
+        return await ParentAuthorizationGuard.AssertCanAccessAsync(
+            http.User, studentAnonId, instituteId, bindingService, logger, ct)
+            .ConfigureAwait(false);
+    }
+
+    internal sealed class TimeBudgetEndpointMarker { }
 }

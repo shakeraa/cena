@@ -90,6 +90,16 @@ public static class CenaAdminServiceRegistration
                 sp.GetRequiredService<ILogger<Services.SlackWebhookSecurityNotifier>>());
         });
 
+        // prr-009 / ADR-0041: Parent → child binding store + guard service.
+        // Phase 1 ships with the in-memory store; Sprint 2 swaps the
+        // registration to a Marten-backed variant (EPIC-PRR-A follow-up)
+        // without touching any endpoint code. The service adapter bridges
+        // the Actors-side store to the Infrastructure-side guard interface.
+        services.TryAddSingleton<Cena.Actors.Parent.IParentChildBindingStore,
+            Cena.Actors.Parent.InMemoryParentChildBindingStore>();
+        services.TryAddScoped<Cena.Infrastructure.Security.IParentChildBindingService,
+            Cena.Actors.Parent.ParentChildBindingService>();
+
         // ADM-004 through ADM-016: Admin API services
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
