@@ -36,8 +36,14 @@ namespace Cena.Actors.Tutor;
 // (task_routing.socratic_question).
 // prr-046: finops cost-center "socratic" — highest-volume student-facing path;
 // the bulk of projected tier-3 spend lives here.
+// ADR-0046: TutorMessageService runs ITutorPromptScrubber (FIND-privacy-008)
+// upstream, with the per-student StudentPiiContext, before the prompt reaches
+// this service. That per-context scrubber is the authoritative scrub for the
+// Tutor seam; ADR-0046's generic IPiiPromptScrubber would be strictly weaker
+// here. See TutorMessageService.BuildPromptAsync.
 [TaskRouting("tier3", "socratic_question")]
 [FeatureTag("socratic")]
+[PiiPreScrubbed("TutorPromptScrubber (FIND-privacy-008) runs upstream in TutorMessageService.BuildPromptAsync with per-student StudentPiiContext. That scrubber is stricter than the ADR-0046 baseline.")]
 public sealed class ClaudeTutorLlmService : ITutorLlmService
 {
     private readonly AnthropicClient _client;

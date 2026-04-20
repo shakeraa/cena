@@ -25,7 +25,9 @@ public sealed class ErrorClassificationServiceTests
     public ErrorClassificationServiceTests()
     {
         _meterFactory = new ClassificationMeterFactory();
-        _service = new ErrorClassificationService(_llm, _logger, _meterFactory, NullLlmCostMetric.Instance);
+        _service = new ErrorClassificationService(
+            _llm, _logger, _meterFactory, NullLlmCostMetric.Instance,
+            NullPiiPromptScrubber.Instance);
     }
 
     // =========================================================================

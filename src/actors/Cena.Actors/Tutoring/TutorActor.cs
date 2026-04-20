@@ -120,6 +120,10 @@ public sealed record TutoringRejected(string Methodology, string Reason);
 // cost-center as ClaudeTutorLlmService because both are the Socratic
 // conversational surface. The SpendPerTurn difference between the two is
 // visible via the model_id label on the counter.
+// ADR-0046: TutorActor composes the student's free-text message directly into
+// its user prompt (see GenerateOpeningAsync / GenerateResponseAsync). Injects
+// IPiiPromptScrubber and fails closed to the safety fallback on any scrub
+// event. IPiiPromptScrubber is injected; DI wires it from AddPiiPromptScrubber.
 [TaskRouting("tier3", "socratic_question")]
 [FeatureTag("socratic")]
 [AllowsUncachedLlm("Multi-turn dialogue: each turn uniquely conditioned on conversation history and student message. System-prompt cache handled by CacheSystemPrompt flag on LlmRequest.")]
@@ -146,6 +150,7 @@ public sealed class TutorActor : IActor
     private readonly ILogger<TutorActor> _logger;
     private readonly IClock _clock;
     private readonly ILlmCostMetric _costMetric;
+    private readonly IPiiPromptScrubber _piiScrubber;
 
     // Per-student daily token tracking (shared across all TutorActor instances).
     // Key: "tutor:{studentId}:{yyyy-MM-dd}", Value: cumulative output tokens.
@@ -178,7 +183,8 @@ public sealed class TutorActor : IActor
         IExplanationCacheService explanationCache,
         ILogger<TutorActor> logger,
         IClock clock,
-        ILlmCostMetric costMetric)
+        ILlmCostMetric costMetric,
+        IPiiPromptScrubber? piiScrubber = null)
     {
         _llm = llm;
         _promptBuilder = promptBuilder;
@@ -188,6 +194,10 @@ public sealed class TutorActor : IActor
         _logger = logger;
         _clock = clock;
         _costMetric = costMetric;
+        // ADR-0046: scrubber defaults to NullPiiPromptScrubber for unit tests
+        // that construct TutorActor directly. Production DI wires the real
+        // scrubber via AddPiiPromptScrubber().
+        _piiScrubber = piiScrubber ?? NullPiiPromptScrubber.Instance;
     }
 
     public Task ReceiveAsync(IContext context)
@@ -477,11 +487,24 @@ public sealed class TutorActor : IActor
 
         var (systemPrompt, userPrompt) = _promptBuilder.Build(promptContext);
 
+        // ADR-0046 Decision 4 — fail-closed on scrubber increment. The student
+        // message is in userPrompt; if the scrubber finds residual PII,
+        // refuse the LLM call and serve the safety fallback.
+        var scrub = _piiScrubber.Scrub(userPrompt, "socratic");
+        if (scrub.RedactionCount > 0)
+        {
+            _logger.LogWarning(
+                "[ADR-0046] PII detected in tutor-opening prompt — refusing LLM call for session {SessionId}. " +
+                "Categories=[{Categories}].",
+                _sessionId, string.Join(",", scrub.Categories));
+            return GetSafetyFallback();
+        }
+
         try
         {
             var llmResponse = await _llm.CompleteAsync(new LlmRequest(
                 SystemPrompt: systemPrompt,
-                UserPrompt: userPrompt,
+                UserPrompt: scrub.ScrubbedText,
                 Temperature: 0.4f,
                 MaxTokens: 500,
                 ModelId: "claude-sonnet-4-6-20260215",
@@ -562,11 +585,24 @@ public sealed class TutorActor : IActor
 
         var (systemPrompt, userPrompt) = _promptBuilder.Build(promptContext);
 
+        // ADR-0046 Decision 4 — fail-closed on scrubber increment. Student
+        // free-text enters the prompt; if the scrubber fires, refuse the
+        // LLM call and serve the safety deflection.
+        var scrub = _piiScrubber.Scrub(userPrompt, "socratic");
+        if (scrub.RedactionCount > 0)
+        {
+            _logger.LogWarning(
+                "[ADR-0046] PII detected in tutor-response prompt — refusing LLM call for session {SessionId}. " +
+                "Categories=[{Categories}].",
+                _sessionId, string.Join(",", scrub.Categories));
+            return GetSafetyDeflection();
+        }
+
         try
         {
             var llmResponse = await _llm.CompleteAsync(new LlmRequest(
                 SystemPrompt: systemPrompt,
-                UserPrompt: userPrompt,
+                UserPrompt: scrub.ScrubbedText,
                 Temperature: 0.4f,
                 MaxTokens: 500,
                 ModelId: "claude-sonnet-4-6-20260215",

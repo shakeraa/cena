@@ -31,7 +31,8 @@ public sealed class PersonalizedExplanationServiceTests : IDisposable
             NullLogger<PersonalizedExplanationService>.Instance,
             _meterFactory,
             _clock,
-            NullLlmCostMetric.Instance);
+            NullLlmCostMetric.Instance,
+            NullPiiPromptScrubber.Instance);
 
         // Reset static token tracking between tests
         PersonalizedExplanationService.ResetDailyTokenTracking();

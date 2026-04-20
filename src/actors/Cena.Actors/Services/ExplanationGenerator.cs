@@ -65,23 +65,32 @@ public interface IExplanationGenerator
 // prr-046: finops cost-center "explanation-l2". Shares the `full_explanation`
 // routing row with L3ExplanationGenerator but bills separately so finops can
 // see the L2/L3 split in the cost-projection dashboard.
+// ADR-0046: composes StudentAnswer free-text. Injects IPiiPromptScrubber and
+// fails closed (returns a generic safe explanation) on any scrub event.
 [TaskRouting("tier3", "full_explanation")]
 [FeatureTag("explanation-l2")]
 [AllowsUncachedLlm("Caller performs IExplanationCacheService.GetAsync before invoking this generator; result is cached by the orchestrator on success.")]
 public sealed class ExplanationGenerator : IExplanationGenerator
 {
+    private const string FeatureLabel = "explanation-l2";
+    private const string SafeFallbackExplanation =
+        "Review this concept with your teacher and try again.";
+
     private readonly ILlmClient _llm;
     private readonly ILogger<ExplanationGenerator> _logger;
     private readonly ILlmCostMetric _costMetric;
+    private readonly IPiiPromptScrubber _piiScrubber;
 
     public ExplanationGenerator(
         ILlmClient llm,
         ILogger<ExplanationGenerator> logger,
-        ILlmCostMetric costMetric)
+        ILlmCostMetric costMetric,
+        IPiiPromptScrubber piiScrubber)
     {
         _llm = llm;
         _logger = logger;
         _costMetric = costMetric;
+        _piiScrubber = piiScrubber;
     }
 
     public async Task<GeneratedExplanation> GenerateAsync(ExplanationContext context, CancellationToken ct)
@@ -90,10 +99,24 @@ public sealed class ExplanationGenerator : IExplanationGenerator
         var userPrompt = BuildUserPrompt(context);
         var maxTokens = DetermineMaxTokens(context);
 
+        // ADR-0046 Decision 4 — fail-closed on scrubber increment.
+        var scrub = _piiScrubber.Scrub(userPrompt, FeatureLabel);
+        if (scrub.RedactionCount > 0)
+        {
+            _logger.LogWarning(
+                "[ADR-0046] PII detected in explanation-l2 prompt — refusing LLM call. " +
+                "Categories=[{Categories}]. Returning safe fallback. See ADR-0046 runbook.",
+                string.Join(",", scrub.Categories));
+            return new GeneratedExplanation(
+                Text: SafeFallbackExplanation,
+                ModelId: "cena-pii-fail-closed-v1",
+                TokenCount: 0);
+        }
+
         var request = new LlmRequest(
             ModelId: "sonnet",
             SystemPrompt: systemPrompt,
-            UserPrompt: userPrompt,
+            UserPrompt: scrub.ScrubbedText,
             Temperature: 0.3f,
             MaxTokens: maxTokens);
 
@@ -105,7 +128,7 @@ public sealed class ExplanationGenerator : IExplanationGenerator
 
         // prr-046: per-feature cost tag on success path.
         _costMetric.Record(
-            feature: "explanation-l2",
+            feature: FeatureLabel,
             tier: "tier3",
             task: "full_explanation",
             modelId: response.ModelId,

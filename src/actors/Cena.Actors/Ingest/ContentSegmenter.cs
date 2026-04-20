@@ -34,9 +34,15 @@ public interface IContentSegmenter
 // deduplicates on content hash before reaching this service, so the same
 // page is never segmented twice.
 // prr-046: finops cost-center "content-segmentation". Batch ingest path.
+// ADR-0046: prompt is composed from OCR'd textbook page content only — admin
+// ingest pipeline material, NEVER student free-text or profile fields. This
+// seam's input provenance is tracked end-to-end (IngestBatchAggregate) and
+// the provenance gate rejects anything sourced from student input, so the
+// structured-placeholder rule has no PII to govern here.
 [TaskRouting("tier3", "knowledge_graph_extraction")]
 [FeatureTag("content-segmentation")]
 [AllowsUncachedLlm("Unique per OCR'd page; upstream ingest pipeline dedupes on content hash so the same page is never segmented twice.")]
+[PiiPreScrubbed("Prompt composed exclusively from OCR'd textbook page content (admin ingest pipeline); upstream provenance gate rejects student-sourced input. No student PII or free-text reaches this seam.")]
 public sealed class ContentSegmenter : IContentSegmenter
 {
     private readonly ILlmClient _llm;

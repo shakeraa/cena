@@ -29,8 +29,14 @@ namespace Cena.Infrastructure.Llm;
 // the LLM-routing scanner; [DelegatesLlmCost] satisfies the cost-metric
 // ratchet without spuriously emitting cost events (the cost is billed by
 // whichever caller is consulting the cache).
+// ADR-0046: cache layer; scrubbing is the responsibility of the [TaskRouting]
+// service whose prompt is about to be cached. The cache key is a SHA256 hash
+// of the prompt (see PromptCacheKeyBuilder), so even if unscrubbed PII reached
+// the key-builder, the stored key never contains the raw bytes. The cached
+// value is the LLM response, not the input.
 [TaskRouting("tier3", "prompt_cache")]
 [DelegatesLlmCost("calling service emits cost on cache-miss LLM path")]
+[PiiPreScrubbed("Cache layer — scrubbing is the [TaskRouting] caller's responsibility. Cache key is a SHA256 digest, not the raw prompt; cached value is the LLM response, not the input. See ADR-0046 §Decision 3.")]
 public sealed class RedisPromptCache : IPromptCache
 {
     private readonly IConnectionMultiplexer _redis;

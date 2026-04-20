@@ -52,6 +52,9 @@ allowlist:
   - path: "src/actors/Cena.Actors.Tests/"
     reason: "All test projects — mocks and fakes; no production LLM calls."
 
+  - path: "src/shared/Cena.Infrastructure.Tests/"
+    reason: "All test projects — mocks and fakes; no production LLM calls."
+
   - path: "src/actors/Cena.Actors/Tutor/ITutorLlmService.cs"
     reason: "Interface declaration — no call site, just the contract."
 

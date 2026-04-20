@@ -29,8 +29,14 @@ namespace Cena.Actors.Diagnosis;
 // contracts/llm/routing-config.yaml §2 (task_routing.stagnation_analysis /
 // error_classification family). Low temperature, small max_tokens.
 // prr-046: finops cost-center "stuck-classification". Shadow-mode classifier.
+// ADR-0046: prompt is a structured JSON payload built from anonymised
+// StuckContext (studentAnonId, not studentId; textScrubbed field for
+// question text; numeric mastery/advancement signals). No raw student
+// free-text or profile PII reaches this seam — the scrub is structural
+// at the payload-build boundary (BuildUserPayload) rather than regex.
 [TaskRouting("tier2", "stagnation_analysis")]
 [FeatureTag("stuck-classification")]
+[PiiPreScrubbed("Prompt is a structured JSON payload of anonymised StuckContext (studentAnonId, textScrubbed, numeric mastery/advancement). No student free-text or profile PII reaches this seam. See BuildUserPayload.")]
 public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
 {
     private readonly AnthropicClient _client;

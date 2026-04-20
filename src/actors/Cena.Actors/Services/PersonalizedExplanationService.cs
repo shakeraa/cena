@@ -139,6 +139,10 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
     // Per-student daily token tracking: key = "student:{budgetKey}:{yyyy-MM-dd}"
     private static readonly ConcurrentDictionary<string, int> s_dailyTokens = new();
 
+    // ADR-0046 feature label; mirrors [FeatureTag] so the PII-scrub metric's
+    // label lines up with the cost metric's.
+    private const string FeatureLabel = "explanation-l3";
+
     private readonly ILlmClient _llm;
     private readonly IExplanationCacheService _cache;
     private readonly ILogger<PersonalizedExplanationService> _logger;
@@ -148,6 +152,7 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
     private readonly Counter<long> _budgetExhaustedCounter;
     private readonly Counter<long> _confusionSuppressedCounter;
     private readonly ILlmCostMetric _featureCost;
+    private readonly IPiiPromptScrubber _piiScrubber;
 
     public PersonalizedExplanationService(
         ILlmClient llm,
@@ -155,13 +160,15 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
         ILogger<PersonalizedExplanationService> logger,
         IMeterFactory meterFactory,
         IClock clock,
-        ILlmCostMetric featureCost)
+        ILlmCostMetric featureCost,
+        IPiiPromptScrubber piiScrubber)
     {
         _llm = llm;
         _cache = cache;
         _logger = logger;
         _clock = clock;
         _featureCost = featureCost;
+        _piiScrubber = piiScrubber;
 
         var meter = meterFactory.Create("Cena.Actors.PersonalizedExplanation", "1.0.0");
         _latencyHistogram = meter.CreateHistogram<double>(
@@ -236,9 +243,20 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
             var maxTokens = DetermineMaxTokens(
                 effectiveScaffolding, ctx.BloomLevel, ctx.QuestionDifficulty, ctx.MasteryProbability);
 
+            // ADR-0046 Decision 4 — fail-closed on scrubber increment.
+            var scrub = _piiScrubber.Scrub(userPrompt, FeatureLabel);
+            if (scrub.RedactionCount > 0)
+            {
+                _logger.LogWarning(
+                    "[ADR-0046] PII detected in personalized-explanation prompt — refusing LLM call. " +
+                    "Categories=[{Categories}]. Falling back to L2 cache.",
+                    string.Join(",", scrub.Categories));
+                return await FallbackToL2Async(ctx, ct);
+            }
+
             var llmRequest = new LlmRequest(
                 SystemPrompt: systemPrompt,
-                UserPrompt: userPrompt,
+                UserPrompt: scrub.ScrubbedText,
                 Temperature: ExplanationTemperature,
                 MaxTokens: maxTokens,
                 ModelId: SonnetModelId,
