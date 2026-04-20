@@ -50,7 +50,9 @@ public class AccommodationProfileTests
     [InlineData(AccommodationDimension.HighContrastTheme)]
     [InlineData(AccommodationDimension.ReducedAnimations)]
     [InlineData(AccommodationDimension.ProgressIndicatorToggle)]
-    public void IsEnabled_refuses_phase_1b_dimensions_even_if_present_in_set(
+    // NOTE: LdAnxiousFriendly (prr-029) intentionally not listed — it IS
+    // shipped in Phase 1B and must activate. See LdAnxiousHintGovernorTests.
+    public void IsEnabled_refuses_unshipped_phase_1b_dimensions_even_if_present_in_set(
         AccommodationDimension phase1bDimension)
     {
         // Even if an older event / replay has a Phase 1B dimension in

@@ -68,7 +68,27 @@ public enum AccommodationDimension
     TtsForHints = 5,
     HighContrastTheme = 6,
     ReducedAnimations = 7,
-    ProgressIndicatorToggle = 8
+    ProgressIndicatorToggle = 8,
+
+    /// <summary>
+    /// LD-anxious-friendly hint governor (prr-029). NOT Ministry-issued —
+    /// this is a Cena-native self/parent opt-in that rewrites the L1 hint
+    /// template into a concrete worked-step example instead of the default
+    /// terse nudge. Zero LLM calls; pure template expansion. Shipped as a
+    /// Phase-1B additive dimension (see <see cref="Phase1BDimensions"/>).
+    ///
+    /// WHY a separate dimension instead of overloading DistractionReducedLayout:
+    /// the hint-content change is orthogonal to layout decisions — a student
+    /// can benefit from worked-example L1 hints without needing the
+    /// one-problem-per-page layout and vice versa. Cognitive-science backing:
+    /// Sweller & Renkl's worked-example effect (d≈0.4–0.6) is especially
+    /// strong for novice / anxious learners whose working memory is taxed by
+    /// the affective load of "I'm stuck again" (Pekrun 2014 — performance
+    /// anxiety narrows working-memory capacity). A terse "Consider how X
+    /// applies here" imposes higher extraneous load than a concrete
+    /// "Try this step: …" on that population.
+    /// </summary>
+    LdAnxiousFriendly = 9
 }
 
 /// <summary>
@@ -86,6 +106,33 @@ public static class Phase1ADimensions
             AccommodationDimension.TtsForProblemStatements,
             AccommodationDimension.DistractionReducedLayout,
             AccommodationDimension.NoComparativeStats
+        };
+
+    public static bool IsShipped(AccommodationDimension d) => Shipped.Contains(d);
+}
+
+/// <summary>
+/// Dimensions that Phase 1B ships additively on top of Phase 1A. The
+/// set is the live "we render this now" gate for dimensions introduced
+/// after the Phase 1A freeze (RDY-066). A dimension must appear here
+/// AND in the event's <c>EnabledDimensions</c> for any derived
+/// accessor to return <c>true</c> — the <see cref="AccommodationProfile.IsEnabled"/>
+/// helper consults the union of Phase 1A + Phase 1B.
+///
+/// prr-029 ships <see cref="AccommodationDimension.LdAnxiousFriendly"/>
+/// as the first Phase-1B live dimension. The remaining 1B rows
+/// (TtsForHints, HighContrastTheme, ReducedAnimations,
+/// ProgressIndicatorToggle) are still blocked on their authoring /
+/// contrast-audit upstream work and are NOT listed here — an event
+/// replay that carries them in the set will still be refused by the
+/// IsEnabled gate.
+/// </summary>
+public static class Phase1BDimensions
+{
+    public static readonly IReadOnlySet<AccommodationDimension> Shipped =
+        new HashSet<AccommodationDimension>
+        {
+            AccommodationDimension.LdAnxiousFriendly
         };
 
     public static bool IsShipped(AccommodationDimension d) => Shipped.Contains(d);
@@ -126,10 +173,13 @@ public sealed record AccommodationProfile(
 {
     /// <summary>
     /// True when a dimension is enabled for this student. Always false
-    /// for dimensions that are not yet shipped (Phase 1A guard).
+    /// for dimensions that are not yet shipped (Phase 1A ∪ Phase 1B
+    /// guard). Adding a dimension to the enum is harmless; adding it
+    /// to the shipped set is the live toggle.
     /// </summary>
     public bool IsEnabled(AccommodationDimension dimension)
-        => Phase1ADimensions.IsShipped(dimension) && EnabledDimensions.Contains(dimension);
+        => (Phase1ADimensions.IsShipped(dimension) || Phase1BDimensions.IsShipped(dimension))
+           && EnabledDimensions.Contains(dimension);
 
     // =========================================================================
     // Session-pipeline consumer helpers (PRR-151 R-22 wiring fix).
@@ -193,6 +243,25 @@ public sealed record AccommodationProfile(
     /// </summary>
     public bool NoComparativeStatsRequired
         => IsEnabled(AccommodationDimension.NoComparativeStats);
+
+    /// <summary>
+    /// True when the LD-anxious hint governor (prr-029) must rewrite
+    /// the L1 hint template into a concrete worked-step example rather
+    /// than the default terse prerequisite nudge. Consumed by
+    /// <c>Cena.Actors.Hints.ILdAnxiousHintGovernor</c> in the student
+    /// session hint pipeline.
+    ///
+    /// WHY: Pekrun (2014) documents that performance anxiety narrows
+    /// working-memory capacity, which amplifies Sweller's extraneous
+    /// cognitive load. For novice / anxious learners, a "Consider how
+    /// X applies here" nudge imposes the same indirection cost as a
+    /// rephrased question — Renkl &amp; Atkinson 2003 faded-worked-
+    /// examples (d≈0.4–0.6) show the concrete-step template is
+    /// strictly more effective for that population. No LLM call —
+    /// deterministic template substitution.
+    /// </summary>
+    public bool LdAnxiousHintGovernorEnabled
+        => IsEnabled(AccommodationDimension.LdAnxiousFriendly);
 
     /// <summary>
     /// Convenience: a default "no accommodations" profile for students

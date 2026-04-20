@@ -11,6 +11,7 @@ using Cena.Actors.Accommodations;
 using Cena.Actors.Bus;
 using Cena.Actors.Diagnosis;
 using Cena.Actors.Events;
+using Cena.Actors.Hints;
 using Cena.Actors.Mastery;
 using Cena.Actors.Projections;
 using Cena.Actors.Questions;
@@ -1117,7 +1118,9 @@ public static class SessionEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/sessions/{sessionId}/question/{questionId}/hint — request a progressive hint
-        group.MapPost("/{sessionId}/question/{questionId}/hint", async (string sessionId, string questionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IHintGenerator hintGenerator, [FromServices] IHintStuckDecisionService stuckDecision, ILogger<SessionLogMarker> logger, SessionHintRequest request) =>
+        // prr-029: IAccommodationProfileService + ILdAnxiousHintGovernor inject the
+        // LD-anxious L1 worked-example rewrite. No-op when the profile flag is off.
+        group.MapPost("/{sessionId}/question/{questionId}/hint", async (string sessionId, string questionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IHintGenerator hintGenerator, [FromServices] IHintStuckDecisionService stuckDecision, [FromServices] IAccommodationProfileService accommodationProfiles, [FromServices] ILdAnxiousHintGovernor ldAnxiousGovernor, ILogger<SessionLogMarker> logger, SessionHintRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -1246,6 +1249,38 @@ public static class SessionEndpoints
                 ConceptState: conceptState);
 
             var hintContent = hintGenerator.Generate(hintRequest);
+
+            // prr-029: LD-anxious hint governor. No-op when the student's
+            // accommodation profile does not include the LdAnxiousFriendly
+            // dimension; when enabled, rewrites L1 hint bodies into a
+            // concrete worked-step example (Renkl/Sweller worked-example
+            // effect). Fail-open — any governor error must never block
+            // hint rendering for the student.
+            try
+            {
+                var accommodationProfile = await accommodationProfiles
+                    .GetCurrentAsync(studentId, ctx.RequestAborted);
+
+                // institute_id for the engagement metric: the student claim
+                // carries the institute scope when a multi-institute tenant
+                // is resolved; fall back to "unknown" (matches the governor's
+                // defensive default).
+                var instituteId =
+                    ctx.User.FindFirstValue("institute_id")
+                    ?? ctx.User.FindFirstValue("tenant_id")
+                    ?? string.Empty;
+
+                hintContent = ldAnxiousGovernor.Apply(
+                    hintContent, hintRequest, accommodationProfile, instituteId);
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "[SIEM] LdAnxiousHintGovernor failed; falling back to raw "
+                    + "hint for student {StudentId}, session {SessionId}, "
+                    + "question {QuestionId}",
+                    studentId, sessionId, questionId);
+            }
 
             logger.LogInformation("[SIEM] HintGenerated: Student {StudentId}, session {SessionId}, question {QuestionId}, level {HintLevel}",
                 studentId, sessionId, questionId, effectiveHintLevel);
