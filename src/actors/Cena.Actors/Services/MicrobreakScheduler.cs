@@ -3,14 +3,14 @@
 //
 // The single highest-impact change from the 20-iteration autoresearch.
 // Frontiers in Psychology (2025): 90-second micro-breaks every 10 minutes
-// produced Cohen's d = 1.784 improvement in sustained attention.
+// produced Cohen's d = 1.784 improvement in sustained attention (citation_id=frontiers-2025-microbreaks — see contracts/citations/approved-citations.yml).
 //
 // Two-tier break system:
 //   Tier 1 (Proactive): Microbreaks BEFORE focus drops — 60-90s, scheduled
 //   Tier 2 (Reactive):  Recovery breaks AFTER focus drops — 5-30 min, existing
 //
 // References:
-// - Frontiers in Psychology (2025): "Sustaining student concentration" — d = 1.784
+// - Frontiers in Psychology (2025): "Sustaining student concentration" — d = 1.784 (citation_id=frontiers-2025-microbreaks)
 // - Kitayama et al. (2022): systematic microbreaks → positive performance
 // - Biwer et al. (2023): systematic breaks → efficiency + mood restoration
 // - Attention Restoration Theory: nature exposure restores attentional resources

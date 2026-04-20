@@ -51,6 +51,14 @@ This file is whitelisted in
 - Variant: predicted Bagrut based on mastery.
 - Variant: predicted exam score widget.
 - Variant: exam readiness score (banned outcome-prediction framing).
+- Variant: 72% chance of passing the Bagrut.
+- Variant: your 85% chance of succeeding this year.
+- Variant: likelihood of passing based on current mastery.
+- Variant: probability of scoring above 80 on the exam.
+- Variant: odds of Bagrut success given your trajectory.
+- Variant: forecast your Bagrut score by unit.
+- Variant: projected grade based on mastery curve.
+- Variant: estimated Bagrut grade for your cohort.
 
 ## Hebrew variants (verify with native-speaker team before enforcement)
 
@@ -64,6 +72,9 @@ This file is whitelisted in
 - מהרי לסיים — hurry (imperative feminine singular).
 - נותרו רק 3 ימים — only 3 days left (scarcity).
 - ציון הבגרות החזוי — predicted Bagrut score.
+- 75% סיכוי לעבור את הבגרות — X% chance of passing (Hebrew).
+- ההסתברות להצלחה בבגרות — probability of Bagrut (Hebrew).
+- הציון המשוער שלך — your estimated/projected score (Hebrew).
 
 ## Arabic variants (verify with native-speaker team before enforcement)
 
@@ -76,3 +87,6 @@ This file is whitelisted in
 - اسرع الآن لإنهاء الوحدة — hurry (urgency: الآن).
 - فقط 2 يوم متبقي — only 2 days left (scarcity).
 - علامة البجروت المتوقعة — predicted Bagrut score.
+- 80% فرصة النجاح في البجروت — X% chance of passing (Arabic).
+- احتمالية النجاح في البجروت — probability of Bagrut success (Arabic).
+- العلامة المتوقعة — estimated/projected score (Arabic).

@@ -276,6 +276,7 @@ const EXCLUDE_REGEXES = [
 const FIXTURE_FILES = {
   citations: "shipgate/fixtures/banned-citation-sample.md",
   mechanics: "shipgate/fixtures/banned-mechanics-sample.md",
+  "effect-size": "shipgate/fixtures/effect-size-citations-sample.md",
 };
 
 function collectFiles() {
@@ -312,6 +313,11 @@ const PACKS = [
     name: "mechanics",
     rulesFile: "scripts/shipgate/banned-mechanics.yml",
     whitelistFile: "scripts/shipgate/banned-mechanics-whitelist.yml",
+  },
+  {
+    name: "effect-size",
+    rulesFile: "scripts/shipgate/effect-size-citations.yml",
+    whitelistFile: "scripts/shipgate/effect-size-citations-whitelist.yml",
   },
 ];
 
