@@ -67,6 +67,7 @@ public static class SessionEndpoints
             [FromServices] Cena.Actors.Sessions.ISessionPlanGenerator planGenerator,
             [FromServices] Cena.Actors.Sessions.ISessionPlanWriter planWriter,
             [FromServices] Cena.Actors.Sessions.ISessionPlanNotifier planNotifier,
+            [FromServices] Cena.Actors.Tutoring.ISessionTutorContextService tutorContext,
             ILogger<SessionLogMarker> logger,
             SessionStartRequest request) =>
         {
@@ -237,6 +238,32 @@ public static class SessionEndpoints
                     "Session continues; GET /plan will 404 until the next session.",
                     sessionId);
             }
+
+            // ── prr-204: Pre-seed the session-scoped tutor context cache ──
+            //
+            // Fire-and-forget so a Redis outage or cold cache never blocks
+            // session start. The first GET /tutor-context on a cache-miss
+            // rebuilds from Marten, so a failed pre-seed degrades silently
+            // to a one-time extra Postgres round-trip. Tenant label comes
+            // from the caller's institute claim — ADR-0001 tenant scope.
+            var preSeedInstitute =
+                ctx.User.FindFirstValue("institute_id")
+                ?? ctx.User.FindFirstValue("tenant_id");
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    await tutorContext.PreSeedAsync(
+                        sessionId, studentId, preSeedInstitute, CancellationToken.None);
+                }
+                catch (Exception preSeedEx)
+                {
+                    logger.LogWarning(preSeedEx,
+                        "prr-204: tutor context pre-seed failed for session {SessionId}; " +
+                        "first GET /tutor-context will rebuild from Marten",
+                        sessionId);
+                }
+            });
 
             return Results.Ok(new SessionStartResponse(
                 SessionId: sessionId,
@@ -1059,7 +1086,8 @@ public static class SessionEndpoints
         group.MapPost("/{sessionId}/complete", async (
             string sessionId,
             HttpContext ctx,
-            IDocumentStore store) =>
+            IDocumentStore store,
+            [FromServices] Cena.Actors.Tutoring.ISessionTutorContextService tutorContext) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -1091,6 +1119,19 @@ public static class SessionEndpoints
 
             session.Events.Append(studentId, endedEvent);
             await session.SaveChangesAsync();
+
+            // prr-204 / ADR-0003: invalidate the session-scoped tutor context
+            // cache on session end so the misconception tag + counts do not
+            // outlive the session. Best-effort — a Redis outage here still
+            // lets the Redis TTL clean up eventually.
+            try
+            {
+                await tutorContext.InvalidateAsync(sessionId, ctx.RequestAborted);
+            }
+            catch (Exception)
+            {
+                // logged inside the service; endpoint stays 200.
+            }
 
             var totalAnswered = queue.TotalQuestionsAttempted;
             var accuracyPercent = totalAnswered > 0

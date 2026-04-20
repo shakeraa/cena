@@ -300,6 +300,17 @@ public partial class Program
     // the new POST .../hint/next route.
     Cena.Actors.Hints.HintLadderRegistration.AddHintLadder(builder.Services);
 
+    // prr-204: SessionTutorContextService — session-scoped tutor context cache
+    // that the Sidekick drawer + hint-ladder consumers read via
+    // GET /api/v1/sessions/{sid}/tutor-context. Redis session-TTL cache
+    // backed by a live Marten fallback; strictly session-scoped per ADR-0003
+    // (misconception tag lives here, never on the student profile). The
+    // architecture test NoTutorContextPersistenceTest locks the scope
+    // boundary at test-time.
+    builder.Services.AddSingleton<
+        Cena.Actors.Tutoring.ISessionTutorContextService,
+        Cena.Actors.Tutoring.SessionTutorContextService>();
+
     // ---- RDY-034: Flow state service (consumes ICognitiveLoadService) ----
     // Registered in both actor + student hosts so the assessment endpoint
     // and any in-process actor consumer resolve the same implementation.
@@ -873,6 +884,14 @@ public partial class Program
     // from the inline /hint endpoint so the ladder ratchet does not couple
     // to the deprecated single-hint path.
     app.MapHintLadderEndpoint();
+
+    // prr-204: tutor context endpoint — GET /api/v1/sessions/{sid}/tutor-context
+    // per ADR-0003. Session-scoped Redis cache + live Marten fallback; the
+    // Sidekick drawer + hint-ladder consumers read the current session's
+    // tutor context (counts, rung, misconception tag, attempt phase, budget,
+    // accommodations). Tenant-scoped — cross-tenant or cross-student reads
+    // return 403 with a SIEM audit entry.
+    app.MapTutorContextEndpoint();
 
     // prr-149: GET /api/session/{sessionId}/plan (scheduler plan read)
     app.MapSessionPlanEndpoints();
