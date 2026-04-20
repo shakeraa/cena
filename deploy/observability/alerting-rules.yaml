@@ -117,6 +117,128 @@ groups:
             daily 25k output-token cap per student. Triage immediately.
           runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cache-runbook.md"
 
+      # ─────────────────────────────────────────────────────────────────
+      # prr-046 — Per-feature LLM cost projection alert
+      # Projected monthly spend per feature = 7d rolling × (30/7). Fires
+      # when that projection exceeds the ceiling recorded in
+      # contracts/llm/routing-config.yaml §feature_monthly_ceiling_usd.
+      # The ceiling is emitted as a static recording rule, so the alert
+      # expr compares two time-series and is self-explanatory.
+      # Runbook entry (TODO: write at docs/operations/llm-cost-runbook.md):
+      #   1. Which feature crossed ceiling — $labels.feature.
+      #   2. Which model did the drift come from — check the
+      #      "Feature × model mix" panel on the cost-projection dashboard.
+      #   3. If a routing-config change shipped in the last 24h,
+      #      consider rolling back; otherwise raise the ceiling in the
+      #      YAML only after finops sign-off (ADR-0026 §Consequences).
+      # Ceilings are placeholder numbers per task DoD — product MUST
+      # replace them before GA, otherwise this alert warns on
+      # artificially low thresholds.
+      # ─────────────────────────────────────────────────────────────────
+      - alert: CenaLlmFeatureProjectedMonthlySpendOverCeiling
+        expr: >-
+          (
+            sum by (feature) (increase(cena_llm_call_cost_usd_total[7d])) * 30/7
+          )
+          > on(feature)
+          group_left
+          (
+            label_replace(
+              label_replace(
+                # Ceiling time-series is emitted by a static recording rule
+                # (see CenaLlmFeatureMonthlyCeilingUsd below); one sample per
+                # feature per scrape.
+                cena_llm_feature_monthly_ceiling_usd,
+                "feature", "$1", "feature", "(.+)"
+              ),
+              "__name__", "", "", ""
+            )
+          )
+        for: 30m
+        labels:
+          severity: warning
+          team: cena-finops
+        annotations:
+          summary: "LLM feature {{ $labels.feature }} projected to exceed monthly ceiling"
+          description: >-
+            Feature {{ $labels.feature }} is projected to spend ${{ $value | humanize }} / month
+            (7d rolling × 30/7), exceeding the configured ceiling in
+            contracts/llm/routing-config.yaml §feature_monthly_ceiling_usd.
+            Verify with the "Projected monthly spend per feature" panel on the
+            LLM Cost Projection dashboard. If the drift came from a routing-config
+            change, roll back before raising the ceiling.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cost-runbook.md"
+
+      # prr-046: ceiling source-of-truth. Hand-maintained recording rule
+      # mirroring contracts/llm/routing-config.yaml §feature_monthly_ceiling_usd
+      # so Prometheus can compare the projection against a stored time-series.
+      # Keep this block in sync with the YAML. A feature missing a ceiling
+      # here fires CenaLlmFeatureUnknownFeatureSpend below.
+  - name: cena-llm-cost-projection-ceilings
+    interval: 1m
+    rules:
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(12000)"
+        labels: { feature: socratic }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(10)"
+        labels: { feature: hint-l1 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(500)"
+        labels: { feature: hint-l2 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(2000)"
+        labels: { feature: hint-l3 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(3000)"
+        labels: { feature: explanation-l2 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(5000)"
+        labels: { feature: explanation-l3 }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(300)"
+        labels: { feature: classification }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(2500)"
+        labels: { feature: question-generation }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(500)"
+        labels: { feature: quality-gate }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(800)"
+        labels: { feature: figure-generation }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(600)"
+        labels: { feature: content-segmentation }
+      - record: cena_llm_feature_monthly_ceiling_usd
+        expr: "vector(400)"
+        labels: { feature: stuck-classification }
+
+  - name: cena-llm-cost-projection-unknown-feature
+    interval: 5m
+    rules:
+      # prr-046: catch features that spend $ but have no ceiling entry. A
+      # non-empty result here means a developer added a new [FeatureTag]
+      # value without adding the ceiling row to routing-config.yaml. The
+      # alert is severity:info so operators see it without paging.
+      - alert: CenaLlmFeatureMissingCeiling
+        expr: >-
+          sum by (feature) (increase(cena_llm_call_cost_usd_total[1d])) > 0
+          unless on (feature) cena_llm_feature_monthly_ceiling_usd
+        for: 15m
+        labels:
+          severity: info
+          team: cena-finops
+        annotations:
+          summary: "LLM feature {{ $labels.feature }} has spend but no ceiling"
+          description: >-
+            Feature {{ $labels.feature }} emitted non-zero cost in the last 24h
+            but has no entry in contracts/llm/routing-config.yaml
+            §feature_monthly_ceiling_usd. Add a ceiling row (and update
+            alerting-rules.yaml recording rules) so the projection alert can fire.
+
+  - name: cena-deploy-health-continued
+    rules:
       # Migrator job running too long (> 5 min)
       - alert: CenaMigratorSlow
         expr: >-

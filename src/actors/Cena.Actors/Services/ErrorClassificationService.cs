@@ -67,7 +67,11 @@ public interface IErrorClassificationService
 // classification is the cheapest call in the explain chain (~$0.001) and its
 // result is what KEYs the downstream explanation cache, so caching here would
 // just push one indirection deeper without cutting tokens.
+// prr-046: finops cost-center "classification". Tier-2 error classification
+// shares the routing row with future wrong-answer classifiers; the feature
+// label lets finops separate wrong-answer spend from other tier-2 usage.
 [TaskRouting("tier2", "error_classification")]
+[FeatureTag("classification")]
 [AllowsUncachedLlm("Classification keyed by free-form student answer text — no repeatable prompt to cache. Result is itself a cache key for the explain tier.")]
 public sealed class ErrorClassificationService : IErrorClassificationService
 {
@@ -82,14 +86,17 @@ public sealed class ErrorClassificationService : IErrorClassificationService
     private readonly ILogger<ErrorClassificationService> _logger;
     private readonly Histogram<double> _classificationLatency;
     private readonly Counter<long> _classificationCounter;
+    private readonly ILlmCostMetric _costMetric;
 
     public ErrorClassificationService(
         ILlmClient llm,
         ILogger<ErrorClassificationService> logger,
-        IMeterFactory meterFactory)
+        IMeterFactory meterFactory,
+        ILlmCostMetric costMetric)
     {
         _llm = llm;
         _logger = logger;
+        _costMetric = costMetric;
 
         var meter = meterFactory.Create("Cena.Actors.ErrorClassification", "1.0.0");
         _classificationLatency = meter.CreateHistogram<double>(
@@ -122,6 +129,15 @@ public sealed class ErrorClassificationService : IErrorClassificationService
                 new KeyValuePair<string, object?>("model_id", response.ModelId));
             _classificationCounter.Add(1,
                 new KeyValuePair<string, object?>("model_id", response.ModelId));
+
+            // prr-046: per-feature cost tag on success path.
+            _costMetric.Record(
+                feature: "classification",
+                tier: "tier2",
+                task: "error_classification",
+                modelId: response.ModelId,
+                inputTokens: response.InputTokens,
+                outputTokens: response.OutputTokens);
 
             var errorType = ParseClassification(response.Content);
 

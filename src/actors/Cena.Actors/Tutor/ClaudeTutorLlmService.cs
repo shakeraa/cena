@@ -34,7 +34,10 @@ namespace Cena.Actors.Tutor;
 // ADR-0026: Socratic tutoring is the canonical tier-3 (Sonnet) path. Primary
 // model is claude_sonnet_4_6 per contracts/llm/routing-config.yaml §2
 // (task_routing.socratic_question).
+// prr-046: finops cost-center "socratic" — highest-volume student-facing path;
+// the bulk of projected tier-3 spend lives here.
 [TaskRouting("tier3", "socratic_question")]
+[FeatureTag("socratic")]
 public sealed class ClaudeTutorLlmService : ITutorLlmService
 {
     private readonly AnthropicClient _client;
@@ -44,6 +47,7 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
     private readonly IStaticHintLadderFallback _staticFallback;
     private readonly IDailyTutorTimeBudget _dailyBudget;
     private readonly ILogger<ClaudeTutorLlmService> _logger;
+    private readonly ILlmCostMetric _costMetric;
 
     /// <summary>
     /// Synthetic model id emitted when a turn is served from the static hint
@@ -62,12 +66,14 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
         ISocraticCallBudget callBudget,
         IStaticHintLadderFallback staticFallback,
         IDailyTutorTimeBudget dailyBudget,
-        ILogger<ClaudeTutorLlmService> logger)
+        ILogger<ClaudeTutorLlmService> logger,
+        ILlmCostMetric costMetric)
     {
         _logger = logger;
         _callBudget = callBudget;
         _staticFallback = staticFallback;
         _dailyBudget = dailyBudget;
+        _costMetric = costMetric;
 
         var apiKey = configuration["Cena:Llm:ApiKey"]
             ?? throw new InvalidOperationException("Cena:Llm:ApiKey is required for ClaudeTutorLlmService");
@@ -179,6 +185,18 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
             var inputTokens = response.Usage?.InputTokens ?? 0;
             var outputTokens = response.Usage?.OutputTokens ?? 0;
             totalTokens = (int)(inputTokens + outputTokens);
+
+            // prr-046: per-feature cost tag on success path. institute_id is
+            // intentionally omitted — TutorContext does not thread tenant
+            // scope through yet; the metric falls back to "unknown" so the
+            // global socratic spend is still counted. See prr-084 follow-up.
+            _costMetric.Record(
+                feature: "socratic",
+                tier: "tier3",
+                task: "socratic_question",
+                modelId: _model,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens);
 
             // Only record budget after a successful LLM response — failed
             // attempts do not consume the 3-call session cap.

@@ -27,6 +27,7 @@ using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
+using Cena.Infrastructure.Llm;
 using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Observability.ErrorAggregator;
 using Cena.Infrastructure.Moderation;
@@ -329,6 +330,11 @@ public partial class Program
     // set here has near-zero cost on non-math/physics paths.
     builder.Services.AddSingleton<Cena.Actors.Gateway.AnthropicLlmClient>();
     builder.Services.AddSingleton<Cena.Actors.Gateway.ILlmClient, Cena.Actors.Gateway.LlmClientRouter>();
+
+    // prr-046: per-feature LLM cost metric. Fail-loud pricing from routing-config.yaml.
+    builder.Services.AddLlmCostMetric(Path.Combine(
+        builder.Environment.ContentRootPath,
+        Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
 
     builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
 

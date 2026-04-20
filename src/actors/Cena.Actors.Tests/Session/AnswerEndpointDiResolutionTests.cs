@@ -18,6 +18,7 @@ using Cena.Actors.Services.ErrorPatternMatching;
 using Cena.Actors.Services.ErrorPatternMatching.BuggyRuleMatchers;
 using Cena.Actors.Serving;
 using Cena.Actors.Tutoring;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Diagnostics.Metrics;
@@ -52,6 +53,10 @@ public sealed class AnswerEndpointDiResolutionTests
         // LLM stack (RDY-033c).
         services.AddSingleton<AnthropicLlmClient>();
         services.AddSingleton<ILlmClient, LlmClientRouter>();
+        // prr-046: cost metric required by every [TaskRouting] consumer.
+        // Test graph uses the null implementation — production hosts wire
+        // the real LlmCostMetric via AddLlmCostMetric(routing-config path).
+        services.AddSingleton<ILlmCostMetric>(NullLlmCostMetric.Instance);
 
         // CAS stack (RDY-033 / ADR-0002).
         services.AddSingleton<IMathNetVerifier, MathNetVerifier>();

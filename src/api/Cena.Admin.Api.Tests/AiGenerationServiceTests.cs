@@ -5,6 +5,7 @@
 using System.Diagnostics.Metrics;
 using Cena.Actors.Cas;
 using Cena.Admin.Api;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -26,7 +27,7 @@ public class AiGenerationServiceTests
         gateMode.CurrentMode.Returns(CasGateMode.Off);
         return new AiGenerationService(
             NullLogger<AiGenerationService>.Instance, config, meterFactory,
-            scopeFactory, gateMode);
+            scopeFactory, gateMode, NullLlmCostMetric.Instance);
     }
 
     [Fact]

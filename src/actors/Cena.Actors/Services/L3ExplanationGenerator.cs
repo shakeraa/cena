@@ -43,17 +43,27 @@ public interface IL3ExplanationGenerator
 // success. Inlining the cache here would double-dip the same Redis key. The
 // CacheSystemPrompt=true flag on the LlmRequest still activates Anthropic's
 // provider-side system-prompt cache per routing-config §6.system_prompt.
+// prr-046: finops cost-center "explanation-l3". Shares the `full_explanation`
+// routing row with ExplanationGenerator (L2 fallback), but bills separately
+// so finops can see if L3 usage drifts upward — over-use of L3 signals a
+// scaffolding regression (ADR-0045 §3 rationale).
 [TaskRouting("tier3", "full_explanation")]
+[FeatureTag("explanation-l3")]
 [AllowsUncachedLlm("L3 fires only on L2 cache miss; caller (ExplanationOrchestrator) owns the cache read/write cycle. System prompt itself is cached via Anthropic cache_control.")]
 public sealed class L3ExplanationGenerator : IL3ExplanationGenerator
 {
     private readonly ILlmClient _llm;
     private readonly ILogger<L3ExplanationGenerator> _logger;
+    private readonly ILlmCostMetric _costMetric;
 
-    public L3ExplanationGenerator(ILlmClient llm, ILogger<L3ExplanationGenerator> logger)
+    public L3ExplanationGenerator(
+        ILlmClient llm,
+        ILogger<L3ExplanationGenerator> logger,
+        ILlmCostMetric costMetric)
     {
         _llm = llm;
         _logger = logger;
+        _costMetric = costMetric;
     }
 
     public async Task<GeneratedExplanation?> GenerateAsync(
@@ -105,6 +115,15 @@ public sealed class L3ExplanationGenerator : IL3ExplanationGenerator
             request.ScaffoldingLevel, request.Methodology, maxTokens);
 
         var response = await _llm.CompleteAsync(llmRequest, ct);
+
+        // prr-046: per-feature cost tag on success path.
+        _costMetric.Record(
+            feature: "explanation-l3",
+            tier: "tier3",
+            task: "full_explanation",
+            modelId: response.ModelId,
+            inputTokens: response.InputTokens,
+            outputTokens: response.OutputTokens);
 
         return new GeneratedExplanation(response.Content, response.ModelId, response.OutputTokens);
     }

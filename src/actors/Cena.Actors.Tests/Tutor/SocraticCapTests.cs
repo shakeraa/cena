@@ -21,6 +21,7 @@
 
 using Cena.Actors.RateLimit;
 using Cena.Actors.Tutor;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging.Abstractions;
 using NSubstitute;
@@ -52,7 +53,8 @@ public sealed class SocraticCapTests
 
     private ClaudeTutorLlmService NewSut() => new(
         TestConfig(), _budget, _fallback, _dailyBudget,
-        NullLogger<ClaudeTutorLlmService>.Instance);
+        NullLogger<ClaudeTutorLlmService>.Instance,
+        NullLlmCostMetric.Instance);
 
     // ── Test 1: under the cap, budget gate passes, LLM path is reached ──
     [Fact]

@@ -24,7 +24,13 @@ using StackExchange.Redis;
 
 namespace Cena.Infrastructure.Llm;
 
+// prr-046: RedisPromptCache does not itself make LLM calls — it is the
+// cache layer that fronts them. The existing [TaskRouting] tag satisfies
+// the LLM-routing scanner; [DelegatesLlmCost] satisfies the cost-metric
+// ratchet without spuriously emitting cost events (the cost is billed by
+// whichever caller is consulting the cache).
 [TaskRouting("tier3", "prompt_cache")]
+[DelegatesLlmCost("calling service emits cost on cache-miss LLM path")]
 public sealed class RedisPromptCache : IPromptCache
 {
     private readonly IConnectionMultiplexer _redis;
