@@ -20,7 +20,10 @@ public sealed class L3ExplanationGeneratorTests
     public L3ExplanationGeneratorTests()
     {
         _generator = new L3ExplanationGenerator(
-            _llm, NullLogger<L3ExplanationGenerator>.Instance, NullLlmCostMetric.Instance);
+            _llm,
+            NullLogger<L3ExplanationGenerator>.Instance,
+            NullLlmCostMetric.Instance,
+            NullPiiPromptScrubber.Instance);
     }
 
     // =========================================================================

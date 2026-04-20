@@ -48,9 +48,13 @@ public interface IAiFigureGenerator
 // scaffolded (CallLlmForFigureSpec returns null); when wired to
 // AiGenerationService (future work), it will delegate cost emission to that
 // service — same diagram-generation row.
+// ADR-0046: admin tool — prompt is composed from question text that was
+// already produced + CAS-gated upstream. No student profile fields or
+// student free-text ever reach this seam.
 [TaskRouting("tier3", "diagram_generation")]
 [FeatureTag("figure-generation")]
 [DelegatesLlmCost("AiGenerationService (when wired); currently scaffolded")]
+[PiiPreScrubbed("Admin tool — prompt composed from already-authored question text at figure-generation time. No student profile fields or student free-text enter this seam.")]
 public sealed class AiFigureGenerator : IAiFigureGenerator
 {
     private readonly ILogger<AiFigureGenerator> _logger;

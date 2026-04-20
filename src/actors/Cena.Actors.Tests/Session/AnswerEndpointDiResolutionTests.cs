@@ -57,6 +57,10 @@ public sealed class AnswerEndpointDiResolutionTests
         // Test graph uses the null implementation — production hosts wire
         // the real LlmCostMetric via AddLlmCostMetric(routing-config path).
         services.AddSingleton<ILlmCostMetric>(NullLlmCostMetric.Instance);
+        // prr-022 / ADR-0046: IPiiPromptScrubber required by the same consumers.
+        // Test graph uses the null implementation — production hosts wire the
+        // real scrubber via AddPiiPromptScrubber().
+        services.AddSingleton<IPiiPromptScrubber>(NullPiiPromptScrubber.Instance);
 
         // CAS stack (RDY-033 / ADR-0002).
         services.AddSingleton<IMathNetVerifier, MathNetVerifier>();

@@ -70,6 +70,11 @@ public interface IErrorClassificationService
 // prr-046: finops cost-center "classification". Tier-2 error classification
 // shares the routing row with future wrong-answer classifiers; the feature
 // label lets finops separate wrong-answer spend from other tier-2 usage.
+// ADR-0046: this service composes StudentAnswer free-text into its user prompt.
+// It injects IPiiPromptScrubber and fails closed (returns the safe default
+// PartialUnderstanding) if the scrubber detects residual PII — that path is
+// the canonical demonstration of ADR-0046 Decision 4 ("fail-closed on counter
+// increment"). An unscrubbed call is never made to the LLM.
 [TaskRouting("tier2", "error_classification")]
 [FeatureTag("classification")]
 [AllowsUncachedLlm("Classification keyed by free-form student answer text — no repeatable prompt to cache. Result is itself a cache key for the explain tier.")]
@@ -82,21 +87,30 @@ public sealed class ErrorClassificationService : IErrorClassificationService
     private const float ClassificationTemperature = 0.0f;
     private const int ClassificationMaxTokens = 200;
 
+    /// <summary>
+    /// Feature tag reused for the cost metric AND for the PII-scrub counter —
+    /// must match the <see cref="FeatureTagAttribute"/> value on the class.
+    /// </summary>
+    private const string FeatureLabel = "classification";
+
     private readonly ILlmClient _llm;
     private readonly ILogger<ErrorClassificationService> _logger;
     private readonly Histogram<double> _classificationLatency;
     private readonly Counter<long> _classificationCounter;
     private readonly ILlmCostMetric _costMetric;
+    private readonly IPiiPromptScrubber _piiScrubber;
 
     public ErrorClassificationService(
         ILlmClient llm,
         ILogger<ErrorClassificationService> logger,
         IMeterFactory meterFactory,
-        ILlmCostMetric costMetric)
+        ILlmCostMetric costMetric,
+        IPiiPromptScrubber piiScrubber)
     {
         _llm = llm;
         _logger = logger;
         _costMetric = costMetric;
+        _piiScrubber = piiScrubber;
 
         var meter = meterFactory.Create("Cena.Actors.ErrorClassification", "1.0.0");
         _classificationLatency = meter.CreateHistogram<double>(
@@ -115,9 +129,28 @@ public sealed class ErrorClassificationService : IErrorClassificationService
 
         try
         {
+            var userPrompt = BuildUserPrompt(input);
+
+            // ADR-0046 Decision 4 — fail-closed on scrubber increment.
+            // The PII scrubber returns RedactionCount > 0 iff it found a
+            // residual pattern (email, phone, government_id, address, postal
+            // code). By design of ADR-0046, that MUST NOT reach the LLM —
+            // serve the pedagogically-neutral PartialUnderstanding default
+            // and trust the scrubber's fail-closed metric to raise a
+            // severity-1 alert for the on-call engineer.
+            var scrub = _piiScrubber.Scrub(userPrompt, FeatureLabel);
+            if (scrub.RedactionCount > 0)
+            {
+                _logger.LogWarning(
+                    "[ADR-0046] PII detected in error-classification prompt — refusing LLM call. " +
+                    "Categories=[{Categories}]. Returning PartialUnderstanding. See ADR-0046 runbook.",
+                    string.Join(",", scrub.Categories));
+                return ExplanationErrorType.PartialUnderstanding;
+            }
+
             var request = new LlmRequest(
                 SystemPrompt: BuildSystemPrompt(),
-                UserPrompt: BuildUserPrompt(input),
+                UserPrompt: scrub.ScrubbedText,
                 Temperature: ClassificationTemperature,
                 MaxTokens: ClassificationMaxTokens,
                 ModelId: HaikuModelId);
@@ -132,7 +165,7 @@ public sealed class ErrorClassificationService : IErrorClassificationService
 
             // prr-046: per-feature cost tag on success path.
             _costMetric.Record(
-                feature: "classification",
+                feature: FeatureLabel,
                 tier: "tier2",
                 task: "error_classification",
                 modelId: response.ModelId,
