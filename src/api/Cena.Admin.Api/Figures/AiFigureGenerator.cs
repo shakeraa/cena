@@ -7,6 +7,7 @@
 // =============================================================================
 
 using System.Text.Json;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api.Figures;
@@ -40,6 +41,10 @@ public interface IAiFigureGenerator
 /// Uses the LLM to propose a FigureSpec JSON, validates it against the schema
 /// and CAS (for physics equilibrium checks), and retries up to MaxAttempts.
 /// </summary>
+// ADR-0045: Multi-attempt figure-spec JSON generation with quality-gate retry
+// loop (≤3 attempts). Shares the `diagram_generation` routing row (Kimi K2.5
+// primary, Sonnet fallback) in contracts/llm/routing-config.yaml. Tier 3.
+[TaskRouting("tier3", "diagram_generation")]
 public sealed class AiFigureGenerator : IAiFigureGenerator
 {
     private readonly ILogger<AiFigureGenerator> _logger;

@@ -40,8 +40,8 @@ grandfathered:
     baseline_loc: 1429
     reason: "Historical seed data; will be replaced by CAS-gated pipeline output (ADR-0032)"
   - path: src/api/Cena.Admin.Api/AiGenerationService.cs
-    baseline_loc: 783
-    reason: "Pre-2026-04-20 legacy; split into Prompt/Compose/Verify pipelines is a follow-up"
+    baseline_loc: 785
+    reason: "Pre-2026-04-20 legacy; split into Prompt/Compose/Verify pipelines is a follow-up. prr-145 added ADR-0045 [TaskRouting] attribute + 5-line rationale comment (+2 LOC)."
   - path: src/api/Cena.Admin.Api/AdminUserService.cs
     baseline_loc: 530
     reason: "Pre-2026-04-20 legacy; extract tenant-scoping helpers is a follow-up"
@@ -57,8 +57,8 @@ grandfathered:
     baseline_loc: 743
     reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"
   - path: src/api/Cena.Student.Api.Host/Program.cs
-    baseline_loc: 604
-    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. PRR-151 R-22 added IAccommodationProfileService DI registration (+4 LOC). prr-148 + prr-149 added StudentPlan + scheduler wiring (+24 LOC)."
+    baseline_loc: 605
+    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. PRR-151 R-22 added IAccommodationProfileService DI registration (+4 LOC). prr-148 + prr-149 added StudentPlan + scheduler wiring (+24 LOC). prr-012 added AddTutorCostCaps() call (+1 LOC) — further wiring lives in TutorServiceRegistration.cs to keep the composition root compact."
 
   # ---- Actor runtime (pre-2026-04-20 legacy) ----
   - path: src/actors/Cena.Actors.Host/Program.cs
@@ -68,8 +68,8 @@ grandfathered:
     baseline_loc: 699
     reason: "Pre-2026-04-20 legacy; EPIC-PRR-A Sprint 1 extraction will absorb most of this"
   - path: src/actors/Cena.Actors/Tutoring/TutorActor.cs
-    baseline_loc: 616
-    reason: "Pre-2026-04-20 legacy; split by conversation-phase handler is a follow-up"
+    baseline_loc: 619
+    reason: "Pre-2026-04-20 legacy; split by conversation-phase handler is a follow-up. prr-145 added ADR-0045 [TaskRouting]+[AllowsUncachedLlm] attributes + rationale comment (+3 LOC)."
   - path: src/actors/Cena.Actors/Bus/NatsBusRouter.cs
     baseline_loc: 594
     reason: "Pre-2026-04-20 legacy; split by subject-group router is a follow-up"

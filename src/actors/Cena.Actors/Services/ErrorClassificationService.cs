@@ -13,6 +13,7 @@ using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Microsoft.Extensions.Logging;
 using Cena.Actors.Gateway;
+using Cena.Infrastructure.Llm;
 
 namespace Cena.Actors.Services;
 
@@ -55,6 +56,19 @@ public interface IErrorClassificationService
 // IMPLEMENTATION
 // =============================================================================
 
+// ADR-0045: 5-class enum classification (ConceptualMisunderstanding, ProceduralError,
+// CarelessMistake, Guessing, PartialUnderstanding) — 200 output tokens, temp=0.
+// Canonical tier-2 path. Routing row: contracts/llm/routing-config.yaml
+// §task_routing.error_classification (Kimi primary, Haiku fallback).
+//
+// prr-047: classification output depends on the free-form StudentAnswer string,
+// which has infinite variety. Caching by exact answer text would yield ~0% hit
+// rate and waste Redis space. This is a legitimate cache bypass — error
+// classification is the cheapest call in the explain chain (~$0.001) and its
+// result is what KEYs the downstream explanation cache, so caching here would
+// just push one indirection deeper without cutting tokens.
+[TaskRouting("tier2", "error_classification")]
+[AllowsUncachedLlm("Classification keyed by free-form student answer text — no repeatable prompt to cache. Result is itself a cache key for the explain tier.")]
 public sealed class ErrorClassificationService : IErrorClassificationService
 {
     // Haiku fallback for error_classification (routing-config.yaml: Kimi primary, Haiku fallback)

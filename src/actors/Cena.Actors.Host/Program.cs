@@ -230,7 +230,7 @@ builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnfor
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
 // INF-019: Redis circuit breaker — protects explanation cache and messaging from Redis outages
 builder.Services.AddSingleton<Cena.Actors.Infrastructure.IRedisCircuitBreaker, Cena.Actors.Infrastructure.RedisCircuitBreaker>();
-builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>();
+builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>().AddSingleton<Cena.Infrastructure.Llm.IPromptCache, Cena.Infrastructure.Llm.RedisPromptCache>(); // prr-047 unified seam
 builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
 builder.Services.AddSingleton<IL3ExplanationGenerator, L3ExplanationGenerator>();
 builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();

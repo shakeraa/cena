@@ -8,6 +8,7 @@
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Cena.Actors.Gateway;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Ingest;
@@ -23,6 +24,17 @@ public interface IContentSegmenter
         CancellationToken ct);
 }
 
+// ADR-0045: OCR-to-structured-JSON extraction over a full textbook page
+// (4096 output tokens). Long-context structured extraction — tier 3. Shares
+// the `knowledge_graph_extraction` routing row (Kimi K2.5 primary, Sonnet
+// fallback) in contracts/llm/routing-config.yaml.
+//
+// prr-047: one-shot ingestion — each OCR'd page is unique, so a
+// response-level cache would be ~0% hits. The ingest pipeline itself
+// deduplicates on content hash before reaching this service, so the same
+// page is never segmented twice.
+[TaskRouting("tier3", "knowledge_graph_extraction")]
+[AllowsUncachedLlm("Unique per OCR'd page; upstream ingest pipeline dedupes on content hash so the same page is never segmented twice.")]
 public sealed class ContentSegmenter : IContentSegmenter
 {
     private readonly ILlmClient _llm;

@@ -10,6 +10,7 @@ using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
 using Cena.Infrastructure.Documents;
+using Cena.Infrastructure.Llm;
 using Marten;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
@@ -25,6 +26,12 @@ public interface IQualityGateService
     Task<QualityGateResult> EvaluateAsync(QualityGateInput input);
 }
 
+// ADR-0045: 0-100 rubric scoring across FactualAccuracy / LanguageQuality /
+// PedagogicalQuality via Haiku tool-use (temp=0.1, 1024 tokens). Deliberately
+// pinned to tier 2 — this evaluator runs on every AI-generated question and
+// must not drift to Sonnet cost. New routing row:
+// contracts/llm/routing-config.yaml §task_routing.quality_gate.
+[TaskRouting("tier2", "quality_gate")]
 public sealed class QualityGateService : IQualityGateService
 {
     private readonly QualityGateThresholds _thresholds;

@@ -199,6 +199,63 @@ task_routing:
     max_tokens: 4000
     notes: "Batch job — long-context structured extraction. Use batch API for 50% discount."
 
+  # ADR-0045: Personalised misconception explanation (L2 and L3 explanation
+  # generators). Methodology + Bloom's + affect shape the prompt. Sonnet
+  # sufficient; Haiku degraded fallback. Tier 3.
+  full_explanation:
+    primary: claude_sonnet_4_6
+    fallback_chain:
+      - claude_sonnet_4_5
+      - claude_haiku_4_5
+    temperature: 0.3
+    max_tokens: 512
+    notes: "Personalised misconception explanation — methodology + Bloom's + affect shape the prompt. Sonnet sufficient; Haiku degraded fallback."
+
+  # ADR-0045: AI question-batch generation (Bagrut-curriculum-aligned tool-use
+  # output). Anthropic-only because Kimi's JSON-schema adherence is insufficient
+  # for tool_use strict mode. Tier 3.
+  question_generation:
+    primary: claude_sonnet_4_6
+    fallback_chain:
+      - claude_sonnet_4_5
+    temperature: 0.5
+    max_tokens: 4096
+    notes: "Tool-use structured question batches — matches video_script pattern for JSON compliance. Anthropic-only (Kimi's JSON-schema adherence insufficient for Bagrut-curriculum tool_use)."
+
+  # ADR-0045: 0-100 rubric scoring across FactualAccuracy / LanguageQuality /
+  # PedagogicalQuality. Haiku deliberately — this evaluator runs on every
+  # AI-generated question and must not drift to Sonnet cost. Tier 2.
+  quality_gate:
+    primary: claude_haiku_4_5
+    fallback_chain:
+      - claude_sonnet_4_6
+    temperature: 0.1
+    max_tokens: 1024
+    notes: "0-100 rubric scoring across three dimensions via tool-use. Haiku deliberately — this evaluator runs on every AI-generated question and must not drift to Sonnet cost."
+
+  # ADR-0045: L2 hint — short pattern-based suggestion ("try factoring the
+  # common term"). Bounded output shape, no multi-step reasoning. Tier 2.
+  # See ADR-0045 §3 for the three-level hint ladder policy.
+  ideation_l2_hint:
+    primary: claude_haiku_4_5
+    fallback_chain:
+      - kimi_k2_0905
+    temperature: 0.2
+    max_tokens: 150
+    notes: "L2 hint — 'here's the method' short structured suggestion. Bounded output, Haiku per tier-2 classification default. L1 hint is deterministic template (no LLM)."
+
+  # ADR-0045: L3 hint — full step-by-step worked example in the student's
+  # methodology. Same pedagogical surface as full_explanation but called from
+  # the hint UI. Separate task-name so its spend is separately trackable in
+  # cena_llm_cost_by_task_and_tier. Tier 3.
+  worked_example_l3_hint:
+    primary: claude_sonnet_4_6
+    fallback_chain:
+      - claude_sonnet_4_5
+    temperature: 0.3
+    max_tokens: 500
+    notes: "L3 hint — full worked example with Bloom's-appropriate depth and methodology-aware framing. Separately tracked from full_explanation so over-use (which signals scaffolding regression) is visible in the cost dashboard."
+
 
 # ─────────────────────────────────────────────────────────────────────
 # 3. RATE LIMITS & TIMEOUTS

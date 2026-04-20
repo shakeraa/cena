@@ -58,37 +58,13 @@ allowlist:
   - path: "src/actors/Cena.Actors/Diagnosis/IStuckClassifierLlm.cs"
     reason: "Interface declaration — no call site, just the contract."
 
+  - path: "src/shared/Cena.Infrastructure/Llm/IPromptCache.cs"
+    reason: "Interface + AllowsUncachedLlmAttribute declaration file — no LLM call site. Docstring references ILlmClient.CompleteAsync as documentation; scanner heuristic triggers on the mention but there is no runtime call here."
+
   # --- consumers pending Epic B tier assignment (TODO(prr-012)) --------------
-  # These call ILlmClient but the exact tier assignment is decided by Epic B
-  # sub-tasks (prr-012, prr-145, prr-105). Scanner skips them for now; the
-  # TODO is tracked in docs/adr/0026-llm-three-tier-routing.md §Follow-up.
-
-  - path: "src/actors/Cena.Actors/Services/L3ExplanationGenerator.cs"
-    reason: "TODO(prr-145): tier decision for hint/explanation generation. Allowlisted until hint-tier ADR lands."
-
-  - path: "src/actors/Cena.Actors/Services/ExplanationGenerator.cs"
-    reason: "TODO(prr-145): tier decision for hint/explanation generation. Allowlisted until hint-tier ADR lands."
-
-  - path: "src/actors/Cena.Actors/Services/ErrorClassificationService.cs"
-    reason: "TODO(prr-012): currently slated for tier2 (classification); Epic B confirms post-routing-gate."
-
-  - path: "src/actors/Cena.Actors/Ingest/ContentSegmenter.cs"
-    reason: "TODO(prr-145): ingestion-side LLM classification; tier pending Epic B."
-
-  - path: "src/actors/Cena.Actors/Tutor/TutorMessageService.cs"
-    reason: "TODO(prr-012): wraps ITutorLlmService (already tier3-tagged at implementation). Wrapper tier derives from callee; pending Epic B."
-
-  - path: "src/actors/Cena.Actors/Tutoring/TutorActor.cs"
-    reason: "TODO(prr-012): actor delegates to ITutorLlmService; tier lives on service."
-
-  - path: "src/api/Cena.Admin.Api/Figures/AiFigureGenerator.cs"
-    reason: "TODO(prr-145): tier decision for figure-generation path."
-
-  - path: "src/api/Cena.Admin.Api/AiGenerationService.cs"
-    reason: "TODO(prr-145): admin-side variant generation; tier pending Epic B."
-
-  - path: "src/api/Cena.Admin.Api/QualityGate/QualityGateService.cs"
-    reason: "TODO(prr-145): quality-gate LLM judge; tier pending Epic B."
+  # Cleared 2026-04-20 by ADR-0045: all nine previously-TODO'd consumers now
+  # carry [TaskRouting] attributes, so they are no longer allowlist exceptions.
+  # See docs/adr/0045-hint-and-llm-tier-selection.md §§2-5.
 
   # --- architecture tests + negative fixtures --------------------------------
 

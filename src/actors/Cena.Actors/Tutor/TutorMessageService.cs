@@ -23,6 +23,7 @@ using Cena.Actors.Infrastructure;
 using Cena.Actors.RateLimit;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Documents;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Tutor;
@@ -114,6 +115,10 @@ public interface ITutorMessageService
 /// Production implementation of <see cref="ITutorMessageService"/>.
 /// FIND-privacy-008: PII scrubbing + safeguarding classification pipeline.
 /// </summary>
+// ADR-0045: Non-streaming tutor-reply wrapper around ITutorLlmService (Claude
+// Sonnet). Same pedagogical surface as the /stream endpoint; same tier-3.
+// Routing row: contracts/llm/routing-config.yaml §task_routing.socratic_question.
+[TaskRouting("tier3", "socratic_question")]
 public sealed class TutorMessageService : ITutorMessageService
 {
     private readonly ITutorMessageRepository _repository;

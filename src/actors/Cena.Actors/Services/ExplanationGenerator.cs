@@ -8,6 +8,7 @@
 // =============================================================================
 
 using Cena.Actors.Gateway;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Services;
@@ -51,6 +52,18 @@ public interface IExplanationGenerator
     Task<GeneratedExplanation> GenerateAsync(ExplanationContext context, CancellationToken ct);
 }
 
+// ADR-0045: Methodology-aware misconception explanation via Sonnet (256-768 tokens).
+// Sonnet sufficient per routing-config §feynman_explanation notes — Haiku quality
+// insufficient for grading-grade explanation. Shares the `full_explanation` routing
+// row with L3ExplanationGenerator. See contracts/llm/routing-config.yaml.
+//
+// prr-047: legacy generator kept for the non-personalized path. Callers
+// (notably PersonalizedExplanationService.FallbackToL2Async and the explanation
+// orchestrator) are responsible for the IExplanationCacheService lookup BEFORE
+// invoking this service, so the cache guard lives at the call site, not here.
+// Downstream we still cache the output back into L2 Redis via the orchestrator.
+[TaskRouting("tier3", "full_explanation")]
+[AllowsUncachedLlm("Caller performs IExplanationCacheService.GetAsync before invoking this generator; result is cached by the orchestrator on success.")]
 public sealed class ExplanationGenerator : IExplanationGenerator
 {
     private readonly ILlmClient _llm;

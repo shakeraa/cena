@@ -15,6 +15,7 @@
 // =============================================================================
 
 using Cena.Actors.Gateway;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Services;
@@ -33,6 +34,17 @@ public interface IL3ExplanationGenerator
     Task<GeneratedExplanation?> GenerateAsync(L3ExplanationRequest request, CancellationToken ct);
 }
 
+// ADR-0045: Personalised explanation via Sonnet with methodology+affect+scaffolding
+// shaping the prompt. Pedagogically load-bearing — tier-3. Routing row:
+// contracts/llm/routing-config.yaml §task_routing.full_explanation.
+//
+// prr-047: L3 fires only on L2 cache MISS, and the outer orchestrator owns
+// both the L2 read (IExplanationCacheService.GetAsync) and the write-back on
+// success. Inlining the cache here would double-dip the same Redis key. The
+// CacheSystemPrompt=true flag on the LlmRequest still activates Anthropic's
+// provider-side system-prompt cache per routing-config §6.system_prompt.
+[TaskRouting("tier3", "full_explanation")]
+[AllowsUncachedLlm("L3 fires only on L2 cache miss; caller (ExplanationOrchestrator) owns the cache read/write cycle. System prompt itself is cached via Anthropic cache_control.")]
 public sealed class L3ExplanationGenerator : IL3ExplanationGenerator
 {
     private readonly ILlmClient _llm;

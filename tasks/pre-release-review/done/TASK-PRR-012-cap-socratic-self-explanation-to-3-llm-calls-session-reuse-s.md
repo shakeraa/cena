@@ -1,29 +1,31 @@
-# TASK-PRR-145: ADR: Hint generation model-tier selection
+# TASK-PRR-012: Cap Socratic self-explanation to 3 LLM calls/session + reuse SAI-003 cache
 
-**Priority**: P2 — post-launch improvement (lens consensus: 2)
-**Effort**: S — 1-2 days
-**Lens consensus**: persona-finops, persona-cogsci
-**Source docs**: `axis1_pedagogy_mechanics_cena.md:L~`
-**Assignee hint**: human-architect
+**Priority**: P0 — ship-blocker (lens consensus: 2)
+**Effort**: M — 1-2 weeks
+**Lens consensus**: persona-finops, persona-sre
+**Source docs**: `axis2_motivation_self_regulation_findings.md:L81`
+**Assignee hint**: kimi-coder
 **Tags**: source=pre-release-review-2026-04-20, lens=finops
-**Status**: Not Started
+**Status**: Done — 2026-04-20
 **Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
-**Tier**: post-launch
+**Tier**: mvp
 **Epic**: EPIC-PRR-B — ADR-026 3-tier LLM routing governance
 
 ---
 
 ## Goal
-Routing ADR for hints: L1 Booster/deterministic; L2 Haiku; L3 Sonnet only on-demand.
+Prevent unbounded Sonnet spend on Socratic self-explanation. Hard cap 3 LLM calls/session; reuse L2 explanation cache pattern from SAI-003.
 
 ## Files
-- docs/adr/NNNN-hint-tier-routing.md
+- src/actors/Cena.Actors/Pedagogy/SocraticSelfExplanationService.cs
+- Redis cache key design
+- ADR rate-limit section
 
 ## Definition of Done
-- ADR accepted; routing config aligned.
+- Cap enforced with 429/fallback to non-LLM scaffold; cache hit-rate ≥70% in load test; cost-per-student dashboard updated.
 
 ## Reporting
-complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
 
 ---
 
@@ -64,12 +66,12 @@ Implementation of this task must be driven by a senior-architect mindset, not a 
 - Observability added (metrics, structured logs with tenant/session IDs, runbook entry).
 - Related personas' cross-lens handoffs addressed or explicitly deferred with a new task ID.
 
-**Reference**: full protocol and its rationale live in [`/tasks/pre-release-review/README.md`](../../../tasks/pre-release-review/README.md#implementation-protocol-senior-architect) (this section is duplicated there for skimming convenience).
+**Reference**: full protocol and its rationale live in [`/tasks/pre-release-review/README.md`](../../tasks/pre-release-review/README.md#implementation-protocol-senior-architect) (this section is duplicated there for skimming convenience).
 
 ---
 
 ## Related
-- [Full synthesis](../../../pre-release-review/reviews/SYNTHESIS.md)
-- [Retired proposals](../../../pre-release-review/reviews/retired.md)
-- [Conflicts needing decision](../../../pre-release-review/reviews/conflicts.md)
-- [Canonical task JSON](../../../pre-release-review/reviews/tasks.jsonl) (id: prr-145)
+- [Full synthesis](../../pre-release-review/reviews/SYNTHESIS.md)
+- [Retired proposals](../../pre-release-review/reviews/retired.md)
+- [Conflicts needing decision](../../pre-release-review/reviews/conflicts.md)
+- [Canonical task JSON](../../pre-release-review/reviews/tasks.jsonl) (id: prr-012)

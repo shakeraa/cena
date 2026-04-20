@@ -17,6 +17,7 @@ using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Services;
 using Cena.Actors.Sessions;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 using Proto;
 
@@ -105,6 +106,18 @@ public sealed record TutoringRejected(string Methodology, string Reason);
 
 // ── Actor ──
 
+// ADR-0045: Multi-turn Socratic dialogue via Sonnet with cache-enabled system
+// prompt (see GenerateOpeningAsync/GenerateResponseAsync using
+// claude-sonnet-4-6-20260215). Canonical tier-3 path. Routing row:
+// contracts/llm/routing-config.yaml §task_routing.socratic_question.
+//
+// prr-047: live conversational tutoring — every turn is conditioned on a
+// unique {history, student message} tuple, so a content-level cache would
+// yield ~0% hits. The system prompt IS cached via Anthropic's 5-min
+// cache_control (routing-config §6.student_context), which is the right
+// caching tier for this workload. No Redis-level response cache possible.
+[TaskRouting("tier3", "socratic_question")]
+[AllowsUncachedLlm("Multi-turn dialogue: each turn uniquely conditioned on conversation history and student message. System-prompt cache handled by CacheSystemPrompt flag on LlmRequest.")]
 public sealed class TutorActor : IActor
 {
     private const int MaxTurns = 10;

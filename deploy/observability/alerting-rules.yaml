@@ -48,6 +48,75 @@ groups:
             3 times in the last 5 minutes. Likely CrashLoopBackOff. Check pod logs and events.
           runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/deploy-runbook.md#crash-loop-backoff"
 
+      # ─────────────────────────────────────────────────────────────────
+      # prr-047 — LLM prompt-cache hit-rate SLO
+      # Target: >= 40% over any rolling 24h window by cache_type.
+      # Alert thresholds:
+      #   warning  — 1h hit rate < 40% (SLO degraded)
+      #   critical — 1h hit rate < 20% (cost cascade; escalate)
+      # Guard: only fires when there is enough traffic (>= 0.1 req/sec mean
+      # over the window) so low-traffic environments don't page overnight.
+      # ─────────────────────────────────────────────────────────────────
+      - alert: CenaPromptCacheHitRateDegraded
+        expr: >-
+          (
+            sum by (cache_type) (rate(cena_prompt_cache_hits_total[1h]))
+            /
+            clamp_min(
+              sum by (cache_type) (
+                rate(cena_prompt_cache_hits_total[1h])
+                + rate(cena_prompt_cache_misses_total[1h])
+              ),
+              0.001
+            )
+          ) < 0.40
+          and
+          sum by (cache_type) (
+            rate(cena_prompt_cache_hits_total[1h])
+            + rate(cena_prompt_cache_misses_total[1h])
+          ) > 0.1
+        for: 1h
+        labels:
+          severity: warning
+          team: cena-platform
+        annotations:
+          summary: "Prompt cache hit rate for {{ $labels.cache_type }} below 40% SLO"
+          description: >-
+            Cache type {{ $labels.cache_type }} has a 1h hit rate of {{ $value | humanizePercentage }}
+            (target >= 40%). Check whether a recent deploy changed a prompt template,
+            invalidated a large cache slice, or wired a new LLM call site without a cache guard.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cache-runbook.md"
+
+      - alert: CenaPromptCacheHitRateCritical
+        expr: >-
+          (
+            sum by (cache_type) (rate(cena_prompt_cache_hits_total[1h]))
+            /
+            clamp_min(
+              sum by (cache_type) (
+                rate(cena_prompt_cache_hits_total[1h])
+                + rate(cena_prompt_cache_misses_total[1h])
+              ),
+              0.001
+            )
+          ) < 0.20
+          and
+          sum by (cache_type) (
+            rate(cena_prompt_cache_hits_total[1h])
+            + rate(cena_prompt_cache_misses_total[1h])
+          ) > 0.1
+        for: 1h
+        labels:
+          severity: critical
+          team: cena-platform
+        annotations:
+          summary: "Prompt cache hit rate for {{ $labels.cache_type }} critically low (<20%)"
+          description: >-
+            Cache type {{ $labels.cache_type }} has a 1h hit rate of {{ $value | humanizePercentage }}.
+            This is burning the Anthropic token budget ~5x faster than planned and may exhaust the
+            daily 25k output-token cap per student. Triage immediately.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cache-runbook.md"
+
       # Migrator job running too long (> 5 min)
       - alert: CenaMigratorSlow
         expr: >-

@@ -1,0 +1,168 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "Cena prompt-cache hit-rate SLO (prr-047 / ADR-0026 §6). Target: hit rate >= 40% rolling 24h per cache_type. Alert: sustained <20% for 1h.",
+  "editable": true,
+  "graphTooltip": 1,
+  "id": null,
+  "tags": ["cena", "llm", "cost", "slo"],
+  "timezone": "browser",
+  "title": "Cena — LLM Prompt Cache Hit Rate",
+  "uid": "cena-llm-cache-hit-rate",
+  "schemaVersion": 38,
+  "version": 1,
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      {
+        "name": "institute",
+        "label": "Institute",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(cena_prompt_cache_hits_total, institute_id)",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 2
+      },
+      {
+        "name": "cache_type",
+        "label": "Cache type",
+        "type": "custom",
+        "query": "explain,sys,ctx",
+        "multi": true,
+        "includeAll": true,
+        "current": { "text": "All", "value": "$__all" }
+      },
+      {
+        "name": "task",
+        "label": "Task",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(cena_prompt_cache_hits_total, task)",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 2
+      }
+    ]
+  },
+  "panels": [
+    {
+      "title": "Overall Hit Rate (5m, all cache types, all tasks)",
+      "type": "stat",
+      "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])) / clamp_min(sum(rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])) + sum(rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])), 0.001)",
+          "legendFormat": "hit rate",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.2 },
+              { "color": "yellow", "value": 0.4 },
+              { "color": "green", "value": 0.6 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"] },
+        "textMode": "value_and_name",
+        "colorMode": "background"
+      }
+    },
+    {
+      "title": "Hit Rate by Cache Type (5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 16, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])) / clamp_min(sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]) + rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])), 0.001)",
+          "legendFormat": "{{cache_type}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 15 }
+        }
+      },
+      "thresholds": {
+        "mode": "absolute",
+        "steps": [
+          { "color": "red", "value": null },
+          { "color": "orange", "value": 0.2 },
+          { "color": "green", "value": 0.4 }
+        ]
+      }
+    },
+    {
+      "title": "Hit Rate by Task (5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 10 },
+      "targets": [
+        {
+          "expr": "sum by (task) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])) / clamp_min(sum by (task) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]) + rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])), 0.001)",
+          "legendFormat": "{{task}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "percentunit", "min": 0, "max": 1 }
+      }
+    },
+    {
+      "title": "Cache Errors (get/set) by cache_type",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 10 },
+      "targets": [
+        {
+          "expr": "sum by (cache_type, op) (rate(cena_prompt_cache_errors_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]))",
+          "legendFormat": "{{cache_type}} {{op}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "title": "Raw hit / miss volume (5m)",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]))",
+          "legendFormat": "hits — {{cache_type}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum by (cache_type) (rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]))",
+          "legendFormat": "misses — {{cache_type}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } }
+    }
+  ]
+}

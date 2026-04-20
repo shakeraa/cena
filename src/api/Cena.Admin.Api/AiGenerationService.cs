@@ -15,6 +15,7 @@ using Anthropic.Core;
 using Anthropic.Models.Messages;
 using Cena.Actors.Cas;
 using Cena.Admin.Api.QualityGate;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -215,6 +216,11 @@ public interface IAiGenerationService
 
 // ── Implementation ──
 
+// ADR-0045: Tool-use structured question-batch generation via Sonnet (4096
+// tokens, Bagrut-curriculum-aligned prompts with ephemeral cache_control on
+// the system block). New routing row: contracts/llm/routing-config.yaml
+// §task_routing.question_generation. Tier 3.
+[TaskRouting("tier3", "question_generation")]
 public sealed class AiGenerationService : IAiGenerationService
 {
     private readonly ILogger<AiGenerationService> _logger;

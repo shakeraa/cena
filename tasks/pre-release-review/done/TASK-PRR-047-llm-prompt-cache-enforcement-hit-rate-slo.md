@@ -6,7 +6,7 @@
 **Source docs**: `feature-discovery-2026-04-20.md:L25`
 **Assignee hint**: kimi-coder
 **Tags**: source=pre-release-review-2026-04-20, lens=finops
-**Status**: Not Started
+**Status**: Done — 2026-04-20
 **Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
 **Tier**: mvp
 **Epic**: EPIC-PRR-B — ADR-026 3-tier LLM routing governance

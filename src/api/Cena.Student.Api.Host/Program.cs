@@ -359,6 +359,8 @@ public partial class Program
     builder.Services.AddScoped<IRightToErasureService, RightToErasureService>();
 
     // ---- HARDEN TutorEndpoints: LLM Service ----
+    // prr-012: Socratic call budget + static hint fallback + daily tutor time cap.
+    Cena.Actors.Tutor.TutorServiceRegistration.AddTutorCostCaps(builder.Services);
     if (!string.IsNullOrEmpty(builder.Configuration["Cena:Llm:ApiKey"]))
     {
         builder.Services.AddScoped<ITutorLlmService, ClaudeTutorLlmService>();
