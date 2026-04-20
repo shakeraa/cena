@@ -52,6 +52,22 @@ public class LearningSessionQueueProjection
     public Dictionary<string, int> HintsUsedByQuestion { get; set; } = new();
 
     /// <summary>
+    /// prr-203 — Per-question hint-ladder rung state. Keyed by QuestionId,
+    /// stores the highest rung (0 = none, 1 = L1 template shown, 2 = L2
+    /// Haiku shown, 3 = L3 worked example shown) that the student has
+    /// already been served for that question. Used by the hint-ladder
+    /// endpoint (POST /api/sessions/{sid}/question/{qid}/hint/next) so
+    /// the server — not the client — decides which rung to advance to,
+    /// per ADR-0045 §3. A client cannot skip L1 by requesting L2 because
+    /// the orchestrator reads and advances from this map. Resets per
+    /// session (session-scoped storage) so a new session starts fresh.
+    /// Serialized as part of the Marten document; new sessions default
+    /// to an empty map so older session snapshots remain forward-
+    /// compatible.
+    /// </summary>
+    public Dictionary<string, int> LadderRungByQuestion { get; set; } = new();
+
+    /// <summary>
     /// RDY-057c — Concept ids the student self-reported as anxious in
     /// onboarding (TopicFeelings == Anxious). Captured at session start
     /// from OnboardingSelfAssessmentDocument when present. Empty list =

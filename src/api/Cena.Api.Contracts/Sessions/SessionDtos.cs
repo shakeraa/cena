@@ -204,6 +204,33 @@ public sealed record SessionHintUsageDto(string QuestionId, int HintsUsed);
 /// </summary>
 public sealed record SessionHintRequest(int HintLevel);
 
+/// <summary>
+/// prr-203 — Response for POST /api/sessions/{sid}/question/{qid}/hint/next.
+/// The server decides the next rung based on per-(session, question) state
+/// held on <c>LearningSessionQueueProjection.LadderRungByQuestion</c>, so
+/// clients CANNOT skip rungs by requesting a level (there is no request
+/// body at all). ADR-0045 §3 pins L1=template (no LLM), L2=Haiku, L3=Sonnet.
+///
+/// Field meaning:
+///   - Rung: the rung actually served on this call (1, 2, or 3).
+///   - Body: the hint text; for L1 this is the deterministic template
+///     (optionally rewritten by the LD-anxious governor), for L2/L3 this
+///     is the LLM-produced copy passed through the ship-gate scrubber.
+///   - RungSource: one of "template" | "haiku" | "sonnet" | "template-fallback".
+///     The UI uses this to choose the right aria-live announcement and the
+///     admin dashboard uses it to track rung-source distribution.
+///   - MaxRungReached: the highest rung the student has been served for
+///     this question so far — equal to Rung on first exposure.
+///   - NextRungAvailable: true when the student still has budget and has
+///     not yet exhausted L3; false after L3 is served or when degraded.
+/// </summary>
+public sealed record HintLadderResponseDto(
+    int Rung,
+    string Body,
+    string RungSource,
+    int MaxRungReached,
+    bool NextRungAvailable);
+
 public sealed record SessionAnswerRequest(
     string QuestionId,
     string Answer,
