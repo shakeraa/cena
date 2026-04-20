@@ -1,8 +1,8 @@
 # Banned-mechanics historical scan report
 
-**Run date**: 2026-04-20
+**Run date**: 2026-04-20 (updated 2026-04-20 by prr-006 follow-up)
 **Scanner**: `scripts/shipgate/rulepack-scan.mjs` (pack=mechanics)
-**Rule pack**: `scripts/shipgate/banned-mechanics.yml` (24 rules, en + he + ar)
+**Rule pack**: `scripts/shipgate/banned-mechanics.yml` (30 rules, en + he + ar)
 **Source authority**: TASK-PRR-006 (Crisis Mode rename), TASK-PRR-019
 (predicted-Bagrut ban), TASK-PRR-040 (locale coverage),
 `docs/engineering/shipgate.md`

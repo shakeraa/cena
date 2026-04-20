@@ -32,6 +32,10 @@ This file is whitelisted in
 - Urgency variant: time is running out for this unit.
 - Urgency variant: we're almost out of time.
 - Urgency variant: last chance to master this topic.
+- Urgency variant: hurry up before the deadline passes.
+- Urgency variant: hurry now to finish this unit.
+- Scarcity variant: only 3 days left before Bagrut.
+- Scarcity variant: only 5 hours remaining to solve this.
 
 ## GD-004 — Streak copy (HARD BAN)
 
@@ -56,6 +60,9 @@ This file is whitelisted in
 - 42 ימים עד הבגרות — days until Bagrut.
 - הזדמנות אחרונה — last chance.
 - הזמן אוזל — time is running out.
+- מהרו לסיים את היחידה — hurry (imperative plural, urgency).
+- מהרי לסיים — hurry (imperative feminine singular).
+- נותרו רק 3 ימים — only 3 days left (scarcity).
 - ציון הבגרות החזוי — predicted Bagrut score.
 
 ## Arabic variants (verify with native-speaker team before enforcement)
@@ -65,4 +72,7 @@ This file is whitelisted in
 - الأيام المتبقية — days remaining.
 - الفرصة الأخيرة — last chance.
 - الوقت ينفد — time is running out.
+- أسرع قبل أن ينتهي الوقت — hurry (imperative + urgency marker قبل).
+- اسرع الآن لإنهاء الوحدة — hurry (urgency: الآن).
+- فقط 2 يوم متبقي — only 2 days left (scarcity).
 - علامة البجروت المتوقعة — predicted Bagrut score.

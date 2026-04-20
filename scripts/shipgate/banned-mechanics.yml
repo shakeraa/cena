@@ -60,6 +60,16 @@ rules:
     pattern: "\\blast\\s+chance\\b"
     flags: i
 
+  - id: hurry-urgency
+    reason: "Banned 'hurry' urgency copy (prr-006 — artificial-urgency mechanic)"
+    pattern: "\\bhurry(?:\\s+(?:up|before|now|and|and\\s+\\w+))?\\b"
+    flags: i
+
+  - id: only-n-left
+    reason: "Banned 'only N left/remaining' scarcity copy (prr-006 — scarcity urgency)"
+    pattern: "\\bonly\\s+\\d+\\s+(days?|hours?|minutes?|seconds?|left|remaining|to\\s+go)\\b"
+    flags: i
+
   # --------------------------------------------------------------------------
   # GD-004 — Streak copy (hard ban)
   # --------------------------------------------------------------------------
@@ -125,6 +135,18 @@ rules:
     flags: u
     locale: he
 
+  - id: he-hurry
+    reason: "Hebrew 'hurry' imperative (prr-006 — verify w/ native speaker; adverb מהר 'fast' is intentionally NOT flagged — only imperative plural/feminine forms bounded by non-Hebrew characters, to avoid adverbial false positives like מהר יותר 'faster'.)"
+    pattern: "(?:^|[^\\u0590-\\u05FF])(?:מהרו|מהרי)(?:[^\\u0590-\\u05FF]|$)"
+    flags: u
+    locale: he
+
+  - id: he-only-n-left
+    reason: "Hebrew 'only N left' scarcity (prr-006 — verify w/ native speaker)"
+    pattern: "נותר(ו|ה)?\\s+רק\\s+\\d+"
+    flags: u
+    locale: he
+
   - id: he-predicted-bagrut
     reason: "Hebrew 'predicted Bagrut score' (prr-019 — verify w/ native speaker)"
     pattern: "ציון\\s+הבגרות\\s+(החזוי|הצפוי)"
@@ -162,6 +184,18 @@ rules:
   - id: ar-time-running-out
     reason: "Arabic 'time is running out' (prr-006 — verify w/ native speaker)"
     pattern: "الوقت\\s+(ينفد|ينفذ)"
+    flags: u
+    locale: ar
+
+  - id: ar-hurry
+    reason: "Arabic 'hurry up' imperative (prr-006 — verify w/ native speaker; adverbial بسرعة 'with speed' is intentionally NOT flagged — that appears in physics content as a velocity descriptor. Only imperative أسرع/اسرع followed by urgency markers (قبل/الآن/ولا/حتى).)"
+    pattern: "(?:^|\\s|[^\\u0600-\\u06FF])(?:أسرع|اسرع)\\s+(?:قبل|الآن|ولا|حتى)"
+    flags: u
+    locale: ar
+
+  - id: ar-only-n-left
+    reason: "Arabic 'only N left' scarcity (prr-006 — verify w/ native speaker)"
+    pattern: "فقط\\s+\\d+\\s+(يوم|ساعة|دقيقة)"
     flags: u
     locale: ar
 
