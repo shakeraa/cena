@@ -21,7 +21,7 @@ These three rules are derived from the [game-design research synthesis](docs/res
 
 1. **SymPy CAS is the sole correctness oracle** — the LLM explains, the CAS verifies. No math reaches students unverified. ([ADR-0002](docs/adr/0002-sympy-correctness-oracle.md))
 2. **Misconception data is session-scoped** — never on student profiles, never for ML training, 30-day retention max. ([ADR-0003](docs/adr/0003-misconception-session-scope.md))
-3. **Dark-pattern engagement mechanics are banned** — no streaks, no loss-aversion, no variable-ratio rewards. CI scanner enforces. ([docs/engineering/shipgate.md](docs/engineering/shipgate.md))
+3. **Dark-pattern engagement mechanics are banned** — no streaks, no loss-aversion, no variable-ratio rewards. Time-awareness is OK, time-pressure mechanics are not. CI scanner enforces. ([docs/engineering/shipgate.md](docs/engineering/shipgate.md), [ADR-0048](docs/adr/0048-exam-prep-time-framing.md), [docs/design/exam-prep-positive-framing.md](docs/design/exam-prep-positive-framing.md))
 
 ## Behavioral Rules (Always Enforced)
 

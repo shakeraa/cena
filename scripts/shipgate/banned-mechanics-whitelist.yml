@@ -51,6 +51,17 @@ whitelist:
   - path: "src/actors/Cena.Actors/Accommodations/AccommodationProfile.cs"
     reason: "Source comment explains UI hides countdown (legit rationale)"
 
+  # Technical session-counter comments (NOT student-facing; decrementing-N-sessions, not a wall-clock deadline)
+  - path: "src/actors/Cena.Actors/Teacher/ScheduleOverride/TeacherOverrideState.cs"
+    reason: "Doc-comment on ActivePin record: 'countdown' describes a decrementing integer counter of pinned sessions (RemainingSessions), not a student-facing time-pressure mechanic. Not rendered to any surface."
+
+  - path: "src/actors/Cena.Actors/Teacher/ScheduleOverride/Events/PinTopicRequested_V1.cs"
+    reason: "Event-comment describes pin replacement semantics — 'countdown' is internal term-of-art for the session-counter (LATEST-ACTIVE-WINS). Not student-facing copy."
+
+  # SMS outbound shipgate is the ENFORCEMENT policy itself — regex list encodes banned patterns
+  - path: "src/actors/Cena.Actors/Notifications/OutboundSms/SmsShipgatePolicy.cs"
+    reason: "This file IS the SMS-side ban enforcement (mirrors banned-mechanics.yml for SMS copy); its regex list quotes every banned term by construction."
+
   # Student-web UI files that include negation comments
   - path: "src/student/full-version/src/components/session/QuestionCard.vue"
     reason: "Component comment states the UI does NOT show a countdown (negation)"
