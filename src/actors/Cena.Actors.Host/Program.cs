@@ -225,9 +225,7 @@ builder.Services.AddSingleton<IHintAdjustedBktService, HintAdjustedBktService>()
 builder.Services.AddSingleton<IHintGenerationService, HintGenerationService>();
 builder.Services.AddSingleton<IConfusionDetector, ConfusionDetector>();
 builder.Services.AddSingleton<IDisengagementClassifier, DisengagementClassifier>();
-builder.Services.AddSingleton<Cena.Actors.Hints.IDeliveryGate, Cena.Actors.Hints.DeliveryGate>();
-// prr-029: LD-anxious hint governor (L1 worked-example rewrite). No LLM.
-builder.Services.AddSingleton<Cena.Actors.Hints.ILdAnxiousHintGovernor, Cena.Actors.Hints.LdAnxiousHintGovernor>();
+builder.Services.AddSingleton<Cena.Actors.Hints.IDeliveryGate, Cena.Actors.Hints.DeliveryGate>().AddSingleton<Cena.Actors.Hints.ILdAnxiousHintGovernor, Cena.Actors.Hints.LdAnxiousHintGovernor>(); // prr-029 LD-anxious L1 rewrite; no LLM.
 builder.Services.AddSingleton<IFocusDegradationService, FocusDegradationService>();
 builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnforcementService>();
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
