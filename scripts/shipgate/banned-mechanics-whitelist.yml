@@ -132,6 +132,21 @@ whitelist:
   - path: "shipgate/fixtures/banned-mechanics-sample.md"
     reason: "Positive-test fixture: deliberately contains every banned pattern"
 
+  - path: "shipgate/fixtures/ux-surfaces-sample.vue"
+    reason: "prr-211 UX-surface positive-test fixture: deliberately contains every banned pattern for ux-surface-scan.mjs"
+
+  - path: "scripts/shipgate/shipgate-ux-surfaces.yml"
+    reason: "prr-211 UX-surface rulepack itself (patterns quoted in rule definitions)"
+
+  - path: "scripts/shipgate/ux-surface-scan.mjs"
+    reason: "prr-211 UX-surface scanner source (patterns referenced in doc comments)"
+
+  - path: "tests/shipgate/ux-surfaces.spec.mjs"
+    reason: "prr-211 UX-surface test suite (patterns referenced in assertion messages)"
+
+  - path: "src/actors/Cena.Actors.Tests/Architecture/ShipgateScannerV2CoversNewSurfacesTest.cs"
+    reason: "prr-211 architecture ratchet (patterns referenced in assertion messages)"
+
   - path: "scripts/shipgate/banned-mechanics.yml"
     reason: "The rule pack itself (patterns quoted in comments)"
 

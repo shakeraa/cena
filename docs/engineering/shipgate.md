@@ -31,12 +31,79 @@ Cena prohibits engagement mechanics that exploit loss aversion, variable-ratio r
 
 ## CI enforcement
 
-The scanner at `scripts/shipgate/scan.mjs` runs on every PR via CI. It:
+Two scanners run side-by-side on every PR:
 
-1. Scans locale files (en.json, ar.json, he.json) for banned terms
-2. Scans Vue templates and TypeScript source for banned patterns
-3. Scans C# backend code for banned patterns
-4. Checks against the allowlist at `scripts/shipgate/allowlist.json`
+### 1. String-based rulepack scanner (`scripts/shipgate/scan.mjs` + `rulepack-scan.mjs`)
+
+- Scans locale files (en.json, ar.json, he.json) for banned terms.
+- Scans Vue templates and TypeScript source for banned patterns.
+- Scans C# backend code for banned patterns.
+- Checks against the allowlist at `scripts/shipgate/allowlist.json`.
+
+### 2. UX-surface DOM-aware scanner v2 (`scripts/shipgate/ux-surface-scan.mjs`, prr-211)
+
+Targets the new UX surfaces introduced by EPIC-PRR-E: `HintLadder`,
+`StepSolverCard`, `Sidekick`, `MathInput`, `FreeBodyDiagramConstruct`.
+The structural rules encoded here cannot be expressed by the string-only
+scanner — they involve DOM-anchor + class-token pairs (e.g. "no
+`text-danger` ON a `.hint-ladder-rung` element"), per-rung emoji bans,
+and aria-marker requirements. Rule pack: `scripts/shipgate/shipgate-ux-surfaces.yml`.
+
+**Extended lexicon enforced by v2 (per-surface):**
+
+#### HintLadder
+
+- String bans: `penalty` / `penalties`, `lost points`, `Wrong!`, `Hint N of M`, `(N remaining)`, `reveal XP`.
+- DOM-coupled: warning-semantic color classes (`text-danger`, `bg-warning`, `text-error`, etc.) AND Vuetify `color="warning"` / `color="error"` / `color="danger"` props on rung elements are banned.
+- Emoji: codepoints inside the L1 (first) rung are banned.
+- Aria: region must carry `role="region"` OR `aria-live="polite"` / `aria-live="assertive"` OR `aria-label`.
+
+#### StepSolverCard
+
+- Countdown / timer-pressure copy (`time is running out`, `countdown`, `timer pressure`, `hurry`).
+- Percentile comparisons (`42nd percentile`, `compared to peers`, `ahead of N%`).
+- `Wrong!` / `Incorrect!` shaming; `penalty`.
+- Urgency color classes (`text-danger`, `bg-warning`, `animate-pulse`) on step-status elements.
+
+#### Sidekick
+
+- `streak`; `daily quota`; `catch up` / `falling behind`.
+- Loss-aversion (`don't lose your`, `you'll lose`, `don't miss out`).
+
+#### MathInput
+
+- `Wrong!` / `Incorrect!`; shame-laden rejection (`that's not right`, `try harder`, `no, that's`).
+
+#### FreeBodyDiagramConstruct
+
+- `chance to score`; variable-ratio reward language (`lucky bonus`, `jackpot`, `surprise reward`, `bonus round`); `penalty`.
+
+**Graceful missing-file handling:** if a named surface's canonical `.vue` file
+does not yet exist (e.g. `Sidekick.vue`), the scanner logs a warning and exits 0.
+Enforcement turns on automatically the moment the file lands. Pass
+`--strict-missing` to flip this to a hard failure.
+
+**Architectural rationale for a separate rulepack** is documented at the top
+of `scripts/shipgate/shipgate-ux-surfaces.yml` — in short, the existing
+string scanner cannot express structure-dependent rules (class × DOM
+position) without growing a DOM parser. The v2 scanner is a separate
+binary; the two run side-by-side in CI.
+
+**Architecture ratchet:**
+`src/actors/Cena.Actors.Tests/Architecture/ShipgateScannerV2CoversNewSurfacesTest.cs`
+asserts the YAML rulepack names all five surfaces at their canonical
+paths and that the scanner script + positive-test fixture exist.
+
+**Fixtures:** `shipgate/fixtures/ux-surfaces-sample.vue` deliberately
+contains every banned pattern; `tests/shipgate/ux-surfaces.spec.mjs`
+asserts every rule fires against the fixture and clean against the real
+repo. Run:
+
+```bash
+node scripts/shipgate/ux-surface-scan.mjs
+node scripts/shipgate/ux-surface-scan.mjs --fixture-mode --json
+node --test tests/shipgate/ux-surfaces.spec.mjs
+```
 
 ### Allowlist
 
