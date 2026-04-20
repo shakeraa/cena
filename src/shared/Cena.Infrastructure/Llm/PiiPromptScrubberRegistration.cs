@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — DI registration for PII prompt scrubber (ADR-0046, prr-022)
+// Cena Platform — DI registration for PII prompt scrubber (ADR-0047, prr-022)
 //
 // Hosts call AddPiiPromptScrubber() during startup to register:
 //   - IPiiPromptScrubber → PiiPromptScrubber (singleton; pre-compiled regex)
@@ -9,7 +9,7 @@
 // the standard AddMetrics()/AddOpenTelemetry() path — every host that calls
 // AddLlmCostMetric() already has that wiring).
 //
-// See docs/adr/0046-no-pii-in-llm-prompts.md.
+// See docs/adr/0047-no-pii-in-llm-prompts.md.
 // =============================================================================
 
 using Microsoft.Extensions.DependencyInjection;
@@ -18,7 +18,7 @@ using Microsoft.Extensions.DependencyInjection.Extensions;
 namespace Cena.Infrastructure.Llm;
 
 /// <summary>
-/// DI extensions for registering the ADR-0046 PII prompt scrubber.
+/// DI extensions for registering the ADR-0047 PII prompt scrubber.
 /// </summary>
 public static class PiiPromptScrubberRegistration
 {

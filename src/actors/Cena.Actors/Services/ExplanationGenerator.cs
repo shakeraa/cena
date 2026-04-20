@@ -65,7 +65,7 @@ public interface IExplanationGenerator
 // prr-046: finops cost-center "explanation-l2". Shares the `full_explanation`
 // routing row with L3ExplanationGenerator but bills separately so finops can
 // see the L2/L3 split in the cost-projection dashboard.
-// ADR-0046: composes StudentAnswer free-text. Injects IPiiPromptScrubber and
+// ADR-0047: composes StudentAnswer free-text. Injects IPiiPromptScrubber and
 // fails closed (returns a generic safe explanation) on any scrub event.
 [TaskRouting("tier3", "full_explanation")]
 [FeatureTag("explanation-l2")]
@@ -99,13 +99,13 @@ public sealed class ExplanationGenerator : IExplanationGenerator
         var userPrompt = BuildUserPrompt(context);
         var maxTokens = DetermineMaxTokens(context);
 
-        // ADR-0046 Decision 4 — fail-closed on scrubber increment.
+        // ADR-0047 Decision 4 — fail-closed on scrubber increment.
         var scrub = _piiScrubber.Scrub(userPrompt, FeatureLabel);
         if (scrub.RedactionCount > 0)
         {
             _logger.LogWarning(
-                "[ADR-0046] PII detected in explanation-l2 prompt — refusing LLM call. " +
-                "Categories=[{Categories}]. Returning safe fallback. See ADR-0046 runbook.",
+                "[ADR-0047] PII detected in explanation-l2 prompt — refusing LLM call. " +
+                "Categories=[{Categories}]. Returning safe fallback. See ADR-0047 runbook.",
                 string.Join(",", scrub.Categories));
             return new GeneratedExplanation(
                 Text: SafeFallbackExplanation,

@@ -1,4 +1,4 @@
-# ADR-0046 — No PII in LLM prompts
+# ADR-0047 — No PII in LLM prompts
 
 - **Status**: Accepted
 - **Date proposed**: 2026-04-20

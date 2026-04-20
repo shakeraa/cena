@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — PiiPromptScrubber tests (ADR-0046, prr-022)
+// Cena Platform — PiiPromptScrubber tests (ADR-0047, prr-022)
 //
 // Guards:
 //   - Empty / whitespace input → zero redactions, same string back, no metric.

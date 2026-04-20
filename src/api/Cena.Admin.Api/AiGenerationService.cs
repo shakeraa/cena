@@ -223,7 +223,7 @@ public interface IAiGenerationService
 // prr-046: finops cost-center "question-generation". Legacy per-service
 // llm_cost_usd counter is preserved for backward compat; the canonical
 // cross-feature dashboard uses cena_llm_call_cost_usd_total via ILlmCostMetric.
-// ADR-0046: admin tool — prompt is composed from Bagrut curriculum references
+// ADR-0047: admin tool — prompt is composed from Bagrut curriculum references
 // and admin-authored topic briefs at question-authoring time. No student
 // profile fields or student free-text reach this seam; it runs strictly
 // upstream of any student session.

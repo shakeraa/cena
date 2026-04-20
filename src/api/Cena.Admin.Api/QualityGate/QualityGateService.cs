@@ -34,7 +34,7 @@ public interface IQualityGateService
 // prr-046: finops cost-center "quality-gate". Runs on every AI-generated
 // question; cost-center split lets finops verify that Haiku pricing is
 // holding (ceiling is tier-2 per ADR-0045 §2).
-// ADR-0046: admin tool — the prompt is composed from AI-generated question text
+// ADR-0047: admin tool — the prompt is composed from AI-generated question text
 // that is itself CAS-gated. No student profile fields or student free-text
 // reach this seam (the gate runs at question-authoring time, strictly upstream
 // of any student session).

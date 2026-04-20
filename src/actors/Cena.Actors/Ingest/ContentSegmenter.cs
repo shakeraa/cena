@@ -34,7 +34,7 @@ public interface IContentSegmenter
 // deduplicates on content hash before reaching this service, so the same
 // page is never segmented twice.
 // prr-046: finops cost-center "content-segmentation". Batch ingest path.
-// ADR-0046: prompt is composed from OCR'd textbook page content only — admin
+// ADR-0047: prompt is composed from OCR'd textbook page content only — admin
 // ingest pipeline material, NEVER student free-text or profile fields. This
 // seam's input provenance is tracked end-to-end (IngestBatchAggregate) and
 // the provenance gate rejects anything sourced from student input, so the

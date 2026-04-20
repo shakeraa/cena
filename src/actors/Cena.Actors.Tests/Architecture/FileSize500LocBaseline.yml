@@ -69,7 +69,7 @@ grandfathered:
     reason: "Pre-2026-04-20 legacy; EPIC-PRR-A Sprint 1 extraction will absorb most of this"
   - path: src/actors/Cena.Actors/Tutoring/TutorActor.cs
     baseline_loc: 658
-    reason: "Pre-2026-04-20 legacy; split by conversation-phase handler is a follow-up. prr-145 added ADR-0045 [TaskRouting]+[AllowsUncachedLlm] attributes + rationale comment (+3 LOC). prr-046 added [FeatureTag]+ILlmCostMetric wiring + two success-path cost emissions (+18 LOC). prr-022 added IPiiPromptScrubber injection + fail-closed scrub gate in both generation paths + ADR-0046 rationale comment (+21 LOC)."
+    reason: "Pre-2026-04-20 legacy; split by conversation-phase handler is a follow-up. prr-145 added ADR-0045 [TaskRouting]+[AllowsUncachedLlm] attributes + rationale comment (+3 LOC). prr-046 added [FeatureTag]+ILlmCostMetric wiring + two success-path cost emissions (+18 LOC). prr-022 added IPiiPromptScrubber injection + fail-closed scrub gate in both generation paths + ADR-0047 rationale comment (+21 LOC)."
   - path: src/actors/Cena.Actors/Bus/NatsBusRouter.cs
     baseline_loc: 594
     reason: "Pre-2026-04-20 legacy; split by subject-group router is a follow-up"

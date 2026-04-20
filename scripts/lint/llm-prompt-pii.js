@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // =============================================================================
-// Pre-commit / CI lint -- "No PII in LLM prompts" (ADR-0046, prr-022)
+// Pre-commit / CI lint -- "No PII in LLM prompts" (ADR-0047, prr-022)
 //
 // This is the pre-commit first-line-of-defence. The xUnit architecture ratchet
 // (NoPiiFieldInLlmPromptTest) is the authoritative build gate; this script
@@ -9,7 +9,7 @@
 //
 // Invariant (same as NoPiiFieldInLlmPromptTest):
 //   Any .cs file under src/ that contains `[TaskRouting(` MUST NOT reference
-//   any banned PII identifier listed in ADR-0046 Decision 1.
+//   any banned PII identifier listed in ADR-0047 Decision 1.
 //
 // Exit codes:
 //   0 -- clean
@@ -37,7 +37,7 @@ const QUIET = args.includes("--quiet");
 
 // Must stay in sync with
 // src/actors/Cena.Actors.Tests/Architecture/NoPiiFieldInLlmPromptTest.cs.
-// When one changes, the other must change in the same PR -- ADR-0046 locks
+// When one changes, the other must change in the same PR -- ADR-0047 locks
 // the pair as the single source of truth.
 const BANNED = new RegExp(
   String.raw`(?<![A-Za-z0-9_])(?<name>` +
@@ -225,12 +225,12 @@ function main() {
   } else if (violations.length === 0) {
     if (!QUIET) {
       process.stdout.write(
-        `ADR-0046 lint clean -- 0 banned-PII-identifier hits in ${withTaskRouting} [TaskRouting] file(s).\n`,
+        `ADR-0047 lint clean -- 0 banned-PII-identifier hits in ${withTaskRouting} [TaskRouting] file(s).\n`,
       );
     }
   } else {
     process.stderr.write(
-      `ADR-0046 lint FAILED -- ${violations.length} banned-PII-identifier hit(s):\n\n`,
+      `ADR-0047 lint FAILED -- ${violations.length} banned-PII-identifier hit(s):\n\n`,
     );
     for (const v of violations) {
       process.stderr.write(
@@ -238,7 +238,7 @@ function main() {
       );
     }
     process.stderr.write(
-      "\nFix options (ADR-0046):\n" +
+      "\nFix options (ADR-0047):\n" +
         "  (a) Replace the raw field with a structured placeholder\n" +
         "      (see Decision 2 -- {{student_pseudonym}}, {{age_band}}, etc.).\n" +
         "  (b) Remove the field from the prompt entirely.\n" +

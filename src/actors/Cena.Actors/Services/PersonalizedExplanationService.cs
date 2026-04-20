@@ -139,7 +139,7 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
     // Per-student daily token tracking: key = "student:{budgetKey}:{yyyy-MM-dd}"
     private static readonly ConcurrentDictionary<string, int> s_dailyTokens = new();
 
-    // ADR-0046 feature label; mirrors [FeatureTag] so the PII-scrub metric's
+    // ADR-0047 feature label; mirrors [FeatureTag] so the PII-scrub metric's
     // label lines up with the cost metric's.
     private const string FeatureLabel = "explanation-l3";
 
@@ -243,12 +243,12 @@ public sealed class PersonalizedExplanationService : IPersonalizedExplanationSer
             var maxTokens = DetermineMaxTokens(
                 effectiveScaffolding, ctx.BloomLevel, ctx.QuestionDifficulty, ctx.MasteryProbability);
 
-            // ADR-0046 Decision 4 — fail-closed on scrubber increment.
+            // ADR-0047 Decision 4 — fail-closed on scrubber increment.
             var scrub = _piiScrubber.Scrub(userPrompt, FeatureLabel);
             if (scrub.RedactionCount > 0)
             {
                 _logger.LogWarning(
-                    "[ADR-0046] PII detected in personalized-explanation prompt — refusing LLM call. " +
+                    "[ADR-0047] PII detected in personalized-explanation prompt — refusing LLM call. " +
                     "Categories=[{Categories}]. Falling back to L2 cache.",
                     string.Join(",", scrub.Categories));
                 return await FallbackToL2Async(ctx, ct);

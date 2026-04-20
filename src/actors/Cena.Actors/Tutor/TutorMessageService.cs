@@ -121,16 +121,16 @@ public interface ITutorMessageService
 // prr-046: delegates the LLM call (and the cost-metric emission) to
 // ClaudeTutorLlmService. Emitting here would double-count the same Anthropic
 // call.
-// ADR-0046: this service already runs ITutorPromptScrubber (FIND-privacy-008)
+// ADR-0047: this service already runs ITutorPromptScrubber (FIND-privacy-008)
 // on every student turn via BuildPromptAsync before the prompt leaves the
 // tenant boundary. That scrubber is per-student-PII-context-aware (names,
 // parent, school pulled from the profile) and strictly supersedes the generic
 // IPiiPromptScrubber baseline for the Tutor seam. The [PiiPreScrubbed]
-// attribute documents that guarantee for the ADR-0046 ratchet.
+// attribute documents that guarantee for the ADR-0047 ratchet.
 [TaskRouting("tier3", "socratic_question")]
 [FeatureTag("socratic")]
 [DelegatesLlmCost("ClaudeTutorLlmService")]
-[PiiPreScrubbed("TutorPromptScrubber (FIND-privacy-008) runs on every student turn in this service's BuildPromptAsync with the per-student StudentPiiContext. That per-context scrubber is stricter than the ADR-0046 baseline.")]
+[PiiPreScrubbed("TutorPromptScrubber (FIND-privacy-008) runs on every student turn in this service's BuildPromptAsync with the per-student StudentPiiContext. That per-context scrubber is stricter than the ADR-0047 baseline.")]
 public sealed class TutorMessageService : ITutorMessageService
 {
     private readonly ITutorMessageRepository _repository;

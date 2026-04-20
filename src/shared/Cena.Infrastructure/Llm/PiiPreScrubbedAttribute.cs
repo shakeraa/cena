@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — PiiPreScrubbed attribute (ADR-0046, prr-022)
+// Cena Platform — PiiPreScrubbed attribute (ADR-0047, prr-022)
 //
 // Declarative opt-out from the runtime PII scrubber check in
 // NoPiiFieldInLlmPromptTest. A [TaskRouting]-tagged service that does NOT
@@ -16,7 +16,7 @@
 // (FIND-privacy-008). ClaudeTutorLlmService is therefore [PiiPreScrubbed]
 // with the reason pointing at that upstream seam.
 //
-// See docs/adr/0046-no-pii-in-llm-prompts.md §Decision 3.
+// See docs/adr/0047-no-pii-in-llm-prompts.md §Decision 3.
 // =============================================================================
 
 namespace Cena.Infrastructure.Llm;
@@ -44,7 +44,7 @@ public sealed class PiiPreScrubbedAttribute : Attribute
         if (string.IsNullOrWhiteSpace(reason))
         {
             throw new ArgumentException(
-                "Reason must not be empty — name the upstream seam that runs the scrub (ADR-0046).",
+                "Reason must not be empty — name the upstream seam that runs the scrub (ADR-0047).",
                 nameof(reason));
         }
         Reason = reason;

@@ -236,7 +236,7 @@ builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>
 builder.Services.AddLlmCostMetric(Path.Combine(
     builder.Environment.ContentRootPath,
     Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
-// prr-022 / ADR-0046: PII prompt scrubber — injected by every [TaskRouting]
+// prr-022 / ADR-0047: PII prompt scrubber — injected by every [TaskRouting]
 // service that composes student free-text into its prompt.
 builder.Services.AddPiiPromptScrubber();
 builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();

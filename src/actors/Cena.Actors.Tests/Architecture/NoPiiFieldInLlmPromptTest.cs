@@ -1,15 +1,15 @@
 // =============================================================================
-// Cena Platform — "No PII in LLM prompts" architecture ratchet (ADR-0046, prr-022)
+// Cena Platform — "No PII in LLM prompts" architecture ratchet (ADR-0047, prr-022)
 //
 // Two invariants enforced against every production class that constructs or
 // consumes an LLM call:
 //
 //   INVARIANT 1 — no banned field identifier may appear in a [TaskRouting]-
-//                 tagged file. The banned vocabulary is ADR-0046 §Decision 1;
+//                 tagged file. The banned vocabulary is ADR-0047 §Decision 1;
 //                 the regex below is the single machine-enforced source of
 //                 truth. Adding a new root is a code-only change — there is
 //                 NO YAML allowlist and the in-test allowlist array is
-//                 intentionally empty (ADR-0046 §Enforcement "strict
+//                 intentionally empty (ADR-0047 §Enforcement "strict
 //                 TODO-free policy").
 //
 //   INVARIANT 2 — every [TaskRouting]-tagged production class either injects
@@ -29,7 +29,7 @@
 //   - Scanner finding zero [TaskRouting] classes → Assert.Fail (scanner
 //     self-broke; same loud-failure convention as CostMetricEmittedTest).
 //
-// See docs/adr/0046-no-pii-in-llm-prompts.md.
+// See docs/adr/0047-no-pii-in-llm-prompts.md.
 // =============================================================================
 
 using System.Text;
@@ -39,7 +39,7 @@ namespace Cena.Actors.Tests.Architecture;
 
 public sealed class NoPiiFieldInLlmPromptTest
 {
-    // ── Banned-identifier regex (ADR-0046 Decision 1) ───────────────────────
+    // ── Banned-identifier regex (ADR-0047 Decision 1) ───────────────────────
     //
     // Grouped roots with word-boundary anchoring. Case-insensitive matching
     // keeps the rule symmetrical across C# (`StudentEmail`), JSON
@@ -100,11 +100,11 @@ public sealed class NoPiiFieldInLlmPromptTest
     private static readonly Regex PiiPreScrubbedAttribute = new(
         @"\[PiiPreScrubbed\s*\(", RegexOptions.Compiled);
 
-    // ── In-source allowlist (ADR-0046: empty by design) ─────────────────────
+    // ── In-source allowlist (ADR-0047: empty by design) ─────────────────────
     //
     // Adding an entry here is a code-only change, visible in PR review. Any
     // non-empty allowlist must be paired with an ADR supersede or addendum —
-    // see ADR-0046 §Enforcement.
+    // see ADR-0047 §Enforcement.
     //
     // Each entry is a relative path (forward-slash, repo-root-anchored). The
     // file is exempted from the banned-identifier scan ONLY (it still
@@ -255,7 +255,7 @@ public sealed class NoPiiFieldInLlmPromptTest
                 violations.Add(
                     $"{rel}:{lineNo + 1} — banned PII identifier `{name}` appears in a " +
                     "[TaskRouting]-tagged file. Replace with the structured placeholder " +
-                    "defined in ADR-0046 §Decision 2 (e.g. {{student_pseudonym}}, " +
+                    "defined in ADR-0047 §Decision 2 (e.g. {{student_pseudonym}}, " +
                     "{{age_band}}, {{subject}}).");
             }
         }
@@ -268,9 +268,9 @@ public sealed class NoPiiFieldInLlmPromptTest
         if (violations.Count == 0) return;
 
         var sb = new StringBuilder();
-        sb.AppendLine($"ADR-0046 violation: {violations.Count} banned-PII-identifier hit(s) in {withTaskRouting} [TaskRouting]-tagged file(s).");
+        sb.AppendLine($"ADR-0047 violation: {violations.Count} banned-PII-identifier hit(s) in {withTaskRouting} [TaskRouting]-tagged file(s).");
         sb.AppendLine();
-        sb.AppendLine("The banned vocabulary is locked by ADR-0046 §Decision 1. Fix options:");
+        sb.AppendLine("The banned vocabulary is locked by ADR-0047 §Decision 1. Fix options:");
         sb.AppendLine("  (a) Replace the raw field with a structured placeholder (§Decision 2).");
         sb.AppendLine("  (b) Remove the field from the prompt entirely; rely on free-text user input.");
         sb.AppendLine("  (c) Raise an ADR addendum if the ban is genuinely wrong for this seam —");
@@ -308,7 +308,7 @@ public sealed class NoPiiFieldInLlmPromptTest
                 "IPiiPromptScrubber nor declares [PiiPreScrubbed(\"<reason>\")]. " +
                 "Either inject the scrubber and call it on the outgoing prompt, or " +
                 "(if an upstream collaborator already scrubs) annotate the class " +
-                "with [PiiPreScrubbed(\"<upstream-seam-name>\")]. See ADR-0046 §Decision 3.");
+                "with [PiiPreScrubbed(\"<upstream-seam-name>\")]. See ADR-0047 §Decision 3.");
         }
 
         Assert.True(
@@ -319,7 +319,7 @@ public sealed class NoPiiFieldInLlmPromptTest
         if (violations.Count == 0) return;
 
         var sb = new StringBuilder();
-        sb.AppendLine($"ADR-0046 violation: {violations.Count} [TaskRouting] class(es) miss PII scrubber wiring.");
+        sb.AppendLine($"ADR-0047 violation: {violations.Count} [TaskRouting] class(es) miss PII scrubber wiring.");
         sb.AppendLine();
         foreach (var v in violations) sb.AppendLine("  " + v);
         Assert.Fail(sb.ToString());

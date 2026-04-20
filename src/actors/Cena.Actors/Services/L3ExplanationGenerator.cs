@@ -47,7 +47,7 @@ public interface IL3ExplanationGenerator
 // routing row with ExplanationGenerator (L2 fallback), but bills separately
 // so finops can see if L3 usage drifts upward — over-use of L3 signals a
 // scaffolding regression (ADR-0045 §3 rationale).
-// ADR-0046: composes StudentAnswer free-text. Injects IPiiPromptScrubber and
+// ADR-0047: composes StudentAnswer free-text. Injects IPiiPromptScrubber and
 // fails closed (returns null — caller then falls back to L2 or a generic safe
 // reply) on any scrub event.
 [TaskRouting("tier3", "full_explanation")]
@@ -106,12 +106,12 @@ public sealed class L3ExplanationGenerator : IL3ExplanationGenerator
         var userPrompt = BuildUserPrompt(request);
         var maxTokens = DetermineMaxTokensByFocus(request.FocusLevel);
 
-        // ADR-0046 Decision 4 — fail-closed on scrubber increment.
+        // ADR-0047 Decision 4 — fail-closed on scrubber increment.
         var scrub = _piiScrubber.Scrub(userPrompt, FeatureLabel);
         if (scrub.RedactionCount > 0)
         {
             _logger.LogWarning(
-                "[ADR-0046] PII detected in L3-explanation prompt — refusing LLM call. " +
+                "[ADR-0047] PII detected in L3-explanation prompt — refusing LLM call. " +
                 "Categories=[{Categories}]. Returning null (caller will fall back to L2 or generic).",
                 string.Join(",", scrub.Categories));
             return null;

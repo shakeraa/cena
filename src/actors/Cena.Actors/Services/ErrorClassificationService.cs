@@ -70,10 +70,10 @@ public interface IErrorClassificationService
 // prr-046: finops cost-center "classification". Tier-2 error classification
 // shares the routing row with future wrong-answer classifiers; the feature
 // label lets finops separate wrong-answer spend from other tier-2 usage.
-// ADR-0046: this service composes StudentAnswer free-text into its user prompt.
+// ADR-0047: this service composes StudentAnswer free-text into its user prompt.
 // It injects IPiiPromptScrubber and fails closed (returns the safe default
 // PartialUnderstanding) if the scrubber detects residual PII — that path is
-// the canonical demonstration of ADR-0046 Decision 4 ("fail-closed on counter
+// the canonical demonstration of ADR-0047 Decision 4 ("fail-closed on counter
 // increment"). An unscrubbed call is never made to the LLM.
 [TaskRouting("tier2", "error_classification")]
 [FeatureTag("classification")]
@@ -131,10 +131,10 @@ public sealed class ErrorClassificationService : IErrorClassificationService
         {
             var userPrompt = BuildUserPrompt(input);
 
-            // ADR-0046 Decision 4 — fail-closed on scrubber increment.
+            // ADR-0047 Decision 4 — fail-closed on scrubber increment.
             // The PII scrubber returns RedactionCount > 0 iff it found a
             // residual pattern (email, phone, government_id, address, postal
-            // code). By design of ADR-0046, that MUST NOT reach the LLM —
+            // code). By design of ADR-0047, that MUST NOT reach the LLM —
             // serve the pedagogically-neutral PartialUnderstanding default
             // and trust the scrubber's fail-closed metric to raise a
             // severity-1 alert for the on-call engineer.
@@ -142,8 +142,8 @@ public sealed class ErrorClassificationService : IErrorClassificationService
             if (scrub.RedactionCount > 0)
             {
                 _logger.LogWarning(
-                    "[ADR-0046] PII detected in error-classification prompt — refusing LLM call. " +
-                    "Categories=[{Categories}]. Returning PartialUnderstanding. See ADR-0046 runbook.",
+                    "[ADR-0047] PII detected in error-classification prompt — refusing LLM call. " +
+                    "Categories=[{Categories}]. Returning PartialUnderstanding. See ADR-0047 runbook.",
                     string.Join(",", scrub.Categories));
                 return ExplanationErrorType.PartialUnderstanding;
             }

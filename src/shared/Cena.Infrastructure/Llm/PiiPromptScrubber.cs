@@ -1,8 +1,8 @@
 // =============================================================================
-// Cena Platform — PII Prompt Scrubber (ADR-0046, prr-022)
+// Cena Platform — PII Prompt Scrubber (ADR-0047, prr-022)
 //
 // Defence-in-depth for the "no PII in LLM prompts" rule. The first line of
-// defence is structured placeholders (see ADR-0046 Decision 2) — template
+// defence is structured placeholders (see ADR-0047 Decision 2) — template
 // authors never interpolate a raw student/parent field; the CI + xUnit
 // architecture ratchet fails a build that does. This scrubber is the runtime
 // backstop: it scans the outgoing prompt string, redacts residual free-text
@@ -10,7 +10,7 @@
 // increments a fail-closed metric so a non-zero reading is a real
 // severity-1 signal.
 //
-// Design notes (ADR-0046 Decision 4 — "fail-closed on counter increment"):
+// Design notes (ADR-0047 Decision 4 — "fail-closed on counter increment"):
 //
 //   Callers are expected to *refuse the LLM call* when RedactionCount > 0.
 //   The scrubber does not itself refuse — it returns the scrubbed text and
@@ -34,7 +34,7 @@
 // generic baseline. Tutor's per-student enricher layers on top of this
 // scrubber via [PiiPreScrubbed("...")] upstream declaration.
 //
-// See docs/adr/0046-no-pii-in-llm-prompts.md.
+// See docs/adr/0047-no-pii-in-llm-prompts.md.
 // =============================================================================
 
 using System.Diagnostics.Metrics;
@@ -52,7 +52,7 @@ namespace Cena.Infrastructure.Llm;
 /// </param>
 /// <param name="RedactionCount">
 /// Total number of PII patterns that matched and were replaced. Any
-/// non-zero value is a severity-1 signal per ADR-0046 — callers must
+/// non-zero value is a severity-1 signal per ADR-0047 — callers must
 /// refuse the LLM call and fall back to their tier's static path.
 /// </param>
 /// <param name="Categories">
@@ -100,7 +100,7 @@ public sealed class PiiPromptScrubber : IPiiPromptScrubber
     /// <summary>
     /// Fully-qualified metric name emitted to Prometheus. Matches the dashboard
     /// and alert expressions. Any non-zero value is a severity-1 alert per
-    /// ADR-0046 Decision 4.
+    /// ADR-0047 Decision 4.
     /// </summary>
     public const string CounterName = "cena_llm_prompt_pii_scrubbed_total";
 
@@ -173,7 +173,7 @@ public sealed class PiiPromptScrubber : IPiiPromptScrubber
             unit: "events",
             description:
                 "LLM prompt PII redaction events, by feature+category. " +
-                "Any non-zero value is a severity-1 alert (ADR-0046).");
+                "Any non-zero value is a severity-1 alert (ADR-0047).");
     }
 
     public PiiScrubResult Scrub(string prompt, string feature)
@@ -213,7 +213,7 @@ public sealed class PiiPromptScrubber : IPiiPromptScrubber
             // the seam; logging the matched content would defeat the whole
             // purpose of the scrubber (PII in the observability store).
             _logger.LogWarning(
-                "[PII_SCRUB_FIRED] feature={Feature} redactions={Count} categories=[{Categories}] — caller MUST refuse the LLM call and fall back (ADR-0046).",
+                "[PII_SCRUB_FIRED] feature={Feature} redactions={Count} categories=[{Categories}] — caller MUST refuse the LLM call and fall back (ADR-0047).",
                 feature,
                 totalCount,
                 string.Join(", ", categories));

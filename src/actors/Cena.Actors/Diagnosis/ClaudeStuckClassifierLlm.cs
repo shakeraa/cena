@@ -29,7 +29,7 @@ namespace Cena.Actors.Diagnosis;
 // contracts/llm/routing-config.yaml §2 (task_routing.stagnation_analysis /
 // error_classification family). Low temperature, small max_tokens.
 // prr-046: finops cost-center "stuck-classification". Shadow-mode classifier.
-// ADR-0046: prompt is a structured JSON payload built from anonymised
+// ADR-0047: prompt is a structured JSON payload built from anonymised
 // StuckContext (studentAnonId, not studentId; textScrubbed field for
 // question text; numeric mastery/advancement signals). No raw student
 // free-text or profile PII reaches this seam — the scrub is structural
