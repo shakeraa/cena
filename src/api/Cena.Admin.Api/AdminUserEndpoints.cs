@@ -5,9 +5,11 @@
 
 using Cena.Admin.Api.Validation;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Security;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Options;
 using Cena.Infrastructure.Errors;
 
 namespace Cena.Admin.Api;
@@ -183,7 +185,15 @@ public static class AdminUserEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/admin/users/bulk-invite
-        group.MapPost("/bulk-invite", async (HttpRequest request, IAdminUserService service, HttpContext ctx) =>
+        // prr-021: Hardened CSV roster import — size / CSV-injection / UTF-8 /
+        // bidi defenses in CsvRosterSanitizer; tenant-scoped rate limit policy
+        // "admin-roster-import" (5/hour/tenant by default); audit log written
+        // per import with byte + row + rejection summary.
+        group.MapPost("/bulk-invite", async (
+            HttpRequest request,
+            IAdminUserService service,
+            HttpContext ctx,
+            IOptions<RosterImportOptions> rosterOptions) =>
         {
             if (!request.HasFormContentType)
                 return Results.BadRequest(new { error = "Expected multipart/form-data with CSV file" });
@@ -193,26 +203,32 @@ public static class AdminUserEndpoints
             if (file == null)
                 return Results.BadRequest(new { error = "No file uploaded" });
 
-            // REV-011.3: Restrict bulk-invite to CSV only
-            var contentType = file.ContentType ?? "";
+            // REV-011.3: Restrict bulk-invite to CSV only.
+            var contentType = file.ContentType ?? string.Empty;
             if (!contentType.Equals("text/csv", StringComparison.OrdinalIgnoreCase)
                 && !contentType.Equals("application/vnd.ms-excel", StringComparison.OrdinalIgnoreCase))
                 return Results.BadRequest(new { error = "Only CSV files are accepted for bulk invite" });
 
-            const long maxBulkInviteSize = 5 * 1024 * 1024; // 5MB for CSV
-            if (file.Length > maxBulkInviteSize)
-                return Results.BadRequest(new { error = $"File exceeds maximum size of {maxBulkInviteSize / (1024 * 1024)}MB" });
+            // prr-021: Outer guard on file.Length. The sanitizer re-counts bytes
+            // in-flight as a belt-and-suspenders check, but we reject here first
+            // so nothing hits the Firebase path for obvious oversize uploads.
+            var maxBytes = rosterOptions.Value.DefaultMaxBytes;
+            if (file.Length > maxBytes)
+                return Results.BadRequest(new
+                {
+                    error = $"File exceeds maximum size of {maxBytes / (1024 * 1024)}MB",
+                    code = "file_too_large",
+                });
 
-            // Sanitize filename
-            var safeName = Path.GetFileName(file.FileName)
-                .Replace("..", "")
-                .Replace("/", "")
-                .Replace("\\", "");
+            // Sanitize filename (defense in depth; stream is what we actually read).
+            _ = InputSanitizer.SanitizeFileName(file.FileName);
 
             using var stream = file.OpenReadStream();
             var result = await service.BulkInviteAsync(stream, ctx.User);
             return Results.Ok(result);
-        }).WithName("BulkInviteUsers").DisableAntiforgery()
+        }).WithName("BulkInviteUsers")
+        .DisableAntiforgery()
+        .RequireRateLimiting("admin-roster-import")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)

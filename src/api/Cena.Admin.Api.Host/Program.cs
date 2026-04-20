@@ -359,7 +359,7 @@ public partial class Program
             var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
                 ?? httpContext.User.FindFirstValue("sub")
                 ?? "anonymous";
-            
+
             return RateLimitPartition.GetFixedWindowLimiter(
                 userId,
                 _ => new FixedWindowRateLimiterOptions
@@ -370,7 +370,28 @@ public partial class Program
                     AutoReplenishment = true,
                 });
         });
-    
+
+        // prr-021: Roster import rate limit — 5/hour per tenant (configurable
+        // via Cena:RosterImport:ImportsPerHourPerTenant). Partitioned by
+        // school_id so one school cannot starve another of quota; SUPER_ADMIN
+        // runs without a school_id get their own "(super_admin)" bucket.
+        var rosterPermit = builder.Configuration
+            .GetValue<int?>("Cena:RosterImport:ImportsPerHourPerTenant") ?? 5;
+        options.AddPolicy("admin-roster-import", httpContext =>
+        {
+            var tenantId = httpContext.User.FindFirstValue("school_id")
+                ?? "(super_admin)";
+            return RateLimitPartition.GetFixedWindowLimiter(
+                tenantId,
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = rosterPermit,
+                    Window = TimeSpan.FromHours(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true,
+                });
+        });
+
         options.OnRejected = async (context, _) =>
         {
             context.HttpContext.Response.Headers["Retry-After"] = "60";
@@ -381,6 +402,11 @@ public partial class Program
             });
         };
     });
+
+    // prr-021: Bind RosterImportOptions so both the sanitizer defaults and
+    // the rate limiter pick up deployment-specific overrides.
+    builder.Services.Configure<Cena.Infrastructure.Security.RosterImportOptions>(
+        builder.Configuration.GetSection(Cena.Infrastructure.Security.RosterImportOptions.SectionName));
     
     // ---- Health checks ----
     builder.Services.AddHealthChecks();
