@@ -7,6 +7,7 @@
 using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text.Json;
+using Cena.Actors.Accommodations;
 using Cena.Actors.Bus;
 using Cena.Actors.Diagnosis;
 using Cena.Actors.Events;
@@ -534,7 +535,10 @@ public static class SessionEndpoints
 
         // GET /api/sessions/{sessionId}/current-question — get current question
         // FIND-pedagogy-016: inject IAdaptiveQuestionPool for lazy refill
-        group.MapGet("/{sessionId}/current-question", async (string sessionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IScaffoldingService scaffoldingService, [FromServices] IAdaptiveQuestionPool adaptivePool, ILogger<SessionLogMarker> logger) =>
+        // PRR-151 R-22: inject IAccommodationProfileService so the DTO
+        // carries the parent-consented accommodation flags (TTS,
+        // extended-time multiplier, distraction-reduced / graph-paper).
+        group.MapGet("/{sessionId}/current-question", async (string sessionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IScaffoldingService scaffoldingService, [FromServices] IAdaptiveQuestionPool adaptivePool, [FromServices] IAccommodationProfileService accommodationProfiles, ILogger<SessionLogMarker> logger) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -656,6 +660,39 @@ public static class SessionEndpoints
             // Get hints used for this question
             var hintsUsed = queue.HintsUsedByQuestion.GetValueOrDefault(questionDoc.QuestionId, 0);
 
+            // ═════════════════════════════════════════════════════════════════
+            // PRR-151 R-22 — consult the student's accommodation profile and
+            // populate the render-time flags on the question DTO. Before this
+            // wiring, the parent-console endpoint persisted
+            // AccommodationProfileAssignedV1 events but NO session-rendering
+            // code path consulted them, so parents could sign legal consent
+            // for TTS / extended-time / distraction-reduced layout and the
+            // platform would never technically render the accommodation —
+            // a Ministry-reportable compliance defect.
+            //
+            // The service returns AccommodationProfile.Default (everything
+            // false, multiplier 1.0) when the student has never had a
+            // profile assigned, so this is a pure additive wiring that does
+            // not change behaviour for students without accommodations.
+            // ═════════════════════════════════════════════════════════════════
+            var accommodations = await accommodationProfiles.GetCurrentAsync(studentId, ctx.RequestAborted);
+            var ttsEnabled = accommodations.TtsForProblemStatementsEnabled;
+            var timeMultiplier = accommodations.ExtendedTimeMultiplier;
+            var graphPaperRequired = accommodations.DistractionReducedLayoutEnabled;
+            var noComparative = accommodations.NoComparativeStatsRequired;
+            const int baseExpectedTimeSeconds = 60;
+            var expectedTimeSeconds = (int)Math.Round(baseExpectedTimeSeconds * timeMultiplier);
+
+            if (ttsEnabled || graphPaperRequired || timeMultiplier > 1.0 || noComparative)
+            {
+                logger.LogInformation(
+                    "[PRR-151 R-22] Session {SessionId} question {QuestionId}: "
+                    + "applying accommodations tts={Tts} graphPaper={GraphPaper} "
+                    + "timeMultiplier={TimeMultiplier:F2} noComparative={NoComparative}",
+                    sessionId, questionDoc.QuestionId,
+                    ttsEnabled, graphPaperRequired, timeMultiplier, noComparative);
+            }
+
             return Results.Ok(new SessionQuestionDto(
                 QuestionId: questionDoc.QuestionId,
                 QuestionIndex: queue.TotalQuestionsAttempted + 1,
@@ -664,11 +701,15 @@ public static class SessionEndpoints
                 QuestionType: questionDoc.QuestionType,
                 Choices: questionDoc.Choices ?? Array.Empty<string>(),
                 Subject: questionDoc.Subject,
-                ExpectedTimeSeconds: 60,
+                ExpectedTimeSeconds: expectedTimeSeconds,
                 ScaffoldingLevel: level.ToString(),
                 WorkedExample: metadata.ShowWorkedExample ? questionDoc.WorkedExample : null,
                 HintsAvailable: metadata.MaxHints,
-                HintsRemaining: Math.Max(0, metadata.MaxHints - hintsUsed)));
+                HintsRemaining: Math.Max(0, metadata.MaxHints - hintsUsed),
+                TtsEnabled: ttsEnabled,
+                ExtendedTimeMultiplier: timeMultiplier,
+                GraphPaperRequired: graphPaperRequired,
+                NoComparativeStats: noComparative));
         })
         .WithName("GetCurrentQuestion")
     .Produces<SessionQuestionDto>(StatusCodes.Status200OK)
@@ -680,7 +721,7 @@ public static class SessionEndpoints
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // POST /api/sessions/{sessionId}/answer — submit an answer
-        group.MapPost("/{sessionId}/answer", async (string sessionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IBktService bktService, [FromServices] IErrorClassificationService errorClassifier, [FromServices] IMisconceptionDetectionService misconceptionDetector, [FromServices] IEloDifficultyService eloService, [FromServices] ILoggerFactory loggerFactory, SessionAnswerRequest request) =>
+        group.MapPost("/{sessionId}/answer", async (string sessionId, HttpContext ctx, IDocumentStore store, [FromServices] IQuestionBank questionBank, [FromServices] IBktService bktService, [FromServices] IErrorClassificationService errorClassifier, [FromServices] IMisconceptionDetectionService misconceptionDetector, [FromServices] IEloDifficultyService eloService, [FromServices] ILoggerFactory loggerFactory, [FromServices] Cena.Infrastructure.Compliance.EncryptedFieldAccessor encryptedFieldAccessor, SessionAnswerRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -857,13 +898,14 @@ public static class SessionEndpoints
 
                 if (misconception is { Detected: true, BuggyRuleId: not null })
                 {
+                    // ADR-0038: encrypt StudentAnswer PII under per-subject key.
                     var misconceptionEvent = new MisconceptionDetected_V1(
                         StudentId: studentId,
                         SessionId: sessionId,
                         BuggyRuleId: misconception.BuggyRuleId,
                         TopicId: questionDoc.ConceptId ?? string.Empty,
                         QuestionId: currentQuestion.QuestionId,
-                        StudentAnswer: rawStudentInput ?? normalizedAnswer ?? string.Empty,
+                        StudentAnswer: await encryptedFieldAccessor.EncryptAsync(rawStudentInput ?? normalizedAnswer ?? string.Empty, studentId) ?? (rawStudentInput ?? normalizedAnswer ?? string.Empty),
                         ExpectedPattern: misconception.CounterExample ?? string.Empty,
                         DetectedAt: DateTimeOffset.UtcNow);
 

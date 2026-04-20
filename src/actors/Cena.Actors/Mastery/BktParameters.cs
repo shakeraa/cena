@@ -26,6 +26,17 @@ public readonly record struct BktParameters(float P_L0, float P_T, float P_S, fl
     /// <summary>Probability of correct response without mastery (Koedinger default).</summary>
     public const double PGuess = 0.15;
 
+    /// <summary>
+    /// Sibling constant to ADR-0039's Koedinger set: within-session micro-forgetting
+    /// factor applied by <c>BktService</c> after each trial update. Not part of the
+    /// Koedinger paper — it's a Cena-specific dampener that prevents mastery from
+    /// ratcheting up on lucky-guess streaks. Long-term decay is HLR's responsibility
+    /// and is orthogonal to this constant. Follow-up doc edit will append a §PForget
+    /// section to ADR-0039 to document the deviation; the constant lives here so
+    /// every BKT consumer routes through a single source of truth.
+    /// </summary>
+    public const double PForget = 0.02;
+
     // Per ADR-0039 — Default uses the locked Koedinger constants above (cast to float for struct storage).
     /// <summary>Default parameters locked to Koedinger literature defaults per ADR-0039.</summary>
     public static readonly BktParameters Default = new(

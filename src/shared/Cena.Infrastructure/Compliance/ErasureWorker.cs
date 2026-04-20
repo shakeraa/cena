@@ -8,6 +8,7 @@
 
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
+using Cena.Infrastructure.Compliance.KeyStore;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -105,6 +106,7 @@ public sealed class ErasureWorker : BackgroundService
         using var scope = _serviceProvider.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<IDocumentStore>();
         var erasureService = scope.ServiceProvider.GetRequiredService<IRightToErasureService>();
+        var subjectKeyStore = scope.ServiceProvider.GetService<ISubjectKeyStore>();
 
         int processedCount = 0;
         int failedCount = 0;
@@ -123,6 +125,33 @@ public sealed class ErasureWorker : BackgroundService
             {
                 var result = await ProcessSingleRequestAsync(erasureService, request, ct);
                 results.Add(result);
+
+                // ADR-0038 (crypto-shredding): regardless of projection-side
+                // anonymisation outcomes, destroy the subject key so every
+                // past and future ciphertext in the append-only event store
+                // becomes undecryptable. Audit-only hash of subject-id — we
+                // never log the raw subject-id here per ADR §"Audit trail".
+                if (result.Success && subjectKeyStore is not null)
+                {
+                    try
+                    {
+                        var wasAlive = await subjectKeyStore.DeleteAsync(request.StudentId, ct);
+                        _logger.LogInformation(
+                            "[SIEM] ErasureSubjectKeyTombstoned: SubjectIdHash={Hash}, priorExisted={Existed}, "
+                            + "authSource={AuthSource}, at={At}, RunId={RunId}",
+                            InMemorySubjectKeyStore.HashSubjectForLog(request.StudentId),
+                            wasAlive,
+                            "data-subject-request",
+                            _clock.UtcNow,
+                            runId);
+                    }
+                    catch (Exception keyEx)
+                    {
+                        _logger.LogError(keyEx,
+                            "[SIEM] ErasureSubjectKeyTombstoneFailed: SubjectIdHash={Hash}, RunId={RunId}",
+                            InMemorySubjectKeyStore.HashSubjectForLog(request.StudentId), runId);
+                    }
+                }
 
                 if (result.Success)
                 {
@@ -233,6 +262,9 @@ public static class ErasureWorkerExtensions
     {
         services.AddSingleton<IClock, SystemClock>();
         services.AddHostedService<ErasureWorker>();
+
+        // ADR-0038: crypto-shredding primitives. Idempotent (TryAdd inside).
+        services.AddSubjectKeyStore();
 
         if (configure != null)
             services.Configure(configure);

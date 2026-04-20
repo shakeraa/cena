@@ -66,10 +66,17 @@ builder.Configuration.AddJsonFile("../../../config/bkt-params.json", optional: t
 builder.Configuration.AddJsonFile("../../../config/bagrut-anchors.json", optional: true, reloadOnChange: true);
 
 // ---- Serilog structured logging ----
+// prr-013 / ADR-0003 / RDY-080: SessionRiskLogEnricher scrubs theta / ability
+// / risk / readiness scalars out of rendered log text. It binds a
+// `RedactedMessage` property; sinks must use `{RedactedMessage}` in their
+// outputTemplate to emit the scrubbed form. PiiDestructuringPolicy covers
+// complex-object destructuring; the enricher covers scalar and literal-text
+// leaks the destructurer can't reach.
 builder.Host.UseSerilog((context, services, configuration) =>
 {
     configuration
         .ReadFrom.Configuration(context.Configuration)
+        .Enrich.With<Cena.Infrastructure.Compliance.SessionRiskLogEnricher>()
         .Destructure.With<Cena.Infrastructure.Compliance.PiiDestructuringPolicy>();
 });
 

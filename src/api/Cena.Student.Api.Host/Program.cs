@@ -132,13 +132,17 @@ public partial class Program
     }
     
     // ---- Serilog ----
-    // FIND-sec-004: Use 3-arg overload to access services and add PII destructuring policy
+    // FIND-sec-004: Use 3-arg overload to access services and add PII destructuring policy.
+    // prr-013 / ADR-0003 / RDY-080: SessionRiskLogEnricher scrubs theta / ability /
+    // risk / readiness scalars; outputTemplate renders {RedactedMessage} in place of
+    // {Message:lj} so sinks emit the scrubbed form.
     builder.Host.UseSerilog((context, services, configuration) =>
     {
         configuration
             .ReadFrom.Configuration(context.Configuration)
+            .Enrich.With<SessionRiskLogEnricher>()
             .Destructure.With<PiiDestructuringPolicy>()
-            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}");
+            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {RedactedMessage}{NewLine}{Exception}");
     });
     
     // ---- Configuration ----
@@ -232,7 +236,22 @@ public partial class Program
     
     // ---- MST-011: Scaffolding Service (stateless pure function wrapper) ----
     builder.Services.AddSingleton<IScaffoldingService, ScaffoldingServiceWrapper>();
-    
+
+    // ---- PRR-151 R-22: AccommodationProfile service (session-render wiring) ----
+    // Wires the Accommodations bounded context into the session pipeline.
+    // Before this registration, AccommodationProfileAssignedV1 events were
+    // persisted but no session-time code consulted them — a Ministry-
+    // reportable compliance defect ("we grant TTS accommodation for
+    // dyslexic students in the consent log, but TTS never turns on in
+    // practice"). The service folds the latest event on the student
+    // stream into an AccommodationProfile so SessionEndpoints can set
+    // the TTS / extended-time / distraction-reduced flags on the
+    // SessionQuestionDto. See
+    // src/actors/Cena.Actors/Accommodations/IAccommodationProfileService.cs.
+    builder.Services.AddSingleton<
+        Cena.Actors.Accommodations.IAccommodationProfileService,
+        Cena.Actors.Accommodations.MartenAccommodationProfileService>();
+
     // ---- RDY-034: Flow state service (consumes ICognitiveLoadService) ----
     // Registered in both actor + student hosts so the assessment endpoint
     // and any in-process actor consumer resolve the same implementation.

@@ -12,6 +12,7 @@
 // =============================================================================
 
 using System.Runtime.CompilerServices;
+using Cena.Actors.Mastery;
 
 namespace Cena.Actors.Services;
 
@@ -48,5 +49,62 @@ public static class ThetaMasteryMapper
         foreach (var (subject, theta) in estimates)
             result[subject] = ThetaToPInitial(theta);
         return result;
+    }
+
+    // =========================================================================
+    // prr-007 ReadinessBucket seam (single authorized constructor of the ordinal).
+    // Per ADR-0012 SessionRiskAssessment pattern + RDY-080 prediction-surface ban,
+    // raw IRT theta scalars MUST NOT reach student/teacher/parent DTOs. This seam
+    // is the only legitimate path; arch test NoThetaInOutboundDtoTest enforces.
+    //
+    // Bucket boundaries (point-estimate):
+    //   θ < -1.0   → Emerging
+    //   θ ∈ [-1.0, 0.0) → Developing
+    //   θ ∈ [0.0, 1.0)  → Proficient
+    //   θ ≥ 1.0    → ExamReady
+    //
+    // CI-aware down-rounding: when [θ - CI, θ + CI] crosses a bucket boundary,
+    // the LOWER bucket wins (Ministry-defensibility — a conservative readiness
+    // claim is always preferable to an optimistic one). Non-finite θ and
+    // extremely wide CIs fall to Emerging.
+    // =========================================================================
+
+    private const double BucketBoundaryEmergingDeveloping = -1.0;
+    private const double BucketBoundaryDevelopingProficient = 0.0;
+    private const double BucketBoundaryProficientExamReady = 1.0;
+
+    /// <summary>
+    /// Convert an IRT theta + confidence-interval half-width into an ordinal
+    /// readiness bucket suitable for student/teacher/parent-visible DTOs.
+    /// CI-straddle of a boundary down-rounds to the lower bucket.
+    /// </summary>
+    public static ReadinessBucket ToReadinessBucket(double theta, double confidenceIntervalHalfWidth)
+    {
+        // Non-finite theta → conservative Emerging
+        if (double.IsNaN(theta) || double.IsInfinity(theta))
+            return ReadinessBucket.Emerging;
+
+        // Negative CI is nonsense → treat as zero (pure point bucket)
+        var ci = confidenceIntervalHalfWidth > 0.0 ? confidenceIntervalHalfWidth : 0.0;
+
+        // CI-straddle rule: bucket = BucketAt(lowerBound) when lower and upper
+        // disagree. When CI is 0, lowerBound == theta, so this degenerates to
+        // the pure point-bucket lookup.
+        var lowerBound = theta - ci;
+        var upperBound = theta + ci;
+
+        var lowerBucket = BucketAt(lowerBound);
+        var upperBucket = BucketAt(upperBound);
+
+        // Same bucket → point case. Different buckets → down-round to lower.
+        return lowerBucket == upperBucket ? lowerBucket : lowerBucket;
+    }
+
+    private static ReadinessBucket BucketAt(double theta)
+    {
+        if (theta < BucketBoundaryEmergingDeveloping) return ReadinessBucket.Emerging;
+        if (theta < BucketBoundaryDevelopingProficient) return ReadinessBucket.Developing;
+        if (theta < BucketBoundaryProficientExamReady) return ReadinessBucket.Proficient;
+        return ReadinessBucket.ExamReady;
     }
 }

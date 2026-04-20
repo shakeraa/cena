@@ -69,21 +69,10 @@ public class BktParametersLockedTest
         // Single authorized seam.
         if (p.EndsWith("src/actors/Cena.Actors/Mastery/BktParameters.cs", StringComparison.Ordinal))
             return true;
-        // TODO(prr-041): BktService.cs carries a parallel BktParameters
-        // record with its own Default ctor-arg literals. The parallel ADR
-        // agent's next migration pass will fold these into the authorized
-        // seam (BktParameters.PInit/PLearn/PSlip/PGuess). Remove this
-        // exemption once the migration lands so the gate goes live.
-        if (p.EndsWith("src/actors/Cena.Actors/Services/BktService.cs", StringComparison.Ordinal))
-            return true;
-        // TODO(prr-041): BktCalibrationOptions.cs defines a SubjectBktParams
-        // config-bound record with its own default literals (PLearning=0.10,
-        // PInitial=0.10 — not Koedinger). Per the ADR, per-subject parameter
-        // learning is forbidden; this file is slated for retirement or
-        // migration to consume BktParameters.PInit/PLearn/PSlip/PGuess.
-        // Remove this exemption once the ADR's config-policy decision lands.
-        if (p.EndsWith("src/actors/Cena.Actors/Services/BktCalibrationOptions.cs", StringComparison.Ordinal))
-            return true;
+        // Previous TODO exemptions for BktService.cs and BktCalibrationOptions.cs
+        // are now removed (2026-04-20). Both files consume the authorized seam
+        // (Cena.Actors.Mastery.BktParameters.PInit/PLearn/PSlip/PGuess/PForget)
+        // directly, so the prr-041 scanner has a single source of truth.
         // Tests legitimately reference the constants.
         if (p.Contains("/Cena.Actors.Tests/", StringComparison.Ordinal)) return true;
         if (p.EndsWith("Tests.cs", StringComparison.Ordinal)) return true;
@@ -148,22 +137,13 @@ public class BktParametersLockedTest
     [Fact]
     public void Authorized_BktParameters_file_exists_or_is_being_authored_by_parallel_agent()
     {
-        // Tolerance for the parallel-agent race: the sibling prr-041 agent
-        // owns BktParameters.cs. If the file is missing right now, this test
-        // passes with a note so the main gate (above) still runs; once the
-        // parallel branch merges, this becomes a hard existence check.
+        // The authorized BKT seam file. Hard existence check — prr-041's parallel
+        // ADR work landed 2026-04-20 so the soft-pass tolerance is no longer
+        // needed. If this fails, someone deleted the authorized seam; the
+        // file-scanner test above won't catch that alone.
         var repoRoot = FindRepoRoot();
         var authorized = Path.Combine(
             repoRoot, "src", "actors", "Cena.Actors", "Mastery", "BktParameters.cs");
-
-        if (!File.Exists(authorized))
-        {
-            // TODO(prr-041): flip to Assert.True once parallel ADR agent
-            // lands src/actors/Cena.Actors/Mastery/BktParameters.cs. Until
-            // then we soft-pass — the file-scanner test above is the actual
-            // policy enforcement.
-            return;
-        }
 
         Assert.True(File.Exists(authorized),
             $"Authorized BKT seam missing: {authorized}. prr-041 requires a single named file " +

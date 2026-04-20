@@ -131,6 +131,69 @@ public sealed record AccommodationProfile(
     public bool IsEnabled(AccommodationDimension dimension)
         => Phase1ADimensions.IsShipped(dimension) && EnabledDimensions.Contains(dimension);
 
+    // =========================================================================
+    // Session-pipeline consumer helpers (PRR-151 R-22 wiring fix).
+    //
+    // These are DERIVED from IsEnabled(...) — they do not add new state to
+    // the profile and do not widen the bounded context. They give the
+    // session-rendering code path a named accessor per decision instead
+    // of forcing it to pass an enum token, which makes the wiring visible
+    // to the NoUnwiredAccommodationsTest (accommodation flags used by
+    // render decisions are trivially grep-able).
+    //
+    // Defaults when the dimension is OFF match the "no accommodation"
+    // baseline the platform already ships: multiplier 1.0 (no time
+    // extension), all feature flags false. A student with no profile
+    // assignment therefore sees identical UX to today — the fix is purely
+    // additive at the render seam.
+    // =========================================================================
+
+    /// <summary>
+    /// Time-pacing multiplier for <c>ExpectedTimeSeconds</c> (and any other
+    /// session-pacing budget). 1.0 when <see cref="AccommodationDimension.ExtendedTime"/>
+    /// is OFF, 1.5 when ON — matches the Ministry hatama-1 (הארכת זמן) 50%
+    /// extension convention referenced by
+    /// <see cref="MinistryAccommodationMapping"/>. See RDY-066 spec
+    /// §Extended-Time for the rationale: the UI hides the countdown
+    /// entirely, but pacing hints (worked-example timing, fatigue budget)
+    /// still need a concrete multiplier.
+    /// </summary>
+    public double ExtendedTimeMultiplier
+        => IsEnabled(AccommodationDimension.ExtendedTime) ? 1.5 : 1.0;
+
+    /// <summary>
+    /// True when problem-statement text-to-speech is authorised for this
+    /// student (Ministry hatama-2 / <see cref="AccommodationDimension.TtsForProblemStatements"/>).
+    /// Session endpoints gate TTS rendering on this flag so a student
+    /// without a signed consent event never hears the TTS voice, even if
+    /// the client-side UI has a TTS button code-path present.
+    /// </summary>
+    public bool TtsForProblemStatementsEnabled
+        => IsEnabled(AccommodationDimension.TtsForProblemStatements);
+
+    /// <summary>
+    /// True when the student's parent (or self, for adults) has opted
+    /// into the distraction-reduced one-problem-per-page layout
+    /// (Ministry hatama-3 / <see cref="AccommodationDimension.DistractionReducedLayout"/>).
+    /// Carried on the question-delivery DTO so the frontend can switch
+    /// to the minimal layout; authoring-side graph-paper overlay and
+    /// similar render-time reductions sit behind the same flag because
+    /// they're all the same accessibility class (reduce incidental
+    /// visual load).
+    /// </summary>
+    public bool DistractionReducedLayoutEnabled
+        => IsEnabled(AccommodationDimension.DistractionReducedLayout);
+
+    /// <summary>
+    /// True when comparative / peer-ranked stats must be hidden from the
+    /// student UI (Ministry hatama-4 / <see cref="AccommodationDimension.NoComparativeStats"/>).
+    /// Kept as a named accessor for symmetry; session-summary and mastery
+    /// widgets consult this before rendering percentiles, leaderboards,
+    /// or cohort comparisons.
+    /// </summary>
+    public bool NoComparativeStatsRequired
+        => IsEnabled(AccommodationDimension.NoComparativeStats);
+
     /// <summary>
     /// Convenience: a default "no accommodations" profile for students
     /// whose parent has not assigned anything. The downstream session

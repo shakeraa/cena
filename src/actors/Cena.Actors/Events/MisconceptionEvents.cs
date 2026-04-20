@@ -18,6 +18,18 @@ namespace Cena.Actors.Events;
 /// Appended to the student's event stream within the session boundary.
 /// ADR-0003 Decision 1: this event drives <c>LearningSessionState</c>,
 /// never <c>StudentState</c>.
+///
+/// <para>
+/// ADR-0038 (crypto-shredding): the <c>StudentAnswer</c> field is PII
+/// (free-form student-authored text). The write path encrypts it with the
+/// subject's per-subject AES-GCM key via
+/// <c>Cena.Infrastructure.Compliance.EncryptedFieldAccessor</c> before
+/// constructing this event; the stored JSON string is the wire-format blob
+/// produced by <c>EncryptedBlob.ToWireString()</c>. Any read path MUST
+/// route the field through <c>EncryptedFieldAccessor.TryDecryptAsync</c>.
+/// Pre-ADR events with plaintext <c>StudentAnswer</c> values remain valid
+/// and decrypt as pass-through until they age out under ADR-0003 retention.
+/// </para>
 /// </summary>
 [MlExcluded("ADR-0003: session-scoped misconception data — Edmodo/COPPA/GDPR-K")]
 public record MisconceptionDetected_V1(

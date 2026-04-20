@@ -51,19 +51,19 @@ grandfathered:
 
   # ---- Student API endpoint surface (pre-2026-04-20 legacy) ----
   - path: src/api/Cena.Student.Api.Host/Endpoints/SessionEndpoints.cs
-    baseline_loc: 1197
-    reason: "Student session minimal-API surface; split post EPIC-PRR-A LearningSession extraction"
+    baseline_loc: 1218
+    reason: "Student session minimal-API surface; split post EPIC-PRR-A LearningSession extraction. PRR-151 R-22 added AccommodationProfile session-render wiring (+21 LOC)."
   - path: src/api/Cena.Student.Api.Host/Endpoints/SocialEndpoints.cs
     baseline_loc: 743
     reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"
   - path: src/api/Cena.Student.Api.Host/Program.cs
-    baseline_loc: 576
-    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up"
+    baseline_loc: 580
+    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. PRR-151 R-22 added IAccommodationProfileService DI registration (+4 LOC)."
 
   # ---- Actor runtime (pre-2026-04-20 legacy) ----
   - path: src/actors/Cena.Actors.Host/Program.cs
-    baseline_loc: 632
-    reason: "Actor-host composition root; extract DI/Proto bootstrap helpers is a follow-up"
+    baseline_loc: 633
+    reason: "Actor-host composition root; extract DI/Proto bootstrap helpers is a follow-up. Serilog SessionRiskLogEnricher wiring (+1 LOC) in working tree."
   - path: src/actors/Cena.Actors/Sessions/LearningSessionActor.cs
     baseline_loc: 699
     reason: "Pre-2026-04-20 legacy; EPIC-PRR-A Sprint 1 extraction will absorb most of this"

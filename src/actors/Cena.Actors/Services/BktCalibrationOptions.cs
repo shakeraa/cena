@@ -12,13 +12,16 @@ namespace Cena.Actors.Services;
 /// </summary>
 public sealed class SubjectBktParams
 {
-    // Defaults updated 2026-04-20 per ADR-0039 (Koedinger literature defaults).
-    // Must match BktParameters.Default in BktService.cs.
-    public double PLearning { get; set; } = 0.15;
-    public double PSlip { get; set; } = 0.10;
-    public double PGuess { get; set; } = 0.15;
-    public double PForget { get; set; } = 0.02;
-    public double PInitial { get; set; } = 0.30;
+    // Defaults route through the single authorized seam per prr-041 /
+    // ADR-0039 (Cena.Actors.Mastery.BktParameters.*). JSON callers can still
+    // override these via config/bkt-params.json for ops reasons, but when
+    // no override is supplied we inherit the Koedinger-locked values and
+    // stay consistent with BktParameters.Default in BktService.cs.
+    public double PLearning { get; set; } = Cena.Actors.Mastery.BktParameters.PLearn;
+    public double PSlip { get; set; } = Cena.Actors.Mastery.BktParameters.PSlip;
+    public double PGuess { get; set; } = Cena.Actors.Mastery.BktParameters.PGuess;
+    public double PForget { get; set; } = Cena.Actors.Mastery.BktParameters.PForget;
+    public double PInitial { get; set; } = Cena.Actors.Mastery.BktParameters.PInit;
 
     /// <summary>
     /// Convert to the immutable <see cref="BktParameters"/> struct used by

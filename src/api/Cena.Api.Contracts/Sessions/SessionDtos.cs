@@ -132,7 +132,51 @@ public sealed record SessionQuestionDto(
     string? ScaffoldingLevel = null,   // "Full" | "Partial" | "HintsOnly" | "None"
     string? WorkedExample = null,      // Authored worked example, only when level == Full
     int HintsAvailable = 0,            // Total hint budget for this scaffolding level
-    int HintsRemaining = 0);           // Same as HintsAvailable on first load
+    int HintsRemaining = 0,            // Same as HintsAvailable on first load
+    // =========================================================================
+    // PRR-151 R-22 accommodation-render flags (compliance fix).
+    //
+    // The parent-console endpoint persists AccommodationProfileAssignedV1
+    // events; until these flags landed, no session-rendering code
+    // consulted them. With these fields, the student frontend can
+    // activate TTS / distraction-reduced layout / graph-paper overlay
+    // based on the folded profile. Default values (off / 1.0) match the
+    // no-accommodation baseline so existing clients that haven't added
+    // the fields to their render path keep working unchanged.
+    // =========================================================================
+    /// <summary>
+    /// PRR-151 R-22 — true when the student has a parent-consented TTS
+    /// accommodation (<c>AccommodationDimension.TtsForProblemStatements</c>).
+    /// Frontend activates the TTS button / autoplay path only when set.
+    /// </summary>
+    bool TtsEnabled = false,
+    /// <summary>
+    /// PRR-151 R-22 — multiplier applied to <see cref="ExpectedTimeSeconds"/>.
+    /// 1.0 = no accommodation, 1.5 = Ministry hatama-1 extended-time
+    /// (<c>AccommodationDimension.ExtendedTime</c>). Server pre-multiplies
+    /// <see cref="ExpectedTimeSeconds"/> before sending; this field is
+    /// reported for client-side telemetry / audit rendering so the
+    /// effective multiplier is visible end-to-end.
+    /// </summary>
+    double ExtendedTimeMultiplier = 1.0,
+    /// <summary>
+    /// PRR-151 R-22 — true when the student has consented to the
+    /// distraction-reduced layout accommodation
+    /// (<c>AccommodationDimension.DistractionReducedLayout</c>). Frontend
+    /// renders one problem per page, hides sidebar / mastery widgets /
+    /// ambient progress bars. Graph-paper overlay for drawing-heavy
+    /// items is gated by the same flag because it's the same
+    /// accessibility class (reduce incidental visual load).
+    /// </summary>
+    bool GraphPaperRequired = false,
+    /// <summary>
+    /// PRR-151 R-22 — true when the student has consented to suppression
+    /// of peer-comparative stats (<c>AccommodationDimension.NoComparativeStats</c>).
+    /// Surfaced on every question DTO so summary / footer widgets can
+    /// consistently hide cohort comparisons without re-fetching the
+    /// profile.
+    /// </summary>
+    bool NoComparativeStats = false);
 
 /// <summary>
 /// FIND-pedagogy-006 — Response for POST /api/sessions/{id}/question/{qid}/hint.

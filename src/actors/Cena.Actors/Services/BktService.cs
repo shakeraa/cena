@@ -24,17 +24,24 @@ public readonly record struct BktParameters(
 {
     // Per ADR-0039 — BKT parameters locked to Koedinger literature defaults.
     // Per-student parameter learning is forbidden; any change requires a new ADR.
-    // PForget=0.02 reflects slow forgetting during active learning; spaced repetition
-    // (HLR) handles longer-term decay separately and is orthogonal to the BKT constants.
+    // Every constant below is consumed from the single authorized seam in
+    // Cena.Actors.Mastery.BktParameters (prr-041). PForget=0.02 is the Cena
+    // sibling constant (within-session micro-forgetting) and is documented
+    // on Mastery.BktParameters.PForget; spaced repetition (HLR) handles
+    // longer-term decay separately and is orthogonal to these BKT constants.
+    // The fully-qualified name is required here because this file defines a
+    // local BktParameters record that shadows the Mastery type.
     /// <summary>
-    /// Default BKT parameters per ADR-0039 (Koedinger defaults).
+    /// Default BKT parameters per ADR-0039 (Koedinger defaults). All scalar
+    /// fields route through <see cref="Cena.Actors.Mastery.BktParameters"/>
+    /// so the prr-041 locked-parameter gate has a single source of truth.
     /// </summary>
     public static BktParameters Default => new(
-        PLearning: 0.15,
-        PSlip: 0.10,
-        PGuess: 0.15,
-        PForget: 0.02,
-        PInitial: 0.30,
+        PLearning: Cena.Actors.Mastery.BktParameters.PLearn,
+        PSlip: Cena.Actors.Mastery.BktParameters.PSlip,
+        PGuess: Cena.Actors.Mastery.BktParameters.PGuess,
+        PForget: Cena.Actors.Mastery.BktParameters.PForget,
+        PInitial: Cena.Actors.Mastery.BktParameters.PInit,
         ProgressionThreshold: MasteryConstants.ProgressionThreshold,
         PrerequisiteGateThreshold: MasteryConstants.PrerequisiteGateThreshold
     );
