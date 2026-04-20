@@ -72,6 +72,12 @@ public sealed class ConsentAggregate
             case ConsentReviewedByParent_V1 reviewed:
                 State.Apply(reviewed);
                 break;
+            case StudentVisibilityVetoed_V1 vetoed:
+                State.Apply(vetoed);
+                break;
+            case StudentVisibilityRestored_V1 restored:
+                State.Apply(restored);
+                break;
         }
     }
 

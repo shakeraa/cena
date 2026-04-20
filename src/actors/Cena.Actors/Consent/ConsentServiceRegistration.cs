@@ -50,6 +50,11 @@ public static class ConsentServiceRegistration
         // Shadow-write adapter for the legacy GdprConsentManager facade.
         services.TryAddSingleton<IConsentAggregateWriter, ConsentAggregateWriterAdapter>();
 
+        // prr-052: age-band lookup. Default to Marten-backed; tests can
+        // override before this line runs by registering their own
+        // IStudentAgeBandLookup first.
+        services.TryAddSingleton<IStudentAgeBandLookup, MartenStudentAgeBandLookup>();
+
         return services;
     }
 }

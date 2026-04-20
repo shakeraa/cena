@@ -291,6 +291,9 @@ public static class CenaAdminServiceRegistration
         // cap; no lockout). GET reads, PUT emits
         // ParentalControlsConfiguredV1.
         Features.ParentConsole.TimeBudgetEndpoint.MapTimeBudgetEndpoint(app);
+        // prr-052: Parent dashboard-visibility view. GET returns the
+        // age-band-filtered field list sourced from AgeBandPolicy.
+        Features.ParentConsole.DashboardVisibilityEndpoint.MapDashboardVisibilityEndpoint(app);
         // FIND-pedagogy-008: learning-objective picker (read-only)
         app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();

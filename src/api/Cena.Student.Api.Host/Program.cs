@@ -845,9 +845,8 @@ public partial class Program
     
     // ---- Health check ----
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "cena-student-api" }));
-    app.MapHealthChecks("/health/live");
-    app.MapHealthChecks("/health/ready");
-    
+    app.MapHealthChecks("/health/live"); app.MapHealthChecks("/health/ready");
+
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
@@ -908,9 +907,11 @@ public partial class Program
     app.MapMeGdprEndpoints();
     
     // Granular Consent Management endpoints (SEC-006)
-    // Per-purpose consent control with defaults and bulk operations
+    // Per-purpose consent control with defaults and bulk operations.
+    // prr-052: student parent-visibility view + veto also mapped below.
     app.MapConsentEndpoints();
-    
+    app.MapParentVisibilityEndpoints();
+
     // RATE-001: Rate limit dashboard (real-time spend + status)
     app.MapRateLimitDashboardEndpoints();
     

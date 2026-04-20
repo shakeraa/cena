@@ -52,6 +52,29 @@ public sealed class ConsentState
     public ConsentReviewedByParent_V1? LastParentReview { get; private set; }
 
     /// <summary>
+    /// Per-purpose student-visibility veto state (prr-052). Key = purpose
+    /// the student (Teen16to17+) has opted the parent out of. Value = the
+    /// most-recent Vetoed event for replay/audit. The absence of a key
+    /// means the parent may see the purpose subject to the usual
+    /// grant rules.
+    /// </summary>
+    private readonly Dictionary<ConsentPurpose, StudentVisibilityVetoed_V1> _vetoes = new();
+
+    /// <summary>
+    /// Read-only set of purposes currently vetoed from parent visibility
+    /// by the student. Feeds <see cref="AgeBandPolicy.EvaluateDashboard"/>.
+    /// </summary>
+    public IReadOnlySet<ConsentPurpose> VetoedParentVisibilityPurposes
+        => _vetoes.Keys.ToHashSet();
+
+    /// <summary>
+    /// Read-only map of the most-recent veto event per purpose (for audit
+    /// rendering). A purpose absent from this map is not currently vetoed.
+    /// </summary>
+    public IReadOnlyDictionary<ConsentPurpose, StudentVisibilityVetoed_V1> VetoHistory
+        => _vetoes;
+
+    /// <summary>
     /// Read-only view of the per-purpose grant state. Use
     /// <see cref="IsEffectivelyGranted"/> for the expiry-aware check.
     /// </summary>
@@ -149,5 +172,17 @@ public sealed class ConsentState
         // this review event when appropriate. The review event's role in
         // the fold is to surface "a parent reviewed these purposes at T".
         _ = e;
+    }
+
+    /// <summary>Apply a <see cref="StudentVisibilityVetoed_V1"/> event (prr-052).</summary>
+    public void Apply(StudentVisibilityVetoed_V1 e)
+    {
+        _vetoes[e.Purpose] = e;
+    }
+
+    /// <summary>Apply a <see cref="StudentVisibilityRestored_V1"/> event (prr-052).</summary>
+    public void Apply(StudentVisibilityRestored_V1 e)
+    {
+        _vetoes.Remove(e.Purpose);
     }
 }

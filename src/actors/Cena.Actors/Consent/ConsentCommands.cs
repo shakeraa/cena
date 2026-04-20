@@ -73,6 +73,35 @@ public sealed record RecordParentReview(
     DateTimeOffset ReviewedAt);
 
 /// <summary>
+/// prr-052 — opt the parent out of visibility for a specific non-safety
+/// purpose. Only permitted for bands where
+/// <see cref="AgeBandPolicy.CanStudentVetoPurpose"/> returns true
+/// (Teen16to17 and Adult).
+/// </summary>
+public sealed record VetoParentVisibility(
+    string StudentSubjectId,
+    AgeBand StudentBand,
+    ConsentPurpose Purpose,
+    VetoInitiator Initiator,
+    string InitiatorActorId,
+    string InstituteId,
+    DateTimeOffset VetoedAt,
+    string Reason);
+
+/// <summary>
+/// prr-052 — restore parent visibility of a previously vetoed purpose.
+/// Symmetrical with <see cref="VetoParentVisibility"/>.
+/// </summary>
+public sealed record RestoreParentVisibility(
+    string StudentSubjectId,
+    AgeBand StudentBand,
+    ConsentPurpose Purpose,
+    VetoInitiator Initiator,
+    string InitiatorActorId,
+    string InstituteId,
+    DateTimeOffset RestoredAt);
+
+/// <summary>
 /// Thrown when a consent command is refused by the age-band authorization
 /// matrix. Carries the denial reason string verbatim from
 /// <see cref="AgeBandAuthorizationRules"/> so the caller can surface a
@@ -234,5 +263,92 @@ public sealed class ConsentCommandHandler
             PurposesReviewed: cmd.PurposesReviewed,
             Outcome: cmd.Outcome,
             ReviewedAt: cmd.ReviewedAt);
+    }
+
+    /// <summary>
+    /// Handle <see cref="VetoParentVisibility"/> (prr-052). Refuses bands
+    /// that lack veto authority (Under13, Teen13to15). Institute-policy
+    /// initiators bypass the band check (the institute is not limited by
+    /// the age band — it is adding a narrower restriction).
+    /// </summary>
+    public async ValueTask<StudentVisibilityVetoed_V1> HandleAsync(
+        VetoParentVisibility cmd, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(cmd);
+        if (string.IsNullOrWhiteSpace(cmd.StudentSubjectId))
+        {
+            throw new ArgumentException("StudentSubjectId must be non-empty.", nameof(cmd));
+        }
+        if (string.IsNullOrWhiteSpace(cmd.InitiatorActorId))
+        {
+            throw new ArgumentException("InitiatorActorId must be non-empty.", nameof(cmd));
+        }
+        if (string.IsNullOrWhiteSpace(cmd.InstituteId))
+        {
+            throw new ArgumentException("InstituteId must be non-empty.", nameof(cmd));
+        }
+
+        if (cmd.Initiator == VetoInitiator.Student
+            && !AgeBandPolicy.CanStudentVetoPurpose(cmd.StudentBand, cmd.Purpose))
+        {
+            throw new ConsentAuthorizationException(
+                $"Student veto refused: band {cmd.StudentBand} has no veto authority "
+                + $"for purpose '{cmd.Purpose}' (ADR-0041 / prr-052).");
+        }
+
+        var studentCipher = await _pii.EncryptAsync(
+            cmd.StudentSubjectId, cmd.StudentSubjectId, ct).ConfigureAwait(false);
+        var initiatorCipher = await _pii.EncryptAsync(
+            cmd.InitiatorActorId, cmd.StudentSubjectId, ct).ConfigureAwait(false);
+
+        return new StudentVisibilityVetoed_V1(
+            StudentSubjectIdEncrypted: studentCipher ?? string.Empty,
+            Purpose: cmd.Purpose,
+            Initiator: cmd.Initiator,
+            InitiatorActorIdEncrypted: initiatorCipher ?? string.Empty,
+            InstituteId: cmd.InstituteId,
+            VetoedAt: cmd.VetoedAt,
+            Reason: cmd.Reason ?? string.Empty);
+    }
+
+    /// <summary>Handle <see cref="RestoreParentVisibility"/> (prr-052).</summary>
+    public async ValueTask<StudentVisibilityRestored_V1> HandleAsync(
+        RestoreParentVisibility cmd, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(cmd);
+        if (string.IsNullOrWhiteSpace(cmd.StudentSubjectId))
+        {
+            throw new ArgumentException("StudentSubjectId must be non-empty.", nameof(cmd));
+        }
+        if (string.IsNullOrWhiteSpace(cmd.InitiatorActorId))
+        {
+            throw new ArgumentException("InitiatorActorId must be non-empty.", nameof(cmd));
+        }
+        if (string.IsNullOrWhiteSpace(cmd.InstituteId))
+        {
+            throw new ArgumentException("InstituteId must be non-empty.", nameof(cmd));
+        }
+
+        // Restore is allowed whenever the band has any veto right at all,
+        // regardless of whether a veto is currently recorded (idempotent).
+        if (cmd.Initiator == VetoInitiator.Student
+            && !AgeBandPolicy.StudentHasAnyVetoRight(cmd.StudentBand))
+        {
+            throw new ConsentAuthorizationException(
+                $"Student restore refused: band {cmd.StudentBand} has no veto authority.");
+        }
+
+        var studentCipher = await _pii.EncryptAsync(
+            cmd.StudentSubjectId, cmd.StudentSubjectId, ct).ConfigureAwait(false);
+        var initiatorCipher = await _pii.EncryptAsync(
+            cmd.InitiatorActorId, cmd.StudentSubjectId, ct).ConfigureAwait(false);
+
+        return new StudentVisibilityRestored_V1(
+            StudentSubjectIdEncrypted: studentCipher ?? string.Empty,
+            Purpose: cmd.Purpose,
+            Initiator: cmd.Initiator,
+            InitiatorActorIdEncrypted: initiatorCipher ?? string.Empty,
+            InstituteId: cmd.InstituteId,
+            RestoredAt: cmd.RestoredAt);
     }
 }
