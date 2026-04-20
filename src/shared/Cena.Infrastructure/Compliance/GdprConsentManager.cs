@@ -1,7 +1,21 @@
 // =============================================================================
-// Cena Platform -- GDPR Consent Manager (SEC-005)
-// Tracks per-student consent for analytics, marketing, and third-party sharing.
-// Backed by Marten document store (PostgreSQL).
+// Cena Platform -- GDPR Consent Manager (SEC-005 / prr-155 facade)
+//
+// Originally the authoritative consent-state writer (backed by Marten
+// document store). Post prr-155 this class is a **thin read-facade +
+// shadow-write adapter**: the authoritative write path is
+// ConsentAggregate (Cena.Actors.Consent), and this manager delegates
+// new writes to IConsentAggregateWriter when registered.
+//
+// The interface contract is intentionally preserved byte-for-byte —
+// every existing consumer (MeGdprEndpoints, ConsentEnforcementMiddleware,
+// RequiresConsentAttribute, FocusAnalyticsService) keeps working without
+// changes. Behaviour changes only at the storage layer: each write now
+// ALSO lands as an event in the ConsentAggregate stream when the
+// optional IConsentAggregateWriter is wired into DI.
+//
+// Tests that don't wire IConsentAggregateWriter get the pre-prr-155
+// document-only behaviour, which is correct for unit scope.
 // =============================================================================
 
 using Marten;
@@ -52,17 +66,37 @@ public interface IGdprConsentManager
 }
 
 /// <summary>
-/// GDPR consent manager implementation using Marten document store.
+/// GDPR consent manager implementation. Post prr-155 this is a thin facade:
+/// the authoritative write path is <c>ConsentAggregate</c> (shadow-written
+/// via <see cref="IConsentAggregateWriter"/> when the aggregate is wired
+/// into DI); the read path continues to project the Marten
+/// <c>ConsentRecord</c> document store for API-contract compatibility.
 /// </summary>
 public sealed class GdprConsentManager : IGdprConsentManager
 {
     private readonly IDocumentStore _store;
     private readonly ILogger<GdprConsentManager> _logger;
+    private readonly IConsentAggregateWriter? _aggregateWriter;
 
     public GdprConsentManager(IDocumentStore store, ILogger<GdprConsentManager> logger)
+        : this(store, logger, aggregateWriter: null)
+    {
+    }
+
+    /// <summary>
+    /// DI-preferred constructor. <paramref name="aggregateWriter"/> is
+    /// optional — when null, the manager falls back to document-only
+    /// behaviour (pre-prr-155 contract). When supplied, every grant and
+    /// revoke is also appended to the ConsentAggregate stream.
+    /// </summary>
+    public GdprConsentManager(
+        IDocumentStore store,
+        ILogger<GdprConsentManager> logger,
+        IConsentAggregateWriter? aggregateWriter)
     {
         _store = store;
         _logger = logger;
+        _aggregateWriter = aggregateWriter;
     }
 
     public async Task RecordConsentAsync(string studentId, ProcessingPurpose purpose, CancellationToken ct = default)
@@ -93,6 +127,23 @@ public sealed class GdprConsentManager : IGdprConsentManager
 
         await session.SaveChangesAsync(ct);
         _logger.LogInformation("GDPR consent recorded: {StudentId} granted {Purpose}", studentId, purpose);
+
+        // prr-155 shadow-write: also append ConsentGranted_V1 to the
+        // ConsentAggregate stream. Best-effort — failures here don't block
+        // the document write, which is still the read source of truth.
+        if (_aggregateWriter is not null)
+        {
+            try
+            {
+                // Legacy RecordConsentAsync does not carry isMinor/recordedBy —
+                // treat as a self-service grant recorded by the subject.
+                await _aggregateWriter.GrantAsync(studentId, purpose, isMinor: false, recordedBy: studentId, ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Shadow-write to ConsentAggregate failed for {StudentId}", studentId);
+            }
+        }
     }
 
     public async Task RevokeConsentAsync(string studentId, ProcessingPurpose purpose, CancellationToken ct = default)
@@ -110,6 +161,22 @@ public sealed class GdprConsentManager : IGdprConsentManager
         await session.SaveChangesAsync(ct);
 
         _logger.LogInformation("GDPR consent revoked: {StudentId} revoked {Purpose}", studentId, purpose);
+
+        // prr-155 shadow-write: also append ConsentRevoked_V1 to the aggregate.
+        if (_aggregateWriter is not null)
+        {
+            try
+            {
+                await _aggregateWriter.RevokeAsync(
+                    studentId, purpose, isMinor: false,
+                    recordedBy: studentId,
+                    reason: "legacy-facade-revoke", ct);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Shadow-write (revoke) to ConsentAggregate failed for {StudentId}", studentId);
+            }
+        }
     }
 
     public async Task<IReadOnlyList<ConsentRecord>> GetConsentsAsync(string studentId, CancellationToken ct = default)
@@ -201,6 +268,31 @@ public sealed class GdprConsentManager : IGdprConsentManager
         _logger.LogInformation(
             "[SIEM] ConsentChangeRecorded: {StudentId}, Purpose={Purpose}, Previous={Previous}, New={New}, By={RecordedBy}, Source={Source}",
             studentId, purpose, previousValue, granted, recordedBy, source);
+
+        // prr-155 shadow-write: mirror the change into the ConsentAggregate stream.
+        if (_aggregateWriter is not null)
+        {
+            try
+            {
+                if (granted)
+                {
+                    await _aggregateWriter.GrantAsync(
+                        studentId, purpose, isMinor: false,
+                        recordedBy: recordedBy, ct);
+                }
+                else
+                {
+                    await _aggregateWriter.RevokeAsync(
+                        studentId, purpose, isMinor: false,
+                        recordedBy: recordedBy,
+                        reason: source ?? "legacy-facade-change", ct);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Shadow-write (change) to ConsentAggregate failed for {StudentId}", studentId);
+            }
+        }
     }
 
     public Task<IReadOnlyDictionary<ProcessingPurpose, bool>> GetDefaultConsentsAsync(bool isMinor, CancellationToken ct = default)

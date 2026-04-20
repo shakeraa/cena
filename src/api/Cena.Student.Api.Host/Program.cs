@@ -152,7 +152,10 @@ public partial class Program
     var pgMaxPool = builder.Configuration.GetValue<int>("PostgreSQL:MaxPoolSize", 50);
     var pgMinPool = builder.Configuration.GetValue<int>("PostgreSQL:MinPoolSize", 5);
     builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, pgMaxPool, pgMinPool);
-    
+
+    // ADR-0038 key store + prr-155 ConsentAggregate (bundled compliance services).
+    Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregate(builder.Services.AddCenaComplianceServices(builder.Configuration, builder.Environment));
+
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
     
@@ -318,10 +321,9 @@ public partial class Program
     // without going through an admin. GDPR Art 12-22, COPPA 312.6, Israel PPL 13.
     builder.Services.AddScoped<IGdprConsentManager, GdprConsentManager>();
     builder.Services.AddScoped<IRightToErasureService, RightToErasureService>();
-    
+
     // ---- HARDEN TutorEndpoints: LLM Service ----
-    var llmApiKey = builder.Configuration["Cena:Llm:ApiKey"];
-    if (!string.IsNullOrEmpty(llmApiKey))
+    if (!string.IsNullOrEmpty(builder.Configuration["Cena:Llm:ApiKey"]))
     {
         builder.Services.AddScoped<ITutorLlmService, ClaudeTutorLlmService>();
         Log.Information("ClaudeTutorLlmService registered for AI tutoring");

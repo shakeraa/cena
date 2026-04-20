@@ -274,7 +274,7 @@ public static class AdminApiEndpoints
                 conceptId = r.ConceptId,
                 conceptName = r.ConceptName,
                 currentMastery = r.LastMasteryLevel,
-                decayRisk = r.DecayRisk,
+                decayFactor = r.DecayFactor,
                 lastPracticed = r.LastAttempted.ToString("yyyy-MM-dd")
             });
             return Results.Ok(new { items });
@@ -296,15 +296,10 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-        group.MapGet("/at-risk", async (ClaimsPrincipal user, IMasteryTrackingService service) =>
-        {
-            var atRisk = await service.GetAtRiskStudentsAsync(user);
-            return Results.Ok(atRisk);
-        }).WithName("GetAtRiskStudents")
-    .Produces<object>(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        // prr-013 follow-up (2026-04-20): the /at-risk admin route was
+        // retired. Session-scoped "student needs intervention" data is
+        // surfaced via the session actor (SessionRiskAssessment); it never
+        // leaves the in-session surface. See ADR-0003 + RDY-080.
 
         // GET /api/admin/mastery/students/{studentId}/methodology-profile
         group.MapGet("/students/{studentId}/methodology-profile", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>

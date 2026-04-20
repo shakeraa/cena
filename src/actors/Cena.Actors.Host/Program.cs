@@ -106,9 +106,10 @@ var enableDevLogging = builder.Configuration.GetValue<bool>("Cluster:EnableDevSu
 // Single connection pool shared by Marten, pgvector, and all raw queries.
 // Actor Host: max 50 connections (actor activations + event flush + background).
 // Prevents thundering herd on school-start peak (200+ students at 8am).
-var pgMaxPool = builder.Configuration.GetValue<int>("PostgreSQL:MaxPoolSize", 50);
-var pgMinPool = builder.Configuration.GetValue<int>("PostgreSQL:MinPoolSize", 5);
-builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, pgMaxPool, pgMinPool);
+builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, builder.Configuration.GetValue<int>("PostgreSQL:MaxPoolSize", 50), builder.Configuration.GetValue<int>("PostgreSQL:MinPoolSize", 5));
+
+// ADR-0038 SubjectKeyStore + prr-155 ConsentAggregate (bundled compliance primitives).
+Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregate(builder.Services.AddCenaComplianceServices(builder.Configuration, builder.Environment));
 
 // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
 var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";

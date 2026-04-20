@@ -19,7 +19,7 @@ public sealed class MasteryTrackingMappingTests
         var result = MasteryTrackingService.BuildMasteryOverview(Array.Empty<ClassMasteryRollupDocument>());
         Assert.Empty(result.Distribution);
         Assert.Empty(result.SubjectBreakdown);
-        Assert.Equal(0, result.AtRiskCount);
+        // AtRiskCount assertion removed per prr-013 follow-up — field retired from MasteryOverviewResponse DTO.
     }
 
     [Fact]
@@ -75,7 +75,8 @@ public sealed class MasteryTrackingMappingTests
         Assert.Equal(5, result.Distribution[1].Count);   // 3 + 2
         Assert.Equal(7, result.Distribution[2].Count);   // 4 + 3
         Assert.Equal(3, result.Distribution[3].Count);   // 1 + 2
-        Assert.Equal(3, result.AtRiskCount);             // 2 + 1
+        // AtRiskCount assertion removed per prr-013 follow-up — field retired from MasteryOverviewResponse DTO.
+        // The persistence-side ClassMasteryRollupDocument.AtRiskCount is retained (not in DTO ban scope).
         Assert.Single(result.SubjectBreakdown);
         Assert.Equal("Math", result.SubjectBreakdown[0].Subject);
         Assert.InRange(result.SubjectBreakdown[0].AvgMasteryLevel, 0.67f, 0.68f); // (0.65+0.70)/2
@@ -208,32 +209,13 @@ public sealed class MasteryTrackingMappingTests
         Assert.Contains("M-ALG-04", response.Pacing.ConceptsToReview);
     }
 
-    [Fact]
-    public void BuildAtRiskStudentList_DeduplicatesByLatestDate()
-    {
-        var docs = new[]
-        {
-            new AtRiskStudentDocument
-            {
-                StudentId = "s1", StudentName = "S One", ClassId = "c1",
-                SchoolId = "dev-school", Date = Today.AddDays(-2),
-                RiskLevel = "medium", CurrentAvgMastery = 0.5f, MasteryDeclineLast14d = -0.05f,
-                RecommendedIntervention = "Older row"
-            },
-            new AtRiskStudentDocument
-            {
-                StudentId = "s1", StudentName = "S One", ClassId = "c1",
-                SchoolId = "dev-school", Date = Today,
-                RiskLevel = "high", CurrentAvgMastery = 0.4f, MasteryDeclineLast14d = -0.1f,
-                RecommendedIntervention = "Newer row"
-            },
-        };
-
-        var list = MasteryTrackingService.BuildAtRiskStudentList(docs);
-        Assert.Single(list);
-        Assert.Equal("high", list[0].RiskLevel);
-        Assert.Equal("Newer row", list[0].RecommendedIntervention);
-    }
+    // Removed per prr-013 follow-up: BuildAtRiskStudentList_DeduplicatesByLatestDate
+    // tested MasteryTrackingService.BuildAtRiskStudentList which was retired along with
+    // the AtRiskStudentsResponse DTO (ADR-0012 + RDY-080 prediction-surface ban).
+    // See pre-release-review/reviews/audit/group-a-caller-audit.md R-22 for the
+    // compliance-defect rationale. Follow-up work will fully retire AtRiskStudentDocument
+    // from persistence + Marten projection + admin SPA; that test will return only if the
+    // new session-scoped teacher-facing view reintroduces equivalent logic.
 
     [Fact]
     public void BagrutConceptCatalog_ExposesAllCoreSubjects()

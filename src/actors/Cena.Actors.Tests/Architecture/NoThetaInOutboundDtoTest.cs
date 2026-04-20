@@ -165,16 +165,10 @@ public sealed class NoThetaInOutboundDtoTest
         (Rel("src/actors/Cena.Actors/Events/ExamSimulationEvents.cs"), "ReadinessLowerBound"),
         (Rel("src/actors/Cena.Actors/Events/ExamSimulationEvents.cs"), "ReadinessUpperBound"),
 
-        // ── src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs ──
-        // TODO(prr-013 follow-up): retire the at-risk surface entirely. The
-        // teacher-facing equivalent must be session-scoped per RDY-080;
-        // these admin-dashboard fields predate the decision.
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "AtRiskCount"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "ReadinessScore"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "AtRiskStudentsResponse"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "AtRiskStudent"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "RiskLevel"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "DecayRisk"),
+        // ── MasteryDtos at-risk fields retired 2026-04-20 per prr-013 follow-up ──
+        // Entries removed since the underlying fields were deleted from MasteryDtos.cs.
+        // Remaining allowlist: ExamSimulationEvents readiness bounds (still present,
+        // retirement deferred to preserve event-schema backward compat).
     };
 
     private static string Rel(string posixPath) =>

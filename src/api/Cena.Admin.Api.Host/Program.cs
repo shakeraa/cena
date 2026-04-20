@@ -121,13 +121,17 @@ public partial class Program
     }
     
     // ---- Serilog ----
-    // FIND-sec-004: Use 3-arg overload to access services and add PII destructuring policy
+    // FIND-sec-004: Use 3-arg overload to access services and add PII destructuring policy.
+    // prr-013 / ADR-0003 / RDY-080: SessionRiskLogEnricher scrubs theta / ability /
+    // risk / readiness scalars; outputTemplate renders {RedactedMessage} in place of
+    // {Message:lj} so sinks emit the scrubbed form.
     builder.Host.UseSerilog((context, services, configuration) =>
     {
         configuration
             .ReadFrom.Configuration(context.Configuration)
+            .Enrich.With<SessionRiskLogEnricher>()
             .Destructure.With<PiiDestructuringPolicy>()
-            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj}{NewLine}{Exception}");
+            .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {RedactedMessage}{NewLine}{Exception}");
     });
     
     // ---- Configuration ----
@@ -137,7 +141,14 @@ public partial class Program
     var pgMaxPool = builder.Configuration.GetValue<int>("PostgreSQL:MaxPoolSize", 30);
     var pgMinPool = builder.Configuration.GetValue<int>("PostgreSQL:MinPoolSize", 3);
     builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, pgMaxPool, pgMinPool);
-    
+
+    // ADR-0038 / prr-003b: Subject key store for crypto-shredding. Must be
+    // registered AFTER AddCenaDataSource so the Postgres backing (selected
+    // in non-Development environments) resolves NpgsqlDataSource from DI.
+    // Also installs the dev-fallback health-check that refuses prod boot
+    // when CENA_PII_ROOT_KEY_BASE64 is not set.
+    builder.Services.AddSubjectKeyStore(builder.Configuration, builder.Environment);
+
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
     

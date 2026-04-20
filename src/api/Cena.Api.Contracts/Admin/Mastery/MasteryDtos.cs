@@ -1,6 +1,12 @@
 // =============================================================================
 // Cena Platform -- Mastery Tracking DTOs
 // ADM-007: Mastery & learning progress analytics
+//
+// prr-013 follow-up (2026-04-20): the at-risk admin surface was retired.
+// Teacher-facing "students needing intervention" data is now session-scoped
+// per ADR-0003 + RDY-080 (see SessionRiskAssessment in the session actor).
+// `AtRiskStudentsResponse`, `AtRiskStudent`, `RiskLevel`, `AtRiskCount`,
+// `ReadinessScore`, and `DecayRisk` are gone from this contract.
 // =============================================================================
 
 namespace Cena.Api.Contracts.Admin.Mastery;
@@ -10,8 +16,7 @@ public sealed record MasteryOverviewResponse(
     IReadOnlyList<MasteryDistributionPoint> Distribution,
     IReadOnlyList<SubjectMastery> SubjectBreakdown,
     float LearningVelocity,  // concepts mastered per week
-    float LearningVelocityChange,
-    int AtRiskCount);
+    float LearningVelocityChange);
 
 public sealed record MasteryDistributionPoint(
     string Level,  // beginner, developing, proficient, master
@@ -46,7 +51,6 @@ public sealed record ConceptMasteryNode(
 public sealed record LearningFrontierItem(
     string ConceptId,
     string ConceptName,
-    float ReadinessScore,
     string Reason);  // prerequisites_met, spiral_review, gap_filled
 
 public sealed record MasteryHistoryPoint(
@@ -64,7 +68,7 @@ public sealed record ScaffoldingRecommendation(
 public sealed record ReviewPriorityItem(
     string ConceptId,
     string ConceptName,
-    float DecayRisk,
+    float DecayFactor,           // 0..1 spaced-repetition decay (HLR-derived)
     float LastMasteryLevel,
     DateTimeOffset LastAttempted,
     int Priority);  // 1 = highest
@@ -96,16 +100,3 @@ public sealed record PacingRecommendation(
     string Recommendation,
     IReadOnlyList<string> ConceptsToReview,
     IReadOnlyList<string> ConceptsReadyToIntroduce);
-
-// At-Risk Students
-public sealed record AtRiskStudentsResponse(
-    IReadOnlyList<AtRiskStudent> Students);
-
-public sealed record AtRiskStudent(
-    string StudentId,
-    string StudentName,
-    string ClassId,
-    string RiskLevel,  // high, medium
-    float CurrentAvgMastery,
-    float MasteryDecline,
-    string RecommendedIntervention);

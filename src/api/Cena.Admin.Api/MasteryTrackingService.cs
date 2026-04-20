@@ -21,7 +21,9 @@ public interface IMasteryTrackingService
     Task<MasteryOverviewResponse> GetOverviewAsync(string? classId, ClaimsPrincipal user);
     Task<StudentMasteryDetailResponse?> GetStudentMasteryAsync(string studentId, ClaimsPrincipal user);
     Task<ClassMasteryResponse?> GetClassMasteryAsync(string classId, ClaimsPrincipal user);
-    Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync(ClaimsPrincipal user);
+    // prr-013 follow-up (2026-04-20): GetAtRiskStudentsAsync retired.
+    // Session-scoped teacher-facing risk lives on SessionRiskAssessment
+    // inside the session actor (see ADR-0003 + RDY-080).
     Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId, ClaimsPrincipal user);
     Task<bool> OverrideMethodologyAsync(string studentId, string level, string levelId, string methodology, string teacherId, ClaimsPrincipal user);
     Task<IReadOnlyList<MethodologyOverrideDocument>> GetStudentOverridesAsync(string studentId, ClaimsPrincipal user);
@@ -135,23 +137,10 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
         return BuildClassMastery(rollup, snapshots, difficulty);
     }
 
-    public async Task<AtRiskStudentsResponse> GetAtRiskStudentsAsync(ClaimsPrincipal user)
-    {
-        var schoolId = TenantScope.GetSchoolFilter(user);
-        await using var session = _store.QuerySession();
-
-        var query = session.Query<AtRiskStudentDocument>();
-        if (schoolId is not null)
-            query = (Marten.Linq.IMartenQueryable<AtRiskStudentDocument>)query.Where(d => d.SchoolId == schoolId);
-
-        var today = new DateTimeOffset(DateTimeOffset.UtcNow.Date, TimeSpan.Zero);
-        var recent = await query
-            .Where(d => d.Date >= today.AddDays(-7))
-            .OrderBy(d => d.CurrentAvgMastery)
-            .ToListAsync();
-
-        return new AtRiskStudentsResponse(BuildAtRiskStudentList(recent));
-    }
+    // prr-013 follow-up (2026-04-20): GetAtRiskStudentsAsync retired.
+    // The admin-dashboard at-risk endpoint was an ADR-0003 + RDY-080
+    // violation — session-scoped risk lives on SessionRiskAssessment
+    // inside the session actor and never leaves the in-session surface.
 
     public async Task<MethodologyProfileAdminResponse?> GetMethodologyProfileAsync(string studentId, ClaimsPrincipal user)
     {
@@ -284,8 +273,7 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
                 Distribution: new List<MasteryDistributionPoint>(),
                 SubjectBreakdown: new List<SubjectMastery>(),
                 LearningVelocity: 0f,
-                LearningVelocityChange: 0f,
-                AtRiskCount: 0);
+                LearningVelocityChange: 0f);
         }
 
         // Aggregate the most recent day across classes
@@ -320,14 +308,12 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
 
         var learningVelocity = latest.Average(r => r.LearningVelocity);
         var learningVelocityChange = latest.Average(r => r.LearningVelocityChange);
-        var atRiskCount = latest.Sum(r => r.AtRiskCount);
 
         return new MasteryOverviewResponse(
             Distribution: distribution,
             SubjectBreakdown: subjects,
             LearningVelocity: MathF.Round(learningVelocity, 2),
-            LearningVelocityChange: MathF.Round(learningVelocityChange, 2),
-            AtRiskCount: atRiskCount);
+            LearningVelocityChange: MathF.Round(learningVelocityChange, 2));
     }
 
     internal static StudentMasteryDetailResponse BuildStudentMasteryDetail(
@@ -368,7 +354,7 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
             .OrderByDescending(c => c.MasteryLevel)
             .Take(5)
             .Select(c => new LearningFrontierItem(
-                c.ConceptId, c.ConceptName, c.MasteryLevel + 0.1f, "prerequisites_met"))
+                c.ConceptId, c.ConceptName, "prerequisites_met"))
             .ToList();
 
         var history = BuildMasteryHistory(snapshot);
@@ -393,7 +379,7 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
                 var decay = halfLife > 0 ? (float)(1.0 - Math.Exp(-hoursSince * Math.Log(2) / halfLife)) : 0f;
                 return new ReviewPriorityItem(
                     c.ConceptId, c.ConceptName,
-                    MathF.Round(decay, 3),
+                    MathF.Round(decay, 3),  // DecayFactor: HLR spaced-repetition decay
                     c.MasteryLevel,
                     lastAttempted,
                     i + 1);
@@ -501,22 +487,9 @@ public sealed class MasteryTrackingService : IMasteryTrackingService
                 ConceptsReadyToIntroduce: toIntroduce));
     }
 
-    internal static List<AtRiskStudent> BuildAtRiskStudentList(
-        IReadOnlyList<AtRiskStudentDocument> docs)
-    {
-        return docs
-            .GroupBy(d => d.StudentId)
-            .Select(g => g.OrderByDescending(d => d.Date).First())
-            .Select(d => new AtRiskStudent(
-                StudentId: d.StudentId,
-                StudentName: d.StudentName,
-                ClassId: d.ClassId,
-                RiskLevel: d.RiskLevel,
-                CurrentAvgMastery: d.CurrentAvgMastery,
-                MasteryDecline: d.MasteryDeclineLast14d,
-                RecommendedIntervention: d.RecommendedIntervention))
-            .ToList();
-    }
+    // prr-013 follow-up (2026-04-20): BuildAtRiskStudentList retired along
+    // with the at-risk admin surface. Session-scoped risk lives on
+    // SessionRiskAssessment per ADR-0003 + RDY-080.
 }
 
 // ── Methodology Profile Response DTOs (kept from original) ──

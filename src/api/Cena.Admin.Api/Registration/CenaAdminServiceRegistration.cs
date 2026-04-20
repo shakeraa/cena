@@ -174,6 +174,8 @@ public static class CenaAdminServiceRegistration
         // Services depend on Marten IDocumentStore, ILogger, and IClock.
         // RightToErasureService also needs IErasureCryptoConfig + IErasureManifestBuilder.
         services.AddScoped<IGdprConsentManager, GdprConsentManager>();
+        // prr-155: ConsentAggregate primitives (event-sourced consent bounded context)
+        Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregate(services);
         services.TryAddSingleton<Cena.Infrastructure.Compliance.IClock, Cena.Infrastructure.Compliance.SystemClock>();
         services.TryAddSingleton<Cena.Infrastructure.Compliance.IErasureCryptoConfig>(
             new Cena.Infrastructure.Compliance.ErasureCryptoConfig(

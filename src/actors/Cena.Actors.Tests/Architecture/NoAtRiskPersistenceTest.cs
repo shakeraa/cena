@@ -151,16 +151,12 @@ public sealed class NoAtRiskPersistenceTest
         (Rel("src/actors/Cena.Actors/Events/ExamSimulationEvents.cs"), "ReadinessLowerBound"),
         (Rel("src/actors/Cena.Actors/Events/ExamSimulationEvents.cs"), "ReadinessUpperBound"),
 
-        // ── src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs ──
-        // TODO(prr-013 follow-up): retire the at-risk surface entirely. The
-        // teacher-facing equivalent must be session-scoped per RDY-080;
-        // these admin-dashboard fields predate the decision.
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "AtRiskCount"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "ReadinessScore"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "AtRiskStudentsResponse"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "AtRiskStudent"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "RiskLevel"),
-        (Rel("src/api/Cena.Api.Contracts/Admin/Mastery/MasteryDtos.cs"), "DecayRisk"),
+        // ── MasteryDtos at-risk fields retired 2026-04-20 per prr-013 follow-up ──
+        // The 6 legacy entries (AtRiskCount / ReadinessScore / AtRiskStudentsResponse /
+        // AtRiskStudent / RiskLevel / DecayRisk) were removed from MasteryDtos.cs;
+        // the allowlist entries are no longer needed. Remaining follow-up: retire
+        // the admin SPA Vue pages + Marten AtRiskStudentDocument projection + seed
+        // data (deferred to subsequent session, out of C# arch-test scope).
     };
 
     private static string Rel(string posixPath) =>
