@@ -22,7 +22,7 @@ public enum StepScaffoldingLevel
     Full = 2,
 
     /// <summary>
-    /// SCAFFOLD-001: Productive failure mode (Kapur 2008/2014, d=0.37 on transfer).
+    /// SCAFFOLD-001: Productive failure mode (Kapur 2008/2014, d=0.37 on transfer, citation_id=kapur-2014-productive-failure).
     /// Student sees only problem stem + figure. Free-form input, no step slots.
     /// CAS verifies only the final answer. After 2 wrong attempts, re-renders
     /// in Full mode with divergence highlight. Triggered when BKT PLEffective >= 0.8.

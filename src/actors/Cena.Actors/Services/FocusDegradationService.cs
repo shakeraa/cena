@@ -771,7 +771,7 @@ public record BreakRecommendation(
 );
 
 /// <summary>
-/// Proactive = scheduled microbreak BEFORE focus drops (Cohen's d = 1.784).
+/// Proactive = scheduled microbreak BEFORE focus drops (Cohen's d = 1.784, citation_id=frontiers-2025-microbreaks).
 /// Reactive  = recovery break AFTER focus has degraded (existing behavior).
 /// </summary>
 public enum BreakType
