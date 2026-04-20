@@ -176,16 +176,23 @@ public static class AccommodationsEndpoints
             parsed.Add(dim);
         }
 
-        // Refuse any Phase-1B dimension — Phase 1A cannot activate them.
-        var unshipped = parsed.Where(d => !Phase1ADimensions.IsShipped(d)).ToList();
+        // Refuse any unshipped dimension (neither Phase 1A nor the
+        // additive Phase 1B set that prr-029 introduced with
+        // LdAnxiousFriendly). Unshipped dimensions are silent-activation
+        // risks: the UI cannot render them, so emitting a consent event
+        // for one would produce the PRR-151 R-22 "consent without render"
+        // defect class all over again.
+        var unshipped = parsed
+            .Where(d => !Phase1ADimensions.IsShipped(d) && !Phase1BDimensions.IsShipped(d))
+            .ToList();
         if (unshipped.Count > 0)
         {
             return Results.BadRequest(new
             {
-                error = "phase-1b-dimension-requested",
+                error = "unshipped-dimension-requested",
                 dimensions = unshipped.Select(d => d.ToString()).ToList(),
-                message = "These dimensions are Phase 1B and cannot be "
-                    + "activated yet. They will become available when the "
+                message = "These dimensions are not yet shipped and cannot "
+                    + "be activated. They will become available when the "
                     + "corresponding UI layer ships.",
             });
         }

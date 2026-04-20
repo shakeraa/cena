@@ -291,6 +291,14 @@ public partial class Program
         Cena.Actors.Accommodations.IAccommodationProfileService,
         Cena.Actors.Accommodations.MartenAccommodationProfileService>();
 
+    // ---- prr-029: LD-anxious hint governor ----
+    // Rewrites L1 hint bodies into a concrete worked-step example when the
+    // student's AccommodationProfile includes LdAnxiousFriendly. No LLM,
+    // pure template expansion. Emits cena_hint_ld_governor_engaged_total.
+    builder.Services.AddSingleton<
+        Cena.Actors.Hints.ILdAnxiousHintGovernor,
+        Cena.Actors.Hints.LdAnxiousHintGovernor>();
+
     // ---- RDY-034: Flow state service (consumes ICognitiveLoadService) ----
     // Registered in both actor + student hosts so the assessment endpoint
     // and any in-process actor consumer resolve the same implementation.
