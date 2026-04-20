@@ -22,7 +22,7 @@ This epic establishes ADR-0012 + the bounded contexts that replace StudentActor.
 |---|---|---|---|
 | prr-002 | ADR-0012 StudentActor split — gate pedagogy + SRL features | P0 | foundation |
 | prr-013 | Redesign 'At-Risk Student Alert' — honest + supportive + legal | P0 | feature |
-| prr-038 | ADR: Right-to-be-forgotten in event-sourced Cena | P1 | foundation |
+| ~~prr-038~~ | ~~ADR: Right-to-be-forgotten in event-sourced Cena~~ **SUPERSEDED by prr-003a** (2026-04-20) | — | — |
 | prr-041 | ADR: BKT fixed-parameter policy + worked-example fading hysteresis | P1 | foundation |
 | prr-044 | ADR: Accommodation profile scope (student vs enrollment) | P1 | foundation |
 | prr-065 | Strategy-discrimination scores in AdaptiveScheduler (session-scoped) | P2 | feature |
@@ -38,7 +38,7 @@ The absorbed task files remain in place as the executable unit-of-work; this epi
 
 ## Suggested execution order
 1. prr-002 — Author ADR-0012, lock split schedule, add 500-LOC architecture test
-2. prr-044, prr-041, prr-038 — Supporting ADRs (accommodation scope, BKT fixed params, event-sourced RTBF) that constrain the split
+2. prr-044, prr-041 — Supporting ADRs (accommodation scope, BKT fixed params) that constrain the split. Note: prr-038 (event-sourced RTBF) was **superseded by prr-003a** on 2026-04-20 — same scope, already a distinct ADR track.
 3. prr-155 — Design ConsentAggregate + events (shares aggregate-design substrate)
 4. prr-148, prr-149 — Wire SchedulerInputs/StudentPlanConfig into new aggregate + live caller
 5. prr-150, prr-151 — Mentor override aggregate and live-caller audit across peer substrates
@@ -117,7 +117,7 @@ Implementation of this epic must be driven by a senior-architect mindset, not a 
 ---
 
 ## Related
-- Absorbed sub-tasks: prr-002, prr-013, prr-038, prr-041, prr-044, prr-065, prr-102, prr-148, prr-149, prr-150, prr-151, prr-155, prr-157
+- Absorbed sub-tasks: prr-002, prr-003a (added 2026-04-20, replaces prr-038), prr-013, prr-041, prr-044, prr-065, prr-102, prr-148, prr-149, prr-150, prr-151, prr-155, prr-157
 - [Full synthesis](../../pre-release-review/reviews/SYNTHESIS.md)
 - [Retired proposals](../../pre-release-review/reviews/retired.md)
 - [Conflicts](../../pre-release-review/reviews/conflicts.md)

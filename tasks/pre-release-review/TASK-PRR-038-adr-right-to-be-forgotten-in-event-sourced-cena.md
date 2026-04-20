@@ -1,29 +1,40 @@
-# TASK-PRR-038: ADR: Right-to-be-forgotten in event-sourced Cena
+# TASK-PRR-038: ADR: Right-to-be-forgotten — SUPERSEDED by prr-003a
 
-**Priority**: P1 — strongly recommended before launch (lens consensus: 2)
-**Effort**: M — 1-2 weeks
-**Lens consensus**: persona-enterprise, persona-privacy
-**Source docs**: `axis9_data_privacy_trust_mechanics.md:L70`
-**Assignee hint**: human-architect
-**Tags**: source=pre-release-review-2026-04-20, lens=privacy
-**Status**: Not Started
-**Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
-**Tier**: mvp
-**Epic**: EPIC-PRR-A — ADR-0012 StudentActor decomposition
+**Priority**: N/A (superseded)
+**Effort**: N/A
+**Status**: **Superseded 2026-04-20** — merged into [prr-003a](./TASK-PRR-003a-adr-event-sourced-right-to-be-forgotten.md)
+**Tags**: source=pre-release-review-2026-04-20, status=superseded, superseded-by=prr-003a
+**Tier**: superseded
 
 ---
 
-## Goal
-ADR on hard-delete vs crypto-shred vs aggregate-rebuild for event-sourced erasure. Migration plan.
+## Why this task is superseded
 
-## Files
-- docs/adr/NNNN-event-sourced-erasure.md
+During the user walkthrough of prr-003 ("Hard-delete misconception events on erasure") on 2026-04-20, the task was split into:
 
-## Definition of Done
-- ADR accepted; migration plan; retention worker aligned.
+- **prr-003a** — ADR-authoring (event-sourced right-to-be-forgotten, crypto-shred preference per user direction)
+- **prr-003b** — Implementation (blocked-on-003a)
+
+The scope of prr-003a is **identical** to prr-038 ("ADR on hard-delete vs crypto-shred vs aggregate-rebuild for event-sourced erasure"). prr-038 pre-dated the split and wasn't updated at the time.
+
+Rather than maintain two identical ADR-authoring tasks, prr-038 is marked superseded. All its requirements (hard-delete vs crypto-shred vs aggregate-rebuild decision, migration plan, retention worker alignment) are already captured in prr-003a's tightened DoD.
+
+## Action for implementers
+
+Do **not** claim or work this task. Redirect all ADR-right-to-be-forgotten work to **[prr-003a](./TASK-PRR-003a-adr-event-sourced-right-to-be-forgotten.md)**.
+
+## Historical record of what prr-038 originally covered
+
+- Hard-delete vs crypto-shred vs aggregate-rebuild for event-sourced erasure
+- Migration plan for pre-ADR events
+- Retention worker alignment under chosen erasure model
+- Lens consensus: persona-enterprise, persona-privacy
+
+All absorbed into prr-003a.
 
 ## Reporting
-complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+
+This task is superseded — do not complete or fail. If a worker picks it up by mistake, close immediately with result: `"superseded-by prr-003a per user decision 2026-04-20"`.
 
 ---
 
