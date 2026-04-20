@@ -1,0 +1,84 @@
+# =============================================================================
+# Ship-gate rule pack: banned citations (EPIC-PRR-D / cluster D1)
+# =============================================================================
+# Source: pre-release-review/finding_assessment_dr_rami.md (2026-04-20)
+# Policy:  Dr. Rami's REJECTED citation set must never ship in student-facing
+#          feature copy, design docs that feed production surfaces, or locale
+#          bundles. Research / retired / review docs are whitelisted.
+#
+# Rule shape:
+#   rules:
+#     - id: <unique-id>
+#       reason: <short reason shown in the violation message>
+#       finding: <FD-003 | FD-008 | FD-011 | hattie-misuse | interleaving-inflation>
+#       # Either a direct regex pattern, OR a "near" pair that requires two
+#       # tokens to co-occur on the same line (with a character-window).
+#       pattern: <JS regex source, no delimiters>
+#       flags: <optional regex flags, default "i">
+#       # "near" rules: both must match the same line.
+#       near:
+#         a: <regex a>
+#         b: <regex b>
+#         flags: <optional>
+#
+# Exit behaviour: any match outside whitelist => scan.mjs exits 1.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # FD-003 — "95% misconception resolution" fabrication
+  # --------------------------------------------------------------------------
+  - id: fd003-95-percent-resolution
+    reason: "FD-003 fabricated '95% misconception resolution' figure (Dr. Rami REJECTED)"
+    finding: FD-003
+    near:
+      a: "(95\\s*%|95\\s+percent|ninety[- ]five\\s+percent|95\\.4\\s*%)"
+      b: "(misconception|resolution|resolve)"
+    flags: i
+
+  - id: fd003-954-percent-literal
+    reason: "FD-003 inflated '95.4%' specificity (Dr. Rami REJECTED)"
+    finding: FD-003
+    pattern: "95\\.4\\s*%"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # FD-008 — Yu et al. 2026 unverifiable citation
+  # --------------------------------------------------------------------------
+  - id: fd008-yu-2026
+    reason: "FD-008 unverifiable 'Yu et al. 2026' citation (Dr. Rami REJECTED)"
+    finding: FD-008
+    pattern: "Yu(\\s+et\\s+al\\.?|\\s+and\\s+colleagues)?[\\s,]*2026"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # FD-011 — d=1.16 fabricated effect size
+  # --------------------------------------------------------------------------
+  - id: fd011-d-116
+    reason: "FD-011 fabricated effect size d=1.16 (Dr. Rami REJECTED)"
+    finding: FD-011
+    pattern: "(d\\s*=\\s*1\\.16|d\\s+of\\s+1\\.16|effect\\s+size\\s+1\\.16)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # Hattie d=1.44 misuse — only flagged when co-occurring with the specific
+  # self-reported/planning/reflective contexts where the 1.44 claim is abused
+  # --------------------------------------------------------------------------
+  - id: hattie-144-misuse
+    reason: "Hattie d=1.44 misused outside self-reported-grades context (Dr. Rami REJECTED)"
+    finding: hattie-misuse
+    near:
+      a: "(d\\s*=\\s*1\\.44|Hattie'?s?\\s+1\\.44)"
+      b: "(self[- ]reported|planning|reflective|metacogniti)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # Interleaving inflation — d=0.5-0.8 when real meta-analytic estimate ~0.34
+  # --------------------------------------------------------------------------
+  - id: interleaving-inflation
+    reason: "Interleaving effect size inflated to 0.5-0.8 (real ES ~0.34 — Dr. Rami REJECTED)"
+    finding: interleaving-inflation
+    near:
+      a: "(d\\s*=\\s*0\\.5\\s*[-–—]\\s*0\\.8|d\\s+of\\s+0\\.5\\s+to\\s+0\\.8|0\\.5\\s*[-–—]\\s*0\\.8)"
+      b: "interleav"
+    flags: i

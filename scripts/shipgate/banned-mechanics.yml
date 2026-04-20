@@ -1,0 +1,172 @@
+# =============================================================================
+# Ship-gate rule pack: banned mechanics (EPIC-PRR-D / cluster D2 + prr-019/040)
+# =============================================================================
+# Source: TASK-PRR-006, TASK-PRR-019, docs/engineering/shipgate.md
+# Policy:  Dark-pattern engagement mechanics are banned: Crisis Mode naming,
+#          Bagrut countdown framing, loss-aversion urgency, streak pressure,
+#          and outcome-prediction copy ("predicted Bagrut score"). The policy
+#          covers all three locales (en / he / ar) across both student-web and
+#          admin/full-version bundles.
+#
+# Rule shape: see banned-citations.yml header.
+# Hebrew and Arabic variants are best-effort machine translation; confirm with
+# the native-speaker locale team before enforcing on he/ar locale files that
+# fail in production. All variants are listed here so the scanner can surface
+# candidate violations for review even before Prof. Amjad / Hebrew reviewer
+# sign-off.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # prr-006 — Crisis Mode naming ban (English)
+  # --------------------------------------------------------------------------
+  - id: crisis-mode-label
+    reason: "Banned 'Crisis Mode' label (prr-006 — loss-aversion mechanic)"
+    pattern: "\\bcrisis[- ]mode\\b"
+    flags: i
+
+  - id: crisis-near-exam
+    reason: "'Crisis' framing near exam/Bagrut context (prr-006 — urgency mechanic)"
+    near:
+      a: "\\bcrisis\\b"
+      b: "(bagrut|exam|test)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-006 — Countdown framing ban (English)
+  # --------------------------------------------------------------------------
+  - id: countdown-generic
+    reason: "Banned 'countdown' framing (prr-006 — time-pressure mechanic)"
+    pattern: "\\b(bagrut|exam|study|test)[- ]?countdown\\b"
+    flags: i
+
+  - id: countdown-standalone
+    reason: "Banned standalone 'countdown' (prr-006 — time-pressure mechanic)"
+    pattern: "\\bcountdown\\b"
+    flags: i
+
+  - id: days-remaining
+    reason: "Banned 'days remaining' (prr-006 — scarcity urgency)"
+    pattern: "\\bdays\\s+(remaining|until|left)\\b"
+    flags: i
+
+  - id: run-out-of-time
+    reason: "Banned 'run out of time' (prr-006 — urgency mechanic)"
+    pattern: "(run\\s+out\\s+of\\s+time|time\\s+is\\s+running\\s+out|almost\\s+out\\s+of\\s+time)"
+    flags: i
+
+  - id: last-chance
+    reason: "Banned 'last chance' (prr-006 — loss-aversion urgency)"
+    pattern: "\\blast\\s+chance\\b"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # GD-004 — Streak copy (hard ban)
+  # --------------------------------------------------------------------------
+  - id: practice-streak
+    reason: "Banned 'practice streaks' (GD-004 — hard ban on streak copy)"
+    pattern: "\\bpractice\\s+streaks?\\b"
+    flags: i
+
+  - id: keep-your-streak
+    reason: "Banned 'keep your streak' (GD-004 — loss-aversion)"
+    pattern: "(keep\\s+your\\s+streak|don'?t\\s+break\\s+your\\s+streak|don'?t\\s+break)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-019 — Outcome-prediction copy (Bagrut / exam score)
+  # --------------------------------------------------------------------------
+  - id: predicted-bagrut-score
+    reason: "Banned 'predicted Bagrut score' (prr-019 — outcome-prediction mechanic)"
+    pattern: "predicted\\s+bagrut(\\s+score)?"
+    flags: i
+
+  - id: predicted-exam-score
+    reason: "Banned 'predicted exam score' (prr-019 — outcome-prediction mechanic)"
+    pattern: "predicted\\s+exam\\s+score"
+    flags: i
+
+  - id: exam-readiness-score
+    reason: "Banned 'exam readiness score' (prr-019 — outcome-prediction mechanic)"
+    pattern: "exam\\s+readiness\\s+score"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # Hebrew variants (best-effort; confirm with native-speaker team)
+  # NOTE: verify with native-speaker team before enforcing in he locale files
+  # --------------------------------------------------------------------------
+  - id: he-crisis-mode
+    reason: "Hebrew 'Crisis Mode' variant (prr-006 — verify w/ native speaker)"
+    pattern: "מצב\\s+משבר"
+    flags: u
+    locale: he
+
+  - id: he-countdown
+    reason: "Hebrew 'countdown' variant (prr-006 — verify w/ native speaker)"
+    pattern: "ספירה\\s+לאחור"
+    flags: u
+    locale: he
+
+  - id: he-days-left
+    reason: "Hebrew 'days left' / 'days remaining' (prr-006 — verify w/ native speaker)"
+    pattern: "ימים\\s+(שנותרו|נותרו|עד)"
+    flags: u
+    locale: he
+
+  - id: he-last-chance
+    reason: "Hebrew 'last chance' (prr-006 — verify w/ native speaker)"
+    pattern: "הזדמנות\\s+אחרונה"
+    flags: u
+    locale: he
+
+  - id: he-time-running-out
+    reason: "Hebrew 'time is running out' (prr-006 — verify w/ native speaker)"
+    pattern: "הזמן\\s+אוזל"
+    flags: u
+    locale: he
+
+  - id: he-predicted-bagrut
+    reason: "Hebrew 'predicted Bagrut score' (prr-019 — verify w/ native speaker)"
+    pattern: "ציון\\s+הבגרות\\s+(החזוי|הצפוי)"
+    flags: u
+    locale: he
+
+  # --------------------------------------------------------------------------
+  # Arabic variants (best-effort; confirm with native-speaker team)
+  # NOTE: verify with native-speaker team before enforcing in ar locale files
+  # --------------------------------------------------------------------------
+  - id: ar-crisis-mode
+    reason: "Arabic 'Crisis Mode' variant (prr-006 — verify w/ native speaker)"
+    pattern: "وضع\\s+الأزمة"
+    flags: u
+    locale: ar
+
+  - id: ar-countdown
+    reason: "Arabic 'countdown' variant (prr-006 — verify w/ native speaker)"
+    pattern: "العد\\s+التنازلي"
+    flags: u
+    locale: ar
+
+  - id: ar-days-remaining
+    reason: "Arabic 'days remaining' (prr-006 — verify w/ native speaker)"
+    pattern: "الأيام\\s+المتبقية"
+    flags: u
+    locale: ar
+
+  - id: ar-last-chance
+    reason: "Arabic 'last chance' (prr-006 — verify w/ native speaker)"
+    pattern: "الفرصة\\s+الأخيرة"
+    flags: u
+    locale: ar
+
+  - id: ar-time-running-out
+    reason: "Arabic 'time is running out' (prr-006 — verify w/ native speaker)"
+    pattern: "الوقت\\s+(ينفد|ينفذ)"
+    flags: u
+    locale: ar
+
+  - id: ar-predicted-bagrut
+    reason: "Arabic 'predicted Bagrut score' (prr-019 — verify w/ native speaker)"
+    pattern: "علامة\\s+البجروت\\s+المتوقعة"
+    flags: u
+    locale: ar
