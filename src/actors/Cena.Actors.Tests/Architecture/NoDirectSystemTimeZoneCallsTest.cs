@@ -34,8 +34,11 @@ public class NoDirectSystemTimeZoneCallsTest
     // Files allowed to reference these APIs directly.
     private static readonly string[] AllowListSuffixes =
     {
-        // THE resolver — single source of truth.
+        // THE Israel resolver — single source of truth for the Israel zone.
         Path.Combine("shared", "Cena.Infrastructure", "Time", "IsraelTimeZoneResolver.cs"),
+        // Generic cross-platform resolver — sanctioned second seam for
+        // arbitrary caller-supplied zone IDs (prr-018 quiet-hours).
+        Path.Combine("shared", "Cena.Infrastructure", "Time", "SafeTimeZoneResolver.cs"),
         // This test file — its error message cites the forbidden symbols.
         Path.Combine("Architecture", "NoDirectSystemTimeZoneCallsTest.cs"),
     };

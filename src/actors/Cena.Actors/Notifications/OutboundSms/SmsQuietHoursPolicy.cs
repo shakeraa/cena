@@ -258,10 +258,10 @@ public sealed class SmsQuietHoursPolicy : IOutboundSmsPolicy
 
     private static TimeZoneInfo FindTimezone(string id)
     {
-        // The BCL accepts IANA ids on Linux/macOS and Windows ids on Windows;
-        // .NET 8+ has a combined tz database. We wrap in try/catch so any
-        // unknown-tz defect fails with a specific exception the caller maps
-        // into a fallback.
-        return TimeZoneInfo.FindSystemTimeZoneById(id);
+        // WHY: raw BCL system-zone lookups are banned outside the resolver
+        // seam (NoDirectSystemTimeZoneCallsTest, prr-157). Route through
+        // SafeTimeZoneResolver which applies the IANA→Windows legacy fallback
+        // for arbitrary zone IDs.
+        return Cena.Infrastructure.Time.SafeTimeZoneResolver.Find(id);
     }
 }
