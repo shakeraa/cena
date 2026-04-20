@@ -142,4 +142,69 @@ public class ClaimsTransformerTests
 
         Assert.Equal("school-nazareth-01", result);
     }
+
+    // =========================================================================
+    // prr-009: parent_of claim parsing (ADR-0041 binding cache)
+    // =========================================================================
+
+    [Fact]
+    public async Task Transform_ExplodesParentOfArrayIntoPerEntryClaims()
+    {
+        var identity = new ClaimsIdentity(new[]
+        {
+            new Claim("role", "PARENT"),
+            new Claim(
+                "parent_of",
+                "[{\"studentId\":\"stu-a\",\"instituteId\":\"inst-x\"},"
+                + "{\"studentId\":\"stu-b\",\"instituteId\":\"inst-y\"}]"),
+        }, "test");
+        var principal = new ClaimsPrincipal(identity);
+
+        var result = await _transformer.TransformAsync(principal);
+
+        var entries = result.FindAll("parent_of").ToList();
+        Assert.Equal(2, entries.Count);
+
+        // Each exploded claim's value must itself be a parseable single
+        // entry object — this is the shape ParentAuthorizationGuard reads.
+        Assert.Contains(entries, c =>
+            c.Value.Contains("\"studentId\":\"stu-a\"") &&
+            c.Value.Contains("\"instituteId\":\"inst-x\""));
+        Assert.Contains(entries, c =>
+            c.Value.Contains("\"studentId\":\"stu-b\"") &&
+            c.Value.Contains("\"instituteId\":\"inst-y\""));
+    }
+
+    [Fact]
+    public async Task Transform_PreservesSingleObjectParentOfClaim()
+    {
+        var identity = new ClaimsIdentity(new[]
+        {
+            new Claim("role", "PARENT"),
+            new Claim("parent_of", "{\"studentId\":\"stu-a\",\"instituteId\":\"inst-x\"}"),
+        }, "test");
+        var principal = new ClaimsPrincipal(identity);
+
+        var result = await _transformer.TransformAsync(principal);
+
+        var entries = result.FindAll("parent_of").ToList();
+        Assert.Single(entries);
+        Assert.Contains("stu-a", entries[0].Value);
+    }
+
+    [Fact]
+    public async Task Transform_DropsMalformedParentOfClaim()
+    {
+        var identity = new ClaimsIdentity(new[]
+        {
+            new Claim("role", "PARENT"),
+            new Claim("parent_of", "not-json{"),
+        }, "test");
+        var principal = new ClaimsPrincipal(identity);
+
+        var result = await _transformer.TransformAsync(principal);
+
+        // Malformed claim is dropped — downstream guard sees zero entries.
+        Assert.Empty(result.FindAll("parent_of"));
+    }
 }

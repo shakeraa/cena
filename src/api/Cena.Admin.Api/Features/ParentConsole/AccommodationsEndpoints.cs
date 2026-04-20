@@ -25,10 +25,13 @@ using System.Security.Claims;
 using Cena.Actors.Accommodations;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.Security;
+using Cena.Infrastructure.Tenancy;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Admin.Api.Features.ParentConsole;
@@ -82,8 +85,12 @@ public static class AccommodationsEndpoints
         if (string.IsNullOrWhiteSpace(studentAnonId))
             return Results.BadRequest(new { error = "missing-studentAnonId" });
 
-        if (!await CallerHasReadAccessAsync(http, store, studentAnonId, ct))
-            return Results.Forbid();
+        // prr-009 / ADR-0041: PARENT read MUST pass the binding guard.
+        // ADMIN / SUPER_ADMIN retain the support-workflow read path
+        // (tenant scope is enforced by Marten's TenantScope helper at
+        // query time — not by this guard).
+        var parentDenial = await AuthorizeReadOrForbidAsync(http, studentAnonId, ct).ConfigureAwait(false);
+        if (parentDenial is not null) return parentDenial;
 
         using var session = store.QuerySession();
         // Fold the student's event stream for the latest
@@ -133,19 +140,26 @@ public static class AccommodationsEndpoints
         if (request is null)
             return Results.BadRequest(new { error = "missing-body" });
 
-        // Only a linked guardian (Parent role) can SET a minor's
-        // accommodations profile. Admins can read (above) but cannot
-        // assign on a parent's behalf in Phase 1B.
-        var parentAnonId = http.User.FindFirst("parentAnonId")?.Value
-            ?? http.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        if (string.IsNullOrWhiteSpace(parentAnonId))
-            return Results.Unauthorized();
-
+        // prr-009 / ADR-0041: SET is PARENT-only. The guard enforces
+        // (parentActorId, studentAnonId, instituteId) binding via the
+        // authoritative IParentChildBindingStore. Admins can READ (via
+        // the GET handler above) but CANNOT assign on a parent's behalf
+        // in Phase 1B — that path would require a signed-off teacher-
+        // delegation consent event, scheduled for Phase 2B (RDY-070).
         if (!http.User.IsInRole("PARENT"))
             return Results.Forbid();
 
-        if (!await CallerIsLinkedGuardianAsync(http, store, studentAnonId, ct))
+        ParentChildBindingResolution binding;
+        try
+        {
+            binding = await RequireParentBindingAsync(http, studentAnonId, ct).ConfigureAwait(false);
+        }
+        catch (ForbiddenException ex) when (ex.ErrorCode == ErrorCodes.CENA_AUTH_IDOR_VIOLATION)
+        {
             return Results.Forbid();
+        }
+
+        var parentAnonId = binding.ParentActorId;
 
         // Parse + validate requested dimensions. Unknown string tokens
         // are rejected rather than silently ignored; a Phase 1B client
@@ -212,36 +226,69 @@ public static class AccommodationsEndpoints
     // ── Authorisation helpers ────────────────────────────────────────────
 
     /// <summary>
-    /// Read access: Parent linked to the minor, OR any ADMIN /
-    /// SUPER_ADMIN (for support workflows). Teachers cannot read
-    /// Phase 1B.
+    /// prr-009: Read access.
+    /// - PARENT: must pass the ParentAuthorizationGuard binding check.
+    /// - ADMIN / SUPER_ADMIN: fall through; Marten's TenantScope filters
+    ///   the query result to the caller's institute.
+    /// - Anything else: 403.
+    /// Returns null when authorized (let the handler proceed); returns
+    /// a <see cref="Results.Forbid()"/> on denial.
     /// </summary>
-    private static async Task<bool> CallerHasReadAccessAsync(
-        HttpContext http, IDocumentStore store, string studentAnonId, CancellationToken ct)
+    internal static async Task<IResult?> AuthorizeReadOrForbidAsync(
+        HttpContext http, string studentAnonId, CancellationToken ct)
     {
-        if (http.User.IsInRole("SUPER_ADMIN")) return true;
-        if (http.User.IsInRole("ADMIN")) return true;
+        if (http.User.IsInRole("SUPER_ADMIN")) return null;
+        if (http.User.IsInRole("ADMIN")) return null;
+
         if (http.User.IsInRole("PARENT"))
-            return await CallerIsLinkedGuardianAsync(http, store, studentAnonId, ct);
-        return false;
+        {
+            try
+            {
+                await RequireParentBindingAsync(http, studentAnonId, ct).ConfigureAwait(false);
+                return null;
+            }
+            catch (ForbiddenException ex) when (ex.ErrorCode == ErrorCodes.CENA_AUTH_IDOR_VIOLATION)
+            {
+                return Results.Forbid();
+            }
+        }
+        return Results.Forbid();
     }
 
     /// <summary>
-    /// Phase 1B placeholder: every Parent role is treated as
-    /// linked-guardian for the minor they target. Phase 1C wires the
-    /// real ParentMinorLinkDocument lookup so a parent can only set
-    /// accommodations on minors they're actually linked to.
-    ///
-    /// Not gating this is DELIBERATE in 1B — the feature is not yet
-    /// exposed to real parents; this endpoint is exercised only by
-    /// the admin onboarding tool + integration tests. Phase 1C MUST
-    /// replace this with the real link check before the feature is
-    /// exposed to a non-staging audience.
+    /// prr-009: resolve the institute id for the guard call. Source is
+    /// the parent's <c>institute_id</c> claim issued at login; absence
+    /// of the claim on a PARENT caller is a hard deny (no default).
     /// </summary>
-    private static Task<bool> CallerIsLinkedGuardianAsync(
-        HttpContext http, IDocumentStore store, string studentAnonId, CancellationToken ct)
-        => Task.FromResult(true);
+    internal static string ResolveInstituteId(HttpContext http)
+    {
+        var claims = TenantScope.GetInstituteFilter(http.User, defaultInstituteId: null);
+        return claims.Count == 0 ? string.Empty : claims[0];
+    }
+
+    /// <summary>
+    /// Invokes <see cref="ParentAuthorizationGuard.AssertCanAccessAsync"/>
+    /// with DI-resolved services. Keeps the architecture ratchet's regex
+    /// matching to exactly one well-known call site.
+    /// </summary>
+    internal static async Task<ParentChildBindingResolution> RequireParentBindingAsync(
+        HttpContext http, string studentAnonId, CancellationToken ct)
+    {
+        var services = http.RequestServices;
+        var bindingService = services.GetRequiredService<IParentChildBindingService>();
+        var logger = services.GetRequiredService<ILogger<AccommodationsEndpointMarker>>();
+        var instituteId = ResolveInstituteId(http);
+        if (string.IsNullOrWhiteSpace(instituteId))
+        {
+            throw new ForbiddenException(
+                ErrorCodes.CENA_AUTH_IDOR_VIOLATION,
+                "PARENT caller is missing a required institute_id claim.");
+        }
+        return await ParentAuthorizationGuard.AssertCanAccessAsync(
+            http.User, studentAnonId, instituteId, bindingService, logger, ct)
+            .ConfigureAwait(false);
+    }
 
     // Marker for ILogger<T> type argument stability.
-    private sealed class AccommodationsEndpointMarker { }
+    internal sealed class AccommodationsEndpointMarker { }
 }
