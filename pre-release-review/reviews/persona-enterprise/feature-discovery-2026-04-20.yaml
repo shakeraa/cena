@@ -1,0 +1,133 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  1727-line index/mega-doc consolidating 55 findings across 10 axes, cross-examined by Dr. Nadia
+  (pedagogy) and Dr. Rami (evidence). 18 SHIP, 22 SHORTLIST, 12 DEFER, 3 REJECT; top-10 shortlist
+  with recommended priority.
+system_purpose_fit: 4
+  rationale:
+    - Acts as the canonical backlog. Enterprise concern is scale-out coherence: 55 findings become 55 potential
+      ADRs/aggregates if not triaged against existing bounded contexts.
+    - Several SHIP findings duplicate already-built infrastructure (parent digest, mentor chat, outreach).
+    - REJECTs correctly include an ADR-0003-violating finding, validating the guardrail.
+code_reality_check:
+  claims_verified_in_code:
+    - "Outreach scheduler already implements tier-routed nudges -> src/actors/Cena.Actors/Outreach/OutreachSchedulerActor.cs"
+    - "Misconception session-scope infra exists -> src/actors/Cena.Actors/Events/MisconceptionEvents.cs (implicit from ADR-0003)"
+    - "Assignment events exist -> src/actors/Cena.Actors/Events/AssignmentEvents.cs"
+    - "Classroom + program events exist -> src/actors/Cena.Actors/Events/EnrollmentEvents.cs:54-68"
+  claims_contradicted_by_code:
+    - "FD-044 'CSV roster import' treated as quick-win: actually requires idempotency + tenant-guard work (enterprise P0)."
+    - "FD-003 'Real-time misconception tagging' described as Redis-only; must verify against MisconceptionEvents.cs that nothing persists to the event stream."
+  claims_unverifiable:
+    - "Total LOC/ADR/task impact of 18 SHIP findings — requires a second pass against architecture map."
+adr_alignment:
+  honored:
+    - "ADR-0002, ADR-0003, GD-004 — top-line guardrail tensions are flagged as BORDERLINE rather than silently accepted"
+  violated: []
+  missing_adr_needed:
+    - "Meta-ADR: 'how a feature-discovery finding becomes an engineering task' — the handshake between product research and the event-sourced architecture"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      18 SHIP findings + 22 SHORTLIST = up to 40 potential feature tracks. Enterprise concern: without a triage
+      gate requiring each feature to map to an existing bounded context (and name the aggregate it touches), the
+      StudentActor god-aggregate (ADR-0012) gets worse, not better. Need a "context-mapping intake" before any
+      ticket enters the queue.
+    evidence: "feature-discovery-2026-04-20.md:L16 (55 findings); docs/adr/0012-aggregate-decomposition.md"
+    lens_note: Enterprise — breadth of proposals collides with aggregate-decomposition plan.
+  - severity: P0
+    finding: |
+      Several "quick wins <2 engineer-weeks" (CSV roster import, auto-translation, SSO, Focus Ritual) touch
+      tenant-boundary or LLM-tier infrastructure that is not yet in place. They are not quick until the
+      infrastructure ADRs (parent auth, external-integration adapter, tier routing, PII gateway) land.
+    evidence: "feature-discovery-2026-04-20.md:L19 (quick-wins list); src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs"
+    lens_note: Enterprise — quick-wins list misleads planning; re-label as "quick once infra lands."
+  - severity: P1
+    finding: |
+      BORDERLINE tensions (FD-003 misconception tagging, etc.) are flagged but no enforcement checklist exists.
+      Every BORDERLINE must have a "compliance design" attached before promotion to SHIP in the queue, or it
+      becomes a ship-gate failure.
+    evidence: feature-discovery-2026-04-20.md:L21 (8 BORDERLINE features)
+    lens_note: Enterprise — formalize the BORDERLINE gate.
+  - severity: P1
+    finding: |
+      Doc uses "RDY-0XX" placeholder task IDs, indicating these aren't queue-linked yet. Enterprise coordination
+      needs one authoritative queue entry per SHIP finding — parallel research doc task IDs drift quickly.
+    evidence: "feature-discovery-2026-04-20.md:L85 (verdict: 'Add RDY-0XX')"
+    lens_note: Enterprise — single source of truth for task IDs (the kimi-queue).
+  - severity: P2
+    finding: |
+      "Feature Discovery" doc itself is 1727 lines, exceeding the <500-LOC file rule applied to code but reasonable
+      for a research artifact. Still — split-for-navigation request: the eventual tasks.jsonl should dereference
+      findings back to doc line ranges.
+    evidence: feature-discovery-2026-04-20.md (1727 LOC)
+    lens_note: Enterprise (housekeeping) — synthesizer must carry source_doc_lines faithfully.
+already_built:
+  - feature: "Outreach-channel tiered nudges (FD-030/FD-048 overlap)"
+    evidence: src/actors/Cena.Actors/Outreach/OutreachSchedulerActor.cs
+    note: "Several notification-adjacent findings should extend, not replace."
+  - feature: "Assignment events (axis-5 overlap)"
+    evidence: src/actors/Cena.Actors/Events/AssignmentEvents.cs
+    note: "'Assignment pusher' feature largely exists at event-schema level."
+  - feature: "Platform Institute + canonical programs (ADR-0001 Phase-1)"
+    evidence: docs/adr/0001-multi-institute-enrollment.md:343-352
+    note: "'Self-learner canonical path' findings are already scaffolded."
+  - feature: "TENANCY-P2a enrollment-scoped mastery"
+    evidence: "docs/adr/0001-multi-institute-enrollment.md:152-168; src/actors/Cena.Actors/Events/EnrollmentEvents.cs:72"
+    note: "Findings assuming student-global mastery should be re-read against enrollment scope."
+duplicates_of_other_docs:
+  - "ALL axis docs overlap this index by design."
+extracted_tasks:
+  - title: "Context-mapping intake gate for all SHIP findings"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any SHIP finding becomes a queue task, require: (a) name the existing bounded context/aggregate it
+      touches, (b) list new events + upcaster stub, (c) confirm ADR-0003 / GD-004 / ADR-026 compatibility, (d)
+      cite non-negotiable it depends on.
+
+      ## Files
+      - docs/engineering/shipgate.md (add intake rule)
+      - pre-release-review/reviews/SYNTHESIS.md (apply when generated)
+
+      ## Definition of Done
+      - Intake template added to shipgate.md.
+      - Synthesis step applies template and rejects findings that can't fill it.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L1-L1727]
+  - title: "Re-label quick-wins list with infra dependencies"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-audit
+    queue_body: |
+      ## Goal
+      For each item in the "Quick wins" list (L19), annotate the prerequisite infra ADR. Output as an appendix
+      to feature-discovery doc.
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md
+
+      ## Definition of Done
+      - 10 quick-wins annotated with "blocked by: ADR-xxxx" or "unblocked".
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-audit --result "<branch>"
+    source_doc_lines: [L19]
+verdict: adopt
+verdict_reason: |
+  This is the canonical backlog. Adoption mandatory. Enterprise work: put a context-mapping intake gate in front of it
+  and don't let "quick wins" masquerade as unblocked.
+cross_lens_handoff:
+  - to: persona-finops
+    about: "Cost envelope of adopting 18 SHIPs concurrently."
+  - to: persona-sre
+    about: "Rollout cadence + projection rebuild windows."
+  - to: persona-privacy
+    about: "BORDERLINE features that touch minor data."

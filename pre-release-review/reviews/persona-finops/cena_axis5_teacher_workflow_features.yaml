@@ -1,0 +1,136 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight teacher workflow features: smart lesson planner, conference prep,
+  Bagrut readiness tracking, class health pulse, alert system, co-teaching,
+  assignment passback, analytics. Teacher seat count is ~1/30 of students so
+  absolute cost is small; but per-teacher features can be LLM-heavy.
+system_purpose_fit: 4
+  rationale:
+    - Teacher seats are low-volume compared to students — cost ceiling less acute.
+    - Smart lesson planner + conference prep are generation-heavy (expensive but rare).
+    - Aggregation features reuse existing analytics (cheap).
+code_reality_check:
+  claims_verified_in_code:
+    - "Mastery tracking service exists -> src/api/Cena.Admin.Api/MasteryTrackingService.cs"
+    - "Item bank health exists -> src/api/Cena.Admin.Api/ItemBankHealthService.cs"
+    - "Admin API endpoints for questions/content -> src/api/Cena.Admin.Api/AdminApiEndpoints.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Mashov/Google Classroom integration cost — per-call API fees not documented"
+adr_alignment:
+  honored:
+    - "ADR-0003 — class aggregation avoids per-student misconception disclosure"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F1 Smart Lesson Planner — LLM-generated lesson plans per class per week.
+      With ~3k teachers x 1 plan/week = 3k calls/week. At Sonnet ($0.02/plan
+      with 1k in / 1k out), that is ~$60/week = $240/month. NEGLIGIBLE at
+      scale. Green-light if cached per-plan (invalidate on roster change).
+    evidence: cena_axis5_teacher_workflow_features.md (F1)
+    lens_note: Teacher volume is ~1% of student volume; LLM-heavy features affordable here.
+  - severity: P1
+    finding: |
+      F2 Conference Prep "strength-first talking points" — 1 per student x
+      teacher-requested only. Bounded by teacher initiative. ~$0.01/gen cost
+      acceptable. But: must not regenerate on tab refresh — cache 24h.
+    evidence: cena_axis5_teacher_workflow_features.md (F2)
+    lens_note: Cache generated output, use etag for refresh.
+  - severity: P1
+    finding: |
+      F5 At-Risk Alert System — if batch computed nightly (SQL over last-7-day
+      activity), cost is near-zero. If real-time LLM classification per student
+      per day, cost balloons. Doc doesn't specify. Force batch path.
+    evidence: cena_axis5_teacher_workflow_features.md (F5)
+    lens_note: Real-time LLM over 100k students daily = $1k+/day. Nightly SQL batch = ~$0.
+  - severity: P2
+    finding: |
+      F7 Assignment & Grade Passback (Google Classroom) — Classroom API is
+      free. Cost is engineering integration time. No per-use cost concern.
+    evidence: cena_axis5_teacher_workflow_features.md (F7)
+    lens_note: Vendor lock-in to Google — acceptable given IL school market share.
+  - severity: P2
+    finding: |
+      F3 Bagrut Readiness Tracking — aggregate of existing mastery data. Near-
+      zero marginal cost. Ship.
+    evidence: cena_axis5_teacher_workflow_features.md (F3)
+    lens_note: Already-computed data surfaced via new endpoint.
+  - severity: P2
+    finding: |
+      F4 Class Health Pulse — privacy-preserving aggregation = DP compute.
+      Same concern as F4 in Axis 4 — nightly batch + cache.
+    evidence: cena_axis5_teacher_workflow_features.md (F4)
+    lens_note: DP cost only matters at aggregation time; cache output all day.
+already_built:
+  - feature: "MasteryTrackingService"
+    evidence: src/api/Cena.Admin.Api/MasteryTrackingService.cs
+    note: F3 Bagrut readiness is an aggregation view over this — no new storage.
+  - feature: "Question bank + item bank health"
+    evidence: src/api/Cena.Admin.Api/ItemBankHealthService.cs
+    note: F1 Smart Lesson Planner should pull from ItemBankHealth, not fresh LLM search.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-042 (Google SSO) overlaps with F7 auth"
+  - "cena_competitive_analysis.md: Feature 4 At-Risk Alert = F5"
+extracted_tasks:
+  - title: "Nightly batch for At-Risk Alert computation (no per-request LLM)"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Implement F5 At-Risk Alerts as a nightly batch job over existing mastery
+      data. Avoid any per-student real-time LLM classification. Emit alerts
+      via NATS for teacher dashboard consumption.
+
+      ## Files
+      - src/api/Cena.Admin.Api/AtRiskAlerts/AtRiskAlertComputeJob.cs (new)
+      - src/api/Cena.Admin.Api/AtRiskAlerts/AtRiskRules.cs (new, deterministic)
+      - src/actors/Cena.Actors.Tests/Alerts/AtRiskAlertTests.cs
+
+      ## Definition of Done
+      - Nightly Quartz job reads last-7-day session aggregates
+      - Deterministic rules: accuracy<60%, hint_usage_rate>70%, session_skip>3
+      - Emit NATS event cena.alerts.at_risk_v1 with student_id + reasons[]
+      - Zero LLM calls in hot path
+      - Metric: cena.alerts.at_risk.emitted_total
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L180-L230]
+  - title: "Cache smart lesson plans 7 days with roster-change invalidation"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Cap F1 LLM cost by caching generated plans for 7 days, keyed on
+      (class_id, week_num, roster_hash). Invalidate on roster change event.
+
+      ## Files
+      - src/api/Cena.Admin.Api/LessonPlans/LessonPlanCache.cs (new)
+      - src/api/Cena.Admin.Api/LessonPlans/LessonPlanGenerator.cs (new)
+
+      ## Definition of Done
+      - Redis cache with 7-day TTL
+      - Invalidation on cena.roster.changed_v1 NATS event
+      - Metric: cena.lessonplan.cache_hit_rate (target >= 80%)
+      - Per-teacher rate limit: max 3 regenerations/week
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L40-L100]
+verdict: adopt
+verdict_reason: |
+  Teacher volume is low enough that LLM costs are manageable across all 8
+  features if caching is enforced. Nightly batch for alerts + 7-day cache
+  for lesson plans = $200-500/month ceiling for the whole axis. Good ROI.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F2 conference prep — strength-first talking points must not leak misconception data per ADR-0003."
+  - to: persona-enterprise
+    about: "Mashov/Classroom integration error-budget and vendor SLA."

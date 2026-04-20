@@ -1,0 +1,321 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 7 peer/social features (anonymized peer explanation circles,
+  teacher-mediated micro groups, team-vs-challenge cooperative
+  competitions, async anonymous Q&A with peer endorsement, "I'm Confused
+  Too" anonymous signal, reciprocal peer tutoring matcher, collaborative
+  math whiteboard). RDY-076 two-sided-consent architecture applied
+  throughout.
+system_purpose_fit: 2
+  rationale:
+    - This is the HIGHEST-STAKES axis for ethics lens — peer social features
+      for minors are the pattern with most regulatory enforcement (Epic, Edmodo,
+      Reddit ICO)
+    - Architecture is thoughtful: two-sided consent, ephemeral data, anonymous
+      avatars, DPIA gates
+    - However, multiple specific proposals DIRECTLY violate shipgate / dark-
+      pattern rules:
+      * F3 "before the pyramid collapses" / "Floor is Lava" framing =
+        loss-aversion
+      * F3 "confetti animation" = explicitly banned by GD-004 Rule 5
+      * F3 Bronze/Silver/Gold tiers for TEAMS creates comparison across teams
+      * F4 "helpfulness tokens" = reward-token system
+    - Also needs stronger cross-background-pairing guardrails (Jewish-Arab) that
+      F6 acknowledges but under-specifies
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code:
+    - "Ship-gate GD-004 Rule 5 explicitly bans confetti/haptics/audio tied to non-learning events — F3 proposes confetti. docs/engineering/shipgate.md:L21"
+  claims_unverifiable:
+    - "Ke & Grabowski 2007 effect-size claims -> cogsci"
+    - "DeepMind/Eedi 95% misconception resolution — Rami flagged fabricated elsewhere"
+adr_alignment:
+  honored:
+    - "RDY-076 two-sided peer-interaction consent"
+    - "Differential privacy for F5 confusion signal (ε=1.0)"
+    - "Session-only data retention (24h-30d)"
+  violated:
+    - "GD-004 shipgate: F3 confetti animation (L232) explicitly banned"
+    - "GD-004 shipgate: F3 'before the pyramid collapses' language is loss-aversion copy"
+  missing_adr_needed:
+    - "ADR on cross-background peer pairing (Jewish-Arab, religious-secular) — must
+      require teacher pre-approval with per-pair rationale; current F6 proposal
+      is too loose"
+    - "ADR on any confetti/animation/haptic in learning interfaces — full ban with
+      allowlist exception process"
+non_negotiable_violations:
+  - "3: No dark-pattern engagement — F3 proposes confetti (banned Rule 5), pyramid-collapse loss-framing, team-tier comparison"
+persona_findings:
+  - severity: P0
+    finding: |
+      F3 Team vs. Challenge Cooperative Competitions (L173-246) directly
+      violates GD-004 ship-gate on multiple vectors:
+      (a) "Can your team collectively solve 20 algebra problems before
+          the pyramid collapses?" (L176) — "collapses" is explicit
+          loss-aversion framing; temporal urgency against a falling
+          object is the exact anxiety vector banned.
+      (b) "Floor is Lava" fully cooperative mode (L176) — same pattern.
+      (c) "Milestone celebration screen at end (confetti animation for
+          tier achieved)" (L232) — confetti is explicitly banned by
+          shipgate.md Rule 5: "Confetti/haptics/audio tied to non-
+          learning events (reward inflation)".
+      (d) "Tiered milestones (Bronze/Silver/Gold)" (L224, L243) even
+          with positive framing are still a comparison-to-threshold
+          structure that shapes teams into a hierarchy. For MINORS this
+          is the banned "comparative-percentile" pattern in a different
+          wrapper. Author flags BORDERLINE (L243) but mitigation is
+          just copy-reframing — the structural pattern remains.
+      The cooperative-competition idea is salvageable without these
+      elements; as currently specified, it is a shipgate block.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L176, L224, L232, L243
+    lens_note: |
+      Shipgate is unambiguous. Confetti for math completion is the
+      dopamine-reward-inflation dark pattern FTC v. Epic was about.
+      "Pyramid collapses / floor is lava" for minors under Bagrut
+      pressure adds threat framing to a purely voluntary activity.
+      Kahoot/Gimkit inspiration is exactly the pattern Cena was
+      founded to reject.
+  - severity: P0
+    finding: |
+      F4 Async Anonymous Q&A (L250-321) introduces "helpfulness tokens
+      (not points or grades — purely decorative badges)" for endorsed
+      responses (L253). "Purely decorative" is the common defense of
+      badge systems that nonetheless create variable-ratio reward
+      loops. The number fluctuates (unpredictable endorsements), the
+      reinforcement is social (endorsement from peers), and the
+      reward is accumulative — this is the psychological structure
+      shipgate Rule 2 bans: "Variable-ratio rewards on answer
+      correctness (slot-machine pattern)." Although the "answer" here
+      is an explanation not a math answer, the reward mechanic is
+      identical.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L253
+    lens_note: |
+      Decorative badges are the classic shipgate dodge. The token
+      is a variable-ratio reward for peer explanation; ban.
+      Substitute: simple "thanks" acknowledgment with no counter,
+      no accumulation, no sort-ranking.
+  - severity: P1
+    finding: |
+      F1 Anonymized Peer Explanation Circles (L33-99) asks minors to
+      record 30-second voice explanations. Ethics concerns:
+      (a) Voice recordings of minors stored even 24h = significant CSAM-
+          adjacent liability surface. Author mentions "voice distortion
+          filter" (L95) as mitigation but distortion is not deletion.
+          Recommend: TEXT-ONLY by default; voice is strictly opt-in
+          with additional parental consent gate for under-16.
+      (b) "Automated content scanning for names, phone numbers, school
+          references; teacher moderation queue for first 3 explanations"
+          (L96) is good. Add: no export, no download, no re-use, no
+          ML-training — explicit at architecture level.
+      (c) Minor who records an explanation with a known misconception
+          cannot fully "un-say" it even with 24h TTL — another minor
+          may have already screenshotted.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L33, L86-L99
+    lens_note: |
+      Voice-recording of minors is a regulatory high-risk zone.
+      ClassDojo-style anonymous visible handles + text replies is
+      already a proven pattern. Voice should be Phase 2 at earliest,
+      with independent privacy/DPIA review.
+  - severity: P1
+    finding: |
+      F6 Reciprocal Peer Tutoring Matcher (L391-461) acknowledges
+      (L457) "power dynamics in mixed Jewish-Arab pairings need
+      consideration" with mitigation "Teacher approval required for
+      all cross-background pairings." Ethics lens: this must be an
+      ADR with explicit per-pair rationale logging. Otherwise teachers
+      under time pressure will auto-approve, and the feature becomes
+      a vector for reinforcing or inflaming inter-group tension. The
+      scope of "cross-background" must be defined: language,
+      religious/secular, settlement-area, gender — all require
+      thought, not just ethnicity.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L454-L461
+    lens_note: |
+      In the Israeli context 2026, cross-background peer pairing is
+      a charged feature. Either build it with ADR-level care or
+      don't build it. No middle ground.
+  - severity: P1
+    finding: |
+      F5 "I'm Confused Too" Anonymous Signal (L324-388) is the
+      best-designed feature in the axis ethically — differential
+      privacy, opt-in, supportive framing. However: storing a
+      "confusion counter" per concept (L366) even with Laplace noise
+      invites re-identification attacks when a single concept has a
+      small number of students working on it concurrently (rate
+      limiting L383 helps but isn't sufficient). Need minimum
+      k-anonymity threshold before display — e.g., only show "others
+      confused too" when underlying true count >= 5 AND noisy count
+      >= 3. Author implies this at L361 but should be explicit.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L361, L382-L385
+    lens_note: |
+      DP alone is not k-anonymity. For minors on a platform, both
+      guarantees are needed.
+  - severity: P2
+    finding: |
+      F2 Teacher-Mediated Micro Groups (L103-169) is well-designed.
+      One concern: "watermarking with student ID to deter
+      screenshots" (L167) — watermarking a minor's ID on chat content
+      creates a surveillance record that persists longer than the
+      chat. Recommend: watermark with anonymous session-identifier
+      that expires with the group, not student ID.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L167
+    lens_note: |
+      Student-ID watermarks are a fingerprinting vector.
+  - severity: P2
+    finding: |
+      F7 Collaborative Math Whiteboard (L464-529) proposes "equal
+      participation prompts ('Both students must drag at least one
+      element before submitting')" (L523). Forcing-participation
+      requirements for minors risk becoming coercive toward the
+      quieter student. Recommend: inform-only ("your partner hasn't
+      contributed yet"), not gate-on-participation.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:L523
+    lens_note: |
+      Gating progress on peer action converts cooperation into
+      coercion. SDT autonomy bar is violated.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-030 (confusion signal), FD-033, FD-034, FD-035 (same features)"
+extracted_tasks:
+  - title: "F3 Team Challenges: remove confetti, pyramid-collapse framing, tier comparisons"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before F3 Team Challenges can enter design specs, revise to
+      remove all shipgate violations:
+      (a) No confetti / haptics / victory audio on challenge end
+      (b) No "collapse / lava / meltdown / running out" language
+      (c) No Bronze/Silver/Gold or any tier labeling across teams
+      (d) Celebrate only the completion itself; single frame, no
+          animation beyond fade-in; brief affirmation text
+      Add explicit shipgate lint entries for banned phrases in
+      any team-challenge namespace. Alternative structure: simple
+      cooperative shared-progress bar toward a fixed numerical goal.
+      ## Files
+      - docs/adr/00NN-team-challenge-policy.md (new)
+      - docs/engineering/shipgate.md
+      - scripts/shipgate/banned.json
+      ## Definition of Done
+      - ADR accepted
+      - Shipgate policy doc updated with explicit confetti ban
+      - F3 spec revised
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L176, L224, L232, L243]
+  - title: "F4 Q&A: remove helpfulness tokens; replace with simple thanks"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F4 Async Anonymous Q&A must not include any counter, badge,
+      accumulator, or ranking of "helpfulness." Replace with:
+      - One-tap "thanks" acknowledgment (sends a thank-you, no counter)
+      - No leaderboard, no top-answers-this-week, no profile trophies
+      ## Files
+      - src/community/QAFeature/*
+      - scripts/shipgate/banned.json (add "helpfulness tokens",
+        "helper badge", "top contributor")
+      ## Definition of Done
+      - No counter field in qa_endorsements data model
+      - UI shows one-time thanks, no accumulation display
+      - Shipgate lint passes
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L253]
+  - title: "F1 Peer explanations: text-only default, voice Phase 2 with DPIA"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F1 Anonymized Peer Explanation Circles ships TEXT-ONLY in Phase 1.
+      Voice mode is Phase 2 feature gated on:
+      - Separate DPIA
+      - Additional parental consent for under-16
+      - Storage architecture review (encryption, lifecycle, no ML access)
+      - Israeli PPA approval for voice recordings of minors
+      ## Files
+      - docs/adr/00NN-peer-voice-phasing.md (new)
+      - docs/privacy/peer-voice-dpia.md (new when Phase 2 starts)
+      ## Definition of Done
+      - ADR accepted
+      - Phase 1 spec text-only; Phase 2 gated on DPIA completion
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L33, L86-L99]
+  - title: "Cross-background peer pairing ADR"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Define policy for any peer-pairing feature (F1, F6, F7) that
+      crosses language, religious/secular, or other demographic lines:
+      - Teacher must provide per-pair written rationale (one line)
+      - Rationale is audit-logged
+      - Pair can be dissolved by either student without explanation
+      - Default: within-school same-language pairs unless teacher
+        explicitly opts in
+      - Annual review of cross-background pairing outcomes
+      ## Files
+      - docs/adr/00NN-cross-background-pairing-policy.md (new)
+      ## Definition of Done
+      - ADR accepted with education advisor sign-off
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L454-L461]
+  - title: "F5 confusion signal: add k-anonymity floor on display"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F5 "I'm Confused Too" signal must display only when:
+      - Noisy count >= 3 AND
+      - True underlying count >= 5 (k-anonymity)
+      - Student has not exceeded 1 signal per concept per 24h
+      ## Files
+      - src/actors/ConfusionSignalActor/*
+      ## Definition of Done
+      - Display gate enforced by service, not UI
+      - Unit tests cover all three conditions
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L361, L382-L385]
+  - title: "F2 watermark: session-id not student-id"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F2 Teacher-Mediated Micro Groups: chat content watermark uses
+      ephemeral session-scoped identifier that expires with the
+      group, not persistent student_id.
+      ## Files
+      - src/community/MicroGroups/Watermark.ts
+      ## Definition of Done
+      - Watermark no longer contains student_id
+      - Session-id expires with group archive
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L167]
+verdict: revise
+verdict_reason: |
+  Axis 7 has the strongest ethics-architecture foundation of any axis
+  (DPIA gates, two-sided consent, ephemeral data) AND the most
+  egregious shipgate violations (F3 confetti + collapse framing, F4
+  helpfulness tokens). Revise to ship the architecture; retire the
+  dark-pattern mechanics. F5 is near-shippable after k-anonymity fix.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F1 voice recording DPIA, F4 anonymity-to-everyone teacher deanon protocol, F5 differential privacy ε=1.0 justification"
+  - to: persona-redteam
+    about: "F6 matching algorithm — ability-level inference via skill profile; F7 WebSocket real-time attack surface"
+  - to: persona-sre
+    about: "F3 Team Challenges WebSocket + real-time scoring engine SLOs and rollback"
+  - to: persona-a11y
+    about: "F7 whiteboard gesture-based manipulation — motor accessibility"

@@ -1,0 +1,191 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 pedagogy features: interleaving scheduler, spaced mastery, retrieval micro-checks,
+  elaborative interrogation prompts, productive-struggle hint governor, desirable-difficulty,
+  near-to-far transfer, adaptive worked-example fading. Each has a guardrail tension section
+  that explicitly checks ADR-0003 (session scope) and DPA §7 (no ML training on student data).
+
+system_purpose_fit: 4
+  rationale:
+    - Every feature explicitly claims ADR-0003 compliance in its Guardrail Tension section
+    - Non-negotiable #1 (SymPy oracle) respected — CAS validates all answers
+    - Several BORDERLINE flags where session-local processing is used; most self-aware
+    - Feature 4 and Feature 8 have acknowledged misconception-leakage risks
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Misconception-detection infrastructure already scaffolded with session scope -> src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs + src/actors/Cena.Actors/Events/MisconceptionEvents.cs:22-60 (all [MlExcluded])"
+    - "CAS oracle integration is real -> src/actors/Cena.Actors (SymPy integration referenced throughout pedagogical services)"
+    - "Hint infrastructure exists and ties to diagnosis -> src/actors/Cena.Actors/Services/HintGenerator.cs + src/actors/Cena.Actors/Diagnosis/DiagnosisHintLevelAdjuster.cs"
+    - "Scaffolding levels exist -> src/actors/Cena.Actors/Services/PersonalizedExplanationService.cs:12-14 (Full/Partial/HintsOnly/None)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "No InterleavingScheduler / TransferTierClassifier / ElaborationPrompt table yet in src/ — all proposed"
+    - "Feature 8 BKT fixed parameters claim unverified — no BKT module exists"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (every feature's Guardrail Tension explicitly addresses it)
+    - ADR-0002 (CAS oracle used for answer validation, not bypassed)
+  violated: []
+  missing_adr_needed:
+    - "ADR for 'self-explanation response' storage semantics — Feature 4 stores elaboration_responses session-local but needs explicit policy on free-text PII from student explanations (these may contain names, phone numbers, sensitive disclosures)"
+    - "ADR for BKT parameter source — Feature 8 uses fixed literature values rather than fitted-on-students, needs ADR to lock this"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 4 (Elaborative Interrogation) and Feature 3 (Retrieval Micro-Checks) accept
+      free-text student responses. Free-text from a 13-year-old carries latent PII
+      (names of classmates, family, home address in a word problem, etc.). Session-local
+      storage is insufficient if logs carry the text; need a PII scanner before persistence.
+    evidence: "axis1_pedagogy_mechanics_cena.md:156-158 (retrieval_responses), :221-223 (elaboration_responses)"
+    lens_note: |
+      "Session-local" means in-memory only unless explicitly stated. The proposed data
+      model has tables with session_id + response_text, which is persistent storage by
+      default. PPL Section 4 minors' data + COPPA §312.5 both apply.
+
+  - severity: P1
+    finding: |
+      Feature 4's "LLM can evaluate quality of free-text elaboration responses" sends
+      potentially PII-carrying student text to an external LLM. This violates the policy
+      asserted in PersonalizedExplanationService.cs:23 ("No student ID, name, or PII is
+      ever included in LLM prompts"). Need PII-scrubbing before LLM call, not after
+      storage.
+    evidence: "axis1_pedagogy_mechanics_cena.md:225-227 + src/actors/Cena.Actors/Services/PersonalizedExplanationService.cs:23"
+    lens_note: |
+      Student free-text is the highest-risk PII surface. Sending raw text to Anthropic's
+      LLM requires either zero-data-retention enterprise agreement or PII scrub preprocessor.
+
+  - severity: P2
+    finding: |
+      Feature 2 "skill_covering_relationships" is per-student mastery state. Stored per
+      student and persistent — this is NOT misconception data so ADR-0003 compliant, but
+      it IS a GDPR-relevant behavioral profile. Must flow through erasure cascade.
+    evidence: "axis1_pedagogy_mechanics_cena.md:110-114"
+    lens_note: |
+      RightToErasureService.cs currently cascades 7 stores; each new per-student projection
+      needs to be added. Feature proposal silent on this.
+
+  - severity: P2
+    finding: |
+      Feature 5 hint-governor tracks "hint dependency rate" per student. Borderline
+      behavioral profile. Doc says "session-local" but the governor needs cross-session
+      calibration to tune delays — that implies persistence. Contradicts own guardrail claim.
+    evidence: "axis1_pedagogy_mechanics_cena.md:278-281"
+    lens_note: |
+      If it truly session-local, next-session delays reset — breaking the pedagogical
+      premise. If persistent, it is a behavioral profile subject to GDPR Art 22.
+
+  - severity: P2
+    finding: |
+      Feature 1 "strategy discrimination" scores and Feature 6 "running success rate" are
+      aggregate metrics — but combined with session timestamps they form a behavioral
+      fingerprint. Needs explicit aggregation / anonymization threshold before teacher exposure.
+    evidence: "axis1_pedagogy_mechanics_cena.md:55-58, :335-338"
+    lens_note: |
+      Privacy-by-aggregation claims need k-anonymity thresholds. Teacher dashboards exposing
+      per-student rates with temporal granularity reintroduce identifiability.
+
+  - severity: P0
+    finding: |
+      Feature 8 Adaptive Worked-Example Fading with BKT touches ADR-0003 directly.
+      "self-explanation responses could reveal misconceptions" is flagged but the
+      mitigation ("store only aggregate explanation quality score") is architectural,
+      not policy. If the LLM that evaluates quality receives raw responses, misconception
+      data leaves the session boundary via the LLM call itself.
+    evidence: "axis1_pedagogy_mechanics_cena.md:461-463"
+    lens_note: |
+      ADR-0003 covers PERSISTENCE of misconception data — LLM INFERENCE on session data
+      is allowed only if the prompt + response loop are session-bounded and the LLM vendor
+      agreement disallows training.
+
+already_built:
+  - feature: Misconception event infrastructure (session-scoped, [MlExcluded])
+    evidence: src/actors/Cena.Actors/Events/MisconceptionEvents.cs + src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs
+    note: Features 1-8 should build on these events, not define new per-student misconception tables.
+  - feature: Hint infrastructure (used by Feature 5)
+    evidence: src/actors/Cena.Actors/Services/HintGenerator.cs + src/actors/Cena.Actors/Diagnosis/DiagnosisHintLevelAdjuster.cs
+    note: Feature 5 "hint governor" extends existing system, not greenfield.
+  - feature: Personalized explanation with scaffolding levels (used by Feature 8)
+    evidence: src/actors/Cena.Actors/Services/PersonalizedExplanationService.cs
+    note: Already implements full/partial/hints-only/none mastery thresholds the doc proposes.
+
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-001 (Interleaving) = Feature 1 here"
+  - "AXIS_6_Assessment_Feedback_Research.md: Feature 6 (Real-Time Misconception Tagging) overlaps with Feature 4/8 free-text handling"
+  - "axis2_motivation_self_regulation_findings.md: Feature 1 (Socratic Self-Explanation) overlaps Feature 4 here"
+
+extracted_tasks:
+  - title: "PII-scrub pipeline for free-text student responses before persist + LLM"
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-privacy
+    queue_body: |
+      ## Goal
+      Free-text retrieval prompts / elaboration responses / self-explanation answers may
+      contain PII (names, addresses, classmates). Before persistence in any
+      retrieval_responses / elaboration_responses / self_explanation_responses table
+      AND before any LLM call, run through a PII scrubber.
+
+      ## Files
+      - New: src/shared/Cena.Infrastructure/Privacy/FreeTextPiiScrubber.cs
+      - New: src/shared/Cena.Infrastructure.Tests/Privacy/PiiScrubberTests.cs
+      - ADR: docs/adr/NNNN-free-text-student-pii.md
+
+      ## Definition of Done
+      - Scrubber detects Israeli phone (+972), email, full-name patterns (Hebrew/Arabic/English)
+      - Scrubber produces original+scrubbed pair; only scrubbed persists; original discarded in-memory
+      - LLM-call helpers wrap scrubber by default (opt-out requires [LlmRawOk] attribute)
+      - Test corpus of 50 synthetic Israeli student responses
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-privacy --result "<branch>"
+    source_doc_lines: ["L156-158", "L221-227", "L461-463"]
+
+  - title: "Add new per-student projections to erasure cascade"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Every new per-student table proposed in Axis 1 (skill_mastery_state,
+      hint_dependency_score, transfer_mastery_log, fading_state) must be added to
+      RightToErasureService cascade when built. Make this a repo convention.
+
+      ## Files
+      - docs/adr/NNNN-erasure-cascade-convention.md
+      - src/shared/Cena.Infrastructure.Tests/Compliance/ErasureCompletenessTests.cs (new)
+      - src/shared/Cena.Infrastructure/Compliance/RightToErasureService.cs (future hook)
+
+      ## Definition of Done
+      - ADR lists every per-student-indexed document type and its erasure action
+      - Convention test scans for [StudentScoped] attribute and fails if not in manifest
+      - CI blocks PRs adding per-student tables without erasure coverage
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L110-114", "L278-281"]
+
+verdict: adopt
+verdict_reason: |
+  Pedagogy features are privacy-aware in design and correctly cite ADR-0003/DPA §7 tensions.
+  The P0 gap is uniformly about free-text PII leaking to LLM / persistent tables —
+  solvable with one scrubber + one cascade-convention test. Otherwise ship.
+
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      Are the effect sizes cited (d=1.05 interleaving, g=0.28 spacing) representative of
+      meta-analytic mean or cherry-picked? Dr. Rami's assessment suggests concerns.
+  - to: persona-educator
+    about: |
+      Features 5/6 borderline flags on anxiety/frustration — pedagogical soundness check needed.
+  - to: persona-enterprise
+    about: |
+      Every new per-student projection adds to aggregate decomposition (ADR-0012) load;
+      mastery vs misconception boundary must be respected in aggregate design.

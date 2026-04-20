@@ -1,0 +1,222 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight operational/integration features (Google SSO, Mashov sync, CSV
+  bulk roster import, offline-first practice, multi-device sync, School IT
+  admin dashboard, Google Classroom grade passback, Student data portability).
+  High-risk integration surface: third-party auth, cross-org data sync, CSV
+  parsing, offline store on device, grade write-back.
+system_purpose_fit: 3
+  rationale:
+    - SSO + Mashov + Google Classroom bring classic OAuth/JWT/CSV/file-upload
+      attack surface
+    - Offline mode introduces local data-store on a minor's device — theft +
+      shared-device risks
+    - Grade passback is a write path to external systems — forgery risk
+code_reality_check:
+  claims_verified_in_code:
+    - "Firebase Auth is already wired -> src/shared/Cena.Infrastructure/Firebase/FirebaseAdminService.cs"
+    - "CenaClaimsTransformer + InstituteRoleClaims exist -> src/shared/Cena.Infrastructure/Auth/*"
+    - "Offline sync endpoints present -> src/api/Cena.Student.Api.Host/Endpoints/OfflineSyncEndpoints.cs; OfflineReplayEndpoints.cs"
+  claims_contradicted_by_code:
+    - "Doc L52 'Store session token in localStorage' — contradicts best practice; localStorage is reachable from any XSS. Should be httpOnly cookie + SameSite=Strict."
+  claims_unverifiable:
+    - "Mashov API is unofficial — doc L70 admits it; no rate-limit/circuit-breaker plan in doc"
+    - "Google Classroom grade passback scope request — no mapping in code today"
+adr_alignment:
+  honored:
+    - ADR-0001 (multi-institute) — SSO must map Google org_id → institute
+  violated: []
+  missing_adr_needed:
+    - "Offline-device data policy ADR — what PII may be cached locally on a student device; wipe-on-logout behaviour"
+    - "Mashov integration ADR — scraping an unofficial API as a production dependency"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Doc L53-57 recommends storing session JWT in localStorage. Any XSS
+      (and Cena has multiple LaTeX/MathML render paths) exfiltrates the token.
+      Must use httpOnly SameSite=Strict cookies, ideally with CSRF-double-
+      submit for non-idempotent calls. This is a hard requirement, not a
+      preference.
+    evidence: pre-release-review/AXIS_10_Operational_Integration_Features.md L52-56
+    lens_note: localStorage tokens are a P0 anti-pattern for a platform serving minors.
+  - severity: P0
+    finding: |
+      F3 CSV Bulk Roster Import — CSV parsing in any language is a classic
+      vector for CSV-injection (=cmd|'/c calc'!A0 on re-open in Excel),
+      header spoofing, and malformed UTF-8 that crashes parsers. At scale,
+      an attacker uploads a 100MB CSV ("billion laughs" style) to DoS the
+      importer. Doc proposes "quick win" but mentions zero of these.
+    evidence: pre-release-review/AXIS_10_Operational_Integration_Features.md Feature 3
+    lens_note: CSV is the most-abused import format in EdTech. Hard row count limits, magic-byte, strict UTF-8, and output-escape on display.
+  - severity: P1
+    finding: |
+      F1 Google SSO — doc only requires `openid email profile` (good). But:
+      (a) account linking via email is an ATO vector if a user changes their
+      Gmail then re-registers — must bind to the Google `sub` claim, not
+      email. (b) Must reject `hd` (hosted domain) claim mismatches when the
+      institute is enrolled as a Workspace-for-Education tenant. (c) Must
+      verify JWT signature with the correct issuer + audience (doc L51 says
+      "verify using Google's public keys" but not which `iss`/`aud`).
+    evidence: pre-release-review/AXIS_10_Operational_Integration_Features.md Feature 1 L50-56
+    lens_note: ATO via email-rebind is the classic SSO failure mode.
+  - severity: P1
+    finding: |
+      F4 Offline-First Practice Mode caches student PII + problem answers on
+      device. On shared devices (typical in Israeli family settings with one
+      tablet), the cache leaks across users. Requirements: (a) per-user
+      encrypted cache with PIN/biometric unlock, (b) auto-wipe on logout,
+      (c) no answers stored, only problem shells.
+    evidence: pre-release-review/AXIS_10_Operational_Integration_Features.md Feature 4
+    lens_note: Cross-user leakage on family devices is a real-world privacy incident.
+  - severity: P1
+    finding: |
+      F7 Google Classroom grade passback is a *write* to an external system.
+      Forgery / replay risk: attacker intercepts the passback and replays with
+      modified grade. Mitigations: idempotency key, signed payload, per-
+      assignment monotonic counter. Doc is silent.
+    evidence: pre-release-review/AXIS_10_Operational_Integration_Features.md Feature 7
+    lens_note: Write paths to external systems are the highest-severity integration surface.
+  - severity: P1
+    finding: |
+      F2 Mashov sync uses an unofficial API with teacher credentials stored
+      on Cena's side. Credential storage format + rotation policy not
+      described. Compromise of Cena's Mashov creds → access to official
+      gradebook. Must use vault + rotation + per-teacher scoped tokens.
+    evidence: pre-release-review/AXIS_10_Operational_Integration_Features.md Feature 2; doc L78 Mashov is unofficial
+    lens_note: Unofficial APIs create vendor-lock AND authz-misuse risk.
+  - severity: P2
+    finding: |
+      F5 Multi-device session continuity — sync queue can be a replay surface
+      if events aren't idempotent. Need per-event ID with server-side dedup.
+    evidence: pre-release-review/AXIS_10_Operational_Integration_Features.md Feature 5; src/api/Cena.Student.Api.Host/Endpoints/OfflineReplayEndpoints.cs
+    lens_note: Offline+replay endpoints already exist; must confirm idempotency.
+  - severity: P2
+    finding: |
+      F6 School IT Admin Deployment Dashboard is a super-privileged surface.
+      Any write on this dashboard must require step-up auth (recent password
+      confirm), audit log, and institute scope. Doc treats it casually.
+    evidence: pre-release-review/AXIS_10_Operational_Integration_Features.md Feature 6
+    lens_note: "Admin dashboard" always becomes an attack magnet.
+already_built:
+  - feature: Firebase auth + claims transformer
+    evidence: src/shared/Cena.Infrastructure/Auth/CenaClaimsTransformer.cs
+    note: Google SSO should layer on top, not replace.
+  - feature: Offline replay endpoints
+    evidence: src/api/Cena.Student.Api.Host/Endpoints/OfflineReplayEndpoints.cs
+    note: F4/F5 extend these — verify idempotency invariant.
+  - feature: Admin action audit middleware
+    evidence: src/shared/Cena.Infrastructure/Compliance/AdminActionAuditMiddleware.cs
+    note: F6 admin dashboard write endpoints must route through this.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-042 Google SSO; FD-044 CSV roster; FD-019 Mashov"
+extracted_tasks:
+  - title: Session JWT in httpOnly SameSite=Strict cookie — not localStorage
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Any new SSO path (F1 Google) issues the Cena session as an httpOnly
+      cookie; retire any localStorage token persistence if present. Add
+      CSRF-double-submit token for unsafe methods.
+      ## Files
+      - new /auth/google/callback handler
+      - src/student/full-version (remove localStorage token reads)
+      ## Definition of Done
+      - [ ] Cookie flags: HttpOnly, Secure, SameSite=Strict
+      - [ ] CSRF token on unsafe methods
+      - [ ] XSS PoC in test harness fails to exfiltrate session
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L50-L60]
+  - title: Harden CSV bulk roster import (size cap, CSV injection, UTF-8)
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F3 CSV importer rejects: file > 5MB, rows > 10k, non-UTF-8, cells
+      starting with =, +, -, @ (CSV injection). Output-escape all
+      display-side rendering of imported values. Rate-limit uploads.
+      ## Files
+      - new F3 endpoint
+      - validation helpers + tests
+      ## Definition of Done
+      - [ ] Row with `=cmd|' /C calc'!A0` is rejected or neutralized
+      - [ ] UTF-8 only; BOM-tolerant
+      - [ ] Size/row caps enforced
+      - [ ] Test: 100MB upload rejected at ingress before parse
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L140-L220]
+  - title: Bind Google SSO to `sub` claim, validate hd, lock iss/aud
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-sec
+    queue_body: |
+      ## Goal
+      F1 Google SSO binds to `sub` (immutable), not email. Validate
+      `iss == accounts.google.com` (or `https://accounts.google.com`), `aud`
+      == Cena client ID, `hd` matches the institute's registered Workspace
+      domain if one is set.
+      ## Files
+      - new /auth/google/callback
+      - tests
+      ## Definition of Done
+      - [ ] Token with mismatched hd rejected for Workspace-enrolled institutes
+      - [ ] Account-linking uses sub; email change doesn't create duplicate
+      - [ ] Signature verified against Google JWKS
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-sec --result "<branch>"
+    source_doc_lines: [L40-L60]
+  - title: Offline cache encryption + wipe-on-logout
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F4/F5 offline store encrypts PII with a user-scoped key derived from
+      the session. Logout wipes the cache. Shared-device test scenario
+      validates no cross-user leakage.
+      ## Files
+      - src/student/full-version PWA offline storage
+      - tests
+      ## Definition of Done
+      - [ ] Cache entries encrypted at rest (IndexedDB + WebCrypto)
+      - [ ] Logout removes all entries
+      - [ ] E2E test: user A logs in, answers; user B logs in same browser; sees nothing
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L270-L340]
+  - title: Idempotent + signed Google Classroom grade passback
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F7 grade-passback requests carry idempotency key + monotonic counter;
+      server-side record asserts counter strictly increases per assignment.
+      ## Files
+      - new F7 service
+      ## Definition of Done
+      - [ ] Replayed request returns 409 without re-write
+      - [ ] Out-of-order counter rejected
+      - [ ] Audit log entry per passback
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L430-L490]
+verdict: revise
+verdict_reason: |
+  Integration layer is inherently high-risk. Five concrete hardening tasks
+  before the F1/F3/F4/F7 quick-wins ship. F2 Mashov needs an integration ADR
+  given unofficial API dependency.
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: Mashov integration aggregate + credential storage; offline store domain model
+  - to: persona-sre
+    about: Mashov rate-limit / circuit-breaker; passback audit retention
+  - to: persona-privacy
+    about: Offline data minimization policy

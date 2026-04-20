@@ -1,0 +1,190 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight content-authoring/quality features: Bayesian IRT calibration-error
+  correction, SymPy CAS-gated variation engine, Bagrut-aligned partial-credit
+  rubric, Arabic RTL math renderer, culturally-contextualised problem generator,
+  mother-tongue hint system, self-efficacy-calibrated difficulty presentation,
+  hybrid Elo+expert difficulty calibration. Primarily content-engineering; cogsci
+  lens reviews F5, F6, F7 claims.
+system_purpose_fit: 4
+  rationale:
+    - F2 (CAS-gated variation) is ADR-0002 enforcement — ideal.
+    - F5 (culturally-contextualised) has the largest claimed effect size in the
+      corpus (d=1.16) — same figure Dr. Rami flags (finding_assessment_dr_rami.md:27)
+      as cherry-picked from the extreme upper tail of a highly heterogeneous meta.
+    - F7 (self-efficacy-calibrated difficulty presentation) treats self-efficacy
+      as an adaptive input; borderline against ADR-0037 which restricts affective
+      self-signal to tie-breaker status.
+code_reality_check:
+  claims_verified_in_code:
+    - "CAS router + MisconceptionCatalog are live -> docs/adr/0031-error-pattern-matching-approach.md"
+    - "Math-LTR-in-RTL policy already enforced -> user memory math_always_ltr"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Zayyadi et al. 2024 meta-analysis ES=1.16 for culturally-based math instruction — Dr. Rami finding_assessment_dr_rami.md:27 flags as cherry-picked; representative meta estimates are d=0.34-0.88 (Tamur 2021, Brummair 2019). Doc must cite the representative mean, not 1.16."
+    - "'Koenig 2025 84% bias reduction' for Bayesian IRT (F1) — Dr. Rami FD-012 flags misattribution. 84% refers to ability-estimation bias, not Koenig's item-parameter correction. Correct before ship."
+  claims_unsupported_in_literature:
+    - "F5 d=1.16 as SHIP warrant: literature mean is d=0.34-0.88. Using d=1.16 is overclaiming by ~50%."
+    - "F6 'mother-tongue-mediated hints' IJES 2025 citation (Dr. Rami FD-013): verify journal/article exists. Translanguaging in math is a legitimate field but this specific citation is suspect."
+adr_alignment:
+  honored:
+    - ADR-0002 (F2 IS the CAS enforcement pattern)
+    - ADR-0003 (F2 'misconception distractors are derived algebraically... not learned from student responses' — AXIS_8:97)
+    - ADR-0037 (F7 must stay within 'tie-breaker only' boundary)
+  violated: []
+  missing_adr_needed:
+    - "F5 cultural-context approval: needs an ADR requiring community-review-board sign-off before deployment of any cultural-context problem (Dr. Nadia also flagged at cena_dr_nadia_pedagogical_review_20_findings.md:194-195)."
+    - "F7 self-efficacy-calibrated difficulty: does this re-introduce affective self-signal as adaptive driver? Explicit ADR cross-refing ADR-0037 is required."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F5 (Culturally-Contextualised Problem Generator) uses Zayyadi 2024
+      d=1.16 as the warrant for "HIGHEST-IMPACT EQUITY FEATURE" framing. Dr.
+      Rami (FD-011) correctly identifies this as cherry-picking: representative
+      meta-analytic estimates are d=0.34-0.88. The feature is still worth
+      shipping on the honest range (d=0.4-0.6 is large for a wrapper change),
+      but the framing must change. This is a P0 citation-hygiene issue because
+      the d=1.16 is the #1 inflated claim in the entire corpus.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:(F5 section, citing Zayyadi)
+    lens_note: |
+      Cogsci lens: a meta-analytic mean of 1.16 on instructional interventions
+      is almost always publication bias + low-quality primary study inclusion.
+      Cena cannot stake "highest-impact" on it.
+  - severity: P1
+    finding: |
+      F7 (Self-Efficacy-Calibrated Difficulty Presentation) proposes adjusting
+      how difficulty is *presented* based on the student's self-efficacy
+      signal. Under ADR-0037, affective self-signal (including self-efficacy)
+      is a tie-breaker in item selection only, never a primary decision driver,
+      never an input to the cognitive-mastery model, never LLM context. If this
+      feature influences only the presentation (copy tone, challenge label),
+      it may be ADR-0037-compatible. If it influences difficulty *selection*,
+      it violates ADR-0037. Doc is ambiguous and must be explicit.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:(F7 section)
+    lens_note: |
+      ADR-0037 was written exactly to preempt this kind of feature. The rule
+      is simple: affective signal can choose between two equally-good items;
+      it cannot change what "good" means.
+  - severity: P1
+    finding: |
+      F6 (Mother-Tongue-Mediated Hint System) is cogsci-sound (translanguaging
+      benefits multilingual learners) but the specific IJES 2025 citation is
+      flagged by Dr. Rami as unverified. Feature can ship on the broader
+      translanguaging literature; the specific citation must be replaced or
+      removed. Also: the doc proposes "student language preference" as the
+      hint-language trigger — make sure this preference is neither auto-detected
+      from past sessions (profiling) nor stored beyond profile settings.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:(F6 section)
+    lens_note: "Concur with Dr. Nadia (FD-013) 'do not track language proficiency profiles'."
+  - severity: P2
+    finding: |
+      F2 (CAS-Gated Variation Engine) is architecturally ideal. One cogsci
+      addition: when generating distractors from "common misconceptions"
+      algebraically (sign errors, distributive errors), make sure the
+      distractor set is fixed per template and does not "learn" from student
+      selection patterns. Doc says so (AXIS_8:97) — test coverage must enforce.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:97
+    lens_note: "No concerns; just verify test coverage."
+  - severity: P2
+    finding: |
+      F8 (Hybrid Elo + Expert Difficulty Calibration) blends empirical response
+      data with expert judgment for item difficulty. Cogsci concern: expert
+      ratings of math problem difficulty are notoriously noisy (Taube & Newman
+      1996 cited), and Elo ratings drift with student-pool composition. The
+      hybrid weighting policy needs explicit validation against a held-out
+      Bagrut sample before use in adaptive selection.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:(F8 section)
+    lens_note: "Method honesty; not a ship blocker."
+already_built:
+  - feature: "MisconceptionCatalog for F2 distractor-from-misconception generation"
+    evidence: docs/adr/0031-error-pattern-matching-approach.md:31-42
+    note: "F2 should import distractor shapes from the existing catalog; do not duplicate."
+  - feature: "Math-LTR-in-RTL policy (F4)"
+    evidence: user memory math_always_ltr
+    note: "F4 is reassertion + Arabic-numeral / Arabic-function-name extension."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-002 CAS-gated variation = F2 here"
+  - "feature-discovery-2026-04-20.md: FD-011 cultural-context generator = F5 here"
+  - "axis3_accessibility_accommodations_findings.md: F7 Arabic RTL Math Renderer = F4 here"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: FD-011 cross-examined, guardrail required"
+extracted_tasks:
+  - title: "Correct F5 cultural-context effect-size framing"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Replace Zayyadi 2024 d=1.16 headline with representative meta estimate
+      (d=0.4-0.6) from Tamur 2021 and Brummair 2019. Keep F5 as a SHIP feature —
+      just honest on effect size.
+
+      ## Files
+      - pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md (F5 evidence section)
+      - pre-release-review/feature-discovery-2026-04-20.md FD-011 if inherits claim
+
+      ## Definition of Done
+      - Effect-size claim reflects representative literature.
+      - "Highest-impact equity feature" framing softened or removed.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f5-effect-size-honesty"
+    source_doc_lines: [F5 section]
+  - title: "ADR: F7 self-efficacy-calibrated presentation is affective-tie-breaker-only"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Explicit ADR stating F7 only adjusts presentation *copy tone* (UI label,
+      encouragement copy), never difficulty *selection*, never mastery inference.
+      Cross-refs ADR-0037.
+
+      ## Files
+      - docs/adr/00XX-self-efficacy-presentation-scope.md
+
+      ## Definition of Done
+      - ADR written and adopted.
+      - AXIS_8 F7 section references it.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f7-adr-0037"
+    source_doc_lines: [F7 section]
+  - title: "ADR: cultural-context community-review-board for F5 authoring"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      ADR requiring cohort-representative community review before any cultural
+      problem context ships. Prevents stereotyping or tokenizing scenarios.
+
+      ## Files
+      - docs/adr/00XX-cultural-context-review-board.md
+
+      ## Definition of Done
+      - ADR defines who must sign off (Arab, Ethiopian, Russian, Druze, Bedouin reps).
+      - Includes "context equivalence validator" to ensure difficulty parity across wrappers.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-cultural-review-adr"
+    source_doc_lines: [F5 section]
+verdict: revise
+verdict_reason: |
+  F2 ship-ready (IS the ADR-0002 enforcement). F4 is reassertion of existing policy.
+  F3 adopts at downstream-of-CAS scoring. F5 ships only with honest effect-size and
+  cultural-review ADR. F7 needs explicit ADR pinning its scope to presentation-only
+  per ADR-0037. F1, F6, F8 need Dr. Rami citation corrections.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: "F3 Bagrut-aligned partial credit — encoding official Ministry rubrics (non-negotiable 4 Bagrut reference-only)."
+  - to: persona-a11y
+    about: "F4 Arabic RTL renderer — a11y primary lens."
+  - to: persona-privacy
+    about: "F6 mother-tongue hint — no profiling of language proficiency."
+  - to: persona-redteam
+    about: "F2 distractor generation — can student infer correct answer from distractor structure?"
+  - to: persona-educator
+    about: "F5 cultural contexts authored in Hebrew vs Arabic — content-author workload."

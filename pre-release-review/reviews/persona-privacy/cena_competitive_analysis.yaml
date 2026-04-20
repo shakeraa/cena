@@ -1,0 +1,196 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Surveys 30+ EdTech platforms; extracts 10 adaptable features: Socratic AI tutor, real-time
+  scaffolding, "Stuck? Ask" button, at-risk student alert, virtual manipulatives, auto-translation
+  parent communications, student portfolio, Bagrut-aligned practice, TTS + highlighting,
+  context-aware math keyboard. Explicitly prioritizes features NOT violating Cena's guardrails.
+
+system_purpose_fit: 3
+  rationale:
+    - Exec summary correctly names the guardrail set (streak/variable-ratio/percentile/misconception-retention/ML-training/under-13-silent)
+    - Features largely respect guardrails but several carry imported privacy patterns from US/EU platforms that don't fit Israeli PPL
+    - Feature 1 Socratic AI — LLM prompt/response data flow to Anthropic for minors
+    - Feature 4 at-risk alerts — per-student behavioral profile + parent alerting
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Ship-gate banned terms enforce 'no streak/loss-aversion' guardrail -> docs/engineering/shipgate.md (per CLAUDE.md)"
+    - "Tutoring LLM services exist (Claude-based) -> src/actors/Cena.Actors/Tutor/ClaudeTutorLlmService.cs + TutorActor.cs"
+    - "Hebrew/Arabic locales present -> src/*/full-version/src/plugins/i18n/locales/{he,ar}.json"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Features 4 (at-risk alerts), 7 (portfolio), 10 (math keyboard) not in src/"
+
+adr_alignment:
+  honored:
+    - Non-negotiable #3 (dark patterns) — doc explicitly excludes streak/ratio features
+    - ADR-0002 (CAS oracle) — Feature 1 Socratic tutor built on CAS not LLM-as-oracle
+    - ADR-0003 (session scope) — doc notes "no misconception data retained across sessions without consent"
+  violated: []
+  missing_adr_needed:
+    - "ADR for LLM-as-tutor prompt/response retention (Feature 1 Khanmigo analog) — Anthropic ZDR requirement"
+    - "ADR for at-risk alerts (Feature 4) — defining 'at-risk' is a profiling decision"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 1 (Socratic AI Tutor) — every student conversation turn goes to Anthropic LLM.
+      Current implementation (ClaudeTutorLlmService.cs, TutorActor.cs) ships tutor
+      messages with 90-day retention per DataRetentionPolicy.cs:50 (TutorMessageRetention).
+      But that's Cena's retention; Anthropic's vendor retention (default 30-day prompt
+      logs unless ZDR) is the unsolved question. Doc L72 says "no misconception data
+      retained across sessions without consent" — but Anthropic logs are a retention
+      pathway not disclosed.
+    evidence: "cena_competitive_analysis.md:60-72 + src/shared/Cena.Infrastructure/Compliance/DataRetentionPolicy.cs:50 + src/actors/Cena.Actors/Tutor/ClaudeTutorLlmService.cs"
+    lens_note: |
+      Anthropic ZDR (Zero Data Retention) enterprise tier is the minimum bar for minor
+      student data. If not confirmed, minors' tutor conversations are retained by a
+      US sub-processor = DPA §7 and PPL §11 non-compliance.
+
+  - severity: P0
+    finding: |
+      Feature 4 (At-Risk Student Alert System) creates per-student "at-risk" classification
+      + parent/teacher notification. This is GDPR Art 22 profiling territory:
+      (a) student has right to object; (b) classification logic must be explainable;
+      (c) accuracy/fairness audit by cohort (Arab/Jewish/religious bias); (d) false
+      positives harm students; (e) minor dignity — being labeled "at-risk" follows
+      the student. Doc gives SHORTLIST but privacy cost is higher than noted.
+    evidence: "cena_competitive_analysis.md:25 (feature table)"
+    lens_note: |
+      ALEKS Insights / iReady at-risk models have been subject to AAAI fairness
+      critiques; porting without local bias audit = legal + ethical risk.
+
+  - severity: P1
+    finding: |
+      Feature 7 (Student Learning Portfolio) — long-term accumulation of student work
+      samples. Contradicts data-minimization for minors. OK if: (a) student/parent
+      explicit opt-in; (b) student can delete individual artifacts; (c) retention tied
+      to StudentRecordRetention (7y FERPA) with annual re-consent; (d) not used for
+      external evaluation without fresh consent.
+    evidence: "cena_competitive_analysis.md:28"
+    lens_note: |
+      Seesaw / Bloomz portfolio patterns imported without local consent model =
+      risk. COPPA 2025 prohibits indefinite retention.
+
+  - severity: P1
+    finding: |
+      Feature 10 (Context-Aware Math Keyboard) logs student keystroke patterns for
+      context inference. Keystroke telemetry on minors = behavioral profile, Art 22
+      adjacent. Must be: inference-only local (no server-side keystroke log), or
+      consent-gated.
+    evidence: "cena_competitive_analysis.md:31"
+    lens_note: |
+      Keystroke patterns are also biometric-adjacent (typing rhythm).
+
+  - severity: P2
+    finding: |
+      Feature 6 (Auto-Translation Parent Communications) = ClassDojo-style translation.
+      Cross-references AXIS 4 Feature 2 bilingual dashboard. Same privacy concerns
+      (machine-translated privacy notices = defective disclosure). Retire this
+      duplicate; reference AXIS 4.
+    evidence: "cena_competitive_analysis.md:27 + AXIS_4_Parent_Engagement_Cena_Research.md:65-70"
+    lens_note: |
+      Dedupe with AXIS 4 Feature 2.
+
+already_built:
+  - feature: LLM-based tutor (Claude)
+    evidence: src/actors/Cena.Actors/Tutor/ClaudeTutorLlmService.cs + TutorActor.cs
+    note: Feature 1 Socratic tutor extends existing; confirm ZDR rather than build new.
+  - feature: Tutor message 90-day retention policy
+    evidence: src/shared/Cena.Infrastructure/Compliance/DataRetentionPolicy.cs:44-50
+    note: 90-day tutor retention defined; vendor side (Anthropic) must match.
+
+duplicates_of_other_docs:
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: Feature 2 bilingual parent dashboard = Feature 6 here"
+  - "AXIS_6_Assessment_Feedback_Research.md: Socratic / tutoring overlap — Feature 1 here"
+  - "feature-discovery-2026-04-20.md: FD-025 TTS = Feature 9, FD-034 translation = Feature 6"
+
+extracted_tasks:
+  - title: "Confirm Anthropic ZDR for tutor messages + update privacy page"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Tutor conversations (ClaudeTutorLlmService.cs) send minor data to Anthropic. Must
+      confirm: (a) ZDR enterprise agreement active; (b) no Cena data used for training;
+      (c) Anthropic listed as sub-processor in privacy page; (d) DataRetentionPolicy.cs:50
+      90-day window matches vendor.
+
+      ## Files
+      - docs/compliance/sub-processors.md
+      - src/student/full-version/src/pages/privacy.vue
+      - Legal: Anthropic DPA
+
+      ## Definition of Done
+      - ZDR confirmed in writing
+      - Privacy page lists Anthropic
+      - Retention figures aligned
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L60-72"]
+
+  - title: "DPIA + bias audit for at-risk classification (Feature 4) before build"
+    priority: P0
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Per GDPR Art 35 + PPL Data Security Regulations, at-risk classification is high-risk
+      automated decision-making on minors. DPIA required before build. Must include
+      cohort fairness analysis (Arab/Jewish/religious/socioeconomic).
+
+      ## Files
+      - docs/compliance/dpia-at-risk-classification.md
+
+      ## Definition of Done
+      - DPIA signed by DPO
+      - Fairness test plan
+      - Art 22 transparency UI planned
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L25"]
+
+  - title: "Portfolio (Feature 7): student-controlled + annual re-consent"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 7 portfolio must enforce: student can delete any artifact; annual re-consent
+      prompt; retention caps tied to StudentRecordRetention (7y) not indefinite.
+
+      ## Definition of Done
+      - ADR for portfolio consent model
+      - Implementation honors per-artifact delete
+      - Annual re-consent flow
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L28"]
+
+verdict: revise
+verdict_reason: |
+  Competitive features are useful but several import US/EU privacy patterns unsuitable for
+  Israeli minors. Feature 1 LLM tutor already exists — ZDR confirmation is the only gate.
+  Feature 4 at-risk alerts need DPIA before build. Feature 6 duplicate of AXIS 4.
+
+cross_lens_handoff:
+  - to: persona-ministry
+    about: |
+      At-risk alert fairness by cohort (Arab/Jewish/Haredi) is Ministry-relevant.
+  - to: persona-redteam
+    about: |
+      Feature 1 Socratic tutor prompt-injection; Feature 10 keystroke telemetry attack surface.
+  - to: persona-ethics
+    about: |
+      At-risk labeling of minors, portfolio as long-term record — dignity concerns.
+  - to: persona-finops
+    about: |
+      LLM tutor per-student cost at 10k-ceiling; caching strategy (already flagged L34-38 in doc).

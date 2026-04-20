@@ -1,0 +1,141 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Teacher-workflow features: classroom mastery heatmap, assignment pusher, pending-approval
+  queue, class-level analytics, CSV roster import, Mashov/Google-Classroom bridges.
+system_purpose_fit: 3
+  rationale:
+    - Teacher surface aligns with ADR-0001 Phase 3 (Mentor admin surface), which is high-risk and blocked on Phase 2.
+    - External integrations (Mashov, Google Classroom) add new bounded-context adapters; must not leak tenant.
+    - CSV roster import is ingestion — needs idempotency + validation.
+code_reality_check:
+  claims_verified_in_code:
+    - "ClassMasteryHeatmapProjection already exists -> src/actors/Cena.Actors/Projections/ClassMasteryHeatmapProjection.cs"
+    - "ClassFeedItemProjection exists -> src/actors/Cena.Actors/Projections/ClassFeedItemProjection.cs"
+    - "Assignments exist as event family -> src/actors/Cena.Actors/Events/AssignmentEvents.cs"
+    - "Classroom lifecycle events exist -> src/actors/Cena.Actors/Events/EnrollmentEvents.cs:54-68 (ClassroomCreated_V1, ClassroomStatusChanged_V1)"
+  claims_contradicted_by_code:
+    - "Doc implies classroom/mentor model is novel; ADR-0001 Phase 1 already landed Institute/Program/Classroom/Enrollment schemas."
+  claims_unverifiable:
+    - "Mashov API contract stability — external; not in repo."
+adr_alignment:
+  honored:
+    - "ADR-0001 (classroom-as-cohort model)"
+  violated: []
+  missing_adr_needed:
+    - "External integration adapter pattern (Mashov, Google Classroom) — auth, token storage, rate-limit, failure mode"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Mashov and Google Classroom adapters pull student rosters. Any roster import that creates a Student event
+      without proving institute scope is a tenant-bleed vector. ADR-0001 Phase 1 still only supports single-institute
+      claims; a teacher in one institute importing a roster could attach students to an unintended institute.
+    evidence: "src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs:57-75; cena_axis5_teacher_workflow_features.md:L~250 (Mashov sync)"
+    lens_note: Enterprise — tenant-scope must be proven at every write path, including external integrations.
+  - severity: P1
+    finding: |
+      Teacher features rely on Firebase custom claims for mentor/instructor roles. ADR-0001 notes these claims don't
+      exist yet and are Phase 3 work. Axis-5 is shipping Phase 3 features before the auth surface lands.
+    evidence: "docs/adr/0001-multi-institute-enrollment.md:209-212 (Phase 3); cena_axis5_teacher_workflow_features.md:L~100"
+    lens_note: Enterprise — phase ordering; Phase 3 auth must land before Phase 3 UX.
+  - severity: P1
+    finding: |
+      CSV roster import has classical ingestion failure modes: partial failures, duplicate rows, malformed rows,
+      encoding. Doc does not require an idempotency key or dead-letter. Under event sourcing this is especially costly
+      — a replayed import with changed content produces duplicate EnrollmentCreated events.
+    evidence: "cena_axis5_teacher_workflow_features.md:L~300 (CSV import); docs/architecture-audit.md:26-28 (C4 gap)"
+    lens_note: Enterprise — every ingestion needs an idempotency key per row + batch checksum.
+  - severity: P2
+    finding: |
+      Pending-approval queue is a new workflow state. Doc is silent on where it lives (new aggregate? projection on
+      ClassroomDocument?). ADR-0001 committed JoinApprovalMode enum to ClassroomDocument, so this is projection work,
+      not a new aggregate. Make that explicit.
+    evidence: "docs/adr/0001-multi-institute-enrollment.md:385-395 (ClassroomDocument extension); cena_axis5_teacher_workflow_features.md:L~180"
+    lens_note: Enterprise — prevent drift; route to existing classroom lifecycle events.
+already_built:
+  - feature: "Class mastery heatmap projection"
+    evidence: src/actors/Cena.Actors/Projections/ClassMasteryHeatmapProjection.cs
+    note: "Retire the 'new heatmap' proposal; extend this."
+  - feature: "Class feed projection"
+    evidence: src/actors/Cena.Actors/Projections/ClassFeedItemProjection.cs
+    note: "Use for class-level analytics."
+  - feature: "Assignment events"
+    evidence: src/actors/Cena.Actors/Events/AssignmentEvents.cs
+    note: "Doc's 'assignment pusher' is already a schema reality; retire or extend."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-044 (CSV roster import)"
+  - "AXIS_10_Operational_Integration_Features.md: Mashov / Google Classroom bridges"
+extracted_tasks:
+  - title: "External-integration adapter pattern ADR"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Define how Cena integrates with external SISes (Mashov, Google Classroom). Cover: OAuth token storage, per-integration
+      tenant guard, rate limits, idempotency key per imported row, dead-letter queue.
+
+      ## Files
+      - docs/adr/ (new 0017-external-integration-adapters.md)
+
+      ## Definition of Done
+      - ADR approved.
+      - Reference adapter skeleton (no network calls) under src/actors/Cena.Actors/Integration/ with contract tests.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~200-L~350]
+  - title: "Add idempotency key to classroom enrollment creation"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      EnrollmentCreated_V1 has no idempotency key. Any re-applied CSV import would create duplicates. Add a client-
+      supplied idempotency key (hash of (studentId, classroomId, externalRosterId)) and dedupe at write.
+
+      ## Files
+      - src/actors/Cena.Actors/Events/EnrollmentEvents.cs (add IdempotencyKey field — schema evolution V2)
+      - Enrollment write path (grep for `EnrollmentCreated_V1`)
+      - Upcaster for V1 -> V2
+
+      ## Definition of Done
+      - V2 event lands with idempotency key.
+      - Upcaster covers legacy V1.
+      - Unit test proving duplicate writes collapse.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~300]
+  - title: "Retire 'new heatmap' proposal — extend existing projection"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Update axis5 feature backlog: replace "build classroom mastery heatmap" with "extend existing
+      ClassMasteryHeatmapProjection to support <new view>".
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (when produced)
+      - cena_axis5_teacher_workflow_features.md (note)
+
+      ## Definition of Done
+      - Proposal marked retired with code cite in retired.md.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~100]
+verdict: revise
+verdict_reason: |
+  Valuable features but they're effectively ADR-0001 Phase 3 work. Must land external-integration adapter ADR +
+  idempotency + Mentor/Instructor auth before feature tickets enter sprint.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "Mashov data shape — what student PII does it hand over?"
+  - to: persona-sre
+    about: "Mashov/Google Classroom rate-limit failure modes + runbook."
+  - to: persona-redteam
+    about: "OAuth token storage + teacher-side impersonation risk."

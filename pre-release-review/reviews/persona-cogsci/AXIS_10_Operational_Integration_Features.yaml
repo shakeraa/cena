@@ -1,0 +1,129 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight operational/integration features: Google SSO, Mashov sync, CSV roster,
+  offline-first mode, multi-device session continuity, IT admin dashboard,
+  Google Classroom grade passback, Israeli-compliant data portability export.
+  Purely infrastructure — almost no cogsci claims to evaluate.
+system_purpose_fit: 2
+  rationale:
+    - Only F4 (offline-first practice with optimistic progress) has cogsci
+      relevance: context-switch cost, ambient-distraction cost, and the
+      cognitive burden of sync failures on the learning session.
+    - Everything else is auth/integration/deployment engineering; cogsci has
+      essentially nothing to add beyond general usability heuristics.
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Clever '85% reduction in login support requests, 40% usage lift' (AXIS_10:26) — vendor marketing statistic. Not peer-reviewed. Frame as operational hypothesis, not evidence."
+  claims_unsupported_in_literature: []
+adr_alignment:
+  honored: []
+  violated: []
+  missing_adr_needed:
+    - "F4 offline-first optimistic progress — needs an ADR on conflict resolution when offline session state diverges from server. From a cogsci angle: what does the student see when their 'completed' session gets rolled back on sync?"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P2
+    finding: |
+      F4 (Offline-First Practice Mode) is sound operationally but cogsci view
+      flags the failure mode: if a student completes a 30-min session offline
+      and the sync later rolls it back (conflict, duplicate, actor-domain
+      validation failure), the student experiences a phantom-progress event.
+      That is more cognitively damaging than never having the offline mode at
+      all — learned-helplessness / trust-erosion research is clear on
+      unpredictable-system-state effects. DoD must require: (a) no server-
+      side rollback of completed session state, (b) conflict resolution is
+      "both session results kept, user-visible", (c) offline sessions preserve
+      full CAS verification (cannot mark correct without CAS — ADR-0002).
+    evidence: AXIS_10_Operational_Integration_Features.md:(Feature 4 section)
+    lens_note: |
+      Cogsci angle on infra: unreliable progress feedback is a direct hit to
+      the competence support that SDT-motivation relies on.
+  - severity: P2
+    finding: |
+      F5 (Multi-Device Session Continuity) — cogsci concern: context-switch
+      cost (15-25s on mobile per Mark et al. cited in cognitive-load research)
+      means resumed sessions on a new device should preserve the *cognitive*
+      context, not just the last-problem-id. Include 'you were working on X
+      with hint Y showing' on resume screen. Minor nicety, not a ship-blocker.
+    evidence: AXIS_10_Operational_Integration_Features.md:(Feature 5 section)
+    lens_note: "Reduces extraneous load on device switch."
+  - severity: P2
+    finding: |
+      F8 (Israel Privacy Law Compliant Data Portability Export) — if the export
+      includes misconception or error-pattern data, that would violate ADR-0003.
+      Doc doesn't specify scope. Must be constrained to: mastery snapshot,
+      completed-session summaries, user-authored content; NOT error patterns
+      or misconception tags.
+    evidence: AXIS_10_Operational_Integration_Features.md:(Feature 8 section)
+    lens_note: "ADR-0003 extends to exports — not just internal storage."
+already_built:
+  - feature: "Nothing cogsci-adjacent — infra doc"
+    evidence: N/A
+    note: "Primary code paths are auth/SSO/sync — not in cogsci lens."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-019 (Mashov sync), FD-042 (Google SSO), FD-044 (CSV roster), FD-050 (offline-first) trace here"
+  - "axis9_data_privacy_trust_mechanics.md: Feature 3 'Delete My Journey' + F2 dashboard overlap F8 portability"
+extracted_tasks:
+  - title: "F4 offline-first: define conflict-resolution UX so progress is never rolled back"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Design + implement conflict resolution for offline session sync such that
+      (a) completed work is never rolled back, (b) CAS verification runs client-
+      side AND server-side (double-check), (c) user sees clear 'synced' indicator.
+
+      ## Files
+      - src/student-web/src/features/offline/ConflictResolver.ts (new)
+      - src/actors/Cena.Actors/Sync/OfflineSessionReconciler.cs (new)
+      - docs/adr/00XX-offline-sync-conflict-resolution.md (new)
+
+      ## Definition of Done
+      - Completed offline sessions cannot be silently deleted by server.
+      - CAS validation runs on server-side acceptance (ADR-0002).
+      - Phantom-progress rollback is architecturally impossible.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-offline-sync-safety"
+    source_doc_lines: [Feature 4 section]
+  - title: "F8 portability export scope: mastery + summary, NOT misconception/error data"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Explicit ADR / policy doc constraining F8 export to: mastery snapshots,
+      completed-session summaries, user-authored free text. Explicitly excludes
+      error-pattern tags / misconception data (ADR-0003 scope extends to export).
+
+      ## Files
+      - docs/adr/00XX-data-export-scope.md
+
+      ## Definition of Done
+      - ADR written.
+      - AXIS_10 F8 section references it.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-export-scope-adr"
+    source_doc_lines: [Feature 8 section]
+verdict: adopt
+verdict_reason: |
+  Pure infrastructure. From cogsci lens only F4 (offline-sync rollback risk) and
+  F8 (export scope must match ADR-0003) have persona-specific findings. The rest
+  is fine — handed off to enterprise/sre/privacy.
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: "Entire doc is primary. Bounded contexts, event sourcing, actor-state reconciliation."
+  - to: persona-sre
+    about: "Offline-first rollback, multi-device sync — reliability/observability lens."
+  - to: persona-privacy
+    about: "F8 Israeli PPL / COPPA + GDPR portability — primary lens."
+  - to: persona-redteam
+    about: "F1 Google SSO scope limitation; F2 Mashov credential storage; F7 grade passback trust boundary."
+  - to: persona-finops
+    about: "F5 multi-device sync infra; F8 export generation cost."

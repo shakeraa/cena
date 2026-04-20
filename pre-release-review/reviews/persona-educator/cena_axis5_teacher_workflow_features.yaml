@@ -1,0 +1,234 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 teacher-workflow features for weekly-active-teacher rate: smart lesson
+  planner, homework auto-generator, 5-min in-class diagnostic sprint, exit-
+  ticket auto-generator, Bagrut rubric alignment engine, student-conference
+  prep, Bagrut-readiness tracking, class health pulse.
+
+system_purpose_fit: 4
+  rationale:
+    - Teacher workflow is leverage — a teacher who uses Cena weekly brings
+      30 students into the ecosystem. Most features directly improve how
+      a teacher does their job without violating pedagogical boundaries.
+    - Bagrut rubric engine (F5) and readiness tracking (F7) are pedagogue-
+      critical — they're the teacher-facing side of the student RDY-080
+      (no unvalidated Bagrut score predictions) rule.
+    - ADR-0003 honored for class-health pulse (aggregate, not per-student).
+    - Minus because the "smart lesson planner" (F1) pulls from "class weakness
+      profiles" which, for small classes or single-outlier students,
+      effectively reveals individual misconception patterns even at aggregate
+      level.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Class-level analytics and teacher dashboard surface exist" -> src/admin/full-version/src/views/apps/pedagogy/
+    - "Error classification exists" -> src/actors/Cena.Actors/Services/ErrorClassificationService.cs
+    - "Methodology analytics service" -> src/api/Cena.Admin.Api/MethodologyAnalyticsService.cs
+    - "Bagrut anchor provider (unit/topic metadata)" -> src/actors/Cena.Actors/Services/BagrutAnchorProvider.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Bagrut rubric alignment engine" — no evidence of a rule engine encoding
+      Ministry partial-credit rules; appears fully new (also proposed in
+      AXIS_8 F3).
+    - "Mashov-driven conference prep integration" — no Mashov integration yet.
+
+adr_alignment:
+  honored:
+    - ADR-0003 (class-health aggregates are declared per-student-safe)
+    - ADR-0002 (CAS validates all homework generated items)
+    - RDY-080 (doc explicitly says "no Bagrut score predictions" for F7
+      readiness tracking; uses "projected readiness level" wording)
+  violated: []
+  missing_adr_needed:
+    - Minimum-class-size ADR for aggregated reporting. "Aggregate at class
+      level" is only safe for class size ≥ N; for small classes (<10) the
+      aggregate leaks individual info. Should be ADR-locked.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 1 (Smart Lesson Planner "Auto-Suggested from Class Weakness
+      Profile") — in IL schools, class sizes can be 30+ but also can be 12-
+      15 in peripheral schools or Arab-sector 5-unit tracks. At n=15 a
+      "class weakness profile" effectively reveals one or two students.
+      ADR-0003's spirit is more than its letter. Require a minimum-
+      anonymity threshold (e.g., show an aggregate only if k≥10 students
+      attempted the skill) with clear "insufficient data" messaging when
+      the threshold isn't met. The doc's "BORDERLINE mitigation" is
+      inadequate.
+    evidence: cena_axis5_teacher_workflow_features.md:L50-L54
+    lens_note: |
+      I taught a 5-unit class of 11 students. If my dashboard highlights
+      "2 students struggling with completing-the-square," I know which two.
+      That's misconception profiling by another name.
+  - severity: P1
+    finding: |
+      Feature 2 (Homework Auto-Generator three streams Core/Progress/Stretch)
+      risks ability-tracking. Students can see which homework stream they're
+      on by the problems they get. Student comparison → shame. The doc
+      addresses this with "teacher can reassign students between streams"
+      but the design needs more: streams must be invisible to students;
+      homework appears as a personalized set without stream labels; teacher
+      sees streams on their dashboard only.
+    evidence: cena_axis5_teacher_workflow_features.md:L58-L88
+    lens_note: |
+      Tracking is a known harm in Israeli math education. Don't build a
+      system that implicitly tracks students even at "differentiated"
+      granularity.
+  - severity: P2
+    finding: |
+      Feature 3 (In-Class Diagnostic Sprint 5-min class-wide check) is
+      excellent — this is what the STEP platform research actually
+      demonstrated. Ensure the aggregate histogram is *truly anonymous* (no
+      way for teacher to hover to see which student chose distractor X),
+      and provide a "re-teach" scaffolding suggestion immediately to reduce
+      teacher cognitive load.
+    evidence: cena_axis5_teacher_workflow_features.md:L93-L124
+    lens_note: |
+      The STEP research is the one Israeli-context study on this
+      specifically; doc has cited it correctly. Good.
+  - severity: P2
+    finding: |
+      Feature 5 (Bagrut Rubric Alignment Engine) — this is the pedagogue's
+      feature. For it to be trustworthy the rubric rules must be encoded
+      per *current* Ministry scoring document (which changes every 2-3
+      years). Include an explicit "rubric version pinning" mechanism so old
+      assessments don't get re-scored against new rules. Also: the "AES
+      scores showed high correlation with human examiner markings" (0.93-
+      0.96) is a medical education correlation, not a Bagrut-specific one —
+      must not be claimed as Bagrut validation.
+    evidence: cena_axis5_teacher_workflow_features.md:L170, L174-L179
+    lens_note: |
+      Ministry rubrics evolve. Without version pinning we re-label student
+      work retroactively — a trust disaster with teachers.
+  - severity: P2
+    finding: |
+      Feature 6 (Student Conference Prep with strength-first talking points)
+      — "auto-generated talking points" can easily slip into deterministic
+      praise that sounds hollow ("Noam shows great persistence!") if the
+      strength pool is small. Require teacher editing-required-before-print
+      rather than one-click-to-print; also limit generated language to
+      observable behaviors ("solved 14 quadratics this week, up from 6"),
+      never personality claims.
+    evidence: cena_axis5_teacher_workflow_features.md section Feature 6
+    lens_note: |
+      Parent-teacher conferences are sacred; an AI-generated "strength"
+      recited in front of a parent who knows their child is a credibility
+      hit for the teacher.
+
+already_built:
+  - feature: "Teacher / admin pedagogy dashboard scaffolding"
+    evidence: src/admin/full-version/src/views/apps/pedagogy/
+    note: |
+      Dashboard surfaces exist in the admin Vuexy app. The data contracts
+      and some analytics services exist (MethodologyAnalyticsService.cs,
+      ErrorClassificationService.cs). Feature 1-4 can ride on this;
+      Features 5-7 need new rubric/readiness infra.
+
+duplicates_of_other_docs:
+  - AXIS_8_Content_Authoring_Quality_Research.md: Feature 3 Bagrut-Aligned Partial Credit Rubric (same as F5)
+  - AXIS_6_Assessment_Feedback_Research.md: Feature 3 AI Partial-Credit Grading (complements F5)
+  - feature-discovery-2026-04-20.md: FD-020 Bagrut Rubric Engine (same as F5)
+  - cena_competitive_analysis.md: Feature 4 At-Risk Student Alert System (overlaps F8 class health pulse)
+
+extracted_tasks:
+  - title: "Enforce k≥10 minimum-anonymity for class-level teacher aggregates"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-privacy
+    queue_body: |
+      ## Goal
+      Every class-aggregate teacher view (Features 1, 3, 4, 8) must suppress
+      skill-level breakdowns when fewer than 10 students have attempted the
+      skill. Replace with "insufficient data — wait for more responses."
+      Protects small-class students from implicit misconception profiling.
+      ## Files
+      - src/actors/Cena.Actors/Projections/ (aggregate computation)
+      - docs/adr/ (new ADR: "minimum-anonymity-for-teacher-aggregates")
+      - src/actors/Cena.Actors.Tests/Projections/KAnonymityEnforcementTests.cs
+      ## Definition of Done
+      - k≥10 threshold enforced at projection layer, not UI.
+      - ADR records decision and rationale.
+      - Tests: class of 9 students → aggregate suppressed; class of 10 → shown.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-privacy --result "<branch>: k-anon teacher aggregates"
+    source_doc_lines: [L50-L54, L83-L87]
+  - title: "Bagrut rubric engine with version pinning"
+    priority: P1
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Build the Bagrut partial-credit rubric engine (F5 / FD-020). Every
+      rubric is versioned against a Ministry document version. Student work
+      is scored against the rubric version *active at authoring time*, not
+      retroactively. Deterministic rule engine (not LLM) on top of CAS step
+      verification.
+      ## Files
+      - src/actors/Cena.Actors/Cas/ (new BagrutRubricEngine.cs + BagrutRubricVersion.cs)
+      - src/actors/Cena.Actors/Assessment/
+      - content/bagrut-rubrics/ (versioned JSON rubrics, seed with 3-unit + 4-unit current)
+      - docs/adr/ (new ADR: "bagrut-rubric-versioning-policy")
+      ## Definition of Done
+      - Rubric engine decomposes solution path into scorable steps with
+        Ministry penalty structure.
+      - Version pinned per authored item; never retroactively re-scored.
+      - ADR for rubric versioning decision.
+      - SymPy validates each step; rubric decides penalty. Never LLM-only.
+      - Seed content: 20 past Bagrut items with expert-assigned rubrics.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: bagrut-rubric-engine"
+    source_doc_lines: [L166-L195]
+  - title: "Hide differentiation stream labels from student view"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F2 homework auto-generator three-stream model (Core/Progress/Stretch)
+      must never expose stream labels to the student UI. Student sees only
+      "your homework" — a personalized set. Teacher sees streams on their
+      dashboard. Prevents ability-tracking perception.
+      ## Files
+      - src/actors/Cena.Actors/Assessment/ (homework assignment)
+      - src/student/student-web/ (homework UI)
+      ## Definition of Done
+      - Stream attribute exists on assignment but never exposed to student API.
+      - Admin/teacher sees stream label; student does not.
+      - Test: student-scope API never returns 'stream' field.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: hide-differentiation-stream-labels"
+    source_doc_lines: [L58-L88]
+
+verdict: revise
+verdict_reason: |
+  Features are largely well-designed for teacher productivity, but three
+  pedagogue-sensitive details (k-anonymity for small classes, stream-label
+  hiding, Bagrut rubric versioning) need explicit guardrails before
+  shipping.
+
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      F4 exit-ticket sharing with students, F1 class-weakness aggregation
+      — privacy should fully own the k-anonymity design and the parent-
+      view of conference talking points.
+  - to: persona-ministry
+    about: |
+      F5 Bagrut rubric engine — ministry should be the source of truth on
+      current scoring rules; F7 readiness tracking must avoid RDY-080
+      violation.
+  - to: persona-enterprise
+    about: |
+      F1 class weakness profile + F2 homework generator share an underlying
+      "class state" aggregate — recommend enterprise review the aggregate
+      as a first-class domain event / projection for consistency.
+  - to: persona-ministry
+    about: |
+      Claim "AES scores 0.93-0.96 correlation" (L170) is medical-education
+      data, not Bagrut. Ministry should verify no Bagrut-specific accuracy
+      claim reaches marketing until Cena runs its own concordance study.

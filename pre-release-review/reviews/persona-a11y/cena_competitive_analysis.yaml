@@ -1,0 +1,156 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  10 adaptable features from EdTech competitive landscape: Socratic AI tutor,
+  real-time scaffolding, stuck-ask button, at-risk alerts, virtual manipulatives,
+  auto-translation parent comms, learning portfolio, Bagrut practice engine,
+  TTS + highlighting, context-aware math keyboard. Several have direct a11y/l10n
+  surface (F6, F9, F10).
+system_purpose_fit: 4
+  rationale:
+    - F6 auto-translation parent comms aligns with l10n policy
+    - F9 TTS + highlighting is a core a11y feature
+    - F10 context-aware math keyboard supports motor-impaired and dyscalculic
+    - F1/F2/F3 Socratic tutors need bidi+math-LTR contracts
+code_reality_check:
+  claims_verified_in_code:
+    - "i18n scaffold for he/ar/en: src/student/full-version/src/plugins/i18n/"
+    - "Math input exists: src/student/full-version/src/components/session/MathInput.vue, StepInput.vue"
+    - "Bagrut alignment backend referenced in repo (syllabus mapping)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "TTS infrastructure (F9) — not in repo"
+    - "At-risk alert UI (F4) — not prototyped"
+adr_alignment:
+  honored:
+    - "ADR-0004 figure rendering for F5 virtual manipulatives"
+    - "ADR-0002 for F1/F8 CAS-backed correctness"
+  violated: []
+  missing_adr_needed:
+    - "ADR for TTS vendor choice and locale voice coverage (he/ar)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: "F9 TTS + highlighting — Hebrew and Arabic TTS voice quality varies wildly by vendor. OS-level voices (iOS AVSpeechSynthesis, Android TTS) have better Hebrew/Arabic than many cloud vendors but require native integration. PWA-first policy means Web Speech API with possibly poor voice quality. No plan is specified."
+    evidence: "cena_competitive_analysis.md:F9 section"
+    lens_note: "A TTS feature that sounds robotic or unclear in Hebrew/Arabic is actively worse for blind students than ARIA-labeled text."
+  - severity: P0
+    finding: "F10 context-aware math keyboard must support Hebrew + Arabic variable names (س, ص, ع) and right-handed keyboard layout (large keys on RTL-appropriate side). Doc cites MathGPT.ai which is English-only."
+    evidence: "cena_competitive_analysis.md:F10 section"
+    lens_note: "A math keyboard that forces Latin variables in Arabic UI is cultural friction. Arabic math uses local variable names."
+  - severity: P1
+    finding: "F1/F3 Socratic tutors generate text that mixes Hebrew/Arabic with math. Every generated message with inline math must be post-processed to insert <bdi> around equations."
+    evidence: "cena_competitive_analysis.md:F1, F3 sections"
+    lens_note: "LLM output is the most common place <bdi> gets dropped. Post-processing or render-time wrapping required."
+  - severity: P1
+    finding: "F6 auto-translation parent communications — which translation engine? If Google Translate, math terminology (derivative, integral) is often mistranslated. Doc mentions ClassDojo 190+ languages but that's generic."
+    evidence: "cena_competitive_analysis.md:F6 section"
+    lens_note: "Glossary-backed MT (he↔ar math glossary) or human review for a small set of core math terms."
+  - severity: P1
+    finding: "F5 virtual manipulatives (DreamBox, Brilliant.org style) are typically canvas-based and inaccessible to screen-reader users. Must provide a keyboard-navigable, semantic equivalent."
+    evidence: "cena_competitive_analysis.md:F5 section"
+    lens_note: "Khan Academy rebuilt their graphing exercises for keyboard; Cena should follow that lead, not DreamBox's canvas approach."
+  - severity: P1
+    finding: "F4 at-risk alerts use color traffic-light. Must have shape+text for CVD parents/teachers."
+    evidence: "cena_competitive_analysis.md:F4 section"
+    lens_note: "Recurring theme: color-coded alerts without redundancy."
+  - severity: P2
+    finding: "F7 student portfolio may include student writing in Hebrew/Arabic. Export must preserve direction and not flatten to LTR."
+    evidence: "cena_competitive_analysis.md:F7 section"
+    lens_note: "Teacher viewing a portfolio must see Arabic/Hebrew writing in correct direction."
+already_built:
+  - feature: "Math input UI with <bdi> wrapping"
+    evidence: "src/student/full-version/src/components/session/MathInput.vue; StepInput.vue"
+    note: "F10 should extend these, not greenfield"
+  - feature: "Arabic/Hebrew locale scaffolding"
+    evidence: "src/student/full-version/src/plugins/i18n/"
+    note: "F1/F3/F6 all depend on it"
+duplicates_of_other_docs:
+  - "axis3...md: Feature 6 MathML pipeline (adjacent to F9 TTS)"
+  - "axis3...md: Feature 7 Arabic RTL Math (ties to F10 math keyboard)"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: F3 parent-teacher bridge (dup of F6)"
+  - "feature-discovery-2026-04-20.md: FD Socratic tutor entries"
+extracted_tasks:
+  - title: "ADR + POC: TTS voice quality for Hebrew/Arabic math"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Decide TTS strategy for F9. Options: (a) Web Speech API (free, variable quality), (b) Cloud TTS with glossary (paid, predictable), (c) Pre-rendered audio for canned math phrases + live for prose. Run a POC with 20 Bagrut-style sentences in he/ar and have native speakers rate intelligibility.
+      ## Files
+      - new: docs/adr/0040-tts-strategy-he-ar.md
+      - throwaway POC under scripts/tts-eval/
+      ## Definition of Done
+      - ADR decides strategy with voice-quality evidence
+      - Fallback path for browsers without chosen voice
+      - FinOps cost estimate for 10k-student ceiling
+      ## Reporting
+      decision committed; PR merged
+    source_doc_lines: [F9 section]
+  - title: "Math keyboard: Arabic variable names and RTL-aware layout (F10)"
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Extend MathInput.vue to offer a mode that exposes Arabic math variable names (س, ص, ع) alongside or instead of Latin letters for Arabic-locale students. Layout mirrors for RTL (common symbols on right side in RTL).
+      ## Files
+      - src/student/full-version/src/components/session/MathInput.vue
+      - src/student/full-version/src/components/session/StepInput.vue
+      - tests for Arabic variable round-trip to SymPy normalizer
+      ## Definition of Done
+      - Arabic mode selectable per student
+      - س/ص/ع map to canonical x/y/z in SymPy via ArabicMathNormalizer
+      - Keyboard layout mirrors under RTL locale
+      - No change to CAS validation path
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F10 section]
+  - title: "LLM-output <bdi> post-processor for Socratic tutor outputs"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Any LLM-generated text rendered in RTL locales must be post-processed to wrap detected math in <bdi dir="ltr">. A client-side or server-side helper scans for math-looking substrings (e.g., /[a-zA-Z]\\^?\\d|\\\\frac\\{|\\$[^$]+\\$/) and wraps them.
+      ## Files
+      - new: src/student/full-version/src/utils/bidiMathWrap.ts
+      - consumers: Socratic tutor panel, hint panel, feedback panel components
+      - tests/unit/bidiMathWrap.spec.ts
+      ## Definition of Done
+      - Pure function with 100% test coverage on canonical cases
+      - LLM output rendering components invoke the helper
+      - Scanner test: no raw math in RTL content without <bdi>
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F1, F3 sections]
+  - title: "Virtual manipulative (F5) keyboard+SR accessibility contract"
+    priority: P1
+    estimate: L
+    suggested_assignee: claude-subagent-a11y
+    queue_body: |
+      ## Goal
+      Before any DreamBox-style canvas manipulative ships, define an a11y contract: keyboard navigation, semantic ARIA roles, and a MathML/text summary alternative.
+      ## Files
+      - new: docs/accessibility/manipulatives-a11y-contract.md
+      - reference Khan Academy's approach (cited in doc)
+      ## Definition of Done
+      - Contract pinned before build
+      - Every manipulative passes keyboard-only walkthrough
+      - Screen-reader can answer the problem via text alternative
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-a11y --result "<branch>"
+    source_doc_lines: [F5 section]
+verdict: revise
+verdict_reason: "Competitive features are useful but several need a11y/l10n contracts before build: TTS voice quality, math keyboard Arabic support, LLM output bidi post-processing, manipulative keyboard access."
+cross_lens_handoff:
+  - to: persona-educator
+    about: "F1 Socratic escape hatch (Dr. Nadia WARNING on FD-009)"
+  - to: persona-finops
+    about: "F9 TTS cost at 10k-student ceiling"
+  - to: persona-ministry
+    about: "F8 Bagrut practice engine syllabus alignment"
+  - to: persona-enterprise
+    about: "F10 Arabic math normalizer service boundary (ArabicMathNormalizer.cs)"

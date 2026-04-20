@@ -1,0 +1,152 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Rami's statistical-honesty review of 20 findings. 9 PASS, 8 WARNING,
+  3 REJECT. Flags fabricated citations (FD-003, FD-008), cherry-picked effect
+  sizes (FD-001, FD-011), and RDY-080 Bagrut-prediction risks (FD-004, FD-020).
+  FinOps lens: REJECTED findings = ZERO cost (don't build).
+system_purpose_fit: 5
+  rationale:
+    - Rami's REJECTs save engineering cost if we heed them.
+    - WARNINGs often imply additional validation cost (concordance studies, citation replacements).
+    - Directly informs Go/No-Go on the most expensive features.
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored: [ADR-0002, ADR-0003]
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      FD-003 REJECT — "95% misconception resolution" fabricated. FinOps
+      cost saved: if the feature was pitched on a 95% success claim,
+      shipping it without delivering that rate creates refund / churn risk.
+      Also implies cross-session retention (ADR-0003 violation) which is a
+      compliance cost. RECOMMEND: kill feature in its current framing;
+      rebuild as session-scoped tagging with REAL success-rate metric
+      (60-80% per actual DeepMind/Eedi data).
+    evidence: finding_assessment_dr_rami.md:19 (FD-003)
+    lens_note: Accurate pitch = sustainable unit economics. Inflated claims = eventual rebuild cost.
+  - severity: P0
+    finding: |
+      FD-008 REJECT — fabricated "Yu et al. 2026" citation + DPA §7 concern
+      for AI grading. FinOps cost implication: if grading requires training
+      on student data, that triggers full DPIA + possibly EU AI Act gating
+      (Israel trailing). Compliance legal cost: $20-50k one-time + ongoing
+      audit fees. RECOMMEND: pivot to CAS-gated + rubric grading (no student
+      data training), per axis_6 FinOps YAML extracted task.
+    evidence: finding_assessment_dr_rami.md:24 (FD-008)
+    lens_note: Compliance dodge via architecture choice is the cheapest path.
+  - severity: P0
+    finding: |
+      FD-011 REJECT — ES 1.16 cherry-pick. If we build based on 1.16 ES
+      expectation and reality is 0.4-0.6, the business case collapses.
+      RECOMMEND: size the feature (authoring-time batch, axis8 FinOps
+      extraction) assuming d~0.4, which still justifies cost.
+    evidence: finding_assessment_dr_rami.md:27 (FD-011)
+    lens_note: Realistic ES = realistic cost/benefit model = correct sizing.
+  - severity: P1
+    finding: |
+      FD-001 WARNING — d=0.34 meta-analytic mean vs claimed 0.5-0.8.
+      Interleaving is cheap to build (pure scheduling algorithm). Cost
+      implication: small. Ship with honest ES in product copy.
+    evidence: finding_assessment_dr_rami.md:17
+    lens_note: Cheap-to-build feature + honest pitch = low risk.
+  - severity: P1
+    finding: |
+      FD-004 WARNING — IRT-CAT "readiness" score risks RDY-080 violation
+      (implicit Bagrut prediction). Concordance study: cost = 500+ student
+      Bagrut-takers x tracked-over-year = engineering + data collection
+      cost ~$10-20k over 2 years. Factor into roadmap budget.
+    evidence: finding_assessment_dr_rami.md:20
+    lens_note: Validation study is a one-time budget line, not ongoing.
+  - severity: P1
+    finding: |
+      FD-006 WARNING — Foster 2021 null result on math achievement. If
+      feature re-pitched as "calibration tool" not "achievement booster",
+      engineering spend is same but success-metric pivot changes business
+      case. Reframe before building.
+    evidence: finding_assessment_dr_rami.md:22
+    lens_note: Metric framing ≠ engineering cost but DOES change launch criteria.
+  - severity: P1
+    finding: |
+      FD-009 WARNING — Socratic tutor DPA §7 for prompt logging / fine-tune.
+      Cost: IF fine-tuning on Israeli student data, full DPIA + data
+      residency infra (~$30k/year private Azure/GCP region). IF inference-
+      only with prompt-logging-off, standard routing. Pin "no fine-tune" in
+      contracts/llm and save $30k/yr.
+    evidence: finding_assessment_dr_rami.md:25
+    lens_note: "log_prompts: false" already in routing-config.yaml:548 — verify no training pipeline ever activates.
+  - severity: P2
+    finding: |
+      FD-012, FD-013, FD-015, FD-017 WARNINGS — citation-quality issues only.
+      Engineering cost unchanged; launch-copy edits needed.
+    evidence: finding_assessment_dr_rami.md:28,29,31,33
+    lens_note: Docs cost, not code cost.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: all FD-### findings indexed there"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: conflicting verdicts where Nadia PASSes Rami REJECTs"
+extracted_tasks:
+  - title: "Lock routing-config prompt-logging OFF + never-fine-tune flag in code"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Rami FD-009 flags DPA §7 exposure from prompt logging / fine-tune
+      pipeline. routing-config.yaml:548 has log_prompts:false; formalize
+      a runtime assertion + code fence that blocks any future code path
+      from enabling prompt logging or fine-tune submission.
+
+      ## Files
+      - src/llm-acl/Cena.LlmAcl/Compliance/PromptLoggingGuard.cs (new)
+      - src/llm-acl/Cena.LlmAcl/Compliance/NoFineTuneAssertion.cs (new)
+      - tests/compliance/no-prompt-log.test.ts (new)
+
+      ## Definition of Done
+      - Startup assertion: log_prompts MUST be false in non-dev
+      - Any call to OpenAI/Anthropic fine-tune endpoints fails at compile time (no import)
+      - Grep CI check: banned tokens ["fine_tune", "fine-tune", "training_file"]
+      - Docs entry: docs/engineering/compliance-fences.md
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L25]
+  - title: "Honest ES in product copy (Interleaving d=0.34, not 0.5-0.8)"
+    priority: P2
+    estimate: S
+    suggested_assignee: claude-subagent-docs
+    queue_body: |
+      ## Goal
+      Update marketing/product copy to cite meta-analytic mean effect sizes
+      (d=0.34 interleaving, d=0.4-0.6 cultural context) instead of upper-
+      tail cherry-picks. Prevents credibility damage + eventual rebuild
+      cost if real-world results underperform inflated claims.
+
+      ## Files
+      - pre-release-review/axis1_pedagogy_mechanics_cena.md (edit F1 ES section)
+      - pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md (edit F5 ES)
+
+      ## Definition of Done
+      - All "d > 1.0" claims replaced with meta-analytic mean
+      - Rami review-pass on revised docs
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-docs --result "<branch>"
+    source_doc_lines: [L17, L27]
+verdict: adopt
+verdict_reason: |
+  Rami's rejections save engineering and compliance cost. His warnings
+  usually imply metric-pivot not cost-pivot. Honor the three REJECTs;
+  the WARNINGs are manageable with honest copy + architecture choices.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "FD-008 DPA §7 assessment — final verdict gate on AI grading"
+  - to: persona-ministry
+    about: "FD-020 Bagrut Rubric Engine — is 'encodes rules, does not predict' defensible to MoE?"

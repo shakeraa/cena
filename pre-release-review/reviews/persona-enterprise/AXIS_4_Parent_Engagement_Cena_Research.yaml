@@ -1,0 +1,140 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Parent-engagement features targeting four Israeli cultural cohorts: parent digest,
+  auto-translation, celebration sharing, consent management, multi-channel outreach.
+system_purpose_fit: 3
+  rationale:
+    - Parent is a new first-class principal. Today the codebase has a ParentDigest context and ParentalControls context but no Parent aggregate.
+    - Cross-tenant risk: a parent with two students across two institutes — tenant isolation design is non-obvious.
+    - REST + SignalR stays compatible; no GraphQL risk.
+code_reality_check:
+  claims_verified_in_code:
+    - "ParentDigest bounded context exists -> src/actors/Cena.Actors/ParentDigest/"
+    - "ParentalControls bounded context exists -> src/actors/Cena.Actors/ParentalControls/"
+    - "Outreach scheduler for multi-channel already exists -> src/actors/Cena.Actors/Outreach/OutreachSchedulerActor.cs"
+  claims_contradicted_by_code:
+    - "Doc treats Parent as a novel principal; ParentDigest is already wired. Features should extend, not replace."
+  claims_unverifiable:
+    - "Whether Firebase custom claims today support a 'parent' role (claim inspection not in repo-visible config); ADR-0001 defines mentor/instructor/student/admin but not parent"
+adr_alignment:
+  honored:
+    - "ADR-0003 (parent views must not surface cross-session misconception data)"
+  violated: []
+  missing_adr_needed:
+    - "Parent auth role + multi-student principal (one parent ↔ N children, possibly across institutes)"
+    - "Parent-child tenant visibility (can a parent in institute A see institute B's analytics for their child?)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Parent-child multi-institute principal is an unsolved tenancy problem. ADR-0001 defines TenantScope.GetInstituteFilter
+      for mentors/students but not for a parent whose child is enrolled in institutes the parent doesn't belong to.
+      Without an ADR, the default will be either (a) parent sees nothing (broken product) or (b) parent sees everything
+      (tenant-escape).
+    evidence: "src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs:16-76; docs/adr/0001-multi-institute-enrollment.md:82-86"
+    lens_note: Enterprise — tenant isolation proof must precede Parent UI.
+  - severity: P1
+    finding: |
+      Parent-digest features propose server-side aggregation across child's sessions. Today aggregation lives on
+      StudentActor projections. Under ADR-0012 the Student split will move session data out of the profile stream;
+      any parent digest that assumes one-stream reads will break in post-pilot.
+    evidence: "src/actors/Cena.Actors/ParentDigest/; docs/adr/0012-aggregate-decomposition.md:21-30"
+    lens_note: Enterprise — build digests from read models, not aggregate streams.
+  - severity: P1
+    finding: |
+      Auto-translation touches every outbound parent communication. This is a classic tier-routing (ADR-026) concern —
+      every translation is an LLM call. Doc doesn't specify Tier 1 (no-op/cached) vs Tier 2 (Haiku) vs Tier 3 (Sonnet)
+      routing and has no cache key discipline.
+    evidence: "AXIS_4_Parent_Engagement_Cena_Research.md:L~200 (auto-translation); CLAUDE.md (ADR-026 table)"
+    lens_note: Enterprise — untiered LLM calls violate the cost/latency contract.
+  - severity: P2
+    finding: |
+      Celebration sharing and consent mgmt both imply new events into the stream. Needs explicit event-schema versioning
+      and retention policy (consent withdrawal is a hard delete or a superseding event? Default is superseding.)
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L~300 (consent feature)
+    lens_note: Enterprise — consent retraction in event-sourced systems is non-trivial; needs ADR.
+already_built:
+  - feature: "Parent digest context"
+    evidence: src/actors/Cena.Actors/ParentDigest/
+    note: "Doc's 'parent digest' feature should extend this, not reintroduce."
+  - feature: "Parental controls context"
+    evidence: src/actors/Cena.Actors/ParentalControls/
+    note: "Consent/approval proposals overlap; review before authoring new."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-034 (Auto-translation for parents)"
+  - "AXIS_10_Operational_Integration_Features.md: consent mgmt overlaps"
+extracted_tasks:
+  - title: "ADR: Parent auth role + multi-institute visibility"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Define Parent as a first-class auth role with a GetVisibleEnrollments(user) helper. Resolve: one parent ↔ N
+      children ↔ M institutes. Must prove tenant isolation by test.
+
+      ## Files
+      - docs/adr/ (new 0016-parent-auth-role.md)
+      - src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs (extend)
+      - src/api/Cena.Admin.Api.Tests/ (new ParentTenantScopeTests.cs)
+
+      ## Definition of Done
+      - ADR published, references ADR-0001.
+      - TenantScope extension merged with unit tests proving (a) parent sees only their children's enrollments, (b)
+        parent cannot read institute roster of institutes they don't belong to.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L1-L50, L200-L300]
+  - title: "Audit ParentDigest + ParentalControls contexts against AXIS-4 features"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-audit
+    queue_body: |
+      ## Goal
+      Inventory existing parent-facing code before AXIS-4 tasks enter queue.
+
+      ## Files
+      - src/actors/Cena.Actors/ParentDigest/
+      - src/actors/Cena.Actors/ParentalControls/
+
+      ## Definition of Done
+      - Feature-coverage matrix appended to this YAML's already_built section.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-audit --result "<branch>"
+    source_doc_lines: [L1-L411]
+  - title: "Define tier-routing policy for translation pipeline"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Before auto-translation of parent communication ships, add tier routing (cached, Haiku, Sonnet) per ADR-026,
+      with a content-hash cache and fallback chain.
+
+      ## Files
+      - src/actors/Cena.Actors/Gateway/ (or equivalent LLM routing layer)
+      - docs/llm-routing-strategy.md
+
+      ## Definition of Done
+      - Every translation call passes through tier router with cache-hit metric.
+      - Cost/latency budget per translation documented.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~200]
+verdict: revise
+verdict_reason: |
+  Good product intent but three enterprise gaps (parent auth role, cross-context digest reads, LLM tier routing) must
+  land before any feature work. Existing ParentDigest/ParentalControls contexts should host these extensions, not new
+  aggregates.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "Minor-child data + parent consent + multi-institute consent matrix."
+  - to: persona-redteam
+    about: "Parent as tenant-escape vector if a parent's student is in institute A but parent is mentor in institute B."
+  - to: persona-finops
+    about: "Auto-translation cost per family-month — needs quantified ceiling."

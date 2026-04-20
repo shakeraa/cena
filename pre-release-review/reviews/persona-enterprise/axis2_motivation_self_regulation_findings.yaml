@@ -1,0 +1,124 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Findings on motivation/self-regulation features (goal setting, reflection prompts, effort
+  framing, progress salience, autonomy supports) with explicit guardrails against streaks,
+  loss-aversion, variable-ratio rewards, and misconception retention.
+system_purpose_fit: 4
+  rationale:
+    - Features align with ship-gate banned-terms policy and ADR-0003 by design.
+    - Self-regulation state (goal, reflection text) is new persisted data that must be enrollment-scoped and have an explicit retention policy.
+    - No proposed feature contradicts non-negotiables 1–9 on surface; the risk is sloppy persistence drift.
+code_reality_check:
+  claims_verified_in_code:
+    - "EngagementEvents.cs exists with XpAwarded_V1, BadgeEarned_V1 — motivation events already in stream -> src/actors/Cena.Actors/Events/EngagementEvents.cs"
+    - "StreakUpdated_V1 currently exists in StudentProfileSnapshot Apply handler -> src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:173-178"
+    - "Outreach actor exists (timing/engagement nudges) -> src/actors/Cena.Actors/Outreach/OutreachSchedulerActor.cs"
+  claims_contradicted_by_code:
+    - "Doc asserts streak already removed; StreakUpdated_V1 Apply handler still writes CurrentStreak/LongestStreak state -> src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:173-178 (event is there even if not surfaced in UI)"
+  claims_unverifiable:
+    - "Goal-setting/reflection persistence lifetime (doc says 'across sessions'); no corresponding Marten document or retention rule in repo"
+adr_alignment:
+  honored:
+    - ADR-0003 (no misconception retention)
+    - Shipgate GD-004 (banned terms)
+  violated: []
+  missing_adr_needed:
+    - "Retention policy ADR for self-regulation artifacts (goals, reflections) — is this session-scoped like misconceptions or profile-durable?"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      StreakUpdated_V1 remains an event that mutates StudentProfileSnapshot.CurrentStreak/LongestStreak even though the
+      shipgate bans streak mechanics. This is latent dark-pattern infrastructure sitting one UI call away. Axis-2 doc
+      claims streaks are gone but the event-sourced state machine still materializes them.
+    evidence: src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:173-178
+    lens_note: Enterprise — event-sourced state that no longer has a policy justification should be formally retired via
+      a CurrentStreak-retirement event + projection rebuild, not just "don't render it in the UI".
+  - severity: P1
+    finding: |
+      Self-regulation artifacts (goals, reflections) are new persisted writes. Doc lacks (a) aggregate boundary (does
+      this live on StudentProfile, LearningSession, or a new SelfRegulation aggregate?), (b) event-sourcing contract,
+      (c) enrollmentId scoping. Default-dropping them onto StudentActor deepens the god-aggregate problem.
+    evidence: axis2_motivation_self_regulation_findings.md:L~150-220 (goal/reflection features)
+    lens_note: Enterprise — ADR-0012 explicitly wants less stuff on the god aggregate, not more.
+  - severity: P1
+    finding: |
+      Reflection text is free-form student writing that may contain PII. No classification in doc (PII? session-scoped?
+      on aggregate?). Will drift into privacy/PPD territory if not pinned.
+    evidence: axis2_motivation_self_regulation_findings.md:L~200 (reflection prompt)
+    lens_note: Enterprise — aggregate boundary decides storage/retention; pushing free-form text onto StudentProfileSnapshot
+      creates a durable PII artifact.
+  - severity: P2
+    finding: |
+      Autonomy-supports (methodology choice) overlap with MethodologySwitched_V1 already in the stream. Need explicit
+      reconciliation or duplicate semantics appear.
+    evidence: "src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs:150-158; src/actors/Cena.Actors/Students/StudentActor.Methodology.cs"
+    lens_note: Enterprise — don't add a parallel event family when one exists.
+already_built:
+  - feature: "Engagement event family and XP accrual"
+    evidence: src/actors/Cena.Actors/Events/EngagementEvents.cs
+    note: "Many 'motivation' features can reuse existing XpAwarded_V1 rather than define new events"
+  - feature: "Methodology switch (autonomy surface)"
+    evidence: src/actors/Cena.Actors/Students/StudentActor.Methodology.cs
+    note: "Student autonomy already encoded; doc's 'autonomy supports' should extend it"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-017 (Focus Ritual) overlaps goal-setting"
+  - "feature-discovery-2026-04-20.md: FD-018 (Learning Energy Tracker)"
+extracted_tasks:
+  - title: "Retire dead streak state machinery cleanly"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      The shipgate bans streaks but StreakUpdated_V1 + CurrentStreak/LongestStreak state is still event-sourced and
+      applied. Formally retire: deprecate event (mark [Obsolete]), add projection that zeroes CurrentStreak going
+      forward, add upcaster that treats the legacy event as a no-op, and delete any emission sites.
+
+      ## Files
+      - src/actors/Cena.Actors/Events/EngagementEvents.cs
+      - src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs (Apply(StreakUpdated_V1))
+      - grep for any `new StreakUpdated_V1` or `.CurrentStreak` writers
+
+      ## Definition of Done
+      - No code path emits StreakUpdated_V1 in main branch.
+      - Apply handler still works on historical events (for replay) but writes nothing visible to UI.
+      - Shipgate scanner upgraded to flag any new emission.
+      - Full Cena.Actors.sln builds and existing tests pass.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L40-L90]
+  - title: "Decide aggregate home for self-regulation artifacts"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any goal/reflection persistence ships, lock aggregate boundary: StudentProfile vs LearningSession vs
+      new SelfRegulation aggregate (aligned to ADR-0012 split). Needs an ADR.
+
+      ## Files
+      - docs/adr/ (new 0014-self-regulation-aggregate.md)
+      - docs/adr/0012-aggregate-decomposition.md (reference)
+
+      ## Definition of Done
+      - ADR-0014 drafted with aggregate choice + rationale + event list + retention rule.
+      - Axis-2 feature tickets updated to reference ADR-0014.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L100-L250]
+verdict: revise
+verdict_reason: |
+  Adoptable but requires (1) formal retirement of dead streak machinery and (2) aggregate decision + retention ADR
+  before any persistence lands. Don't ship reflection/goal features onto StudentActor.
+cross_lens_handoff:
+  - to: persona-ethics
+    about: "Banned-term exposure via CurrentStreak — even if unrendered, presence in API payloads is a leak risk."
+  - to: persona-privacy
+    about: "Free-form reflection text could contain minor PII; retention rule needed."
+  - to: persona-cogsci
+    about: "Validity of 'self-regulation' constructs and whether proposed prompts match SRL literature."

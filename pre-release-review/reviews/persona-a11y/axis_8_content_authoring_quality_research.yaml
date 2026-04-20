@@ -1,0 +1,130 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 content authoring/quality features: Bayesian IRT small-sample calibration,
+  SymPy CAS variation engine, Bagrut partial-credit rubric, Arabic RTL math
+  renderer (F4), culturally-contextualized problem generator (F5), mother-tongue
+  hint system (F6), self-efficacy difficulty presentation, Elo+expert difficulty
+  calibration.
+system_purpose_fit: 4
+  rationale:
+    - F4 is core for non-negotiable 6 (math LTR in RTL)
+    - F5/F6 directly support Arabic-first wedge
+    - F2 CAS-gated variation honors ADR-0002
+    - F6 mother-tongue hints raise translanguaging + a11y considerations
+code_reality_check:
+  claims_verified_in_code:
+    - "Arabic RTL math partial implementation: src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts; src/student/full-version/src/components/session/WorkedExamplePanel.vue:17"
+    - "Arabic locale file: src/student/full-version/src/plugins/i18n/locales/ar.json"
+    - "Arabic math normalizer referenced: useLocaleInference.ts:25 (comment mentions ArabicMathNormalizer.cs)"
+  claims_contradicted_by_code:
+    - "Doc Feature 4 duplicates AXIS 3 Feature 7 — both propose Arabic RTL renderer. Cena code already has a partial impl."
+  claims_unverifiable:
+    - "Mother-tongue hint system (F6) — no hint-switching infrastructure"
+    - "Per-country Arabic notation profiles — not visible in code"
+adr_alignment:
+  honored:
+    - "ADR-0002 (SymPy oracle) via F2"
+    - "ADR-0003 via F6 session-scoped hints"
+  violated: []
+  missing_adr_needed:
+    - "ADR for per-country Arabic math notation profiles (Palestinian, Lebanese, Egyptian conventions differ)"
+    - "ADR for translanguaging policy (when to switch between ar and he for hints)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: "F4 Arabic RTL Math Renderer is a near-exact duplicate of AXIS 3 F7. Both docs proposing the same feature without cross-reference risks double-building or conflicting architectures."
+    evidence: "AXIS_8...md:F4 section; axis3...md:F7 section; src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts already enforces <bdi>"
+    lens_note: "Synthesizer must dedup; this belongs in a single task with one architecture (<bdi> element wrapping per existing code)."
+  - severity: P1
+    finding: "F6 mother-tongue hints — if student UI is Arabic but hint arrives in Hebrew, each hint paragraph needs correct lang attribute and dir (text-level dir='ltr' / lang='he' / lang='ar'). Otherwise screen readers read with wrong voice."
+    evidence: "AXIS_8...md:F6 section"
+    lens_note: "Critical for blind Arabic students hearing a Hebrew hint — voice-pack switching requires lang attribute per paragraph."
+  - severity: P1
+    finding: "F5 culturally-contextualized problems risk stereotyping (Dr. Nadia flagged this). From an a11y/l10n angle: proper-noun transliteration (Arabic names in Hebrew text, Hebrew names in Arabic text) needs <bdi> isolation and font stack that covers both scripts."
+    evidence: "AXIS_8...md:F5 section; cena_dr_nadia_pedagogical_review_20_findings.md:FD-011"
+    lens_note: "e.g., 'אחמד קנה 3 תפוחים' must wrap the name correctly in RTL."
+  - severity: P1
+    finding: "F7 self-efficacy difficulty presentation — if difficulty shown by stars/fire/etc., may drift into gamification. A11y concern: star counts must have explicit aria-label ('difficulty 3 of 5')."
+    evidence: "AXIS_8...md:F7 section"
+    lens_note: "Screen readers often read star characters inconsistently."
+  - severity: P1
+    finding: "F4 specifies mirrored integral/summation symbols per MathML 4.0. KaTeX's built-in mirroring support is partial; implementer must verify font fallbacks include a font that carries mirrored glyphs (Amiri, Noto Naskh) — or ship an SVG polyfill."
+    evidence: "AXIS_8...md:F4 section; ADR-0004 figure stack"
+    lens_note: "Missing font = tofu (boxes). The impl task must pin font stack."
+  - severity: P2
+    finding: "F8 Elo+expert difficulty calibration — expert reviewers annotating items need an admin-side UI. That admin UI must honor admin/full-version a11y scanners (see AXIS 5 task)."
+    evidence: "AXIS_8...md:F8 section"
+    lens_note: "Content authoring UIs are often overlooked for a11y."
+already_built:
+  - feature: "Partial Arabic RTL math renderer"
+    evidence: "src/student/full-version/src/components/session/*.vue (bdi wrapping); tests/a11y/math-ltr-wrapper.spec.ts"
+    note: "Don't greenfield — extend existing <bdi>-based approach"
+  - feature: "Arabic locale + Arabic-first onboarding"
+    evidence: "src/student/full-version/src/plugins/i18n/locales/ar.json; src/student/full-version/src/composables/useLocaleInference.ts"
+    note: "F5/F6 hint flows can ride on these"
+duplicates_of_other_docs:
+  - "axis3_accessibility_accommodations_findings.md: Feature 7 Arabic RTL Math Renderer (exact dup of F4)"
+  - "feature-discovery-2026-04-20.md: FD-014 Arabic RTL Math Renderer"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: FD-010, FD-013"
+extracted_tasks:
+  - title: "Dedup F4 Arabic RTL against AXIS 3 F7 into single roadmap"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Merge AXIS 8 F4 and AXIS 3 F7 into one feature spec. Existing code already uses <bdi dir="ltr">; do not introduce a second CSS-based approach. The dedup must list: residual gaps (Eastern numerals toggle, Arabic function names, font stack, mirrored glyphs) as the actual deliverable.
+      ## Files
+      - updated ADR or PRD that pins <bdi> approach
+      - merged task body combining best of both docs' implementation sketches
+      ## Definition of Done
+      - Single source of truth for Arabic RTL math work
+      - Existing tests (math-ltr-wrapper, rtl-visual-regression) green
+      ## Reporting
+      decision committed; update synthesizer conflict log
+    source_doc_lines: [F4 section]
+  - title: "Mother-tongue hint per-paragraph lang/dir attribute contract (F6)"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F6 switches hint language. Every hint paragraph rendered in a language different from the UI locale must have lang='xx' and, where applicable, dir='rtl'/'ltr'. This lets screen readers switch voice packs correctly.
+      ## Files
+      - hint rendering component (to be identified when F6 is built)
+      - tests/a11y/hint-lang-attribute.spec.ts (new scanner)
+      ## Definition of Done
+      - Every rendered hint carries a lang attribute matching its content
+      - Scanner fails if a hint text node lacks lang or conflicts with parent's lang
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F6 section]
+  - title: "Pin Arabic math font stack (Amiri + Noto Naskh) with mirrored glyph coverage"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Before F4 ships mirrored symbols (integral, summation), pin the font stack and verify glyph coverage on target devices. Missing glyphs render as tofu.
+      ## Files
+      - src/student/full-version/src/plugins/vuetify/theme.ts (font-family additions)
+      - src/student/full-version/src/@core/scss/**/_font.scss (if present)
+      - public/fonts/ (subsetted Amiri + Noto Naskh)
+      ## Definition of Done
+      - Font stack includes Amiri and Noto Naskh Arabic with fallback to Noto Sans Arabic
+      - Visual regression screenshot for RTL math includes mirrored integral sign rendered correctly
+      - Subsetted font bundles <50KB each to respect low-bandwidth
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F4 section]
+verdict: revise
+verdict_reason: "F4 duplicates existing partial work — merge, don't greenfield. F6 needs a per-paragraph lang-attribute contract. F5 must use bidi-safe name rendering."
+cross_lens_handoff:
+  - to: persona-educator
+    about: "F5 cultural contextualization vs stereotyping risk; community review process"
+  - to: persona-privacy
+    about: "F6 translanguaging — language profiles must not persist on student records"
+  - to: persona-enterprise
+    about: "Per-country Arabic notation profile data model"

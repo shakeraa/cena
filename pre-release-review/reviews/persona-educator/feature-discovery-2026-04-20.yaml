@@ -1,0 +1,200 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  The index / mega-doc. Aggregates 97 raw findings across 12 research
+  streams into 55 substantial, deduplicated findings numbered FD-001 …
+  FD-055 (approx). Includes Top-10 shortlist, quick-wins list, guardrail-
+  tension flag list, and references the axis docs and persona reviews
+  (Dr Nadia, Dr Rami, Prof Amjad, Tamar, Dr Lior).
+
+system_purpose_fit: 4
+  rationale:
+    - This is the roll-up index the SUPERPROMPT explicitly tells us to
+      use as the source of truth when axis docs overlap.
+    - Since findings FD-001 … FD-020 have already been reviewed by Dr
+      Nadia (pedagogy) and Dr Rami (honesty), my job here is to:
+      (a) not duplicate their per-finding analysis,
+      (b) add pedagogue perspective on the roll-up-level patterns
+         (priority ordering, quick-wins list, guardrail tensions),
+      (c) note findings beyond FD-020 if the index includes them.
+    - The axis-doc findings I reviewed individually carry the detail;
+      this YAML stays deliberately high-level.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Session misconception tagging already implemented (FD-003)" -> src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs
+    - "CAS-gated question persister (FD-002)" -> src/actors/Cena.Actors/Cas/CasGatedQuestionPersister.cs
+    - "Tutor Socratic turn-budget in place (FD-009)" -> src/actors/Cena.Actors/Tutor/TutorMessageService.cs + docs/adr/0002-sympy-correctness-oracle.md Decision 6
+    - "Adaptive scheduler + BKT + Elo (FD-001, FD-004)" -> src/actors/Cena.Actors/Mastery/
+    - "ExplainItBack ships (related to FD-009 / axis2 F1)" -> src/actors/Cena.Actors/Pedagogy/ExplainItBack.cs
+    - "Cultural context service (FD-011 foundation)" -> src/actors/Cena.Actors/Services/CulturalContextService.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "55 substantial findings" — the index lists FD-001 … FD-020 in detail
+      and references "Top-10 shortlist" including FD-030, FD-034, FD-042,
+      FD-044, FD-048 etc. Without reading all 55 I cannot verify every
+      single claim-to-code mapping, but the top-20 coverage is strong.
+
+adr_alignment:
+  honored:
+    - ADR-0002 "SymPy CAS is the sole correctness oracle" is invoked
+      throughout the index.
+    - ADR-0003 session-scope is invoked for FD-003, FD-015 and the
+      compliance section.
+    - Ship-gate non-negotiables — index explicitly enumerates 8 BORDERLINE
+      guardrail tensions for "explicit discussion, not silent dropping."
+  violated: []
+  missing_adr_needed: []
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      The "Top-10 Shortlist" + "Quick wins (<2 engineer-weeks)" framing
+      in the index optimizes for shippability but under-weights
+      pedagogical dependencies. Specifically: FD-017 Focus Ritual and
+      FD-018 Learning Energy Tracker are listed as quick wins, but they
+      both need ADR-0003 audit (mood data retention) and safeguarding
+      wiring for minor disclosures. Not genuinely <2-engineer-weeks
+      unless those audits are waived.
+    evidence: feature-discovery-2026-04-20.md:L19 quick-wins list
+    lens_note: |
+      "Quick win" is a roadmap temptation that frequently ships
+      corners-cut. Mood-tracking features are never truly quick when
+      under-13 users are in scope.
+  - severity: P1
+    finding: |
+      The index's "Critical guardrail tensions flagged: 8 BORDERLINE
+      features where the tension with GD-004/ADR-0003/RDY-080 deserves
+      explicit discussion" is exactly the right framing — do not silently
+      drop these. The pedagogue risk if they're silently dropped: shame
+      mechanics creep in, misconception data leaks across sessions, or
+      Bagrut predictions are made from un-validated scores. Every
+      BORDERLINE must receive an explicit ADR (keep, revise, retire)
+      before any of its features hit the queue.
+    evidence: feature-discovery-2026-04-20.md:L21
+    lens_note: |
+      A "BORDERLINE" feature that ships without resolution is the most
+      common way pedagogical guardrails are quietly violated.
+  - severity: P1
+    finding: |
+      The index's executive summary claim: "The most substantial finding
+      Cena would have missed without this pass is the Culturally-
+      Contextualized Problem Generator (FD-011): ES=0.4-0.6 in
+      conceptual understanding" — this is the *responsible* effect-size
+      framing, matching my axis8 recommendation and Dr Rami's REJECT of
+      the 1.16 figure. The axis-doc (AXIS_8 feature 5) still carries
+      the 1.16 claim inside it. Dedupe: the index's 0.4-0.6 should be
+      canon; overwrite the axis8 claim.
+    evidence: feature-discovery-2026-04-20.md:L15, AXIS_8_Content_Authoring_Quality_Research.md Feature 5 section
+    lens_note: |
+      The index has the honest number. The axis doc has the sensational
+      one. Fix the axis doc, not the index.
+  - severity: P2
+    finding: |
+      Of the 18 SHIP-ready findings, ~8 are listed as already covered by
+      existing code in my per-axis reviews. The index should carry a
+      "partially built" column so sprint planning doesn't treat every
+      SHIP item as a from-scratch build. Retires that label:
+      FD-001 Interleaving (AdaptiveScheduler exists),
+      FD-002 CAS variation engine (CasGatedQuestionPersister exists),
+      FD-003 Misconception tagging (MisconceptionDetectionService),
+      FD-009 Socratic (TutorMessageService),
+      FD-014 Explainable (ExplanationGenerator),
+      FD-015 Error analysis (ErrorClassificationService),
+      FD-017 Focus ritual (ConfusionDetector related),
+      FD-019 Mashov (MartenOfflineSyncLedger sync foundation).
+    evidence: feature-discovery-2026-04-20.md (index summary), src/actors/Cena.Actors/ (multiple services)
+    lens_note: |
+      Roadmaps slip when teams treat "SHIP" as "start from zero." The
+      index should tell the sprint planner "this is 30% done, scope the
+      remaining 70%."
+
+already_built:
+  - feature: "See per-finding 'already_built' sections in the 14 other axis YAMLs"
+    evidence: aggregated across per-doc reviews
+    note: |
+      I have enumerated already-built features in the axis-level YAMLs
+      (axis1 adaptive scheduler, axis2 ExplainItBack, axis3 accommodations,
+      axis5 admin dashboard, axis6 misconception tagging + CAS suite,
+      axis8 CAS variation engine, axis10 offline ledger, competitive
+      Socratic tutor + hint generator, cross-domain graph + flow). The
+      index should surface these as a "partially-built" annotation
+      rather than treating every SHIP as green-field.
+
+duplicates_of_other_docs:
+  - All axis docs: axis1-9, AXIS_10, cena_competitive_analysis, cena_cross_domain_feature_innovation contribute findings to this index. Cross-reference rather than duplicate.
+  - cena_dr_nadia_pedagogical_review_20_findings.md: Reviews FD-001..FD-020
+  - finding_assessment_dr_rami.md: Same 20 findings, honesty lens
+
+extracted_tasks:
+  - title: "Add 'already-built coverage' annotation to feature-discovery index"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Annotate each SHIP/SHORTLIST finding in feature-discovery-2026-04-20.md
+      with a "code-coverage" field noting which pieces exist. Prevents
+      sprint-planning from treating partially-built features as green-field.
+      ## Files
+      - pre-release-review/feature-discovery-2026-04-20.md (annotations)
+      ## Definition of Done
+      - Each of the 55 findings has an "existing-code" pointer (path:line)
+        for components already implemented, or "green-field" if none.
+      - Top-10 shortlist re-ordered if needed given actual effort after
+        coverage accounting.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: feature-discovery-coverage-annotations"
+    source_doc_lines: [whole doc]
+  - title: "Resolve all 8 BORDERLINE findings to explicit ADRs before queue entry"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      For each of the 8 BORDERLINE guardrail-tension findings flagged in
+      the index, author a discrete ADR (keep-with-guardrails, revise,
+      retire) before the finding can be extracted as a queue task.
+      Prevents silent dropping of pedagogically-sensitive decisions.
+      ## Files
+      - docs/adr/ (up to 8 new ADRs, one per BORDERLINE)
+      ## Definition of Done
+      - All 8 BORDERLINE findings have a paired ADR.
+      - No BORDERLINE feature enters the queue without its ADR approved.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: 8-borderline-ADRs"
+    source_doc_lines: [L21]
+
+verdict: adopt
+verdict_reason: |
+  The index is well-structured. Two structural improvements (code-coverage
+  annotation, BORDERLINE-to-ADR rule) will keep the next sprint-planning
+  phase honest. Per-finding pedagogical analysis lives in the 14 other
+  persona-educator YAMLs.
+
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      The whole evidence-base section (peer-reviewed, meta-analyses) is
+      cogsci territory. Confirm the index's effect-size communication
+      aligns with honest meta-analytic estimates.
+  - to: persona-ministry
+    about: |
+      Cross-verify every "Bagrut-aligned" claim across the 55 findings
+      does not violate RDY-080.
+  - to: persona-privacy
+    about: |
+      The 8 BORDERLINE guardrail tensions include ADR-0003 (misconception
+      data) concerns — privacy owns the resolution audit.
+  - to: persona-enterprise
+    about: |
+      The "Paired-Implementation" matrix (from Dr Nadia's review, also
+      implied here) has cross-aggregate implications; enterprise should
+      sequence the releases around bounded-context dependencies.
+  - to: persona-ethics
+    about: |
+      The 8 BORDERLINE findings include some loss-aversion / variable-
+      ratio tensions that ethics should be the authority on resolving.

@@ -1,0 +1,149 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight assessment features: formative-summative split, IRT-CAT, AI partial
+  credit grading, CAS-validated free-response grading, per-session error
+  report, session-scoped misconception tagging, crisis compression mode,
+  confidence calibration. Mix of LLM-grading (expensive) and analytics.
+system_purpose_fit: 5
+  rationale:
+    - CAS-gated grading directly honors ADR-0002 — correctness is free (SymPy sidecar ~50ms, $0).
+    - AI partial-credit grading is the cost risk: LLM on every step of every answer.
+    - IRT-CAT is compute but not LLM — cheap.
+code_reality_check:
+  claims_verified_in_code:
+    - "SymPy sidecar client + CAS router -> src/actors/Cena.Actors/Cas/SymPySidecarClient.cs, CasRouterService.cs"
+    - "Quality gate service for CAS conformance -> src/api/Cena.Admin.Api/QualityGate/QualityGateService.cs"
+    - "AI generation cas gating tests -> src/api/Cena.Admin.Api.Tests/AiGenerationCasGatingTests.cs"
+    - "IRT calibration pipeline exists -> src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "AI partial-credit grading step-level cost projection — doc doesn't give"
+adr_alignment:
+  honored:
+    - "ADR-0002 — CAS-validated free-response explicit in F4"
+    - "ADR-0003 — session-scoped misconception tagging explicit in F6"
+  violated: []
+  missing_adr_needed:
+    - "ADR for AI partial-credit grading tier + human-in-loop threshold"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F3 AI Partial-Credit Grading — grading 6-step Bagrut solutions per
+      student per answer. 10k students x 5 answers/hour x 6 steps = 300k
+      step-gradings/hr. Even at Haiku ($0.0005 each) that is $150/hr, $3600/
+      day — above the $1.50/student/day hard cap for many students. Must be
+      structured: deterministic CAS check first (free), LLM only for residual
+      conceptual mistakes (~20% of cases).
+    evidence: AXIS_6_Assessment_Feedback_Research.md (F3); contracts/llm/routing-config.yaml:286
+    lens_note: CAS-first grading is the economic bedrock. LLM only for step explanations, not correctness.
+  - severity: P0
+    finding: |
+      F4 Free-Response CAS-Validated Grading — excellent economics. SymPy
+      verification is ~50ms, costs ~$0 (Python sidecar). Should be the
+      DEFAULT path; LLM grading only when CAS returns inconclusive. Doc
+      correctly positions this. GREEN LIGHT.
+    evidence: AXIS_6_Assessment_Feedback_Research.md (F4); src/actors/Cena.Actors/Cas/CasRouterService.cs
+    lens_note: This is the cost-optimal assessment architecture. Ship.
+  - severity: P1
+    finding: |
+      F2 IRT-Driven Adaptive Placement (2PL-CAT) — compute, not LLM. CAT
+      algorithm selects items in ~1ms. Ability update is matrix math. Zero
+      LLM cost. But calibration pipeline (F1 Bayesian) at scale needs PyMC/
+      Stan cluster — $200-500/month infra if kept always-on. Recommend
+      nightly batch on a Spot instance.
+    evidence: AXIS_6_Assessment_Feedback_Research.md (F2); src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs
+    lens_note: Compute-bound; schedule as batch to control infra cost.
+  - severity: P1
+    finding: |
+      F6 Session-Scoped Misconception Tagging — if LLM classifies every wrong
+      answer, cost = 10k students x 15 wrong/day x $0.0005 Haiku = $75/day.
+      Acceptable IF tagging is cached per (question, wrong_answer_hash) —
+      same as L2 explanation cache pattern (SAI-003).
+    evidence: AXIS_6_Assessment_Feedback_Research.md (F6); tasks/student-ai/done/SAI-003-l2-explanation-cache.md
+    lens_note: Reuse SAI-003 cache pattern for 80-90% hit rate.
+  - severity: P2
+    finding: |
+      F1 Formative-Summative Split, F5 Error Analysis Report, F7 Crisis Mode,
+      F8 Confidence Calibration — all pure analytics/UI over existing session
+      data. Near-zero marginal cost. Ship.
+    evidence: AXIS_6_Assessment_Feedback_Research.md (F1,F5,F7,F8)
+    lens_note: Analytics/viz features have trivial unit economics.
+already_built:
+  - feature: "CAS 3-tier router (MathNet -> SymPy -> fallback)"
+    evidence: src/actors/Cena.Actors/Cas/CasRouterService.cs
+    note: F4 proposes what CAS router already does — doc should cite and extend, not re-propose.
+  - feature: "Quality gate with CAS conformance testing"
+    evidence: src/api/Cena.Admin.Api/QualityGate/QualityGateService.cs
+    note: F2/F3 infrastructure partially in place.
+  - feature: "IRT calibration pipeline"
+    evidence: src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs
+    note: F2 builds on existing; not greenfield.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-002 (CAS-gated generation) = F4"
+  - "feature-discovery-2026-04-20.md: FD-004 (IRT-CAT) = F2"
+  - "feature-discovery-2026-04-20.md: FD-003 (Misconception tagging) = F6"
+extracted_tasks:
+  - title: "Implement CAS-first partial credit pipeline; LLM for explanation only"
+    priority: P0
+    estimate: L
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Implement F3/F4 partial-credit grading as CAS-first. SymPy checks each
+      step's algebraic equivalence to the canonical solution path. LLM is
+      invoked ONLY to produce human-readable explanation when CAS says wrong,
+      not to grade correctness. Integrates with existing CasRouterService.
+
+      ## Files
+      - src/actors/Cena.Actors/Grading/PartialCreditGrader.cs (new)
+      - src/actors/Cena.Actors/Grading/StepEquivalenceChecker.cs (new)
+      - src/actors/Cena.Actors/Grading/StepExplanationGenerator.cs (new, LLM, cached)
+      - src/actors/Cena.Actors.Tests/Grading/PartialCreditGraderTests.cs
+
+      ## Definition of Done
+      - CAS (MathNet->SymPy) verifies each step; correct steps get full credit w/ no LLM
+      - LLM invoked only for incorrect-step explanations; routed to Haiku
+      - Explanation cached keyed on (canonical_step_id, student_step_hash)
+      - Target: <=20% LLM invocation rate per answer (80%+ CAS-only)
+      - Metric: cena.grading.llm_invocation_rate (alert if > 30%)
+      - Metric: cena.grading.cost_usd_per_answer (alert if > $0.01)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L100-L200]
+  - title: "Add misconception-tag cache reusing SAI-003 Redis pattern"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Cache F6 session-scoped misconception tags keyed on (question_id,
+      wrong_answer_hash). ADR-0003 compliant: stored under cena:tag:* with
+      per-session TTL <=24h, not on student profile.
+
+      ## Files
+      - src/actors/Cena.Actors/Misconceptions/MisconceptionTagCache.cs (new)
+      - src/actors/Cena.Actors/Misconceptions/IMisconceptionClassifier.cs (new)
+
+      ## Definition of Done
+      - Redis cache with 24h TTL (ADR-0003 session-scope)
+      - Hit rate metric cena.misconception.cache_hit_rate (target >= 80%)
+      - Tier: Haiku (tier listed as 'sonnet' fallback in routing-config.yaml:84 but use direct Haiku routing)
+      - Load test 10k students x 15 wrong answers/day = cost < $100/day
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L240-L310]
+verdict: adopt
+verdict_reason: |
+  CAS-gated grading is the cost sweet spot — SymPy verifies for $0, LLM reserved
+  for explanation. F2/F5/F7/F8 are analytics features with no cost concern. Only
+  F3 risks runaway spend if naively implemented; the extracted task bounds it.
+cross_lens_handoff:
+  - to: persona-educator
+    about: "Is 20% LLM invocation rate (80% CAS-only) acceptable pedagogically, or do more steps need human-language feedback?"
+  - to: persona-redteam
+    about: "Can adversarial answers reliably produce CAS-inconclusive + LLM invocation to attack cost?"

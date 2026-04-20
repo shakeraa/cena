@@ -1,0 +1,172 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Ten competitive-inspired features: Socratic AI tutor, real-time in-lesson
+  scaffolding, "stuck? ask" button, at-risk alert, virtual manipulatives, auto-
+  translation parent comms, student portfolio, Bagrut-aligned practice engine,
+  TTS+highlighting, context-aware math keyboard. Pattern-copying from
+  Khanmigo/DreamBox/IXL/GOOL without primary cogsci warrants — the doc is
+  competitive analysis first, research second.
+system_purpose_fit: 3
+  rationale:
+    - Features 1, 2, 3 directly map to Cena's existing hint ladder + stuck-type
+      ontology (ADR-0036); most overlap rather than innovate.
+    - Feature 4 "at-risk alert" is the highest-risk item from cogsci lens:
+      "at-risk" classification on students creates a behavioral profile that
+      ADR-0003 was built to prevent.
+    - Feature 5 (virtual manipulatives) has real cogsci warrants (concrete
+      representation → abstract) but doc doesn't cite them properly.
+code_reality_check:
+  claims_verified_in_code:
+    - "Stuck-type ontology (ADR-0036) covers the 'stuck? ask' button scope already -> docs/adr/0036-stuck-type-ontology.md:26-34"
+    - "Ground-truth CAS oracle for hints -> docs/adr/0002-sympy-correctness-oracle.md (via ADR-0031)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Khanmigo '0.2 SD improvement' from 'Stanford/NBER 2025' (cena_competitive_analysis.md:47) — Dr. Rami (FD-009) flags as 'preprint, not peer-reviewed'. Verify before citing."
+    - "MathGPT.ai 'trained on 500K+ student tutoring sessions' — marketing claim, not evidence class PEER-REVIEWED."
+  claims_unsupported_in_literature:
+    - "At-risk student alert (Feature 4) cites ALEKS Insights + iReady but no peer-reviewed evidence that at-risk classification improves student outcomes. Literature on early-warning systems (EWS) in K-12 is mixed at best and has established negative side effects on teacher expectations (stereotype threat proxy)."
+adr_alignment:
+  honored:
+    - "Non-negotiable 1 (CAS oracle): Feature 1 Socratic tutor frames SymPy as authoritative (implied)"
+  violated:
+    - "Potentially ADR-0003: Feature 4 (At-Risk Student Alert) requires persistent cross-session modeling to classify 'at-risk'. This is the attribute class ADR-0003 forbids on children."
+    - "Feature 5 (Interactive Virtual Manipulatives) is benign in itself; but doc's framing 'track student interaction with manipulatives for mastery inference' (if it appears in the full text) would breach ADR-0003."
+  missing_adr_needed:
+    - "At-risk classification ADR — flat retire or scope to teacher-initiated, session-scoped alerts with no persistent 'at-risk' status."
+non_negotiable_violations:
+  - "2 (misconception session-scope): Feature 4 at-risk classification requires cross-session retention of patterns. Must retire or redesign."
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 4 (At-Risk Student Alert System) inherits the classifier pattern
+      from ALEKS Insights / iReady. Implementing this in Cena requires a
+      persistent cross-session behavioral model of each student — the exact
+      pattern ADR-0003 forbids. Even if the model is "low-risk / at-risk"
+      binary rather than fine-grained misconception tags, it is a derived
+      work-product on children's data and falls under the Edmodo FTC precedent
+      cited in ADR-0003. Either retire or redesign as teacher-driven,
+      session-scoped alerts only.
+    evidence: cena_competitive_analysis.md:(Feature 4 section)
+    lens_note: |
+      Stereotype-threat / Pygmalion effect: even if the label never reaches
+      the student, labeling shifts teacher expectations (Rist 1970; Babad 1993).
+      Cogsci + ADR concur — retire.
+  - severity: P1
+    finding: |
+      Feature 1 (Socratic AI Tutor — No-Answer Mode) — Dr. Nadia
+      (cena_dr_nadia_pedagogical_review_20_findings.md:155-167) warns this is
+      potentially counterproductive for time-pressured Bagrut students.
+      Cogsci concurrence: Socratic method has strong conceptual-understanding
+      evidence but weak evidence for procedural-fluency/time-to-exam goals.
+      Must ship with: (a) escape hatch to full worked solution after N
+      exchanges, (b) opt-in per session (not default), (c) limit to "why"
+      not "how" questions. Dr. Nadia's required revisions apply.
+    evidence: cena_competitive_analysis.md:37-74
+    lens_note: |
+      Also: the "Khanmigo 0.2 SD improvement" is from a preprint (Dr. Rami
+      FD-009). Shipping a feature primarily on that citation is a Dr. Rami
+      WARNING.
+  - severity: P1
+    finding: |
+      Feature 2 (Real-Time In-Lesson Scaffolding) and Feature 3 ("Stuck? Ask"
+      button) both overlap existing stuck-type ontology (ADR-0036) and hint
+      ladder. This is not a bug — it means these are already substantially
+      built. Tasks should be scoped to integration/UX polish, not new feature
+      construction.
+    evidence: cena_competitive_analysis.md:78-148
+    lens_note: |
+      "Already built" retire candidate — retire the proposals and file as
+      polish tasks on existing code.
+  - severity: P2
+    finding: |
+      Feature 5 (Interactive Virtual Manipulatives) has genuine cogsci
+      warrants that the doc does not cite: concrete-representational-abstract
+      (CRA) sequence (Witzel 2005, Agrawal & Morin 2016), multimedia learning
+      principles (Mayer). Doc leans on DreamBox competitive claim instead.
+      Reframe with the proper research base before SHORTLIST decision.
+    evidence: cena_competitive_analysis.md:(Feature 5 section)
+    lens_note: "Citation upgrade improves the case; not a ship-blocker."
+  - severity: P2
+    finding: |
+      Feature 7 (Student Learning Portfolio) — "artifacts of learning over time"
+      could quietly become a retained error-pattern corpus if student work is
+      stored long-term with error annotations. Scope must be explicit: student
+      work + mastery summaries only, not misconception tags / error patterns.
+    evidence: cena_competitive_analysis.md:(Feature 7 section)
+    lens_note: "Same ADR-0003 scope check as axis10 F8 portability export."
+already_built:
+  - feature: "Hint ladder + stuck-type ontology (Features 1, 2, 3)"
+    evidence: docs/adr/0036-stuck-type-ontology.md:26-34 (LearningSessionActor.HintRequest)
+    note: "These three features largely duplicate the existing system. Retire the proposals and treat as polish tasks."
+  - feature: "Bagrut-aligned practice engine (Feature 8)"
+    evidence: "Bagrut alignment is core to Cena by definition; this feature is a restatement of the product."
+    note: "Retire."
+duplicates_of_other_docs:
+  - "axis1_pedagogy_mechanics_cena.md: F5 Productive Struggle Hint Governor = Features 1-3 here"
+  - "AXIS_6_Assessment_Feedback_Research.md: F6 Real-Time Misconception Tagging overlaps Feature 2 here"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: F2 Bilingual Dashboard = Feature 6 here"
+  - "axis3_accessibility_accommodations_findings.md: F6 MathML SR pipeline = Feature 9 here"
+extracted_tasks:
+  - title: "Retire Feature 4 'At-Risk Student Alert' — replace with teacher-driven session-scoped flag"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Retire the persistent at-risk classifier. Replace with: teacher manually
+      flags student-of-concern per session; no cross-session retention; no
+      automatic classification. Add to retired.md with ADR-0003 evidence.
+
+      ## Files
+      - pre-release-review/reviews/retired.md (add entry)
+      - pre-release-review/cena_competitive_analysis.md (mark Feature 4 RETIRE)
+
+      ## Definition of Done
+      - Retire entry documented with code-evidence citation.
+      - No downstream task enqueues the persistent-classifier version.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-retire-at-risk-classifier"
+    source_doc_lines: [Feature 4 section]
+  - title: "Features 1-3: polish existing stuck-type ontology UX, do not build new hint system"
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-ux
+    queue_body: |
+      ## Goal
+      Retire Features 1-3 as separate proposals. Merge into a single task:
+      polish the existing stuck-type-routed hint ladder (ADR-0036) with:
+      (a) explicit "show me the worked solution" escape hatch, (b) opt-in
+      Socratic mode for "why" questions, (c) persistent floating help button.
+
+      ## Files
+      - src/student-web/src/features/hint-ladder/*.vue
+      - No new actor/service; polish LearningSessionActor.HintRequest flow.
+
+      ## Definition of Done
+      - Escape hatch present from the first hint request.
+      - Socratic mode is opt-in, default off.
+      - UI help button follows existing stuck-type-classifier routing.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-ux --result "branch: claude-subagent-ux/<id>-hint-ladder-polish"
+    source_doc_lines: [L37-L148]
+verdict: revise
+verdict_reason: |
+  Feature 4 is a clear RETIRE on cogsci + ADR grounds. Features 1-3 largely
+  duplicate existing code and should collapse into a single UX polish task.
+  Feature 5 needs proper cogsci citations. Features 6, 9 hand off to
+  a11y/privacy. Feature 8 is a restatement of Cena's core mission.
+cross_lens_handoff:
+  - to: persona-a11y
+    about: "Feature 9 TTS + highlighting; Feature 10 context-aware math keyboard."
+  - to: persona-privacy
+    about: "Feature 4 at-risk classifier is a ship-blocker on privacy grounds too."
+  - to: persona-educator
+    about: "Feature 1 Socratic tutor — teacher-practitioner view on Bagrut-context fit."
+  - to: persona-finops
+    about: "Features 1, 2, 3 all add LLM calls per-problem-session; ADR-026 tier routing review."
+  - to: persona-enterprise
+    about: "Feature 7 portfolio aggregate-root design (ADR-0012)."

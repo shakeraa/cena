@@ -1,0 +1,129 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 ops/integration features: Google SSO, Mashov sync, CSV roster import,
+  offline-first practice mode, multi-device session continuity, IT admin
+  deployment dashboard, Google Classroom, student data portability export.
+  Mostly backend/integration — indirect a11y surface.
+system_purpose_fit: 3
+  rationale:
+    - Offline-first mode supports low-bandwidth (PWA policy alignment)
+    - SSO surface must be keyboard+SR accessible
+    - Export formats must be accessible (tagged PDF, structured data)
+    - Locale handling in SSO name/email extraction (Hebrew/Arabic names)
+code_reality_check:
+  claims_verified_in_code:
+    - "i18n and RTL handling for UI: src/student/full-version/src/plugins/i18n/"
+    - "Offline shell: src/student/full-version/public/offline.html (contains <bdi>)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Mashov API Hebrew character handling — no integration code"
+    - "Google Classroom grade-passback with RTL grade comments — not in repo"
+adr_alignment:
+  honored: []
+  violated: []
+  missing_adr_needed:
+    - "ADR for SSO Hebrew/Arabic name extraction and display (diacritics, bidi)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: "F1 Google SSO — 'Sign in with Google' button is a common a11y failure surface. Google's Identity Services SDK has specific accessibility hooks that must be used (aria-label, type='standard' for keyboard focus)."
+    evidence: "AXIS_10...md:F1 section"
+    lens_note: "Doc calls out Hebrew/RTL name handling but not button a11y."
+  - severity: P1
+    finding: "F1 Hebrew/Arabic name handling mentioned (L42) — must verify that the OAuth name field (which may contain diacritics, bidi characters) is stored and displayed with <bdi> when appearing inside RTL sentences."
+    evidence: "AXIS_10...md:L42"
+    lens_note: "Greeting 'Hello, أحمد علي' in English UI needs <bdi>; 'שלום, John Smith' in Hebrew UI needs <bdi> for John."
+  - severity: P1
+    finding: "F4 offline-first mode — offline error states must not be English-only. Existing offline.html appears to be localized; any new offline UX from F4 must honor the same."
+    evidence: "AXIS_10...md:F4 section; src/student/full-version/public/offline.html"
+    lens_note: "Low-bandwidth-camp user hits offline state most often — they need to see Arabic/Hebrew, not English."
+  - severity: P1
+    finding: "F8 student data portability export — format spec (JSON? PDF? CSV?) not pinned. If PDF, must be tagged; if CSV, column headers in student locale; if JSON, document schema in parent-readable form."
+    evidence: "AXIS_10...md:F8 section"
+    lens_note: "Israeli Privacy Law + COPPA both expect student/parent can actually read the export."
+  - severity: P1
+    finding: "F6 IT admin deployment dashboard — Hebrew-speaking Israeli IT staff. Must localize admin UI too (not just student-web). Admin i18n maturity unclear."
+    evidence: "AXIS_10...md:F6 section"
+    lens_note: "Admin/full-version directory has no confirmed he/ar locale files visible here — needs verification."
+  - severity: P2
+    finding: "F3 CSV roster import — Hebrew/Arabic student names include diacritics + combining marks. Import pipeline must NFC-normalize and reject CSVs without BOM-declared UTF-8 encoding (common Excel/Windows issue)."
+    evidence: "AXIS_10...md:F3 section"
+    lens_note: "Silent name corruption on import is a common failure in Israeli school SIS integrations."
+  - severity: P2
+    finding: "F2 Mashov sync — Mashov returns Hebrew content in cp1255 or UTF-8 depending on endpoint. Sync must handle both or fail loudly."
+    evidence: "AXIS_10...md:F2 section"
+    lens_note: "Silent mojibake will make the feature unusable for Hebrew teachers."
+already_built:
+  - feature: "Offline PWA shell"
+    evidence: "src/student/full-version/public/offline.html"
+    note: "Extend for F4 rather than greenfield"
+  - feature: "i18n scaffolding for he/ar/en"
+    evidence: "src/student/full-version/src/plugins/i18n/"
+    note: "Integration points (SSO, export, roster) must consume this"
+duplicates_of_other_docs:
+  - "axis9_data_privacy_trust_mechanics.md: Feature 3 Delete My Journey (overlaps F8)"
+  - "cena_competitive_analysis.md: SSO and Google Classroom overlap"
+extracted_tasks:
+  - title: "SSO button + greeting a11y/bidi contract (F1)"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Ensure Google SSO button is keyboard-focusable with correct aria-label, and post-login greeting wraps non-locale names in <bdi>.
+      ## Files
+      - auth/login component (to be identified when built)
+      - greeting component (e.g., UserProfile.vue)
+      - tests/a11y/greeting-bidi.spec.ts (new)
+      ## Definition of Done
+      - SSO button has aria-label and visible focus ring
+      - Greeting wraps name in <bdi> in RTL locales
+      - Scanner fails on un-wrapped names
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L38-L60]
+  - title: "Student data portability export: tagged PDF + locale-aware CSV"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Define the export format spec for F8 such that every generated file is readable by the student/parent in their chosen locale. PDFs tagged (PDF/UA), CSVs BOM-prefixed UTF-8 with localized column headers.
+      ## Files
+      - export service (when built)
+      - tests for: PDF tagged structure, CSV BOM, localized headers
+      ## Definition of Done
+      - PDF exports pass a PDF/UA validator in CI
+      - CSV exports start with UTF-8 BOM and have headers in student locale
+      - JSON exports include a human-readable schema.md companion in student locale
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F8 section]
+  - title: "Hebrew/Arabic name normalization for F3 CSV roster import"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Roster CSV import must NFC-normalize names, detect and require UTF-8 BOM, reject cp1255 silently-imported files with a clear Hebrew/Arabic error message.
+      ## Files
+      - roster import service (when built)
+      - unit tests with Hebrew + Arabic sample CSVs
+      ## Definition of Done
+      - Import rejects non-UTF-8 CSVs with localized error
+      - Names normalized NFC before persistence
+      - Round-trip test: import -> export -> import preserves names bit-identically
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F3 section]
+verdict: adopt
+verdict_reason: "Ops features are mostly backend; a11y/l10n ask is to guarantee Hebrew/Arabic round-trip integrity across SSO, roster import, and exports, plus keyboard access on auth UI."
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F8 data portability scope and retention"
+  - to: persona-redteam
+    about: "F1 SSO token handling and session replay"
+  - to: persona-sre
+    about: "F4 offline conflict resolution and observability"

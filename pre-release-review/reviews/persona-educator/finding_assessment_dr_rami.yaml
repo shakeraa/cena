@@ -1,0 +1,200 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr Rami's statistical-honesty assessment of the same 20 SHIP-recommended
+  findings. 9 PASS, 8 WARNING, 3 REJECT (FD-003 fabricated 95% misconception
+  resolution, FD-008 "Yu et al. 2026" unverifiable citation + DPA§7 issue,
+  FD-011 ES=1.16 cherry-picked). Also flags FD-006 Foster 2021 null on math
+  achievement and FD-004 RDY-080 implicit Bagrut prediction.
+
+system_purpose_fit: 4
+  rationale:
+    - Not a pedagogical doc per se — it's a statistical-honesty audit.
+      But honest effect-size communication is a pedagogical necessity:
+      we don't lie to teachers about what the system will deliver.
+    - Dr Rami's three REJECTs + five WARNINGs expose real risks that
+      Dr Nadia's review largely passed through.
+    - Minus because some WARNINGs (FD-015 Kehrer misdated) are minor
+      citation hygiene, while others (FD-003 fabricated 95%) are
+      ship-blockers — the doc doesn't differentiate severities clearly.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "MisconceptionDetectionService enforces ADR-0003 (FD-003 compliance already in code)" -> src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs + src/actors/Cena.Actors.Tests/Compliance/MlExclusionEnforcementTests.cs
+    - "CAS step verifier (FD-008 CAS-first architecture for grading)" -> src/actors/Cena.Actors/Cas/StepVerifierService.cs
+    - "IRT + Elo (FD-004)" -> src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+
+adr_alignment:
+  honored:
+    - ADR-0002 (Dr Rami validates CAS-oracle framing in FD-002, FD-005)
+    - ADR-0003 (Dr Rami raises the 95% resolution claim as an ADR-0003
+      violation risk — correctly)
+    - RDY-080 (multiple entries call out Bagrut-prediction risk)
+  violated: []
+  missing_adr_needed:
+    - Effect-size language policy ADR (combined with Dr Nadia review's
+      same recommendation).
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Dr Rami's FD-003 REJECT — "95% misconception resolution" is
+      fabricated or misattributed. From a pedagogue standpoint this is
+      serious: the 95% figure appears in internal team communication
+      and motivates the whole misconception-tagging investment.
+      Correcting it to 60-80% (actual DeepMind/Eedi range) doesn't kill
+      the feature (Cena's implementation is already code-complete and
+      ADR-0003 compliant) but *does* change the expected-impact framing
+      for teachers. Before any teacher-facing demo or marketing mentions
+      this feature, the effect-size must be corrected internally.
+    evidence: finding_assessment_dr_rami.md FD-003 REJECT, src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs (feature exists and is compliant; only the ES claim is wrong)
+    lens_note: |
+      Honest expected-outcome framing is pedagogical ethics. A teacher
+      who hears "95% resolution!" and sees 70% in their class loses
+      trust in the platform.
+  - severity: P1
+    finding: |
+      Dr Rami's FD-008 REJECT notes "Yu et al. 2026" is unverifiable
+      (the year is in the future or doesn't exist). The feature
+      (partial-credit grading) is still valuable — CAS-first grading is
+      architecturally sound. The fix: replace the fabricated citation
+      with real grading-research sources (Yu et al. 2024 arXiv:2408.11728
+      is real; the 2026 reference is the fabrication). Do not build
+      internal communication on unverifiable claims.
+    evidence: finding_assessment_dr_rami.md FD-008 REJECT
+    lens_note: |
+      Citation hygiene is pedagogical hygiene. We publish to teachers
+      who check references.
+  - severity: P1
+    finding: |
+      Dr Rami's FD-006 WARNING on Foster 2021 null effect on math
+      achievement is critical. The CBM mechanism improves *calibration*
+      but not *achievement*. Shipping the feature framed as an
+      achievement booster mis-sets expectations. Frame as a metacognitive-
+      awareness tool and scale internal success metrics accordingly (we'd
+      expect calibration-accuracy improvement, NOT Bagrut-outcome delta).
+    evidence: finding_assessment_dr_rami.md FD-006 WARNING
+    lens_note: |
+      Foster 2021 is the definitive word on CBM + math. Omitting it is
+      cherry-picking.
+  - severity: P1
+    finding: |
+      Dr Rami's FD-011 REJECT on ES=1.16 cherry-picking aligns with my
+      axis8 review. A meta-analysis ES above 1.0 in education is almost
+      always either a small-study bias artifact or methodology issue.
+      Use d=0.3-0.6 in all internal communication; do not build roadmap
+      or marketing commitments on 1.16.
+    evidence: finding_assessment_dr_rami.md FD-011 REJECT
+    lens_note: |
+      Dr Nadia and I agree; the three-way resolution is: ship the
+      feature, honest about the effect size.
+  - severity: P2
+    finding: |
+      Dr Rami's FD-015 WARNING on Kehrer citation year (2013 vs 2021) is
+      minor citation hygiene. Effect size (d=0.37) is correctly cited;
+      fix the year and move on.
+    evidence: finding_assessment_dr_rami.md FD-015 WARNING
+    lens_note: |
+      Not a blocker, but should be fixed in the next research doc pass.
+
+already_built: []
+
+duplicates_of_other_docs:
+  - feature-discovery-2026-04-20.md: Dr Rami reviews the same 20 findings as Dr Nadia; all 20 findings live in the feature-discovery doc
+  - cena_dr_nadia_pedagogical_review_20_findings.md: Same 20 findings, different lens (pedagogy vs statistical honesty); complementary, not redundant
+
+extracted_tasks:
+  - title: "Correct FD-003 misconception-resolution figure across all internal docs"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Sweep all Cena internal docs (ADRs, research, marketing drafts,
+      roadmaps, onboarding) and replace "95% misconception resolution"
+      with "60-80% retry success (DeepMind/Eedi 2025)." Prevents
+      teacher-facing claims built on a fabricated figure.
+      ## Files
+      - grep -r "95%" docs/ pre-release-review/ — replace or remove
+      - Each ADR referencing misconception resolution rate
+      ## Definition of Done
+      - grep "95%.*misconception" returns no results outside this task's
+        own history.
+      - Replacement figures cite the DeepMind/Eedi 2025 arXiv paper.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: correct-misconception-resolution-figure"
+    source_doc_lines: [finding_assessment_dr_rami.md FD-003 + cross-cutting]
+  - title: "Replace FD-008 fabricated 'Yu et al. 2026' citations"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Sweep all Cena docs replacing "Yu et al. 2026" with the verifiable
+      arXiv:2408.11728 (2024) "AI-assisted Automated Short Answer Grading
+      of Handwritten University Level Mathematics Exams." Correct the
+      90%+ agreement claim accordingly.
+      ## Files
+      - grep -r "Yu et al. 2026" pre-release-review/ docs/
+      ## Definition of Done
+      - No unverifiable Yu 2026 citations remain.
+      - Replacement citation is real and linked.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: replace-yu-2026-citation"
+    source_doc_lines: [finding_assessment_dr_rami.md FD-008]
+  - title: "Reframe FD-006 CBM as metacognitive tool, update success metrics"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Update the confidence-based-marking feature spec: primary
+      success metric is *calibration accuracy improvement*, not Bagrut-
+      outcome delta. Cite Foster 2021 null in the feature doc.
+      Communicates honest expectations to teachers.
+      ## Files
+      - pre-release-review/reviews/persona-educator/AXIS_6_Assessment_Feedback_Research.yaml (already reflects this)
+      - Any active spec doc for CBM
+      - docs/adr/ (optional: ADR-lock the reframing)
+      ## Definition of Done
+      - Feature success metric updated.
+      - Foster 2021 null finding cited.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: cbm-metric-reframe"
+    source_doc_lines: [finding_assessment_dr_rami.md FD-006]
+
+verdict: adopt
+verdict_reason: |
+  Dr Rami's three REJECTs (FD-003, FD-008, FD-011) identify real
+  integrity risks that must be fixed before any teacher-facing
+  communication. The five WARNINGs are either citation hygiene or
+  framing issues with concrete fixes. None of these require retiring
+  features — only correcting the effect-size/citation language around
+  them.
+
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      All effect-size debates — primary cogsci-lens territory. Recommend
+      cogsci compile a Cena-wide "effect-size policy" document so the
+      Dr Rami / Dr Nadia disagreements have a canonical resolution.
+  - to: persona-privacy
+    about: |
+      FD-003's ADR-0003 architectural audit recommendation — privacy
+      should confirm the MisconceptionDetectionService + ML exclusion
+      tests meet the bar Dr Rami implies.
+  - to: persona-ministry
+    about: |
+      FD-004 RDY-080 implicit Bagrut prediction, FD-020 rubric engine
+      misuse risk — ministry should hold the line on no unvalidated
+      Bagrut score claims.
+  - to: persona-ethics
+    about: |
+      FD-006 overselling CBM as achievement booster is an ethics
+      concern — ethics should ensure internal + external communication
+      language is honest.

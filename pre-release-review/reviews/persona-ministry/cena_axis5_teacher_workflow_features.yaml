@@ -1,0 +1,181 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight teacher-workflow features: lesson planner from class weakness,
+  differentiated homework auto-generator, student-conference prep, Bagrut-
+  readiness tracking, class-health pulse, parent bridge, CoGrader-style
+  grading assist, marketing claim "MagicSchool AI clone". Ministry lens:
+  teacher-facing = curriculum-authority-facing. These tools speak to the
+  teacher''s planning decisions, which the school (and by extension the
+  Ministry) owns. Bagrut-readiness tracking is the hottest item here.
+system_purpose_fit: 3
+  rationale:
+    - Lesson planner (F1) + homework generator (F2) + conference prep (F3)
+      are teacher productivity wins; Ministry-neutral if they reference
+      official taxonomy + prereq DAG rather than a synthetic curriculum.
+    - F4 "Bagrut-Readiness Tracking" is RDY-080 territory — same risk as
+      parent-facing countdown. Teachers may want a predicted score, but
+      we cannot ship one without concordance evidence.
+    - Features rely on "class weakness profile" aggregation — privacy/
+      tenant leakage risk flagged for redteam/privacy; Ministry lens
+      flags only the syllabus-grounding requirement.
+code_reality_check:
+  claims_verified_in_code:
+    - 'Teacher dashboard surface: src/admin/full-version/ (per memory:project_admin_dashboard)'
+    - 'Content coverage service exists: src/api/Cena.Admin.Api/Content/ContentCoverageService.cs'
+    - 'Bagrut-taxonomy JSON + review doc: scripts/bagrut-taxonomy.json + docs/curriculum/bagrut-taxonomy-review.md'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'F4 Bagrut-Readiness Tracking — no existing readiness calculator found; if this ships, it must not be a score predictor'
+    - 'F1 lesson planner "40% reduction in planning time" citation — outside lens, flagged for cogsci'
+adr_alignment:
+  honored:
+    - 'F2 differentiated homework can ride existing AdaptiveScheduler + ChapterDocument (ADR-0034)'
+    - 'Mashov read-only sync (F6 parent bridge and cross-doc) — read-only = no Bagrut-score write-back'
+  violated: []
+  missing_adr_needed:
+    - 'Teacher-surface Bagrut-readiness framing policy — what teachers may see (coverage, mastery frontier) vs must not (numeric Bagrut prediction without concordance)'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 4 "Bagrut-Readiness Tracking with target unit level mapping"
+      is advertised by the doc as one of the three differentiated
+      capabilities (L263). "Target unit level mapping" implies the system
+      tells a teacher "this student should sit 4U not 5U" — this is a
+      Bagrut-trajectory recommendation, functionally a prediction. Unless
+      paired with a published concordance study (RDY-080), this is the
+      most serious Ministry-defensibility breach in the parent+teacher
+      family of proposals.
+    evidence: 'cena_axis5_teacher_workflow_features.md:L263; pre-release-review/finding_assessment_dr_rami.md:L20 (RDY-080)'
+    lens_note: |
+      Ministry lens: telling a teacher "switch this student to 3U" is a
+      policy decision the school and student own. Cena can surface data
+      (chapter coverage, attempt accuracy), but must not issue the
+      recommendation. Getting this wrong could surface students in the
+      wrong exam track — a Ministry-visible harm.
+  - severity: P1
+    finding: |
+      Feature 1 "Smart Lesson Planner" auto-generates plans from class
+      weakness profile. The plan must reference the ChapterDocument
+      structure + prereq DAG; otherwise a well-meaning teacher could be
+      advised to teach a locked chapter. The doc''s guardrail section
+      (L300) only addresses privacy / aggregation, not syllabus-grounding.
+    evidence: 'cena_axis5_teacher_workflow_features.md:L271-L300; docs/adr/0034-syllabus-advancement-model.md:L31-L52'
+    lens_note: |
+      Ministry lens: if Cena "plans" a lesson that violates Ministry
+      syllabus ordering, we are telling teachers to teach out-of-scope
+      material. Inspectors notice.
+  - severity: P1
+    finding: |
+      Feature 8 implied "Bagrut prep teacher" persona (L289) uses "Bagrut
+      curriculum map" as a data source. This map must be the canonical
+      scripts/bagrut-taxonomy.json + docs/curriculum/bagrut-taxonomy-
+      review.md artefact; doc does not specify. If a second curriculum
+      map ships, we have two ontologies in play.
+    evidence: 'cena_axis5_teacher_workflow_features.md:L289, L297 (Bagrut curriculum database integration); scripts/bagrut-taxonomy.json (canonical source)'
+    lens_note: |
+      Ministry lens: one canonical taxonomy, one expert sign-off
+      (bagrut-taxonomy-review.md), one source of truth. All teacher-
+      facing recommendations must flow from it.
+  - severity: P2
+    finding: |
+      Feature 5 "Class Health Pulse" should expose only chapter-level
+      aggregate signals, not individual student scores. The guardrail
+      note (L300) addresses small-class reveal risk, but Ministry-lens
+      concern is framing: "pulse" must not cross into "prediction" for
+      the class.
+    evidence: 'cena_axis5_teacher_workflow_features.md (F5 section, not excerpted but per summary L263)'
+    lens_note: |
+      Ministry lens: class-level prediction has the same regulation
+      footprint as individual.
+already_built:
+  - feature: Content coverage service + curriculum taxonomy
+    evidence: src/api/Cena.Admin.Api/Content/ContentCoverageService.cs, scripts/bagrut-taxonomy.json
+    note: |
+      F1 lesson planner should read from ContentCoverageService; doc
+      proposes green-field aggregation.
+  - feature: Syllabus advancement teacher view
+    evidence: 'docs/adr/0034-syllabus-advancement-model.md:L167 (StudentSyllabusAdvancement landed)'
+    note: |
+      F3 conference prep overlaps — teacher already has a per-student
+      advancement view.
+duplicates_of_other_docs:
+  - 'AXIS_4_Parent_Engagement_Cena_Research.md: F3 parent-teacher bridge'
+  - 'feature-discovery-2026-04-20.md: FD-004 IRT placement has the RDY-080 flag pattern for "readiness" scores'
+  - 'feature-discovery-2026-04-20.md: FD-019 Mashov read-only sync overlaps the integration implied here'
+extracted_tasks:
+  - title: Reframe F4 "Bagrut-Readiness Tracking" to non-predictive coverage view
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Remove any numeric/ordinal prediction from F4 "Bagrut-Readiness
+      Tracking". Replace with deterministic coverage signals:
+      - Chapters mastered (per ADR-0034 StudentAdvancement aggregate)
+      - Chapters remaining on the Ministry 3U/4U/5U syllabus
+      - First-attempt accuracy on mock items (no bayesian uplift, no
+        theta estimate shown to teacher until RDY-080 concordance study
+        lands)
+
+      ## Files
+      - pre-release-review/cena_axis5_teacher_workflow_features.md
+        (revise F4 spec)
+      - docs/adr/00XX-teacher-surface-bagrut-readiness-framing.md (new)
+      - docs/engineering/shipgate.md (scanner patterns for teacher copy)
+
+      ## Definition of Done
+      - F4 spec revised — "tracking" limited to coverage + mock
+        accuracy; no "on track for Nu" language
+      - ADR drafted and linked
+      - Shipgate scanner additions land
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L263]
+  - title: Bind lesson-planner output to ChapterDocument prereq DAG
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-lesson-planner-prereq
+    queue_body: |
+      ## Goal
+      Ensure F1 "Smart Lesson Planner" never recommends a lesson on a
+      chapter whose prereqs are not majority-mastered by the class.
+
+      ## Files
+      - src/api/Cena.Admin.Api/Teacher/LessonPlannerService.cs (new or
+        existing — check first)
+      - src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs (expose
+        read API suitable for class-aggregate filtering)
+      - Tests in src/api/Cena.Admin.Api.Tests/Teacher/
+
+      ## Definition of Done
+      - Recommendation engine filters candidate chapters by
+        (class-aggregate prereq-mastery threshold configurable, default 70%)
+      - Test: class with 0% mastery of prereqs → recommender returns
+        only the prereq chapter, never the downstream chapter
+      - Full sln build green
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-lesson-planner-prereq --result "<branch>"
+    source_doc_lines: [L271-L300]
+verdict: revise
+verdict_reason: |
+  F4 is P0 — must be reframed before any teacher-facing surface advertises
+  "Bagrut readiness". F1 needs prereq-DAG binding. Rest are adopt-grade
+  with syllabus-ground checks.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      F5 Class Health Pulse aggregation privacy, small-class reveal,
+      teacher-vs-student data access — privacy lens is canonical.
+  - to: persona-cogsci
+    about: |
+      "40% reduction in planning time" citation and other effect-size
+      claims in this doc.
+  - to: persona-enterprise
+    about: |
+      Bounded-context placement for teacher workflow services (admin
+      API vs new teacher-ops service) and Mashov integration shape.

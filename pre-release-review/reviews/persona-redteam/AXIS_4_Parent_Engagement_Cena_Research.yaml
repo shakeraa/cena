@@ -1,0 +1,157 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight parent-engagement features (explainability card, bilingual dashboard,
+  parent-teacher bridge messages, cohort context, weekly snapshot,
+  encouragement SMS nudges, cultural localization, Bagrut countdown). Adds
+  parent-authenticated surface with cross-account relationships (parent ↔
+  child) and an outbound SMS channel — high authz + side-channel risk.
+system_purpose_fit: 3
+  rationale:
+    - Parent features cross tenant + family boundaries — authz gaps here are worst-case
+    - SMS outbound (F6) reuses RDY-069 Twilio scaffold and has the same abuse surface
+    - F3 parent→teacher messaging is a new peer-to-adult communication channel
+      for a platform serving minors — must not become a grooming/contact vector
+code_reality_check:
+  claims_verified_in_code:
+    - "Tenant/institute scoping helper exists -> src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs:57"
+    - "School filter enforced for non-SUPER_ADMIN -> src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs:30"
+    - "Twilio adapter scaffold recent (RDY-069)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "'Parent-Teacher Bridge Messages' — no parent-to-teacher messaging aggregate exists today; security model must be designed from scratch"
+    - "Parent-to-child relationship claim mapping — not found in InstituteRoleClaims.cs"
+adr_alignment:
+  honored:
+    - ADR-0001 (multi-institute enrollment) — any parent view must inherit institute filter
+    - ADR-0003 — snapshot content must respect 30-day session scope
+  violated: []
+  missing_adr_needed:
+    - "Parent↔child claims mapping ADR — how a parent proves they own the relationship to a specific student_id"
+    - "Parent-teacher messaging ADR — moderation, retention, 1:1 vs group, attachment policy"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F3 Parent-Teacher Bridge Messages proposes a new adult-to-adult message
+      channel scoped per-student. Without a designed moderation + audit plan,
+      this becomes a grooming / unauthorized-contact vector through a platform
+      serving minors. Every message must be: auditable, teacher-initiated or
+      teacher-accepted, content-filtered (URL + phone stripping), and visible
+      to the institute admin. Doc does NOT specify any of this.
+    evidence: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md Feature 3
+    lens_note: Minor-safeguarding blocker; cannot ship as "messages between adults about a child" without a safeguarding design.
+  - severity: P0
+    finding: |
+      No clear mapping from Firebase claims → parent→child relationship. The
+      existing TenantScope.GetInstituteFilter handles institute only; there is
+      no documented "parent_of=[student_ids]" claim or aggregate. If F1/F2/F5
+      endpoints accept a query parameter `studentId` and only check
+      `user.role == "parent"`, any parent can enumerate any student. Doc
+      silent on how parents are bound to their specific child(ren).
+    evidence: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md F1/F2/F5; src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs (no parent logic)
+    lens_note: Classic IDOR across tenant+family boundary. High severity.
+  - severity: P1
+    finding: |
+      F6 Encouragement SMS / WhatsApp nudges — same abuse surface as axis2 F2.
+      Any student-authored field (child's goal text, progress note) that
+      appears in the outbound body is a smishing vector billed to the
+      institute's Twilio account. Also: STOP-list / opt-out compliance
+      (TCPA-equivalent for IL) not discussed.
+    evidence: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md Feature 6
+    lens_note: Outbound channels at minor-serving platforms = highest scrutiny.
+  - severity: P1
+    finding: |
+      F5 Weekly Chapter Snapshot persisted to parents — if snapshots include
+      per-question misconception tags, this back-doors ADR-0003 (data lives
+      30+ days in "parent archive"). Snapshot must be rendered-on-read from
+      rolled-up aggregates, not persisted PII-laden document.
+    evidence: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md F5 data model (implicit); ADR-0003
+    lens_note: Retention shifted to parent inbox is still retention.
+  - severity: P2
+    finding: |
+      F2 bilingual dashboard — Arabic RTL rendering path must apply the same
+      bidi override strip noted in axis3 review. Parent dashboard may render
+      student-authored text (problem notes), so same spoof vector applies.
+    evidence: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md Feature 2
+    lens_note: Cross-reference to axis3 finding.
+already_built:
+  - feature: Tenant/institute filter extraction
+    evidence: src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs:57
+    note: Needed as a building block; a *parent→child* filter does not yet exist and is a P0 prerequisite.
+duplicates_of_other_docs:
+  - "axis9_data_privacy_trust_mechanics.md: parent dashboard + erasure features overlap F1/F2"
+extracted_tasks:
+  - title: Design and implement parent→child claims binding + enforcement helper
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Parent users must only see data for student_ids explicitly bound to them
+      via a custom Firebase claim `parent_of=[student_id,...]` (or equivalent
+      server-side mapping). Add a `TenantScope.GetChildrenFilter(user)` helper
+      and enforce it on every parent-scoped endpoint introduced by axis4.
+      Follow ADR-0001 pattern.
+      ## Files
+      - src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs
+      - src/shared/Cena.Infrastructure/Auth/InstituteRoleClaims.cs
+      - new tests under src/api/Cena.Admin.Api.Tests (similar to TeacherHeatmapScopeGuardTests)
+      ## Definition of Done
+      - [ ] Claim mapping documented in ADR (new or addendum to ADR-0001)
+      - [ ] Scope guard rejects cross-family access with 403
+      - [ ] All F1/F2/F5/F8 endpoints use the guard
+      - [ ] Scope-guard test lands alongside any parent endpoint
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L25-L120, L200-L310]
+  - title: Outbound SMS sanitizer for parent nudges (URLs, phone numbers, STOP)
+    priority: P0
+    estimate: S
+    suggested_assignee: claude-subagent-sec
+    queue_body: |
+      ## Goal
+      F6 Encouragement Nudges must not include user-authored URLs or phone
+      numbers and must honour a global STOP list.
+      ## Files
+      - RDY-069 Twilio adapter path
+      - new sanitizer in src/shared/Cena.Infrastructure
+      ## Definition of Done
+      - [ ] Outbound body stripped of http(s)://, tel:, phone regex
+      - [ ] Global STOP list checked before send, else drop with audit
+      - [ ] Unit test: parent attempts to send custom message with URL → rejected
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-sec --result "<branch>"
+    source_doc_lines: [L260-L320]
+  - title: Bridge-message safeguarding spec before any parent-teacher messaging lands
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Produce a safeguarding design ADR for F3 covering: teacher-initiated
+      only, attachment policy, URL/phone strip, retention, institute-admin
+      audit view, moderation queue, and age-of-student gating. NO implementation
+      until the ADR is accepted.
+      ## Files
+      - docs/adr/0038-parent-teacher-messaging.md (new)
+      ## Definition of Done
+      - [ ] ADR accepted by owner
+      - [ ] Explicit COPPA/IL PPL §11 & §13 mapping
+      - [ ] Explicit moderation path with SLOs
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L165-L230]
+verdict: revise
+verdict_reason: |
+  Parent engagement as described has two P0 shipgates: parent→child claim
+  binding is missing in code, and parent-teacher messaging has no safeguarding
+  design. Ship F1/F5/F7 cleanly after those land; F3 and F6 need explicit ADRs.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: Weekly snapshot retention path (F5); parent archive as ADR-0003 back-door
+  - to: persona-enterprise
+    about: Parent-of relationship aggregate design and event sourcing fit
+  - to: persona-sre
+    about: SMS spend runaway monitoring for F6

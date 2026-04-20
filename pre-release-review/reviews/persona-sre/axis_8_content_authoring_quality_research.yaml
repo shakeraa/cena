@@ -1,0 +1,110 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight content-authoring + quality features (Bayesian IRT calibration, CAS-gated variation engine, Bagrut partial-credit rubric
+  engine, Arabic RTL math renderer, culturally-contextualized problem generator, mother-tongue hint system, self-efficacy
+  calibrated difficulty, hybrid Elo+expert calibration). Heavy CAS + LLM generation volume.
+system_purpose_fit: 4
+  rationale:
+    - CAS-gated variation engine (Feature 2) is THE enforcement mechanism for ADR-0002.
+    - SRE gap: ingestion burst profile not specified; LLM generation cost + rate not bounded.
+code_reality_check:
+  claims_verified_in_code:
+    - "CAS-gated ingestion pipeline exists (ADR-0032) -> docs/adr/0032-cas-gated-question-ingestion.md; src/api/Cena.Admin.Api/Ingestion/BagrutPdfIngestionService.cs"
+    - "OCR cascade produces CAS-validated output -> src/shared/Cena.Infrastructure/Ocr/ + OCR tests (111/111 passing per memory)"
+    - "Curator metadata service -> src/api/Cena.Admin.Api/Ingestion/CuratorMetadataService.cs"
+    - "Reference-calibrated generation tests -> src/api/Cena.Admin.Api.Tests/Content/ReferenceCalibratedGenerationServiceTests.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Bayesian IRT posterior computation latency at scale — PyMC/Stan not in dependency tree"
+    - "Hybrid Elo + expert calibration pipeline — no Elo service cited"
+adr_alignment:
+  honored: [ADR-0002, ADR-0032, ADR-0033]
+  violated: []
+  missing_adr_needed:
+    - "Content generation rate-limit policy (per-tenant burst cap)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 2 (CAS-Gated Variation Engine) is load-bearing. Any regression in SymPy sidecar throughput = content pipeline stall
+      = exam-week content gap. Need a persistent CAS sidecar SLO (throughput, p99 latency, failure budget) + chaos CI already
+      present must include "SymPy returns error 10% of calls" case.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md Feature 2; .github/workflows/cas-chaos-nightly.yml
+    lens_note: Existing chaos workflow is a starting point; verify it includes rate-limited-degradation mode.
+  - severity: P1
+    finding: |
+      Feature 5 (Culturally-Contextualized Problem Generator) requires community review board per Dr Nadia. That review board is
+      operational (people + queue + SLA) — treat as a feature, not metadata. Need a content review runbook + DLQ for items that
+      fail cultural review.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md Feature 5; cena_dr_nadia_pedagogical_review_20_findings.md FD-011
+    lens_note: "Human review board" without operational backing is a hand-wave.
+  - severity: P1
+    finding: |
+      Feature 1 (Bayesian IRT) introduces Hamiltonian Monte Carlo at item selection time. That is a new runtime cost not modeled
+      in load tests. Either move sampling offline (batch) or specify a latency budget.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md Feature 1
+    lens_note: Don't put MCMC on the request path unless you want to hot-patch at 03:00.
+  - severity: P2
+    finding: |
+      Feature 4 (Arabic RTL renderer) is primarily client-side but needs to be bundled in Service Worker cache for offline-first.
+      Coordinate with axis-10 Feature 4 (offline-first) so RTL CSS + fonts ship together.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md Feature 4; AXIS_10_Operational_Integration_Features.md:L212-L218
+    lens_note: Cross-feature coupling often only surfaces during deploy.
+already_built:
+  - feature: OCR cascade + CAS-gated ingestion pipeline
+    evidence: src/shared/Cena.Infrastructure/Ocr/**; src/api/Cena.Admin.Api/Ingestion/BagrutPdfIngestionService.cs
+    note: Feature 2 extends this; do not re-propose ingestion core.
+  - feature: Reference-calibrated generation service
+    evidence: src/api/Cena.Admin.Api.Tests/Content/ReferenceCalibratedGenerationServiceTests.cs
+    note: Feature 8 hybrid calibration likely overlaps.
+  - feature: Curator metadata flow
+    evidence: src/api/Cena.Admin.Api/Ingestion/CuratorMetadataService.cs
+    note: Use for Feature 5 cultural-review routing.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-002 / FD-011 / FD-014 / FD-027 (CAS gen, cultural, RTL, difficulty)."
+extracted_tasks:
+  - title: Publish SymPy sidecar SLO + expand chaos CI to rate-degradation case
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Declare CAS sidecar throughput + p99 latency SLO; add chaos scenario where SymPy returns 503 for 10% of calls and pipeline
+      still passes with retries + back-pressure.
+      ## Files
+      .github/workflows/cas-chaos-nightly.yml
+      deploy/observability/alerting-rules.yaml
+      docs/ops/runbooks/ (extend: ocr-sidecar-runbook.md or new cas-sidecar.md)
+      ## Definition of Done
+      - Chaos scenario green
+      - SLO dashboard + burn-rate alert
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/cas-slo"
+    source_doc_lines: []
+  - title: Stand up cultural-review board as an operational queue with DLQ + SLA
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Items flagged for Feature 5 cultural review land in a moderation queue; DLQ for items that never get reviewed; SLA
+      surfacing in admin dashboard.
+      ## Files
+      src/api/Cena.Admin.Api/Ingestion/CuratorMetadataEndpoints.cs
+      src/admin/full-version/src/ (queue UI)
+      docs/ops/runbooks/ (new: cultural-review-queue.md)
+      ## Definition of Done
+      - Integration test: flagged item routed + SLA breach alerts
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/cultural-review"
+    source_doc_lines: []
+verdict: revise
+verdict_reason: |
+  Most features extend existing CAS-gated pipeline. Adding SLOs + an operational review queue is the remaining gap.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: Cultural-contextualized generation staying within Bagrut-reference-only boundary.
+  - to: persona-finops
+    about: MCMC sampling cost and LLM generation burst rate.

@@ -1,0 +1,137 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight parent-engagement features: Why-this-topic card, bilingual dashboard,
+  parent-teacher bridge messages, cohort context, weekly snapshot,
+  encouragement SMS nudges, culturally-localized views, crisis countdown.
+  Mix of SMS/WhatsApp send costs and LLM generation for personalized content.
+system_purpose_fit: 4
+  rationale:
+    - Parent engagement is critical but adds per-parent-day cost (SMS + LLM).
+    - Several features explicitly state "template-based" (good) vs "LLM" (watch).
+    - WhatsApp adapter already scaffolded (RDY-069) — ongoing vendor cost.
+code_reality_check:
+  claims_verified_in_code:
+    - "WhatsApp Twilio adapter scaffolded -> recent commit e0c2b21 feat(rdy-069) and src/actors/Cena.Actors/ParentDigest/TwilioWhatsAppSender.cs"
+    - "Parent console endpoints present -> src/api/Cena.Admin.Api/Features/ParentConsole/"
+    - "LLM judge sidecar exists -> src/actors/Cena.Actors/Pedagogy/LlmJudgeSidecar.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "SMS vendor costs in Israel — doc doesn't specify Twilio vs 019 Telecom; pricing differs materially"
+adr_alignment:
+  honored:
+    - "ADR-0003 — parent views on aggregate, not misconception data"
+  violated: []
+  missing_adr_needed:
+    - "ADR for parent-channel cost ceiling (per-parent monthly SMS/WhatsApp budget)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F6 Encouragement Nudges (SMS) — SMS to Israel via Twilio is ~$0.06/msg.
+      At 3 nudges/week x 100k parents = 1.2M msg/month = ~$72k/month. This
+      exceeds the ENTIRE global LLM cap ($30k/month, routing-config.yaml:301).
+      Must switch to WhatsApp (free/cheap for Israel) or in-app push
+      notifications only. Doc is silent on channel cost.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md (F6); contracts/llm/routing-config.yaml:301
+    lens_note: Channel choice is THE cost driver. SMS-as-default breaks unit economics.
+  - severity: P0
+    finding: |
+      F1 "Why This Topic" Card — doc explicitly says "template-based, NOT LLM"
+      (line ~L48). EXCELLENT. Ship as-is. Contrast with F5 and F8 which do
+      not commit to template-only approach.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:48
+    lens_note: Doc author did the right thing here — others should follow the pattern.
+  - severity: P1
+    finding: |
+      F3 Parent-Teacher Bridge Messages and F7 Culturally-Localized Parent Views
+      — if messages are LLM-generated per parent per week, cost = ~100k parents
+      x $0.01/msg = $1k/week = $4k/month. Acceptable IF capped. Doc does not
+      specify cap.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md (F3, F7)
+    lens_note: Quota per parent per week (1-2 max) essential to avoid cost spiral.
+  - severity: P1
+    finding: |
+      F4 Privacy-Preserving Cohort Context — differential privacy analytics
+      are compute-expensive (noise sampling, laplace mechanism). At 10k
+      students x daily queries, DP compute is non-trivial. Batch overnight
+      to avoid per-request cost.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md (F4)
+    lens_note: Make this a nightly batch job; cache results 24h.
+  - severity: P2
+    finding: |
+      F8 Crisis Mode Bagrut Countdown — pure UI (date math + scheduling).
+      Zero LLM cost if rendered from existing mastery aggregates.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md (F8)
+    lens_note: Ship cheap.
+already_built:
+  - feature: "Twilio WhatsApp vendor adapter"
+    evidence: src/actors/Cena.Actors/ParentDigest/TwilioWhatsAppSender.cs (commit e0c2b21)
+    note: F6 should route through WhatsApp (existing) not SMS (new cost line).
+  - feature: "Parent console accommodations + time budget endpoints"
+    evidence: src/api/Cena.Admin.Api/Features/ParentConsole/AccommodationsEndpoints.cs
+    note: Dashboard features F2 should extend existing endpoints.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-034 (Auto-translation parent comms) = F2/F7 adjacent"
+  - "feature-discovery-2026-04-20.md: FD-014 (Why this problem) = F1 sibling"
+extracted_tasks:
+  - title: "Gate all parent messaging to WhatsApp first, SMS fallback with cost cap"
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Enforce WhatsApp (existing TwilioWhatsAppSender) as primary parent channel;
+      SMS only on opt-in or WhatsApp delivery failure. Add per-parent monthly
+      SMS cap of 20 messages (~$1.20/month/parent max) to keep channel costs
+      under control.
+
+      ## Files
+      - src/actors/Cena.Actors/ParentDigest/ParentChannelRouter.cs (new)
+      - src/actors/Cena.Actors/ParentDigest/SmsCostCircuitBreaker.cs (new, model on RedisCostCircuitBreaker)
+      - src/actors/Cena.Actors.Tests/ParentDigest/ParentChannelRouterTests.cs
+
+      ## Definition of Done
+      - Router selects WhatsApp when phone has WA and opt-in; SMS fallback
+      - Per-parent monthly cap enforced (count + $ budget)
+      - Metric: cena.parent.channel.cost_usd{channel=whatsapp|sms}
+      - Alert at 70% of global monthly SMS budget
+      - Per-message cost projection at enqueue time; refuse if projected monthly > cap
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L200-L260]
+  - title: "Cap LLM-generated parent bridge messages to 1/parent/week"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Prevent runaway LLM cost on F3 bridge messages by enforcing a 1-per-week
+      generation quota per parent. Use Sonnet for initial generation but cache
+      verbatim for the week; do not regenerate on read.
+
+      ## Files
+      - src/actors/Cena.Actors/ParentDigest/ParentMessageGenerator.cs
+      - src/actors/Cena.Actors/ParentDigest/WeeklyMessageQuota.cs (new)
+
+      ## Definition of Done
+      - Max 1 LLM-generated message per (parent_id, week) tuple
+      - Redis key: cena:parent:weekly:{parent_id}:{yyyy-ww} with 8-day TTL
+      - Metric: cena.parent.llm.generations_total, cena.parent.llm.cache_hits_total
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L120-L180]
+verdict: revise
+verdict_reason: |
+  F1 and F8 are ship-ready at zero runtime cost. F6 in proposed form (SMS
+  default) would single-handedly exceed the global monthly LLM budget; must be
+  revised to WhatsApp-first with SMS cap. F3/F7 need explicit per-parent
+  weekly quota before commitment.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F4 differential privacy implementation and epsilon budget consistency with ADR-0003."
+  - to: persona-sre
+    about: "WhatsApp Twilio rate limits — can we sustain 100k x 3 msg/week during exam season?"
