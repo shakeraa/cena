@@ -47,12 +47,13 @@ Implementation of every task (and every epic) must be driven by a senior-archite
 
 ## Epic Bundles (pre-launch)
 
-Four architectural epics bundle sub-tasks that share a substrate and must ship in lock-step:
+Five architectural epics bundle sub-tasks that share a substrate and must ship in lock-step:
 
 - [EPIC-PRR-A — ADR-0012 StudentActor decomposition](./EPIC-PRR-A-studentactor-decomposition.md)
 - [EPIC-PRR-B — ADR-026 3-tier LLM routing governance](./EPIC-PRR-B-llm-routing-governance.md)
 - [EPIC-PRR-C — Parent Aggregate + age-band consent + IDOR enforcement](./EPIC-PRR-C-parent-aggregate-consent.md)
 - [EPIC-PRR-D — Ship-gate scanner v2 (banned vocabulary expansion)](./EPIC-PRR-D-shipgate-scanner-v2.md)
+- [EPIC-PRR-E — Question-engine UX integration (parametric coverage + hint ladder + step-solver + sidekick)](./EPIC-PRR-E-question-engine-ux-integration.md)
 
 Each epic file lists its absorbed sub-tasks and suggested execution order. Absorbed sub-tasks remain as individual task files — the epic provides coordination.
 
