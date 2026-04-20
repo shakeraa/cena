@@ -1,26 +1,27 @@
-# TASK-PRR-121: Retire FD-011 (d=1.16 fabricated claim)
+# TASK-PRR-027: Correct FD-003 misconception-resolution figure, remove 95% claim
 
-**Priority**: P2 — post-launch improvement (lens consensus: 2)
+**Priority**: P1 — strongly recommended before launch (lens consensus: 4)
 **Effort**: S — 1-2 days
-**Lens consensus**: persona-cogsci, persona-redteam
-**Source docs**: `finding_assessment_dr_rami.md:L~`
+**Lens consensus**: persona-privacy, persona-educator, persona-cogsci, persona-redteam
+**Source docs**: `finding_assessment_dr_rami.md:L93`, `finding_assessment_dr_rami.md:L112`
 **Assignee hint**: claude-subagent-doc-remediation
 **Tags**: source=pre-release-review-2026-04-20, lens=cogsci
-**Status**: Not Started
+**Status**: Done — 2026-04-20
 **Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
-**Tier**: post-launch
+**Tier**: mvp
 **Epic**: EPIC-PRR-D — Ship-gate scanner v2 — banned vocabulary expansion
 
 ---
 
 ## Goal
-Remove FD-011 from shortlist until valid effect-size provided.
+Edit FD-003 in feature-discovery to remove fabricated 95% resolution figure; replace with Dr. Rami's meta-analytic effect size.
 
 ## Files
-- docs/features/FD-011*.md
+- docs/features/FD-003*.md
+- feature-discovery-2026-04-20.md
 
 ## Definition of Done
-- Retired; rationale in retired.md.
+- 95% language removed; citation added; ship-gate green.
 
 ## Reporting
 complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-doc-remediation --result "<branch>"
@@ -64,12 +65,12 @@ Implementation of this task must be driven by a senior-architect mindset, not a 
 - Observability added (metrics, structured logs with tenant/session IDs, runbook entry).
 - Related personas' cross-lens handoffs addressed or explicitly deferred with a new task ID.
 
-**Reference**: full protocol and its rationale live in [`/tasks/pre-release-review/README.md`](../../../tasks/pre-release-review/README.md#implementation-protocol-senior-architect) (this section is duplicated there for skimming convenience).
+**Reference**: full protocol and its rationale live in [`/tasks/pre-release-review/README.md`](../../tasks/pre-release-review/README.md#implementation-protocol-senior-architect) (this section is duplicated there for skimming convenience).
 
 ---
 
 ## Related
-- [Full synthesis](../../../pre-release-review/reviews/SYNTHESIS.md)
-- [Retired proposals](../../../pre-release-review/reviews/retired.md)
-- [Conflicts needing decision](../../../pre-release-review/reviews/conflicts.md)
-- [Canonical task JSON](../../../pre-release-review/reviews/tasks.jsonl) (id: prr-121)
+- [Full synthesis](../../pre-release-review/reviews/SYNTHESIS.md)
+- [Retired proposals](../../pre-release-review/reviews/retired.md)
+- [Conflicts needing decision](../../pre-release-review/reviews/conflicts.md)
+- [Canonical task JSON](../../pre-release-review/reviews/tasks.jsonl) (id: prr-027)

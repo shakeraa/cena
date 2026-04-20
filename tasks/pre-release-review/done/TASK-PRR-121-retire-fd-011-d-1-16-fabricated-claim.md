@@ -1,26 +1,26 @@
-# TASK-PRR-028: Replace 'Yu et al. 2026' citations in FD-008 — or retire partial-credit grading
+# TASK-PRR-121: Retire FD-011 (d=1.16 fabricated claim)
 
-**Priority**: P1 — strongly recommended before launch (lens consensus: 3)
+**Priority**: P2 — post-launch improvement (lens consensus: 2)
 **Effort**: S — 1-2 days
-**Lens consensus**: persona-educator, persona-cogsci, persona-redteam
-**Source docs**: `finding_assessment_dr_rami.md:L132`
+**Lens consensus**: persona-cogsci, persona-redteam
+**Source docs**: `finding_assessment_dr_rami.md:L~`
 **Assignee hint**: claude-subagent-doc-remediation
-**Tags**: source=pre-release-review-2026-04-20, lens=educator
-**Status**: Not Started
+**Tags**: source=pre-release-review-2026-04-20, lens=cogsci
+**Status**: Done — 2026-04-20
 **Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
-**Tier**: mvp
+**Tier**: post-launch
 **Epic**: EPIC-PRR-D — Ship-gate scanner v2 — banned vocabulary expansion
 
 ---
 
 ## Goal
-Replace rejected Yu-2026 citation with valid sources or retire FD-008 partial-credit grading feature.
+Remove FD-011 from shortlist until valid effect-size provided.
 
 ## Files
-- docs/features/FD-008*.md
+- docs/features/FD-011*.md
 
 ## Definition of Done
-- Citation replaced or feature retired; ship-gate green.
+- Retired; rationale in retired.md.
 
 ## Reporting
 complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-doc-remediation --result "<branch>"
@@ -64,12 +64,12 @@ Implementation of this task must be driven by a senior-architect mindset, not a 
 - Observability added (metrics, structured logs with tenant/session IDs, runbook entry).
 - Related personas' cross-lens handoffs addressed or explicitly deferred with a new task ID.
 
-**Reference**: full protocol and its rationale live in [`/tasks/pre-release-review/README.md`](../../tasks/pre-release-review/README.md#implementation-protocol-senior-architect) (this section is duplicated there for skimming convenience).
+**Reference**: full protocol and its rationale live in [`/tasks/pre-release-review/README.md`](../../../tasks/pre-release-review/README.md#implementation-protocol-senior-architect) (this section is duplicated there for skimming convenience).
 
 ---
 
 ## Related
-- [Full synthesis](../../pre-release-review/reviews/SYNTHESIS.md)
-- [Retired proposals](../../pre-release-review/reviews/retired.md)
-- [Conflicts needing decision](../../pre-release-review/reviews/conflicts.md)
-- [Canonical task JSON](../../pre-release-review/reviews/tasks.jsonl) (id: prr-028)
+- [Full synthesis](../../../pre-release-review/reviews/SYNTHESIS.md)
+- [Retired proposals](../../../pre-release-review/reviews/retired.md)
+- [Conflicts needing decision](../../../pre-release-review/reviews/conflicts.md)
+- [Canonical task JSON](../../../pre-release-review/reviews/tasks.jsonl) (id: prr-121)

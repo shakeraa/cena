@@ -1,35 +1,36 @@
-# TASK-PRR-027: Correct FD-003 misconception-resolution figure, remove 95% claim
+# TASK-PRR-156: Feature-spec citation verifiability rule
 
-**Priority**: P1 — strongly recommended before launch (lens consensus: 4)
-**Effort**: S — 1-2 days
-**Lens consensus**: persona-privacy, persona-educator, persona-cogsci, persona-redteam
-**Source docs**: `finding_assessment_dr_rami.md:L93`, `finding_assessment_dr_rami.md:L112`
-**Assignee hint**: claude-subagent-doc-remediation
-**Tags**: source=pre-release-review-2026-04-20, lens=cogsci
-**Status**: Not Started
-**Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
+**Priority**: P1 — strongly-recommended pre-launch (lens consensus: 1)
+**Effort**: M — 1-2 weeks
+**Lens consensus**: persona-ethics
+**Source docs**: `finding_assessment_dr_rami.md:L94`
+**Assignee hint**: claude-subagent-policy
+**Tags**: source=pre-release-review-2026-04-20, lens=ethics, origin=tight-match-audit, src-audit-id=O-095
+**Status**: Done — 2026-04-20
+**Source**: tight-match audit 2026-04-20 (O-095)
 **Tier**: mvp
 **Epic**: EPIC-PRR-D — Ship-gate scanner v2 — banned vocabulary expansion
 
 ---
 
 ## Goal
-Edit FD-003 in feature-discovery to remove fabricated 95% resolution figure; replace with Dr. Rami's meta-analytic effect size.
+Feature-spec citation verifiability rule
 
-## Files
-- docs/features/FD-003*.md
-- feature-discovery-2026-04-20.md
+## Source
+Raised by persona-ethics in persona YAMLs — see source docs above. Promoted from tight-match audit confirmed-orphans (prior audit ID O-095).
 
 ## Definition of Done
-- 95% language removed; citation added; ship-gate green.
+- Proposal translated to concrete code / copy / policy change.
+- Tied to an existing ADR or a new micro-ADR if policy-level.
+- Tested where testable; otherwise reviewed by the raising lens.
 
 ## Reporting
-complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-doc-remediation --result "<branch>"
+complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-policy --result "<branch>"
 
 ---
 
 ## Non-negotiable references
-None
+- None explicitly bound; all baseline non-negotiables from CLAUDE.md still apply.
 
 ## Implementation Protocol — Senior Architect
 
@@ -73,4 +74,5 @@ Implementation of this task must be driven by a senior-architect mindset, not a 
 - [Full synthesis](../../pre-release-review/reviews/SYNTHESIS.md)
 - [Retired proposals](../../pre-release-review/reviews/retired.md)
 - [Conflicts needing decision](../../pre-release-review/reviews/conflicts.md)
-- [Canonical task JSON](../../pre-release-review/reviews/tasks.jsonl) (id: prr-027)
+- [Canonical task JSON](../../pre-release-review/reviews/tasks.jsonl) (id: prr-156)
+- [Tight-match audit confirmed-orphans](../../pre-release-review/reviews/audit/confirmed-orphans.jsonl)

@@ -1,36 +1,34 @@
-# TASK-PRR-156: Feature-spec citation verifiability rule
+# TASK-PRR-028: Replace 'Yu et al. 2026' citations in FD-008 — or retire partial-credit grading
 
-**Priority**: P1 — strongly-recommended pre-launch (lens consensus: 1)
-**Effort**: M — 1-2 weeks
-**Lens consensus**: persona-ethics
-**Source docs**: `finding_assessment_dr_rami.md:L94`
-**Assignee hint**: claude-subagent-policy
-**Tags**: source=pre-release-review-2026-04-20, lens=ethics, origin=tight-match-audit, src-audit-id=O-095
-**Status**: Not Started
-**Source**: tight-match audit 2026-04-20 (O-095)
+**Priority**: P1 — strongly recommended before launch (lens consensus: 3)
+**Effort**: S — 1-2 days
+**Lens consensus**: persona-educator, persona-cogsci, persona-redteam
+**Source docs**: `finding_assessment_dr_rami.md:L132`
+**Assignee hint**: claude-subagent-doc-remediation
+**Tags**: source=pre-release-review-2026-04-20, lens=educator
+**Status**: Done — 2026-04-20
+**Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
 **Tier**: mvp
 **Epic**: EPIC-PRR-D — Ship-gate scanner v2 — banned vocabulary expansion
 
 ---
 
 ## Goal
-Feature-spec citation verifiability rule
+Replace rejected Yu-2026 citation with valid sources or retire FD-008 partial-credit grading feature.
 
-## Source
-Raised by persona-ethics in persona YAMLs — see source docs above. Promoted from tight-match audit confirmed-orphans (prior audit ID O-095).
+## Files
+- docs/features/FD-008*.md
 
 ## Definition of Done
-- Proposal translated to concrete code / copy / policy change.
-- Tied to an existing ADR or a new micro-ADR if policy-level.
-- Tested where testable; otherwise reviewed by the raising lens.
+- Citation replaced or feature retired; ship-gate green.
 
 ## Reporting
-complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-policy --result "<branch>"
+complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-doc-remediation --result "<branch>"
 
 ---
 
 ## Non-negotiable references
-- None explicitly bound; all baseline non-negotiables from CLAUDE.md still apply.
+None
 
 ## Implementation Protocol — Senior Architect
 
@@ -74,5 +72,4 @@ Implementation of this task must be driven by a senior-architect mindset, not a 
 - [Full synthesis](../../pre-release-review/reviews/SYNTHESIS.md)
 - [Retired proposals](../../pre-release-review/reviews/retired.md)
 - [Conflicts needing decision](../../pre-release-review/reviews/conflicts.md)
-- [Canonical task JSON](../../pre-release-review/reviews/tasks.jsonl) (id: prr-156)
-- [Tight-match audit confirmed-orphans](../../pre-release-review/reviews/audit/confirmed-orphans.jsonl)
+- [Canonical task JSON](../../pre-release-review/reviews/tasks.jsonl) (id: prr-028)
