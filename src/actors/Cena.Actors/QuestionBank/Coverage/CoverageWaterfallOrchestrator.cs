@@ -49,6 +49,7 @@ public sealed class CoverageWaterfallOrchestrator : ICoverageWaterfallOrchestrat
     private readonly ICasVerificationGate _casGate;
     private readonly ICostBudgetService? _budgetService;
     private readonly ICuratorQueueEmitter _curatorQueue;
+    private readonly ICoverageCellVariantCounter? _variantCounter;
     private readonly CoverageWaterfallOptions _options;
     private readonly ILogger<CoverageWaterfallOrchestrator> _logger;
 
@@ -60,7 +61,8 @@ public sealed class CoverageWaterfallOrchestrator : ICoverageWaterfallOrchestrat
         ICuratorQueueEmitter curatorQueue,
         IOptions<CoverageWaterfallOptions> options,
         ILogger<CoverageWaterfallOrchestrator> logger,
-        ICostBudgetService? budgetService = null)
+        ICostBudgetService? budgetService = null,
+        ICoverageCellVariantCounter? variantCounter = null)
     {
         _parametricCompiler = parametricCompiler ?? throw new ArgumentNullException(nameof(parametricCompiler));
         _isomorphGenerator = isomorphGenerator ?? throw new ArgumentNullException(nameof(isomorphGenerator));
@@ -70,6 +72,7 @@ public sealed class CoverageWaterfallOrchestrator : ICoverageWaterfallOrchestrat
         _options = (options ?? throw new ArgumentNullException(nameof(options))).Value;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _budgetService = budgetService; // optional — null in tests / offline mode
+        _variantCounter = variantCounter; // optional — prr-210 wiring
     }
 
     public async Task<WaterfallResult> FillRungAsync(
@@ -98,6 +101,10 @@ public sealed class CoverageWaterfallOrchestrator : ICoverageWaterfallOrchestrat
         if (allAccepted.Count >= targetCount)
         {
             RecordOutcome(cell, "strategy1_sufficient");
+            // prr-210: the cell is fully covered by stage 1 — record the
+            // variant count and clear any prior below-SLO flag so the
+            // snapshot the ship-gate reads reflects the healthy state.
+            UpdateVariantCounter(cell, allAccepted.Count, belowSlo: false);
             return new WaterfallResult(cell, targetCount, allAccepted.Count, stageOutcomes, null, allAccepted);
         }
 
@@ -109,6 +116,7 @@ public sealed class CoverageWaterfallOrchestrator : ICoverageWaterfallOrchestrat
         if (allAccepted.Count >= targetCount)
         {
             RecordOutcome(cell, "strategy2_closed_gap");
+            UpdateVariantCounter(cell, allAccepted.Count, belowSlo: false);
             return new WaterfallResult(cell, targetCount, allAccepted.Count, stageOutcomes, null, allAccepted);
         }
 
@@ -118,6 +126,10 @@ public sealed class CoverageWaterfallOrchestrator : ICoverageWaterfallOrchestrat
         stageOutcomes.Add(s3);
         RecordOutcome(cell, "curator_enqueued");
         RecordGap(cell, gap);
+        // prr-210: CuratorQueued → cell is below SLO. Surface both the
+        // accepted count and the below-SLO flag so metrics + the ops
+        // snapshot stay in sync with the human curator backlog.
+        UpdateVariantCounter(cell, allAccepted.Count, belowSlo: true);
 
         return new WaterfallResult(cell, targetCount, allAccepted.Count, stageOutcomes, curatorId, allAccepted);
     }
@@ -492,4 +504,22 @@ public sealed class CoverageWaterfallOrchestrator : ICoverageWaterfallOrchestrat
 
     private static string Truncate(string s, int n) =>
         string.IsNullOrEmpty(s) || s.Length <= n ? s : s.Substring(0, n) + "…";
+
+    private void UpdateVariantCounter(CoverageCell cell, int variantCount, bool belowSlo)
+    {
+        if (_variantCounter is null) return;
+        try
+        {
+            _variantCounter.Record(cell, variantCount);
+            _variantCounter.MarkBelowSlo(cell, belowSlo);
+        }
+        catch (Exception ex)
+        {
+            // Metric bookkeeping MUST NOT throw through the waterfall. The
+            // ship-gate will still catch drift on its next run via the
+            // ops/reports snapshot.
+            _logger.LogWarning(ex,
+                "[COVERAGE_WATERFALL] variant-counter update failed for {Cell}", cell.Address);
+        }
+    }
 }

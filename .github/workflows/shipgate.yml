@@ -46,3 +46,17 @@ jobs:
           node --test tests/shipgate/banned-citations.spec.mjs \
                       tests/shipgate/banned-mechanics.spec.mjs \
                       tests/shipgate/llm-routing-scanner.spec.mjs
+
+      - name: Coverage SLO ship-gate (prr-210)
+        run: node scripts/shipgate/coverage-slo.mjs
+
+      - name: Upload coverage rung status report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-rung-status
+          path: ops/reports/coverage-rung-status.md
+          if-no-files-found: warn
+
+      - name: Coverage SLO script self-test
+        run: node --test tests/shipgate/coverage-slo.spec.mjs
