@@ -106,6 +106,22 @@ public static class CenaAdminServiceRegistration
         services.TryAddScoped<Cena.Infrastructure.Security.IParentChildBindingService,
             Cena.Actors.Parent.ParentChildBindingService>();
 
+        // prr-051: Parent digest preferences store + unsubscribe token stack.
+        // Phase 1 ships with in-memory stores; Marten-backed projections are
+        // added alongside EPIC-PRR-A consent work. Endpoint code is unchanged.
+        services.TryAddSingleton<Cena.Actors.ParentDigest.IParentDigestPreferencesStore,
+            Cena.Actors.ParentDigest.InMemoryParentDigestPreferencesStore>();
+        services.TryAddSingleton<Cena.Actors.ParentDigest.IUnsubscribeTokenNonceStore,
+            Cena.Actors.ParentDigest.InMemoryUnsubscribeTokenNonceStore>();
+        services.TryAddSingleton<Cena.Actors.ParentDigest.IUnsubscribeTokenService>(sp =>
+        {
+            var config = sp.GetRequiredService<IConfiguration>();
+            var secret = config["Cena:ParentDigest:UnsubscribeHmacSecret"]
+                         ?? "cena-unsubscribe-dev-secret-prr051-rotate-me";
+            var nonces = sp.GetRequiredService<Cena.Actors.ParentDigest.IUnsubscribeTokenNonceStore>();
+            return new Cena.Actors.ParentDigest.UnsubscribeTokenService(secret, nonces);
+        });
+
         // ADM-004 through ADM-016: Admin API services
         services.AddScoped<IAdminDashboardService, AdminDashboardService>();
         services.AddScoped<IAdminUserService, AdminUserService>();
@@ -305,6 +321,13 @@ public static class CenaAdminServiceRegistration
         // cap; no lockout). GET reads, PUT emits
         // ParentalControlsConfiguredV1.
         Features.ParentConsole.TimeBudgetEndpoint.MapTimeBudgetEndpoint(app);
+        // prr-051: Parent digest purpose-based opt-in + one-click
+        // unsubscribe-all link. GET+POST preferences (PARENT only,
+        // guarded by ParentAuthorizationGuard); GET /unsubscribe/{token}
+        // (anonymous, token-authenticated).
+        Features.ParentConsole.ParentDigestPreferencesEndpoints
+            .MapParentDigestPreferencesEndpoints(app);
+        Features.ParentConsole.UnsubscribeEndpoint.MapUnsubscribeEndpoint(app);
         // FIND-pedagogy-008: learning-objective picker (read-only)
         app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();
