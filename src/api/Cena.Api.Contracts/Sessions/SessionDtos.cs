@@ -313,3 +313,56 @@ public sealed record SessionSnapshotDto(
     List<Cena.Actors.Sessions.StepResultDto> CompletedSteps,
     DateTimeOffset SessionStartedAt,
     int SessionDurationSeconds);
+
+// =============================================================================
+// prr-204: Tutor Context DTOs
+// Session-scoped snapshot served to the Sidekick drawer + hint-ladder
+// consumers. The DTO stays strictly flat so downstream TypeScript clients
+// can type it as a plain interface. See ADR-0003 for the scope boundary:
+// the snapshot lives in Redis with session-TTL and is rebuilt from session
+// projections on cache miss — it is never persisted on a student profile.
+// =============================================================================
+
+/// <summary>
+/// prr-204 — Response for GET /api/v1/sessions/{sid}/tutor-context.
+///
+/// Strictly session-scoped (ADR-0003). The
+/// <see cref="LastMisconceptionTag"/> field is the session's most recent
+/// buggy-rule id and NEVER joins onto a long-lived student profile.
+/// </summary>
+/// <param name="SessionId">Session stream key.</param>
+/// <param name="CurrentQuestionId">The question the student is currently on, or null between questions.</param>
+/// <param name="AnsweredCount">Questions answered in this session.</param>
+/// <param name="CorrectCount">Questions answered correctly in this session.</param>
+/// <param name="CurrentRung">Highest hint-ladder rung (0..3) reached for the current question.</param>
+/// <param name="LastMisconceptionTag">Session-scoped misconception tag. Null when none detected.</param>
+/// <param name="AttemptPhase">"first_try" | "retry" | "post_solution".</param>
+/// <param name="ElapsedMinutes">Minutes since session start at snapshot time.</param>
+/// <param name="DailyMinutesRemaining">Minutes left in today's tutor-time budget.</param>
+/// <param name="BktMasteryBucket">"low" | "mid" | "high" | "unknown" — coarse per-ADR-0003.</param>
+/// <param name="AccommodationFlags">Accommodation flags relevant to the tutor/hint copy path.</param>
+/// <param name="BuiltAtUtc">When the snapshot was assembled (for staleness telemetry).</param>
+public sealed record TutorContextResponseDto(
+    string SessionId,
+    string? CurrentQuestionId,
+    int AnsweredCount,
+    int CorrectCount,
+    int CurrentRung,
+    string? LastMisconceptionTag,
+    string AttemptPhase,
+    int ElapsedMinutes,
+    int DailyMinutesRemaining,
+    string BktMasteryBucket,
+    TutorContextAccommodationDto AccommodationFlags,
+    DateTimeOffset BuiltAtUtc);
+
+/// <summary>
+/// prr-204 — Accommodation flags forwarded with the tutor context so the
+/// Sidekick + hint consumers don't need a round-trip to the accommodations
+/// service mid-turn. Defaults match "no accommodations" baseline.
+/// </summary>
+public sealed record TutorContextAccommodationDto(
+    bool LdAnxiousFriendly,
+    double ExtendedTimeMultiplier,
+    bool DistractionReducedLayout,
+    bool TtsForProblemStatements);
