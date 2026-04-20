@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cena.edu-apps/contracts/questions/parametric-template.schema.json",
+  "title": "ParametricTemplate",
+  "description": "Deterministic no-LLM question template (Strategy 1). Consumed by Cena.Admin.Api.Templates.TemplateGenerateEndpoint and the Cena.Tools.QuestionGen CLI. Authored by content authors via prr-202 (admin UI).",
+  "type": "object",
+  "required": [
+    "id", "version", "subject", "topic", "track", "difficulty", "methodology",
+    "stemTemplate", "solutionExpr", "acceptShapes", "slots"
+  ],
+  "properties": {
+    "id":           { "type": "string", "minLength": 1, "pattern": "^[a-zA-Z0-9_\\-\\.]+$" },
+    "version":      { "type": "integer", "minimum": 1 },
+    "subject":      { "type": "string", "enum": ["math", "physics", "chemistry"] },
+    "topic":        { "type": "string", "minLength": 1 },
+    "track":        { "type": "string", "enum": ["FourUnit", "FiveUnit"] },
+    "difficulty":   { "type": "string", "enum": ["Easy", "Medium", "Hard"] },
+    "methodology":  { "type": "string", "enum": ["Halabi", "Rabinovitch"] },
+    "bloomsLevel":  { "type": "integer", "minimum": 1, "maximum": 6 },
+    "language":     { "type": "string", "enum": ["en", "he", "ar"] },
+    "stemTemplate": { "type": "string", "minLength": 1 },
+    "solutionExpr": { "type": "string", "minLength": 1 },
+    "variableName": { "type": ["string", "null"] },
+    "acceptShapes": {
+      "type": "array",
+      "items": { "type": "string", "enum": ["integer", "rational", "decimal", "symbolic", "any"] },
+      "minItems": 1
+    },
+    "slots": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/slot" }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["description", "predicateExpr"],
+        "properties": {
+          "description":   { "type": "string", "minLength": 1 },
+          "predicateExpr": { "type": "string", "minLength": 1, "description": "3-token predicate: <slot> <op> <slot-or-number>. Supported ops: == != > >= < <=" }
+        }
+      }
+    },
+    "distractorRules": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/distractorRule" }
+    },
+    "bagrutSource": {
+      "type": ["object", "null"],
+      "description": "ADR-0043 — reference-only attribution when the template was authored from a Ministry Bagrut item. Never surfaced on a student-facing DTO (enforced by BagrutRecreationOnlyTest).",
+      "properties": {
+        "ministryExamYear":       { "type": "string" },
+        "ministryExamMoed":       { "type": "string" },
+        "ministryQuestionNumber": { "type": "string" },
+        "referenceOnly":          { "type": "boolean" }
+      },
+      "required": ["ministryExamYear", "ministryExamMoed", "ministryQuestionNumber", "referenceOnly"]
+    }
+  },
+  "additionalProperties": false,
+
+  "$defs": {
+    "slot": {
+      "type": "object",
+      "required": ["name", "kind"],
+      "oneOf": [
+        { "properties": { "kind": { "const": "integer" } }, "required": ["integerMin", "integerMax"] },
+        { "properties": { "kind": { "const": "rational" } }, "required": ["numeratorMin", "numeratorMax", "denominatorMin", "denominatorMax"] },
+        { "properties": { "kind": { "const": "choice" } }, "required": ["choices"] }
+      ],
+      "properties": {
+        "name":             { "type": "string", "pattern": "^[A-Za-z_][A-Za-z0-9_]*$" },
+        "kind":             { "type": "string", "enum": ["integer", "rational", "choice"] },
+        "integerMin":       { "type": "integer" },
+        "integerMax":       { "type": "integer" },
+        "integerExclude":   { "type": "array", "items": { "type": "integer" } },
+        "numeratorMin":     { "type": "integer" },
+        "numeratorMax":     { "type": "integer" },
+        "denominatorMin":   { "type": "integer" },
+        "denominatorMax":   { "type": "integer" },
+        "reduceRational":   { "type": "boolean", "default": true },
+        "choices":          { "type": "array", "items": { "type": "string" }, "minItems": 1 }
+      }
+    },
+    "distractorRule": {
+      "type": "object",
+      "required": ["misconceptionId", "formulaExpr"],
+      "properties": {
+        "misconceptionId": { "type": "string", "description": "Id from Cena.Actors.Services.MisconceptionCatalog (e.g. 'SIGN-FLIP-INEQ', 'CANCEL-COMMON')." },
+        "formulaExpr":     { "type": "string", "description": "SymPy expression in slot names that computes the distractor value for this misconception class." },
+        "labelHint":       { "type": ["string", "null"] }
+      }
+    }
+  }
+}

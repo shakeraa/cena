@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>Cena.Tools.QuestionGen</RootNamespace>
+    <AssemblyName>Cena.Tools.QuestionGen</AssemblyName>
+  </PropertyGroup>
+
+  <!-- prr-200: deterministic parametric template generator CLI.
+       Links ONLY to Cena.Actors (domain) — NOT to Admin.Api, Anthropic, or any
+       LLM SDK. The NoLlmInParametricPipelineTest architecture test enforces
+       that this project stays LLM-import-free. -->
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Logging" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
+    <PackageReference Include="YamlDotNet" Version="16.2.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\actors\Cena.Actors\Cena.Actors.csproj" />
+  </ItemGroup>
+
+</Project>
