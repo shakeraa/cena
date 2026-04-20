@@ -53,8 +53,24 @@ public static class SessionExchangeEndpoint
     /// Name of the httpOnly cookie that carries the server-minted session JWT.
     /// Referenced by <see cref="CookieAuthMiddleware"/> and by the logout
     /// clear-cookie response.
+    ///
+    /// prr-011 Phase 1B: upgraded from "cena_session" to "__Host-cena_session".
+    /// The __Host- prefix is browser-enforced — cookies with this prefix MUST
+    /// have Secure, MUST have Path=/, and MUST NOT carry Domain. This kills
+    /// the subdomain-cookie-shadowing class of attack (threat model T2,
+    /// ADR-0046 §1) at the browser layer rather than the application layer.
     /// </summary>
-    public const string CookieName = "cena_session";
+    public const string CookieName = "__Host-cena_session";
+
+    /// <summary>
+    /// Legacy cookie name from Phase 1A. <see cref="CookieAuthMiddleware"/>
+    /// still reads this name so users with an in-flight Phase 1A cookie are
+    /// not force-logged-out on deploy; on their next refresh or re-login we
+    /// issue the __Host- cookie and clear the legacy one. Safe to remove
+    /// after <see cref="DefaultSessionLifetime"/> + a safety margin past the
+    /// deploy. Remove by prr-011i (cleanup task).
+    /// </summary>
+    public const string LegacyCookieName = "cena_session";
 
     /// <summary>
     /// Default session lifetime. Matches the cookie Max-Age, the JWT exp claim,
@@ -94,6 +110,11 @@ public static class SessionExchangeEndpoint
             .WithName("PostSessionLogout")
             .WithSummary("Clear the session cookie and revoke the server session JWT.")
             .Produces(StatusCodes.Status204NoContent);
+
+        // prr-011 Phase 1B: refresh endpoint lives in SessionRefreshEndpoint.cs
+        // so this file stays under its 500 LOC budget. Wires into the same
+        // /api/auth/session group for URL consistency.
+        SessionRefreshEndpoint.MapRefresh(group);
 
         return app;
     }
@@ -166,20 +187,39 @@ public static class SessionExchangeEndpoint
         var sessionJwt = MintSessionJwt(
             configuration, userId, email, jti, now, expiresAt);
 
-        // ── 4. Set the httpOnly + Secure + SameSite=Strict cookie. ──
+        // ── 4. Set the __Host- httpOnly + Secure + SameSite=Strict cookie. ──
         // Secure is ALWAYS true — in local dev the student dev server runs
         // over http on localhost, which browsers treat as secure for cookie
         // purposes. Do not relax this flag.
+        //
+        // __Host- prefix: browser rejects cookies with this name unless
+        // Secure=true, Path="/", and Domain is absent. We set Domain=null
+        // explicitly to make the contract obvious at the call site, even
+        // though CookieOptions.Domain defaults to null.
+        //
+        // If an in-flight Phase 1A cookie exists on the client, clear it so
+        // the migrated client does not carry both names forever.
         ctx.Response.Cookies.Append(CookieName, sessionJwt, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
             SameSite = SameSiteMode.Strict,
             Path = "/",
+            Domain = null, // __Host- forbids Domain
             Expires = expiresAt,
             MaxAge = lifetime,
             IsEssential = true,
         });
+        if (ctx.Request.Cookies.ContainsKey(LegacyCookieName))
+        {
+            ctx.Response.Cookies.Delete(LegacyCookieName, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = true,
+                SameSite = SameSiteMode.Strict,
+                Path = "/",
+            });
+        }
 
         logger.LogInformation(
             "[SESSION_EXCHANGE] minted session for {UserId} expiring {ExpiresAt}",
@@ -200,11 +240,13 @@ public static class SessionExchangeEndpoint
         [Microsoft.AspNetCore.Mvc.FromServices] SessionRevocationList revocationList,
         [Microsoft.AspNetCore.Mvc.FromServices] ILogger<SessionExchangeLoggerMarker> logger)
     {
-        // If the request carried a valid cookie, extract its jti + exp so we
-        // can add the session to the revocation list. We cannot simply trust
-        // the client-side "delete this cookie" because an attacker with the
-        // cookie value can ignore our clear-cookie header and keep replaying.
-        if (ctx.Request.Cookies.TryGetValue(CookieName, out var sessionJwt)
+        // If the request carried a valid cookie (new or legacy name), extract
+        // its jti + exp so we can add the session to the revocation list. We
+        // cannot simply trust the client-side "delete this cookie" because an
+        // attacker with the cookie value can ignore our clear-cookie header
+        // and keep replaying.
+        if ((ctx.Request.Cookies.TryGetValue(CookieName, out var sessionJwt)
+                || ctx.Request.Cookies.TryGetValue(LegacyCookieName, out sessionJwt))
             && !string.IsNullOrWhiteSpace(sessionJwt))
         {
             try
@@ -234,10 +276,19 @@ public static class SessionExchangeEndpoint
             }
         }
 
-        // Tell the browser to drop the cookie regardless of what the server
-        // state was. Browsers only honour cookie deletion with matching
-        // Path / Secure / SameSite attributes, so mirror the exchange handler.
+        // Tell the browser to drop both cookie names (new + legacy) regardless
+        // of what the server state was. Browsers only honour cookie deletion
+        // with matching Path / Secure / SameSite attributes, so mirror the
+        // exchange handler. Deleting legacy is cheap insurance during the
+        // rollout window.
         ctx.Response.Cookies.Delete(CookieName, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/",
+        });
+        ctx.Response.Cookies.Delete(LegacyCookieName, new CookieOptions
         {
             HttpOnly = true,
             Secure = true,
@@ -369,16 +420,43 @@ public static class SessionExchangeEndpoint
         return new SymmetricSecurityKey(bytes);
     }
 
+    internal static TimeSpan GetSessionLifetimeInternal(IConfiguration configuration)
+        => GetSessionLifetime(configuration);
+
     private static TimeSpan GetSessionLifetime(IConfiguration configuration)
     {
         var hours = configuration.GetValue<int?>("SessionJwt:LifetimeHours");
         return hours is > 0 ? TimeSpan.FromHours(hours.Value) : DefaultSessionLifetime;
     }
 
+    internal static string GenerateJtiInternal() => GenerateJti();
+
     private static string GenerateJti()
     {
         Span<byte> buffer = stackalloc byte[16];
         RandomNumberGenerator.Fill(buffer);
         return Convert.ToHexString(buffer);
+    }
+
+    /// <summary>
+    /// Emit the __Host- session cookie using the exact attributes locked in
+    /// ADR-0046 §1. Centralised so the exchange and refresh endpoints speak
+    /// the same cookie language — a mismatch would be a deletion-won't-honour
+    /// bug.
+    /// </summary>
+    internal static void AppendSessionCookie(
+        HttpContext ctx, string sessionJwt, DateTimeOffset expiresAt, TimeSpan lifetime)
+    {
+        ctx.Response.Cookies.Append(CookieName, sessionJwt, new CookieOptions
+        {
+            HttpOnly = true,
+            Secure = true,
+            SameSite = SameSiteMode.Strict,
+            Path = "/",
+            Domain = null, // __Host- forbids Domain
+            Expires = expiresAt,
+            MaxAge = lifetime,
+            IsEssential = true,
+        });
     }
 }
