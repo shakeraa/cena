@@ -296,10 +296,26 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-        // prr-013 follow-up (2026-04-20): the /at-risk admin route was
-        // retired. Session-scoped "student needs intervention" data is
-        // surfaced via the session actor (SessionRiskAssessment); it never
-        // leaves the in-session surface. See ADR-0003 + RDY-080.
+        // prr-013 retirement 2026-04-20: the /at-risk admin route is retired.
+        // Session-scoped "student needs intervention" data is surfaced via
+        // the session actor (SessionRiskAssessment); it never leaves the
+        // in-session surface (ADR-0003 + RDY-080).
+        //
+        // We keep the URL bound to a 410 Gone response for ~6 months so any
+        // in-flight SPA client still pointing at it fails loudly and updates,
+        // rather than silently 404'ing and masking the migration. Removal of
+        // the 410 shim itself is tracked as a follow-up once the admin SPA
+        // retirement (Phase 2) is complete.
+        group.MapGet("/at-risk", () => Results.Json(
+            new CenaError(
+                Code: "ROUTE_RETIRED",
+                Message: "retired per prr-013 2026-04-20; use SessionRiskAssessment via session API.",
+                Category: ErrorCategory.Validation,
+                Details: null,
+                CorrelationId: null),
+            statusCode: StatusCodes.Status410Gone))
+            .WithName("GetAtRiskStudents_Retired")
+            .Produces<CenaError>(StatusCodes.Status410Gone);
 
         // GET /api/admin/mastery/students/{studentId}/methodology-profile
         group.MapGet("/students/{studentId}/methodology-profile", async (string studentId, ClaimsPrincipal user, IMasteryTrackingService service) =>

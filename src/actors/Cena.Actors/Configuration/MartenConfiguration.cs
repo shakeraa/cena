@@ -572,11 +572,11 @@ public static class MartenConfiguration
             .Index(x => x.ClassId)
             .Index(x => x.Date);
 
-        opts.Schema.For<AtRiskStudentDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.SchoolId)
-            .Index(x => x.StudentId)
-            .Index(x => x.Date);
+        // Retired 2026-04-20 per prr-013 + ADR-0012 RDY-080. Use session-scoped
+        // SessionRiskAssessment via LearningSessionActor. The CLR type lives
+        // under Documents/Legacy/AtRiskStudentDocument.Legacy.cs marked
+        // [Obsolete] — retained only so historical rows remain deserialisable
+        // until we know no more orphans exist. No new writes; no new queries.
 
         opts.Schema.For<ConceptDifficultyDocument>()
             .Identity(x => x.Id)

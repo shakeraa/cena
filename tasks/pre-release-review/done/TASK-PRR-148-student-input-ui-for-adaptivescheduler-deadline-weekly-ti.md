@@ -6,7 +6,7 @@
 **Source docs**: `axis1_pedagogy_mechanics_cena.md:L40`, `retired.md R-01` (user decision 2026-04-20)
 **Assignee hint**: kimi-coder
 **Tags**: source=pre-release-review-2026-04-20, lens=educator, cluster=scheduler-wiring
-**Status**: Not Started
+**Status**: Done — 2026-04-20
 **Source**: R-01 walk-through (Adaptive Interleaving Scheduler) — 2026-04-20 user-surfaced wiring gap
 **Tier**: mvp
 **Epic**: EPIC-PRR-A — ADR-0012 StudentActor decomposition

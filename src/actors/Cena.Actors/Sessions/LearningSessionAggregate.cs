@@ -67,6 +67,12 @@ public sealed class LearningSessionAggregate
             case SessionStarted_V2 e:
                 State.Apply(e);
                 break;
+            case SessionPlanComputed_V1 p:
+                // prr-149 — scheduler plan. Session-scoped only; applying the
+                // event refreshes State.CurrentPlan so stream replay rebuilds
+                // the same plan an in-flight actor is already holding.
+                State.Apply(p);
+                break;
             // Phase 2+ handlers land here as each V1 event migrates in.
         }
     }

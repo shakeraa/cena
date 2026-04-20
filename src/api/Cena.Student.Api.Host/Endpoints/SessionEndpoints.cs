@@ -56,7 +56,18 @@ public static class SessionEndpoints
 
         // POST /api/sessions/start — start a new learning session (STB-01)
         // FIND-pedagogy-016: inject IAdaptiveQuestionPool to seed the question queue
-        group.MapPost("/start", async (HttpContext ctx, IDocumentStore store, [FromServices] IAdaptiveQuestionPool adaptivePool, ILogger<SessionLogMarker> logger, SessionStartRequest request) =>
+        // prr-149: inject ISessionPlanGenerator/Writer/Notifier so every new
+        //   session gets an AdaptiveScheduler plan written to its session
+        //   stream before the /start call returns.
+        group.MapPost("/start", async (
+            HttpContext ctx,
+            IDocumentStore store,
+            [FromServices] IAdaptiveQuestionPool adaptivePool,
+            [FromServices] Cena.Actors.Sessions.ISessionPlanGenerator planGenerator,
+            [FromServices] Cena.Actors.Sessions.ISessionPlanWriter planWriter,
+            [FromServices] Cena.Actors.Sessions.ISessionPlanNotifier planNotifier,
+            ILogger<SessionLogMarker> logger,
+            SessionStartRequest request) =>
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId))
@@ -187,6 +198,42 @@ public static class SessionEndpoints
                 logger.LogError(ex,
                     "FIND-pedagogy-016: Failed to seed question queue for session {SessionId}. " +
                     "GET /current-question will retry seeding.",
+                    sessionId);
+            }
+
+            // ── prr-149: compute the AdaptiveScheduler plan for this session ──
+            //
+            // Session-scoped — plan goes on the `session-{id}` stream + read
+            // doc, never on StudentProfileSnapshot. Failure here logs + swallows:
+            // the session is already created and the student UI will work
+            // without a plan (the GET /plan endpoint returns 404 until the plan
+            // is written). A stale plan beats a blocked session.
+            try
+            {
+                var genResult = await planGenerator.GenerateAsync(
+                    studentAnonId: studentId,
+                    sessionId: sessionId,
+                    nowUtc: DateTimeOffset.UtcNow,
+                    ct: ctx.RequestAborted);
+                await planWriter.WriteAsync(
+                    genResult.Snapshot, genResult.InputsSource, ctx.RequestAborted);
+                await planNotifier.NotifyAsync(
+                    genResult.Snapshot, genResult.InputsSource, ctx.RequestAborted);
+
+                logger.LogInformation(
+                    "prr-149: session {SessionId} plan generated ({TopicCount} topics, source={Source})",
+                    sessionId,
+                    genResult.Snapshot.PriorityOrdered.Length,
+                    genResult.InputsSource);
+            }
+            catch (Exception planEx)
+            {
+                // Observability only — plan is a non-critical enrichment of the
+                // session surface. The student can still answer questions; the
+                // trajectory UI just shows "no plan yet" until the next session.
+                logger.LogWarning(planEx,
+                    "prr-149: scheduler plan generation failed for session {SessionId}. " +
+                    "Session continues; GET /plan will 404 until the next session.",
                     sessionId);
             }
 

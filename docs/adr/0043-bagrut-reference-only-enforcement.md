@@ -65,3 +65,14 @@ The gate deliberately never logs the raw item body — only identifiers (`itemId
 | Audit | `ExamSimulationItemDelivered_V1` | Every successful delivery carries its `ProvenanceKind` in the event store |
 
 See prr-008 for the originating pre-release review task and the negative-integration tests in `src/actors/Cena.Actors.Tests/Assessment/BagrutRecreationOnlyDeliveryTests.cs`.
+
+## Sibling change 2026-04-20: V1→V2 readiness field migration (prr-013)
+
+On 2026-04-20 the prr-013 backend retirement landed alongside this ADR. The change shipped `ExamSimulationSubmitted_V2` (in the same `ExamSimulationEvents.cs` file this ADR governs) and retired the `ReadinessLowerBound` / `ReadinessUpperBound` scalars from the on-stream shape:
+
+- `ExamSimulationSubmitted_V1` is marked `[Obsolete]` (error: false) and retained in source for historical Marten replay only. A 2026-04-20 grep confirmed no handler, projection, or emitter in the codebase reads or writes V1 — the record existed as a declaration but no production code path produced instances. The `[Obsolete]` tag makes any NEW emitter surface as a compiler warning.
+- `ExamSimulationSubmitted_V2` is the only event shape emitters may construct going forward. It drops the readiness bounds entirely. Per ADR-0003 + RDY-080, readiness is **session-scoped**: if the session actor computes a `SessionRiskAssessment`, it lives on the session actor only and never crosses the persistence boundary.
+- No upcaster was required: V1 has no in-code aggregate/projection consumers, so there is no V1→V2 replay path that must be kept compatible. If a future aggregate consumer ever needs to fold historical V1 events, it should apply them as if the readiness scalars were absent (treat `ReadinessLowerBound` / `ReadinessUpperBound` as `null` / ignored) — the point of the migration is that those numbers do not survive the session.
+- The two architecture tests (`NoAtRiskPersistenceTest`, `NoThetaInOutboundDtoTest`) continue to legacy-allowlist the V1 readiness fields so historical replay does not trip the ban. V2 is NOT allowlisted — any regression that puts a readiness-shaped field on V2 fails the build. The allowlist posture flipped from "pending retirement" to "V1 is legacy-only; V2 is the authoritative clean replacement."
+
+This sibling change is intentionally narrow: the provenance-gate contract that ADR-0043 introduces (compile-time phantom type + runtime gate + arch test + audit event) is unchanged. V2's event shape still carries everything the delivery-audit path needs (student, simulation, attempt counts, score, time, visibility warnings, submitted-at) — dropping the readiness bounds only removes a field that persistent downstream consumers were never allowed to read.

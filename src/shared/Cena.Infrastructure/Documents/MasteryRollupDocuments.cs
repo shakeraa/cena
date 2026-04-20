@@ -3,13 +3,20 @@
 // Marten-backed rollup docs that feed the mastery dashboards. These replace
 // the Random-backed stubs in MasteryTrackingService and let admin queries
 // read precomputed class/concept rollups instead of event scans.
+//
+// prr-013 retirement 2026-04-20: `AtRiskStudentDocument` moved to
+// Documents/Legacy/AtRiskStudentDocument.Legacy.cs (type retained, [Obsolete],
+// schema registration removed from MartenConfiguration). The
+// `AtRiskCount` field on `ClassMasteryRollupDocument` was removed outright —
+// "at-risk" is session-scoped per ADR-0003 + RDY-080 and lives on
+// SessionRiskAssessment, never on a persisted rollup.
 // =============================================================================
 
 namespace Cena.Infrastructure.Documents;
 
 /// <summary>
-/// Class-wide mastery rollup for a specific day. Powers MasteryOverview,
-/// ClassMastery, and AtRiskStudents views. One row per (classId, yyyy-MM-dd).
+/// Class-wide mastery rollup for a specific day. Powers MasteryOverview and
+/// ClassMastery views. One row per (classId, yyyy-MM-dd).
 /// </summary>
 public class ClassMasteryRollupDocument
 {
@@ -28,8 +35,7 @@ public class ClassMasteryRollupDocument
     public int ProficientCount { get; set; }
     public int MasterCount { get; set; }
 
-    // Risk and velocity
-    public int AtRiskCount { get; set; }              // students below threshold
+    // Velocity (the risk/at-risk counter was retired 2026-04-20 per prr-013).
     public float LearningVelocity { get; set; }       // concepts mastered per week
     public float LearningVelocityChange { get; set; }
 
@@ -45,27 +51,6 @@ public class ClassMasterySubjectSlot
     public float AvgMasteryLevel { get; set; }
     public int ConceptCount { get; set; }
     public int MasteredCount { get; set; }
-}
-
-/// <summary>
-/// At-risk student row persisted by the mastery rollup service. Makes
-/// "students needing intervention" queryable without scanning snapshots.
-/// One row per (schoolId, studentId, date).
-/// </summary>
-public class AtRiskStudentDocument
-{
-    public string Id { get; set; } = "";              // "{schoolId}:{studentId}:{yyyy-MM-dd}"
-    public string StudentId { get; set; } = "";
-    public string StudentName { get; set; } = "";
-    public string ClassId { get; set; } = "";
-    public string SchoolId { get; set; } = "";
-    public DateTimeOffset Date { get; set; }
-
-    public string RiskLevel { get; set; } = "medium"; // high | medium | low
-    public float CurrentAvgMastery { get; set; }
-    public float MasteryDeclineLast14d { get; set; }
-    public string RecommendedIntervention { get; set; } = "";
-    public DateTimeOffset UpdatedAt { get; set; } = DateTimeOffset.UtcNow;
 }
 
 /// <summary>

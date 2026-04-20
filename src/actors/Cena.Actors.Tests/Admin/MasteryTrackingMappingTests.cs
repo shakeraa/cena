@@ -40,7 +40,9 @@ public sealed class MasteryTrackingMappingTests
                 MasterCount = 1,
                 LearningVelocity = 2.5f,
                 LearningVelocityChange = 0.1f,
-                AtRiskCount = 2,
+                // AtRiskCount removed 2026-04-20 per prr-013 — field retired
+                // from ClassMasteryRollupDocument. Session-scoped risk lives
+                // on SessionRiskAssessment (ADR-0003 + RDY-080).
                 SubjectBreakdown = new List<ClassMasterySubjectSlot>
                 {
                     new() { Subject = "Math", AvgMasteryLevel = 0.65f, ConceptCount = 42, MasteredCount = 20 },
@@ -59,7 +61,7 @@ public sealed class MasteryTrackingMappingTests
                 MasterCount = 2,
                 LearningVelocity = 3.0f,
                 LearningVelocityChange = 0.2f,
-                AtRiskCount = 1,
+                // AtRiskCount removed per prr-013 — see note above.
                 SubjectBreakdown = new List<ClassMasterySubjectSlot>
                 {
                     new() { Subject = "Math", AvgMasteryLevel = 0.70f, ConceptCount = 42, MasteredCount = 22 },
@@ -75,8 +77,9 @@ public sealed class MasteryTrackingMappingTests
         Assert.Equal(5, result.Distribution[1].Count);   // 3 + 2
         Assert.Equal(7, result.Distribution[2].Count);   // 4 + 3
         Assert.Equal(3, result.Distribution[3].Count);   // 1 + 2
-        // AtRiskCount assertion removed per prr-013 follow-up — field retired from MasteryOverviewResponse DTO.
-        // The persistence-side ClassMasteryRollupDocument.AtRiskCount is retained (not in DTO ban scope).
+        // AtRiskCount assertion removed per prr-013 follow-up — field retired from MasteryOverviewResponse DTO
+        // AND from ClassMasteryRollupDocument (persistence). Session-scoped SessionRiskAssessment is the
+        // only seam that may carry risk-named fields (ADR-0003 + RDY-080).
         Assert.Single(result.SubjectBreakdown);
         Assert.Equal("Math", result.SubjectBreakdown[0].Subject);
         Assert.InRange(result.SubjectBreakdown[0].AvgMasteryLevel, 0.67f, 0.68f); // (0.65+0.70)/2
@@ -213,9 +216,12 @@ public sealed class MasteryTrackingMappingTests
     // tested MasteryTrackingService.BuildAtRiskStudentList which was retired along with
     // the AtRiskStudentsResponse DTO (ADR-0012 + RDY-080 prediction-surface ban).
     // See pre-release-review/reviews/audit/group-a-caller-audit.md R-22 for the
-    // compliance-defect rationale. Follow-up work will fully retire AtRiskStudentDocument
-    // from persistence + Marten projection + admin SPA; that test will return only if the
-    // new session-scoped teacher-facing view reintroduces equivalent logic.
+    // compliance-defect rationale. 2026-04-20: backend retirement completed —
+    // AtRiskStudentDocument moved to Documents/Legacy/ as [Obsolete], Marten schema
+    // registration removed, seed data dropped, /at-risk admin route retired.
+    // Remaining: admin SPA Vue pages (Phase 2, separate task). This test will
+    // return only if a new session-scoped teacher-facing view reintroduces
+    // equivalent logic (via SessionRiskAssessment, not via persisted rollups).
 
     [Fact]
     public void BagrutConceptCatalog_ExposesAllCoreSubjects()

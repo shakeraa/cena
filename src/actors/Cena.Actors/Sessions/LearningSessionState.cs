@@ -59,4 +59,24 @@ public sealed class LearningSessionState
         SchoolId = e.SchoolId;
         IsStarted = true;
     }
+
+    // ── prr-149: session-scoped scheduler plan ──
+    //
+    // These fields are session-local and die when the session stream is
+    // archived. They must NEVER be copied into StudentState or
+    // StudentProfileSnapshot — the SessionScopedSnapshotTest archtest
+    // enforces this contract.
+
+    /// <summary>
+    /// The most-recent scheduler plan computed for this session. Null
+    /// until <see cref="SessionPlanComputed_V1"/> is applied.
+    /// Rebuilt on stream replay so a restarted actor sees the same plan.
+    /// </summary>
+    public SessionPlanComputed_V1? CurrentPlan { get; private set; }
+
+    /// <summary>Applies a scheduler plan event to the session state.</summary>
+    public void Apply(SessionPlanComputed_V1 e)
+    {
+        CurrentPlan = e;
+    }
 }

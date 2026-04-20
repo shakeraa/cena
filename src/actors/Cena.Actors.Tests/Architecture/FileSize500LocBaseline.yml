@@ -34,7 +34,7 @@ grandfathered:
 
   # ---- Admin API surface (pre-2026-04-20 legacy; refactor candidates) ----
   - path: src/api/Cena.Admin.Api/AdminApiEndpoints.cs
-    baseline_loc: 1496
+    baseline_loc: 1497
     reason: "Admin minimal-API surface; split into per-domain endpoint groups is a follow-up refactor"
   - path: src/api/Cena.Admin.Api/QuestionBankSeedData.cs
     baseline_loc: 1429
@@ -51,14 +51,14 @@ grandfathered:
 
   # ---- Student API endpoint surface (pre-2026-04-20 legacy) ----
   - path: src/api/Cena.Student.Api.Host/Endpoints/SessionEndpoints.cs
-    baseline_loc: 1218
-    reason: "Student session minimal-API surface; split post EPIC-PRR-A LearningSession extraction. PRR-151 R-22 added AccommodationProfile session-render wiring (+21 LOC)."
+    baseline_loc: 1250
+    reason: "Student session minimal-API surface; split post EPIC-PRR-A LearningSession extraction. PRR-151 R-22 added AccommodationProfile session-render wiring (+21 LOC). prr-149 wired AdaptiveScheduler plan generation into /start (+32 LOC)."
   - path: src/api/Cena.Student.Api.Host/Endpoints/SocialEndpoints.cs
     baseline_loc: 743
     reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"
   - path: src/api/Cena.Student.Api.Host/Program.cs
-    baseline_loc: 580
-    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. PRR-151 R-22 added IAccommodationProfileService DI registration (+4 LOC)."
+    baseline_loc: 604
+    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. PRR-151 R-22 added IAccommodationProfileService DI registration (+4 LOC). prr-148 + prr-149 added StudentPlan + scheduler wiring (+24 LOC)."
 
   # ---- Actor runtime (pre-2026-04-20 legacy) ----
   - path: src/actors/Cena.Actors.Host/Program.cs

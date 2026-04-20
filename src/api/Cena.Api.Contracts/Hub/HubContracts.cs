@@ -34,6 +34,9 @@ public interface ICenaClient
     Task TutorMessage(TutorMessageEvent evt);
     Task TutoringEnded(TutoringEndedEvent evt);
 
+    // prr-149: scheduler plan refreshed for the active session
+    Task SessionPlanUpdated(SessionPlanUpdatedEvent evt);
+
     // System
     Task Error(HubErrorEvent evt);
     Task CommandAck(CommandAckEvent evt);
@@ -190,6 +193,18 @@ public sealed record TutoringEndedEvent(
     string SessionId,
     string StudentId,
     string Summary,
+    DateTimeOffset Timestamp);
+
+// prr-149: scheduler plan refresh notification. Session-scoped — the
+// payload carries the session id; the student UI fetches the full plan
+// via GET /api/session/{sessionId}/plan if it needs the topics (we push
+// only the lightweight header so the hub frame stays small).
+public sealed record SessionPlanUpdatedEvent(
+    string SessionId,
+    string StudentAnonId,
+    DateTimeOffset GeneratedAtUtc,
+    int TopicCount,
+    string InputsSource,
     DateTimeOffset Timestamp);
 
 public sealed record HubErrorEvent(

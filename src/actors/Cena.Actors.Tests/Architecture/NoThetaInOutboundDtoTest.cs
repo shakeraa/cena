@@ -144,31 +144,34 @@ public sealed class NoThetaInOutboundDtoTest
         }
     }
 
-    // Legacy allowlist — shares entries with NoAtRiskPersistenceTest for
-    // the types that overlap (MasteryDtos.cs at-risk surface, ExamSimulation
-    // readiness fields). Those are tracked under prr-013 follow-up for full
-    // retirement; until then we accept the known shapes and scan for NEW
-    // violations only.
+    // Legacy allowlist — read-only entries for shapes that the codebase has
+    // retired from new writes but must still tolerate (cross-aligned with
+    // NoAtRiskPersistenceTest).
     //
-    // TODO(prr-013 follow-up): retire ExamSimulationSubmitted_V1 readiness
-    // bounds + MasteryDtos at-risk admin surface. Once those land the
-    // entries below can go away — this test will start failing loudly if
-    // they don't, which is the point.
+    // Posture change 2026-04-20 (prr-013 backend retirement):
+    //   * V1 readiness fields on `ExamSimulationSubmitted_V1` stay
+    //     allowlisted: V1 is `[Obsolete]` and retained only for historical
+    //     Marten replay. New emitters use `ExamSimulationSubmitted_V2`
+    //     (no readiness bounds); V2 is NOT allowlisted, so any regression
+    //     that puts a readiness field back on V2 fails the build. See
+    //     ADR-0043 "Sibling change 2026-04-20: V1→V2 readiness field
+    //     migration."
+    //   * MasteryDtos at-risk fields were physically removed from
+    //     MasteryDtos.cs; no allowlist entry needed.
+    //   * Event files are still scanned by `NoAtRiskPersistenceTest` but
+    //     not by this test (Events are not DTOs). The entries below
+    //     document the cross-test alignment — they are defensively kept
+    //     in case a future refactor moves those fields into a `*Dto.cs`
+    //     file, which would then fall under this test's surface.
     private static readonly HashSet<(string RelPath, string Identifier)> LegacyAllowlist =
         new(new TupleComparer())
     {
         // ── src/actors/Cena.Actors/Events/ExamSimulationEvents.cs ──
-        // NOTE: not in this scan's surface (Events are not DTOs), kept
-        // here only to document the cross-test alignment. If a future
-        // refactor moves these fields into a *Dto.cs file, the entries
-        // below already cover the migration.
+        // Read-only historical replay only. V1 is [Obsolete]; V2 is clean
+        // and NOT on this allowlist. Cross-aligned with
+        // NoAtRiskPersistenceTest. See ADR-0043 (prr-013 sibling change).
         (Rel("src/actors/Cena.Actors/Events/ExamSimulationEvents.cs"), "ReadinessLowerBound"),
         (Rel("src/actors/Cena.Actors/Events/ExamSimulationEvents.cs"), "ReadinessUpperBound"),
-
-        // ── MasteryDtos at-risk fields retired 2026-04-20 per prr-013 follow-up ──
-        // Entries removed since the underlying fields were deleted from MasteryDtos.cs.
-        // Remaining allowlist: ExamSimulationEvents readiness bounds (still present,
-        // retirement deferred to preserve event-schema backward compat).
     };
 
     private static string Rel(string posixPath) =>

@@ -6,7 +6,24 @@
 **Source docs**: `cena_competitive_analysis.md:L91`, `cena_competitive_analysis.md:L122`
 **Assignee hint**: claude-subagent-adr-authoring
 **Tags**: source=pre-release-review-2026-04-20, lens=ministry, product-stance=honest-supportive-legal
-**Status**: Not Started
+**Status**: Backend retirement complete — 2026-04-20; Vue SPA retirement pending (Phase 2)
+
+**Backend completion 2026-04-20 (this pass)**:
+
+- `AtRiskStudentDocument` moved to `src/shared/Cena.Infrastructure/Documents/Legacy/AtRiskStudentDocument.Legacy.cs` with `[Obsolete]`; schema registration removed from `MartenConfiguration.cs`.
+- `ClassMasteryRollupDocument.AtRiskCount` field dropped from the persisted rollup.
+- `AdminAnalyticsSeedData` no longer seeds `AtRiskStudentDocument` records and no longer sets `AtRiskCount`.
+- `/api/admin/mastery/at-risk` mapped to a 410 Gone response with a `retired per prr-013` message for ~6 months so in-flight clients fail loudly.
+- `ExamSimulationSubmitted_V2` is the only shape new emitters construct (no readiness bounds on-stream). V1 is `[Obsolete]`, retained only for historical Marten replay; a codebase grep confirmed zero production emitters. V1→V2 migration note added to ADR-0043 (sibling change section).
+- `NoAtRiskPersistenceTest` / `NoThetaInOutboundDtoTest` allowlist comments updated: V1 readiness fields remain allowlisted (read-only legacy); V2 is NOT allowlisted so any regression fails the build.
+- New integration test: `src/actors/Cena.Actors.Tests/Assessment/ExamSimulationSubmittedV2Tests.cs` covers (a) V2 shape has no readiness fields, (b) no production code path constructs V1, (c) V1 historical replay is still constructable and projects down to V2 shape by dropping readiness.
+
+**Still pending (Phase 2, separate follow-up task)**:
+
+- Vue SPA at-risk pages under `src/admin/full-version/src/` (admin dashboard "Students Needing Intervention" view, any composables / stores still referencing the retired route).
+- The session-actor-side `SessionRiskAssessment` wiring into a live in-session teacher view (scaffold exists; live computation path is RDY-080 / EPIC-PRR-A Sprint-2 work).
+- ADR `NNNN-at-risk-session-surface.md` if the session-scope + in-surface + CI-bounded policy needs its own dedicated ADR beyond the ADR-0003 / RDY-080 anchors.
+
 **Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`. **User decision 2026-04-20**: the original swarm recommendation to "soften the label" is overridden — harsh-reality numbers ARE the target voice; persistence, externalization, and confidence-binding are the hard constraints.
 **Tier**: mvp
 **Epic**: EPIC-PRR-A — ADR-0012 StudentActor decomposition

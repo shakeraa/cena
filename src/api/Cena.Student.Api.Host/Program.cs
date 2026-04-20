@@ -14,9 +14,11 @@ using Cena.Actors.Mastery;
 using Cena.Actors.RateLimit;
 using Cena.Actors.Services;
 using Cena.Actors.Serving;
+using Cena.Actors.StudentPlan;
 using Cena.Actors.Tutor;
 using Cena.Api.Host.Endpoints;
 using Cena.Api.Host.Hubs;
+using Cena.Api.Host.Services;
 using Cena.Student.Api.Host.Endpoints;
 using Cena.Infrastructure.Ai;
 using Cena.Infrastructure.Auth;
@@ -156,6 +158,9 @@ public partial class Program
     // ADR-0038 key store + prr-155 ConsentAggregate (bundled compliance services).
     Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregate(builder.Services.AddCenaComplianceServices(builder.Configuration, builder.Environment));
 
+    // prr-148: StudentPlan bounded context (new, per NoNewStudentActorStateTest).
+    builder.Services.AddStudentPlanServices();
+
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
     
@@ -239,6 +244,36 @@ public partial class Program
     
     // ---- MST-011: Scaffolding Service (stateless pure function wrapper) ----
     builder.Services.AddSingleton<IScaffoldingService, ScaffoldingServiceWrapper>();
+
+    // ---- prr-149: AdaptiveScheduler live caller at session start ----
+    // Every POST /api/sessions/start asks ISessionPlanGenerator for a
+    // SessionPlanSnapshot, persists it via ISessionPlanWriter (session-
+    // scoped event + read doc), and notifies the student via SignalR.
+    // Failure is observability-only — the session continues.
+    //
+    // Bridge to prr-148: StudentPlanConfigBridgeService reads the raw
+    // student-set deadline+budget via IStudentPlanInputsService
+    // (registered by AddStudentPlanServices) and folds in scheduler
+    // defaults for any null fields.
+    builder.Services.AddStudentPlanServices();
+    builder.Services.AddSingleton<
+        Cena.Actors.Sessions.IStudentPlanConfigService,
+        Cena.Actors.Sessions.StudentPlanConfigBridgeService>();
+    builder.Services.AddScoped<
+        Cena.Actors.Sessions.ISessionAbilityEstimateProvider,
+        StudentProfileAbilityEstimateProvider>();
+    builder.Services.AddSingleton<
+        Cena.Actors.Sessions.ITopicPrerequisiteGraphProvider>(
+            _ => Cena.Actors.Sessions.EmptyTopicPrerequisiteGraphProvider.Instance);
+    builder.Services.AddScoped<
+        Cena.Actors.Sessions.ISessionPlanGenerator,
+        Cena.Actors.Sessions.SessionPlanGenerator>();
+    builder.Services.AddScoped<
+        Cena.Actors.Sessions.ISessionPlanWriter,
+        Cena.Actors.Sessions.SessionPlanWriter>();
+    builder.Services.AddSingleton<
+        Cena.Actors.Sessions.ISessionPlanNotifier,
+        Cena.Api.Host.Hubs.SignalRSessionPlanNotifier>();
 
     // ---- PRR-151 R-22: AccommodationProfile service (session-render wiring) ----
     // Wires the Accommodations bounded context into the session pipeline.
@@ -805,9 +840,14 @@ public partial class Program
     // Me/Profile endpoints (STB-00, STB-00b)
     app.MapMeEndpoints();
     app.MapSelfAssessmentEndpoints();
-    
+
+    app.MapStudyPlanSettingsEndpoints(); // prr-148
+
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();
+
+    // prr-149: GET /api/session/{sessionId}/plan (scheduler plan read)
+    app.MapSessionPlanEndpoints();
 
     // RDY-075 Phase 1B: offline PWA reconnect sync — accepts batched
     // offline answer events with ItemVersionFreeze guards.

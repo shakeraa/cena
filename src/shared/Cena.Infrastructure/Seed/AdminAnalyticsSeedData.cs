@@ -203,7 +203,9 @@ public static class AdminAnalyticsSeedData
                     DevelopingCount = developing,
                     ProficientCount = proficient,
                     MasterCount = master,
-                    AtRiskCount = beginner,
+                    // prr-013 retirement 2026-04-20: AtRiskCount removed.
+                    // "At-risk" is session-scoped via SessionRiskAssessment,
+                    // never aggregated onto a persisted rollup (ADR-0003 + RDY-080).
                     LearningVelocity = 2f + rng.NextSingle() * 1.5f,
                     LearningVelocityChange = rng.NextSingle() * 0.4f - 0.2f,
                     SubjectBreakdown = subjectBreakdown,
@@ -213,34 +215,14 @@ public static class AdminAnalyticsSeedData
             }
         }
 
-        // At-risk students — three per class, latest day only
-        var atRiskNames = new[]
-        {
-            ("stu-alice", "Alice Green", "class-grade-10a"),
-            ("stu-dan", "Dan Blue", "class-grade-10b"),
-            ("stu-frank", "Frank Brown", "class-grade-11a"),
-        };
-        foreach (var (sid, name, cid) in atRiskNames)
-        {
-            var doc = new AtRiskStudentDocument
-            {
-                Id = $"{DevSchoolId}:{sid}:{today:yyyy-MM-dd}",
-                StudentId = sid,
-                StudentName = name,
-                ClassId = cid,
-                SchoolId = DevSchoolId,
-                Date = today,
-                RiskLevel = "high",
-                CurrentAvgMastery = 0.42f + rng.NextSingle() * 0.1f,
-                MasteryDeclineLast14d = -(rng.NextSingle() * 0.12f + 0.03f),
-                RecommendedIntervention = "Extra scaffolding on prerequisites",
-            };
-            session.Store(doc);
-            docs++;
-        }
+        // prr-013 retirement 2026-04-20: the AtRiskStudentDocument seeder was
+        // removed. Teacher-facing "students needing intervention" data is now
+        // session-scoped via SessionRiskAssessment inside the session actor
+        // (ADR-0003 + RDY-080). No dev-tier seeding is required for that seam
+        // — it is computed live during an active session and never persisted.
 
         await session.SaveChangesAsync();
-        logger.LogInformation("Seeded {Count} class mastery / at-risk docs", docs);
+        logger.LogInformation("Seeded {Count} class mastery rollup docs", docs);
     }
 
     // ── Concept difficulty per school ────────────────────────────────────────

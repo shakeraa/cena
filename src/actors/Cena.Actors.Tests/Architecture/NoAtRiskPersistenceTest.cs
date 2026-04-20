@@ -135,28 +135,40 @@ public sealed class NoAtRiskPersistenceTest
         }
     }
 
-    // Pre-2026-04-20 legacy violations. Each entry is a
-    // (relative-path, identifier) tuple. Every entry is tech debt that the
-    // broader prr-013 DoD retires (the MasteryDtos at-risk endpoints + the
-    // ExamSim readiness fields migrate to session-scoped surfaces). Do NOT
-    // add to this list without a follow-up task and an explicit decision
-    // note — the default posture is "rename or move into SessionRiskAssessment".
+    // Legacy allowlist — entries here are READ-ONLY legacy that the codebase
+    // has retired from new writes but must still tolerate on-stream replay.
+    //
+    // Posture change 2026-04-20 (prr-013 backend retirement):
+    //   * V1 readiness fields on `ExamSimulationSubmitted_V1` stay
+    //     allowlisted because the record is `[Obsolete]` and retained
+    //     solely for historical Marten replay. New emitters use
+    //     `ExamSimulationSubmitted_V2` (no readiness bounds); V2 is NOT on
+    //     this allowlist, so any regression that puts a readiness-shaped
+    //     field back on V2 fails the build. See ADR-0043 "Sibling change
+    //     2026-04-20: V1→V2 readiness field migration" for the full rationale.
+    //   * MasteryDtos at-risk fields were physically removed from
+    //     MasteryDtos.cs the same day, so they no longer need allowlisting.
+    //   * ClassMasteryRollupDocument.AtRiskCount was removed from persistence
+    //     and AtRiskStudentDocument was moved to Documents/Legacy/ as
+    //     [Obsolete] + schema registration dropped from MartenConfiguration.
+    //     None of those types are scanned by this arch test (persistence
+    //     documents are not event DTOs / outbound contracts), so no
+    //     allowlist entry is required.
+    //   * Remaining Vue SPA at-risk pages are Phase 2 (separate task); they
+    //     are not in this test's scan zone either.
+    //
+    // Do NOT add to this list without a follow-up task and an explicit
+    // decision note. The default posture is "rename or move into
+    // SessionRiskAssessment".
     private static readonly HashSet<(string RelPath, string Identifier)> LegacyAllowlist =
         new(new TupleComparer())
     {
         // ── src/actors/Cena.Actors/Events/ExamSimulationEvents.cs ──
-        // TODO(prr-013 follow-up): migrate ExamSimulationSubmitted_V1 to emit
-        // a session-scoped SessionRiskAssessment payload via a side channel
-        // rather than persisting the readiness bounds into the event stream.
+        // Read-only historical replay only. V1 is [Obsolete]; V2 is the
+        // clean replacement and is NOT allowlisted. See ADR-0043 sibling
+        // change note (prr-013, 2026-04-20).
         (Rel("src/actors/Cena.Actors/Events/ExamSimulationEvents.cs"), "ReadinessLowerBound"),
         (Rel("src/actors/Cena.Actors/Events/ExamSimulationEvents.cs"), "ReadinessUpperBound"),
-
-        // ── MasteryDtos at-risk fields retired 2026-04-20 per prr-013 follow-up ──
-        // The 6 legacy entries (AtRiskCount / ReadinessScore / AtRiskStudentsResponse /
-        // AtRiskStudent / RiskLevel / DecayRisk) were removed from MasteryDtos.cs;
-        // the allowlist entries are no longer needed. Remaining follow-up: retire
-        // the admin SPA Vue pages + Marten AtRiskStudentDocument projection + seed
-        // data (deferred to subsequent session, out of C# arch-test scope).
     };
 
     private static string Rel(string posixPath) =>
