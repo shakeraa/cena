@@ -14,16 +14,35 @@
 ---
 
 ## Goal
-Extend ship-gate scanner to reject feature docs/specs citing rejected claims: FD-003 95% misconception resolution, FD-008 Yu-2026, FD-011 d=1.16, Hattie d=1.44 misuse, interleaving d=0.5-0.8.
+
+Extend existing ship-gate scanner (`scripts/shipgate/lexicon-lock-gate.mjs`) with a rule pack that rejects Dr. Rami's REJECTED citations and related citation-abuse patterns. Requires positive-test fixture + retroactive scan + narrow whitelist.
+
+### User decision 2026-04-20 — tightened DoD
+
+- Catch exact strings AND reasonable variants for: FD-003 "95% misconception resolution", FD-008 "Yu et al. 2026", FD-011 "d=1.16", Hattie "d=1.44" near planning/self-reported context, interleaving "d=0.5-0.8"
+- Positive-test fixture `shipgate/fixtures/banned-citation-sample.md` contains every pattern; CI asserts scanner catches each
+- Narrow exemption whitelist: `retired.md`, `finding_assessment_dr_rami.md`, `cena_dr_nadia_pedagogical_review_20_findings.md`, this task file
+- Retroactive scan on landing: report to `pre-release-review/reviews/banned-citation-historical-scan.md`; historical hits quarantined with follow-up tasks, not blocked
 
 ## Files
-- scripts/shipgate/banned-citations.yml
-- tests/shipgate/*.spec.ts
+
+- `scripts/shipgate/banned-citations.yml` (new)
+- `scripts/shipgate/lexicon-lock-gate.mjs` (teach scanner to load YAML rule pack if not generic)
+- `shipgate/fixtures/banned-citation-sample.md` (positive-test)
+- `tests/shipgate/banned-citations.spec.ts`
+- `scripts/shipgate/banned-citations-whitelist.yml` (with one-line reason per entry)
+- `.github/workflows/shipgate.yml` (wire new rule)
 
 ## Definition of Done
-- Scanner matches banned-citation patterns in doc corpus; CI fails on match; exemption list for historical docs.
+
+1. Rule pack detects all patterns in the fixture; CI fails PRs introducing banned patterns outside whitelist
+2. Positive + negative tests in `tests/shipgate/`; positive fails scanner, negative passes
+3. Retroactive scan report committed; historical hits whitelisted with per-hit follow-up tasks
+4. Narrow whitelist — each entry has one-line reason
+5. Rolls up into EPIC-PRR-D — coordinate with prr-013 euphemism ban, prr-019/040 banned-mechanics, prr-156 emoji inflation for single scanner invocation
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-shipgate --result "<branch>"
 
 ---

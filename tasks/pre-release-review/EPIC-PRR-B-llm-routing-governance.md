@@ -50,6 +50,21 @@ The absorbed task files remain in place as the executable unit-of-work; this epi
 - SYNTHESIS.md epic section reflects completion.
 - No absorbed task is marked done until all peers in the epic are merged.
 
+## Epic triage decisions 2026-04-20 (user)
+
+**Adopted**: scope + general execution order.
+
+**Tightenings**:
+
+1. **Promote prr-012 (Cap Socratic) to P0** — Socratic at default Sonnet = ~$480k/mo vs $30k cap (Svetlana finops). That is ship-blocker, not pre-launch-required.
+2. **Cross-link new ADR everywhere**: once prr-004 lands docs/adr/0026-*.md, update CLAUDE.md, /Users/shaker/.claude/projects/.../memory/, SUPERPROMPT.md to cite the real file instead of the phantom reference. Add to prr-004 DoD.
+3. **Promote prr-145 (hint-tier ADR) from P2 to P1** and move earlier in sequence — it determines which tier Socratic (prr-012) belongs on.
+4. **Missing sub-task — routing-config gate**: every new LLM-consuming feature PR must add its entry to routing-config.yaml; CI scanner rule catches new LLM call sites without a tier tag. Roll into prr-004 scanner or add explicit sub-task.
+
+**Tags**: user-decision=2026-04-20-epic-triaged
+
+---
+
 ## Implementation Protocol — Senior Architect
 
 Implementation of this epic must be driven by a senior-architect mindset, not a checklist. Before writing any code, the implementer (human or agent) must answer both sets of questions in writing — either in a task-comment, the PR description, or a `docs/decisions/` note:

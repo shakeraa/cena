@@ -49,6 +49,24 @@ The absorbed task files remain in place as the executable unit-of-work; this epi
 - SYNTHESIS.md epic section reflects completion.
 - No absorbed task is marked done until all peers in the epic are merged.
 
+## Epic triage decisions 2026-04-20 (user)
+
+**Adopted**: scope + general execution order.
+
+**Tightenings**:
+
+1. **Explicit external blockers (ADD to Blocks section)**:
+   - **prr-011** (httpOnly session cookie + BFF) — parent session cookie reuses this pattern; cannot ship until prr-011 lands.
+   - **prr-007** (theta isolation seam) — parent-visible surfaces consume readiness buckets via ThetaMasteryMapper; need the seam first.
+   - **prr-003a** (erasure ADR) — parental-erasure flow depends on chosen erasure model.
+2. **C-04 conflict is explicit prerequisite** — parent visibility at 13-16 is a decision gate; epic cannot start until C-04 resolves.
+3. **prr-018 role reclassified**: `doc` → `feature+infra`. Outbound SMS sanitizer is code, not documentation.
+4. **Coordinate ConsentAggregate with EPIC-PRR-A prr-155** — same aggregate-design substrate; avoid double-design.
+
+**Tags**: user-decision=2026-04-20-epic-triaged
+
+---
+
 ## Implementation Protocol — Senior Architect
 
 Implementation of this epic must be driven by a senior-architect mindset, not a checklist. Before writing any code, the implementer (human or agent) must answer both sets of questions in writing — either in a task-comment, the PR description, or a `docs/decisions/` note:

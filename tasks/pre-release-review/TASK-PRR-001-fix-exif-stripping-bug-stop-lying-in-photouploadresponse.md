@@ -13,17 +13,47 @@
 ---
 
 ## Goal
-Implement real EXIF stripping (currently stubbed) before returning ExifStripped=true in PhotoUploadResponse. Lying-label is a non-negotiable violation.
+
+Replace the current `StripExifMetadata` stub (at `src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:241-248` — returns input bytes unchanged) with a real EXIF/IPTC/XMP/GPS scrub. Tie the `ExifStripped` flag to the **strip result**, not to file-type. Reject uploads where strip fails rather than persist leaked metadata. "Labels match data" (user memory) and "no stubs in production" (banned 2026-04-11) both apply.
+
+### User decision 2026-04-20 — tightened DoD
+- Implement via [Magick.NET](https://github.com/dlemstra/Magick.NET). `image.Strip()` removes all EXIF/IPTC/XMP tags including GPS in a single call. Handles JPEG/PNG/HEIC; well-maintained; MIT-friendly license.
+- `ExifStripped` flag becomes `stripResult.Success` — never tied to file-type (`!isPdf`) again.
+- On strip failure: return 422, do **not** persist the bytes. Better to reject than to persist a leaked-GPS photo.
+- Integration test against a real EXIF-laden fixture — unit-testing the stripper in isolation is insufficient; the bug is at the endpoint seam.
+- Architecture test: no outbound pipeline (OCR, LLM prompt assembly, analytics, RetentionWorker) may accept image bytes that haven't passed `ExifStripper.StripSucceeded()`.
 
 ## Files
-- src/shared/Cena.Infrastructure/Media/ExifStripper.cs
-- src/actors/Cena.Actors/Services/PhotoIngestService.cs
-- tests for metadata-stripped invariant
+
+- `src/shared/Cena.Infrastructure/Media/ExifStripper.cs` — new; Magick.NET wrapper returning `StripResult(byte[] scrubbed, bool success, string? failureReason)`
+- `src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs` — replace `StripExifMetadata` stub (lines 241-248), change line 211 to tie `ExifStripped` to `stripResult.Success`, add 422 path on failure
+- `src/actors/Cena.Actors/Services/PhotoIngestService.cs` — consume the new stripper; never accept raw bytes
+- `tests/fixtures/exif-laden-sample.jpg` — real JPEG with known GPS/Make/Model/timestamp (commit in-repo so the test is deterministic)
+- `tests/integration/PhotoUploadEndpoint.ExifStripping.Tests.cs` — upload the fixture through the full endpoint, read persisted bytes via `MetadataExtractor`, assert zero GPS/Make/Model/serial-number/owner tags remain; separate test asserts 422 on strip failure
+- `tests/arch/NoUnstrippedImageBytesTest.cs` — architecture test: only `ExifStripper.StripResult.Scrubbed` may flow to persistence/LLM/OCR/analytics seams
+- `Cena.Shared.Infrastructure.csproj` — add `Magick.NET-Q8-AnyCPU` NuGet dep (smaller Q8 build, sufficient for 8-bit image scrub)
 
 ## Definition of Done
-- Real exif strip via MagickNet or similar; unit tests assert all GPS/Make/Model keys removed; ExifStripped=true only on success; RetentionWorker registered.
+
+1. `StripExifMetadata` stub removed from `PhotoUploadEndpoints.cs`; `ExifStripper` service exists and is injected.
+2. `ExifStripped` response flag is `stripResult.Success` — architecture test enforces no other assignment path.
+3. Integration test with the committed EXIF-laden fixture passes: upload → response asserts `ExifStripped=true` → read persisted bytes → `MetadataExtractor` finds zero GPS/Make/Model/owner tags.
+4. Negative integration test: strip-failure path returns 422, persists nothing, response carries failure reason.
+5. Architecture test green: `NoUnstrippedImageBytesTest` scans the type graph and asserts no persistence/LLM/OCR/analytics method accepts `byte[]` image payloads directly — only `StripResult.Scrubbed`.
+6. Full `Cena.Actors.sln` builds cleanly (branch-only builds miss cross-project errors — user memory `feedback_full_sln_build_gate`).
+7. All existing tests still pass.
+
+### Downstream tasks blocked until this lands
+
+- prr-010 (sandbox SymPy template evaluation — ingestion-adjacent)
+- AXIS_6 assessment features that accept photo uploads
+- AXIS_8 OCR/content-authoring work that consumes uploaded images
+- Any prr-NNN whose Files list includes `PhotoUploadEndpoints.cs` or `PhotoIngestService.cs`
+
+Annotate those tasks with `blocked-by: prr-001` when their implementer claims them.
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
 
 ---

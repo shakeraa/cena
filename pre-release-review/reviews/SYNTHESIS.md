@@ -28,7 +28,8 @@ Source corpus: 15 feature-research docs under `pre-release-review/*.md` (total 7
 |---|---|---|---|---|---|---|
 | 1 | Fix EXIF stripping bug — stop lying in PhotoUploadResponse | P0 | redteam | axis9:L39 | S | kimi-coder |
 | 2 | ADR-0012 StudentActor split — gate pedagogy + SRL features | P0 | enterprise | axis1:L44, axis2:L43 | L | human-architect |
-| 3 | Hard-delete misconception events on erasure (not read-filter) | P0 | privacy+redteam | axis9:L176 | M | kimi-coder |
+| 3a | ADR — Event-sourced right-to-be-forgotten policy (crypto-shred preference per user direction 2026-04-20) | P0 | privacy+redteam+enterprise | axis9:L176 | S | human-architect |
+| 3b | Implement chosen erasure model for MisconceptionDetected_V1 (blocked-by 3a) | P0 | privacy+redteam | axis9:L176 | M-L | kimi-coder |
 | 4 | Promote contracts/llm/routing-config.yaml governance to ADR-026 + CI scanner | P0 | finops+enterprise+sre+cogsci | feature-discovery:L25 | M | human-architect |
 | 5 | Block features whose evidence Dr. Rami REJECTED (FD-003, FD-008, FD-011) | P0 | redteam+educator+cogsci+privacy+sre | finding_assessment_dr_rami:L69 | S | claude-subagent-shipgate |
 | 6 | Rename "Crisis Mode" + replace Bagrut countdown with progress framing | P0 | ethics+educator+cogsci+ministry | axis6:L135, axis4:L129, competitive:L126 | M | human-architect |

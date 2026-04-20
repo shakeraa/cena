@@ -13,17 +13,45 @@
 ---
 
 ## Goal
-Sandbox (container + resource limits) all SymPy template evaluations in the problem-variation engine. Current path permits arbitrary symbolic eval with no timeout/memory cap.
+
+Sandbox SymPy template evaluation at three layers (container, SymPy whitelist, canary tests). Current sidecar has only millisecond timeout (`SymPySidecarClient.cs:103`) — insufficient for memory blow-up, infinite recursion, or sandbox-escape patterns. LLM-generated templates are untrusted input; CAS is correctness, sandbox is containment — both required.
+
+### User decision 2026-04-20 — tightened DoD
+
+- **Container layer**: dedicated sidecar with seccomp blocking `execve`/`fork`/`ptrace`/filesystem syscalls except stdin/stdout; cgroups 128MB mem + 1 CPU-sec hard limits; no network namespace
+- **SymPy layer**: whitelist imports to `sympy.core`/`simplify`/`solvers`; deny `__import__`/`exec`/`eval`/`open`/`sympy.printing`/`__subclasses__`; `sympify(expr, strict=True)` with symbol whitelist, fail-closed
+- **Canary suite**: `tests/fixtures/hostile-sympy/` with memory-bomb, infinite recursion, `__subclasses__` escape, SSRF via printing, filesystem probe — CI asserts each is contained
+- **Defense in depth**: CAS output still passes `CasConformanceSuite` after sandbox; layered integration test
 
 ## Files
-- src/actors/Cena.Actors/Cas/SymPySidecarClient.cs
-- src/actors/Cena.Actors/ContentAuthoring/ProblemVariationEngine.cs
-- sidecar Dockerfile with seccomp/cgroup limits
+
+- `src/actors/Cena.Actors/Cas/SymPySidecarClient.cs` (resource-limit enforcement + whitelist)
+- `src/actors/Cena.Actors/Cas/ProblemVariationEngine.cs` or content-authoring entry
+- `deploy/docker/sympy-sidecar/Dockerfile` (seccomp + cgroups + no-network)
+- `deploy/docker/sympy-sidecar/seccomp.json`
+- `src/sympy-sidecar/main.py` (SymPy import + symbol whitelist)
+- `tests/fixtures/hostile-sympy/` (5+ canary patterns)
+- `tests/integration/SymPySandbox.HostileTemplate.Tests.cs`
+- `tests/integration/SymPySandbox.ResourceLimit.Tests.cs`
+- `docs/runbooks/sympy-sandbox-breach.md`
 
 ## Definition of Done
-- Hostile template eval canary: memory/CPU capped, sandbox escape prevented, unit test with timeout.
+
+1. Sidecar rebuilt with seccomp + cgroups + no-network; `docker run` validates limits
+2. SymPy import + symbol whitelist active; unknown symbol fails closed
+3. All canary fixtures contained within limits; no host OOM/crash; assertions per canary
+4. Layered integration test: sandbox + CasConformanceSuite both hold
+5. Runbook for containment-failure response
+6. **`docker ps` before build per `feedback_container_state_before_build`** — virtiofs + hot-reload crashed Docker Desktop twice
+7. Full `Cena.Actors.sln` builds cleanly
+
+## Blocked-by / Coordinate
+
+- **prr-001** (EXIF stripping) — ingestion hardening; land together
+- Loosely coupled with prr-007 (CAS router)
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
 
 ---

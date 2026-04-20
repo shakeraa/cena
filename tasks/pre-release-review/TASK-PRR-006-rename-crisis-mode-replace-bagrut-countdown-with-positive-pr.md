@@ -14,17 +14,62 @@
 ---
 
 ## Goal
-Kill 'Crisis Mode' and 'Bagrut Countdown' naming + UX patterns (ship-gate GD-004 dark-pattern violation). Replace with opt-in positive progress framing. Per-family opt-in only.
+
+Kill "Crisis Mode" and "Bagrut Countdown" naming + mechanic patterns before they ship. This is **preventive** work — 2026-04-20 grep confirms no code implements these patterns today; the task is to keep it that way via scanner + design-intent ADR + positive-framing reference copy.
+
+### Relationship to prr-013 "honest + supportive + legal" stance (user decision 2026-04-20)
+
+The R-28 decision said "honest numbers, not soft euphemism" for student performance data. This task is orthogonal:
+- **Honest language, session-scoped, in-surface**: YES (prr-013)
+- **Loss-aversion *mechanics* (countdown timers, Crisis Mode label, red-at-risk tier, urgency copy)**: NO (this task)
+
+A perfectly honest countdown ("42 days until exam, you're behind trajectory") is still a coercive *mechanic* banned by ship-gate GD-004. The mechanic is the problem, not the number's honesty.
+
+### User decision 2026-04-20 — tightened DoD
+
+**Scope A — ship-gate vocabulary expansion** (rolls up under EPIC-PRR-D):
+- Banned terms in en/he/ar locale files: "Crisis", "crisis-mode", "countdown", "days remaining", "days until", "days left", "run out of time", "last chance", "almost out", "time is running out", and Hebrew/Arabic variants (checked with a native speaker or locale team)
+- Scanner fails CI on any match in student-facing i18n bundles (`src/student/full-version/src/locales/`, `src/admin/full-version/src/locales/`)
+- Exemption whitelist narrow: only this task file, `retired.md`, and `shipgate/fixtures/` may mention the patterns
+
+**Scope B — design-intent ADR**:
+- `docs/adr/NNNN-exam-prep-time-framing.md`: codify principle — **time-awareness is OK, time-pressure mechanics are not**. "2 of 8 units mastered" OK; "62 days remaining with red badge" not.
+- ADR governs future feature proposals without requiring another swarm review
+- Cross-link from CLAUDE.md non-negotiable #3 so future authors hit it
+
+**Scope C — positive-framing reference copy**:
+- `docs/design/exam-prep-positive-framing.md`: authoritative examples for every surface that would naively show countdown/crisis framing. Each example pairs banned-framing-anti-pattern with positive-framing target, with rationale.
+- Designers reference this when building new exam-prep surfaces
+
+**Scope D — per-family opt-in for time-awareness (optional, not default)**:
+- If a family wants plain days-until-exam as informational (not coercive), it ships behind a parent-settings opt-in
+- Never default-on, never student-surface default, never styled with red/alert/urgent semantics
+- Note: this ties to EPIC-PRR-C Parent Aggregate — defer the opt-in settings UI to that epic; this task locks the *policy*
 
 ## Files
-- src/student/full-version/src/locales/**/countdown*
-- src/actors/Cena.Actors/ExamPrep/**
-- ADR on crisis-mode boundary
+
+- `scripts/shipgate/banned-mechanics.yml` (new — distinct from banned-citations in prr-005; both feed scanner)
+- `scripts/shipgate/lexicon-lock-gate.mjs` (teach scanner to load new rule)
+- `docs/adr/NNNN-exam-prep-time-framing.md` (new)
+- `docs/design/exam-prep-positive-framing.md` (new)
+- `shipgate/fixtures/banned-mechanics-sample.md` (positive-test)
+- `tests/shipgate/banned-mechanics.spec.ts`
+- Locale pre-scan: `src/student/full-version/src/locales/**/*.json` — retroactive; quarantine any existing hit
+- Update CLAUDE.md non-negotiable #3 to link the ADR
 
 ## Definition of Done
-- All three locales purged of banned terms; CI scanner green; ADR-0003 progress-framing accepted.
+
+1. Banned-mechanics rule pack active; scanner catches every pattern in the fixture across en/he/ar
+2. ADR accepted with time-awareness vs time-pressure distinction clearly articulated
+3. Positive-framing reference copy committed with ≥5 concrete anti-pattern → target examples
+4. Locale pre-scan report: zero hits in current student-facing i18n bundles (or, if hits found, each is fixed in this PR)
+5. CLAUDE.md non-negotiable #3 cross-links the new ADR
+6. Parent opt-in UI *deferred to EPIC-PRR-C* — document the handoff in that epic's task file
+7. Rolls up into EPIC-PRR-D; coordinate with prr-005 (banned citations), prr-013 (banned euphemism), prr-156 (banned emoji), prr-019/040 for single scanner invocation
+8. Full `Cena.Actors.sln` unaffected (this is scanner + docs + locale changes)
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
 
 ---

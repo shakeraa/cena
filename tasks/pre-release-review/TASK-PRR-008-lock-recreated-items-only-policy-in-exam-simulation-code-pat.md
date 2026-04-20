@@ -13,16 +13,38 @@
 ---
 
 ## Goal
-Assert at persistence/delivery boundaries: no raw Ministry exam text reaches students. Only CAS-gated AI-authored recreations. Prevent regression on reference-only policy.
+
+Enforce 2026-04-15 "Bagrut reference-only" decision at compile-time + runtime + test layers. Substrate already built (`BagrutRecreation.cs`, `ExamSimulationMode.cs`, `ExamSimulationEvents.cs`, tests); the delivery-side invariant enforcement is the gap.
+
+### User decision 2026-04-20 — tightened DoD
+
+- **Compile-time**: `Provenance` enum (`AiRecreated | TeacherAuthoredOriginal | MinistryBagrut`); phantom-type / DU prevents `MinistryBagrut` from ever being `Deliverable<T>`
+- **Runtime**: single `IItemDeliveryGate.AssertDeliverable` chokepoint at last-moment-before-serialization; throws on non-recreated + SIEM-logs with actor/session/tenant/item-id
+- **Arch test**: no student-facing DTO field reachable from MinistryBagrut-provenanced source
+- **Negative integration test**: seed Ministry item → attempt delivery → gate throws + SIEM log + no event persisted + 5xx response (bug, not graceful fallback)
+- **Cross-ref ADR-0032** (write-side CAS ingestion) in new invariant's code comment
 
 ## Files
-- src/actors/Cena.Actors/ExamSimulation/**
-- tests/architecture/BagrutRecreationOnlyTests.cs
+
+- `src/actors/Cena.Actors/Content/Provenance.cs` (new)
+- `src/actors/Cena.Actors/Assessment/IItemDeliveryGate.cs` (new + impl)
+- `src/actors/Cena.Actors/Assessment/ExamSimulationMode.cs` (consume gate)
+- `src/actors/Cena.Actors/Events/ExamSimulationEvents.cs` (`DeliveredItem` records provenance)
+- `tests/architecture/BagrutRecreationOnlyTests.cs`
+- `tests/integration/ExamSimulation.ReferenceOnlyEnforcement.Tests.cs`
+- `docs/adr/NNNN-bagrut-reference-only-enforcement.md` (optional small ADR)
 
 ## Definition of Done
-- Runtime guard + arch test verify provenance='recreated'; integration test attempts raw Ministry import and fails.
+
+1. `Provenance` compile-time phantom-type makes `MinistryBagrut` un-deliverable
+2. `IItemDeliveryGate` chokepoint routes every student-delivery path
+3. Arch test + negative integration test both green
+4. SIEM captures actor/session/tenant/item-id on attempt
+5. Full `Cena.Actors.sln` builds; existing tests pass
+6. ADR (if written) cross-links ADR-0032 + non-negotiable #4
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-bagrut-fidelity --result "<branch>"
 
 ---

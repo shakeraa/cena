@@ -51,6 +51,21 @@ The absorbed task files remain in place as the executable unit-of-work; this epi
 - SYNTHESIS.md epic section reflects completion.
 - No absorbed task is marked done until all peers in the epic are merged.
 
+## Epic triage decisions 2026-04-20 (user)
+
+**Adopted**: scope + general execution order.
+
+**Tightenings**:
+
+1. **prr-155 ConsentAggregate is cross-epic with EPIC-PRR-C** — same DDD-aggregate design substrate. Coordinate ConsentAggregate design with EPIC-PRR-C before either commits to events. Owner: this epic; reviewer: EPIC-PRR-C.
+2. **Move prr-157 TZ fix to step 2** alongside ADRs — `FindSystemTimeZoneById("Israel")` is a latent prod-crash on Linux (actor-system-review L1), not a late-stage polish.
+3. **Epic kill switch**: if Sprint 1 of ADR-0012 reveals the split fights the 500-LOC rule, pause new absorbed-feature work until re-plan. Do not keep adding features to a god-aggregate-in-refactor.
+4. **Aggregate-citation gate**: every absorbed P1/P2 PR must name the successor aggregate it writes state to, referenced against the accepted ADR. Hand-wave "StudentActor or its successor" insufficient post-split.
+
+**Tags**: user-decision=2026-04-20-epic-triaged
+
+---
+
 ## Implementation Protocol — Senior Architect
 
 Implementation of this epic must be driven by a senior-architect mindset, not a checklist. Before writing any code, the implementer (human or agent) must answer both sets of questions in writing — either in a task-comment, the PR description, or a `docs/decisions/` note:

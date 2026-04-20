@@ -32,8 +32,9 @@ Companion to `SYNTHESIS.md`. These eight conflicts represent genuine tensions be
 - **persona-enterprise**: **adopt crypto-shred** — deleting events corrupts projections and aggregate rebuilds; shred keys instead.
 - **persona-privacy + persona-redteam**: **adopt hard-delete** — crypto-shred is "forensic theater"; regulators may reject; key compromise resurrects data.
 - **Tension**: correctness of event-sourcing rebuild vs unambiguous erasure.
-- **Blocks**: prr-003, prr-038
-- **Recommended decision frame**: Hybrid — hard-delete misconception + PII events (session-scoped, no rebuild dependency); crypto-shred identity+enrollment events (required for rebuild). Codify in ADR. Need privacy officer + event-sourcing architect agreement.
+- **Blocks**: prr-003a (ADR — this conflict IS the decision it resolves), prr-003b (impl), prr-038
+- **User direction 2026-04-20 (not final — ADR authors decide)**: prefer crypto-shredding (Option A). Rationale: Marten-compatible, audit trail preserved, one-key-one-erasure-all-streams, performance-neutral at read. **Privacy/redteam concerns must still be addressed in the ADR, not dismissed**: per-subject key isolation (not shared key), key destruction must be irreversible (no "soft delete" of keys), backup/restore runbook tested, legal PPL review before acceptance. If PPL requires physical deletion, fall back to Option D (aggregate rebuild + new stream); DO NOT fall back to the current read-filter stub.
+- **Recommended decision frame**: ADR authors (prr-003a) evaluate A vs B/C/D in light of the user direction. Document all four, justify the chosen option. Required sign-off: human-architect + privacy lens + legal/PPL review note. Hybrid (hard-delete PII events, crypto-shred identity events) was the original synthesizer suggestion; user direction shifts the default toward A uniformly, but hybrid remains open if ADR authors find a clean boundary.
 
 ---
 
@@ -68,7 +69,7 @@ Companion to `SYNTHESIS.md`. These eight conflicts represent genuine tensions be
 - **persona-educator + persona-ministry**: **revise to Marten events** — need misconception history within session for teacher-facing mid-session dashboard; Redis-only loses continuity on restart.
 - **persona-sre**: **merge-with** — mix is actually a hidden two-source-of-truth bug; resolve first.
 - **Tension**: retention simplicity vs in-session continuity.
-- **Blocks**: prr-003, prr-015, prr-020
+- **Blocks**: prr-003a (coordinate ADR), prr-003b (impl), prr-015, prr-020
 - **Recommended decision frame**: Redis-only session view + Marten append for catalog-grade patterns (not per-student). Dashboard reads Redis; retention worker still guards Marten catalog. ADR-0003 Decision 7 must formalize.
 
 ---

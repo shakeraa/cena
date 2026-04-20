@@ -13,17 +13,64 @@
 ---
 
 ## Goal
-Migrate session JWT from localStorage to httpOnly SameSite=Strict secure cookie to close XSS-driven session theft.
+
+Close XSS-driven session-theft by moving authentication out of any JS-accessible storage.
+
+### Code-reality correction (2026-04-20 verification)
+
+- **Production**: Firebase Auth (`plugins/firebase.ts`) stores session in IndexedDB — JS-accessible, XSS-drainable
+- **Mock path**: `authStore.ts:40` uses localStorage (`MOCK_AUTH_STORAGE_KEY`) for E2E/dev — deployment-config risk if it leaks to prod
+
+Both are real problems. Requires architectural change: BFF session-exchange endpoint (Firebase Auth doesn't natively issue httpOnly cookies).
+
+### User decision 2026-04-20 — tightened DoD, effort S → M
+
+**Scope A — strip mock-auth from production bundles**:
+- Vite `define` flag + build-time assertion; mock code path gated by `import.meta.env.DEV || VITE_USE_MOCK_AUTH === 'true'`; env var rejected at config-load in production
+
+**Scope B — BFF httpOnly session cookie**:
+- New `POST /api/auth/session` endpoint: accepts Firebase ID token (bearer, this one call only), verifies server-side, sets `cena_session` cookie (HttpOnly + Secure + SameSite=Strict)
+- Subsequent API calls use cookie automatically; remove `Authorization: Bearer` from client
+- Backend middleware validates cookie; populates user context
+- `POST /api/auth/session/logout` → expire cookie + server-side revocation-list entry (TTL matching cookie Max-Age)
+- SameSite=Strict handles CSRF for now; document double-submit token as future work
+
+### Hard constraints
+
+- **Arch test**: production bundle contains zero `window.localStorage.setItem` with keys matching `auth|token|jwt|session|bearer` — build fails
+- **API arch test**: no endpoint except `/api/auth/session` accepts `Authorization: Bearer`
+- **E2E test**: login flow asserts `cena_session` cookie present but unreadable (httpOnly) + `fetch('/api/me')` succeeds without Authorization header
 
 ## Files
-- src/student/full-version/src/stores/auth.ts
-- src/admin/full-version/src/stores/auth.ts
-- backend cookie-set middleware
+
+- `src/api/Cena.Student.Api.Host/Auth/SessionExchangeEndpoint.cs` (new)
+- `src/api/Cena.Student.Api.Host/Auth/CookieAuthMiddleware.cs` (new)
+- `src/student/full-version/src/stores/authStore.ts` (drop localStorage behind build guard)
+- `src/admin/full-version/src/stores/auth*.ts`
+- `src/student/full-version/vite.config.ts` + admin equivalent (define flag)
+- `tests/arch/NoLocalStorageAuthTest.cs`
+- `tests/arch/NoBearerTokenEndpoints.cs`
+- `tests/e2e/login-httponly-cookie.spec.ts`
+- `docs/runbooks/auth-cookie-rotation.md`
 
 ## Definition of Done
-- No access_token in JS-visible storage; CSRF double-submit or SameSite=Strict verified; e2e login test updated.
+
+1. Production bundles (student + admin) contain zero JS-accessible auth storage; dev bundles retain mock mode
+2. Session-exchange endpoint operational end-to-end
+3. All non-session endpoints authenticate via cookie middleware
+4. Both arch tests green
+5. E2E test asserts cookie invisibility
+6. Logout clears cookie + server revokes session-JWT
+7. **Effort revised S → M** (BFF work not accounted for in original estimate)
+8. Full `Cena.Actors.sln` builds; existing tests pass
+
+## Blocks / Coordinate
+
+- **Blocks EPIC-PRR-C** (Parent Aggregate auth — same cookie pattern)
+- Coordinate with prr-014 (parent auth role ADR) — same middleware
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
 
 ---

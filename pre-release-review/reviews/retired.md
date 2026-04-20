@@ -56,7 +56,7 @@ Companion to `SYNTHESIS.md`. Any feature proposal listed here is not to be imple
 
 ### R-09: Real-time session-scoped misconception tagging (axis6 F6)
 - **Already built at**: Services/MisconceptionDetectionService.cs; MisconceptionCatalog.cs; MlExclusionEnforcementTests.cs; RetentionWorker.cs
-- **Delta task(s)**: prr-003 (hard-delete), prr-015 (retention registration)
+- **Delta task(s)**: prr-003a (ADR — erasure policy, crypto-shred preference), prr-003b (implementation, blocked-by 003a), prr-015 (retention registration)
 - **Flagged by**: persona-educator, persona-cogsci
 - **Action**: retire greenfield.
 
@@ -97,7 +97,7 @@ Companion to `SYNTHESIS.md`. Any feature proposal listed here is not to be imple
 
 ### R-16: Retention worker + data retention policy
 - **Already built at**: Compliance/RetentionWorker.cs; DataRetentionPolicy.cs
-- **Delta task(s)**: prr-003, prr-015
+- **Delta task(s)**: prr-003a (ADR), prr-003b (impl), prr-015
 - **Flagged by**: persona-educator, persona-privacy, persona-sre
 - **Action**: retire greenfield; adopt deltas.
 

@@ -71,6 +71,30 @@ The absorbed task files remain in place as the executable unit-of-work; this epi
 - SYNTHESIS.md epic section reflects completion.
 - No absorbed task is marked done until all peers in the epic are merged.
 
+## Epic triage decisions 2026-04-20 (user)
+
+**Adopted**: scope.
+
+**Tightenings — 31 tasks requires internal sub-clustering**:
+
+Split the 31 absorbed tasks into 5 coherent clusters, each shipping as a bounded PR:
+
+| Cluster | Theme | Tasks | Size | Notes |
+|---|---|---|---|---|
+| **D1 — Citations** | Dr. Rami REJECTs, effect-size policy | prr-005, prr-027, prr-028, prr-042, prr-121, prr-156, prr-170 | 7 | prr-042 (citation-integrity ADR) ships first |
+| **D2 — Mechanics** | Crisis/countdown/confetti/emoji/animation | prr-006, prr-019, prr-153, prr-164, prr-171, prr-177, prr-178 | 7 | — |
+| **D3 — Copy semantics** | Therapeutic/cheating/blame/scores-as-identity/inference | prr-073, prr-091, prr-142, prr-144, prr-163, prr-166, prr-167, prr-168, prr-169, prr-172, prr-173 | 11 | Sequential — copy items need stakeholder review each |
+| **D4 — Locale coverage** | he/ar/en across student + admin bundles | prr-040, prr-165 | 2 | — |
+| **D5 — PII-in-prompts lint** | Roslyn analyzer for LLM prompt assembly | prr-022 | 1 | Structurally different from lexicon-lock-gate; separate analyzer |
+
+**Effort correction**: XL (3-8 weeks) is optimistic at 31 tasks without clusters. Realistic: D1+D2+D4 parallel (1-2 weeks), D3 sequential (2-3 weeks), D5 standalone (1 week). **Parallel path: 4-5 weeks**; sequential: 6-8 weeks.
+
+**Sequencing constraint**: prr-042 (citation-integrity ADR) lands before D1; prr-022 (PII lint) is independent and can parallelize; D2 landing before D3 since mechanic bans are clearer than copy-semantic ones.
+
+**Tags**: user-decision=2026-04-20-epic-triaged, sub-clusters-D1-D5
+
+---
+
 ## Implementation Protocol — Senior Architect
 
 Implementation of this epic must be driven by a senior-architect mindset, not a checklist. Before writing any code, the implementer (human or agent) must answer both sets of questions in writing — either in a task-comment, the PR description, or a `docs/decisions/` note:

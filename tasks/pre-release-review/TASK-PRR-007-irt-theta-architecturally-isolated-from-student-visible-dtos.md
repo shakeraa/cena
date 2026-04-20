@@ -13,17 +13,65 @@
 ---
 
 ## Goal
-Enforce RDY-080 prediction-surface ban as architecture test. Theta/readiness/at-risk never reach student/teacher/parent DTOs. Readiness outputs clamped to ordinal categories.
+
+Enforce RDY-080 prediction-surface ban as architecture invariant. Theta / raw ability estimates / exam-readiness predictions never reach student, teacher, or parent DTOs. Readiness outputs clamped to ordinal buckets at the single mapper seam.
+
+### Code-reality correction (2026-04-20 verification) — NOT preventive, active leaks exist
+
+Two shipped API endpoints leak raw theta today:
+
+- [`DiagnosticEndpoints.cs:77`](../../src/api/Cena.Student.Api.Host/Endpoints/DiagnosticEndpoints.cs#L77) — `Theta: Math.Round(ability.Theta, 3)` in response DTO
+- [`TrajectoryEndpoints.cs:137`](../../src/api/Cena.Student.Api.Host/Endpoints/TrajectoryEndpoints.cs#L137) — `Theta: p.Theta` in trajectory response payload
+- [`DiagnosticEndpoints.cs:85`](../../src/api/Cena.Student.Api.Host/Endpoints/DiagnosticEndpoints.cs#L85) — logs theta per subject (`"{Subject}={Theta:F2}"`); SIEM/analytics exfil vector
+
+This is not theoretical — student clients currently receive raw IRT theta scalars. Every day this ships is a Ministry-defensibility day with no cover.
+
+### User decision 2026-04-20 — tightened DoD, P0 severity confirmed, remediation-first
+
+**Scope A — REMEDIATE existing leaks (P0 urgency)**:
+- Rewrite `DiagnosticEndpoints` response DTO: replace `Theta: double` with `Readiness: ReadinessBucket` (enum: `Emerging | Developing | Proficient | ExamReady`)
+- Rewrite `TrajectoryEndpoints` response DTO: same replacement
+- Scrub log line 85: log bucket only, or `[theta-redacted]` sentinel; extend `PiiLogSanitizer` with theta-scalar detection
+- Coordinate client changes: student-web + admin-web that consume these endpoints need DTO-shape migration — schedule in same PR to avoid broken builds
+
+**Scope B — PREVENT regression (arch invariant)**:
+- `tests/architecture/PredictionSurfaceTests.cs` / `NoThetaInOutboundDto` — scans types reachable from `*Endpoint`, `*Hub`, `*EventDto`; fails if any field is named `theta|Theta|Theta*` OR typed as `AbilityEstimate`/`IrtAbilityEstimate` OR typed as `double` with a name matching `theta*|ability*|score*|prediction*|atRisk*|bagrutReadiness*`
+- Single seam: `ThetaMasteryMapper.ToReadinessBucket(theta, confidenceInterval) → ReadinessBucket`. Any surface wanting to expose readiness goes through this mapper; arch test enforces no other code path constructs a bucket
+- Same policy applies to **teacher and parent surfaces** — a teacher export that leaks to a school-district audit or parent dashboard carries the same Ministry-defensibility risk. Buckets for everyone non-internal.
+
+**Scope C — ADR**:
+- `docs/adr/NNNN-prediction-surface-ban.md`: policy + rationale + the four ordinal bucket definitions + the single-mapper-seam contract
+- Cross-link from RDY-080 doc and CLAUDE.md
 
 ## Files
-- src/contracts/dto/**
-- tests/architecture/PredictionSurfaceTests.cs
-- ADR on prediction-surface ban
+
+- `src/api/Cena.Student.Api.Host/Endpoints/DiagnosticEndpoints.cs` — rewrite DTO (remediation)
+- `src/api/Cena.Student.Api.Host/Endpoints/TrajectoryEndpoints.cs` — rewrite DTO (remediation)
+- `src/actors/Cena.Actors/Mastery/ThetaMasteryMapper.cs` — single seam, add `ToReadinessBucket` function
+- `src/actors/Cena.Actors/Mastery/ReadinessBucket.cs` (new) — enum definition
+- `src/shared/Cena.Infrastructure/Compliance/PiiLogSanitizer.cs` — theta-scalar detection
+- `tests/architecture/PredictionSurfaceTests.cs` (new)
+- `src/student/full-version/src/composables/useTrajectory.ts` (+ admin equivalents) — DTO consumer updates
+- `docs/adr/NNNN-prediction-surface-ban.md`
 
 ## Definition of Done
-- Arch test fails if theta scalar leaks into any outbound DTO; ADR accepted; readiness maps to 4 ordinal buckets.
+
+1. Both leak endpoints rewritten; response DTOs carry ordinal buckets, no raw theta
+2. Log scrub active; no theta scalar in any structured log
+3. `ThetaMasteryMapper.ToReadinessBucket` is the only constructor of `ReadinessBucket` (enforced by arch test)
+4. `NoThetaInOutboundDto` arch test green; scans all outbound DTO types
+5. ADR accepted with bucket definitions + seam contract
+6. Client changes merged alongside DTO changes — no broken UI state
+7. Full `Cena.Actors.sln` builds; all tests pass
+8. Integration test: call `/api/diagnostic/estimate` and `/api/trajectory` — response contains `Readiness: "Developing"` (or similar bucket), never a theta scalar
+
+## Blocks / Coordinate
+
+- Coordinate with prr-013 (at-risk redesign) — both touch student-visible performance surfaces; bucket semantics must be consistent
+- Blocks any new feature that would expose theta — e.g. IRT-CAT implementations, exam-readiness dashboards (currently in post-launch or parked)
 
 ## Reporting
+
 complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-theta-isolation --result "<branch>"
 
 ---
