@@ -57,13 +57,13 @@ grandfathered:
     baseline_loc: 743
     reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"
   - path: src/api/Cena.Student.Api.Host/Program.cs
-    baseline_loc: 610
-    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. PRR-151 R-22 added IAccommodationProfileService DI registration (+4 LOC). prr-148 + prr-149 added StudentPlan + scheduler wiring (+24 LOC). prr-012 added AddTutorCostCaps() call (+1 LOC). prr-046 added AddLlmCostMetric() DI wiring (+4 LOC). prr-022 added AddPiiPromptScrubber() DI wiring (+1 LOC)."
+    baseline_loc: 611
+    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. PRR-151 R-22 added IAccommodationProfileService DI registration (+4 LOC). prr-148 + prr-149 added StudentPlan + scheduler wiring (+24 LOC). prr-012 added AddTutorCostCaps() call (+1 LOC). prr-046 added AddLlmCostMetric() DI wiring (+4 LOC). prr-022 added AddPiiPromptScrubber() DI wiring (+1 LOC). prr-015 added AddMisconceptionPiiStoreRegistry().AddCanonicalMartenMisconceptionStore() chained + comment (+1 LOC)."
 
   # ---- Actor runtime (pre-2026-04-20 legacy) ----
   - path: src/actors/Cena.Actors.Host/Program.cs
-    baseline_loc: 638
-    reason: "Actor-host composition root; extract DI/Proto bootstrap helpers is a follow-up. Serilog SessionRiskLogEnricher wiring (+1 LOC). prr-046 added AddLlmCostMetric() DI wiring (+4 LOC). prr-022 added AddPiiPromptScrubber() DI wiring (+1 LOC)."
+    baseline_loc: 639
+    reason: "Actor-host composition root; extract DI/Proto bootstrap helpers is a follow-up. Serilog SessionRiskLogEnricher wiring (+1 LOC). prr-046 added AddLlmCostMetric() DI wiring (+4 LOC). prr-022 added AddPiiPromptScrubber() DI wiring (+1 LOC). prr-015 added AddMisconceptionPiiStoreRegistry().AddCanonicalMartenMisconceptionStore() chained + comment (+1 LOC)."
   - path: src/actors/Cena.Actors/Sessions/LearningSessionActor.cs
     baseline_loc: 699
     reason: "Pre-2026-04-20 legacy; EPIC-PRR-A Sprint 1 extraction will absorb most of this"
