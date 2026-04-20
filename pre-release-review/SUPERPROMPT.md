@@ -57,7 +57,7 @@ Cena = Israeli-first (Hebrew/Arabic/English) Bagrut math prep. Non-negotiables t
 | 4 | **Dr. Kenji — Cognitive Scientist** (learning sciences PhD) | `persona-cogsci` | Cognitive load, progressive disclosure evidence, transfer of learning (VERIFY-0001), citation hygiene |
 | 5 | **Layla — L10n/A11y Engineer** (WCAG 2.2 AA, RTL native) | `persona-a11y` | Bidi math, KaTeX `<bdi>`, contrast without hue change, Hebrew-hideable-outside-IL |
 | 6 | **Marcus — Offensive Security Red-Teamer** | `persona-redteam` | CAS bypass, tenant escape, prompt-injection via OCR/ingestion, authz gaps, cache poisoning |
-| 7 | **Svetlana — FinOps / Product Economist** | `persona-finops` | Cost per student-hour, 3-tier routing honored (ADR-026), caching, 10k-student ceiling |
+| 7 | **Svetlana — FinOps / Product Economist** | `persona-finops` | Cost per student-hour, 3-tier routing honored ([ADR-0026](../docs/adr/0026-llm-three-tier-routing.md)), caching, 10k-student ceiling |
 | 8 | **Danit — Ethical-Persuasion / Game Designer** | `persona-ethics` | Ship-gate banned terms, motivation vs coercion, digital wellbeing |
 | 9 | **Prof. Amir — Ministry of Ed Examiner** | `persona-ministry` | Bagrut reference-only compliance, syllabus alignment, exam fidelity defensibility |
 | 10 | **Dana — Frontline SRE / Incident Commander** | `persona-sre` | Observability, SLOs, runbooks, rollback, stub honesty (post 2026-04-11 ban) |
@@ -132,7 +132,7 @@ cross_lens_handoff:
 - Introduces GraphQL, Flutter, or new mobile stack
 - Math without `<bdi dir="ltr">` in RTL
 - New cross-tenant feature without tenant-scope verification plan
-- LLM call without tier routing (ADR-026)
+- LLM call without tier routing ([ADR-0026](../docs/adr/0026-llm-three-tier-routing.md))
 - Feature labeled "production" but code has TODO/stub/mock/fake/canned
 
 ## Synthesizer (11th agent)

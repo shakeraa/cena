@@ -6,7 +6,7 @@
 **Source docs**: `feature-discovery-2026-04-20.md:L25`
 **Assignee hint**: human-architect
 **Tags**: source=pre-release-review-2026-04-20, lens=finops
-**Status**: Not Started
+**Status**: Done (2026-04-20 — ADR-0026 landed; scanner wired in advisory mode; 3 primary call sites tagged with [TaskRouting])
 **Source**: Synthesized from 10-persona pre-release review (2026-04-20) — see `/pre-release-review/reviews/SYNTHESIS.md`
 **Tier**: mvp
 **Epic**: EPIC-PRR-B — ADR-026 3-tier LLM routing governance

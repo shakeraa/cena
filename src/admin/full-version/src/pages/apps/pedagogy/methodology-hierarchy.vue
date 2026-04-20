@@ -1,6 +1,15 @@
 <script setup lang="ts">
+// prr-013 Phase 2 retirement 2026-04-20:
+// The student picker used to populate from `/admin/mastery/at-risk`, which
+// was retired under ADR-0003 + RDY-080 (session-scope, in-surface only).
+// Loading a cross-session "needs intervention" roster from a teacher
+// dashboard violates both rules.
+//
+// The picker is reduced to a direct Student-ID entry field. A proper
+// roster-driven picker (class → student) is tracked as a follow-up once
+// the admin API ships a non-retired roster endpoint; until then, teachers
+// enter the student ID they already know from their class list.
 import MethodologyHierarchyPanel from '@/views/apps/pedagogy/MethodologyHierarchyPanel.vue'
-import { $api } from '@/utils/api'
 
 definePage({
   meta: {
@@ -9,73 +18,7 @@ definePage({
   },
 })
 
-// --- Student search ---
-interface StudentSearchResult {
-  studentId: string
-  studentName: string
-  avgMastery: number
-  totalConcepts: number
-  masteredCount: number
-}
-
-const searchQuery = ref('')
-const searchLoading = ref(false)
-const searchResults = ref<StudentSearchResult[]>([])
 const selectedStudentId = ref<string | null>(null)
-
-const searchStudents = async () => {
-  if (!searchQuery.value.trim()) return
-  searchLoading.value = true
-  try {
-    const data = await $api<{ students: StudentSearchResult[] }>(
-      `/admin/mastery/at-risk`,
-    )
-    // Filter by search query (client-side for now)
-    searchResults.value = (data.students ?? []).filter(s =>
-      s.studentId.toLowerCase().includes(searchQuery.value.toLowerCase())
-      || (s.studentName ?? '').toLowerCase().includes(searchQuery.value.toLowerCase()),
-    )
-  }
-  catch (err: any) {
-    console.error('Student search failed:', err)
-    searchResults.value = []
-  }
-  finally {
-    searchLoading.value = false
-  }
-}
-
-// Quick student list for initial view
-const recentStudents = ref<StudentSearchResult[]>([])
-const loadingRecent = ref(true)
-
-const fetchRecentStudents = async () => {
-  loadingRecent.value = true
-  try {
-    const data = await $api<{ students: { studentId: string; studentName: string; riskLevel: string; currentAvgMastery: number }[] }>(
-      '/admin/mastery/at-risk',
-    )
-    recentStudents.value = (data.students ?? []).map(s => ({
-      studentId: s.studentId,
-      studentName: s.studentName,
-      avgMastery: s.currentAvgMastery ?? 0,
-      totalConcepts: 0,
-      masteredCount: 0,
-    }))
-  }
-  catch (err: any) {
-    console.error('Failed to fetch student list:', err)
-  }
-  finally {
-    loadingRecent.value = false
-  }
-}
-
-onMounted(fetchRecentStudents)
-
-const selectStudent = (id: string) => {
-  selectedStudentId.value = id
-}
 
 // Direct student ID entry
 const directStudentId = ref('')
@@ -110,7 +53,7 @@ const goToStudent = () => {
           <VDivider />
           <VCardText>
             <!-- Direct ID entry -->
-            <div class="d-flex gap-2 mb-4">
+            <div class="d-flex gap-2 mb-2">
               <VTextField
                 v-model="directStudentId"
                 label="Student ID"
@@ -129,66 +72,9 @@ const goToStudent = () => {
               </VBtn>
             </div>
 
-            <VDivider class="mb-4" />
-
-            <!-- Recent / At-risk students -->
-            <h6 class="text-subtitle-2 text-medium-emphasis mb-2">
-              At-Risk Students
-            </h6>
-
-            <VProgressLinear
-              v-if="loadingRecent"
-              indeterminate
-              color="primary"
-              class="mb-2"
-            />
-
-            <VList
-              v-else-if="recentStudents.length"
-              density="compact"
-              nav
-            >
-              <VListItem
-                v-for="s in recentStudents"
-                :key="s.studentId"
-                :active="selectedStudentId === s.studentId"
-                @click="selectStudent(s.studentId)"
-              >
-                <template #prepend>
-                  <VAvatar
-                    color="primary"
-                    variant="tonal"
-                    size="32"
-                  >
-                    <span class="text-caption">{{ s.studentName?.charAt(0) ?? '?' }}</span>
-                  </VAvatar>
-                </template>
-
-                <VListItemTitle class="text-body-2 font-weight-medium">
-                  {{ s.studentName }}
-                </VListItemTitle>
-                <VListItemSubtitle class="text-caption">
-                  {{ s.studentId }}
-                </VListItemSubtitle>
-
-                <template #append>
-                  <VChip
-                    :color="s.avgMastery >= 0.7 ? 'success' : s.avgMastery >= 0.4 ? 'warning' : 'error'"
-                    label
-                    size="x-small"
-                  >
-                    {{ (s.avgMastery * 100).toFixed(0) }}%
-                  </VChip>
-                </template>
-              </VListItem>
-            </VList>
-
-            <div
-              v-else
-              class="text-disabled text-center pa-4"
-            >
-              No students found
-            </div>
+            <p class="text-caption text-medium-emphasis mt-2 mb-0">
+              Enter the student ID from your class roster.
+            </p>
           </VCardText>
         </VCard>
       </VCol>
@@ -225,7 +111,7 @@ const goToStudent = () => {
               Select a Student
             </h5>
             <p class="text-body-1 text-medium-emphasis text-center" style="max-inline-size: 400px;">
-              Enter a student ID or select from the at-risk list to view their methodology hierarchy and make overrides.
+              Enter a student ID to view their methodology hierarchy and make overrides.
             </p>
           </VCardText>
         </VCard>

@@ -5,6 +5,7 @@
 
 using Anthropic;
 using Anthropic.Models.Messages;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Runtime.CompilerServices;
@@ -15,6 +16,10 @@ namespace Cena.Actors.Tutor;
 /// Production-grade Anthropic Claude integration for AI tutoring.
 /// Uses the official Anthropic SDK (v12.9.0).
 /// </summary>
+// ADR-0026: Socratic tutoring is the canonical tier-3 (Sonnet) path. Primary
+// model is claude_sonnet_4_6 per contracts/llm/routing-config.yaml §2
+// (task_routing.socratic_question).
+[TaskRouting("tier3", "socratic_question")]
 public sealed class ClaudeTutorLlmService : ITutorLlmService
 {
     private readonly AnthropicClient _client;

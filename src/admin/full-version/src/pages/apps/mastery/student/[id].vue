@@ -306,11 +306,15 @@ const historyChartSeries = computed(() => {
 })
 
 // --- Review Priority ---
+// prr-013 Phase 2 retirement 2026-04-20: the `decayRisk` point estimate was
+// dropped from this view. Cross-session "risk of decay" framing violated
+// ADR-0003 (session-scope) + RDY-080 (in-surface only). The review-priority
+// list is kept as a plain queue of concepts-to-review ordered by server-
+// side priority; the numeric decay badge is gone.
 interface ReviewItem {
   conceptId: string
   conceptName: string
   currentMastery: number
-  decayRisk: number
   lastPracticed: string
 }
 
@@ -332,12 +336,6 @@ const fetchReviewPriority = async () => {
 }
 
 onMounted(fetchReviewPriority)
-
-const decayColor = (risk: number): string => {
-  if (risk >= 0.7) return 'error'
-  if (risk >= 0.4) return 'warning'
-  return 'info'
-}
 </script>
 
 <template>
@@ -640,7 +638,7 @@ const decayColor = (risk: number): string => {
     <VCard>
       <VCardItem title="Review Priority">
         <template #subtitle>
-          Concepts at risk of decay, sorted by urgency
+          Concepts suggested for the next review session, in priority order
         </template>
       </VCardItem>
 
@@ -658,7 +656,7 @@ const decayColor = (risk: number): string => {
           v-else-if="!reviewItems.length"
           class="text-disabled"
         >
-          No concepts at risk of decay
+          No concepts queued for review
         </div>
 
         <VList
@@ -672,11 +670,11 @@ const decayColor = (risk: number): string => {
             <template #prepend>
               <VAvatar
                 variant="tonal"
-                :color="decayColor(item.decayRisk)"
+                color="info"
                 rounded
               >
                 <VIcon
-                  icon="tabler-alert-circle"
+                  icon="tabler-refresh"
                   size="24"
                 />
               </VAvatar>
@@ -689,16 +687,6 @@ const decayColor = (risk: number): string => {
               Current: {{ (item.currentMastery * 100).toFixed(0) }}% &middot;
               Last practiced: {{ item.lastPracticed }}
             </VListItemSubtitle>
-
-            <template #append>
-              <VChip
-                :color="decayColor(item.decayRisk)"
-                label
-                size="small"
-              >
-                {{ (item.decayRisk * 100).toFixed(0) }}% decay risk
-              </VChip>
-            </template>
           </VListItem>
         </VList>
       </VCardText>

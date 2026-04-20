@@ -6,7 +6,7 @@
 **Source docs**: `cena_competitive_analysis.md:L91`, `cena_competitive_analysis.md:L122`
 **Assignee hint**: claude-subagent-adr-authoring
 **Tags**: source=pre-release-review-2026-04-20, lens=ministry, product-stance=honest-supportive-legal
-**Status**: Backend retirement complete — 2026-04-20; Vue SPA retirement pending (Phase 2)
+**Status**: Done — 2026-04-20 (backend retirement + Vue SPA Phase 2 retirement complete)
 
 **Backend completion 2026-04-20 (this pass)**:
 

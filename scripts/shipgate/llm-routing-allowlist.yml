@@ -1,0 +1,96 @@
+# =============================================================================
+# ADR-0026 — LLM routing scanner allowlist
+#
+# Files listed here are LLM-adjacent but intentionally not tagged with
+# [TaskRouting] because they do not represent a single tier. Each entry
+# MUST carry a one-line justification.
+#
+# The scanner (scripts/shipgate/llm-routing-scanner.mjs) skips allowlisted
+# files entirely. Adding a path here is a policy decision; every allowlist
+# entry must be defensible at code review.
+#
+# Conventions:
+#   - Paths are relative to repo root, forward-slash only.
+#   - A trailing "/" means "everything under this directory".
+#   - Every entry has a "reason:" string.
+# =============================================================================
+
+allowlist:
+  # --- wire protocol / abstract contracts ------------------------------------
+
+  - path: "src/actors/Cena.Actors/Gateway/ILlmClient.cs"
+    reason: "Provider-agnostic wire protocol (ILlmClient, LlmRequest, LlmResponse). No tier; dispatchers and consumers bring their own."
+
+  - path: "src/actors/Cena.Actors/Gateway/LlmClientRouter.cs"
+    reason: "Router dispatches across providers/tiers by ModelId prefix. No single tier; each caller's [TaskRouting] is load-bearing."
+
+  - path: "src/actors/Cena.Actors/Gateway/AnthropicLlmClient.cs"
+    reason: "Provider adapter — consumes any tier depending on caller's LlmRequest.ModelId. Tier lives on the caller, not the adapter."
+
+  # --- factory / DI registration --------------------------------------------
+
+  - path: "src/actors/Cena.Actors/Diagnosis/StuckClassifierRegistration.cs"
+    reason: "DI factory constructs AnthropicClient for multiple tier-3 consumers; tiering lives on the consumer class."
+
+  - path: "src/actors/Cena.Actors.Host/Program.cs"
+    reason: "DI composition root — wires ILlmClient/AnthropicLlmClient; tier lives on each consuming class."
+
+  - path: "src/api/Cena.Student.Api.Host/Program.cs"
+    reason: "DI composition root — wires ILlmClient/AnthropicLlmClient; tier lives on each consuming class."
+
+  - path: "src/api/Cena.Student.Api.Host/Endpoints/TutorEndpoints.cs"
+    reason: "HTTP endpoint wires ITutorLlmService (already tier3-tagged); tier lives on service."
+
+  # --- test doubles ---------------------------------------------------------
+
+  - path: "src/actors/Cena.Actors/Tutor/NullTutorLlmService.cs"
+    reason: "In-process null implementation of ITutorLlmService; makes no LLM calls."
+
+  - path: "tests/"
+    reason: "All test projects — mocks and fakes; no production LLM calls."
+
+  - path: "src/actors/Cena.Actors.Tests/"
+    reason: "All test projects — mocks and fakes; no production LLM calls."
+
+  - path: "src/actors/Cena.Actors/Tutor/ITutorLlmService.cs"
+    reason: "Interface declaration — no call site, just the contract."
+
+  - path: "src/actors/Cena.Actors/Diagnosis/IStuckClassifierLlm.cs"
+    reason: "Interface declaration — no call site, just the contract."
+
+  # --- consumers pending Epic B tier assignment (TODO(prr-012)) --------------
+  # These call ILlmClient but the exact tier assignment is decided by Epic B
+  # sub-tasks (prr-012, prr-145, prr-105). Scanner skips them for now; the
+  # TODO is tracked in docs/adr/0026-llm-three-tier-routing.md §Follow-up.
+
+  - path: "src/actors/Cena.Actors/Services/L3ExplanationGenerator.cs"
+    reason: "TODO(prr-145): tier decision for hint/explanation generation. Allowlisted until hint-tier ADR lands."
+
+  - path: "src/actors/Cena.Actors/Services/ExplanationGenerator.cs"
+    reason: "TODO(prr-145): tier decision for hint/explanation generation. Allowlisted until hint-tier ADR lands."
+
+  - path: "src/actors/Cena.Actors/Services/ErrorClassificationService.cs"
+    reason: "TODO(prr-012): currently slated for tier2 (classification); Epic B confirms post-routing-gate."
+
+  - path: "src/actors/Cena.Actors/Ingest/ContentSegmenter.cs"
+    reason: "TODO(prr-145): ingestion-side LLM classification; tier pending Epic B."
+
+  - path: "src/actors/Cena.Actors/Tutor/TutorMessageService.cs"
+    reason: "TODO(prr-012): wraps ITutorLlmService (already tier3-tagged at implementation). Wrapper tier derives from callee; pending Epic B."
+
+  - path: "src/actors/Cena.Actors/Tutoring/TutorActor.cs"
+    reason: "TODO(prr-012): actor delegates to ITutorLlmService; tier lives on service."
+
+  - path: "src/api/Cena.Admin.Api/Figures/AiFigureGenerator.cs"
+    reason: "TODO(prr-145): tier decision for figure-generation path."
+
+  - path: "src/api/Cena.Admin.Api/AiGenerationService.cs"
+    reason: "TODO(prr-145): admin-side variant generation; tier pending Epic B."
+
+  - path: "src/api/Cena.Admin.Api/QualityGate/QualityGateService.cs"
+    reason: "TODO(prr-145): quality-gate LLM judge; tier pending Epic B."
+
+  # --- architecture tests + negative fixtures --------------------------------
+
+  - path: "src/actors/Cena.Actors.Tests/Architecture/"
+    reason: "Architecture-test project that reflects on LLM types to enforce invariants — not a production call site."

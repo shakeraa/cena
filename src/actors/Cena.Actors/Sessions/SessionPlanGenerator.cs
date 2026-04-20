@@ -29,6 +29,7 @@
 
 using System.Collections.Immutable;
 using Cena.Actors.Mastery;
+using Cena.Actors.Teacher.ScheduleOverride;
 
 namespace Cena.Actors.Sessions;
 
@@ -138,15 +139,22 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
     private readonly IStudentPlanConfigService _planConfig;
     private readonly ISessionAbilityEstimateProvider _abilityProvider;
     private readonly ITopicPrerequisiteGraphProvider _graphProvider;
+    // prr-150: optional bridge that applies teacher/mentor overrides on
+    // top of the base SchedulerInputs. Null when the TeacherOverride
+    // bounded context is not wired into this host — in that case the
+    // generator behaves exactly as before.
+    private readonly IOverrideAwareSchedulerInputsBridge? _overrideBridge;
 
     public SessionPlanGenerator(
         IStudentPlanConfigService planConfig,
         ISessionAbilityEstimateProvider abilityProvider,
-        ITopicPrerequisiteGraphProvider graphProvider)
+        ITopicPrerequisiteGraphProvider graphProvider,
+        IOverrideAwareSchedulerInputsBridge? overrideBridge = null)
     {
         _planConfig = planConfig ?? throw new ArgumentNullException(nameof(planConfig));
         _abilityProvider = abilityProvider ?? throw new ArgumentNullException(nameof(abilityProvider));
         _graphProvider = graphProvider ?? throw new ArgumentNullException(nameof(graphProvider));
+        _overrideBridge = overrideBridge;
     }
 
     /// <inheritdoc />
@@ -189,17 +197,36 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
             NowUtc: nowUtc,
             PrerequisiteGraph: graph);
 
+        // prr-150: apply teacher/mentor overrides on top of the base inputs
+        // if the bridge is wired in. Precedence: override > student plan
+        // input > scheduler default. When no override exists for this
+        // student (or the bridge is not registered at all) the inputs pass
+        // through unchanged. Using ScopeAll here — future callers that
+        // know the session-type can pass a narrower scope for scoped
+        // motivation overrides.
+        if (_overrideBridge is not null)
+        {
+            var applied = await _overrideBridge
+                .ApplyAsync(inputs, TeacherOverrideCommands.ScopeAll, ct)
+                .ConfigureAwait(false);
+            inputs = applied.EffectiveInputs;
+        }
+
         // Pure heuristic call — no LLM path.
         var entries = AdaptiveScheduler.PrioritizeTopics(inputs);
 
+        // prr-150: the snapshot reflects the EFFECTIVE inputs (post-override)
+        // so downstream consumers (UI, events, audit) see the values that
+        // actually drove prioritisation. When no override is active the
+        // effective inputs equal the student's own config.
         var snapshot = new SessionPlanSnapshot(
             StudentAnonId: studentAnonId,
             SessionId: sessionId,
             GeneratedAtUtc: nowUtc,
             PriorityOrdered: entries,
-            MotivationProfile: config.MotivationProfile,
-            DeadlineUtc: config.DeadlineUtc,
-            WeeklyBudgetMinutes: (int)config.WeeklyBudget.TotalMinutes);
+            MotivationProfile: inputs.MotivationProfile,
+            DeadlineUtc: inputs.DeadlineUtc,
+            WeeklyBudgetMinutes: (int)inputs.WeeklyTimeBudget.TotalMinutes);
 
         return new SessionPlanGenerationResult(
             Snapshot: snapshot,

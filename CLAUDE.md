@@ -101,7 +101,7 @@ npm run lint
 - Never use CLI tools alone for execution — Task tool agents do the actual work
 - MUST call CLI tools AND Task tool in ONE message for complex work
 
-### 3-Tier Model Routing (ADR-026)
+### 3-Tier Model Routing ([ADR-0026](docs/adr/0026-llm-three-tier-routing.md))
 
 | Tier | Handler | Latency | Cost | Use Cases |
 |------|---------|---------|------|-----------|

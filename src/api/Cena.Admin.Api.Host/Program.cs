@@ -9,7 +9,9 @@ using System.Threading.RateLimiting;
 using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
+using Cena.Actors.Teacher.ScheduleOverride;
 using Cena.Admin.Api;
+using Cena.Admin.Api.Features.Teacher;
 using Cena.Admin.Api.Host.Hubs;
 using Cena.Admin.Api.Registration;
 using Cena.Api.Host.Endpoints;
@@ -210,6 +212,14 @@ public partial class Program
     // RDY-061: syllabus advancement — read-side + teacher-override writes.
     builder.Services.AddScoped<Cena.Actors.Advancement.IStudentAdvancementService,
         Cena.Actors.Advancement.StudentAdvancementService>();
+
+    // prr-150: teacher/mentor schedule-override bounded context. Registers
+    // ITeacherOverrideStore (in-memory Phase 1), IStudentInstituteLookup
+    // (in-memory default; admin host may replace with a Marten-backed
+    // EnrollmentDocument lookup in a follow-up), TeacherOverrideCommands,
+    // and the IOverrideAwareSchedulerInputsBridge that applies overrides
+    // on top of prr-149's SchedulerInputs.
+    builder.Services.AddTeacherOverrideServices();
 
     // RDY-056 §4 / Phase 5: OCR cascade wiring. Admin-only consumers take
     // IOcrCascadeService as an OPTIONAL (`? = null`) dependency; registering
@@ -519,6 +529,14 @@ public partial class Program
     // RDY-057b: teacher classroom-level roll-up over onboarding self-assessment
     Cena.Admin.Api.SelfAssessmentRollup.SelfAssessmentRollupEndpoints
         .MapSelfAssessmentRollupEndpoints(app);
+
+    // prr-150: teacher/mentor schedule-override POST endpoints
+    //   POST /api/admin/teacher/override/pin-topic
+    //   POST /api/admin/teacher/override/budget
+    //   POST /api/admin/teacher/override/motivation
+    // Tenant invariant enforced inside TeacherOverrideCommands (ADR-0001);
+    // AdminActionAuditMiddleware captures every POST under /api/admin/**.
+    app.MapScheduleOverrideEndpoints();
 
     // RDY-060: admin SignalR hub + health probe
     app.MapCenaAdminHub();

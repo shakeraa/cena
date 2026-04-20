@@ -43,10 +43,12 @@ interface ConceptNode {
   status: string
 }
 
+// prr-013 Phase 2 retirement 2026-04-20: ReviewItem no longer carries
+// `decayRisk`. Cross-session decay-risk point estimates on a student-
+// profile tab violate ADR-0003 (session-scope) + RDY-080 (in-surface only).
 interface ReviewItem {
   conceptId: string
   conceptName: string
-  decayRisk: number
   lastMasteryLevel: number
   lastAttempted: string
   priority: number
@@ -63,7 +65,7 @@ interface MasteryData {
   knowledgeMap: ConceptNode[]
   reviewQueue: ReviewItem[]
   masteryHistory: MasteryHistoryPoint[]
-  learningFrontier: { conceptId: string; conceptName: string; readinessScore: number; reason: string }[]
+  learningFrontier: { conceptId: string; conceptName: string; reason: string }[]
   scaffolding: { conceptId: string; conceptName: string; recommendedLevel: string; rationale: string }[]
 }
 
@@ -132,15 +134,11 @@ const masteryBySubject = computed(() => {
   }))
 })
 
-// Concepts at risk of decay (top 5)
-const decayRisks = computed(() => {
-  return (masteryData.value?.reviewQueue ?? [])
-    .slice(0, 5)
-    .map(r => ({
-      ...r,
-      daysSinceAttempt: Math.round((Date.now() - new Date(r.lastAttempted).getTime()) / 86400000),
-    }))
-})
+// prr-013 Phase 2 retirement 2026-04-20: the cross-session `decayRisks`
+// computed (and its accompanying "Decay Risk" card) was removed to align
+// with ADR-0003 (session-scope) + RDY-080 (in-surface only). The review
+// queue is still fetched for other flows; simply no longer rendered as a
+// decay-risk badge on the student-profile tab.
 
 // Struggling concepts: in_progress with low mastery
 const strugglingConcepts = computed(() => {
@@ -384,7 +382,6 @@ const degradationSeries = computed(() => [{
 // ── Helpers ──
 const focusScoreColor = (score: number) => score >= 70 ? 'success' : score >= 40 ? 'warning' : 'error'
 const masteryColor = (level: number) => level >= 80 ? 'success' : level >= 50 ? 'info' : level >= 30 ? 'warning' : 'error'
-const decayColor = (risk: number) => risk >= 0.7 ? 'error' : risk >= 0.4 ? 'warning' : 'success'
 
 const formatDate = (dateStr: string) => {
   try {
@@ -714,10 +711,16 @@ onUnmounted(() => {
       </VCol>
     </VRow>
 
-    <!-- ═══ ROW 3: Irregularities + Decay Risk ═══ -->
+    <!-- ═══ ROW 3: Struggling Concepts ═══ -->
+    <!--
+      prr-013 Phase 2 retirement 2026-04-20: the "Decay Risk" card that
+      used to share this row was removed. Cross-session decay-risk point
+      estimates on a student-profile tab violate ADR-0003 (session-scope)
+      + RDY-080 (in-surface only). Struggling Concepts now spans the row.
+    -->
     <VRow class="match-height mb-2">
       <!-- Struggling Concepts -->
-      <VCol cols="12" md="6">
+      <VCol cols="12">
         <VCard :loading="masteryLoading">
           <VCardItem title="Struggling Concepts">
             <template #subtitle>Low mastery, needs attention</template>
@@ -740,40 +743,6 @@ onUnmounted(() => {
             </VList>
             <div v-else-if="!masteryLoading" class="d-flex justify-center py-6">
               <span class="text-body-1 text-disabled">No struggling concepts</span>
-            </div>
-          </VCardText>
-        </VCard>
-      </VCol>
-
-      <!-- Decay Risk (Review Queue) -->
-      <VCol cols="12" md="6">
-        <VCard :loading="masteryLoading">
-          <VCardItem title="Decay Risk">
-            <template #subtitle>Concepts losing retention</template>
-          </VCardItem>
-          <VCardText>
-            <VList v-if="decayRisks.length > 0" lines="two" density="compact">
-              <VListItem v-for="r in decayRisks" :key="r.conceptId">
-                <template #prepend>
-                  <VProgressCircular
-                    :model-value="r.decayRisk * 100"
-                    :color="decayColor(r.decayRisk)"
-                    :size="36"
-                    :width="3"
-                  >
-                    <span class="text-caption">{{ Math.round(r.decayRisk * 100) }}</span>
-                  </VProgressCircular>
-                </template>
-                <VListItemTitle class="text-body-1 font-weight-medium">
-                  {{ r.conceptName }}
-                </VListItemTitle>
-                <VListItemSubtitle>
-                  Last practiced {{ r.daysSinceAttempt }}d ago &mdash; was {{ Math.round(r.lastMasteryLevel) }}%
-                </VListItemSubtitle>
-              </VListItem>
-            </VList>
-            <div v-else-if="!masteryLoading" class="d-flex justify-center py-6">
-              <span class="text-body-1 text-disabled">No concepts at risk</span>
             </div>
           </VCardText>
         </VCard>
@@ -847,7 +816,7 @@ onUnmounted(() => {
                   {{ f.conceptName }}
                 </VListItemTitle>
                 <VListItemSubtitle>
-                  Readiness: {{ Math.round(f.readinessScore * 100) }}% &mdash; {{ f.reason.replace(/_/g, ' ') }}
+                  {{ f.reason.replace(/_/g, ' ') }}
                 </VListItemSubtitle>
               </VListItem>
             </VList>

@@ -1,4 +1,11 @@
 <script setup lang="ts">
+// prr-013 Phase 2 retirement 2026-04-20:
+// The "At-Risk Students" widget card and table were removed under ADR-0003 +
+// RDY-080. Teacher-visible "student needs intervention" data is now
+// session-scoped only (SessionRiskAssessment, rendered inside the live
+// session surface — never in a daily dashboard). A follow-up RDY task will
+// wire that session-scoped teacher widget; for now the dashboard shows
+// only the class-aggregate distribution + velocity.
 import MasteryDistributionChart from '@/views/apps/mastery/MasteryDistributionChart.vue'
 import SubjectRadarChart from '@/views/apps/mastery/SubjectRadarChart.vue'
 import { $api } from '@/utils/api'
@@ -10,7 +17,7 @@ definePage({
   },
 })
 
-// --- Overview data (matches MasteryOverviewResponse DTO) ---
+// --- Overview data (matches MasteryOverviewResponse DTO after prr-013 retirement) ---
 interface DistributionPoint {
   level: string
   count: number
@@ -27,7 +34,6 @@ interface OverviewData {
   subjectBreakdown: SubjectMastery[]
   learningVelocity: number
   learningVelocityChange: number
-  atRiskCount: number
 }
 
 const loading = ref(true)
@@ -73,8 +79,6 @@ const velocityTrendPercent = computed(() => {
   return Math.round((overview.value.learningVelocityChange ?? 0) * 100)
 })
 
-const atRiskCount = computed(() => overview.value?.atRiskCount ?? 0)
-
 const widgetCards = computed(() => [
   {
     icon: 'tabler-chart-histogram',
@@ -93,78 +97,7 @@ const widgetCards = computed(() => [
     change: velocityTrendPercent.value,
     isHover: false,
   },
-  {
-    icon: 'tabler-alert-triangle',
-    color: 'error',
-    title: 'At-Risk Students',
-    value: String(atRiskCount.value),
-    subtitle: 'Below 0.3 mastery threshold',
-    isHover: false,
-  },
 ])
-
-// --- At-Risk Students Table ---
-interface AtRiskStudent {
-  studentId: string
-  studentName: string
-  avgMastery: number
-  trend: 'up' | 'down' | 'flat'
-  daysSinceImprovement: number
-}
-
-const atRiskLoading = ref(true)
-const atRiskError = ref<string | null>(null)
-const atRiskStudents = ref<AtRiskStudent[]>([])
-
-const fetchAtRisk = async () => {
-  atRiskLoading.value = true
-  atRiskError.value = null
-  try {
-    const data = await $api<{ students: any[] }>('/admin/mastery/at-risk')
-    atRiskStudents.value = (data.students ?? []).map(s => ({
-      studentId: s.studentId,
-      studentName: s.studentName,
-      avgMastery: s.avgMastery ?? s.currentAvgMastery ?? 0,
-      trend: (s.masteryDecline ?? 0) < 0 ? 'down' as const : (s.masteryDecline ?? 0) > 0 ? 'up' as const : 'flat' as const,
-      daysSinceImprovement: 0,
-    }))
-  }
-  catch (err: any) {
-    atRiskError.value = err.message ?? 'Failed to load at-risk students'
-    console.error('Failed to fetch at-risk students:', err)
-  }
-  finally {
-    atRiskLoading.value = false
-  }
-}
-
-onMounted(fetchAtRisk)
-
-const atRiskHeaders = [
-  { title: 'Student', key: 'studentName' },
-  { title: 'Avg Mastery', key: 'avgMastery' },
-  { title: 'Trend', key: 'trend', sortable: false },
-  { title: 'Days Since Improvement', key: 'daysSinceImprovement' },
-  { title: 'Action', key: 'action', sortable: false },
-]
-
-const masteryColor = (val: number): string => {
-  if (val >= 0.8) return 'success'
-  if (val >= 0.4) return 'warning'
-  return 'error'
-}
-
-const trendIcon = (trend: string): string => {
-  if (trend === 'up') return 'tabler-trending-up'
-  if (trend === 'down') return 'tabler-trending-down'
-  return 'tabler-minus'
-}
-
-const trendColor = (trend: string): string => {
-  if (trend === 'up') return 'success'
-  if (trend === 'down') return 'error'
-  return 'secondary'
-}
 </script>
 
 <template>
@@ -195,7 +128,7 @@ const trendColor = (trend: string): string => {
         v-for="(card, index) in widgetCards"
         :key="index"
         cols="12"
-        md="4"
+        md="6"
       >
         <VCard
           class="mastery-stat-card cursor-pointer"
@@ -255,86 +188,16 @@ const trendColor = (trend: string): string => {
       </VCol>
     </VRow>
 
-    <!-- At-Risk Students Table -->
-    <VCard>
-      <VCardItem title="At-Risk Students">
-        <template #subtitle>
-          Students below 0.3 mastery threshold
-        </template>
-      </VCardItem>
-
-      <VDivider />
-
-      <VAlert
-        v-if="atRiskError"
-        type="error"
-        variant="tonal"
-        class="ma-4"
-      >
-        {{ atRiskError }}
-      </VAlert>
-
-      <VDataTable
-        :headers="atRiskHeaders"
-        :items="atRiskStudents"
-        :loading="atRiskLoading"
-        item-value="studentId"
-        class="text-no-wrap"
-      >
-        <template #item.avgMastery="{ item }">
-          <div
-            class="d-flex align-center gap-x-3"
-            style="min-inline-size: 180px;"
-          >
-            <VProgressLinear
-              :model-value="item.avgMastery * 100"
-              :color="masteryColor(item.avgMastery)"
-              rounded
-              :height="8"
-              class="flex-grow-1"
-            />
-            <span class="text-body-2 font-weight-medium">
-              {{ (item.avgMastery * 100).toFixed(0) }}%
-            </span>
-          </div>
-        </template>
-
-        <template #item.trend="{ item }">
-          <VIcon
-            :icon="trendIcon(item.trend)"
-            :color="trendColor(item.trend)"
-            size="20"
-          />
-        </template>
-
-        <template #item.daysSinceImprovement="{ item }">
-          <VChip
-            :color="item.daysSinceImprovement > 14 ? 'error' : item.daysSinceImprovement > 7 ? 'warning' : 'secondary'"
-            label
-            size="small"
-          >
-            {{ item.daysSinceImprovement }}d
-          </VChip>
-        </template>
-
-        <template #item.action="{ item }">
-          <VBtn
-            variant="text"
-            color="primary"
-            size="small"
-            :to="{ path: `/apps/mastery/student/${item.studentId}` }"
-          >
-            View Detail
-          </VBtn>
-        </template>
-
-        <template #no-data>
-          <div class="text-center pa-4 text-disabled">
-            No at-risk students found
-          </div>
-        </template>
-      </VDataTable>
-    </VCard>
+    <!--
+      prr-013 Phase 2 retirement 2026-04-20:
+      The dashboard-level "At-Risk Students" table was removed here. That
+      list violated ADR-0003 (session-scope) and RDY-080 (in-surface only):
+      it persisted "student needs intervention" labels across days, surfaced
+      them in a cross-session dashboard, and could have fed external
+      channels (parent SMS, SIS pass-back). The session-scoped replacement
+      — SessionRiskAssessment rendered inside the live teacher session view
+      — is tracked as a follow-up (RDY-080 / Epic-PRR-A Sprint-2).
+    -->
   </div>
 </template>
 

@@ -18,11 +18,17 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Anthropic;
 using Anthropic.Models.Messages;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace Cena.Actors.Diagnosis;
 
+// ADR-0026: Stuck classification is a short structured extraction from a
+// StuckContext JSON. Matches the tier-2 (Haiku) pattern per
+// contracts/llm/routing-config.yaml §2 (task_routing.stagnation_analysis /
+// error_classification family). Low temperature, small max_tokens.
+[TaskRouting("tier2", "stagnation_analysis")]
 public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
 {
     private readonly AnthropicClient _client;

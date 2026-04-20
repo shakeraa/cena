@@ -35,7 +35,14 @@ jobs:
       - name: Rule-pack scanner (banned-citations + banned-mechanics, advisory)
         run: node scripts/shipgate/rulepack-scan.mjs --advisory
 
+      - name: LLM-routing scanner (ADR-0026, advisory)
+        # Starts in --advisory mode; flip to --strict once Epic B sub-tasks
+        # (prr-012, prr-145, prr-105) retire the TODO(prr-012) allowlist
+        # entries. See docs/adr/0026-llm-three-tier-routing.md §Follow-up.
+        run: node scripts/shipgate/llm-routing-scanner.mjs --advisory
+
       - name: Rule-pack fixture self-test (strict — every rule must fire)
         run: |
           node --test tests/shipgate/banned-citations.spec.mjs \
-                      tests/shipgate/banned-mechanics.spec.mjs
+                      tests/shipgate/banned-mechanics.spec.mjs \
+                      tests/shipgate/llm-routing-scanner.spec.mjs

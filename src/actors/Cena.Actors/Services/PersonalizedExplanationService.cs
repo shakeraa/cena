@@ -29,6 +29,7 @@ using System.Diagnostics.Metrics;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
 using Cena.Actors.Mastery;
+using Cena.Infrastructure.Llm;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Actors.Services;
@@ -115,6 +116,10 @@ public interface IPersonalizedExplanationService
 // IMPLEMENTATION
 // =============================================================================
 
+// ADR-0026: L3 personalized explanations are Sonnet-grade (complex reasoning
+// over full student context). Primary model is claude_sonnet_4_6 per
+// contracts/llm/routing-config.yaml §2 (task_routing.answer_evaluation).
+[TaskRouting("tier3", "answer_evaluation")]
 public sealed class PersonalizedExplanationService : IPersonalizedExplanationService
 {
     private const string GenericFallback =
