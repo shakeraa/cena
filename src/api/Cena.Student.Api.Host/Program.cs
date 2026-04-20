@@ -294,6 +294,12 @@ public partial class Program
     // prr-029: LD-anxious hint governor (L1 worked-step template; no LLM).
     builder.Services.AddSingleton<Cena.Actors.Hints.ILdAnxiousHintGovernor, Cena.Actors.Hints.LdAnxiousHintGovernor>();
 
+    // prr-203: hint-ladder orchestrator (L1 template / L2 Haiku / L3 Sonnet)
+    // per ADR-0045. L1 is no-LLM (template); L2 and L3 carry [TaskRouting]
+    // on their respective generators. Consumed by HintLadderEndpoint —
+    // the new POST .../hint/next route.
+    Cena.Actors.Hints.HintLadderRegistration.AddHintLadder(builder.Services);
+
     // ---- RDY-034: Flow state service (consumes ICognitiveLoadService) ----
     // Registered in both actor + student hosts so the assessment endpoint
     // and any in-process actor consumer resolve the same implementation.
@@ -861,6 +867,12 @@ public partial class Program
 
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();
+
+    // prr-203: hint-ladder endpoint — POST /api/sessions/{sid}/question/{qid}/hint/next
+    // per ADR-0045. Server-authoritative rung advancement; distinct route
+    // from the inline /hint endpoint so the ladder ratchet does not couple
+    // to the deprecated single-hint path.
+    app.MapHintLadderEndpoint();
 
     // prr-149: GET /api/session/{sessionId}/plan (scheduler plan read)
     app.MapSessionPlanEndpoints();
