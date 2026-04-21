@@ -51,8 +51,8 @@ ADR-0049 MUST lock:
 
 Before ADR-0049 can be signed off, decision-holder resolves:
 
-1. Arab-stream (המגזר הערבי) question-paper variant codes — v1 scope one or both streams?
-2. PET Russian-verbal — v1 or v2?
+1. Arab-stream (המגזר הערבי) question-paper variant codes — Launch scope one or both streams?
+2. PET Russian-verbal — Launch or Post-Launch?
 3. Tenant-admin-forced plan lawful basis (privacy).
 4. SAT + PET content-engineering budget owner + approval (blocks EPIC-PRR-G).
 5. Paid-tier pricing floor given per-student-per-month LLM cost ceiling ~$3.30.

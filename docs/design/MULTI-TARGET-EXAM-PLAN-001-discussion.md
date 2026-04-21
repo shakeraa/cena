@@ -1,7 +1,7 @@
 # MULTI-TARGET-EXAM-PLAN-001: Multi-Target Student Exam Plan — Persona Discussion Brief
 
 > **Status**: Discussion draft — pre-ADR, pre-task-split.
-> **Decision captured (2026-04-21)**: Cena will model a student's learning plan as a **list of exam targets**, not a single target. Ship in v1 — no single-target → multi-target migration dance post-launch.
+> **Decision captured (2026-04-21)**: Cena will model a student's learning plan as a **list of exam targets**, not a single target. Ship at Launch — no single-target → multi-target migration dance post-launch.
 > **Next**: run the persona-lens review (educator, cogsci, privacy, ethics, a11y, enterprise, ministry, sre, redteam, finops) against this brief, then collapse findings into ADR-0049 + EPIC-PRR-F.
 > **Related**: [PRR-148 (marked Done, false-done on onboarding wiring)](../../tasks/pre-release-review/done/TASK-PRR-148-student-input-ui-for-adaptivescheduler-deadline-weekly-ti.md), orphaned components [ExamPlanStep.vue](../../src/student/full-version/src/components/onboarding/ExamPlanStep.vue), [SyllabusMap.vue](../../src/student/full-version/src/components/onboarding/SyllabusMap.vue), [OnboardingCatalogPicker.vue](../../src/student/full-version/src/components/OnboardingCatalogPicker.vue).
 
@@ -55,9 +55,9 @@ Events on StudentActor successor aggregate (ADR-0012): `ExamTargetAdded`, `ExamT
 
 ## 4. Exam Catalog (MVP)
 
-Catalog is **server-driven**, i18n'd, versioned, served via `GET /api/catalog/exams`. Per [ADR-0001](../adr/0001-tenant-isolation.md), globally scoped (no tenant variation v1) but the endpoint carries a tenant header for future override.
+Catalog is **server-driven**, i18n'd, versioned, served via `GET /api/catalog/exams`. Per [ADR-0001](../adr/0001-tenant-isolation.md), globally scoped (no tenant variation at Launch) but the endpoint carries a tenant header for future override.
 
-### Included (v1)
+### Included (Launch)
 
 | `ExamCode` | Exam | Track options | Sitting windows (per year) |
 |---|---|---|---|
@@ -70,7 +70,7 @@ Catalog is **server-driven**, i18n'd, versioned, served via `GET /api/catalog/ex
 | `PSYCHOMETRY` | Psychometric Entrance Test (PET) | — | Apr, Jul, Sep, Dec |
 | `SAT` | SAT | — | Quarterly (Mar/May/Aug/Oct/Dec) |
 
-### SAT + Psychometry — full v1 inclusion (decided 2026-04-21)
+### SAT + Psychometry — full Launch inclusion (decided 2026-04-21)
 
 User decision: SAT and Psychometry ship **fully functional** on day one, not behind "coming soon" flags. This is a significant content-engineering commitment that extends beyond the plan-aggregate epic. What it requires:
 
@@ -79,13 +79,13 @@ User decision: SAT and Psychometry ship **fully functional** on day one, not beh
 - **Per-target syllabus reference IDs** in the catalog (section 4) → must resolve to real syllabi for both SAT and PET in the rubric DSL ([PRR-033](../../tasks/pre-release-review/TASK-PRR-033-ministry-bagrut-rubric-dsl-version-pinning-per-track-sign-of.md)) and coverage matrix ([PRR-072](../../tasks/pre-release-review/post-launch/TASK-PRR-072-item-bank-coverage-matrix-vs-bagrut-syllabus.md)) from day one.
 - **CAS oracle ([ADR-0002](../adr/0002-sympy-correctness-oracle.md))** applies to SAT math + PET quantitative exactly as to Bagrut math — SymPy verifies every student-facing item.
 - **No-stubs rule**: per the user's 2026-04-11 ban on stub/canned/fake backend, SAT + PET sessions must produce real adaptive output from day one. No placeholder items, no "10 seed questions and hope nobody notices."
-- This **blocks v1 launch on SAT + PET content readiness**, not just on the plan-aggregate epic. A parallel content-engineering epic (separate from EPIC-PRR-F) must track item-bank authoring for both.
+- This **blocks Launch on SAT + PET content readiness**, not just on the plan-aggregate epic. A parallel content-engineering epic (separate from EPIC-PRR-F) must track item-bank authoring for both.
 
-### Explicit non-goals (v1)
+### Explicit non-goals (Launch)
 
 - ACT, GCE A-Levels, IB — no item-bank coverage and no user-demand signal.
-- Other Bagrut subjects (Hebrew, Arabic, History, Tanakh, etc.) — **not v1**; item bank doesn't cover.
-- Israeli-specific non-Bagrut assessments (Mekhina, army-prep) — not v1.
+- Other Bagrut subjects (Hebrew, Arabic, History, Tanakh, etc.) — **not at Launch**; item bank doesn't cover.
+- Israeli-specific non-Bagrut assessments (Mekhina, army-prep) — not at Launch.
 
 ### Catalog metadata per entry
 
@@ -143,7 +143,7 @@ New route `/settings/study-plan` (replaces PRR-148's half-shipped `StudyPlanSett
 2. Else **weighted round-robin**: weights = `WeeklyHours[i] / sum(WeeklyHours)`. Picker is deterministic given RNG seed = hash(userId, dayOfYear).
 3. **Student override**: "Study [different exam] instead today" button. Logs an `ExamTargetOverrideApplied` event for later analysis. No penalty, no nudging.
 
-**Out of scope for v1**: multi-target interleaving *within a single session*. A session is single-target. Cross-target interleaving across sessions is enough to get the spacing benefit.
+**Out of scope for Launch**: multi-target interleaving *within a single session*. A session is single-target. Cross-target interleaving across sessions is enough to get the spacing benefit.
 
 ### What the scheduler does not do
 
@@ -175,7 +175,7 @@ Each lens should answer the prompts below. File findings under `pre-release-revi
 
 ### 9.1 persona-educator (Ministry-curriculum + teacher workflow)
 
-- Is the exam catalog **complete** for the v1 market, or are there critical Bagrut subjects missing for teacher classrooms (Hebrew language? History?)?
+- Is the exam catalog **complete** for the Launch market, or are there critical Bagrut subjects missing for teacher classrooms (Hebrew language? History?)?
 - Is "3U/4U/5U" the right abstraction, or does the Ministry use a different labeling that we'd be misaligned with?
 - Does the deadline picker surface **all** legitimate Bagrut sitting windows (including the מועד ב' retake window)?
 - If a teacher assigns a whole class to Bagrut Math 5U, does the class roster override the student's personal picks, or coexist? (Interacts with PRR-058 teacher accommodations + PRR-037 grade-passback policy.)
@@ -206,9 +206,9 @@ Each lens should answer the prompts below. File findings under `pre-release-revi
 
 ### 9.5 persona-enterprise (Multi-institute, tenancy)
 
-- Does the exam catalog need to vary per tenant in v2 (e.g. Saudi tenants need a non-Bagrut catalog)? If so, is the catalog API shape future-proof?
+- Does the exam catalog need to vary per tenant in Post-Launch (e.g. Saudi tenants need a non-Bagrut catalog)? If so, is the catalog API shape future-proof?
 - Classroom-code onboarding path ([ExamPlanStep.vue](../../src/student/full-version/src/components/onboarding/ExamPlanStep.vue) currently hardcodes `classroomCode: null`) — how does a classroom-assigned plan interact with student-chosen targets?
-- Tenant-admin-forced plans (e.g. "all students in this school must target Bagrut Math 5U") — is this a v1 or v2 capability? If v2, do we need a `source: student|classroom|tenant` discriminator on `ExamTarget` now so we don't retrofit it?
+- Tenant-admin-forced plans (e.g. "all students in this school must target Bagrut Math 5U") — is this a Launch or Post-Launch capability? If Post-Launch, do we need a `source: student|classroom|tenant` discriminator on `ExamTarget` now so we don't retrofit it?
 
 ### 9.6 persona-ministry (Ministry-facing, Bagrut compliance)
 
@@ -249,11 +249,11 @@ Each lens should answer the prompts below. File findings under `pre-release-revi
 
 ## 10. Open Product Questions (need your call before ADR draft)
 
-1. ~~**SAT in v1?**~~ **Resolved 2026-04-21**: SAT + Psychometry both ship fully functional v1. See section 4 for the commitments this creates. Blocks launch on content-engineering readiness for both.
+1. ~~**SAT at Launch?**~~ **Resolved 2026-04-21**: SAT + Psychometry both ship fully functional at Launch. See section 4 for the commitments this creates. Blocks launch on content-engineering readiness for both.
 2. **Per-target free-text note field?** Section 5 step 4 includes it; persona-privacy 9.9 flags the risk. Drop entirely, or keep with aggressive PII scrub?
 3. **Maximum targets cap — 4 or higher?** Real students may legitimately do 3 Bagrut subjects + Psychometry = 4. Retake candidates may want 5. Where's the ceiling?
 4. **"Not sure yet, skip" during onboarding** — creates an incomplete plan. Is it better to require at least one target (friction, potential abandonment) or allow skip (incomplete state, need a nag)?
-5. **Classroom-assigned targets** (persona-enterprise 9.5) — v1 or v2?
+5. **Classroom-assigned targets** (persona-enterprise 9.5) — Launch or Post-Launch?
 6. **Parent visibility of exam plan** (persona-privacy 9.9) — default visible, default hidden, or per-student-consent?
 
 ## 11. What This Replaces / Retires
@@ -283,8 +283,8 @@ Run personas against sections 9.1–9.10. File findings under each `pre-release-
 ---
 
 **History**:
-- 2026-04-21: Draft created after `/pages/onboarding.vue` audit surfaced the missing grade+exam-target gap; user decided full multi-target over honest-single-target-Bagrut-only v1.
-- 2026-04-21: User resolved open question #1 — SAT and Psychometry both ship fully functional in v1, not behind "coming soon" flags. Adds a parallel content-engineering epic as a launch blocker; extends CAS oracle + no-stubs rule to both exam families.
+- 2026-04-21: Draft created after `/pages/onboarding.vue` audit surfaced the missing grade+exam-target gap; user decided full multi-target over honest-single-target-Bagrut-only Launch.
+- 2026-04-21: User resolved open question #1 — SAT and Psychometry both ship fully functional at Launch, not behind "coming soon" flags. Adds a parallel content-engineering epic as a launch blocker; extends CAS oracle + no-stubs rule to both exam families.
 - 2026-04-21: 10-persona review completed. Verdicts: 2 red (a11y, ministry), 1 yellow-leaning-red (privacy), 7 yellow. Synthesis below revises the data model and task slate before ADR lock.
 
 ---
@@ -312,14 +312,14 @@ Run personas against sections 9.1–9.10. File findings under each `pre-release-
 2. **Sittings are named tuples, not free dates** *(educator + ministry)*. Replace `Deadline: DateTimeOffset` with `SittingCode` → `{AcademicYear, Season, Moed}` tuple that dereferences to a canonical date + Ministry סמל שנה שאלון mapping. Free dates collapse the moed taxonomy (מועד א / ב / ג / מיוחד) and misalign with every Ministry reporting artefact downstream.
 3. **Ministry numeric codes are the primary key**, not display labels *(ministry emphatic)*. `BAGRUT_MATH + 5U` is a label; the real key is `{035581 | 035582 | 035583}` — Math 5U is **three** שאלונים, not one. Catalog entries carry `ministrySubjectCode` + `ministryQuestionPaperCodes[]`.
 4. **Rename `PSYCHOMETRY` → `PET`** *(ministry)*. NITE-owned, not Ministry-of-Education — different regulator, different compliance path.
-5. **`ExamTarget.Source ∈ {Student, Classroom, Tenant}` + `AssignedById` + `EnrollmentId?` in v1 schema** *(educator + enterprise converge)*. Classroom-write UI defers to v2, but the event schema discriminator must land v1 to avoid a post-launch event-sourced migration.
+5. **`ExamTarget.Source ∈ {Student, Classroom, Tenant}` + `AssignedById` + `EnrollmentId?` in Launch schema** *(educator + enterprise converge)*. Classroom-write UI defers to Post-Launch, but the event schema discriminator must land at Launch to avoid a post-launch event-sourced migration.
 6. **Targets cap = 5, not 4** *(educator=5, enterprise=6)*. Real Grade-12 students exceed 4 (3 STEM + 1 humanity + 1 standardized). Compromise: server cap 5, soft-warn at 4.
 7. **Track enum extended** *(educator)*: include `"2U"` (mandatory humanities baseline); English uses Modules A–G, not units — add `ModuleCode` as parallel track-shape.
 8. **Exam-week lock stays silent** *(cogsci + ethics agree)*. 14-day proximity rule is scheduler behavior, not UX copy. No countdown, no label, no "days-remaining" identifier anywhere in `src/`. Extend shipgate scanner to catch `daysUntil`, `countdown`, `streak`.
 9. **Diagnostic must be per-target blocks, not unified** *(cogsci)*. Unified diagnostic creates order-effect bias. 6-8 items per target + shared 3-item warmup; priors reported per-target.
 10. **Mastery state keyed on `skillId`, not `(targetId, skillId)`** *(cogsci blocker)*. Otherwise Bagrut-Math ↔ PET-Quant overlap gives phantom weakness. Skills are catalog-global.
 11. **Migration one-shot is unsafe** *(sre blocker)*. Staged feature-flagged upcast with retry + DLQ, not first-login-throws-everyone-out.
-12. **Catalog needs `GlobalCatalog + TenantCatalogOverlay` v1** *(enterprise)*. Header-only tenancy is theatre; schema must be overlay-ready from day one.
+12. **Catalog needs `GlobalCatalog + TenantCatalogOverlay` at Launch** *(enterprise)*. Header-only tenancy is theatre; schema must be overlay-ready from day one.
 13. **Archived-target retention = 24 months, not "indefinite"** *(privacy)*. PPL Amendment 13 + GDPR Art. 5(1)(e) purpose-limitation. User-extendable opt-in.
 14. **RTBF cascade** *(privacy)*. `ExamTarget*` events crypto-shredded + all downstream derivations (coverage matrix, mastery projection, scheduler state) purged. Ties to PRR-003a.
 15. **Aggregate invariants server-enforced** *(redteam)*. `sum(Targets.WeeklyHours) ≤ 40`, `count(Targets) ≤ 5`, `target.Archived ⇒ immutable`. Not UI-only.
@@ -327,7 +327,7 @@ Run personas against sections 9.1–9.10. File findings under each `pre-release-
 17. **Per-target-plan nested-step SR announcement undefined** *(a11y red)*. Flatten to top-level steps or define `aria-live` source-of-truth. Not defer-able.
 18. **PRR-032 is a ghost reference** *(a11y)*. The brief cites `numeralsPreference` from PRR-032 but the PRR-032 task file doesn't exist and `onboardingStore.ts` has no `numeralSystem` field. Create the task or stop citing it.
 19. **Pre-existing streak-leak in `src/student/full-version/src/pages/progress/time.vue:40-54`** *(ethics)*. Renders `dayStreakCount` — a GD-004 / ADR-0048 violation that the shipgate scanner at `scripts/shipgate/scan.mjs:26` should catch but isn't. Remove before PRR-F merges.
-20. **PRR-053 capacity plan is stale** *(sre)*. SAT+PET v1 turns a 2-spike (Jun/Aug) into a 7-window compound calendar. Amend before launch.
+20. **PRR-053 capacity plan is stale** *(sre)*. SAT+PET at Launch turns a 2-spike (Jun/Aug) into a 7-window compound calendar. Amend before launch.
 21. **Prompt cache hit rate at PRR-047 SLO floor** *(finops)*. 4-target variation drops hit rate from ~85% → ~68-72% (SLO = 70%). Observability per-target required; no action if we stay above floor, but instrumented.
 22. **SAT+PET content-engineering budget unowned** *(finops)*. ~$10-15k one-shot (PET Hebrew/Arabic verbal $8-12k dominates) + $500-1500/quarter refresh. Must be named owner + approved line before EPIC-PRR-G starts.
 
@@ -335,11 +335,11 @@ Run personas against sections 9.1–9.10. File findings under each `pre-release-
 
 | Question | Resolution | Source |
 |---|---|---|
-| 10.1 SAT-in-v1? | **Yes, full** | user 2026-04-21 |
+| 10.1 SAT-at-Launch? | **Yes, full** | user 2026-04-21 |
 | 10.2 Free-text note? | **Drop, replace with ReasonTag enum** | ethics + privacy + redteam + finops |
 | 10.3 Max targets cap? | **5 server, soft-warn at 4** | educator + enterprise |
 | 10.4 Skip-during-onboarding? | **Allowed, conditional on classroomCode absence; strict nag-copy guardrails** | ethics + educator |
-| 10.5 Classroom-assigned v1/v2? | **Schema v1, teacher UI v2** | educator + enterprise |
+| 10.5 Classroom-assigned Launch/Post-Launch? | **Schema at Launch, teacher UI Post-Launch** | educator + enterprise |
 | 10.6 Parent visibility? | **Default hidden 13+, visible <13, student-grants at 18+** | privacy |
 
 ### 14.4 Revised task slate (supersedes section 12)
@@ -371,20 +371,41 @@ Run personas against sections 9.1–9.10. File findings under each `pre-release-
 
 **P2 tasks**:
 - PRR-234 — Close out PRR-148 (mark superseded + delete legacy `StudentPlanConfig` in next cycle).
-- PRR-235 — Ministry reporting export endpoint shape (future-proof; deferred implementation, spec only v1).
+- PRR-235 — Ministry reporting export endpoint shape (future-proof; deferred implementation, spec only at Launch).
 
-**Deferred (v2)**:
-- Classroom-assigned target teacher UI.
-- Within-session interleaving across targets.
-- Retake-cohort surface (Karpicke/Roediger retrieval-strength; cogsci flag).
-- Magen/מגן capture (ministry: out of v1 scope).
+**Deferred (Post-Launch)**:
+- Magen/מגן capture — stays deferred. Ministry persona red-flag: we are not source of truth (school is). Capturing a magen value creates false-authority risk. Revisit post-launch only if formal Mashov integration lands with school as authoritative source.
+
+### 14.4.1 Scope expansion 2026-04-21 (user directive: "all options on release day")
+
+Previously-deferred items promoted to Launch + new corpus enabler task added. Honest budget + timeline delta flagged at decision.
+
+**Promoted to Launch**:
+- PRR-236 — Classroom-assigned target teacher UI (was Post-Launch schema-only).
+- PRR-237 — Within-session cross-target interleaving (was Post-Launch).
+- PRR-238 — Retake-cohort surface + retrieval-strength framing (was Post-Launch).
+
+**New catalog extensions (Launch)**:
+- PRR-239 — Arab-stream (המגזר הערבי) Bagrut variants — full שאלון code set + content tagging.
+- PRR-240 — PET Russian-verbal section — native authoring (not translation).
+- PRR-241 — Full Bagrut humanities catalog (Hebrew Lang, Lit, History, Tanakh, Civics, Arabic-L2, Arabic-L1, Islamic Studies).
+
+**New content accelerator (P0)**:
+- PRR-242 — Past-Bagrut corpus ingestion. User-proposed 2026-04-21; per memory "Bagrut reference-only" this is legitimate reference material for AI-authored recreations. Leverages existing Phase 1A OCR pipeline. **Cuts EPIC-PRR-G content budget estimate from ~$40-60k → ~$20-30k** (reference-anchored authoring vs. cold generation).
+
+### 14.4.2 Revised budget + timeline
+
+- **EPIC-PRR-F engineering timeline**: ~8 weeks → **~12-14 weeks** with promoted tasks (classroom UI + interleaving + retake).
+- **EPIC-PRR-G content-engineering budget**: original ~$10-15k → expansion forecast ~$40-60k → **revised ~$20-30k** with PRR-242 corpus enabler.
+- **EPIC-PRR-G content-engineering timeline**: ~8 weeks → **~16-20 weeks** across parallel SMEs, corpus-anchored.
+- Content-engineering budget owner + approval still open (brief §14.5 Q4).
 
 ### 14.5 Outstanding questions back to decision-holder
 
 From persona findings, items that did NOT converge and still need your call:
 
-1. **Arab-stream (המגזר הערבי) variant question-paper codes** — different numeric codes per stream. V1 covers both or one? *(ministry)*
-2. **PET Russian-verbal variant** — olim population. V1 scope or v2? *(educator)*
+1. **Arab-stream (המגזר הערבי) variant question-paper codes** — different numeric codes per stream. Launch covers both or one? *(ministry)*
+2. **PET Russian-verbal variant** — olim population. Launch scope or Post-Launch? *(educator)*
 3. **Tenant-admin-forced plans under what lawful basis** — when a school admin assigns targets to a student with parent consent only? *(privacy)*
 4. **Content-engineering budget line owner + approval** for the $10-15k one-shot on SAT+PET item banks *(finops)*.
 5. **Paid-tier pricing floor** given per-student-per-month ceiling of ~$3.30 LLM spend *(finops)*.

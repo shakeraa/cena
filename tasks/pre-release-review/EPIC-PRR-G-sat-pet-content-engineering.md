@@ -1,13 +1,13 @@
 # EPIC-PRR-G: SAT + PET content engineering (launch blocker)
 
 **Priority**: P0
-**Effort**: XL (content-engineering epic: 8-16 weeks, not code-weeks)
+**Effort**: XL (content-engineering epic: 16-20 weeks across parallel SMEs, corpus-anchored; revised 2026-04-21 for scope expansion — see Absorbed tasks)
 **Lens consensus**: persona-educator, persona-cogsci, persona-ministry, persona-privacy, persona-finops
 **Source docs**: [docs/design/MULTI-TARGET-EXAM-PLAN-001-discussion.md §4](../../docs/design/MULTI-TARGET-EXAM-PLAN-001-discussion.md), persona-finops findings (~$10-15k one-shot budget estimate)
 **Assignee hint**: content-engineering lead (human) + parallel subject-matter experts + CAS-gate reviewers
 **Tags**: source=multi-target-exam-plan-001, type=epic, epic=epic-prr-g, content-engineering, launch-blocker
 **Status**: Not Started — blocked on decision-holder budget approval
-**Source**: User decision 2026-04-21: SAT + Psychometry ship fully-functional v1, not "coming soon" flags. Per memory "No stubs — production grade", this requires real item banks on day one.
+**Source**: User decision 2026-04-21: SAT + Psychometry ship fully-functional at Launch, not "coming soon" flags. Per memory "No stubs — production grade", this requires real item banks on day one.
 
 ---
 
@@ -35,7 +35,7 @@ EPIC-PRR-F adds SAT + PET to the exam catalog and renders them as selectable onb
 - **English section**: ESL-style, Israeli-PET-specific.
 - **Combined quantitative+verbal scoring logic** — PET's composite score is a specific algorithm, not a simple sum.
 
-## Scope — what's out (v1)
+## Scope — what's out (Launch)
 
 - SAT Essay (optional section; deprecated by CollegeBoard 2021 but some schools request).
 - ACT, GCSE, IB — no target in catalog.
@@ -63,13 +63,29 @@ EPIC-PRR-F adds SAT + PET to the exam catalog and renders them as selectable onb
 ## Dependencies
 
 - Blocked on **decision-holder Q4 (brief §14.5)**: who owns the $10-15k content-engineering budget line? What's the approval path?
-- Blocked on **decision-holder Q2 (brief §14.5)**: PET Russian-verbal in v1 scope or v2?
+- Blocked on **decision-holder Q2 (brief §14.5)**: PET Russian-verbal in Launch scope or Post-Launch?
 - Coordinates with [PRR-033 Bagrut rubric DSL](TASK-PRR-033-ministry-bagrut-rubric-dsl-version-pinning-per-track-sign-of.md) — rubric DSL is extended, not forked.
 - Coordinates with [PRR-072 coverage matrix](post-launch/TASK-PRR-072-item-bank-coverage-matrix-vs-bagrut-syllabus.md) — same structure, extended with new exam families.
 
-## Sub-tasks
+## Absorbed / sub-tasks
 
-Decomposition deferred to content-engineering lead after budget approval. Expected shape: one sub-task per (exam × section × language) = ~12-18 sub-tasks.
+Scope expanded 2026-04-21 per user directive "all options on release day". Additions:
+
+| ID | Title | Role |
+|---|---|---|
+| [PRR-239](TASK-PRR-239-arab-stream-bagrut-variants.md) | Arab-stream (המגזר הערבי) Bagrut variants | catalog + content |
+| [PRR-240](TASK-PRR-240-pet-russian-verbal-section.md) | PET Russian-verbal section | content |
+| [PRR-241](TASK-PRR-241-bagrut-humanities-catalog.md) | Full Bagrut humanities catalog (8 subjects) | catalog + content |
+| [PRR-242](TASK-PRR-242-past-bagrut-corpus-ingestion.md) | Past-Bagrut corpus ingestion | **content accelerator (P0) — cuts downstream budget ~50%** |
+
+Further SAT + PET decomposition (already in scope) deferred to content-engineering lead: one sub-task per (exam × section × language) = ~12-18 additional sub-tasks.
+
+## Budget revision 2026-04-21
+
+- Original: ~$10-15k (SAT + PET only).
+- Unadjusted with scope expansion: ~$40-60k (+ Arab-stream + Russian + humanities).
+- **Revised with PRR-242 corpus enabler: ~$20-30k.** Corpus-anchored authoring vs. cold generation roughly halves per-item cost and accelerates timeline.
+- Budget owner + approval path still open (brief §14.5 Q4).
 
 ## Related
 

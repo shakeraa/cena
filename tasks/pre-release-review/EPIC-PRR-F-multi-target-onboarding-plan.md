@@ -54,7 +54,10 @@ This epic is a **launch blocker** for the multi-target product positioning. It a
 | [PRR-232](TASK-PRR-232-realize-prr-032-numerals-preference.md) | Realize PRR-032 (numerals preference task — create the ghost reference) | P1 | a11y |
 | [PRR-233](TASK-PRR-233-prompt-cache-slo-per-target.md) | Prompt cache hit SLO per target + finops observability | P1 | finops |
 | [PRR-234](TASK-PRR-234-close-out-prr-148-superseded.md) | Close out PRR-148 (mark superseded + legacy `StudentPlanConfig` removal) | P2 | housekeeping |
-| [PRR-235](TASK-PRR-235-ministry-reporting-export-spec.md) | Ministry reporting export endpoint shape (spec-only v1) | P2 | spec |
+| [PRR-235](TASK-PRR-235-ministry-reporting-export-spec.md) | Ministry reporting export endpoint shape (spec-only at Launch) | P2 | spec |
+| [PRR-236](TASK-PRR-236-classroom-assigned-target-teacher-ui.md) | Classroom-assigned target teacher UI | P1 | teacher feature (promoted to Launch 2026-04-21) |
+| [PRR-237](TASK-PRR-237-within-session-cross-target-interleaving.md) | Within-session cross-target interleaving | P1 | scheduler (promoted to Launch 2026-04-21) |
+| [PRR-238](TASK-PRR-238-retake-cohort-surface.md) | Retake-cohort surface + retrieval-strength framing | P1 | pedagogy (promoted to Launch 2026-04-21) |
 
 ## Blockers outbound
 

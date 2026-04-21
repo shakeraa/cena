@@ -69,7 +69,7 @@ Serve the canonical exam catalog as `{GlobalCatalog, TenantCatalogOverlay}` via 
 - **Ministry codes are primary** (persona-ministry): catalog entries carry `ministry_subject_code` + `question_papers[].code` as שאלון numerics. Display names are localized metadata.
 - **Sittings are named tuples** (persona-educator + ministry): `{code, academic_year, season, moed, canonical_date}`. `canonical_date` is derivable, `code` is canonical.
 - **PET regulator = NITE**, not Ministry of Education. `regulator` field distinguishes.
-- **Overlay is empty but present v1** (persona-enterprise): shape is future-proof without retrofit.
+- **Overlay is empty but present at Launch** (persona-enterprise): shape is future-proof without retrofit.
 - **`passback_eligible`** flag ties into PRR-037.
 - **`item_bank_status`** ∈ `{full, reference-only, unavailable}`. Persona-educator's "catalog shows humanities honestly" call.
 - **`regulator`** ∈ `{ministry_of_education, nite, collegeboard}`.
