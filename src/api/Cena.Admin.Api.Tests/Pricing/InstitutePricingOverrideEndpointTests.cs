@@ -136,8 +136,11 @@ public sealed class InstitutePricingOverrideEndpointTests
             NullLogger<InstitutePricingOverrideEndpoint.PricingOverrideMarker>.Instance,
             CancellationToken.None);
 
-        var bad = Assert.IsType<BadRequest<object>>(Cast(result));
-        Assert.NotNull(bad);
+        // The endpoint returns Results.BadRequest with an anonymous payload;
+        // we only need to pin that it's a BadRequest of SOME shape and the
+        // event stream stayed empty.
+        Assert.IsAssignableFrom<IStatusCodeHttpResult>(result);
+        Assert.Equal(400, ((IStatusCodeHttpResult)result).StatusCode);
         Assert.Empty(publisher.Events);
     }
 
@@ -208,8 +211,4 @@ public sealed class InstitutePricingOverrideEndpointTests
         Assert.Equal(200, ok.StatusCode);
     }
 
-    // Helper: IResult is sealed to an internal type; a couple of our
-    // assertions use `IsType` against the public facades which requires
-    // unwrapping.
-    private static object Cast(IResult r) => r;
 }
