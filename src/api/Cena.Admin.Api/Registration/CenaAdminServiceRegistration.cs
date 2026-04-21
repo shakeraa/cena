@@ -7,6 +7,7 @@
 using Cena.Actors.Cas;
 using Cena.Actors.QuestionBank.Coverage;
 using Cena.Actors.QuestionBank.Templates;
+using Cena.Actors.StudentPlan;
 using Cena.Admin.Api.Content;
 using Cena.Admin.Api.Coverage;
 using Cena.Admin.Api.Endpoints;
@@ -107,6 +108,11 @@ public static class CenaAdminServiceRegistration
             Cena.Actors.Parent.InMemoryParentChildBindingStore>();
         services.TryAddScoped<Cena.Infrastructure.Security.IParentChildBindingService,
             Cena.Actors.Parent.ParentChildBindingService>();
+
+        // prr-230: StudentPlan reader (+ its store deps) so the parent
+        // exam-targets endpoint can project the student's plan through the
+        // ParentVisibility filter. Idempotent via AddStudentPlanServices.
+        services.AddStudentPlanServices();
 
         // prr-051: Parent digest preferences store + unsubscribe token stack.
         // Phase 1 ships with in-memory stores; Marten-backed projections are
@@ -435,6 +441,10 @@ public static class CenaAdminServiceRegistration
         // prr-052: Parent dashboard-visibility view. GET returns the
         // age-band-filtered field list sourced from AgeBandPolicy.
         Features.ParentConsole.DashboardVisibilityEndpoint.MapDashboardVisibilityEndpoint(app);
+        // prr-230: Parent exam-targets view. GET returns the student's
+        // active targets filtered by ParentVisibility (default-hidden 13+).
+        Features.ParentConsole.ExamTargetsParentVisibilityEndpoint
+            .MapExamTargetsParentVisibilityEndpoint(app);
         // prr-130: Admin per-student consent audit export (CSV/JSON).
         // GET /api/admin/institutes/{iid}/students/{sid}/consent-audit
         //   Admin-role gated + tenant-scoped. SUPER_ADMIN may cross

@@ -35,6 +35,7 @@
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Actors.Consent;
 using Cena.Actors.StudentPlan;
 using Cena.Actors.StudentPlan.Events;
 using Cena.Infrastructure.Errors;
@@ -117,6 +118,7 @@ public static class ExamTargetEndpoints
         [FromBody] AddExamTargetRequestDto? req,
         ClaimsPrincipal user,
         IStudentPlanCommandHandler handler,
+        IStudentAgeBandLookup bandLookup,
         ILogger<LoggerMarker> logger,
         CancellationToken ct)
     {
@@ -134,6 +136,15 @@ public static class ExamTargetEndpoints
                 kv => new SittingCode(kv.Value.AcademicYear!, kv.Value.Season, kv.Value.Moed),
                 StringComparer.Ordinal);
 
+        // PRR-230: authoritative age band drives default ParentVisibility.
+        // A null band (missing DOB) falls through to the aggregate's safe
+        // Visible default — the add is NOT refused on missing DOB because
+        // the age-gate is a separate flow; the student can still build
+        // their plan and the parent visibility is simply Visible by default
+        // (same as pre-PRR-230 semantics) until a DOB lands.
+        var studentBand = await bandLookup.ResolveBandAsync(
+            studentId, DateTimeOffset.UtcNow, ct).ConfigureAwait(false);
+
         var cmd = new AddExamTargetCommand(
             StudentAnonId: studentId,
             Source: ExamTargetSource.Student,
@@ -145,7 +156,8 @@ public static class ExamTargetEndpoints
             WeeklyHours: req.WeeklyHours,
             ReasonTag: req.ReasonTag,
             QuestionPaperCodes: req.QuestionPaperCodes,
-            PerPaperSittingOverride: perPaperOverride);
+            PerPaperSittingOverride: perPaperOverride,
+            StudentAgeBand: studentBand);
 
         var result = await handler.HandleAsync(cmd, ct).ConfigureAwait(false);
         if (!result.Success)
@@ -404,6 +416,11 @@ public static class ExamTargetEndpoints
                 (StatusCodes.Status400BadRequest,
                  ErrorCodes.CENA_INTERNAL_VALIDATION,
                  "Override sitting must differ from the target's primary sitting."),
+            // PRR-230: safety-flag carve-out locks visibility to Visible.
+            CommandError.ParentVisibilitySafetyFlagLocked =>
+                (StatusCodes.Status409Conflict,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Safety-flagged targets cannot be hidden from the parent dashboard."),
             _ =>
                 (StatusCodes.Status400BadRequest,
                  ErrorCodes.CENA_INTERNAL_ERROR,
@@ -456,7 +473,8 @@ public sealed record ExamTargetResponseDto(
     bool IsActive,
     DateTimeOffset? ArchivedAt,
     IReadOnlyList<string> QuestionPaperCodes,
-    IReadOnlyDictionary<string, SittingCodeDto>? PerPaperSittingOverride)
+    IReadOnlyDictionary<string, SittingCodeDto>? PerPaperSittingOverride,
+    ParentVisibility ParentVisibility = ParentVisibility.Visible)
 {
     /// <summary>Project an aggregate target onto the wire DTO.</summary>
     public static ExamTargetResponseDto From(ExamTarget t)
@@ -481,7 +499,8 @@ public sealed record ExamTargetResponseDto(
             IsActive: t.IsActive,
             ArchivedAt: t.ArchivedAt,
             QuestionPaperCodes: t.QuestionPaperCodes,
-            PerPaperSittingOverride: perPaper);
+            PerPaperSittingOverride: perPaper,
+            ParentVisibility: t.ParentVisibility);
     }
 }
 

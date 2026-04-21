@@ -907,6 +907,7 @@ public partial class Program
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
     app.MapExamTargetEndpoints();        // prr-218: multi-target /api/me/exam-targets per ADR-0050
     app.MapExamTargetQuestionPaperEndpoints(); // prr-243: שאלון post-hoc PATCH endpoints per ADR-0050 §1
+    app.MapExamTargetParentVisibilityEndpoint(); // prr-230: POST /api/me/exam-targets/{id}/visibility
     app.MapDiagnosticEndpoints();        // RDY-023 + prr-228: legacy + per-target diagnostic blocks
 
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
