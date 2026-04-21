@@ -685,10 +685,14 @@
       },
       "hintLadder": {
         "moreHint": "المزيد من المساعدة",
-        "previousRungs": "الإرشادات السابقة"
+        "previousRungs": "الإرشادات السابقة",
+        "imStuck": "أحتاج مساعدة"
       },
       "stuckCta": "أحتاج مساعدة",
-      "explanationLangNote": "تفسير (بالإنجليزية)"
+      "explanationLangNote": "تفسير (بالإنجليزية)",
+      "fbd": {
+        "diagramAria": "Free-body diagram construction area"
+      }
     },
     "summary": {
       "title": "اكتملت الجلسة",
@@ -708,6 +712,41 @@
       "verbalExplanation": "اشرح طريقتك في الحل",
       "verbalPlaceholder": "صف أسلوبك…",
       "normalizedAs": "فهمنا إجابتك على أنها"
+    }
+  },
+  "sidekick": {
+    "title": "Your study sidekick",
+    "trigger": "Sidekick",
+    "openAria": "Open study sidekick",
+    "closeAria": "Close sidekick",
+    "intent": {
+      "toolbar": "Pick what to explain",
+      "explainQuestion": "Explain this question",
+      "explainStep": "Explain this step",
+      "explainConcept": "Explain the concept",
+      "freeForm": "Ask something",
+      "explainQuestionPrompt": "Can you walk me through this question?",
+      "explainStepPrompt": "Can you explain this step?",
+      "explainConceptPrompt": "Can you explain the underlying concept?"
+    },
+    "context": {
+      "rung": "Hint depth",
+      "lastFocus": "Last focus",
+      "minutesLeft": "Study minutes today"
+    },
+    "composer": {
+      "placeholder": "Ask anything about this problem…",
+      "ariaLabel": "Type a message to your sidekick",
+      "send": "Send"
+    },
+    "stream": {
+      "aria": "Sidekick conversation",
+      "thinking": "Thinking…",
+      "leakRedacted": "I held that answer back — let's work through it together."
+    },
+    "circuit": {
+      "resting": "The sidekick is resting right now — try a hint instead.",
+      "openLadder": "Open hint ladder"
     }
   },
   "challenges": {

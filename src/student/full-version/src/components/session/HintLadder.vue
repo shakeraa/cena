@@ -99,6 +99,7 @@ function handleRequestMore() {
     class="hint-ladder"
     data-testid="hint-ladder"
     role="region"
+    aria-live="polite"
     :aria-label="t('session.runner.hintLadder.previousRungs')"
   >
     <!--

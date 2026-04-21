@@ -1,36 +1,30 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import QuestionCard from '@/components/session/QuestionCard.vue'
 import AnswerFeedback from '@/components/session/AnswerFeedback.vue'
+import HintLadder from '@/components/session/HintLadder.vue'
+import StepSolverCard from '@/components/session/StepSolverCard.vue'
+import FreeBodyDiagramConstruct from '@/components/session/FreeBodyDiagramConstruct.vue'
+import Sidekick from '@/components/Sidekick.vue'
 import { $api } from '@/api/$api'
+import { postFbdSubmission, postStep } from '@/api/sessions'
 import { useCelebration } from '@/composables/useCelebration'
 import { useFlowState } from '@/composables/useFlowState'
 import FlowAmbientBackground from '@/components/common/FlowAmbientBackground.vue'
 import SessionTimer from '@/components/session/SessionTimer.vue'
 import FatigueCheck from '@/components/session/FatigueCheck.vue'
 import { useSessionPersistence } from '@/composables/useSessionPersistence'
+import { useHintLadder } from '@/composables/useHintLadder'
 import type {
+  PhysicsFigureSpec,
   SessionAnswerResponseDto,
-  SessionHintResponseDto,
   SessionQuestionDto,
 } from '@/api/types/common'
 
-// FIND-pedagogy-005 — tap-to-continue feedback
-//
-// The previous implementation auto-dismissed feedback after a hard-coded
-// ~1.6-second setTimeout, well below the floor needed for learners to
-// read and reflect on a rationale (Shute 2008, DOI 10.3102/0034654307313795).
-// The page now waits for an explicit `@continue` emission from
-// AnswerFeedback. For correct answers it additionally offers an optional
-// auto-advance after `CORRECT_AUTO_ADVANCE_MS`, but only when the
-// student has not disabled auto-advance via the a11y preference.
-//
-// The a11y preference is stored under `cena.a11y.feedbackTiming` in
-// localStorage so refreshes survive. 'manual' disables all auto-advance
-// (even on correct answers), 'auto' uses the default delay, and 'slow'
-// triples the delay for students who need more reading time.
+// FIND-pedagogy-005 — tap-to-continue feedback.
+// (see prior rationale in git history; this comment is a short marker)
 const CORRECT_AUTO_ADVANCE_MS = 8000
 const SLOW_MULTIPLIER = 3
 type FeedbackTiming = 'auto' | 'manual' | 'slow'
@@ -38,14 +32,10 @@ type FeedbackTiming = 'auto' | 'manual' | 'slow'
 function readFeedbackTimingPref(): FeedbackTiming {
   try {
     const raw = globalThis.localStorage?.getItem('cena.a11y.feedbackTiming')
-    if (raw === 'manual' || raw === 'slow' || raw === 'auto')
-      return raw
+    if (raw === 'manual' || raw === 'slow' || raw === 'auto') return raw
   }
-  catch {
-    // SSR / disabled storage — fall through to default
-  }
-
-  return 'manual' // conservative default: manual continue for EVERY answer
+  catch { /* SSR / disabled storage */ }
+  return 'manual'
 }
 
 definePage({
@@ -60,7 +50,7 @@ definePage({
   },
 })
 
-const { t } = useI18n()
+const { t, locale } = useI18n()
 const route = useRoute()
 const router = useRouter()
 
@@ -75,17 +65,15 @@ const {
   dismissDifficultyAdjustment,
 } = useFlowState()
 
-// RDY-022: Session timer + fatigue check + persistence
 const { saveSnapshot, restoreSnapshot, clearSession } = useSessionPersistence()
 
 const sessionPaused = ref(false)
 const showFatigueCheck = ref(false)
 const questionsAnswered = ref(0)
-const sessionStartedAt = ref(new Date().toISOString()) // overwritten by backend on first question load
+const sessionStartedAt = ref(new Date().toISOString())
 const pausedDurationSeconds = ref(0)
 const FATIGUE_CHECK_INTERVAL = 10
 
-// Restore session state on mount (survives refresh)
 const existingSnapshot = restoreSnapshot(sessionId)
 if (existingSnapshot) {
   sessionStartedAt.value = existingSnapshot.startedAt
@@ -94,22 +82,19 @@ if (existingSnapshot) {
 
 function togglePause() {
   sessionPaused.value = !sessionPaused.value
-
   if (sessionPaused.value) {
-    // Save snapshot on pause so state survives browser close
     saveSnapshot({
       sessionId,
       currentStep: questionsAnswered.value,
       startedAt: sessionStartedAt.value,
       lastActivityAt: new Date().toISOString(),
-      totalSteps: 0, // unknown total
+      totalSteps: 0,
       answeredSteps: Array.from({ length: questionsAnswered.value }, (_, i) => i),
     })
   }
 }
 
 function handleTimerTick(elapsed: number) {
-  // Periodic snapshot save (every 60 seconds of study time)
   if (elapsed > 0 && elapsed % 60 === 0) {
     saveSnapshot({
       sessionId,
@@ -123,50 +108,68 @@ function handleTimerTick(elapsed: number) {
 }
 
 function handleMilestone() {
-  // 25-minute milestone — also trigger break suggestion via flow state
   showBreakSuggestion.value = true
 }
 
 async function handleEnergyReport(level: 'energized' | 'okay' | 'tired') {
-  // POST self-reported energy to backend for fatigue model calibration
   try {
     await $api(`/api/sessions/${sessionId}/fatigue-report`, {
       method: 'POST' as any,
       body: { energyLevel: level, questionsAnswered: questionsAnswered.value } as any,
     })
-  } catch {
-    // Best-effort — don't block UX if backend rejects
-  }
+  } catch { /* best-effort */ }
 }
 
 const question = ref<SessionQuestionDto | null>(null)
 const feedback = ref<SessionAnswerResponseDto | null>(null)
-const lastHint = ref<SessionHintResponseDto | null>(null)
-const hintLoading = ref(false)
 const loading = ref(true)
 const submitting = ref(false)
 const completing = ref(false)
 const advancing = ref(false)
 const error = ref<string | null>(null)
 
-// Active auto-advance timer so `onBeforeUnmount` / manual continue can
-// cancel it before it fires. Undefined means "no auto-advance pending".
+// prr-205 — server-authoritative HintLadder state.
+const ladder = useHintLadder({
+  sessionId,
+  questionId: () => question.value?.questionId ?? null,
+  masteryBucket: () => question.value?.bktMasteryBucket ?? 'unknown',
+})
+
+// prr-207 — Sidekick drawer ref for imperative teardown on events.
+const sidekickRef = ref<InstanceType<typeof Sidekick> | null>(null)
+const sidekickOpen = ref(false)
+
+// prr-206/208 — dispatch helpers. We look at server-provided fields to
+// choose the right surface: step_solver → StepSolverCard, physics.fbd+
+// Construct → FreeBodyDiagramConstruct, else MCQ (QuestionCard).
+const questionSurface = computed<'mcq' | 'step_solver' | 'fbd'>(() => {
+  const q = question.value
+  if (!q) return 'mcq'
+  const figure = q.figureSpec as PhysicsFigureSpec | undefined
+  if (q.methodology === 'mechanics.fbd' && figure?.diagramMode === 'Construct')
+    return 'fbd'
+  if (q.questionType === 'step_solver') return 'step_solver'
+  return 'mcq'
+})
+
+// RTL direction from active i18n locale.
+const rtlDirection = computed<'rtl' | 'ltr'>(() =>
+  locale.value === 'ar' || locale.value === 'he' ? 'rtl' : 'ltr')
+
 let autoAdvanceTimer: ReturnType<typeof setTimeout> | undefined
 
 async function loadCurrentQuestion() {
   loading.value = true
   error.value = null
-
-  // FIND-pedagogy-006: reset the hint panel when a fresh question loads
-  // so the previous question's hint does not leak into this one.
-  lastHint.value = null
   try {
-    question.value = await $api<SessionQuestionDto>(`/api/sessions/${sessionId}/current-question`)
-
-    // RDY-022: Get session start timestamp from backend for timer accuracy
+    question.value = await $api<SessionQuestionDto>(
+      `/api/sessions/${sessionId}/current-question`,
+    )
     if (question.value && (question.value as any).sessionStartedAt) {
       sessionStartedAt.value = (question.value as any).sessionStartedAt
     }
+    // Seed the Sidekick context on first question load so open() is instant.
+    sidekickRef.value?.refreshContext?.()
   }
   catch (err) {
     error.value = (err as Error).message || t('error.serverError')
@@ -176,53 +179,46 @@ async function loadCurrentQuestion() {
   }
 }
 
-// FIND-pedagogy-006 — Request a progressive hint for the question
-// currently in flight. Hits the new POST /hint endpoint which returns
-// the next hint from HintGenerator (same service the actor-side session
-// uses). A 404 from the backend is the canonical "no more hints" signal
-// and the UI reacts by zeroing the remaining count so the button hides.
-async function handleHintRequest() {
-  if (!question.value || hintLoading.value)
-    return
-  hintLoading.value = true
-  error.value = null
+// prr-205 — wire "request next rung" from HintLadder + QuestionCard "I'm stuck".
+async function handleRequestNextRung() {
+  await ladder.requestNext()
+}
+
+function handleStuckSurface() {
+  ladder.surface()
+  // Also start the ladder at rung 1 if empty.
+  if (ladder.rungs.value.length === 0) {
+    void ladder.requestNext()
+  }
+}
+
+// prr-206 — per-step submit dispatch.
+async function handleStepSubmit(payload: { stepNumber: number; expression: string; timeSpentMs: number; hintsConsumed: number }) {
+  if (!question.value) return
   try {
-    const hint = await $api<SessionHintResponseDto>(
-      `/api/sessions/${sessionId}/question/${question.value.questionId}/hint`,
-      { method: 'POST' as any },
-    )
-
-    lastHint.value = hint
-
-    // Mirror the remaining-hint count into the question prop so the
-    // hint button disables when exhausted (HintsOnly, Partial, Full).
-    question.value = { ...question.value, hintsRemaining: hint.hintsRemaining }
+    const resp = await postStep(sessionId, question.value.questionId, payload)
+    return resp
+  } catch (err) {
+    error.value = (err as Error).message || t('error.serverError')
   }
-  catch (err) {
-    // Production-grade per the review: a 404 means "no more hints
-    // available" (either exhausted budget or level=None). Reflect that
-    // by zeroing the counter so the button hides, but do NOT surface an
-    // error banner — the student didn't do anything wrong.
-    const status = (err as { statusCode?: number; status?: number }).statusCode
-      ?? (err as { statusCode?: number; status?: number }).status
+}
 
-    if (status === 404) {
-      if (question.value)
-        question.value = { ...question.value, hintsRemaining: 0 }
-    }
-    else {
-      error.value = (err as Error).message || t('error.serverError')
-    }
-  }
-  finally {
-    hintLoading.value = false
+// prr-208 — FBD submit dispatch.
+async function handleFbdSubmit(forces: { label: string; magnitude: number; angleDeg: number }[]) {
+  if (!question.value) return
+  try {
+    const resp = await postFbdSubmission(sessionId, question.value.questionId, {
+      forces,
+      timeSpentMs: 0,
+    })
+    return resp
+  } catch (err) {
+    error.value = (err as Error).message || t('error.serverError')
   }
 }
 
 async function completeSession() {
   completing.value = true
-
-  // The summary page calls /complete itself — we just navigate there.
   await router.push(`/session/${sessionId}/summary`)
 }
 
@@ -234,20 +230,14 @@ function clearAutoAdvance() {
 }
 
 async function advanceAfterFeedback() {
-  if (advancing.value)
-    return
+  if (advancing.value) return
   advancing.value = true
   clearAutoAdvance()
-
   const resp = feedback.value
-
   feedback.value = null
   try {
-    if (resp?.nextQuestionId)
-      await loadCurrentQuestion()
-
-    else
-      await completeSession()
+    if (resp?.nextQuestionId) await loadCurrentQuestion()
+    else await completeSession()
   }
   finally {
     advancing.value = false
@@ -255,9 +245,7 @@ async function advanceAfterFeedback() {
 }
 
 async function handleAnswer(answer: string, timeSpentMs: number) {
-  if (!question.value)
-    return
-
+  if (!question.value) return
   submitting.value = true
   error.value = null
   try {
@@ -272,31 +260,24 @@ async function handleAnswer(answer: string, timeSpentMs: number) {
         } as any,
       },
     )
-
     feedback.value = resp
-
-    // RDY-022: Track questions answered for fatigue check
     questionsAnswered.value++
     if (questionsAnswered.value > 0 && questionsAnswered.value % FATIGUE_CHECK_INTERVAL === 0) {
       showFatigueCheck.value = true
     }
-
-    // RDY-016: Trigger celebrations based on answer result
     if (resp.correct) {
       triggerCorrectAnswer(resp.xpAwarded ?? 10)
-
-      // Level-up check (backend includes levelUp flag when XP crosses threshold)
-      if ((resp as any).levelUp && (resp as any).newLevel) {
+      if ((resp as any).levelUp && (resp as any).newLevel)
         triggerLevelUp((resp as any).newLevel)
-      }
-
-      // Mastery milestone check (mastery crossed 0.85)
-      if ((resp as any).masteryMilestone && (resp as any).conceptName) {
+      if ((resp as any).masteryMilestone && (resp as any).conceptName)
         triggerMasteryMilestone((resp as any).conceptName)
-      }
+    }
+    else {
+      // prr-207 — mark wrong-step so the Sidekick's explain-step intent
+      // stays disabled for 15s (productive-failure debounce).
+      sidekickRef.value?.noteWrongStep?.()
     }
 
-    // RDY-016: Update flow state from backend response
     if ((resp as any).flowState) {
       updateFlowState({
         fatigueLevel: (resp as any).flowState.fatigueLevel ?? 0,
@@ -306,23 +287,10 @@ async function handleAnswer(answer: string, timeSpentMs: number) {
       })
     }
 
-    // FIND-pedagogy-005: NO hard-coded dismiss timeout. The student taps
-    // the Continue button in AnswerFeedback (emits @continue) to advance.
-    //
-    // Exception (optional) — when the answer is correct AND the a11y
-    // preference is 'auto' or 'slow', schedule a delayed auto-advance as
-    // a convenience. A manual Continue button is STILL shown, and wrong
-    // answers NEVER auto-advance regardless of preference (Kulhavy &
-    // Stock 1989 — errors require more processing time).
     const timingPref = readFeedbackTimingPref()
     if (resp.correct && timingPref !== 'manual') {
       const delay = CORRECT_AUTO_ADVANCE_MS * (timingPref === 'slow' ? SLOW_MULTIPLIER : 1)
-
       autoAdvanceTimer = setTimeout(() => {
-        // Only advance if the student hasn't already done it manually.
-        // We intentionally do not await the promise — the timer is a
-        // fire-and-forget schedule, and `advanceAfterFeedback` guards
-        // against concurrent advances via the `advancing` ref.
         if (feedback.value)
           advanceAfterFeedback().catch(() => { /* handled inside */ })
       }, delay)
@@ -338,15 +306,31 @@ async function handleAnswer(answer: string, timeSpentMs: number) {
 
 function handleExit() {
   clearAutoAdvance()
-  // RDY-022: Clear session persistence on intentional exit (not on pause)
-  if (!sessionPaused.value) {
-    clearSession(sessionId)
-  }
+  if (!sessionPaused.value) clearSession(sessionId)
+  sidekickRef.value?.teardown?.()
   router.push('/home')
 }
 
-onMounted(loadCurrentQuestion)
-onBeforeUnmount(clearAutoAdvance)
+// Ctrl+K / Cmd+K toggle at the page level too (Sidekick also listens,
+// but the page-level listener ensures focus-trap restoration is wired
+// to a stable element even when the drawer is not yet mounted).
+function onSidekickShortcut(e: KeyboardEvent) {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+    e.preventDefault()
+    sidekickOpen.value = !sidekickOpen.value
+  }
+}
+
+onMounted(() => {
+  loadCurrentQuestion()
+  window.addEventListener('keydown', onSidekickShortcut)
+})
+
+onBeforeUnmount(() => {
+  clearAutoAdvance()
+  window.removeEventListener('keydown', onSidekickShortcut)
+  sidekickRef.value?.teardown?.()
+})
 </script>
 
 <template>
@@ -354,10 +338,8 @@ onBeforeUnmount(clearAutoAdvance)
     class="session-runner-page"
     data-testid="session-runner-page"
   >
-    <!-- RDY-016: Flow state ambient background -->
     <FlowAmbientBackground :flow-state="currentFlowState" />
 
-    <!-- RDY-016: Flow state user feedback -->
     <VSnackbar
       v-model="showBreakSuggestion"
       color="warning"
@@ -388,7 +370,7 @@ onBeforeUnmount(clearAutoAdvance)
         </VBtn>
       </template>
     </VSnackbar>
-    <!-- RDY-022: Fatigue check dialog -->
+
     <FatigueCheck
       v-model="showFatigueCheck"
       @energy-reported="handleEnergyReport"
@@ -406,7 +388,6 @@ onBeforeUnmount(clearAutoAdvance)
         {{ t('session.runner.exit') }}
       </VBtn>
 
-      <!-- RDY-022: Session timer (driven by backend startedAt, survives refresh) -->
       <SessionTimer
         :started-at="sessionStartedAt"
         :paused="sessionPaused"
@@ -417,8 +398,24 @@ onBeforeUnmount(clearAutoAdvance)
         @tick="handleTimerTick"
       />
 
-      <div class="text-caption text-medium-emphasis">
-        {{ t('session.runner.sessionIdLabel') }} {{ sessionId.slice(0, 8) }}
+      <div class="d-flex align-center ga-2">
+        <!-- prr-207 — Sidekick trigger. Persistent but never pulsing or
+             badge-annotated. Ctrl+K opens; click opens. Focus returns
+             to this element on drawer close. -->
+        <VBtn
+          variant="tonal"
+          color="primary"
+          size="small"
+          prepend-icon="tabler-message-circle"
+          :aria-label="t('sidekick.openAria')"
+          data-testid="sidekick-trigger"
+          @click="sidekickOpen = !sidekickOpen"
+        >
+          {{ t('sidekick.trigger') }}
+        </VBtn>
+        <div class="text-caption text-medium-emphasis">
+          {{ t('session.runner.sessionIdLabel') }} {{ sessionId.slice(0, 8) }}
+        </div>
       </div>
     </div>
 
@@ -462,16 +459,83 @@ onBeforeUnmount(clearAutoAdvance)
         @continue="advanceAfterFeedback"
       />
 
-      <QuestionCard
-        v-else-if="question"
-        :question="question"
-        :locked="submitting"
-        :last-hint="lastHint"
-        :hint-loading="hintLoading"
-        @submit="handleAnswer"
-        @hint="handleHintRequest"
+      <!-- prr-208 — physics FBD Construct path -->
+      <FreeBodyDiagramConstruct
+        v-else-if="question && questionSurface === 'fbd'"
+        :scene-svg="(question.figureSpec as PhysicsFigureSpec).sceneSvg ?? ''"
+        :body-center="(question.figureSpec as PhysicsFigureSpec).bodyCenter ?? { x: 300, y: 200 }"
+        :expected-forces="(question.figureSpec as PhysicsFigureSpec).expectedForces ?? []"
+        :ariaLabel="t('session.runner.fbd.diagramAria')"
+        data-testid="runner-fbd"
+        @submit="handleFbdSubmit"
       />
+
+      <!-- prr-206 — step-solver path -->
+      <StepSolverCard
+        v-else-if="question && questionSurface === 'step_solver' && question.steps"
+        :question="{
+          id: question.questionId,
+          stem: question.prompt,
+          subject: question.subject,
+          conceptId: '',
+          steps: question.steps.map(s => ({
+            stepNumber: s.stepNumber,
+            instruction: s.instruction,
+            fadedExample: s.fadedExample,
+            expectedExpression: s.expectedExpression ?? '',
+            hints: s.hints ?? [],
+          })),
+          finalAnswer: question.finalAnswer ?? '',
+          scaffoldingLevel: (question.scaffoldingLevel === 'Full' ? 'full' : question.scaffoldingLevel === 'Partial' ? 'faded' : 'none') as 'full' | 'faded' | 'none',
+        }"
+        :session-id="sessionId"
+        data-testid="runner-step-solver"
+        @step-verified="(stepNumber, isCorrect) => {
+          if (!isCorrect) sidekickRef?.noteWrongStep?.()
+        }"
+      />
+
+      <!-- prr-205 — MCQ/short-answer path with hint ladder wired in -->
+      <template v-else-if="question && questionSurface === 'mcq'">
+        <QuestionCard
+          :question="question"
+          :locked="submitting"
+          :last-hint="null"
+          :hint-loading="ladder.loading.value"
+          data-testid="runner-question-card"
+          @submit="handleAnswer"
+          @hint="handleStuckSurface"
+        />
+
+        <!-- HintLadder only renders once the student has asked or a
+             low/mid mastery student auto-sees it after first rung.
+             Expertise-reversal: high-mastery students stay collapsed
+             unless they explicitly press "I'm stuck". -->
+        <div
+          v-if="ladder.visible.value && ladder.rungs.value.length > 0"
+          class="session-runner-page__ladder mt-4"
+          data-testid="runner-hint-ladder"
+        >
+          <HintLadder
+            :hints="ladder.rungs.value"
+            :loading="ladder.loading.value"
+            :locked="submitting"
+            :hints-remaining="ladder.nextRungAvailable.value ? undefined : 0"
+            @request-next-rung="handleRequestNextRung"
+          />
+        </div>
+      </template>
     </div>
+
+    <!-- prr-207 — Sidekick drawer. Single instance, session-scoped. -->
+    <Sidekick
+      ref="sidekickRef"
+      v-model="sidekickOpen"
+      :session-id="sessionId"
+      :direction="rtlDirection"
+      @fallback-to-ladder="handleStuckSurface"
+      @fallbackToLadder="handleStuckSurface"
+    />
   </div>
 </template>
 

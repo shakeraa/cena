@@ -296,12 +296,45 @@ export interface WorkedExampleDto {
   steps: WorkedExampleStepDto[]
 }
 
+/**
+ * prr-206 — Step-solver step shape. Mirrors server-side
+ * `StepSolverQuestion.Step`. Delivered when `questionType === 'step_solver'`.
+ */
+export interface StepSolverStepDto {
+  stepNumber: number
+  /** Instruction shown to the student (e.g. "isolate the variable"). */
+  instruction?: string
+  /** Human-friendly faded-example scaffold, when scaffoldingLevel='Partial'. */
+  fadedExample?: string
+  /** Expected canonical expression. Not shown to student directly. */
+  expectedExpression?: string
+  /** Per-step hint templates, available to the per-step hint ladder. */
+  hints?: string[]
+  /** BKT mastery discount for scaffolded attempts. Server-driven. */
+  scaffoldingPenalty?: number
+}
+
+/**
+ * prr-208 — Physics figure spec subset consumed by the runner to
+ * decide whether to render an interactive FBD Construct.
+ */
+export interface PhysicsFigureSpec {
+  type: 'PhysicsDiagramSpec' | string
+  diagramMode?: 'Display' | 'Construct'
+  sceneSvg?: string
+  bodyCenter?: { x: number; y: number }
+  expectedForces?: { label: string; magnitude: number; angleDeg: number }[]
+  methodology?: string
+  ariaLabel?: string
+}
+
 export interface SessionQuestionDto {
   questionId: string
   questionIndex: number
   totalQuestions: number
   prompt: string
-  questionType: 'multiple-choice' | 'short-answer' | 'numeric'
+  /** prr-206 adds 'step_solver' to the discriminator set. */
+  questionType: 'multiple-choice' | 'short-answer' | 'numeric' | 'step_solver'
   choices: string[]
   subject: string
   expectedTimeSeconds: number
@@ -326,6 +359,149 @@ export interface SessionQuestionDto {
 
   /** Remaining hints the student can still request (mirrors hintsAvailable on first load). */
   hintsRemaining?: number
+
+  /** prr-206 — populated for step_solver questions only. */
+  steps?: StepSolverStepDto[] | null
+
+  /** prr-206 — canonical final answer expression (server CAS reference). */
+  finalAnswer?: string | null
+
+  /**
+   * prr-208 — optional figure spec; physics + Construct => FBD renderer.
+   * Loosely typed to stay compatible with QuestionFigure's internal
+   * FigureSpec interface. Runtime guards in the runner page + children
+   * narrow it to PhysicsFigureSpec when the methodology tag allows.
+   */
+  figureSpec?: any
+
+  /** prr-208 — physics methodology tag ("mechanics.fbd"); drives FBD routing. */
+  methodology?: string | null
+
+  /**
+   * prr-205 — BKT mastery bucket ('low' | 'mid' | 'high' | 'unknown')
+   * used client-side for expertise-reversal gating. Server authoritative;
+   * when 'high' (>0.60 mastery) the HintLadder stays collapsed by default.
+   */
+  bktMasteryBucket?: 'low' | 'mid' | 'high' | 'unknown'
+}
+
+// =============================================================================
+// prr-203 — Hint ladder DTO (mirrors C# HintLadderResponseDto)
+// =============================================================================
+
+export interface HintLadderResponseDto {
+  rung: number
+  body: string
+  rungSource: 'template' | 'haiku' | 'sonnet' | 'template-fallback' | string
+  maxRungReached: number
+  nextRungAvailable: boolean
+}
+
+// =============================================================================
+// prr-206 — Step-solver submit DTOs
+// =============================================================================
+
+export interface StepSolverSubmitRequest {
+  stepNumber: number
+  /** Student-submitted LaTeX or plain expression. */
+  expression: string
+  timeSpentMs: number
+  /** Hints consumed on this step (BKT scaffolding adjustment). */
+  hintsConsumed?: number
+}
+
+export interface StepSolverSubmitResponseDto {
+  correct: boolean
+  /** AST-diff feedback string; null on correct. */
+  astDiff?: string | null
+  /** Optional misconception tag (session-scoped, ADR-0003). */
+  misconceptionTag?: string | null
+  /** True when CAS decided this wrong path is pedagogically productive. */
+  isProductiveFailurePath?: boolean
+  /** Whether a next step is now unlocked. */
+  nextStepUnlocked?: boolean
+  /** CAS sidecar rest-state ("checking later" → queued verification). */
+  queuedForLaterVerification?: boolean
+}
+
+// =============================================================================
+// prr-208 — FBD submission DTOs
+// =============================================================================
+
+export interface FbdForceDto {
+  label: string
+  magnitude: number
+  angleDeg: number
+}
+
+export interface FbdSubmissionRequest {
+  forces: FbdForceDto[]
+  timeSpentMs: number
+}
+
+export interface FbdForceVerdictDto {
+  label: string
+  directionCorrect: boolean
+  magnitudeCorrect: boolean
+  componentsCorrect: boolean
+  feedback?: string | null
+}
+
+export interface FbdSubmissionResponseDto {
+  correct: boolean
+  perForceVerdicts: FbdForceVerdictDto[]
+  /** Σ F = 0 or Σ F = ma consistency. */
+  netForceValid: boolean
+  feedback?: string | null
+}
+
+// =============================================================================
+// prr-204 — Tutor Context DTO (mirrors C# TutorContextResponseDto)
+// =============================================================================
+
+export interface TutorContextAccommodationDto {
+  ldAnxiousFriendly: boolean
+  extendedTimeMultiplier: number
+  distractionReducedLayout: boolean
+  ttsForProblemStatements: boolean
+}
+
+export interface TutorContextResponseDto {
+  sessionId: string
+  currentQuestionId: string | null
+  answeredCount: number
+  correctCount: number
+  currentRung: number
+  lastMisconceptionTag: string | null
+  attemptPhase: 'first_try' | 'retry' | 'post_solution' | string
+  elapsedMinutes: number
+  dailyMinutesRemaining: number
+  bktMasteryBucket: 'low' | 'mid' | 'high' | 'unknown' | string
+  accommodationFlags: TutorContextAccommodationDto
+  builtAtUtc: string
+}
+
+// =============================================================================
+// prr-207 — Tutor turn request/response (non-streaming)
+// =============================================================================
+
+export type SidekickIntent =
+  | 'explain_question'
+  | 'explain_step'
+  | 'explain_concept'
+  | 'free_form'
+
+export interface TutorTurnRequest {
+  intent: SidekickIntent
+  userMessage?: string
+  stepIndex?: number
+}
+
+export interface TutorTurnResponseDto {
+  /** Final assembled assistant message (non-streaming fallback). */
+  content: string
+  model: string | null
+  cached: boolean
 }
 
 export interface SessionAnswerRequest {
