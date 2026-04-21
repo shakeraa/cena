@@ -378,7 +378,8 @@
       "today": "היום",
       "kpi30dayTotal": "סך 30 ימים",
       "kpi7dayTotal": "7 ימים אחרונים",
-      "kpiDayStreak": "רצף פעיל"
+      "kpi7dayActiveDays": "ימים שלמדת",
+      "ofNDays": "מתוך {total}"
     },
     "mastery": {
       "title": "שליטה במקצועות",

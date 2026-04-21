@@ -37,20 +37,17 @@ const last7DaysMinutes = computed(() => {
   return last7.reduce((acc, i) => acc + i.minutes, 0)
 })
 
-const dayStreakCount = computed(() => {
+// ADR-0048 positive framing: show days the student actively learned in the last
+// 7 days (non-streaking, non-comparative, resets each period — no loss-aversion
+// pressure from a counter that can go to zero). GD-004 ban enforced by
+// scripts/shipgate/multi-target-mechanics.yml + rulepack-scan.mjs.
+const last7DaysActiveDays = computed(() => {
   if (!timeQuery.data.value)
     return 0
 
-  let count = 0
-  const items = [...timeQuery.data.value.items].reverse()
-  for (const item of items) {
-    if (item.minutes > 0)
-      count += 1
-    else
-      break
-  }
+  const last7 = timeQuery.data.value.items.slice(-7)
 
-  return count
+  return last7.filter(i => i.minutes > 0).length
 })
 </script>
 
@@ -126,13 +123,13 @@ const dayStreakCount = computed(() => {
           <VCard
             variant="outlined"
             class="pa-4"
-            data-testid="kpi-day-streak"
+            data-testid="kpi-7day-active-days"
           >
             <div class="text-caption text-medium-emphasis">
-              {{ t('progress.time.kpiDayStreak') }}
+              {{ t('progress.time.kpi7dayActiveDays') }}
             </div>
             <div class="text-h4 font-weight-bold mt-1">
-              {{ dayStreakCount }}<span class="text-body-2 ms-1">days</span>
+              {{ last7DaysActiveDays }}<span class="text-body-2 ms-1">{{ t('progress.time.ofNDays', { total: 7 }) }}</span>
             </div>
           </VCard>
         </VCol>
