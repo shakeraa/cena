@@ -379,7 +379,7 @@
       "kpi30dayTotal": "30-day total",
       "kpi7dayTotal": "Last 7 days",
       "kpi7dayActiveDays": "Days you learned",
-      "ofNDays": "of {total}"
+      "ofNDaysWindow": "of 7"
     },
     "mastery": {
       "title": "Subject mastery",

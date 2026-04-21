@@ -380,7 +380,7 @@
       "kpi30dayTotal": "إجمالي 30 يومًا",
       "kpi7dayTotal": "آخر 7 أيام",
       "kpi7dayActiveDays": "أيام تعلمت فيها",
-      "ofNDays": "من {total}"
+      "ofNDaysWindow": "من 7"
     },
     "mastery": {
       "title": "إتقان المواد",

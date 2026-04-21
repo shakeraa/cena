@@ -379,7 +379,7 @@
       "kpi30dayTotal": "סך 30 ימים",
       "kpi7dayTotal": "7 ימים אחרונים",
       "kpi7dayActiveDays": "ימים שלמדת",
-      "ofNDays": "מתוך {total}"
+      "ofNDaysWindow": "מתוך 7"
     },
     "mastery": {
       "title": "שליטה במקצועות",

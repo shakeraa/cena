@@ -129,7 +129,7 @@ const last7DaysActiveDays = computed(() => {
               {{ t('progress.time.kpi7dayActiveDays') }}
             </div>
             <div class="text-h4 font-weight-bold mt-1">
-              {{ last7DaysActiveDays }}<span class="text-body-2 ms-1">{{ t('progress.time.ofNDays', { total: 7 }) }}</span>
+              {{ last7DaysActiveDays }}<span class="text-body-2 ms-1">{{ t('progress.time.ofNDaysWindow') }}</span>
             </div>
           </VCard>
         </VCol>
