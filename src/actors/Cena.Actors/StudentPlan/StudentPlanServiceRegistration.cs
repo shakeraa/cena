@@ -46,6 +46,14 @@ public static class StudentPlanServiceRegistration
         services.TryAddSingleton<IStudentPlanReader, StudentPlanReader>();
         services.TryAddSingleton<IStudentPlanCommandHandler, StudentPlanCommandHandler>();
 
+        // PRR-236: Classroom-assigned target teacher service. Fans out a
+        // single teacher AssignClassroomTargetCommand to every enrolled
+        // student via the StudentPlan command handler above. Requires an
+        // IClassroomRosterLookup, which each host registers separately
+        // (Marten-backed in Admin.Api.Host, in-memory in tests).
+        services.TryAddSingleton<IClassroomTargetAssignmentService,
+            ClassroomTargetAssignmentService>();
+
         // PRR-243: permissive catalog validator by default (accepts any
         // non-empty paper code). The Student API host overrides this with
         // CatalogBackedQuestionPaperCatalogValidator, which consults the
