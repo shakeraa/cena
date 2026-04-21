@@ -568,6 +568,46 @@
       "dsarConfirm": "Submit request",
       "dsarSuccess": "Your request has been submitted. Tracking ID: {trackingId}. We will respond within 30 days.",
       "dsarError": "Could not submit your request. Please try again later."
+    },
+    "studyPlan": {
+      "title": "Study plan",
+      "subtitle": "Manage the exams you're preparing for.",
+      "activeHeading": "Active targets",
+      "archivedHeading": "Archived",
+      "addTarget": "Add a target",
+      "editTarget": "Edit target",
+      "archiveTarget": "Archive target",
+      "archiveConfirm": "Archive this target? You can still see it in the archived list for a retention window.",
+      "archiveConfirmYes": "Archive",
+      "noActiveTargets": "You have no active targets. Add one to get started.",
+      "noArchivedTargets": "No archived targets.",
+      "totalWeeklyHours": "Total weekly hours: {hours}h",
+      "overLimitWarning": "Total weekly hours exceeds 40. Please reduce before saving.",
+      "fields": {
+        "examCode": "Exam",
+        "track": "Track",
+        "sitting": "Sitting",
+        "weeklyHours": "Weekly hours",
+        "reasonTag": "Why"
+      },
+      "actions": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "close": "Close"
+      },
+      "errors": {
+        "loadFailed": "Could not load your study plan. Please try again.",
+        "addFailed": "Could not add the target. Please try again.",
+        "updateFailed": "Could not save your changes. Please try again.",
+        "archiveFailed": "Could not archive the target. Please try again."
+      },
+      "parentVisibility": {
+        "label": "Parent dashboard visibility",
+        "visible": "Visible to parent",
+        "hidden": "Hidden from parent",
+        "helpText": "Students aged 13 and over can decide whether each exam target appears on their parent's dashboard. Safety-flagged targets always remain visible.",
+        "toggleFailed": "Could not update visibility. Please try again."
+      }
     }
   },
   "social": {

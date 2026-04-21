@@ -26,6 +26,8 @@ interface SectionCard {
 const SECTIONS: SectionCard[] = [
   { id: 'account', icon: 'tabler-user-circle', titleKey: 'settingsPage.account.title', subtitleKey: 'settingsPage.account.subtitle', to: '/settings/account' },
   { id: 'appearance', icon: 'tabler-palette', titleKey: 'settingsPage.appearance.title', subtitleKey: 'settingsPage.appearance.subtitle', to: '/settings/appearance' },
+  // PRR-227: multi-target study-plan edit surface.
+  { id: 'study-plan', icon: 'tabler-target', titleKey: 'settingsPage.studyPlan.title', subtitleKey: 'settingsPage.studyPlan.subtitle', to: '/settings/study-plan' },
   { id: 'notifications', icon: 'tabler-bell-ringing', titleKey: 'settingsPage.notifications.title', subtitleKey: 'settingsPage.notifications.subtitle', to: '/settings/notifications' },
   { id: 'privacy', icon: 'tabler-shield-lock', titleKey: 'settingsPage.privacy.title', subtitleKey: 'settingsPage.privacy.subtitle', to: '/settings/privacy' },
 ]

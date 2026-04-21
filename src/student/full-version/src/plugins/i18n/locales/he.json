@@ -568,6 +568,46 @@
       "dsarConfirm": "שלח בקשה",
       "dsarSuccess": "הבקשה שלך הוגשה. מספר מעקב: {trackingId}. נשיב תוך 30 יום.",
       "dsarError": "לא ניתן להגיש את הבקשה. נסה שוב מאוחר יותר."
+    },
+    "studyPlan": {
+      "title": "תוכנית לימודים",
+      "subtitle": "נהל את הבחינות שאליהן אתה מתכונן.",
+      "activeHeading": "יעדים פעילים",
+      "archivedHeading": "בארכיון",
+      "addTarget": "הוסף יעד",
+      "editTarget": "ערוך יעד",
+      "archiveTarget": "העבר לארכיון",
+      "archiveConfirm": "להעביר את היעד לארכיון? ניתן לשחזר בתוך חלון השמירה.",
+      "archiveConfirmYes": "העבר לארכיון",
+      "noActiveTargets": "אין יעדים פעילים. הוסף אחד כדי להתחיל.",
+      "noArchivedTargets": "אין יעדים בארכיון.",
+      "totalWeeklyHours": "סה״כ שעות שבועיות: {hours}",
+      "overLimitWarning": "הסכום חורג מ-40 שעות. הפחת לפני שמירה.",
+      "fields": {
+        "examCode": "בחינה",
+        "track": "מסלול",
+        "sitting": "מועד",
+        "weeklyHours": "שעות/שבוע",
+        "reasonTag": "סיבה"
+      },
+      "actions": {
+        "save": "שמור",
+        "cancel": "ביטול",
+        "close": "סגור"
+      },
+      "errors": {
+        "loadFailed": "לא ניתן לטעון את תוכנית הלימודים. נסה שוב.",
+        "addFailed": "לא ניתן להוסיף את היעד. נסה שוב.",
+        "updateFailed": "לא ניתן לשמור את השינויים. נסה שוב.",
+        "archiveFailed": "לא ניתן להעביר לארכיון. נסה שוב."
+      },
+      "parentVisibility": {
+        "label": "נראות דשבורד הורים",
+        "visible": "נראה להורה",
+        "hidden": "מוסתר מההורה",
+        "helpText": "תלמידים מגיל 13 יכולים להחליט אם כל יעד מופיע בדשבורד ההורה. יעדים בדגל בטיחות נשארים תמיד נראים.",
+        "toggleFailed": "לא ניתן לעדכן נראות. נסה שוב."
+      }
     }
   },
   "social": {
