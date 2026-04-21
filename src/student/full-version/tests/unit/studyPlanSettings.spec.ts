@@ -61,10 +61,15 @@ describe('PRR-227: /settings/study-plan edit UI', () => {
   })
 
   it('study-plan.vue shows neutral archive copy — no streak / celebration (shipgate)', () => {
-    // The shipgate scanner bans these terms; source-level sanity check.
+    // The shipgate scanner bans these terms inside user-facing copy. We
+    // check the <template> block only; doc comments may legitimately
+    // mention the ban (prose, not UI copy).
+    const templateMatch = vueSrc.match(/<template>([\s\S]*?)<\/template>/)
+    expect(templateMatch).not.toBeNull()
+    const template = (templateMatch?.[1] ?? '').toLowerCase()
     const banned = ['streak', 'celebrate', 'congratulations', 'rewarded']
     for (const term of banned)
-      expect(vueSrc.toLowerCase()).not.toContain(term)
+      expect(template).not.toContain(term)
   })
 
   it('study-plan.vue wraps exam codes + tracks in <bdi dir="ltr"> for RTL pages', () => {

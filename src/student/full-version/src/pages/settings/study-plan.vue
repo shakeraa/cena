@@ -1,27 +1,7 @@
 <script setup lang="ts">
-// =============================================================================
-// Cena — /settings/study-plan (PRR-227)
-//
-// Replaces the half-shipped PRR-148 StudyPlanSettings.vue with a proper
-// multi-target edit surface. Wires three actions to the existing wave1a
-// endpoints (PRR-218):
-//
-//   POST   /api/me/exam-targets           → addTarget
-//   PUT    /api/me/exam-targets/{id}      → editTarget
-//   POST   /api/me/exam-targets/{id}/archive → archiveTarget
-//
-// MVP scope (per the task body): reuses flat v-dialog forms rather than
-// importing PRR-221's step components — the shared components are a
-// follow-up when PRR-221 lands. The three mutations are fully functional
-// and server-validated.
-//
-// Non-negotiables honored:
-//   - Neutral copy (no streaks/celebration on archive per shipgate scanner).
-//   - RTL + numerals per locale (flip-in-rtl class on icons).
-//   - Keyboard + SR scaffolding (autofocus, aria-label, role=alert on
-//     error).
-// =============================================================================
-
+// PRR-227: /settings/study-plan. Three actions wire to PRR-218 endpoints —
+// POST /api/me/exam-targets (add), PUT {id} (edit), POST {id}/archive.
+// Neutral copy; no streak/celebration mechanics.
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useApiMutation } from '@/composables/useApiMutation'
@@ -39,8 +19,7 @@ definePage({
   },
 })
 
-// ---- Types (match Cena.Student.Api.Host ExamTargetResponseDto) -------------
-
+// Types mirror Cena.Student.Api.Host ExamTargetResponseDto.
 interface SittingCodeDto {
   academicYear: string
   season: 'Summer' | 'Winter'
@@ -76,8 +55,6 @@ interface TargetFormValue {
 
 const { t } = useI18n()
 
-// ---- Load plan (active + archived) ------------------------------------------
-
 const listQuery = useApiQuery<ListResponseDto>(
   '/api/me/exam-targets?includeArchived=true',
 )
@@ -91,8 +68,6 @@ const totalWeeklyHours = computed(() =>
   active.value.reduce((sum, t) => sum + t.weeklyHours, 0))
 
 const overLimit = computed(() => totalWeeklyHours.value > 40)
-
-// ---- Dialog + form state ----------------------------------------------------
 
 const showForm = ref(false)
 const editingId = ref<string | null>(null) // null = add; non-null = edit
@@ -132,8 +107,6 @@ function openEdit(target: ExamTargetDto) {
   showForm.value = true
 }
 
-// ---- Mutations --------------------------------------------------------------
-
 const addMutation = useApiMutation<ExamTargetDto, unknown>(
   '/api/me/exam-targets', 'POST')
 
@@ -170,8 +143,6 @@ async function archiveTarget(id: string) {
 
   return mut.execute({})
 }
-
-// ---- Action handlers --------------------------------------------------------
 
 async function handleSave() {
   formError.value = null
@@ -221,8 +192,6 @@ async function confirmArchive() {
     archiveError.value = t('settingsPage.studyPlan.errors.archiveFailed')
   }
 }
-
-// ---- Mount ------------------------------------------------------------------
 
 onMounted(() => listQuery.refresh())
 </script>
