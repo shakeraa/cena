@@ -61,3 +61,47 @@ public sealed record ContentBalanceRecommendation(
     int CurrentCount,
     int RecommendedCount,
     string GapDescription);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// prr-034: Cultural Context Community Review Board — ops queue DTOs
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Enqueue request for a new cultural-context DLQ entry. The enqueue path
+/// is not directly student-exposed — callers are moderation scanners,
+/// human moderators, and triage pipelines.
+/// </summary>
+public sealed record CulturalContextEnqueueRequest(
+    string SchoolId,
+    string SubjectKind,        // "question" | "explanation" | "hint" | "bagrut-recreation"
+    string SubjectId,
+    string ConcernCategory,    // "language-register" | "cultural-reference-clarity" | ...
+    string Reason,
+    string Source,             // "scanner-miss" | "moderator-flagged" | "student-reported"
+    string? CorrelationId,
+    string? EnqueuedByOperatorId);
+
+/// <summary>
+/// Ops-queue listing DTO. Single entry.
+/// </summary>
+public sealed record CulturalContextDlqItem(
+    string Id,
+    string SchoolId,
+    string SubjectKind,
+    string SubjectId,
+    string ConcernCategory,
+    string Reason,
+    string Source,
+    string? CorrelationId,
+    string? EnqueuedByOperatorId,
+    DateTimeOffset EnqueuedAt,
+    string Status,
+    string? AssignedReviewerId,
+    DateTimeOffset? DecidedAt,
+    string? DecisionOutcome);
+
+public sealed record CulturalContextDlqListResponse(
+    IReadOnlyList<CulturalContextDlqItem> Items,
+    int Page,
+    int PageSize,
+    int Total);
