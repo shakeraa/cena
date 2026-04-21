@@ -1,0 +1,91 @@
+# =============================================================================
+# Cena Platform — Redis Session-Store Alert Rules (prr-020)
+#
+# Fires on the Redis instance that holds misconception session data
+# (ADR-0003: session-scoped, 30-day hard cap). Loss of session data is a
+# correctness bug — the CAS-oracle gate loses the student's prior attempt
+# history and re-asks questions it already answered.
+#
+# Metric source: RedisSessionStoreMetricsService emits these gauges /
+# counters under Meter "Cena.RedisSessionStore". Prometheus scrapes via
+# the standard .NET OTLP → Prometheus exporter wired into Program.cs.
+#
+# Runbook: docs/ops/runbooks/redis-session-eviction.md
+# Dashboard: redis-session-health.json (Grafana)
+# =============================================================================
+groups:
+  - name: redis-session-store
+    interval: 30s
+    rules:
+
+      # --- Eviction rate (the correctness-impact alert) -----------------
+      # Threshold: >5% of total keys evicted per minute. At 5% per minute,
+      # a session cohort is effectively purged within 20 minutes — that
+      # is session-data loss, not just memory pressure.
+      - alert: RedisSessionEvictionRateHigh
+        expr: |
+          (
+            rate(cena_redis_session_evicted_keys_total[1m])
+            /
+            clamp_min(cena_redis_session_total_keys, 1)
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          surface: misconception-session-store
+          adr: "0003"
+        annotations:
+          summary: "Redis session eviction rate exceeds 5%/min — session data loss imminent"
+          description: |
+            Over the past 2 minutes, {{ $value | humanizePercentage }} of
+            session keys have been evicted per minute due to maxmemory
+            pressure. Misconception session state (ADR-0003) is being
+            silently dropped; the CAS-oracle gate will lose prior-attempt
+            history.
+          runbook_url: https://github.com/cena-platform/cena/blob/main/docs/ops/runbooks/redis-session-eviction.md
+
+      # --- Memory headroom ---------------------------------------------
+      - alert: RedisSessionMemoryHigh
+        expr: |
+          (
+            cena_redis_session_memory_used_bytes
+            /
+            clamp_min(cena_redis_session_memory_max_bytes, 1)
+          ) > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          surface: misconception-session-store
+        annotations:
+          summary: "Redis session memory utilization above 85%"
+          description: |
+            Used memory = {{ $value | humanizePercentage }} of maxmemory.
+            Scale the Redis tier OR shorten the ADR-0003 in-session TTL
+            (currently 30 days max) before eviction rate climbs.
+          runbook_url: https://github.com/cena-platform/cena/blob/main/docs/ops/runbooks/redis-session-eviction.md
+
+      # --- Hit ratio degradation ---------------------------------------
+      # A sustained drop in hit ratio means eviction has already happened
+      # and the student-facing read path is paying the cost.
+      - alert: RedisSessionHitRatioLow
+        expr: |
+          (
+            rate(cena_redis_session_hits_total[5m])
+            /
+            clamp_min(
+              rate(cena_redis_session_hits_total[5m])
+              + rate(cena_redis_session_misses_total[5m]),
+              1
+            )
+          ) < 0.70
+        for: 10m
+        labels:
+          severity: warning
+          surface: misconception-session-store
+        annotations:
+          summary: "Redis session hit ratio below 70%"
+          description: |
+            Hit ratio over the last 5 minutes is
+            {{ $value | humanizePercentage }}. Expected ≥90%; sustained
+            <70% implies either eviction is active OR a hot-partition
+            pattern that the in-session store was not sized for.

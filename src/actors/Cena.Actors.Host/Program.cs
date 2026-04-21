@@ -21,6 +21,7 @@ using Cena.Infrastructure.Llm;
 using Cena.Infrastructure.Nats;
 using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Observability.ErrorAggregator;
+using Cena.Infrastructure.Secrets;
 using Cena.Infrastructure.Ocr.DependencyInjection;
 using Cena.Infrastructure.Resilience;
 using Cena.Infrastructure.Seed;
@@ -580,6 +581,17 @@ builder.Services.AddOpenTelemetry()
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy("Host is running"), tags: ["live"])
     .AddCheck<ProtoActorHealthCheck>("proto-actor-cluster", tags: ["ready"]);
+
+// prr-020: Emit Redis session-store eviction / memory / hit-ratio metrics.
+// Alert rule lives in ops/prometheus/alerts-redis-sessions.yml. Runbook:
+// docs/ops/runbooks/redis-session-eviction.md.
+builder.Services.AddCenaRedisSessionStoreMetrics(builder.Configuration);
+
+// prr-017: Register the ISecretStore abstraction. Null default in
+// Development; staging / production must register a provider adapter
+// (AWS / GCP / Vault) BEFORE this call — AddCenaSecretStore throws on
+// boot if it has to fall back to the Null default outside Development.
+builder.Services.AddCenaSecretStore(builder.Environment);
 
 // =============================================================================
 // BUILD & CONFIGURE PIPELINE

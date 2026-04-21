@@ -62,8 +62,8 @@ grandfathered:
 
   # ---- Actor runtime (pre-2026-04-20 legacy) ----
   - path: src/actors/Cena.Actors.Host/Program.cs
-    baseline_loc: 639
-    reason: "Actor-host composition root; extract DI/Proto bootstrap helpers is a follow-up. Serilog SessionRiskLogEnricher wiring (+1 LOC). prr-046 added AddLlmCostMetric() DI wiring (+4 LOC). prr-022 added AddPiiPromptScrubber() DI wiring (+1 LOC). prr-015 added AddMisconceptionPiiStoreRegistry().AddCanonicalMartenMisconceptionStore() chained + comment (+1 LOC)."
+    baseline_loc: 642
+    reason: "Actor-host composition root; extract DI/Proto bootstrap helpers is a follow-up. Serilog SessionRiskLogEnricher wiring (+1 LOC). prr-046 added AddLlmCostMetric() DI wiring (+4 LOC). prr-022 added AddPiiPromptScrubber() DI wiring (+1 LOC). prr-015 added AddMisconceptionPiiStoreRegistry().AddCanonicalMartenMisconceptionStore() chained + comment (+1 LOC). prr-020 added AddCenaRedisSessionStoreMetrics() DI wiring + prr-017 added AddCenaSecretStore() DI wiring + using import (+3 LOC)."
   - path: src/actors/Cena.Actors/Sessions/LearningSessionActor.cs
     baseline_loc: 699
     reason: "Pre-2026-04-20 legacy; EPIC-PRR-A Sprint 1 extraction will absorb most of this"
