@@ -30,4 +30,13 @@
     <InternalsVisibleTo Include="Cena.Admin.Api.Tests" />
   </ItemGroup>
 
+  <!-- prr-244: ship the default-pricing.yml into the bin output so the
+       resolver finds it via AppContext.BaseDirectory in published images. -->
+  <ItemGroup>
+    <None Include="../../../contracts/pricing/default-pricing.yml"
+          Link="contracts/pricing/default-pricing.yml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
