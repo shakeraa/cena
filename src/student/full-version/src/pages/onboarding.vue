@@ -8,6 +8,7 @@ import RoleSelector from '@/components/onboarding/RoleSelector.vue'
 import LanguagePicker from '@/components/onboarding/LanguagePicker.vue'
 import DiagnosticQuiz from '@/components/onboarding/DiagnosticQuiz.vue'
 import SelfAssessmentStep from '@/components/onboarding/SelfAssessmentStep.vue'
+
 // PRR-221: new multi-target onboarding steps.
 import ExamTargetsStep from '@/components/onboarding/ExamTargetsStep.vue'
 import PerTargetPlanStep from '@/components/onboarding/PerTargetPlanStep.vue'
@@ -115,6 +116,7 @@ const stepOwnsAdvance = computed(() => (
 async function submitSelfAssessment() {
   try {
     const sa = onboarding.selfAssessment
+
     await $api('/api/me/self-assessment', {
       method: 'POST',
       body: {
@@ -143,7 +145,8 @@ async function submitExamTargets(): Promise<string | null> {
   const seasons = ['Summer', 'Winter', 'Spring', 'Autumn']
   const moeds = ['A', 'B', 'C', 'Special']
   for (const target of onboarding.examTargets) {
-    if (!target.sitting) continue
+    if (!target.sitting)
+      continue
     try {
       await $api('/api/me/exam-targets', {
         method: 'POST',
@@ -164,13 +167,16 @@ async function submitExamTargets(): Promise<string | null> {
     }
     catch (err) {
       const msg = (err as Error).message ?? ''
+
       // Duplicate target => already persisted on a previous attempt.
       if (!/409|already exists/i.test(msg)) {
         console.warn('[ONBOARDING] exam-target POST failed (non-blocking):', err)
+
         return msg || t('error.serverError')
       }
     }
   }
+
   return null
 }
 
@@ -184,6 +190,7 @@ async function handleConfirm() {
   const targetErr = await submitExamTargets()
   if (targetErr) {
     submitError.value = targetErr
+
     return
   }
 
@@ -343,14 +350,16 @@ async function handleConfirm() {
         <p class="text-body-2 text-medium-emphasis mb-5">
           {{ t('onboarding.confirm.subtitle') }}
         </p>
-        <!-- FIND-ux-onboarding: confirm-step summary. Use a bordered,
-             transparent surface so the card inherits the outer VCard's
-             theme color instead of the Material 'surface-variant' token
-             which renders as light-grey on both light AND dark themes
-             and fails contrast for the subtitle text. -->
+        <!--
+          FIND-ux-onboarding: confirm-step summary. Use a bordered,
+          transparent surface so the card inherits the outer VCard's
+          theme color instead of the Material 'surface-variant' token
+          which renders as light-grey on both light AND dark themes
+          and fails contrast for the subtitle text.
+        -->
         <VList
           class="mb-4 rounded-lg onboarding-summary-list"
-          :bg-color="'transparent'"
+          bg-color="transparent"
           border
         >
           <VListItem

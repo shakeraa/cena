@@ -26,10 +26,10 @@ import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
   DEFAULT_WEEKLY_HOURS,
-  MAX_EXAM_TARGETS,
-  useOnboardingStore,
   type ExamSittingDraft,
   type ExamTargetDraft,
+  MAX_EXAM_TARGETS,
+  useOnboardingStore,
 } from '@/stores/onboardingStore'
 import { $api } from '@/utils/api'
 
@@ -73,10 +73,15 @@ interface ExamTargetCatalogWire {
   groups: ExamTargetGroupWire[]
 }
 
+const emit = defineEmits<{
+  (e: 'complete'): void
+}>()
+
 // ─── Season / Moed ordinal maps (sync with SittingSeason / SittingMoed) ──
 const SEASON_ORDINAL: Record<string, number> = {
   summer: 0, winter: 1, spring: 2, autumn: 3,
 }
+
 const MOED_ORDINAL: Record<string, number> = {
   A: 0, B: 1, C: 2, Special: 3,
 }
@@ -90,10 +95,6 @@ function toSittingDraft(s: SittingWire): ExamSittingDraft {
     canonicalDate: s.canonicalDate,
   }
 }
-
-const emit = defineEmits<{
-  (e: 'complete'): void
-}>()
 
 const { t, locale: i18nLocale } = useI18n()
 const onboarding = useOnboardingStore()
@@ -112,6 +113,7 @@ async function loadCatalog() {
   try {
     const locale = i18nLocale.value || 'en'
     const url = `/api/v1/catalog/exam-targets?locale=${encodeURIComponent(locale)}`
+
     catalog.value = await $api<ExamTargetCatalogWire>(url)
   }
   catch (err) {
@@ -127,6 +129,7 @@ async function loadCatalog() {
 const flatTargets = computed<ExamTargetWire[]>(() => {
   if (!catalog.value)
     return []
+
   return catalog.value.groups.flatMap(g => g.targets)
 })
 
@@ -143,9 +146,12 @@ function isSelected(code: string): boolean {
 function toggle(target: ExamTargetWire) {
   if (isSelected(target.examCode)) {
     onboarding.removeExamTarget(target.examCode)
+
     return
   }
-  if (atCap.value) return
+  if (atCap.value)
+    return
+
   const draft: ExamTargetDraft = {
     examCode: target.examCode,
     displayName: target.display.name,
@@ -153,11 +159,13 @@ function toggle(target: ExamTargetWire) {
     track: target.track ?? undefined,
     questionPaperCodes: [...target.ministryQuestionPaperCodes],
     availableQuestionPaperCodes: [...target.ministryQuestionPaperCodes],
+
     // Default-pick the earliest sitting; student refines on next step.
     sitting: target.sittings.length > 0 ? toSittingDraft(target.sittings[0]) : null,
     availableSittings: target.sittings.map(toSittingDraft),
     weeklyHours: DEFAULT_WEEKLY_HOURS,
   }
+
   onboarding.addExamTarget(draft)
 }
 

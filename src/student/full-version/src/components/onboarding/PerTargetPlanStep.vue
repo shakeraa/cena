@@ -21,10 +21,10 @@
 import { computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import {
+  type ExamSittingDraft,
   MAX_WEEKLY_HOURS,
   MIN_WEEKLY_HOURS,
   useOnboardingStore,
-  type ExamSittingDraft,
 } from '@/stores/onboardingStore'
 
 const emit = defineEmits<{
@@ -40,6 +40,7 @@ const targets = computed(() => onboarding.examTargets)
 function sittingLabel(s: ExamSittingDraft): string {
   const season = ['summer', 'winter', 'spring', 'autumn'][s.season] ?? 'summer'
   const moed = ['A', 'B', 'C', 'Special'][s.moed] ?? 'A'
+
   return t('onboarding.perTargetPlan.sittingLabel', {
     season: t(`onboarding.perTargetPlan.season.${season}`),
     year: s.academicYear,
@@ -50,6 +51,7 @@ function sittingLabel(s: ExamSittingDraft): string {
 
 function isSelectedSitting(code: string, sitting: ExamSittingDraft): boolean {
   const t = targets.value.find(x => x.examCode === code)
+
   return t?.sitting?.sittingCode === sitting.sittingCode
 }
 
@@ -59,15 +61,19 @@ function selectSitting(examCode: string, sitting: ExamSittingDraft) {
 
 function togglePaper(examCode: string, paperCode: string) {
   const t = targets.value.find(x => x.examCode === examCode)
-  if (!t) return
+  if (!t)
+    return
+
   const next = t.questionPaperCodes.includes(paperCode)
     ? t.questionPaperCodes.filter(c => c !== paperCode)
     : [...t.questionPaperCodes, paperCode]
+
   onboarding.updateExamTarget(examCode, { questionPaperCodes: next })
 }
 
 function setWeeklyHours(examCode: string, hours: number) {
   const clamped = Math.max(MIN_WEEKLY_HOURS, Math.min(MAX_WEEKLY_HOURS, Math.round(hours)))
+
   onboarding.updateExamTarget(examCode, { weeklyHours: clamped })
 }
 
