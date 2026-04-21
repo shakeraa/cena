@@ -883,7 +883,8 @@ public partial class Program
     app.MapMeEndpoints();
     app.MapSelfAssessmentEndpoints();
 
-    app.MapStudyPlanSettingsEndpoints(); // prr-148
+    // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
+    app.MapExamTargetEndpoints();        // prr-218: multi-target /api/me/exam-targets per ADR-0050
 
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();

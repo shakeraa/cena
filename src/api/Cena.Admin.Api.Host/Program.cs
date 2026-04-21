@@ -9,6 +9,7 @@ using System.Threading.RateLimiting;
 using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
+using Cena.Actors.StudentPlan;
 using Cena.Actors.Teacher.ScheduleOverride;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Features.Teacher;
@@ -222,6 +223,12 @@ public partial class Program
     // and the IOverrideAwareSchedulerInputsBridge that applies overrides
     // on top of prr-149's SchedulerInputs.
     builder.Services.AddTeacherOverrideServices();
+
+    // prr-218 + prr-219: StudentPlan multi-target aggregate + migration
+    // safety net. Registers the in-memory aggregate store (which also
+    // satisfies IMigrationMarkerStore), command handler, readers, and the
+    // migration service. Feature flag defaults off so deployment is safe.
+    builder.Services.AddStudentPlanServices();
 
     // RDY-056 §4 / Phase 5: OCR cascade wiring. Admin-only consumers take
     // IOcrCascadeService as an OPTIONAL (`? = null`) dependency; registering
@@ -581,6 +588,11 @@ public partial class Program
     
     // ---- Classroom endpoints (STB-00b) ----
     app.MapClassroomEndpoints();
+
+    // prr-219: StudentPlan multi-target migration safety net
+    //   POST /api/admin/institutes/{tenantId}/migrate-student-plan
+    Cena.Admin.Api.Host.Endpoints.StudentPlanMigrationEndpoints
+        .MapStudentPlanMigrationEndpoints(app);
     
     // ---- Content management endpoints ----
     app.MapContentEndpoints();

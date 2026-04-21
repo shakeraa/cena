@@ -1,15 +1,29 @@
 # TASK-PRR-148: Student-input UI for AdaptiveScheduler (deadline + weekly time budget)
 
+**Superseded-By**: PRR-217 + PRR-218 + PRR-219 + PRR-234 (EPIC-PRR-F). ADR-0050
+establishes the multi-target `StudentPlan` aggregate; the single-target
+`StudentPlanConfig` VO this task shipped is replaced by `ExamTarget`
+records, and the `/api/me/study-plan` endpoints are replaced by
+`/api/me/exam-targets`. Legacy events (`ExamDateSet_V1`,
+`WeeklyTimeBudgetSet_V1`) remain on the stream for backward compat
+during the prr-219 migration window. The single-target
+`StudentPlanConfig` VO is retained only as the internal projection shim
+between the multi-target aggregate and the prr-149 scheduler bridge
+until PRR-220 catalog lands; at that point the VO can be deleted
+outright (follow-up marker in [StudentPlanConfig.cs](../../../src/actors/Cena.Actors/StudentPlan/StudentPlanConfig.cs)).
+
+**Superseded-On**: 2026-04-21 via commit `claude-subagent-wave1a/prr-218-219-234-aggregate-migration`
+
 **Priority**: P1 — strongly-recommended pre-launch (lens consensus: 2)
 **Effort**: M — 1-2 weeks
 **Lens consensus**: persona-educator, persona-enterprise
 **Source docs**: `axis1_pedagogy_mechanics_cena.md:L40`, `retired.md R-01` (user decision 2026-04-20)
 **Assignee hint**: kimi-coder
-**Tags**: source=pre-release-review-2026-04-20, lens=educator, cluster=scheduler-wiring
-**Status**: Done — 2026-04-20
+**Tags**: source=pre-release-review-2026-04-20, lens=educator, cluster=scheduler-wiring, superseded
+**Status**: Superseded — 2026-04-21 (marked Done 2026-04-20, but DoD #1 never met; see ADR-0050 §Context)
 **Source**: R-01 walk-through (Adaptive Interleaving Scheduler) — 2026-04-20 user-surfaced wiring gap
 **Tier**: mvp
-**Epic**: EPIC-PRR-A — ADR-0012 StudentActor decomposition
+**Epic**: EPIC-PRR-A (originally) → EPIC-PRR-F (superseding epic)
 
 ---
 
