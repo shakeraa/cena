@@ -142,6 +142,17 @@ public sealed class NoUnregisteredMisconceptionStoreTest
          "prr-015: composition root; delegates misconception persistence " +
          "to the canonical Marten store registered by Actors.Host."),
 
+        // prr-202 admin template authoring service — persists parametric-template
+        // documents and events, not misconceptions. The "MisconceptionId" token
+        // appears only as a distractor-mapping field on the preview DTO
+        // (distractors are authored with a mapping to misconception tags for
+        // teacher UI; no per-student misconception PII is written here).
+        ("src/api/Cena.Admin.Api/Templates/ParametricTemplateAuthoringService.cs",
+         "prr-202: persists ParametricTemplateDocument + authoring events; " +
+         "MisconceptionId references are distractor-mapping metadata in the " +
+         "preview DTO, not per-student misconception PII. No session-scoped " +
+         "misconception data flows through this seam."),
+
         // Student API answer endpoint — appends MisconceptionDetected_V1
         // events to the session stream. The canonical Marten store
         // (registered via MisconceptionStoreRegistrations.cs) owns this

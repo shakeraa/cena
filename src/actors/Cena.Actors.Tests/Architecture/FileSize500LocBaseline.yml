@@ -74,8 +74,8 @@ grandfathered:
     baseline_loc: 594
     reason: "Pre-2026-04-20 legacy; split by subject-group router is a follow-up"
   - path: src/actors/Cena.Actors/Configuration/MartenConfiguration.cs
-    baseline_loc: 560
-    reason: "Pre-2026-04-20 legacy; split by aggregate-config group is a follow-up"
+    baseline_loc: 571
+    reason: "Pre-2026-04-20 legacy; split by aggregate-config group is a follow-up. prr-202 added ParametricTemplateDocument schema + 4 authoring events + indexes (+11 LOC)."
   - path: src/actors/Cena.Actors/Ingest/ContentExtractorService.cs
     baseline_loc: 523
     reason: "Pre-2026-04-20 legacy; split by content-type extractor is a follow-up"
