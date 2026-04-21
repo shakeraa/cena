@@ -36,6 +36,12 @@ watch([isFallbackStateActive, refLoadingIndicator], () => {
       </Suspense>
     </RouterView>
   </div>
+
+  <!-- A11yToolbar on the blank layout too — onboarding (layout: 'blank')
+       is the first surface a new student sees. IL 5758-1998 requires the
+       a11y toolbar to be reachable on every web surface, including
+       pre-onboarded flows. -->
+  <A11yToolbar />
 </template>
 
 <style>
