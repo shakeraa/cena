@@ -149,6 +149,45 @@ public static class CenaAdminServiceRegistration
         // Prometheus-backed implementation in production.
         services.TryAddSingleton<Cena.Infrastructure.Llm.ILlmCostRollupService,
             Cena.Infrastructure.Llm.NullLlmCostRollupService>();
+
+        // prr-238: Retake cohort reader. Default wires
+        // InMemoryRetakeCohortReader against a static empty student
+        // directory so GET returns an empty cohort on fresh hosts — the
+        // Marten-backed projection is wired by Program.cs once the
+        // student-directory context lands.
+        services.TryAddSingleton<Cena.Actors.StudentPlan.IStudentDirectory>(
+            _ => new Cena.Actors.StudentPlan.StaticStudentDirectory(
+                Array.Empty<(string, string)>()));
+        services.TryAddSingleton<Cena.Actors.StudentPlan.IRetakeCohortReader,
+            Cena.Actors.StudentPlan.InMemoryRetakeCohortReader>();
+
+        // prr-244: Per-institute pricing override domain. Loads defaults
+        // from contracts/pricing/default-pricing.yml at startup — throws
+        // InvalidOperationException if the file is missing or
+        // out-of-bounds, which is the right failure mode (pricing must
+        // not silently degrade to a zero-priced product).
+        services.TryAddSingleton<Cena.Actors.Pricing.DefaultPricingYaml>(sp =>
+        {
+            var candidates = new[]
+            {
+                Path.Combine(AppContext.BaseDirectory, "contracts", "pricing", "default-pricing.yml"),
+                Path.Combine(Directory.GetCurrentDirectory(), "contracts", "pricing", "default-pricing.yml"),
+                // Walk up from BaseDirectory looking for the repo-root file.
+                FindRepoContractsPricingFile(),
+            }.Where(p => !string.IsNullOrEmpty(p)).ToArray();
+            var path = candidates.FirstOrDefault(File.Exists)
+                ?? throw new FileNotFoundException(
+                    "[prr-244] contracts/pricing/default-pricing.yml not found");
+            return Cena.Actors.Pricing.DefaultPricingYaml.LoadFromFile(path);
+        });
+        services.TryAddSingleton<Cena.Actors.Pricing.IInstitutePricingOverrideStore,
+            Cena.Actors.Pricing.InMemoryInstitutePricingOverrideStore>();
+        services.TryAddSingleton<Cena.Actors.Pricing.IPricingCache,
+            Cena.Actors.Pricing.NullPricingCache>();
+        services.TryAddSingleton<Cena.Actors.Pricing.IInstitutePricingResolver,
+            Cena.Actors.Pricing.InstitutePricingResolver>();
+        services.TryAddSingleton<Cena.Admin.Api.Features.Pricing.IInstitutePricingEventPublisher,
+            Cena.Admin.Api.Features.Pricing.InMemoryInstitutePricingEventPublisher>();
         services.TryAddSingleton<Cena.Actors.ParentDigest.IUnsubscribeTokenNonceStore,
             Cena.Actors.ParentDigest.InMemoryUnsubscribeTokenNonceStore>();
         services.TryAddSingleton<Cena.Actors.ParentDigest.IUnsubscribeTokenService>(sp =>
@@ -464,6 +503,20 @@ public static class CenaAdminServiceRegistration
         // GET /api/admin/llm-cost/per-cohort
         Features.LlmCost.AdminLlmCostDashboardEndpoint
             .MapAdminLlmCostDashboardEndpoint(app);
+        // prr-238: Retake cohort surface. GET returns the list of students
+        // with active ReasonTag=Retake targets + the retrieval-strength
+        // framing flag so the admin UI labels the cohort as retrieval-
+        // practice prep (not re-teaching).
+        //   GET /api/admin/institutes/{id}/cohorts/retake
+        Features.RetakeCohort.RetakeCohortEndpoint
+            .MapRetakeCohortEndpoint(app);
+        // prr-244: Per-institute pricing override. SUPER_ADMIN-gated write
+        // + ADMIN (own-institute) read. All writes emit the
+        // InstitutePricingOverridden_V1 event + SIEM audit log.
+        //   GET  /api/admin/institutes/{id}/pricing-override
+        //   POST /api/admin/institutes/{id}/pricing-override
+        Features.Pricing.InstitutePricingOverrideEndpoint
+            .MapInstitutePricingOverrideEndpoint(app);
         // FIND-pedagogy-008: learning-objective picker (read-only)
         app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();
@@ -504,5 +557,22 @@ public static class CenaAdminServiceRegistration
         app.MapGdprEndpoints();
 
         return app;
+    }
+
+    // prr-244: walks up from AppContext.BaseDirectory until it finds the
+    // repo-root `contracts/pricing/default-pricing.yml`. Returns the path
+    // or null if the walk reaches the filesystem root without success.
+    // Used by the DefaultPricingYaml registration so dev + test hosts
+    // find the defaults without requiring an env var.
+    private static string? FindRepoContractsPricingFile()
+    {
+        var dir = new DirectoryInfo(AppContext.BaseDirectory);
+        while (dir is not null)
+        {
+            var candidate = Path.Combine(dir.FullName, "contracts", "pricing", "default-pricing.yml");
+            if (File.Exists(candidate)) return candidate;
+            dir = dir.Parent;
+        }
+        return null;
     }
 }

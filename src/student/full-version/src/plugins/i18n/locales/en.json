@@ -1072,7 +1072,15 @@
     },
     "next": "Next",
     "back": "Back",
-    "getStarted": "Let's get started"
+    "getStarted": "Let's get started",
+    "retakeBanner": {
+      "title": "Welcome back — this is retake prep.",
+      "subtitle": "You've studied this material before. This surface focuses on retrieval practice — short, spaced recall exercises — to help what you already know stick more reliably at exam time.",
+      "approachLabel": "Our approach",
+      "approachBody": "Retrieval practice over restudy (Karpicke & Roediger, 2008): testing yourself in short bursts strengthens memory more than re-reading. Expect more questions, fewer worked examples.",
+      "reassurance": "There is no judgment or shame signal in this surface. You picked a date — that's it.",
+      "dismiss": "Got it"
+    }
   },
   "flow": {
     "warming": "Warming up",
