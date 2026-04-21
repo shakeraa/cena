@@ -11,8 +11,15 @@ Tasks synthesized from the 10-persona pre-release review dated 2026-04-20. See [
 | **Pre-launch (MVP)** | 63 tasks + 4 epics | `./` (this folder) | P0 ship-blockers + P1s that must ship before launch + epic-level bundles |
 | **Post-launch** | 98 tasks | `./post-launch/` | P2 polish + P1 UX enhancements that can ship after launch |
 | **Descoped** | 25 tasks | `./descoped/` | Nice-to-haves with no downstream dependency; not scheduled |
+| **Superseded** | 1 task | `./superseded/` | Tasks marked done but superseded by a later ADR + replacement task set |
 
 Total: 186 canonical tasks + 4 epics = 190 entries. Descope rule preserved: nothing from privacy / redteam / ministry lenses was descoped without a covering task; nothing referencing non-negotiables 1-9 was descoped.
+
+### Supersede trail
+
+| Superseded | By | Reason |
+|---|---|---|
+| [PRR-148](superseded/TASK-PRR-148-student-input-ui-for-adaptivescheduler-deadline-weekly-ti.md) | [PRR-217](TASK-PRR-217-adr-0049-multi-target-exam-plan.md) + [PRR-218](TASK-PRR-218-studentplan-aggregate-events.md) + [PRR-219](TASK-PRR-219-migration-safety-net.md) + [PRR-234](TASK-PRR-234-close-out-prr-148-superseded.md) (EPIC-PRR-F) | ADR-0050 multi-target exam plan replaces single-target `StudentPlanConfig`. |
 
 ## Implementation Protocol — Senior Architect
 
