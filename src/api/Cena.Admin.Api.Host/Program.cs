@@ -6,9 +6,11 @@
 
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Cena.Actors.Assessment.Rubric;
 using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
+using Cena.Actors.Infrastructure.Privacy;
 using Cena.Actors.StudentPlan;
 using Cena.Actors.Teacher.ScheduleOverride;
 using Cena.Admin.Api;
@@ -265,6 +267,16 @@ public partial class Program
     //     Cena.Actors.Cas.CasRouterLatexValidator>();
 
     builder.Services.AddCenaAdminServices();
+
+    // prr-033: Ministry Bagrut rubric DSL + version pinning (ADR-0052).
+    // Loads contracts/rubric/*.yml on boot; fails fast on malformed rubrics.
+    builder.Services.AddCenaRubricVersionPinning(
+        builder.Configuration, builder.Environment);
+
+    // prr-035: Sub-processor registry. Loads contracts/privacy/sub-processors.yml
+    // on boot; fails fast if any entry is missing DPA/SSO/residency/purpose.
+    builder.Services.AddCenaSubProcessorRegistry(
+        builder.Configuration, builder.Environment);
 
     // prr-046: per-feature LLM cost metric (fail-loud pricing from routing-config.yaml).
     // AiGenerationService + QualityGateService + AiFigureGenerator depend on ILlmCostMetric.
@@ -612,6 +624,11 @@ public partial class Program
     
     // ---- FERPA Compliance endpoints (FIND-arch-008) ----
     app.MapComplianceEndpoints();
+
+    // prr-035: Sub-processor registry (read-only admin surface)
+    //   GET /api/admin/privacy/sub-processors
+    //   GET /api/admin/privacy/sub-processors/parent
+    app.MapPrivacyEndpoints();
     
     // ---- Root endpoint ----
     app.MapGet("/", () => Results.Ok(new 
