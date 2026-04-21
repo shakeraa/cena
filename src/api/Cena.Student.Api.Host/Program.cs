@@ -11,6 +11,7 @@ using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
 using Cena.Actors.Notifications;
 using Cena.Actors.Mastery;
+using Cena.Actors.Retention;
 using Cena.Actors.RateLimit;
 using Cena.Actors.Services;
 using Cena.Actors.Serving;
@@ -329,6 +330,17 @@ public partial class Program
     // instantiate — singleton is fine. The student API host used to compute
     // posterior mastery as PriorMastery + 0.05, which bypassed BKT entirely.
     builder.Services.AddSingleton<IBktService, BktService>();
+
+    // ---- prr-228: Per-target diagnostic engine (ADR-0050, EPIC-PRR-F) ----
+    // The engine folds per-target diagnostic responses into skill-keyed
+    // BKT priors (StudentId, ExamTargetCode, SkillCode). Singleton for
+    // allocation efficiency; internal state is only the injected tracker.
+    //
+    // Register IBktStateTracker + ISkillKeyedMasteryStore via the shared
+    // prr-222 wiring (idempotent TryAdd — no-op if another layer already
+    // wired it).
+    builder.Services.AddExamTargetRetentionServices();
+    builder.Services.AddSingleton<Cena.Actors.Diagnosis.PerTarget.PerTargetDiagnosticEngine>();
     
     // ---- FIND-pedagogy-009: Elo difficulty calibration for 85% rule ----
     // Updates question DifficultyElo after each answer using Elo formula.
@@ -895,6 +907,7 @@ public partial class Program
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
     app.MapExamTargetEndpoints();        // prr-218: multi-target /api/me/exam-targets per ADR-0050
     app.MapExamTargetQuestionPaperEndpoints(); // prr-243: שאלון post-hoc PATCH endpoints per ADR-0050 §1
+    app.MapDiagnosticEndpoints();        // RDY-023 + prr-228: legacy + per-target diagnostic blocks
 
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();

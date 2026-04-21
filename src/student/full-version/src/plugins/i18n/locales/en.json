@@ -946,6 +946,32 @@
       "skipAll": "Skip quiz",
       "confirm": "Confirm"
     },
+    "perTargetDiagnostic": {
+      "title": "Let's calibrate for {target}",
+      "calibrationFraming": "We're learning what you already know — this is calibration, not a test. Skip anything that feels unfamiliar.",
+      "blockCounter": "Calibration block {current} of {total}",
+      "loading": "Loading items…",
+      "fetchFailed": "Couldn't load items — please try again.",
+      "progress": "Item {current} of up to {max}",
+      "optionsLabel": "Choose an answer",
+      "submit": "Continue",
+      "skipItem": "Skip this item",
+      "skipTarget": "Skip this target — I'll come back later",
+      "feelingPrompt": "How do you feel about {target} so far?",
+      "feelingAria": "How you feel about this topic",
+      "feelingSkip": "Skip this question",
+      "feeling": {
+        "solid": "Solid — I've got this",
+        "unsure": "Unsure — I could use some practice",
+        "anxious": "Anxious — this is hard for me",
+        "new": "New — I haven't seen this before"
+      },
+      "provenance": {
+        "aiRecreated": "Practice item inspired by the exam catalog",
+        "teacherAuthored": "Teacher-authored original",
+        "ministryReference": "Reference material (curator view only)"
+      }
+    },
     "confirm": {
       "title": "You're all set",
       "subtitle": "Review your choices and jump right in.",
