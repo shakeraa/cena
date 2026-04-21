@@ -1,0 +1,89 @@
+# =============================================================================
+# Ship-gate whitelist: assistant-therapeutic-claims rule pack
+# =============================================================================
+# Files that legitimately need to reference the banned therapeutic/clinical
+# terms (policy docs, accommodations specs that describe what Cena does NOT
+# diagnose, research notes, retirement logs, and the positive-test fixture).
+# Everything else is scanned.
+#
+# Core principle: accommodations surfaces refer to an accommodation as an
+# administrative artefact — "extended time is available" — never to the
+# student as if Cena were diagnosing them. Those surfaces are allowed here
+# because they are already gated on a prior clinician-issued accommodation
+# record. See src/actors/Cena.Actors/Accommodations/ for the source of
+# truth.
+# =============================================================================
+
+whitelist:
+  - path: "scripts/shipgate/assistant-therapeutic-claims.yml"
+    reason: "The rule pack itself (patterns quoted in rule definitions)"
+
+  - path: "scripts/shipgate/assistant-therapeutic-claims-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "scripts/shipgate/rulepack-scan.mjs"
+    reason: "Scanner source references pack name in comments"
+
+  - path: "shipgate/fixtures/assistant-therapeutic-claims-sample.md"
+    reason: "Positive-test fixture: deliberately contains every banned pattern"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures/specs reference banned patterns in assertion messages"
+
+  - path: "docs/adr/**"
+    reason: "ADRs describe therapeutic-claim ban rationale in context"
+
+  - path: "docs/engineering/shipgate.md"
+    reason: "Ship-gate policy doc: enumerates the banned therapeutic-claim moves"
+
+  - path: "docs/engineering/**/*.md"
+    reason: "Engineering policy docs cite banned therapeutic phrasing in rejection context"
+
+  - path: "docs/design/**/*.md"
+    reason: "Design docs describe anti-patterns to reject"
+
+  - path: "docs/research/**"
+    reason: "Research notes analyse therapeutic-claim literature (pre-production)"
+
+  - path: "docs/feature-specs/**/*.md"
+    reason: "Feature specs may cite clinical vocabulary in rejection/rationale context (spec quotes banned phrasing to explain why Cena rejects it)"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may mention shipgate scanner expansions"
+
+  - path: "pre-release-review/**"
+    reason: "Pre-release review corpus (findings / persona reviews / retirements)"
+
+  - path: "tasks/pre-release-review/TASK-PRR-073-*.md"
+    reason: "Task body defines therapeutic-claim ban"
+
+  - path: "tasks/pre-release-review/EPIC-PRR-D-*.md"
+    reason: "Epic body"
+
+  - path: "CLAUDE.md"
+    reason: "Project rules cross-reference non-negotiables"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules mirror CLAUDE.md"
+
+  - path: ".agentdb/**"
+    reason: "Task queue protocol docs may reference shipgate expansions"
+
+  # Accommodations surfaces refer to clinician-issued accommodation records as
+  # administrative artefacts — they do not diagnose. These paths are known
+  # reviewed surfaces (see AccommodationProfile.cs which already carries the
+  # boundary comment).
+  - path: "src/actors/Cena.Actors/Accommodations/**"
+    reason: "Accommodations actor refers to clinician-issued records, not diagnosis"
+
+  - path: "src/api/Cena.Admin.Api/**Accommodation*"
+    reason: "Admin-API accommodation endpoints reference clinician-approved accommodations only"
+
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Test assertions may reference banned copy in DoesNotContain checks"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may assert banned copy is absent"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant) may assert banned copy is absent"

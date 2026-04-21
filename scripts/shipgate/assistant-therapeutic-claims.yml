@@ -1,0 +1,165 @@
+# =============================================================================
+# Ship-gate rule pack: assistant therapeutic claims (prr-073 / EPIC-PRR-D D3)
+# =============================================================================
+# Source:  tasks/pre-release-review/TASK-PRR-073 absorbed into EPIC-PRR-D
+# Policy:  Assistant messaging (the Sidekick, the Stuck-Ask flow, onboarding,
+#          hint ladder copy, error recovery — any surface where Cena speaks to
+#          a student) MUST NOT perform therapeutic-claim moves:
+#
+#            1. Do not assert the student's emotional state ("I understand
+#               your anxiety", "you're feeling overwhelmed", "this sounds
+#               difficult emotionally"). Cena is not a therapist; asserting
+#               a clinical emotional state is a therapeutic-claim move that
+#               invites licensing-liability and is contraindicated for
+#               minors by WHO mental-health-AI guidance.
+#            2. Do not use clinical diagnosis vocabulary ("depression",
+#               "anxiety disorder", "ADHD", "dyslexia", "autism"). These
+#               words are reserved for clinicians. Factual accommodations
+#               copy ("extended time is available") is allowed — it refers
+#               to the accommodation itself, not a diagnosis of the student.
+#            3. Do not offer "help with your stress" / "help with your
+#               overwhelm" — Cena offers help with math, not emotion
+#               regulation.
+#
+# Whitelist discipline: accommodations docs, ADRs describing why these moves
+# are banned, research notes analysing the rules, and this rule pack file
+# are whitelisted. See assistant-therapeutic-claims-whitelist.yml.
+#
+# Locale coverage: en / he / ar. Hebrew and Arabic patterns are best-effort
+# machine translations; review by native-speaker team before enforcement.
+#
+# Rule shape: see banned-citations.yml header.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # prr-073 — assertion of emotional state (English)
+  # --------------------------------------------------------------------------
+  - id: therapeutic-understand-anxiety
+    reason: "Banned 'I understand your anxiety' (prr-073 — therapeutic-claim move)"
+    pattern: "i\\s+understand\\s+your\\s+(anxiety|anxieties|overwhelm|stress|fear|worry|worries|panic|distress)"
+    flags: i
+
+  - id: therapeutic-feeling-overwhelmed
+    reason: "Banned 'you're feeling overwhelmed' / 'you feel overwhelmed' (prr-073 — therapeutic-claim move)"
+    pattern: "you(?:'re|\\s+are|\\s+feel|\\s+must\\s+feel|\\s+might\\s+feel)\\s+(feeling\\s+)?(overwhelmed|anxious|stressed|depressed|panicked|distressed|burnt\\s+out|burned\\s+out)"
+    flags: i
+
+  - id: therapeutic-sounds-difficult-emotionally
+    reason: "Banned 'this sounds difficult emotionally' / 'emotionally hard' (prr-073 — therapeutic-claim move)"
+    pattern: "(this|that|it)\\s+(sounds|seems|feels|must\\s+be)\\s+(difficult|hard|tough|challenging|stressful)\\s+(emotionally|mentally|for\\s+you\\s+emotionally)"
+    flags: i
+
+  - id: therapeutic-help-with-stress
+    reason: "Banned 'let me help with your stress/anxiety' (prr-073 — therapeutic-claim move)"
+    pattern: "(let\\s+me|i\\s+can|i'?ll|i\\s+will)\\s+help\\s+(you\\s+)?(with\\s+)?your\\s+(stress|anxiety|anxieties|overwhelm|worry|worries|fear|depression|panic|distress)"
+    flags: i
+
+  - id: therapeutic-here-for-you-emotionally
+    reason: "Banned 'here for you emotionally' (prr-073 — therapeutic-claim move)"
+    pattern: "(here|available)\\s+for\\s+you\\s+emotionally"
+    flags: i
+
+  - id: therapeutic-know-how-you-feel
+    reason: "Banned 'I know how you feel' / 'I know what you're going through' (prr-073 — therapeutic-claim move)"
+    pattern: "i\\s+know\\s+(how\\s+you\\s+feel|what\\s+you'?re\\s+(going\\s+through|experiencing|feeling))"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-073 — clinical diagnosis vocabulary (English)
+  # Note: "anxiety" bare-word is flagged in a therapeutic context by the
+  # rules above (I understand your anxiety, etc.). We additionally flag the
+  # clinical-disorder phrasings that reach clinically-reserved terrain.
+  # --------------------------------------------------------------------------
+  - id: clinical-anxiety-disorder
+    reason: "Banned clinical term 'anxiety disorder' (prr-073 — clinicians only)"
+    pattern: "\\banxiety\\s+(disorder|disorders|diagnosis)\\b"
+    flags: i
+
+  - id: clinical-depression
+    reason: "Banned clinical term 'depression' / 'depressive' / 'clinical depression' (prr-073 — clinicians only)"
+    pattern: "\\b(clinical\\s+)?(depression|depressive\\s+(episode|disorder|symptoms))\\b"
+    flags: i
+
+  - id: clinical-adhd-diagnosis
+    reason: "Banned diagnosis framing 'ADHD' outside accommodations copy (prr-073 — clinicians only)"
+    near:
+      a: "\\b(ADHD|ADD|attention[- ]deficit)\\b"
+      b: "(you(?:'re|\\s+are|\\s+have|\\s+might\\s+have|\\s+seem\\s+to\\s+have)|diagnosed|diagnosis|sounds\\s+like|symptoms)"
+    flags: i
+
+  - id: clinical-dyslexia-diagnosis
+    reason: "Banned diagnosis framing 'dyslexia' outside accommodations copy (prr-073 — clinicians only)"
+    near:
+      a: "\\b(dyslexia|dyslexic|dyscalculia|dyscalculic)\\b"
+      b: "(you(?:'re|\\s+are|\\s+have|\\s+might\\s+have|\\s+seem\\s+to\\s+have|\\s+look\\s+like)|diagnosed|diagnosis|sounds\\s+like|symptoms)"
+    flags: i
+
+  - id: clinical-autism-diagnosis
+    reason: "Banned diagnosis framing 'autism' / 'autistic' / 'on the spectrum' (prr-073 — clinicians only)"
+    pattern: "\\b(autism|autistic|on\\s+the\\s+spectrum|asperger'?s?)\\b"
+    flags: i
+
+  - id: clinical-ocd-diagnosis
+    reason: "Banned clinical term 'OCD' / 'obsessive-compulsive' (prr-073 — clinicians only)"
+    pattern: "\\b(OCD|obsessive[- ]compulsive)\\b"
+    flags: i
+
+  - id: clinical-ptsd-diagnosis
+    reason: "Banned clinical term 'PTSD' / 'trauma' in diagnostic framing (prr-073 — clinicians only)"
+    pattern: "\\b(PTSD|post[- ]traumatic\\s+stress)\\b"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # Hebrew variants (best-effort; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: he-therapeutic-understand-anxiety
+    reason: "Hebrew 'I understand your anxiety' variant (prr-073 — verify w/ native speaker)"
+    pattern: "אני\\s+מבין\\s+(את\\s+)?(החרדה|הלחץ|הדאגה|הפחד)\\s+שלך"
+    flags: u
+    locale: he
+
+  - id: he-therapeutic-feeling-overwhelmed
+    reason: "Hebrew 'you're feeling overwhelmed/anxious' (prr-073 — verify w/ native speaker)"
+    pattern: "אתה\\s+(מרגיש|חש)\\s+(מוצף|חרד|לחוץ|מדוכא)"
+    flags: u
+    locale: he
+
+  - id: he-clinical-depression
+    reason: "Hebrew 'depression' clinical term (prr-073 — verify w/ native speaker; \\b does not recognise Hebrew so we use an explicit non-Hebrew boundary to avoid false positives inside larger Hebrew words)"
+    pattern: "(?:^|[^\\u0590-\\u05FF])דיכאון(?:$|[^\\u0590-\\u05FF])"
+    flags: u
+    locale: he
+
+  - id: he-clinical-anxiety-disorder
+    reason: "Hebrew 'anxiety disorder' clinical term (prr-073 — verify w/ native speaker)"
+    pattern: "הפרעת\\s+(חרדה|קשב|ריכוז)"
+    flags: u
+    locale: he
+
+  # --------------------------------------------------------------------------
+  # Arabic variants (best-effort; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: ar-therapeutic-understand-anxiety
+    reason: "Arabic 'I understand your anxiety' variant (prr-073 — verify w/ native speaker)"
+    pattern: "أفهم\\s+(قلقك|توترك|خوفك|ضغطك)"
+    flags: u
+    locale: ar
+
+  - id: ar-therapeutic-feeling-overwhelmed
+    reason: "Arabic 'you are feeling overwhelmed/anxious' (prr-073 — verify w/ native speaker)"
+    pattern: "(تشعر|أنت\\s+تشعر)\\s+(بالإرهاق|بالقلق|بالضغط|بالاكتئاب)"
+    flags: u
+    locale: ar
+
+  - id: ar-clinical-depression
+    reason: "Arabic 'depression' clinical term (prr-073 — verify w/ native speaker; \\b does not recognise Arabic so we use an explicit non-Arabic boundary to avoid false positives inside larger Arabic words)"
+    pattern: "(?:^|[^\\u0600-\\u06FF])الاكتئاب(?:$|[^\\u0600-\\u06FF])"
+    flags: u
+    locale: ar
+
+  - id: ar-clinical-anxiety-disorder
+    reason: "Arabic 'anxiety disorder' clinical term (prr-073 — verify w/ native speaker)"
+    pattern: "اضطراب\\s+(القلق|نقص\\s+الانتباه|فرط\\s+الحركة)"
+    flags: u
+    locale: ar

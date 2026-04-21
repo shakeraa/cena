@@ -1,0 +1,123 @@
+# =============================================================================
+# Ship-gate rule pack: cheating-alert framing (prr-144 / EPIC-PRR-D D3)
+# =============================================================================
+# Source:  tasks/pre-release-review/TASK-PRR-144 absorbed into EPIC-PRR-D
+# Policy:  The "cheating-alert" family of features is retired. Any signal
+#          Cena emits about possible answer-copying, session-sharing, or
+#          integrity-review triggers MUST route through a designated
+#          IAcademicIntegrityReviewService — never as a student-facing
+#          "cheating detected!" message.
+#
+#          BANNED student-facing and generic copy:
+#            - "cheating detected"
+#            - "flagged for academic integrity"
+#            - "plagiarism alert"
+#            - "honor code violation"
+#            - "academic dishonesty"
+#          NEUTRAL ALTERNATIVE (educator-facing only):
+#            "potential collaboration detected — review needed"
+#
+#          The arch-test companion
+#          (src/actors/Cena.Actors.Tests/Architecture/
+#           AcademicIntegrityRoutingTest.cs) asserts that any code path
+#          emitting an integrity signal names IAcademicIntegrityReviewService
+#          — which is a stub interface in src/actors/Cena.Actors/Academic
+#          Integrity/ (no implementation yet; the interface locks the seam).
+#
+# Whitelist discipline: admin-facing review workflows and the demo
+# UserSeedData suspension reason are whitelisted as non-student-facing.
+# See cheating-alert-framing-whitelist.yml.
+#
+# Locale coverage: en / he / ar. Hebrew and Arabic patterns are best-effort
+# machine translations; review by native-speaker team before enforcement.
+#
+# Rule shape: see banned-citations.yml header.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # prr-144 — student-facing "cheating" copy (English)
+  # --------------------------------------------------------------------------
+  - id: cheating-detected
+    reason: "Banned 'cheating detected' alert (prr-144 — route via IAcademicIntegrityReviewService; neutral alt: 'potential collaboration detected — review needed')"
+    pattern: "\\bcheat(?:ing|ed|er|ers)?\\s+(detected|flagged|alert|alarm|identified|suspected)"
+    flags: i
+
+  - id: cheating-label
+    reason: "Banned bare 'cheating' label in user copy (prr-144 — educator-facing neutral alt: 'potential collaboration')"
+    near:
+      a: "\\bcheat(?:ing|ed|er|ers)?\\b"
+      b: "(you|your|student|the\\s+user|detected|alert|warning|flag|flagged|you'?re|you\\s+are)"
+    flags: i
+
+  - id: flagged-for-academic-integrity
+    reason: "Banned 'flagged for academic integrity' phrasing (prr-144 — route via IAcademicIntegrityReviewService)"
+    pattern: "flagged\\s+for\\s+(an?\\s+)?academic\\s+integrity(?:\\s+(violation|review|check))?"
+    flags: i
+
+  - id: plagiarism-alert
+    reason: "Banned 'plagiarism alert/detected' phrasing (prr-144 — route via IAcademicIntegrityReviewService)"
+    pattern: "plagiari[sz](?:m|ed|ing)?\\s+(alert|detected|flag|flagged|warning|alarm)"
+    flags: i
+
+  - id: honor-code-violation
+    reason: "Banned 'honor code violation' shaming language (prr-144 — route via IAcademicIntegrityReviewService)"
+    pattern: "honou?r\\s+code\\s+(violation|breach|infraction|offense|offence)"
+    flags: i
+
+  - id: academic-dishonesty
+    reason: "Banned 'academic dishonesty' shaming label (prr-144 — route via IAcademicIntegrityReviewService)"
+    pattern: "academic\\s+dishonest(?:y|ly|ies)"
+    flags: i
+
+  - id: you-cheated
+    reason: "Banned 'you cheated' accusation (prr-144 — student-shaming; route via IAcademicIntegrityReviewService)"
+    pattern: "you\\s+(cheated|copied|plagiari[sz]ed|were\\s+caught)"
+    flags: i
+
+  - id: copied-from-classmate
+    reason: "Banned 'copied (answer(s) )from (classmate|peer|another student)' accusation (prr-144 — neutral alt: 'potential collaboration detected')"
+    pattern: "copied\\s+(?:(?:your\\s+)?answers?\\s+)?from\\s+(a\\s+)?(classmate|peer|another\\s+student|friend)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # Hebrew variants (best-effort; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: he-cheating-detected
+    reason: "Hebrew 'cheating detected' (prr-144 — verify w/ native speaker)"
+    pattern: "זוהתה\\s+(העתקה|רמאות|הונאה)"
+    flags: u
+    locale: he
+
+  - id: he-academic-dishonesty
+    reason: "Hebrew 'academic dishonesty' (prr-144 — verify w/ native speaker)"
+    pattern: "(חוסר\\s+יושר\\s+אקדמי|חוסר\\s+יושרה\\s+אקדמית)"
+    flags: u
+    locale: he
+
+  - id: he-you-copied
+    reason: "Hebrew 'you copied (from classmate/friend)' accusation (prr-144 — verify w/ native speaker)"
+    pattern: "העתקת\\s+(מחבר|מחברה|מתלמיד|תשובות)"
+    flags: u
+    locale: he
+
+  # --------------------------------------------------------------------------
+  # Arabic variants (best-effort; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: ar-cheating-detected
+    reason: "Arabic 'cheating detected' (prr-144 — verify w/ native speaker; bare 'نقل' means 'transfer' and is legitimate in data-transfer/navigation copy, so the rule requires co-occurrence with 'غش' (deception), 'تزوير' (forgery), or the explicit 'تم اكتشاف + غش/تزوير' detection phrase to avoid false positives on unrelated 'transfer' uses)"
+    pattern: "(تم\\s+اكتشاف\\s+)?(غش|تزوير)\\s*(تم\\s+اكتشافه|مكتشف|مُكتشف)?"
+    flags: u
+    locale: ar
+
+  - id: ar-academic-dishonesty
+    reason: "Arabic 'academic dishonesty' (prr-144 — verify w/ native speaker)"
+    pattern: "عدم\\s+(النزاهة|الأمانة)\\s+الأكاديمية"
+    flags: u
+    locale: ar
+
+  - id: ar-you-copied
+    reason: "Arabic 'you copied (from classmate/friend)' accusation (prr-144 — verify w/ native speaker)"
+    pattern: "(نقلت|غششت)\\s+(من|الإجابات\\s+من)\\s+(زميلك|صديقك|طالب\\s+آخر)"
+    flags: u
+    locale: ar

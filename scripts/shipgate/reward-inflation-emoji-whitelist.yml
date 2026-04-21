@@ -1,0 +1,99 @@
+# =============================================================================
+# Ship-gate whitelist: reward-inflation-emoji rule pack
+# =============================================================================
+# Files that legitimately use the banned emoji (policy docs, retirement
+# logs, the positive-test fixture, pre-existing Vuexy template
+# demo-data components slated for replacement, and research notes).
+#
+# Core principle: student learning UI is the protected surface. Docs,
+# tests, and pre-existing demo-data components are whitelisted; the scanner
+# exits 0 on the current repo.
+#
+# Pre-existing Vuexy template components (2026-04-21 scan):
+#   - src/student/full-version/src/components/dialogs/ReferAndEarnDialog.vue
+#     Vuexy template refer-and-earn dialog; "Free Trial 🎉" is stock demo
+#     copy not yet rewritten. Flagged for future Vuexy-strip PR.
+#   - src/student/full-version/src/layouts/components/NavBarNotifications.vue
+#     Vuexy template notification demo; "Congratulation Flora! 🎉" is stock
+#     demo copy. Flagged for future Vuexy-strip PR.
+#   - src/admin/full-version/src/components/dialogs/ReferAndEarnDialog.vue
+#     Admin-side Vuexy template counterpart. Same reason.
+#
+# These three whitelisted entries are time-bound: any follow-up PR that
+# replaces the Vuexy demo copy MUST remove the corresponding whitelist
+# entry so the scanner fails-closed on future regressions.
+# =============================================================================
+
+whitelist:
+  - path: "scripts/shipgate/reward-inflation-emoji.yml"
+    reason: "The rule pack itself (patterns quoted in rule definitions)"
+
+  - path: "scripts/shipgate/reward-inflation-emoji-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "scripts/shipgate/rulepack-scan.mjs"
+    reason: "Scanner source references pack name in comments"
+
+  - path: "shipgate/fixtures/reward-inflation-emoji-sample.md"
+    reason: "Positive-test fixture: deliberately contains every banned emoji"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures/specs reference banned emoji in assertion messages"
+
+  - path: "docs/adr/**"
+    reason: "ADRs describe emoji ban rationale"
+
+  - path: "docs/engineering/**/*.md"
+    reason: "Engineering policy docs cite banned emoji in rejection context"
+
+  - path: "docs/design/**/*.md"
+    reason: "Design docs describe anti-patterns"
+
+  - path: "docs/research/**"
+    reason: "Research notes analyse variable-ratio-reward literature"
+
+  - path: "docs/feature-specs/**/*.md"
+    reason: "Feature specs may cite banned emoji in rationale / alternatives-considered"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may mention shipgate scanner expansions"
+
+  - path: "pre-release-review/**"
+    reason: "Pre-release review corpus"
+
+  - path: "tasks/pre-release-review/TASK-PRR-153-*.md"
+    reason: "Task body defines emoji ban"
+
+  - path: "tasks/pre-release-review/EPIC-PRR-D-*.md"
+    reason: "Epic body"
+
+  - path: "CLAUDE.md"
+    reason: "Project rules"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules"
+
+  - path: ".agentdb/**"
+    reason: "Task queue protocol docs"
+
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Test assertions may reference banned emoji in DoesNotContain checks"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may assert banned emoji is absent"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant) may assert banned emoji is absent"
+
+  # Pre-existing Vuexy template demo-data components (time-bound whitelist)
+  - path: "src/student/full-version/src/components/dialogs/ReferAndEarnDialog.vue"
+    reason: "Pre-existing Vuexy template demo copy ('Free Trial 🎉'). Time-bound: remove on Vuexy-strip PR."
+
+  - path: "src/student/full-version/src/layouts/components/NavBarNotifications.vue"
+    reason: "Pre-existing Vuexy template demo notification ('Congratulation Flora! 🎉'). Time-bound: remove on Vuexy-strip PR."
+
+  - path: "src/admin/full-version/src/components/dialogs/ReferAndEarnDialog.vue"
+    reason: "Pre-existing admin-side Vuexy template demo copy ('Free Trial 🎉'). Time-bound: remove on Vuexy-strip PR."
+
+  - path: "src/student/full-version/src/plugins/fake-api/handlers/apps/email/types.ts"
+    reason: "Pre-existing Vuexy fake-API demo comment block (contains '💯' in an inline code-comment about email schema). Time-bound: remove on Vuexy-strip PR."
