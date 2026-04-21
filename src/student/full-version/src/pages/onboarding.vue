@@ -8,6 +8,10 @@ import RoleSelector from '@/components/onboarding/RoleSelector.vue'
 import LanguagePicker from '@/components/onboarding/LanguagePicker.vue'
 import DiagnosticQuiz from '@/components/onboarding/DiagnosticQuiz.vue'
 import SelfAssessmentStep from '@/components/onboarding/SelfAssessmentStep.vue'
+
+// PRR-221: new multi-target onboarding steps.
+import ExamTargetsStep from '@/components/onboarding/ExamTargetsStep.vue'
+import PerTargetPlanStep from '@/components/onboarding/PerTargetPlanStep.vue'
 import { useOnboardingStore } from '@/stores/onboardingStore'
 import { useMeStore } from '@/stores/meStore'
 import { useApiMutation } from '@/composables/useApiMutation'
@@ -96,9 +100,13 @@ function handleBack() {
 // Next button is suppressed on these so the user sees one advance-button
 // instead of two side-by-side. Back stays visible so the user can
 // retreat without completing the step.
+//
+// PRR-221: the two new multi-target steps also own their advance button.
 const stepOwnsAdvance = computed(() => (
   onboarding.step === 'diagnostic'
   || onboarding.step === 'self-assessment'
+  || onboarding.step === 'exam-targets'
+  || onboarding.step === 'per-target-plan'
 ))
 
 // RDY-057: post the self-assessment separately from onboarding completion.
@@ -108,6 +116,7 @@ const stepOwnsAdvance = computed(() => (
 async function submitSelfAssessment() {
   try {
     const sa = onboarding.selfAssessment
+
     await $api('/api/me/self-assessment', {
       method: 'POST',
       body: {
@@ -126,10 +135,64 @@ async function submitSelfAssessment() {
   }
 }
 
+// PRR-221: POST each drafted exam target before the onboarding POST.
+// Failures are surfaced to the student but do NOT block onboarding
+// completion — the student can retry from /settings/study-plan later.
+// Duplicate-target 409s are swallowed (idempotent retry on refresh).
+async function submitExamTargets(): Promise<string | null> {
+  if (!onboarding.examTargets.length)
+    return null
+  const seasons = ['Summer', 'Winter', 'Spring', 'Autumn']
+  const moeds = ['A', 'B', 'C', 'Special']
+  for (const target of onboarding.examTargets) {
+    if (!target.sitting)
+      continue
+    try {
+      await $api('/api/me/exam-targets', {
+        method: 'POST',
+        body: {
+          examCode: target.examCode,
+          track: target.track,
+          sitting: {
+            academicYear: target.sitting.academicYear,
+            season: seasons[target.sitting.season] ?? 'Summer',
+            moed: moeds[target.sitting.moed] ?? 'A',
+          },
+          weeklyHours: target.weeklyHours,
+          questionPaperCodes: target.family === 'BAGRUT'
+            ? target.questionPaperCodes
+            : undefined,
+        },
+      })
+    }
+    catch (err) {
+      const msg = (err as Error).message ?? ''
+
+      // Duplicate target => already persisted on a previous attempt.
+      if (!/409|already exists/i.test(msg)) {
+        console.warn('[ONBOARDING] exam-target POST failed (non-blocking):', err)
+
+        return msg || t('error.serverError')
+      }
+    }
+  }
+
+  return null
+}
+
 async function handleConfirm() {
   submitError.value = null
   if (!onboarding.role)
     return
+
+  // PRR-221: persist exam-targets first so the student's plan survives
+  // even if the legacy onboarding POST fails downstream.
+  const targetErr = await submitExamTargets()
+  if (targetErr) {
+    submitError.value = targetErr
+
+    return
+  }
 
   try {
     const res = await submitOnboarding({
@@ -228,7 +291,19 @@ async function handleConfirm() {
         />
       </section>
 
-      <!-- STEP 3: LANGUAGE -->
+      <!-- STEP 3: EXAM TARGETS (PRR-221) -->
+      <ExamTargetsStep
+        v-else-if="onboarding.step === 'exam-targets'"
+        @complete="() => onboarding.next()"
+      />
+
+      <!-- STEP 4: PER-TARGET PLAN (PRR-221) -->
+      <PerTargetPlanStep
+        v-else-if="onboarding.step === 'per-target-plan'"
+        @complete="() => onboarding.next()"
+      />
+
+      <!-- STEP 5: LANGUAGE -->
       <section
         v-else-if="onboarding.step === 'language'"
         data-testid="onboarding-step-language"
@@ -275,14 +350,16 @@ async function handleConfirm() {
         <p class="text-body-2 text-medium-emphasis mb-5">
           {{ t('onboarding.confirm.subtitle') }}
         </p>
-        <!-- FIND-ux-onboarding: confirm-step summary. Use a bordered,
-             transparent surface so the card inherits the outer VCard's
-             theme color instead of the Material 'surface-variant' token
-             which renders as light-grey on both light AND dark themes
-             and fails contrast for the subtitle text. -->
+        <!--
+          FIND-ux-onboarding: confirm-step summary. Use a bordered,
+          transparent surface so the card inherits the outer VCard's
+          theme color instead of the Material 'surface-variant' token
+          which renders as light-grey on both light AND dark themes
+          and fails contrast for the subtitle text.
+        -->
         <VList
           class="mb-4 rounded-lg onboarding-summary-list"
-          :bg-color="'transparent'"
+          bg-color="transparent"
           border
         >
           <VListItem

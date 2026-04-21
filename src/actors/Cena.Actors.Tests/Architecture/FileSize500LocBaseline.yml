@@ -57,8 +57,8 @@ grandfathered:
     baseline_loc: 743
     reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"
   - path: src/api/Cena.Student.Api.Host/Program.cs
-    baseline_loc: 632
-    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. prr-243 added CatalogBackedQuestionPaperCatalogValidator Replace + MapExamTargetQuestionPaperEndpoints (+5 LOC). prr-228 added AddExamTargetRetentionServices() + PerTargetDiagnosticEngine DI registration + MapDiagnosticEndpoints() route-registration call + using statement + comment (+4 LOC). History: PRR-151/148/149/012/046/022/015/029/203/204/123 collectively +47 LOC from the pre-2026-04-20 legacy base."
+    baseline_loc: 633
+    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. prr-243 added CatalogBackedQuestionPaperCatalogValidator Replace + MapExamTargetQuestionPaperEndpoints (+5 LOC). prr-228 added AddExamTargetRetentionServices() + PerTargetDiagnosticEngine DI registration + MapDiagnosticEndpoints() route-registration call + using statement + comment (+4 LOC). prr-230 added MapExamTargetParentVisibilityEndpoint() route-registration call (+1 LOC). History: PRR-151/148/149/012/046/022/015/029/203/204/123 collectively +47 LOC from the pre-2026-04-20 legacy base."
 
   # ---- Actor runtime (pre-2026-04-20 legacy) ----
   - path: src/actors/Cena.Actors.Host/Program.cs
