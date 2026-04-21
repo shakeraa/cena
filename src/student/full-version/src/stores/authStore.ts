@@ -2,6 +2,10 @@ import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { ability, studentAbilityRules } from '@/plugins/casl/ability'
 import type { Rule } from '@/plugins/casl/ability'
+import {
+  initEncryptedOfflineCache,
+  wipeEncryptedOfflineCache,
+} from '@/composables/useEncryptedOfflineCache'
 
 /**
  * Auth store — student app wrapper over Firebase Auth state.
@@ -159,6 +163,14 @@ export const useAuthStore = defineStore('auth', () => {
     ability.update(studentAbilityRules)
     writeAbilityCookie(studentAbilityRules)
 
+    // prr-158: derive the per-user AES-GCM key for the encrypted offline cache.
+    // Fire-and-forget: SubtleCrypto failures degrade the cache to no-op, never
+    // block the sign-in flow. If a previous user's ciphertext was on disk, the
+    // init helper wipes it before re-keying.
+    initEncryptedOfflineCache(payload.uid, payload.idToken).catch(err => {
+      console.warn('[auth] encrypted offline cache init failed', err)
+    })
+
     console.info('[auth] Firebase sign-in complete for', payload.uid)
   }
 
@@ -174,6 +186,14 @@ export const useAuthStore = defineStore('auth', () => {
 
     ability.update([])
     clearAbilityCookie()
+
+    // prr-158 + ADR-0038 crypto-shred: drop the AES-GCM key AND wipe the
+    // IndexedDB ciphertext before the next user can sign in. Ordering matters
+    // — the key is gone before the DB wipe completes, so even a partial wipe
+    // leaves only unrecoverable ciphertext behind.
+    wipeEncryptedOfflineCache().catch(err => {
+      console.warn('[auth] encrypted offline cache wipe failed', err)
+    })
 
     console.info('[auth] Firebase sign-out complete')
   }
@@ -201,6 +221,12 @@ export const useAuthStore = defineStore('auth', () => {
     ability.update(studentAbilityRules)
     writeAbilityCookie(studentAbilityRules)
 
+    // prr-158: mock auth still gets a real encrypted cache (uid-scoped) so dev
+    // workflows exercise the same crypto-shred path as production sign-in.
+    initEncryptedOfflineCache(payload.uid, `mock-token-${payload.uid}`).catch(err => {
+      console.warn('[auth] encrypted offline cache init failed (mock)', err)
+    })
+
     console.info('[auth] CASL ability rules seeded for student', payload.uid)
   }
 
@@ -215,6 +241,12 @@ export const useAuthStore = defineStore('auth', () => {
     // after sign-out. Mirrors the admin pattern.
     ability.update([])
     clearAbilityCookie()
+
+    // prr-158 + ADR-0038: crypto-shred on mock sign-out too — otherwise the
+    // next mock sign-in on a shared dev box could read the prior ciphertext.
+    wipeEncryptedOfflineCache().catch(err => {
+      console.warn('[auth] encrypted offline cache wipe failed (mock)', err)
+    })
 
     console.info('[auth] CASL ability rules cleared on sign-out')
   }
