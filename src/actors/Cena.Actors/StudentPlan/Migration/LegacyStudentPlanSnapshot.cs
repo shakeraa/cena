@@ -39,6 +39,12 @@ namespace Cena.Actors.StudentPlan.Migration;
 /// deadline by the catalog service (PRR-220). Null when the deadline
 /// doesn't fit any catalog sitting — in that case the upcast creates the
 /// target in an immediately-archived state so retention still applies.</param>
+/// <param name="InferredQuestionPaperCodes">Ministry שאלון codes inferred
+/// by the manifest loader from the catalog's default paper-set for the
+/// (examCode, track) pair, per PRR-243. Populated for Bagrut family so
+/// the aggregate accepts the migrated target; empty for Standardized
+/// family. If null, the migration service uses the catalog's default
+/// set via the injected fallback resolver.</param>
 public sealed record LegacyStudentPlanSnapshot(
     string MigrationSourceId,
     string StudentAnonId,
@@ -47,4 +53,5 @@ public sealed record LegacyStudentPlanSnapshot(
     TimeSpan? LegacyWeeklyBudget,
     ExamCode InferredExamCode,
     TrackCode? InferredTrack,
-    SittingCode? InferredSitting);
+    SittingCode? InferredSitting,
+    IReadOnlyList<string>? InferredQuestionPaperCodes = null);

@@ -147,6 +147,112 @@ public sealed class StudentPlanState
         // on the stream so downstream projections can count overrides.
     }
 
+    /// <summary>Apply a question-paper-added event (PRR-243). Idempotent
+    /// for the "already present" case (silently no-ops so replay of a
+    /// malformed stream does not fail). Archived targets do not accept
+    /// new papers.</summary>
+    public void Apply(QuestionPaperAdded_V1 e)
+    {
+        var index = _targets.FindIndex(t => t.Id == e.TargetId);
+        if (index < 0 || !_targets[index].IsActive) return;
+
+        var current = _targets[index];
+        if (current.QuestionPaperCodes.Contains(e.PaperCode)) return;
+
+        var newPapers = new List<string>(current.QuestionPaperCodes) { e.PaperCode };
+
+        IReadOnlyDictionary<string, SittingCode>? newOverride = current.PerPaperSittingOverride;
+        if (e.SittingOverride is { } ov)
+        {
+            var map = current.PerPaperSittingOverride is null
+                ? new Dictionary<string, SittingCode>(StringComparer.Ordinal)
+                : new Dictionary<string, SittingCode>(current.PerPaperSittingOverride, StringComparer.Ordinal);
+            map[e.PaperCode] = ov;
+            newOverride = map;
+        }
+
+        _targets[index] = current with
+        {
+            QuestionPaperCodes = newPapers,
+            PerPaperSittingOverride = newOverride,
+        };
+        UpdatedAt = Later(UpdatedAt, e.AddedAt);
+    }
+
+    /// <summary>Apply a question-paper-removed event (PRR-243). Clears any
+    /// matching per-paper sitting override as a side effect. Silently
+    /// ignored for archived or unknown targets, and for unknown paper
+    /// codes.</summary>
+    public void Apply(QuestionPaperRemoved_V1 e)
+    {
+        var index = _targets.FindIndex(t => t.Id == e.TargetId);
+        if (index < 0 || !_targets[index].IsActive) return;
+
+        var current = _targets[index];
+        if (!current.QuestionPaperCodes.Contains(e.PaperCode)) return;
+
+        var newPapers = current.QuestionPaperCodes.Where(c => c != e.PaperCode).ToList();
+
+        IReadOnlyDictionary<string, SittingCode>? newOverride = current.PerPaperSittingOverride;
+        if (current.PerPaperSittingOverride is not null
+            && current.PerPaperSittingOverride.ContainsKey(e.PaperCode))
+        {
+            var map = new Dictionary<string, SittingCode>(
+                current.PerPaperSittingOverride, StringComparer.Ordinal);
+            map.Remove(e.PaperCode);
+            newOverride = map.Count == 0 ? null : map;
+        }
+
+        _targets[index] = current with
+        {
+            QuestionPaperCodes = newPapers,
+            PerPaperSittingOverride = newOverride,
+        };
+        UpdatedAt = Later(UpdatedAt, e.RemovedAt);
+    }
+
+    /// <summary>Apply a per-paper sitting override set event (PRR-243).
+    /// Overwrites any existing entry for the same paper code.</summary>
+    public void Apply(PerPaperSittingOverrideSet_V1 e)
+    {
+        var index = _targets.FindIndex(t => t.Id == e.TargetId);
+        if (index < 0 || !_targets[index].IsActive) return;
+
+        var current = _targets[index];
+        if (!current.QuestionPaperCodes.Contains(e.PaperCode)) return;
+
+        var map = current.PerPaperSittingOverride is null
+            ? new Dictionary<string, SittingCode>(StringComparer.Ordinal)
+            : new Dictionary<string, SittingCode>(current.PerPaperSittingOverride, StringComparer.Ordinal);
+        map[e.PaperCode] = e.Sitting;
+
+        _targets[index] = current with { PerPaperSittingOverride = map };
+        UpdatedAt = Later(UpdatedAt, e.SetAt);
+    }
+
+    /// <summary>Apply a per-paper sitting override cleared event
+    /// (PRR-243). Idempotent on missing keys.</summary>
+    public void Apply(PerPaperSittingOverrideCleared_V1 e)
+    {
+        var index = _targets.FindIndex(t => t.Id == e.TargetId);
+        if (index < 0 || !_targets[index].IsActive) return;
+
+        var current = _targets[index];
+        if (current.PerPaperSittingOverride is null
+            || !current.PerPaperSittingOverride.ContainsKey(e.PaperCode))
+        {
+            return;
+        }
+
+        var map = new Dictionary<string, SittingCode>(
+            current.PerPaperSittingOverride, StringComparer.Ordinal);
+        map.Remove(e.PaperCode);
+        IReadOnlyDictionary<string, SittingCode>? newOverride = map.Count == 0 ? null : map;
+
+        _targets[index] = current with { PerPaperSittingOverride = newOverride };
+        UpdatedAt = Later(UpdatedAt, e.ClearedAt);
+    }
+
     /// <summary>Apply a migration failure. Pure telemetry.</summary>
     public void Apply(StudentPlanMigrationFailed_V1 _)
     {

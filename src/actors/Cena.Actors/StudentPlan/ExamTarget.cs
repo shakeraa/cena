@@ -255,6 +255,66 @@ public readonly record struct UserId
 }
 
 /// <summary>
+/// Family of the exam code, used to gate the Bagrut-only
+/// <see cref="ExamTarget.QuestionPaperCodes"/> invariant per
+/// PRR-243 / ADR-0050 §1.
+/// </summary>
+/// <remarks>
+/// The family is inferred from the <see cref="ExamCode"/> string prefix so
+/// the aggregate does not need to consult the catalog at command-time
+/// (the catalog validates the specific paper codes separately via
+/// <c>IQuestionPaperCatalogValidator</c>). Classification rules:
+/// <list type="bullet">
+///   <item><description><c>BAGRUT_*</c> → <see cref="Bagrut"/> (requires ≥1 paper code).</description></item>
+///   <item><description><c>SAT_*</c>, <c>PET</c>/<c>PET_*</c> → <see cref="Standardized"/> (forbids paper codes).</description></item>
+///   <item><description>Anything else (IB, Tawjihi, enrichment codes) → <see cref="Other"/>
+///     — neither required nor forbidden, paper codes are optional.</description></item>
+/// </list>
+/// </remarks>
+public enum ExamCodeFamily
+{
+    /// <summary>Israeli Bagrut. Multi-שאלון mandatory per Ministry reality.</summary>
+    Bagrut = 0,
+
+    /// <summary>SAT, PET, and other standardised single-paper tests.</summary>
+    Standardized = 1,
+
+    /// <summary>Any other family — paper codes optional.</summary>
+    Other = 2,
+}
+
+/// <summary>
+/// Static helpers for inferring <see cref="ExamCodeFamily"/> from a raw
+/// <see cref="ExamCode"/>. Kept in one place so the command handler,
+/// architecture tests, and migration service all agree on the mapping.
+/// </summary>
+public static class ExamCodeFamilyClassifier
+{
+    /// <summary>
+    /// Infer the family from the exam-code prefix. Case-sensitive
+    /// (catalog codes are uppercase by convention).
+    /// </summary>
+    public static ExamCodeFamily Classify(ExamCode code)
+    {
+        var value = code.Value;
+        if (value.StartsWith("BAGRUT_", StringComparison.Ordinal))
+            return ExamCodeFamily.Bagrut;
+        if (value.StartsWith("SAT_", StringComparison.Ordinal))
+            return ExamCodeFamily.Standardized;
+        // PET and PET_* both classify as Standardized (single-paper).
+        if (value == "PET" || value.StartsWith("PET_", StringComparison.Ordinal))
+            return ExamCodeFamily.Standardized;
+        return ExamCodeFamily.Other;
+    }
+
+    /// <summary>True when the code is Bagrut-family (≥1 שאלון required).</summary>
+    public static bool IsBagrut(ExamCode code) => Classify(code) == ExamCodeFamily.Bagrut;
+
+    /// <summary>True when the code is Standardized-family (no שאלון).</summary>
+    public static bool IsStandardized(ExamCode code) => Classify(code) == ExamCodeFamily.Standardized;
+}
+
+/// <summary>
 /// The authoritative shape per ADR-0050 §1. Immutable record — every
 /// mutation produces a new instance via <c>with</c>-expressions at the
 /// aggregate root.
@@ -270,8 +330,19 @@ public readonly record struct UserId
 /// SAT code).</param>
 /// <param name="Track">Track within the exam (2U/3U/4U/5U/ModuleCode) or
 /// null when the exam has no track concept.</param>
-/// <param name="Sitting">Sitting tuple — catalog resolves to canonical
-/// date.</param>
+/// <param name="QuestionPaperCodes">Ministry שאלון codes the student is
+/// preparing for, per PRR-243 / ADR-0050 §1. Non-empty for Bagrut family;
+/// empty for Standardized (SAT/PET). Insertion-ordered; the command
+/// handler de-duplicates before emitting events.</param>
+/// <param name="Sitting">Primary sitting tuple — catalog resolves to
+/// canonical date. Applies to all שאלונים unless overridden
+/// per-paper.</param>
+/// <param name="PerPaperSittingOverride">Optional sparse override map:
+/// paper-code → sitting for שאלונים taken at a different sitting than the
+/// primary (e.g. שאלון 1 in Grade-11 Summer, שאלונים 2+3 in Grade-12).
+/// Null OR empty when no overrides. Keys must be a subset of
+/// <paramref name="QuestionPaperCodes"/>; values must differ from the
+/// primary <paramref name="Sitting"/> (minimal-map invariant).</param>
 /// <param name="WeeklyHours">Hours per week committed to this target.
 /// Range 1..40. Aggregate invariant: sum ≤ 40 across active targets.</param>
 /// <param name="ReasonTag">Why the student added this target (enum-only).</param>
@@ -285,7 +356,9 @@ public sealed record ExamTarget(
     EnrollmentId? EnrollmentId,
     ExamCode ExamCode,
     TrackCode? Track,
+    IReadOnlyList<string> QuestionPaperCodes,
     SittingCode Sitting,
+    IReadOnlyDictionary<string, SittingCode>? PerPaperSittingOverride,
     int WeeklyHours,
     ReasonTag? ReasonTag,
     DateTimeOffset CreatedAt,
@@ -300,4 +373,8 @@ public sealed record ExamTarget(
     /// <summary>Maximum weekly-hour allocation per active target and per
     /// aggregate total (ADR-0050 §5: sum ≤ 40).</summary>
     public const int MaxWeeklyHours = 40;
+
+    /// <summary>Inferred family for invariant gating (Bagrut vs
+    /// Standardized vs Other).</summary>
+    public ExamCodeFamily Family => ExamCodeFamilyClassifier.Classify(ExamCode);
 }

@@ -43,8 +43,18 @@ public sealed class StudentPlanCommandHandlerTests
         string? track = "5U",
         SittingCode? sitting = null,
         ExamTargetSource source = ExamTargetSource.Student,
-        EnrollmentId? enrollmentId = null)
-        => new(
+        EnrollmentId? enrollmentId = null,
+        IReadOnlyList<string>? questionPaperCodes = null)
+    {
+        // PRR-243: Bagrut family requires ≥1 שאלון; Standardized forbids.
+        // Auto-supply a plausible default so wave-1 tests that don't care
+        // about papers still construct valid commands.
+        var papers = questionPaperCodes
+            ?? (examCode.StartsWith("BAGRUT_", StringComparison.Ordinal)
+                    ? new[] { "035581" }
+                    : Array.Empty<string>());
+
+        return new(
             StudentAnonId: StudentId,
             Source: source,
             AssignedById: new UserId(StudentId),
@@ -53,7 +63,9 @@ public sealed class StudentPlanCommandHandlerTests
             Track: track is null ? null : new TrackCode(track),
             Sitting: sitting ?? Bagrut2026Summer,
             WeeklyHours: weeklyHours,
-            ReasonTag: null);
+            ReasonTag: null,
+            QuestionPaperCodes: papers);
+    }
 
     // ── Add: happy path ──────────────────────────────────────────────────
 
