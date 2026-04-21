@@ -943,6 +943,10 @@ public partial class Program
     app.MapConsentEndpoints();
     app.MapParentVisibilityEndpoints();
 
+    // prr-123: Dual-version privacy policy. Public read — no auth required;
+    // the app shell renders the current policy during pre-consent onboarding.
+    app.MapLegalEndpoints();
+
     // RATE-001: Rate limit dashboard (real-time spend + status)
     app.MapRateLimitDashboardEndpoints();
     

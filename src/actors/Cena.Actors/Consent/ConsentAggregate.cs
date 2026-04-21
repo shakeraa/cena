@@ -60,6 +60,9 @@ public sealed class ConsentAggregate
     {
         switch (@event)
         {
+            case ConsentGranted_V2 grantedV2:
+                State.Apply(grantedV2);
+                break;
             case ConsentGranted_V1 granted:
                 State.Apply(granted);
                 break;
