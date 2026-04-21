@@ -147,6 +147,20 @@ public sealed class StudentPlanState
         // on the stream so downstream projections can count overrides.
     }
 
+    /// <summary>
+    /// Apply a parent-visibility toggle event (PRR-230). Updates the
+    /// visibility flag on the matching target; silently ignored for
+    /// archived or unknown targets (defensive — command handler enforces).
+    /// </summary>
+    public void Apply(ParentVisibilityChanged_V1 e)
+    {
+        var index = _targets.FindIndex(t => t.Id == e.TargetId);
+        if (index < 0 || !_targets[index].IsActive) return;
+
+        _targets[index] = _targets[index] with { ParentVisibility = e.Visibility };
+        UpdatedAt = Later(UpdatedAt, e.ChangedAt);
+    }
+
     /// <summary>Apply a question-paper-added event (PRR-243). Idempotent
     /// for the "already present" case (silently no-ops so replay of a
     /// malformed stream does not fail). Archived targets do not accept

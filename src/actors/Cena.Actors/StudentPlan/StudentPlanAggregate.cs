@@ -85,6 +85,11 @@ public sealed class StudentPlanAggregate
                 State.Apply(overrideApplied);
                 break;
 
+            // PRR-230 parent-visibility toggle.
+            case ParentVisibilityChanged_V1 visibility:
+                State.Apply(visibility);
+                break;
+
             // PRR-243 question-paper events.
             case QuestionPaperAdded_V1 paperAdded:
                 State.Apply(paperAdded);

@@ -6,6 +6,7 @@
 // partials stay comfortably under the 500-LOC cap.
 // =============================================================================
 
+using Cena.Actors.Consent;
 using Cena.Actors.StudentPlan.Events;
 
 namespace Cena.Actors.StudentPlan;
@@ -34,6 +35,14 @@ namespace Cena.Actors.StudentPlan;
 /// <paramref name="Sitting"/>.</param>
 /// <param name="MigrationSourceId">prr-219 idempotency key. Null for
 /// non-migration commands.</param>
+/// <param name="StudentAgeBand">PRR-230: authoritative age band for the
+/// student at the moment of creation, supplied by the endpoint layer via
+/// <see cref="IStudentAgeBandLookup"/>. Drives the default
+/// <see cref="ParentVisibility"/> for the new target (≥13 default Hidden,
+/// &lt;13 default Visible, SafetyFlag always Visible). When null (e.g.
+/// migration cohort or tests that do not care), the handler falls back
+/// to <see cref="ParentVisibility.Visible"/> to preserve pre-PRR-230
+/// always-visible semantics.</param>
 public sealed record AddExamTargetCommand(
     string StudentAnonId,
     ExamTargetSource Source,
@@ -46,7 +55,22 @@ public sealed record AddExamTargetCommand(
     ReasonTag? ReasonTag,
     IReadOnlyList<string>? QuestionPaperCodes = null,
     IReadOnlyDictionary<string, SittingCode>? PerPaperSittingOverride = null,
-    string? MigrationSourceId = null);
+    string? MigrationSourceId = null,
+    AgeBand? StudentAgeBand = null);
+
+/// <summary>
+/// Command: set (toggle) the parent-dashboard visibility of an active
+/// exam target (PRR-230). Student-initiated toggles require authority at
+/// the endpoint layer (any band may opt IN; only ≥13 bands may opt OUT
+/// because &lt;13 is COPPA-governed by the parent).
+/// </summary>
+public sealed record SetParentVisibilityCommand(
+    string StudentAnonId,
+    ExamTargetId TargetId,
+    ParentVisibility Visibility,
+    ParentVisibilityChangeInitiator Initiator,
+    string InitiatorActorId,
+    string Reason);
 
 /// <summary>
 /// Command: append a Ministry שאלון code to an existing active Bagrut
@@ -156,4 +180,7 @@ public interface IStudentPlanCommandHandler
 
     /// <summary>Clear a per-שאלון sitting override (PRR-243).</summary>
     Task<CommandResult> HandleAsync(ClearPerPaperSittingOverrideCommand cmd, CancellationToken ct = default);
+
+    /// <summary>Toggle parent-dashboard visibility of an active target (PRR-230).</summary>
+    Task<CommandResult> HandleAsync(SetParentVisibilityCommand cmd, CancellationToken ct = default);
 }

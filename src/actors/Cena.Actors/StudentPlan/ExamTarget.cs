@@ -64,6 +64,38 @@ public enum ReasonTag
 
     /// <summary>Enrichment — student exceeding standard curriculum.</summary>
     Enrichment = 3,
+
+    /// <summary>
+    /// Safety-flag carve-out (PRR-230): targets flagged as safety-adjacent
+    /// (at-risk signal, duty-of-care oversight) bypass age-gated
+    /// parent-visibility defaults and remain Visible regardless of band.
+    /// Mirrors <see cref="Consent.SafetyVisibilityCategory"/> rationale at
+    /// the plan aggregate so StudentPlan doesn't need to cross bounded
+    /// contexts on the hot path.
+    /// </summary>
+    SafetyFlag = 4,
+}
+
+/// <summary>
+/// PRR-230: parent dashboard visibility of an individual exam target.
+/// Gate applied at the parent-facing read path; the target still exists
+/// on the student's plan regardless. Default-hidden for students ≥13 per
+/// PPL minor-dignity; default-visible for &lt;13 per COPPA VPC; safety-flag
+/// (<see cref="ReasonTag.SafetyFlag"/>) targets override both to Visible.
+/// </summary>
+public enum ParentVisibility
+{
+    /// <summary>
+    /// Target is visible to the parent on the exam-plan parent dashboard.
+    /// Default for Under13 and for SafetyFlag-tagged targets at any age.
+    /// </summary>
+    Visible = 0,
+
+    /// <summary>
+    /// Target is hidden from the parent dashboard. Default for Teen13to15,
+    /// Teen16to17, Adult bands when ReasonTag is not SafetyFlag.
+    /// </summary>
+    Hidden = 1,
 }
 
 /// <summary>
@@ -349,6 +381,14 @@ public static class ExamCodeFamilyClassifier
 /// <param name="CreatedAt">When the target was first added.</param>
 /// <param name="ArchivedAt">When archived (terminal). Null while
 /// active.</param>
+/// <param name="ParentVisibility">PRR-230: visibility flag for the parent
+/// dashboard. Defaulted by the command handler using AgeBandPolicy +
+/// <see cref="ReasonTag.SafetyFlag"/> carve-out; students ≥13 default to
+/// <see cref="ParentVisibility.Hidden"/>, &lt;13 default to
+/// <see cref="ParentVisibility.Visible"/>, SafetyFlag always Visible.
+/// Back-compat: omitted on pre-PRR-230 events, so replay defaults to
+/// <see cref="ParentVisibility.Visible"/> to preserve the prior
+/// always-visible semantics.</param>
 public sealed record ExamTarget(
     ExamTargetId Id,
     ExamTargetSource Source,
@@ -362,7 +402,8 @@ public sealed record ExamTarget(
     int WeeklyHours,
     ReasonTag? ReasonTag,
     DateTimeOffset CreatedAt,
-    DateTimeOffset? ArchivedAt)
+    DateTimeOffset? ArchivedAt,
+    ParentVisibility ParentVisibility = ParentVisibility.Visible)
 {
     /// <summary>True while the target is active (not archived).</summary>
     public bool IsActive => ArchivedAt is null;
@@ -377,4 +418,13 @@ public sealed record ExamTarget(
     /// <summary>Inferred family for invariant gating (Bagrut vs
     /// Standardized vs Other).</summary>
     public ExamCodeFamily Family => ExamCodeFamilyClassifier.Classify(ExamCode);
+
+    /// <summary>
+    /// PRR-230: true when this target must remain Visible regardless of
+    /// age-band defaults. Currently keyed off
+    /// <see cref="ReasonTag.SafetyFlag"/>; at the policy layer we may
+    /// widen this to external signals (at-risk triggers, duty-of-care
+    /// flags) without changing call sites.
+    /// </summary>
+    public bool IsSafetyFlagged => ReasonTag == StudentPlan.ReasonTag.SafetyFlag;
 }
