@@ -14,7 +14,16 @@ import { inferLocale } from '@/composables/useLocaleInference'
 
 export type StudentRole = 'student' | 'self-learner' | 'test-prep' | 'homeschool'
 export type SupportedLocale = 'en' | 'ar' | 'he'
-export type WizardStep = 'welcome' | 'role' | 'language' | 'diagnostic' | 'self-assessment' | 'confirm'
+// PRR-221: insert `exam-targets` + `per-target-plan` between `role` and `language`.
+export type WizardStep
+  = 'welcome'
+  | 'role'
+  | 'exam-targets'
+  | 'per-target-plan'
+  | 'language'
+  | 'diagnostic'
+  | 'self-assessment'
+  | 'confirm'
 /** PRR-032: which numeral system to render in math output for the student. */
 export type NumeralsPreference = 'western' | 'eastern'
 
@@ -23,6 +32,47 @@ export interface DiagnosticResponseItem {
   subject: string
   correct: boolean
   difficulty: number
+}
+
+/**
+ * PRR-221: an in-memory sitting tuple as drafted by the student in the
+ * per-target-plan step. Wire shape maps to the server's `SittingCodeDto`
+ * on POST. Season/Moed are carried as ordinal ints matching the server
+ * `SittingSeason` / `SittingMoed` enums (0-indexed).
+ */
+export interface ExamSittingDraft {
+  sittingCode: string
+  academicYear: string
+  season: number
+  moed: number
+  canonicalDate?: string
+}
+
+/**
+ * PRR-221: a draft of one exam target while the student is still
+ * inside the onboarding wizard. Persisted to localStorage so a
+ * mid-wizard refresh resumes with the selected cards intact. Committed
+ * to the server via `POST /api/me/exam-targets` on confirm.
+ */
+export interface ExamTargetDraft {
+  /** Catalog exam code (e.g. "bagrut-math-5u"). */
+  examCode: string
+  /** Localized display name for UI recap. */
+  displayName: string
+  /** Bagrut/Standardized/etc — used to decide whether שאלון picker shows. */
+  family: string
+  /** Optional track code for multi-track exams. */
+  track?: string
+  /** Bagrut only: selected question-paper codes (defaults = all). */
+  questionPaperCodes: string[]
+  /** All available question-paper codes (from catalog) for the target. */
+  availableQuestionPaperCodes: string[]
+  /** Student-chosen sitting. */
+  sitting: ExamSittingDraft | null
+  /** All catalog sittings (for the sitting picker). */
+  availableSittings: ExamSittingDraft[]
+  /** Weekly time budget for this target (1..40). */
+  weeklyHours: number
 }
 
 // RDY-057: self-reported affective state captured after the diagnostic.
@@ -51,6 +101,12 @@ export interface OnboardingState {
   numeralsPreference: NumeralsPreference | null
   dailyTimeGoalMinutes: number
   subjects: string[]
+  /**
+   * PRR-221: student-drafted exam targets. Committed to the server on
+   * confirm via POST /api/me/exam-targets. Min 1, max 4 for MVP
+   * (server cap is 5; soft-warn at 4 is a follow-up).
+   */
+  examTargets: ExamTargetDraft[]
   diagnosticResponses: DiagnosticResponseItem[]
   diagnosticSkipped: boolean
   selfAssessment: SelfAssessmentState
@@ -59,6 +115,14 @@ export interface OnboardingState {
 
 const STORAGE_KEY = 'cena-onboarding-state'
 const DEFAULT_DAILY_GOAL = 15
+// PRR-221: MVP per-target-plan bounds. Server cap is 5; UI limits to 4
+// to leave headroom for classroom-assigned targets that land via
+// EPIC-PRR-C after onboarding. A later iteration can relax to 5 with a
+// soft-warn at 4 (task body).
+export const MAX_EXAM_TARGETS = 4
+export const MIN_WEEKLY_HOURS = 1
+export const MAX_WEEKLY_HOURS = 40
+export const DEFAULT_WEEKLY_HOURS = 8
 
 function readPersisted(): Partial<OnboardingState> | null {
   if (typeof localStorage === 'undefined')
@@ -121,6 +185,12 @@ export const useOnboardingStore = defineStore('onboarding', () => {
 
   const dailyTimeGoalMinutes = ref<number>(persisted?.dailyTimeGoalMinutes ?? DEFAULT_DAILY_GOAL)
   const subjects = ref<string[]>(persisted?.subjects ?? [])
+  // PRR-221: exam-target drafts (multi-target).
+  const examTargets = ref<ExamTargetDraft[]>(
+    Array.isArray((persisted as any)?.examTargets)
+      ? ((persisted as any).examTargets as ExamTargetDraft[])
+      : [],
+  )
   const diagnosticResponses = ref<DiagnosticResponseItem[]>((persisted as any)?.diagnosticResponses ?? [])
   const diagnosticSkipped = ref<boolean>((persisted as any)?.diagnosticSkipped ?? false)
   const selfAssessment = ref<SelfAssessmentState>({
@@ -134,7 +204,16 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   })
   const completedAt = ref<string | null>(persisted?.completedAt ?? null)
 
-  const STEP_ORDER: WizardStep[] = ['welcome', 'role', 'language', 'diagnostic', 'self-assessment', 'confirm']
+  const STEP_ORDER: WizardStep[] = [
+    'welcome',
+    'role',
+    'exam-targets',
+    'per-target-plan',
+    'language',
+    'diagnostic',
+    'self-assessment',
+    'confirm',
+  ]
 
   const stepIndex = computed(() => {
     return STEP_ORDER.indexOf(step.value)
@@ -150,6 +229,19 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     switch (step.value) {
       case 'welcome': return true
       case 'role': return role.value !== null
+      // PRR-221: need at least one target and at most 4.
+      case 'exam-targets':
+        return examTargets.value.length >= 1 && examTargets.value.length <= MAX_EXAM_TARGETS
+      // PRR-221: every selected target needs a sitting and a weekly hours
+      // value in range. `questionPaperCodes` defaults to all-checked so
+      // Bagrut targets are valid as long as there's at least one paper in
+      // the available list.
+      case 'per-target-plan':
+        return examTargets.value.length > 0 && examTargets.value.every(t =>
+          t.sitting !== null
+          && t.weeklyHours >= MIN_WEEKLY_HOURS
+          && t.weeklyHours <= MAX_WEEKLY_HOURS
+          && (t.family !== 'BAGRUT' || t.questionPaperCodes.length > 0))
       case 'language': return sanitizeLocale(locale.value) === locale.value
       case 'diagnostic': return diagnosticResponses.value.length > 0 || diagnosticSkipped.value
       case 'self-assessment': return true  // always advanceable; skip is a valid outcome
@@ -187,6 +279,33 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     numeralsPreference.value = next
   }
 
+  /**
+   * PRR-221: replace the list of drafted exam targets. The caller is
+   * expected to enforce the 1..MAX_EXAM_TARGETS bound at the UI layer;
+   * we silently cap here as a belt-and-suspenders safeguard.
+   */
+  function setExamTargets(next: ExamTargetDraft[]) {
+    examTargets.value = next.slice(0, MAX_EXAM_TARGETS)
+  }
+
+  /** Add a single draft if there is capacity; no-op when at cap. */
+  function addExamTarget(draft: ExamTargetDraft) {
+    if (examTargets.value.length >= MAX_EXAM_TARGETS) return
+    if (examTargets.value.some(t => t.examCode === draft.examCode)) return
+    examTargets.value = [...examTargets.value, draft]
+  }
+
+  function removeExamTarget(examCode: string) {
+    examTargets.value = examTargets.value.filter(t => t.examCode !== examCode)
+  }
+
+  /** Merge-patch one draft identified by `examCode`. */
+  function updateExamTarget(examCode: string, patch: Partial<ExamTargetDraft>) {
+    examTargets.value = examTargets.value.map(t =>
+      t.examCode === examCode ? { ...t, ...patch } : t,
+    )
+  }
+
   function setDiagnosticResults(items: DiagnosticResponseItem[]) {
     diagnosticResponses.value = items
     diagnosticSkipped.value = false
@@ -220,6 +339,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     numeralsPreference.value = null
     dailyTimeGoalMinutes.value = DEFAULT_DAILY_GOAL
     subjects.value = []
+    examTargets.value = []
     diagnosticResponses.value = []
     diagnosticSkipped.value = false
     selfAssessment.value = {
@@ -241,7 +361,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   }
 
   watch(
-    [step, role, locale, numeralsPreference, dailyTimeGoalMinutes, subjects, diagnosticResponses, diagnosticSkipped, selfAssessment, completedAt],
+    [step, role, locale, numeralsPreference, dailyTimeGoalMinutes, subjects, examTargets, diagnosticResponses, diagnosticSkipped, selfAssessment, completedAt],
     () => {
       writePersisted({
         step: step.value,
@@ -250,6 +370,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
         numeralsPreference: numeralsPreference.value,
         dailyTimeGoalMinutes: dailyTimeGoalMinutes.value,
         subjects: subjects.value,
+        examTargets: examTargets.value,
         diagnosticResponses: diagnosticResponses.value,
         diagnosticSkipped: diagnosticSkipped.value,
         selfAssessment: selfAssessment.value,
@@ -267,6 +388,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     effectiveNumerals,
     dailyTimeGoalMinutes,
     subjects,
+    examTargets,
     diagnosticResponses,
     diagnosticSkipped,
     selfAssessment,
@@ -280,6 +402,10 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     setRole,
     setLocale,
     setNumeralsPreference,
+    setExamTargets,
+    addExamTarget,
+    removeExamTarget,
+    updateExamTarget,
     setDiagnosticResults,
     skipDiagnostic,
     setSelfAssessment,
