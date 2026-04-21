@@ -528,8 +528,8 @@ public partial class Program
     // back the anonymous POST /api/auth/password-reset endpoint. The admin host
     // already registers this as a singleton; mirror that here so the student
     // self-service forgot-password flow has a real implementation on both sides.
-    builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminService>();
-    
+    builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminService>(); Cena.Student.Api.Host.Catalog.CatalogServiceRegistration.AddCenaExamCatalog(builder.Services, builder.Configuration, builder.Environment); // prr-220 ADR-0050
+
     // ---- SignalR Real-Time Hub ----
     builder.Services.AddCenaSignalR();
     builder.Services.AddSignalRTokenExtraction();
@@ -876,8 +876,7 @@ public partial class Program
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
-    app.MapAuthEndpoints();
-    // prr-011 MapSessionExchangeEndpoints wired earlier via UseStudentApiAuthPipeline().
+    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); // prr-011 Session exchange wired via UseStudentApiAuthPipeline(); prr-220 catalog ADR-0050.
 
     // Me/Profile endpoints (STB-00, STB-00b)
     app.MapMeEndpoints();

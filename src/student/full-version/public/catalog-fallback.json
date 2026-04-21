@@ -1,0 +1,177 @@
+{
+  "catalog_version": "2026.04.21-01",
+  "locale": "en",
+  "locale_fallback_used": "en",
+  "family_order": [
+    "BAGRUT",
+    "TAWJIHI",
+    "STANDARDIZED",
+    "INTERNATIONAL"
+  ],
+  "groups": [
+    {
+      "family": "BAGRUT",
+      "targets": [
+        {
+          "exam_code": "BAGRUT_MATH_3U",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Hebrew",
+          "track": "3U",
+          "units": 3,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "035",
+          "ministry_question_paper_codes": ["035371", "035372"],
+          "availability": "launch",
+          "item_bank_status": "full",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {"code": "TASHPA_SUMMER_A", "academic_year": "תשפ\"ו", "season": "summer", "moed": "A", "canonical_date": "2026-06-15"},
+            {"code": "TASHPA_SUMMER_B", "academic_year": "תשפ\"ו", "season": "summer", "moed": "B", "canonical_date": "2026-07-20"},
+            {"code": "TASHPA_WINTER_A", "academic_year": "תשפ\"ו", "season": "winter", "moed": "A", "canonical_date": "2026-01-28"}
+          ],
+          "display": {"name": "Bagrut Math (3 units)", "short_description": "Israeli Bagrut mathematics, three-unit track."},
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_MATH_4U",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Hebrew",
+          "track": "4U",
+          "units": 4,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "035",
+          "ministry_question_paper_codes": ["035471", "035472"],
+          "availability": "launch",
+          "item_bank_status": "full",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {"code": "TASHPA_SUMMER_A", "academic_year": "תשפ\"ו", "season": "summer", "moed": "A", "canonical_date": "2026-06-15"}
+          ],
+          "display": {"name": "Bagrut Math (4 units)", "short_description": "Israeli Bagrut mathematics, four-unit track."},
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_MATH_5U",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Hebrew",
+          "track": "5U",
+          "units": 5,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "035",
+          "ministry_question_paper_codes": ["035581", "035582", "035583"],
+          "availability": "launch",
+          "item_bank_status": "full",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {"code": "TASHPA_SUMMER_A", "academic_year": "תשפ\"ו", "season": "summer", "moed": "A", "canonical_date": "2026-06-15"}
+          ],
+          "display": {"name": "Bagrut Math (5 units)", "short_description": "Israeli Bagrut mathematics, five-unit track (highest)."},
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_MATH_5U_ARAB_STREAM",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Arabic",
+          "track": "5U",
+          "units": 5,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "035",
+          "ministry_question_paper_codes": ["035581", "035582", "035583"],
+          "availability": "launch",
+          "item_bank_status": "full",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [],
+          "display": {"name": "Bagrut Math (5 units, Arab stream)", "short_description": "Israeli Bagrut mathematics, five-unit track, Arabic-instruction."},
+          "topics": []
+        }
+      ]
+    },
+    {
+      "family": "STANDARDIZED",
+      "targets": [
+        {
+          "exam_code": "PET_QUANTITATIVE",
+          "family": "STANDARDIZED",
+          "region": "International-PET",
+          "track": null,
+          "units": null,
+          "regulator": "nite",
+          "ministry_subject_code": null,
+          "ministry_question_paper_codes": [],
+          "availability": "launch",
+          "item_bank_status": "full",
+          "passback_eligible": false,
+          "default_lead_days": 90,
+          "sittings": [],
+          "display": {"name": "PET Quantitative", "short_description": "Psychometric Entrance Test (NITE), quantitative section."},
+          "topics": []
+        },
+        {
+          "exam_code": "PET_VERBAL_RUSSIAN",
+          "family": "STANDARDIZED",
+          "region": "International-PET",
+          "track": null,
+          "units": null,
+          "regulator": "nite",
+          "ministry_subject_code": null,
+          "ministry_question_paper_codes": [],
+          "availability": "roadmap",
+          "item_bank_status": "reference-only",
+          "passback_eligible": false,
+          "default_lead_days": 90,
+          "sittings": [],
+          "display": {"name": "PET Verbal (Russian)", "short_description": "Psychometric Entrance Test (NITE), verbal section - Russian."},
+          "topics": []
+        },
+        {
+          "exam_code": "SAT_MATH",
+          "family": "STANDARDIZED",
+          "region": "International-SAT",
+          "track": null,
+          "units": null,
+          "regulator": "collegeboard",
+          "ministry_subject_code": null,
+          "ministry_question_paper_codes": [],
+          "availability": "roadmap",
+          "item_bank_status": "reference-only",
+          "passback_eligible": false,
+          "default_lead_days": 90,
+          "sittings": [],
+          "display": {"name": "SAT Math", "short_description": "College Board SAT mathematics section."},
+          "topics": []
+        }
+      ]
+    },
+    {
+      "family": "INTERNATIONAL",
+      "targets": [
+        {
+          "exam_code": "IB_MATH_HL_AA",
+          "family": "INTERNATIONAL",
+          "region": "International-IB",
+          "track": "HL",
+          "units": null,
+          "regulator": "ib",
+          "ministry_subject_code": null,
+          "ministry_question_paper_codes": [],
+          "availability": "queued",
+          "item_bank_status": "unavailable",
+          "passback_eligible": false,
+          "default_lead_days": 180,
+          "sittings": [],
+          "display": {"name": "IB Math HL — Analysis & Approaches", "short_description": "International Baccalaureate mathematics, Higher Level, AA."},
+          "topics": []
+        }
+      ]
+    }
+  ],
+  "overlay": {
+    "tenant_id": null,
+    "enabled_exam_codes": null,
+    "disabled_exam_codes": []
+  }
+}

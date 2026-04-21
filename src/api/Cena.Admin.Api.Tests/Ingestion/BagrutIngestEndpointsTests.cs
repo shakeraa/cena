@@ -196,6 +196,79 @@ public sealed class BagrutIngestEndpointsTests
     }
 
     [Fact]
+    public async Task Corpus_Service_Receives_Items_When_Metadata_Provided()
+    {
+        // prr-242: when subject + paper codes are present on the form, the
+        // handler calls corpus.UpsertManyAsync with extractor-produced items.
+        var drafts = new[]
+        {
+            new IngestionDraftQuestion("d-1", 1, "פתרו את x + 1 = 0", null,
+                Array.Empty<string>(), null, "bagrut-math-5u",
+                null, 0.9, Array.Empty<string>()),
+        };
+        _service.IngestAsync(Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new PdfIngestionResult("pdf-xyz", "bagrut-math-5u", 1, 1, 0,
+                drafts, Array.Empty<string>()));
+
+        var corpus = Substitute.For<IBagrutCorpusService>();
+
+        var result = await BagrutIngestHandler.HandleAsync(
+            examCode: "bagrut-math-5u",
+            fileContentType: "application/pdf",
+            fileBytes: PdfBytes(),
+            uploadedBy: "admin-1",
+            fallbackUserId: null,
+            service: _service,
+            corpusService: corpus,
+            ministrySubjectCode: "035",
+            ministryQuestionPaperCode: "035581",
+            units: 5,
+            year: 2024,
+            topicId: "algebra.quadratics",
+            sourceFilename: "bagrut-math-5u-2024-summer-moedA.pdf");
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        await corpus.Received(1).UpsertManyAsync(
+            Arg.Is<IReadOnlyList<Cena.Infrastructure.Documents.BagrutCorpusItemDocument>>(
+                items => items.Count == 1
+                         && items[0].MinistrySubjectCode == "035"
+                         && items[0].MinistryQuestionPaperCode == "035581"
+                         && items[0].Year == 2024
+                         && items[0].TopicId == "algebra.quadratics"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task Corpus_Service_Skipped_When_Metadata_Missing()
+    {
+        // Missing ministrySubjectCode → the handler skips the corpus write.
+        _service.IngestAsync(Arg.Any<byte[]>(), Arg.Any<string>(), Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(new PdfIngestionResult("pdf-xyz", "bagrut-math-5u", 1, 1, 0,
+                new[] { new IngestionDraftQuestion("d-1", 1, "x", null,
+                    Array.Empty<string>(), null, "bagrut-math-5u", null, 0.9,
+                    Array.Empty<string>()) },
+                Array.Empty<string>()));
+
+        var corpus = Substitute.For<IBagrutCorpusService>();
+
+        var result = await BagrutIngestHandler.HandleAsync(
+            examCode: "bagrut-math-5u",
+            fileContentType: "application/pdf",
+            fileBytes: PdfBytes(),
+            uploadedBy: "admin-1",
+            fallbackUserId: null,
+            service: _service,
+            corpusService: corpus,
+            ministrySubjectCode: null,
+            ministryQuestionPaperCode: null);
+
+        Assert.Equal(StatusCodes.Status200OK, StatusOf(result));
+        await corpus.DidNotReceive().UpsertManyAsync(
+            Arg.Any<IReadOnlyList<Cena.Infrastructure.Documents.BagrutCorpusItemDocument>>(),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task Fallback_User_Id_Used_When_UploadedBy_Blank()
     {
         _service.IngestAsync(Arg.Any<byte[]>(), Arg.Any<string>(), "admin-sub",
