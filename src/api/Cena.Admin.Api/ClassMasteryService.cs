@@ -1,12 +1,21 @@
 // =============================================================================
-// Cena Platform — Class Mastery Service (MASTERY-002)
-// Anonymous class-level mastery statistics with k≥10 anonymity threshold.
+// Cena Platform — Class Mastery Service (MASTERY-002, prr-026)
+// Anonymous class-level mastery statistics with k>=10 anonymity threshold.
 //
 // Teacher dashboard shows aggregated mastery per topic. No individual
 // student names visible. Heatmap: rows=topics, columns=mastery bands.
+//
+// prr-026: the inline `MinStudentsForAnonymity = 10` check was lifted to a
+// platform primitive, <see cref="IKAnonymityEnforcer"/>. This service now
+// delegates per-topic suppression to the enforcer via
+// <see cref="IKAnonymityEnforcer.MeetsFloor{T}"/> so every suppression is
+// counted on the shared <c>cena_k_anonymity_suppressed_total</c> metric
+// and the floor cannot drift away from the other aggregate surfaces.
+// </summary>
 // =============================================================================
 
 using Cena.Actors.Events;
+using Cena.Infrastructure.Analytics;
 using Marten;
 using Microsoft.Extensions.Logging;
 
@@ -22,15 +31,29 @@ public sealed class ClassMasteryService
     /// <summary>
     /// Minimum number of students who must have attempted a topic before
     /// class-level statistics are shown. Prevents de-anonymization.
+    /// Shared constant with <see cref="IKAnonymityEnforcer.DefaultClassroomAggregateK"/>;
+    /// kept public for legacy callers and asserted equal to the enforcer
+    /// default in the architecture tests.
     /// </summary>
-    public const int MinStudentsForAnonymity = 10;
+    public const int MinStudentsForAnonymity = IKAnonymityEnforcer.DefaultClassroomAggregateK;
+
+    /// <summary>
+    /// Surface name used by the enforcer to label suppression events.
+    /// Stable so the k-anonymity dashboard can group hits by surface.
+    /// </summary>
+    internal const string SurfaceName = "/institutes/{id}/classrooms/{cid}/analytics/class-mastery";
 
     private readonly IDocumentStore _store;
+    private readonly IKAnonymityEnforcer _enforcer;
     private readonly ILogger<ClassMasteryService> _logger;
 
-    public ClassMasteryService(IDocumentStore store, ILogger<ClassMasteryService> logger)
+    public ClassMasteryService(
+        IDocumentStore store,
+        IKAnonymityEnforcer enforcer,
+        ILogger<ClassMasteryService> logger)
     {
         _store = store;
+        _enforcer = enforcer;
         _logger = logger;
     }
 
@@ -68,10 +91,26 @@ public sealed class ClassMasteryService
             }
         }
 
-        // Filter by anonymity threshold
-        var rows = topicStats.Values
-            .Where(t => t.StudentCount >= MinStudentsForAnonymity)
-            .Select(t => new TopicMasteryRow
+        // prr-026: Filter by anonymity threshold through the shared
+        // IKAnonymityEnforcer so every suppression is counted on
+        // cena_k_anonymity_suppressed_total{surface,k}. The per-topic
+        // partial-suppression pattern (drop the row, keep the rest) is the
+        // non-throwing path — we only throw if the WHOLE classroom is below
+        // the floor, which is handled by the endpoint, not by this service.
+        var rows = new List<TopicMasteryRow>(topicStats.Count);
+        var suppressed = 0;
+        foreach (var t in topicStats.Values)
+        {
+            if (!_enforcer.MeetsFloor(
+                    Enumerable.Range(0, t.StudentCount), // synthetic distinct marker per student
+                    MinStudentsForAnonymity))
+            {
+                _enforcer.RecordSuppression(SurfaceName, MinStudentsForAnonymity);
+                suppressed++;
+                continue;
+            }
+
+            rows.Add(new TopicMasteryRow
             {
                 TopicId = t.TopicId,
                 StudentCount = t.StudentCount,
@@ -80,12 +119,10 @@ public sealed class ClassMasteryService
                 Band40To60 = t.Band40To60,
                 Band60To80 = t.Band60To80,
                 Band80To100 = t.Band80To100,
-                MeanMastery = t.TotalMastery / t.StudentCount
-            })
-            .OrderBy(r => r.MeanMastery)
-            .ToList();
-
-        var suppressed = topicStats.Count - rows.Count;
+                MeanMastery = t.TotalMastery / t.StudentCount,
+            });
+        }
+        rows.Sort((a, b) => a.MeanMastery.CompareTo(b.MeanMastery));
 
         _logger.LogDebug(
             "MASTERY-002: ClassMastery for {ClassroomId}: {TopicCount} topics shown, {Suppressed} suppressed (k<{K})",

@@ -21,6 +21,7 @@ using Cena.Api.Host.Hubs;
 using Cena.Api.Host.Services;
 using Cena.Student.Api.Host.Endpoints;
 using Cena.Infrastructure.Ai;
+using Cena.Infrastructure.Analytics;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
@@ -310,6 +311,11 @@ public partial class Program
     builder.Services.AddSingleton<
         Cena.Actors.Tutoring.ISessionTutorContextService,
         Cena.Actors.Tutoring.SessionTutorContextService>();
+    // prr-152: TutorContext cache invalidation for the erasure cascade.
+    // Registered alongside the service so the Student host's erasure
+    // worker picks up the cascade via IEnumerable<IErasureProjectionCascade>.
+    builder.Services.AddSingleton<Cena.Infrastructure.Compliance.IErasureProjectionCascade,
+        Cena.Actors.Tutoring.TutorContextErasureCascade>();
 
     // ---- RDY-034: Flow state service (consumes ICognitiveLoadService) ----
     // Registered in both actor + student hosts so the assessment endpoint
@@ -358,6 +364,9 @@ public partial class Program
     // prr-022 / ADR-0047: PII prompt scrubber — injected by every [TaskRouting]
     // service that composes student free-text into its prompt.
     builder.Services.AddPiiPromptScrubber();
+    // prr-026: k-anonymity enforcer — injected by every aggregate
+    // teacher/classroom/institute surface that serves a statistical claim.
+    builder.Services.AddKAnonymityEnforcer();
 
     builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
 

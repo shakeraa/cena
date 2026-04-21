@@ -196,6 +196,70 @@ public sealed class SessionTutorContextService : ISessionTutorContextService
         }
     }
 
+    public async Task<int> InvalidateAllForStudentAsync(
+        string studentId,
+        CancellationToken ct = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(studentId);
+
+        // prr-152: scan every tutor-context key and remove entries whose
+        // embedded StudentId matches. We SCAN (not KEYS) to avoid blocking
+        // the Redis event loop on a large instance. Cache entries expire
+        // on the session TTL (default 6h), so after a 30-day cooling
+        // period this is almost always a no-op — but we still invalidate
+        // explicitly so the audit trail records the intent and so a
+        // second erasure run after the TTL still succeeds idempotently.
+        var removed = 0;
+        try
+        {
+            var endpoints = _redis.GetEndPoints();
+            var db = _redis.GetDatabase();
+            var pattern = $"{CacheKeyPrefix}:*";
+
+            foreach (var endpoint in endpoints)
+            {
+                ct.ThrowIfCancellationRequested();
+                var server = _redis.GetServer(endpoint);
+                await foreach (var key in server.KeysAsync(pattern: pattern))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var raw = await db.StringGetAsync(key).WaitAsync(ct).ConfigureAwait(false);
+                    if (raw.IsNullOrEmpty) continue;
+
+                    SessionTutorContext? snapshot = null;
+                    try
+                    {
+                        snapshot = JsonSerializer.Deserialize<SessionTutorContext>(raw.ToString(), Json);
+                    }
+                    catch (JsonException)
+                    {
+                        // Corrupt / pre-upgrade value — skip without failing the cascade.
+                        continue;
+                    }
+
+                    if (snapshot is null) continue;
+                    if (!string.Equals(snapshot.StudentId, studentId, StringComparison.Ordinal))
+                        continue;
+
+                    if (await db.KeyDeleteAsync(key).WaitAsync(ct).ConfigureAwait(false))
+                        removed++;
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _cacheErrors.Add(1, new KeyValuePair<string, object?>("op", "del-bulk"));
+            _logger.LogWarning(ex,
+                "Tutor context bulk-invalidate failed for student {StudentId}; " +
+                "TTL will clean up eventually (prr-152)", studentId);
+        }
+        return removed;
+    }
+
     // -------------------------------------------------------------------------
     // Live-build path — folds Marten projections into a context snapshot.
     // -------------------------------------------------------------------------
