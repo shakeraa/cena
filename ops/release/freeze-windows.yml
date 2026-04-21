@@ -1,0 +1,210 @@
+# =============================================================================
+# Exam-day freeze windows — AUTO-GENERATED, DO NOT EDIT BY HAND
+# Source: contracts/exam-catalog/*.yml
+# Generator: scripts/ops/generate-freeze-windows.mjs
+# Regenerated: 2026-04-21T19:17:39.208Z
+# Catalog version: 2026.04.21-02
+# =============================================================================
+
+generated_at: "2026-04-21T19:17:39.208Z"
+catalog_version: "2026.04.21-02"
+generator: "scripts/ops/generate-freeze-windows.mjs"
+pre_hours: 48
+post_hours: 6
+windows:
+  - start_utc: "2026-01-26T12:00:00.000Z"
+    end_utc: "2026-01-28T18:00:00.000Z"
+    families:
+      - Bagrut
+    sittings:
+      - exam_code: BAGRUT_MATH_3U_ARAB_STREAM
+        sitting_code: TASHPA_WINTER_A
+        canonical_date: "2026-01-28"
+        anchor_utc: "2026-01-28T12:00:00.000Z"
+        season: winter
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_3U
+        sitting_code: TASHPA_WINTER_A
+        canonical_date: "2026-01-28"
+        anchor_utc: "2026-01-28T12:00:00.000Z"
+        season: winter
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_4U_ARAB_STREAM
+        sitting_code: TASHPA_WINTER_A
+        canonical_date: "2026-01-28"
+        anchor_utc: "2026-01-28T12:00:00.000Z"
+        season: winter
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_4U
+        sitting_code: TASHPA_WINTER_A
+        canonical_date: "2026-01-28"
+        anchor_utc: "2026-01-28T12:00:00.000Z"
+        season: winter
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_5U
+        sitting_code: TASHPA_WINTER_A
+        canonical_date: "2026-01-28"
+        anchor_utc: "2026-01-28T12:00:00.000Z"
+        season: winter
+        moed: A
+        academic_year: "תשפ\"ו"
+  - start_utc: "2026-04-08T12:00:00.000Z"
+    end_utc: "2026-04-10T18:00:00.000Z"
+    families:
+      - Standardized
+    sittings:
+      - exam_code: PET_QUANTITATIVE
+        sitting_code: PET_2026_SPRING
+        canonical_date: "2026-04-10"
+        anchor_utc: "2026-04-10T12:00:00.000Z"
+        season: spring
+        moed: A
+        academic_year: "2026"
+  - start_utc: "2026-06-08T12:00:00.000Z"
+    end_utc: "2026-06-10T18:00:00.000Z"
+    families:
+      - Bagrut
+    sittings:
+      - exam_code: BAGRUT_HISTORY_2U
+        sitting_code: TASHPA_SUMMER_A
+        canonical_date: "2026-06-10"
+        anchor_utc: "2026-06-10T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "תשפ\"ו"
+  - start_utc: "2026-06-12T12:00:00.000Z"
+    end_utc: "2026-06-15T18:00:00.000Z"
+    families:
+      - Bagrut
+    sittings:
+      - exam_code: BAGRUT_CIVICS_1U
+        sitting_code: TASHPA_SUMMER_A
+        canonical_date: "2026-06-14"
+        anchor_utc: "2026-06-14T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_3U_ARAB_STREAM
+        sitting_code: TASHPA_SUMMER_A
+        canonical_date: "2026-06-15"
+        anchor_utc: "2026-06-15T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_3U
+        sitting_code: TASHPA_SUMMER_A
+        canonical_date: "2026-06-15"
+        anchor_utc: "2026-06-15T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_4U_ARAB_STREAM
+        sitting_code: TASHPA_SUMMER_A
+        canonical_date: "2026-06-15"
+        anchor_utc: "2026-06-15T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_4U
+        sitting_code: TASHPA_SUMMER_A
+        canonical_date: "2026-06-15"
+        anchor_utc: "2026-06-15T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_5U_ARAB_STREAM
+        sitting_code: TASHPA_SUMMER_A
+        canonical_date: "2026-06-15"
+        anchor_utc: "2026-06-15T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_5U
+        sitting_code: TASHPA_SUMMER_A
+        canonical_date: "2026-06-15"
+        anchor_utc: "2026-06-15T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "תשפ\"ו"
+  - start_utc: "2026-07-03T12:00:00.000Z"
+    end_utc: "2026-07-05T18:00:00.000Z"
+    families:
+      - Standardized
+    sittings:
+      - exam_code: PET_QUANTITATIVE
+        sitting_code: PET_2026_SUMMER
+        canonical_date: "2026-07-05"
+        anchor_utc: "2026-07-05T12:00:00.000Z"
+        season: summer
+        moed: A
+        academic_year: "2026"
+  - start_utc: "2026-07-13T12:00:00.000Z"
+    end_utc: "2026-07-15T18:00:00.000Z"
+    families:
+      - Bagrut
+    sittings:
+      - exam_code: BAGRUT_HISTORY_2U
+        sitting_code: TASHPA_SUMMER_B
+        canonical_date: "2026-07-15"
+        anchor_utc: "2026-07-15T12:00:00.000Z"
+        season: summer
+        moed: B
+        academic_year: "תשפ\"ו"
+  - start_utc: "2026-07-17T12:00:00.000Z"
+    end_utc: "2026-07-20T18:00:00.000Z"
+    families:
+      - Bagrut
+    sittings:
+      - exam_code: BAGRUT_CIVICS_1U
+        sitting_code: TASHPA_SUMMER_B
+        canonical_date: "2026-07-19"
+        anchor_utc: "2026-07-19T12:00:00.000Z"
+        season: summer
+        moed: B
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_3U_ARAB_STREAM
+        sitting_code: TASHPA_SUMMER_B
+        canonical_date: "2026-07-20"
+        anchor_utc: "2026-07-20T12:00:00.000Z"
+        season: summer
+        moed: B
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_3U
+        sitting_code: TASHPA_SUMMER_B
+        canonical_date: "2026-07-20"
+        anchor_utc: "2026-07-20T12:00:00.000Z"
+        season: summer
+        moed: B
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_4U_ARAB_STREAM
+        sitting_code: TASHPA_SUMMER_B
+        canonical_date: "2026-07-20"
+        anchor_utc: "2026-07-20T12:00:00.000Z"
+        season: summer
+        moed: B
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_4U
+        sitting_code: TASHPA_SUMMER_B
+        canonical_date: "2026-07-20"
+        anchor_utc: "2026-07-20T12:00:00.000Z"
+        season: summer
+        moed: B
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_5U_ARAB_STREAM
+        sitting_code: TASHPA_SUMMER_B
+        canonical_date: "2026-07-20"
+        anchor_utc: "2026-07-20T12:00:00.000Z"
+        season: summer
+        moed: B
+        academic_year: "תשפ\"ו"
+      - exam_code: BAGRUT_MATH_5U
+        sitting_code: TASHPA_SUMMER_B
+        canonical_date: "2026-07-20"
+        anchor_utc: "2026-07-20T12:00:00.000Z"
+        season: summer
+        moed: B
+        academic_year: "תשפ\"ו"

@@ -15,6 +15,15 @@
 ## Goal
 Capacity plan for Bagrut exam-day traffic spike (5-10x baseline); load test; scale-out policy.
 
+**Amendment (2026-04-21, wave6c)**: Superseded-in-scope-by
+[PRR-231](TASK-PRR-231-amend-capacity-plan-sat-pet.md). The Bagrut-only
+Goal here is retained for traceability; the multi-target compound calendar
+(Bagrut + SAT + PET + IB + PET-quarterly) lives in
+[`docs/ops/capacity/exam-day-capacity-plan.md`](../../docs/ops/capacity/exam-day-capacity-plan.md).
+The runbook and CD freeze flowing from this task are in
+[`docs/ops/runbooks/exam-day-slo.md`](../../docs/ops/runbooks/exam-day-slo.md)
+and [`ops/release/freeze-windows.yml`](../../ops/release/freeze-windows.yml).
+
 ## Files
 - ops/capacity/exam-day-plan.md
 - k6 scripts
