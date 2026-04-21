@@ -3,10 +3,34 @@ id: prr-148-followup
 re-opens: prr-148
 priority: P1
 tier: mvp
-tags: [epic-prr-a, pedagogy, onboarding, false-done]
+tags: [epic-prr-a, pedagogy, onboarding, false-done, superseded]
+status: superseded
+superseded-by: prr-221
+superseded-on: 2026-04-21
+superseded-by-commit: claude-subagent-wave6b/prr-232-148-a11y-frontend
 ---
 
 # prr-148-followup — Wire `ExamPlanStep` into onboarding stepper
+
+## Superseded — 2026-04-21
+
+This follow-up is superseded by **PRR-221** (multi-target onboarding /
+`EPIC-PRR-F`). The single-target `ExamPlanStep.vue` from the original
+prr-148 is replaced by the richer `PerTargetPlanStep.vue`, which is now
+mounted at `onboarding.step === 'per-target-plan'` inside
+`src/student/full-version/src/pages/onboarding.vue:300-304` and already
+handles sitting, weekly-hours, and Bagrut question-paper selection per
+target. The `stepOwnsAdvance` guard already includes
+`'per-target-plan'` (onboarding.vue:109), so the outer Next button does
+not double up with the step's internal Continue.
+
+The legacy `ExamPlanStep.vue` file remains on disk as reference for a
+future classroom-override path (see prr-221 close-out notes) but is NOT
+rendered anywhere. No new code ships from this follow-up.
+
+File moved to `superseded/` as a record only. Do not re-open.
+
+## Original description (kept for audit)
 
 ## Why this exists
 

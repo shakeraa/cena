@@ -240,6 +240,7 @@
     "openToolbar": "Open accessibility toolbar",
     "closeToolbar": "Close accessibility toolbar",
     "toolbarTitle": "Accessibility",
+    "language": "Language",
     "textSize": "Text size",
     "increaseTextSize": "Increase text size",
     "decreaseTextSize": "Decrease text size",
@@ -247,7 +248,8 @@
     "reducedMotion": "Reduce motion",
     "dyslexiaFont": "Dyslexia-friendly font",
     "resetDefaults": "Reset to defaults",
-    "legalNote": "These settings persist on this device. Per the Equal Rights for Persons with Disabilities Law (5758-1998).",
+    "legalNote": "These settings persist on this device. Per the Equal Rights for Persons with Disabilities Law (5758-1998) and Accessibility Regulations (5773-2013).",
+    "accessibilityStatement": "Accessibility statement",
     "size": {
       "xsmall": "Extra small",
       "small": "Small",
@@ -255,6 +257,12 @@
       "large": "Large",
       "xlarge": "Extra large",
       "xxlarge": "Maximum"
+    },
+    "numerals": {
+      "label": "Numerals",
+      "auto": "Automatic (follow language)",
+      "western": "Western (0-9)",
+      "eastern": "Eastern Arabic (٠-٩)"
     }
   },
   "status": {
