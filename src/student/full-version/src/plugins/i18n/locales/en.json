@@ -946,6 +946,30 @@
       "skipAll": "Skip quiz",
       "confirm": "Confirm"
     },
+    "examTargets": {
+      "title": "Which exams are you aiming for?",
+      "subtitle": "Pick up to {max} — you can change this anytime from settings.",
+      "groupLabel": "Available exam targets",
+      "loading": "Loading exam catalog…",
+      "fetchFailed": "Couldn't load the exam catalog — please try again.",
+      "capReached": "You've selected the maximum of {max}. Deselect one to swap."
+    },
+    "perTargetPlan": {
+      "title": "Set a plan for each exam",
+      "subtitle": "Pick a sitting and how many hours per week you want to study for each.",
+      "targetHeader": "{current} of {total}: {name}",
+      "sittingLegend": "When are you sitting this exam?",
+      "papersLegend": "Which question papers (שאלונים) are you taking?",
+      "weeklyLabel": "Weekly study time",
+      "noSittings": "No sittings listed for this target — we'll follow up.",
+      "sittingLabel": "{season} {year} — Moed {moed} ({date})",
+      "season": {
+        "summer": "Summer",
+        "winter": "Winter",
+        "spring": "Spring",
+        "autumn": "Autumn"
+      }
+    },
     "perTargetDiagnostic": {
       "title": "Let's calibrate for {target}",
       "calibrationFraming": "We're learning what you already know — this is calibration, not a test. Skip anything that feels unfamiliar.",
