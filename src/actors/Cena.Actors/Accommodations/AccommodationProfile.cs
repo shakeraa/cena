@@ -152,7 +152,39 @@ public enum AccommodationDimension
     /// defensible (reduces cognitive load at zero cost to unaffected
     /// students) but we do not claim it closes an achievement gap.
     /// </summary>
-    Dyscalculia = 10
+    Dyscalculia = 10,
+
+    /// <summary>
+    /// prr-179 — student-facing "go gentler today" self-opt-in. A single-
+    /// dimension signal the student can flip at the start of a session
+    /// ("go gentler today") when they want the session-pacing engine to
+    /// bias toward shorter items, lower item-selection difficulty, and
+    /// fewer mid-session adjustments. Unlike <see cref="ExtendedTime"/>
+    /// and <see cref="LdAnxiousFriendly"/>, this is NOT a Ministry-issued
+    /// hatama and requires NO consent-document hash — it is a transient
+    /// self-regulation control the student owns.
+    ///
+    /// Crucially, this dimension is NOT a diagnostic inference. The
+    /// student is not telling the platform "I am depressed today"
+    /// (therapeutic-claim territory, banned by prr-073) — they are telling
+    /// the pacing engine "bias toward the lower-stress end of my
+    /// mastery-appropriate item range for this session". The accommodation
+    /// is session-scoped by default (renew each session); an explicit
+    /// parent/self toggle makes it persistent.
+    ///
+    /// WHY a separate dimension instead of overloading DistractionReducedLayout:
+    /// layout reduction is about visual noise on the problem page; go-gentler-
+    /// today is about item-selection and session-pacing decisions that sit
+    /// upstream of the render seam. A student may want layout reduction
+    /// without pacing changes (concentration support) or pacing changes
+    /// without layout reduction (tired/sick day) — conflating them destroys
+    /// the signal.
+    ///
+    /// Phase 1B ships the dimension as a registered opt-in; the session
+    /// pacing engine consumes the <see cref="AccommodationProfile.GoGentlerTodayEnabled"/>
+    /// accessor. The student-facing UI toggle is a follow-up task.
+    /// </summary>
+    GoGentlerToday = 11
 }
 
 /// <summary>
@@ -201,7 +233,13 @@ public static class Phase1BDimensions
             // Wired in SessionEndpoints.GetCurrentQuestion via the
             // ShowNumberLineStrip + DyscalculiaExtendedTimeMultiplier
             // accessors. Research backing in the enum comment.
-            AccommodationDimension.Dyscalculia
+            AccommodationDimension.Dyscalculia,
+            // prr-179: "go gentler today" self-opt-in. Registered as a
+            // Phase-1B dimension so the session pacing engine can consume
+            // GoGentlerTodayEnabled today; the UI toggle is a follow-up
+            // task (it is NOT gated by a Ministry hatama code, so no
+            // consent-document-hash wiring is required).
+            AccommodationDimension.GoGentlerToday
         };
 
     public static bool IsShipped(AccommodationDimension d) => Shipped.Contains(d);
@@ -365,6 +403,19 @@ public sealed record AccommodationProfile(
     /// </summary>
     public double SessionTimeMultiplier
         => Math.Max(ExtendedTimeMultiplier, DyscalculiaExtendedTimeMultiplier);
+
+    /// <summary>
+    /// prr-179 — true when the student has flipped the "go gentler today"
+    /// self-opt-in for this session. Consumed by the session pacing engine
+    /// to bias item-selection toward the lower-stress end of the student's
+    /// mastery-appropriate range and to suppress mid-session difficulty
+    /// adjustments that would otherwise ratchet up intensity. The flag is
+    /// a SELF-REGULATION SIGNAL, not a diagnostic inference — the pacing
+    /// engine MUST NOT interpret it as evidence of a mood/clinical state
+    /// (therapeutic-claim territory, separately banned by prr-073).
+    /// </summary>
+    public bool GoGentlerTodayEnabled
+        => IsEnabled(AccommodationDimension.GoGentlerToday);
 
     /// <summary>
     /// Convenience: a default "no accommodations" profile for students
