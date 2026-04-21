@@ -337,6 +337,106 @@ groups:
             (and reconcile with institute-admin UI) so prr-084 breach alerts can fire for
             this tenant. Default fallback of $100/mo applies until then.
 
+  # ─────────────────────────────────────────────────────────────────
+  # prr-233 — Per-target prompt-cache SLO + cache-miss spend projection.
+  #
+  # Motivation (persona-finops): multi-target plans pull the GLOBAL cache
+  # hit rate from ~85% down to ~68-72% because the per-target prompt
+  # context varies. The global average view hides a failing target — the
+  # per-target split surfaces it.
+  #
+  # SLO (prr-233 §DoD):
+  #   7-day rolling hit rate >= 60% per (feature, exam_target_code).
+  #   Alert fires below 60% sustained for 1h so flapping cold-start
+  #   doesn't page. Guard: denom > 0.1 req/sec (same shape as the
+  #   global SLO alert in §prr-047).
+  #
+  # The "unknown" target is EXCLUDED from the per-target SLO. Rationale:
+  # it aggregates every call where no active-target scope was open
+  # (legacy prr-148, migrations, system-prompt warmups). Holding it to
+  # the per-target SLO would constantly fire on the bootstrap cohort.
+  # The GLOBAL SLO (§prr-047 above) still catches catastrophic drops in
+  # the "unknown" bucket via the combined hits+misses rollup.
+  #
+  # The second rule group emits a RECORDING rule
+  # `cena_llm_cache_miss_spend_usd_projected{feature, exam_target_code}`
+  # which converts the 'hit rate dipped' signal into a 30-day dollar
+  # projection. The dashboard consumes this recording directly so the
+  # cost panel paints per target without re-deriving the math per query.
+  # Formula: projection = cost_7d * (1 - hit_rate_7d) * (30/7)
+  # ─────────────────────────────────────────────────────────────────
+  - name: cena-prompt-cache-per-target
+    rules:
+      - alert: CenaPromptCacheHitRatePerTargetDegraded
+        expr: >-
+          (
+            sum by (task, exam_target_code) (rate(cena_prompt_cache_hits_total{exam_target_code!="unknown"}[7d]))
+            /
+            clamp_min(
+              sum by (task, exam_target_code) (
+                rate(cena_prompt_cache_hits_total{exam_target_code!="unknown"}[7d])
+                + rate(cena_prompt_cache_misses_total{exam_target_code!="unknown"}[7d])
+              ),
+              0.001
+            )
+          ) < 0.60
+          and
+          sum by (task, exam_target_code) (
+            rate(cena_prompt_cache_hits_total{exam_target_code!="unknown"}[7d])
+            + rate(cena_prompt_cache_misses_total{exam_target_code!="unknown"}[7d])
+          ) > 0.1
+        for: 1h
+        labels:
+          severity: warning
+          team: cena-finops
+        annotations:
+          summary: "Prompt cache hit rate for (task={{ $labels.task }}, target={{ $labels.exam_target_code }}) below 60% SLO"
+          description: >-
+            Per-target SLO breach: (task, exam_target_code) =
+            ({{ $labels.task }}, {{ $labels.exam_target_code }}) has a 7d
+            rolling hit rate of {{ $value | humanizePercentage }} (target >=
+            60%). Check the 'Cache hit rate per exam target' heatmap on the
+            LLM Prompt Cache Hit Rate dashboard. Likely causes:
+            (1) a per-target prompt template introduced a new variable that
+            defeats the cache; (2) a target just went live and is in cold
+            start (wait out the 1h window); (3) the active-target resolver
+            (prr-226 / ADR-0050 §10) is mis-scoping a student's session.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/operations/llm-cache-runbook.md#per-target-slo-breach"
+
+  - name: cena-llm-cache-savings-projection
+    interval: 5m
+    rules:
+      # prr-233: per-(feature, exam_target_code) projected 30d cache-miss
+      # spend. The dashboard consumes this recording directly (no re-
+      # derivation per panel query). Only computed when the denom
+      # > 0.1 req/sec so cold environments don't surface noise numbers.
+      - record: cena_llm_cache_miss_spend_usd_projected
+        expr: >-
+          (
+            sum by (feature, exam_target_code) (increase(cena_llm_call_cost_usd_total[7d]))
+            *
+            (
+              1 -
+              (
+                sum by (feature, exam_target_code) (rate(cena_prompt_cache_hits_total[7d]))
+                /
+                clamp_min(
+                  sum by (feature, exam_target_code) (
+                    rate(cena_prompt_cache_hits_total[7d])
+                    + rate(cena_prompt_cache_misses_total[7d])
+                  ),
+                  0.001
+                )
+              )
+            )
+            * 30 / 7
+          )
+          and
+          sum by (feature, exam_target_code) (
+            rate(cena_prompt_cache_hits_total[7d])
+            + rate(cena_prompt_cache_misses_total[7d])
+          ) > 0.1
+
   - name: cena-deploy-health-continued
     rules:
       # Migrator job running too long (> 5 min)

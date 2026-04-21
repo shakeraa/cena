@@ -77,6 +77,59 @@ public sealed class LlmCostMetricTests
         Assert.Equal("socratic_question", tags["task"]);
         Assert.Equal("cena-platform", tags["institute_id"]);
         Assert.Equal("test-sonnet", tags["model_id"]);
+        // prr-233: when no target is supplied the label degrades to "unknown"
+        // using the same spelling as UnknownInstituteLabel — this is load-
+        // bearing for the dashboard's "group by unknown" semantics.
+        Assert.Equal(LlmCostMetric.UnknownExamTargetCodeLabel, tags["exam_target_code"]);
+    }
+
+    [Fact]
+    public void Record_EmitsExamTargetCodeLabel_WhenSupplied()
+    {
+        using var factory = new CapturingMeterFactory();
+        var metric = new LlmCostMetric(factory, SamplePricing());
+
+        string? capturedTarget = null;
+        using var listener = new MeterListener
+        {
+            InstrumentPublished = (inst, lst) =>
+            {
+                if (inst.Name == LlmCostMetric.CostCounterName)
+                    lst.EnableMeasurementEvents(inst);
+            }
+        };
+        listener.SetMeasurementEventCallback<double>((instrument, value, tags, state) =>
+        {
+            foreach (var t in tags)
+            {
+                if (t.Key == "exam_target_code") capturedTarget = (string?)t.Value;
+            }
+        });
+        listener.Start();
+
+        metric.Record(
+            feature: "socratic",
+            tier: "tier3",
+            task: "socratic_question",
+            modelId: "test-sonnet",
+            inputTokens: 1,
+            outputTokens: 1,
+            instituteId: "cena-platform",
+            examTargetCode: "BAGRUT_MATH_5U");
+        Assert.Equal("BAGRUT_MATH_5U", capturedTarget);
+    }
+
+    [Fact]
+    public void Record_RejectsColonInExamTargetCode()
+    {
+        using var factory = new CapturingMeterFactory();
+        var metric = new LlmCostMetric(factory, SamplePricing());
+
+        // Colons are structured-id separators in some exporters; reject at
+        // the Record seam so a bad label never reaches Prometheus.
+        Assert.Throws<ArgumentException>(() =>
+            metric.Record("socratic", "tier3", "socratic_question", "test-sonnet",
+                1, 1, instituteId: "cena-platform", examTargetCode: "BAGRUT:MATH"));
     }
 
     [Fact]

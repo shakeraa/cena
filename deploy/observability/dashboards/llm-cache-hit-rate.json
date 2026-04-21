@@ -11,16 +11,16 @@
       }
     ]
   },
-  "description": "Cena prompt-cache hit-rate SLO (prr-047 / ADR-0026 §6). Target: hit rate >= 40% rolling 24h per cache_type. Alert: sustained <20% for 1h.",
+  "description": "Cena prompt-cache hit-rate SLO (prr-047 / prr-233 / ADR-0026 §6). Global target: hit rate >= 40% rolling 24h per cache_type. Per-target SLO (prr-233): hit rate >= 60% per (feature, exam_target_code) over a 7-day rolling window; alert fires below 60%.",
   "editable": true,
   "graphTooltip": 1,
   "id": null,
-  "tags": ["cena", "llm", "cost", "slo"],
+  "tags": ["cena", "llm", "cost", "slo", "finops"],
   "timezone": "browser",
   "title": "Cena — LLM Prompt Cache Hit Rate",
   "uid": "cena-llm-cache-hit-rate",
   "schemaVersion": 38,
-  "version": 1,
+  "version": 2,
   "time": { "from": "now-24h", "to": "now" },
   "refresh": "1m",
   "templating": {
@@ -53,6 +53,16 @@
         "multi": true,
         "includeAll": true,
         "refresh": 2
+      },
+      {
+        "name": "exam_target_code",
+        "label": "Exam target (prr-233)",
+        "type": "query",
+        "datasource": { "type": "prometheus", "uid": "prometheus" },
+        "query": "label_values(cena_prompt_cache_hits_total, exam_target_code)",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 2
       }
     ]
   },
@@ -63,7 +73,7 @@
       "gridPos": { "h": 6, "w": 8, "x": 0, "y": 0 },
       "targets": [
         {
-          "expr": "sum(rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])) / clamp_min(sum(rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])) + sum(rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])), 0.001)",
+          "expr": "sum(rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m])) / clamp_min(sum(rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m])) + sum(rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m])), 0.001)",
           "legendFormat": "hit rate",
           "refId": "A"
         }
@@ -96,7 +106,7 @@
       "gridPos": { "h": 10, "w": 16, "x": 8, "y": 0 },
       "targets": [
         {
-          "expr": "sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])) / clamp_min(sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]) + rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])), 0.001)",
+          "expr": "sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m])) / clamp_min(sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m]) + rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m])), 0.001)",
           "legendFormat": "{{cache_type}}",
           "refId": "A"
         }
@@ -124,7 +134,7 @@
       "gridPos": { "h": 10, "w": 12, "x": 0, "y": 10 },
       "targets": [
         {
-          "expr": "sum by (task) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])) / clamp_min(sum by (task) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]) + rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m])), 0.001)",
+          "expr": "sum by (task) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m])) / clamp_min(sum by (task) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m]) + rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m])), 0.001)",
           "legendFormat": "{{task}}",
           "refId": "A"
         }
@@ -139,7 +149,7 @@
       "gridPos": { "h": 10, "w": 12, "x": 12, "y": 10 },
       "targets": [
         {
-          "expr": "sum by (cache_type, op) (rate(cena_prompt_cache_errors_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]))",
+          "expr": "sum by (cache_type, op) (rate(cena_prompt_cache_errors_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m]))",
           "legendFormat": "{{cache_type}} {{op}}",
           "refId": "A"
         }
@@ -152,17 +162,100 @@
       "gridPos": { "h": 10, "w": 24, "x": 0, "y": 20 },
       "targets": [
         {
-          "expr": "sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]))",
+          "expr": "sum by (cache_type) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m]))",
           "legendFormat": "hits — {{cache_type}}",
           "refId": "A"
         },
         {
-          "expr": "sum by (cache_type) (rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\"}[5m]))",
+          "expr": "sum by (cache_type) (rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[5m]))",
           "legendFormat": "misses — {{cache_type}}",
           "refId": "B"
         }
       ],
       "fieldConfig": { "defaults": { "unit": "ops" } }
+    },
+    {
+      "title": "Cache hit rate per exam target (prr-233 — 7d rolling)",
+      "description": "Per-target cache hit-rate heatmap. SLO: every (feature, exam_target_code) bucket >= 60% over the 7-day rolling window. Below 60% triggers CenaPromptCacheHitRatePerTargetDegraded. Persona-finops expects the multi-target world to pull the global average from ~85% down to ~68-72% — the per-target split is the early-detection signal.",
+      "type": "heatmap",
+      "gridPos": { "h": 12, "w": 24, "x": 0, "y": 30 },
+      "targets": [
+        {
+          "expr": "sum by (exam_target_code, task) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[7d])) / clamp_min(sum by (exam_target_code, task) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[7d]) + rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[7d])), 0.001)",
+          "legendFormat": "{{exam_target_code}} x {{task}}",
+          "refId": "A",
+          "format": "heatmap"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.45 },
+              { "color": "yellow", "value": 0.55 },
+              { "color": "green", "value": 0.6 }
+            ]
+          }
+        }
+      },
+      "options": {
+        "calculate": false,
+        "yAxis": { "decimals": 2 },
+        "color": { "scheme": "RdYlGn", "mode": "scheme", "steps": 16 },
+        "legend": { "show": true },
+        "tooltip": { "show": true, "yHistogram": false },
+        "showValue": "auto"
+      }
+    },
+    {
+      "title": "Per-target hit rate trend (7d rolling, per exam_target_code)",
+      "description": "Timeseries companion to the heatmap — use to spot targets whose hit rate is trending below the 60% floor before the alert fires.",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 42 },
+      "targets": [
+        {
+          "expr": "sum by (exam_target_code) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[7d])) / clamp_min(sum by (exam_target_code) (rate(cena_prompt_cache_hits_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[7d]) + rate(cena_prompt_cache_misses_total{institute_id=~\"$institute\",cache_type=~\"$cache_type\",task=~\"$task\",exam_target_code=~\"$exam_target_code\"}[7d])), 0.001)",
+          "legendFormat": "{{exam_target_code}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "min": 0,
+          "max": 1,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 0.45 },
+              { "color": "green", "value": 0.6 }
+            ]
+          },
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10 }
+        }
+      }
+    },
+    {
+      "title": "Projected cache-miss spend USD per (feature, exam_target_code)  (prr-233)",
+      "description": "Recording-rule backed: cena_llm_cache_miss_spend_usd_projected{exam_target_code, feature} projects the 7-day cost attributable to cache-miss LLM calls out to 30 days. Sourced from the cost counter filtered to misses via the join-by-key recording rule in alerting-rules.yaml §cena-prompt-cache-per-target. Gives finops a dollar-scaled view of the 'hit rate dipped' signal.",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 52 },
+      "targets": [
+        {
+          "expr": "sum by (exam_target_code, feature) (cena_llm_cache_miss_spend_usd_projected{exam_target_code=~\"$exam_target_code\"})",
+          "legendFormat": "{{feature}} / {{exam_target_code}}",
+          "refId": "A"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": { "unit": "currencyUSD", "decimals": 2 }
+      }
     }
   ]
 }
