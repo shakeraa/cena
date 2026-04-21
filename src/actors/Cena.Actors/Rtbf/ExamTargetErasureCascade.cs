@@ -81,6 +81,11 @@ public sealed class ExamTargetErasureCascade : IErasureProjectionCascade
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(studentId);
 
+        // Erasure target: SkillKeyedMasteryRow (keyed by StudentAnonId,
+        // ExamTargetCode, SkillCode per prr-222). Deletion routes through
+        // ISkillKeyedMasteryStore; the row type name appears here so the
+        // architecture ratchet ErasureCascadeCoversExamTargetProjectionsTest
+        // can grep-verify coverage without reflection.
         var masteryDeleted = await _masteryStore
             .DeleteByStudentAsync(studentId, ct)
             .ConfigureAwait(false);
