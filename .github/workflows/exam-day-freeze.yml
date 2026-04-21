@@ -1,0 +1,74 @@
+name: Exam-day change-freeze gate
+
+# Blocks production-affecting merges + dispatches during windows declared in
+# ops/release/freeze-windows.yml. The file is auto-generated from
+# contracts/exam-catalog/ via scripts/ops/generate-freeze-windows.mjs.
+#
+# Break-glass: apply the `exam-day/break-glass` label (gated by SRE approval
+# in #incident-exam-day) to the PR, with an incident-link comment. See
+# docs/ops/runbooks/exam-day-slo.md §3c.
+#
+# Security note: all event-driven data is routed through env vars (never
+# interpolated into run: blocks) per the hardening guidance in
+# scripts/shipgate/ — the check script reads from process.env, not argv.
+#
+# Source task: prr-016. Extended by prr-053 (capacity plan) + prr-231 (SAT/PET).
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+  workflow_dispatch:
+    inputs:
+      target_environment:
+        description: "Environment being dispatched to (informational)"
+        required: false
+        type: string
+        default: "production"
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  check-freeze:
+    name: Verify exam-day freeze
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check freeze window
+        id: freeze
+        env:
+          # Route event data through env vars, never inline interpolation, per
+          # workflow-injection hardening guide linked in the PR review doc.
+          PR_LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+          EVENT_NAME: ${{ github.event_name }}
+          TARGET_ENV: ${{ inputs.target_environment }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: node .github/workflows/scripts/exam-day-freeze-check.mjs
+
+      - name: Summary
+        if: always()
+        env:
+          FREEZE_OUTCOME: ${{ steps.freeze.outcome }}
+        run: |
+          {
+            echo "### Exam-day freeze check"
+            if [ "$FREEZE_OUTCOME" = "success" ]; then
+              echo "Freeze check **passed**."
+            else
+              echo "Freeze check **failed**. See job log for the active window."
+              echo ""
+              echo "Break-glass: apply label \`exam-day/break-glass\` after SRE approval."
+              echo "Runbook: docs/ops/runbooks/exam-day-slo.md §3c."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
