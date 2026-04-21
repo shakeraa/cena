@@ -1,6 +1,6 @@
 # ADR-0050 — Multi-target student exam plan (grade is per-target, not per-student)
 
-- **Status**: Accepted (draft pending final sign-off)
+- **Status**: Accepted
 - **Date proposed**: 2026-04-21
 - **Deciders**: Shaker (project owner), claude-code (coordinator); 10-persona review consensus
 - **Supersedes**: single-target `StudentPlanConfig` assumption implicit in [PRR-148](../../tasks/pre-release-review/done/TASK-PRR-148-student-input-ui-for-adaptivescheduler-deadline-weekly-ti.md)
@@ -183,3 +183,4 @@ Every task that touches StudentActor / AdaptiveScheduler / onboarding / catalog 
 
 - 2026-04-21 proposed: 10-persona review + user scope-expansion + content-budget approval.
 - 2026-04-21 accepted (draft): pending final read-through by Shaker; no material changes expected.
+- 2026-04-21 signed off ([PRR-217](../../tasks/pre-release-review/done/TASK-PRR-217-adr-0049-multi-target-exam-plan.md)): draft status removed. All 5 open questions resolved; cross-references to ADR-0001/0002/0003/0012/0026/0038/0043/0048 locked. Shipgate extension for multi-target dark-pattern identifier bans landed in [PRR-224](../../tasks/pre-release-review/done/TASK-PRR-224-shipgate-scanner-v2-multi-target-bans.md); pre-existing streak leak at `src/student/full-version/src/pages/progress/time.vue:40-54` removed in [PRR-225](../../tasks/pre-release-review/done/TASK-PRR-225-remove-streak-leak-progress-time.md).

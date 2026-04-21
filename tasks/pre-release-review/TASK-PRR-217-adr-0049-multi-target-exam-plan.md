@@ -6,7 +6,7 @@
 **Source docs**: [docs/design/MULTI-TARGET-EXAM-PLAN-001-discussion.md §14](../../docs/design/MULTI-TARGET-EXAM-PLAN-001-discussion.md), persona-ministry findings (Ministry שאלון codes), persona-educator findings (sitting taxonomy)
 **Assignee hint**: human-architect + kimi-coder (ADR writing support)
 **Tags**: source=multi-target-exam-plan-001, type=adr, epic=epic-prr-f, priority=p0, blocker
-**Status**: Draft landed 2026-04-21 — ADR at [docs/adr/0050-multi-target-student-exam-plan.md](../../docs/adr/0050-multi-target-student-exam-plan.md). Note: canonical number is ADR-**0050**, not 0049 (0049 was already taken by citation-integrity). All 5 open questions resolved. Pending final sign-off read.
+**Status**: Done 2026-04-21 — ADR at [docs/adr/0050-multi-target-student-exam-plan.md](../../docs/adr/0050-multi-target-student-exam-plan.md). Note: canonical number is ADR-**0050**, not 0049 (0049 was already taken by citation-integrity). All 5 open questions resolved. Final sign-off closed by wave6a bundle (PRR-217/224/225): ADR status line reads `Accepted` (draft qualifier removed); history entry added noting sign-off; shipgate extension for multi-target dark-pattern identifier bans landed in PRR-224; pre-existing streak leak at `progress/time.vue:40-54` removed in PRR-225.
 **Source**: 10-persona review of MULTI-TARGET-EXAM-PLAN-001
 **Tier**: mvp
 **Epic**: [EPIC-PRR-F](EPIC-PRR-F-multi-target-onboarding-plan.md)
