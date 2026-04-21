@@ -1,4 +1,4 @@
-# TASK-PRR-243: Per-institute pricing override (super-admin configurable)
+# TASK-PRR-244: Per-institute pricing override (super-admin configurable)
 
 **Priority**: P1
 **Effort**: M (1 week — 3 surfaces: admin UI + resolver + audit)
@@ -130,6 +130,6 @@ prominently so the default is the truth for 95%+ of institutes.
 
 ```sh
 git add -A
-git commit -m "feat(prr-243): per-institute pricing override — SUPER_ADMIN-gated + audit trail + arch ratchet"
+git commit -m "feat(prr-244): per-institute pricing override — SUPER_ADMIN-gated + audit trail + arch ratchet"
 git push
 ```

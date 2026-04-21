@@ -38,6 +38,7 @@ welcome → role → exam-targets → per-target-plan → language → diagnosti
 - Loop page per selected target. Must be announced correctly by SR (persona-a11y non-negotiable): "step 4 of 8 — target 2 of 3: Bagrut Physics 5U". Either flatten into top-level steps or use `aria-live` + `aria-labelledby` on a single `aria-current="step"` source of truth.
 - Per-target controls:
   - Track picker (if `trackOptions.length > 1`): radio with `aria-label` per track.
+  - **שאלון multi-pick sub-step for Bagrut targets only** (per [PRR-243](TASK-PRR-243-bagrut-question-paper-multi-pick.md)): after track is chosen, show catalog `question_papers[]` with defaults-all-checked; student can uncheck. Optional expand "Take some at different sittings?" surfaces per-שאלון sitting override. Non-Bagrut targets skip this sub-step.
   - Sitting picker: list of `{sittingCode}` from catalog, **not** a free date picker. Radio list sorted by `canonical_date` ascending; show canonical date next to sitting label wrapped `<bdi dir="ltr">`.
   - Weekly-hours slider 1..40: `role="slider"`, `aria-valuemin/max/now/text` set. `aria-valuetext` in locale numerals (Western vs Eastern Arabic; see PRR-232).
   - No free-text note field (persona-privacy + redteam + ethics + finops kill).

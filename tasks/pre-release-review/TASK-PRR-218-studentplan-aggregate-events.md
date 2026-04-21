@@ -25,10 +25,13 @@ Implement the event-sourced `StudentPlan` aggregate and `ExamTarget*` events on 
 
 ### Events
 
-- `ExamTargetAdded(targetId, source, assignedById, enrollmentId?, examCode, track?, sittingCode, weeklyHours, reasonTag?, createdAt)`
+- `ExamTargetAdded(targetId, source, assignedById, enrollmentId?, examCode, track?, questionPaperCodes, sittingCode, perPaperSittingOverride?, weeklyHours, reasonTag?, createdAt)` — includes שאלון list + optional per-paper sitting overrides per PRR-243.
 - `ExamTargetUpdated(targetId, track?, sittingCode, weeklyHours, reasonTag?)` — no source/examCode/assignedById change.
 - `ExamTargetArchived(targetId, archivedAt, reason)` — archival is soft; event is terminal for the target.
 - `ExamTargetOverrideApplied(targetId, sessionId, appliedAt)` — student picked a different target for this session (scheduler telemetry; no behavior change).
+- `QuestionPaperAdded(targetId, paperCode, sittingOverride?)` — post-hoc add of a שאלון to an active Bagrut target.
+- `QuestionPaperRemoved(targetId, paperCode)` — post-hoc removal; rejects if it would leave Bagrut target with zero papers.
+- `PerPaperSittingOverrideSet(targetId, paperCode, sitting)` / `PerPaperSittingOverrideCleared(targetId, paperCode)`.
 
 ### Command handlers
 
@@ -43,6 +46,9 @@ Implement the event-sourced `StudentPlan` aggregate and `ExamTarget*` events on 
 - `count(active Targets) ≤ 5` (archived don't count).
 - `target.ArchivedAt != null ⇒ no further Updated/Archived events`.
 - `examCode + sittingCode + track` tuple unique across active targets per student (can't add 2 identical targets).
+- Bagrut-family `examCode ⇒ QuestionPaperCodes.Count ≥ 1` and each code exists in catalog for `(examCode, track)`.
+- Standardized-family (SAT / PET) `examCode ⇒ QuestionPaperCodes.Count = 0`.
+- `PerPaperSittingOverride` keys ⊆ `QuestionPaperCodes`; values ≠ primary `Sitting` (keep the map minimal).
 - All validation at the aggregate root, not in endpoints.
 
 ### Endpoints

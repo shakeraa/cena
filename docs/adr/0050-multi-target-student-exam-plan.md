@@ -45,7 +45,9 @@ public record ExamTarget(
     EnrollmentId?   EnrollmentId,     // ADR-0001; null for Source=Student
     ExamCode        ExamCode,         // catalog primary key (not display label)
     TrackCode?      Track,            // "2U" | "3U" | "4U" | "5U" | ModuleCode | null
-    SittingCode     Sitting,          // {AcademicYear, Season, Moed} tuple
+    IReadOnlyList<string> QuestionPaperCodes,        // non-empty for Bagrut; empty for SAT/PET
+    SittingCode     Sitting,          // primary {AcademicYear, Season, Moed}
+    IReadOnlyDictionary<string, SittingCode>? PerPaperSittingOverride,  // optional per-שאלון override
     int             WeeklyHours,      // 1..40
     ReasonTag?      ReasonTag,        // {Retake, NewSubject, ReviewOnly, Enrichment}
     DateTimeOffset  CreatedAt,
@@ -56,6 +58,8 @@ public record StudentPlan(IReadOnlyList<ExamTarget> Targets);
 ```
 
 No free-text fields. Free-text note was proposed in the discussion brief and **rejected** by four-lens convergence (ethics + privacy + redteam + finops); `ReasonTag` enum replaces it.
+
+`QuestionPaperCodes` and `PerPaperSittingOverride` encode the Ministry reality that a Bagrut subject per track is **multiple שאלונים** (e.g. Math 5U = {035581, 035582, 035583}), and a student often splits שאלונים across sittings (שאלון 1 in Grade 11 summer, שאלונים 2+3 in Grade 12 summer). See [PRR-243](../../tasks/pre-release-review/TASK-PRR-243-bagrut-question-paper-multi-pick.md) for the onboarding sub-step and implementation. Invariants: Bagrut family ⇒ ≥1 paper code; Standardized (SAT/PET) family ⇒ empty list; override map keys ⊆ paper codes; override values ≠ primary sitting.
 
 ### 2. Catalog primary key is the Ministry numeric code (שאלון), not the display label
 

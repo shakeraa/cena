@@ -423,11 +423,11 @@ All 5 questions resolved. ADR-0049 draft can proceed.
 5. **Paid-tier pricing — recommended defaults, per-institute configurable.**
    - **Defaults (SaaS-global):** $19/month student individual tier; $14/seat institutional (≥20 seats); free-tier 10 sessions/month with tier-2-only LLM (Haiku).
    - **NEW REQUIREMENT:** Super-admin can override all three values per institute in Admin UI. Use case: subsidized regional rollout, enterprise school-network pricing, free-tier expansion for underserved cohorts. Pricing surface is tenant-scoped config with audit trail (every override logs {super_admin_id, institute_id, old_price, new_price, justification, timestamp}).
-   - **Effect:** institutes default to the global pricing; overrides appear in both billing + finance dashboards so the override is visible to finance review. Filed as new task **PRR-243** (see §14.7).
+   - **Effect:** institutes default to the global pricing; overrides appear in both billing + finance dashboards so the override is visible to finance review. Filed as new task **PRR-244** (see §14.7). (PRR-243 was claimed by the parallel-coder Bagrut-שאלון-multi-pick task filed the same day; pricing renumbered to avoid collision.)
 
 ### 14.7 Follow-up task added by the Q5 decision
 
-**PRR-243 — Per-institute pricing override (super-admin configurable)**
+**PRR-244 — Per-institute pricing override (super-admin configurable)**
 
 - Super-admin UI surface (admin app, SUPER_ADMIN-role-gated) with three editable fields: student monthly price, institutional per-seat price (≥N seats), free-tier monthly session cap.
 - Audit event `InstitutePricingOverridden_V1` on every change with full old-value / new-value / justification / actor / institute_id / timestamp.
