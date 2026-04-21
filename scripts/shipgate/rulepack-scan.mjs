@@ -277,6 +277,12 @@ const FIXTURE_FILES = {
   citations: "shipgate/fixtures/banned-citation-sample.md",
   mechanics: "shipgate/fixtures/banned-mechanics-sample.md",
   "effect-size": "shipgate/fixtures/effect-size-citations-sample.md",
+  // EPIC-PRR-D 2nd-wave packs (prr-073/091/142/144/153)
+  "therapeutic-claims": "shipgate/fixtures/assistant-therapeutic-claims-sample.md",
+  "progress-framing": "shipgate/fixtures/progress-framing-sample.md",
+  "error-blame": "shipgate/fixtures/error-message-blame-sample.md",
+  "cheating-alert": "shipgate/fixtures/cheating-alert-framing-sample.md",
+  "reward-emoji": "shipgate/fixtures/reward-inflation-emoji-sample.md",
 };
 
 function collectFiles() {
@@ -302,7 +308,6 @@ function collectFiles() {
 // ---------------------------------------------------------------------------
 // Rule-pack registry
 // ---------------------------------------------------------------------------
-
 const PACKS = [
   {
     name: "citations",
@@ -318,6 +323,32 @@ const PACKS = [
     name: "effect-size",
     rulesFile: "scripts/shipgate/effect-size-citations.yml",
     whitelistFile: "scripts/shipgate/effect-size-citations-whitelist.yml",
+  },
+  // EPIC-PRR-D 2nd-wave packs (prr-073/091/142/144/153 — bundled 2026-04-21).
+  {
+    name: "therapeutic-claims",
+    rulesFile: "scripts/shipgate/assistant-therapeutic-claims.yml",
+    whitelistFile: "scripts/shipgate/assistant-therapeutic-claims-whitelist.yml",
+  },
+  {
+    name: "progress-framing",
+    rulesFile: "scripts/shipgate/progress-framing.yml",
+    whitelistFile: "scripts/shipgate/progress-framing-whitelist.yml",
+  },
+  {
+    name: "error-blame",
+    rulesFile: "scripts/shipgate/error-message-blame.yml",
+    whitelistFile: "scripts/shipgate/error-message-blame-whitelist.yml",
+  },
+  {
+    name: "cheating-alert",
+    rulesFile: "scripts/shipgate/cheating-alert-framing.yml",
+    whitelistFile: "scripts/shipgate/cheating-alert-framing-whitelist.yml",
+  },
+  {
+    name: "reward-emoji",
+    rulesFile: "scripts/shipgate/reward-inflation-emoji.yml",
+    whitelistFile: "scripts/shipgate/reward-inflation-emoji-whitelist.yml",
   },
 ];
 

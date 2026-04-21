@@ -1,0 +1,169 @@
+# =============================================================================
+# Ship-gate whitelist: progress-framing rule pack
+# =============================================================================
+# Files that legitimately need to reference the banned progress-framing /
+# scores-as-identity terms (policy docs, retirement logs, task bodies,
+# research notes, admin-analytics surfaces that rank legitimately, and the
+# positive-test fixture).
+#
+# Core principle: admin/educator analytics are allowed to rank and compare;
+# the student UI is the protected surface. The admin bundles (teacher,
+# principal, ministry dashboards) are whitelisted because their users ARE
+# the comparators.
+# =============================================================================
+
+whitelist:
+  - path: "scripts/shipgate/progress-framing.yml"
+    reason: "The rule pack itself (patterns quoted in rule definitions)"
+
+  - path: "scripts/shipgate/progress-framing-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "scripts/shipgate/rulepack-scan.mjs"
+    reason: "Scanner source references pack name in comments"
+
+  - path: "shipgate/fixtures/progress-framing-sample.md"
+    reason: "Positive-test fixture: deliberately contains every banned pattern"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures/specs reference banned patterns"
+
+  - path: "docs/adr/**"
+    reason: "ADRs describe progress-framing ban rationale"
+
+  - path: "docs/engineering/**/*.md"
+    reason: "Engineering policy docs cite banned phrasing in rejection context"
+
+  - path: "docs/design/**/*.md"
+    reason: "Design docs describe anti-patterns"
+
+  - path: "docs/research/**"
+    reason: "Research notes analyse social-comparison literature"
+
+  - path: "docs/feature-specs/**/*.md"
+    reason: "Feature specs may cite the banned framing in rationale / alternatives-considered context"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may mention shipgate scanner expansions"
+
+  - path: "pre-release-review/**"
+    reason: "Pre-release review corpus"
+
+  - path: "tasks/pre-release-review/TASK-PRR-091-*.md"
+    reason: "Task body defines progress-framing ban"
+
+  - path: "tasks/pre-release-review/EPIC-PRR-D-*.md"
+    reason: "Epic body"
+
+  - path: "CLAUDE.md"
+    reason: "Project rules"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules"
+
+  - path: ".agentdb/**"
+    reason: "Task queue protocol docs"
+
+  # Admin-facing surfaces — teachers, principals, ministry reviewers — ARE
+  # the comparators. They legitimately need to see ranks and top-percentiles.
+  # The protected surface is the STUDENT UI; admin analytics are explicitly
+  # allowed here.
+  - path: "src/admin/full-version/**"
+    reason: "Admin UI is educator-facing; rank/top-N analytics are legitimate for teachers and principals"
+
+  - path: "src/api/Cena.Admin.Api/**"
+    reason: "Admin API serves educator/principal analytics (rank/percentile are by-design for these users)"
+
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Test assertions may reference banned copy in DoesNotContain checks"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may assert banned copy is absent"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant) may assert banned copy is absent"
+
+  # ---- Pre-existing internal domain code (2026-04-21 scan) --------------
+  # Internal C# code models the accommodations boundary ("hide rankings,
+  # leaderboards, percentiles for this student") — the file describes what
+  # the accommodation DOES, not user-facing rank copy. Likewise for consent
+  # purposes, mastery item selection, compliance policy, and gamification
+  # domain DTOs: the word "rank" / "leaderboard" / "top N%" appears as
+  # internal vocabulary, not as student-facing copy.
+  - path: "src/actors/Cena.Actors/Accommodations/**"
+    reason: "Internal accommodations code references rankings in 'hide rankings' policy comments, not as user copy"
+
+  - path: "src/actors/Cena.Actors/Consent/**"
+    reason: "Consent purpose enum references rank/leaderboard as processing purposes (policy domain, not copy)"
+
+  - path: "src/actors/Cena.Actors/Mastery/**"
+    reason: "Internal mastery selection / item-routing domain code (describes what the selector does, not student-facing copy)"
+
+  - path: "src/actors/Cena.Actors/Services/**"
+    reason: "Internal decay / disengagement / error-classification services (domain vocabulary, not student-facing)"
+
+  - path: "src/actors/Cena.Actors/Simulation/**"
+    reason: "Student-archetype simulation code for testing (describes simulated behaviours, not student-facing)"
+
+  - path: "src/actors/Cena.Actors/Tutoring/**"
+    reason: "Tutor prompt builder and session context (internal LLM-prompt construction — prompts themselves are scanned on generation by a separate pipeline)"
+
+  - path: "src/api/Cena.Api.Contracts/Gamification/**"
+    reason: "Gamification DTOs model a pre-existing gamification subsystem (internal transport vocabulary; retirement of student-visible leaderboard features tracked separately)"
+
+  - path: "src/api/Cena.Student.Api.Host/Endpoints/ChallengesEndpoints.cs"
+    reason: "Pre-existing challenges endpoint; retirement of student-visible leaderboard tracked separately"
+
+  - path: "src/api/Cena.Student.Api.Host/Endpoints/GamificationEndpoints.cs"
+    reason: "Pre-existing gamification endpoint; retirement of student-visible leaderboard tracked separately"
+
+  - path: "src/api/Cena.Student.Api.Host/Services/IRecommendationService.cs"
+    reason: "Service interface describes ranked recommendations as an internal contract (not student copy)"
+
+  - path: "src/shared/Cena.Infrastructure/Compliance/**"
+    reason: "Consent / processing-purpose enums reference rank/leaderboard as processing purposes (policy domain)"
+
+  - path: "src/shared/Cena.Infrastructure/Documents/ChallengeDocuments.cs"
+    reason: "Challenge document schema (internal persistence model; not student-facing copy)"
+
+  - path: "src/shared/Cena.Infrastructure/Gamification/**"
+    reason: "Pre-existing gamification infrastructure (LeaderboardService, BadgeCatalog); student-visible leaderboard retirement tracked separately"
+
+  - path: "src/shared/Cena.Infrastructure/Seed/**"
+    reason: "Seed data for demo/challenge content (internal scaffolding, not student-facing production copy)"
+
+  - path: "src/shared/Cena.Infrastructure.Tests/**"
+    reason: "Infrastructure tests assert leaderboard SQL safety / domain behaviour (test vocabulary, not student copy)"
+
+  # ---- Pre-existing student-web legacy leaderboard surfaces -------------
+  # Time-bound: these are pre-existing Vuexy-template + legacy student
+  # leaderboard UI components and the i18n bundles feeding them. A
+  # follow-up task will retire the student-visible leaderboard feature;
+  # until that ships, these files are whitelisted. Remove entries when the
+  # feature retires.
+  - path: "src/student/full-version/src/components/progress/LeaderboardPreview.vue"
+    reason: "Pre-existing student leaderboard preview. Time-bound: remove on leaderboard-retirement PR."
+
+  - path: "src/student/full-version/src/pages/social/leaderboard.vue"
+    reason: "Pre-existing student leaderboard page. Time-bound: remove on leaderboard-retirement PR."
+
+  - path: "src/student/full-version/src/pages/progress/index.vue"
+    reason: "Pre-existing student progress page (surfaces leaderboard preview). Time-bound: remove on leaderboard-retirement PR."
+
+  - path: "src/student/full-version/src/components/shell/CommandPalette.vue"
+    reason: "Pre-existing Vuexy shell command palette (references leaderboard route). Time-bound: remove on leaderboard-retirement PR."
+
+  - path: "src/student/full-version/src/components/shell/ShellShortcuts.vue"
+    reason: "Pre-existing Vuexy shell shortcuts (references leaderboard). Time-bound: remove on leaderboard-retirement PR."
+
+  - path: "src/student/full-version/src/navigation/vertical/index.ts"
+    reason: "Pre-existing nav config (references leaderboard route). Time-bound: remove on leaderboard-retirement PR."
+
+  - path: "src/student/full-version/src/composables/useApiQuery.ts"
+    reason: "Pre-existing API-query composable (mentions leaderboard cache key). Time-bound: remove on leaderboard-retirement PR."
+
+  - path: "src/student/full-version/src/plugins/fake-api/**"
+    reason: "Pre-existing Vuexy fake-API handlers (demo data + leaderboard mock). Time-bound: remove on leaderboard-retirement PR."
+
+  - path: "src/student/full-version/src/plugins/i18n/locales/*.json"
+    reason: "Pre-existing i18n bundles with leaderboard / yourRank / top-N keys. Time-bound: remove on leaderboard-retirement PR."
