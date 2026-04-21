@@ -93,6 +93,20 @@ public enum WhatsAppSenderQuality
 /// is the digest envelope id; the vendor adapter uses it to
 /// deduplicate.
 /// </summary>
+/// <param name="CorrelationId">Digest envelope id — vendor dedup key.</param>
+/// <param name="ParentAnonId">Parent actor id (anon).</param>
+/// <param name="MinorAnonId">Minor student id (anon).</param>
+/// <param name="TemplateId">Pre-approved WhatsApp template id.</param>
+/// <param name="Locale">Render locale.</param>
+/// <param name="AttemptNumber">1-based attempt counter.</param>
+/// <param name="AttemptedAtUtc">Wall clock of this attempt.</param>
+/// <param name="InstituteId">
+/// Optional tenant scope (ADR-0001). Required for prr-108 opt-out
+/// preferences lookup; null/empty falls through to a conservative
+/// "no preferences store consulted → treat as opted-in" ONLY when the
+/// policy is intentionally unwired (test fixtures). Production DI
+/// always threads this.
+/// </param>
 public sealed record WhatsAppDeliveryAttempt(
     string CorrelationId,
     string ParentAnonId,
@@ -100,14 +114,17 @@ public sealed record WhatsAppDeliveryAttempt(
     string TemplateId,
     string Locale,
     int AttemptNumber,
-    DateTimeOffset AttemptedAtUtc);
+    DateTimeOffset AttemptedAtUtc,
+    string? InstituteId = null);
 
 /// <summary>
 /// Outcome of one delivery. Accepted means the vendor queued the
 /// message; Duplicate means the correlation id was already seen;
 /// InvalidRecipient moves to dead-letter; RateLimited requests a
 /// backoff retry; VendorError is retriable up to the per-correlation
-/// cap.
+/// cap; OptedOut is the prr-108 short-circuit (parent has withdrawn
+/// consent for WhatsApp on this child — terminal, no retry, no vendor
+/// call).
 /// </summary>
 public enum WhatsAppDeliveryOutcome
 {
@@ -117,7 +134,8 @@ public enum WhatsAppDeliveryOutcome
     RateLimited = 3,
     VendorError = 4,
     TemplateNotApproved = 5,
-    SenderParked = 6
+    SenderParked = 6,
+    OptedOut = 7
 }
 
 /// <summary>

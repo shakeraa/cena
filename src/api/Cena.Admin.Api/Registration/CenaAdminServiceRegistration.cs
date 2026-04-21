@@ -113,6 +113,20 @@ public static class CenaAdminServiceRegistration
         // added alongside EPIC-PRR-A consent work. Endpoint code is unchanged.
         services.TryAddSingleton<Cena.Actors.ParentDigest.IParentDigestPreferencesStore,
             Cena.Actors.ParentDigest.InMemoryParentDigestPreferencesStore>();
+
+        // prr-108: WhatsApp template → digest-purpose catalog for opt-out policy.
+        // The DefaultWhatsAppTemplatePurposeCatalog ships the Phase 1B live
+        // template mappings; host DI can override by registering a different
+        // IWhatsAppTemplatePurposeCatalog before this call.
+        services.TryAddSingleton<Cena.Actors.ParentDigest.IWhatsAppTemplatePurposeCatalog,
+            Cena.Actors.ParentDigest.DefaultWhatsAppTemplatePurposeCatalog>();
+
+        // prr-112: LLM cost rollup service for the admin cost dashboard.
+        // Default binding is the NullLlmCostRollupService which returns
+        // zero-cost slices — the host's Program.cs swaps this for a
+        // Prometheus-backed implementation in production.
+        services.TryAddSingleton<Cena.Infrastructure.Llm.ILlmCostRollupService,
+            Cena.Infrastructure.Llm.NullLlmCostRollupService>();
         services.TryAddSingleton<Cena.Actors.ParentDigest.IUnsubscribeTokenNonceStore,
             Cena.Actors.ParentDigest.InMemoryUnsubscribeTokenNonceStore>();
         services.TryAddSingleton<Cena.Actors.ParentDigest.IUnsubscribeTokenService>(sp =>
@@ -396,6 +410,19 @@ public static class CenaAdminServiceRegistration
         //   institutes; ADMIN is pinned to the caller's institute_id claim.
         Features.ParentConsole.ConsentAuditExportEndpoint
             .MapConsentAuditExportEndpoint(app);
+        // prr-096: Admin parental-consent management — summary + override.
+        // GET  /api/admin/institutes/{iid}/students/{sid}/consent-summary
+        // POST /api/admin/institutes/{iid}/students/{sid}/consent-override
+        Features.ParentConsole.AdminConsentManagementEndpoints
+            .MapAdminConsentManagementEndpoints(app);
+        // prr-106: Accommodation audit exports for parents (on request).
+        // GET /api/v1/parent/minors/{sid}/accommodation-audit
+        Features.ParentConsole.AccommodationAuditExportEndpoint
+            .MapAccommodationAuditExportEndpoint(app);
+        // prr-112: Admin cost dashboard per-feature per-cohort.
+        // GET /api/admin/llm-cost/per-cohort
+        Features.LlmCost.AdminLlmCostDashboardEndpoint
+            .MapAdminLlmCostDashboardEndpoint(app);
         // FIND-pedagogy-008: learning-objective picker (read-only)
         app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();

@@ -204,4 +204,59 @@ public sealed class ConsentState
     {
         _vetoes.Remove(e.Purpose);
     }
+
+    /// <summary>
+    /// Apply an <see cref="AdminConsentOverridden_V1"/> event (prr-096).
+    /// Admin override behaves like a grant or revoke depending on the Operation
+    /// string: "grant" = new ConsentGrantInfo with IsGranted=true; "revoke" =
+    /// flip IsGranted to false + record the justification as RevocationReason.
+    /// Unknown operations are defensively ignored so a future "suspend" event
+    /// does not corrupt state on an older replay.
+    /// </summary>
+    public void Apply(AdminConsentOverridden_V1 e)
+    {
+        switch (e.Operation)
+        {
+            case "grant":
+                _grants[e.Purpose] = new ConsentGrantInfo(
+                    IsGranted: true,
+                    GrantedByRole: ActorRole.Admin,
+                    GrantedAt: e.OverrideAt,
+                    ExpiresAt: null,
+                    RevokedAt: null,
+                    RevokedByRole: null,
+                    RevocationReason: null);
+                break;
+
+            case "revoke":
+                if (_grants.TryGetValue(e.Purpose, out var prior))
+                {
+                    _grants[e.Purpose] = prior with
+                    {
+                        IsGranted = false,
+                        RevokedAt = e.OverrideAt,
+                        RevokedByRole = ActorRole.Admin,
+                        RevocationReason = e.Justification,
+                    };
+                }
+                else
+                {
+                    _grants[e.Purpose] = new ConsentGrantInfo(
+                        IsGranted: false,
+                        GrantedByRole: null,
+                        GrantedAt: null,
+                        ExpiresAt: null,
+                        RevokedAt: e.OverrideAt,
+                        RevokedByRole: ActorRole.Admin,
+                        RevocationReason: e.Justification);
+                }
+                break;
+
+            default:
+                // Forward-compatible: unknown operation names are logged at
+                // the renderer layer (audit still captures the row) but do
+                // not mutate state here.
+                break;
+        }
+    }
 }

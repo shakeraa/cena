@@ -49,6 +49,16 @@ public sealed class OutboundSmsPolicyArchitectureTests
         // outside the scope of prr-018 which explicitly targets parent-nudge
         // traffic. Revisit when NotificationChannelService grows parent fan-out.
         "src/actors/Cena.Actors/Notifications/NotificationChannelService.cs",
+
+        // prr-108: WhatsApp opt-out decorator. Wraps an inner IWhatsAppSender
+        // and consults ParentDigestPreferences BEFORE delegating to _inner.SendAsync.
+        // The decorator IS the preferences gate for every downstream caller —
+        // it cannot itself route through IOutboundSmsGateway because the
+        // gateway is SMS-only; WhatsApp uses its own vendor path. Adding the
+        // decorator to the allowlist is the correct architectural decision
+        // because the whole point of the class is to be the single wrapper
+        // that every IWhatsAppSender consumer gets from DI.
+        "src/actors/Cena.Actors/ParentDigest/WhatsAppOptOutPolicy.cs",
     };
 
     private static string FindRepoRoot()
