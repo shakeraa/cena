@@ -88,7 +88,71 @@ public enum AccommodationDimension
     /// applies here" imposes higher extraneous load than a concrete
     /// "Try this step: …" on that population.
     /// </summary>
-    LdAnxiousFriendly = 9
+    LdAnxiousFriendly = 9,
+
+    /// <summary>
+    /// Dyscalculia accommodation pack (prr-050). NOT Ministry-gated — this
+    /// is a Cena-native opt-in that layers on top of whatever Ministry
+    /// hatamot the student holds. When enabled, the session-render seam
+    /// emits two additional signals:
+    ///
+    ///   - ShowNumberLineStrip = true  (frontend renders a 0–20 number-
+    ///     line strip with a movable marker across every question DTO so
+    ///     a student can count/point rather than holding numeric
+    ///     cardinality in working memory).
+    ///   - Extended-time multiplier = 1.5 (identical to ExtendedTime but
+    ///     exposed via DyscalculiaExtendedTimeMultiplier so a student can
+    ///     get dyscalculia-only time without also toggling the broader
+    ///     ExtendedTime Ministry-facing dimension).
+    ///
+    /// WHY a separate dimension instead of reusing ExtendedTime +
+    /// DistractionReducedLayout: dyscalculia-specific accommodations are
+    /// orthogonal to the Ministry hatamot set and are described in
+    /// ADR-0040 (accommodation-scope-and-bagrut-parity) as student-
+    /// profile-scoped (they travel across enrolments), not enrollment-
+    /// scoped (which is where the Ministry extended-time variant lives).
+    /// Overloading ExtendedTime would bind dyscalculia support to a
+    /// single enrolment's hatama-1 letter; that is the wrong scope.
+    ///
+    /// Research backing:
+    ///
+    ///   - Butterworth, Varma &amp; Laurillard (2011) "Dyscalculia: From
+    ///     brain to education" (Science 332:1049–1053,
+    ///     DOI 10.1126/science.1201536) document that dyscalculic
+    ///     learners have an impaired "approximate number system" and
+    ///     benefit from EXTERNAL spatial representations of number
+    ///     magnitude — a number-line strip is the canonical intervention.
+    ///     Effect size for number-line training on arithmetic fluency
+    ///     is d≈0.4 (moderate; see Ramani &amp; Siegler 2008 and the
+    ///     Fischer, Moeller, Bientzle, Cress &amp; Nuerk 2011 review).
+    ///     Per ADR-0049 effect-size honesty: moderate, not transformative.
+    ///
+    ///   - Shalev, Manor &amp; Gross-Tsur (2005) "Developmental
+    ///     dyscalculia: a prospective six-year follow-up" (Developmental
+    ///     Medicine &amp; Child Neurology 47:121–125,
+    ///     DOI 10.1017/S0012162205000216) — IL-cohort longitudinal study
+    ///     showing dyscalculia prevalence of ~6% in Israeli primary
+    ///     students with persistence into Bagrut-age cohorts. This is
+    ///     the specific population Cena is shipping for; the
+    ///     intervention set is not hypothetical.
+    ///
+    ///   - Extended time for dyscalculia: Gross-Tsur, Manor &amp; Shalev
+    ///     (1996) "Developmental dyscalculia: prevalence and demographic
+    ///     features" (Developmental Medicine &amp; Child Neurology
+    ///     38:25–33) establishes that calculation-fluency deficits scale
+    ///     roughly linearly with problem complexity — a 1.5× time
+    ///     multiplier is the Israeli Ministry-of-Education standard
+    ///     hatama magnitude for specific-maths-LD students (matches
+    ///     hatama-1).
+    ///
+    /// Honest effect-size caveat (ADR-0049): number-line interventions
+    /// produce moderate gains in early-grade arithmetic fluency; there
+    /// is NO RCT-grade evidence that they improve Bagrut-calibre
+    /// performance on complex items. The accommodation is ethically
+    /// defensible (reduces cognitive load at zero cost to unaffected
+    /// students) but we do not claim it closes an achievement gap.
+    /// </summary>
+    Dyscalculia = 10
 }
 
 /// <summary>
@@ -132,7 +196,12 @@ public static class Phase1BDimensions
     public static readonly IReadOnlySet<AccommodationDimension> Shipped =
         new HashSet<AccommodationDimension>
         {
-            AccommodationDimension.LdAnxiousFriendly
+            AccommodationDimension.LdAnxiousFriendly,
+            // prr-050: dyscalculia pack (number-line strip + 1.5x time).
+            // Wired in SessionEndpoints.GetCurrentQuestion via the
+            // ShowNumberLineStrip + DyscalculiaExtendedTimeMultiplier
+            // accessors. Research backing in the enum comment.
+            AccommodationDimension.Dyscalculia
         };
 
     public static bool IsShipped(AccommodationDimension d) => Shipped.Contains(d);
@@ -262,6 +331,40 @@ public sealed record AccommodationProfile(
     /// </summary>
     public bool LdAnxiousHintGovernorEnabled
         => IsEnabled(AccommodationDimension.LdAnxiousFriendly);
+
+    /// <summary>
+    /// prr-050 — true when the student has the dyscalculia accommodation
+    /// pack enabled. Surfaced on the question DTO so the frontend renders
+    /// a 0–20 number-line strip beneath the problem (the frontend owns
+    /// the visual; the backend merely signals). Research citations live
+    /// on <see cref="AccommodationDimension.Dyscalculia"/>.
+    /// </summary>
+    public bool ShowNumberLineStrip
+        => IsEnabled(AccommodationDimension.Dyscalculia);
+
+    /// <summary>
+    /// prr-050 — dyscalculia-specific pacing multiplier. Returns 1.5 when
+    /// the Dyscalculia dimension is enabled (matches the Ministry hatama-1
+    /// magnitude for specific-maths-LD students — Gross-Tsur, Manor &amp;
+    /// Shalev 1996), 1.0 otherwise. Exposed as a separate accessor from
+    /// <see cref="ExtendedTimeMultiplier"/> so a student can opt into
+    /// dyscalculia-only time without toggling the broader Ministry-facing
+    /// ExtendedTime dimension. Callers that want the MOST-generous
+    /// multiplier across both dimensions should take
+    /// <c>Math.Max(profile.ExtendedTimeMultiplier, profile.DyscalculiaExtendedTimeMultiplier)</c>.
+    /// </summary>
+    public double DyscalculiaExtendedTimeMultiplier
+        => IsEnabled(AccommodationDimension.Dyscalculia) ? 1.5 : 1.0;
+
+    /// <summary>
+    /// prr-050 — effective session-pacing multiplier combining Ministry
+    /// ExtendedTime and Cena-native Dyscalculia. Returns the MAX of the
+    /// two so a student who carries both accommodations does not
+    /// accidentally get stacked multipliers (we do not compound 1.5 × 1.5
+    /// = 2.25 — that is not what either accommodation authorises).
+    /// </summary>
+    public double SessionTimeMultiplier
+        => Math.Max(ExtendedTimeMultiplier, DyscalculiaExtendedTimeMultiplier);
 
     /// <summary>
     /// Convenience: a default "no accommodations" profile for students

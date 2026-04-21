@@ -51,8 +51,8 @@ grandfathered:
 
   # ---- Student API endpoint surface (pre-2026-04-20 legacy) ----
   - path: src/api/Cena.Student.Api.Host/Endpoints/SessionEndpoints.cs
-    baseline_loc: 1297
-    reason: "Student session minimal-API surface; split post EPIC-PRR-A LearningSession extraction. PRR-151 R-22 added AccommodationProfile session-render wiring (+21 LOC). prr-149 wired AdaptiveScheduler plan generation into /start (+32 LOC). prr-029 wired ILdAnxiousHintGovernor into the hint endpoint for L1 worked-step rewrite (+20 LOC; pure template, no LLM). prr-204 wired ISessionTutorContextService pre-seed into /start and invalidate into /complete (+27 LOC; session-scoped per ADR-0003)."
+    baseline_loc: 1302
+    reason: "Student session minimal-API surface; split post EPIC-PRR-A LearningSession extraction. PRR-151 R-22 added AccommodationProfile session-render wiring (+21 LOC). prr-149 wired AdaptiveScheduler plan generation into /start (+32 LOC). prr-029 wired ILdAnxiousHintGovernor into the hint endpoint for L1 worked-step rewrite (+20 LOC; pure template, no LLM). prr-204 wired ISessionTutorContextService pre-seed into /start and invalidate into /complete (+27 LOC; session-scoped per ADR-0003). prr-050 wired Dyscalculia accommodation pack (number-line strip + session-time multiplier max) into current-question (+5 LOC; pure signal, no render logic on backend)."
   - path: src/api/Cena.Student.Api.Host/Endpoints/SocialEndpoints.cs
     baseline_loc: 743
     reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"

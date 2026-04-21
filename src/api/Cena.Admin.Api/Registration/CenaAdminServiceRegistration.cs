@@ -313,6 +313,12 @@ public static class CenaAdminServiceRegistration
         // RDY-070 Phase 1A: Teacher console mastery heatmap (read-only, GET).
         // Vue view + "Assign 15 min" homework action land in Phase 1B/2.
         app.MapHeatmapEndpoint();
+        // prr-049: Actionable teacher dashboard (struggling topics, hint-
+        // ladder usage, intervention-recommended list). Replaces pre-
+        // launch vanity counters (streak days, total minutes) per the
+        // persona-educator lens + ship-gate GD-004 ban on engagement
+        // mechanics.
+        app.MapTeacherDashboardEndpoint();
         // RDY-066 Phase 1B: Parent console accommodations profile.
         // GET reads the latest assigned profile; PUT appends a new
         // AccommodationProfileAssignedV1 event with consent-doc hash.

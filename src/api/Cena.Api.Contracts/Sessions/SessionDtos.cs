@@ -176,7 +176,34 @@ public sealed record SessionQuestionDto(
     /// consistently hide cohort comparisons without re-fetching the
     /// profile.
     /// </summary>
-    bool NoComparativeStats = false);
+    bool NoComparativeStats = false,
+    // =========================================================================
+    // prr-050 — Dyscalculia accommodation pack. Sibling of the PRR-151 R-22
+    // render flags above. When ShowNumberLineStrip is true, the frontend
+    // renders a 0–20 number-line strip beneath the problem so the student
+    // can count/point visually. SessionTimeMultiplier propagates the max
+    // of ExtendedTime and Dyscalculia multipliers; clients that want to
+    // telemeter the effective pacing budget read this field instead of
+    // computing a max themselves (the server has already done so).
+    //
+    // Defaults match the no-accommodation baseline (off / 1.0) so existing
+    // clients that have not added the field to their render path keep
+    // working unchanged. Research citations live on
+    // AccommodationDimension.Dyscalculia.
+    // =========================================================================
+    /// <summary>
+    /// prr-050 — true when the student has the dyscalculia accommodation
+    /// pack enabled (<c>AccommodationDimension.Dyscalculia</c>). Frontend
+    /// renders a 0–20 number-line strip beneath the problem.
+    /// </summary>
+    bool ShowNumberLineStrip = false,
+    /// <summary>
+    /// prr-050 — effective pacing multiplier combining ExtendedTime and
+    /// Dyscalculia accommodations (max of the two; no stacking). 1.0 when
+    /// neither is enabled, 1.5 when either is. Reported so client-side
+    /// audit / telemetry can log the effective budget the student saw.
+    /// </summary>
+    double SessionTimeMultiplier = 1.0);
 
 /// <summary>
 /// FIND-pedagogy-006 — Response for POST /api/sessions/{id}/question/{qid}/hint.

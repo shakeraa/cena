@@ -752,20 +752,26 @@ public static class SessionEndpoints
             // ═════════════════════════════════════════════════════════════════
             var accommodations = await accommodationProfiles.GetCurrentAsync(studentId, ctx.RequestAborted);
             var ttsEnabled = accommodations.TtsForProblemStatementsEnabled;
-            var timeMultiplier = accommodations.ExtendedTimeMultiplier;
             var graphPaperRequired = accommodations.DistractionReducedLayoutEnabled;
             var noComparative = accommodations.NoComparativeStatsRequired;
+            // prr-050 — dyscalculia pack: number-line strip flag + session
+            // pacing multiplier. SessionTimeMultiplier = max(ExtendedTime,
+            // Dyscalculia) so a student with both gets 1.5 (not 2.25).
+            var showNumberLineStrip = accommodations.ShowNumberLineStrip;
+            var timeMultiplier = accommodations.SessionTimeMultiplier;
+            var extendedTimeMultiplier = accommodations.ExtendedTimeMultiplier;
             const int baseExpectedTimeSeconds = 60;
             var expectedTimeSeconds = (int)Math.Round(baseExpectedTimeSeconds * timeMultiplier);
 
-            if (ttsEnabled || graphPaperRequired || timeMultiplier > 1.0 || noComparative)
+            if (ttsEnabled || graphPaperRequired || timeMultiplier > 1.0 || noComparative || showNumberLineStrip)
             {
                 logger.LogInformation(
-                    "[PRR-151 R-22] Session {SessionId} question {QuestionId}: "
+                    "[PRR-151 R-22 / prr-050] Session {SessionId} question {QuestionId}: "
                     + "applying accommodations tts={Tts} graphPaper={GraphPaper} "
-                    + "timeMultiplier={TimeMultiplier:F2} noComparative={NoComparative}",
+                    + "timeMultiplier={TimeMultiplier:F2} noComparative={NoComparative} "
+                    + "numberLineStrip={NumberLineStrip}",
                     sessionId, questionDoc.QuestionId,
-                    ttsEnabled, graphPaperRequired, timeMultiplier, noComparative);
+                    ttsEnabled, graphPaperRequired, timeMultiplier, noComparative, showNumberLineStrip);
             }
 
             return Results.Ok(new SessionQuestionDto(
@@ -782,9 +788,11 @@ public static class SessionEndpoints
                 HintsAvailable: metadata.MaxHints,
                 HintsRemaining: Math.Max(0, metadata.MaxHints - hintsUsed),
                 TtsEnabled: ttsEnabled,
-                ExtendedTimeMultiplier: timeMultiplier,
+                ExtendedTimeMultiplier: extendedTimeMultiplier,
                 GraphPaperRequired: graphPaperRequired,
-                NoComparativeStats: noComparative));
+                NoComparativeStats: noComparative,
+                ShowNumberLineStrip: showNumberLineStrip,
+                SessionTimeMultiplier: timeMultiplier));
         })
         .WithName("GetCurrentQuestion")
     .Produces<SessionQuestionDto>(StatusCodes.Status200OK)

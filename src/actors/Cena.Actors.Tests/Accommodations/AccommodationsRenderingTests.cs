@@ -184,4 +184,72 @@ public class AccommodationsRenderingTests
         Assert.False(p.DistractionReducedLayoutEnabled);
         Assert.False(p.NoComparativeStatsRequired);
     }
+
+    // -------------------------------------------------------------------------
+    // prr-050 — Dyscalculia accommodation pack.
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public void Dyscalculia_profile_reports_ShowNumberLineStrip_true()
+    {
+        var p = ProfileWith(AccommodationDimension.Dyscalculia);
+        Assert.True(p.ShowNumberLineStrip,
+            "Dyscalculia accommodation present in profile but "
+            + "ShowNumberLineStrip returned false — the session endpoint "
+            + "will not set SessionQuestionDto.ShowNumberLineStrip, so "
+            + "the frontend number-line strip stays hidden. prr-050 "
+            + "accessibility-critical wiring.");
+    }
+
+    [Fact]
+    public void Dyscalculia_profile_reports_time_multiplier_1_5()
+    {
+        var p = ProfileWith(AccommodationDimension.Dyscalculia);
+        Assert.Equal(1.5, p.DyscalculiaExtendedTimeMultiplier);
+        Assert.Equal(1.5, p.SessionTimeMultiplier);
+    }
+
+    [Fact]
+    public void Dyscalculia_disabled_profile_reports_flags_off()
+    {
+        var p = ProfileWith(); // no dimensions
+        Assert.False(p.ShowNumberLineStrip);
+        Assert.Equal(1.0, p.DyscalculiaExtendedTimeMultiplier);
+        Assert.Equal(1.0, p.SessionTimeMultiplier);
+    }
+
+    [Fact]
+    public void Dyscalculia_is_independent_of_ExtendedTime()
+    {
+        // Student with Dyscalculia but NOT ExtendedTime should still get
+        // 1.5× pacing (dyscalculia carries its own time grant).
+        var dyscalculiaOnly = ProfileWith(AccommodationDimension.Dyscalculia);
+        // Dyscalculia must NOT flip the Ministry ExtendedTime accessor.
+        Assert.Equal(1.0, dyscalculiaOnly.ExtendedTimeMultiplier);
+        // SessionTimeMultiplier MUST pick up dyscalculia-only time.
+        Assert.Equal(1.5, dyscalculiaOnly.SessionTimeMultiplier);
+        Assert.True(dyscalculiaOnly.ShowNumberLineStrip);
+    }
+
+    [Fact]
+    public void SessionTimeMultiplier_does_not_stack_both_dimensions()
+    {
+        // Student with BOTH ExtendedTime and Dyscalculia should NOT get
+        // stacked 2.25× — we take the max (1.5) per prr-050 rationale.
+        var both = ProfileWith(
+            AccommodationDimension.ExtendedTime,
+            AccommodationDimension.Dyscalculia);
+        Assert.Equal(1.5, both.ExtendedTimeMultiplier);
+        Assert.Equal(1.5, both.DyscalculiaExtendedTimeMultiplier);
+        Assert.Equal(1.5, both.SessionTimeMultiplier);
+    }
+
+    [Fact]
+    public void Default_profile_keeps_dyscalculia_flags_off()
+    {
+        var p = AccommodationProfile.Default("stu-anon-none");
+        Assert.False(p.ShowNumberLineStrip);
+        Assert.Equal(1.0, p.DyscalculiaExtendedTimeMultiplier);
+        Assert.Equal(1.0, p.SessionTimeMultiplier);
+    }
 }
