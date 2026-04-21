@@ -25,9 +25,10 @@ public class L2HaikuHintGeneratorTests
     private readonly ILlmClient _llm = Substitute.For<ILlmClient>();
     private readonly IPiiPromptScrubber _scrubber = Substitute.For<IPiiPromptScrubber>();
     private readonly ILlmCostMetric _cost = Substitute.For<ILlmCostMetric>();
+    private readonly IActivityPropagator _activityPropagator = Substitute.For<IActivityPropagator>();
 
     private L2HaikuHintGenerator CreateSut() => new(
-        _llm, _scrubber, _cost,
+        _llm, _scrubber, _cost, _activityPropagator,
         NullLogger<L2HaikuHintGenerator>.Instance);
 
     private static HintLadderInput SampleInput() => new(

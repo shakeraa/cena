@@ -43,6 +43,7 @@ public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
     private readonly StuckClassifierOptions _options;
     private readonly ILogger<ClaudeStuckClassifierLlm> _logger;
     private readonly ILlmCostMetric? _featureCost;
+    private readonly IActivityPropagator? _activityPropagator;
 
     // Haiku 4.5 typical pricing (USD per 1M tokens). Kept local rather
     // than in config so we can reason about cost at compile time; update
@@ -60,18 +61,31 @@ public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
         AnthropicClient client,
         IOptions<StuckClassifierOptions> options,
         ILogger<ClaudeStuckClassifierLlm> logger,
-        ILlmCostMetric? featureCost = null)
+        ILlmCostMetric? featureCost = null,
+        IActivityPropagator? activityPropagator = null)
     {
         _client = client ?? throw new ArgumentNullException(nameof(client));
         _options = options?.Value ?? throw new ArgumentNullException(nameof(options));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _featureCost = featureCost;
+        _activityPropagator = activityPropagator;
     }
 
     public async Task<LlmClassificationResult> ClassifyAsync(
         StuckContext ctx, CancellationToken ct = default)
     {
         var sw = Stopwatch.StartNew();
+
+        // prr-143: stamp trace_id on every LLM attempt for cross-call stitching.
+        var traceId = _activityPropagator?.GetTraceId();
+        using var activity = _activityPropagator?.StartLlmActivity("stagnation_analysis");
+        if (activity is not null)
+        {
+            activity.SetTag("trace_id", traceId);
+            activity.SetTag("task", "stagnation_analysis");
+            activity.SetTag("tier", "tier2");
+            activity.SetTag("session_id", ctx.SessionId);
+        }
 
         try
         {
@@ -121,6 +135,15 @@ public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
                 inputTokens: input,
                 outputTokens: output);
 
+            // prr-143: success-path structured log carries trace_id so the
+            // exporter stitches cost metric ↔ trace ↔ log in Grafana.
+            activity?.SetTag("outcome", "success");
+            activity?.SetTag("input_tokens", input);
+            activity?.SetTag("output_tokens", output);
+            _logger.LogInformation(
+                "Stuck classifier LLM OK (trace_id={TraceId} session={SessionId} input={Input} output={Output})",
+                traceId, ctx.SessionId, input, output);
+
             return parsed with
             {
                 EstimatedCostUsd = cost,
@@ -134,9 +157,11 @@ public sealed class ClaudeStuckClassifierLlm : IStuckClassifierLlm
         catch (Exception ex)
         {
             sw.Stop();
+            activity?.SetTag("outcome", "error");
+            activity?.SetTag("error.type", ex.GetType().Name);
             _logger.LogError(ex,
-                "Stuck classifier LLM call failed for session {SessionId} ({Ms}ms)",
-                ctx.SessionId, sw.ElapsedMilliseconds);
+                "Stuck classifier LLM call failed (trace_id={TraceId} session={SessionId} {Ms}ms)",
+                traceId, ctx.SessionId, sw.ElapsedMilliseconds);
             return LlmClassificationResult.Invalid("llm_exception", (int)sw.ElapsedMilliseconds);
         }
     }

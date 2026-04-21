@@ -33,6 +33,18 @@ public sealed class SocraticCapTests
     private readonly ISocraticCallBudget _budget = Substitute.For<ISocraticCallBudget>();
     private readonly IStaticHintLadderFallback _fallback = Substitute.For<IStaticHintLadderFallback>();
     private readonly IDailyTutorTimeBudget _dailyBudget = Substitute.For<IDailyTutorTimeBudget>();
+    private readonly ITutorTurnBudget _turnBudget = Substitute.For<ITutorTurnBudget>();
+    private readonly IActivityPropagator _activityPropagator = Substitute.For<IActivityPropagator>();
+
+    public SocraticCapTests()
+    {
+        // Default: turn budget allows every call unless a test overrides.
+        _turnBudget.CanTakeTurnAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(true);
+        _turnBudget.ResolveCapFor(Arg.Any<string?>()).Returns(TutorTurnBudget.DefaultMaxTurns);
+        _activityPropagator.GetTraceId().Returns("trace-test-0001");
+    }
 
     private static IConfiguration TestConfig() =>
         new ConfigurationBuilder()
@@ -52,7 +64,7 @@ public sealed class SocraticCapTests
             CurrentGrade: 9);
 
     private ClaudeTutorLlmService NewSut() => new(
-        TestConfig(), _budget, _fallback, _dailyBudget,
+        TestConfig(), _budget, _fallback, _dailyBudget, _turnBudget, _activityPropagator,
         NullLogger<ClaudeTutorLlmService>.Instance,
         NullLlmCostMetric.Instance);
 
@@ -169,6 +181,44 @@ public sealed class SocraticCapTests
         // The second fallback turn should render L2, not L1.
         _fallback.Received(1).GetHint(Arg.Any<TutorContext>(), 1);
         Assert.Contains(chunks, c => c.Delta.Contains("method", StringComparison.OrdinalIgnoreCase));
+    }
+
+    // ── prr-105: turn-budget cap hit → static hint ladder, no LLM ──
+    [Fact]
+    public async Task TurnCapHit_EmitsStaticHint_DoesNotCallLlm()
+    {
+        _dailyBudget.CheckAsync(Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(new DailyTutorTimeCheck(true, 0, 1800, 1800));
+
+        // Turn budget refuses: session has taken 20 turns (hit cap).
+        _turnBudget.CanTakeTurnAsync(
+            Arg.Any<string>(), Arg.Any<string?>(), Arg.Any<CancellationToken>())
+            .Returns(false);
+        _turnBudget.GetTurnCountAsync(Arg.Any<string>(), Arg.Any<CancellationToken>())
+            .Returns(20L);
+        _turnBudget.ResolveCapFor(Arg.Any<string?>()).Returns(20);
+
+        _fallback.GetHint(Arg.Any<TutorContext>(), 0)
+            .Returns(new StaticHintResponse(
+                "Let's look at this step-by-step.",
+                StaticHintRung.L1_TryThisStep));
+
+        var sut = NewSut();
+        var chunks = new List<LlmChunk>();
+        await foreach (var chunk in sut.StreamCompletionAsync(NewContext(), CancellationToken.None))
+            chunks.Add(chunk);
+
+        // Turn-cap fallback emits synthetic model id.
+        Assert.Contains(chunks, c => c.Model == ClaudeTutorLlmService.TurnCapModelId);
+        Assert.Contains(chunks, c => c.Delta.Contains("step-by-step"));
+
+        // When the turn budget refuses, the Socratic call budget is never
+        // consulted — prevents double-counting the refusal against both gates.
+        await _budget.DidNotReceive().CanMakeLlmCallAsync(
+            Arg.Any<string>(), Arg.Any<CancellationToken>());
+
+        // Budget is recorded (advance the ladder index for next turn).
+        await _turnBudget.Received(1).RecordTurnAsync("thread-1", Arg.Any<CancellationToken>());
     }
 
     // ── Static ladder selection is deterministic and ship-gate compliant ──

@@ -124,6 +124,7 @@ public interface IPersonalizedExplanationService
 // orchestrators). Same rationale in ADR-0045 §3 applies.
 [TaskRouting("tier3", "answer_evaluation")]
 [FeatureTag("explanation-l3")]
+[DelegatesTraceIdTo("ILlmClient")]
 public sealed class PersonalizedExplanationService : IPersonalizedExplanationService
 {
     private const string GenericFallback =

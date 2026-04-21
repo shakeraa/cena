@@ -78,6 +78,7 @@ public interface IErrorClassificationService
 [TaskRouting("tier2", "error_classification")]
 [FeatureTag("classification")]
 [AllowsUncachedLlm("Classification keyed by free-form student answer text — no repeatable prompt to cache. Result is itself a cache key for the explain tier.")]
+[DelegatesTraceIdTo("ILlmClient")]
 public sealed class ErrorClassificationService : IErrorClassificationService
 {
     // Haiku fallback for error_classification (routing-config.yaml: Kimi primary, Haiku fallback)

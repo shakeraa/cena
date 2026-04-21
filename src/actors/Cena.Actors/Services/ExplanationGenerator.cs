@@ -70,6 +70,7 @@ public interface IExplanationGenerator
 [TaskRouting("tier3", "full_explanation")]
 [FeatureTag("explanation-l2")]
 [AllowsUncachedLlm("Caller performs IExplanationCacheService.GetAsync before invoking this generator; result is cached by the orchestrator on success.")]
+[DelegatesTraceIdTo("ILlmClient")]
 public sealed class ExplanationGenerator : IExplanationGenerator
 {
     private const string FeatureLabel = "explanation-l2";

@@ -52,6 +52,8 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
     private readonly ISocraticCallBudget _callBudget;
     private readonly IStaticHintLadderFallback _staticFallback;
     private readonly IDailyTutorTimeBudget _dailyBudget;
+    private readonly ITutorTurnBudget _turnBudget;
+    private readonly IActivityPropagator _activityPropagator;
     private readonly ILogger<ClaudeTutorLlmService> _logger;
     private readonly ILlmCostMetric _costMetric;
 
@@ -67,11 +69,19 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
     /// </summary>
     public const string DailyCapModelId = "cena-daily-cap-rest-v1";
 
+    /// <summary>
+    /// Synthetic model id emitted when a turn is refused because the
+    /// session hit the per-institute tutor turn cap (prr-105, ADR-0002).
+    /// </summary>
+    public const string TurnCapModelId = "cena-turn-cap-fallback-v1";
+
     public ClaudeTutorLlmService(
         IConfiguration configuration,
         ISocraticCallBudget callBudget,
         IStaticHintLadderFallback staticFallback,
         IDailyTutorTimeBudget dailyBudget,
+        ITutorTurnBudget turnBudget,
+        IActivityPropagator activityPropagator,
         ILogger<ClaudeTutorLlmService> logger,
         ILlmCostMetric costMetric)
     {
@@ -79,6 +89,8 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
         _callBudget = callBudget;
         _staticFallback = staticFallback;
         _dailyBudget = dailyBudget;
+        _turnBudget = turnBudget;
+        _activityPropagator = activityPropagator;
         _costMetric = costMetric;
 
         var apiKey = configuration["Cena:Llm:ApiKey"]
@@ -97,6 +109,19 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var turnStopwatch = Stopwatch.StartNew();
+
+        // ── prr-143: trace-id stamped on every attempt ──
+        // Resolved once per call so the success path, the static fallback
+        // path, and the daily-cap path all share the same trace id when
+        // they land in the observability backend. Every cost-metric emission
+        // and every structured log line below references this value.
+        var traceId = _activityPropagator.GetTraceId();
+        using var activity = _activityPropagator.StartLlmActivity("socratic_question");
+        activity?.SetTag("trace_id", traceId);
+        activity?.SetTag("task", "socratic_question");
+        activity?.SetTag("tier", "tier3");
+        activity?.SetTag("student_id", context.StudentId);
+        activity?.SetTag("thread_id", context.ThreadId);
 
         // ── prr-012 gate 1: daily tutor-time cap ──
         // 30-min/student/day hard stop (tenant-overridable per prr-048).
@@ -117,6 +142,51 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
                 Finished: true,
                 TokensUsed: 0,
                 Model: DailyCapModelId);
+            yield break;
+        }
+
+        // ── prr-105 gate: per-session tutor turn budget (ADR-0002) ──
+        // Per ADR-0002 §Turn budget, Socratic dialogue cannot productively
+        // extend indefinitely — past ~20 turns the CAS oracle can no longer
+        // anchor the conversation. Default cap 20; configurable per-
+        // institute. When exhausted, fall back to the static hint ladder
+        // (same no-LLM degradation path used by the prr-012 cap).
+        var canTakeTurn = await _turnBudget.CanTakeTurnAsync(
+            context.ThreadId, context.InstituteId, ct);
+        if (!canTakeTurn)
+        {
+            activity?.SetTag("outcome", "turn_cap_hit");
+            _logger.LogInformation(
+                "Tutor turn cap hit — serving static hint ladder (trace_id={TraceId} thread={Thread} institute={Institute})",
+                traceId, context.ThreadId, context.InstituteId ?? "unknown");
+
+            // Fallback index = turns already taken beyond the cap. Matches the
+            // prr-012 ladder-index convention so the L1→L2→L3 ladder keeps
+            // advancing across both cap-hit sources.
+            var turnCount = await _turnBudget.GetTurnCountAsync(context.ThreadId, ct);
+            var turnCap = _turnBudget.ResolveCapFor(context.InstituteId);
+            var fallbackIndexFromTurnCap = (int)Math.Max(0, turnCount - turnCap);
+
+            var hint = _staticFallback.GetHint(context, fallbackIndexFromTurnCap);
+            await _turnBudget.RecordTurnAsync(context.ThreadId, ct);
+
+            yield return new LlmChunk(
+                Delta: hint.Text,
+                Finished: false,
+                TokensUsed: null,
+                Model: TurnCapModelId);
+            yield return new LlmChunk(
+                Delta: "",
+                Finished: true,
+                TokensUsed: 0,
+                Model: TurnCapModelId);
+
+            turnStopwatch.Stop();
+            await _dailyBudget.RecordUsageAsync(
+                context.StudentId,
+                (int)turnStopwatch.Elapsed.TotalSeconds,
+                context.InstituteId,
+                ct);
             yield break;
         }
 
@@ -202,11 +272,23 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
                 task: "socratic_question",
                 modelId: _model,
                 inputTokens: inputTokens,
-                outputTokens: outputTokens);
+                outputTokens: outputTokens,
+                instituteId: context.InstituteId);
 
-            // Only record budget after a successful LLM response — failed
-            // attempts do not consume the 3-call session cap.
+            // prr-143: trace-id on every successful LLM call — structured-log
+            // emission is the scraped signal that stitches cost metric to span.
+            activity?.SetTag("outcome", "success");
+            activity?.SetTag("input_tokens", inputTokens);
+            activity?.SetTag("output_tokens", outputTokens);
+            _logger.LogInformation(
+                "Socratic LLM call OK (trace_id={TraceId} thread={Thread} model={Model} input={Input} output={Output})",
+                traceId, context.ThreadId, _model, inputTokens, outputTokens);
+
+            // Only record budgets after a successful LLM response — failed
+            // attempts do not consume the 3-call session cap or the 20-turn
+            // session cap.
             await _callBudget.RecordLlmCallAsync(context.ThreadId, ct);
+            await _turnBudget.RecordTurnAsync(context.ThreadId, ct);
         }
         catch (OperationCanceledException)
         {
@@ -215,7 +297,11 @@ public sealed class ClaudeTutorLlmService : ITutorLlmService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error streaming from Claude for thread {ThreadId}", context.ThreadId);
+            activity?.SetTag("outcome", "error");
+            activity?.SetTag("error.type", ex.GetType().Name);
+            _logger.LogError(ex,
+                "Error streaming from Claude (trace_id={TraceId} thread={Thread})",
+                traceId, context.ThreadId);
             fullText = "I'm sorry, I encountered an error. Please try again.";
             totalTokens = null;
             hasError = true;

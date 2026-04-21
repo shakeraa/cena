@@ -72,17 +72,20 @@ public sealed class L2HaikuHintGenerator : IL2HaikuHintGenerator
     private readonly ILlmClient _llm;
     private readonly IPiiPromptScrubber _piiScrubber;
     private readonly ILlmCostMetric _costMetric;
+    private readonly IActivityPropagator _activityPropagator;
     private readonly ILogger<L2HaikuHintGenerator> _logger;
 
     public L2HaikuHintGenerator(
         ILlmClient llm,
         IPiiPromptScrubber piiScrubber,
         ILlmCostMetric costMetric,
+        IActivityPropagator activityPropagator,
         ILogger<L2HaikuHintGenerator> logger)
     {
         _llm = llm;
         _piiScrubber = piiScrubber;
         _costMetric = costMetric;
+        _activityPropagator = activityPropagator;
         _logger = logger;
     }
 
@@ -115,6 +118,16 @@ public sealed class L2HaikuHintGenerator : IL2HaikuHintGenerator
             ModelId: HaikuModelId,
             CacheSystemPrompt: true);
 
+        // prr-143: trace-id on every LLM call attempt. Stamped here rather
+        // than inside the ILlmClient adapter so the call-site scanner can
+        // see a visible GetTraceId reference in this file.
+        var traceId = _activityPropagator.GetTraceId();
+        using var activity = _activityPropagator.StartLlmActivity("ideation_l2_hint");
+        activity?.SetTag("trace_id", traceId);
+        activity?.SetTag("task", "ideation_l2_hint");
+        activity?.SetTag("tier", "tier2");
+        activity?.SetTag("question_id", input.QuestionId);
+
         try
         {
             var response = await _llm.CompleteAsync(llmRequest, ct);
@@ -122,8 +135,8 @@ public sealed class L2HaikuHintGenerator : IL2HaikuHintGenerator
             if (string.IsNullOrWhiteSpace(response.Content))
             {
                 _logger.LogWarning(
-                    "L2 hint generator returned empty content for question {QuestionId}",
-                    input.QuestionId);
+                    "L2 hint generator returned empty content (trace_id={TraceId} question={QuestionId})",
+                    traceId, input.QuestionId);
                 return null;
             }
 
@@ -137,6 +150,11 @@ public sealed class L2HaikuHintGenerator : IL2HaikuHintGenerator
                 outputTokens: response.OutputTokens,
                 instituteId: input.InstituteId);
 
+            activity?.SetTag("outcome", "success");
+            _logger.LogInformation(
+                "L2 hint OK (trace_id={TraceId} question={QuestionId} input={Input} output={Output})",
+                traceId, input.QuestionId, response.InputTokens, response.OutputTokens);
+
             return new L2HintPayload(response.Content.Trim());
         }
         catch (OperationCanceledException)
@@ -147,10 +165,11 @@ public sealed class L2HaikuHintGenerator : IL2HaikuHintGenerator
         }
         catch (Exception ex)
         {
+            activity?.SetTag("outcome", "error");
             _logger.LogWarning(ex,
-                "L2 hint generator failed for question {QuestionId}; "
+                "L2 hint generator failed (trace_id={TraceId} question={QuestionId}); "
                 + "orchestrator will fall back to L1 template.",
-                input.QuestionId);
+                traceId, input.QuestionId);
             return null;
         }
     }

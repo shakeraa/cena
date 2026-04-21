@@ -247,6 +247,8 @@ public sealed class AiGenerationService : IAiGenerationService
     private readonly Counter<double> _costUsd;
     // prr-046: canonical per-feature cost counter (cena_llm_call_cost_usd_total).
     private readonly ILlmCostMetric _featureCost;
+    // prr-143: trace-id stamping site for question-generation LLM calls.
+    private readonly IActivityPropagator? _activityPropagator;
 
     // In-process circuit breaker state (mirrors LlmCircuitBreakerActor: Sonnet 3/90s)
     private int _failureCount;
@@ -286,13 +288,15 @@ public sealed class AiGenerationService : IAiGenerationService
         IMeterFactory meterFactory,
         IServiceScopeFactory scopeFactory,
         ICasGateModeProvider casGateMode,
-        ILlmCostMetric featureCost)
+        ILlmCostMetric featureCost,
+        IActivityPropagator? activityPropagator = null)
     {
         _logger = logger;
         _configuration = configuration;
         _scopeFactory = scopeFactory;
         _casGateMode = casGateMode;
         _featureCost = featureCost;
+        _activityPropagator = activityPropagator;
 
         var meter = meterFactory.Create("Cena.Admin.LlmMetrics", "1.0.0");
         _requestDuration = meter.CreateHistogram<double>(
@@ -610,6 +614,16 @@ public sealed class AiGenerationService : IAiGenerationService
                 ToolChoice = new ToolChoiceTool { Name = "generate_questions" },
             };
 
+            // prr-143: stamp trace_id on the outbound LLM attempt so the
+            // question-generation path is stitchable in the observability
+            // backend with the quality-gate LLM call that validates its output.
+            var traceId = _activityPropagator?.GetTraceId();
+            using var activity = _activityPropagator?.StartLlmActivity("question_generation");
+            activity?.SetTag("trace_id", traceId);
+            activity?.SetTag("task", "question_generation");
+            activity?.SetTag("tier", "tier3");
+            activity?.SetTag("model_id", SonnetModelId);
+
             var response = await client.Messages.Create(createParams);
             sw.Stop();
 
@@ -618,6 +632,13 @@ public sealed class AiGenerationService : IAiGenerationService
             var outputTokens = response.Usage.OutputTokens;
             EmitMetrics(modelName, "question_generation", sw.ElapsedMilliseconds,
                 inputTokens, outputTokens);
+
+            activity?.SetTag("outcome", "success");
+            activity?.SetTag("input_tokens", (long)inputTokens);
+            activity?.SetTag("output_tokens", (long)outputTokens);
+            _logger.LogInformation(
+                "AiGeneration LLM OK (trace_id={TraceId} model={Model} input={Input} output={Output})",
+                traceId, modelName, inputTokens, outputTokens);
 
             // Extract tool_use block
             foreach (var block in response.Content)
