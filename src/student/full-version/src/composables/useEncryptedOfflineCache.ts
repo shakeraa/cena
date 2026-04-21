@@ -15,7 +15,7 @@
 //                  rotates every ~1h, which naturally rotates the encryption
 //                  key — a stolen ciphertext is unusable once the token
 //                  expires. Salt is `cena-offline-cache-v1` (constant).
-//   - Key lifetime: CryptoKey lives only in memory (non-extractable), never
+//   - Key lifetime: CryptoKey is held only in memory (non-extractable), never
 //                  persisted. On logout, the in-memory reference is zeroed
 //                  AND the backing IndexedDB store is wiped. This is the
 //                  ADR-0038 crypto-shred pattern: without the key, the

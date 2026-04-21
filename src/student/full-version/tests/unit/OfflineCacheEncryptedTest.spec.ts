@@ -118,19 +118,23 @@ describe('OfflineCacheEncryptedTest (prr-158)', () => {
     expect(src).toMatch(/initEncryptedOfflineCache/)
     expect(src).toMatch(/wipeEncryptedOfflineCache/)
 
-    // Real Firebase sign-in invokes init.
-    const firebaseSignInBlock = src.match(/__firebaseSignIn\b[\s\S]{0,2000}?\n\s{0,4}\}/)
+    // Real Firebase sign-in invokes init. Anchor on the `function` keyword so
+    // we match the function body, not the header-comment mention.
+    const firebaseSignInBlock = src.match(/function\s+__firebaseSignIn[\s\S]{0,2000}?\n\s{0,4}\}/)
 
+    expect(firebaseSignInBlock, 'function __firebaseSignIn not found in authStore').toBeTruthy()
     expect(firebaseSignInBlock?.[0]).toMatch(/initEncryptedOfflineCache\s*\(/)
 
     // Real Firebase sign-out invokes wipe.
-    const firebaseSignOutBlock = src.match(/__firebaseSignOut\b[\s\S]{0,2000}?\n\s{0,4}\}/)
+    const firebaseSignOutBlock = src.match(/function\s+__firebaseSignOut[\s\S]{0,2000}?\n\s{0,4}\}/)
 
+    expect(firebaseSignOutBlock, 'function __firebaseSignOut not found in authStore').toBeTruthy()
     expect(firebaseSignOutBlock?.[0]).toMatch(/wipeEncryptedOfflineCache\s*\(/)
 
     // Mock sign-out also wipes — shared dev boxes must be safe too.
-    const mockSignOutBlock = src.match(/__signOut\b[\s\S]{0,2000}?\n\s{0,4}\}/)
+    const mockSignOutBlock = src.match(/function\s+__signOut\b[\s\S]{0,2000}?\n\s{0,4}\}/)
 
+    expect(mockSignOutBlock, 'function __signOut not found in authStore').toBeTruthy()
     expect(mockSignOutBlock?.[0]).toMatch(/wipeEncryptedOfflineCache\s*\(/)
   })
 })
