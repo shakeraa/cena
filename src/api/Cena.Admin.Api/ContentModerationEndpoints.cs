@@ -181,6 +181,33 @@ public static class ContentModerationEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
+        // prr-034: GET /api/admin/moderation/cultural-context-dlq
+        // Community review board ops queue. Tenant-scoped via TenantScope
+        // inside the service (SUPER_ADMIN sees all; others see their
+        // own school only).
+        group.MapGet("/cultural-context-dlq", async (
+            string? status,
+            int? page,
+            int? pageSize,
+            HttpContext httpContext,
+            ICulturalContextReviewBoardService service,
+            CancellationToken ct) =>
+        {
+            var validPage = ParameterValidator.ValidatePage(page);
+            var validPageSize = ParameterValidator.ValidatePageSize(pageSize);
+            var result = await service.ListAsync(
+                httpContext.User,
+                status,
+                validPage,
+                validPageSize,
+                ct);
+            return Results.Ok(result);
+        }).WithName("GetCulturalContextDlq")
+    .Produces<Cena.Api.Contracts.Admin.Cultural.CulturalContextDlqListResponse>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+
         return app;
     }
 }
