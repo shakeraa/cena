@@ -15,7 +15,7 @@
 
 ## Goal
 
-Amend the existing Bagrut-focused capacity model (PRR-053) to reflect that SAT + PET in v1 turn a 2-spike calendar (Jun / Aug) into a 7-window compound calendar. Recalculate peak sizing + scale-out triggers.
+Amend the existing Bagrut-focused capacity model (PRR-053) to reflect that SAT + PET at Launch turn a 2-spike calendar (Jun / Aug) into a 7-window compound calendar. Recalculate peak sizing + scale-out triggers.
 
 ## Windows to model
 

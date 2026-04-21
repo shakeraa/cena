@@ -27,7 +27,7 @@ Per persona-finops, multi-target context variation is expected to drop prompt ca
 
 ## Cost ceiling gate
 
-- Prometheus rule triggers at per-student-per-month estimated LLM cost > $3.30 (persona-finops ceiling). Gate is alert-only v1; budget-enforce in a later task.
+- Prometheus rule triggers at per-student-per-month estimated LLM cost > $3.30 (persona-finops ceiling). Gate is alert-only at Launch; budget-enforce in a later task.
 
 ## Files
 

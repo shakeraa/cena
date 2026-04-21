@@ -1,4 +1,4 @@
-# TASK-PRR-235: Ministry reporting export endpoint shape (spec-only v1)
+# TASK-PRR-235: Ministry reporting export endpoint shape (spec-only at Launch)
 
 **Priority**: P2 — persona-ministry + persona-enterprise
 **Effort**: S (2-3 days — spec only)
@@ -15,7 +15,7 @@
 
 ## Goal
 
-Spec the shape of a future school / Ministry reporting export so that the multi-target data model doesn't paint us into a corner. Implementation is out-of-scope for v1; spec-only landing allows tenants that need to export to Ministry/school systems to plan.
+Spec the shape of a future school / Ministry reporting export so that the multi-target data model doesn't paint us into a corner. Implementation is out-of-scope for Launch; spec-only landing allows tenants that need to export to Ministry/school systems to plan.
 
 ## Scope
 
@@ -29,7 +29,7 @@ Spec the shape of a future school / Ministry reporting export so that the multi-
 
 - `docs/api/ministry-reporting-export-spec.md` (new spec doc)
 - Annotate data contracts in `ExamTarget` VO with export-readiness flag.
-- No endpoint implementation v1.
+- No endpoint implementation at Launch.
 
 ## Definition of Done
 

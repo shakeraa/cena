@@ -6,7 +6,7 @@
 **Source docs**: [docs/design/MULTI-TARGET-EXAM-PLAN-001-discussion.md §4](../../docs/design/MULTI-TARGET-EXAM-PLAN-001-discussion.md), persona-finops findings (~$10-15k one-shot budget estimate)
 **Assignee hint**: content-engineering lead (human) + parallel subject-matter experts + CAS-gate reviewers
 **Tags**: source=multi-target-exam-plan-001, type=epic, epic=epic-prr-g, content-engineering, launch-blocker
-**Status**: Not Started — blocked on decision-holder budget approval
+**Status**: Unblocked 2026-04-21 — budget approved ($20-30k envelope, owner: Shaker). Ready to start once content-engineering lead is assigned. See [ADR-0050](../../docs/adr/0050-multi-target-student-exam-plan.md) Q4.
 **Source**: User decision 2026-04-21: SAT + Psychometry ship fully-functional at Launch, not "coming soon" flags. Per memory "No stubs — production grade", this requires real item banks on day one.
 
 ---
@@ -62,8 +62,8 @@ EPIC-PRR-F adds SAT + PET to the exam catalog and renders them as selectable onb
 
 ## Dependencies
 
-- Blocked on **decision-holder Q4 (brief §14.5)**: who owns the $10-15k content-engineering budget line? What's the approval path?
-- Blocked on **decision-holder Q2 (brief §14.5)**: PET Russian-verbal in Launch scope or Post-Launch?
+- ~~Blocked on decision-holder Q4 (brief §14.5)~~ **Resolved 2026-04-21** ([ADR-0050 Q4](../../docs/adr/0050-multi-target-student-exam-plan.md)): Owner = Shaker. Envelope ~$20-30k.
+- ~~Blocked on decision-holder Q2 (brief §14.5)~~ **Resolved 2026-04-21** ([ADR-0050 Q2](../../docs/adr/0050-multi-target-student-exam-plan.md)): PET Russian-verbal at Launch (PRR-240).
 - Coordinates with [PRR-033 Bagrut rubric DSL](TASK-PRR-033-ministry-bagrut-rubric-dsl-version-pinning-per-track-sign-of.md) — rubric DSL is extended, not forked.
 - Coordinates with [PRR-072 coverage matrix](post-launch/TASK-PRR-072-item-bank-coverage-matrix-vs-bagrut-syllabus.md) — same structure, extended with new exam families.
 

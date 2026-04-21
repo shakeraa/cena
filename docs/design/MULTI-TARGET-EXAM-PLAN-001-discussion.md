@@ -411,3 +411,26 @@ From persona findings, items that did NOT converge and still need your call:
 5. **Paid-tier pricing floor** given per-student-per-month ceiling of ~$3.30 LLM spend *(finops)*.
 
 These are blocking ADR-0049 draft, not the task files.
+
+### 14.6 Decision record — 2026-04-21 (decision-holder)
+
+All 5 questions resolved. ADR-0049 draft can proceed.
+
+1. **Arab-stream Bagrut variants → A (both at launch).** IL-Hebrew-sector + IL-Arabic-sector variants land together. Content cost 1.8× Hebrew-only, but topic taxonomy is shared and only item pools diverge. Rationale: Arabic is already a first-class locale; shipping without its exam codes would make the localization work symbolic. Catalog service (PRR-220) must carry both variant codes day 1.
+2. **PET Russian-verbal → B (post-launch with visible roadmap).** PET as a category is in the launch catalog; Russian-verbal variant ships Q3 2026 with a "Coming Q3" placeholder tile visible in the picker. Document in catalog YAML with `availability: "roadmap"` flag so UI can gray-out + disable select.
+3. **Tenant-admin-forced plans — D + C belt-and-braces.** Primary lawful basis: Israeli Compulsory Education Law §4 (statutory). Secondary: explicit parent consent captured per assigned target (revocable). For future non-IL tenants, default to C-only (parent consent). PRR-230 (parent visibility default-hidden 13+) surfaces the per-target consent item in the parent dashboard as revocable. ADR-0049 documents the basis selection logic.
+4. **Content-engineering budget — phased, Product owns PO, $15k pre-approved.** Phase order: SAT first (highest non-Bagrut demand signal), then PET Hebrew verbal, then IB Math HL AA/AI. IB gated on validated international-cohort conversion signal. Budget line: `content-eng.exam-catalogs.2026`, Product-team-owned PO.
+5. **Paid-tier pricing — recommended defaults, per-institute configurable.**
+   - **Defaults (SaaS-global):** $19/month student individual tier; $14/seat institutional (≥20 seats); free-tier 10 sessions/month with tier-2-only LLM (Haiku).
+   - **NEW REQUIREMENT:** Super-admin can override all three values per institute in Admin UI. Use case: subsidized regional rollout, enterprise school-network pricing, free-tier expansion for underserved cohorts. Pricing surface is tenant-scoped config with audit trail (every override logs {super_admin_id, institute_id, old_price, new_price, justification, timestamp}).
+   - **Effect:** institutes default to the global pricing; overrides appear in both billing + finance dashboards so the override is visible to finance review. Filed as new task **PRR-243** (see §14.7).
+
+### 14.7 Follow-up task added by the Q5 decision
+
+**PRR-243 — Per-institute pricing override (super-admin configurable)**
+
+- Super-admin UI surface (admin app, SUPER_ADMIN-role-gated) with three editable fields: student monthly price, institutional per-seat price (≥N seats), free-tier monthly session cap.
+- Audit event `InstitutePricingOverridden_V1` on every change with full old-value / new-value / justification / actor / institute_id / timestamp.
+- Architecture ratchet: every pricing-bearing code path must read from `IInstitutePricingResolver.ResolveAsync(instituteId)` — no hard-coded prices; arch test `NoHardcodedPricingTest` scans for literal dollar amounts.
+- Arch ratchet: the resolver falls back to global defaults if no override recorded for the institute.
+- Blocks on PRR-217 (same as other EPIC-PRR-F tasks — needs the ADR to record the default-pricing constants and the override policy).
