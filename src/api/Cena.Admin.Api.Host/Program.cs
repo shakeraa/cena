@@ -230,6 +230,14 @@ public partial class Program
     // migration service. Feature flag defaults off so deployment is safe.
     builder.Services.AddStudentPlanServices();
 
+    // prr-236: Classroom-assigned target teacher UI — Marten-backed roster
+    // lookup that feeds the classroom-target fan-out service. The service
+    // itself is registered by AddStudentPlanServices above; only the
+    // Marten-backed IClassroomRosterLookup is host-specific.
+    builder.Services.AddSingleton<
+        Cena.Actors.StudentPlan.IClassroomRosterLookup,
+        Cena.Admin.Api.Host.Endpoints.MartenClassroomRosterLookup>();
+
     // RDY-056 §4 / Phase 5: OCR cascade wiring. Admin-only consumers take
     // IOcrCascadeService as an OPTIONAL (`? = null`) dependency; registering
     // OcrCascadeService here without the pluggable runner layers
@@ -593,6 +601,11 @@ public partial class Program
     //   POST /api/admin/institutes/{tenantId}/migrate-student-plan
     Cena.Admin.Api.Host.Endpoints.StudentPlanMigrationEndpoints
         .MapStudentPlanMigrationEndpoints(app);
+
+    // prr-236: Classroom-assigned target teacher endpoint
+    //   POST /api/admin/institutes/{instituteId}/classrooms/{classroomId}/assigned-targets
+    Cena.Admin.Api.Host.Endpoints.ClassroomTargetEndpoints
+        .MapClassroomTargetEndpoints(app);
     
     // ---- Content management endpoints ----
     app.MapContentEndpoints();
