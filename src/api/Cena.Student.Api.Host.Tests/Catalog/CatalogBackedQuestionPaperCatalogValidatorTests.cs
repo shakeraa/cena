@@ -26,6 +26,7 @@ public sealed class CatalogBackedQuestionPaperCatalogValidatorTests
             MinistrySubjectCode: "035",
             MinistryQuestionPaperCodes: new[] { "035581", "035582", "035583" },
             Availability: "launch",
+            AvailableFrom: null,
             ItemBankStatus: "full",
             PassbackEligible: true,
             DefaultLeadDays: 180,

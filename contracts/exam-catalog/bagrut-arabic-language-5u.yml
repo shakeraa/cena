@@ -1,0 +1,74 @@
+# Bagrut Arabic as a Foreign/Second Language (ערבית כשפה זרה) — 5 Units,
+# Hebrew-stream (Jewish students studying Arabic as L2).
+# PRR-241: humanities catalog extension.
+# Standard Ministry syllabus: language skills + classical/modern texts +
+# culture + translation. Distinct from Arab-stream Arabic Literature
+# (which is a native-speaker curriculum, separately cataloged).
+
+exam_code: BAGRUT_ARABIC_LANGUAGE_5U
+family: BAGRUT
+track: "5U"
+units: 5
+region: IL-Bagrut-Hebrew
+regulator: ministry_of_education
+ministry_subject_code: "016"
+ministry_question_paper_codes:
+  - "016581"
+  - "016582"
+  - "016583"
+availability: queued
+item_bank_status: reference-only
+passback_eligible: true
+default_lead_days: 180
+sittings:
+  - code: TASHPA_SUMMER_A
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-18"
+  - code: TASHPA_SUMMER_B
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: B
+    canonical_date: "2026-07-22"
+display:
+  en:
+    name: "Bagrut Arabic (5 units, L2)"
+    short_description: "Israeli Bagrut Arabic as a second language, five-unit track."
+  he:
+    name: "בגרות בערבית כשפה זרה (5 יחידות)"
+    short_description: "בגרות בערבית כשפה זרה, 5 יחידות."
+  ar:
+    name: "بجروت اللغة العربية لغة ثانية (5 وحدات)"
+    short_description: "بجروت اللغة العربية كلغة ثانية، 5 وحدات."
+topics:
+  - topic_id: arabic.grammar
+    display:
+      en: "Arabic grammar and morphology"
+      he: "דקדוק וצורות בערבית"
+      ar: "قواعد اللغة العربية والصرف"
+  - topic_id: arabic.vocabulary
+    display:
+      en: "Vocabulary and idiom"
+      he: "אוצר מילים וביטויים"
+      ar: "المفردات والتعابير"
+  - topic_id: arabic.modern_texts
+    display:
+      en: "Modern literary texts"
+      he: "טקסטים ספרותיים מודרניים"
+      ar: "النصوص الأدبية الحديثة"
+  - topic_id: arabic.classical_texts
+    display:
+      en: "Classical texts and Quranic excerpts"
+      he: "טקסטים קלאסיים וקטעי קוראן"
+      ar: "النصوص الكلاسيكية ومقتطفات قرآنية"
+  - topic_id: arabic.reading_comprehension
+    display:
+      en: "Reading comprehension"
+      he: "הבנת הנקרא"
+      ar: "فهم المقروء"
+  - topic_id: arabic.translation
+    display:
+      en: "Translation and composition"
+      he: "תרגום וחיבור"
+      ar: "الترجمة والإنشاء"

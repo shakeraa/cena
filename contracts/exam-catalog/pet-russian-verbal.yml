@@ -10,6 +10,7 @@ regulator: nite
 ministry_subject_code: null
 ministry_question_paper_codes: []
 availability: roadmap
+available_from: "2026-Q3"
 item_bank_status: reference-only
 passback_eligible: false
 default_lead_days: 90

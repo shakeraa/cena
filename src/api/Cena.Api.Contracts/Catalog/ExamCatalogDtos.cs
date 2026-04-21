@@ -59,6 +59,7 @@ public sealed record ExamTargetDto(
     string? MinistrySubjectCode,
     IReadOnlyList<string> MinistryQuestionPaperCodes,
     string Availability,      // launch | roadmap | queued
+    string? AvailableFrom,    // cohort label like "2026-Q3"; required when Availability=roadmap (PRR-240)
     string ItemBankStatus,    // full | reference-only | unavailable
     bool PassbackEligible,
     int DefaultLeadDays,
