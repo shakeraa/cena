@@ -325,6 +325,21 @@ public partial class Program
     builder.Services.AddSingleton<ICognitiveLoadService, CognitiveLoadService>();
     builder.Services.AddSingleton<IFlowStateService, FlowStateService>();
 
+    // ---- prr-154: If-then implementation-intentions planner (F2) ----
+    // Stateless domain service; singleton is fine. Consumers: session-plan
+    // endpoints + a later student-facing UI task.
+    builder.Services.AddSingleton<
+        Cena.Actors.Pedagogy.IIfThenPlanner,
+        Cena.Actors.Pedagogy.IfThenPlanner>();
+
+    // ---- prr-159: Peer-confused signal service (F5) ----
+    // Session-scoped anonymous "I'm confused too" aggregator with
+    // k-anonymity floor. Scoped because it uses IDocumentStore.LightweightSession
+    // per emission and we want one logger scope per request.
+    builder.Services.AddScoped<
+        Cena.Actors.Sessions.IPeerConfusedSignalService,
+        Cena.Actors.Sessions.PeerConfusedSignalService>();
+
     // ---- FIND-pedagogy-003: Real BKT posterior for session answer endpoint ----
     // BktService is stateless, allocation-free on the hot path, and cheap to
     // instantiate — singleton is fine. The student API host used to compute
@@ -942,7 +957,11 @@ public partial class Program
     // from session signals supplied by the caller. Frontend parity with
     // src/student/full-version/src/composables/useFlowState.ts.
     app.MapFlowStateEndpoints();
-    
+
+    // prr-159: Anonymous peer-confused signal endpoint. Session-scoped,
+    // k-anon ≥3, never identifies emitting students.
+    app.MapPeerConfusedSignalEndpoints();
+
     // Plan/Recommendation endpoints (STB-02)
     app.MapPlanEndpoints();
     
