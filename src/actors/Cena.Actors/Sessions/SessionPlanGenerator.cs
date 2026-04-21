@@ -29,6 +29,7 @@
 
 using System.Collections.Immutable;
 using Cena.Actors.Mastery;
+using Cena.Actors.StudentPlan;
 using Cena.Actors.Teacher.ScheduleOverride;
 
 namespace Cena.Actors.Sessions;
@@ -145,16 +146,60 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
     // generator behaves exactly as before.
     private readonly IOverrideAwareSchedulerInputsBridge? _overrideBridge;
 
+    // prr-226 / ADR-0050 §10: the three multi-target seams. All optional
+    // because the prr-148 path (single legacy target via IStudentPlanConfigService)
+    // must continue to work for hosts that have not wired prr-218 yet.
+    // When the reader is non-null, the generator resolves an active target
+    // via ActiveExamTargetPolicy and stamps it on SchedulerInputs. When the
+    // reader is null, ActiveExamTargetId stays null — no behavioural change
+    // from prr-149.
+    private readonly IStudentPlanReader? _planReader;
+    private readonly ISittingCanonicalDateResolver _sittingResolver;
+    private readonly IExamTargetOverrideReader _overrideReader;
+
+    /// <summary>
+    /// prr-149 constructor — legacy single-target path. Kept for backward
+    /// compatibility; new hosts should use the prr-226 overload.
+    /// </summary>
     public SessionPlanGenerator(
         IStudentPlanConfigService planConfig,
         ISessionAbilityEstimateProvider abilityProvider,
         ITopicPrerequisiteGraphProvider graphProvider,
         IOverrideAwareSchedulerInputsBridge? overrideBridge = null)
+        : this(
+            planConfig,
+            abilityProvider,
+            graphProvider,
+            overrideBridge,
+            planReader: null,
+            sittingResolver: EmptySittingCanonicalDateResolver.Instance,
+            overrideReader: NullExamTargetOverrideReader.Instance)
+    {
+    }
+
+    /// <summary>
+    /// prr-226 constructor — multi-target path. Production wiring registers
+    /// a real <see cref="IStudentPlanReader"/>, a catalog-backed
+    /// <see cref="ISittingCanonicalDateResolver"/>, and an event-store
+    /// backed <see cref="IExamTargetOverrideReader"/>. Tests can inject
+    /// the in-memory / null variants.
+    /// </summary>
+    public SessionPlanGenerator(
+        IStudentPlanConfigService planConfig,
+        ISessionAbilityEstimateProvider abilityProvider,
+        ITopicPrerequisiteGraphProvider graphProvider,
+        IOverrideAwareSchedulerInputsBridge? overrideBridge,
+        IStudentPlanReader? planReader,
+        ISittingCanonicalDateResolver sittingResolver,
+        IExamTargetOverrideReader overrideReader)
     {
         _planConfig = planConfig ?? throw new ArgumentNullException(nameof(planConfig));
         _abilityProvider = abilityProvider ?? throw new ArgumentNullException(nameof(abilityProvider));
         _graphProvider = graphProvider ?? throw new ArgumentNullException(nameof(graphProvider));
         _overrideBridge = overrideBridge;
+        _planReader = planReader;
+        _sittingResolver = sittingResolver ?? throw new ArgumentNullException(nameof(sittingResolver));
+        _overrideReader = overrideReader ?? throw new ArgumentNullException(nameof(overrideReader));
     }
 
     /// <inheritdoc />
@@ -188,6 +233,35 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
             && fallback.DeadlineUtc.HasValue
             && Math.Abs((config.DeadlineUtc.Value - fallback.DeadlineUtc.Value).TotalSeconds) < 2;
 
+        // prr-226 / ADR-0050 §10: if the multi-target reader is wired, resolve
+        // the single active exam target (and the silent 14-day lock flag)
+        // and stamp both onto SchedulerInputs. When the reader is null we
+        // stay on the legacy prr-148 path — ActiveExamTargetId remains
+        // null, no lock, and downstream consumers see the identical shape
+        // they got before prr-226.
+        ExamTargetId? activeTargetId = null;
+        var lockedForExamWeek = false;
+        if (_planReader is not null)
+        {
+            var activeTargets = await _planReader
+                .ListTargetsAsync(studentAnonId, includeArchived: false, ct)
+                .ConfigureAwait(false);
+
+            var overrideTargetId = await _overrideReader
+                .GetOverrideAsync(studentAnonId, sessionId, ct)
+                .ConfigureAwait(false);
+
+            var resolution = ActiveExamTargetPolicy.Resolve(
+                activeTargets: activeTargets,
+                nowUtc: nowUtc,
+                sittingDateResolver: _sittingResolver,
+                overrideTargetId: overrideTargetId,
+                deficitFunc: null);
+
+            activeTargetId = resolution.ActiveTargetId;
+            lockedForExamWeek = resolution.LockedForExamWeek;
+        }
+
         var inputs = new SchedulerInputs(
             StudentAnonId: studentAnonId,
             PerTopicEstimates: estimates,
@@ -195,7 +269,9 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
             WeeklyTimeBudget: config.WeeklyBudget,
             MotivationProfile: config.MotivationProfile,
             NowUtc: nowUtc,
-            PrerequisiteGraph: graph);
+            PrerequisiteGraph: graph,
+            ActiveExamTargetId: activeTargetId,
+            LockedForExamWeek: lockedForExamWeek);
 
         // prr-150: apply teacher/mentor overrides on top of the base inputs
         // if the bridge is wired in. Precedence: override > student plan
