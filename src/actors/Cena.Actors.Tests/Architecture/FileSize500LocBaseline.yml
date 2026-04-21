@@ -82,6 +82,9 @@ grandfathered:
   - path: src/actors/Cena.Actors/Services/EmbeddingService.cs
     baseline_loc: 509
     reason: "Pre-2026-04-20 legacy; split provider adapters is a follow-up"
+  - path: src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs
+    baseline_loc: 515
+    reason: "prr-031 extended with Hebrew + Arabic lexicons (3 locale × ~180 LOC tables). Extracting lexicons to partial-class sibling files is a follow-up; inline keeps the speech-rule logic colocated with the phonetic data."
 
   # ---- Test fixtures (oversize but allowlisted; tests may shrink naturally) ----
   - path: src/actors/Cena.Actors.Tests/Compliance/RetentionWorkerTests.cs
