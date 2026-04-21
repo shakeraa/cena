@@ -125,17 +125,32 @@
 }
 
 // ═══════════════════════════════════════════════════════════════════
-// A11y: Arabic script readability
+// A11y: per-locale font family + Arabic script readability
 // Arabic renders ~10-12% smaller than Latin at the same CSS em value
 // due to x-height/cap-height differences. Bump body font + line-height
 // when the document language is Arabic so labels stay legible at the
 // same visual weight as Hebrew/Latin. Math stays in <bdi dir="ltr">
 // and inherits a normal em from its own locale scope (see prr-032).
+//
+// Font families per locale:
+//   en → Inter (loaded from index.html; fallback system-ui)
+//   he → Noto Sans Hebrew (good x-height, nikud-safe)
+//   ar → Noto Kufi Arabic (kufi style, sharp on small sizes)
 // ═══════════════════════════════════════════════════════════════════
+
+html {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+html:lang(he),
+html[lang^="he"] {
+  font-family: 'Noto Sans Hebrew', 'Inter', system-ui, sans-serif;
+}
 
 html:lang(ar),
 html[lang^="ar"],
 html[dir="rtl"]:lang(ar) {
+  font-family: 'Noto Kufi Arabic', 'Inter', system-ui, sans-serif;
   font-size: 17px;  // base rem bumps from 16 -> 17 (~6.25% scale)
 }
 
@@ -153,4 +168,71 @@ html:lang(ar) .layout-vertical-nav .nav-section-title,
 html[lang^="ar"] .layout-vertical-nav .nav-item-title,
 html[lang^="ar"] .layout-vertical-nav .nav-section-title {
   font-size: 0.9375rem;  // ~15px at 16px root (up from default 0.8125rem / 13px)
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// A11y toolbar: user-adjustable accessibility controls
+// IL law (Equal Rights for Persons with Disabilities, 5758-1998 + Reg
+// 5773-2013) requires web services to offer independent a11y controls.
+// The A11yToolbar component exposes: text-size slider, high-contrast
+// toggle, dyslexia-friendly font toggle, reduced-motion toggle. The CSS
+// below is the runtime contract — components attach the html[data-*]
+// attributes and the SCSS cascades the rest.
+// ═══════════════════════════════════════════════════════════════════
+
+// Text-size: 6 steps (0.875x → 1.5x) applied to root em so every
+// rem-based size scales together without layout regressions.
+html[data-a11y-text-size="0"] { font-size: 14px; }  // smaller than default
+html[data-a11y-text-size="1"] { font-size: 16px; }  // default
+html[data-a11y-text-size="2"] { font-size: 18px; }
+html[data-a11y-text-size="3"] { font-size: 20px; }
+html[data-a11y-text-size="4"] { font-size: 22px; }
+html[data-a11y-text-size="5"] { font-size: 24px; }
+
+// Arabic defaults bump one notch higher (already larger by script).
+html:lang(ar)[data-a11y-text-size="0"] { font-size: 15px; }
+html:lang(ar)[data-a11y-text-size="1"] { font-size: 17px; }
+html:lang(ar)[data-a11y-text-size="2"] { font-size: 19px; }
+html:lang(ar)[data-a11y-text-size="3"] { font-size: 21px; }
+html:lang(ar)[data-a11y-text-size="4"] { font-size: 23px; }
+html:lang(ar)[data-a11y-text-size="5"] { font-size: 25px; }
+
+// High-contrast override: boosts text contrast via increased opacity on
+// text-medium-emphasis + on-surface tokens. Does NOT change primary hue
+// per feedback_primary_color_locked (prr #7367F0 stays).
+html[data-a11y-contrast="high"] {
+  --v-medium-emphasis-opacity: 1;
+  --v-disabled-opacity: 0.9;
+}
+
+html[data-a11y-contrast="high"] .text-medium-emphasis,
+html[data-a11y-contrast="high"] .text-disabled {
+  color: rgb(var(--v-theme-on-surface)) !important;
+  opacity: 1 !important;
+}
+
+html[data-a11y-contrast="high"] .v-btn--variant-text,
+html[data-a11y-contrast="high"] .v-btn--variant-tonal {
+  text-decoration: underline;
+}
+
+// Dyslexia font — when toggled, swap body font to OpenDyslexic-like
+// fallback stack. We don't bundle OpenDyslexic (license/weight); we
+// route to Atkinson Hyperlegible if present (user installs), else fall
+// back to Verdana which is the dyslexia-friendly widely-installed
+// alternative per British Dyslexia Association guidance.
+html[data-a11y-dyslexia-font="on"] {
+  font-family: 'Atkinson Hyperlegible', 'Verdana', 'Noto Kufi Arabic', 'Noto Sans Hebrew', system-ui, sans-serif !important;
+}
+
+// Reduced motion — user-requested, overrides media query. The existing
+// @media (prefers-reduced-motion: reduce) rule still applies for OS-level
+// preference; this adds an explicit user-controlled toggle.
+html[data-a11y-motion="reduced"] *,
+html[data-a11y-motion="reduced"] *::before,
+html[data-a11y-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }

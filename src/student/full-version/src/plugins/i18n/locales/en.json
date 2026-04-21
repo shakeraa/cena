@@ -236,6 +236,27 @@
     "community": "Community",
     "account": "Account"
   },
+  "a11y": {
+    "openToolbar": "Open accessibility toolbar",
+    "closeToolbar": "Close accessibility toolbar",
+    "toolbarTitle": "Accessibility",
+    "textSize": "Text size",
+    "increaseTextSize": "Increase text size",
+    "decreaseTextSize": "Decrease text size",
+    "highContrast": "High contrast",
+    "reducedMotion": "Reduce motion",
+    "dyslexiaFont": "Dyslexia-friendly font",
+    "resetDefaults": "Reset to defaults",
+    "legalNote": "These settings persist on this device. Per the Equal Rights for Persons with Disabilities Law (5758-1998).",
+    "size": {
+      "xsmall": "Extra small",
+      "small": "Small",
+      "medium": "Medium (default)",
+      "large": "Large",
+      "xlarge": "Extra large",
+      "xxlarge": "Maximum"
+    }
+  },
   "status": {
     "online": "Online",
     "offline": "Offline",
@@ -892,6 +913,7 @@
     "notifications": "Notifications"
   },
   "onboarding": {
+    "stepCounter": "Step {current} of {total}",
     "welcome": {
       "title": "Welcome to Cena",
       "subtitle": "Let's personalize your learning journey in just a couple of steps."

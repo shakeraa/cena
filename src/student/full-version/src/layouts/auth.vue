@@ -38,6 +38,10 @@ watch([isFallbackStateActive, refLoadingIndicator], () => {
       </RouterView>
     </div>
   </div>
+
+  <!-- A11yToolbar on auth + onboarding screens too (IL 5758-1998 requires
+       the toolbar be reachable before login). -->
+  <A11yToolbar />
 </template>
 
 <style scoped lang="scss">

@@ -237,6 +237,27 @@
     "community": "المجتمع",
     "account": "الحساب"
   },
+  "a11y": {
+    "openToolbar": "فتح شريط إمكانية الوصول",
+    "closeToolbar": "إغلاق شريط إمكانية الوصول",
+    "toolbarTitle": "إمكانية الوصول",
+    "textSize": "حجم النص",
+    "increaseTextSize": "تكبير النص",
+    "decreaseTextSize": "تصغير النص",
+    "highContrast": "تباين عالٍ",
+    "reducedMotion": "تقليل الحركة",
+    "dyslexiaFont": "خط مناسب لعسر القراءة",
+    "resetDefaults": "إعادة إلى الافتراضي",
+    "legalNote": "تُحفظ هذه الإعدادات على جهازك وفقًا لقانون المساواة لذوي الإعاقة (5758-1998).",
+    "size": {
+      "xsmall": "صغير جدًا",
+      "small": "صغير",
+      "medium": "متوسط (افتراضي)",
+      "large": "كبير",
+      "xlarge": "كبير جدًا",
+      "xxlarge": "الحد الأقصى"
+    }
+  },
   "status": {
     "online": "متصل",
     "offline": "غير متصل",
@@ -890,6 +911,7 @@
     "notifications": "الإشعارات"
   },
   "onboarding": {
+    "stepCounter": "الخطوة {current} من {total}",
     "welcome": {
       "title": "مرحبًا بك في سينا",
       "subtitle": "لنخصص رحلتك التعليمية بخطوات قليلة."

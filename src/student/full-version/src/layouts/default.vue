@@ -138,6 +138,11 @@ watch([isFallbackStateActive, refLoadingIndicator], () => {
 
   <!-- PWA-005: Offline banner + reconnect toast with auto-replay of queued submissions. -->
   <OfflineBanner />
+
+  <!-- A11yToolbar: IL Equal-Rights-for-Persons-with-Disabilities-Law
+       5758-1998 compliance. Always mounted (except embed) so the handle
+       is reachable on every screen including onboarding + auth. -->
+  <A11yToolbar v-if="!isEmbedMode" />
 </template>
 
 <style lang="scss">

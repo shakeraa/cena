@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 
 interface Props {
   currentStep: number
@@ -7,8 +8,11 @@ interface Props {
 }
 
 const props = defineProps<Props>()
+const { t } = useI18n()
 
 const percent = computed(() => Math.round(((props.currentStep + 1) / props.totalSteps) * 100))
+const stepLabel = computed(() =>
+  t('onboarding.stepCounter', { current: props.currentStep + 1, total: props.totalSteps }))
 </script>
 
 <template>
@@ -18,7 +22,7 @@ const percent = computed(() => Math.round(((props.currentStep + 1) / props.total
   >
     <div class="d-flex align-center justify-space-between mb-2">
       <span class="text-caption text-medium-emphasis">
-        Step {{ currentStep + 1 }} of {{ totalSteps }}
+        {{ stepLabel }}
       </span>
       <span class="text-caption text-medium-emphasis">
         {{ percent }}%
@@ -29,7 +33,7 @@ const percent = computed(() => Math.round(((props.currentStep + 1) / props.total
       color="primary"
       rounded
       height="6"
-      :aria-label="`Onboarding progress: step ${currentStep + 1} of ${totalSteps}`"
+      :aria-label="stepLabel"
     />
   </div>
 </template>

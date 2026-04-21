@@ -236,6 +236,27 @@
     "community": "קהילה",
     "account": "חשבון"
   },
+  "a11y": {
+    "openToolbar": "פתיחת סרגל נגישות",
+    "closeToolbar": "סגירת סרגל נגישות",
+    "toolbarTitle": "נגישות",
+    "textSize": "גודל טקסט",
+    "increaseTextSize": "הגדלת טקסט",
+    "decreaseTextSize": "הקטנת טקסט",
+    "highContrast": "ניגודיות גבוהה",
+    "reducedMotion": "הפחתת תנועה",
+    "dyslexiaFont": "גופן ידידותי לדיסלקציה",
+    "resetDefaults": "איפוס לברירת מחדל",
+    "legalNote": "ההעדפות נשמרות במכשיר זה לפי חוק שוויון זכויות לאנשים עם מוגבלות (התשנ\"ח-1998).",
+    "size": {
+      "xsmall": "קטן מאוד",
+      "small": "קטן",
+      "medium": "בינוני (ברירת מחדל)",
+      "large": "גדול",
+      "xlarge": "גדול מאוד",
+      "xxlarge": "מקסימום"
+    }
+  },
   "status": {
     "online": "מחובר",
     "offline": "לא מחובר",
@@ -889,6 +910,7 @@
     "notifications": "התראות"
   },
   "onboarding": {
+    "stepCounter": "שלב {current} מתוך {total}",
     "welcome": {
       "title": "ברוכים הבאים לסינה",
       "subtitle": "בואו נתאים אישית את מסע הלמידה שלך בכמה צעדים פשוטים."
