@@ -15,6 +15,7 @@ using Cena.Admin.Api.Features.Teacher;
 using Cena.Admin.Api.Host.Hubs;
 using Cena.Admin.Api.Registration;
 using Cena.Api.Host.Endpoints;
+using Cena.Infrastructure.Analytics;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
@@ -255,6 +256,10 @@ public partial class Program
     builder.Services.AddLlmCostMetric(Path.Combine(
         builder.Environment.ContentRootPath,
         Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
+
+    // prr-026: k-anonymity enforcer — injected by every aggregate
+    // teacher/classroom/institute surface that serves a statistical claim.
+    builder.Services.AddKAnonymityEnforcer();
 
     // RDY-063 Phase 2a: stuck-type classifier services (for admin
     // diagnostics read endpoints). Behaviour-gated by

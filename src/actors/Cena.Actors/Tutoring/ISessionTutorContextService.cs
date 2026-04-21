@@ -70,4 +70,20 @@ public interface ISessionTutorContextService
     Task InvalidateAsync(
         string sessionId,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// prr-152 — bulk invalidation for the erasure cascade. Removes every
+    /// cached tutor-context entry whose embedded <c>StudentId</c> matches
+    /// <paramref name="studentId"/>, regardless of session id.
+    ///
+    /// Because cache entries expire on the session TTL (default 6h), this
+    /// is almost always a no-op by the time a 30-day-cooled erasure runs —
+    /// but we still invalidate explicitly so a second erasure run after
+    /// the TTL still succeeds and so the manifest audit trail records the
+    /// intent. Returns the number of entries invalidated (best-effort on
+    /// Redis outage — logs a warning and returns 0).
+    /// </summary>
+    Task<int> InvalidateAllForStudentAsync(
+        string studentId,
+        CancellationToken ct = default);
 }

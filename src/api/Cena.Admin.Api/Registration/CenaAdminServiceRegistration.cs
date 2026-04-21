@@ -113,6 +113,22 @@ public static class CenaAdminServiceRegistration
         // added alongside EPIC-PRR-A consent work. Endpoint code is unchanged.
         services.TryAddSingleton<Cena.Actors.ParentDigest.IParentDigestPreferencesStore,
             Cena.Actors.ParentDigest.InMemoryParentDigestPreferencesStore>();
+        // prr-152: erasure cascade — the in-memory store also implements the
+        // IParentDigestPreferencesErasureSink contract. Binding the sink
+        // ONLY to the same singleton instance guarantees the cascade sees
+        // the same rows the product code reads/writes. The cascade itself
+        // is registered with the RightToErasureService via IEnumerable<IErasureProjectionCascade>.
+        services.TryAddSingleton<Cena.Actors.ParentDigest.IParentDigestPreferencesErasureSink>(sp =>
+            (Cena.Actors.ParentDigest.InMemoryParentDigestPreferencesStore)
+                sp.GetRequiredService<Cena.Actors.ParentDigest.IParentDigestPreferencesStore>());
+        services.AddSingleton<Cena.Infrastructure.Compliance.IErasureProjectionCascade,
+            Cena.Actors.ParentDigest.ParentDigestErasureCascade>();
+        // prr-152: StudentVisibilityVeto event cascade — records
+        // "Preserved via ADR-0038 crypto-shred" in the manifest. Safe to
+        // register without extra dependencies; the cascade is side-effect
+        // free at the Marten layer.
+        services.AddSingleton<Cena.Infrastructure.Compliance.IErasureProjectionCascade,
+            Cena.Actors.Consent.StudentVisibilityVetoErasureCascade>();
 
         // prr-108: WhatsApp template → digest-purpose catalog for opt-out policy.
         // The DefaultWhatsAppTemplatePurposeCatalog ships the Phase 1B live
@@ -386,6 +402,10 @@ public static class CenaAdminServiceRegistration
         // persona-educator lens + ship-gate GD-004 ban on engagement
         // mechanics.
         app.MapTeacherDashboardEndpoint();
+        // prr-026: Classroom analytics aggregate (k=10 floor). Broader
+        // statistical claims (class-wide mean mastery, hint-ladder rate)
+        // shown on a teacher's cross-classroom analytics view.
+        app.MapClassroomAnalyticsEndpoint();
         // RDY-066 Phase 1B: Parent console accommodations profile.
         // GET reads the latest assigned profile; PUT appends a new
         // AccommodationProfileAssignedV1 event with consent-doc hash.

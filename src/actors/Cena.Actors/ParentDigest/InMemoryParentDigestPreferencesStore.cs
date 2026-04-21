@@ -14,8 +14,11 @@ namespace Cena.Actors.ParentDigest;
 
 /// <summary>
 /// Thread-safe in-memory <see cref="IParentDigestPreferencesStore"/>.
+/// Also implements <see cref="IParentDigestPreferencesErasureSink"/> to
+/// support the prr-152 erasure cascade.
 /// </summary>
-public sealed class InMemoryParentDigestPreferencesStore : IParentDigestPreferencesStore
+public sealed class InMemoryParentDigestPreferencesStore
+    : IParentDigestPreferencesStore, IParentDigestPreferencesErasureSink
 {
     // Keyed on the full triple so cross-tenant probes miss naturally.
     private readonly ConcurrentDictionary<PrefKey, ParentDigestPreferences> _rows = new();
@@ -87,6 +90,27 @@ public sealed class InMemoryParentDigestPreferencesStore : IParentDigestPreferen
                 .AsFullyUnsubscribed(unsubscribedAtUtc),
             (_, existing) => existing.AsFullyUnsubscribed(unsubscribedAtUtc));
         return Task.FromResult(next);
+    }
+
+    /// <summary>
+    /// prr-152: hard-delete every preference row where the erased student
+    /// is the (parent, child, institute) child component, regardless of
+    /// which parent or institute. Matches the erasure cascade contract —
+    /// idempotent, returns the actual number of rows removed.
+    /// </summary>
+    public Task<int> DeleteByStudentAsync(string studentId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(studentId))
+            return Task.FromResult(0);
+
+        var removed = 0;
+        foreach (var key in _rows.Keys)
+        {
+            if (!string.Equals(key.StudentSubjectId, studentId, StringComparison.Ordinal))
+                continue;
+            if (_rows.TryRemove(key, out _)) removed++;
+        }
+        return Task.FromResult(removed);
     }
 
     private readonly record struct PrefKey(

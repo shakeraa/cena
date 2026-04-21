@@ -12,6 +12,7 @@ using Cena.Actors.Diagnosis;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
 using Cena.Actors.Configuration;
+using Cena.Infrastructure.Analytics;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Configuration;
@@ -239,6 +240,9 @@ builder.Services.AddLlmCostMetric(Path.Combine(
 // prr-022 / ADR-0047: PII prompt scrubber — injected by every [TaskRouting]
 // service that composes student free-text into its prompt.
 builder.Services.AddPiiPromptScrubber();
+// prr-026: k-anonymity enforcer — injected by every aggregate
+// teacher/classroom/institute surface that serves a statistical claim.
+builder.Services.AddKAnonymityEnforcer();
 builder.Services.AddSingleton<IExplanationGenerator, ExplanationGenerator>();
 builder.Services.AddSingleton<IL3ExplanationGenerator, L3ExplanationGenerator>();
 builder.Services.AddSingleton<IErrorClassificationService, ErrorClassificationService>();
@@ -431,6 +435,17 @@ builder.Services.AddErasureWorker(opts =>
     opts.BatchSize = builder.Configuration.GetValue<int>("Cena:Compliance:ErasureBatchSize", 100);
 });
 builder.Services.AddRightToErasureService(builder.Configuration.GetValue<string>("Cena:Compliance:ErasurePepper") ?? "change-me-in-production");
+
+// prr-152: per-student projection cascades run during
+// RightToErasureService.ProcessErasureAsync so the manifest records the
+// full set of projections touched. ParentDigestPreferences + StudentVisibilityVeto
+// cascades are registered in AddCenaAdminServices (called above). Here we add
+// the TutorContext cascade, which depends on ISessionTutorContextService
+// that is registered only in hosts that run the tutor pipeline.
+builder.Services.AddSingleton<Cena.Actors.Tutoring.ISessionTutorContextService,
+    Cena.Actors.Tutoring.SessionTutorContextService>();
+builder.Services.AddSingleton<Cena.Infrastructure.Compliance.IErasureProjectionCascade,
+    Cena.Actors.Tutoring.TutorContextErasureCascade>();
 
 // SAI-000: LLM client abstraction and usage tracking
 builder.Services.AddSingleton<AnthropicLlmClient>();

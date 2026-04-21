@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform -- GDPR Right to Erasure (SEC-005)
+// Cena Platform -- GDPR Right to Erasure (SEC-005, prr-152)
 // Implements GDPR Article 17 — request, cooling period, and REAL erasure.
 //
 // Erasure strategy per data store:
@@ -10,6 +10,17 @@
 //   - Share Tokens: HARD DELETE
 //   - Consent Records: PRESERVE (mark revoked - legal provenance)
 //   - Access Logs: PRESERVE (FERPA requirement - disclosure records outlive subject)
+//
+// prr-152 — per-student projections added after SEC-005 baseline cascade
+// through the IErasureProjectionCascade collaborators registered in DI:
+//   - ParentDigestPreferences (prr-051) → HARD DELETE per (parent, child, institute)
+//   - TutorContext Redis cache (prr-204) → INVALIDATE
+//   - StudentVisibilityVetoed_V1 events → PRESERVE via ADR-0038 crypto-shred
+// Additional projections added in future PRs register a new cascade; the
+// arch test ErasureCascadeCoversAllPerStudentDocsTest catches regressions.
+//
+// Contracts + DTOs live in ErasureContracts.cs to keep this file under the
+// 500-LOC rule.
 // =============================================================================
 
 using System.Security.Cryptography;
@@ -20,174 +31,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Cena.Infrastructure.Compliance;
-
-/// <summary>
-/// Status of a GDPR erasure request through its lifecycle.
-/// </summary>
-public enum ErasureStatus
-{
-    /// <summary>Initial request received, cooling period not yet started.</summary>
-    Requested,
-
-    /// <summary>30-day cooling period in effect.</summary>
-    CoolingPeriod,
-
-    /// <summary>Erasure actively being processed.</summary>
-    Processing,
-
-    /// <summary>Erasure completed successfully across all stores.</summary>
-    Completed,
-
-    /// <summary>Request cancelled by data subject before processing.</summary>
-    Cancelled
-}
-
-/// <summary>
-/// Types of erasure actions that can be taken against a data store.
-/// </summary>
-public enum ErasureAction
-{
-    /// <summary>Data anonymized (PII removed/irreversibly hashed, record retained for integrity).</summary>
-    Anonymized,
-
-    /// <summary>Data permanently deleted.</summary>
-    Deleted,
-
-    /// <summary>Data preserved (legal hold, audit requirement, or FERPA).</summary>
-    Preserved
-}
-
-/// <summary>
-/// Represents a single erasure action taken against a specific data store.
-/// Part of the ErasureManifest for audit trail purposes.
-/// </summary>
-public sealed class ErasureManifestItem
-{
-    /// <summary>Name of the data store (e.g., "StudentProfile", "TutorMessages").</summary>
-    public string Store { get; set; } = "";
-
-    /// <summary>The type of action taken.</summary>
-    public ErasureAction Action { get; set; }
-
-    /// <summary>Number of records/rows affected in this store.</summary>
-    public int Count { get; set; }
-
-    /// <summary>Additional context for audit (e.g., "HMAC-SHA256 hashed").</summary>
-    public string? Details { get; set; }
-
-    public ErasureManifestItem(string store, ErasureAction action, int count, string? details = null)
-    {
-        Store = store;
-        Action = action;
-        Count = count;
-        Details = details;
-    }
-}
-
-/// <summary>
-/// Complete manifest of all erasure actions taken across all data stores.
-/// Provides full audit trail for compliance verification.
-/// </summary>
-public sealed class ErasureManifest
-{
-    /// <summary>The student ID that was erased.</summary>
-    public string StudentId { get; set; } = "";
-
-    /// <summary>Timestamp when erasure was completed.</summary>
-    public DateTimeOffset CompletedAt { get; set; }
-
-    /// <summary>All actions taken across data stores.</summary>
-    public List<ErasureManifestItem> Actions { get; set; } = new();
-
-    /// <summary>Total records affected across all stores.</summary>
-    public int RowsAffected => Actions.Sum(a => a.Count);
-
-    public ErasureManifest(string studentId, DateTimeOffset completedAt)
-    {
-        StudentId = studentId;
-        CompletedAt = completedAt;
-    }
-
-    /// <summary>Adds an action to the manifest.</summary>
-    public void AddAction(string store, ErasureAction action, int count, string? details = null)
-    {
-        Actions.Add(new ErasureManifestItem(store, action, count, details));
-    }
-}
-
-/// <summary>
-/// Interface for building an erasure manifest during processing.
-/// Abstracts manifest construction for testability.
-/// </summary>
-public interface IErasureManifestBuilder
-{
-    /// <summary>Creates a new manifest for the specified student.</summary>
-    ErasureManifest CreateManifest(string studentId, DateTimeOffset completedAt);
-}
-
-/// <summary>
-/// Default implementation of the erasure manifest builder.
-/// </summary>
-public sealed class ErasureManifestBuilder : IErasureManifestBuilder
-{
-    /// <inheritdoc />
-    public ErasureManifest CreateManifest(string studentId, DateTimeOffset completedAt)
-    {
-        return new ErasureManifest(studentId, completedAt);
-    }
-}
-
-/// <summary>
-/// Provides configuration for cryptographic operations during erasure.
-/// </summary>
-public interface IErasureCryptoConfig
-{
-    /// <summary>The pepper value used for HMAC hashing (should be 32+ bytes).</summary>
-    string Pepper { get; }
-}
-
-/// <summary>
-/// Default implementation reading pepper from configuration.
-/// </summary>
-public sealed class ErasureCryptoConfig : IErasureCryptoConfig
-{
-    /// <inheritdoc />
-    public string Pepper { get; }
-
-    public ErasureCryptoConfig(string pepper)
-    {
-        if (string.IsNullOrEmpty(pepper))
-            throw new ArgumentException("Erasure pepper must be configured", nameof(pepper));
-        Pepper = pepper;
-    }
-}
-
-/// <summary>
-/// A GDPR erasure request record stored in Marten.
-/// </summary>
-public sealed class ErasureRequest
-{
-    /// <summary>Unique identifier for this request.</summary>
-    public Guid Id { get; set; }
-
-    /// <summary>The student ID to erase.</summary>
-    public string StudentId { get; set; } = "";
-
-    /// <summary>Current status of the erasure request.</summary>
-    public ErasureStatus Status { get; set; }
-
-    /// <summary>When the request was initially received.</summary>
-    public DateTimeOffset RequestedAt { get; set; }
-
-    /// <summary>When the erasure was actually processed (null if not yet).</summary>
-    public DateTimeOffset? ProcessedAt { get; set; }
-
-    /// <summary>Who requested the erasure (e.g., "student:self", "parent:email@example.com").</summary>
-    public string? RequestedBy { get; set; }
-
-    /// <summary>The completed erasure manifest (null until completion).</summary>
-    public ErasureManifest? Manifest { get; set; }
-}
 
 /// <summary>
 /// Lightweight POCO for loading StudentProfileSnapshot from Marten without
@@ -208,21 +51,6 @@ internal class StudentProfileRef
 }
 
 /// <summary>
-/// Service interface for GDPR Right to Erasure operations.
-/// </summary>
-public interface IRightToErasureService
-{
-    /// <summary>Submit a new erasure request (enters cooling period).</summary>
-    Task<ErasureRequest> RequestErasureAsync(string studentId, string requestedBy, CancellationToken ct = default);
-
-    /// <summary>Process the erasure for a student (after cooling period).</summary>
-    Task ProcessErasureAsync(string studentId, CancellationToken ct = default);
-
-    /// <summary>Get the current status of an erasure request.</summary>
-    Task<ErasureRequest?> GetErasureStatusAsync(string studentId, CancellationToken ct = default);
-}
-
-/// <summary>
 /// Implements GDPR Article 17 Right to Erasure with proper store-specific handling.
 /// </summary>
 public sealed class RightToErasureService : IRightToErasureService
@@ -234,22 +62,31 @@ public sealed class RightToErasureService : IRightToErasureService
     private readonly IClock _clock;
     private readonly IErasureManifestBuilder _manifestBuilder;
     private readonly IErasureCryptoConfig _cryptoConfig;
+    private readonly IReadOnlyList<IErasureProjectionCascade> _cascades;
 
     /// <summary>
     /// Creates a new RightToErasureService.
     /// </summary>
+    /// <param name="cascades">
+    /// prr-152 — zero or more per-student projection cascades, resolved via
+    /// <c>IEnumerable&lt;IErasureProjectionCascade&gt;</c>. A missing cascade
+    /// never fails the whole erasure; each cascade logs its own failure and
+    /// the manifest still records what DID run.
+    /// </param>
     public RightToErasureService(
         IDocumentStore store,
         ILogger<RightToErasureService> logger,
         IClock clock,
         IErasureManifestBuilder manifestBuilder,
-        IErasureCryptoConfig cryptoConfig)
+        IErasureCryptoConfig cryptoConfig,
+        IEnumerable<IErasureProjectionCascade>? cascades = null)
     {
         _store = store;
         _logger = logger;
         _clock = clock;
         _manifestBuilder = manifestBuilder;
         _cryptoConfig = cryptoConfig;
+        _cascades = cascades?.ToList() ?? new List<IErasureProjectionCascade>();
     }
 
     /// <inheritdoc />
@@ -448,6 +285,39 @@ public sealed class RightToErasureService : IRightToErasureService
             manifest.AddAction("StudentRecordAccessLog", ErasureAction.Preserved, accessLogCount,
                 "FERPA requirement - disclosure records preserved");
             _logger.LogDebug("Preserved {Count} StudentRecordAccessLog for {StudentId} (FERPA)", accessLogCount, studentId);
+
+            // =============================================================================
+            // 7b. prr-152 — per-student projection cascade.
+            // =============================================================================
+            // Each registered IErasureProjectionCascade runs in order; a
+            // cascade failure is logged but does NOT abort the whole run.
+            // Cascades cover per-student projections added after the
+            // SEC-005 baseline (ParentDigestPreferences, TutorContext
+            // cache, StudentVisibilityVeto events, etc.) — see the arch
+            // test ErasureCascadeCoversAllPerStudentDocsTest for the
+            // invariant.
+            foreach (var cascade in _cascades)
+            {
+                try
+                {
+                    var cascadeItem = await cascade.EraseForStudentAsync(studentId, ct);
+                    manifest.Actions.Add(cascadeItem);
+                    _logger.LogDebug(
+                        "[SIEM] ErasureCascade: {Projection} for {StudentId} -> {Action}={Count}",
+                        cascade.ProjectionName, studentId, cascadeItem.Action, cascadeItem.Count);
+                }
+                catch (Exception cascadeEx) when (cascadeEx is not OperationCanceledException)
+                {
+                    _logger.LogError(cascadeEx,
+                        "[SIEM] ErasureCascadeFailed: {Projection} for {StudentId} - {Error}",
+                        cascade.ProjectionName, studentId, cascadeEx.Message);
+                    manifest.AddAction(
+                        cascade.ProjectionName,
+                        ErasureAction.Preserved,
+                        0,
+                        $"cascade failed: {cascadeEx.GetType().Name}");
+                }
+            }
 
             // =============================================================================
             // 8. Structured SIEM event for erasure completion
