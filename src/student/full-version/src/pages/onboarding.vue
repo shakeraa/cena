@@ -92,6 +92,15 @@ function handleBack() {
   onboarding.back()
 }
 
+// Steps that render their OWN action row (Skip/Continue) — outer
+// Next button is suppressed on these so the user sees one advance-button
+// instead of two side-by-side. Back stays visible so the user can
+// retreat without completing the step.
+const stepOwnsAdvance = computed(() => (
+  onboarding.step === 'diagnostic'
+  || onboarding.step === 'self-assessment'
+))
+
 // RDY-057: post the self-assessment separately from onboarding completion.
 // Best-effort — a failure here does NOT block the user's onboarding; we
 // log it and let the student reach /home. The self-assessment can be
@@ -322,7 +331,7 @@ async function handleConfirm() {
         </VBtn>
 
         <VBtn
-          v-if="onboarding.step !== 'confirm'"
+          v-if="onboarding.step !== 'confirm' && !stepOwnsAdvance"
           color="primary"
           :disabled="!onboarding.canAdvance"
           data-testid="onboarding-next"
