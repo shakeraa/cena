@@ -419,6 +419,26 @@ public static class MartenConfiguration
             .Index(x => x.Grade)
             .Index(x => x.LearningObjectiveId!); // FIND-pedagogy-008
 
+        // ── Parametric Template Document (prr-202 admin authoring) ──
+        // Denormalised projection of the latest template state. The authoritative
+        // history lives in the per-template event stream keyed on Id.
+        opts.Schema.For<Cena.Infrastructure.Documents.ParametricTemplateDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.Subject)
+            .Index(x => x.Topic)
+            .Index(x => x.Track)
+            .Index(x => x.Difficulty)
+            .Index(x => x.Methodology)
+            .Index(x => x.Active)
+            .Index(x => x.Status)
+            .Index(x => x.UpdatedAt);
+
+        // Authoring events — appended on every create/update/delete + preview.
+        opts.Events.AddEventType<Cena.Actors.QuestionBank.Templates.ParametricTemplateCreated_V1>();
+        opts.Events.AddEventType<Cena.Actors.QuestionBank.Templates.ParametricTemplateUpdated_V1>();
+        opts.Events.AddEventType<Cena.Actors.QuestionBank.Templates.ParametricTemplateDeleted_V1>();
+        opts.Events.AddEventType<Cena.Actors.QuestionBank.Templates.ParametricTemplatePreviewExecuted_V1>();
+
         // ── Learning Objective Document (FIND-pedagogy-008) ──
         opts.Schema.For<LearningObjectiveDocument>()
             .Identity(x => x.Id)

@@ -180,6 +180,11 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<IParametricRenderer, SymPyParametricRenderer>();
         services.AddScoped<ParametricCompiler>();
 
+        // prr-202: Admin parametric template authoring — CRUD + CAS-verified
+        // live preview. Emits ParametricTemplate*_V1 events and AuditEventDocument
+        // rows on every mutation. Uses the prr-200 ParametricCompiler for preview.
+        services.AddScoped<IParametricTemplateAuthoringService, ParametricTemplateAuthoringService>();
+
         // CNT-002: Question pipeline orchestration
         services.AddScoped<IQuestionPipelineService, QuestionPipelineService>();
 
@@ -285,6 +290,13 @@ public static class CenaAdminServiceRegistration
         // variant batch generation (Strategy 1, ADR-0002). Dry-run only in
         // prr-200; wet-run ingestion lands with prr-201.
         app.MapParametricTemplateEndpoints();
+
+        // prr-202: CRUD + CAS-verified preview for the admin authoring UI.
+        //   GET/POST/PUT/DELETE /api/admin/templates[/{id}]
+        //   POST /api/admin/templates/{id}/preview
+        // All routes AdminOnly; preview fans out through the CAS sidecar so it
+        // lives in the "ai" rate-limit bucket.
+        app.MapTemplateCrudEndpoints();
 
         // RDY-059: POST /api/admin/questions/expand-corpus — batch corpus
         // expander (SuperAdminOnly, dry-run by default).
