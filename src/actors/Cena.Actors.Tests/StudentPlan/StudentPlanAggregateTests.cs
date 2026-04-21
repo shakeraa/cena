@@ -45,7 +45,9 @@ public sealed class StudentPlanAggregateTests
         int weeklyHours = 5,
         SittingCode? sitting = null,
         DateTimeOffset? createdAt = null,
-        DateTimeOffset? archivedAt = null)
+        DateTimeOffset? archivedAt = null,
+        IReadOnlyList<string>? questionPaperCodes = null,
+        IReadOnlyDictionary<string, SittingCode>? perPaperSittingOverride = null)
         => new(
             Id: new ExamTargetId(id),
             Source: ExamTargetSource.Student,
@@ -53,7 +55,12 @@ public sealed class StudentPlanAggregateTests
             EnrollmentId: null,
             ExamCode: new ExamCode(examCode),
             Track: track is null ? null : new TrackCode(track),
+            QuestionPaperCodes: questionPaperCodes
+                ?? (examCode.StartsWith("BAGRUT_", StringComparison.Ordinal)
+                        ? new[] { "035581" } // plausible default for tests
+                        : Array.Empty<string>()),
             Sitting: sitting ?? Bagrut2026Summer,
+            PerPaperSittingOverride: perPaperSittingOverride,
             WeeklyHours: weeklyHours,
             ReasonTag: null,
             CreatedAt: createdAt ?? DateTimeOffset.Parse("2026-04-21T10:00:00Z"),

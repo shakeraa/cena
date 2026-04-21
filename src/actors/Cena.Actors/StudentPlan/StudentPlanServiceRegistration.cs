@@ -46,6 +46,13 @@ public static class StudentPlanServiceRegistration
         services.TryAddSingleton<IStudentPlanReader, StudentPlanReader>();
         services.TryAddSingleton<IStudentPlanCommandHandler, StudentPlanCommandHandler>();
 
+        // PRR-243: permissive catalog validator by default (accepts any
+        // non-empty paper code). The Student API host overrides this with
+        // CatalogBackedQuestionPaperCatalogValidator, which consults the
+        // loaded YAML catalog snapshot.
+        services.TryAddSingleton<IQuestionPaperCatalogValidator>(
+            AllowAllQuestionPaperCatalogValidator.Instance);
+
         // Migration safety net (prr-219). Feature flag defaults off via
         // MigrationFeatureFlagSnapshot.Off; hosts override the provider
         // delegate to wire real config.

@@ -84,6 +84,21 @@ public sealed class StudentPlanAggregate
             case ExamTargetOverrideApplied_V1 overrideApplied:
                 State.Apply(overrideApplied);
                 break;
+
+            // PRR-243 question-paper events.
+            case QuestionPaperAdded_V1 paperAdded:
+                State.Apply(paperAdded);
+                break;
+            case QuestionPaperRemoved_V1 paperRemoved:
+                State.Apply(paperRemoved);
+                break;
+            case PerPaperSittingOverrideSet_V1 overrideSet:
+                State.Apply(overrideSet);
+                break;
+            case PerPaperSittingOverrideCleared_V1 overrideCleared:
+                State.Apply(overrideCleared);
+                break;
+
             case StudentPlanMigrationFailed_V1 migFailed:
                 State.Apply(migFailed);
                 break;

@@ -37,6 +37,7 @@ using Cena.Infrastructure.Ocr.DependencyInjection;
 using Cena.Infrastructure.Ocr.Layers;
 using Cena.Infrastructure.Ocr.Runners;
 using Cena.Actors.Cas;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using Cena.Infrastructure.Seed;
 using Marten;
@@ -530,6 +531,15 @@ public partial class Program
     // self-service forgot-password flow has a real implementation on both sides.
     builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminService>(); Cena.Student.Api.Host.Catalog.CatalogServiceRegistration.AddCenaExamCatalog(builder.Services, builder.Configuration, builder.Environment); // prr-220 ADR-0050
 
+    // PRR-243: wire the catalog-backed שאלון validator (replaces the
+    // permissive AllowAll registered by AddStudentPlanServices). Must run
+    // AFTER AddCenaExamCatalog so IExamCatalogService is resolvable.
+    // Use Replace (not Add) because AddStudentPlanServices used TryAdd,
+    // and Replace ensures the catalog-backed implementation wins.
+    builder.Services.Replace(Microsoft.Extensions.DependencyInjection.ServiceDescriptor.Singleton<
+        Cena.Actors.StudentPlan.IQuestionPaperCatalogValidator,
+        Cena.Student.Api.Host.Catalog.CatalogBackedQuestionPaperCatalogValidator>());
+
     // ---- SignalR Real-Time Hub ----
     builder.Services.AddCenaSignalR();
     builder.Services.AddSignalRTokenExtraction();
@@ -884,6 +894,7 @@ public partial class Program
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
     app.MapExamTargetEndpoints();        // prr-218: multi-target /api/me/exam-targets per ADR-0050
+    app.MapExamTargetQuestionPaperEndpoints(); // prr-243: שאלון post-hoc PATCH endpoints per ADR-0050 §1
 
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();

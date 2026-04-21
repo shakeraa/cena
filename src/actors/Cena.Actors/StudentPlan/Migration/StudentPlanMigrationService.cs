@@ -94,6 +94,14 @@ public sealed class StudentPlanMigrationService : IStudentPlanMigrationService
 
         try
         {
+            // PRR-243: Bagrut-family targets require ≥1 שאלון. For the
+            // migration cohort we use the manifest-supplied list if
+            // present, else fall back to the first Ministry paper code
+            // for the (examCode, track) pair via MigrationBagrutFallbackPapers
+            // — a stable sentinel so replay is deterministic. Standardized
+            // family stays empty regardless of manifest input.
+            var papers = ResolveQuestionPaperCodes(snapshot);
+
             var cmd = new AddExamTargetCommand(
                 StudentAnonId: snapshot.StudentAnonId,
                 Source: ExamTargetSource.Migration,
@@ -104,6 +112,8 @@ public sealed class StudentPlanMigrationService : IStudentPlanMigrationService
                 Sitting: sitting,
                 WeeklyHours: weeklyHours,
                 ReasonTag: ReasonTag.NewSubject,
+                QuestionPaperCodes: papers,
+                PerPaperSittingOverride: null,
                 MigrationSourceId: snapshot.MigrationSourceId);
 
             var cmdResult = await _commandHandler.HandleAsync(cmd, ct).ConfigureAwait(false);
@@ -247,6 +257,40 @@ public sealed class StudentPlanMigrationService : IStudentPlanMigrationService
         Season: SittingSeason.Summer,
         Moed: SittingMoed.Special);
 
+    /// <summary>
+    /// Sentinel question-paper code used when a Bagrut migration snapshot
+    /// doesn't carry an inferred paper set. Stable so the retention worker
+    /// sweep + downstream projections can filter migrated rows
+    /// unambiguously. Not a real Ministry code — validation layers treat
+    /// this as opaque.
+    /// </summary>
+    public const string MigrationPlaceholderPaperCode = "MIGRATION_UNMAPPED";
+
+    /// <summary>
+    /// PRR-243: resolve the question-paper list for a migration snapshot.
+    /// Priorities:
+    /// <list type="number">
+    ///   <item><description>Manifest-supplied list (when non-null, non-empty).</description></item>
+    ///   <item><description>Family-driven fallback: Bagrut → single
+    ///     placeholder code (so the aggregate invariant accepts the target
+    ///     and a retention/reconciliation job can patch it later);
+    ///     Standardized → empty; Other → empty.</description></item>
+    /// </list>
+    /// </summary>
+    internal static IReadOnlyList<string> ResolveQuestionPaperCodes(LegacyStudentPlanSnapshot snapshot)
+    {
+        if (snapshot.InferredQuestionPaperCodes is { Count: > 0 } explicitList)
+        {
+            return explicitList;
+        }
+
+        return ExamCodeFamilyClassifier.Classify(snapshot.InferredExamCode) switch
+        {
+            ExamCodeFamily.Bagrut => new[] { MigrationPlaceholderPaperCode },
+            _ => Array.Empty<string>(),
+        };
+    }
+
     private async Task<UpcastRowResult> RecordFailureAsync(
         LegacyStudentPlanSnapshot snapshot,
         MigrationErrorCategory category,
@@ -300,6 +344,12 @@ public sealed class StudentPlanMigrationService : IStudentPlanMigrationService
             CommandError.DuplicateTarget => MigrationErrorCategory.InvariantViolation,
             CommandError.WeeklyHoursOutOfRange => MigrationErrorCategory.InvariantViolation,
             CommandError.SourceAssignmentMismatch => MigrationErrorCategory.Permanent,
+            CommandError.QuestionPaperCodesRequired => MigrationErrorCategory.InvariantViolation,
+            CommandError.QuestionPaperCodesForbidden => MigrationErrorCategory.InvariantViolation,
+            CommandError.QuestionPaperCodeUnknown => MigrationErrorCategory.Permanent,
+            CommandError.QuestionPaperCodeDuplicate => MigrationErrorCategory.InvariantViolation,
+            CommandError.PerPaperSittingOverrideKeyUnknown => MigrationErrorCategory.InvariantViolation,
+            CommandError.PerPaperSittingOverrideMatchesPrimary => MigrationErrorCategory.InvariantViolation,
             _ => MigrationErrorCategory.Transient,
         };
 

@@ -128,16 +128,24 @@ public static class ExamTargetEndpoints
             return BadRequest(err);
         }
 
+        var perPaperOverride = req!.PerPaperSittingOverride?
+            .ToDictionary(
+                kv => kv.Key,
+                kv => new SittingCode(kv.Value.AcademicYear!, kv.Value.Season, kv.Value.Moed),
+                StringComparer.Ordinal);
+
         var cmd = new AddExamTargetCommand(
             StudentAnonId: studentId,
             Source: ExamTargetSource.Student,
             AssignedById: new UserId(studentId),
             EnrollmentId: null,
-            ExamCode: new ExamCode(req!.ExamCode!),
+            ExamCode: new ExamCode(req.ExamCode!),
             Track: string.IsNullOrWhiteSpace(req.Track) ? null : new TrackCode(req.Track!),
             Sitting: new SittingCode(req.Sitting!.AcademicYear!, req.Sitting.Season, req.Sitting.Moed),
             WeeklyHours: req.WeeklyHours,
-            ReasonTag: req.ReasonTag);
+            ReasonTag: req.ReasonTag,
+            QuestionPaperCodes: req.QuestionPaperCodes,
+            PerPaperSittingOverride: perPaperOverride);
 
         var result = await handler.HandleAsync(cmd, ct).ConfigureAwait(false);
         if (!result.Success)
@@ -165,7 +173,9 @@ public static class ExamTargetEndpoints
                 WeeklyHours: req.WeeklyHours,
                 ReasonTag: req.ReasonTag,
                 IsActive: true,
-                ArchivedAt: null));
+                ArchivedAt: null,
+                QuestionPaperCodes: req.QuestionPaperCodes ?? Array.Empty<string>(),
+                PerPaperSittingOverride: req.PerPaperSittingOverride));
     }
 
     private static async Task<IResult> UpdateAsync(
@@ -357,6 +367,43 @@ public static class ExamTargetEndpoints
                 (StatusCodes.Status400BadRequest,
                  ErrorCodes.CENA_INTERNAL_VALIDATION,
                  "Source / enrollment mismatch."),
+            // PRR-243 שאלון errors.
+            CommandError.QuestionPaperCodesRequired =>
+                (StatusCodes.Status400BadRequest,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Bagrut targets must include at least one question-paper code."),
+            CommandError.QuestionPaperCodesForbidden =>
+                (StatusCodes.Status400BadRequest,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Standardized (SAT/PET) targets cannot carry question-paper codes."),
+            CommandError.QuestionPaperCodeUnknown =>
+                (StatusCodes.Status400BadRequest,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Question-paper code is not in the catalog for this exam/track."),
+            CommandError.QuestionPaperCodeDuplicate =>
+                (StatusCodes.Status400BadRequest,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Duplicate question-paper code in the request."),
+            CommandError.QuestionPaperCodeAlreadyPresent =>
+                (StatusCodes.Status409Conflict,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Question-paper code is already on this target."),
+            CommandError.QuestionPaperCodeNotPresent =>
+                (StatusCodes.Status404NotFound,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Question-paper code is not on this target."),
+            CommandError.QuestionPaperRemovalLeavesEmpty =>
+                (StatusCodes.Status409Conflict,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Removing this paper would leave the Bagrut target empty; archive instead."),
+            CommandError.PerPaperSittingOverrideKeyUnknown =>
+                (StatusCodes.Status400BadRequest,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Override key is not one of the target's question-paper codes."),
+            CommandError.PerPaperSittingOverrideMatchesPrimary =>
+                (StatusCodes.Status400BadRequest,
+                 ErrorCodes.CENA_INTERNAL_VALIDATION,
+                 "Override sitting must differ from the target's primary sitting."),
             _ =>
                 (StatusCodes.Status400BadRequest,
                  ErrorCodes.CENA_INTERNAL_ERROR,
@@ -384,7 +431,9 @@ public sealed record AddExamTargetRequestDto(
     string? Track,
     SittingCodeDto? Sitting,
     int WeeklyHours,
-    ReasonTag? ReasonTag);
+    ReasonTag? ReasonTag,
+    IReadOnlyList<string>? QuestionPaperCodes = null,
+    IReadOnlyDictionary<string, SittingCodeDto>? PerPaperSittingOverride = null);
 
 /// <summary>PUT body for updating a target.</summary>
 public sealed record UpdateExamTargetRequestDto(
@@ -405,21 +454,35 @@ public sealed record ExamTargetResponseDto(
     int WeeklyHours,
     ReasonTag? ReasonTag,
     bool IsActive,
-    DateTimeOffset? ArchivedAt)
+    DateTimeOffset? ArchivedAt,
+    IReadOnlyList<string> QuestionPaperCodes,
+    IReadOnlyDictionary<string, SittingCodeDto>? PerPaperSittingOverride)
 {
     /// <summary>Project an aggregate target onto the wire DTO.</summary>
-    public static ExamTargetResponseDto From(ExamTarget t) => new(
-        Id: t.Id.Value,
-        Source: t.Source,
-        AssignedById: t.AssignedById.Value,
-        EnrollmentId: t.EnrollmentId?.Value,
-        ExamCode: t.ExamCode.Value,
-        Track: t.Track?.Value,
-        Sitting: new SittingCodeDto(t.Sitting.AcademicYear, t.Sitting.Season, t.Sitting.Moed),
-        WeeklyHours: t.WeeklyHours,
-        ReasonTag: t.ReasonTag,
-        IsActive: t.IsActive,
-        ArchivedAt: t.ArchivedAt);
+    public static ExamTargetResponseDto From(ExamTarget t)
+    {
+        var perPaper = t.PerPaperSittingOverride is null
+            ? null
+            : t.PerPaperSittingOverride.ToDictionary(
+                kv => kv.Key,
+                kv => new SittingCodeDto(kv.Value.AcademicYear, kv.Value.Season, kv.Value.Moed),
+                StringComparer.Ordinal);
+
+        return new(
+            Id: t.Id.Value,
+            Source: t.Source,
+            AssignedById: t.AssignedById.Value,
+            EnrollmentId: t.EnrollmentId?.Value,
+            ExamCode: t.ExamCode.Value,
+            Track: t.Track?.Value,
+            Sitting: new SittingCodeDto(t.Sitting.AcademicYear, t.Sitting.Season, t.Sitting.Moed),
+            WeeklyHours: t.WeeklyHours,
+            ReasonTag: t.ReasonTag,
+            IsActive: t.IsActive,
+            ArchivedAt: t.ArchivedAt,
+            QuestionPaperCodes: t.QuestionPaperCodes,
+            PerPaperSittingOverride: perPaper);
+    }
 }
 
 /// <summary>List response shape.</summary>

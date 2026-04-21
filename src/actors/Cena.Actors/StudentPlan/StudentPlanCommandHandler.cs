@@ -62,114 +62,70 @@ public enum CommandError
     /// <summary>AssignedById is wrong kind for the Source (e.g. Source=
     /// Classroom requires a teacher id + enrollment id).</summary>
     SourceAssignmentMismatch,
-}
 
-/// <summary>
-/// Command: add a new exam target to a student's plan.
-/// </summary>
-/// <param name="StudentAnonId">Plan owner.</param>
-/// <param name="Source">Who is adding (Student | Classroom | Tenant |
-/// Migration).</param>
-/// <param name="AssignedById">Student / teacher / admin / system id.</param>
-/// <param name="EnrollmentId">ADR-0001 scoping — required when
-/// Source=Classroom or Tenant, must be null when Source=Student.</param>
-/// <param name="ExamCode">Catalog primary key.</param>
-/// <param name="Track">Track within the exam (null when exam has no
-/// track concept).</param>
-/// <param name="Sitting">Sitting tuple.</param>
-/// <param name="WeeklyHours">Hours/week for this target (1..40).</param>
-/// <param name="ReasonTag">Why (optional).</param>
-/// <param name="MigrationSourceId">prr-219 idempotency key. Null for
-/// non-migration commands.</param>
-public sealed record AddExamTargetCommand(
-    string StudentAnonId,
-    ExamTargetSource Source,
-    UserId AssignedById,
-    EnrollmentId? EnrollmentId,
-    ExamCode ExamCode,
-    TrackCode? Track,
-    SittingCode Sitting,
-    int WeeklyHours,
-    ReasonTag? ReasonTag,
-    string? MigrationSourceId = null);
+    /// <summary>Bagrut-family target missing required question-paper
+    /// codes (PRR-243 / ADR-0050 §1: Bagrut ⇒ ≥1 paper).</summary>
+    QuestionPaperCodesRequired,
 
-/// <summary>
-/// Command: update an existing active target's mutable fields.
-/// </summary>
-public sealed record UpdateExamTargetCommand(
-    string StudentAnonId,
-    ExamTargetId TargetId,
-    TrackCode? Track,
-    SittingCode Sitting,
-    int WeeklyHours,
-    ReasonTag? ReasonTag);
+    /// <summary>Standardized-family target carrying question-paper codes
+    /// (PRR-243 / ADR-0050 §1: SAT/PET ⇒ 0 papers).</summary>
+    QuestionPaperCodesForbidden,
 
-/// <summary>
-/// Command: archive an active target (terminal).
-/// </summary>
-public sealed record ArchiveExamTargetCommand(
-    string StudentAnonId,
-    ExamTargetId TargetId,
-    ArchiveReason Reason);
+    /// <summary>A supplied paper code is not in the exam catalog for the
+    /// given (examCode, track) pair (PRR-243).</summary>
+    QuestionPaperCodeUnknown,
 
-/// <summary>
-/// Command: mark an active target completed (terminal, specialised
-/// archive reason).
-/// </summary>
-public sealed record CompleteExamTargetCommand(
-    string StudentAnonId,
-    ExamTargetId TargetId);
+    /// <summary>Duplicate paper code within a single target (PRR-243
+    /// de-dup invariant).</summary>
+    QuestionPaperCodeDuplicate,
 
-/// <summary>
-/// Command: telemetry event — the scheduler ran a session against a
-/// specific target. No state mutation; no invariants checked beyond
-/// target existence.
-/// </summary>
-public sealed record ApplyExamTargetOverrideCommand(
-    string StudentAnonId,
-    ExamTargetId TargetId,
-    string SessionId);
+    /// <summary>Paper code already present on the target (PRR-243
+    /// idempotency — QuestionPaperAdded).</summary>
+    QuestionPaperCodeAlreadyPresent,
 
-/// <summary>
-/// Command handler + invariants. Stateless; delegates persistence to
-/// <see cref="IStudentPlanAggregateStore"/>.
-/// </summary>
-public interface IStudentPlanCommandHandler
-{
-    /// <summary>Add a new exam target.</summary>
-    Task<CommandResult> HandleAsync(AddExamTargetCommand cmd, CancellationToken ct = default);
+    /// <summary>Paper code not present on the target (PRR-243
+    /// QuestionPaperRemoved / PerPaperSittingOverrideSet precondition).</summary>
+    QuestionPaperCodeNotPresent,
 
-    /// <summary>Update an existing active target.</summary>
-    Task<CommandResult> HandleAsync(UpdateExamTargetCommand cmd, CancellationToken ct = default);
+    /// <summary>Removing this paper would leave a Bagrut target with
+    /// zero papers (PRR-243 DoD) — archive the target instead.</summary>
+    QuestionPaperRemovalLeavesEmpty,
 
-    /// <summary>Archive an active target.</summary>
-    Task<CommandResult> HandleAsync(ArchiveExamTargetCommand cmd, CancellationToken ct = default);
+    /// <summary>A per-paper sitting override keys a paper code not in
+    /// the target's QuestionPaperCodes (PRR-243).</summary>
+    PerPaperSittingOverrideKeyUnknown,
 
-    /// <summary>Complete an active target.</summary>
-    Task<CommandResult> HandleAsync(CompleteExamTargetCommand cmd, CancellationToken ct = default);
-
-    /// <summary>Record a scheduler-override telemetry event.</summary>
-    Task<CommandResult> HandleAsync(ApplyExamTargetOverrideCommand cmd, CancellationToken ct = default);
+    /// <summary>A per-paper sitting override maps to the same sitting as
+    /// the target's primary — violates the minimal-map invariant
+    /// (PRR-243 / ADR-0050 §1).</summary>
+    PerPaperSittingOverrideMatchesPrimary,
 }
 
 /// <summary>
 /// Default implementation of the command handler. Enforces
-/// ADR-0050 §5 invariants before writing events.
+/// ADR-0050 §5 invariants before writing events. Command DTOs +
+/// interface live in <see cref="IStudentPlanCommandHandler"/> (StudentPlanCommands.cs).
+/// The PRR-243 שאלון handlers live in StudentPlanCommandHandler.QuestionPapers.cs.
 /// </summary>
-public sealed class StudentPlanCommandHandler : IStudentPlanCommandHandler
+public sealed partial class StudentPlanCommandHandler : IStudentPlanCommandHandler
 {
     private readonly IStudentPlanAggregateStore _store;
+    private readonly IQuestionPaperCatalogValidator _paperValidator;
     private readonly Func<DateTimeOffset> _clock;
 
     /// <summary>
-    /// Public ctor with injectable clock so tests can freeze time.
+    /// Public ctor with injectable clock + catalog validator so tests can
+    /// freeze time and inject a permissive catalog, and production can
+    /// inject the real catalog-backed validator.
     /// </summary>
     public StudentPlanCommandHandler(
         IStudentPlanAggregateStore store,
-        Func<DateTimeOffset>? clock = null)
+        Func<DateTimeOffset>? clock = null,
+        IQuestionPaperCatalogValidator? paperValidator = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _clock = clock ?? (() => DateTimeOffset.UtcNow);
+        _paperValidator = paperValidator ?? AllowAllQuestionPaperCatalogValidator.Instance;
     }
 
     /// <inheritdoc />
@@ -186,6 +142,24 @@ public sealed class StudentPlanCommandHandler : IStudentPlanCommandHandler
         if (!IsSourceAssignmentConsistent(cmd.Source, cmd.EnrollmentId))
         {
             return new CommandResult(Success: false, Error: CommandError.SourceAssignmentMismatch);
+        }
+
+        // PRR-243: normalise + validate question-paper codes BEFORE store
+        // I/O so malformed requests fail fast with a clean error code.
+        var rawPapers = cmd.QuestionPaperCodes ?? Array.Empty<string>();
+        var (papers, paperError) = NormaliseQuestionPaperCodes(
+            rawPapers, cmd.ExamCode, cmd.Track);
+        if (paperError is { } pe)
+        {
+            return new CommandResult(Success: false, Error: pe);
+        }
+
+        // PRR-243: normalise + validate the per-paper sitting override map.
+        var (perPaperOverride, overrideError) = NormalisePerPaperSittingOverride(
+            cmd.PerPaperSittingOverride, papers, cmd.Sitting);
+        if (overrideError is { } oe)
+        {
+            return new CommandResult(Success: false, Error: oe);
         }
 
         var aggregate = await _store.LoadAsync(cmd.StudentAnonId, ct).ConfigureAwait(false);
@@ -222,7 +196,9 @@ public sealed class StudentPlanCommandHandler : IStudentPlanCommandHandler
             EnrollmentId: cmd.EnrollmentId,
             ExamCode: cmd.ExamCode,
             Track: cmd.Track,
+            QuestionPaperCodes: papers,
             Sitting: cmd.Sitting,
+            PerPaperSittingOverride: perPaperOverride,
             WeeklyHours: cmd.WeeklyHours,
             ReasonTag: cmd.ReasonTag,
             CreatedAt: now,
