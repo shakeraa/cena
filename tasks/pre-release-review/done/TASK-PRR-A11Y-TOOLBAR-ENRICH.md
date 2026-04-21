@@ -4,9 +4,49 @@ depends-on: [prr-031, prr-032]
 priority: P1
 tier: mvp
 tags: [a11y, i18n, il-equal-rights-law-5758-1998, enrichment]
+status: done-mvp-partial
+done-on: 2026-04-21
+done-by-commit: claude-subagent-wave6b/prr-232-148-a11y-frontend
 ---
 
 # A11yToolbar enrichment — language switcher + expanded controls
+
+## Closeout — 2026-04-21 (MVP partial)
+
+Narrow MVP landed on branch
+`claude-subagent-wave6b/prr-232-148-a11y-frontend`. Per the user's
+budget directive "narrow MVP, commit every 10 minutes," the follow-up
+splits into **MVP now** + **follow-ups filed**.
+
+**MVP shipped (this branch):**
+
+- Language switcher inside the toolbar, radio-group with native-script
+  labels (English / עברית / العربية), filtered through the Hebrew gate.
+  Persists via `cena-student-locale` (same key as LanguageSwitcher.vue).
+- Numerals preference radio (Automatic / Western / Eastern Arabic) —
+  PRR-232.
+- Accessibility statement footer link pointing at
+  `/accessibility-statement` (route content deferred — see FU-1 below).
+- `mailto:accessibility@cena.app` contact per IL Reg 5773-2013 §35(b)(4).
+- Legal note updated to cite 5773-2013 alongside 5758-1998.
+- i18n keys for `a11y.language`, `a11y.numerals.*`,
+  `a11y.accessibilityStatement` in en / ar / he.
+
+**Follow-ups filed (not shipped here):**
+
+- **FU-1** [TASK-PRR-A11Y-STATEMENT-ROUTE.md](../TASK-PRR-A11Y-STATEMENT-ROUTE.md)
+  — `/accessibility-statement` route content (required by 5773-2013 §35).
+- **FU-2** [TASK-PRR-A11Y-FIRST-RUN-CHOOSER.md](../TASK-PRR-A11Y-FIRST-RUN-CHOOSER.md)
+  — full-screen FirstRunLanguageChooser.vue + useLocaleStore.
+- **FU-3** [TASK-PRR-A11Y-EXPANDED-CONTROLS.md](../TASK-PRR-A11Y-EXPANDED-CONTROLS.md)
+  — color-blind filters, reading guide, underline-all-links, cursor
+  magnifier, line-height slider.
+- **FU-4** [TASK-PRR-A11Y-SEMANTICS-SHORTCUT.md](../TASK-PRR-A11Y-SEMANTICS-SHORTCUT.md)
+  — Alt+A shortcut, aria-live per-preference announce,
+  "skip to accessibility toolbar" link.
+- **FU-5** [TASK-PRR-A11Y-PLAYWRIGHT-RATCHET.md](../TASK-PRR-A11Y-PLAYWRIGHT-RATCHET.md)
+  — Playwright smoke across layouts + architecture ratchet test
+  forbidding a layout without `<A11yToolbar />`.
 
 ## Why this exists
 

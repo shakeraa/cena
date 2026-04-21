@@ -6,10 +6,50 @@
 **Source docs**: persona-a11y findings (PRR-032 is a ghost reference)
 **Assignee hint**: kimi-coder
 **Tags**: source=multi-target-exam-plan-001, epic=epic-prr-f, priority=p1, a11y, ghost-reference
-**Status**: Ready
+**Status**: Done — 2026-04-21 via claude-subagent-wave6b/prr-232-148-a11y-frontend
 **Source**: persona-a11y review
 **Tier**: mvp
-**Epic**: [EPIC-PRR-F](EPIC-PRR-F-multi-target-onboarding-plan.md)
+**Epic**: [EPIC-PRR-F](../EPIC-PRR-F-multi-target-onboarding-plan.md)
+
+---
+
+## Closeout — 2026-04-21
+
+All plumbing was already in place from PRR-031 / PRR-032 (Wave 1b):
+
+- `onboardingStore.numeralsPreference: 'western' | 'eastern' | null`
+  (null = auto) + `effectiveNumerals` computed + `setNumeralsPreference()`
+  setter, persisted to localStorage via the existing watch.
+- `mathLocale.ts` — `inferNumeralsPreference()` (ar → eastern,
+  he/en → western) + `toEasternNumerals()` digit swap.
+- `useMathRenderer.ts` — honors `onboarding.effectiveNumerals` on every
+  KaTeX render and wraps in `<bdi dir="ltr">`.
+- PRR-032 task file is present at
+  `done/TASK-PRR-032-ship-arabic-rtl-math-delta-notation-profile-numerals-toggle.md`.
+
+What this task added:
+
+- A11yToolbar.vue — user-visible radio group (Automatic / Western /
+  Eastern Arabic) with LTR-bdi-wrapped digit samples, writing through to
+  `onboarding.setNumeralsPreference()`.
+- i18n keys in en.json / ar.json / he.json under `a11y.numerals.*`.
+- Legal note updated to cite IL Reg 5773-2013 alongside 5758-1998.
+
+Surfaces downstream of the toggle (already live from PRR-032):
+
+- KaTeX math rendering in QuestionCard, WorkedExamplePanel, StepInput,
+  MasteryMap, QuestionFigure labels — all route through
+  `useMathRenderer` and respond to the preference.
+
+Follow-ups NOT in scope (filed separately):
+
+- Weekly-hours slider numeral formatting (PRR-221 has `aria-valuetext`
+  TODO at PerTargetPlanStep.vue) — separate task.
+- Deadline-date formatting across dashboards — out of scope here.
+- Dedicated settings/accessibility.vue page — existing
+  `/settings/appearance.vue` hosts theme + language; the numerals toggle
+  lives in the A11yToolbar which is available on every layout, so a
+  duplicate settings surface is deferred.
 
 ---
 
