@@ -568,6 +568,46 @@
       "dsarConfirm": "Submit request",
       "dsarSuccess": "Your request has been submitted. Tracking ID: {trackingId}. We will respond within 30 days.",
       "dsarError": "Could not submit your request. Please try again later."
+    },
+    "studyPlan": {
+      "title": "Study plan",
+      "subtitle": "Manage the exams you're preparing for.",
+      "activeHeading": "Active targets",
+      "archivedHeading": "Archived",
+      "addTarget": "Add a target",
+      "editTarget": "Edit target",
+      "archiveTarget": "Archive target",
+      "archiveConfirm": "Archive this target? You can still see it in the archived list for a retention window.",
+      "archiveConfirmYes": "Archive",
+      "noActiveTargets": "You have no active targets. Add one to get started.",
+      "noArchivedTargets": "No archived targets.",
+      "totalWeeklyHours": "Total weekly hours: {hours}h",
+      "overLimitWarning": "Total weekly hours exceeds 40. Please reduce before saving.",
+      "fields": {
+        "examCode": "Exam",
+        "track": "Track",
+        "sitting": "Sitting",
+        "weeklyHours": "Weekly hours",
+        "reasonTag": "Why"
+      },
+      "actions": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "close": "Close"
+      },
+      "errors": {
+        "loadFailed": "Could not load your study plan. Please try again.",
+        "addFailed": "Could not add the target. Please try again.",
+        "updateFailed": "Could not save your changes. Please try again.",
+        "archiveFailed": "Could not archive the target. Please try again."
+      },
+      "parentVisibility": {
+        "label": "Parent dashboard visibility",
+        "visible": "Visible to parent",
+        "hidden": "Hidden from parent",
+        "helpText": "Students aged 13 and over can decide whether each exam target appears on their parent's dashboard. Safety-flagged targets always remain visible.",
+        "toggleFailed": "Could not update visibility. Please try again."
+      }
     }
   },
   "social": {
@@ -945,30 +985,6 @@
       "optionsLabel": "Choose an answer",
       "skipAll": "Skip quiz",
       "confirm": "Confirm"
-    },
-    "examTargets": {
-      "title": "Which exams are you aiming for?",
-      "subtitle": "Pick up to {max} — you can change this anytime from settings.",
-      "groupLabel": "Available exam targets",
-      "loading": "Loading exam catalog…",
-      "fetchFailed": "Couldn't load the exam catalog — please try again.",
-      "capReached": "You've selected the maximum of {max}. Deselect one to swap."
-    },
-    "perTargetPlan": {
-      "title": "Set a plan for each exam",
-      "subtitle": "Pick a sitting and how many hours per week you want to study for each.",
-      "targetHeader": "{current} of {total}: {name}",
-      "sittingLegend": "When are you sitting this exam?",
-      "papersLegend": "Which question papers (שאלונים) are you taking?",
-      "weeklyLabel": "Weekly study time",
-      "noSittings": "No sittings listed for this target — we'll follow up.",
-      "sittingLabel": "{season} {year} — Moed {moed} ({date})",
-      "season": {
-        "summer": "Summer",
-        "winter": "Winter",
-        "spring": "Spring",
-        "autumn": "Autumn"
-      }
     },
     "perTargetDiagnostic": {
       "title": "Let's calibrate for {target}",

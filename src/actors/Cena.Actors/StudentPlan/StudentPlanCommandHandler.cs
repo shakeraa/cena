@@ -99,6 +99,10 @@ public enum CommandError
     /// the target's primary — violates the minimal-map invariant
     /// (PRR-243 / ADR-0050 §1).</summary>
     PerPaperSittingOverrideMatchesPrimary,
+
+    /// <summary>PRR-230: cannot set a SafetyFlag-tagged target to Hidden —
+    /// duty-of-care carve-out mirrors ADR-0041.</summary>
+    ParentVisibilitySafetyFlagLocked,
 }
 
 /// <summary>
@@ -189,6 +193,15 @@ public sealed partial class StudentPlanCommandHandler : IStudentPlanCommandHandl
         }
 
         var now = _clock();
+
+        // PRR-230: resolve default parent-visibility from age band + reason.
+        // When the endpoint does not supply a band (migration cohort, legacy
+        // callers), fall back to Visible to preserve pre-PRR-230 semantics
+        // — the student can later hide explicitly via the toggle endpoint.
+        var defaultVisibility = cmd.StudentAgeBand is { } band
+            ? ParentVisibilityDefaults.Resolve(band, cmd.ReasonTag)
+            : ParentVisibility.Visible;
+
         var target = new ExamTarget(
             Id: ExamTargetId.New(),
             Source: cmd.Source,
@@ -202,7 +215,8 @@ public sealed partial class StudentPlanCommandHandler : IStudentPlanCommandHandl
             WeeklyHours: cmd.WeeklyHours,
             ReasonTag: cmd.ReasonTag,
             CreatedAt: now,
-            ArchivedAt: null);
+            ArchivedAt: null,
+            ParentVisibility: defaultVisibility);
 
         // Initialize the stream on first write.
         if (state.InitializedAt is null && !aggregate.IsInitialized)

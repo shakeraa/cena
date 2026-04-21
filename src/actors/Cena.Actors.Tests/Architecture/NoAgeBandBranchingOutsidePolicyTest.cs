@@ -52,6 +52,16 @@ public class NoAgeBandBranchingOutsidePolicyTest
         Path.Combine("src", "actors", "Cena.Actors", "Consent", "AgeBandPolicy.cs"),
         Path.Combine("src", "actors", "Cena.Actors", "Consent", "ConsentCommands.cs"),
         Path.Combine("src", "actors", "Cena.Actors", "Consent", "ConsentAggregateWriterAdapter.cs"),
+        // PRR-230 parent-visibility default policy — the ONLY place in
+        // StudentPlan that branches on AgeBand.
+        Path.Combine("src", "actors", "Cena.Actors", "StudentPlan", "ParentVisibilityDefaults.cs"),
+        // PRR-230 student-facing toggle endpoint — coarse Under13 gate
+        // (authority check). Any finer branching inside the endpoint is
+        // forbidden; this suffix only authorises the Under13 === no-veto
+        // check.
+        Path.Combine(
+            "src", "api", "Cena.Student.Api.Host", "Endpoints",
+            "ExamTargetParentVisibilityEndpoints.cs"),
     };
 
     /// <summary>

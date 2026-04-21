@@ -569,6 +569,46 @@
       "dsarConfirm": "إرسال الطلب",
       "dsarSuccess": "تم تقديم طلبك. رقم التتبع: {trackingId}. سنرد خلال 30 يومًا.",
       "dsarError": "تعذر تقديم طلبك. يرجى المحاولة لاحقًا."
+    },
+    "studyPlan": {
+      "title": "خطة الدراسة",
+      "subtitle": "أدر الامتحانات التي تستعد لها.",
+      "activeHeading": "الأهداف النشطة",
+      "archivedHeading": "المؤرشفة",
+      "addTarget": "إضافة هدف",
+      "editTarget": "تعديل الهدف",
+      "archiveTarget": "أرشفة الهدف",
+      "archiveConfirm": "أرشفة هذا الهدف؟ يمكنك العودة إليه ضمن نافذة الاحتفاظ.",
+      "archiveConfirmYes": "أرشفة",
+      "noActiveTargets": "لا توجد أهداف نشطة. ابدأ بإضافة هدف.",
+      "noArchivedTargets": "لا توجد أهداف مؤرشفة.",
+      "totalWeeklyHours": "إجمالي الساعات الأسبوعية: {hours}",
+      "overLimitWarning": "الإجمالي يتجاوز 40 ساعة. خفّض قبل الحفظ.",
+      "fields": {
+        "examCode": "الامتحان",
+        "track": "المسار",
+        "sitting": "الدورة",
+        "weeklyHours": "ساعات/أسبوع",
+        "reasonTag": "السبب"
+      },
+      "actions": {
+        "save": "حفظ",
+        "cancel": "إلغاء",
+        "close": "إغلاق"
+      },
+      "errors": {
+        "loadFailed": "تعذر تحميل خطتك. حاول مرة أخرى.",
+        "addFailed": "تعذر إضافة الهدف. حاول مرة أخرى.",
+        "updateFailed": "تعذر حفظ تعديلاتك. حاول مرة أخرى.",
+        "archiveFailed": "تعذر أرشفة الهدف. حاول مرة أخرى."
+      },
+      "parentVisibility": {
+        "label": "رؤية ولي الأمر",
+        "visible": "مرئي لولي الأمر",
+        "hidden": "مخفي عن ولي الأمر",
+        "helpText": "يستطيع الطلاب من سن 13 عامًا فأكثر تحديد ما يظهر على لوحة ولي الأمر. الأهداف ذات العلامة السلامة تبقى مرئية دائمًا.",
+        "toggleFailed": "تعذر تحديث الرؤية. حاول مرة أخرى."
+      }
     }
   },
   "social": {
@@ -928,30 +968,6 @@
       "homeschool": "تعليم منزلي",
       "homeschoolDescription": "أتعلم في المنزل أو أُعلِّم أحد أفراد العائلة.",
       "none": "لم يتم الاختيار"
-    },
-    "examTargets": {
-      "title": "Which exams are you aiming for?",
-      "subtitle": "Pick up to {max} — you can change this anytime from settings.",
-      "groupLabel": "Available exam targets",
-      "loading": "Loading exam catalog…",
-      "fetchFailed": "Couldn't load the exam catalog — please try again.",
-      "capReached": "You've selected the maximum of {max}. Deselect one to swap."
-    },
-    "perTargetPlan": {
-      "title": "Set a plan for each exam",
-      "subtitle": "Pick a sitting and how many hours per week you want to study for each.",
-      "targetHeader": "{current} of {total}: {name}",
-      "sittingLegend": "When are you sitting this exam?",
-      "papersLegend": "Which question papers are you taking?",
-      "weeklyLabel": "Weekly study time",
-      "noSittings": "No sittings listed for this target — we'll follow up.",
-      "sittingLabel": "{season} {year} — Moed {moed} ({date})",
-      "season": {
-        "summer": "Summer",
-        "winter": "Winter",
-        "spring": "Spring",
-        "autumn": "Autumn"
-      }
     },
     "language": {
       "title": "اختر لغتك",
