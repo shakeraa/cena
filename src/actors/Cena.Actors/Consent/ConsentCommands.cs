@@ -32,6 +32,21 @@ namespace Cena.Actors.Consent;
 /// <see cref="AgeBandAuthorizationRules.CanActorGrant"/> and throws
 /// <see cref="ConsentAuthorizationException"/> on denial.
 /// </summary>
+/// <param name="SubjectId">Plaintext subject id (encrypted inside the handler).</param>
+/// <param name="SubjectBand">Authoritative age band for the subject.</param>
+/// <param name="Purpose">Processing purpose being granted.</param>
+/// <param name="Scope">Structural scope label (institute id, device, etc.).</param>
+/// <param name="GrantedByRole">Role performing the grant.</param>
+/// <param name="GrantedByActorId">Plaintext actor id (encrypted inside the handler).</param>
+/// <param name="GrantedAt">Wall-clock timestamp.</param>
+/// <param name="ExpiresAt">Optional expiry; null = indefinite.</param>
+/// <param name="PolicyVersionAccepted">
+/// prr-123: the exact version string of the privacy policy the grantor
+/// accepted (e.g. <c>"v1.0.0 2026-04-21"</c>). Null is accepted for
+/// callers that have not yet been migrated to the versioned-accept flow;
+/// the handler then substitutes
+/// <see cref="PolicyVersionSentinels.PreVersioning"/>.
+/// </param>
 public sealed record GrantConsent(
     string SubjectId,
     AgeBand SubjectBand,
@@ -40,7 +55,8 @@ public sealed record GrantConsent(
     ActorRole GrantedByRole,
     string GrantedByActorId,
     DateTimeOffset GrantedAt,
-    DateTimeOffset? ExpiresAt);
+    DateTimeOffset? ExpiresAt,
+    string? PolicyVersionAccepted = null);
 
 /// <summary>Revoke a consent purpose for a subject.</summary>
 public sealed record RevokeConsent(
@@ -130,8 +146,15 @@ public sealed class ConsentCommandHandler
     /// Handle <see cref="GrantConsent"/>. Returns the event to append.
     /// Throws <see cref="ConsentAuthorizationException"/> if the age-band
     /// matrix denies the action.
+    ///
+    /// Emits <see cref="ConsentGranted_V2"/> (prr-123): carries the exact
+    /// privacy-policy version the grantor accepted. Callers that do not
+    /// yet supply a version default to
+    /// <see cref="PolicyVersionSentinels.PreVersioning"/> (for human
+    /// grants) or <see cref="PolicyVersionSentinels.SystemOp"/> (for
+    /// System-role automated grants).
     /// </summary>
-    public async ValueTask<ConsentGranted_V1> HandleAsync(
+    public async ValueTask<ConsentGranted_V2> HandleAsync(
         GrantConsent cmd, CancellationToken ct = default)
     {
         ArgumentNullException.ThrowIfNull(cmd);
@@ -152,14 +175,23 @@ public sealed class ConsentCommandHandler
         var actorCipher = await _pii.EncryptAsync(cmd.GrantedByActorId, cmd.SubjectId, ct)
             .ConfigureAwait(false);
 
-        return new ConsentGranted_V1(
+        var policyVersion = cmd.PolicyVersionAccepted;
+        if (string.IsNullOrWhiteSpace(policyVersion))
+        {
+            policyVersion = cmd.GrantedByRole == ActorRole.System
+                ? PolicyVersionSentinels.SystemOp
+                : PolicyVersionSentinels.PreVersioning;
+        }
+
+        return new ConsentGranted_V2(
             SubjectIdEncrypted: subjectCipher ?? string.Empty,
             Purpose: cmd.Purpose,
             Scope: cmd.Scope,
             GrantedByRole: cmd.GrantedByRole,
             GrantedByActorIdEncrypted: actorCipher ?? string.Empty,
             GrantedAt: cmd.GrantedAt,
-            ExpiresAt: cmd.ExpiresAt);
+            ExpiresAt: cmd.ExpiresAt,
+            PolicyVersionAccepted: policyVersion);
     }
 
     /// <summary>Handle <see cref="RevokeConsent"/>.</summary>

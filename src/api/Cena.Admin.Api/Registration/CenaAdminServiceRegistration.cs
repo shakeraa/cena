@@ -390,6 +390,12 @@ public static class CenaAdminServiceRegistration
         // prr-052: Parent dashboard-visibility view. GET returns the
         // age-band-filtered field list sourced from AgeBandPolicy.
         Features.ParentConsole.DashboardVisibilityEndpoint.MapDashboardVisibilityEndpoint(app);
+        // prr-130: Admin per-student consent audit export (CSV/JSON).
+        // GET /api/admin/institutes/{iid}/students/{sid}/consent-audit
+        //   Admin-role gated + tenant-scoped. SUPER_ADMIN may cross
+        //   institutes; ADMIN is pinned to the caller's institute_id claim.
+        Features.ParentConsole.ConsentAuditExportEndpoint
+            .MapConsentAuditExportEndpoint(app);
         // FIND-pedagogy-008: learning-objective picker (read-only)
         app.MapLearningObjectiveEndpoints();
         app.MapMethodologyAnalyticsEndpoints();

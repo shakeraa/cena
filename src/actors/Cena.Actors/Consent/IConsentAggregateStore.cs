@@ -31,4 +31,19 @@ public interface IConsentAggregateStore
     /// with an empty state if no events have been recorded for this subject.
     /// </summary>
     Task<ConsentAggregate> LoadAsync(string subjectId, CancellationToken ct = default);
+
+    /// <summary>
+    /// prr-130: Read the raw event sequence for a subject in append order.
+    /// Distinct from <see cref="LoadAsync"/> which folds to a single
+    /// state snapshot — the admin audit exporter needs every event,
+    /// including grant/revoke/veto history, with its original timestamp
+    /// and role.
+    ///
+    /// Tenant scoping is the HTTP boundary's responsibility (see the
+    /// <c>ConsentAuditExportEndpoint</c>, which enforces institute
+    /// matching via <c>TenantScope.GetInstituteFilter</c> before
+    /// consulting this method).
+    /// </summary>
+    Task<IReadOnlyList<object>> ReadEventsAsync(
+        string subjectId, CancellationToken ct = default);
 }

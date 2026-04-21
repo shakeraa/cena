@@ -110,6 +110,25 @@ public sealed class ConsentState
             RevocationReason: null);
     }
 
+    /// <summary>
+    /// Apply a <see cref="ConsentGranted_V2"/> event (prr-123). V2 adds the
+    /// accepted privacy-policy version; the fold treats V1 and V2 identically
+    /// for the IsGranted/role/timestamp view — the version string is carried
+    /// at the raw-event layer for the audit exporter (prr-130), not in the
+    /// folded <see cref="ConsentGrantInfo"/>.
+    /// </summary>
+    public void Apply(ConsentGranted_V2 e)
+    {
+        _grants[e.Purpose] = new ConsentGrantInfo(
+            IsGranted: true,
+            GrantedByRole: e.GrantedByRole,
+            GrantedAt: e.GrantedAt,
+            ExpiresAt: e.ExpiresAt,
+            RevokedAt: null,
+            RevokedByRole: null,
+            RevocationReason: null);
+    }
+
     /// <summary>Apply a <see cref="ConsentRevoked_V1"/> event.</summary>
     public void Apply(ConsentRevoked_V1 e)
     {

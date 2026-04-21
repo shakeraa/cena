@@ -327,6 +327,58 @@ public sealed class ConsentAggregateTests
     // Command validation
     // -------------------------------------------------------------------------
 
+    // -------------------------------------------------------------------------
+    // prr-123: Policy-version acceptance recorded on grant events
+    // -------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Grant_records_accepted_policy_version_on_V2_event()
+    {
+        var (_, handler, store) = BuildSut();
+        const string subjectId = "student-prr123";
+        var now = DateTimeOffset.Parse("2026-04-21T12:00:00Z");
+
+        var evt = await handler.HandleAsync(new GrantConsent(
+            SubjectId: subjectId, SubjectBand: AgeBand.Adult,
+            Purpose: ConsentPurpose.AiAssistance,
+            Scope: "onboarding", GrantedByRole: ActorRole.Student,
+            GrantedByActorId: subjectId, GrantedAt: now, ExpiresAt: null,
+            PolicyVersionAccepted: "v1.0.0 2026-04-21"));
+
+        // The handler emits a V2 event.
+        Assert.IsType<ConsentGranted_V2>(evt);
+        Assert.Equal("v1.0.0 2026-04-21", evt.PolicyVersionAccepted);
+
+        // And the aggregate folds V2 the same as V1 (grant state).
+        await store.AppendAsync(subjectId, evt);
+        var agg = await store.LoadAsync(subjectId);
+        Assert.True(agg.State.IsEffectivelyGranted(ConsentPurpose.AiAssistance, now));
+    }
+
+    [Fact]
+    public async Task Grant_without_policy_version_substitutes_pre_versioning_sentinel()
+    {
+        var (_, handler, _) = BuildSut();
+        var evt = await handler.HandleAsync(new GrantConsent(
+            SubjectId: "student-legacy", SubjectBand: AgeBand.Adult,
+            Purpose: ConsentPurpose.AiAssistance,
+            Scope: "legacy-facade", GrantedByRole: ActorRole.Student,
+            GrantedByActorId: "student-legacy",
+            GrantedAt: DateTimeOffset.UtcNow, ExpiresAt: null));
+            // no PolicyVersionAccepted
+
+        Assert.Equal(PolicyVersionSentinels.PreVersioning, evt.PolicyVersionAccepted);
+    }
+
+    [Fact]
+    public void PolicyVersionSentinels_reserved_values_are_recognised()
+    {
+        Assert.True(PolicyVersionSentinels.IsSentinel(PolicyVersionSentinels.PreVersioning));
+        Assert.True(PolicyVersionSentinels.IsSentinel(PolicyVersionSentinels.SystemOp));
+        Assert.False(PolicyVersionSentinels.IsSentinel("v1.0.0 2026-04-21"));
+        Assert.False(PolicyVersionSentinels.IsSentinel(null));
+    }
+
     [Fact]
     public async Task Grant_with_empty_subject_id_throws_ArgumentException()
     {

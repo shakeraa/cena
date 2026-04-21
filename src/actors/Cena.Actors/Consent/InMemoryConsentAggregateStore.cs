@@ -55,6 +55,26 @@ public sealed class InMemoryConsentAggregateStore : IConsentAggregateStore
         return Task.FromResult(ConsentAggregate.ReplayFrom(snapshot));
     }
 
+    /// <inheritdoc />
+    public Task<IReadOnlyList<object>> ReadEventsAsync(
+        string subjectId, CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(subjectId))
+        {
+            throw new ArgumentException("subjectId must be non-empty.", nameof(subjectId));
+        }
+        if (!_streams.TryGetValue(subjectId, out var list))
+        {
+            return Task.FromResult<IReadOnlyList<object>>(Array.Empty<object>());
+        }
+        List<object> snapshot;
+        lock (list)
+        {
+            snapshot = new List<object>(list);
+        }
+        return Task.FromResult<IReadOnlyList<object>>(snapshot);
+    }
+
     /// <summary>
     /// Test/introspection helper: enumerate all subject ids with recorded
     /// events. Not part of the <see cref="IConsentAggregateStore"/> contract.
