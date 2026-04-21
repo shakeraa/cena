@@ -123,9 +123,16 @@ public interface ISessionPlanGenerator
 /// <param name="InputsSource">"student-plan-config" when prr-148's
 /// service supplied real values; "default-fallback" when the scheduler
 /// ran against defaults.</param>
+/// <param name="ActiveExamTargetCode">prr-233: resolved catalog exam-target
+/// code for this session (e.g. "BAGRUT_MATH_5U"), or null when no active
+/// target was resolved (legacy prr-148 path or cold-start). Callers use
+/// this to open an <see cref="IPromptCacheKeyContext"/> scope around the
+/// session's downstream LLM fan-out so cache hits/misses and per-call cost
+/// are labelled by target.</param>
 public sealed record SessionPlanGenerationResult(
     SessionPlanSnapshot Snapshot,
-    string InputsSource);
+    string InputsSource,
+    string? ActiveExamTargetCode = null);
 
 /// <summary>
 /// Default implementation. Composes the three providers + the scheduler
@@ -239,7 +246,14 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
         // stay on the legacy prr-148 path — ActiveExamTargetId remains
         // null, no lock, and downstream consumers see the identical shape
         // they got before prr-226.
+        //
+        // prr-233: we ALSO resolve the target's catalog ExamCode (if any) so
+        // callers can open an IPromptCacheKeyContext scope around the
+        // downstream LLM fan-out. The code is the Ministry שאלון family
+        // identifier ("BAGRUT_MATH_5U", "PET", "SAT_MATH") — operational,
+        // not PII — used as a Prometheus label only.
         ExamTargetId? activeTargetId = null;
+        string? activeExamCode = null;
         var lockedForExamWeek = false;
         if (_planReader is not null)
         {
@@ -260,6 +274,19 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
 
             activeTargetId = resolution.ActiveTargetId;
             lockedForExamWeek = resolution.LockedForExamWeek;
+
+            // Resolve the ExamCode string for the active target, if one was
+            // picked. The ExamCode on ExamTarget is the catalog key, not a
+            // PII-tainted value — safe to surface on metric labels per
+            // ADR-0050 §2 + prr-233 label-safety rules.
+            if (activeTargetId is { } resolvedId)
+            {
+                var activeTarget = activeTargets.FirstOrDefault(t => t.Id == resolvedId);
+                if (activeTarget is not null)
+                {
+                    activeExamCode = activeTarget.ExamCode.Value;
+                }
+            }
         }
 
         var inputs = new SchedulerInputs(
@@ -306,6 +333,7 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
 
         return new SessionPlanGenerationResult(
             Snapshot: snapshot,
-            InputsSource: isFallback ? SourceDefaultFallback : SourceStudentPlanConfig);
+            InputsSource: isFallback ? SourceDefaultFallback : SourceStudentPlanConfig,
+            ActiveExamTargetCode: activeExamCode);
     }
 }

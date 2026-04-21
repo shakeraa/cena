@@ -26,7 +26,8 @@ public sealed class NullLlmCostMetric : ILlmCostMetric
         string modelId,
         long inputTokens,
         long outputTokens,
-        string? instituteId = null)
+        string? instituteId = null,
+        string? examTargetCode = null)
     {
         // intentionally no-op
     }

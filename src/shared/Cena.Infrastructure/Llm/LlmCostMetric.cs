@@ -1,23 +1,29 @@
 // =============================================================================
-// Cena Platform — LLM cost metric (prr-046)
+// Cena Platform — LLM cost metric (prr-046 + prr-233)
 //
 // Emits the canonical per-feature cost counter:
 //
-//   cena_llm_call_cost_usd_total{feature, tier, institute_id, task, model_id}
+//   cena_llm_call_cost_usd_total{feature, tier, institute_id, task, model_id, exam_target_code}
 //
 // Every class carrying [TaskRouting] is expected to call
 // ILlmCostMetric.Record(...) exactly once on the success path of its LLM
 // call. Failure paths DO NOT emit (a failed call has no billable cost; the
 // error budget lives in a separate counter governed by ADR-0026 §7).
 //
-// Label conventions (per task DoD + ADR-0026 §7):
-//   - feature       [FeatureTag] — lowercase kebab-case, bounded vocabulary
-//   - tier          "tier1" | "tier2" | "tier3" from [TaskRouting]
-//   - task          [TaskRouting] task-name — matches routing-config.yaml row
-//   - institute_id  tenant scope. "unknown" when the caller doesn't have it;
-//                   intentional — see WHY note in the Record method body.
-//   - model_id      resolved model (after fallback chain) — useful for
-//                   tracking Sonnet→Haiku degradation cost.
+// Label conventions (per task DoD + ADR-0026 §7 + prr-233):
+//   - feature           [FeatureTag] — lowercase kebab-case, bounded vocabulary
+//   - tier              "tier1" | "tier2" | "tier3" from [TaskRouting]
+//   - task              [TaskRouting] task-name — matches routing-config.yaml row
+//   - institute_id      tenant scope. "unknown" when the caller doesn't have it;
+//                       intentional — see WHY note in the Record method body.
+//   - model_id          resolved model (after fallback chain) — useful for
+//                       tracking Sonnet→Haiku degradation cost.
+//   - exam_target_code  prr-233: Ministry / catalog exam-target code (e.g.
+//                       "BAGRUT_MATH_5U"). Optional; degrades to "unknown"
+//                       using the same null-signifier as institute_id so
+//                       the cost + cache dashboards align on the same
+//                       missing-label bucket. Operational (catalog) code,
+//                       not PII.
 //
 // No PII in labels:
 //   The institute_id label is the finest tenant grain allowed. Student IDs,
@@ -63,6 +69,12 @@ public interface ILlmCostMetric
     /// not yet thread institute_id through — "unknown" will be emitted so
     /// the cost is still counted toward the per-feature projection.
     /// </param>
+    /// <param name="examTargetCode">
+    /// prr-233: optional Ministry / catalog exam-target code. Pass null/empty
+    /// when the call site has no active target (e.g. content-ingestion,
+    /// system-prompt warm-ups); emits "unknown" in the label. Must not
+    /// contain ':' (Prometheus label-value constraint on structured forms).
+    /// </param>
     void Record(
         string feature,
         string tier,
@@ -70,7 +82,8 @@ public interface ILlmCostMetric
         string modelId,
         long inputTokens,
         long outputTokens,
-        string? instituteId = null);
+        string? instituteId = null,
+        string? examTargetCode = null);
 }
 
 /// <summary>
@@ -101,6 +114,13 @@ public sealed class LlmCostMetric : ILlmCostMetric
     /// <summary>Placeholder label value for unknown institute scope.</summary>
     public const string UnknownInstituteLabel = "unknown";
 
+    /// <summary>
+    /// prr-233: placeholder label value for unknown exam-target scope.
+    /// Same spelling as <see cref="UnknownInstituteLabel"/> so dashboards
+    /// can group the null-signifier consistently across cost + cache metrics.
+    /// </summary>
+    public const string UnknownExamTargetCodeLabel = "unknown";
+
     private readonly LlmPricingTable _pricing;
     private readonly Counter<double> _cost;
     private readonly Histogram<double> _costHistogram;
@@ -129,12 +149,22 @@ public sealed class LlmCostMetric : ILlmCostMetric
         string modelId,
         long inputTokens,
         long outputTokens,
-        string? instituteId = null)
+        string? instituteId = null,
+        string? examTargetCode = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(feature);
         ArgumentException.ThrowIfNullOrWhiteSpace(tier);
         ArgumentException.ThrowIfNullOrWhiteSpace(task);
         ArgumentException.ThrowIfNullOrWhiteSpace(modelId);
+        // prr-233: target code must be label-safe (no colons) because some
+        // exporters flatten TagList entries into structured IDs. Empty/null
+        // is fine (degrades to "unknown"); a colon is not.
+        if (examTargetCode is not null && examTargetCode.Contains(':'))
+        {
+            throw new ArgumentException(
+                $"exam_target_code must not contain ':' — got '{examTargetCode}'.",
+                nameof(examTargetCode));
+        }
 
         var cost = _pricing.ComputeCostUsd(modelId, inputTokens, outputTokens);
 
@@ -150,13 +180,22 @@ public sealed class LlmCostMetric : ILlmCostMetric
             ? UnknownInstituteLabel
             : instituteId!;
 
+        // prr-233: exam_target_code degrades the same way. A call site that
+        // does not yet thread the active target (e.g. a legacy prr-148 path
+        // that has not migrated to prr-218 aggregates) emits "unknown" and
+        // is visible on the per-target dashboard as a gap to close.
+        var target = string.IsNullOrWhiteSpace(examTargetCode)
+            ? UnknownExamTargetCodeLabel
+            : examTargetCode!;
+
         var tags = new TagList
         {
-            { "feature",      feature  },
-            { "tier",         tier     },
-            { "task",         task     },
-            { "institute_id", institute },
-            { "model_id",     modelId  },
+            { "feature",          feature  },
+            { "tier",             tier     },
+            { "task",             task     },
+            { "institute_id",     institute },
+            { "model_id",         modelId  },
+            { "exam_target_code", target   },
         };
 
         _cost.Add(cost, tags);

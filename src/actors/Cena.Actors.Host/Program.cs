@@ -233,7 +233,11 @@ builder.Services.AddSingleton<IPrerequisiteEnforcementService, PrerequisiteEnfor
 builder.Services.AddSingleton<IDecayPropagationService, DecayPropagationService>();
 // INF-019: Redis circuit breaker — protects explanation cache and messaging from Redis outages
 builder.Services.AddSingleton<Cena.Actors.Infrastructure.IRedisCircuitBreaker, Cena.Actors.Infrastructure.RedisCircuitBreaker>();
-builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>().AddSingleton<Cena.Infrastructure.Llm.IPromptCache, Cena.Infrastructure.Llm.RedisPromptCache>(); // prr-047 unified seam
+// prr-233: ambient cache-key context — carries (institute_id, exam_target_code)
+// for cache metric labels. Register as singleton (the instance is stateless;
+// state lives in its AsyncLocal, which is per-logical-call-chain).
+builder.Services.AddSingleton<Cena.Infrastructure.Llm.IPromptCacheKeyContext, Cena.Infrastructure.Llm.AsyncLocalPromptCacheKeyContext>();
+builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>().AddSingleton<Cena.Infrastructure.Llm.IPromptCache, Cena.Infrastructure.Llm.RedisPromptCache>(); // prr-047 unified seam + prr-233 per-target labels
 // prr-046: per-feature cost metric. Pricing loaded fail-loud from routing-config.yaml.
 builder.Services.AddLlmCostMetric(Path.Combine(
     builder.Environment.ContentRootPath,

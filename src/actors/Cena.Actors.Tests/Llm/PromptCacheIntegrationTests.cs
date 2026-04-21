@@ -28,6 +28,7 @@ public sealed class PromptCacheIntegrationTests : IDisposable
     private readonly IConnectionMultiplexer _redis = Substitute.For<IConnectionMultiplexer>();
     private readonly IDatabase _db = Substitute.For<IDatabase>();
     private readonly IMeterFactory _meterFactory = new TestMeterFactory();
+    private readonly IPromptCacheKeyContext _keyContext = new AsyncLocalPromptCacheKeyContext();
     private readonly RedisPromptCache _cache;
 
     public PromptCacheIntegrationTests()
@@ -37,7 +38,8 @@ public sealed class PromptCacheIntegrationTests : IDisposable
         _cache = new RedisPromptCache(
             _redis,
             NullLogger<RedisPromptCache>.Instance,
-            _meterFactory);
+            _meterFactory,
+            _keyContext);
     }
 
     public void Dispose() => _meterFactory.Dispose();
