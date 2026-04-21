@@ -74,19 +74,17 @@ public sealed class RubricSignOffMetadataRequiredTest
 }
 
 /// <summary>
-/// Test-only accessor around the internal YAML loader. Keeps the service
-/// class clean (no test-only entrypoints on the public surface).
+/// Test-only accessor — builds a fresh RubricVersionPinningService
+/// against the contracts/rubric/ dir so the test exercises the real
+/// load path (no reflection into internals).
 /// </summary>
 internal static class RubricVersionPinningService_TestAccessor
 {
-    // RubricYamlLoader is internal; the Cena.Actors csproj marks
-    // InternalsVisibleTo="Cena.Actors.Tests", so this direct call works.
-    public static RubricSnapshot Load(string dir) =>
-        typeof(Cena.Actors.Assessment.Rubric.IRubricVersionPinning).Assembly
-            .GetTypes()
-            .Single(t => t.FullName == "Cena.Actors.Assessment.Rubric.RubricYamlLoader")
-            .GetMethod("Load", System.Reflection.BindingFlags.Static | System.Reflection.BindingFlags.NonPublic)!
-            .Invoke(null, new object[] { dir, DateTimeOffset.UtcNow })
-            as RubricSnapshot
-            ?? throw new InvalidOperationException("RubricYamlLoader.Load returned null");
+    public static RubricSnapshot Load(string dir)
+    {
+        var service = new RubricVersionPinningService(
+            dir,
+            Microsoft.Extensions.Logging.Abstractions.NullLogger<RubricVersionPinningService>.Instance);
+        return service.Current;
+    }
 }
