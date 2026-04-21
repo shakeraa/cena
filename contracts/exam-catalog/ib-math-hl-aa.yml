@@ -1,0 +1,52 @@
+# IB Math HL AA (Analysis & Approaches).
+# Placeholder tile: availability=queued until content-engineering lands.
+
+exam_code: IB_MATH_HL_AA
+family: INTERNATIONAL
+track: HL
+units: null
+region: International-IB
+regulator: ib
+ministry_subject_code: null
+ministry_question_paper_codes: []
+availability: queued
+item_bank_status: unavailable
+passback_eligible: false
+default_lead_days: 180
+sittings:
+  - code: IB_2026_MAY
+    academic_year: "2026"
+    season: spring
+    moed: A
+    canonical_date: "2026-05-04"
+  - code: IB_2026_NOV
+    academic_year: "2026"
+    season: autumn
+    moed: A
+    canonical_date: "2026-11-02"
+display:
+  en:
+    name: "IB Math HL — Analysis & Approaches"
+    short_description: "International Baccalaureate mathematics, Higher Level, AA."
+  he:
+    name: "IB Math HL — Analysis & Approaches"
+    short_description: "בגרות בינלאומית במתמטיקה, HL, AA."
+  ar:
+    name: "IB Math HL — Analysis & Approaches"
+    short_description: "بكالوريا دولية في الرياضيات، HL، AA."
+topics:
+  - topic_id: algebra.core
+    display:
+      en: "Algebra core"
+      he: "אלגברה בסיסית"
+      ar: "الجبر الأساسي"
+  - topic_id: calculus.integrals
+    display:
+      en: "Calculus"
+      he: "חשבון דיפרנציאלי ואינטגרלי"
+      ar: "حساب التفاضل والتكامل"
+  - topic_id: probability.statistics
+    display:
+      en: "Probability and statistics"
+      he: "הסתברות וסטטיסטיקה"
+      ar: "الاحتمالات والإحصاء"

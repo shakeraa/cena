@@ -1,0 +1,63 @@
+# Bagrut Math 3 Units (3 יחידות) — Hebrew mainstream.
+
+exam_code: BAGRUT_MATH_3U
+family: BAGRUT
+track: "3U"
+units: 3
+region: IL-Bagrut-Hebrew
+regulator: ministry_of_education
+ministry_subject_code: "035"
+ministry_question_paper_codes:
+  - "035371"
+  - "035372"
+availability: launch
+item_bank_status: full
+passback_eligible: true
+default_lead_days: 180
+sittings:
+  - code: TASHPA_SUMMER_A
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-15"
+  - code: TASHPA_SUMMER_B
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: B
+    canonical_date: "2026-07-20"
+  - code: TASHPA_WINTER_A
+    academic_year: "תשפ\"ו"
+    season: winter
+    moed: A
+    canonical_date: "2026-01-28"
+display:
+  en:
+    name: "Bagrut Math (3 units)"
+    short_description: "Israeli Bagrut mathematics, three-unit track."
+  he:
+    name: "בגרות במתמטיקה (3 יחידות)"
+    short_description: "בגרות מתמטיקה במסלול 3 יחידות."
+  ar:
+    name: "بجروت الرياضيات (3 وحدات)"
+    short_description: "بجروت الرياضيات، مسار 3 وحدات."
+topics:
+  - topic_id: algebra.linear
+    display:
+      en: "Linear equations"
+      he: "משוואות ליניאריות"
+      ar: "المعادلات الخطية"
+  - topic_id: algebra.quadratics
+    display:
+      en: "Quadratic equations"
+      he: "משוואות ריבועיות"
+      ar: "المعادلات التربيعية"
+  - topic_id: geometry.plane
+    display:
+      en: "Plane geometry"
+      he: "גיאומטריה מישורית"
+      ar: "الهندسة المستوية"
+  - topic_id: statistics.basic
+    display:
+      en: "Descriptive statistics"
+      he: "סטטיסטיקה תיאורית"
+      ar: "الإحصاء الوصفي"

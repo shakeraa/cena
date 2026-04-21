@@ -1,0 +1,25 @@
+# Catalog metadata (prr-220, ADR-0050)
+# Increment CATALOG_VERSION when any target file here changes. The service
+# refuses to serve a catalog whose version decreases vs the last warm one
+# (monotonicity guard). Use YYYY.MM.DD-NN form for auditability.
+
+catalog_version: "2026.04.21-01"
+family_order:
+  - BAGRUT
+  - TAWJIHI
+  - STANDARDIZED
+  - INTERNATIONAL
+families:
+  BAGRUT:
+    - BAGRUT_MATH_3U
+    - BAGRUT_MATH_4U
+    - BAGRUT_MATH_5U
+    - BAGRUT_MATH_5U_ARAB_STREAM
+  TAWJIHI:
+    - TAWJIHI_MATH_SCIENTIFIC
+  STANDARDIZED:
+    - PET_QUANTITATIVE
+    - PET_VERBAL_RUSSIAN
+    - SAT_MATH
+  INTERNATIONAL:
+    - IB_MATH_HL_AA

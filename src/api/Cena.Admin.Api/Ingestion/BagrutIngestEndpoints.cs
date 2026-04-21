@@ -39,6 +39,7 @@ public static class BagrutIngestEndpoints
             HttpRequest request,
             ClaimsPrincipal user,
             IBagrutPdfIngestionService service,
+            IBagrutCorpusService corpusService,
             CancellationToken ct) =>
         {
             if (!request.HasFormContentType)
@@ -64,7 +65,14 @@ public static class BagrutIngestEndpoints
                 fileBytes:     bytes,
                 uploadedBy:    form["uploadedBy"].ToString(),
                 fallbackUserId: uploadedByClaim,
+                ministrySubjectCode: form["ministrySubjectCode"].ToString(),
+                ministryQuestionPaperCode: form["ministryQuestionPaperCode"].ToString(),
+                units: int.TryParse(form["units"], out var u) ? u : null,
+                year: int.TryParse(form["year"], out var y) ? y : null,
+                topicId: form["topicId"].ToString(),
+                sourceFilename: file?.FileName,
                 service:       service,
+                corpusService: corpusService,
                 ct:            ct);
         })
         .DisableAntiforgery()
@@ -100,6 +108,13 @@ public static class BagrutIngestHandler
         string? uploadedBy,
         string? fallbackUserId,
         IBagrutPdfIngestionService service,
+        IBagrutCorpusService? corpusService = null,
+        string? ministrySubjectCode = null,
+        string? ministryQuestionPaperCode = null,
+        int? units = null,
+        int? year = null,
+        string? topicId = null,
+        string? sourceFilename = null,
         CancellationToken ct = default)
     {
         var normalizedExam = (examCode ?? "").Trim().ToLowerInvariant();
@@ -125,10 +140,10 @@ public static class BagrutIngestHandler
             ? (fallbackUserId ?? "unknown-admin")
             : uploadedBy.Trim();
 
+        PdfIngestionResult result;
         try
         {
-            var result = await service.IngestAsync(fileBytes, normalizedExam, submitter, ct);
-            return Results.Ok(result);
+            result = await service.IngestAsync(fileBytes, normalizedExam, submitter, ct);
         }
         catch (OcrInputException ex)
         {
@@ -145,6 +160,36 @@ public static class BagrutIngestHandler
             return Error("invalid_request", ex.Message,
                 ErrorCategory.Validation, StatusCodes.Status400BadRequest);
         }
+
+        // prr-242: corpus-item side effect. Skip silently when the minimum
+        // metadata is missing (subject/paper code) — the admin UI surfaces
+        // this via the returned result.Warnings.
+        if (corpusService is not null
+            && !string.IsNullOrWhiteSpace(ministrySubjectCode)
+            && !string.IsNullOrWhiteSpace(ministryQuestionPaperCode)
+            && result.Drafts.Count > 0)
+        {
+            var context = new BagrutCorpusIngestContext(
+                ExamCode: normalizedExam,
+                MinistrySubjectCode: ministrySubjectCode!.Trim(),
+                MinistryQuestionPaperCode: ministryQuestionPaperCode!.Trim(),
+                Units: units,
+                Year: year,
+                Season: null,
+                Moed: null,
+                Stream: null,
+                DefaultTopicId: string.IsNullOrWhiteSpace(topicId) ? null : topicId!.Trim(),
+                SourceFilename: sourceFilename,
+                SourcePdfId: result.PdfId,
+                UploadedBy: submitter,
+                IngestedAt: DateTimeOffset.UtcNow);
+
+            var corpusItems = BagrutCorpusExtractor.Extract(result.Drafts, context);
+            if (corpusItems.Count > 0)
+                await corpusService.UpsertManyAsync(corpusItems, ct);
+        }
+
+        return Results.Ok(result);
     }
 
     internal static IResult InvalidBody(string message) =>

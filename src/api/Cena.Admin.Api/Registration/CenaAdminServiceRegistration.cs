@@ -167,6 +167,17 @@ public static class CenaAdminServiceRegistration
         // the real OCR cascade (IOcrCascadeService, ADR-0033). No stubs.
         services.AddScoped<Ingestion.IBagrutPdfIngestionService, Ingestion.BagrutPdfIngestionService>();
 
+        // prr-242: Bagrut reference-corpus service. Produces BagrutCorpusItem
+        // rows downstream of the PDF ingest, and also serves as the production
+        // IMinistryReferenceCorpus feed for the MinistrySimilarityChecker
+        // (ADR-0043 §runtime-gate-defense-in-depth; isomorph pipeline reject
+        // threshold). Singleton because GetReferences caches per (subj, track).
+        services.AddSingleton<Ingestion.BagrutCorpusService>();
+        services.AddSingleton<Ingestion.IBagrutCorpusService>(sp =>
+            sp.GetRequiredService<Ingestion.BagrutCorpusService>());
+        services.AddSingleton<Cena.Actors.QuestionBank.Coverage.IMinistryReferenceCorpus>(sp =>
+            sp.GetRequiredService<Ingestion.BagrutCorpusService>());
+
         // RDY-019e-IMPL (Phase 1C): Curator metadata handshake — auto-extract
         // on upload, curator review + confirm via three REST endpoints,
         // confirmed state feeds OcrContextHints into the cascade.
