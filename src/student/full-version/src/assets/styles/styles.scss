@@ -123,3 +123,34 @@
     scroll-behavior: auto !important;
   }
 }
+
+// ═══════════════════════════════════════════════════════════════════
+// A11y: Arabic script readability
+// Arabic renders ~10-12% smaller than Latin at the same CSS em value
+// due to x-height/cap-height differences. Bump body font + line-height
+// when the document language is Arabic so labels stay legible at the
+// same visual weight as Hebrew/Latin. Math stays in <bdi dir="ltr">
+// and inherits a normal em from its own locale scope (see prr-032).
+// ═══════════════════════════════════════════════════════════════════
+
+html:lang(ar),
+html[lang^="ar"],
+html[dir="rtl"]:lang(ar) {
+  font-size: 17px;  // base rem bumps from 16 -> 17 (~6.25% scale)
+}
+
+html:lang(ar) body,
+html[lang^="ar"] body {
+  line-height: 1.6;  // Arabic benefits from slightly taller lines
+  letter-spacing: 0;  // never add letter-spacing in Arabic — breaks ligatures
+}
+
+// Sidebar labels specifically — Arabic shapers compress narrow column
+// text. Give the vertical-nav link text a modest size bump so it stays
+// above the 14px WCAG comfort threshold on RTL.
+html:lang(ar) .layout-vertical-nav .nav-item-title,
+html:lang(ar) .layout-vertical-nav .nav-section-title,
+html[lang^="ar"] .layout-vertical-nav .nav-item-title,
+html[lang^="ar"] .layout-vertical-nav .nav-section-title {
+  font-size: 0.9375rem;  // ~15px at 16px root (up from default 0.8125rem / 13px)
+}

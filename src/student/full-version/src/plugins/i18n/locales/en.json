@@ -223,7 +223,18 @@
     "settingsNotifications": "Notification Preferences",
     "settingsPrivacy": "Data & Privacy",
     "userMenu": "Account menu for {name}",
-    "notificationsBell": "Notifications"
+    "notificationsBell": "Notifications",
+    "aiTutor": "AI Tutor",
+    "snapProblem": "Snap Problem",
+    "uploadProblem": "Upload Problem",
+    "overview": "Overview"
+  },
+  "navSection": {
+    "learn": "Learn",
+    "practice": "Practice",
+    "progress": "Progress",
+    "community": "Community",
+    "account": "Account"
   },
   "status": {
     "online": "Online",

@@ -224,7 +224,18 @@
     "settingsNotifications": "إعدادات الإشعارات",
     "settingsPrivacy": "البيانات والخصوصية",
     "userMenu": "قائمة الحساب لـ {name}",
-    "notificationsBell": "إشعارات"
+    "notificationsBell": "إشعارات",
+    "aiTutor": "المعلم الذكي",
+    "snapProblem": "التقاط مسألة",
+    "uploadProblem": "رفع مسألة",
+    "overview": "نظرة عامة"
+  },
+  "navSection": {
+    "learn": "تعلّم",
+    "practice": "تمرّن",
+    "progress": "التقدم",
+    "community": "المجتمع",
+    "account": "الحساب"
   },
   "status": {
     "online": "متصل",

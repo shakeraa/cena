@@ -223,7 +223,18 @@
     "settingsNotifications": "הגדרות התראות",
     "settingsPrivacy": "נתונים ופרטיות",
     "userMenu": "תפריט חשבון עבור {name}",
-    "notificationsBell": "התראות"
+    "notificationsBell": "התראות",
+    "aiTutor": "מורה AI",
+    "snapProblem": "צילום שאלה",
+    "uploadProblem": "העלאת שאלה",
+    "overview": "סקירה כללית"
+  },
+  "navSection": {
+    "learn": "למידה",
+    "practice": "תרגול",
+    "progress": "התקדמות",
+    "community": "קהילה",
+    "account": "חשבון"
   },
   "status": {
     "online": "מחובר",

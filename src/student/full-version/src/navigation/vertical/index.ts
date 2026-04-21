@@ -3,104 +3,108 @@ import type { VerticalNavItems } from '@layouts/types'
 // Student sidebar per docs/student/01-navigation-and-ia.md §Navigation Structure.
 // The `badge` slot on "Start Session" is populated dynamically by the nav shell
 // from the active-session poll (see meStore + useActiveSessionBadge).
+//
+// i18n: every `title` and `heading` is an i18n key resolved by getDynamicI18nProps
+// (see src/@layouts/utils.ts:93). Keys live under `nav.*` and `navSection.*` in
+// the three locale bundles (en/he/ar).
 const navItems: VerticalNavItems = [
-  { heading: 'Learn' },
+  { heading: 'navSection.learn' },
   {
-    title: 'Home',
+    title: 'nav.home',
     icon: { icon: 'tabler-home' },
     to: { name: 'home' },
   },
   {
-    title: 'Start Session',
+    title: 'nav.startSession',
     icon: { icon: 'tabler-player-play' },
     to: { name: 'session' },
   },
   {
-    title: 'AI Tutor',
+    title: 'nav.aiTutor',
     icon: { icon: 'tabler-message-chatbot' },
     to: { name: 'tutor' },
   },
   // RDY-056: student photo + PDF upload flows drive the Phase 2.1 / 2.2
   // ingestion endpoints.
   {
-    title: 'Snap Problem',
+    title: 'nav.snapProblem',
     icon: { icon: 'tabler-camera' },
     to: { name: 'tutor-photo-capture' },
   },
   {
-    title: 'Upload Problem',
+    title: 'nav.uploadProblem',
     icon: { icon: 'tabler-upload' },
     to: { name: 'tutor-pdf-upload' },
   },
 
-  { heading: 'Practice' },
+  { heading: 'navSection.practice' },
   {
-    title: 'Challenges',
+    title: 'nav.challenges',
     icon: { icon: 'tabler-swords' },
     children: [
-      { title: 'Daily Challenge', to: { name: 'challenges-daily' } },
-      { title: 'Boss Battles', to: { name: 'challenges-boss' } },
-      { title: 'Card Chains', to: { name: 'challenges' } },
+      { title: 'nav.dailyChallenge', to: { name: 'challenges-daily' } },
+      { title: 'nav.bossBattles', to: { name: 'challenges-boss' } },
+      { title: 'nav.cardChain', to: { name: 'challenges' } },
     ],
   },
   {
-    title: 'Knowledge Graph',
+    title: 'nav.knowledgeGraph',
     icon: { icon: 'tabler-affiliate' },
     to: { name: 'knowledge-graph' },
   },
 
-  { heading: 'Progress' },
+  { heading: 'navSection.progress' },
   {
-    title: 'Overview',
+    title: 'nav.overview',
     icon: { icon: 'tabler-chart-line' },
     to: { name: 'progress' },
   },
   {
-    title: 'Session History',
+    title: 'nav.sessionHistory',
     icon: { icon: 'tabler-history' },
     to: { name: 'progress-sessions' },
   },
   {
-    title: 'Mastery',
+    title: 'nav.mastery',
     icon: { icon: 'tabler-target' },
     to: { name: 'progress-mastery' },
   },
   {
-    title: 'Learning Time',
+    title: 'nav.learningTime',
     icon: { icon: 'tabler-clock' },
     to: { name: 'progress-time' },
   },
 
-  { heading: 'Community' },
+  { heading: 'navSection.community' },
   {
-    title: 'Class Feed',
+    title: 'nav.classFeed',
     icon: { icon: 'tabler-users' },
     to: { name: 'social' },
   },
   {
-    title: 'Leaderboard',
+    title: 'nav.leaderboard',
     icon: { icon: 'tabler-trophy' },
     to: { name: 'social-leaderboard' },
   },
   {
-    title: 'Peer Solutions',
+    title: 'nav.peerSolutions',
     icon: { icon: 'tabler-bulb' },
     to: { name: 'social-peers' },
   },
 
-  { heading: 'Account' },
+  { heading: 'navSection.account' },
   {
-    title: 'Notifications',
+    title: 'nav.notifications',
     icon: { icon: 'tabler-bell' },
     to: { name: 'notifications' },
   },
   {
-    title: 'Profile',
+    title: 'nav.profile',
     icon: { icon: 'tabler-user' },
     to: { name: 'profile' },
   },
   {
-    title: 'Settings',
+    title: 'nav.settings',
     icon: { icon: 'tabler-settings' },
     to: { name: 'settings' },
   },
