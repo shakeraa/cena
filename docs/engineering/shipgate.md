@@ -40,6 +40,16 @@ Two scanners run side-by-side on every PR:
 - Scans C# backend code for banned patterns.
 - Checks against the allowlist at `scripts/shipgate/allowlist.json`.
 
+Registered packs (each pack = one YAML rule file + whitelist + positive-test
+fixture under `shipgate/fixtures/`):
+
+- `citations` — [PRR-005] Dr. Rami-rejected citations.
+- `mechanics` — [PRR-006/019/040] Crisis-Mode / countdown / predicted-Bagrut copy.
+- `effect-size` — [PRR-071] uncited effect sizes.
+- `therapeutic-claims`, `progress-framing`, `error-blame`, `cheating-alert`, `reward-emoji` — [EPIC-PRR-D 2nd-wave].
+- `positive-framing-extended` — [EPIC-PRR-D P2 tail].
+- `multi-target-mechanics` — [PRR-224] multi-target cohort-shaming + ADR-0050 §10 identifier bans (daysUntil / countdown / streak / deadlinePressure anywhere in `src/`). Covers cross-target framings like "don't miss your Bagrut — only N days", "falling behind in Physics", and cross-target cohort shaming.
+
 ### 2. UX-surface DOM-aware scanner v2 (`scripts/shipgate/ux-surface-scan.mjs`, prr-211)
 
 Targets the new UX surfaces introduced by EPIC-PRR-E: `HintLadder`,
