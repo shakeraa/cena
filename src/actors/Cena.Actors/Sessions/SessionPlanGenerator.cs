@@ -29,6 +29,7 @@
 
 using System.Collections.Immutable;
 using Cena.Actors.Mastery;
+using Cena.Actors.Sessions.Events;
 using Cena.Actors.StudentPlan;
 using Cena.Actors.Teacher.ScheduleOverride;
 
@@ -116,6 +117,32 @@ public interface ISessionPlanGenerator
 }
 
 /// <summary>
+/// Session-scoped provider that returns per-target candidate PlanEntry
+/// lists for <see cref="InterleavingPolicy.Plan"/>. Prr-237 wires this as
+/// an optional seam on <see cref="SessionPlanGenerator"/>: a host without
+/// it registered keeps the wave-2 single-target behaviour. The concrete
+/// implementation (to be shipped in a follow-up wave) calls
+/// <see cref="AdaptiveScheduler.PrioritizeTopics"/> per-target against
+/// each target's own topic subset + mastery-deficit scalar.
+///
+/// Pure heuristic path — no LLM call (ADR-0026, SchedulerNoLlmCallTest).
+/// </summary>
+public interface ISessionInterleavingInputsProvider
+{
+    /// <summary>
+    /// Resolve per-target interleaving inputs for the session. The returned
+    /// list order is treated as the deterministic tie-breaker by
+    /// <see cref="InterleavingPolicy.Plan"/>. An empty list short-circuits
+    /// interleaving to <see cref="InterleavingDisabledReason.SingleOrZeroTargets"/>.
+    /// </summary>
+    Task<IReadOnlyList<InterleavingTargetInput>> GetAsync(
+        string studentAnonId,
+        IReadOnlyList<ExamTarget> activeTargets,
+        SchedulerInputs baseInputs,
+        CancellationToken ct = default);
+}
+
+/// <summary>
 /// Snapshot plus the provenance tag used for observability and for the
 /// SessionPlanComputed_V1 event's <c>InputsSource</c> field.
 /// </summary>
@@ -129,10 +156,21 @@ public interface ISessionPlanGenerator
 /// this to open an <see cref="IPromptCacheKeyContext"/> scope around the
 /// session's downstream LLM fan-out so cache hits/misses and per-call cost
 /// are labelled by target.</param>
+/// <param name="Interleaving">prr-237 / EPIC-PRR-F: outcome of
+/// <see cref="InterleavingPolicy.Plan"/> when the session has >1 active
+/// targets, is NOT exam-week-locked, and an
+/// <see cref="ISessionInterleavingInputsProvider"/> is wired. Disabled
+/// otherwise — <see cref="InterleavingResult.DisabledReason"/> names the
+/// short-circuit for audit. The <see cref="Snapshot"/> always carries the
+/// wave-2 single-target plan for back-compat; callers that want the
+/// interleaved entries read them off this field. See PRR-237 task body +
+/// ADR-0049 citation integrity (d = 0.34, Brunmair 2019 meta, not Rohrer
+/// cherry-pick).</param>
 public sealed record SessionPlanGenerationResult(
     SessionPlanSnapshot Snapshot,
     string InputsSource,
-    string? ActiveExamTargetCode = null);
+    string? ActiveExamTargetCode = null,
+    InterleavingResult Interleaving = default);
 
 /// <summary>
 /// Default implementation. Composes the three providers + the scheduler
@@ -164,6 +202,18 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
     private readonly ISittingCanonicalDateResolver _sittingResolver;
     private readonly IExamTargetOverrideReader _overrideReader;
 
+    // prr-237 / EPIC-PRR-F: optional within-session cross-target interleaving.
+    // When both are wired, the generator runs InterleavingPolicy after the
+    // base scheduler and either surfaces the interleaved entries via
+    // SessionPlanGenerationResult.Interleaving (enabled path) or records
+    // the short-circuit reason on the audit event (disabled path). When
+    // either is null, the generator stays on the wave-2 single-target
+    // path — exam-week-lock sessions always go through this null branch
+    // because ActiveExamTargetPolicy sets LockedForExamWeek = true and
+    // the policy short-circuits itself.
+    private readonly ISessionInterleavingInputsProvider? _interleavingInputs;
+    private readonly ISessionInterleavingAuditSink _interleavingAudit;
+
     /// <summary>
     /// prr-149 constructor — legacy single-target path. Kept for backward
     /// compatibility; new hosts should use the prr-226 overload.
@@ -180,7 +230,9 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
             overrideBridge,
             planReader: null,
             sittingResolver: EmptySittingCanonicalDateResolver.Instance,
-            overrideReader: NullExamTargetOverrideReader.Instance)
+            overrideReader: NullExamTargetOverrideReader.Instance,
+            interleavingInputs: null,
+            interleavingAudit: null)
     {
     }
 
@@ -199,6 +251,34 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
         IStudentPlanReader? planReader,
         ISittingCanonicalDateResolver sittingResolver,
         IExamTargetOverrideReader overrideReader)
+        : this(
+            planConfig,
+            abilityProvider,
+            graphProvider,
+            overrideBridge,
+            planReader,
+            sittingResolver,
+            overrideReader,
+            interleavingInputs: null,
+            interleavingAudit: null)
+    {
+    }
+
+    /// <summary>
+    /// prr-237 constructor — adds the within-session cross-target
+    /// interleaving seam + audit sink. When both are null the behaviour
+    /// is identical to the prr-226 constructor.
+    /// </summary>
+    public SessionPlanGenerator(
+        IStudentPlanConfigService planConfig,
+        ISessionAbilityEstimateProvider abilityProvider,
+        ITopicPrerequisiteGraphProvider graphProvider,
+        IOverrideAwareSchedulerInputsBridge? overrideBridge,
+        IStudentPlanReader? planReader,
+        ISittingCanonicalDateResolver sittingResolver,
+        IExamTargetOverrideReader overrideReader,
+        ISessionInterleavingInputsProvider? interleavingInputs,
+        ISessionInterleavingAuditSink? interleavingAudit)
     {
         _planConfig = planConfig ?? throw new ArgumentNullException(nameof(planConfig));
         _abilityProvider = abilityProvider ?? throw new ArgumentNullException(nameof(abilityProvider));
@@ -207,6 +287,8 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
         _planReader = planReader;
         _sittingResolver = sittingResolver ?? throw new ArgumentNullException(nameof(sittingResolver));
         _overrideReader = overrideReader ?? throw new ArgumentNullException(nameof(overrideReader));
+        _interleavingInputs = interleavingInputs;
+        _interleavingAudit = interleavingAudit ?? NullSessionInterleavingAuditSink.Instance;
     }
 
     /// <inheritdoc />
@@ -255,11 +337,13 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
         ExamTargetId? activeTargetId = null;
         string? activeExamCode = null;
         var lockedForExamWeek = false;
+        IReadOnlyList<ExamTarget> activeTargetsCaptured = Array.Empty<ExamTarget>();
         if (_planReader is not null)
         {
             var activeTargets = await _planReader
                 .ListTargetsAsync(studentAnonId, includeArchived: false, ct)
                 .ConfigureAwait(false);
+            activeTargetsCaptured = activeTargets;
 
             var overrideTargetId = await _overrideReader
                 .GetOverrideAsync(studentAnonId, sessionId, ct)
@@ -331,9 +415,125 @@ public sealed class SessionPlanGenerator : ISessionPlanGenerator
             DeadlineUtc: inputs.DeadlineUtc,
             WeeklyBudgetMinutes: (int)inputs.WeeklyTimeBudget.TotalMinutes);
 
+        // prr-237 / EPIC-PRR-F: within-session cross-target interleaving.
+        // Runs AFTER the base scheduler so we have the effective inputs
+        // (post-override) and can pass them to the inputs provider for
+        // per-target subset resolution. Disabled inside exam-week lock
+        // (preserves wave-2 single-target behaviour) and when <2 active
+        // targets or no provider wired.
+        //
+        // WHY (research citation): interleaved practice produces
+        // discrimination-learning gains of d ≈ 0.34 per the Brunmair
+        // (2019) meta over 59 studies; Rohrer & Taylor (2007) is the
+        // canonical single-study reference. We DO NOT cite the Rohrer
+        // cherry-pick d = 1.05 — "Honest not complimentary" memory +
+        // ADR-0049 citation integrity + PRR-237 DoD.
+        var interleaving = await RunInterleavingAsync(
+            studentAnonId,
+            sessionId,
+            nowUtc,
+            activeTargetsCaptured,
+            lockedForExamWeek,
+            inputs,
+            ct).ConfigureAwait(false);
+
         return new SessionPlanGenerationResult(
             Snapshot: snapshot,
             InputsSource: isFallback ? SourceDefaultFallback : SourceStudentPlanConfig,
-            ActiveExamTargetCode: activeExamCode);
+            ActiveExamTargetCode: activeExamCode,
+            Interleaving: interleaving);
+    }
+
+    private async Task<InterleavingResult> RunInterleavingAsync(
+        string studentAnonId,
+        string sessionId,
+        DateTimeOffset nowUtc,
+        IReadOnlyList<ExamTarget> activeTargets,
+        bool lockedForExamWeek,
+        SchedulerInputs inputs,
+        CancellationToken ct)
+    {
+        // Short-circuit BEFORE the provider call when the exam-week lock
+        // is active — preserves wave-2 ActiveExamTargetPolicy behaviour
+        // byte-for-byte. The architecture test
+        // InterleavingDisabledInExamWeekLockTest guards this branch.
+        if (lockedForExamWeek)
+        {
+            var locked = InterleavingPolicy.Plan(
+                targets: Array.Empty<InterleavingTargetInput>(),
+                lockedForExamWeek: true);
+            await AuditAsync(studentAnonId, sessionId, nowUtc, locked, activeTargets, ct)
+                .ConfigureAwait(false);
+            return locked;
+        }
+
+        if (_interleavingInputs is null || activeTargets.Count < 2)
+        {
+            var noop = InterleavingPolicy.Plan(
+                targets: Array.Empty<InterleavingTargetInput>(),
+                lockedForExamWeek: false);
+            // No audit emitted when no provider is wired — keeps the
+            // wave-2 compatibility path silent. When ≥2 targets exist but
+            // no provider is wired we still emit the audit so ops can see
+            // "feature off" vs "feature on, but short-circuit" distinctly.
+            if (_interleavingInputs is null)
+            {
+                return noop;
+            }
+            await AuditAsync(studentAnonId, sessionId, nowUtc, noop, activeTargets, ct)
+                .ConfigureAwait(false);
+            return noop;
+        }
+
+        var targetInputs = await _interleavingInputs
+            .GetAsync(studentAnonId, activeTargets, inputs, ct)
+            .ConfigureAwait(false)
+            ?? Array.Empty<InterleavingTargetInput>();
+
+        var result = InterleavingPolicy.Plan(
+            targets: targetInputs,
+            lockedForExamWeek: false);
+
+        await AuditAsync(studentAnonId, sessionId, nowUtc, result, activeTargets, ct)
+            .ConfigureAwait(false);
+        return result;
+    }
+
+    private Task AuditAsync(
+        string studentAnonId,
+        string sessionId,
+        DateTimeOffset nowUtc,
+        InterleavingResult result,
+        IReadOnlyList<ExamTarget> activeTargets,
+        CancellationToken ct)
+    {
+        // Map allocation rows to the wire-stable event shape. ExamCode
+        // lookup via the captured active-target list — O(allocations ×
+        // active-targets) is fine for MVP (active-targets count ≤ 8
+        // per ADR-0050 weekly-hours invariant).
+        var rows = new List<SessionInterleavingAllocation_V1>(result.Allocations.Length);
+        foreach (var alloc in result.Allocations)
+        {
+            var target = activeTargets.FirstOrDefault(t => t.Id == alloc.TargetId);
+            rows.Add(new SessionInterleavingAllocation_V1(
+                TargetId: alloc.TargetId.Value,
+                ExamCode: target?.ExamCode.Value ?? string.Empty,
+                Slots: alloc.Slots,
+                BucketWeight: alloc.BucketWeight));
+        }
+
+        var total = 0;
+        foreach (var r in rows) total += r.Slots;
+
+        var @event = new SessionInterleavingPlanned_V1(
+            StudentAnonId: studentAnonId,
+            SessionId: sessionId,
+            PlannedAtUtc: nowUtc,
+            Enabled: !result.Disabled,
+            DisabledReasonTag: SessionInterleavingPlanned_V1.TagFromReason(result.DisabledReason),
+            Allocations: rows,
+            TotalSlots: total);
+
+        return _interleavingAudit.AppendAsync(@event, ct);
     }
 }
