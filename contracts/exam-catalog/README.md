@@ -17,6 +17,10 @@ Editing rules
   localized metadata.
 - `availability` ∈ `{launch, roadmap, queued}` — the student SPA shows
   different chips for each.
+- `available_from` — required when `availability: roadmap` (PRR-240).
+  Free-form cohort string like `"2026-Q3"` / `"2026-Q4"`. The student
+  SPA renders it as a "Coming …" badge; a `CatalogRoadmapTargetTest`
+  arch test asserts the field is populated for every roadmap target.
 - `regulator` ∈ `{ministry_of_education, nite, collegeboard, ib, other}`.
 - `item_bank_status` ∈ `{full, reference-only, unavailable}` — honest tile.
 

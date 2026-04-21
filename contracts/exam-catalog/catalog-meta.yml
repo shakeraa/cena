@@ -3,7 +3,7 @@
 # refuses to serve a catalog whose version decreases vs the last warm one
 # (monotonicity guard). Use YYYY.MM.DD-NN form for auditability.
 
-catalog_version: "2026.04.21-01"
+catalog_version: "2026.04.21-02"
 family_order:
   - BAGRUT
   - TAWJIHI
@@ -12,9 +12,16 @@ family_order:
 families:
   BAGRUT:
     - BAGRUT_MATH_3U
+    - BAGRUT_MATH_3U_ARAB_STREAM
     - BAGRUT_MATH_4U
+    - BAGRUT_MATH_4U_ARAB_STREAM
     - BAGRUT_MATH_5U
     - BAGRUT_MATH_5U_ARAB_STREAM
+    - BAGRUT_CIVICS_1U
+    - BAGRUT_HISTORY_2U
+    - BAGRUT_TANAKH_2U
+    - BAGRUT_HEBREW_LITERATURE_2U
+    - BAGRUT_ARABIC_LANGUAGE_5U
   TAWJIHI:
     - TAWJIHI_MATH_SCIENTIFIC
   STANDARDIZED:

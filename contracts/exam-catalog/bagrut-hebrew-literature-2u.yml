@@ -1,0 +1,72 @@
+# Bagrut Hebrew Literature (ספרות עברית) — 2 Units, Hebrew-stream.
+# PRR-241: humanities catalog extension.
+# Topics cover the five standard literary genres + comparative work.
+# `queued` at launch: content team is still assembling the item bank
+# against the Ministry reading-list rotation (no raw texts in YAML).
+
+exam_code: BAGRUT_HEBREW_LITERATURE_2U
+family: BAGRUT
+track: "2U"
+units: 2
+region: IL-Bagrut-Hebrew
+regulator: ministry_of_education
+ministry_subject_code: "008"
+ministry_question_paper_codes:
+  - "008281"
+  - "008282"
+availability: queued
+item_bank_status: reference-only
+passback_eligible: true
+default_lead_days: 180
+sittings:
+  - code: TASHPA_SUMMER_A
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: A
+    canonical_date: "2026-06-12"
+  - code: TASHPA_SUMMER_B
+    academic_year: "תשפ\"ו"
+    season: summer
+    moed: B
+    canonical_date: "2026-07-17"
+display:
+  en:
+    name: "Bagrut Hebrew Literature (2 units)"
+    short_description: "Israeli Bagrut Hebrew literature, two-unit track."
+  he:
+    name: "בגרות בספרות עברית (2 יחידות)"
+    short_description: "בגרות בספרות עברית במסלול 2 יחידות."
+  ar:
+    name: "بجروت الأدب العبري (وحدتان)"
+    short_description: "بجروت الأدب العبري، مسار وحدتين."
+topics:
+  - topic_id: literature.poetry_medieval
+    display:
+      en: "Medieval Hebrew poetry"
+      he: "שירת ימי הביניים"
+      ar: "الشعر العبري في العصور الوسطى"
+  - topic_id: literature.poetry_modern
+    display:
+      en: "Modern Hebrew poetry"
+      he: "שירה עברית מודרנית"
+      ar: "الشعر العبري الحديث"
+  - topic_id: literature.short_stories
+    display:
+      en: "Short stories"
+      he: "סיפור קצר"
+      ar: "القصة القصيرة"
+  - topic_id: literature.novella
+    display:
+      en: "Novella"
+      he: "נובלה"
+      ar: "الرواية القصيرة"
+  - topic_id: literature.drama
+    display:
+      en: "Drama"
+      he: "מחזה"
+      ar: "المسرحية"
+  - topic_id: literature.comparative
+    display:
+      en: "Comparative literary analysis"
+      he: "השוואה ספרותית"
+      ar: "التحليل الأدبي المقارن"
