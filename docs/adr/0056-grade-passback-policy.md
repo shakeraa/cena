@@ -1,4 +1,4 @@
-# ADR-0053 — Grade-passback policy (teacher opt-in + veto window + whitelist)
+# ADR-0056 — Grade-passback policy (teacher opt-in + veto window + whitelist)
 
 - **Status**: Accepted
 - **Date proposed**: 2026-04-22
@@ -9,7 +9,7 @@
   - [ADR-0040 (accommodation scope + Bagrut parity)](0040-accommodation-scope-and-bagrut-parity.md) — accommodated scores pass back identically; the SIS gets the final grade, not the accommodation metadata
   - [ADR-0043 (Bagrut reference-only)](0043-bagrut-reference-only-enforcement.md) — we pass back grades computed against Cena-recreated items, never against Ministry-reference items
   - [ADR-0048 (exam-prep time-framing)](0048-exam-prep-time-framing.md) — passback notifications never use time-pressure copy
-  - [ADR-0052 (Ministry rubric version pinning)](0052-ministry-rubric-version-pinning.md) — `RubricId` is the audit anchor on every passed-back score
+  - [ADR-0052 (Ministry rubric version pinning)](0055-ministry-rubric-version-pinning.md) — `RubricId` is the audit anchor on every passed-back score
   - Sub-processor registry: Mashov + Classroom entries in `contracts/privacy/sub-processors.yml` (prr-035)
 - **Source**: [tasks/pre-release-review/TASK-PRR-037-grade-passback-policy-adr-teacher-opt-in-veto-whitelist.md](../../tasks/pre-release-review/TASK-PRR-037-grade-passback-policy-adr-teacher-opt-in-veto-whitelist.md)
 

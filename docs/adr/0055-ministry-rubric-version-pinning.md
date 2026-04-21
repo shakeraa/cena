@@ -1,4 +1,4 @@
-# ADR-0052 — Ministry Bagrut rubric DSL + version pinning + per-track sign-off
+# ADR-0055 — Ministry Bagrut rubric DSL + version pinning + per-track sign-off
 
 - **Status**: Accepted
 - **Date proposed**: 2026-04-22

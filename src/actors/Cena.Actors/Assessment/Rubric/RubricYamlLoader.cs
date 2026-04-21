@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — Rubric DSL YAML loader (prr-033, ADR-0052)
+// Cena Platform — Rubric DSL YAML loader (prr-033, ADR-0055)
 //
 // Pure-disk deserializer. Mirrors ExamCatalogYamlLoader: YamlDotNet with
 // underscore naming convention, IgnoreUnmatchedProperties, non-caching.
@@ -87,19 +87,19 @@ internal static class RubricYamlLoader
         if (string.IsNullOrWhiteSpace(raw.RubricVersion))
             throw new RubricLoadException($"{file}: rubric_version is required");
 
-        // ── Sign-off triple is mandatory (ADR-0052 §3) ───────────────────
+        // ── Sign-off triple is mandatory (ADR-0055 §3) ───────────────────
         if (string.IsNullOrWhiteSpace(raw.ApprovedByUserId))
             throw new RubricLoadException(
                 $"{file}: approved_by_user_id is required — a rubric without sign-off " +
-                "cannot be served. See ADR-0052 §3.");
+                "cannot be served. See ADR-0055 §3.");
         if (raw.ApprovedAtUtc is null)
             throw new RubricLoadException(
                 $"{file}: approved_at_utc is required — a rubric without a sign-off " +
-                "timestamp cannot be served. See ADR-0052 §3.");
+                "timestamp cannot be served. See ADR-0055 §3.");
         if (string.IsNullOrWhiteSpace(raw.MinistryCircularRef))
             throw new RubricLoadException(
                 $"{file}: ministry_circular_ref is required — a rubric without a " +
-                "citable Ministry source cannot be served. See ADR-0052 §3.");
+                "citable Ministry source cannot be served. See ADR-0055 §3.");
 
         var signOff = new RubricSignOff(
             raw.ApprovedByUserId.Trim(),

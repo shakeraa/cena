@@ -71,4 +71,4 @@ scoring_criteria:
   matching entry under `contracts/exam-catalog/`.
 - `RubricWeightsSumToOneTest` — scoring criteria weights sum to 1.0.
 
-See [ADR-0052](../../docs/adr/0052-ministry-rubric-version-pinning.md).
+See [ADR-0052](../../docs/adr/0055-ministry-rubric-version-pinning.md).

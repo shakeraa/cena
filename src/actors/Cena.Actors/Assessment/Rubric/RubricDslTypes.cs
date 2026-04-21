@@ -1,10 +1,10 @@
 // =============================================================================
-// Cena Platform — Ministry Bagrut Rubric DSL domain types (prr-033, ADR-0052)
+// Cena Platform — Ministry Bagrut Rubric DSL domain types (prr-033, ADR-0055)
 //
 // Immutable value-objects the IRubricVersionPinning service exposes to
 // callers. Every field on a rubric is a deliberate part of the v1 DSL;
 // adding a field is a minor-bump, removing or reshaping one is a major
-// bump and requires a superseding rubric entry per ADR-0052 §3.
+// bump and requires a superseding rubric entry per ADR-0055 §3.
 //
 // Sign-off metadata (ApprovedByUserId + ApprovedAtUtc + MinistryCircularRef)
 // is REQUIRED on every track. The loader rejects rubrics where any of the

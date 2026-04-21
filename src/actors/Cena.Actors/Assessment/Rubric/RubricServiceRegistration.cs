@@ -1,8 +1,8 @@
 // =============================================================================
-// Cena Platform — DI extension for IRubricVersionPinning (prr-033, ADR-0052)
+// Cena Platform — DI extension for IRubricVersionPinning (prr-033, ADR-0055)
 //
 // Reads contracts/rubric/*.yml on boot, registered as a singleton shared
-// across tenants (Ministry rubric is global per ADR-0052).
+// across tenants (Ministry rubric is global per ADR-0055).
 // Dir resolution: `Cena:Rubric:Dir` config key overrides; default falls
 // back to the repo-relative path used by the other catalog services.
 // =============================================================================

@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — Rubric Version Pinning service (prr-033, ADR-0052)
+// Cena Platform — Rubric Version Pinning service (prr-033, ADR-0055)
 //
 // Owns the in-memory snapshot of BagrutRubric objects and serves them to
 // grading / diagnostic seams. Contract:
@@ -40,7 +40,7 @@ public interface IRubricVersionPinning
     /// <summary>
     /// Resolve a rubric by its addressable id (<c>"EXAM_CODE@version"</c>).
     /// Today only the currently-loaded version is resolvable; historical
-    /// replay against superseded rubric versions is future work (ADR-0052 §5).
+    /// replay against superseded rubric versions is future work (ADR-0055 §5).
     /// </summary>
     BagrutRubric? PinById(string rubricId);
 
@@ -100,7 +100,7 @@ public sealed class RubricVersionPinningService : IRubricVersionPinning
         var rubric = PinFor(parts[0]);
         if (rubric is null) return null;
         // Today: only current version is loaded. Historical-version resolution
-        // is ADR-0052 §5 future work — event-store replay using the captured
+        // is ADR-0055 §5 future work — event-store replay using the captured
         // RubricId stamp on every graded attempt.
         return string.Equals(rubric.RubricVersion, parts[1], StringComparison.Ordinal)
             ? rubric

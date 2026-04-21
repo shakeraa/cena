@@ -1,5 +1,5 @@
 // =============================================================================
-// Cena Platform — RubricSignOffMetadataRequiredTest (prr-033, ADR-0052 §3)
+// Cena Platform — RubricSignOffMetadataRequiredTest (prr-033, ADR-0055 §3)
 //
 // Architecture gate: every *.yml in contracts/rubric/ has a non-empty
 // sign-off triple (approved_by_user_id + approved_at_utc +

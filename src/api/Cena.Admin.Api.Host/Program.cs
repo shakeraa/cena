@@ -268,7 +268,7 @@ public partial class Program
 
     builder.Services.AddCenaAdminServices();
 
-    // prr-033: Ministry Bagrut rubric DSL + version pinning (ADR-0052).
+    // prr-033: Ministry Bagrut rubric DSL + version pinning (ADR-0055).
     // Loads contracts/rubric/*.yml on boot; fails fast on malformed rubrics.
     builder.Services.AddCenaRubricVersionPinning(
         builder.Configuration, builder.Environment);
