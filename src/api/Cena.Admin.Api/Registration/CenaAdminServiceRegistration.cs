@@ -5,8 +5,10 @@
 // =============================================================================
 
 using Cena.Actors.Cas;
+using Cena.Actors.QuestionBank.Coverage;
 using Cena.Actors.QuestionBank.Templates;
 using Cena.Admin.Api.Content;
+using Cena.Admin.Api.Coverage;
 using Cena.Admin.Api.Endpoints;
 using Cena.Admin.Api.Templates;
 using Cena.Admin.Api.Features.TeacherConsole;
@@ -255,6 +257,38 @@ public static class CenaAdminServiceRegistration
             return MinistryTopicHierarchy.LoadFromDirectory(dir);
         });
 
+        // prr-209: admin content-coverage heatmap. Reads the prr-210
+        // contract (contracts/coverage/coverage-targets.yml) once at boot
+        // and joins it against the live prr-201 projection via
+        // ICoverageCellVariantCounter. Path discovery mirrors the syllabus
+        // loader above — honours CENA_COVERAGE_TARGETS env override and
+        // otherwise walks upward from the bin directory looking for
+        // <repo>/contracts/coverage/coverage-targets.yml so a fresh clone
+        // works out of the box.
+        services.TryAddSingleton<ICoverageCellVariantCounter, CoverageCellVariantCounter>();
+        services.TryAddSingleton<ICoverageRungDrilldownSource, EmptyCoverageRungDrilldownSource>();
+        services.TryAddSingleton<ICoverageTargetManifestProvider>(_ =>
+        {
+            var configured = Environment.GetEnvironmentVariable("CENA_COVERAGE_TARGETS");
+            var candidates = new List<string>();
+            if (!string.IsNullOrWhiteSpace(configured)) candidates.Add(configured);
+
+            var contentRoot = AppContext.BaseDirectory;
+            candidates.Add(Path.Combine(contentRoot, "contracts", "coverage", "coverage-targets.yml"));
+            var cursor = new DirectoryInfo(contentRoot);
+            for (int i = 0; i < 8 && cursor is not null; i++, cursor = cursor.Parent)
+            {
+                var probe = Path.Combine(cursor.FullName, "contracts", "coverage", "coverage-targets.yml");
+                if (File.Exists(probe)) candidates.Add(probe);
+            }
+
+            var path = candidates.FirstOrDefault(File.Exists)
+                ?? throw new FileNotFoundException(
+                    "[CoverageTargetManifest] coverage-targets.yml not found; set CENA_COVERAGE_TARGETS.");
+            return new FileCoverageTargetManifestProvider(path);
+        });
+        services.TryAddSingleton<ICoverageHeatmapService, CoverageHeatmapService>();
+
         return services;
     }
 
@@ -304,6 +338,13 @@ public static class CenaAdminServiceRegistration
 
         // RDY-019c (Phase 3): GET /api/v1/admin/content/coverage
         app.MapContentCoverageEndpoints();
+
+        // prr-209: admin content-coverage heatmap (topic × difficulty ×
+        // methodology × track), with the non-color-alone status + pattern
+        // contract required by the accessibility review.
+        //   GET /api/admin/coverage/heatmap?track=...&institute=...
+        //   GET /api/admin/coverage/heatmap/rung?topic=...&...
+        app.MapCoverageHeatmapEndpoints();
 
         // RDY-019b (Phase 3.2): POST /api/admin/content/recreate-from-reference
         // SuperAdmin-only, dry-run default. Ministry-reference → AI-authored
