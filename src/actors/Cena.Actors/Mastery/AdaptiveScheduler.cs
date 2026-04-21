@@ -18,10 +18,31 @@
 // =============================================================================
 
 using System.Collections.Immutable;
+using Cena.Actors.StudentPlan;
 
 namespace Cena.Actors.Mastery;
 
 /// <summary>Inputs to one scheduler run.</summary>
+/// <param name="StudentAnonId">Pseudonymous student id.</param>
+/// <param name="PerTopicEstimates">Topic-keyed ability snapshot.</param>
+/// <param name="DeadlineUtc">Catalog-resolved deadline for the ACTIVE target
+/// (null when the student supplied no target and no legacy deadline).</param>
+/// <param name="WeeklyTimeBudget">Aggregate weekly budget the scheduler
+/// plans against. With multi-target this is the sum across active targets
+/// (per ADR-0050 §5 capped ≤ 40h).</param>
+/// <param name="MotivationProfile">RDY-057 self-reported stance.</param>
+/// <param name="NowUtc">Injected wall-clock for deterministic tests.</param>
+/// <param name="PrerequisiteGraph">Optional topic DAG.</param>
+/// <param name="ActiveExamTargetId">prr-226 / ADR-0050 §10: the ONE target
+/// the session should run against this turn. Resolved by
+/// <see cref="Cena.Actors.Sessions.ActiveExamTargetPolicy"/>. Null when
+/// the student has no active targets or the host has not wired the
+/// multi-target reader (legacy prr-148 path).</param>
+/// <param name="LockedForExamWeek">prr-226 / ADR-0050 §10: when true, the
+/// scheduler was pinned to <paramref name="ActiveExamTargetId"/> because its
+/// sitting is within the 14-day window. SCHEDULER-INTERNAL only — downstream
+/// UX copy MUST NOT surface "days until" / "exam week" / "countdown" (ADR-0048
+/// + shipgate PRR-224).</param>
 public sealed record SchedulerInputs(
     string StudentAnonId,
     IReadOnlyDictionary<string, AbilityEstimate> PerTopicEstimates,
@@ -29,7 +50,9 @@ public sealed record SchedulerInputs(
     TimeSpan WeeklyTimeBudget,
     MotivationProfile MotivationProfile,
     DateTimeOffset NowUtc,
-    TopicPrerequisiteGraph? PrerequisiteGraph = null);
+    TopicPrerequisiteGraph? PrerequisiteGraph = null,
+    ExamTargetId? ActiveExamTargetId = null,
+    bool LockedForExamWeek = false);
 
 /// <summary>
 /// Student's self-reported stance toward surfacing weaknesses, from
