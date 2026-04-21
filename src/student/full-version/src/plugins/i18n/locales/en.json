@@ -378,7 +378,8 @@
       "today": "Today",
       "kpi30dayTotal": "30-day total",
       "kpi7dayTotal": "Last 7 days",
-      "kpiDayStreak": "Active streak"
+      "kpi7dayActiveDays": "Days you learned",
+      "ofNDaysWindow": "of 7"
     },
     "mastery": {
       "title": "Subject mastery",

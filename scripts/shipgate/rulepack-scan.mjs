@@ -266,6 +266,8 @@ const FIXTURE_FILES = {
   "reward-emoji": "shipgate/fixtures/reward-inflation-emoji-sample.md",
   // EPIC-PRR-D P2 tail (prr-163/166/167/168/170/171/172/177/178 — 2026-04-21).
   "positive-framing-extended": "shipgate/fixtures/positive-framing-extended-sample.md",
+  // EPIC-PRR-F / PRR-224 multi-target dark-pattern bans (2026-04-21).
+  "multi-target-mechanics": "shipgate/fixtures/multi-target-mechanics-sample.md",
 };
 
 function collectFiles() {
@@ -338,6 +340,12 @@ const PACKS = [
     name: "positive-framing-extended",
     rulesFile: "scripts/shipgate/positive-framing-extended.yml",
     whitelistFile: "scripts/shipgate/positive-framing-extended-whitelist.yml",
+  },
+  // EPIC-PRR-F / PRR-224 — multi-target dark-pattern identifier + copy bans.
+  {
+    name: "multi-target-mechanics",
+    rulesFile: "scripts/shipgate/multi-target-mechanics.yml",
+    whitelistFile: "scripts/shipgate/multi-target-mechanics-whitelist.yml",
   },
 ];
 
