@@ -347,7 +347,7 @@ async function handleConfirm() {
         </VBtn>
 
         <VBtn
-          v-else
+          v-else-if="onboarding.step === 'confirm'"
           color="primary"
           :loading="submitting"
           :disabled="!onboarding.canAdvance || submitting"

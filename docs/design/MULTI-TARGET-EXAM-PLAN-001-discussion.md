@@ -285,3 +285,108 @@ Run personas against sections 9.1–9.10. File findings under each `pre-release-
 **History**:
 - 2026-04-21: Draft created after `/pages/onboarding.vue` audit surfaced the missing grade+exam-target gap; user decided full multi-target over honest-single-target-Bagrut-only v1.
 - 2026-04-21: User resolved open question #1 — SAT and Psychometry both ship fully functional in v1, not behind "coming soon" flags. Adds a parallel content-engineering epic as a launch blocker; extends CAS oracle + no-stubs rule to both exam families.
+- 2026-04-21: 10-persona review completed. Verdicts: 2 red (a11y, ministry), 1 yellow-leaning-red (privacy), 7 yellow. Synthesis below revises the data model and task slate before ADR lock.
+
+---
+
+## 14. Persona Review Synthesis (2026-04-21)
+
+### 14.1 Verdict roll-up
+
+| Persona | Verdict | Findings file |
+|---|---|---|
+| educator | yellow | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-educator/multi-target-exam-plan-findings.md) |
+| cogsci | yellow | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-cogsci/multi-target-exam-plan-findings.md) |
+| ethics | yellow | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-ethics/multi-target-exam-plan-findings.md) |
+| a11y | **red** | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-a11y/multi-target-exam-plan-findings.md) |
+| enterprise | yellow | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-enterprise/multi-target-exam-plan-findings.md) |
+| ministry | **red** | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-ministry/multi-target-exam-plan-findings.md) |
+| sre | yellow | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-sre/multi-target-exam-plan-findings.md) |
+| redteam | yellow | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-redteam/multi-target-exam-plan-findings.md) |
+| privacy | yellow → red | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-privacy/multi-target-exam-plan-findings.md) |
+| finops | yellow | [multi-target-exam-plan-findings.md](../../pre-release-review/reviews/persona-finops/multi-target-exam-plan-findings.md) |
+
+### 14.2 Convergent findings (multi-lens agreement — load-bearing)
+
+1. **Kill the free-text per-target note** *(ethics + privacy + redteam + finops converge)*. Replace with a closed enum `ReasonTag ∈ {Retake, NewSubject, ReviewOnly, Enrichment}`. Eliminates PII exposure, prompt-injection surface, and scrub-cost.
+2. **Sittings are named tuples, not free dates** *(educator + ministry)*. Replace `Deadline: DateTimeOffset` with `SittingCode` → `{AcademicYear, Season, Moed}` tuple that dereferences to a canonical date + Ministry סמל שנה שאלון mapping. Free dates collapse the moed taxonomy (מועד א / ב / ג / מיוחד) and misalign with every Ministry reporting artefact downstream.
+3. **Ministry numeric codes are the primary key**, not display labels *(ministry emphatic)*. `BAGRUT_MATH + 5U` is a label; the real key is `{035581 | 035582 | 035583}` — Math 5U is **three** שאלונים, not one. Catalog entries carry `ministrySubjectCode` + `ministryQuestionPaperCodes[]`.
+4. **Rename `PSYCHOMETRY` → `PET`** *(ministry)*. NITE-owned, not Ministry-of-Education — different regulator, different compliance path.
+5. **`ExamTarget.Source ∈ {Student, Classroom, Tenant}` + `AssignedById` + `EnrollmentId?` in v1 schema** *(educator + enterprise converge)*. Classroom-write UI defers to v2, but the event schema discriminator must land v1 to avoid a post-launch event-sourced migration.
+6. **Targets cap = 5, not 4** *(educator=5, enterprise=6)*. Real Grade-12 students exceed 4 (3 STEM + 1 humanity + 1 standardized). Compromise: server cap 5, soft-warn at 4.
+7. **Track enum extended** *(educator)*: include `"2U"` (mandatory humanities baseline); English uses Modules A–G, not units — add `ModuleCode` as parallel track-shape.
+8. **Exam-week lock stays silent** *(cogsci + ethics agree)*. 14-day proximity rule is scheduler behavior, not UX copy. No countdown, no label, no "days-remaining" identifier anywhere in `src/`. Extend shipgate scanner to catch `daysUntil`, `countdown`, `streak`.
+9. **Diagnostic must be per-target blocks, not unified** *(cogsci)*. Unified diagnostic creates order-effect bias. 6-8 items per target + shared 3-item warmup; priors reported per-target.
+10. **Mastery state keyed on `skillId`, not `(targetId, skillId)`** *(cogsci blocker)*. Otherwise Bagrut-Math ↔ PET-Quant overlap gives phantom weakness. Skills are catalog-global.
+11. **Migration one-shot is unsafe** *(sre blocker)*. Staged feature-flagged upcast with retry + DLQ, not first-login-throws-everyone-out.
+12. **Catalog needs `GlobalCatalog + TenantCatalogOverlay` v1** *(enterprise)*. Header-only tenancy is theatre; schema must be overlay-ready from day one.
+13. **Archived-target retention = 24 months, not "indefinite"** *(privacy)*. PPL Amendment 13 + GDPR Art. 5(1)(e) purpose-limitation. User-extendable opt-in.
+14. **RTBF cascade** *(privacy)*. `ExamTarget*` events crypto-shredded + all downstream derivations (coverage matrix, mastery projection, scheduler state) purged. Ties to PRR-003a.
+15. **Aggregate invariants server-enforced** *(redteam)*. `sum(Targets.WeeklyHours) ≤ 40`, `count(Targets) ≤ 5`, `target.Archived ⇒ immutable`. Not UI-only.
+16. **VDatePicker RTL is unverified** *(a11y red)*. Hebrew calendar has no Vuetify coverage; Arabic-Umm-al-Qura is opt-in. Prototype in all three locales + screen reader before ADR lock, or stay with native `<input type="date">` wrapped `<bdi>`.
+17. **Per-target-plan nested-step SR announcement undefined** *(a11y red)*. Flatten to top-level steps or define `aria-live` source-of-truth. Not defer-able.
+18. **PRR-032 is a ghost reference** *(a11y)*. The brief cites `numeralsPreference` from PRR-032 but the PRR-032 task file doesn't exist and `onboardingStore.ts` has no `numeralSystem` field. Create the task or stop citing it.
+19. **Pre-existing streak-leak in `src/student/full-version/src/pages/progress/time.vue:40-54`** *(ethics)*. Renders `dayStreakCount` — a GD-004 / ADR-0048 violation that the shipgate scanner at `scripts/shipgate/scan.mjs:26` should catch but isn't. Remove before PRR-F merges.
+20. **PRR-053 capacity plan is stale** *(sre)*. SAT+PET v1 turns a 2-spike (Jun/Aug) into a 7-window compound calendar. Amend before launch.
+21. **Prompt cache hit rate at PRR-047 SLO floor** *(finops)*. 4-target variation drops hit rate from ~85% → ~68-72% (SLO = 70%). Observability per-target required; no action if we stay above floor, but instrumented.
+22. **SAT+PET content-engineering budget unowned** *(finops)*. ~$10-15k one-shot (PET Hebrew/Arabic verbal $8-12k dominates) + $500-1500/quarter refresh. Must be named owner + approved line before EPIC-PRR-G starts.
+
+### 14.3 Resolved open questions (sections 10 + persona positions)
+
+| Question | Resolution | Source |
+|---|---|---|
+| 10.1 SAT-in-v1? | **Yes, full** | user 2026-04-21 |
+| 10.2 Free-text note? | **Drop, replace with ReasonTag enum** | ethics + privacy + redteam + finops |
+| 10.3 Max targets cap? | **5 server, soft-warn at 4** | educator + enterprise |
+| 10.4 Skip-during-onboarding? | **Allowed, conditional on classroomCode absence; strict nag-copy guardrails** | ethics + educator |
+| 10.5 Classroom-assigned v1/v2? | **Schema v1, teacher UI v2** | educator + enterprise |
+| 10.6 Parent visibility? | **Default hidden 13+, visible <13, student-grants at 18+** | privacy |
+
+### 14.4 Revised task slate (supersedes section 12)
+
+**Epics**:
+- **EPIC-PRR-F** — Multi-target onboarding + plan aggregate (engineering umbrella).
+- **EPIC-PRR-G** — SAT + PET content engineering (content-eng umbrella; launch-blocker parallel).
+
+**P0 (blocker) tasks**:
+- PRR-217 — ADR-0049 Multi-target exam plan + Ministry codes + sitting-tuple (foundation ADR).
+- PRR-218 — StudentPlan aggregate events (source, EnrollmentId, sittingCode, ReasonTag, no free-text).
+- PRR-219 — Migration safety net (feature-flagged staged upcast + retry + DLQ).
+- PRR-220 — Catalog service with Global + TenantOverlay + offline fallback + CDN runbook.
+- PRR-221 — Onboarding UI exam-targets + per-target-plan steps (with a11y scaffolding + VDatePicker RTL prototype-or-fallback).
+- PRR-222 — Skill-keyed mastery state (not target-scoped) + dedup invariant.
+- PRR-223 — RTBF cascade for ExamTarget + derived projections.
+- PRR-224 — Shipgate scanner v2: ban `streak`, `countdown`, `daysUntil`, `days-remaining`, `timeLeft` identifier-names + amber/red CSS in onboarding nag.
+- PRR-225 — Remove pre-existing streak leak in `src/student/full-version/src/pages/progress/time.vue`.
+
+**P1 tasks**:
+- PRR-226 — Scheduler ActiveExamTargetId + silent exam-week lock + TZ-safe determinism.
+- PRR-227 — `/settings/study-plan` edit UI (archive + add + edit).
+- PRR-228 — Per-target diagnostic blocks (replaces unified diagnostic).
+- PRR-229 — 24-month post-archive retention policy + user-extend opt-in.
+- PRR-230 — Parent visibility default-hidden 13+ (consent surface).
+- PRR-231 — Amend PRR-053 capacity plan (SAT+PET 7-window compound calendar).
+- PRR-232 — Realize PRR-032 (numerals preference task — create the ghost reference).
+- PRR-233 — Prompt cache hit SLO per target + finops observability.
+
+**P2 tasks**:
+- PRR-234 — Close out PRR-148 (mark superseded + delete legacy `StudentPlanConfig` in next cycle).
+- PRR-235 — Ministry reporting export endpoint shape (future-proof; deferred implementation, spec only v1).
+
+**Deferred (v2)**:
+- Classroom-assigned target teacher UI.
+- Within-session interleaving across targets.
+- Retake-cohort surface (Karpicke/Roediger retrieval-strength; cogsci flag).
+- Magen/מגן capture (ministry: out of v1 scope).
+
+### 14.5 Outstanding questions back to decision-holder
+
+From persona findings, items that did NOT converge and still need your call:
+
+1. **Arab-stream (המגזר הערבי) variant question-paper codes** — different numeric codes per stream. V1 covers both or one? *(ministry)*
+2. **PET Russian-verbal variant** — olim population. V1 scope or v2? *(educator)*
+3. **Tenant-admin-forced plans under what lawful basis** — when a school admin assigns targets to a student with parent consent only? *(privacy)*
+4. **Content-engineering budget line owner + approval** for the $10-15k one-shot on SAT+PET item banks *(finops)*.
+5. **Paid-tier pricing floor** given per-student-per-month ceiling of ~$3.30 LLM spend *(finops)*.
+
+These are blocking ADR-0049 draft, not the task files.
