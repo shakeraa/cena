@@ -42,6 +42,7 @@ public sealed record CatalogTarget(
     string? MinistrySubjectCode,
     IReadOnlyList<string> MinistryQuestionPaperCodes,
     string Availability,
+    string? AvailableFrom,
     string ItemBankStatus,
     bool PassbackEligible,
     int DefaultLeadDays,

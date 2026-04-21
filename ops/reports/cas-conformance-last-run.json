@@ -1,6 +1,6 @@
 {
   "SchemaVersion": "1.0",
-  "RunAt": "2026-04-21T18:22:36.321368+00:00",
+  "RunAt": "2026-04-21T18:59:55.29001+00:00",
   "Baseline": "ops/reports/cas-conformance-baseline.md",
   "TotalCases": 26,
   "CorrectCases": 11,
@@ -23,7 +23,7 @@
       "Observed": "Ok",
       "Engine": "MathNet",
       "Status": "Ok",
-      "LatencyMs": 54.724,
+      "LatencyMs": 1718.9115,
       "Matched": true
     },
     {
@@ -36,7 +36,7 @@
       "Observed": "Ok",
       "Engine": "MathNet",
       "Status": "Ok",
-      "LatencyMs": 15.0383,
+      "LatencyMs": 29.7823,
       "Matched": true
     },
     {
@@ -49,7 +49,7 @@
       "Observed": "Ok",
       "Engine": "MathNet",
       "Status": "Ok",
-      "LatencyMs": 2.7513,
+      "LatencyMs": 1.0325,
       "Matched": true
     },
     {
@@ -62,7 +62,7 @@
       "Observed": "Ok",
       "Engine": "MathNet",
       "Status": "Ok",
-      "LatencyMs": 0.1172,
+      "LatencyMs": 0.5088,
       "Matched": true
     },
     {
@@ -76,7 +76,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: 1/(-1 \u002B x) \u002B 1/(1 \u002B x) \u2260 (2*x)/(-1 \u002B x^2)",
-      "LatencyMs": 0.0867,
+      "LatencyMs": 0.126,
       "Matched": false
     },
     {
@@ -90,7 +90,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: sqrt(4) \u2260 2",
-      "LatencyMs": 4.46,
+      "LatencyMs": 1.8297,
       "Matched": false
     },
     {
@@ -104,7 +104,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: 1 \u002B x^2 \u2260 1 \u002B 2*x \u002B x^2",
-      "LatencyMs": 0.0777,
+      "LatencyMs": 0.1145,
       "Matched": true
     },
     {
@@ -116,7 +116,7 @@
       "Observed": "Ok",
       "Engine": "MathNet",
       "Status": "Ok",
-      "LatencyMs": 0.1154,
+      "LatencyMs": 0.3295,
       "Matched": true
     },
     {
@@ -128,7 +128,7 @@
       "Observed": "Ok",
       "Engine": "MathNet",
       "Status": "Ok",
-      "LatencyMs": 0.0115,
+      "LatencyMs": 0.0187,
       "Matched": true
     },
     {
@@ -140,7 +140,7 @@
       "Observed": "Ok",
       "Engine": "MathNet",
       "Status": "Ok",
-      "LatencyMs": 0.0195,
+      "LatencyMs": 0.0398,
       "Matched": true
     },
     {
@@ -153,7 +153,7 @@
       "Engine": "none",
       "Status": "Error",
       "Error": "No CAS engine available for this operation",
-      "LatencyMs": 5.4867,
+      "LatencyMs": 0.241,
       "Matched": false
     },
     {
@@ -166,7 +166,7 @@
       "Engine": "none",
       "Status": "Error",
       "Error": "No CAS engine available for this operation",
-      "LatencyMs": 0.0293,
+      "LatencyMs": 0.0054,
       "Matched": false
     },
     {
@@ -179,7 +179,7 @@
       "Engine": "none",
       "Status": "Error",
       "Error": "No CAS engine available for this operation",
-      "LatencyMs": 0.0076,
+      "LatencyMs": 0.0017,
       "Matched": false
     },
     {
@@ -193,7 +193,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: x^2 \u2260 2*x",
-      "LatencyMs": 0.1187,
+      "LatencyMs": 0.2634,
       "Matched": false
     },
     {
@@ -207,7 +207,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: sin(x) \u2260 cos(x)",
-      "LatencyMs": 4.446,
+      "LatencyMs": 0.7082,
       "Matched": false
     },
     {
@@ -221,7 +221,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: ln(x) \u2260 1/x",
-      "LatencyMs": 0.2185,
+      "LatencyMs": 0.1918,
       "Matched": false
     },
     {
@@ -235,7 +235,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: 2*x \u002B x^3 \u2260 2 \u002B 3*x^2",
-      "LatencyMs": 0.0429,
+      "LatencyMs": 0.0408,
       "Matched": false
     },
     {
@@ -249,7 +249,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: x^2 \u2260 x",
-      "LatencyMs": 0.0105,
+      "LatencyMs": 0.0111,
       "Matched": true
     },
     {
@@ -263,7 +263,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: 2*x \u2260 x^2",
-      "LatencyMs": 0.0129,
+      "LatencyMs": 0.0137,
       "Matched": false
     },
     {
@@ -277,7 +277,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: cos(x) \u2260 sin(x)",
-      "LatencyMs": 0.0114,
+      "LatencyMs": 0.011,
       "Matched": false
     },
     {
@@ -291,7 +291,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: 1/x \u2260 ln(x)",
-      "LatencyMs": 0.0104,
+      "LatencyMs": 0.0187,
       "Matched": false
     },
     {
@@ -305,7 +305,7 @@
       "Engine": "none",
       "Status": "Error",
       "Error": "No CAS engine available for this operation",
-      "LatencyMs": 0.0112,
+      "LatencyMs": 0.0133,
       "Matched": false
     },
     {
@@ -319,7 +319,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: 2*sin(x)*cos(x) \u2260 sin(2*x)",
-      "LatencyMs": 0.0268,
+      "LatencyMs": 0.0255,
       "Matched": false
     },
     {
@@ -333,7 +333,7 @@
       "Engine": "MathNet",
       "Status": "Ok",
       "Error": "Expressions differ: tan(x) \u2260 sin(x)/cos(x)",
-      "LatencyMs": 0.4293,
+      "LatencyMs": 59.3379,
       "Matched": false
     },
     {
@@ -347,7 +347,7 @@
       "Engine": "MathNet",
       "Status": "Error",
       "Error": "Parse error: The given key was not present in the dictionary.",
-      "LatencyMs": 0.0447,
+      "LatencyMs": 0.069,
       "Matched": true
     },
     {
@@ -361,7 +361,7 @@
       "Engine": "MathNet",
       "Status": "Error",
       "Error": "Parse error: Error in Ln: 1 Col: 1\n\u0060\n^\nExpecting: identifier, number, prefix operator, symbol, \u0027(\u0027, \u0027pow\u0027, \u0027sqrt\u0027 or\n\u0027|\u0027\n",
-      "LatencyMs": 0.0591,
+      "LatencyMs": 0.2634,
       "Matched": true
     }
   ]

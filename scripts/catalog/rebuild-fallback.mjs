@@ -47,6 +47,7 @@ function projectTarget(t, locale = 'en') {
     ministry_subject_code: t.ministry_subject_code ?? null,
     ministry_question_paper_codes: t.ministry_question_paper_codes ?? [],
     availability: t.availability,
+    available_from: t.available_from ?? null,
     item_bank_status: t.item_bank_status,
     passback_eligible: !!t.passback_eligible,
     default_lead_days: t.default_lead_days ?? 90,

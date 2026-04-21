@@ -990,6 +990,15 @@
       "languageLabel": "שפה",
       "cta": "התחל ללמוד"
     },
+    "examTargets": {
+      "title": "בחר יעדי בחינה",
+      "subtitle": "בחר עד {max} — תמיד אפשר לשנות.",
+      "loading": "טוען קטלוג…",
+      "fetchFailed": "טעינת הקטלוג נכשלה — נסה שוב.",
+      "groupLabel": "יעדי בחינה",
+      "capReached": "הגעת למכסה של {max} יעדים.",
+      "comingSoon": "מגיע ב-{cohort}"
+    },
     "selfAssessment": {
       "title": "ספר לנו קצת על עצמך",
       "subtitle": "זה עוזר לנו להתאים עצמנו אליך. השדות אופציונליים — אפשר לדלג.",

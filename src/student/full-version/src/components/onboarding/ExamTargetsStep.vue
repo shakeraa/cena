@@ -55,6 +55,7 @@ interface ExamTargetWire {
   ministrySubjectCode?: string | null
   ministryQuestionPaperCodes: string[]
   availability: string
+  availableFrom?: string | null
   itemBankStatus: string
   passbackEligible: boolean
   defaultLeadDays: number
@@ -143,7 +144,15 @@ function isSelected(code: string): boolean {
   return selectedCodes.value.has(code)
 }
 
+function isRoadmap(target: ExamTargetWire): boolean {
+  return target.availability?.toLowerCase() === 'roadmap'
+}
+
 function toggle(target: ExamTargetWire) {
+  // PRR-240: roadmap targets are visible but un-selectable until available_from.
+  if (isRoadmap(target))
+    return
+
   if (isSelected(target.examCode)) {
     onboarding.removeExamTarget(target.examCode)
 
@@ -224,10 +233,12 @@ function handleContinue() {
           :key="target.examCode"
           :variant="isSelected(target.examCode) ? 'flat' : 'outlined'"
           :color="isSelected(target.examCode) ? 'primary' : undefined"
-          :disabled="!isSelected(target.examCode) && atCap"
-          class="pa-3 cursor-pointer"
+          :disabled="(!isSelected(target.examCode) && atCap) || isRoadmap(target)"
+          class="pa-3"
+          :class="{ 'cursor-pointer': !isRoadmap(target) }"
           role="checkbox"
           :aria-checked="isSelected(target.examCode)"
+          :aria-disabled="isRoadmap(target)"
           tabindex="0"
           :data-testid="`exam-target-card-${target.examCode}`"
           @click="toggle(target)"
@@ -253,6 +264,16 @@ function handleContinue() {
                 <span>
                   <bdi dir="ltr">{{ target.examCode }}</bdi>
                 </span>
+                <!-- PRR-240: roadmap badge (e.g. "Coming 2026-Q3"). -->
+                <VChip
+                  v-if="isRoadmap(target)"
+                  size="x-small"
+                  variant="tonal"
+                  color="warning"
+                  :data-testid="`exam-target-roadmap-badge-${target.examCode}`"
+                >
+                  {{ t('onboarding.examTargets.comingSoon', { cohort: target.availableFrom ?? '' }) }}
+                </VChip>
               </div>
             </div>
             <VIcon

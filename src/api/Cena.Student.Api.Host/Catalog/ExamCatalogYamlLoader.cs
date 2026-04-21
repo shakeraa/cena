@@ -150,6 +150,18 @@ internal static class ExamCatalogYamlLoader
                         StringComparer.OrdinalIgnoreCase)))
             .ToArray();
 
+        // PRR-240: `availability: roadmap` entries MUST declare `available_from`
+        // (cohort label, e.g. "2026-Q3"). The arch test
+        // `CatalogRoadmapTargetTest` guards the same invariant on the
+        // deserialised snapshot; enforcing it here ensures the loader fails
+        // loudly rather than letting an empty badge reach the SPA.
+        if (string.Equals(y.Availability, "roadmap", StringComparison.OrdinalIgnoreCase)
+            && string.IsNullOrWhiteSpace(y.AvailableFrom))
+        {
+            throw new ExamCatalogLoadException(
+                $"{y.ExamCode}: availability=roadmap requires available_from (e.g. \"2026-Q3\")");
+        }
+
         return new CatalogTarget(
             ExamCode: y.ExamCode,
             Family: y.Family,
@@ -161,6 +173,7 @@ internal static class ExamCatalogYamlLoader
                 ? null : y.MinistrySubjectCode,
             MinistryQuestionPaperCodes: (y.MinistryQuestionPaperCodes ?? new List<string>()).ToArray(),
             Availability: y.Availability,
+            AvailableFrom: string.IsNullOrWhiteSpace(y.AvailableFrom) ? null : y.AvailableFrom!.Trim(),
             ItemBankStatus: y.ItemBankStatus,
             PassbackEligible: y.PassbackEligible,
             DefaultLeadDays: y.DefaultLeadDays > 0 ? y.DefaultLeadDays : 90,
@@ -194,6 +207,7 @@ internal static class ExamCatalogYamlLoader
         public string? MinistrySubjectCode { get; set; }
         public List<string>? MinistryQuestionPaperCodes { get; set; }
         public string? Availability { get; set; }
+        public string? AvailableFrom { get; set; }
         public string? ItemBankStatus { get; set; }
         public bool PassbackEligible { get; set; }
         public int DefaultLeadDays { get; set; }

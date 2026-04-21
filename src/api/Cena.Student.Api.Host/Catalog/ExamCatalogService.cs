@@ -321,6 +321,7 @@ public sealed class ExamCatalogService : IExamCatalogService
             MinistrySubjectCode: t.MinistrySubjectCode,
             MinistryQuestionPaperCodes: t.MinistryQuestionPaperCodes,
             Availability: t.Availability,
+            AvailableFrom: t.AvailableFrom,
             ItemBankStatus: t.ItemBankStatus,
             PassbackEligible: t.PassbackEligible,
             DefaultLeadDays: t.DefaultLeadDays,

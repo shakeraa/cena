@@ -1019,6 +1019,15 @@
       "languageLabel": "Language",
       "cta": "Start learning"
     },
+    "examTargets": {
+      "title": "Pick your exam targets",
+      "subtitle": "Choose up to {max} — you can change this anytime.",
+      "loading": "Loading catalog…",
+      "fetchFailed": "Couldn't load the catalog — please try again.",
+      "groupLabel": "Exam targets",
+      "capReached": "You've reached the {max}-target cap.",
+      "comingSoon": "Coming {cohort}"
+    },
     "selfAssessment": {
       "title": "Tell us about yourself",
       "subtitle": "This helps us meet you where you are. It's optional — you can skip anything.",

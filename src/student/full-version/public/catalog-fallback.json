@@ -1,5 +1,5 @@
 {
-  "catalog_version": "2026.04.21-01",
+  "catalog_version": "2026.04.21-02",
   "locale": "en",
   "locale_fallback_used": "en",
   "family_order": [
@@ -20,17 +20,88 @@
           "units": 3,
           "regulator": "ministry_of_education",
           "ministry_subject_code": "035",
-          "ministry_question_paper_codes": ["035371", "035372"],
+          "ministry_question_paper_codes": [
+            "035371",
+            "035372"
+          ],
           "availability": "launch",
+          "available_from": null,
           "item_bank_status": "full",
           "passback_eligible": true,
           "default_lead_days": 180,
           "sittings": [
-            {"code": "TASHPA_SUMMER_A", "academic_year": "תשפ\"ו", "season": "summer", "moed": "A", "canonical_date": "2026-06-15"},
-            {"code": "TASHPA_SUMMER_B", "academic_year": "תשפ\"ו", "season": "summer", "moed": "B", "canonical_date": "2026-07-20"},
-            {"code": "TASHPA_WINTER_A", "academic_year": "תשפ\"ו", "season": "winter", "moed": "A", "canonical_date": "2026-01-28"}
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-15"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-20"
+            },
+            {
+              "code": "TASHPA_WINTER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "winter",
+              "moed": "A",
+              "canonical_date": "2026-01-28"
+            }
           ],
-          "display": {"name": "Bagrut Math (3 units)", "short_description": "Israeli Bagrut mathematics, three-unit track."},
+          "display": {
+            "name": "Bagrut Math (3 units)",
+            "short_description": "Israeli Bagrut mathematics, three-unit track."
+          },
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_MATH_3U_ARAB_STREAM",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Arabic",
+          "track": "3U",
+          "units": 3,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "035",
+          "ministry_question_paper_codes": [
+            "035371",
+            "035372"
+          ],
+          "availability": "launch",
+          "available_from": null,
+          "item_bank_status": "full",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-15"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-20"
+            },
+            {
+              "code": "TASHPA_WINTER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "winter",
+              "moed": "A",
+              "canonical_date": "2026-01-28"
+            }
+          ],
+          "display": {
+            "name": "Bagrut Math (3 units, Arab stream)",
+            "short_description": "Israeli Bagrut mathematics, three-unit track, Arabic-instruction."
+          },
           "topics": []
         },
         {
@@ -41,15 +112,88 @@
           "units": 4,
           "regulator": "ministry_of_education",
           "ministry_subject_code": "035",
-          "ministry_question_paper_codes": ["035471", "035472"],
+          "ministry_question_paper_codes": [
+            "035471",
+            "035472"
+          ],
           "availability": "launch",
+          "available_from": null,
           "item_bank_status": "full",
           "passback_eligible": true,
           "default_lead_days": 180,
           "sittings": [
-            {"code": "TASHPA_SUMMER_A", "academic_year": "תשפ\"ו", "season": "summer", "moed": "A", "canonical_date": "2026-06-15"}
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-15"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-20"
+            },
+            {
+              "code": "TASHPA_WINTER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "winter",
+              "moed": "A",
+              "canonical_date": "2026-01-28"
+            }
           ],
-          "display": {"name": "Bagrut Math (4 units)", "short_description": "Israeli Bagrut mathematics, four-unit track."},
+          "display": {
+            "name": "Bagrut Math (4 units)",
+            "short_description": "Israeli Bagrut mathematics, four-unit track."
+          },
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_MATH_4U_ARAB_STREAM",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Arabic",
+          "track": "4U",
+          "units": 4,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "035",
+          "ministry_question_paper_codes": [
+            "035471",
+            "035472"
+          ],
+          "availability": "launch",
+          "available_from": null,
+          "item_bank_status": "full",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-15"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-20"
+            },
+            {
+              "code": "TASHPA_WINTER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "winter",
+              "moed": "A",
+              "canonical_date": "2026-01-28"
+            }
+          ],
+          "display": {
+            "name": "Bagrut Math (4 units, Arab stream)",
+            "short_description": "Israeli Bagrut mathematics, four-unit track, Arabic-instruction."
+          },
           "topics": []
         },
         {
@@ -60,15 +204,43 @@
           "units": 5,
           "regulator": "ministry_of_education",
           "ministry_subject_code": "035",
-          "ministry_question_paper_codes": ["035581", "035582", "035583"],
+          "ministry_question_paper_codes": [
+            "035581",
+            "035582",
+            "035583"
+          ],
           "availability": "launch",
+          "available_from": null,
           "item_bank_status": "full",
           "passback_eligible": true,
           "default_lead_days": 180,
           "sittings": [
-            {"code": "TASHPA_SUMMER_A", "academic_year": "תשפ\"ו", "season": "summer", "moed": "A", "canonical_date": "2026-06-15"}
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-15"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-20"
+            },
+            {
+              "code": "TASHPA_WINTER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "winter",
+              "moed": "A",
+              "canonical_date": "2026-01-28"
+            }
           ],
-          "display": {"name": "Bagrut Math (5 units)", "short_description": "Israeli Bagrut mathematics, five-unit track (highest)."},
+          "display": {
+            "name": "Bagrut Math (5 units)",
+            "short_description": "Israeli Bagrut mathematics, five-unit track (highest)."
+          },
           "topics": []
         },
         {
@@ -79,13 +251,265 @@
           "units": 5,
           "regulator": "ministry_of_education",
           "ministry_subject_code": "035",
-          "ministry_question_paper_codes": ["035581", "035582", "035583"],
+          "ministry_question_paper_codes": [
+            "035581",
+            "035582",
+            "035583"
+          ],
           "availability": "launch",
+          "available_from": null,
           "item_bank_status": "full",
           "passback_eligible": true,
           "default_lead_days": 180,
-          "sittings": [],
-          "display": {"name": "Bagrut Math (5 units, Arab stream)", "short_description": "Israeli Bagrut mathematics, five-unit track, Arabic-instruction."},
+          "sittings": [
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-15"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-20"
+            }
+          ],
+          "display": {
+            "name": "Bagrut Math (5 units, Arab stream)",
+            "short_description": "Israeli Bagrut mathematics, five-unit track, Arabic-instruction."
+          },
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_CIVICS_1U",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Hebrew",
+          "track": "1U",
+          "units": 1,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "034",
+          "ministry_question_paper_codes": [
+            "034181"
+          ],
+          "availability": "launch",
+          "available_from": null,
+          "item_bank_status": "full",
+          "passback_eligible": true,
+          "default_lead_days": 120,
+          "sittings": [
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-14"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-19"
+            }
+          ],
+          "display": {
+            "name": "Bagrut Civics (1 unit)",
+            "short_description": "Israeli Bagrut civics, one-unit compulsory baseline."
+          },
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_HISTORY_2U",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Hebrew",
+          "track": "2U",
+          "units": 2,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "022",
+          "ministry_question_paper_codes": [
+            "022281",
+            "022282"
+          ],
+          "availability": "launch",
+          "available_from": null,
+          "item_bank_status": "full",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-10"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-15"
+            }
+          ],
+          "display": {
+            "name": "Bagrut History (2 units)",
+            "short_description": "Israeli Bagrut general history, two-unit track."
+          },
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_TANAKH_2U",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Hebrew",
+          "track": "2U",
+          "units": 2,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "001",
+          "ministry_question_paper_codes": [
+            "001281",
+            "001282"
+          ],
+          "availability": "queued",
+          "available_from": null,
+          "item_bank_status": "reference-only",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-11"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-16"
+            }
+          ],
+          "display": {
+            "name": "Bagrut Tanakh (2 units)",
+            "short_description": "Israeli Bagrut Hebrew Bible, two-unit track."
+          },
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_HEBREW_LITERATURE_2U",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Hebrew",
+          "track": "2U",
+          "units": 2,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "008",
+          "ministry_question_paper_codes": [
+            "008281",
+            "008282"
+          ],
+          "availability": "queued",
+          "available_from": null,
+          "item_bank_status": "reference-only",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-12"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-17"
+            }
+          ],
+          "display": {
+            "name": "Bagrut Hebrew Literature (2 units)",
+            "short_description": "Israeli Bagrut Hebrew literature, two-unit track."
+          },
+          "topics": []
+        },
+        {
+          "exam_code": "BAGRUT_ARABIC_LANGUAGE_5U",
+          "family": "BAGRUT",
+          "region": "IL-Bagrut-Hebrew",
+          "track": "5U",
+          "units": 5,
+          "regulator": "ministry_of_education",
+          "ministry_subject_code": "016",
+          "ministry_question_paper_codes": [
+            "016581",
+            "016582",
+            "016583"
+          ],
+          "availability": "queued",
+          "available_from": null,
+          "item_bank_status": "reference-only",
+          "passback_eligible": true,
+          "default_lead_days": 180,
+          "sittings": [
+            {
+              "code": "TASHPA_SUMMER_A",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-18"
+            },
+            {
+              "code": "TASHPA_SUMMER_B",
+              "academic_year": "תשפ\"ו",
+              "season": "summer",
+              "moed": "B",
+              "canonical_date": "2026-07-22"
+            }
+          ],
+          "display": {
+            "name": "Bagrut Arabic (5 units, L2)",
+            "short_description": "Israeli Bagrut Arabic as a second language, five-unit track."
+          },
+          "topics": []
+        }
+      ]
+    },
+    {
+      "family": "TAWJIHI",
+      "targets": [
+        {
+          "exam_code": "TAWJIHI_MATH_SCIENTIFIC",
+          "family": "TAWJIHI",
+          "region": "IL-Tawjihi",
+          "track": "scientific",
+          "units": null,
+          "regulator": "other",
+          "ministry_subject_code": null,
+          "ministry_question_paper_codes": [],
+          "availability": "queued",
+          "available_from": null,
+          "item_bank_status": "unavailable",
+          "passback_eligible": false,
+          "default_lead_days": 120,
+          "sittings": [
+            {
+              "code": "TAWJIHI_2026_SUMMER",
+              "academic_year": "2025-2026",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-06-20"
+            }
+          ],
+          "display": {
+            "name": "Tawjihi Math (Scientific)",
+            "short_description": "Tawjihi mathematics, scientific stream."
+          },
           "topics": []
         }
       ]
@@ -103,11 +527,30 @@
           "ministry_subject_code": null,
           "ministry_question_paper_codes": [],
           "availability": "launch",
+          "available_from": null,
           "item_bank_status": "full",
           "passback_eligible": false,
           "default_lead_days": 90,
-          "sittings": [],
-          "display": {"name": "PET Quantitative", "short_description": "Psychometric Entrance Test (NITE), quantitative section."},
+          "sittings": [
+            {
+              "code": "PET_2026_SPRING",
+              "academic_year": "2026",
+              "season": "spring",
+              "moed": "A",
+              "canonical_date": "2026-04-10"
+            },
+            {
+              "code": "PET_2026_SUMMER",
+              "academic_year": "2026",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-07-05"
+            }
+          ],
+          "display": {
+            "name": "PET Quantitative",
+            "short_description": "Psychometric Entrance Test (NITE), quantitative section."
+          },
           "topics": []
         },
         {
@@ -120,11 +563,30 @@
           "ministry_subject_code": null,
           "ministry_question_paper_codes": [],
           "availability": "roadmap",
+          "available_from": "2026-Q3",
           "item_bank_status": "reference-only",
           "passback_eligible": false,
           "default_lead_days": 90,
-          "sittings": [],
-          "display": {"name": "PET Verbal (Russian)", "short_description": "Psychometric Entrance Test (NITE), verbal section - Russian."},
+          "sittings": [
+            {
+              "code": "PET_2026_SPRING",
+              "academic_year": "2026",
+              "season": "spring",
+              "moed": "A",
+              "canonical_date": "2026-04-10"
+            },
+            {
+              "code": "PET_2026_SUMMER",
+              "academic_year": "2026",
+              "season": "summer",
+              "moed": "A",
+              "canonical_date": "2026-07-05"
+            }
+          ],
+          "display": {
+            "name": "PET Verbal (Russian)",
+            "short_description": "Psychometric Entrance Test (NITE), verbal section — Russian."
+          },
           "topics": []
         },
         {
@@ -137,11 +599,30 @@
           "ministry_subject_code": null,
           "ministry_question_paper_codes": [],
           "availability": "roadmap",
+          "available_from": "2026-Q4",
           "item_bank_status": "reference-only",
           "passback_eligible": false,
           "default_lead_days": 90,
-          "sittings": [],
-          "display": {"name": "SAT Math", "short_description": "College Board SAT mathematics section."},
+          "sittings": [
+            {
+              "code": "SAT_2026_MARCH",
+              "academic_year": "2026",
+              "season": "spring",
+              "moed": "A",
+              "canonical_date": "2026-03-08"
+            },
+            {
+              "code": "SAT_2026_MAY",
+              "academic_year": "2026",
+              "season": "spring",
+              "moed": "B",
+              "canonical_date": "2026-05-03"
+            }
+          ],
+          "display": {
+            "name": "SAT Math",
+            "short_description": "College Board SAT mathematics section."
+          },
           "topics": []
         }
       ]
@@ -159,11 +640,30 @@
           "ministry_subject_code": null,
           "ministry_question_paper_codes": [],
           "availability": "queued",
+          "available_from": null,
           "item_bank_status": "unavailable",
           "passback_eligible": false,
           "default_lead_days": 180,
-          "sittings": [],
-          "display": {"name": "IB Math HL — Analysis & Approaches", "short_description": "International Baccalaureate mathematics, Higher Level, AA."},
+          "sittings": [
+            {
+              "code": "IB_2026_MAY",
+              "academic_year": "2026",
+              "season": "spring",
+              "moed": "A",
+              "canonical_date": "2026-05-04"
+            },
+            {
+              "code": "IB_2026_NOV",
+              "academic_year": "2026",
+              "season": "autumn",
+              "moed": "A",
+              "canonical_date": "2026-11-02"
+            }
+          ],
+          "display": {
+            "name": "IB Math HL — Analysis & Approaches",
+            "short_description": "International Baccalaureate mathematics, Higher Level, AA."
+          },
           "topics": []
         }
       ]
