@@ -101,6 +101,11 @@ public sealed class CostMetricEmittedTest
             // class attribute).
             if (rel.EndsWith($"{sep}TaskRoutingAttribute.cs")) continue;
             if (rel.EndsWith($"{sep}FeatureTagAttribute.cs")) continue;
+            // prr-143: new attribute + propagator declarations reference
+            // [TaskRouting] in XML-doc examples; they do not themselves
+            // consume an LLM client.
+            if (rel.EndsWith($"{sep}DelegatesTraceIdToAttribute.cs")) continue;
+            if (rel.EndsWith($"{sep}LlmTraceContext.cs")) continue;
             yield return f;
         }
     }

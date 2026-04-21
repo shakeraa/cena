@@ -43,6 +43,7 @@ public interface IContentSegmenter
 [FeatureTag("content-segmentation")]
 [AllowsUncachedLlm("Unique per OCR'd page; upstream ingest pipeline dedupes on content hash so the same page is never segmented twice.")]
 [PiiPreScrubbed("Prompt composed exclusively from OCR'd textbook page content (admin ingest pipeline); upstream provenance gate rejects student-sourced input. No student PII or free-text reaches this seam.")]
+[DelegatesTraceIdTo("ILlmClient")]
 public sealed class ContentSegmenter : IContentSegmenter
 {
     private readonly ILlmClient _llm;

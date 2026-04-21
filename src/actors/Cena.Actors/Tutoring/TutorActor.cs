@@ -127,6 +127,7 @@ public sealed record TutoringRejected(string Methodology, string Reason);
 [TaskRouting("tier3", "socratic_question")]
 [FeatureTag("socratic")]
 [AllowsUncachedLlm("Multi-turn dialogue: each turn uniquely conditioned on conversation history and student message. System-prompt cache handled by CacheSystemPrompt flag on LlmRequest.")]
+[DelegatesTraceIdTo("ILlmClient")]
 public sealed class TutorActor : IActor
 {
     private const int MaxTurns = 10;

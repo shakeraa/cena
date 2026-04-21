@@ -53,6 +53,7 @@ public interface IL3ExplanationGenerator
 [TaskRouting("tier3", "full_explanation")]
 [FeatureTag("explanation-l3")]
 [AllowsUncachedLlm("L3 fires only on L2 cache miss; caller (ExplanationOrchestrator) owns the cache read/write cycle. System prompt itself is cached via Anthropic cache_control.")]
+[DelegatesTraceIdTo("ILlmClient")]
 public sealed class L3ExplanationGenerator : IL3ExplanationGenerator
 {
     private const string FeatureLabel = "explanation-l3";

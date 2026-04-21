@@ -131,6 +131,7 @@ public interface ITutorMessageService
 [FeatureTag("socratic")]
 [DelegatesLlmCost("ClaudeTutorLlmService")]
 [PiiPreScrubbed("TutorPromptScrubber (FIND-privacy-008) runs on every student turn in this service's BuildPromptAsync with the per-student StudentPiiContext. That per-context scrubber is stricter than the ADR-0047 baseline.")]
+[DelegatesTraceIdTo("ClaudeTutorLlmService")]
 public sealed class TutorMessageService : ITutorMessageService
 {
     private readonly ITutorMessageRepository _repository;

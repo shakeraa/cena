@@ -55,6 +55,11 @@ public sealed class QualityGateService : IQualityGateService
     // registers ILlmCostMetric via AddLlmCostMetric() in the host Program.cs.
     private readonly ILlmCostMetric? _featureCost;
 
+    // prr-143: optional activity propagator — production DI provides one so
+    // every LLM call carries a stitchable trace_id. Tests that construct
+    // without DI get the no-stamp default.
+    private readonly IActivityPropagator? _activityPropagator;
+
     // Lazily created Anthropic client for LLM-based scoring
     private AnthropicClient? _client;
     private string? _lastApiKey;
@@ -70,13 +75,15 @@ public sealed class QualityGateService : IQualityGateService
         IConfiguration? configuration = null,
         ILogger<QualityGateService>? logger = null,
         IDocumentStore? store = null,
-        ILlmCostMetric? featureCost = null)
+        ILlmCostMetric? featureCost = null,
+        IActivityPropagator? activityPropagator = null)
     {
         _thresholds = thresholds ?? QualityGateThresholds.Default;
         _configuration = configuration;
         _logger = logger;
         _store = store;
         _featureCost = featureCost;
+        _activityPropagator = activityPropagator;
     }
 
     public async Task<QualityGateResult> EvaluateAsync(QualityGateInput input)
@@ -214,6 +221,17 @@ public sealed class QualityGateService : IQualityGateService
                 InputSchema = scoreSchema
             };
 
+            // prr-143: trace-id stamped on every LLM attempt so the quality-
+            // gate call stitches onto the question-authoring trace in the
+            // observability backend. Structured log emission is the signal
+            // the exporter scrapes.
+            var traceId = _activityPropagator?.GetTraceId();
+            using var activity = _activityPropagator?.StartLlmActivity("quality_gate");
+            activity?.SetTag("trace_id", traceId);
+            activity?.SetTag("task", "quality_gate");
+            activity?.SetTag("tier", "tier2");
+            activity?.SetTag("question_id", input.QuestionId);
+
             var response = await client.Messages.Create(new MessageCreateParams
             {
                 Model = "claude-haiku-4-5-20260101",  // Haiku: cheaper model for assessment tasks (routing-config section 2)
@@ -246,6 +264,11 @@ public sealed class QualityGateService : IQualityGateService
                 modelId: "claude-haiku-4-5-20260101",
                 inputTokens: response.Usage?.InputTokens ?? 0,
                 outputTokens: response.Usage?.OutputTokens ?? 0);
+
+            activity?.SetTag("outcome", "success");
+            _logger?.LogInformation(
+                "QualityGate LLM OK (trace_id={TraceId} question={QuestionId})",
+                traceId, input.QuestionId);
 
             foreach (var block in response.Content)
             {

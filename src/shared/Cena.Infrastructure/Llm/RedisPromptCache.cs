@@ -36,6 +36,7 @@ namespace Cena.Infrastructure.Llm;
 // value is the LLM response, not the input.
 [TaskRouting("tier3", "prompt_cache")]
 [DelegatesLlmCost("calling service emits cost on cache-miss LLM path")]
+[DelegatesTraceIdTo("calling service stamps trace_id on cache-miss LLM path")]
 [PiiPreScrubbed("Cache layer — scrubbing is the [TaskRouting] caller's responsibility. Cache key is a SHA256 digest, not the raw prompt; cached value is the LLM response, not the input. See ADR-0047 §Decision 3.")]
 public sealed class RedisPromptCache : IPromptCache
 {

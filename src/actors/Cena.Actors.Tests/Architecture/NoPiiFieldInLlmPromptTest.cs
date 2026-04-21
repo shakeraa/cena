@@ -147,6 +147,10 @@ public sealed class NoPiiFieldInLlmPromptTest
             if (rel.EndsWith($"{sep}PiiPreScrubbedAttribute.cs")) continue;
             if (rel.EndsWith($"{sep}PiiPromptScrubber.cs")) continue;
             if (rel.EndsWith($"{sep}PiiPromptScrubberRegistration.cs")) continue;
+            // prr-143: new attribute + propagator declarations reference
+            // [TaskRouting] in XML-doc examples only.
+            if (rel.EndsWith($"{sep}DelegatesTraceIdToAttribute.cs")) continue;
+            if (rel.EndsWith($"{sep}LlmTraceContext.cs")) continue;
             yield return f;
         }
     }

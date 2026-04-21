@@ -28,9 +28,10 @@ public class L3WorkedExampleHintGeneratorTests
     private readonly ISocraticCallBudget _budget = Substitute.For<ISocraticCallBudget>();
     private readonly IPiiPromptScrubber _scrubber = Substitute.For<IPiiPromptScrubber>();
     private readonly ILlmCostMetric _cost = Substitute.For<ILlmCostMetric>();
+    private readonly IActivityPropagator _activityPropagator = Substitute.For<IActivityPropagator>();
 
     private L3WorkedExampleHintGenerator CreateSut() => new(
-        _llm, _budget, _scrubber, _cost,
+        _llm, _budget, _scrubber, _cost, _activityPropagator,
         NullLogger<L3WorkedExampleHintGenerator>.Instance);
 
     private static HintLadderInput SampleInput() => new(

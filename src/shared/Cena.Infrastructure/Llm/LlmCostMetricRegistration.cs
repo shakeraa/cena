@@ -71,4 +71,17 @@ public static class LlmCostMetricRegistration
         services.TryAddSingleton<ILlmCostMetric, LlmCostMetric>();
         return services;
     }
+
+    /// <summary>
+    /// Registers the prr-143 activity propagator. Every [TaskRouting] class
+    /// consumes <see cref="IActivityPropagator"/> so the per-call trace id is
+    /// stitched into both cost metrics and spans. Idempotent — safe to call
+    /// from multiple composition roots.
+    /// </summary>
+    public static IServiceCollection AddLlmActivityPropagator(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.TryAddSingleton<IActivityPropagator, ActivityPropagator>();
+        return services;
+    }
 }

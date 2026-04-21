@@ -80,6 +80,7 @@ public sealed class L3WorkedExampleHintGenerator : IL3WorkedExampleHintGenerator
     private readonly ISocraticCallBudget _socraticBudget;
     private readonly IPiiPromptScrubber _piiScrubber;
     private readonly ILlmCostMetric _costMetric;
+    private readonly IActivityPropagator _activityPropagator;
     private readonly ILogger<L3WorkedExampleHintGenerator> _logger;
 
     public L3WorkedExampleHintGenerator(
@@ -87,12 +88,14 @@ public sealed class L3WorkedExampleHintGenerator : IL3WorkedExampleHintGenerator
         ISocraticCallBudget socraticBudget,
         IPiiPromptScrubber piiScrubber,
         ILlmCostMetric costMetric,
+        IActivityPropagator activityPropagator,
         ILogger<L3WorkedExampleHintGenerator> logger)
     {
         _llm = llm;
         _socraticBudget = socraticBudget;
         _piiScrubber = piiScrubber;
         _costMetric = costMetric;
+        _activityPropagator = activityPropagator;
         _logger = logger;
     }
 
@@ -139,6 +142,14 @@ public sealed class L3WorkedExampleHintGenerator : IL3WorkedExampleHintGenerator
             ModelId: "sonnet",
             CacheSystemPrompt: true);
 
+        // prr-143: stamp trace_id on every L3 attempt.
+        var traceId = _activityPropagator.GetTraceId();
+        using var activity = _activityPropagator.StartLlmActivity("worked_example_l3_hint");
+        activity?.SetTag("trace_id", traceId);
+        activity?.SetTag("task", "worked_example_l3_hint");
+        activity?.SetTag("tier", "tier3");
+        activity?.SetTag("question_id", input.QuestionId);
+
         try
         {
             var response = await _llm.CompleteAsync(llmRequest, ct);
@@ -146,8 +157,8 @@ public sealed class L3WorkedExampleHintGenerator : IL3WorkedExampleHintGenerator
             if (string.IsNullOrWhiteSpace(response.Content))
             {
                 _logger.LogWarning(
-                    "L3 hint generator returned empty content for question {QuestionId}",
-                    input.QuestionId);
+                    "L3 hint generator returned empty content (trace_id={TraceId} question={QuestionId})",
+                    traceId, input.QuestionId);
                 return null;
             }
 
@@ -167,6 +178,11 @@ public sealed class L3WorkedExampleHintGenerator : IL3WorkedExampleHintGenerator
                 outputTokens: response.OutputTokens,
                 instituteId: input.InstituteId);
 
+            activity?.SetTag("outcome", "success");
+            _logger.LogInformation(
+                "L3 hint OK (trace_id={TraceId} question={QuestionId} input={Input} output={Output})",
+                traceId, input.QuestionId, response.InputTokens, response.OutputTokens);
+
             return new L3HintPayload(response.Content.Trim());
         }
         catch (OperationCanceledException)
@@ -175,10 +191,11 @@ public sealed class L3WorkedExampleHintGenerator : IL3WorkedExampleHintGenerator
         }
         catch (Exception ex)
         {
+            activity?.SetTag("outcome", "error");
             _logger.LogWarning(ex,
-                "L3 hint generator failed for question {QuestionId}; "
+                "L3 hint generator failed (trace_id={TraceId} question={QuestionId}); "
                 + "orchestrator will fall back to the static ladder.",
-                input.QuestionId);
+                traceId, input.QuestionId);
             return null;
         }
     }

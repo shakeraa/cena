@@ -54,6 +54,7 @@ public interface IAiFigureGenerator
 [TaskRouting("tier3", "diagram_generation")]
 [FeatureTag("figure-generation")]
 [DelegatesLlmCost("AiGenerationService (when wired); currently scaffolded")]
+[DelegatesTraceIdTo("AiGenerationService")]
 [PiiPreScrubbed("Admin tool — prompt composed from already-authored question text at figure-generation time. No student profile fields or student free-text enter this seam.")]
 public sealed class AiFigureGenerator : IAiFigureGenerator
 {
