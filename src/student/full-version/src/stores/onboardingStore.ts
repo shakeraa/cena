@@ -9,11 +9,14 @@ import { inferLocale } from '@/composables/useLocaleInference'
  * to localStorage so a mid-wizard refresh resumes at the current step.
  *
  * STU-W-04C-B extends this with Subjects, Goals, Diagnostic steps.
+ * PRR-032 adds `numeralsPreference` (western vs eastern Arabic digits).
  */
 
 export type StudentRole = 'student' | 'self-learner' | 'test-prep' | 'homeschool'
 export type SupportedLocale = 'en' | 'ar' | 'he'
 export type WizardStep = 'welcome' | 'role' | 'language' | 'diagnostic' | 'self-assessment' | 'confirm'
+/** PRR-032: which numeral system to render in math output for the student. */
+export type NumeralsPreference = 'western' | 'eastern'
 
 export interface DiagnosticResponseItem {
   questionId: string
@@ -40,6 +43,12 @@ export interface OnboardingState {
   step: WizardStep
   role: StudentRole | null
   locale: SupportedLocale
+  /**
+   * PRR-032: Numerals preference. Null = "follow locale default"
+   * (inferred on read via inferNumeralsPreference); a non-null value is a
+   * user override. Persisted so it survives refresh.
+   */
+  numeralsPreference: NumeralsPreference | null
   dailyTimeGoalMinutes: number
   subjects: string[]
   diagnosticResponses: DiagnosticResponseItem[]
@@ -94,6 +103,21 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     ? (sanitizeLocale(persisted.locale as string) as SupportedLocale)
     : inferLocale({ availableCodes: availableCodesForInference })
   const locale = ref<SupportedLocale>(initialLocale)
+
+  // PRR-032: numerals preference. Default is null → "auto" (resolves to
+  // eastern for ar, western otherwise). A student can flip it in settings.
+  const persistedNumerals = (persisted as any)?.numeralsPreference
+  const numeralsPreference = ref<NumeralsPreference | null>(
+    persistedNumerals === 'eastern' || persistedNumerals === 'western'
+      ? persistedNumerals
+      : null,
+  )
+
+  /** Resolved preference: null → auto-infer from locale. */
+  const effectiveNumerals = computed<NumeralsPreference>(() => {
+    if (numeralsPreference.value) return numeralsPreference.value
+    return locale.value === 'ar' ? 'eastern' : 'western'
+  })
 
   const dailyTimeGoalMinutes = ref<number>(persisted?.dailyTimeGoalMinutes ?? DEFAULT_DAILY_GOAL)
   const subjects = ref<string[]>(persisted?.subjects ?? [])
@@ -155,6 +179,14 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     locale.value = sanitizeLocale(next) as SupportedLocale
   }
 
+  /**
+   * PRR-032: explicit override of numerals preference. Pass `null` to
+   * revert to locale-default.
+   */
+  function setNumeralsPreference(next: NumeralsPreference | null) {
+    numeralsPreference.value = next
+  }
+
   function setDiagnosticResults(items: DiagnosticResponseItem[]) {
     diagnosticResponses.value = items
     diagnosticSkipped.value = false
@@ -185,6 +217,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     step.value = 'welcome'
     role.value = null
     locale.value = 'en'
+    numeralsPreference.value = null
     dailyTimeGoalMinutes.value = DEFAULT_DAILY_GOAL
     subjects.value = []
     diagnosticResponses.value = []
@@ -208,12 +241,13 @@ export const useOnboardingStore = defineStore('onboarding', () => {
   }
 
   watch(
-    [step, role, locale, dailyTimeGoalMinutes, subjects, diagnosticResponses, diagnosticSkipped, selfAssessment, completedAt],
+    [step, role, locale, numeralsPreference, dailyTimeGoalMinutes, subjects, diagnosticResponses, diagnosticSkipped, selfAssessment, completedAt],
     () => {
       writePersisted({
         step: step.value,
         role: role.value,
         locale: locale.value,
+        numeralsPreference: numeralsPreference.value,
         dailyTimeGoalMinutes: dailyTimeGoalMinutes.value,
         subjects: subjects.value,
         diagnosticResponses: diagnosticResponses.value,
@@ -229,6 +263,8 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     step,
     role,
     locale,
+    numeralsPreference,
+    effectiveNumerals,
     dailyTimeGoalMinutes,
     subjects,
     diagnosticResponses,
@@ -243,6 +279,7 @@ export const useOnboardingStore = defineStore('onboarding', () => {
     back,
     setRole,
     setLocale,
+    setNumeralsPreference,
     setDiagnosticResults,
     skipDiagnostic,
     setSelfAssessment,
