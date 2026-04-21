@@ -22,9 +22,9 @@
 //
 // RELATED:
 //   - ADR-0003: misconception / affective signal session-scoping.
-//   - ADR-0052 (prr-023): this lives under the collaboration-saga pattern
-//     as a fan-in aggregate. A later task migrates the persistence to the
-//     full saga actor; this service is the simpler Marten-backed slice
+//   - ADR-0052 (prr-023): this is a fan-in aggregate under the
+//     collaboration-saga pattern. A later task migrates the persistence to
+//     the full saga actor; this service is the simpler Marten-backed slice
 //     that ships for MVP.
 // =============================================================================
 

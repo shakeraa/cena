@@ -48,11 +48,16 @@ public sealed class PeerConfusedSignalServiceTests
             .Returns(call => Task.FromResult<PeerConfusedSignalAggregate?>(
                 _docs.TryGetValue((string)call.Args()[0], out var d) ? d : null));
 
-        _writeSession.When(s => s.Store(Arg.Any<PeerConfusedSignalAggregate>()))
+        // Marten's IDocumentSession.Store<T>(params T[] entities) — so
+        // the captured argument is a PeerConfusedSignalAggregate[].
+        _writeSession.When(s => s.Store(Arg.Any<PeerConfusedSignalAggregate[]>()))
             .Do(call =>
             {
-                var doc = call.Arg<PeerConfusedSignalAggregate>();
-                _docs[doc.Id] = doc;
+                var docs = (PeerConfusedSignalAggregate[])call.Args()[0];
+                foreach (var d in docs)
+                {
+                    _docs[d.Id] = d;
+                }
             });
 
         _writeSession.SaveChangesAsync(Arg.Any<CancellationToken>())

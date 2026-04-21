@@ -181,11 +181,14 @@ public sealed class CulturalContextReviewBoardServiceTests
     [Fact]
     public async Task EnqueueAsync_SurvivesNatsPublishFailure_BecauseMartenIsSourceOfTruth()
     {
-        _nats.PublishAsync(
+        // INatsConnection.PublishAsync returns ValueTask — NSubstitute's
+        // .ThrowsAsync extension only targets Task, so we wire the throw
+        // via When(..).Do(..) for a ValueTask-returning method.
+        _nats.When(n => n.PublishAsync(
                 Arg.Any<string>(),
                 Arg.Any<byte[]>(),
-                cancellationToken: Arg.Any<CancellationToken>())
-            .ThrowsAsync(new InvalidOperationException("nats down"));
+                cancellationToken: Arg.Any<CancellationToken>()))
+            .Do(_ => throw new InvalidOperationException("nats down"));
 
         var sut = CreateSut();
         var req = new CulturalContextEnqueueRequest(
