@@ -363,7 +363,7 @@ onBeforeUnmount(() => {
       location="top"
       timeout="5000"
     >
-      {{ $t('session.flow.difficultyAdjustment', "Let's try something easier to rebuild momentum.") }}
+      {{ $t('session.flow.difficultyAdjustment', "Here's a familiar pattern — a good warm-up for the next step.") }}
       <template #actions>
         <VBtn variant="text" @click="dismissDifficultyAdjustment">
           {{ $t('common.ok', 'OK') }}

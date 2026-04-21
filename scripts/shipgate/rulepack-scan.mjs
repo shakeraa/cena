@@ -1,32 +1,13 @@
 #!/usr/bin/env node
 // =============================================================================
-// Ship-gate rule-pack scanner (EPIC-PRR-D D1+D2)
-//
+// Ship-gate rule-pack scanner (EPIC-PRR-D D1+D2 + 2nd-wave + P2 tail)
 // Reads YAML rule packs from scripts/shipgate/*.yml, scans doc + locale + UI
-// source paths for matches, and reports violations. Complements the baked-in
-// rules in scan.mjs by externalising two larger rule packs (banned-citations,
-// banned-mechanics) so they can evolve via YAML edits without touching the
-// JS scanner.
-//
-// The YAML parser is intentionally minimal — the rule packs use a
-// deliberately constrained subset (top-level `rules:` or `whitelist:` list,
-// scalar values, double-quoted strings, two-space indent). Do not stretch
-// the parser to handle arbitrary YAML; if you need more, add js-yaml.
-//
-// Exit codes:
-//   0 — clean
-//   1 — one or more violations found
-//   2 — a rule-pack file failed to load
-//
-// Flags:
-//   --pack=<name>         Only run one pack (citations | mechanics)
-//   --fixture-mode        Scan ONLY the fixture files; used in CI tests.
-//   --json                Machine-readable output
-//   --quiet               Suppress header banners
-//
-// Usage:
-//   node scripts/shipgate/rulepack-scan.mjs
-//   node scripts/shipgate/rulepack-scan.mjs --pack=citations --fixture-mode
+// source paths for matches, reports violations.
+// YAML parser is intentionally minimal — constrained subset only. For more
+// shapes, add js-yaml rather than stretching this loader.
+// Exit codes: 0 clean | 1 violations | 2 rule-pack load error
+// Flags: --pack=<name> | --fixture-mode | --json | --quiet | --advisory | --strict
+// Usage: node scripts/shipgate/rulepack-scan.mjs [--pack=citations] [--fixture-mode]
 // =============================================================================
 
 import { readFileSync, existsSync, statSync } from "fs";
@@ -283,6 +264,8 @@ const FIXTURE_FILES = {
   "error-blame": "shipgate/fixtures/error-message-blame-sample.md",
   "cheating-alert": "shipgate/fixtures/cheating-alert-framing-sample.md",
   "reward-emoji": "shipgate/fixtures/reward-inflation-emoji-sample.md",
+  // EPIC-PRR-D P2 tail (prr-163/166/167/168/170/171/172/177/178 — 2026-04-21).
+  "positive-framing-extended": "shipgate/fixtures/positive-framing-extended-sample.md",
 };
 
 function collectFiles() {
@@ -349,6 +332,12 @@ const PACKS = [
     name: "reward-emoji",
     rulesFile: "scripts/shipgate/reward-inflation-emoji.yml",
     whitelistFile: "scripts/shipgate/reward-inflation-emoji-whitelist.yml",
+  },
+  // EPIC-PRR-D P2 tail bundle (prr-163/166/167/168/170/171/172/177/178 — 2026-04-21).
+  {
+    name: "positive-framing-extended",
+    rulesFile: "scripts/shipgate/positive-framing-extended.yml",
+    whitelistFile: "scripts/shipgate/positive-framing-extended-whitelist.yml",
   },
 ];
 
