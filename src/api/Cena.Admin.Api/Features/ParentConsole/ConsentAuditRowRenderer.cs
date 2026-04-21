@@ -72,8 +72,32 @@ internal static class ConsentAuditRowRenderer
             ConsentReviewedByParent_V1 rv => await RenderParentReviewAsync(rv, studentAnonId, pii, ct).ConfigureAwait(false),
             StudentVisibilityVetoed_V1 v => await RenderVetoAsync(v, studentAnonId, pii, ct).ConfigureAwait(false),
             StudentVisibilityRestored_V1 rs => await RenderRestoreAsync(rs, studentAnonId, pii, ct).ConfigureAwait(false),
+            AdminConsentOverridden_V1 ao => await RenderAdminOverrideAsync(ao, studentAnonId, pii, ct).ConfigureAwait(false),
             _ => null,
         };
+    }
+
+    private static async ValueTask<ConsentAuditRowDto> RenderAdminOverrideAsync(
+        AdminConsentOverridden_V1 e, string studentAnonId, EncryptedFieldAccessor pii, CancellationToken ct)
+    {
+        // prr-096: admin emergency override. Render the justification into
+        // Reason (free-form but short); Operation (grant/revoke) goes in
+        // the Scope column so CSV parsers keep a flat one-row shape.
+        var actor = await DecryptAsync(e.AdminActorIdEncrypted, studentAnonId, pii, ct)
+            .ConfigureAwait(false);
+        return new ConsentAuditRowDto(
+            EventType: nameof(AdminConsentOverridden_V1),
+            Timestamp: FormatIso(e.OverrideAt),
+            Purpose: e.Purpose.ToString(),
+            ActorRole: ActorRole.Admin.ToString(),
+            ActorAnonId: actor,
+            PolicyVersionAccepted: string.Empty,
+            Source: SourceAdminOverride,
+            Reason: e.Justification ?? string.Empty,
+            Scope: e.Operation ?? string.Empty,
+            InstituteId: e.InstituteId ?? string.Empty,
+            TraceId: string.Empty,
+            ExpiresAt: string.Empty);
     }
 
     // ── Per-event renderers ─────────────────────────────────────────────

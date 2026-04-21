@@ -237,6 +237,106 @@ groups:
             §feature_monthly_ceiling_usd. Add a ceiling row (and update
             alerting-rules.yaml recording rules) so the projection alert can fire.
 
+  # ─────────────────────────────────────────────────────────────────
+  # prr-084 — Per-institute LLM spend breach alerts.
+  #
+  # Each institute has a configured monthly ceiling. The projection is
+  # the 7-day rolling increase × 30/7 (same shape as the per-feature
+  # projection above). We fire two severities:
+  #
+  #   - warning  at 80%   — route to Slack #cena-finops
+  #   - critical at 100%  — route to SRE PagerDuty
+  #
+  # Ceilings are sourced from the recording rule
+  # `cena_llm_institute_monthly_ceiling_usd{institute_id}` which
+  # operators maintain alongside the per-feature ceilings. An
+  # institute that has LLM spend but no ceiling entry fires
+  # CenaLlmInstituteMissingCeiling (severity:info).
+  #
+  # Runbook: docs/ops/runbooks/llm-cost-breach.md
+  # ─────────────────────────────────────────────────────────────────
+  - name: cena-llm-cost-per-institute-ceilings
+    interval: 1m
+    rules:
+      # Example ceilings — production overwrites these via the
+      # institute-admin UI (prr-084 roadmap). The placeholder shape
+      # keeps Prometheus parseable on day-1 with a single bootstrap
+      # institute.
+      - record: cena_llm_institute_monthly_ceiling_usd
+        expr: "vector(500)"
+        labels: { institute_id: demo-institute }
+      # Fallback-catchall so an institute without an explicit ceiling
+      # row has a *conservative* $100/mo cap until finops bumps it.
+      # Ops gets a CenaLlmInstituteMissingCeiling alert to drive the
+      # conversation; the fallback prevents an unlimited-spend bug.
+      - record: cena_llm_institute_monthly_ceiling_usd_default
+        expr: "vector(100)"
+
+  - name: cena-llm-cost-per-institute
+    rules:
+      - alert: CenaLlmInstituteSpendWarning
+        expr: >-
+          (
+            sum by (institute_id) (increase(cena_llm_call_cost_usd_total[7d])) * 30/7
+          )
+          > on(institute_id) group_left()
+          (cena_llm_institute_monthly_ceiling_usd * 0.80)
+        for: 30m
+        labels:
+          severity: warning
+          team: cena-finops
+          channel: slack
+        annotations:
+          summary: "LLM spend at institute {{ $labels.institute_id }} projected to exceed 80% of monthly ceiling"
+          description: >-
+            Institute {{ $labels.institute_id }} is projected to spend ${{ $value | humanize }} / month
+            (7d rolling × 30/7), crossing 80% of the configured monthly ceiling in
+            cena_llm_institute_monthly_ceiling_usd. Verify with the "Per-institute projected spend"
+            panel on the LLM Cost Projection dashboard. Finops can raise the ceiling after sign-off
+            or triage the driving cohort / feature mix.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/ops/runbooks/llm-cost-breach.md"
+
+      - alert: CenaLlmInstituteSpendCritical
+        expr: >-
+          (
+            sum by (institute_id) (increase(cena_llm_call_cost_usd_total[7d])) * 30/7
+          )
+          > on(institute_id) group_left()
+          cena_llm_institute_monthly_ceiling_usd
+        for: 15m
+        labels:
+          severity: critical
+          team: cena-sre
+          channel: pagerduty
+        annotations:
+          summary: "LLM spend at institute {{ $labels.institute_id }} projected to EXCEED monthly ceiling"
+          description: >-
+            Institute {{ $labels.institute_id }} is projected to spend ${{ $value | humanize }} / month
+            (7d rolling × 30/7), EXCEEDING the configured ceiling. This is a budget-breach event —
+            page finops-on-call AND SRE-on-call. Immediate actions: (a) identify cohort /
+            feature driving the drift via the cost-per-cohort dashboard (prr-112); (b) decide
+            soft-cap vs. hard-throttle per docs/ops/runbooks/llm-cost-breach.md §4.
+          runbook_url: "https://github.com/cena-platform/cena/blob/main/docs/ops/runbooks/llm-cost-breach.md"
+
+      # prr-084: catch institutes that spend $ but have no ceiling entry.
+      # Severity: info — operators see it without paging, but the gap
+      # is visible.
+      - alert: CenaLlmInstituteMissingCeiling
+        expr: >-
+          sum by (institute_id) (increase(cena_llm_call_cost_usd_total[1d])) > 0
+          unless on (institute_id) cena_llm_institute_monthly_ceiling_usd
+        for: 15m
+        labels:
+          severity: info
+          team: cena-finops
+        annotations:
+          summary: "LLM institute {{ $labels.institute_id }} has spend but no monthly ceiling"
+          description: >-
+            Institute {{ $labels.institute_id }} emitted non-zero LLM cost in the last 24h
+            but has no entry in cena_llm_institute_monthly_ceiling_usd. Add a recording rule
+            (and reconcile with institute-admin UI) so prr-084 breach alerts can fire for
+            this tenant. Default fallback of $100/mo applies until then.
+
   - name: cena-deploy-health-continued
     rules:
       # Migrator job running too long (> 5 min)

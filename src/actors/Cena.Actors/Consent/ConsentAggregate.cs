@@ -81,6 +81,9 @@ public sealed class ConsentAggregate
             case StudentVisibilityRestored_V1 restored:
                 State.Apply(restored);
                 break;
+            case AdminConsentOverridden_V1 overridden:
+                State.Apply(overridden);
+                break;
         }
     }
 

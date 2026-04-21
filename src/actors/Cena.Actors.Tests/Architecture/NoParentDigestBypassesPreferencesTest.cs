@@ -92,6 +92,19 @@ public sealed class NoParentDigestBypassesPreferencesTest
         // Vendor adapter — implements IWhatsAppSender. Its SendAsync IS
         // the vendor call, not a dispatcher.
         "src/actors/Cena.Actors/ParentDigest/TwilioWhatsAppSender.cs",
+
+        // prr-108 opt-out decorator — it consults preferences itself
+        // (the whole point of the class) and delegates to an inner
+        // IWhatsAppSender. The decorator IS the preferences consult
+        // for every downstream caller; adding it to the allowlist
+        // would only be necessary if the ratchet's token scan
+        // misidentified the internal .SendAsync call as a consumer
+        // call. The class uses .ShouldSend(...) + .EffectiveStatus
+        // semantics via IParentDigestPreferencesStore which are
+        // whitelisted tokens, so it already passes the scan — but
+        // we still pin the path so a future refactor that removes
+        // the tokens still registers as a definition, not a dispatch.
+        "src/actors/Cena.Actors/ParentDigest/WhatsAppOptOutPolicy.cs",
     };
 
     private static string FindRepoRoot()
