@@ -37,7 +37,13 @@ RUN groupadd --system --gid 10001 emu \
  && chown -R emu:emu /app
 USER emu:emu
 
-ENV DOTNET_RUNNING_IN_CONTAINER=true
+# RDY-064 / ADR-0058 §3: release correlation. Emulator events flow to the
+# same Sentry project tagged with the same CENA_GIT_SHA so load-test
+# incidents can be cross-correlated with real traffic.
+ARG CENA_GIT_SHA=unknown
+ENV DOTNET_RUNNING_IN_CONTAINER=true \
+    CENA__ErrorAggregator__Release=$CENA_GIT_SHA \
+    CENA__Cluster__ServiceVersion=$CENA_GIT_SHA
 
 # Default args; overridable in docker-compose env / command.
 ENTRYPOINT ["dotnet", "Cena.Emulator.dll"]

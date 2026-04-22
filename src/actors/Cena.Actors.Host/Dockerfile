@@ -87,9 +87,16 @@ EXPOSE 8090
 # HTTP port for health probes + metrics
 EXPOSE 5050
 
+# RDY-064 / ADR-0058 §3: release correlation. CI populates CENA_GIT_SHA from
+# `git rev-parse --short=12 HEAD`; both Sentry (via ErrorAggregator:Release)
+# and OpenTelemetry (service.version) consume the same value so traces and
+# exceptions share one release identifier.
+ARG CENA_GIT_SHA=unknown
 ENV ASPNETCORE_URLS=http://+:5050 \
     DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_USE_POLLING_FILE_WATCHER=false
+    DOTNET_USE_POLLING_FILE_WATCHER=false \
+    CENA__ErrorAggregator__Release=$CENA_GIT_SHA \
+    CENA__Cluster__ServiceVersion=$CENA_GIT_SHA
 
 # Healthcheck targets /health/live (liveness probe endpoint from Program.cs)
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \

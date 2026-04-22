@@ -82,6 +82,26 @@ builder.Host.UseSerilog((context, services, configuration) =>
         .ReadFrom.Configuration(context.Configuration)
         .Enrich.With<Cena.Infrastructure.Compliance.SessionRiskLogEnricher>()
         .Destructure.With<Cena.Infrastructure.Compliance.PiiDestructuringPolicy>();
+
+    // RDY-064 / ADR-0058: conditional Sentry Serilog sink. Only attached when
+    // ErrorAggregator:Backend=sentry AND a non-empty DSN is configured. Logs
+    // at Information+ become breadcrumbs, Errors become Sentry events. The
+    // source-layer scrubber still runs in SentryErrorAggregator for direct
+    // Capture() calls; sink path relies on Sentry's BeforeSend PII scrub
+    // which is wired in SentryErrorAggregator.Init.
+    var dsn = context.Configuration["ErrorAggregator:Dsn"];
+    var backend = context.Configuration["ErrorAggregator:Backend"];
+    if (!string.IsNullOrWhiteSpace(dsn)
+        && string.Equals(backend, "sentry", StringComparison.OrdinalIgnoreCase))
+    {
+        configuration.WriteTo.Sentry(s =>
+        {
+            s.Dsn = dsn;
+            s.MinimumBreadcrumbLevel = Serilog.Events.LogEventLevel.Information;
+            s.MinimumEventLevel = Serilog.Events.LogEventLevel.Error;
+            s.InitializeSdk = false; // SentryErrorAggregator owns SDK init.
+        });
+    }
 });
 
 // RDY-056 §1.2: In Development the actor host runs with partial DI graphs
@@ -564,11 +584,18 @@ builder.Services.AddSingleton(provider =>
 // 7. OPENTELEMETRY
 // =============================================================================
 
+// RDY-064 / ADR-0058 §3: release correlation. service.version is the same
+// CENA_GIT_SHA value that Sentry tags on events, so traces and exceptions
+// share a single release identifier.
+var otelServiceVersion = builder.Configuration["ErrorAggregator:Release"]
+    ?? builder.Configuration["Cluster:ServiceVersion"]
+    ?? "unknown";
+
 builder.Services.AddOpenTelemetry()
     .ConfigureResource(resource => resource
         .AddService(
             serviceName: ServiceName,
-            serviceVersion: "1.0.0",
+            serviceVersion: otelServiceVersion,
             serviceInstanceId: Environment.MachineName))
     .WithTracing(tracing => tracing
         .AddSource("Cena.Actors.StudentActor")
