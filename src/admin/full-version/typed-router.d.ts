@@ -64,6 +64,7 @@ declare module 'vue-router/auto-routes' {
     'dashboards-admin': RouteRecordInfo<'dashboards-admin', '/dashboards/admin', Record<never, never>, Record<never, never>>,
     'forgot-password': RouteRecordInfo<'forgot-password', '/forgot-password', Record<never, never>, Record<never, never>>,
     'instructor': RouteRecordInfo<'instructor', '/instructor', Record<never, never>, Record<never, never>>,
+    'instructor-classrooms-classroom-id-exam-targets': RouteRecordInfo<'instructor-classrooms-classroom-id-exam-targets', '/instructor/classrooms/:classroomId/exam-targets', { classroomId: ParamValue<true> }, { classroomId: ParamValue<false> }>,
     'login': RouteRecordInfo<'login', '/login', Record<never, never>, Record<never, never>>,
     'mentor': RouteRecordInfo<'mentor', '/mentor', Record<never, never>, Record<never, never>>,
     'mentor-institutes-id': RouteRecordInfo<'mentor-institutes-id', '/mentor/institutes/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,

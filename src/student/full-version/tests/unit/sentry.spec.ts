@@ -15,6 +15,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { getSentryConfig, scrubEvent } from '@/plugins/sentry.config'
 import type { SentryEvent } from '@/plugins/sentry.config'
 
+// ADR-0058 — the real @sentry/vue SDK is installed, but these tests are
+// about the privacy contract. Mock the SDK so (a) tests don't require
+// network, (b) init() is a no-op, and (c) nothing reaches a real DSN.
+vi.mock('@sentry/vue', () => ({
+  init: vi.fn(),
+  captureException: vi.fn(),
+  addBreadcrumb: vi.fn(),
+  setTag: vi.fn(),
+  setUser: vi.fn(),
+}))
+
 describe('FIND-privacy-016: Sentry privacy lockdown', () => {
   beforeEach(() => {
     vi.restoreAllMocks()
