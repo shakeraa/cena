@@ -125,6 +125,14 @@ public partial class Program
     var builder = WebApplication.CreateBuilder(args);
     if (Environment.GetEnvironmentVariable("CENA_OPENAPI_GEN") == "1")
     {
+        // PRR-438: swagger-gen boot must not collide with a running Docker
+        // admin-api container on port 5052. Override the Kestrel:Endpoints:*
+        // config keys (which win over UseUrls) to bind an ephemeral loopback
+        // port, then belt-and-braces UseUrls the same.
+        builder.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+        {
+            ["Kestrel:Endpoints:Http:Url"] = "http://127.0.0.1:0",
+        });
         builder.WebHost.UseUrls("http://127.0.0.1:0");
     }
     
