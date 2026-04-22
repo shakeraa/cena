@@ -8,7 +8,15 @@
 //
 // Output: which model tier to route to + whether a soft-cap upsell fired.
 // The LLM router (EPIC-PRR-B) reads this decision on every call.
+//
+// Metrics (PRR-311 DoD "escalation rate per tier per week tracked"):
+//   - cena.llm.routing.decisions{tier,target,degrade_reason}  counter
+//   - cena.llm.routing.softcap_triggered{tier}                counter
+// Both emitted synchronously from Decide() so any observability surface
+// (Prometheus, OTLP collector) sees every call without extra plumbing.
 // =============================================================================
+
+using System.Diagnostics.Metrics;
 
 namespace Cena.Actors.Subscriptions;
 
@@ -48,6 +56,16 @@ public sealed class TierLlmRoutingPolicy : ITierLlmRoutingPolicy
     /// <summary>Complexity threshold above which a call is "complex".</summary>
     public const double ComplexityThreshold = 0.30;
 
+    private static readonly Meter Meter = new("Cena.Llm.Routing", "1.0.0");
+
+    private static readonly Counter<long> DecisionsCounter = Meter.CreateCounter<long>(
+        "cena.llm.routing.decisions",
+        description: "LLM routing decisions, tagged by tier + target model + degrade reason.");
+
+    private static readonly Counter<long> SoftCapCounter = Meter.CreateCounter<long>(
+        "cena.llm.routing.softcap_triggered",
+        description: "Soft-cap upsell signals per tier.");
+
     /// <inheritdoc/>
     public LlmRoutingDecision Decide(
         StudentEntitlementView entitlement,
@@ -60,6 +78,16 @@ public sealed class TierLlmRoutingPolicy : ITierLlmRoutingPolicy
             throw new ArgumentException("Usage count must be non-negative.", nameof(weeklySonnetEscalationCount));
         }
 
+        var decision = DecideInternal(entitlement, complexityEstimate, weeklySonnetEscalationCount);
+        Record(entitlement.EffectiveTier, decision);
+        return decision;
+    }
+
+    private static LlmRoutingDecision DecideInternal(
+        StudentEntitlementView entitlement,
+        double complexityEstimate,
+        int weeklySonnetEscalationCount)
+    {
         var isComplex = complexityEstimate >= ComplexityThreshold;
         var caps = entitlement.Caps;
 
@@ -100,6 +128,21 @@ public sealed class TierLlmRoutingPolicy : ITierLlmRoutingPolicy
 
             default:
                 return new LlmRoutingDecision(LlmModelTier.Haiku, false, "unknown-tier");
+        }
+    }
+
+    private static void Record(SubscriptionTier tier, LlmRoutingDecision decision)
+    {
+        DecisionsCounter.Add(1,
+            new KeyValuePair<string, object?>("tier", tier.ToString()),
+            new KeyValuePair<string, object?>("target", decision.Target.ToString()),
+            new KeyValuePair<string, object?>(
+                "degrade_reason", decision.DegradeReason ?? "none"));
+
+        if (decision.SoftCapReached)
+        {
+            SoftCapCounter.Add(1,
+                new KeyValuePair<string, object?>("tier", tier.ToString()));
         }
     }
 }
