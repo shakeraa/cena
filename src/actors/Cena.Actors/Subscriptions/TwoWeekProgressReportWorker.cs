@@ -76,13 +76,11 @@ public sealed class TwoWeekProgressReportWorker : BackgroundService
     public async Task<int> RunOnceAsync(CancellationToken ct)
     {
         var now = _clock.GetUtcNow();
-        var windowLowerBound = now.AddDays(-21);   // give a 1-week retry window
-        var windowUpperBound = now.AddDays(-14);   // at least 14 days old
 
         await using var session = _store.LightweightSession();
         var alreadySent = (await session.Query<TwoWeekReportSentMarker>().ToListAsync(ct))
             .Select(m => m.Id)
-            .ToHashSet();
+            .ToHashSet(StringComparer.Ordinal);
 
         var events = await session.Events
             .QueryAllRawEvents()
@@ -90,12 +88,10 @@ public sealed class TwoWeekProgressReportWorker : BackgroundService
                 SubscriptionAggregate.StreamKeyPrefix))
             .ToListAsync(ct);
 
-        var candidates = events
+        var activations = events
             .Select(e => e.Data)
-            .OfType<SubscriptionActivated_V1>()
-            .Where(a => a.ActivatedAt >= windowLowerBound && a.ActivatedAt <= windowUpperBound)
-            .Where(a => !alreadySent.Contains(a.ParentSubjectIdEncrypted))
-            .ToList();
+            .OfType<SubscriptionActivated_V1>();
+        var candidates = SelectCandidates(activations, alreadySent, now).ToList();
 
         var dispatched = 0;
         foreach (var activation in candidates)
@@ -127,5 +123,34 @@ public sealed class TwoWeekProgressReportWorker : BackgroundService
         }
         if (dispatched > 0) await session.SaveChangesAsync(ct);
         return dispatched;
+    }
+
+    /// <summary>
+    /// Pure candidate-selection helper. Given every subscription-activation
+    /// event + the set of parent ids already sent a two-week report + the
+    /// current clock, return the activations whose age falls in
+    /// [14, 21] days and whose parent has not already been sent. The
+    /// 1-week retry window (21d upper bound) is how we recover from a
+    /// worker down-day without permanently losing the report — the
+    /// sent-marker keeps it idempotent so a retry on day 15 after a
+    /// dispatch on day 14 is still a no-op.
+    /// </summary>
+    public static IEnumerable<SubscriptionActivated_V1> SelectCandidates(
+        IEnumerable<SubscriptionActivated_V1> activations,
+        ISet<string> alreadySentParentIds,
+        DateTimeOffset now)
+    {
+        ArgumentNullException.ThrowIfNull(activations);
+        ArgumentNullException.ThrowIfNull(alreadySentParentIds);
+
+        var windowLowerBound = now.AddDays(-21);
+        var windowUpperBound = now.AddDays(-14);
+        foreach (var a in activations)
+        {
+            if (a.ActivatedAt < windowLowerBound) continue;
+            if (a.ActivatedAt > windowUpperBound) continue;
+            if (alreadySentParentIds.Contains(a.ParentSubjectIdEncrypted)) continue;
+            yield return a;
+        }
     }
 }
