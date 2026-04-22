@@ -1482,5 +1482,87 @@
     "subtitle": "No charge was made. Come back when you're ready to pick a plan.",
     "backToPricing": "Back to pricing",
     "goHome": "Back to home"
+  },
+  "softCapUpsell": {
+    "photo": {
+      "heading": "You've been busy this month",
+      "body": "You've used {usage} of {softCap} photo diagnostics this month. You can continue, or book a tutor session to review it all."
+    },
+    "sonnet": {
+      "heading": "Intense week",
+      "body": "Your most active week yet. Continue, or schedule a tutor session to consolidate."
+    },
+    "hint": {
+      "heading": "You've used a lot of hints",
+      "body": "{usage} of {softCap} — all fine. Continue, or take a break and return?"
+    },
+    "bookTutor": "Book a tutor session",
+    "continueAnyway": "Continue anyway",
+    "dismiss": "Close"
+  },
+  "accountSubscription": {
+    "title": "My subscription",
+    "loadError": "We couldn't load your subscription details. Try refreshing.",
+    "actionError": "The action failed. Try again or contact support.",
+    "status": {
+      "unsubscribed": "Not active",
+      "active": "Active",
+      "pastdue": "Payment retry failed",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded"
+    },
+    "renewsAt": "Next renewal: {date}",
+    "seePricing": "See pricing",
+    "common": { "cancel": "Cancel", "back": "Back" },
+    "siblings": {
+      "title": "Students on this plan",
+      "addCta": "Add sibling",
+      "count": "{n} active students"
+    },
+    "manage": {
+      "title": "Manage subscription",
+      "refund": "Request refund (within 30 days)",
+      "cancel": "Cancel subscription"
+    },
+    "refundDialog": {
+      "title": "Refund request",
+      "body": "Your 30-day money-back guarantee is active — you'll get a full refund. Tell us briefly why so we can improve.",
+      "reasonLabel": "Reason (optional)",
+      "confirm": "Confirm refund"
+    },
+    "cancelDialog": {
+      "title": "Cancel subscription",
+      "body": "Your subscription stays active until the end of the current period. Tell us why you're leaving.",
+      "reasonLabel": "Reason (optional)",
+      "confirm": "Confirm cancellation"
+    },
+    "siblingDialog": {
+      "title": "Add a sibling",
+      "body": "Each additional sibling gets their own account with the family discount.",
+      "idLabel": "Student ID",
+      "tierLabel": "Tier",
+      "confirm": "Add"
+    }
+  },
+  "parentDashboard": {
+    "title": "Parent dashboard",
+    "tierGate": {
+      "title": "Parent dashboard is a Premium feature",
+      "subtitle": "See your students' progress, a weekly report, and a tutor-handoff PDF.",
+      "cta": "Upgrade to Premium"
+    },
+    "household": {
+      "weekly": "This week",
+      "monthly": "This month",
+      "min": "minutes"
+    },
+    "students": {
+      "heading": "Students on this plan",
+      "empty": "No active students yet. Add a sibling from the subscription page.",
+      "unnamed": "Student",
+      "weekly": "This week",
+      "topics": "Topics",
+      "readiness": "Readiness"
+    }
   }
 }

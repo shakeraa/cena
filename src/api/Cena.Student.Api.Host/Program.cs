@@ -943,7 +943,7 @@ public partial class Program
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
-    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapStripeWebhook(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + Stripe webhook; STB-00 Me/Profile
+    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + Stripe webhook + parent dashboard; STB-00 Me/Profile
     app.MapSelfAssessmentEndpoints();
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
