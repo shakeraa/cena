@@ -134,8 +134,36 @@ services:
         done
     restart: unless-stopped
 
+  # ── LocalStack (S3 emulator for dev, profile-gated) ──
+  # ADR-0058: dev/prod parity — dev exercises the same S3 code path
+  # prod does, pointed at a local S3-compatible endpoint. Opt-in:
+  #   docker compose --profile localstack up -d localstack
+  # The init-s3.sh bootstrap script runs on first healthy boot to
+  # create the cena-ingest-dev bucket.
+  localstack:
+    image: localstack/localstack:3
+    container_name: cena-localstack
+    profiles: [ "localstack" ]
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEBUG=0
+      - PERSISTENCE=1
+      - LOCALSTACK_HOST=localhost
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./config/localstack:/etc/localstack/init/ready.d:ro
+    healthcheck:
+      test: [ "CMD", "sh", "-c", "curl -fsS http://localhost:4566/_localstack/health | grep -q '\"s3\": \"available\"'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
 volumes:
   postgres_data:
   postgres_backups:
   nats_data:
   neo4j_data:
+  localstack_data:

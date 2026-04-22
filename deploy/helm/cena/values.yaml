@@ -216,7 +216,29 @@ imagePullSecrets: []
 serviceAccount:
   create: true
   name: ""
+  # ADR-0058: attach the IRSA role ARN here for EKS production:
+  #   annotations:
+  #     eks.amazonaws.com/role-arn: "arn:aws:iam::ACCOUNT_ID:role/cena-ingest-reader"
+  # The SDK picks it up via projected OIDC token — no static keys needed.
   annotations: {}
+
+# -- Admin ingestion providers (ADR-0058) -------------------------------------
+# S3 block is disabled by default. Prod overlays set enabled=true and fill
+# region + allowedBuckets. IRSA path: no static keys needed (rely on the
+# serviceAccount.annotations above). Non-EKS path: set accessKeySecretName
+# to a K8s Secret with AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY keys.
+ingestion:
+  s3:
+    enabled: false
+    region: "us-east-1"
+    allowedBuckets: []    # e.g. ["cena-ingest-prod"]
+    # For non-IRSA environments only. Leave "" in EKS prod.
+    accessKeySecretName: ""
+    # Dev-only override to point at LocalStack / MinIO. Leave "" in prod.
+    serviceUrl: ""
+    forcePathStyle: false
+  maxBatchFiles: 1000
+  maxBatchBytes: 10737418240   # 10 GiB
 
 # -- Pod-level settings -------------------------------------------------------
 
