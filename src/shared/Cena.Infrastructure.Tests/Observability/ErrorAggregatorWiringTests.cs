@@ -1,10 +1,14 @@
 // =============================================================================
-// RDY-064: Error Aggregator DI wiring tests
+// RDY-064 / ADR-0058: Error Aggregator DI wiring tests
 //
 // Proves that:
 //   * Default (no config) resolves NullErrorAggregator.
-//   * Enabled=true + Backend="sentry" (gated on ADR) falls back to null
-//     with a warning. The concrete Sentry wire-up is blocked on RDY-064 ADR.
+//   * Enabled=true + Backend="sentry" + non-empty DSN resolves the real
+//     SentryErrorAggregator (ADR-0058 unblocked this path).
+//   * Enabled=true + Backend="sentry" + empty DSN gracefully degrades to
+//     NullErrorAggregator (same posture as peripherals with no credentials).
+//   * Enabled=true + Backend="appinsights" still falls back to Null
+//     (ADR-0058 only covered Sentry).
 //   * Unknown backend falls back to null.
 //   * IExceptionScrubber is always registered.
 // =============================================================================
@@ -44,27 +48,63 @@ public class ErrorAggregatorWiringTests
         using var sp = Build(new Dictionary<string, string?>
         {
             ["ErrorAggregator:Enabled"] = "false",
-            ["ErrorAggregator:Backend"] = "sentry"
+            ["ErrorAggregator:Backend"] = "sentry",
+            ["ErrorAggregator:Dsn"] = "https://dummy@example.ingest.sentry.io/1"
         });
         var agg = sp.GetRequiredService<IErrorAggregator>();
         Assert.IsType<NullErrorAggregator>(agg);
     }
 
     [Fact]
-    public void Sentry_backend_enabled_falls_back_to_null_until_ADR_lands()
+    public void Sentry_backend_with_valid_dsn_resolves_real_SentryErrorAggregator()
     {
-        // RDY-064 decision gate: concrete Sentry wire-up blocked on ADR.
-        // Configuring Enabled=true + Backend=sentry must NOT throw at
-        // startup — it logs a warning and registers Null so ops notices
-        // the config is ahead of code.
+        // ADR-0058 landed: the decision gate is lifted. A configured backend
+        // plus a non-empty DSN now resolves the concrete SentryErrorAggregator.
+        // The DSN here is a dummy — SentrySdk.Init does not network-round-trip
+        // at construction, it just configures the transport.
         using var sp = Build(new Dictionary<string, string?>
         {
             ["ErrorAggregator:Enabled"] = "true",
             ["ErrorAggregator:Backend"] = "sentry",
-            ["ErrorAggregator:Dsn"] = "https://example.ingest.sentry.io/123"
+            ["ErrorAggregator:Dsn"] = "https://dummy@example.ingest.sentry.io/1",
+            ["ErrorAggregator:Environment"] = "test",
+            ["ErrorAggregator:Release"] = "abcdef123456"
         });
         var agg = sp.GetRequiredService<IErrorAggregator>();
+        Assert.IsType<SentryErrorAggregator>(agg);
+        Assert.Equal("sentry", agg.Backend);
+    }
+
+    [Fact]
+    public void Sentry_backend_with_empty_dsn_falls_back_to_Null_gracefully()
+    {
+        // Same graceful-disabled posture as SMS/email peripherals without
+        // credentials: DSN missing → no aggregator, but startup still works.
+        using var sp = Build(new Dictionary<string, string?>
+        {
+            ["ErrorAggregator:Enabled"] = "true",
+            ["ErrorAggregator:Backend"] = "sentry",
+            ["ErrorAggregator:Dsn"] = ""
+        });
+        var agg = sp.GetRequiredService<IErrorAggregator>();
+        Assert.IsType<NullErrorAggregator>(agg);
+        Assert.Equal("null", agg.Backend);
         Assert.False(agg.IsEnabled);
+    }
+
+    [Fact]
+    public void AppInsights_backend_still_gated_and_falls_back_to_null()
+    {
+        // ADR-0058 only covered Sentry. AppInsights still falls back to
+        // Null with a warning so ops notices the config is ahead of code.
+        using var sp = Build(new Dictionary<string, string?>
+        {
+            ["ErrorAggregator:Enabled"] = "true",
+            ["ErrorAggregator:Backend"] = "appinsights",
+            ["ErrorAggregator:Dsn"] = "InstrumentationKey=abc"
+        });
+        var agg = sp.GetRequiredService<IErrorAggregator>();
+        Assert.IsType<NullErrorAggregator>(agg);
         Assert.Equal("null", agg.Backend);
     }
 

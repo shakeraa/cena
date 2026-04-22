@@ -79,6 +79,10 @@ services:
     build:
       context: .
       dockerfile: src/api/Cena.Admin.Api.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation. CI populates CENA_GIT_SHA
+      # from the commit short-sha; local dev defaults to "unknown".
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
     container_name: cena-admin-api
     depends_on:
       postgres:
@@ -137,6 +141,9 @@ services:
     build:
       context: .
       dockerfile: src/api/Cena.Student.Api.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
     container_name: cena-student-api
     depends_on:
       postgres:
@@ -276,6 +283,9 @@ services:
     build:
       context: .
       dockerfile: src/emulator/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
     container_name: cena-emulator
     profiles: ["emulator"]
     depends_on:
@@ -306,6 +316,9 @@ services:
     build:
       context: .
       dockerfile: src/actors/Cena.Actors.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
     container_name: cena-actor-host
     depends_on:
       postgres:

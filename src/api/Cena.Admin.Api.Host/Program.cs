@@ -140,6 +140,23 @@ public partial class Program
             .Enrich.With<SessionRiskLogEnricher>()
             .Destructure.With<PiiDestructuringPolicy>()
             .WriteTo.Console(outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {RedactedMessage}{NewLine}{Exception}");
+
+        // RDY-064 / ADR-0058: conditional Sentry Serilog sink. See actor-host
+        // Program.cs for the shared rationale. InitializeSdk=false because
+        // SentryErrorAggregator owns the single canonical Init call.
+        var dsn = context.Configuration["ErrorAggregator:Dsn"];
+        var backend = context.Configuration["ErrorAggregator:Backend"];
+        if (!string.IsNullOrWhiteSpace(dsn)
+            && string.Equals(backend, "sentry", StringComparison.OrdinalIgnoreCase))
+        {
+            configuration.WriteTo.Sentry(s =>
+            {
+                s.Dsn = dsn;
+                s.MinimumBreadcrumbLevel = Serilog.Events.LogEventLevel.Information;
+                s.MinimumEventLevel = Serilog.Events.LogEventLevel.Error;
+                s.InitializeSdk = false;
+            });
+        }
     });
     
     // ---- Configuration ----
@@ -452,11 +469,17 @@ public partial class Program
     var otlpEndpoint = builder.Configuration.GetValue<string>("Cluster:OtlpEndpoint")
         ?? "http://localhost:4317";
     
+    // RDY-064 / ADR-0058 §3: release correlation. service.version shares the
+    // CENA_GIT_SHA string that Sentry uses for release tags.
+    var otelServiceVersion = builder.Configuration["ErrorAggregator:Release"]
+        ?? builder.Configuration["Cluster:ServiceVersion"]
+        ?? "unknown";
+
     builder.Services.AddOpenTelemetry()
         .ConfigureResource(resource => resource
             .AddService(
                 serviceName: "cena-admin-api",
-                serviceVersion: "1.0.0",
+                serviceVersion: otelServiceVersion,
                 serviceInstanceId: Environment.MachineName))
         .WithTracing(tracing => tracing
             .AddAspNetCoreInstrumentation()

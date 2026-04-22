@@ -72,9 +72,13 @@ USER cena:cena
 
 EXPOSE 5052
 
+# RDY-064 / ADR-0058 §3: release correlation (see Actors.Host/Dockerfile).
+ARG CENA_GIT_SHA=unknown
 ENV ASPNETCORE_URLS=http://+:5052 \
     DOTNET_RUNNING_IN_CONTAINER=true \
-    DOTNET_USE_POLLING_FILE_WATCHER=false
+    DOTNET_USE_POLLING_FILE_WATCHER=false \
+    CENA__ErrorAggregator__Release=$CENA_GIT_SHA \
+    CENA__Cluster__ServiceVersion=$CENA_GIT_SHA
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD curl -fsS http://localhost:5052/health/live || exit 1
