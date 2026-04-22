@@ -192,6 +192,7 @@
     "profile": "Profile",
     "settings": "Settings",
     "pricing": "Pricing",
+    "subscription": "My subscription",
     "signOut": "Sign out",
     "login": "Sign in",
     "register": "Sign up",
@@ -1454,6 +1455,32 @@
       "arabicDashboard": "Parent dashboard with full Arabic",
       "tutorHandoff": "Tutor-handoff report (PDF)",
       "prioritySupport": "Priority support"
-    }
+    },
+    "redirecting": "Redirecting you to secure Stripe checkout…",
+    "checkoutError": "We couldn't open checkout. Try again in a moment."
+  },
+  "subscriptionConfirm": {
+    "polling": {
+      "title": "Confirming your subscription…",
+      "subtitle": "One moment — finalizing activation."
+    },
+    "active": {
+      "title": "Subscription active",
+      "subtitle": "Welcome to {tier}.",
+      "renewsAt": "Next renewal: {date}",
+      "cta": "Start learning"
+    },
+    "pending": {
+      "title": "Activation on the way",
+      "subtitle": "Payment received. We'll notify you once activation completes.",
+      "cta": "Back to home"
+    },
+    "error": "We couldn't locate your subscription. Please contact support."
+  },
+  "subscriptionCancel": {
+    "title": "Checkout cancelled",
+    "subtitle": "No charge was made. Come back when you're ready to pick a plan.",
+    "backToPricing": "Back to pricing",
+    "goHome": "Back to home"
   }
 }

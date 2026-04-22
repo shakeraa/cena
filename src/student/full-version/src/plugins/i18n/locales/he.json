@@ -192,6 +192,7 @@
     "profile": "פרופיל",
     "settings": "הגדרות",
     "pricing": "מחירים",
+    "subscription": "המנוי שלי",
     "signOut": "התנתק",
     "login": "התחברות",
     "register": "הרשמה",
@@ -1425,6 +1426,32 @@
       "arabicDashboard": "לוח הורים בערבית מלאה",
       "tutorHandoff": "דוח למורה פרטי (PDF)",
       "prioritySupport": "תמיכה מהירה"
-    }
+    },
+    "redirecting": "מעביר אותך לתשלום מאובטח ב-Stripe…",
+    "checkoutError": "לא הצלחנו לפתוח תשלום. נסה שוב בעוד רגע."
+  },
+  "subscriptionConfirm": {
+    "polling": {
+      "title": "מאמת את המנוי…",
+      "subtitle": "רק רגע — מסיים את הפעלת המנוי."
+    },
+    "active": {
+      "title": "המנוי פעיל",
+      "subtitle": "ברוך/ה הבא/ה ל-{tier}.",
+      "renewsAt": "החידוש הבא: {date}",
+      "cta": "להתחלת לימוד"
+    },
+    "pending": {
+      "title": "ההפעלה בדרך",
+      "subtitle": "התשלום נקלט. ברגע שנאשר את ההפעלה, תקבל עדכון.",
+      "cta": "חזרה לדף הבית"
+    },
+    "error": "אירעה שגיאה באיתור המנוי. נא לפנות לתמיכה."
+  },
+  "subscriptionCancel": {
+    "title": "ביטלת את התשלום",
+    "subtitle": "לא חויבת. אפשר לחזור לבחור מסלול כשתהיה/י מוכן/ה.",
+    "backToPricing": "חזרה למחירים",
+    "goHome": "חזרה לדף הבית"
   }
 }

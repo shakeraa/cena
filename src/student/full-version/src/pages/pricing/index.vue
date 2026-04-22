@@ -10,11 +10,14 @@
 // a session cookie, otherwise redirect to /register with returnTo=/pricing.
 // =============================================================================
 
-import { computed, ref } from 'vue'
+import { onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/authStore'
+import { useMeStore } from '@/stores/meStore'
 import { usePricingCatalog } from '@/composables/usePricingCatalog'
 import type { RetailTierDto } from '@/composables/usePricingCatalog'
+import { useCheckoutSession } from '@/composables/useCheckoutSession'
 import TierCard from '@/components/pricing/TierCard.vue'
 import GuaranteeBadge from '@/components/pricing/GuaranteeBadge.vue'
 import SiblingDiscountNote from '@/components/pricing/SiblingDiscountNote.vue'
@@ -32,28 +35,111 @@ definePage({
 })
 
 const { t } = useI18n()
+const route = useRoute()
 const router = useRouter()
+const authStore = useAuthStore()
+const meStore = useMeStore()
 const { tiers, siblingDiscount, loading, error, formatPriceAgorot } = usePricingCatalog()
+const { startCheckout, submitting: checkoutSubmitting, error: checkoutError } = useCheckoutSession()
 
 const annual = ref(false)
+const redirectingToStripe = ref(false)
 
 // Premium is the marketing-recommended target tier (per ADR-0057 §review).
 const isRecommended = (tier: RetailTierDto) => tier.tierId === 'Premium'
 
-const handleSelect = (tier: RetailTierDto) => {
-  // Non-auth visitors are redirected to register with returnTo carrying the
-  // selection. Authenticated parents would hit the checkout-session endpoint
-  // directly; that path is owned by the account/checkout flow (PRR-292).
-  const params = new URLSearchParams({
-    tier: tier.tierId,
-    cycle: annual.value ? 'Annual' : 'Monthly',
-  })
-  router.push(`/register?returnTo=/pricing%3F${params.toString()}`)
+/**
+ * Drive checkout for an authenticated user: POST to checkout-session endpoint
+ * then redirect to Stripe. Error surfaces via checkoutError ref.
+ */
+const launchCheckout = async (tier: RetailTierDto, cycle: 'Monthly' | 'Annual') => {
+  const studentId = meStore.studentId ?? authStore.uid
+  if (!studentId) {
+    // Defensive: shouldn't happen if isSignedIn is true. Fall back to register.
+    router.push(buildRegisterReturnTo(tier.tierId, cycle))
+    return
+  }
+  redirectingToStripe.value = true
+  try {
+    await startCheckout({
+      primaryStudentId: studentId,
+      tier: tier.tierId,
+      billingCycle: cycle,
+    })
+  } catch {
+    // useCheckoutSession already captured the error on its own ref.
+    redirectingToStripe.value = false
+  }
 }
+
+/**
+ * Build the register URL with a returnTo that replays the current selection
+ * on /pricing after successful sign-up/in.
+ */
+const buildRegisterReturnTo = (
+  tierId: 'Basic' | 'Plus' | 'Premium',
+  cycle: 'Monthly' | 'Annual',
+): string => {
+  const params = new URLSearchParams({ tier: tierId, cycle })
+  return `/register?returnTo=${encodeURIComponent(`/pricing?${params.toString()}`)}`
+}
+
+const handleSelect = (tier: RetailTierDto) => {
+  const cycle: 'Monthly' | 'Annual' = annual.value ? 'Annual' : 'Monthly'
+  if (authStore.isSignedIn) {
+    launchCheckout(tier, cycle)
+  } else {
+    router.push(buildRegisterReturnTo(tier.tierId, cycle))
+  }
+}
+
+/**
+ * Auto-resume flow: if the page loads with ?tier=&cycle= query params AND
+ * the user is authenticated (just finished register), trigger the Stripe
+ * redirect automatically. Anonymous visitors keep the card visible.
+ */
+onMounted(async () => {
+  const queryTier = typeof route.query.tier === 'string' ? route.query.tier : null
+  const queryCycle = typeof route.query.cycle === 'string' ? route.query.cycle : null
+  if (!queryTier || !queryCycle) return
+  if (!authStore.isSignedIn) return
+  const matchedTier = tiers.value.find(t => t.tierId === queryTier)
+  if (!matchedTier) return
+  const matchedCycle = queryCycle === 'Annual' ? 'Annual' : 'Monthly'
+  annual.value = matchedCycle === 'Annual'
+  await launchCheckout(matchedTier, matchedCycle)
+})
 </script>
 
 <template>
   <div class="pricing-page pa-4 pa-md-8" data-testid="pricing-page">
+    <!-- Full-page overlay while redirecting to Stripe -->
+    <VOverlay
+      v-model="redirectingToStripe"
+      contained
+      persistent
+      class="align-center justify-center"
+      data-testid="pricing-redirecting-overlay"
+    >
+      <div class="d-flex flex-column align-center">
+        <VProgressCircular indeterminate color="primary" size="48" />
+        <p class="text-body-1 mt-4">
+          {{ t('pricing.redirecting') }}
+        </p>
+      </div>
+    </VOverlay>
+
+    <VAlert
+      v-if="checkoutError"
+      type="error"
+      variant="tonal"
+      closable
+      class="mb-4"
+      data-testid="pricing-checkout-error"
+    >
+      {{ t('pricing.checkoutError') }}
+    </VAlert>
+
     <div class="text-center mb-8">
       <h1 class="text-h3 font-weight-bold mb-2">
         {{ t('pricing.page.title') }}

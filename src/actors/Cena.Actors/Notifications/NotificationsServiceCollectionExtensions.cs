@@ -56,6 +56,15 @@ public static class NotificationsServiceCollectionExtensions
         RegisterSms(services, smsBackend);
         RegisterWhatsApp(services, configuration, whatsAppBackend);
 
+        // NotificationChannelService depends on IAnalyticsRollupService for
+        // learn-signal telemetry. The concrete AnalyticsRollupService requires
+        // IDocumentStore (registered by AddMarten) and IClock (registered by
+        // ClockRegistration.AddClock in the host). TryAdd so a host that
+        // already registered its own concrete wins.
+        services.TryAddSingleton<
+            Cena.Actors.Projections.IAnalyticsRollupService,
+            Cena.Actors.Projections.AnalyticsRollupService>();
+
         // Multi-channel coordinator — resolves whichever concrete senders
         // the selector just registered.
         services.TryAddScoped<INotificationChannelService, NotificationChannelService>();
