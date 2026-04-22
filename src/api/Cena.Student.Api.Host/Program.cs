@@ -297,6 +297,11 @@ public partial class Program
     // registration is idempotent; repeating it is safe).
     builder.Services.AddExamTargetRetentionServices();
     builder.Services.AddSkillKeyedMasteryMarten();
+
+    // prr-229 production binding: replace the in-memory retention-extension
+    // store with the Marten-backed MartenExamTargetRetentionExtensionStore
+    // so the 60-month opt-in flag (ADR-0050 §6) survives a process restart.
+    builder.Services.AddExamTargetRetentionExtensionMarten();
     builder.Services.AddSingleton<
         Cena.Actors.Sessions.IStudentPlanConfigService,
         Cena.Actors.Sessions.StudentPlanConfigBridgeService>();

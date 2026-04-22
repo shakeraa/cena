@@ -276,6 +276,11 @@ public partial class Program
     builder.Services.AddExamTargetRetentionServices();
     builder.Services.AddSkillKeyedMasteryMarten();
 
+    // prr-229 production binding: Marten replacement for the retention
+    // extension store so admin audit exports see the accurate 60-month
+    // opt-in state per student (ADR-0050 §6).
+    builder.Services.AddExamTargetRetentionExtensionMarten();
+
     // prr-236: Classroom-assigned target teacher UI — Marten-backed roster
     // lookup that feeds the classroom-target fan-out service. The service
     // itself is registered by AddStudentPlanServices above; only the

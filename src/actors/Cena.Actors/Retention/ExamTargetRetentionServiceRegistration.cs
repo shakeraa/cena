@@ -116,4 +116,29 @@ public static class ExamTargetRetentionServiceRegistration
 
         return services;
     }
+
+    /// <summary>
+    /// Replace the in-memory <see cref="IExamTargetRetentionExtensionStore"/>
+    /// binding registered by <see cref="AddExamTargetRetentionServices"/>
+    /// with the Marten-backed <see cref="MartenExamTargetRetentionExtensionStore"/>
+    /// and register the <see cref="ExamTargetRetentionExtensionDocument"/>
+    /// schema via <see cref="ExamTargetRetentionMartenRegistration.RegisterExamTargetRetentionContext"/>.
+    /// <para>
+    /// Per memory "No stubs — production grade" (2026-04-11), the in-memory
+    /// extension store is test-only; production hosts persist the 60-month
+    /// opt-in flag (ADR-0050 §6) via Marten so a student who opted in
+    /// before a deploy doesn't silently fall back to the 24-month default.
+    /// </para>
+    /// </summary>
+    public static IServiceCollection AddExamTargetRetentionExtensionMarten(
+        this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<MartenExamTargetRetentionExtensionStore>();
+        services.Replace(ServiceDescriptor.Singleton<IExamTargetRetentionExtensionStore>(sp
+            => sp.GetRequiredService<MartenExamTargetRetentionExtensionStore>()));
+        services.ConfigureMarten(opts => opts.RegisterExamTargetRetentionContext());
+        return services;
+    }
 }
