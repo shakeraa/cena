@@ -271,6 +271,16 @@ export default defineConfig({
   server: {
     port: 5175,
     strictPort: true,
+    // EPIC-PRR-I: proxy /api → student-api so the SPA's fetch('/api/...')
+    // paths resolve in `vite` dev. In docker compose the student-api is
+    // reachable via the compose-network DNS name; outside docker, set
+    // VITE_DEV_API_PROXY_TARGET to http://localhost:5050 (or similar).
+    proxy: {
+      '/api': {
+        target: process.env.VITE_DEV_API_PROXY_TARGET ?? 'http://cena-student-api:5050',
+        changeOrigin: true,
+      },
+    },
   },
   build: {
     chunkSizeWarningLimit: 5000,

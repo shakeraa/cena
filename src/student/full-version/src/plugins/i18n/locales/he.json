@@ -191,6 +191,7 @@
     "tutor": "מורה",
     "profile": "פרופיל",
     "settings": "הגדרות",
+    "pricing": "מחירים",
     "signOut": "התנתק",
     "login": "התחברות",
     "register": "הרשמה",
@@ -1376,5 +1377,54 @@
     "tileEnglishHint": "Continue in English",
     "tileArabicHint": "متابعة بالعربية",
     "tileHebrewHint": "המשך בעברית"
+  },
+  "pricing": {
+    "page": {
+      "title": "מנויי Cena",
+      "subtitle": "הכנה מלאה לבגרות, אימות מתמטי אוטומטי ומשפחה אחת לכל הילדים.",
+      "loadError": "לא הצלחנו לטעון את קטלוג המחירים. נסה לרענן."
+    },
+    "cycle": {
+      "monthly": "לחודש",
+      "annual": "לשנה",
+      "annualSavings": "חסכון של כ-17%"
+    },
+    "vatInclusive": "המחיר כולל מע\"מ",
+    "recommended": "הבחירה המומלצת",
+    "guarantee": {
+      "thirtyDay": "ערובת החזרה במשך 30 ימים"
+    },
+    "sibling": {
+      "heading": "יש יותר מילד אחד?",
+      "body": "כל אח/ות נוספ/ת (עד 2 אחים) {firstRate} לחודש, והחל מהשלישי {householdCapRate} לחודש."
+    },
+    "tier": {
+      "basic": {
+        "name": "בסיסי",
+        "pitch": "הכנה יומיומית בקצב שלך, עם אימות מתמטי אוטומטי.",
+        "cta": "התחל עם בסיסי"
+      },
+      "plus": {
+        "name": "פלוס",
+        "pitch": "כל מה שבבסיסי, בתוספת אבחון תמונה וחשיבה מתקדמת ללא הגבלה.",
+        "cta": "בחר פלוס"
+      },
+      "premium": {
+        "name": "פרימיום",
+        "pitch": "הכל כלול: אבחון תמונה, לוח הורים מלא, דוח למורה הפרטי ותמיכה מהירה.",
+        "cta": "בחר פרימיום"
+      }
+    },
+    "feature": {
+      "coreExamPrep": "הכנה מלאה לבגרות",
+      "cas": "אימות מתמטי אוטומטי (CAS)",
+      "photoDiagnosticPremium": "אבחון תמונה: עד 100 לחודש",
+      "photoDiagnosticPlus": "אבחון תמונה: 20 לחודש",
+      "photoDiagnosticUnlimited": "אבחון תמונה ללא הגבלה",
+      "parentDashboard": "לוח הורים מלא",
+      "arabicDashboard": "לוח הורים בערבית מלאה",
+      "tutorHandoff": "דוח למורה פרטי (PDF)",
+      "prioritySupport": "תמיכה מהירה"
+    }
   }
 }

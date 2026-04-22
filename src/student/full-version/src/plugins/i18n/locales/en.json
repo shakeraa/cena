@@ -191,6 +191,7 @@
     "tutor": "Tutor",
     "profile": "Profile",
     "settings": "Settings",
+    "pricing": "Pricing",
     "signOut": "Sign out",
     "login": "Sign in",
     "register": "Sign up",
@@ -1405,5 +1406,54 @@
     "tileEnglishHint": "Continue in English",
     "tileArabicHint": "متابعة بالعربية",
     "tileHebrewHint": "המשך בעברית"
+  },
+  "pricing": {
+    "page": {
+      "title": "Cena subscriptions",
+      "subtitle": "Full Bagrut preparation, automatic math verification, and one household plan for all of your students.",
+      "loadError": "We couldn't load the pricing catalog. Try refreshing."
+    },
+    "cycle": {
+      "monthly": "per month",
+      "annual": "per year",
+      "annualSavings": "~17% off"
+    },
+    "vatInclusive": "Price includes VAT",
+    "recommended": "Recommended",
+    "guarantee": {
+      "thirtyDay": "30-day money-back guarantee"
+    },
+    "sibling": {
+      "heading": "More than one student?",
+      "body": "Each additional sibling (up to 2) is {firstRate}/month; a third sibling and beyond is {householdCapRate}/each."
+    },
+    "tier": {
+      "basic": {
+        "name": "Basic",
+        "pitch": "Daily practice at your pace, with automatic math verification.",
+        "cta": "Start with Basic"
+      },
+      "plus": {
+        "name": "Plus",
+        "pitch": "Everything in Basic, plus unlimited photo diagnostics and advanced reasoning.",
+        "cta": "Choose Plus"
+      },
+      "premium": {
+        "name": "Premium",
+        "pitch": "The full package: photo diagnostics, parent dashboard, tutor-handoff report, and priority support.",
+        "cta": "Choose Premium"
+      }
+    },
+    "feature": {
+      "coreExamPrep": "Full Bagrut preparation",
+      "cas": "Automatic math verification (CAS)",
+      "photoDiagnosticPremium": "Photo diagnostics: up to 100 per month",
+      "photoDiagnosticPlus": "Photo diagnostics: 20 per month",
+      "photoDiagnosticUnlimited": "Unlimited photo diagnostics",
+      "parentDashboard": "Full parent dashboard",
+      "arabicDashboard": "Parent dashboard with full Arabic",
+      "tutorHandoff": "Tutor-handoff report (PDF)",
+      "prioritySupport": "Priority support"
+    }
   }
 }
