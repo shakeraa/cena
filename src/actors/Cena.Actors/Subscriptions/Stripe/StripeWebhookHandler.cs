@@ -79,8 +79,17 @@ public sealed class StripeWebhookHandler
 
         // Signature verification is Stripe's library — throws StripeException
         // on any mismatch. No silent-accept path.
+        //
+        // throwOnApiVersionMismatch: false — Stripe's own CLI recommends this
+        // because Stripe's sandbox auto-updates to the latest API version while
+        // Stripe.net SDK versions lag. Our 5 event types (checkout.session.
+        // completed, invoice.paid/payment_failed, customer.subscription.deleted,
+        // charge.refunded) have stable shapes across 2024-2026 API versions, so
+        // tolerating the mismatch is the pragmatic call. Periodically bump
+        // Stripe.net to minimise the deserialisation-drift surface area.
         var stripeEvent = EventUtility.ConstructEvent(
-            rawBody, stripeSignatureHeader, _options.WebhookSigningSecret);
+            rawBody, stripeSignatureHeader, _options.WebhookSigningSecret,
+            tolerance: 300L, throwOnApiVersionMismatch: false);
 
         // Idempotency: skip already-processed events.
         var fresh = await _processedLog.TryRegisterAsync(stripeEvent.Id, ct);
