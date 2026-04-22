@@ -58,6 +58,14 @@ public static class StripeServiceRegistration
         services.ConfigureMarten(opts =>
             opts.Schema.For<ProcessedWebhookDocument>().Identity(d => d.Id));
         services.AddSingleton<StripeWebhookHandler>();
+
+        // PRR-306 refund gateway: replace the sandbox default with Stripe's
+        // adapter so self-service refunds within the 30-day window actually
+        // credit the card via the Stripe Refund API. The sandbox default
+        // (registered in SubscriptionServiceRegistration) is kept for hosts
+        // that never call AddStripeCheckoutIfConfigured (unit test setups).
+        services.RemoveAll<IRefundGatewayService>();
+        services.AddSingleton<IRefundGatewayService, StripeRefundGatewayService>();
         return true;
     }
 

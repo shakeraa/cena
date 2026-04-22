@@ -12,6 +12,7 @@
 
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace Cena.Actors.Subscriptions;
 
@@ -41,6 +42,9 @@ public static class SubscriptionServiceRegistration
         services.AddSingleton<ISubscriptionAggregateStore, MartenSubscriptionAggregateStore>();
         services.ConfigureMarten(opts => opts.RegisterSubscriptionsContext());
         AddSharedServices(services);
+        // PRR-306 production refund-usage probe: aggregates Marten-backed
+        // photo usage + raw hint events across linked students.
+        services.Replace(ServiceDescriptor.Singleton<IRefundUsageProbe, MartenRefundUsageProbe>());
         return services;
     }
 
@@ -62,5 +66,28 @@ public static class SubscriptionServiceRegistration
         {
             services.AddSingleton<ICheckoutSessionProvider, SandboxCheckoutSessionProvider>();
         }
+
+        // PRR-306 refund workflow composition:
+        //   - Default refund gateway = sandbox. StripeServiceRegistration
+        //     replaces this with StripeRefundGatewayService when Stripe
+        //     config is present.
+        //   - Usage probe default = noop (policy denies only on explicit
+        //     abuse signals; production replaces with MartenRefundUsageProbe).
+        //   - Original charge lookup walks the event stream so any host
+        //     with ISubscriptionAggregateStore wired gets correct behaviour.
+        //   - RefundService is the orchestrator; endpoints resolve it.
+        if (!services.Any(d => d.ServiceType == typeof(IRefundGatewayService)))
+        {
+            services.AddSingleton<IRefundGatewayService, SandboxRefundGatewayService>();
+        }
+        if (!services.Any(d => d.ServiceType == typeof(IRefundUsageProbe)))
+        {
+            services.AddSingleton<IRefundUsageProbe, NoopRefundUsageProbe>();
+        }
+        if (!services.Any(d => d.ServiceType == typeof(IOriginalChargeLookup)))
+        {
+            services.AddSingleton<IOriginalChargeLookup, EventStreamOriginalChargeLookup>();
+        }
+        services.AddSingleton<RefundService>();
     }
 }

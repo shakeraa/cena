@@ -289,34 +289,34 @@ public static class SubscriptionManagementEndpoints
         HttpContext http,
         [FromBody] RefundRequest body,
         [FromServices] ISubscriptionAggregateStore store,
-        [FromServices] TimeProvider clock,
+        [FromServices] RefundService refundService,
         CancellationToken ct)
     {
+        // PRR-306: full self-service refund workflow.
+        // The endpoint is a thin HTTP adapter — all orchestration
+        // (policy, gateway refund, event emit, email) lives in
+        // RefundService so the same path is reused from the cancellation
+        // worker when an auto-refund is in scope.
         var parentId = RequireParentId(http);
-        var aggregate = await store.LoadAsync(parentId, ct);
-        if (aggregate.State.ActivatedAt is null)
-        {
-            return Results.BadRequest(new { error = "never_activated" });
-        }
-        // Refund amount: last gross charged. V1 uses the tier's current monthly
-        // price as the refund amount; pro-rata for annual is a follow-up task.
-        var definition = TierCatalog.Get(aggregate.State.CurrentTier);
-        var refundAmount = aggregate.State.CurrentCycle == BillingCycle.Annual
-            ? definition.AnnualPrice.Amount
-            : definition.MonthlyPrice.Amount;
+        var outcome = await refundService
+            .RequestRefundAsync(parentId, body.Reason ?? "requested_by_customer", ct);
 
-        try
+        if (!outcome.Succeeded)
         {
-            var evt = SubscriptionCommands.Refund(
-                aggregate.State, refundAmount, body.Reason, clock.GetUtcNow());
-            await store.AppendAsync(parentId, evt, ct);
-            aggregate.Apply(evt);
-            return Results.Ok(ToStatusDto(aggregate.State));
+            // Surface stable machine-readable codes. UI maps these to
+            // honest, localized copy — no generic "request denied".
+            var errorCode = outcome.DenialReason ?? outcome.GatewayFailureReason
+                ?? "refund_failed";
+            return Results.BadRequest(new
+            {
+                error = errorCode,
+                refund_amount_agorot = outcome.RefundAmountAgorot,
+            });
         }
-        catch (SubscriptionCommandException ex)
-        {
-            return Results.BadRequest(new { error = "command_rejected", details = ex.Message });
-        }
+
+        // Load the post-refund state and return the canonical status DTO.
+        var aggregate = await store.LoadAsync(parentId, ct);
+        return Results.Ok(ToStatusDto(aggregate.State));
     }
 
     // ----- POST cancel -----
