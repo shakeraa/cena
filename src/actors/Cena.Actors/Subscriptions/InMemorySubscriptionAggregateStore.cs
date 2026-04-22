@@ -4,10 +4,8 @@
 // Production-grade in-memory implementation for dev/test and early
 // single-instance deployments. Not a stub: it is fully thread-safe, preserves
 // event ordering, and passes the full SubscriptionAggregateTests suite. The
-// Marten-backed store is tracked as a follow-up task per the ConsentAggregate
-// migration pattern (ADR-0042 §Neutral: "aggregate store currently backed by
-// InMemoryConsentAggregateStore. A Marten-backed variant is tracked under
-// EPIC-PRR-A Sprint 2").
+// Marten-backed variant is provided for production (see ADR-0042 §Neutral
+// for the canonical "InMemory first, Marten second" migration pattern).
 // =============================================================================
 
 using System.Collections.Concurrent;

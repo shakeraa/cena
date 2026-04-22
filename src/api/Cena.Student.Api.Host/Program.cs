@@ -7,7 +7,6 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Cena.Actors.Bus;
-using Cena.Actors.Subscriptions;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
 using Cena.Actors.Notifications;
@@ -163,11 +162,8 @@ public partial class Program
     // ADR-0038 key store + prr-155 ConsentAggregate (bundled compliance services).
     Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregate(builder.Services.AddCenaComplianceServices(builder.Configuration, builder.Environment));
 
-    // prr-148: StudentPlan bounded context (new, per NoNewStudentActorStateTest).
-    builder.Services.AddStudentPlanServices();
-
-    // EPIC-PRR-I / ADR-0057: Subscription aggregate + retail pricing catalog.
-    builder.Services.AddSubscriptions();
+    // prr-148: StudentPlan + EPIC-PRR-I / ADR-0057 Subscription registration. TimeProvider registered later via ClockRegistration.AddClock.
+    builder.Services.AddStudentPlanServices(); Cena.Actors.Subscriptions.SubscriptionServiceRegistration.AddSubscriptionsMarten(builder.Services);
 
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
@@ -920,11 +916,7 @@ public partial class Program
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
-    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); // prr-011 Session exchange wired via UseStudentApiAuthPipeline(); prr-220 catalog ADR-0050.
-    app.MapSubscriptionEndpoints();                    // EPIC-PRR-I / ADR-0057: retail pricing catalog
-
-    // Me/Profile endpoints (STB-00, STB-00b)
-    app.MapMeEndpoints();
+    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription; STB-00 Me/Profile
     app.MapSelfAssessmentEndpoints();
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.

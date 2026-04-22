@@ -3,7 +3,7 @@
 //
 // In-memory fold of subscription events. State is pure — no wall-clock,
 // no persistence. Consumers ask IsActiveAsOf(now) for effective-state
-// checks. Matches the ConsentState pattern (ADR-0042).
+// checks. Matches the ADR-0042 bounded-context state pattern.
 //
 // Linked students are tracked as an ordered list; primary = ordinal 0,
 // siblings = 1..N. Ordinal is stable across re-ordering to preserve

@@ -5,9 +5,9 @@
 // `subscription-{parentSubjectId}`. Parent-keyed per ADR-0057 §2 — parent is
 // the billing counterparty; students are entitlement targets.
 //
-// Pattern matches ConsentAggregate (ADR-0042): aggregate is a thin state
-// + Apply-dispatch shell; command validation lives in SubscriptionCommands;
-// persistence is the caller's concern.
+// Pattern per ADR-0042 neighboring bounded-context convention: aggregate is
+// a thin state + Apply-dispatch shell; command validation lives in
+// SubscriptionCommands; persistence is the caller's concern.
 // =============================================================================
 
 using Cena.Actors.Subscriptions.Events;
@@ -44,8 +44,7 @@ public sealed class SubscriptionAggregate
 
     /// <summary>
     /// Apply an inbound domain event. Unknown events are silently ignored to
-    /// tolerate forward migration — matches the <c>ConsentAggregate</c>
-    /// convention.
+    /// tolerate forward migration per ADR-0042 convention.
     /// </summary>
     public void Apply(object @event)
     {

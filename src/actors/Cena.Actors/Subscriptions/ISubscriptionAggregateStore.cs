@@ -2,8 +2,8 @@
 // Cena Platform — ISubscriptionAggregateStore (EPIC-PRR-I PRR-300, ADR-0057)
 //
 // Narrow persistence seam. Swap the InMemory implementation for a Marten-
-// backed implementation in a follow-up task (matches the ConsentAggregate
-// migration pattern from ADR-0042).
+// backed implementation in a follow-up task (matches the ADR-0042 migration
+// pattern used in neighboring bounded contexts).
 // =============================================================================
 
 namespace Cena.Actors.Subscriptions;
