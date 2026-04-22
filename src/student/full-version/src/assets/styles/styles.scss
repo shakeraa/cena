@@ -24,6 +24,15 @@
   }
 }
 
+// PRR-A11Y-SEMANTICS-SHORTCUT: tertiary skip target pinned next to the
+// primary link when focused so screen-reader + keyboard users can reach
+// the accessibility toolbar directly.
+.skip-link--toolbar {
+  left: auto;
+  right: 0;
+  border-radius: 0 0 0 8px;
+}
+
 // Screen-reader only utility
 .sr-only {
   position: absolute;
@@ -235,4 +244,57 @@ html[data-a11y-motion="reduced"] *::after {
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
   scroll-behavior: auto !important;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// PRR-A11Y-EXPANDED-CONTROLS (2026-04-21): line-height slider, color-
+// blind simulation filter, underline-all-links toggle. Each preference
+// is driven from its html[data-a11y-*] attribute and cascades via the
+// CSS variables below so a single selector doesn't need to know the
+// whole Vuetify surface.
+// ─────────────────────────────────────────────────────────────────────
+
+// Line-height: 5 steps, 1.2 → 2.0 in 0.2 increments. Applied as a CSS
+// custom property so components and Vuetify surfaces that care can opt
+// in. Also set `line-height` directly on <body> for the broad baseline.
+html[data-a11y-line-height="0"] { --cena-a11y-line-height: 1.2; }
+html[data-a11y-line-height="1"] { --cena-a11y-line-height: 1.4; }
+html[data-a11y-line-height="2"] { --cena-a11y-line-height: 1.6; }
+html[data-a11y-line-height="3"] { --cena-a11y-line-height: 1.8; }
+html[data-a11y-line-height="4"] { --cena-a11y-line-height: 2.0; }
+
+html[data-a11y-line-height] body {
+  line-height: var(--cena-a11y-line-height, 1.6);
+}
+
+// Color-blind simulation. These matrices are the standard sRGB
+// approximations for protanopia/deuteranopia/tritanopia from Brettel et
+// al. (1997) — close enough for student/teacher self-audit of content.
+// Applied on <main> only so the toolbar + system chrome remain true
+// colour for orientation.
+html[data-a11y-color-blind="protanopia"] main {
+  filter: url('#cena-cb-protanopia') grayscale(0);
+}
+html[data-a11y-color-blind="deuteranopia"] main {
+  filter: url('#cena-cb-deuteranopia');
+}
+html[data-a11y-color-blind="tritanopia"] main {
+  filter: url('#cena-cb-tritanopia');
+}
+
+// Fallback when the SVG filters haven't mounted yet (e.g. on embed
+// routes with no chrome). Matrix functions via CSS `filter` aren't
+// supported across all Safari versions, so we lean on SVG filters and
+// accept a graceful no-op when they're missing.
+html[data-a11y-color-blind="off"] main {
+  filter: none;
+}
+
+// Underline all links — WCAG 2.4.7 "focus visibility" + 1.4.1 "use of
+// colour". Safe default: `text-decoration: underline` on <a> inside
+// <main> so top navigation / buttons that visually double as links
+// don't all suddenly underline.
+html[data-a11y-underline-links="on"] main a:not([class*="v-btn"]) {
+  text-decoration: underline !important;
+  text-underline-offset: 2px;
 }
