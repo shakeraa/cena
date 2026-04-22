@@ -1515,6 +1515,16 @@
       "confirm": "הוסף"
     }
   },
+  "mcOptionsGate": {
+    "placeholder": "האפשרויות מוסתרות. חשוב/י על תשובה קודם, אחר כך חשוף/י.",
+    "reveal": "הצג אפשרויות",
+    "optionsContainer": "אפשרויות תשובה",
+    "revealedAnnouncement": "האפשרויות גלויות כעת."
+  },
+  "attemptModeToggle": {
+    "label": "הסתר אפשרויות תשובה עד שאחליט שאני מוכנ/ה",
+    "description": "קרא/י את השאלה, חשוב/י על תשובה, ואז חשוף/י את האפשרויות. איפוס בכל שיעור חדש."
+  },
   "parentDashboard": {
     "title": "לוח הורים",
     "tierGate": {

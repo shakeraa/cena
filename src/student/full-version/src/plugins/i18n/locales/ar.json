@@ -1516,6 +1516,16 @@
       "confirm": "إضافة"
     }
   },
+  "mcOptionsGate": {
+    "placeholder": "الخيارات مخفية. فكّر/ي في الإجابة أولًا ثم اكشف/ي.",
+    "reveal": "أظهر الخيارات",
+    "optionsContainer": "خيارات الإجابة",
+    "revealedAnnouncement": "الخيارات ظاهرة الآن."
+  },
+  "attemptModeToggle": {
+    "label": "اخفِ خيارات الإجابة حتى أصبح جاهزًا/ة",
+    "description": "اقرأ/ي السؤال، فكّر/ي في الإجابة، ثم اكشف/ي الخيارات. تعاد التهيئة مع كل جلسة جديدة."
+  },
   "parentDashboard": {
     "title": "لوحة الوالدين",
     "tierGate": {

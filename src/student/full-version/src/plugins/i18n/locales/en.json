@@ -1544,6 +1544,16 @@
       "confirm": "Add"
     }
   },
+  "mcOptionsGate": {
+    "placeholder": "Options are hidden. Think about your answer first, then reveal.",
+    "reveal": "Show options",
+    "optionsContainer": "Answer options",
+    "revealedAnnouncement": "Options now visible."
+  },
+  "attemptModeToggle": {
+    "label": "Hide answer options until I'm ready",
+    "description": "Read the question, think about your answer, then reveal the options. Resets each session."
+  },
   "parentDashboard": {
     "title": "Parent dashboard",
     "tierGate": {
