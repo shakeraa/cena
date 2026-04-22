@@ -9,10 +9,30 @@ services:
     container_name: cena-prometheus
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      # PRR-434: Critical-alert rules + self-resolving routing.
+      - ./prometheus/rules:/etc/prometheus/rules:ro
     ports:
       - "9090:9090"
+    depends_on:
+      - alertmanager
     healthcheck:
       test: ["CMD-SHELL", "wget --spider -q http://localhost:9090/-/healthy"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # PRR-434: Alertmanager receives Prometheus alerts and routes them.
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: cena-alertmanager
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yml"
+    ports:
+      - "9093:9093"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q http://localhost:9093/-/healthy"]
       interval: 10s
       timeout: 3s
       retries: 3

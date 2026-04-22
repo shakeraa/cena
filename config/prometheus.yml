@@ -1,12 +1,31 @@
-# Cena Platform — Prometheus Configuration (RES-002)
+# =============================================================================
+# Cena Platform — Prometheus Configuration (PRR-433 + PRR-434)
+#
+# Scrape targets complete per EPIC-PRR-L PRR-433 (actors, admin-api,
+# student-api, NATS, sympy-sidecar, prometheus self). Alert rules loaded
+# from config/prometheus/rules/ per EPIC-PRR-L PRR-434 (6 CriticalAlert
+# records from ObservabilityConfiguration.cs materialized as live rules).
+#
+# Kestrel binds the .NET services on host ports: 5050 (student-api),
+# 5052 (admin-api), 5119 (actor-host Prometheus endpoint). NATS monitoring
+# endpoint is 8222. `host.docker.internal` routes from inside the compose
+# network back to the host ports.
+# =============================================================================
+
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+rule_files:
+  - /etc/prometheus/rules/cena-critical-alerts.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+
 scrape_configs:
-  - job_name: "cena-actors-host"
-    # Scrape the ASP.NET Core Prometheus endpoint
-    # Adjust target if running outside Docker (use host.docker.internal on macOS)
+  - job_name: "cena-actor-host"
     static_configs:
       - targets: ["host.docker.internal:5119"]
         labels:
@@ -16,11 +35,35 @@ scrape_configs:
 
   - job_name: "cena-admin-api"
     static_configs:
-      - targets: ["host.docker.internal:5050"]
+      - targets: ["host.docker.internal:5052"]
         labels:
           service: "admin-api"
     metrics_path: /metrics
     scrape_interval: 15s
+
+  - job_name: "cena-student-api"
+    static_configs:
+      - targets: ["host.docker.internal:5050"]
+        labels:
+          service: "student-api"
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: "cena-nats"
+    static_configs:
+      - targets: ["host.docker.internal:8222"]
+        labels:
+          service: "nats"
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+  - job_name: "cena-sympy-sidecar"
+    static_configs:
+      - targets: ["host.docker.internal:8000"]
+        labels:
+          service: "sympy-sidecar"
+    metrics_path: /metrics
+    scrape_interval: 30s
 
   - job_name: "prometheus"
     static_configs:
