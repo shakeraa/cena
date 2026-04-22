@@ -12,6 +12,7 @@ using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
 using Cena.Actors.Infrastructure.Privacy;
 using Cena.Actors.Notifications;
+using Cena.Actors.Retention;
 using Cena.Actors.StudentPlan;
 using Cena.Actors.Teacher.ScheduleOverride;
 using Cena.Admin.Api;
@@ -267,6 +268,13 @@ public partial class Program
     // classroom assignments (prr-236) and admin consent exports survive a
     // process restart.
     builder.Services.AddStudentPlanMarten();
+
+    // prr-222 production binding: same Marten replacement for the
+    // skill-keyed mastery store. The Admin Host reads mastery rows to
+    // power the teacher dashboard and admin audit exports; persistence is
+    // required so those surfaces don't read empty after a deploy.
+    builder.Services.AddExamTargetRetentionServices();
+    builder.Services.AddSkillKeyedMasteryMarten();
 
     // prr-236: Classroom-assigned target teacher UI — Marten-backed roster
     // lookup that feeds the classroom-target fan-out service. The service

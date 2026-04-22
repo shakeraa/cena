@@ -289,6 +289,14 @@ public partial class Program
     // the in-memory store is test-only; production (Student.Api.Host)
     // persists the StudentPlanAggregate event stream via Marten.
     builder.Services.AddStudentPlanMarten();
+
+    // prr-222 production binding: replace the in-memory skill-keyed
+    // mastery store with the Marten-backed MartenSkillKeyedMasteryStore
+    // so BKT posteriors survive a process restart. Requires
+    // AddExamTargetRetentionServices to have been called first (the shared
+    // registration is idempotent; repeating it is safe).
+    builder.Services.AddExamTargetRetentionServices();
+    builder.Services.AddSkillKeyedMasteryMarten();
     builder.Services.AddSingleton<
         Cena.Actors.Sessions.IStudentPlanConfigService,
         Cena.Actors.Sessions.StudentPlanConfigBridgeService>();
