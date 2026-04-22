@@ -48,7 +48,7 @@ fixture under `shipgate/fixtures/`):
 - `effect-size` — [PRR-071] uncited effect sizes.
 - `therapeutic-claims`, `progress-framing`, `error-blame`, `cheating-alert`, `reward-emoji` — [EPIC-PRR-D 2nd-wave].
 - `positive-framing-extended` — [EPIC-PRR-D P2 tail].
-- `multi-target-mechanics` — [PRR-224] multi-target cohort-shaming + ADR-0050 §10 identifier bans (daysUntil / countdown / streak / deadlinePressure anywhere in `src/`). Covers cross-target framings like "don't miss your Bagrut — only N days", "falling behind in Physics", and cross-target cohort shaming.
+- `multi-target-mechanics` — [PRR-224] multi-target cohort-shaming + ADR-0050 §10 identifier bans (daysUntil / countdown / streak / deadlinePressure anywhere in `src/`). Covers cross-target framings like "don't miss your Bagrut — only N days", "falling behind in Physics", and cross-target cohort shaming. Extended by [PRR-264] with hide-reveal timer / auto-hide identifier + copy bans (`autoHideOptionsAfter`, `optionsRevealTimer`, `revealCountdown`, `scheduled_hide_at`, "options disappear in N seconds", "you have N seconds before the options hide") across en/he/ar — closes the STUDENT-INPUT-MODALITIES-002 §3.1 persona-ethics red line on time-pressure leakage into the hide-reveal primitive.
 
 ### 2. UX-surface DOM-aware scanner v2 (`scripts/shipgate/ux-surface-scan.mjs`, prr-211)
 

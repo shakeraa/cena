@@ -113,3 +113,36 @@ const urgency_score = 9                // ident-deadline-pressure
 - زملاؤك متقدمون في الفيزياء — peers are ahead in Physics.
 - الطلاب الآخرون يسبقونك في الرياضيات — other students are ahead in Math.
 - صفّك أمامك في البجروت — your class is ahead in Bagrut.
+
+## PRR-264 — Hide-reveal timer / auto-hide bans
+
+Identifier-level (BANNED):
+const autoHideOptionsAfter = 10        // hide-reveal-auto-hide-identifier
+const autoHideAfterSeconds = 8         // hide-reveal-auto-hide-identifier
+const autoHideMs = 5000                // hide-reveal-auto-hide-identifier
+const autoHideTimer = null             // hide-reveal-auto-hide-identifier
+const optionsRevealTimer = 0           // hide-reveal-reveal-timer-identifier
+const revealTimer = null               // hide-reveal-reveal-timer-identifier
+const revealCountdown = 5              // hide-reveal-reveal-countdown-identifier
+scheduledHideAt: Date.now()            // hide-reveal-scheduled-hide-identifier
+scheduled_hide_at                      // hide-reveal-scheduled-hide-identifier
+
+English copy (BANNED):
+- Options disappear in 10 seconds — pick fast!
+- Choices hide in 5 seconds if you do not answer.
+- Answers vanish in 8 seconds.
+- You have 10 seconds before the options hide.
+- You have 12 seconds until the reveal locks.
+- You have 6 seconds to pick before options vanish.
+- Hurry before options hide forever!
+- Hurry up or answers disappear.
+
+Hebrew copy (BANNED — verify with reviewer):
+- האפשרויות ייעלמו בעוד 10 שניות.
+- התשובות נעלמות בעוד 5 שניות.
+- יש לך 8 שניות לפני שהאפשרויות ייסגרו.
+
+Arabic copy (BANNED — verify with native speaker):
+- الخيارات ستختفي خلال 10 ثوان.
+- الإجابات تختفي في 5 ثوان.
+- لديك 8 ثوان قبل إخفاء الخيارات.

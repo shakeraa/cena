@@ -197,3 +197,83 @@ rules:
     pattern: "(زملاؤك|الطلاب\\s+الآخرون|صفّك|صفك)\\s+(متقدمون|يسبقونك|أمامك)\\s+في\\s+(الرياضيات|الفيزياء|الكيمياء|الأحياء|الإنجليزية|البجروت|البسيخومتري)"
     flags: u
     locale: ar
+
+  # --------------------------------------------------------------------------
+  # PRR-264 — Hide-reveal timer / auto-hide bans (identifier-level, EN copy)
+  # --------------------------------------------------------------------------
+  # Source: STUDENT-INPUT-MODALITIES-002 §3.1 — persona-ethics rejected
+  # Option C (silent auto-hide of MC options after N seconds) because it
+  # converts a hide-reveal pedagogy primitive into a time-pressure mechanic
+  # in violation of ADR-0048 exam-prep-positive-framing and CLAUDE.md
+  # Design Non-Negotiable #3 (no variable-ratio / loss-aversion mechanics).
+  # The identifiers below catch the leakage pattern where copy is clean but
+  # the variable name encodes the banned mechanic (telemetry field, aria-
+  # label, observability log field). AST-level enforcement of setTimeout /
+  # setInterval inside hide-reveal files is a follow-up that requires a
+  # real JS parser in the CI runner; regex catches the identifier + copy
+  # surface which is where the documented §3.1 concern lives.
+
+  - id: hide-reveal-auto-hide-identifier
+    reason: "Banned 'autoHide*' identifier in hide-reveal context (PRR-264)"
+    pattern: "\\bautoHide(Options|After|Ms|Seconds|Timer)[A-Za-z0-9_]*\\b"
+
+  - id: hide-reveal-reveal-timer-identifier
+    reason: "Banned 'optionsRevealTimer' / 'revealTimer' identifier (PRR-264)"
+    pattern: "\\b(options?)?RevealTimer[A-Za-z0-9_]*\\b"
+
+  - id: hide-reveal-reveal-countdown-identifier
+    reason: "Banned 'revealCountdown' identifier (PRR-264 — time-pressure leakage)"
+    pattern: "\\brevealCountdown[A-Za-z0-9_]*\\b"
+
+  - id: hide-reveal-scheduled-hide-identifier
+    reason: "Banned 'scheduledHideAt' state field (PRR-264 — server-side force-hide)"
+    pattern: "\\bscheduled_?hide_?at\\b"
+    flags: i
+
+  - id: hide-reveal-hide-countdown-copy-en
+    reason: "Banned 'options disappear in N seconds' copy (PRR-264)"
+    pattern: "options?\\s+(disappear|hide|vanish|go\\s+away)\\s+in\\s+\\d"
+    flags: i
+    locale: en
+
+  - id: hide-reveal-you-have-seconds-en
+    reason: "Banned 'you have N seconds' before-hide copy (PRR-264)"
+    pattern: "you\\s+have\\s+\\d+\\s+seconds?\\s+(before|until|to\\s+(hide|reveal|pick))"
+    flags: i
+    locale: en
+
+  - id: hide-reveal-hurry-before-hide-en
+    reason: "Banned 'hurry before options hide' urgency copy (PRR-264)"
+    pattern: "hurry\\s+(up\\s+)?(before|or)\\s+(options|answers|choices)\\s+(hide|disappear|vanish|lock)"
+    flags: i
+    locale: en
+
+  # --------------------------------------------------------------------------
+  # PRR-264 — Hebrew hide-reveal timer / auto-hide bans
+  # --------------------------------------------------------------------------
+  - id: he-hide-reveal-options-disappear
+    reason: "Hebrew 'options disappear in N seconds' (PRR-264 — verify w/ he reviewer)"
+    pattern: "(האפשרויות|התשובות|התשובה)\\s+(ייעלמו|נעלמות|יסגרו|ייסגרו)\\s+בעוד\\s+\\d"
+    flags: u
+    locale: he
+
+  - id: he-hide-reveal-you-have-seconds
+    reason: "Hebrew 'you have N seconds before hide' (PRR-264 — verify w/ he reviewer)"
+    pattern: "יש\\s+לך\\s+\\d+\\s+שניות\\s+(לפני|עד)"
+    flags: u
+    locale: he
+
+  # --------------------------------------------------------------------------
+  # PRR-264 — Arabic hide-reveal timer / auto-hide bans
+  # --------------------------------------------------------------------------
+  - id: ar-hide-reveal-options-disappear
+    reason: "Arabic 'options disappear in N seconds' (PRR-264 — verify w/ native speaker)"
+    pattern: "(الخيارات|الإجابات|الإجابة)\\s+(ستختفي|تختفي|ستُغلق)\\s+(خلال|في)\\s+\\d"
+    flags: u
+    locale: ar
+
+  - id: ar-hide-reveal-you-have-seconds
+    reason: "Arabic 'you have N seconds before hide' (PRR-264 — verify w/ native speaker)"
+    pattern: "لديك\\s+\\d+\\s+(ثوان|ثانية)\\s+(قبل|حتى)"
+    flags: u
+    locale: ar
