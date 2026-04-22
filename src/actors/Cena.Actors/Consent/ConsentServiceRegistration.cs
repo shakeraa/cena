@@ -18,6 +18,7 @@
 
 using Cena.Infrastructure.Compliance;
 using Cena.Infrastructure.Compliance.KeyStore;
+using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
@@ -55,6 +56,39 @@ public static class ConsentServiceRegistration
         // IStudentAgeBandLookup first.
         services.TryAddSingleton<IStudentAgeBandLookup, MartenStudentAgeBandLookup>();
 
+        return services;
+    }
+
+    /// <summary>
+    /// Replace the in-memory <see cref="IConsentAggregateStore"/> binding
+    /// registered by <see cref="AddConsentAggregate"/> with the
+    /// Marten-backed <see cref="MartenConsentAggregateStore"/> and register
+    /// every consent event type on the Marten <see cref="StoreOptions"/>
+    /// via <see cref="ConsentMartenRegistration.RegisterConsentContext"/>.
+    /// <para>
+    /// Per memory "No stubs — production grade" (2026-04-11), the in-memory
+    /// store is test-only; production hosts persist the consent event
+    /// stream via Marten. The consent stream is the compliance audit trail
+    /// for ADR-0042 and ADR-0038 — an in-memory fallback loses every
+    /// grant / revoke / parent-review / admin-override / student-veto on
+    /// every host restart, which is unrecoverable from other signals.
+    /// </para>
+    /// <para>
+    /// Composition order: call <see cref="AddConsentAggregate"/> first
+    /// (wires the command handler + adapter + age-band lookup + in-memory
+    /// default store), then this method to replace the store binding.
+    /// Requires <c>AddMarten()</c> to have been invoked on
+    /// <paramref name="services"/> already.
+    /// </para>
+    /// </summary>
+    public static IServiceCollection AddConsentAggregateMarten(this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<MartenConsentAggregateStore>();
+        services.Replace(ServiceDescriptor.Singleton<IConsentAggregateStore>(sp
+            => sp.GetRequiredService<MartenConsentAggregateStore>()));
+        services.ConfigureMarten(opts => opts.RegisterConsentContext());
         return services;
     }
 }

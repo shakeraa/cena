@@ -311,6 +311,12 @@ public partial class Program
     // authorization guard consults on every parent-scoped request.
     Cena.Actors.Parent.ParentServiceRegistration.AddParentChildBindingMarten(
         builder.Services);
+
+    // prr-155 / ADR-0042 production binding: Marten replacement for the
+    // consent aggregate event store. Consent is the compliance audit
+    // trail — losing it on pod restart is unrecoverable.
+    Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregateMarten(
+        builder.Services);
     builder.Services.AddSingleton<
         Cena.Actors.Sessions.IStudentPlanConfigService,
         Cena.Actors.Sessions.StudentPlanConfigBridgeService>();

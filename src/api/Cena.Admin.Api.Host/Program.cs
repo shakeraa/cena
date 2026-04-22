@@ -291,6 +291,14 @@ public partial class Program
     Cena.Actors.Parent.ParentServiceRegistration.AddParentChildBindingMarten(
         builder.Services);
 
+    // prr-155 / ADR-0042 production binding: Marten replacement for the
+    // consent aggregate event store. Consent is the compliance audit
+    // trail — losing it on pod restart is unrecoverable, and ADR-0038
+    // event-sourced RTBF assumes the stream is durable so crypto-shreds
+    // can land idempotently against real events.
+    Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregateMarten(
+        builder.Services);
+
     // prr-236: Classroom-assigned target teacher UI — Marten-backed roster
     // lookup that feeds the classroom-target fan-out service. The service
     // itself is registered by AddStudentPlanServices above; only the
