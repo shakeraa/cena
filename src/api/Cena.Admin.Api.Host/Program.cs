@@ -299,6 +299,13 @@ public partial class Program
     Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregateMarten(
         builder.Services);
 
+    // prr-150 production binding: Marten replacement for the teacher-
+    // override aggregate store. Without this, every motivation-profile
+    // override, budget adjustment, and pinned topic silently reverts on
+    // every deploy — a teacher-trust erosion at scale.
+    Cena.Actors.Teacher.ScheduleOverride.TeacherOverrideServiceRegistration
+        .AddTeacherOverrideMarten(builder.Services);
+
     // prr-236: Classroom-assigned target teacher UI — Marten-backed roster
     // lookup that feeds the classroom-target fan-out service. The service
     // itself is registered by AddStudentPlanServices above; only the
