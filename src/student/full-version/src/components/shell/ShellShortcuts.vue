@@ -28,6 +28,21 @@ useShortcut([
       paletteOpen.value = true
     },
   },
+  // PRR-A11Y-SEMANTICS-SHORTCUT: register Alt+A in the cheatsheet so
+  // discovery happens alongside the other global shortcuts. The actual
+  // Alt+A listener lives inside A11yToolbar.vue (mounted on every layout,
+  // including auth/blank where ShellShortcuts is absent) — this entry is
+  // documentation-only so the help UI lists the shortcut.
+  {
+    id: 'global.a11y.toolbar',
+    keys: 'alt+a',
+    label: 'Open accessibility toolbar',
+    scope: 'global',
+    blockInInputs: false,
+    handler: () => {
+      // No-op: A11yToolbar owns the real Alt+A handler.
+    },
+  },
   {
     id: 'global.cheatsheet',
     keys: '?',

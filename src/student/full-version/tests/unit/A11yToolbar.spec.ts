@@ -153,7 +153,13 @@ describe('A11yToolbar', () => {
     await arRadio.trigger('change')
     await flushPromises()
 
-    expect(localStorage.getItem('cena-student-locale')).toBe('ar')
+    // Post-2026-04-21: A11yToolbar writes through useLocaleStore which
+    // persists the v1 schema `{code, locked, version}` to localStorage,
+    // not a bare string. The locale store's readPersisted() still upcasts
+    // legacy bare strings so existing users aren't re-prompted.
+    const raw = localStorage.getItem('cena-student-locale')!
+
+    expect(JSON.parse(raw)).toMatchObject({ code: 'ar', locked: true, version: 1 })
     expect(document.documentElement.lang).toBe('ar')
     expect(document.documentElement.dir).toBe('rtl')
   })
@@ -219,5 +225,77 @@ describe('A11yToolbar', () => {
     expect(wrapper.find('[data-testid="a11y-motion-toggle"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="a11y-dyslexia-toggle"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="a11y-reset"]').exists()).toBe(true)
+  })
+
+  // PRR-A11Y-EXPANDED-CONTROLS: new surfaces.
+  it('renders line-height slider, color-blind radio, and underline-links toggle', async () => {
+    const wrapper = await mountToolbarOpen()
+
+    expect(wrapper.find('[data-testid="a11y-line-height-slider"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="a11y-color-blind-section"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="a11y-color-blind-protanopia"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="a11y-color-blind-deuteranopia"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="a11y-color-blind-tritanopia"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="a11y-underline-links-toggle"]').exists()).toBe(true)
+  })
+
+  it('color-blind selection writes through store and flips html[data-a11y-color-blind]', async () => {
+    const wrapper = await mountToolbarOpen()
+
+    const proto = wrapper.find('[data-testid="a11y-color-blind-protanopia"]')
+
+    await proto.trigger('change')
+    await flushPromises()
+
+    expect(document.documentElement.getAttribute('data-a11y-color-blind')).toBe('protanopia')
+  })
+
+  it('underline-links toggle flips html[data-a11y-underline-links]', async () => {
+    const wrapper = await mountToolbarOpen()
+
+    expect(document.documentElement.getAttribute('data-a11y-underline-links')).toBe('off')
+    await (wrapper.vm as any).onUnderlineToggle()
+    await flushPromises()
+
+    expect(document.documentElement.getAttribute('data-a11y-underline-links')).toBe('on')
+  })
+
+  // PRR-A11Y-SEMANTICS-SHORTCUT.
+  it('handle exposes id="a11y-toolbar-handle" so the skip link can target it', async () => {
+    const { vuetify, i18n } = makeHarness()
+
+    const wrapper = mount(A11yToolbar, {
+      global: {
+        plugins: [vuetify, i18n],
+        stubs: { teleport: true, VNavigationDrawer: drawerStub },
+      },
+    })
+
+    const handle = wrapper.find('[data-testid="a11y-toolbar-handle"]')
+
+    expect(handle.attributes('id')).toBe('a11y-toolbar-handle')
+  })
+
+  it('Alt+A global keydown opens the toolbar', async () => {
+    const { vuetify, i18n } = makeHarness()
+
+    const wrapper = mount(A11yToolbar, {
+      attachTo: document.body,
+      global: {
+        plugins: [vuetify, i18n],
+        stubs: { teleport: true, VNavigationDrawer: drawerStub },
+      },
+    })
+
+    expect((wrapper.vm as any).open).toBe(false)
+
+    const evt = new KeyboardEvent('keydown', { key: 'a', altKey: true })
+
+    window.dispatchEvent(evt)
+    await flushPromises()
+
+    expect((wrapper.vm as any).open).toBe(true)
+
+    wrapper.unmount()
   })
 })

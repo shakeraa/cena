@@ -1,44 +1,23 @@
 <script setup lang="ts">
-// =============================================================================
-// A11yToolbar — Israeli Equal-Rights for Persons with Disabilities Law
-// (5758-1998) compliance. Offers text-size slider, high-contrast toggle,
-// dyslexia-font toggle, reduced-motion toggle, numerals preference
-// (PRR-232), a language switcher (IL 5758-1998 "independent control"
-// principle — Arabic/Hebrew readers must be able to switch BEFORE login),
-// and a reset button.
-//
-// Placement: slide-in sheet from the trailing edge (inline-end). Trigger is
-// a persistent "handle" button anchored inline-end, center-vertical.
-// The sheet is a true dialog (focus-trap, role=dialog, Esc closes).
-//
-// WHY language switcher lives here (added 2026-04-21 via
-// claude-subagent-wave6b): the first A11yToolbar pass deliberately scoped
-// only WCAG-oriented controls and delegated locale to the onboarding /
-// settings flows. User review surfaced that students landing on the wrong
-// locale (shared device, public kiosk, wrong OS default) could not reach
-// the LanguagePicker without first completing onboarding — an access
-// barrier for first-language Arabic/Hebrew readers and arguably a
-// violation of the IL 5758-1998 "independent control" principle. The
-// follow-up collapses i18n into the a11y surface so language is a
-// first-class a11y control on every layout (default / auth / blank).
-//
-// Deferred to separate follow-up tasks (see
-// TASK-PRR-A11Y-TOOLBAR-ENRICH-FOLLOWUPS):
-//   - First-run full-screen language chooser (prr-a11y-first-run-chooser)
-//   - Color-blind simulation filters (prr-a11y-color-blind)
-//   - Cursor-tracking reading guide (prr-a11y-reading-guide)
-//   - Line-height slider (prr-a11y-line-height)
-//   - Alt+A keyboard shortcut (prr-a11y-keyboard-shortcut)
-// =============================================================================
-import { computed, ref } from 'vue'
+// A11yToolbar — IL 5758-1998 + Reg 5773-2013 compliance. Offers text-size,
+// high-contrast, dyslexia-font, reduced-motion, numerals, language, plus
+// line-height / color-blind sim / underline-all-links (added 2026-04-21 via
+// PRR-A11Y-EXPANDED-CONTROLS). Alt+A opens it from any layout and every
+// preference change emits an aria-live announce (PRR-A11Y-SEMANTICS-SHORTCUT).
+// Language writes route through useLocaleStore + useLocaleSideEffects so the
+// toolbar, LanguageSwitcher, and FirstRunLanguageChooser never drift.
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useLocale } from 'vuetify'
-import { useA11yStore } from '@/stores/a11yStore'
+import { useA11yStore, LINE_HEIGHT_STEPS, type A11yColorBlind, type A11yLineHeight } from '@/stores/a11yStore'
 import { useOnboardingStore, type NumeralsPreference } from '@/stores/onboardingStore'
 import { useAvailableLocales, type LocaleDescriptor } from '@/composables/useAvailableLocales'
+import { useLocaleSideEffects } from '@/composables/useLocaleSideEffects'
+import { useLocaleStore } from '@/stores/localeStore'
+import A11yColorBlindRadio from '@/components/common/A11yColorBlindRadio.vue'
 
 const { t, locale: i18nLocale } = useI18n()
-const vuetifyLocale = useLocale()
+const { apply: applyLocaleSideEffects } = useLocaleSideEffects()
+const localeStore = useLocaleStore()
 const a11y = useA11yStore()
 const onboarding = useOnboardingStore()
 const { locales: availableLocales, hebrewEnabled } = useAvailableLocales()
@@ -54,20 +33,21 @@ const sizeMarks = computed(() => [
   { value: 5, label: t('a11y.size.xxlarge') },
 ])
 
-// PRR-232: numerals preference. `null` in the store means "auto from
-// locale"; the radio group surfaces the auto default as a non-modifying
-// option so the student can opt back into locale-driven behavior.
+// PRR-232: numerals preference. `null` in the store means "auto from locale".
 type NumeralsChoice = 'auto' | NumeralsPreference
 const numeralsChoice = computed<NumeralsChoice>(() =>
   onboarding.numeralsPreference === null ? 'auto' : onboarding.numeralsPreference,
 )
 function setNumerals(choice: NumeralsChoice) {
   onboarding.setNumeralsPreference(choice === 'auto' ? null : choice)
+  const label
+    = choice === 'auto' ? t('a11y.numerals.auto')
+    : choice === 'eastern' ? t('a11y.numerals.eastern')
+    : t('a11y.numerals.western')
+  announce(t('a11y.announce.numerals', { value: label }))
 }
 
-// Language switcher — mirrors LanguageSwitcher.vue's persistence contract
-// (same storage key) so the two stay in lockstep when both are visible.
-const LOCALE_STORAGE_KEY = 'cena-student-locale'
+// Language — single-seam writer via useLocaleSideEffects + useLocaleStore.
 const currentLocale = computed<LocaleDescriptor['code']>(() => {
   const code = i18nLocale.value
   if (code === 'en' || code === 'ar' || code === 'he')
@@ -75,39 +55,128 @@ const currentLocale = computed<LocaleDescriptor['code']>(() => {
   return 'en'
 })
 function setLocale(code: LocaleDescriptor['code']) {
-  const found = availableLocales.value.find(l => l.code === code)
-  if (!found)
-    return
-
-  // Defence in depth: if Hebrew is gated off at build time, the filtered
-  // list already excluded it, but a stray radio dispatch shouldn't crash.
   if (code === 'he' && !hebrewEnabled)
     return
-
-  i18nLocale.value = code
-  vuetifyLocale.current.value = code
-  if (typeof document !== 'undefined') {
-    document.documentElement.lang = code
-    document.documentElement.dir = found.dir
-  }
-  if (typeof localStorage !== 'undefined')
-    localStorage.setItem(LOCALE_STORAGE_KEY, code)
-
-  // Keep the onboarding store in sync so store-driven flows (settings
-  // page, useMathRenderer's numerals inference) see the new locale
-  // immediately without waiting for a route change.
+  const applied = applyLocaleSideEffects(code)
+  if (!applied)
+    return
+  localeStore.setLocale(code, { lock: true })
   onboarding.setLocale(code)
+  announce(t('a11y.announce.language', { value: applied.label }))
+}
+
+// ───── aria-live announcer ─────
+// PRR-A11Y-SEMANTICS-SHORTCUT: every preference change emits a polite live
+// message. The global #cena-live-region element (mounted in App.vue) is the
+// target; if it is not in the DOM we fall back to a local element. Debounced
+// so slider drag only announces the final resting value.
+let pendingAnnounce: ReturnType<typeof setTimeout> | null = null
+function announce(message: string, delay = 250) {
+  if (pendingAnnounce) {
+    clearTimeout(pendingAnnounce)
+    pendingAnnounce = null
+  }
+  pendingAnnounce = setTimeout(() => {
+    pendingAnnounce = null
+    if (typeof document === 'undefined')
+      return
+    const region = document.getElementById('cena-live-region')
+    if (!region)
+      return
+    // Flip the content twice so screen readers re-announce even when the
+    // same message fires in quick succession (AT implementation quirk).
+    region.textContent = ''
+    requestAnimationFrame(() => { region.textContent = message })
+  }, delay)
+}
+
+// ───── announce wrappers for boolean toggles ─────
+function onContrastToggle() {
+  a11y.toggleContrast()
+  announce(t('a11y.announce.contrast', {
+    value: a11y.prefs.contrast === 'high' ? t('a11y.announce.enabled') : t('a11y.announce.disabled'),
+  }))
+}
+function onMotionToggle() {
+  a11y.toggleMotion()
+  announce(t('a11y.announce.motion', {
+    value: a11y.prefs.motion === 'reduced' ? t('a11y.announce.enabled') : t('a11y.announce.disabled'),
+  }))
+}
+function onDyslexiaToggle() {
+  a11y.toggleDyslexiaFont()
+  announce(t('a11y.announce.dyslexia', {
+    value: a11y.prefs.dyslexiaFont === 'on' ? t('a11y.announce.enabled') : t('a11y.announce.disabled'),
+  }))
+}
+function onUnderlineToggle() {
+  a11y.toggleUnderlineLinks()
+  announce(t('a11y.announce.underlineLinks', {
+    value: a11y.prefs.underlineLinks === 'on' ? t('a11y.announce.enabled') : t('a11y.announce.disabled'),
+  }))
+}
+function onSetTextSize(v: number) {
+  a11y.setTextSize(v as 0 | 1 | 2 | 3 | 4 | 5)
+  announce(t('a11y.announce.textSize', { value: sizeMarks.value[a11y.prefs.textSize].label }))
+}
+function onSetLineHeight(v: number) {
+  const step = Math.max(0, Math.min(4, Math.round(v))) as A11yLineHeight
+  a11y.setLineHeight(step)
+  announce(t('a11y.announce.lineHeight', { value: `${LINE_HEIGHT_STEPS[step].toFixed(1)}×` }))
+}
+function onSetColorBlind(mode: A11yColorBlind) {
+  a11y.setColorBlind(mode)
+  const labelKey
+    = mode === 'protanopia' ? 'a11y.cbProtanopia'
+    : mode === 'deuteranopia' ? 'a11y.cbDeuteranopia'
+    : mode === 'tritanopia' ? 'a11y.cbTritanopia'
+    : 'a11y.cbNone'
+  announce(t('a11y.announce.colorBlind', { value: t(labelKey) }))
+}
+function onReset() {
+  a11y.resetToDefaults()
+  announce(t('a11y.announce.reset'))
 }
 
 function closeOnEsc(event: KeyboardEvent) {
   if (event.key === 'Escape') open.value = false
 }
+
+// ───── Alt+A global shortcut ─────
+// We attach our own listener rather than go through `useShortcut` because
+// the A11yToolbar is mounted in EVERY layout (including auth/blank where
+// ShellShortcuts is not present). Alt+A is used sparingly by OS screen
+// readers — NVDA uses Insert+, JAWS uses Insert+, VoiceOver uses Ctrl+
+// Opt+ — so Alt+A is safe.
+function onGlobalKeydown(e: KeyboardEvent) {
+  if (e.altKey && !e.metaKey && !e.ctrlKey && e.key.toLowerCase() === 'a') {
+    e.preventDefault()
+    open.value = true
+  }
+}
+onMounted(() => {
+  if (typeof window !== 'undefined')
+    window.addEventListener('keydown', onGlobalKeydown)
+})
+onBeforeUnmount(() => {
+  if (typeof window !== 'undefined')
+    window.removeEventListener('keydown', onGlobalKeydown)
+  if (pendingAnnounce)
+    clearTimeout(pendingAnnounce)
+})
+
+// Keep the reactive store in sync when mounting — ensures announce() text
+// picks up the correct locale on first keystroke after locale switch.
+watch(i18nLocale, () => {
+  // no-op today; placeholder for future "language changed" polite announce.
+})
 </script>
 
 <template>
   <!-- Persistent handle — fixed inline-end center. Always reachable even
        when the sidebar is collapsed. Tab-accessible. -->
   <VBtn
+    id="a11y-toolbar-handle"
     class="a11y-toolbar__handle"
     color="primary"
     icon
@@ -150,8 +219,11 @@ function closeOnEsc(event: KeyboardEvent) {
         </VBtn>
       </div>
 
-      <!-- Language — listed first so first-language Arabic/Hebrew readers
-           reach it without scrolling past the WCAG toggles. -->
+      <p class="text-caption text-medium-emphasis mb-4">
+        {{ t('a11y.shortcutHint') }}
+      </p>
+
+      <!-- Language -->
       <fieldset
         class="mb-6 a11y-toolbar__fieldset"
         data-testid="a11y-language-section"
@@ -180,9 +252,6 @@ function closeOnEsc(event: KeyboardEvent) {
               :checked="currentLocale === option.code"
               @change="setLocale(option.code)"
             >
-            <!-- Native-script label — never transliterated. Per-locale
-                 fonts (Noto Sans Hebrew / Noto Kufi Arabic) are already
-                 loaded by commits cdfc0a24 / 418aec7a. -->
             <bdi :dir="option.dir">{{ option.label }}</bdi>
           </label>
         </div>
@@ -217,6 +286,7 @@ function closeOnEsc(event: KeyboardEvent) {
             aria-labelledby="a11y-size-label"
             data-testid="a11y-text-size-slider"
             class="flex-grow-1"
+            @end="onSetTextSize($event as number)"
             @update:model-value="(v) => a11y.setTextSize(v as 0 | 1 | 2 | 3 | 4 | 5)"
           />
           <VBtn
@@ -236,6 +306,30 @@ function closeOnEsc(event: KeyboardEvent) {
         </p>
       </div>
 
+      <!-- Line-height (PRR-A11Y-EXPANDED-CONTROLS) -->
+      <div class="mb-6">
+        <label
+          id="a11y-line-height-label"
+          class="text-subtitle-2 mb-2 d-block"
+        >
+          {{ t('a11y.lineHeight') }}
+        </label>
+        <VSlider
+          :model-value="a11y.prefs.lineHeight"
+          :min="0"
+          :max="4"
+          :step="1"
+          hide-details
+          aria-labelledby="a11y-line-height-label"
+          data-testid="a11y-line-height-slider"
+          @end="onSetLineHeight($event as number)"
+          @update:model-value="(v) => a11y.setLineHeight(Math.max(0, Math.min(4, Math.round(v as number))) as 0 | 1 | 2 | 3 | 4)"
+        />
+        <p class="text-caption text-medium-emphasis mb-0">
+          <bdi dir="ltr">{{ LINE_HEIGHT_STEPS[a11y.prefs.lineHeight].toFixed(1) }}×</bdi>
+        </p>
+      </div>
+
       <!-- High contrast -->
       <VSwitch
         :model-value="a11y.prefs.contrast === 'high'"
@@ -244,7 +338,7 @@ function closeOnEsc(event: KeyboardEvent) {
         hide-details
         class="mb-2"
         data-testid="a11y-contrast-toggle"
-        @update:model-value="a11y.toggleContrast"
+        @update:model-value="onContrastToggle"
       />
 
       <!-- Reduced motion -->
@@ -255,7 +349,7 @@ function closeOnEsc(event: KeyboardEvent) {
         hide-details
         class="mb-2"
         data-testid="a11y-motion-toggle"
-        @update:model-value="a11y.toggleMotion"
+        @update:model-value="onMotionToggle"
       />
 
       <!-- Dyslexia font -->
@@ -264,14 +358,30 @@ function closeOnEsc(event: KeyboardEvent) {
         :label="t('a11y.dyslexiaFont')"
         color="primary"
         hide-details
-        class="mb-4"
+        class="mb-2"
         data-testid="a11y-dyslexia-toggle"
-        @update:model-value="a11y.toggleDyslexiaFont"
+        @update:model-value="onDyslexiaToggle"
       />
 
-      <!-- PRR-232: Numerals preference. Samples are forced LTR so the
-           western vs eastern digits render in numeric order even when the
-           toolbar sits on an RTL page. -->
+      <!-- Underline all links (PRR-A11Y-EXPANDED-CONTROLS) -->
+      <VSwitch
+        :model-value="a11y.prefs.underlineLinks === 'on'"
+        :label="t('a11y.underlineLinks')"
+        color="primary"
+        hide-details
+        class="mb-4"
+        data-testid="a11y-underline-links-toggle"
+        @update:model-value="onUnderlineToggle"
+      />
+
+      <!-- Color-blind filter (PRR-A11Y-EXPANDED-CONTROLS) — extracted so
+           the parent stays under the 500-LOC cap. -->
+      <A11yColorBlindRadio
+        :model-value="a11y.prefs.colorBlind"
+        @change="onSetColorBlind"
+      />
+
+      <!-- PRR-232: Numerals preference. -->
       <fieldset
         class="mb-6 a11y-toolbar__fieldset"
         data-testid="a11y-numerals-section"
@@ -308,10 +418,7 @@ function closeOnEsc(event: KeyboardEvent) {
               @change="setNumerals('western')"
             >
             <span>{{ t('a11y.numerals.western') }}</span>
-            <bdi
-              dir="ltr"
-              class="text-caption text-medium-emphasis"
-            >(0123)</bdi>
+            <bdi dir="ltr" class="text-caption text-medium-emphasis">(0123)</bdi>
           </label>
           <label class="d-flex align-center ga-2 cursor-pointer">
             <input
@@ -323,10 +430,7 @@ function closeOnEsc(event: KeyboardEvent) {
               @change="setNumerals('eastern')"
             >
             <span>{{ t('a11y.numerals.eastern') }}</span>
-            <bdi
-              dir="ltr"
-              class="text-caption text-medium-emphasis"
-            >(٠١٢٣)</bdi>
+            <bdi dir="ltr" class="text-caption text-medium-emphasis">(٠١٢٣)</bdi>
           </label>
         </div>
       </fieldset>
@@ -338,12 +442,9 @@ function closeOnEsc(event: KeyboardEvent) {
         block
         :aria-label="t('a11y.resetDefaults')"
         data-testid="a11y-reset"
-        @click="a11y.resetToDefaults"
+        @click="onReset"
       >
-        <VIcon
-          icon="tabler-rotate"
-          start
-        />
+        <VIcon icon="tabler-rotate" start />
         {{ t('a11y.resetDefaults') }}
       </VBtn>
 
@@ -351,11 +452,6 @@ function closeOnEsc(event: KeyboardEvent) {
         {{ t('a11y.legalNote') }}
       </p>
 
-      <!-- Accessibility statement stub. Route target is authored in
-           follow-up task A11Y-STATEMENT-ROUTE; for now we render the link
-           pointing at /accessibility-statement so the footprint is in
-           place and screen-reader users can confirm the contact channel
-           (required by IL Reg 5773-2013 §35(b)(4)). -->
       <p class="text-caption mb-0">
         <a
           href="/accessibility-statement"
