@@ -7,6 +7,7 @@
 using System.Security.Claims;
 using System.Threading.RateLimiting;
 using Cena.Actors.Bus;
+using Cena.Actors.Subscriptions;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
 using Cena.Actors.Notifications;
@@ -164,6 +165,9 @@ public partial class Program
 
     // prr-148: StudentPlan bounded context (new, per NoNewStudentActorStateTest).
     builder.Services.AddStudentPlanServices();
+
+    // EPIC-PRR-I / ADR-0057: Subscription aggregate + retail pricing catalog.
+    builder.Services.AddSubscriptions();
 
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
@@ -917,6 +921,7 @@ public partial class Program
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
     app.MapAuthEndpoints(); app.MapCatalogEndpoints(); // prr-011 Session exchange wired via UseStudentApiAuthPipeline(); prr-220 catalog ADR-0050.
+    app.MapSubscriptionEndpoints();                    // EPIC-PRR-I / ADR-0057: retail pricing catalog
 
     // Me/Profile endpoints (STB-00, STB-00b)
     app.MapMeEndpoints();
