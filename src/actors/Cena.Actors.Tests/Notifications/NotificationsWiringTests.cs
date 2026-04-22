@@ -152,6 +152,25 @@ public class NotificationsWiringTests
     }
 
     [Fact]
+    public void WhatsApp_backend_meta_resolves_MetaCloudWhatsAppSender()
+    {
+        // PRR-429: "meta" backend selects MetaCloudWhatsAppSender. The
+        // MetaCloud section is bound here so IsConfigured flips true and
+        // the selector wires through the named HttpClient factory.
+        using var sp = Build(new Dictionary<string, string?>
+        {
+            ["Notifications:WhatsApp:Backend"] = "meta",
+            ["MetaCloud:PhoneNumberId"] = "1234567890",
+            ["MetaCloud:AccessToken"] = "dummy-token",
+            ["MetaCloud:BusinessAccountId"] = "987654321"
+        });
+        var sender = sp.GetRequiredService<IWhatsAppSender>();
+        Assert.IsType<MetaCloudWhatsAppSender>(sender);
+        Assert.Equal("meta", sender.VendorId);
+        Assert.True(sender.IsConfigured);
+    }
+
+    [Fact]
     public void WhatsApp_backend_unknown_falls_back_to_Null()
     {
         using var sp = Build(new Dictionary<string, string?>

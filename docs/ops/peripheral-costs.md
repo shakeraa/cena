@@ -164,3 +164,4 @@ Out of scope for this doc — tracked separately in `docs/ops/capacity/` and the
 | Date | Change | Source |
 |---|---|---|
 | 2026-04-22 | Initial document — peripherals audit follow-up + ADR-0058 Sentry decision + Meta-direct WhatsApp decision | Peripherals audit conversation |
+| 2026-04-22 | MetaCloudWhatsAppSender shipped — selector supports "meta" backend. Flipping `Notifications:WhatsApp:Backend` to `"meta"` saves ~$15/mo at 1k-parent scale. | PRR-429 |
