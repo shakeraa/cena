@@ -26,4 +26,7 @@ public interface IDiagnosticDisputeRepository
         DateTimeOffset reviewedAt,
         string? reviewerNote,
         CancellationToken ct);
+
+    /// <summary>Delete disputes with SubmittedAt strictly older than the threshold. Returns rows deleted.</summary>
+    Task<int> DeleteSubmittedBeforeAsync(DateTimeOffset threshold, CancellationToken ct);
 }

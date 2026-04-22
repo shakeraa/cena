@@ -71,4 +71,18 @@ public sealed class InMemoryDiagnosticDisputeRepository : IDiagnosticDisputeRepo
         _byId[disputeId] = updated;
         return Task.CompletedTask;
     }
+
+    public Task<int> DeleteSubmittedBeforeAsync(DateTimeOffset threshold, CancellationToken ct)
+    {
+        var toRemove = _byId.Values
+            .Where(d => d.SubmittedAt < threshold)
+            .Select(d => d.Id)
+            .ToList();
+        var removed = 0;
+        foreach (var id in toRemove)
+        {
+            if (_byId.TryRemove(id, out _)) removed++;
+        }
+        return Task.FromResult(removed);
+    }
 }

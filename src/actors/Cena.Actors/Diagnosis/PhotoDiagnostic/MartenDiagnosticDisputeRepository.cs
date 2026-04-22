@@ -87,4 +87,16 @@ public sealed class MartenDiagnosticDisputeRepository : IDiagnosticDisputeReposi
         session.Store(updated);
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
     }
+
+    public async Task<int> DeleteSubmittedBeforeAsync(DateTimeOffset threshold, CancellationToken ct)
+    {
+        await using var session = _store.LightweightSession();
+        var count = await session.Query<DiagnosticDisputeDocument>()
+            .CountAsync(d => d.SubmittedAt < threshold, ct)
+            .ConfigureAwait(false);
+        if (count == 0) return 0;
+        session.DeleteWhere<DiagnosticDisputeDocument>(d => d.SubmittedAt < threshold);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return count;
+    }
 }
