@@ -162,8 +162,8 @@ public partial class Program
     // ADR-0038 key store + prr-155 ConsentAggregate (bundled compliance services).
     Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregate(builder.Services.AddCenaComplianceServices(builder.Configuration, builder.Environment));
 
-    // prr-148: StudentPlan + EPIC-PRR-I / ADR-0057 Subscription registration. TimeProvider registered later via ClockRegistration.AddClock.
-    builder.Services.AddStudentPlanServices(); Cena.Actors.Subscriptions.SubscriptionServiceRegistration.AddSubscriptionsMarten(builder.Services);
+    // prr-148: StudentPlan + EPIC-PRR-I / ADR-0057 Subscription + PRR-301 Stripe (if configured). TimeProvider registered later via ClockRegistration.AddClock.
+    builder.Services.AddStudentPlanServices(); Cena.Actors.Subscriptions.SubscriptionServiceRegistration.AddSubscriptionsMarten(builder.Services); Cena.Actors.Subscriptions.Stripe.StripeServiceRegistration.AddStripeCheckoutIfConfigured(builder.Services, builder.Configuration);
 
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
@@ -916,7 +916,7 @@ public partial class Program
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
-    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription; STB-00 Me/Profile
+    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapStripeWebhook(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + Stripe webhook; STB-00 Me/Profile
     app.MapSelfAssessmentEndpoints();
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.

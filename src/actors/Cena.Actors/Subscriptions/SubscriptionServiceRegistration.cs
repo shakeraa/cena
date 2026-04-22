@@ -56,5 +56,11 @@ public static class SubscriptionServiceRegistration
         {
             services.AddSingleton<IPaymentGateway, SandboxPaymentGateway>();
         }
+        // Checkout-session provider: sandbox by default. StripeServiceRegistration
+        // .AddStripeCheckoutIfConfigured() replaces it when Stripe config is present.
+        if (!services.Any(d => d.ServiceType == typeof(ICheckoutSessionProvider)))
+        {
+            services.AddSingleton<ICheckoutSessionProvider, SandboxCheckoutSessionProvider>();
+        }
     }
 }

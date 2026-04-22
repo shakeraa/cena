@@ -39,6 +39,7 @@ public static class SubscriptionManagementEndpoints
             .RequireAuthorization();
 
         group.MapGet("", GetStatus).WithName("GetSubscriptionStatus");
+        group.MapPost("checkout-session", CreateCheckoutSession).WithName("CreateCheckoutSession");
         group.MapPost("activate", Activate).WithName("ActivateSubscription");
         group.MapPost("siblings", LinkSibling).WithName("LinkSibling");
         group.MapDelete("siblings/{siblingId}", UnlinkSibling).WithName("UnlinkSibling");
@@ -60,6 +61,48 @@ public static class SubscriptionManagementEndpoints
         var parentId = RequireParentId(http);
         var aggregate = await store.LoadAsync(parentId, ct);
         return Results.Ok(ToStatusDto(aggregate.State));
+    }
+
+    // ----- POST checkout-session (Stripe-style hosted checkout) -----
+
+    private static async Task<IResult> CreateCheckoutSession(
+        HttpContext http,
+        [FromBody] CheckoutSessionRequestDto body,
+        [FromServices] ICheckoutSessionProvider provider,
+        CancellationToken ct)
+    {
+        var parentId = RequireParentId(http);
+        if (!Enum.TryParse<SubscriptionTier>(body.Tier, ignoreCase: true, out var tier) ||
+            !TierCatalog.Get(tier).IsRetail)
+        {
+            return Results.BadRequest(new { error = "invalid_tier" });
+        }
+        if (!Enum.TryParse<BillingCycle>(body.BillingCycle, ignoreCase: true, out var cycle) ||
+            cycle == BillingCycle.None)
+        {
+            return Results.BadRequest(new { error = "invalid_cycle" });
+        }
+        if (string.IsNullOrWhiteSpace(body.IdempotencyKey))
+        {
+            return Results.BadRequest(new { error = "idempotency_key_required" });
+        }
+
+        // Success/cancel URLs come from provider options (Stripe) or sandbox
+        // defaults. The caller doesn't pass these — the gateway owns them.
+        var req = new Cena.Actors.Subscriptions.CheckoutSessionRequest(
+            ParentSubjectIdEncrypted: parentId,
+            PrimaryStudentSubjectIdEncrypted: body.PrimaryStudentId,
+            Tier: tier,
+            Cycle: cycle,
+            IdempotencyKey: body.IdempotencyKey,
+            SuccessUrl: "https://cena.test/subscription/confirm",
+            CancelUrl: "https://cena.test/pricing");
+
+        var result = await provider.CreateSessionAsync(req, ct);
+        return Results.Ok(new CheckoutSessionResponseDto(
+            CheckoutUrl: result.CheckoutUrl,
+            SessionId: result.SessionId,
+            ProviderName: provider.Name));
     }
 
     // ----- POST activate -----
