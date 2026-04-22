@@ -17,7 +17,7 @@
  * mounts the A11yToolbar even when unauthenticated so the link loops back
  * to itself).
  *
- * All copy lives under the `accessibilityStatement.*` key in en/ar/he.
+ * All copy is under the `accessibilityStatement.*` key in en/ar/he.
  * The last-updated date is pulled from a module-level constant so legal
  * can bump it without touching translations.
  */
