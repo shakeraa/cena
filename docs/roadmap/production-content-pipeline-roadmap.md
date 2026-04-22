@@ -51,11 +51,14 @@ the ministry reference distribution, drives the existing
 **Next ship (code-reachable)**: none — every readiness task that doesn't
 require cluster infra, pilot data, or human content work has landed.
 **Environment-gated remainder**:
-  - Phase 4.1 OCR regression harness (needs tesseract + poppler locally)
+  - Phase 4.1 OCR regression harness — host-OS dependency **resolved**
+    2026-04-22 via `docker-ocr-parity` (eb8b5740); still needs harness
+    code + golden fixtures + new CI workflow (see §11)
   - RDY-025c deploy validation (needs kind/staging cluster)
   - RDY-024b BKT Phase B (needs pilot-completion data)
 **Non-code remainder**: RDY-004b translation, RDY-005 legal docs,
 RDY-019d Bagrut curriculum expert review (Amjad).
+**Full open-points checkpoint**: see §11 "Open points — 2026-04-22".
 
 ## 2. OCR layer scoreboard (as of commit `adb706d`)
 
@@ -140,7 +143,7 @@ All 9 slices shipped. See §3 for commit list.
 
 | # | Slice | Landed | State |
 |---|---|---|---|
-| 4.1 | Integration tests + frozen fixture regression (fail CI on > 5 pp WER/math drop) | — | ⬜ pending (env-gated) |
+| 4.1 | Integration tests + frozen fixture regression (fail CI on > 5 pp WER/math drop) | Host-OS deps landed `eb8b5740` (docker-ocr-parity) | 🟡 partial — harness code still TODO; see §11 item 1 |
 | 4.2 | OCR sidecar container + K8s manifest + HF pre-warm init-container | `docker/ocr-sidecar/` + `k8s/ocr-sidecar/` + `docker-compose.ocr-sidecar.yml` | ✅ done |
 | 4.3 | Observability — `[OCR_CASCADE]` metrics, Prometheus alerts, Grafana dashboard | `370276e` (OcrMetrics + alerts) + dashboard JSON on main | ✅ done |
 | 4.4 | End-to-end load test (subsumes 1B.4) | `tests/load/e2e-student-journey.js` + `tests/load/e2e-admin-corpus.js` + `.github/workflows/e2e-load-nightly.yml` shipped `dc85875` | ✅ done |
@@ -272,3 +275,101 @@ if (!string.IsNullOrEmpty(cfg["Ocr:Gemini:ApiKey"]))
 5. `dotnet test --filter Ocr`. Expect count to go UP only.
 6. Commit with scoreboard update in the message. Push to origin/main.
 7. Update this doc's phase table row state before the next slice.
+
+## 11. Open points — 2026-04-22 checkpoint
+
+Status at the end of the 2026-04-22 session:
+
+**Shipped today**: `docker-ocr-parity` (commit `eb8b5740`). All 3 .NET
+host images (Student / Admin / Actors) now have identical OCR toolchain
+across `dev` + `runtime` stages — `tesseract 5.3.0` + `heb` + `eng` +
+`poppler 22.12.0`. Dev stack runs on `:dev` tags. Prod runtime images
+188–192 MB (under RDY-025c 300 MB budget). Phase 4.1 host-OS blocker
+retired.
+
+Five items remain. Ordered by decision-gate-nearness, not by size:
+
+### 11.1 Phase 4.1 — OCR regression harness (CODE work, queued)
+
+**Blocker retired**: OS binaries are present in all .NET hosts and will
+be present in CI as soon as a new workflow file drops that uses the
+existing Dockerfiles (or installs via apt in the runner).
+
+**Still to do**:
+
+- New test class `OcrEndToEndRegressionTests` in `Cena.Infrastructure.Tests/Ocr/`
+- Real golden inputs under `tests/fixtures/ocr-regression/inputs/` — 10–20 PDFs/PNGs spanning 3u/4u/5u bagrut, Geva solutions, student photos, and edge cases (encrypted PDF, low-res scan)
+- Golden expected outputs (`.expected.json`) per input — WER, math parse rate, block counts
+- Assertion: fail CI if WER or math-parse-rate regresses > 5 pp on any fixture
+- New workflow `.github/workflows/ocr-regression-e2e.yml` (separate from the existing fixture-contract `ocr-regression.yml`) — installs tesseract+poppler, starts OCR sidecar via docker-compose, runs the new test filter
+
+**Effort**: ~1 dev-day. **Queue task**: see "Queued tasks" below.
+
+### 11.2 S3 backend for IngestionPipelineCloudDir (CODE + OPS, queued, **decision-gated**)
+
+**Current state**: [src/api/Cena.Admin.Api/IngestionPipelineCloudDir.cs:35-42](../../src/api/Cena.Admin.Api/IngestionPipelineCloudDir.cs#L35-L42) returns empty placeholder when `provider == "s3"`. `local` branch is fully real (SHA-256 dedup, path-traversal guard via `Ingestion:CloudWatchDirs` allowlist, content-type mapping, lastModified ordering).
+
+**Architectural decisions required before implementation**:
+
+1. **IAM model** — IRSA (K8s-native, EKS OIDC provider + SA annotation, no secrets) vs static access keys in a K8s secret (simpler, rotation burden) vs STS AssumeRole (cross-account).
+   *Prod-grade recommendation*: IRSA as primary, static-key as fallback for kind/MicroK8s clusters.
+2. **Bucket allowlist** — `Ingestion:S3Buckets` config analog to existing `CloudWatchDirs`, so an admin can't type `prod-secrets-bucket` into the UI.
+3. **Dedup identity** — do NOT GetObject-and-hash every file (network-heavy on large buckets). Store `bucket + key + etag` on `PipelineItemDocument.S3Source`; full SHA-256 only computed on actual ingest of selected files. This is a `PipelineItemDocument` **contract change**.
+4. **Provider abstraction** — today's hardcoded `"s3"` / `"local"` string checks should become `ICloudDirectoryProvider` + `LocalDirectoryProvider` + `S3DirectoryProvider`, registered by config.
+5. **Dev/prod parity** (recurring directive, locked 2026-04-22) — LocalStack as a docker-compose service so dev exercises S3-shaped code paths, not a different provider.
+6. **Batch-size gate** — reject batches > 1000 files OR > 10 GB to bound egress cost.
+7. **Read-only permissions** — `s3:ListBucket` + `s3:GetObject` only. Never write or delete.
+
+**Three possible scopes** (user to pick):
+
+| Scope | What | Time | Output |
+|---|---|---|---|
+| **A** | Contract + LocalStack | ~1 dev-day | Provider abstraction, S3 impl against LocalStack, allowlist, tests, docker-compose LocalStack service. Code ready; awaits ops-side bucket + IAM to go live. |
+| **B** (recommended) | A + ops handoff ADR | ~1 dev-day + 30 min | All of A, plus a short ADR spelling out the IRSA/static-key choice and the Helm values changes needed so ops has a one-pager to execute from. |
+| **C** | Just the abstraction | 2 hours | Refactor to `ICloudDirectoryProvider`; defer S3 impl. |
+
+**Effort**: 2 h / 1 day / 1 day + 30 min. **Queue task**: see "Queued tasks" below — body documents all three scopes; user decision gates the claim.
+
+### 11.3 RDY-025c — Deploy validation (OPS-owned, not queued)
+
+**Current state**: Helm chart passes `helm lint` + `kubeconform -strict` on all 3 overlays (18/18 valid for production overlay). See [deploy/LINT-VALIDATION.md](../../deploy/LINT-VALIDATION.md).
+
+**Still to do** (all on a real cluster):
+
+- `docker build` × 4 images, confirm size ≤ 300 MB each — **our 3 .NET host images are 188–192 MB after docker-ocr-parity, well under budget**
+- HEALTHCHECK smoke inside each image
+- `helm install cena ./deploy/helm/cena -f values-staging.yaml` on `kind` → verify Pods Running + Ready
+- HPA scale-test (k6 load → confirm scale-up)
+- PDB drain-test, ingress smoke
+- Replace `image.tag: latest` with SHA-based tags in CI (anti-pattern flagged in [deploy/LINT-VALIDATION.md:67-88](../../deploy/LINT-VALIDATION.md#L67-L88))
+
+**Effort**: ~2 dev-days once a cluster is available; ~1 week if ops needs to stand up staging.
+
+### 11.4 RDY-024b — BKT Phase B calibration (DATA-gated, not queued)
+
+**Current state**: Phase A (RDY-024) shipped the BKT framework with default priors. Phase B re-calibrates `p(learn)` / `p(slip)` / `p(guess)` per concept using real student attempts — design requires **≥ 200 attempts per concept** for statistical power.
+
+**Dependency chain**: RDY-024 ✅ + RDY-032 (pilot data exporter, ✅ shipped `3641516`) → RDY-024b blocked on pilot completion.
+
+**Effort**: ~1 dev-week, gated on 4–6 weeks of pilot usage.
+
+### 11.5 Non-code trio (HUMAN / DOMAIN / LEGAL, not queued)
+
+| Task | Who | Artifact | Effort |
+|---|---|---|---|
+| **RDY-004b** | Amjad + native-speaker translator | Hebrew/Arabic translation of seed question-bank corpus; two-translator peer review + glossary-anchored QA; machine translation explicitly banned ([docs/translations/drafts/rdy-004b-pilot-batch-1.json](../../docs/translations/drafts/rdy-004b-pilot-batch-1.json)) | 2–3 weeks per language |
+| **RDY-005** | Legal counsel + DPO + Dr. Lior + Dr. Rami | DPA, Privacy Notice, COPPA, school SDPA, teacher consent, breach notification, subprocessor disclosure, AI transparency notice — 7 documents | **8–16 weeks, $15–30 K counsel cost** |
+| **RDY-019d** | Amjad (math curriculum SME) | Review AI-recreated Bagrut items for curriculum alignment, difficulty calibration, dialect/terminology | ~2 weeks per track (3u/4u/5u) |
+
+### Queued tasks (for future claim)
+
+| Task ID | Title | Priority | Assignee |
+|---|---|---|---|
+| see queue `list --status pending` | Phase 4.1 OCR regression harness (§11.1) | medium | unassigned — any worker |
+| see queue `list --status pending` | S3 backend for IngestionPipelineCloudDir (§11.2, scope A/B/C) | medium | unassigned — decision-gated |
+
+### User-revisit reminder
+
+User paused on 2026-04-22 at the end of the `docker-ocr-parity` merge and
+said "I will get back to it." Decision gate on re-entry: **S3 scope A / B / C**.
+Target revisit date: **2026-04-29** (1 week).
