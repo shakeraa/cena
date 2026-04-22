@@ -10,6 +10,7 @@
 // =============================================================================
 
 using Cena.Actors.Subscriptions;
+using Marten;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -46,9 +47,16 @@ public static class StripeServiceRegistration
         services.RemoveAll<ICheckoutSessionProvider>();
         services.AddSingleton<ICheckoutSessionProvider, StripeCheckoutSessionProvider>();
 
-        // Webhook dedup is in-memory at v1; production swap-out is a Marten
-        // or Redis-backed store (interface is narrow — mechanical).
-        services.AddSingleton<IProcessedWebhookLog, InMemoryProcessedWebhookLog>();
+        // Webhook dedup is persisted via Marten so Stripe retries after a pod
+        // restart are deduped correctly. In-memory dedup would lose the seen-id
+        // set on every restart, re-processing retries within Stripe's 3-day
+        // replay window — duplicate subscription activations on the student's
+        // stream, duplicate billing-cycle advances, and worst-case a double
+        // refund on retries of `charge.refunded`. Per memory "No stubs —
+        // production grade" (2026-04-11). Requires AddMarten() upstream.
+        services.AddSingleton<IProcessedWebhookLog, MartenProcessedWebhookLog>();
+        services.ConfigureMarten(opts =>
+            opts.Schema.For<ProcessedWebhookDocument>().Identity(d => d.Id));
         services.AddSingleton<StripeWebhookHandler>();
         return true;
     }
