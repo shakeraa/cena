@@ -148,6 +148,19 @@ public static class NotificationsServiceCollectionExtensions
                     sp.GetRequiredService<ILogger<TwilioWhatsAppSender>>()));
                 break;
 
+            case "meta":
+                // PRR-429: Meta Cloud Graph API direct adapter. Saves ~$15/mo
+                // vs Twilio at 1k-parent scale (docs/ops/peripheral-costs.md §3).
+                services.Configure<MetaCloudWhatsAppOptions>(
+                    configuration.GetSection(MetaCloudWhatsAppOptions.SectionName));
+                services.AddHttpClient("MetaCloudWhatsApp");
+                services.TryAddSingleton<IWhatsAppSender>(sp => new MetaCloudWhatsAppSender(
+                    sp.GetRequiredService<IOptions<MetaCloudWhatsAppOptions>>(),
+                    sp.GetRequiredService<IHttpClientFactory>().CreateClient("MetaCloudWhatsApp"),
+                    sp.GetRequiredService<IWhatsAppRecipientLookup>(),
+                    sp.GetRequiredService<ILogger<MetaCloudWhatsAppSender>>()));
+                break;
+
             case "null":
             case "":
                 services.TryAddSingleton<IWhatsAppSender, NullWhatsAppSender>();
@@ -160,7 +173,7 @@ public static class NotificationsServiceCollectionExtensions
                         .CreateLogger("Notifications.Setup")
                         .LogWarning(
                             "Notifications:WhatsApp:Backend={Backend} is not recognised. "
-                            + "Falling back to NullWhatsAppSender. Expected one of: twilio, null.",
+                            + "Falling back to NullWhatsAppSender. Expected one of: twilio, meta, null.",
                             backend);
                     return new NullWhatsAppSender();
                 });
