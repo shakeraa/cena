@@ -11,6 +11,7 @@ using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
 using Cena.Actors.Infrastructure.Privacy;
+using Cena.Actors.Notifications;
 using Cena.Actors.StudentPlan;
 using Cena.Actors.Teacher.ScheduleOverride;
 using Cena.Admin.Api;
@@ -322,6 +323,10 @@ public partial class Program
     // RDY-064: Error aggregator scaffold — registers Null aggregator by
     // default. Switching to Sentry / AppInsights is blocked on the RDY-064 ADR.
     builder.Services.AddCenaErrorAggregator(builder.Configuration);
+
+    // PRR-428: Notifications DI — config-driven Email/SMS/WhatsApp backend
+    // selection. See Notifications:* in appsettings.json.
+    builder.Services.AddCenaNotifications(builder.Configuration);
 
     // ---- CORS ----
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()

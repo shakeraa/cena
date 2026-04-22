@@ -28,6 +28,7 @@ using Cena.Infrastructure.Resilience;
 using Cena.Infrastructure.Seed;
 using Cena.Actors.Gateway;
 using Cena.Actors.Infrastructure;
+using Cena.Actors.Notifications;
 using Cena.Actors.Cas;
 using Cena.Actors.Services;
 using Cena.Actors.Services.ErrorPatternMatching;
@@ -181,6 +182,11 @@ builder.Services.AddSecurityMetrics();
 
 // RDY-064: Error aggregator scaffold — Null aggregator by default.
 builder.Services.AddCenaErrorAggregator(builder.Configuration);
+
+// PRR-428: Notifications DI — config-driven Email/SMS/WhatsApp backend
+// selection. Default backends resolve today's graceful-disabled senders
+// when credentials are absent. See Notifications:* in appsettings.json.
+builder.Services.AddCenaNotifications(builder.Configuration);
 
 // IClock for deterministic time-based testing (FIND-qa-007)
 builder.Services.AddClock();

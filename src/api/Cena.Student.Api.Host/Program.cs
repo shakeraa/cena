@@ -220,6 +220,10 @@ public partial class Program
     builder.Services.AddSingleton<IWebPushClient, WebPushClient>();
     builder.Services.AddScoped<IWebPushDispatchService, WebPushDispatchService>();
     builder.Services.AddHostedService<PushNotificationTriggerService>();
+
+    // PRR-428: Notifications DI — Email / SMS / WhatsApp + INotificationChannelService.
+    // Config-driven backend selection; defaults in Notifications:* appsettings section.
+    builder.Services.AddCenaNotifications(builder.Configuration);
     
     // ---- RATE-001: Distributed rate limiting + cost circuit breaker ----
     builder.Services.AddSingleton<IRateLimitService, RedisRateLimitService>();
