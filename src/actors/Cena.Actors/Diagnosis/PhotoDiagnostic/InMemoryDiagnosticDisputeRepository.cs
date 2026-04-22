@@ -85,4 +85,20 @@ public sealed class InMemoryDiagnosticDisputeRepository : IDiagnosticDisputeRepo
         }
         return Task.FromResult(removed);
     }
+
+    public Task<int> DeleteByStudentAsync(string studentSubjectIdHash, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(studentSubjectIdHash))
+            throw new ArgumentException("studentSubjectIdHash is required.", nameof(studentSubjectIdHash));
+        var toRemove = _byId.Values
+            .Where(d => d.StudentSubjectIdHash == studentSubjectIdHash)
+            .Select(d => d.Id)
+            .ToList();
+        var removed = 0;
+        foreach (var id in toRemove)
+        {
+            if (_byId.TryRemove(id, out _)) removed++;
+        }
+        return Task.FromResult(removed);
+    }
 }

@@ -99,4 +99,18 @@ public sealed class MartenDiagnosticDisputeRepository : IDiagnosticDisputeReposi
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
         return count;
     }
+
+    public async Task<int> DeleteByStudentAsync(string studentSubjectIdHash, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(studentSubjectIdHash))
+            throw new ArgumentException("studentSubjectIdHash is required.", nameof(studentSubjectIdHash));
+        await using var session = _store.LightweightSession();
+        var count = await session.Query<DiagnosticDisputeDocument>()
+            .CountAsync(d => d.StudentSubjectIdHash == studentSubjectIdHash, ct)
+            .ConfigureAwait(false);
+        if (count == 0) return 0;
+        session.DeleteWhere<DiagnosticDisputeDocument>(d => d.StudentSubjectIdHash == studentSubjectIdHash);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+        return count;
+    }
 }

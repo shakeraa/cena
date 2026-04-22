@@ -29,4 +29,7 @@ public interface IDiagnosticDisputeRepository
 
     /// <summary>Delete disputes with SubmittedAt strictly older than the threshold. Returns rows deleted.</summary>
     Task<int> DeleteSubmittedBeforeAsync(DateTimeOffset threshold, CancellationToken ct);
+
+    /// <summary>Delete all disputes for a student (GDPR Article 17). Returns rows deleted.</summary>
+    Task<int> DeleteByStudentAsync(string studentSubjectIdHash, CancellationToken ct);
 }
