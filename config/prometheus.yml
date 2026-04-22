@@ -65,6 +65,15 @@ scrape_configs:
     metrics_path: /metrics
     scrape_interval: 30s
 
+  # PRR-435: OTel Collector re-exposes OTLP metrics on :8889.
+  - job_name: "cena-otel-collector"
+    static_configs:
+      - targets: ["otel-collector:8889"]
+        labels:
+          service: "otel-collector"
+    metrics_path: /metrics
+    scrape_interval: 15s
+
   - job_name: "prometheus"
     static_configs:
       - targets: ["localhost:9090"]

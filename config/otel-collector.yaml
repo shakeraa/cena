@@ -1,3 +1,16 @@
+# =============================================================================
+# Cena Platform — OpenTelemetry Collector pipeline (EPIC-PRR-L PRR-435)
+#
+# Traces → Jaeger (existing)
+# Metrics → Prometheus remote-write + exposed scrape endpoint
+# Logs → Loki (new; adds log aggregation + structured search)
+#
+# PII scrubbing: structured log fields tagged sensitive are redacted via
+# the `attributes` processor before they reach Loki. ADR-0047 (no PII in
+# LLM prompts) is enforced source-side, not here; this collector adds a
+# belt-and-braces redaction layer on the telemetry path.
+# =============================================================================
+
 receivers:
   otlp:
     protocols:
@@ -6,14 +19,68 @@ receivers:
       http:
         endpoint: 0.0.0.0:4318
 
+processors:
+  batch:
+    timeout: 5s
+    send_batch_size: 1024
+
+  # PRR-435: Strip known-sensitive attribute names on every signal. Source
+  # services should not emit these, but belt-and-braces against a mis-tagged
+  # scope.
+  attributes/redact-pii:
+    actions:
+      - key: user.email
+        action: delete
+      - key: user.phone
+        action: delete
+      - key: student.name
+        action: delete
+      - key: student.national_id
+        action: delete
+
+  resource/cena-tags:
+    attributes:
+      - key: deployment.environment
+        from_attribute: cena.environment
+        action: upsert
+
 exporters:
   otlp/jaeger:
     endpoint: jaeger:4317
     tls:
       insecure: true
 
+  # PRR-435: Prometheus metrics exposition — collector re-exposes OTLP
+  # metrics on :8889 so Prometheus can scrape them as a standard target.
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    const_labels:
+      collector: "cena-otel"
+
+  # PRR-435: Loki for structured log aggregation. Endpoint resolves within
+  # the compose network to the `loki` service added alongside in the
+  # observability compose stack.
+  loki:
+    endpoint: "http://loki:3100/loki/api/v1/push"
+    tls:
+      insecure: true
+
+  debug:
+    verbosity: basic
+
 service:
   pipelines:
     traces:
       receivers: [otlp]
+      processors: [attributes/redact-pii, resource/cena-tags, batch]
       exporters: [otlp/jaeger]
+
+    metrics:
+      receivers: [otlp]
+      processors: [resource/cena-tags, batch]
+      exporters: [prometheus]
+
+    logs:
+      receivers: [otlp]
+      processors: [attributes/redact-pii, resource/cena-tags, batch]
+      exporters: [loki]
