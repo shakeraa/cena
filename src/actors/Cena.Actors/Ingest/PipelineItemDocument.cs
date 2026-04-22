@@ -39,6 +39,13 @@ public sealed class PipelineItemDocument
     public string ContentType { get; set; } = "";
     public long FileSizeBytes { get; set; }
 
+    // ADR-0058: S3 provenance. Populated only when the item was ingested
+    // via the S3 cloud-directory provider; null for local / upload /
+    // photo sources. Enables fast list-time dedup via ETag match without
+    // a GetObject round-trip.
+    public string? S3Bucket { get; set; }
+    public string? S3ETag { get; set; }
+
     public PipelineStage CurrentStage { get; set; } = PipelineStage.Incoming;
     public string Status { get; set; } = "processing";     // processing, completed, failed
 

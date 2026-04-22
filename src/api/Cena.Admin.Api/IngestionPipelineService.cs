@@ -6,10 +6,10 @@
 
 using System.Security.Cryptography;
 using Cena.Actors.Ingest;
+using Cena.Admin.Api.Ingestion;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.AspNetCore.Http;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 using IngestionDto = Cena.Api.Contracts.Admin.Ingestion;
@@ -37,13 +37,16 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
     private readonly IIngestionOrchestrator? _orchestrator;
     private readonly Cena.Admin.Api.Ingestion.ICuratorMetadataService? _metadataService;
     private readonly ILogger<IngestionPipelineService> _logger;
-    private readonly IReadOnlyList<string> _allowedCloudDirs;
+    // ADR-0058: cloud-directory dispatch moved behind a provider
+    // abstraction. Path-traversal allowlist + SHA-256 dedup + S3 SDK
+    // calls all live in the per-provider implementations now.
+    private readonly ICloudDirectoryProviderRegistry _cloudDirRegistry;
 
     public IngestionPipelineService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
         ILogger<IngestionPipelineService> logger,
-        IConfiguration configuration,
+        ICloudDirectoryProviderRegistry cloudDirRegistry,
         IIngestionOrchestrator? orchestrator = null,
         Cena.Admin.Api.Ingestion.ICuratorMetadataService? metadataService = null)
     {
@@ -52,8 +55,7 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
         _orchestrator = orchestrator;
         _metadataService = metadataService;
         _logger = logger;
-        _allowedCloudDirs = configuration.GetSection("Ingestion:CloudWatchDirs")
-            .Get<string[]>() ?? Array.Empty<string>();
+        _cloudDirRegistry = cloudDirRegistry;
     }
 
     public async Task<PipelineStatusResponse> GetPipelineStatusAsync()
@@ -121,8 +123,12 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
         OcrOutput? ocrOutput = null;
         if (item.Ocr is not null)
         {
+            // ADR-0058: S3-ingested items carry their own bucket; fall
+            // back to the legacy "cena-ingest" placeholder for rows
+            // that predate the S3Bucket column.
+            var bucket = !string.IsNullOrEmpty(item.S3Bucket) ? item.S3Bucket : "cena-ingest";
             ocrOutput = new OcrOutput(
-                OriginalImageUrl: $"s3://cena-ingest/{item.S3Key}",
+                OriginalImageUrl: $"s3://{bucket}/{item.S3Key}",
                 ExtractedText: item.Ocr.Pages.FirstOrDefault()?.RawText ?? "",
                 Confidence: item.Ocr.Confidence,
                 Regions: new List<OcrRegion>());

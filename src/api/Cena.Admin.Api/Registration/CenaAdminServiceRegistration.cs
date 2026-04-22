@@ -207,6 +207,13 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<IFocusAnalyticsService, FocusAnalyticsService>();
         services.AddScoped<IMasteryTrackingService, MasteryTrackingService>();
         services.AddScoped<ISystemMonitoringService, SystemMonitoringService>();
+
+        // ADR-0058: cloud-directory providers (Local + S3) behind a
+        // registry that IngestionPipelineService dispatches through.
+        // Registers IAmazonS3 unconditionally; its factory only instantiates
+        // when S3DirectoryProvider is actually dispatched (IsEnabled gate).
+        services.AddCloudDirectoryProviders();
+
         services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
         // RDY-OCR-WIREUP-C (Phase 2.3): Bagrut PDF ingestion routes through
         // the real OCR cascade (IOcrCascadeService, ADR-0033). No stubs.
