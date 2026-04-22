@@ -164,6 +164,122 @@ public static class SubscriptionCommands
     }
 
     /// <summary>
+    /// Unlink a sibling and compute the pro-rata credit for the unused
+    /// remainder of the current billing cycle. Credit = sibling_price ×
+    /// (days_remaining / cycle_days), floored at 0. This is the mirror of
+    /// <see cref="LinkSibling"/> — every new sibling charged on the next
+    /// invoice at <c>SiblingMonthlyPrice(ordinal)</c> can be unlinked
+    /// with the portion not consumed credited back.
+    /// </summary>
+    /// <remarks>
+    /// Ordinal-stability after an unlink is intentionally out of scope
+    /// here — the LinkedStudents list keeps its historical ordering so
+    /// "a student that was ever ordinal 1 keeps its discount even if
+    /// another sibling is added/removed later" (SubscriptionState.cs
+    /// header). The price for this particular sibling at time of
+    /// unlink is derived from the ordinal it currently carries on the
+    /// aggregate, which may be higher than ordinal 1 if earlier siblings
+    /// have already been unlinked — the invoice reflects reality.
+    /// </remarks>
+    public static SiblingEntitlementUnlinked_V1 UnlinkSibling(
+        SubscriptionState currentState,
+        string siblingStudentSubjectIdEncrypted,
+        DateTimeOffset now)
+    {
+        if (currentState.Status is SubscriptionStatus.Cancelled or SubscriptionStatus.Refunded)
+        {
+            throw new SubscriptionCommandException(
+                $"Cannot unlink sibling; subscription is {currentState.Status}.");
+        }
+        var sibling = currentState.LinkedStudents
+            .FirstOrDefault(s =>
+                s.StudentSubjectIdEncrypted == siblingStudentSubjectIdEncrypted);
+        if (sibling is null)
+        {
+            throw new SubscriptionCommandException(
+                "Sibling is not linked to this subscription.");
+        }
+        if (sibling.Ordinal == 0)
+        {
+            throw new SubscriptionCommandException(
+                "Primary student (ordinal 0) cannot be unlinked as a sibling; "
+                + "cancel the subscription instead.");
+        }
+
+        var siblingPrice = TierCatalog.SiblingMonthlyPrice(sibling.Ordinal);
+        long proRataCreditAgorot = ComputeSiblingProRataCredit(
+            siblingPrice.Amount, currentState, now);
+
+        return new SiblingEntitlementUnlinked_V1(
+            ParentSubjectIdEncrypted: RequireParentId(currentState),
+            SiblingStudentSubjectIdEncrypted: siblingStudentSubjectIdEncrypted,
+            ProRataCreditAgorot: proRataCreditAgorot,
+            UnlinkedAt: now);
+    }
+
+    /// <summary>
+    /// Pure pro-rata helper. <c>credit = monthly_price × daysRemaining
+    /// / cycleDays</c>. Integer-agorot truncation so the credit is
+    /// deterministic and can never exceed the monthly charge. Returns 0
+    /// when the cycle has already fully elapsed or RenewsAt is missing.
+    /// Annual cycles use the monthly price (sibling is billed monthly
+    /// regardless of parent's cycle — one sibling invoice per month,
+    /// consolidated with the parent's renewal).
+    /// </summary>
+    public static long ComputeSiblingProRataCredit(
+        long siblingMonthlyAgorot,
+        SubscriptionState state,
+        DateTimeOffset now)
+    {
+        if (siblingMonthlyAgorot <= 0) return 0;
+        if (state.RenewsAt is null) return 0;
+        var renewsAt = state.RenewsAt.Value;
+        if (now >= renewsAt) return 0;
+
+        // Cycle boundary for the sibling credit denominator is always the
+        // monthly cadence, so the remainder computation uses the NEXT
+        // monthly boundary regardless of whether the parent is on a
+        // monthly or annual cycle. For monthly parent cycles, RenewsAt IS
+        // the next boundary. For annual, the sibling's renewal is monthly
+        // within the annual term — we take the nearest month boundary
+        // from ActivatedAt forward.
+        DateTimeOffset cycleStart;
+        DateTimeOffset cycleEnd;
+        switch (state.CurrentCycle)
+        {
+            case BillingCycle.Monthly:
+                // Current cycle runs renewsAt-30 → renewsAt.
+                cycleStart = renewsAt.AddDays(-30);
+                cycleEnd = renewsAt;
+                break;
+            case BillingCycle.Annual:
+                // Walk monthly anchors from ActivatedAt to find the
+                // current [cycleStart, cycleEnd) that contains `now`.
+                if (state.ActivatedAt is null) return 0;
+                cycleStart = state.ActivatedAt.Value;
+                while (cycleStart.AddMonths(1) <= now)
+                {
+                    cycleStart = cycleStart.AddMonths(1);
+                }
+                cycleEnd = cycleStart.AddMonths(1);
+                break;
+            default:
+                return 0;
+        }
+
+        var totalSeconds = (cycleEnd - cycleStart).TotalSeconds;
+        if (totalSeconds <= 0) return 0;
+        var remainingSeconds = (cycleEnd - now).TotalSeconds;
+        if (remainingSeconds <= 0) return 0;
+
+        // Integer-agorot truncating math: floor((price × remaining) / total).
+        var credit = (long)((siblingMonthlyAgorot * remainingSeconds) / totalSeconds);
+        if (credit < 0) return 0;
+        if (credit > siblingMonthlyAgorot) return siblingMonthlyAgorot;
+        return credit;
+    }
+
+    /// <summary>
     /// Cancel the subscription. Terminal. Refund policy enforced by
     /// <see cref="Refund"/>, not here.
     /// </summary>

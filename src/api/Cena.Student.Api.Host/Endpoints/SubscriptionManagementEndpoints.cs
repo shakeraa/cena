@@ -209,14 +209,21 @@ public static class SubscriptionManagementEndpoints
             return Results.NotFound(new { error = "sibling_not_linked" });
         }
         var now = clock.GetUtcNow();
-        var evt = new SiblingEntitlementUnlinked_V1(
-            ParentSubjectIdEncrypted: parentId,
-            SiblingStudentSubjectIdEncrypted: siblingId,
-            ProRataCreditAgorot: 0L,   // pro-rata math is a follow-up task
-            UnlinkedAt: now);
-        await store.AppendAsync(parentId, evt, ct);
-        aggregate.Apply(evt);
-        return Results.Ok(ToStatusDto(aggregate.State));
+        try
+        {
+            // PRR-293: SubscriptionCommands.UnlinkSibling computes the
+            // pro-rata credit from the sibling's ordinal + the parent's
+            // current cycle. The command rejects unlink of ordinal 0
+            // (primary) + terminal-state subscriptions.
+            var evt = SubscriptionCommands.UnlinkSibling(aggregate.State, siblingId, now);
+            await store.AppendAsync(parentId, evt, ct);
+            aggregate.Apply(evt);
+            return Results.Ok(ToStatusDto(aggregate.State));
+        }
+        catch (SubscriptionCommandException ex)
+        {
+            return Results.BadRequest(new { error = "command_rejected", details = ex.Message });
+        }
     }
 
     // ----- PATCH tier -----
