@@ -305,9 +305,31 @@ existing Dockerfiles (or installs via apt in the runner).
 
 **Effort**: ~1 dev-day. **Queue task**: see "Queued tasks" below.
 
-### 11.2 S3 backend for IngestionPipelineCloudDir (CODE + OPS, queued, **decision-gated**)
+### 11.2 S3 backend for IngestionPipelineCloudDir ✅ SHIPPED 2026-04-22 (Scope B)
 
-**Current state**: [src/api/Cena.Admin.Api/IngestionPipelineCloudDir.cs:35-42](../../src/api/Cena.Admin.Api/IngestionPipelineCloudDir.cs#L35-L42) returns empty placeholder when `provider == "s3"`. `local` branch is fully real (SHA-256 dedup, path-traversal guard via `Ingestion:CloudWatchDirs` allowlist, content-type mapping, lastModified ordering).
+**Shipped via commit `c46f9b79`** (merge `33d672a5`). User selected **Scope B** (code + ops handoff ADR) on 2026-04-22. 20 new unit tests passing; Admin.Api.Tests 1001/1001; OCR 142/142.
+
+Architectural decisions locked in [ADR-0058](../adr/0058-ingestion-s3-provider.md):
+
+- **IAM**: IRSA primary (EKS OIDC), static-key fallback for kind / dev / LocalStack.
+- **Allowlist**: `Ingestion:S3:AllowedBuckets` (analog to `Ingestion:CloudWatchDirs`).
+- **Dedup**: two-tier — ETag match at list-time, full SHA-256 at ingest-time. `PipelineItemDocument` gained optional `S3Bucket` + `S3ETag` (null on non-S3 rows, Marten-additive).
+- **Abstraction**: `ICloudDirectoryProvider` + `LocalDirectoryProvider` + `S3DirectoryProvider` with `ICloudDirectoryProviderRegistry` dispatch.
+- **Dev/prod parity**: LocalStack profile-gated docker-compose service; dev exercises the same code path prod does.
+- **Batch gate**: 1000 files / 10 GiB via `Ingestion:MaxBatchFiles` + `Ingestion:MaxBatchBytes`.
+- **Permissions**: `s3:ListBucket` + `s3:GetObject` only.
+
+**Remaining work is pure-ops** (not engineering):
+
+- Create S3 bucket + IAM role `cena-ingest-reader` per ADR-0058 Terraform snippet.
+- Annotate the Admin.Api K8s ServiceAccount with the role ARN.
+- Flip `ingestion.s3.enabled: true` + populate `allowedBuckets` in `values-production.yaml`.
+
+**Deferred follow-up** (not blocking): Testcontainers-based LocalStack integration test. Manual dev verification today: `docker compose --profile localstack up -d localstack`, then POST `/api/admin/ingestion/cloud-dir/list` with `provider=s3 bucketOrPath=cena-ingest-dev`.
+
+#### 11.2.x Pre-shipment analysis (audit trail)
+
+**Original placeholder**: `src/api/Cena.Admin.Api/IngestionPipelineCloudDir.cs:35-42` returned empty results when `provider == "s3"`.
 
 **Architectural decisions required before implementation**:
 
@@ -320,7 +342,7 @@ existing Dockerfiles (or installs via apt in the runner).
 6. **Batch-size gate** — reject batches > 1000 files OR > 10 GB to bound egress cost.
 7. **Read-only permissions** — `s3:ListBucket` + `s3:GetObject` only. Never write or delete.
 
-**Three possible scopes** (user to pick):
+**Three possible scopes** (historical — user picked B):
 
 | Scope | What | Time | Output |
 |---|---|---|---|
@@ -328,7 +350,9 @@ existing Dockerfiles (or installs via apt in the runner).
 | **B** (recommended) | A + ops handoff ADR | ~1 dev-day + 30 min | All of A, plus a short ADR spelling out the IRSA/static-key choice and the Helm values changes needed so ops has a one-pager to execute from. |
 | **C** | Just the abstraction | 2 hours | Refactor to `ICloudDirectoryProvider`; defer S3 impl. |
 
-**Effort**: 2 h / 1 day / 1 day + 30 min. **Queue task**: see "Queued tasks" below — body documents all three scopes; user decision gates the claim.
+**Effort**: 2 h / 1 day / 1 day + 30 min. User chose B; shipped in `c46f9b79`.
+
+---
 
 ### 11.3 RDY-025c — Deploy validation (OPS-owned, not queued)
 
