@@ -2,9 +2,11 @@
 import { useTheme } from 'vuetify'
 import ScrollToTop from '@core/components/ScrollToTop.vue'
 import UpdateToast from '@/components/UpdateToast.vue'
+import FirstRunLanguageChooser from '@/components/common/FirstRunLanguageChooser.vue'
 import initCore from '@core/initCore'
 import { initConfigStore, useConfigStore } from '@core/stores/config'
 import { hexToRgb } from '@core/utils/colorConverter'
+import { useLocaleStore } from '@/stores/localeStore'
 
 const { global } = useTheme()
 
@@ -13,6 +15,12 @@ initCore()
 initConfigStore()
 
 const configStore = useConfigStore()
+
+// PRR-A11Y-FIRST-RUN-CHOOSER: mount the full-screen chooser when the locale
+// store has not yet been locked. Legacy users (bare "en"/"ar"/"he" strings in
+// cena-student-locale) are upcast to `{ code, locked: true }` by the store's
+// loader, so they never see the chooser.
+const localeStore = useLocaleStore()
 </script>
 
 <template>
@@ -37,6 +45,12 @@ const configStore = useConfigStore()
         aria-atomic="true"
         class="sr-only"
       />
+
+      <!-- PRR-A11Y-FIRST-RUN-CHOOSER: blocks route content on very first
+           visit until the student picks a locale. Dismissal is intentional:
+           Esc is disabled inside the chooser and it unmounts only after a
+           tile click / Enter. -->
+      <FirstRunLanguageChooser v-if="!localeStore.locked" />
     </VApp>
   </VLocaleProvider>
 </template>
