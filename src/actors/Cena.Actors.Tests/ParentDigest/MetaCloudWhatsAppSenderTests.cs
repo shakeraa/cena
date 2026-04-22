@@ -97,7 +97,7 @@ public class MetaCloudWhatsAppSender_MappingTests
     [InlineData(132999)]
     public void Maps_400_with_132xxx_to_TemplateNotApproved(int code)
     {
-        var body = $$"""{"error":{"code":{{code}},"message":"template mismatch"}}""";
+        var body = $$$"""{"error":{"code":{{{code}}},"message":"template mismatch"}}""";
         Assert.Equal(
             WhatsAppDeliveryOutcome.TemplateNotApproved,
             MetaCloudWhatsAppSender.MapMetaResponse(HttpStatusCode.BadRequest, body, "c"));
@@ -109,7 +109,7 @@ public class MetaCloudWhatsAppSender_MappingTests
     [InlineData(0)]
     public void Maps_400_with_unmapped_code_to_VendorError(int code)
     {
-        var body = $$"""{"error":{"code":{{code}},"message":"other"}}""";
+        var body = $$$"""{"error":{"code":{{{code}}},"message":"other"}}""";
         Assert.Equal(
             WhatsAppDeliveryOutcome.VendorError,
             MetaCloudWhatsAppSender.MapMetaResponse(HttpStatusCode.BadRequest, body, "c"));
