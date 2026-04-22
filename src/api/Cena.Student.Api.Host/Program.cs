@@ -354,6 +354,9 @@ public partial class Program
     // Register IBktStateTracker + ISkillKeyedMasteryStore via the shared
     // prr-222 wiring (idempotent TryAdd — no-op if another layer already
     // wired it).
+    // prr-229: IClock required by ExamTargetRetentionWorker's age calcs.
+    // Student API host didn't previously register one; actor-host does via AddClock().
+    Cena.Actors.Infrastructure.ClockRegistration.AddClock(builder.Services);
     builder.Services.AddExamTargetRetentionServices();
     builder.Services.AddSingleton<Cena.Actors.Diagnosis.PerTarget.PerTargetDiagnosticEngine>();
     
