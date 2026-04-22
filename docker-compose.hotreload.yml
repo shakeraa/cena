@@ -47,6 +47,7 @@ services:
       - ./db/migrations:/src/db/migrations
       - ./docker/ocr-sidecar/app:/src/docker/ocr-sidecar/app
       - ./config:/src/config
+      - ./contracts:/src/contracts
       - /src/src/api/Cena.Admin.Api.Host/bin
       - /src/src/api/Cena.Admin.Api.Host/obj
       - nuget_admin_api:/root/.nuget/packages
@@ -69,6 +70,7 @@ services:
       - ./db/migrations:/src/db/migrations
       - ./docker/ocr-sidecar/app:/src/docker/ocr-sidecar/app
       - ./config:/src/config
+      - ./contracts:/src/contracts
       - /src/src/api/Cena.Student.Api.Host/bin
       - /src/src/api/Cena.Student.Api.Host/obj
       - nuget_student_api:/root/.nuget/packages
@@ -91,6 +93,7 @@ services:
       - ./db/migrations:/src/db/migrations
       - ./docker/ocr-sidecar/app:/src/docker/ocr-sidecar/app
       - ./config:/src/config
+      - ./contracts:/src/contracts
       - /src/src/actors/Cena.Actors.Host/bin
       - /src/src/actors/Cena.Actors.Host/obj
       - nuget_actor_host:/root/.nuget/packages
