@@ -85,19 +85,6 @@ services:
       timeout: 5s
       retries: 10
 
-  # ── DynamoDB Local (Actor Cluster Discovery) ──
-  dynamodb:
-    image: amazon/dynamodb-local:latest
-    container_name: cena-dynamodb
-    ports:
-      - "8000:8000"
-    command: -jar DynamoDBLocal.jar -sharedDb -inMemory
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8000 || exit 1"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   # ── NATS Stream Setup (runs once, creates streams + consumers) ──
   nats-setup:
     image: natsio/nats-box:latest

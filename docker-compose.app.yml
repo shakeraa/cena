@@ -6,7 +6,7 @@
 #
 #   docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build
 #
-# Infra services (postgres/redis/nats/neo4j/dynamodb) come from the base
+# Infra services (postgres/redis/nats/neo4j) come from the base
 # compose file. This overlay adds:
 #   - sympy-sidecar: Python NATS worker for CAS Tier-2 verification
 #   - db-migrator:  one-shot DbUp migration runner
