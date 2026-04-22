@@ -141,4 +141,42 @@ public static class ExamTargetRetentionServiceRegistration
         services.ConfigureMarten(opts => opts.RegisterExamTargetRetentionContext());
         return services;
     }
+
+    /// <summary>
+    /// Replace the in-memory <see cref="IArchivedExamTargetSource"/>
+    /// binding registered by <see cref="AddExamTargetRetentionServices"/>
+    /// with the Marten-backed <see cref="MartenArchivedExamTargetSource"/>
+    /// and register the <see cref="ExamTargetShredLedgerDocument"/>
+    /// schema via <see cref="ArchivedExamTargetMartenRegistration.RegisterArchivedExamTargetContext"/>.
+    /// <para>
+    /// Per memory "No stubs — production grade" (2026-04-11), the in-memory
+    /// source is test-only; production hosts must read archived-target
+    /// state from the canonical StudentPlan event log. The in-memory
+    /// source is a <see cref="System.Collections.Concurrent.ConcurrentDictionary{TKey,TValue}"/>
+    /// that no production code ever populates, so shipping it to prod
+    /// silently turns the ADR-0050 §6 24-month retention window into a
+    /// no-op — this method closes that gap.
+    /// </para>
+    /// <para>
+    /// Composition order: call <see cref="AddExamTargetRetentionServices"/>
+    /// first (shared services + in-memory fallback), then this method to
+    /// replace the source binding. Requires the StudentPlan aggregate
+    /// store (<c>AddStudentPlanServices</c> + <c>AddStudentPlanMarten</c>)
+    /// to have been registered upstream — the Marten source composes
+    /// against <see cref="IStudentPlanAggregateStore"/> to resolve the
+    /// <see cref="Cena.Actors.ExamTargets.ExamTargetCode"/> per archived
+    /// target.
+    /// </para>
+    /// </summary>
+    public static IServiceCollection AddArchivedExamTargetSourceMarten(
+        this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+
+        services.TryAddSingleton<MartenArchivedExamTargetSource>();
+        services.Replace(ServiceDescriptor.Singleton<IArchivedExamTargetSource>(sp
+            => sp.GetRequiredService<MartenArchivedExamTargetSource>()));
+        services.ConfigureMarten(opts => opts.RegisterArchivedExamTargetContext());
+        return services;
+    }
 }

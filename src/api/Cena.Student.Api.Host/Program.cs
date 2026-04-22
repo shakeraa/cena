@@ -303,6 +303,14 @@ public partial class Program
     // so the 60-month opt-in flag (ADR-0050 §6) survives a process restart.
     builder.Services.AddExamTargetRetentionExtensionMarten();
 
+    // prr-229 production binding: replace the in-memory archived-target
+    // source with MartenArchivedExamTargetSource so the retention worker
+    // reads canonical archive state from the StudentPlan event log. The
+    // in-memory source is an empty ConcurrentDictionary in production,
+    // making the ADR-0050 §6 24-month retention window a silent no-op
+    // until this binding lands.
+    builder.Services.AddArchivedExamTargetSourceMarten();
+
     // prr-009 / EPIC-PRR-C / EPIC-PRR-M production binding: replace the
     // in-memory parent-child binding store with MartenParentChildBindingStore
     // so parent session-refresh reads the persisted binding rows (not an

@@ -49,12 +49,26 @@ public sealed record ArchivedExamTargetRow(
 public interface IArchivedExamTargetSource
 {
     /// <summary>
-    /// Enumerate every archived target that is CURRENTLY archived. The
-    /// worker filters by "past its retention horizon" itself against the
-    /// policy + live extension store; the source's job is purely to
-    /// enumerate, not decide.
+    /// Enumerate every archived target that is CURRENTLY archived and has
+    /// NOT yet been shredded. The worker filters by "past its retention
+    /// horizon" itself against the policy + live extension store; the
+    /// source's job is purely to enumerate, not decide.
     /// </summary>
     IAsyncEnumerable<ArchivedExamTargetRow> ListArchivedAsync(
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Record that the given (student, target) has been shredded so that
+    /// subsequent sweeps do not re-enumerate it. Idempotent: calling with
+    /// the same key multiple times is a no-op after the first. Replaces
+    /// the prior <c>memSource.Remove(...)</c> downcast the worker used to
+    /// do — production Marten impl persists the shred marker so restarts
+    /// keep the sweep monotonically progressing instead of looping.
+    /// </summary>
+    Task MarkShreddedAsync(
+        string studentAnonId,
+        ExamTargetCode examTargetCode,
+        DateTimeOffset shreddedAtUtc,
         CancellationToken ct = default);
 }
 

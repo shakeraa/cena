@@ -57,6 +57,17 @@ public sealed class InMemoryArchivedExamTargetSource
         await Task.CompletedTask;
     }
 
+    /// <inheritdoc />
+    public Task MarkShreddedAsync(
+        string studentAnonId,
+        ExamTargetCode examTargetCode,
+        DateTimeOffset shreddedAtUtc,
+        CancellationToken ct = default)
+    {
+        Remove(studentAnonId, examTargetCode);
+        return Task.CompletedTask;
+    }
+
     private static string KeyOf(ArchivedExamTargetRow row)
         => KeyOf(row.StudentAnonId, row.ExamTargetCode);
 

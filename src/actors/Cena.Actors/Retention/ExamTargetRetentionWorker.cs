@@ -249,11 +249,13 @@ public sealed class ExamTargetRetentionWorker : BackgroundService
                 row.StudentAnonId, row.ExamTargetCode, now, ct)
             .ConfigureAwait(false);
 
-        // 4. Remove from the source so next sweep doesn't re-process.
-        if (_source is InMemoryArchivedExamTargetSource memSource)
-        {
-            memSource.Remove(row.StudentAnonId, row.ExamTargetCode);
-        }
+        // 4. Mark the source so next sweep doesn't re-process. Idempotent
+        //    via the interface contract; the Marten impl persists the
+        //    marker so sweep progress survives a pod restart, whereas the
+        //    InMemory impl just forgets the row.
+        await _source
+            .MarkShreddedAsync(row.StudentAnonId, row.ExamTargetCode, now, ct)
+            .ConfigureAwait(false);
 
         _logger.LogInformation(
             "[SIEM] ExamTargetRetentionShredded: "

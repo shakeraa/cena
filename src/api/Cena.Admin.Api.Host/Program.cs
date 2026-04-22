@@ -281,6 +281,16 @@ public partial class Program
     // opt-in state per student (ADR-0050 §6).
     builder.Services.AddExamTargetRetentionExtensionMarten();
 
+    // prr-229 production binding: Marten replacement for the archived
+    // exam-target source so ExamTargetRetentionWorker can actually find
+    // archived targets to shred. The in-memory source is an empty
+    // ConcurrentDictionary in production (no Append caller exists),
+    // which silently turns the ADR-0050 §6 24-month retention window
+    // into a no-op. The Marten source reads canonical archive state
+    // from the StudentPlan event log and persists shred markers so
+    // sweeps progress monotonically across restarts.
+    builder.Services.AddArchivedExamTargetSourceMarten();
+
     // prr-009 / EPIC-PRR-C / EPIC-PRR-M production binding: replace the
     // in-memory parent-child binding store with MartenParentChildBindingStore
     // so parent authorization grants survive a process restart. Per memory
