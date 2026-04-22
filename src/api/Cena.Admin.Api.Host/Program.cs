@@ -281,6 +281,16 @@ public partial class Program
     // opt-in state per student (ADR-0050 §6).
     builder.Services.AddExamTargetRetentionExtensionMarten();
 
+    // prr-009 / EPIC-PRR-C / EPIC-PRR-M production binding: replace the
+    // in-memory parent-child binding store with MartenParentChildBindingStore
+    // so parent authorization grants survive a process restart. Per memory
+    // "No stubs — production grade" (2026-04-11) + the ParentChildBinding.cs
+    // doc comment noting "the JWT parent_of claim is an advisory cache;
+    // this store is the authoritative source of truth" — an in-memory
+    // source of truth that forgets every pod restart is a compliance gap.
+    Cena.Actors.Parent.ParentServiceRegistration.AddParentChildBindingMarten(
+        builder.Services);
+
     // prr-236: Classroom-assigned target teacher UI — Marten-backed roster
     // lookup that feeds the classroom-target fan-out service. The service
     // itself is registered by AddStudentPlanServices above; only the

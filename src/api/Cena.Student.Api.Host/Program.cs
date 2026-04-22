@@ -302,6 +302,15 @@ public partial class Program
     // store with the Marten-backed MartenExamTargetRetentionExtensionStore
     // so the 60-month opt-in flag (ADR-0050 §6) survives a process restart.
     builder.Services.AddExamTargetRetentionExtensionMarten();
+
+    // prr-009 / EPIC-PRR-C / EPIC-PRR-M production binding: replace the
+    // in-memory parent-child binding store with MartenParentChildBindingStore
+    // so parent session-refresh reads the persisted binding rows (not an
+    // empty in-memory map) after a pod restart. ADR-0041 requires parent
+    // grants to be durable — this store is the authoritative answer the
+    // authorization guard consults on every parent-scoped request.
+    Cena.Actors.Parent.ParentServiceRegistration.AddParentChildBindingMarten(
+        builder.Services);
     builder.Services.AddSingleton<
         Cena.Actors.Sessions.IStudentPlanConfigService,
         Cena.Actors.Sessions.StudentPlanConfigBridgeService>();
