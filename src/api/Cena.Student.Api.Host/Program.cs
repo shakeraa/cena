@@ -281,6 +281,14 @@ public partial class Program
     // (registered by AddStudentPlanServices) and folds in scheduler
     // defaults for any null fields.
     builder.Services.AddStudentPlanServices();
+
+    // prr-218 production binding: replace the in-memory aggregate store
+    // default with the Marten-backed MartenStudentPlanAggregateStore and
+    // register every StudentPlan event type on the configured
+    // StoreOptions. Per memory "No stubs — production grade" (2026-04-11),
+    // the in-memory store is test-only; production (Student.Api.Host)
+    // persists the StudentPlanAggregate event stream via Marten.
+    builder.Services.AddStudentPlanMarten();
     builder.Services.AddSingleton<
         Cena.Actors.Sessions.IStudentPlanConfigService,
         Cena.Actors.Sessions.StudentPlanConfigBridgeService>();

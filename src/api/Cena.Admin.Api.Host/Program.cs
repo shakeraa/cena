@@ -258,6 +258,16 @@ public partial class Program
     // migration service. Feature flag defaults off so deployment is safe.
     builder.Services.AddStudentPlanServices();
 
+    // prr-218 production binding: replace the in-memory aggregate store
+    // default with the Marten-backed MartenStudentPlanAggregateStore and
+    // register every StudentPlan event type on the configured
+    // StoreOptions. Per memory "No stubs — production grade" (2026-04-11),
+    // the in-memory store is test-only; production (Admin.Api.Host)
+    // persists the StudentPlanAggregate event stream via Marten so teacher
+    // classroom assignments (prr-236) and admin consent exports survive a
+    // process restart.
+    builder.Services.AddStudentPlanMarten();
+
     // prr-236: Classroom-assigned target teacher UI — Marten-backed roster
     // lookup that feeds the classroom-target fan-out service. The service
     // itself is registered by AddStudentPlanServices above; only the
