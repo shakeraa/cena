@@ -38,13 +38,39 @@ RUN dotnet publish src/actors/Cena.Actors.Host/Cena.Actors.Host.csproj \
     /p:UseAppHost=false \
     /p:SkipOpenApiGeneration=true
 
-# ── Stage 3: runtime ──────────────────────────────────────────────────────────
+# ── Stage 3: dev (hotreload target — used by docker-compose.hotreload.yml) ───
+# SDK-based image so `dotnet watch` works; carries the same OCR toolchain as
+# the runtime stage below so dev and prod cannot drift on OS-level tools.
+# Compose overlay supplies volume mounts, working dir, and the watch command.
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS dev
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+      curl \
+      tesseract-ocr \
+      tesseract-ocr-heb \
+      tesseract-ocr-eng \
+      poppler-utils \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+WORKDIR /src
+# ENTRYPOINT / CMD intentionally omitted — docker-compose.hotreload.yml
+# overrides them with `dotnet watch`.
+
+# ── Stage 4: runtime ──────────────────────────────────────────────────────────
+# OCR toolchain list is identical to the `dev` stage above — keep them in sync.
+# Layer 0 (pdftoppm) and Layer 2a (tesseract) run in-process via Process.Start
+# per ADR-0033. TesseractLocalRunner fail-fasts at construction if these
+# binaries are missing, so they are a hard prod requirement, not optional.
 FROM mcr.microsoft.com/dotnet/aspnet:9.0 AS runtime
 WORKDIR /app
 
-# Install curl for healthcheck (minimal tooling footprint)
 RUN apt-get update \
- && apt-get install -y --no-install-recommends curl \
+ && apt-get install -y --no-install-recommends \
+      curl \
+      tesseract-ocr \
+      tesseract-ocr-heb \
+      tesseract-ocr-eng \
+      poppler-utils \
  && apt-get clean \
  && rm -rf /var/lib/apt/lists/*
 

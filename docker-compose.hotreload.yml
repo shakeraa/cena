@@ -11,10 +11,14 @@
 #                  -f docker-compose.hotreload.yml up -d
 #
 # What this overlay changes
-#   - .NET services (admin-api, student-api, actor-host): swap the
-#     prod-shape multi-stage runtime image for the SDK image and run
-#     `dotnet watch run`. Host src/, db/, docker/, config/ are mounted
-#     read-write so C# edits trigger an in-process restart.
+#   - .NET services (admin-api, student-api, actor-host): build the
+#     `dev` target of each service's prod Dockerfile (SDK image + same
+#     OCR toolchain as prod runtime) and run `dotnet watch run`. Host
+#     src/, db/, docker/, config/ are mounted read-write so C# edits
+#     trigger an in-process restart. Building the `dev` target (rather
+#     than pulling vanilla sdk:9.0) keeps dev and prod on an identical
+#     OS layer — no drift on tesseract / poppler / curl / language
+#     packs. See docker-ocr-parity task (t_8755d78dab87).
 #   - sympy-sidecar: bind-mount the Python worker. Restart the container
 #     after edits (`docker restart cena-sympy-sidecar`) — nats-py is a
 #     sync subscriber, no reload-on-change story out of the box.
@@ -36,8 +40,11 @@
 services:
   # ── .NET: Admin API ───────────────────────────────────────────────
   admin-api:
-    build: !reset null
-    image: mcr.microsoft.com/dotnet/sdk:9.0
+    build:
+      context: .
+      dockerfile: src/api/Cena.Admin.Api.Host/Dockerfile
+      target: dev
+    image: cena-admin-api:dev
     working_dir: /src
     environment:
       - DOTNET_USE_POLLING_FILE_WATCHER=true
@@ -59,8 +66,11 @@ services:
 
   # ── .NET: Student API ─────────────────────────────────────────────
   student-api:
-    build: !reset null
-    image: mcr.microsoft.com/dotnet/sdk:9.0
+    build:
+      context: .
+      dockerfile: src/api/Cena.Student.Api.Host/Dockerfile
+      target: dev
+    image: cena-student-api:dev
     working_dir: /src
     environment:
       - DOTNET_USE_POLLING_FILE_WATCHER=true
@@ -82,8 +92,11 @@ services:
 
   # ── .NET: Actor Host ──────────────────────────────────────────────
   actor-host:
-    build: !reset null
-    image: mcr.microsoft.com/dotnet/sdk:9.0
+    build:
+      context: .
+      dockerfile: src/actors/Cena.Actors.Host/Dockerfile
+      target: dev
+    image: cena-actor-host:dev
     working_dir: /src
     environment:
       - DOTNET_USE_POLLING_FILE_WATCHER=true
