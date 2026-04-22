@@ -2,18 +2,41 @@ import { existsSync, readFileSync, unlinkSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { resolve } from 'node:path'
 import VueI18nPlugin from '@intlify/unplugin-vue-i18n/vite'
+import { sentryVitePlugin } from '@sentry/vite-plugin'
 import vue from '@vitejs/plugin-vue'
 import vueJsx from '@vitejs/plugin-vue-jsx'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { VueRouterAutoImports, getPascalCaseRouteName } from 'unplugin-vue-router'
 import VueRouter from 'unplugin-vue-router/vite'
+import type { Plugin } from 'vite'
 import { defineConfig } from 'vite'
 import VueDevTools from 'vite-plugin-vue-devtools'
 import MetaLayouts from 'vite-plugin-vue-meta-layouts'
 import vuetify from 'vite-plugin-vuetify'
 import svgLoader from 'vite-svg-loader'
 import { VitePWA } from 'vite-plugin-pwa'
+
+// ADR-0058 §3 — Sentry release correlation. `VITE_CENA_RELEASE` is set
+// by the CI build job (or the Dockerfile) from `git rev-parse --short=12
+// HEAD`. Exposed as a compile-time global `__SENTRY_RELEASE__` so the
+// SPA plugin can read it without needing `import.meta.env` to be the
+// only source of truth (matches the .NET side which reads from an env
+// var). Falls back to 'unknown' for local dev.
+const cenaRelease = process.env.VITE_CENA_RELEASE ?? 'unknown'
+
+// ADR-0058 §3 — Source-map upload: ONLY runs when `SENTRY_AUTH_TOKEN` is
+// present in the build environment. Keeps local dev silent and avoids
+// leaking an auth token into any build that doesn't need it.
+const sentryPlugins: Plugin[] = process.env.SENTRY_AUTH_TOKEN
+  ? sentryVitePlugin({
+      org: process.env.SENTRY_ORG ?? 'cena',
+      project: process.env.SENTRY_PROJECT ?? 'student-spa',
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+      release: { name: cenaRelease },
+      telemetry: false,
+    })
+  : []
 
 /**
  * FIND-ux-029: Vite plugin that validates PWA manifest icons exist at
@@ -105,6 +128,7 @@ function stripMswInProduction() {
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
+    ...sentryPlugins,
     // Docs: https://github.com/posva/unplugin-vue-router
     // ℹ️ This plugin should be placed before vue plugin
     VueRouter({
@@ -254,7 +278,13 @@ export default defineConfig({
       },
     }),
   ],
-  define: { 'process.env': {} },
+  define: {
+    'process.env': {},
+
+    // ADR-0058 §3 — release string consumed by the Sentry plugin init
+    // (`__SENTRY_RELEASE__` read in `src/plugins/sentry.ts`).
+    '__SENTRY_RELEASE__': JSON.stringify(cenaRelease),
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
