@@ -1,0 +1,54 @@
+# =============================================================================
+# Cena Platform — k3d cluster config for capacity validation (PRR-430)
+#
+# Starts a 3-node k3d cluster that matches production replica topology:
+# one control-plane, two worker nodes (= 2 actor-host replicas per the
+# PRR-053 capacity plan). Proto.Cluster can use the real
+# KubernetesProvider instead of the TestProvider that devs currently see.
+#
+# Usage:
+#   k3d cluster create --config tests/load/k3d-cluster.yaml
+#   kubectl apply -f tests/load/actor-host-deployment.yaml
+#   k3d cluster delete cena-capacity
+#
+# The cluster is local + ephemeral; no real ingress — port-forward or
+# NodePort to reach the actor-host.
+# =============================================================================
+
+apiVersion: k3d.io/v1alpha5
+kind: Simple
+metadata:
+  name: cena-capacity
+
+servers: 1
+agents: 2
+
+kubeAPI:
+  host: "127.0.0.1"
+  hostPort: "6550"
+
+image: rancher/k3s:v1.30.0-k3s1
+
+ports:
+  # NodePort for actor-host Prometheus metrics scrape.
+  - port: 30119:30119
+    nodeFilters:
+      - agent:0
+  # NodePort for actor-host gRPC remote-actor port.
+  - port: 30080:30080
+    nodeFilters:
+      - agent:0
+
+options:
+  k3d:
+    wait: true
+    timeout: 60s
+  kubeconfig:
+    updateDefaultKubeconfig: true
+    switchCurrentContext: true
+
+registries:
+  create:
+    name: cena-capacity-registry
+    host: "0.0.0.0"
+    hostPort: "5000"
