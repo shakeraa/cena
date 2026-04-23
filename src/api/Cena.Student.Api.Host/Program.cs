@@ -182,6 +182,15 @@ public partial class Program
     // prr-148: StudentPlan + EPIC-PRR-I / ADR-0057 Subscription + PRR-301 Stripe (if configured). TimeProvider registered later via ClockRegistration.AddClock.
     builder.Services.AddStudentPlanServices(); Cena.Actors.Subscriptions.SubscriptionServiceRegistration.AddSubscriptionsMarten(builder.Services); Cena.Actors.Subscriptions.Stripe.StripeServiceRegistration.AddStripeCheckoutIfConfigured(builder.Services, builder.Configuration);
 
+    // PRR-324: household-dashboard card source. NoopHouseholdCardSource is
+    // the legitimate zero-data default (see its file banner for why this
+    // is not a stub). Uses TryAddSingleton so a production host can
+    // register a Marten-backed implementation ahead of this call without
+    // being overwritten.
+    builder.Services.TryAddSingleton<
+        Cena.Api.Contracts.Subscriptions.IHouseholdCardSource,
+        Cena.Api.Contracts.Subscriptions.NoopHouseholdCardSource>();
+
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
     
@@ -995,7 +1004,7 @@ public partial class Program
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
-    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + Stripe webhook + parent dashboard; STB-00 Me/Profile
+    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapHouseholdDashboardEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + Stripe webhook + parent dashboard + PRR-324 household dashboard; STB-00 Me/Profile
     app.MapSelfAssessmentEndpoints();
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
