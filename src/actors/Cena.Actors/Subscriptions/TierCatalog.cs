@@ -45,6 +45,88 @@ public static class TierCatalog
         return Money.FromAgorot(agorot);
     }
 
+    // B2B School SKU volume pricing brackets (PRR-341, BUSINESS-MODEL-001
+    // persona #8 school coordinator + #10 CFO). Bracket boundaries and
+    // prices come from the 2026-04-22 10-persona pricing review. Any
+    // edit to these constants has the same legal/commercial weight as
+    // editing the retail prices above and MUST land via a PR reviewed
+    // by the pricing decision-holder (ADR-0057 §6).
+    private const int VolumeSmallBracketMinStudents = 100;   // first volume bracket
+    private const int VolumeMidBracketMinStudents = 500;     // second volume bracket
+    private const int VolumeLargeBracketMinStudents = 1_500; // third volume bracket
+    private const long VolumeSmallBracketPerStudentAgorot = 3_500L; // ₪35/student/mo (100-499)
+    private const long VolumeMidBracketPerStudentAgorot = 2_900L;   // ₪29/student/mo (500-1499)
+    private const long VolumeLargeBracketPerStudentAgorot = 2_400L; // ₪24/student/mo (1500+)
+
+    /// <summary>
+    /// Per-student monthly price for a B2B school contract with
+    /// <paramref name="studentCount"/> seats. Brackets (inclusive lower bound):
+    /// <list type="bullet">
+    ///   <item>    0 –   99 students — ₪35/student/mo (entry-bracket default)</item>
+    ///   <item>  100 –  499 students — ₪35/student/mo (small)</item>
+    ///   <item>  500 – 1499 students — ₪29/student/mo (mid)</item>
+    ///   <item> 1500+     students   — ₪24/student/mo (large)</item>
+    /// </list>
+    /// Contracts below 100 seats are uncommon in Israeli secondary schools
+    /// but not banned; they pay the same per-student rate as the 100-499
+    /// bracket so small pilots are not penalised. The <c>MonthlyPrice</c>
+    /// field on <c>TierCatalog.Get(SchoolSku)</c> continues to hold the
+    /// entry-bracket rate as the canonical single-seat anchor. This
+    /// function is the bracketed variant for contract-level pricing.
+    /// </summary>
+    /// <param name="studentCount">Number of student seats on the contract. Must be ≥ 1.</param>
+    public static Money SchoolSkuMonthlyPricePerStudent(int studentCount)
+    {
+        if (studentCount < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(studentCount), studentCount,
+                "Student count must be at least 1.");
+        }
+        long perStudentAgorot = studentCount switch
+        {
+            >= VolumeLargeBracketMinStudents => VolumeLargeBracketPerStudentAgorot,
+            >= VolumeMidBracketMinStudents => VolumeMidBracketPerStudentAgorot,
+            _ => VolumeSmallBracketPerStudentAgorot,
+        };
+        return Money.FromAgorot(perStudentAgorot);
+    }
+
+    /// <summary>
+    /// Total monthly contract value for a B2B school with
+    /// <paramref name="studentCount"/> seats. Equals
+    /// <c>SchoolSkuMonthlyPricePerStudent(studentCount) × studentCount</c>.
+    /// Prefer this for contract-total arithmetic so the bracket lookup
+    /// and multiplication happen atomically and rounding is consistent.
+    /// </summary>
+    public static Money SchoolSkuMonthlyContractTotal(int studentCount)
+    {
+        var perStudent = SchoolSkuMonthlyPricePerStudent(studentCount);
+        return Money.FromAgorot(perStudent.Amount * studentCount);
+    }
+
+    /// <summary>
+    /// Name of the volume bracket the given <paramref name="studentCount"/>
+    /// falls into — useful for invoice line-items and sales pipelines where
+    /// the bracket identity has commercial significance independent of the
+    /// numeric price. Values: <c>small</c>, <c>mid</c>, <c>large</c>.
+    /// </summary>
+    public static string SchoolSkuVolumeBracket(int studentCount)
+    {
+        if (studentCount < 1)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(studentCount), studentCount,
+                "Student count must be at least 1.");
+        }
+        return studentCount switch
+        {
+            >= VolumeLargeBracketMinStudents => "large",
+            >= VolumeMidBracketMinStudents => "mid",
+            _ => "small",
+        };
+    }
+
     // ----- Caps -----
     private static readonly UsageCaps BasicCaps = new(
         SonnetEscalationsPerWeek: 20,

@@ -121,4 +121,108 @@ public class TierCatalogTests
             t => Assert.Equal(SubscriptionTier.Plus, t.Tier),
             t => Assert.Equal(SubscriptionTier.Premium, t.Tier));
     }
+
+    // --- B2B School SKU volume pricing (PRR-341) ------------------------
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(50)]
+    [InlineData(99)]
+    [InlineData(100)]
+    [InlineData(250)]
+    [InlineData(499)]
+    public void SchoolSku_small_bracket_is_3500_agorot_per_student(int count)
+    {
+        Assert.Equal(3_500L, TierCatalog.SchoolSkuMonthlyPricePerStudent(count).Amount);
+        Assert.Equal("small", TierCatalog.SchoolSkuVolumeBracket(count));
+    }
+
+    [Theory]
+    [InlineData(500)]
+    [InlineData(1000)]
+    [InlineData(1_499)]
+    public void SchoolSku_mid_bracket_is_2900_agorot_per_student(int count)
+    {
+        Assert.Equal(2_900L, TierCatalog.SchoolSkuMonthlyPricePerStudent(count).Amount);
+        Assert.Equal("mid", TierCatalog.SchoolSkuVolumeBracket(count));
+    }
+
+    [Theory]
+    [InlineData(1_500)]
+    [InlineData(5_000)]
+    [InlineData(25_000)]
+    public void SchoolSku_large_bracket_is_2400_agorot_per_student(int count)
+    {
+        Assert.Equal(2_400L, TierCatalog.SchoolSkuMonthlyPricePerStudent(count).Amount);
+        Assert.Equal("large", TierCatalog.SchoolSkuVolumeBracket(count));
+    }
+
+    [Fact]
+    public void SchoolSku_bracket_is_step_function_no_interpolation_between_brackets()
+    {
+        // Exact boundaries: 499 = small, 500 = mid, 1499 = mid, 1500 = large.
+        // Lock the step-function behaviour so no well-meaning refactor
+        // turns this into a linear-blend that would fabricate a price
+        // neither the sales team nor the pricing page publishes.
+        Assert.Equal(3_500L, TierCatalog.SchoolSkuMonthlyPricePerStudent(499).Amount);
+        Assert.Equal(2_900L, TierCatalog.SchoolSkuMonthlyPricePerStudent(500).Amount);
+        Assert.Equal(2_900L, TierCatalog.SchoolSkuMonthlyPricePerStudent(1_499).Amount);
+        Assert.Equal(2_400L, TierCatalog.SchoolSkuMonthlyPricePerStudent(1_500).Amount);
+    }
+
+    [Fact]
+    public void SchoolSku_monotonically_non_increasing_in_volume()
+    {
+        // Volume discount invariant — price-per-student must never go UP
+        // as student count grows. Lock this so a bracket-table typo
+        // (e.g., swapping mid and large rates) is caught in CI.
+        long prev = long.MaxValue;
+        foreach (var count in new[] { 1, 50, 99, 100, 250, 499, 500, 750, 1_499, 1_500, 5_000, 25_000 })
+        {
+            var price = TierCatalog.SchoolSkuMonthlyPricePerStudent(count).Amount;
+            Assert.True(
+                price <= prev,
+                $"SchoolSku pricing must be non-increasing in volume; at {count} students price jumped from {prev} to {price}.");
+            prev = price;
+        }
+    }
+
+    [Theory]
+    [InlineData(100, 100 * 3_500L)]
+    [InlineData(500, 500 * 2_900L)]
+    [InlineData(1_500, 1_500 * 2_400L)]
+    [InlineData(2_000, 2_000 * 2_400L)]
+    public void SchoolSku_contract_total_equals_per_student_times_seats(
+        int count, long expectedTotalAgorot)
+    {
+        var total = TierCatalog.SchoolSkuMonthlyContractTotal(count);
+        Assert.Equal(expectedTotalAgorot, total.Amount);
+    }
+
+    [Fact]
+    public void SchoolSku_volume_pricing_rejects_zero_and_negative_counts()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => TierCatalog.SchoolSkuMonthlyPricePerStudent(0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => TierCatalog.SchoolSkuMonthlyPricePerStudent(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => TierCatalog.SchoolSkuMonthlyContractTotal(0));
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => TierCatalog.SchoolSkuVolumeBracket(0));
+    }
+
+    [Fact]
+    public void SchoolSku_entry_bracket_matches_single_seat_anchor_on_TierDefinition()
+    {
+        // The single-seat anchor on TierCatalog.Get(SchoolSku).MonthlyPrice
+        // is the canonical entry-bracket rate (₪35/student/mo). Volume
+        // pricing extends downward from this; the anchor stays the same
+        // so existing call-sites that treat SchoolSku as a flat tier do
+        // not silently migrate to the volume-discounted rate.
+        var anchor = TierCatalog.Get(SubscriptionTier.SchoolSku).MonthlyPrice.Amount;
+        var smallBracketPerStudent = TierCatalog
+            .SchoolSkuMonthlyPricePerStudent(100).Amount;
+        Assert.Equal(anchor, smallBracketPerStudent);
+    }
 }
