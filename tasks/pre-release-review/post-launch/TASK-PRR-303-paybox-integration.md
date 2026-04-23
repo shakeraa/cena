@@ -6,7 +6,7 @@
 **Source docs**: [BUSINESS-MODEL-001-pricing-10-persona-review.md](../../docs/design/BUSINESS-MODEL-001-pricing-10-persona-review.md)
 **Assignee hint**: backend-dev + payments-procurement
 **Tags**: epic=epic-prr-i, billing, payments, priority=p0, vendor-gate
-**Status**: Not Started — **vendor-procurement gate**
+**Status**: Deferred to post-launch 2026-04-23 — **blocked on PayBox merchant contract**; cannot proceed without procurement. PRR-304 bank-transfer ships as the alternative-payment path for launch.
 **Source**: 10-persona pricing review 2026-04-22
 **Tier**: launch
 **Epic**: [EPIC-PRR-I](EPIC-PRR-I-subscription-pricing-model.md)
