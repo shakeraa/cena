@@ -430,6 +430,27 @@ public partial class Program
     // selection. See Notifications:* in appsettings.json.
     builder.Services.AddCenaNotifications(builder.Configuration);
 
+    // PRR-437: Meta WhatsApp inbound delivery-status webhook. Registers the
+    // HMAC-SHA256 signature verifier (iff MetaCloud:AppSecret is populated)
+    // + an in-memory dedup store for Meta's retried POSTs. The endpoint
+    // itself (MapMetaWhatsAppWebhook below) is wired unconditionally; it
+    // returns 404 when !IsWebhookReady so probes on a mis-configured host
+    // don't pretend to be wired.
+    {
+        var metaSection = builder.Configuration.GetSection(
+            Cena.Actors.ParentDigest.MetaCloudWhatsAppOptions.SectionName);
+        var appSecret = metaSection["AppSecret"];
+        if (!string.IsNullOrWhiteSpace(appSecret))
+        {
+            builder.Services.AddSingleton<
+                Cena.Actors.ParentDigest.IMetaWebhookSignatureVerifier>(
+                _ => new Cena.Actors.ParentDigest.MetaWebhookSignatureVerifier(appSecret));
+        }
+        builder.Services.TryAddSingleton<
+            Cena.Admin.Api.Host.Endpoints.IMetaWebhookDedupStore,
+            Cena.Admin.Api.Host.Endpoints.InMemoryMetaWebhookDedupStore>();
+    }
+
     // ---- CORS ----
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
         ?? new[] { "http://localhost:5175" };
@@ -693,6 +714,12 @@ public partial class Program
     
     // ---- Admin REST API endpoints (migrated from Cena.Api.Host) ----
     app.MapCenaAdminEndpoints();
+
+    // PRR-437: Meta WhatsApp inbound webhook (GET handshake + POST
+    // delivery-status callback). Lives on the admin host adjacent to
+    // the Stripe-webhook pattern; anonymous-auth (signature-verified)
+    // per Meta's protocol — Meta doesn't carry our auth tokens.
+    Cena.Admin.Api.Host.Endpoints.MetaWhatsAppWebhookEndpoint.MapMetaWhatsAppWebhook(app);
 
     // RDY-058: /api/admin/me/* — admin self-service account management
     // (profile, sign-out-everywhere, sign-in history, GDPR self-delete).
