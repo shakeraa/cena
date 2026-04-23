@@ -47,3 +47,18 @@ public sealed record CancelRequest(
     string Reason,
     string? ChurnReasonCategory = null,
     string? ChurnFreeText = null);
+
+/// <summary>
+/// Response for GET /api/me/subscription/guarantee-window (PRR-294).
+/// Drives the "Request refund" CTA on the parent's account → billing screen
+/// and the "N days left" copy in lifecycle emails.
+/// </summary>
+/// <param name="IsWithinWindow">True iff the CTA should be surfaced today.</param>
+/// <param name="DaysRemaining">Whole days remaining, ceiling-rounded. Zero outside the window.</param>
+/// <param name="WindowEndsAtUtc">Absolute UTC instant the window closes. Null when never activated.</param>
+/// <param name="Reason">Stable machine-readable reason code. See <c>MoneyBackGuaranteeWindowReason</c>.</param>
+public sealed record GuaranteeWindowStatusDto(
+    bool IsWithinWindow,
+    int DaysRemaining,
+    DateTimeOffset? WindowEndsAtUtc,
+    string Reason);

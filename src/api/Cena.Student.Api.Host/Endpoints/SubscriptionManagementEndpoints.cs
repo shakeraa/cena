@@ -10,6 +10,7 @@
 //   PATCH  /api/me/subscription/tier             — change tier
 //   PATCH  /api/me/subscription/cycle            — change billing cycle
 //   POST   /api/me/subscription/refund           — request refund (30-day window)
+//   GET    /api/me/subscription/guarantee-window — 30-day money-back window status (PRR-294)
 //   POST   /api/me/subscription/cancel           — terminal cancel
 //
 // The caller MUST be authenticated; the parent's subject id comes from the
@@ -46,6 +47,7 @@ public static class SubscriptionManagementEndpoints
         group.MapPatch("tier", ChangeTier).WithName("ChangeSubscriptionTier");
         group.MapPatch("cycle", ChangeCycle).WithName("ChangeBillingCycle");
         group.MapPost("refund", RequestRefund).WithName("RequestRefund");
+        group.MapGet("guarantee-window", GetGuaranteeWindow).WithName("GetGuaranteeWindow");
         group.MapPost("cancel", Cancel).WithName("CancelSubscription");
 
         return app;
@@ -61,6 +63,25 @@ public static class SubscriptionManagementEndpoints
         var parentId = RequireParentId(http);
         var aggregate = await store.LoadAsync(parentId, ct);
         return Results.Ok(ToStatusDto(aggregate.State));
+    }
+
+    // ----- GET guarantee-window (PRR-294 30-day money-back CTA visibility) -----
+
+    private static async Task<IResult> GetGuaranteeWindow(
+        HttpContext http,
+        [FromServices] ISubscriptionAggregateStore store,
+        [FromServices] TimeProvider clock,
+        CancellationToken ct)
+    {
+        var parentId = RequireParentId(http);
+        var aggregate = await store.LoadAsync(parentId, ct);
+        var now = clock.GetUtcNow();
+        var status = MoneyBackGuaranteeWindow.Evaluate(aggregate.State, now);
+        return Results.Ok(new GuaranteeWindowStatusDto(
+            IsWithinWindow: status.IsWithinWindow,
+            DaysRemaining: status.DaysRemaining,
+            WindowEndsAtUtc: status.WindowEndsAtUtc,
+            Reason: status.Reason));
     }
 
     // ----- POST checkout-session (Stripe-style hosted checkout) -----
