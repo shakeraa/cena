@@ -353,20 +353,23 @@ public partial class Program
 
     builder.Services.AddCenaAdminServices();
 
-    // PRR-393: dispute-metrics admin surface. Registers only what the
-    // /api/admin/dispute-metrics endpoint needs — the Marten-backed
-    // dispute repository + the pure-aggregator service + a TimeProvider.
-    // We deliberately do NOT call AddPhotoDiagnosticMarten here (that
-    // bundle depends on the CAS router, subscription entitlements, and
-    // the student-side dispute write path that only the Student.Api.Host
-    // exposes). The admin host only reads.
+    // PRR-393 + PRR-391: admin-side PhotoDiagnostic surface. PRR-393 only
+    // needed the dispute-metrics read path (dispute repository + metrics
+    // service + TimeProvider). PRR-391 adds the one-click credit flow,
+    // which needs the full credit-ledger + dispute service + quota gate
+    // graph — so we call AddPhotoDiagnosticMarten here. AddSubscriptions-
+    // Marten must precede it because the quota gate depends on
+    // IStudentEntitlementResolver + IPerTierCapEnforcer which live in the
+    // subscriptions bounded context. TryAdd-guarded throughout so the
+    // dispute repository + metrics service the PRR-393 endpoint consumes
+    // are registered transitively by AddPhotoDiagnosticMarten's shared
+    // services block (MartenDiagnosticDisputeRepository, MartenDispute-
+    // MetricsService).
     builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
-    builder.Services.TryAddSingleton<
-        Cena.Actors.Diagnosis.PhotoDiagnostic.IDiagnosticDisputeRepository,
-        Cena.Actors.Diagnosis.PhotoDiagnostic.MartenDiagnosticDisputeRepository>();
-    builder.Services.TryAddSingleton<
-        Cena.Actors.Diagnosis.PhotoDiagnostic.IDisputeMetricsService,
-        Cena.Actors.Diagnosis.PhotoDiagnostic.MartenDisputeMetricsService>();
+    Cena.Actors.Subscriptions.SubscriptionServiceRegistration
+        .AddSubscriptionsMarten(builder.Services);
+    Cena.Actors.Diagnosis.PhotoDiagnostic.PhotoDiagnosticServiceRegistration
+        .AddPhotoDiagnosticMarten(builder.Services);
 
     // prr-033: Ministry Bagrut rubric DSL + version pinning (ADR-0055).
     // Loads contracts/rubric/*.yml on boot; fails fast on malformed rubrics.
@@ -728,6 +731,11 @@ public partial class Program
     //   POST /api/admin/institutes/{instituteId}/classrooms/{classroomId}/assigned-targets
     Cena.Admin.Api.Host.Endpoints.ClassroomTargetEndpoints
         .MapClassroomTargetEndpoints(app);
+
+    // PRR-391: one-click credit on confirmed photo-diagnostic dispute
+    //   POST /api/admin/diagnostic-disputes/{disputeId}/credit
+    Cena.Admin.Api.Host.Endpoints.DiagnosticCreditEndpoints
+        .MapDiagnosticCreditEndpoints(app);
     
     // ---- Content management endpoints ----
     app.MapContentEndpoints();
