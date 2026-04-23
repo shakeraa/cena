@@ -113,5 +113,10 @@ public static class SubscriptionServiceRegistration
         {
             services.AddSingleton<UnitEconomicsAggregationService>();
         }
+        if (!services.Any(d => d.ServiceType == typeof(IUnitEconomicsAggregationService)))
+        {
+            services.AddSingleton<IUnitEconomicsAggregationService>(
+                sp => sp.GetRequiredService<UnitEconomicsAggregationService>());
+        }
     }
 }
