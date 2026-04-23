@@ -102,10 +102,7 @@ public sealed class WeeklyParentDigestWorker : BackgroundService
         foreach (var group in byStream)
         {
             var replayed = SubscriptionAggregate.ReplayFrom(group.Select(e => e.Data));
-            if (replayed.State.Status != SubscriptionStatus.Active) continue;
-
-            var featureFlags = TierCatalog.Get(replayed.State.CurrentTier).Features;
-            if (!featureFlags.ParentDashboard) continue;
+            if (!IsEligibleForDigest(replayed.State)) continue;
 
             var parentId = group.Key.Substring(SubscriptionAggregate.StreamKeyPrefix.Length);
             var studentIds = replayed.State.LinkedStudents
@@ -126,15 +123,51 @@ public sealed class WeeklyParentDigestWorker : BackgroundService
         return dispatched;
     }
 
-    /// <summary>Time until Sunday 08:00 UTC. Exposed internal for tests.</summary>
-    internal static TimeSpan TimeUntilNextSundayMorning(DateTimeOffset now)
+    /// <summary>
+    /// Pure eligibility test exposed for tests: a subscription gets a weekly
+    /// digest iff it is currently Active AND its tier's feature flags grant
+    /// ParentDashboard access. Basic explicitly opts out by the feature flag
+    /// (TierCatalog sets Basic.ParentDashboard=false); Plus+Premium opt in
+    /// (both set ParentDashboard=true — see TierCatalog.PlusFeatures /
+    /// PremiumFeatures). This keeps the "who gets the digest" rule in one
+    /// place instead of scattering it across TierCatalog + worker + test.
+    /// </summary>
+    public static bool IsEligibleForDigest(SubscriptionState state)
     {
-        var target = now.Date.AddHours(8);
-        var daysUntilSunday = ((int)DayOfWeek.Sunday - (int)now.DayOfWeek + 7) % 7;
-        var nextSunday = target.AddDays(daysUntilSunday == 0 && now.TimeOfDay >= TimeSpan.FromHours(8)
-            ? 7
-            : daysUntilSunday);
-        var result = nextSunday - now;
+        ArgumentNullException.ThrowIfNull(state);
+        if (state.Status != SubscriptionStatus.Active) return false;
+        var featureFlags = TierCatalog.Get(state.CurrentTier).Features;
+        return featureFlags.ParentDashboard;
+    }
+
+    /// <summary>
+    /// Time until the next Sunday 08:00 UTC anchor. Pure function, exposed
+    /// public for tests.
+    /// </summary>
+    /// <remarks>
+    /// Anchored in UTC explicitly. The earlier implementation used
+    /// <c>now.Date.AddHours(8)</c> which returns a <see cref="DateTime"/>
+    /// with <c>Kind=Unspecified</c>; subtracting a <see cref="DateTimeOffset"/>
+    /// from that triggered an implicit conversion of the unspecified
+    /// <see cref="DateTime"/> to <see cref="DateTimeOffset"/> using the
+    /// runtime's LOCAL timezone. That made the returned <see cref="TimeSpan"/>
+    /// silently timezone-dependent — fine on a UTC container, off by N hours
+    /// on a developer laptop in Asia/Jerusalem. The rewrite below stays in
+    /// <see cref="DateTimeOffset"/> throughout so the scheduling math is
+    /// identical in every environment.
+    /// </remarks>
+    public static TimeSpan TimeUntilNextSundayMorning(DateTimeOffset now)
+    {
+        var nowUtc = now.ToUniversalTime();
+        var todayMidnightUtc = new DateTimeOffset(
+            nowUtc.Year, nowUtc.Month, nowUtc.Day, 0, 0, 0, TimeSpan.Zero);
+        var todayEightUtc = todayMidnightUtc.AddHours(8);
+        var daysUntilSunday = ((int)DayOfWeek.Sunday - (int)todayMidnightUtc.DayOfWeek + 7) % 7;
+        var nextSunday = todayEightUtc.AddDays(
+            daysUntilSunday == 0 && nowUtc.TimeOfDay >= TimeSpan.FromHours(8)
+                ? 7
+                : daysUntilSunday);
+        var result = nextSunday - nowUtc;
         return result < TimeSpan.Zero ? TimeSpan.FromMinutes(1) : result;
     }
 }
