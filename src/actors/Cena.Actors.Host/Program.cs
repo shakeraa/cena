@@ -563,10 +563,16 @@ builder.Services.AddSingleton(provider =>
     logger.LogInformation("Cluster provider: {Provider} (environment: {Env})",
         clusterProviderType, hostEnv.EnvironmentName);
 
-    // Identity Lookup — PartitionActivatorLookup for single-node dev, PartitionIdentityLookup for prod
-    var identityLookup = isDevelopment
-        ? (IIdentityLookup)new Proto.Cluster.PartitionActivator.PartitionActivatorLookup()
-        : new PartitionIdentityLookup();
+    // Identity Lookup — PartitionIdentityLookup across dev + prod.
+    // The original config used PartitionActivatorLookup in dev (it was
+    // supposed to be lighter for single-node) but paired with the
+    // TestProvider it produced a state where cluster members existed yet
+    // "student" kind activations never fired — RequestAsync hung 30s per
+    // call waiting for an activation the lookup never completed. Matching
+    // prod's PartitionIdentityLookup resolves activations reliably. The
+    // minor memory overhead of the partition-identity actor is acceptable
+    // for dev, and this keeps dev behaviour closer to prod.
+    var identityLookup = (IIdentityLookup)new PartitionIdentityLookup();
 
     // Register Virtual Actor Kinds (Grains) — EPIC-PRR-A Sprint 1 (ADR-0012): shadow writer attached post-construction.
     var studentKind = new ClusterKind("student", Props.FromProducer(() => ActivatorUtilities.CreateInstance<StudentActor>(provider).UseLearningSessionShadowWriter(provider.GetRequiredService<Cena.Actors.Sessions.Shadow.ILearningSessionShadowWriter>())));
@@ -581,8 +587,17 @@ builder.Services.AddSingleton(provider =>
         .WithHeartbeatExpiration(TimeSpan.FromSeconds(30));
 
     // Remote config for cluster — gRPC transport for actor activation.
+    // BindToLocalhost() without a port argument picks a RANDOM ephemeral
+    // port, which silently mismatches the Cluster:AdvertisedPort the
+    // cluster member registers under. In a single-node dev cluster that
+    // means the member's identity-lookup points at 127.0.0.1:8090 but
+    // the gRPC listener is at 127.0.0.1:<random> — self-dials never
+    // connect, PartitionActivatorLookup can't reach the "student" kind
+    // owner, and every cena.session.* / cena.mastery.* request times
+    // out after 30s waiting for an activation that never fires.
+    // Pin bind + advertise to the same port so self-dial resolves.
     system
-        .WithRemote(RemoteConfig.BindToLocalhost())
+        .WithRemote(RemoteConfig.BindToLocalhost(advertisedPort))
         .WithCluster(clusterConfig);
 
     logger.LogInformation(
