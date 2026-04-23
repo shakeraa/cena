@@ -592,6 +592,14 @@ public partial class Program
     builder.Services.AddOcrCascadeCore(builder.Configuration);
     builder.Services.AddOcrCascadeWithCasValidation();
 
+    // PRR-304 bank-transfer payee details — bound from configuration so the
+    // parent-side reserve endpoint can render bank coordinates back to the
+    // customer. Unbound section → endpoint returns 503 rather than a
+    // half-filled response (see BankTransferEndpoints.Reserve).
+    builder.Services.Configure<Cena.Student.Api.Host.Endpoints.BankTransferPayeeOptions>(
+        builder.Configuration.GetSection(
+            Cena.Student.Api.Host.Endpoints.BankTransferPayeeOptions.SectionName));
+
     builder.Services.Configure<TesseractOptions>(builder.Configuration.GetSection("Ocr:Tesseract"));
     builder.Services.AddSingleton<ILayer2aTextOcr>(sp =>
     {
@@ -1024,7 +1032,7 @@ public partial class Program
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
-    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapHouseholdDashboardEndpoints(); app.MapTutorHandoffEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + Stripe webhook + parent dashboard + PRR-324 household dashboard + PRR-325 tutor-handoff HTML report; STB-00 Me/Profile
+    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapBankTransferEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapHouseholdDashboardEndpoints(); app.MapTutorHandoffEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + /bank-transfer PRR-304 + Stripe webhook + parent dashboard + PRR-324 household dashboard + PRR-325 tutor-handoff HTML report; STB-00 Me/Profile
     app.MapSelfAssessmentEndpoints();
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.

@@ -803,6 +803,11 @@ public partial class Program
     Cena.Admin.Api.Host.Endpoints.AlphaMigrationEndpoints
         .MapAlphaMigrationEndpoints(app);
 
+    // PRR-304 bank-transfer admin reconciliation: list Pending + confirm
+    // payment received -> transition subscription to Active.
+    Cena.Admin.Api.Host.Endpoints.BankTransferAdminEndpoints
+        .MapBankTransferAdminEndpoints(app);
+
     // ---- Root endpoint ----
     app.MapGet("/", () => Results.Ok(new 
     { 

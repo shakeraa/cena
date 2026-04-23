@@ -93,6 +93,18 @@ public static class SubscriptionServiceRegistration
     {
         services.AddSingleton<IStudentEntitlementResolver, StudentEntitlementResolver>();
 
+        // PRR-304 bank-transfer reservation. InMemory default for single-host;
+        // Marten variant is a follow-up when multi-replica parents need a
+        // shared view of reservations. The service is Singleton (stateless
+        // orchestrator) so the same instance the Student-side endpoint calls
+        // is the one the Admin-side confirm endpoint calls and the one the
+        // daily expiry worker calls — no split-brain across reservations.
+        services.TryAddSingleton<IBankTransferReservationStore,
+            InMemoryBankTransferReservationStore>();
+        services.AddSingleton<BankTransferReservationService>();
+        services.AddOptions<BankTransferExpiryWorkerOptions>();
+        services.AddHostedService<BankTransferExpiryWorker>();
+
         // PRR-344 alpha-migration defaults (InMemory). AddSubscriptionsMarten
         // swaps these for the Marten-backed variants so the seed list and
         // grace markers persist across pod restarts. TryAdd so a host that
