@@ -6,7 +6,7 @@
 **Source docs**: [STUDENT-INPUT-MODALITIES-002-discussion.md §3](../../docs/design/STUDENT-INPUT-MODALITIES-002-discussion.md) + 10-persona findings under [pre-release-review/reviews/persona-*/student-input-modalities-2-findings.md](../../pre-release-review/reviews/)
 **Assignee hint**: kimi-coder (after research prompt lands) or front-end coder
 **Tags**: source=student-input-modalities-002, epic=epic-prr-f, priority=p1, ui, pedagogy, q2
-**Status**: Ready (awaiting research-prompt output)
+**Status**: Ready (awaiting research-prompt output) — **decision-gate confirmed 2026-04-23: option A (run research, gate launch on it)**. No code work begins until research output lands. Downstream PRR-261 / PRR-262 / PRR-263 remain blocked on this task per their existing status lines.
 **Source**: 10-persona 002-brief review 2026-04-22
 **Tier**: launch
 **Epic**: [EPIC-PRR-F](EPIC-PRR-F-multi-target-onboarding-plan.md)
