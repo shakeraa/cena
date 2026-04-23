@@ -781,7 +781,16 @@ public partial class Program
     //   GET /api/admin/dispute-metrics?window={7d|30d}
     Cena.Admin.Api.Host.Endpoints.DisputeMetricsEndpoints
         .MapDisputeMetricsEndpoints(app);
-    
+
+    // PRR-330: admin unit-economics history endpoint. Returns the last N
+    // weekly rollup snapshots written by UnitEconomicsRollupWorker for
+    // the admin dashboard's trend-line chart. The single-window (current-
+    // week) view lives on the Student API host at
+    // GET /api/admin/unit-economics; this history endpoint complements it.
+    //   GET /api/admin/unit-economics/history?weeks=12
+    Cena.Admin.Api.Host.Endpoints.UnitEconomicsAdminEndpoints
+        .MapUnitEconomicsAdminEndpoints(app);
+
     // ---- Root endpoint ----
     app.MapGet("/", () => Results.Ok(new 
     { 

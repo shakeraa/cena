@@ -45,6 +45,27 @@ public static class SubscriptionServiceRegistration
         // PRR-306 production refund-usage probe: aggregates Marten-backed
         // photo usage + raw hint events across linked students.
         services.Replace(ServiceDescriptor.Singleton<IRefundUsageProbe, MartenRefundUsageProbe>());
+
+        // PRR-330 production wiring:
+        //   - Replace the InMemory unit-economics snapshot store default
+        //     (registered in AddSharedServices) with MartenUnitEconomicsSnapshotStore
+        //     so weekly rollups survive pod restarts and are shared across replicas.
+        //   - Register UnitEconomicsRollupWorker as a hosted service so Marten-
+        //     mode hosts (Actor Host in production) fire the weekly Sunday
+        //     06:00 UTC rollup. Non-Marten hosts (tests, dev single-host)
+        //     keep the InMemory store without the hosted worker running.
+        services.Replace(ServiceDescriptor.Singleton<
+            IUnitEconomicsSnapshotStore, MartenUnitEconomicsSnapshotStore>());
+        // AddOptions<>().BindConfiguration(...) is the modern options-pattern
+        // wiring; we TryAdd the bare Configure here so a host that already
+        // bound the section (with custom post-processing) is not clobbered.
+        // Hosts can override via
+        //   services.Configure<UnitEconomicsRollupOptions>(
+        //     configuration.GetSection(UnitEconomicsRollupOptions.SectionName));
+        // in Program.cs; the defaults baked into the POCO give a safe
+        // no-config boot.
+        services.AddOptions<UnitEconomicsRollupOptions>();
+        services.AddHostedService<UnitEconomicsRollupWorker>();
         return services;
     }
 

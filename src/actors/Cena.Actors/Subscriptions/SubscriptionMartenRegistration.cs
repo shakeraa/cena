@@ -35,5 +35,11 @@ public static class SubscriptionMartenRegistration
 
         opts.Schema.For<StudentEntitlementDocument>().Identity(d => d.Id);
         opts.Projections.Add<StudentEntitlementProjection>(ProjectionLifecycle.Inline);
+
+        // PRR-330 — Weekly unit-economics snapshot. One row per week keyed
+        // by the Sunday-anchored id ("week-YYYY-MM-DD") so the admin
+        // history chart renders trend lines by cheap index scan instead
+        // of replaying the subscription event stream on every page load.
+        opts.Schema.For<UnitEconomicsSnapshotDocument>().Identity(d => d.Id);
     }
 }
