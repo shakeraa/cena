@@ -29,3 +29,11 @@ Missing claims → 401 loop; wrong tenant → cross-institute visibility; duplic
 - [ ] All 4 boundaries asserted
 - [ ] Runs < 45s
 - [ ] Tagged `@auth @p0`
+
+## Prereqs
+
+- [TASK-E2E-A-01-BE-01](TASK-E2E-A-01-BE-01-on-first-sign-in.md) — `POST /api/auth/on-first-sign-in` + claims transformer
+- [TASK-E2E-A-01-BE-02](TASK-E2E-A-01-BE-02-student-onboarded-event.md) — `StudentOnboardedV1` event + NATS emitter
+- [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) — `fixtures/bus-probe.ts` for bus boundary assertion
+
+Spec skeleton landed at `src/student/full-version/tests/e2e-flow/workflows/student-register.spec.ts` with DOM + Firebase + DB-via-API boundaries wired and bus boundary TODO'd until INFRA-01 ships.

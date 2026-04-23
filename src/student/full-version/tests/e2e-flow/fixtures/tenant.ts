@@ -17,6 +17,7 @@ import { test as base } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { createFirebaseUser, signInFirebaseUser, type FirebaseAuthUser } from './auth'
 import { createStripeScope, type StripeScope } from './stripe'
+import { createBusProbe, type BusProbe } from './bus-probe'
 
 export interface TenantContext {
   /**
@@ -39,6 +40,7 @@ export interface E2EFixtures {
   tenant: TenantContext
   authUser: FirebaseAuthUser
   stripeScope: StripeScope
+  busProbe: BusProbe
 }
 
 function buildTenantId(workerIndex: number, runId: string): string {
@@ -87,6 +89,20 @@ export const e2eTest = base.extend<E2EFixtures, { tenant: TenantContext }>({
   stripeScope: async ({ tenant }, use) => {
     const scope = createStripeScope(tenant.id)
     await use(scope)
+  },
+
+  // Test-scoped: NATS bus probe for asserting that expected events land on
+  // the JetStream subjects each boundary names. Fresh TCP connection per
+  // spec → no subscriber state bleed across specs. Teardown is guaranteed
+  // even on assertion failure (Playwright calls the cleanup arm).
+  busProbe: async ({}, use) => {
+    const probe = await createBusProbe()
+    try {
+      await use(probe)
+    }
+    finally {
+      await probe.close()
+    }
   },
 })
 
