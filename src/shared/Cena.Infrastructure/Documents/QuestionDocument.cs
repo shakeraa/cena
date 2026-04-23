@@ -83,6 +83,26 @@ public class QuestionDocument
     /// for precedence — author force-visible overrides the stored mode.
     /// </summary>
     public bool ForceOptionsVisible { get; set; }
+
+    /// <summary>
+    /// PRR-262 — Authored hint list carrying level × variant × locale
+    /// metadata. Each row is one (level, variant, locale) tuple: level
+    /// binds to the ADR-0045 hint-ladder rung (1=template, 2=method,
+    /// 3=worked-example); variant is
+    /// <see cref="Cena.Actors.Mastery.HintVariant.StemGrounded"/>
+    /// (safe for hidden_reveal mode) or
+    /// <see cref="Cena.Actors.Mastery.HintVariant.Full"/> (may reference
+    /// options — requires revealed options). Null or empty list on a
+    /// question means no authored hints; the
+    /// <see cref="Cena.Actors.Mastery.StemGroundedHintRouter.Pick"/>
+    /// router honours the PRR-262 "never leak options" invariant by
+    /// returning a reveal-required signal rather than a Full-variant
+    /// hint when the student is in hidden mode and only Full variants
+    /// exist at the requested level. Defaults to null so existing
+    /// seeded items have no authored hints until the authoring pipeline
+    /// backfills them (downstream authoring UI is a follow-up).
+    /// </summary>
+    public List<AuthoredHint>? AuthoredHints { get; set; }
     public string CorrectAnswer { get; set; } = "";
     public string? Explanation { get; set; }
 
