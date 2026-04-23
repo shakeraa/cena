@@ -311,6 +311,14 @@ public partial class Program
     // until this binding lands.
     builder.Services.AddArchivedExamTargetSourceMarten();
 
+    // PRR-385 / EPIC-PRR-J: photo-diagnostic services (dispute service +
+    // quota gate + audit). Registers IDiagnosticDisputeService against
+    // MartenDiagnosticDisputeRepository so student-filed disputes persist
+    // across restarts. TryAdd-guarded so the call is idempotent with any
+    // upstream composition that already wired the stores.
+    Cena.Actors.Diagnosis.PhotoDiagnostic.PhotoDiagnosticServiceRegistration
+        .AddPhotoDiagnosticMarten(builder.Services);
+
     // prr-009 / EPIC-PRR-C / EPIC-PRR-M production binding: replace the
     // in-memory parent-child binding store with MartenParentChildBindingStore
     // so parent session-refresh reads the persisted binding rows (not an
@@ -995,6 +1003,7 @@ public partial class Program
     app.MapExamTargetQuestionPaperEndpoints(); // prr-243: שאלון post-hoc PATCH endpoints per ADR-0050 §1
     app.MapExamTargetParentVisibilityEndpoint(); // prr-230: POST /api/me/exam-targets/{id}/visibility
     app.MapDiagnosticEndpoints();        // RDY-023 + prr-228: legacy + per-target diagnostic blocks
+    app.MapDiagnosticDisputeEndpoints(); // PRR-385: POST /api/me/diagnostic-disputes — "this doesn't look right"
 
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();
