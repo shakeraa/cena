@@ -23,6 +23,7 @@
 // =============================================================================
 
 using Cena.Actors.Cas;
+using Cena.Actors.Diagnosis.PhotoDiagnostic.Taxonomy;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -47,6 +48,9 @@ public static class PhotoDiagnosticServiceRegistration
         services.TryAddSingleton<IRecentPhotoHashStore, InMemoryRecentPhotoHashStore>();
         // PRR-391: support-issued credit ledger (in-memory for dev/test).
         services.TryAddSingleton<IDiagnosticCreditLedger, InMemoryDiagnosticCreditLedger>();
+        // PRR-375: taxonomy-governance version store. InMemory is the dev/test
+        // default and is production-grade (concurrency-safe, not a stub).
+        services.TryAddSingleton<ITaxonomyVersionStore, InMemoryTaxonomyVersionStore>();
         AddSharedServices(services);
         return services;
     }
@@ -85,6 +89,12 @@ public static class PhotoDiagnosticServiceRegistration
         // MUST override this registration with a replacement IRecentPhotoHashStore
         // — the in-memory fallback is ONLY safe for single-host dev boxes.
         services.TryAddSingleton<IRecentPhotoHashStore, InMemoryRecentPhotoHashStore>();
+
+        // PRR-375: taxonomy-governance version store — Marten-backed in prod.
+        // Schema identity registered so Marten recognises the document.
+        services.TryAddSingleton<ITaxonomyVersionStore, MartenTaxonomyVersionStore>();
+        services.ConfigureMarten(opts =>
+            opts.Schema.For<TaxonomyVersionDocument>().Identity(d => d.Id));
 
         AddSharedServices(services);
         return services;
@@ -146,5 +156,11 @@ public static class PhotoDiagnosticServiceRegistration
         // TryAdd preserves the override.
         services.TryAddSingleton<IDiagnosticCreditDispatcher, NullDiagnosticCreditDispatcher>();
         services.TryAddSingleton<IDiagnosticCreditService, DiagnosticCreditService>();
+
+        // PRR-375: taxonomy-governance service composing the version store
+        // with the dispute-metrics read surface. Enables "flag high-dispute
+        // templates" on the admin dashboard and the reviewer-approve
+        // workflow (enforces ≥2-reviewer guardrail inside the store).
+        services.TryAddSingleton<ITaxonomyGovernanceService, TaxonomyGovernanceService>();
     }
 }
