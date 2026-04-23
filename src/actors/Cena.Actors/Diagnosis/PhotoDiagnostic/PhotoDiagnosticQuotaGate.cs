@@ -9,6 +9,11 @@
 //   - IDiagnosticCreditLedger (opt): subtracts support-issued free credits
 //   - IHardCapExtensionAdjuster (opt): adds support-granted month-end
 //                                       extensions to the effective hard cap
+//   - ISoftCapEventEmitter (opt)    : PRR-401 — emits
+//                                       EntitlementSoftCapReached_V1 exactly
+//                                       once per (student, cap, month) when
+//                                       the gate's decision is SoftCapReached.
+//                                       Idempotent via SoftCapEmissionLedger.
 //
 // Returns a QuotaDecision with Allow / SoftCapReached / HardCapReached
 // (the same three-state enum used elsewhere). SoftCapReached still lets
@@ -37,9 +42,26 @@
 // manually approves a one-time month-end extension). Both dependencies
 // are nullable so test harnesses that don't care about either path don't
 // have to wire a fixture; production DI always binds both.
+//
+// PRR-401 — soft-cap event emission:
+// When the final decision (after credit + extension adjustments) is
+// SoftCapReached, we fire the soft-cap telemetry event through
+// ISoftCapEventEmitter. The emitter is idempotent via the
+// ISoftCapEmissionLedger it composes in — so even though CheckAsync is
+// called on every upload past the soft cap (uploads 101, 102, ...), the
+// event lands on the parent's subscription stream exactly once per UTC
+// calendar month. We await the emit (not fire-and-forget) so a genuine
+// storage outage surfaces to the caller's retry path instead of being
+// lost; the emit is cheap on the repeat-call hot path (one ledger LoadAsync
+// that hits the already-present row + early return).
+// The dependency is optional so tests that don't care about the
+// telemetry path don't have to wire a fixture. Production DI always
+// binds an emitter (either the real SoftCapEventEmitter or
+// NullSoftCapEventEmitter when no subscription store is available).
 // =============================================================================
 
 using Cena.Actors.Subscriptions;
+using Cena.Actors.Subscriptions.Events;
 
 namespace Cena.Actors.Diagnosis.PhotoDiagnostic;
 
@@ -76,19 +98,25 @@ public sealed class PhotoDiagnosticQuotaGate : IPhotoDiagnosticQuotaGate
     private readonly IPerTierCapEnforcer _enforcer;
     private readonly IDiagnosticCreditLedger? _credits;
     private readonly IHardCapExtensionAdjuster? _hardCapAdjuster;
+    private readonly ISoftCapEventEmitter? _softCapEmitter;
+    private readonly TimeProvider _clock;
 
     public PhotoDiagnosticQuotaGate(
         IStudentEntitlementResolver entitlements,
         IPhotoDiagnosticMonthlyUsage usage,
         IPerTierCapEnforcer enforcer,
         IDiagnosticCreditLedger? credits = null,
-        IHardCapExtensionAdjuster? hardCapAdjuster = null)
+        IHardCapExtensionAdjuster? hardCapAdjuster = null,
+        ISoftCapEventEmitter? softCapEmitter = null,
+        TimeProvider? clock = null)
     {
         _entitlements = entitlements ?? throw new ArgumentNullException(nameof(entitlements));
         _usage = usage ?? throw new ArgumentNullException(nameof(usage));
         _enforcer = enforcer ?? throw new ArgumentNullException(nameof(enforcer));
         _credits = credits;
         _hardCapAdjuster = hardCapAdjuster;
+        _softCapEmitter = softCapEmitter;
+        _clock = clock ?? TimeProvider.System;
     }
 
     public async Task<PhotoDiagnosticQuotaDecision> CheckAsync(
@@ -121,17 +149,42 @@ public sealed class PhotoDiagnosticQuotaGate : IPhotoDiagnosticQuotaGate
             : await _hardCapAdjuster.GetActiveExtensionAsync(studentSubjectIdHash, asOfUtc, ct)
                 .ConfigureAwait(false);
 
+        PhotoDiagnosticQuotaDecision decision;
         if (hardCapExtension <= 0)
         {
-            return new PhotoDiagnosticQuotaDecision(
+            decision = new PhotoDiagnosticQuotaDecision(
                 cap.Decision, cap.CurrentUsage, cap.SoftCap, cap.HardCap, entitlement.EffectiveTier);
         }
+        else
+        {
+            var bumpedHardCap = cap.HardCap + hardCapExtension;
+            var adjustedDecision = RecomputeDecision(
+                effectiveUsage, cap.SoftCap, bumpedHardCap);
+            decision = new PhotoDiagnosticQuotaDecision(
+                adjustedDecision, cap.CurrentUsage, cap.SoftCap, bumpedHardCap, entitlement.EffectiveTier);
+        }
 
-        var bumpedHardCap = cap.HardCap + hardCapExtension;
-        var adjustedDecision = RecomputeDecision(
-            effectiveUsage, cap.SoftCap, bumpedHardCap);
-        return new PhotoDiagnosticQuotaDecision(
-            adjustedDecision, cap.CurrentUsage, cap.SoftCap, bumpedHardCap, entitlement.EffectiveTier);
+        // PRR-401: on SoftCapReached, fire the once-per-(student, cap,
+        // month) telemetry event. Awaited (not fire-and-forget) so a
+        // storage outage surfaces to the caller; the emit is cheap on
+        // the 2nd..Nth call this month (ledger LoadAsync hits the
+        // already-present row + early return). Null-safe: tests that
+        // don't wire the emitter skip this block entirely.
+        if (_softCapEmitter is not null
+            && decision.Decision == CapDecision.SoftCapReached
+            && !string.IsNullOrWhiteSpace(entitlement.SourceParentSubjectIdEncrypted))
+        {
+            await _softCapEmitter.EmitIfFirstInPeriodAsync(
+                studentSubjectIdHash: studentSubjectIdHash,
+                parentSubjectIdEncrypted: entitlement.SourceParentSubjectIdEncrypted,
+                capType: EntitlementSoftCapReached_V1.CapTypes.PhotoDiagnosticMonthly,
+                usageCount: decision.CurrentUsage,
+                capLimit: decision.SoftCap,
+                nowUtc: asOfUtc,
+                ct: ct).ConfigureAwait(false);
+        }
+
+        return decision;
     }
 
     /// <summary>

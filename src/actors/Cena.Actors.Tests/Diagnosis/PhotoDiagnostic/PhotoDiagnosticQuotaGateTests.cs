@@ -121,6 +121,67 @@ public class PhotoDiagnosticQuotaGateTests
             gate.CheckAsync("", DateTimeOffset.UtcNow, default));
     }
 
+    // PRR-401 — soft-cap emitter is called exactly once across repeat checks
+    // in the same (student, cap, month). We use a counting fake emitter +
+    // the in-memory ledger so the integration-style invariant is locked
+    // at the gate, not just at the emitter unit.
+    [Fact]
+    public async Task SoftCapReached_invokes_emitter_exactly_once_across_repeat_checks()
+    {
+        var usage = new InMemoryPhotoDiagnosticMonthlyUsage();
+        var emitter = new CountingSoftCapEmitter();
+        var gate = new PhotoDiagnosticQuotaGate(
+            entitlements: new FakeEntitlementResolver(SubscriptionTier.Premium),
+            usage: usage,
+            enforcer: new PerTierCapEnforcer(),
+            credits: null,
+            hardCapAdjuster: null,
+            softCapEmitter: emitter);
+        var now = new DateTimeOffset(2026, 4, 23, 10, 0, 0, TimeSpan.Zero);
+
+        // Get the counter to 100 so the gate returns SoftCapReached on the
+        // 101st check.
+        for (var i = 0; i < 100; i++)
+        {
+            await gate.CommitAsync("s-101", now, default);
+        }
+
+        for (var i = 0; i < 5; i++)
+        {
+            var d = await gate.CheckAsync("s-101", now.AddMinutes(i), default);
+            Assert.Equal(CapDecision.SoftCapReached, d.Decision);
+        }
+
+        // Five CheckAsync calls at SoftCapReached, but emitter invoked once.
+        Assert.Equal(5, emitter.CallCount);
+        Assert.Equal(1, emitter.EmittedCount);
+        Assert.Equal(
+            Cena.Actors.Subscriptions.Events.EntitlementSoftCapReached_V1.CapTypes.PhotoDiagnosticMonthly,
+            emitter.LastCapType);
+    }
+
+    [Fact]
+    public async Task Allow_does_not_invoke_soft_cap_emitter()
+    {
+        var usage = new InMemoryPhotoDiagnosticMonthlyUsage();
+        var emitter = new CountingSoftCapEmitter();
+        var gate = new PhotoDiagnosticQuotaGate(
+            entitlements: new FakeEntitlementResolver(SubscriptionTier.Premium),
+            usage: usage,
+            enforcer: new PerTierCapEnforcer(),
+            credits: null,
+            hardCapAdjuster: null,
+            softCapEmitter: emitter);
+
+        for (var i = 0; i < 50; i++)
+        {
+            var d = await gate.CheckAsync("s-102", DateTimeOffset.UtcNow, default);
+            Assert.Equal(CapDecision.Allow, d.Decision);
+        }
+
+        Assert.Equal(0, emitter.CallCount);
+    }
+
     private sealed class FakeEntitlementResolver : IStudentEntitlementResolver
     {
         private readonly SubscriptionTier _tier;
@@ -133,5 +194,35 @@ public class PhotoDiagnosticQuotaGateTests
                 SourceParentSubjectIdEncrypted: "parent",
                 ValidUntil: null,
                 LastUpdatedAt: DateTimeOffset.UtcNow));
+    }
+
+    // Inline counting emitter wraps the real idempotency mechanism
+    // (InMemorySoftCapEmissionLedger) to give us both "how many times did
+    // the gate call me" and "how many times did the invariant actually
+    // let me emit". Both numbers matter to the PRR-401 acceptance criteria.
+    private sealed class CountingSoftCapEmitter : ISoftCapEventEmitter
+    {
+        private readonly InMemorySoftCapEmissionLedger _ledger = new();
+        public int CallCount { get; private set; }
+        public int EmittedCount { get; private set; }
+        public string? LastCapType { get; private set; }
+
+        public async Task EmitIfFirstInPeriodAsync(
+            string studentSubjectIdHash,
+            string parentSubjectIdEncrypted,
+            string capType,
+            int usageCount,
+            int capLimit,
+            DateTimeOffset nowUtc,
+            CancellationToken ct)
+        {
+            CallCount++;
+            LastCapType = capType;
+            var month = MonthlyUsageKey.For(nowUtc);
+            if (await _ledger.TryClaimAsync(studentSubjectIdHash, capType, month, nowUtc, ct))
+            {
+                EmittedCount++;
+            }
+        }
     }
 }
