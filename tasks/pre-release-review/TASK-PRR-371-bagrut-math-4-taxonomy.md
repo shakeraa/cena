@@ -6,7 +6,7 @@
 **Source docs**: [PHOTO-UPLOAD-DIAGNOSTIC-001-10-persona-review.md](../../docs/design/PHOTO-UPLOAD-DIAGNOSTIC-001-10-persona-review.md)
 **Assignee hint**: math-education SME (contracted or in-house) + content-eng
 **Tags**: epic=epic-prr-j, content, sme-required, priority=p0, sme-gate, launch-blocker
-**Status**: **SME gate** — resource needs approval (§5 decision #1)
+**Status**: **SME gate** — resource approved **2026-04-23: option A (hire/contract math-education SME for launch tranche)**. Content authoring begins when SME onboards; 40+ templates across HE/AR/EN with 2-SME peer review per DoD. Same SME expected to also cover [PRR-372 Bagrut-5](TASK-PRR-372-bagrut-math-5-taxonomy.md) per the 2026-04-23 decision batch.
 **Source**: 10-persona photo-diagnostic review 2026-04-22
 **Tier**: launch
 **Epic**: [EPIC-PRR-J](EPIC-PRR-J-photo-upload-cas-diagnostic-chain.md)
