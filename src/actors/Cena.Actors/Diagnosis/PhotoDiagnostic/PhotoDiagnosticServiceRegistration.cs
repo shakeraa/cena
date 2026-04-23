@@ -41,12 +41,29 @@ public static class PhotoDiagnosticServiceRegistration
     /// <summary>
     /// Register with Marten-backed stores and add the retention worker as
     /// an IHostedService. Requires AddMarten to have been called first.
+    ///
+    /// PRR-412: also registers the PhotoHashLedgerDocument schema, the
+    /// PhotoDeletionWorker (BackgroundService that enforces the 5-min
+    /// SLA), and the PhotoDeletionAuditJob (verifiable audit). The
+    /// IPhotoBlobStore default is the Noop fixture; production
+    /// composition (Student API host) replaces it with the S3 adapter
+    /// shipped via Scope B / ADR-0058. The Noop default lets the
+    /// Marten-backed DI graph resolve in tests that don't wire a real
+    /// store.
     /// </summary>
     public static IServiceCollection AddPhotoDiagnosticMarten(this IServiceCollection services)
     {
         services.TryAddSingleton<IPhotoDiagnosticMonthlyUsage, MartenPhotoDiagnosticMonthlyUsage>();
         services.TryAddSingleton<IDiagnosticDisputeRepository, MartenDiagnosticDisputeRepository>();
         services.AddHostedService<DiagnosticDisputeRetentionWorker>();
+
+        // PRR-412 photo-deletion SLA wiring.
+        services.TryAddSingleton<IPhotoBlobStore, NoopPhotoBlobStore>();
+        services.ConfigureMarten(opts =>
+            opts.Schema.For<PhotoHashLedgerDocument>().Identity(d => d.Id));
+        services.AddHostedService<PhotoDeletionWorker>();
+        services.TryAddSingleton<PhotoDeletionAuditJob>();
+
         AddSharedServices(services);
         return services;
     }
