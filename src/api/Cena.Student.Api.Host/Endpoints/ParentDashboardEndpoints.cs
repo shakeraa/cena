@@ -8,10 +8,21 @@
 // Feature-gate discipline: if the caller's tier doesn't include the parent
 // dashboard, return 403 with error=tier_required. Frontend handles the
 // upsell to Premium.
+//
+// PRR-320 backfill: the previous version of this endpoint hard-coded zero
+// values for WeeklyMinutes / MonthlyMinutes / TopicsPracticed /
+// LastActiveAt / ReadinessScore with a "PRR-323 will fill these values"
+// TODO. That comment is now closed — the endpoint delegates to
+// IParentDashboardCardSource (see ParentDashboardServiceRegistration)
+// which composes the scalars from the Marten event log. The Noop
+// default remains registered so hosts without a document store still
+// resolve the dependency graph (returns zero-scalar cards — honest
+// empties).
 // =============================================================================
 
 using System.Security.Claims;
 using Cena.Actors.Subscriptions;
+using Cena.Api.Contracts.Parenting;
 using Cena.Api.Contracts.Subscriptions;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -37,6 +48,7 @@ public static class ParentDashboardEndpoints
         HttpContext http,
         [FromServices] ISubscriptionAggregateStore store,
         [FromServices] IStudentEntitlementResolver entitlementResolver,
+        [FromServices] IParentDashboardCardSource cardSource,
         [FromServices] TimeProvider clock,
         CancellationToken ct)
     {
@@ -63,25 +75,33 @@ public static class ParentDashboardEndpoints
         }
 
         var now = clock.GetUtcNow();
-        var students = new List<ParentDashboardStudentDto>();
+
+        // PRR-320 backfill: delegate per-student scalars to the card
+        // source. The card source owns the read-model composition
+        // (Marten event scan in production; honest empties in the Noop
+        // default). See IParentDashboardCardSource file banner for the
+        // v1 proxy rationale — HintRequested_V1 as engagement signal
+        // until a dedicated minutes-on-task projection ships.
+        var cards = await cardSource
+            .BuildAsync(aggregate.State.LinkedStudents, now, ct)
+            .ConfigureAwait(false);
+
+        var students = new List<ParentDashboardStudentDto>(
+            aggregate.State.LinkedStudents.Count);
         foreach (var linked in aggregate.State.LinkedStudents)
         {
             var entitlement = await entitlementResolver.ResolveAsync(
                 linked.StudentSubjectIdEncrypted, ct);
-            // v1 rollup surface: usage metrics come from the per-student
-            // StudentMetricsAggregate (ADR-0012) once fan-out wires in.
-            // Here we expose tier + placeholder zero counters — the dedicated
-            // weekly-rollup worker (PRR-323) will fill these values via the
-            // same endpoint once its Marten projection lands.
+            var card = cards.GetOrZero(linked.StudentSubjectIdEncrypted);
             students.Add(new ParentDashboardStudentDto(
                 StudentId: linked.StudentSubjectIdEncrypted,
                 DisplayName: string.Empty,
                 ActiveTier: entitlement.EffectiveTier.ToString(),
-                WeeklyMinutes: 0,
-                MonthlyMinutes: 0,
-                TopicsPracticed: 0,
-                ReadinessScore: null,
-                LastActiveAt: null));
+                WeeklyMinutes: card.WeeklyMinutes,
+                MonthlyMinutes: card.MonthlyMinutes,
+                TopicsPracticed: card.TopicsPracticed,
+                ReadinessScore: card.ReadinessScore,
+                LastActiveAt: card.LastActiveAt));
         }
 
         var response = new ParentDashboardResponseDto(
