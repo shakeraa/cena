@@ -76,10 +76,37 @@ public sealed class MetaCloudWhatsAppOptions
     /// </summary>
     public string BaseUrl { get; set; } = "https://graph.facebook.com";
 
+    /// <summary>
+    /// Meta app secret — used to verify the HMAC-SHA256 signature on every
+    /// inbound webhook (PRR-437). Required when the webhook is wired; the
+    /// endpoint refuses traffic if this is blank (fail-loud — the right
+    /// posture when the signing secret is missing is "reject everything",
+    /// not "accept unsigned traffic").
+    /// </summary>
+    public string? AppSecret { get; set; }
+
+    /// <summary>
+    /// Verify-token string Meta presents during the GET handshake at
+    /// subscription time (PRR-437). Must match a shared secret configured
+    /// in WhatsApp Business Manager when setting up the webhook; otherwise
+    /// the handshake returns 403 and Meta considers the webhook invalid.
+    /// </summary>
+    public string? WebhookVerifyToken { get; set; }
+
     public bool IsComplete =>
         !string.IsNullOrWhiteSpace(PhoneNumberId)
         && !string.IsNullOrWhiteSpace(AccessToken)
         && !string.IsNullOrWhiteSpace(BusinessAccountId);
+
+    /// <summary>
+    /// True when BOTH AppSecret + WebhookVerifyToken are populated. The
+    /// webhook endpoint refuses inbound traffic when this is false so a
+    /// deploy-without-webhook-config doesn't silently accept unverified
+    /// POSTs.
+    /// </summary>
+    public bool IsWebhookReady =>
+        !string.IsNullOrWhiteSpace(AppSecret)
+        && !string.IsNullOrWhiteSpace(WebhookVerifyToken);
 }
 
 public sealed class MetaCloudWhatsAppSender : IWhatsAppSender
