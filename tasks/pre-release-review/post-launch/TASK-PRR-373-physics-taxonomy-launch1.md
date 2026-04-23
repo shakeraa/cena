@@ -6,7 +6,7 @@
 **Source docs**: [PHOTO-UPLOAD-DIAGNOSTIC-001-10-persona-review.md](../../docs/design/PHOTO-UPLOAD-DIAGNOSTIC-001-10-persona-review.md)
 **Assignee hint**: physics-education SME
 **Tags**: epic=epic-prr-j, content, priority=p2, launch+1
-**Status**: Deferred to launch+1
+**Status**: Deferred to post-launch 2026-04-23 — physics-SME content work; task was always `Tier: launch+1`, just formalised to post-launch/ folder this pass.
 **Source**: 10-persona photo-diagnostic review 2026-04-22
 **Tier**: launch+1
 **Epic**: [EPIC-PRR-J](EPIC-PRR-J-photo-upload-cas-diagnostic-chain.md)
