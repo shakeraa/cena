@@ -324,28 +324,45 @@ public sealed class NatsOutboxPublisher : BackgroundService
     /// given event type (see ExplanationCacheInvalidator). The curriculum branch
     /// is also exposed as <see cref="NatsSubjects.DurableCurriculumEvent(string)"/>
     /// for strong typing on the subscriber side.
+    ///
+    /// Matching is case-insensitive because Marten's event-type naming is not
+    /// normalized across producers: Proto.Cluster / typed projections emit
+    /// PascalCase (e.g. <c>SessionStartedEvent</c>) while event-sourced aggregates
+    /// that opted into DocType.UnderscoreCaseTypeAlias emit snake_case
+    /// (<c>session_started__v1</c>). Before this was made case-insensitive the
+    /// switch silently sent every snake_case event to the default
+    /// <c>cena.durable.system.*</c> branch (wrong stream), which was only noticed
+    /// when the emulator ran and SYSTEM_HEALTH accumulated 1,700+ messages that
+    /// belonged in PEDAGOGY_EVENTS / LEARNER_EVENTS / ENGAGEMENT_EVENTS.
     /// </summary>
     public static string GetDurableSubject(string eventTypeName) => eventTypeName switch
     {
-        var e when e.StartsWith("Concept") || e.StartsWith("Mastery") || e.StartsWith("Stagnation")
-            || e.StartsWith("Methodology") || e.StartsWith("Annotation") || e.StartsWith("CognitiveLoad")
+        var e when StartsAny(e, "Concept", "Mastery", "Stagnation", "Methodology", "Annotation", "CognitiveLoad")
             => $"cena.durable.learner.{eventTypeName}",
-        var e when e.StartsWith("Session") || e.StartsWith("Exercise") || e.StartsWith("Hint")
-            || (e.StartsWith("Question") && e.Contains("Skipped"))
+        var e when StartsAny(e, "Session", "Exercise", "Hint")
+            || (StartsAny(e, "Question") && e.Contains("Skipped", StringComparison.OrdinalIgnoreCase))
             => $"cena.durable.pedagogy.{eventTypeName}",
-        var e when e.StartsWith("Xp") || e.StartsWith("Streak") || e.StartsWith("Badge")
-            || e.StartsWith("Review")
+        var e when StartsAny(e, "Xp", "Streak", "Badge", "Review")
             => $"cena.durable.engagement.{eventTypeName}",
-        var e when e.StartsWith("Outreach")
+        var e when StartsAny(e, "Outreach")
             => $"cena.durable.outreach.{eventTypeName}",
-        var e when e.StartsWith("Focus") || e.StartsWith("MindWandering") || e.StartsWith("Microbreak")
+        var e when StartsAny(e, "Focus", "MindWandering", "Microbreak")
             => $"cena.durable.learner.{eventTypeName}",
-        var e when e.StartsWith("Tutoring")
+        var e when StartsAny(e, "Tutoring")
             => $"cena.durable.pedagogy.{eventTypeName}",
-        var e when e.StartsWith("Question") || e.StartsWith("Pipeline") || e.StartsWith("File")
+        var e when StartsAny(e, "Question", "Pipeline", "File")
             => NatsSubjects.DurableCurriculumEvent(eventTypeName),
         _ => $"cena.durable.system.{eventTypeName}"
     };
+
+    private static bool StartsAny(string eventTypeName, params string[] prefixes)
+    {
+        foreach (var p in prefixes)
+        {
+            if (eventTypeName.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
+        }
+        return false;
+    }
 }
 
 // =============================================================================

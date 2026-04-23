@@ -203,9 +203,12 @@ public partial class Program
         options.AbortOnConnectFail = false;
         options.ConnectRetry = 3;
         options.ConnectTimeout = 5000;
+        // RedisSessionStoreMetricsService polls INFO for per-keyspace session
+        // counts; StackExchange.Redis blocks admin commands by default.
+        options.AllowAdmin = true;
         return ConnectionMultiplexer.Connect(options);
     });
-    
+
     // ---- NATS ----
     var natsUrl = builder.Configuration.GetConnectionString("NATS") ?? "nats://localhost:4222";
     builder.Services.AddSingleton<NATS.Client.Core.INatsConnection>(sp =>

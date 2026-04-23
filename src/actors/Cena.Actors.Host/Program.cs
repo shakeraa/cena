@@ -161,6 +161,11 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     options.ConnectRetry = 3;
     options.ConnectTimeout = 5000;
     options.SyncTimeout = 3000;
+    // RedisSessionStoreMetricsService polls INFO for per-keyspace session
+    // counts; StackExchange.Redis blocks admin commands by default and
+    // throws "This operation is not available unless admin mode is enabled:
+    // INFO". Observability-only, no write side effects.
+    options.AllowAdmin = true;
     var multiplexer = ConnectionMultiplexer.Connect(options);
     logger.LogInformation("Connected to Redis at {RedisConnection}", redisConnectionString);
     return multiplexer;
