@@ -70,6 +70,19 @@ public class QuestionDocument
     public string Prompt { get; set; } = "";
     public string QuestionType { get; set; } = "multiple-choice"; // multiple-choice, free-text, etc.
     public string[]? Choices { get; set; }
+
+    /// <summary>
+    /// PRR-260 — Author-level override that forces MC options to render
+    /// visible even when the student's session attempt-mode is
+    /// <c>hidden_reveal</c>. True when the options ARE the question
+    /// (e.g. "which graph is correct", "choose the matching triangle"),
+    /// where hiding the options would break the question's pedagogical
+    /// contract. Defaults to false so existing seeded items are eligible
+    /// for hide-then-reveal without a migration. See
+    /// <see cref="Cena.Actors.Sessions.SessionAttemptModePolicy.ResolveEffective"/>
+    /// for precedence — author force-visible overrides the stored mode.
+    /// </summary>
+    public bool ForceOptionsVisible { get; set; }
     public string CorrectAnswer { get; set; } = "";
     public string? Explanation { get; set; }
 

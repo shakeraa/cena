@@ -68,6 +68,24 @@ public class LearningSessionQueueProjection
     public Dictionary<string, int> LadderRungByQuestion { get; set; } = new();
 
     /// <summary>
+    /// PRR-260 — Student-controlled hide-then-reveal attempt mode. Default
+    /// "visible" (traditional render). The student may flip to
+    /// "hidden_reveal" at session start or mid-session via the settings
+    /// drawer; the flip is session-scoped (persona-ethics autonomy
+    /// guardrail — student re-opts-in each session rather than having a
+    /// cross-session default that might feel prescriptive). See
+    /// <see cref="Cena.Actors.Sessions.SessionAttemptMode"/> for the canonical
+    /// enum + wire strings and
+    /// <see cref="Cena.Actors.Sessions.SessionAttemptModePolicy.ResolveEffective"/>
+    /// for the read-side override policy (non-MC / author-force-visible /
+    /// diagnostic-block all force Visible regardless of stored mode).
+    /// Serialised as a string on Marten docs so a replay of an older
+    /// session without this field reads as the default Visible via
+    /// <c>SessionAttemptModeWire.TryParse</c> at the endpoint boundary.
+    /// </summary>
+    public string AttemptMode { get; set; } = Cena.Actors.Sessions.SessionAttemptModeWire.Visible;
+
+    /// <summary>
     /// RDY-057c — Concept ids the student self-reported as anxious in
     /// onboarding (TopicFeelings == Anxious). Captured at session start
     /// from OnboardingSelfAssessmentDocument when present. Empty list =
