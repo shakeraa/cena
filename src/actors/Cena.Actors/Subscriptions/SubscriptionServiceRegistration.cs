@@ -98,5 +98,20 @@ public static class SubscriptionServiceRegistration
         {
             services.AddSingleton<IChurnReasonRepository, InMemoryChurnReasonRepository>();
         }
+
+        // PRR-330: weekly unit-economics snapshot store. InMemory default is
+        // production-grade for single-host installs; AddSubscriptionsMarten
+        // replaces it with MartenUnitEconomicsSnapshotStore. The aggregation
+        // service itself depends on IDocumentStore and is registered here
+        // so the Marten-mode admin endpoint and the rollup worker both
+        // resolve the same instance.
+        if (!services.Any(d => d.ServiceType == typeof(IUnitEconomicsSnapshotStore)))
+        {
+            services.AddSingleton<IUnitEconomicsSnapshotStore, InMemoryUnitEconomicsSnapshotStore>();
+        }
+        if (!services.Any(d => d.ServiceType == typeof(UnitEconomicsAggregationService)))
+        {
+            services.AddSingleton<UnitEconomicsAggregationService>();
+        }
     }
 }
