@@ -40,6 +40,7 @@
 // =============================================================================
 
 using Cena.Actors.Cas;
+using Cena.Actors.Diagnosis.PhotoDiagnostic.Intake;
 using Cena.Actors.Diagnosis.PhotoDiagnostic.Taxonomy;
 using Marten;
 using Microsoft.Extensions.DependencyInjection;
@@ -212,5 +213,15 @@ public static class PhotoDiagnosticServiceRegistration
         // templates" on the admin dashboard and the reviewer-approve
         // workflow (enforces ≥2-reviewer guardrail inside the store).
         services.TryAddSingleton<ITaxonomyGovernanceService, TaxonomyGovernanceService>();
+
+        // PRR-413: pre-OCR PII redaction seam. Default binding is the Noop
+        // null-object (mirrors NoopPhotoBlobStore / NullDiagnosticCreditDispatcher
+        // — NOT a stub). Hosts opt into the heuristic byte-level redactor via
+        // an explicit services.Replace(...) with HeuristicPhotoRedactor, or a
+        // follow-up task will land a decoder-backed implementation that
+        // supersedes the heuristic. The audit log is the log-based seam a
+        // Marten-backed implementation can slot into later.
+        services.TryAddSingleton<IPhotoRedactor, NoopPhotoRedactor>();
+        services.TryAddSingleton<IPhotoRedactionAuditLog, LoggingPhotoRedactionAuditLog>();
     }
 }
