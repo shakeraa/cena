@@ -44,6 +44,7 @@ public sealed class PhotoDiagnosticMetrics : IDisposable
     private readonly Counter<long> _templateFallback;
     private readonly Counter<long> _auditSampled;
     private readonly Counter<long> _funnelEvents;
+    private readonly Histogram<double> _stageLatencyMs;
 
     public PhotoDiagnosticMetrics(IMeterFactory meterFactory)
     {
@@ -77,6 +78,14 @@ public sealed class PhotoDiagnosticMetrics : IDisposable
                 "Funnel progression counter, tagged by stage + outcome. "
                 + "Dashboard rollup: stage-to-stage conversion across the 12 "
                 + "canonical stages (wrong-answer → dispute-filed). PRR-426.");
+        _stageLatencyMs = _meter.CreateHistogram<double>(
+            "cena.photo_diagnostic.stage_latency_ms",
+            unit: "ms",
+            description:
+                "Per-stage latency breakdown for SLO root-cause analysis. "
+                + "Tags: stage = Upload | Ocr | StepExtraction | CasChain | "
+                + "TemplateMatch | Narrate. Sum p95 across all stages MUST "
+                + "stay under 15000 ms (PRR-422 e2e SLO).");
     }
 
     public void RecordOcrConfidence(double confidence, string source)
@@ -110,6 +119,21 @@ public sealed class PhotoDiagnosticMetrics : IDisposable
     }
 
     /// <summary>
+    /// Record one per-stage latency sample for PRR-422 SLO tracking. The
+    /// stage tag lets the SLO dashboard break the e2e budget down into
+    /// upload / OCR / step-extraction / CAS / template-match / narrate
+    /// so bottleneck-hunting does not require distributed tracing during
+    /// a p95 incident.
+    /// </summary>
+    public void RecordStageLatency(DiagnosticStage stage, double ms)
+    {
+        _stageLatencyMs.Record(ms, new TagList
+        {
+            { "stage", stage.ToString() },
+        });
+    }
+
+    /// <summary>
     /// Record one funnel progression event. The 12 canonical stages live on
     /// <see cref="DiagnosticFunnelStage"/>; <paramref name="outcome"/> is
     /// a short string the caller chooses so stage-specific conversion rates
@@ -126,6 +150,27 @@ public sealed class PhotoDiagnosticMetrics : IDisposable
     }
 
     public void Dispose() => _meter.Dispose();
+}
+
+/// <summary>
+/// Per-stage latency taxonomy for PRR-422 SLO tracking. The e2e budget
+/// (&lt; 15000 ms p95) decomposes into these stages; when the SLO is
+/// breached the dashboard shows which stage is carrying the regression.
+/// </summary>
+public enum DiagnosticStage
+{
+    /// <summary>Upload intake: receive bytes, scan, persist to blob.</summary>
+    Upload = 0,
+    /// <summary>OCR pass: extract LaTeX from the image.</summary>
+    Ocr = 1,
+    /// <summary>Step-extraction: parse LaTeX into ordered ExtractedSteps.</summary>
+    StepExtraction = 2,
+    /// <summary>CAS chain walk: per-transition equivalence checks.</summary>
+    CasChain = 3,
+    /// <summary>Template-match scoring against MisconceptionTaxonomy.</summary>
+    TemplateMatch = 4,
+    /// <summary>Narration render + reflection gate prep.</summary>
+    Narrate = 5,
 }
 
 /// <summary>
