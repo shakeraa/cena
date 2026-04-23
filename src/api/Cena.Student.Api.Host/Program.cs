@@ -191,6 +191,14 @@ public partial class Program
         Cena.Api.Contracts.Subscriptions.IHouseholdCardSource,
         Cena.Api.Contracts.Subscriptions.NoopHouseholdCardSource>();
 
+    // PRR-325: tutor-handoff HTML renderer + card source. Registers
+    // ITutorHandoffHtmlRenderer → TutorHandoffHtmlRenderer and
+    // ITutorHandoffCardSource → NoopTutorHandoffCardSource (TryAdd-
+    // guarded). A later commit can swap NoopTutorHandoffCardSource for
+    // a Marten-backed implementation without touching Program.cs.
+    Cena.Api.Contracts.Parenting.TutorHandoffServiceRegistration
+        .AddTutorHandoffServices(builder.Services);
+
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
     
@@ -1004,7 +1012,7 @@ public partial class Program
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
-    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapHouseholdDashboardEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + Stripe webhook + parent dashboard + PRR-324 household dashboard; STB-00 Me/Profile
+    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapHouseholdDashboardEndpoints(); app.MapTutorHandoffEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + Stripe webhook + parent dashboard + PRR-324 household dashboard + PRR-325 tutor-handoff HTML report; STB-00 Me/Profile
     app.MapSelfAssessmentEndpoints();
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
