@@ -34,6 +34,10 @@ public static class PhotoDiagnosticServiceRegistration
     {
         services.TryAddSingleton<IPhotoDiagnosticMonthlyUsage, InMemoryPhotoDiagnosticMonthlyUsage>();
         services.TryAddSingleton<IDiagnosticDisputeRepository, InMemoryDiagnosticDisputeRepository>();
+        // PRR-404 dev/test: in-memory similarity ledger. Production Marten
+        // store is deferred to PRR-412 (photo deletion SLA) where the
+        // durable hash ledger schema lives.
+        services.TryAddSingleton<IRecentPhotoHashStore, InMemoryRecentPhotoHashStore>();
         AddSharedServices(services);
         return services;
     }
@@ -64,6 +68,13 @@ public static class PhotoDiagnosticServiceRegistration
         services.AddHostedService<PhotoDeletionWorker>();
         services.TryAddSingleton<PhotoDeletionAuditJob>();
 
+        // PRR-404: similarity ledger. Durable Marten-backed implementation is
+        // deferred to a follow-up that coordinates with the PhotoHashLedgerDocument
+        // schema above (PRR-412's ledger). Until that lands, prod composition
+        // MUST override this registration with a replacement IRecentPhotoHashStore
+        // — the in-memory fallback is ONLY safe for single-host dev boxes.
+        services.TryAddSingleton<IRecentPhotoHashStore, InMemoryRecentPhotoHashStore>();
+
         AddSharedServices(services);
         return services;
     }
@@ -85,6 +96,11 @@ public static class PhotoDiagnosticServiceRegistration
         services.TryAddSingleton<IDiagnosticOutcomeAssembler, DiagnosticOutcomeAssembler>();
 
         services.TryAddSingleton<IPhotoDiagnosticQuotaGate, PhotoDiagnosticQuotaGate>();
+        services.TryAddSingleton(ImageSimilarityOptions.Default);
+        services.TryAddSingleton<IImageSimilarityGate>(sp =>
+            new ImageSimilarityGate(
+                sp.GetRequiredService<IRecentPhotoHashStore>(),
+                sp.GetRequiredService<ImageSimilarityOptions>()));
 
         services.TryAddSingleton<IDiagnosticDisputeService, DiagnosticDisputeService>();
         services.TryAddSingleton<IPhotoDiagnosticGdprService, PhotoDiagnosticGdprService>();
