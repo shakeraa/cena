@@ -13,6 +13,11 @@
 //   - low_confidence_refusals counter — chain-verify refusals (PRR-420)
 //   - template_fallback counter — no-template "check with teacher" fallback
 //   - audit_sampled    counter — diagnostic flagged for SME review
+//   - funnel_events    counter — per-stage funnel counter (PRR-426)
+//                                tags: stage, outcome — gives dashboard
+//                                rollup of wrong-answer → resolution
+//                                progression across the 12 canonical
+//                                stages enumerated in DiagnosticFunnelStage.
 //
 // Production-grade: real OTel instruments registered with IMeterFactory,
 // no stubs (memory 'No stubs — production grade', 2026-04-11).
@@ -38,6 +43,7 @@ public sealed class PhotoDiagnosticMetrics : IDisposable
     private readonly Counter<long> _lowConfidenceRefusals;
     private readonly Counter<long> _templateFallback;
     private readonly Counter<long> _auditSampled;
+    private readonly Counter<long> _funnelEvents;
 
     public PhotoDiagnosticMetrics(IMeterFactory meterFactory)
     {
@@ -65,6 +71,12 @@ public sealed class PhotoDiagnosticMetrics : IDisposable
         _auditSampled = _meter.CreateCounter<long>(
             "cena.photo_diagnostic.audit_sampled_total",
             description: "Diagnostic flagged for retrospective SME review by the audit sampler.");
+        _funnelEvents = _meter.CreateCounter<long>(
+            "cena.photo_diagnostic.funnel_events_total",
+            description:
+                "Funnel progression counter, tagged by stage + outcome. "
+                + "Dashboard rollup: stage-to-stage conversion across the 12 "
+                + "canonical stages (wrong-answer → dispute-filed). PRR-426.");
     }
 
     public void RecordOcrConfidence(double confidence, string source)
@@ -97,5 +109,47 @@ public sealed class PhotoDiagnosticMetrics : IDisposable
         _auditSampled.Add(1, new TagList { { "reason", sampleReason } });
     }
 
+    /// <summary>
+    /// Record one funnel progression event. The 12 canonical stages live on
+    /// <see cref="DiagnosticFunnelStage"/>; <paramref name="outcome"/> is
+    /// a short string the caller chooses so stage-specific conversion rates
+    /// surface in dashboards (e.g., "succeeded" vs "abandoned" on
+    /// PreviewConfirmed, or "retry" vs "dispute" on AnalysisComplete).
+    /// </summary>
+    public void RecordFunnelEvent(DiagnosticFunnelStage stage, string outcome)
+    {
+        _funnelEvents.Add(1, new TagList
+        {
+            { "stage", stage.ToString() },
+            { "outcome", outcome },
+        });
+    }
+
     public void Dispose() => _meter.Dispose();
+}
+
+/// <summary>
+/// Canonical funnel stages for PRR-426 instrumentation. Order matches the
+/// student-facing flow: wrong-answer → see-CTA → click-upload → capture →
+/// preview-shown → preview-confirmed → analysis-start → analysis-complete →
+/// reflection-gate-shown → retry-submitted → retry-success →
+/// narration-shown. Dispute-filed is the terminal branch from any
+/// later stage. Add new stages at the end to preserve dashboard order.
+/// </summary>
+public enum DiagnosticFunnelStage
+{
+    WrongAnswer = 0,
+    SeeCta = 1,
+    ClickUpload = 2,
+    Capture = 3,
+    PreviewShown = 4,
+    PreviewConfirmed = 5,
+    AnalysisStart = 6,
+    AnalysisComplete = 7,
+    ReflectionGateShown = 8,
+    RetrySubmitted = 9,
+    HintRequested = 10,
+    RetrySuccess = 11,
+    NarrationShown = 12,
+    DisputeFiled = 13,
 }
