@@ -17,10 +17,25 @@ using Marten;
 namespace Cena.Actors.Subscriptions;
 
 /// <summary>
+/// Seam over the concrete <see cref="UnitEconomicsAggregationService"/>.
+/// Introduced by PRR-330 so <see cref="UnitEconomicsRollupWorker"/> can
+/// take a replaceable dependency and test doubles can swap the Marten
+/// scan out for deterministic in-memory fixtures.
+/// </summary>
+public interface IUnitEconomicsAggregationService
+{
+    /// <summary>
+    /// Compute a snapshot for a half-open window <c>[windowStart, windowEnd)</c>.
+    /// </summary>
+    Task<UnitEconomicsSnapshot> ComputeAsync(
+        DateTimeOffset windowStart, DateTimeOffset windowEnd, CancellationToken ct);
+}
+
+/// <summary>
 /// Aggregates subscription events from Marten into a
 /// <see cref="UnitEconomicsSnapshot"/>. Runs reads; does not write.
 /// </summary>
-public sealed class UnitEconomicsAggregationService
+public sealed class UnitEconomicsAggregationService : IUnitEconomicsAggregationService
 {
     private readonly IDocumentStore _store;
 
