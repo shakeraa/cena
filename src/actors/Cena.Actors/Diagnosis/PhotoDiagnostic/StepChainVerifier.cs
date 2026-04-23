@@ -97,25 +97,41 @@ public sealed class StepChainVerifier : IStepChainVerifier
 
     private readonly ICasRouterService _casRouter;
     private readonly ICanonicalizer? _canonicalizer;
+    private readonly IStepSkippingTolerator _skippingTolerator;
 
     /// <summary>
-    /// Backwards-compatible ctor — no canonicalization pre-step. Retained
-    /// so that existing call sites in tests and legacy composition roots
-    /// keep compiling; production DI binds the 2-arg ctor.
+    /// Backwards-compatible ctor — no canonicalization pre-step, default
+    /// tolerator. Retained so that existing call sites in tests and legacy
+    /// composition roots keep compiling; production DI binds the 3-arg ctor.
     /// </summary>
     public StepChainVerifier(ICasRouterService casRouter)
-        : this(casRouter, canonicalizer: null)
+        : this(casRouter, canonicalizer: null, skippingTolerator: null)
     {
     }
 
     /// <summary>
-    /// Production ctor. Injects the canonicalization pre-step so
-    /// (x-2)(x+3) and x^2+x-6 compare as equal (PRR-361).
+    /// 2-arg back-compat ctor (canonicalizer only) — kept for the existing
+    /// DI registrations that wire the canonicalizer but not yet the
+    /// skipping tolerator.
     /// </summary>
     public StepChainVerifier(ICasRouterService casRouter, ICanonicalizer? canonicalizer)
+        : this(casRouter, canonicalizer, skippingTolerator: null)
+    {
+    }
+
+    /// <summary>
+    /// Production ctor. Injects the canonicalization pre-step (PRR-361) +
+    /// the step-skipping tolerator (PRR-362) that distinguishes Wrong
+    /// from UnfollowableSkip when CAS equivalence fails.
+    /// </summary>
+    public StepChainVerifier(
+        ICasRouterService casRouter,
+        ICanonicalizer? canonicalizer,
+        IStepSkippingTolerator? skippingTolerator)
     {
         _casRouter = casRouter ?? throw new ArgumentNullException(nameof(casRouter));
         _canonicalizer = canonicalizer;
+        _skippingTolerator = skippingTolerator ?? new StepSkippingTolerator();
     }
 
     /// <inheritdoc/>
@@ -153,16 +169,41 @@ public sealed class StepChainVerifier : IStepChainVerifier
             var from = canonicalized[i];
             var to = canonicalized[i + 1];
             var cas = await VerifyTransitionAsync(from, to, ct);
-            var outcome = cas.Verified
-                ? StepTransitionOutcome.Valid
-                : StepTransitionOutcome.Wrong;
 
-            var summary = outcome == StepTransitionOutcome.Valid
-                ? $"Step {from.Index + 1} → Step {to.Index + 1}: OK"
-                : $"Step {from.Index + 1} → Step {to.Index + 1}: {cas.ErrorMessage ?? "not equivalent"}";
+            // PRR-362 step-skipping tolerance: when CAS equivalence fails,
+            // ask the skipping-tolerator whether this looks like a genuine
+            // error (short, close algebraic mistake) or a legit leap
+            // (student skipped intermediate work we can't reconstruct).
+            // The distinction surfaces as a different UI message: "Wrong"
+            // vs "I couldn't follow between step N and step N+1".
+            StepTransitionOutcome outcome;
+            string summary;
+            if (cas.Verified)
+            {
+                outcome = StepTransitionOutcome.Valid;
+                summary = $"Step {from.Index + 1} → Step {to.Index + 1}: OK";
+            }
+            else
+            {
+                outcome = _skippingTolerator.Classify(new StepSkippingContext(
+                    FromCanonical: string.IsNullOrWhiteSpace(from.Canonical) ? from.Latex : from.Canonical,
+                    ToCanonical: string.IsNullOrWhiteSpace(to.Canonical) ? to.Latex : to.Canonical,
+                    CasResult: cas));
+                summary = outcome switch
+                {
+                    StepTransitionOutcome.UnfollowableSkip =>
+                        $"Step {from.Index + 1} → Step {to.Index + 1}: I couldn't follow the work between these two steps.",
+                    _ =>
+                        $"Step {from.Index + 1} → Step {to.Index + 1}: {cas.ErrorMessage ?? "not equivalent"}",
+                };
+            }
 
             results.Add(new StepTransitionResult(from.Index, to.Index, outcome, cas, summary));
 
+            // Short-circuit only on Wrong — UnfollowableSkip is NOT a
+            // failure for the chain, it's a honest-uncertainty signal
+            // the UI renders inline while continuing to show the rest
+            // of the steps. Memory "Honest not complimentary".
             if (outcome == StepTransitionOutcome.Wrong)
             {
                 return new StepChainVerificationResult(results, to.Index);

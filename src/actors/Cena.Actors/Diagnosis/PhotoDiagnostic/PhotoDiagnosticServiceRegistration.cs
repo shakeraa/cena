@@ -102,10 +102,18 @@ public static class PhotoDiagnosticServiceRegistration
         services.TryAddSingleton<ICanonicalizer>(sp =>
             new Canonicalizer(sp.GetRequiredService<ICasRouterService>()));
 
+        // PRR-362: step-skipping tolerance. Deterministic heuristic, no
+        // external deps; uses default thresholds (operator tunes via
+        // StepSkippingToleratorOptions override if needed).
+        services.TryAddSingleton(StepSkippingToleratorOptions.Default);
+        services.TryAddSingleton<IStepSkippingTolerator>(sp =>
+            new StepSkippingTolerator(sp.GetRequiredService<StepSkippingToleratorOptions>()));
+
         services.TryAddSingleton<IStepChainVerifier>(sp =>
             new StepChainVerifier(
                 sp.GetRequiredService<ICasRouterService>(),
-                sp.GetRequiredService<ICanonicalizer>()));
+                sp.GetRequiredService<ICanonicalizer>(),
+                sp.GetRequiredService<IStepSkippingTolerator>()));
         services.TryAddSingleton<ITemplateMatchingScorer, TemplateMatchingScorer>();
 
         services.TryAddSingleton<IPhotoDiagnosticConfidenceTracker, PhotoDiagnosticConfidenceTracker>();
