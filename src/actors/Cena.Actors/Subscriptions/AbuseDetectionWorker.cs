@@ -70,29 +70,56 @@ public sealed class AbuseDetectionWorker : BackgroundService
                 SubscriptionAggregate.StreamKeyPrefix))
             .ToListAsync(ct);
 
-        var byStudent = events
+        var softCapEvents = events
             .Select(e => e.Data)
-            .OfType<EntitlementSoftCapReached_V1>()
-            .Where(e => e.CapType == EntitlementSoftCapReached_V1.CapTypes.PhotoDiagnosticMonthly)
-            .GroupBy(e => e.StudentSubjectIdEncrypted)
-            .ToList();
+            .OfType<EntitlementSoftCapReached_V1>();
+        var flags = FindAbusers(softCapEvents, AbuseThreshold).ToList();
 
-        var flagged = 0;
-        foreach (var group in byStudent)
+        foreach (var flag in flags)
         {
-            var max = group.Max(e => e.UsageCount);
-            if (max >= AbuseThreshold)
-            {
-                _logger.LogWarning(
-                    "Abuse-detection: student {StudentIdHash} hit {Usage} photo diagnostics in 30d (threshold {Threshold}). Parent={ParentIdHash}. Human review required.",
-                    HashForLog(group.Key),
-                    max,
-                    AbuseThreshold,
-                    HashForLog(group.First().ParentSubjectIdEncrypted));
-                flagged++;
-            }
+            _logger.LogWarning(
+                "Abuse-detection: student {StudentIdHash} hit {Usage} photo diagnostics in 30d "
+                + "(threshold {Threshold}). Parent={ParentIdHash}. Human review required.",
+                HashForLog(flag.StudentSubjectIdEncrypted),
+                flag.MaxUsageCount,
+                AbuseThreshold,
+                HashForLog(flag.ParentSubjectIdEncrypted));
         }
-        return flagged;
+        return flags.Count;
+    }
+
+    /// <summary>
+    /// Flagged-student record emitted by the pure detection kernel. The
+    /// worker's output channel is the structured warning log; follow-up
+    /// tasks (admin queue projection, support dashboard) consume this
+    /// same record shape.
+    /// </summary>
+    public sealed record AbuseFlag(
+        string StudentSubjectIdEncrypted,
+        string ParentSubjectIdEncrypted,
+        int MaxUsageCount);
+
+    /// <summary>
+    /// Pure detection kernel: filter <paramref name="events"/> to photo-
+    /// diagnostic soft-cap events, group by student, and yield an
+    /// <see cref="AbuseFlag"/> for any student whose max-usage in the
+    /// window meets or exceeds <paramref name="threshold"/>. Empty input
+    /// yields empty output. Callers supply the window filter (by passing
+    /// only events inside the window); this kernel treats the input set
+    /// as already-scoped so it is trivially unit-testable.
+    /// </summary>
+    public static IEnumerable<AbuseFlag> FindAbusers(
+        IEnumerable<EntitlementSoftCapReached_V1> events, int threshold)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        return events
+            .Where(e => e.CapType == EntitlementSoftCapReached_V1.CapTypes.PhotoDiagnosticMonthly)
+            .GroupBy(e => e.StudentSubjectIdEncrypted, StringComparer.Ordinal)
+            .Select(g => new AbuseFlag(
+                StudentSubjectIdEncrypted: g.Key,
+                ParentSubjectIdEncrypted: g.First().ParentSubjectIdEncrypted,
+                MaxUsageCount: g.Max(e => e.UsageCount)))
+            .Where(f => f.MaxUsageCount >= threshold);
     }
 
     /// <summary>Truncate encrypted id to 8 chars for log correlation without leaking ciphertext.</summary>
