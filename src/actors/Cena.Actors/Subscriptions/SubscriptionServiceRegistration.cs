@@ -86,6 +86,14 @@ public static class SubscriptionServiceRegistration
         // no-config boot.
         services.AddOptions<UnitEconomicsRollupOptions>();
         services.AddHostedService<UnitEconomicsRollupWorker>();
+
+        // PRR-345 subscription lifecycle email worker — scans the Marten
+        // event log for lifecycle triggers and dispatches via
+        // ISubscriptionLifecycleEmailDispatcher. Requires IDocumentStore,
+        // so it only registers in Marten-mode hosts (Actor-Host production).
+        // Non-Marten hosts (tests, dev single-host) can still exercise the
+        // pure RunOnceAsync logic directly via unit tests.
+        services.AddHostedService<SubscriptionLifecycleEmailWorker>();
         return services;
     }
 
@@ -104,6 +112,17 @@ public static class SubscriptionServiceRegistration
         services.AddSingleton<BankTransferReservationService>();
         services.AddOptions<BankTransferExpiryWorkerOptions>();
         services.AddHostedService<BankTransferExpiryWorker>();
+
+        // PRR-345 subscription lifecycle emails (welcome / renewal-upcoming /
+        // past-due / cancellation / refund). The worker is registered by
+        // AddSubscriptionsMarten below because it needs Marten's
+        // IDocumentStore for event scanning; the dispatcher seam defaults
+        // to the NullDispatcher (dev-safe no-op). Hosts bind their concrete
+        // dispatcher (SMTP / SES / Mailgun with HE/AR/EN templates) by
+        // replacing the Null binding; TryAdd below makes that trivial.
+        services.TryAddSingleton<ISubscriptionLifecycleEmailDispatcher,
+            NullSubscriptionLifecycleEmailDispatcher>();
+        services.AddOptions<SubscriptionLifecycleEmailWorkerOptions>();
 
         // PRR-344 alpha-migration defaults (InMemory). AddSubscriptionsMarten
         // swaps these for the Marten-backed variants so the seed list and
