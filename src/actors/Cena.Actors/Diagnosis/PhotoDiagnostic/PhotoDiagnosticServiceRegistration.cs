@@ -26,6 +26,17 @@
 // PhotoDiagnosticQuotaGate composes in to bump the effective hard cap by
 // any support-granted extensions active this UTC month (ledger-not-decrement,
 // mirrors PRR-391).
+//
+// PRR-401: registers ISoftCapEmissionLedger (InMemory or Marten) +
+// ISoftCapEventEmitter (Null fallback). The ledger backs the
+// once-per-(student, cap, month) dedup invariant for
+// EntitlementSoftCapReached_V1; the emitter appends the event onto the
+// parent's subscription stream. The Null emitter is a legitimate
+// no-ISubscriptionAggregateStore fallback — mirrors NullEmailSender /
+// NullDiagnosticCreditDispatcher. Hosts that have AddSubscriptions(...)
+// wired replace the binding with SoftCapEventEmitter BEFORE calling
+// AddPhotoDiagnostic / AddPhotoDiagnosticMarten so TryAdd preserves
+// the override.
 // =============================================================================
 
 using Cena.Actors.Cas;
@@ -56,6 +67,8 @@ public static class PhotoDiagnosticServiceRegistration
         services.TryAddSingleton<IDiagnosticCreditLedger, InMemoryDiagnosticCreditLedger>();
         // PRR-402: hard-cap support ticket aggregate (in-memory for dev/test).
         services.TryAddSingleton<IHardCapSupportTicketRepository, InMemoryHardCapSupportTicketRepository>();
+        // PRR-401: soft-cap emission ledger (dedup for EntitlementSoftCapReached_V1).
+        services.TryAddSingleton<ISoftCapEmissionLedger, InMemorySoftCapEmissionLedger>();
         // PRR-375: taxonomy-governance version store. InMemory is the dev/test
         // default and is production-grade (concurrency-safe, not a stub).
         services.TryAddSingleton<ITaxonomyVersionStore, InMemoryTaxonomyVersionStore>();
@@ -86,6 +99,11 @@ public static class PhotoDiagnosticServiceRegistration
         services.TryAddSingleton<IHardCapSupportTicketRepository, MartenHardCapSupportTicketRepository>();
         services.ConfigureMarten(opts =>
             opts.Schema.For<HardCapSupportTicketDocument>().Identity(t => t.Id));
+        // PRR-401: soft-cap emission ledger — Marten-backed in production so
+        // the once-per-(student, cap, month) invariant survives pod restarts.
+        services.TryAddSingleton<ISoftCapEmissionLedger, MartenSoftCapEmissionLedger>();
+        services.ConfigureMarten(opts =>
+            opts.Schema.For<SoftCapEmissionLedgerDocument>().Identity(d => d.Id));
         services.AddHostedService<DiagnosticDisputeRetentionWorker>();
 
         // PRR-412 photo-deletion SLA wiring.
@@ -178,6 +196,16 @@ public static class PhotoDiagnosticServiceRegistration
         // the repository registered in the composition-root method above.
         services.TryAddSingleton<IHardCapExtensionAdjuster, HardCapExtensionAdjuster>();
         services.TryAddSingleton<IHardCapSupportService, HardCapSupportService>();
+
+        // PRR-401: soft-cap telemetry emitter. Default binding is
+        // NullSoftCapEventEmitter (no-subscription-store fallback, mirrors
+        // NullEmailSender pattern — NOT a stub). Hosts that wire
+        // ISubscriptionAggregateStore via AddSubscriptions(...) replace
+        // this binding with SoftCapEventEmitter BEFORE calling the
+        // AddPhotoDiagnostic / AddPhotoDiagnosticMarten entry points so
+        // TryAdd preserves the override. The ledger binding is picked
+        // up from the per-mode method above.
+        services.TryAddSingleton<ISoftCapEventEmitter, NullSoftCapEventEmitter>();
 
         // PRR-375: taxonomy-governance service composing the version store
         // with the dispute-metrics read surface. Enables "flag high-dispute
