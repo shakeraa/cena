@@ -41,5 +41,15 @@ public static class SubscriptionMartenRegistration
         // history chart renders trend lines by cheap index scan instead
         // of replaying the subscription event stream on every page load.
         opts.Schema.For<UnitEconomicsSnapshotDocument>().Identity(d => d.Id);
+
+        // PRR-344 — Alpha-migration grace marker + operator seed list.
+        //   AlphaGraceMarker        : one row per granted parent (Id =
+        //                              parentSubjectIdEncrypted).
+        //   AlphaMigrationSeedDocument: singleton row (Id = "current") carrying
+        //                              the operator-supplied seed list so the
+        //                              worker, admin endpoint, and replicas
+        //                              share one canonical source.
+        opts.Schema.For<AlphaGraceMarker>().Identity(d => d.Id);
+        opts.Schema.For<AlphaMigrationSeedDocument>().Identity(d => d.Id);
     }
 }
