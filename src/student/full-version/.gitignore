@@ -53,6 +53,8 @@ public/mockServiceWorker.js
 
 # STU-W-01 test tooling artifacts (keep screenshots, drop traces)
 test-results/stuw01/playwright-artifacts/
+# E2E flow tests — full artifact tree is ephemeral
+test-results/e2e-flow/
 playwright-report/
 coverage/
 
