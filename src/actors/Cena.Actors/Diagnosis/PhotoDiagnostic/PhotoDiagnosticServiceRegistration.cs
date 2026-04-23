@@ -20,6 +20,12 @@
 // Hosts that want real email/SMS apology delivery replace the binding
 // before calling AddPhotoDiagnostic/AddPhotoDiagnosticMarten, and TryAdd
 // will leave the override alone.
+//
+// PRR-402: registers IHardCapSupportTicketRepository + IHardCapExtensionAdjuster
+// + IHardCapSupportService. The adjuster is a narrow read-only port that
+// PhotoDiagnosticQuotaGate composes in to bump the effective hard cap by
+// any support-granted extensions active this UTC month (ledger-not-decrement,
+// mirrors PRR-391).
 // =============================================================================
 
 using Cena.Actors.Cas;
@@ -48,6 +54,8 @@ public static class PhotoDiagnosticServiceRegistration
         services.TryAddSingleton<IRecentPhotoHashStore, InMemoryRecentPhotoHashStore>();
         // PRR-391: support-issued credit ledger (in-memory for dev/test).
         services.TryAddSingleton<IDiagnosticCreditLedger, InMemoryDiagnosticCreditLedger>();
+        // PRR-402: hard-cap support ticket aggregate (in-memory for dev/test).
+        services.TryAddSingleton<IHardCapSupportTicketRepository, InMemoryHardCapSupportTicketRepository>();
         // PRR-375: taxonomy-governance version store. InMemory is the dev/test
         // default and is production-grade (concurrency-safe, not a stub).
         services.TryAddSingleton<ITaxonomyVersionStore, InMemoryTaxonomyVersionStore>();
@@ -74,6 +82,10 @@ public static class PhotoDiagnosticServiceRegistration
         services.TryAddSingleton<IDiagnosticDisputeRepository, MartenDiagnosticDisputeRepository>();
         // PRR-391: Marten-backed credit ledger in production.
         services.TryAddSingleton<IDiagnosticCreditLedger, MartenDiagnosticCreditLedger>();
+        // PRR-402: Marten-backed hard-cap support ticket aggregate in production.
+        services.TryAddSingleton<IHardCapSupportTicketRepository, MartenHardCapSupportTicketRepository>();
+        services.ConfigureMarten(opts =>
+            opts.Schema.For<HardCapSupportTicketDocument>().Identity(t => t.Id));
         services.AddHostedService<DiagnosticDisputeRetentionWorker>();
 
         // PRR-412 photo-deletion SLA wiring.
@@ -156,6 +168,16 @@ public static class PhotoDiagnosticServiceRegistration
         // TryAdd preserves the override.
         services.TryAddSingleton<IDiagnosticCreditDispatcher, NullDiagnosticCreditDispatcher>();
         services.TryAddSingleton<IDiagnosticCreditService, DiagnosticCreditService>();
+
+        // PRR-402: hard-cap → contact-support flow. The adjuster is the
+        // narrow read port PhotoDiagnosticQuotaGate composes in to bump the
+        // effective hard cap by the sum of support-granted extensions
+        // active this month. The service is the write surface for the
+        // student-facing POST /api/me/hard-cap-support-tickets endpoint
+        // and the two admin resolve/reject endpoints. Both bind against
+        // the repository registered in the composition-root method above.
+        services.TryAddSingleton<IHardCapExtensionAdjuster, HardCapExtensionAdjuster>();
+        services.TryAddSingleton<IHardCapSupportService, HardCapSupportService>();
 
         // PRR-375: taxonomy-governance service composing the version store
         // with the dispute-metrics read surface. Enables "flag high-dispute
