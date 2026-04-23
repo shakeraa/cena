@@ -27,7 +27,18 @@ public enum CasOperation
     NormalForm,
 
     /// <summary>Solve an equation and return the solution set.</summary>
-    Solve
+    Solve,
+
+    /// <summary>
+    /// Return the canonical expanded+simplified form of an expression.
+    /// PRR-361: used by the ICanonicalizer pre-step so equivalent surface
+    /// forms (e.g. "(x-2)(x+3)" vs "x^2+x-6") collapse to the same string
+    /// before step-chain comparison. The canonical output is returned in
+    /// <see cref="CasVerifyResult.SimplifiedA"/>. Unlike <see cref="NormalForm"/>
+    /// which is a predicate ("is this already canonical?"), Canonicalize
+    /// is a function ("return the canonical form"). ADR-0002.
+    /// </summary>
+    Canonicalize
 }
 
 /// <summary>

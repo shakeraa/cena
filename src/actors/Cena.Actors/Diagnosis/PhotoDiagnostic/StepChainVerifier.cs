@@ -78,6 +78,14 @@ public interface IStepChainVerifier
 /// Default implementation. Walks step-by-step, calls the CAS router on
 /// each transition. Short-circuits on first wrong transition (diagnostic
 /// "first wrong step" is the only scope v1 ships).
+///
+/// PRR-361: each step is canonicalized via <see cref="ICanonicalizer"/>
+/// BEFORE comparison. The original LaTeX on <see cref="ExtractedStep.Latex"/>
+/// is preserved — canonicalization is strictly a compare-layer concern,
+/// so the student still sees their own surface form in UI (DoD:
+/// "Preserve original form for display"). If an ExtractedStep already
+/// carries a non-empty Canonical (e.g. pre-canonicalized upstream), we
+/// honor it and skip the re-canonicalize round-trip for that step.
 /// </summary>
 public sealed class StepChainVerifier : IStepChainVerifier
 {
@@ -88,10 +96,26 @@ public sealed class StepChainVerifier : IStepChainVerifier
     public const double ConfidenceThreshold = 0.60;
 
     private readonly ICasRouterService _casRouter;
+    private readonly ICanonicalizer? _canonicalizer;
 
+    /// <summary>
+    /// Backwards-compatible ctor — no canonicalization pre-step. Retained
+    /// so that existing call sites in tests and legacy composition roots
+    /// keep compiling; production DI binds the 2-arg ctor.
+    /// </summary>
     public StepChainVerifier(ICasRouterService casRouter)
+        : this(casRouter, canonicalizer: null)
+    {
+    }
+
+    /// <summary>
+    /// Production ctor. Injects the canonicalization pre-step so
+    /// (x-2)(x+3) and x^2+x-6 compare as equal (PRR-361).
+    /// </summary>
+    public StepChainVerifier(ICasRouterService casRouter, ICanonicalizer? canonicalizer)
     {
         _casRouter = casRouter ?? throw new ArgumentNullException(nameof(casRouter));
+        _canonicalizer = canonicalizer;
     }
 
     /// <inheritdoc/>
@@ -118,11 +142,16 @@ public sealed class StepChainVerifier : IStepChainVerifier
             return new StepChainVerificationResult(new[] { transition }, lc.Index);
         }
 
-        var results = new List<StepTransitionResult>(steps.Count - 1);
-        for (int i = 0; i < steps.Count - 1; i++)
+        // PRR-361: populate each step's Canonical field via the canonicalizer.
+        // We do this once up-front rather than per-transition so each pair
+        // shares the cached form on both sides.
+        var canonicalized = await CanonicalizeAllAsync(steps, ct).ConfigureAwait(false);
+
+        var results = new List<StepTransitionResult>(canonicalized.Count - 1);
+        for (int i = 0; i < canonicalized.Count - 1; i++)
         {
-            var from = steps[i];
-            var to = steps[i + 1];
+            var from = canonicalized[i];
+            var to = canonicalized[i + 1];
             var cas = await VerifyTransitionAsync(from, to, ct);
             var outcome = cas.Verified
                 ? StepTransitionOutcome.Valid
@@ -140,6 +169,44 @@ public sealed class StepChainVerifier : IStepChainVerifier
             }
         }
         return new StepChainVerificationResult(results, null);
+    }
+
+    /// <summary>
+    /// Run the (optional) canonicalizer over every step, returning a new
+    /// list with <see cref="ExtractedStep.Canonical"/> populated. Preserves
+    /// <see cref="ExtractedStep.Latex"/> verbatim for display. If no
+    /// canonicalizer is wired OR a step already carries a canonical form,
+    /// we pass it through unchanged.
+    /// </summary>
+    private async Task<IReadOnlyList<ExtractedStep>> CanonicalizeAllAsync(
+        IReadOnlyList<ExtractedStep> steps, CancellationToken ct)
+    {
+        if (_canonicalizer is null)
+        {
+            return steps;
+        }
+
+        var output = new ExtractedStep[steps.Count];
+        for (int i = 0; i < steps.Count; i++)
+        {
+            var s = steps[i];
+            if (!string.IsNullOrWhiteSpace(s.Canonical))
+            {
+                output[i] = s;
+                continue;
+            }
+
+            var form = await _canonicalizer
+                .CanonicalizeAsync(s.Latex ?? string.Empty, CasOperation.StepValidity, ct)
+                .ConfigureAwait(false);
+
+            // Prefer the SymPy-expanded canonical when available; fall back
+            // to the cheap NormalizedLatex. Either way, preserve the raw
+            // Latex on the output step.
+            var canonical = form.CanonicalExpanded ?? form.NormalizedLatex;
+            output[i] = s with { Canonical = canonical };
+        }
+        return output;
     }
 
     /// <summary>

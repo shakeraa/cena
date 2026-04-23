@@ -94,8 +94,18 @@ public static class PhotoDiagnosticServiceRegistration
     {
         services.TryAddSingleton<PhotoDiagnosticMetrics>();
 
+        // PRR-361: canonicalization pre-step for the step-chain verifier.
+        // Two-layer: cheap string normalization + SymPy expand/simplify
+        // for algebraic ops (ADR-0002). Singleton because it holds no
+        // mutable state; the ICasRouterService it wraps manages its own
+        // concurrency + circuit-breaker.
+        services.TryAddSingleton<ICanonicalizer>(sp =>
+            new Canonicalizer(sp.GetRequiredService<ICasRouterService>()));
+
         services.TryAddSingleton<IStepChainVerifier>(sp =>
-            new StepChainVerifier(sp.GetRequiredService<ICasRouterService>()));
+            new StepChainVerifier(
+                sp.GetRequiredService<ICasRouterService>(),
+                sp.GetRequiredService<ICanonicalizer>()));
         services.TryAddSingleton<ITemplateMatchingScorer, TemplateMatchingScorer>();
 
         services.TryAddSingleton<IPhotoDiagnosticConfidenceTracker, PhotoDiagnosticConfidenceTracker>();
