@@ -105,5 +105,10 @@ public static class PhotoDiagnosticServiceRegistration
         services.TryAddSingleton<IDiagnosticDisputeService, DiagnosticDisputeService>();
         services.TryAddSingleton<IPhotoDiagnosticGdprService, PhotoDiagnosticGdprService>();
         services.TryAddSingleton<ISupportEscalationPolicy, SupportEscalationPolicy>();
+
+        // PRR-393: dispute-metrics read surface for the admin observability
+        // dashboard. Depends only on IDiagnosticDisputeRepository (already
+        // registered above) and TimeProvider (supplied by the host).
+        services.TryAddSingleton<IDisputeMetricsService, MartenDisputeMetricsService>();
     }
 }

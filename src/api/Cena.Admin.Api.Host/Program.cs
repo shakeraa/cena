@@ -32,6 +32,7 @@ using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Observability.ErrorAggregator;
 using Marten;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using NATS.Client.Core;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
@@ -351,6 +352,21 @@ public partial class Program
     //     Cena.Actors.Cas.CasRouterLatexValidator>();
 
     builder.Services.AddCenaAdminServices();
+
+    // PRR-393: dispute-metrics admin surface. Registers only what the
+    // /api/admin/dispute-metrics endpoint needs — the Marten-backed
+    // dispute repository + the pure-aggregator service + a TimeProvider.
+    // We deliberately do NOT call AddPhotoDiagnosticMarten here (that
+    // bundle depends on the CAS router, subscription entitlements, and
+    // the student-side dispute write path that only the Student.Api.Host
+    // exposes). The admin host only reads.
+    builder.Services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+    builder.Services.TryAddSingleton<
+        Cena.Actors.Diagnosis.PhotoDiagnostic.IDiagnosticDisputeRepository,
+        Cena.Actors.Diagnosis.PhotoDiagnostic.MartenDiagnosticDisputeRepository>();
+    builder.Services.TryAddSingleton<
+        Cena.Actors.Diagnosis.PhotoDiagnostic.IDisputeMetricsService,
+        Cena.Actors.Diagnosis.PhotoDiagnostic.MartenDisputeMetricsService>();
 
     // prr-033: Ministry Bagrut rubric DSL + version pinning (ADR-0055).
     // Loads contracts/rubric/*.yml on boot; fails fast on malformed rubrics.
@@ -723,6 +739,13 @@ public partial class Program
     //   GET /api/admin/privacy/sub-processors
     //   GET /api/admin/privacy/sub-processors/parent
     app.MapPrivacyEndpoints();
+
+    // PRR-393: dispute-metrics read surface for the admin observability
+    // dashboard. Admin-only auth policy; backed by the pure
+    // DisputeRateAggregator + Marten-backed IDiagnosticDisputeRepository.
+    //   GET /api/admin/dispute-metrics?window={7d|30d}
+    Cena.Admin.Api.Host.Endpoints.DisputeMetricsEndpoints
+        .MapDisputeMetricsEndpoints(app);
     
     // ---- Root endpoint ----
     app.MapGet("/", () => Results.Ok(new 
