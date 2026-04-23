@@ -6,7 +6,7 @@
 **Source docs**: [PHOTO-UPLOAD-DIAGNOSTIC-001-10-persona-review.md](../../docs/design/PHOTO-UPLOAD-DIAGNOSTIC-001-10-persona-review.md)
 **Assignee hint**: frontend + backend (mastery signal)
 **Tags**: epic=epic-prr-j, ux, mastery, priority=p0
-**Status**: Ready
+**Status**: Partial — mastery-signal backend (`MasterySignalEmitted_V1` event + `IMasterySignalEmitter` with InMemory + Marten + `PostReflectionMasteryService` + DI registration + 18 tests) shipped 2026-04-23 (prior sub-agent work verified today); Vue `ReflectionRetry.vue` + `MisconceptionNarration.vue` deferred on frontend gate
 **Source**: 10-persona photo-diagnostic review 2026-04-22
 **Tier**: launch
 **Epic**: [EPIC-PRR-J](EPIC-PRR-J-photo-upload-cas-diagnostic-chain.md)
@@ -87,3 +87,29 @@ frontend task:
 - `src/student/full-version/src/components/diagnostic/MisconceptionNarration.vue`
   — renders the misconception-template explanation + counter-case (backend
   already in `MisconceptionTaxonomy`, no new API needed).
+
+## Audit (2026-04-23 close-out pass)
+
+Verified the sub-agent's backend landed on `main` and passes CI:
+
+- All 4 files cited above exist and compile.
+- `MasterySignalServiceRegistration.TryAddSingleton<IPostReflectionMasteryService,
+  PostReflectionMasteryService>()` is live — the service is DI-resolvable
+  for any endpoint that later wires the retry path.
+- Full `dotnet test` on the Mastery filter: 333/334 pass, 1 skipped
+  (unrelated `ScaffoldingIntegrationTests.GetCurrentQuestion_LowMastery_ReturnsFullScaffolding`).
+- `MasterySignalEmitted_V1` wire fields audited for banned terms —
+  no streak / countdown / scarcity markers (memory "Ship-gate banned
+  terms"; locked by `PostReflectionMasteryServiceTests` payload +
+  field-names test).
+- Stream-per-student (`masterysignal-{studentAnonId}`) matches the
+  RTBF-friendly pattern used elsewhere so PRR-003b crypto-shred can
+  target a single student's signals without a table-scan.
+
+The prior sub-agent shipped and pushed the backend but did not move
+the task file from `pending/` to `done/`. Task-file move + status
+flip is this turn's contribution; no code change needed.
+
+Closing as **Partial** per memory "Honest not complimentary": retry-
+success → mastery-signal path is real and tested; the Vue retry +
+narration components remain on the frontend gate.
