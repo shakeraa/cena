@@ -6,7 +6,7 @@
 **Source docs**: [PHOTO-UPLOAD-DIAGNOSTIC-001-10-persona-review.md](../../docs/design/PHOTO-UPLOAD-DIAGNOSTIC-001-10-persona-review.md)
 **Assignee hint**: math-education SME
 **Tags**: epic=epic-prr-j, content, priority=p1
-**Status**: Ready
+**Status**: Ready — **decision-gate confirmed 2026-04-23: option B (attempt in launch tranche, do NOT defer to post-launch despite `launch+1-ok` tier marker)**. Competes for the same math-education SME resource approved in [PRR-371](TASK-PRR-371-bagrut-math-4-taxonomy.md) 2026-04-23 option-A decision; 30+ advanced-topic templates (trig / calculus / series / limits).
 **Source**: 10-persona photo-diagnostic review 2026-04-22
 **Tier**: launch+1-ok
 **Epic**: [EPIC-PRR-J](EPIC-PRR-J-photo-upload-cas-diagnostic-chain.md)

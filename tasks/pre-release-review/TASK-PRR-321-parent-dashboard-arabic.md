@@ -6,7 +6,7 @@
 **Source docs**: [BUSINESS-MODEL-001-pricing-10-persona-review.md](../../docs/design/BUSINESS-MODEL-001-pricing-10-persona-review.md)
 **Assignee hint**: frontend-dev + Arabic-native content reviewer
 **Tags**: epic=epic-prr-i, parent-ux, i18n, rtl, priority=p0, launch-blocker
-**Status**: Ready (pending §5 decision #3 — Arabic on critical path Y/N)
+**Status**: Ready — **decision-gate confirmed 2026-04-23: option A (Arabic is on critical path, launch-tranche)**. Frontend-dev + Arabic-native content reviewer work begins now; task stays in pending/ until Vue pass + native reviewer sign-off land.
 **Source**: 10-persona pricing review 2026-04-22
 **Tier**: launch (per persona #6 — do not defer)
 **Epic**: [EPIC-PRR-I](EPIC-PRR-I-subscription-pricing-model.md)
