@@ -160,3 +160,84 @@ public static class SessionAttemptModePolicy
         return context.StoredMode;
     }
 }
+
+/// <summary>
+/// PRR-263 — builder that folds a live
+/// <see cref="Cena.Actors.Projections.LearningSessionQueueProjection"/>
+/// + <see cref="Cena.Infrastructure.Documents.QuestionDocument"/> pair
+/// into the <see cref="SessionAttemptModeContext"/> the policy consumes.
+/// Single call-site so PRR-228 (diagnostic-mode sessions) automatically
+/// get the "always Visible" carve-out persona-cogsci flagged as a
+/// retrieval-strength-assessment contamination risk.
+/// </summary>
+public static class SessionAttemptModeContextBuilder
+{
+    /// <summary>
+    /// Canonical session-mode string for PRR-228 diagnostic blocks.
+    /// Matches the value <c>AdaptiveQuestionPool.MapModeToGoal</c> already
+    /// expects on <c>queue.Mode</c>. Hoisted to a const here so callers
+    /// (and tests) depend on the name, not the stringly-typed value.
+    /// </summary>
+    public const string DiagnosticModeString = "diagnostic";
+
+    /// <summary>
+    /// Compose the context. Defensive on nulls so an unseeded question or
+    /// a replayed older session projection with missing AttemptMode reads
+    /// as the safe default (Visible) rather than crashing.
+    /// </summary>
+    /// <param name="sessionMode">
+    /// Session-level mode string (typically <c>queue.Mode</c>). Compared
+    /// case-insensitively against <see cref="DiagnosticModeString"/>.
+    /// </param>
+    /// <param name="storedAttemptModeWire">
+    /// Stored attempt-mode wire string (typically <c>queue.AttemptMode</c>).
+    /// Unknown / null / empty parses as <see cref="SessionAttemptMode.Visible"/>
+    /// per the forward-compat rule in <see cref="SessionAttemptModeWire.TryParse"/>.
+    /// </param>
+    /// <param name="isMultipleChoice">
+    /// True when the question exposes MC options. Callers derive from
+    /// the question document: <c>questionType == "multiple-choice"</c>
+    /// AND <c>choices.Length &gt;= 1</c>.
+    /// </param>
+    /// <param name="authorForceVisible">
+    /// Question-author override from <c>QuestionDocument.ForceOptionsVisible</c>.
+    /// </param>
+    public static SessionAttemptModeContext Build(
+        string? sessionMode,
+        string? storedAttemptModeWire,
+        bool isMultipleChoice,
+        bool authorForceVisible)
+    {
+        var stored = SessionAttemptModeWire.TryParse(storedAttemptModeWire, out var parsed)
+            ? parsed
+            : SessionAttemptMode.Visible;
+
+        var isDiagnostic = !string.IsNullOrWhiteSpace(sessionMode)
+            && string.Equals(
+                sessionMode.Trim(),
+                DiagnosticModeString,
+                StringComparison.OrdinalIgnoreCase);
+
+        return new SessionAttemptModeContext(
+            StoredMode: stored,
+            IsQuestionMultipleChoice: isMultipleChoice,
+            AuthorForceVisible: authorForceVisible,
+            IsDiagnosticBlock: isDiagnostic);
+    }
+
+    /// <summary>
+    /// Convenience — composes <see cref="Build"/> with
+    /// <see cref="SessionAttemptModePolicy.ResolveEffective"/>. The most
+    /// common call-site only needs the effective mode, not the context
+    /// record; this helper collapses both calls into one.
+    /// </summary>
+    public static SessionAttemptMode ResolveFrom(
+        string? sessionMode,
+        string? storedAttemptModeWire,
+        bool isMultipleChoice,
+        bool authorForceVisible)
+    {
+        var ctx = Build(sessionMode, storedAttemptModeWire, isMultipleChoice, authorForceVisible);
+        return SessionAttemptModePolicy.ResolveEffective(ctx);
+    }
+}

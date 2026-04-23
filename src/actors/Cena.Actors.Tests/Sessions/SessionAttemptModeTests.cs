@@ -174,4 +174,111 @@ public class SessionAttemptModeTests
         Assert.True(SessionAttemptModeWire.TryParse(defaultValue, out var mode));
         Assert.Equal(SessionAttemptMode.Visible, mode);
     }
+
+    // ---- PRR-263 diagnostic carve-out (property tests) ---------------------
+
+    [Theory]
+    [InlineData("visible")]
+    [InlineData("hidden_reveal")]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("unknown_mode_from_future_client")]
+    public void Builder_diagnostic_session_always_resolves_Visible_regardless_of_stored_mode(
+        string? storedAttemptMode)
+    {
+        // PRR-263 property: any diagnostic session × any stored attemptMode
+        // value must render Visible. Persona-cogsci blocker — mixing
+        // retrieval-practice (hide-then-reveal) with retrieval-strength
+        // assessment (PRR-228 diagnostic) contaminates the posterior.
+        var effective = SessionAttemptModeContextBuilder.ResolveFrom(
+            sessionMode: "diagnostic",
+            storedAttemptModeWire: storedAttemptMode,
+            isMultipleChoice: true,
+            authorForceVisible: false);
+        Assert.Equal(SessionAttemptMode.Visible, effective);
+    }
+
+    [Theory]
+    [InlineData("Diagnostic")]
+    [InlineData("DIAGNOSTIC")]
+    [InlineData(" diagnostic ")]
+    public void Builder_diagnostic_mode_string_is_case_and_whitespace_tolerant(
+        string diagnosticModeLabel)
+    {
+        // The session-mode string comes from a config / upstream feed; a
+        // future producer might emit with capitalisation drift. The
+        // carve-out must still trigger so the property test doesn't miss
+        // a diagnostic session because of a Mode casing change.
+        var effective = SessionAttemptModeContextBuilder.ResolveFrom(
+            sessionMode: diagnosticModeLabel,
+            storedAttemptModeWire: "hidden_reveal",
+            isMultipleChoice: true,
+            authorForceVisible: false);
+        Assert.Equal(SessionAttemptMode.Visible, effective);
+    }
+
+    [Theory]
+    [InlineData("practice")]
+    [InlineData("review")]
+    [InlineData("challenge")]
+    [InlineData("exam")]
+    [InlineData("")]
+    [InlineData(null)]
+    public void Builder_non_diagnostic_session_honours_stored_hidden_reveal_mode(
+        string? nonDiagnosticMode)
+    {
+        // Non-diagnostic sessions (practice / review / challenge / exam /
+        // unset) must NOT force Visible — they return the stored mode so
+        // a student who opted into hide-then-reveal gets it during
+        // practice. This is the inverse guard: the carve-out is scoped
+        // to diagnostic specifically, not any "non-practice" session.
+        var effective = SessionAttemptModeContextBuilder.ResolveFrom(
+            sessionMode: nonDiagnosticMode,
+            storedAttemptModeWire: "hidden_reveal",
+            isMultipleChoice: true,
+            authorForceVisible: false);
+        Assert.Equal(SessionAttemptMode.HiddenReveal, effective);
+    }
+
+    [Fact]
+    public void Builder_cross_session_stored_mode_does_not_leak_into_diagnostic()
+    {
+        // Regression guard: a student who opts into hidden_reveal in a
+        // practice session (queue.AttemptMode = "hidden_reveal") then
+        // starts a diagnostic session. The diagnostic queue is a different
+        // projection — but even if the same queue doc were reused (bug),
+        // the carve-out must still fire. Simulate by passing the stored
+        // hidden_reveal + the diagnostic mode in one Build call; the
+        // effective mode is still Visible.
+        var effective = SessionAttemptModeContextBuilder.ResolveFrom(
+            sessionMode: "diagnostic",
+            storedAttemptModeWire: "hidden_reveal",
+            isMultipleChoice: true,
+            authorForceVisible: false);
+        Assert.Equal(SessionAttemptMode.Visible, effective);
+    }
+
+    [Fact]
+    public void Builder_unknown_stored_mode_parses_as_safe_default_Visible()
+    {
+        // A storage bug that writes a bogus value to queue.AttemptMode
+        // (e.g. from a mid-deployment schema mismatch) must not crash
+        // rendering. Default to Visible — the safe "traditional render"
+        // fallback is always correct to show.
+        var effective = SessionAttemptModeContextBuilder.ResolveFrom(
+            sessionMode: "practice",
+            storedAttemptModeWire: "garbage_from_future",
+            isMultipleChoice: true,
+            authorForceVisible: false);
+        Assert.Equal(SessionAttemptMode.Visible, effective);
+    }
+
+    [Fact]
+    public void Builder_DiagnosticModeString_constant_matches_canonical_value()
+    {
+        // Canonical session-mode string used across AdaptiveQuestionPool +
+        // this carve-out must stay in sync. If AdaptiveQuestionPool
+        // starts emitting a different string, this test fails loudly.
+        Assert.Equal("diagnostic", SessionAttemptModeContextBuilder.DiagnosticModeString);
+    }
 }
