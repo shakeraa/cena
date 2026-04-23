@@ -199,6 +199,18 @@ public partial class Program
     Cena.Api.Contracts.Parenting.TutorHandoffServiceRegistration
         .AddTutorHandoffServices(builder.Services);
 
+    // PRR-320: parent-dashboard card source. The Marten binding (real
+    // implementation that scans HintRequested_V1 events to compute
+    // per-student engagement scalars) is registered FIRST; the Noop
+    // default then TryAdds behind it so any downstream registration
+    // without the Marten store still resolves. When the dedicated
+    // minutes-on-task projection ships, only MartenParentDashboardCardSource
+    // changes — the endpoint contract is stable.
+    Cena.Api.Contracts.Parenting.ParentDashboardServiceRegistration
+        .AddParentDashboardMarten(builder.Services);
+    Cena.Api.Contracts.Parenting.ParentDashboardServiceRegistration
+        .AddParentDashboardServices(builder.Services);
+
     // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
     var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
     
