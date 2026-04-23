@@ -808,6 +808,12 @@ public partial class Program
     Cena.Admin.Api.Host.Endpoints.BankTransferAdminEndpoints
         .MapBankTransferAdminEndpoints(app);
 
+    // PRR-390 diagnostic-audit detail: support agent reads a single
+    // disputed diagnostic's envelope metadata. Photo/CAS-chain/narration
+    // fields are null until upstream capture writers land.
+    Cena.Admin.Api.Host.Endpoints.DiagnosticAuditEndpoints
+        .MapDiagnosticAuditEndpoints(app);
+
     // ---- Root endpoint ----
     app.MapGet("/", () => Results.Ok(new 
     { 
