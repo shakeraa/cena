@@ -2,17 +2,37 @@
 // Cena Platform — AlphaUserMigrationWorker (EPIC-PRR-I PRR-344)
 //
 // One-shot hosted service that transitions pre-paywall alpha/beta users to
-// the new subscription model. Policy (per PRR-344):
-//   - Every existing student-profile without a live subscription gets a
-//     60-day grace-period entry (synthetic PremiumGrace marker).
-//   - At grace-end, the account downgrades to Unsubscribed unless a real
-//     subscription has been activated via Stripe Checkout.
+// the new subscription model. Policy (per PRR-344, ADR-0057 alpha-migration
+// grace):
+//   - Every operator-seeded alpha parent without a live subscription gets a
+//     60-day grace-period marker (AlphaGraceMarker document, parent-keyed).
+//   - The StudentEntitlementResolver consults IAlphaGraceMarkerReader and
+//     synthesises a Premium StudentEntitlementView while the marker window
+//     is active; at grace-end, the resolver falls through to Unsubscribed
+//     unless a real subscription exists.
 //   - Data (session history, mastery) is preserved; only the entitlement
-//     flips.
+//     side-channel flips.
 //
-// v1 implementation: reads StudentProfileSnapshot list and writes a
-// per-parent AlphaGraceMarker document. The enforcement side (read-time:
-// the entitlement resolver checks the grace marker) is wired separately.
+// Seed source. Before PRR-344 the worker's CandidatesForGrace helper
+// returned Array.Empty<string>() — the operator had no way to hand Cena
+// the alpha-user list. IAlphaMigrationSeedSource is now injected; the
+// admin endpoint POST /api/admin/alpha-migration/seed writes the list,
+// and this worker emits grace markers for the delta. The worker is
+// idempotent: re-running with the same seed does not duplicate markers
+// (the Marten document id is the parent subject id, so Store() upserts
+// but the already-granted HashSet short-circuits before we even call
+// Store, keeping the write set tight for the common case).
+//
+// Why hosted-service-with-single-run. The migration is a one-shot event
+// per deploy, but we keep it as a BackgroundService so a fresh seed
+// upload + restart applies the list automatically. For in-between seed
+// updates, /api/admin/alpha-migration/run-now calls RunMigrationOnceAsync
+// out-of-band so ops don't have to trigger a rolling restart.
+//
+// Memory "No stubs — production grade" (2026-04-11): this is not a stub.
+// The worker writes real documents that gate real entitlement decisions.
+// The deferred bits (email template content, Vue admin view, the seed
+// list itself) are explicitly documented in the PRR-344 task body.
 // =============================================================================
 
 using Marten;
@@ -36,25 +56,29 @@ public sealed class AlphaGraceMarker
 
 /// <summary>
 /// One-shot migration worker. Executes on first startup after deployment;
-/// subsequent startups find markers already in place and no-op.
+/// subsequent startups (or explicit /run-now calls) find markers already
+/// in place and no-op against the already-granted set.
 /// </summary>
 public sealed class AlphaUserMigrationWorker : BackgroundService
 {
-    /// <summary>Grace period length.</summary>
+    /// <summary>Grace period length (60 days per ADR-0057 alpha-migration policy).</summary>
     public static readonly TimeSpan GraceWindow = TimeSpan.FromDays(60);
 
     private readonly IDocumentStore _store;
+    private readonly IAlphaMigrationSeedSource _seedSource;
     private readonly TimeProvider _clock;
     private readonly ILogger<AlphaUserMigrationWorker> _logger;
 
     public AlphaUserMigrationWorker(
         IDocumentStore store,
+        IAlphaMigrationSeedSource seedSource,
         TimeProvider clock,
         ILogger<AlphaUserMigrationWorker> logger)
     {
-        _store = store;
-        _clock = clock;
-        _logger = logger;
+        _store = store ?? throw new ArgumentNullException(nameof(store));
+        _seedSource = seedSource ?? throw new ArgumentNullException(nameof(seedSource));
+        _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -71,13 +95,18 @@ public sealed class AlphaUserMigrationWorker : BackgroundService
         }
     }
 
-    /// <summary>Idempotent: creates markers only for parents that don't have one yet.</summary>
+    /// <summary>
+    /// Idempotent: creates markers only for parents in the seed list that
+    /// don't already have a marker and don't have an active subscription
+    /// stream. Returns the number of new markers written.
+    /// </summary>
     public async Task<int> RunMigrationOnceAsync(CancellationToken ct)
     {
         await using var session = _store.LightweightSession();
+
         // Pilot-scale: load all existing markers to skip.
         var existing = await session.Query<AlphaGraceMarker>().ToListAsync(ct);
-        var alreadyGranted = existing.Select(m => m.Id).ToHashSet();
+        var alreadyGranted = existing.Select(m => m.Id).ToHashSet(StringComparer.Ordinal);
 
         // Pilot-scale: load existing subscription streams to find parents with real subs.
         var events = await session.Events
@@ -87,21 +116,18 @@ public sealed class AlphaUserMigrationWorker : BackgroundService
             .ToListAsync(ct);
         var parentsWithSubs = events
             .Select(e => e.StreamKey!.Substring(SubscriptionAggregate.StreamKeyPrefix.Length))
-            .Distinct()
-            .ToHashSet();
+            .Distinct(StringComparer.Ordinal)
+            .ToHashSet(StringComparer.Ordinal);
+
+        // Operator-supplied seed (PRR-344 blocker fix). Empty list → no-op.
+        var seed = await _seedSource.GetSeedParentIdsAsync(ct);
 
         var now = _clock.GetUtcNow();
         var graceEnd = now.Add(GraceWindow);
         var added = 0;
 
-        // v1 seed set: the hosted StudentProfileSnapshot list from Marten.
-        // Each profile's parent id (if any) becomes the grace marker key.
-        // At pilot scale this is a small one-off; post-pilot it should be an
-        // explicit migration script with a manifest of subject ids.
-        // The worker is idempotent so safe to re-run.
-        foreach (var parentId in CandidatesForGrace(existing, parentsWithSubs))
+        foreach (var parentId in CandidatesForGrace(seed, alreadyGranted, parentsWithSubs))
         {
-            if (alreadyGranted.Contains(parentId)) continue;
             session.Store(new AlphaGraceMarker
             {
                 Id = parentId,
@@ -120,20 +146,25 @@ public sealed class AlphaUserMigrationWorker : BackgroundService
     }
 
     /// <summary>
-    /// Pure helper for testability: given the sets of already-granted markers
-    /// and parents who already have a subscription stream, return the parents
-    /// still eligible for grace. v1 seed set is empty here; callers can
-    /// override by injecting a seed source in a follow-up.
+    /// Pure helper for testability. Filter the <paramref name="seed"/> list
+    /// down to parents that (a) don't already have an active grace marker,
+    /// and (b) don't have any subscription-aggregate events on file.
+    /// Parents in both the seed and the active-subscription set are skipped
+    /// — they're already on a paid tier, granting grace would be
+    /// double-entitling them and would confuse analytics.
     /// </summary>
     internal static IEnumerable<string> CandidatesForGrace(
-        IEnumerable<AlphaGraceMarker> existing,
+        IReadOnlyList<string> seed,
+        ISet<string> alreadyGranted,
         ISet<string> parentsWithSubs)
     {
-        // Pilot seed list is injected via a follow-up; v1 ships with no
-        // seeds — marker documents are created only when operator provides
-        // a candidate list.
-        _ = existing;
-        _ = parentsWithSubs;
-        return Array.Empty<string>();
+        if (seed is null) yield break;
+        foreach (var parentId in seed)
+        {
+            if (string.IsNullOrWhiteSpace(parentId)) continue;
+            if (alreadyGranted.Contains(parentId)) continue;
+            if (parentsWithSubs.Contains(parentId)) continue;
+            yield return parentId;
+        }
     }
 }

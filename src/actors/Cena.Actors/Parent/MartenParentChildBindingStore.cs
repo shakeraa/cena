@@ -16,6 +16,7 @@
 // deleting; per ADR-0042 the consent context is append-only.
 // =============================================================================
 
+using Cena.Actors.Subscriptions;
 using Marten;
 
 namespace Cena.Actors.Parent;
@@ -24,8 +25,11 @@ namespace Cena.Actors.Parent;
 /// Marten-backed implementation of <see cref="IParentChildBindingStore"/>.
 /// Thread safety is delegated to Marten's session-per-unit-of-work model
 /// (a fresh LightweightSession per write, fresh QuerySession per read).
+/// Also implements <see cref="IStudentParentIndex"/> (PRR-344) so the
+/// alpha-migration grace path can enumerate parents bound to a given
+/// student via an indexed Postgres query.
 /// </summary>
-public sealed class MartenParentChildBindingStore : IParentChildBindingStore
+public sealed class MartenParentChildBindingStore : IParentChildBindingStore, IStudentParentIndex
 {
     private readonly IDocumentStore _store;
 
@@ -177,6 +181,25 @@ public sealed class MartenParentChildBindingStore : IParentChildBindingStore
 
         session.Store(updated);
         await session.SaveChangesAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <inheritdoc />
+    public async Task<IReadOnlyList<string>> ListParentsForStudentAsync(
+        string studentSubjectId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(studentSubjectId))
+        {
+            return Array.Empty<string>();
+        }
+        await using var session = _store.QuerySession();
+        var parents = await session
+            .Query<ParentChildBindingDocument>()
+            .Where(d => d.StudentSubjectId == studentSubjectId
+                     && d.RevokedAtUtc == null)
+            .Select(d => d.ParentActorId)
+            .ToListAsync(ct)
+            .ConfigureAwait(false);
+        return parents.Distinct(StringComparer.Ordinal).ToList();
     }
 
     // ---- conversion ----

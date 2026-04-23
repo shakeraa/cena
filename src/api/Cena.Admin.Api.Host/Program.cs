@@ -791,6 +791,18 @@ public partial class Program
     Cena.Admin.Api.Host.Endpoints.UnitEconomicsAdminEndpoints
         .MapUnitEconomicsAdminEndpoints(app);
 
+    // PRR-344: alpha-user migration operator endpoints.
+    //   POST /api/admin/alpha-migration/seed     — overwrite the seed list
+    //   GET  /api/admin/alpha-migration/status   — size + granted + pending
+    //   POST /api/admin/alpha-migration/run-now  — fire the worker off-cron
+    // Operators use these to promote pre-paywall alpha users into the
+    // 60-day Premium grace window (ADR-0057 alpha-migration). The
+    // StudentEntitlementResolver on every host honours the resulting
+    // AlphaGraceMarker rows via IAlphaGraceMarkerReader (wired by
+    // AddSubscriptionsMarten).
+    Cena.Admin.Api.Host.Endpoints.AlphaMigrationEndpoints
+        .MapAlphaMigrationEndpoints(app);
+
     // ---- Root endpoint ----
     app.MapGet("/", () => Results.Ok(new 
     { 

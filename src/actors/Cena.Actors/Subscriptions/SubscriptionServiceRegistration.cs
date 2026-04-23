@@ -42,6 +42,26 @@ public static class SubscriptionServiceRegistration
         services.AddSingleton<ISubscriptionAggregateStore, MartenSubscriptionAggregateStore>();
         services.ConfigureMarten(opts => opts.RegisterSubscriptionsContext());
         AddSharedServices(services);
+
+        // PRR-344 production grace wiring:
+        //   - Replace the InMemory seed source with Marten so the admin-
+        //     supplied seed list survives pod restarts and is shared
+        //     across replicas (the worker on pod B reads what the admin
+        //     endpoint on pod A persisted).
+        //   - Replace the InMemory grace marker reader with Marten so the
+        //     entitlement resolver on any replica sees the same markers
+        //     the worker wrote to Postgres.
+        //   - Register the worker as a hosted service so it runs on
+        //     Actor-Host startup without additional composition work.
+        services.Replace(ServiceDescriptor.Singleton<IAlphaMigrationSeedSource,
+            MartenAlphaMigrationSeedSource>());
+        services.Replace(ServiceDescriptor.Singleton<IAlphaGraceMarkerReader,
+            MartenAlphaGraceMarkerReader>());
+        // Register once as a concrete singleton so the admin /run-now
+        // endpoint can resolve it; register again as an IHostedService so
+        // it runs on startup. The same instance is used both ways.
+        services.AddSingleton<AlphaUserMigrationWorker>();
+        services.AddHostedService(sp => sp.GetRequiredService<AlphaUserMigrationWorker>());
         // PRR-306 production refund-usage probe: aggregates Marten-backed
         // photo usage + raw hint events across linked students.
         services.Replace(ServiceDescriptor.Singleton<IRefundUsageProbe, MartenRefundUsageProbe>());
@@ -72,6 +92,15 @@ public static class SubscriptionServiceRegistration
     private static void AddSharedServices(IServiceCollection services)
     {
         services.AddSingleton<IStudentEntitlementResolver, StudentEntitlementResolver>();
+
+        // PRR-344 alpha-migration defaults (InMemory). AddSubscriptionsMarten
+        // swaps these for the Marten-backed variants so the seed list and
+        // grace markers persist across pod restarts. TryAdd so a host that
+        // has already bound custom impls wins.
+        services.TryAddSingleton<IAlphaMigrationSeedSource,
+            InMemoryAlphaMigrationSeedSource>();
+        services.TryAddSingleton<IAlphaGraceMarkerReader,
+            InMemoryAlphaGraceMarkerReader>();
         services.AddSingleton<IPerTierCapEnforcer, PerTierCapEnforcer>();
         services.AddSingleton<ITierLlmRoutingPolicy, TierLlmRoutingPolicy>();
         // Default gateway = sandbox. Production composition root overrides

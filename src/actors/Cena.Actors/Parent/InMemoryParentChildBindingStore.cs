@@ -7,15 +7,19 @@
 // =============================================================================
 
 using System.Collections.Concurrent;
+using Cena.Actors.Subscriptions;
 
 namespace Cena.Actors.Parent;
 
 /// <summary>
 /// Thread-safe in-memory <see cref="IParentChildBindingStore"/>.
 /// Production flips the DI registration to the Marten-backed variant
-/// without touching any endpoint code.
+/// without touching any endpoint code. Also implements
+/// <see cref="IStudentParentIndex"/> so the alpha-migration grace path
+/// in <see cref="StudentEntitlementResolver"/> can enumerate the
+/// parents bound to a given student (PRR-344).
 /// </summary>
-public sealed class InMemoryParentChildBindingStore : IParentChildBindingStore
+public sealed class InMemoryParentChildBindingStore : IParentChildBindingStore, IStudentParentIndex
 {
     // Keyed on (parent, student, institute) — the full triple. A parent
     // with the same child enrolled at two institutes has two rows.
@@ -93,6 +97,23 @@ public sealed class InMemoryParentChildBindingStore : IParentChildBindingStore
                 parentActorId, studentSubjectId, instituteId, revokedAtUtc, revokedAtUtc),
             (_, existing) => existing with { RevokedAtUtc = revokedAtUtc });
         return Task.CompletedTask;
+    }
+
+    /// <inheritdoc />
+    public Task<IReadOnlyList<string>> ListParentsForStudentAsync(
+        string studentSubjectId, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(studentSubjectId))
+        {
+            return Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        }
+        var parents = _bindings.Values
+            .Where(b => b.IsActive &&
+                        string.Equals(b.StudentSubjectId, studentSubjectId, StringComparison.Ordinal))
+            .Select(b => b.ParentActorId)
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
+        return Task.FromResult<IReadOnlyList<string>>(parents);
     }
 
     private readonly record struct BindingKey(
