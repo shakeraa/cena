@@ -38,5 +38,12 @@ public sealed record ChangeCycleRequest(string NewCycle);
 /// <summary>Body of POST /api/me/subscription/refund.</summary>
 public sealed record RefundRequest(string Reason);
 
-/// <summary>Body of POST /api/me/subscription/cancel.</summary>
-public sealed record CancelRequest(string Reason);
+/// <summary>Body of POST /api/me/subscription/cancel. PRR-331: the optional
+/// <paramref name="ChurnReasonCategory"/> + <paramref name="ChurnFreeText"/>
+/// capture the structured survey response (dropdown + free text). Both are
+/// optional — a cancel without a survey still works, but the dashboard
+/// gets less signal.</summary>
+public sealed record CancelRequest(
+    string Reason,
+    string? ChurnReasonCategory = null,
+    string? ChurnFreeText = null);

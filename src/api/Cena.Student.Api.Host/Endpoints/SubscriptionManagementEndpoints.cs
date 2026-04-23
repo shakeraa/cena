@@ -332,6 +332,7 @@ public static class SubscriptionManagementEndpoints
         HttpContext http,
         [FromBody] CancelRequest body,
         [FromServices] ISubscriptionAggregateStore store,
+        [FromServices] IChurnReasonRepository churnRepo,
         [FromServices] TimeProvider clock,
         CancellationToken ct)
     {
@@ -339,9 +340,46 @@ public static class SubscriptionManagementEndpoints
         var aggregate = await store.LoadAsync(parentId, ct);
         try
         {
-            var evt = SubscriptionCommands.Cancel(aggregate.State, body.Reason, "parent", clock.GetUtcNow());
+            var now = clock.GetUtcNow();
+            var evt = SubscriptionCommands.Cancel(aggregate.State, body.Reason, "parent", now);
             await store.AppendAsync(parentId, evt, ct);
             aggregate.Apply(evt);
+
+            // PRR-331: structured churn-reason capture. Optional on the
+            // wire — absence is treated as "parent declined the survey";
+            // presence must parse to a known enum value, otherwise 400
+            // (so the UI cannot ship a typo that silently drops data).
+            if (!string.IsNullOrWhiteSpace(body.ChurnReasonCategory))
+            {
+                if (!Enum.TryParse<ChurnReasonCategory>(
+                    body.ChurnReasonCategory, ignoreCase: true, out var category))
+                {
+                    return Results.BadRequest(new
+                    {
+                        error = "invalid_churn_category",
+                        allowed = Enum.GetNames<ChurnReasonCategory>(),
+                    });
+                }
+                if (body.ChurnFreeText is { Length: > ChurnReasonReport.MaxFreeTextLength })
+                {
+                    return Results.BadRequest(new
+                    {
+                        error = "churn_free_text_too_long",
+                        max = ChurnReasonReport.MaxFreeTextLength,
+                    });
+                }
+
+                await churnRepo.RecordAsync(new ChurnReasonReport
+                {
+                    Id = ChurnReasonReport.BuildId(parentId, now),
+                    ParentSubjectIdEncrypted = parentId,
+                    Category = category,
+                    FreeText = body.ChurnFreeText,
+                    CollectedAt = now,
+                    FollowedByRefund = null,
+                }, ct);
+            }
+
             return Results.Ok(ToStatusDto(aggregate.State));
         }
         catch (SubscriptionCommandException ex)

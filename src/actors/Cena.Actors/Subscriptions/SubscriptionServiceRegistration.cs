@@ -89,5 +89,14 @@ public static class SubscriptionServiceRegistration
             services.AddSingleton<IOriginalChargeLookup, EventStreamOriginalChargeLookup>();
         }
         services.AddSingleton<RefundService>();
+
+        // PRR-331: churn-reason capture. In-memory default (test fixture);
+        // Marten-backed variant is a follow-up task when we need cross-host
+        // aggregation. TryAdd so a host that already bound a Marten impl
+        // wins.
+        if (!services.Any(d => d.ServiceType == typeof(IChurnReasonRepository)))
+        {
+            services.AddSingleton<IChurnReasonRepository, InMemoryChurnReasonRepository>();
+        }
     }
 }
