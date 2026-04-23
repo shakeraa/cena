@@ -352,6 +352,18 @@ public partial class Program
 
     builder.Services.AddCenaAdminServices();
 
+    // PRR-391: PhotoDiagnostic credit-ledger + dispute service are needed
+    // by POST /api/admin/diagnostic-disputes/{disputeId}/credit. Uses the
+    // Marten-backed variant so credits survive restarts and match the
+    // student-host wiring. AddSubscriptionsMarten is a transitive
+    // dependency (the quota gate's IStudentEntitlementResolver +
+    // IPerTierCapEnforcer live in the subscriptions bounded context) and
+    // must be registered before AddPhotoDiagnosticMarten.
+    Cena.Actors.Subscriptions.SubscriptionServiceRegistration
+        .AddSubscriptionsMarten(builder.Services);
+    Cena.Actors.Diagnosis.PhotoDiagnostic.PhotoDiagnosticServiceRegistration
+        .AddPhotoDiagnosticMarten(builder.Services);
+
     // prr-033: Ministry Bagrut rubric DSL + version pinning (ADR-0055).
     // Loads contracts/rubric/*.yml on boot; fails fast on malformed rubrics.
     builder.Services.AddCenaRubricVersionPinning(
@@ -712,6 +724,11 @@ public partial class Program
     //   POST /api/admin/institutes/{instituteId}/classrooms/{classroomId}/assigned-targets
     Cena.Admin.Api.Host.Endpoints.ClassroomTargetEndpoints
         .MapClassroomTargetEndpoints(app);
+
+    // PRR-391: one-click credit on confirmed photo-diagnostic dispute
+    //   POST /api/admin/diagnostic-disputes/{disputeId}/credit
+    Cena.Admin.Api.Host.Endpoints.DiagnosticCreditEndpoints
+        .MapDiagnosticCreditEndpoints(app);
     
     // ---- Content management endpoints ----
     app.MapContentEndpoints();
