@@ -19,6 +19,7 @@
 // and Admin.Api.Host.
 // =============================================================================
 
+using Cena.Actors.Infrastructure;
 using Cena.Actors.Mastery;
 using Cena.Actors.Rtbf;
 using Cena.Infrastructure.Compliance;
@@ -40,6 +41,13 @@ public static class ExamTargetRetentionServiceRegistration
         this IServiceCollection services)
     {
         ArgumentNullException.ThrowIfNull(services);
+
+        // ExamTargetRetentionWorker ctor depends on Cena.Actors.Infrastructure.IClock.
+        // Admin.Api.Host doesn't call AddClock() (only actor-host + student-api do),
+        // so self-register here — idempotent via TryAdd, safe to re-call from hosts
+        // that already registered the clock.
+        services.TryAddSingleton(TimeProvider.System);
+        services.TryAddSingleton<Cena.Actors.Infrastructure.IClock, Clock>();
 
         services.TryAddSingleton<ISkillKeyedMasteryStore, InMemorySkillKeyedMasteryStore>();
         services.TryAddSingleton<IBktParameterProvider, DefaultBktParameterProvider>();

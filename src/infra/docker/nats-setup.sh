@@ -15,64 +15,80 @@ sleep 3
 
 echo "Creating JetStream streams..."
 
+# Helper — nats CLI ≥0.2 requires a unit suffix on --max-bytes (previously
+# raw integers were accepted). We pass SI-suffixed values here to stay
+# compatible with current nats-box images.
+
 # Core domain streams (3 replicas in prod, 1 in dev)
 nats -s $NATS_URL stream add LEARNER_EVENTS \
   --subjects "cena.durable.learner.>" \
-  --retention limits --max-age 90d --max-bytes 10737418240 \
+  --retention limits --max-age 90d --max-bytes 10GB \
   --storage file --replicas 1 --discard old \
   --dupe-window 2m --no-allow-rollup --deny-delete --deny-purge \
-  2>/dev/null || echo "LEARNER_EVENTS exists"
+  --defaults \
+  || echo "LEARNER_EVENTS add failed or exists"
 
 nats -s $NATS_URL stream add PEDAGOGY_EVENTS \
   --subjects "cena.durable.pedagogy.>" \
-  --retention limits --max-age 90d --max-bytes 10737418240 \
+  --retention limits --max-age 90d --max-bytes 10GB \
   --storage file --replicas 1 --discard old \
   --dupe-window 2m \
-  2>/dev/null || echo "PEDAGOGY_EVENTS exists"
+  --defaults \
+  || echo "PEDAGOGY_EVENTS add failed or exists"
 
 nats -s $NATS_URL stream add ENGAGEMENT_EVENTS \
   --subjects "cena.durable.engagement.>" \
-  --retention limits --max-age 30d --max-bytes 5368709120 \
+  --retention limits --max-age 30d --max-bytes 5GB \
   --storage file --replicas 1 --discard old \
   --dupe-window 2m \
-  2>/dev/null || echo "ENGAGEMENT_EVENTS exists"
+  --defaults \
+  || echo "ENGAGEMENT_EVENTS add failed or exists"
 
 nats -s $NATS_URL stream add OUTREACH_EVENTS \
   --subjects "cena.durable.outreach.>" \
-  --retention limits --max-age 7d --max-bytes 1073741824 \
+  --retention limits --max-age 7d --max-bytes 1GB \
   --storage file --replicas 1 --discard old \
-  2>/dev/null || echo "OUTREACH_EVENTS exists"
+  --defaults \
+  || echo "OUTREACH_EVENTS add failed or exists"
 
 nats -s $NATS_URL stream add CURRICULUM_EVENTS \
   --subjects "cena.durable.curriculum.>" \
-  --retention limits --max-age 365d --max-bytes 1073741824 \
+  --retention limits --max-age 365d --max-bytes 1GB \
   --storage file --replicas 1 --discard old \
-  2>/dev/null || echo "CURRICULUM_EVENTS exists"
+  --defaults \
+  || echo "CURRICULUM_EVENTS add failed or exists"
 
 nats -s $NATS_URL stream add ANALYTICS_EVENTS \
   --subjects "cena.durable.analytics.>" \
-  --retention limits --max-age 90d --max-bytes 10737418240 \
+  --retention limits --max-age 90d --max-bytes 10GB \
   --storage file --replicas 1 --discard old \
-  2>/dev/null || echo "ANALYTICS_EVENTS exists"
+  --defaults \
+  || echo "ANALYTICS_EVENTS add failed or exists"
 
 nats -s $NATS_URL stream add SCHOOL_EVENTS \
   --subjects "cena.durable.school.>" \
-  --retention limits --max-age 90d --max-bytes 2147483648 \
+  --retention limits --max-age 90d --max-bytes 2GB \
   --storage file --replicas 1 --discard old \
-  2>/dev/null || echo "SCHOOL_EVENTS exists"
+  --defaults \
+  || echo "SCHOOL_EVENTS add failed or exists"
 
-# System streams
+# System streams — file-backed so a NATS restart doesn't wipe the
+# default-route stream. Previously memory-backed which silently dropped
+# every lowercase-prefixed event (e.g. focus_score_updated__v1,
+# concept_attempted__v1) into a black hole after the first restart.
 nats -s $NATS_URL stream add SYSTEM_HEALTH \
   --subjects "cena.durable.system.>" \
-  --retention limits --max-age 1d --max-bytes 268435456 \
-  --storage memory --replicas 1 --discard old \
-  2>/dev/null || echo "SYSTEM_HEALTH exists"
+  --retention limits --max-age 1d --max-bytes 256MB \
+  --storage file --replicas 1 --discard old \
+  --defaults \
+  || echo "SYSTEM_HEALTH add failed or exists"
 
 nats -s $NATS_URL stream add DEAD_LETTER \
   --subjects "cena.durable.dlq.>" \
-  --retention limits --max-age 30d --max-bytes 1073741824 \
+  --retention limits --max-age 30d --max-bytes 1GB \
   --storage file --replicas 1 --discard old \
-  2>/dev/null || echo "DEAD_LETTER exists"
+  --defaults \
+  || echo "DEAD_LETTER add failed or exists"
 
 echo ""
 echo "Creating consumers..."
@@ -86,29 +102,37 @@ echo "Creating consumers..."
 # Engagement context consumers
 nats -s $NATS_URL consumer add LEARNER_EVENTS engagement-xp \
   --filter "cena.durable.learner.>" \
+  --pull \
   --ack explicit --max-deliver 5 --max-pending 500 \
-  --ack-wait 60s --deliver all --replay instant \
-  2>/dev/null || echo "engagement-xp exists"
+  --wait 60s --deliver all --replay instant \
+  --defaults \
+  || echo "engagement-xp add failed or exists"
 
 nats -s $NATS_URL consumer add PEDAGOGY_EVENTS engagement-session \
   --filter "cena.durable.pedagogy.>" \
+  --pull \
   --ack explicit --max-deliver 5 --max-pending 500 \
-  --ack-wait 60s --deliver all --replay instant \
-  2>/dev/null || echo "engagement-session exists"
+  --wait 60s --deliver all --replay instant \
+  --defaults \
+  || echo "engagement-session add failed or exists"
 
 # Outreach consumers (lower throughput, tighter limits)
 nats -s $NATS_URL consumer add LEARNER_EVENTS outreach-triggers \
   --filter "cena.durable.learner.>" \
+  --pull \
   --ack explicit --max-deliver 3 --max-pending 100 \
-  --ack-wait 30s --deliver all --replay instant \
-  2>/dev/null || echo "outreach-triggers exists"
+  --wait 30s --deliver all --replay instant \
+  --defaults \
+  || echo "outreach-triggers add failed or exists"
 
 # Analytics consumer (high throughput, relaxed limits)
 nats -s $NATS_URL consumer add LEARNER_EVENTS analytics-all \
   --filter "cena.durable.learner.>" \
+  --pull \
   --ack explicit --max-deliver 10 --max-pending 1000 \
-  --ack-wait 60s --deliver all --replay instant \
-  2>/dev/null || echo "analytics-all exists"
+  --wait 60s --deliver all --replay instant \
+  --defaults \
+  || echo "analytics-all add failed or exists"
 
 echo ""
 echo "✅ NATS JetStream setup complete"
