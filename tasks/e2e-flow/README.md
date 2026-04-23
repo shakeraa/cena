@@ -86,12 +86,35 @@ cd src/student/full-version
 npm run test:e2e:flow
 ```
 
-## What's in this directory
+## Epics (12 — grouped by user journey, not technical layer)
 
-- [TASK-E2E-001](TASK-E2E-001-subscription-happy-path.md) — login → pricing → Plus annual → Stripe checkout (test card success) → `/subscription/confirm` shows active
-- [TASK-E2E-002](TASK-E2E-002-subscription-declined.md) — login → pricing → tier → decline card → `/subscription/cancel` with retry CTA
-- [TASK-E2E-003](TASK-E2E-003-subscription-cancel-back.md) — login → pricing → tier → user dismisses Stripe modal → back to `/pricing` without a half-provisioned sub
-- [TASK-E2E-004](TASK-E2E-004-multi-agent-runner.md) — how to fan N Claude sub-agents out for isolated triage
+| Epic | Title | Priority | Ship-gate? |
+| --- | --- | --- | --- |
+| [EPIC-E2E-A](EPIC-E2E-A-auth-onboarding.md) | Authentication, onboarding, identity | P0 | `@auth @p0` |
+| [EPIC-E2E-B](EPIC-E2E-B-subscription-billing.md) | Subscription & billing lifecycle | P0 | `@billing @p0` |
+| [EPIC-E2E-C](EPIC-E2E-C-student-learning-core.md) | Student learning core (diagnostic → session → mastery) | P0 | `@learning @p0` |
+| [EPIC-E2E-D](EPIC-E2E-D-ai-tutoring.md) | AI tutoring & content-safety round-trips | P0 | `@cas @ship-gate` |
+| [EPIC-E2E-E](EPIC-E2E-E-parent-console.md) | Parent console (digest, consent, dashboard, controls) | P1 | `@gdpr @p0` (subset) |
+| [EPIC-E2E-F](EPIC-E2E-F-teacher-classroom.md) | Teacher & classroom operations | P1 | `@privacy @k-floor` |
+| [EPIC-E2E-G](EPIC-E2E-G-admin-operations.md) | Admin operations (content, moderation, ops) | P1 | `@content @ship-gate` |
+| [EPIC-E2E-H](EPIC-E2E-H-multi-tenant-isolation.md) | Multi-tenant isolation (cross-institute prevention) | P0 | `@tenant @p0` |
+| [EPIC-E2E-I](EPIC-E2E-I-gdpr-compliance.md) | GDPR / COPPA / Ministry compliance | P0 | `@compliance @p0` |
+| [EPIC-E2E-J](EPIC-E2E-J-resilience-failure-modes.md) | Resilience & failure modes | P1 | `@resilience @p0` (subset) |
+| [EPIC-E2E-K](EPIC-E2E-K-offline-pwa.md) | Offline / PWA behavior | P2 | `@offline @p1` |
+| [EPIC-E2E-L](EPIC-E2E-L-accessibility-i18n.md) | Accessibility & i18n flow-level checks | P1 | `@i18n @a11y` |
+
+Total: ~80 workflows across 12 epics. ~20 tagged as ship-gate blockers.
+
+## Flagship TASK files (already split out)
+
+Tasks materialize as separate files only when implementation starts. Today's standalones:
+
+- [TASK-E2E-001](TASK-E2E-001-subscription-happy-path.md) (EPIC-E2E-B-01) — **spike shipped**; boundary upgrades scheduled
+- [TASK-E2E-002](TASK-E2E-002-subscription-declined.md) (EPIC-E2E-B-02) — spec'd, body pending
+- [TASK-E2E-003](TASK-E2E-003-subscription-cancel-back.md) (EPIC-E2E-B-03) — spec'd, body pending
+- [TASK-E2E-004](TASK-E2E-004-multi-agent-runner.md) — cross-epic infrastructure (sub-agent triage)
+
+All other workflows live inline inside their epic files until someone claims one to implement.
 
 ## Test code layout
 
