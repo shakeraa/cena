@@ -230,6 +230,11 @@ public partial class Program
         options.AbortOnConnectFail = false;
         options.ConnectRetry = 3;
         options.ConnectTimeout = 5000;
+        // Bump from 3s default. Shared multiplexer queues bursts of 100+
+        // async ops under load (rate-limit, circuit-breaker, session
+        // metrics); 3s is too tight and causes false RedisTimeoutException.
+        options.SyncTimeout = 10000;
+        options.AsyncTimeout = 10000;
         // RedisSessionStoreMetricsService polls INFO for per-keyspace session
         // counts; StackExchange.Redis blocks admin commands by default.
         options.AllowAdmin = true;

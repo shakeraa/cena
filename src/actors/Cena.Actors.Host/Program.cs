@@ -160,7 +160,19 @@ builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
     options.AbortOnConnectFail = false;
     options.ConnectRetry = 3;
     options.ConnectTimeout = 5000;
-    options.SyncTimeout = 3000;
+    // SyncTimeout + AsyncTimeout raised from 3s → 10s. Observed under a
+    // 10-student emulator burst: the shared multiplexer queued 150+ async
+    // ops (XP counters, rate-limit checks, circuit-breaker state, session
+    // metrics, analysis job queue polls) and individual command round-trips
+    // exceeded 3s, timing out with "RedisTimeoutException 3716ms elapsed,
+    // timeout is 3000ms". That cascaded into StudentActor command handlers
+    // (UpdateStreak → FlushEvents is pure Marten, but rate-limit + circuit-
+    // breaker precheck paths hit Redis) and blew past ActorRequestTimeout.
+    // 10s is the generous prod default and absorbs multiplexer bursts
+    // without masking real Redis outages (AbortOnConnectFail is still
+    // explicit).
+    options.SyncTimeout = 10000;
+    options.AsyncTimeout = 10000;
     // RedisSessionStoreMetricsService polls INFO for per-keyspace session
     // counts; StackExchange.Redis blocks admin commands by default and
     // throws "This operation is not available unless admin mode is enabled:
