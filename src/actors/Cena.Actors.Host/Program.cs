@@ -308,8 +308,15 @@ builder.Services.AddSingleton<IExplanationOrchestrator, ExplanationOrchestrator>
 builder.Services.AddSingleton<IPersonalizedExplanationService, PersonalizedExplanationService>();
 builder.Services.AddSingleton<OfflineSyncHandler>();
 
-// FIND-arch-022: JetStream bootstrapper ensures streams exist before NatsOutboxPublisher starts
-builder.Services.AddHostedService<Cena.Infrastructure.Nats.JetStreamBootstrapper>();
+// FIND-arch-022 (superseded 2026-04-23): JetStream streams are created by the
+// external `nats-setup` init container (src/infra/docker/nats-setup.sh) with
+// richer configuration — retention, dup-window, deny-purge, 9 streams total.
+// The in-app bootstrapper below tried to create its OWN 7 streams (CENA_*) on
+// the SAME subjects, producing overlap errors and "durable streams may not be
+// available" warnings on every actor-host start. App code should not manage
+// NATS infrastructure lifecycle — that belongs to the init job. Disabled so
+// the single authoritative stream definition wins.
+// builder.Services.AddHostedService<Cena.Infrastructure.Nats.JetStreamBootstrapper>();
 builder.Services.AddHostedService<NatsOutboxPublisher>();
 
 // Analysis Job Processor (background worker for stagnation analysis jobs)
