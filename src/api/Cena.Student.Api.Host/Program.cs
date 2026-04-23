@@ -1013,6 +1013,7 @@ public partial class Program
     app.MapExamTargetParentVisibilityEndpoint(); // prr-230: POST /api/me/exam-targets/{id}/visibility
     app.MapDiagnosticEndpoints();        // RDY-023 + prr-228: legacy + per-target diagnostic blocks
     app.MapDiagnosticDisputeEndpoints(); // PRR-385: POST /api/me/diagnostic-disputes — "this doesn't look right"
+    app.MapHardCapSupportTicketEndpoints(); // PRR-402: hard-cap → contact-support UX (student open + admin resolve/reject)
 
     // Session Lifecycle endpoints (STB-01, STB-01b, STB-01c)
     app.MapSessionEndpoints();

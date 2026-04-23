@@ -7,6 +7,8 @@
 //   - IPhotoDiagnosticMonthlyUsage : reads current count for this month
 //   - IPerTierCapEnforcer          : maps caps + usage -> decision
 //   - IDiagnosticCreditLedger (opt): subtracts support-issued free credits
+//   - IHardCapExtensionAdjuster (opt): adds support-granted month-end
+//                                       extensions to the effective hard cap
 //
 // Returns a QuotaDecision with Allow / SoftCapReached / HardCapReached
 // (the same three-state enum used elsewhere). SoftCapReached still lets
@@ -18,20 +20,23 @@
 // (check -> commit) shape avoids counting failed invocations against
 // the cap.
 //
-// PRR-391 credit-ledger integration: when a support agent confirms a
-// dispute = real system error, they issue the student a free upload-
-// quota bump via DiagnosticCreditService. The IPhotoDiagnosticMonthlyUsage
-// counter (an append-only record of real upload attempts) is never
-// decremented — instead the CreditLedger accumulates monthly credits,
-// and this gate subtracts them from the raw count before cap enforcement:
+// Ledger-not-decrement: the PRR-391 CreditLedger and the PRR-402 hard-cap
+// support-ticket aggregate BOTH use the same discipline — the raw upload
+// counter is never mutated by a "forgiveness" or "extension" event. Instead
+// those events land as additive rows in their respective aggregates, and
+// this gate reads them at check-time:
 //
 //     effectiveUsage = max(0, rawUsage - monthlyCredits)
+//     effectiveHardCap = baseHardCap + monthlyHardCapExtension
 //
-// That keeps the upload counter truthful for metrics, audit samplers,
-// and abuse detection, while making the cap behave as if the erroneous
-// upload never happened from the student's perspective. The ledger is
-// injected as optional (nullable) so existing test harnesses that pre-
-// date PRR-391 don't need a fixture; production DI always binds one.
+// That keeps the upload counter truthful for metrics, audit samplers, and
+// abuse detection, while making the cap behave as the student expects. The
+// credit adjuster targets the "error" path (support confirmed our system
+// made a mistake → forgive the upload); the hard-cap adjuster targets the
+// "legitimate heavy use" path (student hit 300/mo on Premium, support
+// manually approves a one-time month-end extension). Both dependencies
+// are nullable so test harnesses that don't care about either path don't
+// have to wire a fixture; production DI always binds both.
 // =============================================================================
 
 using Cena.Actors.Subscriptions;
@@ -70,17 +75,20 @@ public sealed class PhotoDiagnosticQuotaGate : IPhotoDiagnosticQuotaGate
     private readonly IPhotoDiagnosticMonthlyUsage _usage;
     private readonly IPerTierCapEnforcer _enforcer;
     private readonly IDiagnosticCreditLedger? _credits;
+    private readonly IHardCapExtensionAdjuster? _hardCapAdjuster;
 
     public PhotoDiagnosticQuotaGate(
         IStudentEntitlementResolver entitlements,
         IPhotoDiagnosticMonthlyUsage usage,
         IPerTierCapEnforcer enforcer,
-        IDiagnosticCreditLedger? credits = null)
+        IDiagnosticCreditLedger? credits = null,
+        IHardCapExtensionAdjuster? hardCapAdjuster = null)
     {
         _entitlements = entitlements ?? throw new ArgumentNullException(nameof(entitlements));
         _usage = usage ?? throw new ArgumentNullException(nameof(usage));
         _enforcer = enforcer ?? throw new ArgumentNullException(nameof(enforcer));
         _credits = credits;
+        _hardCapAdjuster = hardCapAdjuster;
     }
 
     public async Task<PhotoDiagnosticQuotaDecision> CheckAsync(
@@ -101,8 +109,44 @@ public sealed class PhotoDiagnosticQuotaGate : IPhotoDiagnosticQuotaGate
         var effectiveUsage = Math.Max(0, rawUsage - credits);
 
         var cap = _enforcer.Check(entitlement, CapCounter.PhotoDiagnosticPerMonth, effectiveUsage);
+
+        // PRR-402: bump the effective hard cap by any support-granted
+        // extensions active this month. Not-bound or zero-grants is
+        // behaviourally identical to the pre-PRR-402 gate — we return
+        // the enforcer's decision verbatim. When there IS an active grant
+        // we recompute the decision against the bumped cap so the student
+        // gets Allow / SoftCapReached / HardCapReached correctly.
+        var hardCapExtension = _hardCapAdjuster is null
+            ? 0
+            : await _hardCapAdjuster.GetActiveExtensionAsync(studentSubjectIdHash, asOfUtc, ct)
+                .ConfigureAwait(false);
+
+        if (hardCapExtension <= 0)
+        {
+            return new PhotoDiagnosticQuotaDecision(
+                cap.Decision, cap.CurrentUsage, cap.SoftCap, cap.HardCap, entitlement.EffectiveTier);
+        }
+
+        var bumpedHardCap = cap.HardCap + hardCapExtension;
+        var adjustedDecision = RecomputeDecision(
+            effectiveUsage, cap.SoftCap, bumpedHardCap);
         return new PhotoDiagnosticQuotaDecision(
-            cap.Decision, cap.CurrentUsage, cap.SoftCap, cap.HardCap, entitlement.EffectiveTier);
+            adjustedDecision, cap.CurrentUsage, cap.SoftCap, bumpedHardCap, entitlement.EffectiveTier);
+    }
+
+    /// <summary>
+    /// Decision recomputation against a bumped hard cap. Mirrors the
+    /// tri-state logic in PerTierCapEnforcer: usage at/above the hard cap
+    /// is HardCapReached; at/above soft but below hard is SoftCapReached;
+    /// otherwise Allow. Lives inline (not on the enforcer) because the
+    /// support-granted extension is specifically a PhotoDiagnostic concern
+    /// — the enforcer itself stays agnostic of which counters have adjusters.
+    /// </summary>
+    private static CapDecision RecomputeDecision(int effectiveUsage, int softCap, int bumpedHardCap)
+    {
+        if (effectiveUsage >= bumpedHardCap) return CapDecision.HardCapReached;
+        if (softCap > 0 && effectiveUsage >= softCap) return CapDecision.SoftCapReached;
+        return CapDecision.Allow;
     }
 
     public Task CommitAsync(string studentSubjectIdHash, DateTimeOffset asOfUtc, CancellationToken ct)
