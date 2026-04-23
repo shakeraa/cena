@@ -50,3 +50,40 @@ complete via: standard queue complete.
 ## Related
 
 - [PRR-380](TASK-PRR-380-diagnostic-result-screen.md), [EPIC-PRR-A](EPIC-PRR-A-studentactor-decomposition.md)
+
+---
+
+## Progress — 2026-04-23 (claude-subagent-prr381)
+
+Backend mastery-signal slice shipped on branch
+`claude-subagent-prr381/prr-381-mastery-signal`.
+
+- `src/actors/Cena.Actors/Mastery/MasterySignalEmitted_V1.cs` — event record,
+  `MasterySignalTrigger` constants, `MasterySignalOptions` (default delta 0.05).
+- `src/actors/Cena.Actors/Mastery/IMasterySignalEmitter.cs` — interface +
+  `InMemoryMasterySignalEmitter` (ConcurrentBag, test-inspectable) +
+  `MartenMasterySignalEmitter` (per-student stream `masterysignal-{studentAnonId}`,
+  FetchStreamStateAsync-guarded StartStream vs. Append).
+- `src/actors/Cena.Actors/Mastery/PostReflectionMasteryService.cs` — only emits
+  when `CasVerifyResult.Status == Ok && Verified == true`; returns null on
+  CAS outage (no fake mastery, ADR-0002).
+- `src/actors/Cena.Actors/Mastery/MasterySignalServiceRegistration.cs` —
+  `AddMasterySignalServices` (InMemory default) + `AddMasterySignalServicesMarten`.
+- `src/actors/Cena.Actors.Tests/Mastery/PostReflectionMasteryServiceTests.cs` —
+  18 passing cases covering verified success, non-verified, 4 non-Ok statuses,
+  default + override delta, trigger string constant, empty-identifier theory,
+  null CAS, out-of-range options, banned-term audit on payload + field names.
+
+Build: `dotnet build src/actors/Cena.Actors.sln` → 0 errors.
+Tests: 18/18 pass.
+
+### Deferred
+
+Vue frontend components remain open and should be picked up as a separate
+frontend task:
+
+- `src/student/full-version/src/components/diagnostic/ReflectionRetry.vue`
+  — retry-success celebration surface (no streak, no cartoonish reward).
+- `src/student/full-version/src/components/diagnostic/MisconceptionNarration.vue`
+  — renders the misconception-template explanation + counter-case (backend
+  already in `MisconceptionTaxonomy`, no new API needed).
