@@ -1,0 +1,145 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Rami's statistical-honesty / measurement-integrity meta-review of the
+  20 SHIP-recommended findings. Flags cherry-picking, fabricated citations,
+  and RDY-080 Bagrut-prediction violations. 9 PASS / 8 WARNING / 3 REJECT.
+system_purpose_fit: 4
+  rationale:
+    - Rami's lens (statistical honesty) is adjacent to but distinct from
+      ethics lens
+    - Where it overlaps: fabricated claims / cherry-picked effect sizes
+      also fail the "informed student" ethical-persuasion test because
+      they mislead stakeholders about expected outcomes
+    - Strong ethics-adjacent finding: FD-008 Yu et al. 2026 AI-grading
+      citation appears fabricated — a marketing/research integrity
+      failure that ethics lens supports retiring
+    - FD-003 misconception-resolution 95% claim flagged as fabricated —
+      directly affects product promises made to schools/parents
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Rami's own citation-verification claims — I'm not a statistician; cogsci lens should independently verify"
+adr_alignment:
+  honored:
+    - "RDY-080 Bagrut-prediction protection (Rami applies it to FD-004, FD-007, FD-020)"
+    - "DPA §7 ML-training (Rami applies to FD-003, FD-008)"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Rami flags FD-008 "Yu et al. 2026" as an unverifiable /
+      fabricated citation (L24). Ethics lens: shipping a feature
+      (AI Partial-Credit Grading) whose primary evidence is
+      fabricated is a form of marketing manipulation — parents and
+      schools will be told "90%+ agreement with human TAs" based on
+      a nonexistent paper. This fails informed-consent of the
+      institutional buyer. Until citation is verified/replaced, the
+      feature cannot be marketed with the 90% claim, and the
+      spec/marketing materials must be flagged.
+    evidence: finding_assessment_dr_rami.md:L24
+    lens_note: |
+      Statistical honesty is an ethics floor. Shipgate should add a
+      rule that every "Evidence class" claim in feature specs must
+      cite a verifiable DOI/URL — CI can flag non-resolving URLs.
+  - severity: P1
+    finding: |
+      Rami flags FD-003 "95% misconception resolution" as unsupported
+      (L19). Ethics concern: this figure likely to appear in
+      marketing decks aimed at school administrators. Selling a
+      product to parents of minors on an inflated claim is a dark
+      pattern distinct from — but parallel to — the engagement ones
+      shipgate bans. Evidence-honesty is an ethical baseline.
+    evidence: finding_assessment_dr_rami.md:L19
+    lens_note: |
+      Ethics lens strongly supports Rami's REJECT here. The
+      "informed buyer" test extends to schools and parents, not just
+      the student.
+  - severity: P2
+    finding: |
+      Rami flags FD-011 ES=1.16 as cherry-picked (L27). Same marketing-
+      honesty concern. If the feature ships with "cultural context
+      has a 1.16 effect size" claim to schools, and the real meta-
+      analytic range is 0.4-0.6, this is inflated promise-making.
+      Ethics lens supports Rami's REJECT of the ES claim while the
+      underlying feature (culturally-contextualized problems) can
+      still ship — just with honest effect-size framing.
+    evidence: finding_assessment_dr_rami.md:L27
+    lens_note: |
+      Feature is ethically valuable even with smaller effect size.
+      The cherry-pick is the ethics problem, not the feature.
+  - severity: P2
+    finding: |
+      Rami flags FD-006 selective citation of Foster (doc cites
+      Foster but does not disclose Foster 2021 null-achievement
+      finding) (L22). Ethics lens: this is the same informed-
+      consent issue applied to product positioning. Feature F8
+      Confidence Calibration should be positioned as metacognitive
+      tool (Rami's recommendation), not achievement booster — and
+      the ethics lens adds CBM subtractive-scoring concern (see
+      Axis 6 F8 finding).
+    evidence: finding_assessment_dr_rami.md:L22
+    lens_note: |
+      Converges with Axis 6 ethics finding. Positioning honesty +
+      structural non-subtraction = full fix.
+already_built: []
+duplicates_of_other_docs:
+  - "This IS a meta-review of feature-discovery-2026-04-20.md FD-001..FD-020"
+  - "Overlaps with cena_dr_nadia_pedagogical_review_20_findings.md"
+extracted_tasks:
+  - title: "Feature-spec citation verifiability rule"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add a CI rule: every feature spec under pre-release-review/ or
+      docs/ that cites an "Evidence class: PEER-REVIEWED" must
+      include a DOI or resolvable URL. CI fetches the URL and fails
+      on 404 or unresolvable DOI.
+      ## Files
+      - scripts/shipgate/citation-check.mjs (new)
+      - .github/workflows/citation-check.yml (new)
+      ## Definition of Done
+      - CI blocks merge of any feature-spec .md with unresolvable DOIs
+      - Retries + caching to avoid flakiness
+      - Allowlist for pre-prints / in-press with explicit justification
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L19, L24, L27]
+  - title: "Marketing claim floor: no effect-size claim without meta-analytic mean citation"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Any marketing / school-sales material referencing feature
+      effect sizes must cite the meta-analytic MEAN, not single-
+      study maximums. Specs under pre-release-review/ that cite
+      single-study ES must also present meta-analytic mean where
+      available. Add to design-review checklist.
+      ## Files
+      - docs/engineering/design-review-checklist.md
+      - docs/marketing-claims-policy.md (new)
+      ## Definition of Done
+      - Policy accepted
+      - Rami's flagged specs (FD-001, FD-011) updated to include meta-means
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L17, L27]
+verdict: adopt
+verdict_reason: |
+  Rami's lens is statistical integrity; ethics lens adopts his
+  REJECTs and WARNINGs where they overlap with evidence-honesty.
+  Primary ethics-lens addition: add CI infrastructure for citation
+  verifiability. Rami's review is mostly out-of-lens for me — no new
+  ethics findings beyond marketing-integrity concern.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Independently verify all Rami flagged citations (primary lens for this doc)"
+  - to: persona-enterprise
+    about: "RDY-080 prediction-vs-inference boundary on FD-004 placement engine"

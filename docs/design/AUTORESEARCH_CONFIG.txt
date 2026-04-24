@@ -1,0 +1,9 @@
+GOAL: Improve micro-lessons-design.md and discussion-student-ai-interaction.md with deeper research evidence, stronger pedagogical grounding, and more concrete implementation details across 10 iterations.
+
+METRIC: docs/design/measure_metric.sh — counts: (1) unique empirical citations with year+author, (2) resolved open questions (marked RESOLVED), (3) concrete implementation details (code blocks, data models, algorithms), (4) Cena-specific integration points (references to existing actors/services/events). Score = citations×2 + resolved×5 + implementations×3 + integrations×3.
+
+CONSTRAINT: Only modify docs/design/micro-lessons-design.md and docs/discussion-student-ai-interaction.md. Stay focused on Cena platform context (Israeli Bagrut, Hebrew/Arabic, BKT/MCM, actor architecture). One focused improvement per iteration.
+
+TARGET_FILES:
+  - docs/design/micro-lessons-design.md
+  - docs/discussion-student-ai-interaction.md

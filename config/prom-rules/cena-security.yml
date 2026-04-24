@@ -1,0 +1,219 @@
+# =============================================================================
+# FIND-sec-014: Prometheus Alerting Rules for Security Metrics
+#
+# These rules monitor security-critical paths and alert on suspicious patterns
+# or regressions of security fixes from FIND-sec-001..011.
+#
+# To load these rules in Prometheus, add to prometheus.yml:
+#   rule_files:
+#     - /etc/prometheus/rules/cena-security.yml
+# =============================================================================
+
+groups:
+  - name: cena_security_tenant_isolation
+    interval: 30s
+    rules:
+      # Alert: High rate of tenant isolation rejections
+      # Indicates possible IDOR attack or cross-tenant access attempts
+      - alert: CenaHighTenantRejectionRate
+        expr: |
+          rate(cena_security_tenant_rejection_count_total[5m]) > 5/60
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "High tenant rejection rate on {{ $labels.service }}"
+          description: |
+            Tenant isolation rejections are occurring at a rate of {{ $value }} per second
+            on service {{ $labels.service }}, endpoint {{ $labels.endpoint }}.
+            This may indicate IDOR attempts or a regression in tenant scoping.
+
+      # Alert: Immediate page for critical tenant breach attempts
+      - alert: CenaCriticalTenantBreach
+        expr: |
+          cena_security_tenant_rejection_count_total{caller_role="anonymous"} > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: security
+        annotations:
+          summary: "Anonymous user attempted cross-tenant access"
+          description: |
+            Anonymous caller attempted to access {{ $labels.endpoint }}.
+            This may indicate an automated attack or auth bypass attempt.
+
+  - name: cena_security_authentication
+    interval: 30s
+    rules:
+      # Alert: High auth rejection rate
+      - alert: CenaHighAuthRejectionRate
+        expr: |
+          rate(cena_security_auth_rejection_count_total[5m]) > 50/60
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "High authentication failure rate on {{ $labels.service }}"
+          description: |
+            Auth rejections are occurring at {{ $value }} per second
+            with reason {{ $labels.reason }} on {{ $labels.service }}.
+            Check for credential stuffing or token validation issues.
+
+      # Alert: Spike in expired tokens
+      - alert: CenaTokenExpirationSpike
+        expr: |
+          rate(cena_security_auth_rejection_count_total{reason="token_expired"}[5m]) > 10/60
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Spike in expired token rejections"
+          description: |
+            Many clients are presenting expired tokens. Clock skew or
+            session timeout configuration issue possible.
+
+  - name: cena_security_rate_limiting
+    interval: 30s
+    rules:
+      # Alert: Rate limit being hit frequently
+      - alert: CenaRateLimitHitFrequently
+        expr: |
+          rate(cena_security_rate_limit_rejection_count_total[5m]) > 20/60
+        for: 5m
+        labels:
+          severity: info
+          category: security
+        annotations:
+          summary: "Rate limit hit frequently on {{ $labels.policy_name }}"
+          description: |
+            Rate limit {{ $labels.policy_name }} is being triggered frequently.
+            May indicate abuse or need to adjust limits.
+
+  - name: cena_security_privileged_actions
+    interval: 10s
+    rules:
+      # CRITICAL: Immediate page for role assignment
+      # Any role change should be audited and alerted immediately
+      - alert: CenaPrivilegedActionRoleAssignment
+        expr: |
+          cena_security_privileged_action_count_total{action="assign_role"} > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: security
+          paged: "true"
+        annotations:
+          summary: "CRITICAL: Role assignment executed by {{ $labels.performed_by }}"
+          description: |
+            A privileged role assignment action was performed by {{ $labels.performed_by }}.
+            This requires immediate review and audit.
+
+      # Alert: GDPR export action
+      - alert: CenaPrivilegedActionGdprExport
+        expr: |
+          cena_security_privileged_action_count_total{action="gdpr_export"} > 0
+        for: 0m
+        labels:
+          severity: warning
+          category: security
+          compliance: gdpr
+        annotations:
+          summary: "GDPR data export executed by {{ $labels.performed_by }}"
+          description: |
+            A GDPR data export was performed by {{ $labels.performed_by }}.
+            Verify this was authorized and log for compliance audit.
+
+      # Alert: GDPR erasure action
+      - alert: CenaPrivilegedActionGdprErasure
+        expr: |
+          cena_security_privileged_action_count_total{action="gdpr_erasure"} > 0
+        for: 0m
+        labels:
+          severity: warning
+          category: security
+          compliance: gdpr
+        annotations:
+          summary: "GDPR erasure executed by {{ $labels.performed_by }}"
+          description: |
+            A GDPR right-to-erasure request was executed by {{ $labels.performed_by }}.
+            Verify authorization and ensure proper audit trail.
+
+      # Alert: User suspension
+      - alert: CenaPrivilegedActionSuspendUser
+        expr: |
+          cena_security_privileged_action_count_total{action="suspend_user"} > 0
+        for: 0m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "User suspension executed by {{ $labels.performed_by }}"
+          description: |
+            A user was suspended by {{ $labels.performed_by }}.
+            Review for policy compliance.
+
+      # Alert: Force password reset
+      - alert: CenaPrivilegedActionForceReset
+        expr: |
+          cena_security_privileged_action_count_total{action="force_reset"} > 0
+        for: 0m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "Force password reset executed by {{ $labels.performed_by }}"
+          description: |
+            A force password reset was executed by {{ $labels.performed_by }}.
+            Verify this was a legitimate security response.
+
+      # Alert: Session revocation
+      - alert: CenaPrivilegedActionRevokeSession
+        expr: |
+          cena_security_privileged_action_count_total{action="revoke_session"} > 0
+        for: 0m
+        labels:
+          severity: info
+          category: security
+        annotations:
+          summary: "Session revocation executed by {{ $labels.performed_by }}"
+          description: |
+            User sessions were revoked by {{ $labels.performed_by }}.
+
+  - name: cena_security_signalr
+    interval: 30s
+    rules:
+      # Alert: SignalR connection auth rejections
+      - alert: CenaSignalrAuthRejection
+        expr: |
+          rate(cena_security_signalr_connect_rejection_count_total[5m]) > 5/60
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+        annotations:
+          summary: "High SignalR auth rejection rate"
+          description: |
+            SignalR connections are being rejected at {{ $value }} per second.
+            Check auth middleware and token validation.
+
+  - name: cena_security_firebase
+    interval: 30s
+    rules:
+      # Alert: Slow Firebase token validation
+      - alert: CenaSlowFirebaseTokenValidation
+        expr: |
+          histogram_quantile(0.95, 
+            rate(cena_security_firebase_token_validation_duration_ms_bucket[5m])
+          ) > 500
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "Slow Firebase token validation on {{ $labels.service }}"
+          description: |
+            95th percentile Firebase token validation is {{ $value }}ms.
+            Check Firebase Auth service health and caching.

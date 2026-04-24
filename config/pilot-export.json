@@ -1,0 +1,50 @@
+{
+  "schema_version": "1.0",
+  "description": "RDY-032: pilot data export configuration. Read by Cena.Infrastructure.Pilot.PilotDataExporter on every run.",
+  "output": {
+    "directory": "data/pilot",
+    "attempts_filename_template": "attempts_{from:yyyyMMdd}_{to:yyyyMMdd}.csv",
+    "sessions_filename_template": "sessions_{from:yyyyMMdd}_{to:yyyyMMdd}.csv",
+    "metadata_filename_template": "metadata_{from:yyyyMMdd}_{to:yyyyMMdd}.json"
+  },
+  "privacy": {
+    "pseudonymization_algorithm": "sha256-truncated-16",
+    "salt_env_var": "CENA_PILOT_EXPORT_SALT",
+    "note": "Salt MUST be provisioned via environment variable. Never commit the salt value."
+  },
+  "filters": {
+    "exclude_ml_excluded_events": true,
+    "exclude_test_students": true,
+    "test_student_id_prefixes": ["test-", "load-", "emu-"]
+  },
+  "retention": {
+    "directory_ttl_days": 365,
+    "note": "Pilot data retained 12 months post-pilot then deleted per GDPR Art 5(1)(e)."
+  },
+  "schema": {
+    "attempt_columns": [
+      "student_id_hash",
+      "concept_id",
+      "subject",
+      "question_id",
+      "correct",
+      "hints_used",
+      "response_time_ms",
+      "session_id",
+      "session_number",
+      "prior_mastery",
+      "posterior_mastery",
+      "timestamp"
+    ],
+    "session_columns": [
+      "student_id_hash",
+      "session_id",
+      "started_at",
+      "ended_at",
+      "duration_ms",
+      "questions_attempted",
+      "questions_correct",
+      "accuracy"
+    ]
+  }
+}

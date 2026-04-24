@@ -1,0 +1,147 @@
+{
+  "schema_version": "1.0",
+  "description": "PipelineItemDocument samples — one per major lifecycle state",
+  "items": [
+    {
+      "item_id": "ad581e57-0b12-4c8e-e539-1ee5853d452f",
+      "state": "pending",
+      "tenant_id": "tenant_demo",
+      "source_uri": "cloud_dir://s3/bagrut-dev/raw/2024_summer_5u.pdf",
+      "source_kind": "cloud_dir",
+      "curator_hints": null,
+      "cascade_result_ref": null,
+      "created_at": "2026-04-16T12:00:00Z",
+      "updated_at": "2026-04-16T12:00:00Z"
+    },
+    {
+      "item_id": "82f11ec0-3312-464b-58e0-8779ff2f6504",
+      "state": "triaged",
+      "tenant_id": "tenant_demo",
+      "source_uri": "cloud_dir://s3/bagrut-dev/raw/2024_summer_5u.pdf",
+      "source_kind": "cloud_dir",
+      "curator_hints": null,
+      "triage_verdict": "text",
+      "cascade_result_ref": null,
+      "created_at": "2026-04-16T12:00:00Z",
+      "updated_at": "2026-04-16T12:02:00Z"
+    },
+    {
+      "item_id": "4a13d22e-95af-425f-9851-1b9042d60baa",
+      "state": "in_cascade",
+      "tenant_id": "tenant_demo",
+      "source_uri": "admin_upload://curator_alice/scan_042.pdf",
+      "source_kind": "admin_upload",
+      "curator_hints": {
+        "subject": "math",
+        "language": "he",
+        "track": "5u",
+        "source_type": "admin_upload",
+        "taxonomy_node": "calculus.derivatives",
+        "expected_figures": true
+      },
+      "triage_verdict": "image_only",
+      "cascade_result_ref": null,
+      "layer_progress": "layer_2a",
+      "created_at": "2026-04-16T12:00:00Z",
+      "updated_at": "2026-04-16T12:12:00Z"
+    },
+    {
+      "item_id": "42ac030c-6970-453c-f7cf-d5a24495ce11",
+      "state": "awaiting_review",
+      "tenant_id": "tenant_demo",
+      "source_uri": "admin_upload://curator_bob/worksheet_015.pdf",
+      "source_kind": "admin_upload",
+      "curator_hints": {
+        "subject": "math",
+        "language": "he",
+        "track": "4u",
+        "source_type": "admin_upload",
+        "taxonomy_node": null,
+        "expected_figures": false
+      },
+      "triage_verdict": "scanned_bad_ocr",
+      "cascade_result_ref": "dev-fixtures/cascade-results/pdf-scanned-bad-ocr.json",
+      "review_reasons": [
+        "low_overall_confidence"
+      ],
+      "assigned_reviewer": "curator_admin_01",
+      "created_at": "2026-04-16T11:00:00Z",
+      "updated_at": "2026-04-16T11:20:00Z"
+    },
+    {
+      "item_id": "1b8e8d8d-c5f6-4535-e5ae-05da4fa1f5f5",
+      "state": "reviewed_approved",
+      "tenant_id": "tenant_demo",
+      "source_uri": "bagrut_reference://5u/2024_winter/035581",
+      "source_kind": "bagrut_reference",
+      "curator_hints": {
+        "subject": "math",
+        "language": "he",
+        "track": "5u",
+        "source_type": "bagrut_reference",
+        "taxonomy_node": null,
+        "expected_figures": true
+      },
+      "triage_verdict": "image_only",
+      "cascade_result_ref": "dev-fixtures/cascade-results/bagrut-5u-full-cascade.json",
+      "review_reasons": [],
+      "reviewer_decision": "approved_for_recreation",
+      "assigned_reviewer": "curator_admin_01",
+      "created_at": "2026-04-16T09:00:00Z",
+      "updated_at": "2026-04-16T11:30:00Z"
+    },
+    {
+      "item_id": "91b9b6a2-9e1b-4339-e10f-eb9f121f24de",
+      "state": "rejected",
+      "tenant_id": "tenant_demo",
+      "source_uri": "admin_upload://curator_carol/bad_scan.pdf",
+      "source_kind": "admin_upload",
+      "curator_hints": null,
+      "triage_verdict": "encrypted",
+      "cascade_result_ref": "dev-fixtures/cascade-results/pdf-encrypted-422.json",
+      "review_reasons": [
+        "preprocess_failed_or_encrypted"
+      ],
+      "reviewer_decision": "rejected_unreadable",
+      "created_at": "2026-04-16T08:00:00Z",
+      "updated_at": "2026-04-16T08:10:00Z"
+    },
+    {
+      "item_id": "33da7327-1d27-48ad-74a2-ddb86378c977",
+      "state": "recreated",
+      "tenant_id": "tenant_demo",
+      "source_uri": "bagrut_reference://5u/2023_summer/035572",
+      "source_kind": "bagrut_reference",
+      "curator_hints": {
+        "subject": "math",
+        "language": "he",
+        "track": "5u",
+        "source_type": "bagrut_reference",
+        "taxonomy_node": "algebra.polynomials",
+        "expected_figures": false
+      },
+      "triage_verdict": "text",
+      "cascade_result_ref": "dev-fixtures/cascade-results/bagrut-3u-text-shortcut.json",
+      "reviewer_decision": "approved_for_recreation",
+      "recreations": {
+        "generated_item_ids": [
+          "bbc4ba50-12de-4cd9-1936-044d6a189505",
+          "196f8d86-943f-4ba5-6c55-da50c17323a5",
+          "65646802-70b7-4a88-fd3d-921b4c8e9782"
+        ],
+        "provenance": "recreation",
+        "reference_calibration": {
+          "year": "2023",
+          "topic_cluster": "algebra.polynomials",
+          "difficulty": 0.65
+        },
+        "cas_validated": true
+      },
+      "created_at": "2026-04-15T16:00:00Z",
+      "updated_at": "2026-04-16T02:00:00Z"
+    }
+  ],
+  "_dev_fixture": {
+    "notes": "Shape mirrors the Marten document type in Cena.Admin.Api. Use to seed the admin review queue for local dev."
+  }
+}

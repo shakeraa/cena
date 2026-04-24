@@ -1,0 +1,98 @@
+# =============================================================================
+# Generated 2026-04-20 per ADR-0012 Schedule Lock
+# (docs/adr/0012-aggregate-decomposition.md — "Enforcement" section)
+#
+# Grandfathered files are permitted to exceed the 500-LOC rule at the specified
+# baseline. LOC here is measured by FileSize500LocTest.CountLoc:
+#   LOC = total_lines − blank_lines − single_line_comment_only_lines
+# (A line is "single-line-comment-only" iff its trimmed content starts with
+# "//"; block comments are intentionally not special-cased.) This is the
+# canonical counter used by the test, so numbers here DO NOT match raw
+# `wc -l` output; they match what the rule actually enforces.
+#
+# Rules (enforced by FileSize500LocTest):
+#   - A PR MAY lower a baseline_loc value (the file shrank — record the new
+#     lower value in this file in the same PR). A separate stale-entry test
+#     FAILS if the file is now at or below 500; in that case remove the entry.
+#   - A PR MUST NOT raise a baseline_loc value.
+#   - A PR MUST NOT add a new entry here unless the file was already > 500 LOC
+#     as of a prior commit; the grandfather list is monotonically shrinking.
+#   - Any non-grandfathered .cs file under src/ must be <= 500 LOC.
+#
+# Paths are relative to the repository root (the directory containing CLAUDE.md).
+# =============================================================================
+grandfathered:
+  # ---- StudentActor god-aggregate (ADR-0012, Sprint 1 extraction target) ----
+  # Note: ADR-0012 cites wc-l values (1036 / 764); the heuristic values below
+  # are what the test enforces and what this baseline tracks.
+  - path: src/actors/Cena.Actors/Students/StudentActor.Commands.cs
+    baseline_loc: 779
+    reason: "ADR-0012 StudentActor god-aggregate (wc-l 1036); migrating to LearningSessionActor Sprint 1 (2026-04-27)"
+  - path: src/actors/Cena.Actors/Students/StudentActor.cs
+    baseline_loc: 519
+    reason: "ADR-0012 StudentActor god-aggregate (wc-l 764); migrating to LearningSessionActor Sprint 1 (2026-04-27)"
+
+  # ---- Admin API surface (pre-2026-04-20 legacy; refactor candidates) ----
+  - path: src/api/Cena.Admin.Api/AdminApiEndpoints.cs
+    baseline_loc: 1497
+    reason: "Admin minimal-API surface; split into per-domain endpoint groups is a follow-up refactor"
+  - path: src/api/Cena.Admin.Api/QuestionBankSeedData.cs
+    baseline_loc: 1429
+    reason: "Historical seed data; will be replaced by CAS-gated pipeline output (ADR-0032)"
+  - path: src/api/Cena.Admin.Api/AiGenerationService.cs
+    baseline_loc: 812
+    reason: "Pre-2026-04-20 legacy; split into Prompt/Compose/Verify pipelines is a follow-up. prr-145 added ADR-0045 [TaskRouting] attribute + 5-line rationale comment (+2 LOC). prr-046 added [FeatureTag]+ILlmCostMetric wiring + cost-metric emission (+11 LOC). prr-022 added [PiiPreScrubbed] attribute + 4-line rationale comment (+1 LOC). prr-143 added IActivityPropagator field + ctor param + activity span stamping block (+15 LOC)."
+  - path: src/api/Cena.Admin.Api/AdminUserService.cs
+    baseline_loc: 530
+    reason: "Pre-2026-04-20 legacy; extract tenant-scoping helpers is a follow-up"
+  - path: src/api/Cena.Admin.Api/QuestionBankService.cs
+    baseline_loc: 502
+    reason: "Pre-2026-04-20 legacy; extract versioning + locale handlers is a follow-up"
+
+  # ---- Student API endpoint surface (pre-2026-04-20 legacy) ----
+  - path: src/api/Cena.Student.Api.Host/Endpoints/SessionEndpoints.cs
+    baseline_loc: 1302
+    reason: "Student session minimal-API surface; split post EPIC-PRR-A LearningSession extraction. PRR-151 R-22 added AccommodationProfile session-render wiring (+21 LOC). prr-149 wired AdaptiveScheduler plan generation into /start (+32 LOC). prr-029 wired ILdAnxiousHintGovernor into the hint endpoint for L1 worked-step rewrite (+20 LOC; pure template, no LLM). prr-204 wired ISessionTutorContextService pre-seed into /start and invalidate into /complete (+27 LOC; session-scoped per ADR-0003). prr-050 wired Dyscalculia accommodation pack (number-line strip + session-time multiplier max) into current-question (+5 LOC; pure signal, no render logic on backend)."
+  - path: src/api/Cena.Student.Api.Host/Endpoints/SocialEndpoints.cs
+    baseline_loc: 743
+    reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"
+  - path: src/api/Cena.Student.Api.Host/Program.cs
+    baseline_loc: 640
+    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. prr-243 added CatalogBackedQuestionPaperCatalogValidator Replace + MapExamTargetQuestionPaperEndpoints (+5 LOC). prr-228 added AddExamTargetRetentionServices() + PerTargetDiagnosticEngine DI registration + MapDiagnosticEndpoints() route-registration call + using statement + comment (+4 LOC). prr-230 added MapExamTargetParentVisibilityEndpoint() route-registration call (+1 LOC). prr-154 + prr-159 added IfThenPlanner + PeerConfusedSignalService DI registrations + MapPeerConfusedSignalEndpoints() (+7 LOC). History: PRR-151/148/149/012/046/022/015/029/203/204/123 collectively +47 LOC from the pre-2026-04-20 legacy base."
+
+  # ---- Actor runtime (pre-2026-04-20 legacy) ----
+  - path: src/actors/Cena.Actors.Host/Program.cs
+    baseline_loc: 652
+    reason: "Actor-host composition root; extract DI/Proto bootstrap helpers is a follow-up. Serilog SessionRiskLogEnricher wiring (+1 LOC). prr-046 added AddLlmCostMetric() DI wiring (+4 LOC). prr-022 added AddPiiPromptScrubber() DI wiring (+1 LOC). prr-015 added AddMisconceptionPiiStoreRegistry().AddCanonicalMartenMisconceptionStore() chained + comment (+1 LOC). prr-020 added AddCenaRedisSessionStoreMetrics() + prr-017 added AddCenaSecretStore() (+3 LOC). prr-026 added AddKAnonymityEnforcer() (+3 LOC). prr-152 added TutorContext ErasureProjectionCascade registration + comment (+3 LOC)."
+  - path: src/actors/Cena.Actors/Sessions/LearningSessionActor.cs
+    baseline_loc: 699
+    reason: "Pre-2026-04-20 legacy; EPIC-PRR-A Sprint 1 extraction will absorb most of this"
+  - path: src/actors/Cena.Actors/Tutoring/TutorActor.cs
+    baseline_loc: 659
+    reason: "Pre-2026-04-20 legacy; split by conversation-phase handler is a follow-up. prr-145 added ADR-0045 [TaskRouting]+[AllowsUncachedLlm] attributes + rationale comment (+3 LOC). prr-046 added [FeatureTag]+ILlmCostMetric wiring + two success-path cost emissions (+18 LOC). prr-022 added IPiiPromptScrubber injection + fail-closed scrub gate in both generation paths + ADR-0047 rationale comment (+21 LOC). prr-143 added [DelegatesTraceIdTo] attribute (+1 LOC)."
+  - path: src/actors/Cena.Actors/Bus/NatsBusRouter.cs
+    baseline_loc: 594
+    reason: "Pre-2026-04-20 legacy; split by subject-group router is a follow-up"
+  - path: src/actors/Cena.Actors/Configuration/MartenConfiguration.cs
+    baseline_loc: 571
+    reason: "Pre-2026-04-20 legacy; split by aggregate-config group is a follow-up. prr-202 added ParametricTemplateDocument schema + 4 authoring events + indexes (+11 LOC)."
+  - path: src/actors/Cena.Actors/Ingest/ContentExtractorService.cs
+    baseline_loc: 523
+    reason: "Pre-2026-04-20 legacy; split by content-type extractor is a follow-up"
+  - path: src/actors/Cena.Actors/Services/EmbeddingService.cs
+    baseline_loc: 509
+    reason: "Pre-2026-04-20 legacy; split provider adapters is a follow-up"
+  - path: src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs
+    baseline_loc: 515
+    reason: "prr-031 extended with Hebrew + Arabic lexicons (3 locale × ~180 LOC tables). Extracting lexicons to partial-class sibling files is a follow-up; inline keeps the speech-rule logic colocated with the phonetic data."
+
+  # ---- Test fixtures (oversize but allowlisted; tests may shrink naturally) ----
+  - path: src/actors/Cena.Actors.Tests/Compliance/RetentionWorkerTests.cs
+    baseline_loc: 711
+    reason: "Comprehensive retention coverage; split by scenario group is a follow-up"
+  - path: src/shared/Cena.Infrastructure.Tests/Compliance/RightToErasureEndToEndTests.cs
+    baseline_loc: 593
+    reason: "E2E erasure coverage; split by phase is a follow-up"
+  - path: src/api/Cena.Admin.Api.Tests/QualityGate/QualityGateTestData.cs
+    baseline_loc: 548
+    reason: "Test-data fixtures; static data, refactor into per-category partials is a follow-up"

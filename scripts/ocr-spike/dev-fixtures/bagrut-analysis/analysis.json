@@ -1,0 +1,98 @@
+{
+  "schema_version": "1.1",
+  "analysis_kind": "corpus_structural_aggregate",
+  "generated_at": "2026-04-16T12:00:00Z",
+  "source": "scripts/ocr-spike/results/full_corpus_triage.json",
+  "summary": {
+    "total_pdfs": 182,
+    "total_pages": 5205,
+    "text_extractable_chars": 1674870,
+    "by_pdf_type": {
+      "mixed": 47,
+      "scanned_bad_ocr": 41,
+      "text": 90,
+      "encrypted": 4
+    },
+    "categories": [
+      "bagrut",
+      "sat",
+      "psychometric",
+      "geva_downloads"
+    ]
+  },
+  "per_category": {
+    "bagrut": {
+      "count": 121,
+      "pages": 3149,
+      "text_chars": 401794,
+      "by_pdf_type": {
+        "mixed": 35,
+        "scanned_bad_ocr": 16,
+        "text": 70
+      },
+      "avg_hebrew_ratio": 0.71,
+      "avg_latin_ratio": 0.173,
+      "avg_gibberish": 0.115,
+      "text_shortcut_rate": 0.579
+    },
+    "sat": {
+      "count": 7,
+      "pages": 274,
+      "text_chars": 248715,
+      "by_pdf_type": {
+        "mixed": 4,
+        "text": 3
+      },
+      "avg_hebrew_ratio": 0.0,
+      "avg_latin_ratio": 0.995,
+      "avg_gibberish": 0.005,
+      "text_shortcut_rate": 0.429
+    },
+    "psychometric": {
+      "count": 24,
+      "pages": 1441,
+      "text_chars": 951146,
+      "by_pdf_type": {
+        "text": 6,
+        "scanned_bad_ocr": 11,
+        "encrypted": 4,
+        "mixed": 3
+      },
+      "avg_hebrew_ratio": 0.19,
+      "avg_latin_ratio": 0.347,
+      "avg_gibberish": 0.296,
+      "text_shortcut_rate": 0.25
+    },
+    "geva_downloads": {
+      "count": 30,
+      "pages": 341,
+      "text_chars": 73215,
+      "by_pdf_type": {
+        "mixed": 5,
+        "text": 11,
+        "scanned_bad_ocr": 14
+      },
+      "avg_hebrew_ratio": 0.661,
+      "avg_latin_ratio": 0.308,
+      "avg_gibberish": 0.025,
+      "text_shortcut_rate": 0.367
+    }
+  },
+  "bagrut_unit_breakdown": {
+    "3u": 32,
+    "4u": 29,
+    "5u": 56,
+    "unknown": 4
+  },
+  "text_shortcut_rate": 0.495,
+  "requires_ocr_rate": 0.484,
+  "recreation_inputs": {
+    "note": "Feed this aggregate into ReferenceCalibratedGenerationService (bagrut category only — SAT/psychometric/geva are out-of-scope for Cena recreations). Per-question topic/difficulty/Bloom will be filled in by the structural analyzer (RDY-019b §2); this fixture is the outer shell + cost-model data.",
+    "topic_weights": {
+      "_pending": "Populated by the structural analyzer. Shape: { topic: { share, difficulty_dist, bloom_dist, format_dist } }"
+    }
+  },
+  "_dev_fixture": {
+    "notes": "Aggregate only — no question-level content. Covers bagrut + sat + psychometric + geva_downloads so downstream teams can see the full language/category diversity. Detailed analysis.json produced by the admin ingestion pipeline stays git-ignored under corpus/bagrut/reference/."
+  }
+}

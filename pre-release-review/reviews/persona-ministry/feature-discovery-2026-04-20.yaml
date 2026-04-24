@@ -1,0 +1,254 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  1727-line mega-index: 55 deduplicated findings (FD-001..FD-055) across
+  10 axes + competitive landscape + cross-domain innovation, merged from
+  97 raw findings via 12 parallel research streams. Cross-examined by
+  Dr. Nadia (pedagogy) and Dr. Rami (honesty). Ships 18 SHIP, 22 SHORTLIST,
+  12 DEFER, 3 REJECT. Includes a Top-10 shortlist and a Borderline-with-
+  tension table that lines up directly with Ministry-lens concerns.
+system_purpose_fit: 4
+  rationale:
+    - This doc IS the index; every axis-specific review in other
+      YAMLs traces back here. Ministry-lens concerns are well-
+      represented in the BORDERLINE table (L1677-L1693): RDY-080 on
+      FD-004/FD-025/FD-031, ADR-0003 on FD-003/FD-029, raw-Bagrut-text
+      implicitly handled (no FD proposes this).
+    - Top-10 ranks FD-036 Cultural Problems #1 (d=0.4-0.6 corrected),
+      FD-014 RTL Renderer #4 (non-negotiable), FD-040 Rubric Engine
+      #7, FD-048 Mashov #10 — all Ministry-aligned.
+    - Doc explicitly records Rami''s corrections to prior overclaims
+      (L1710-L1712) — exactly what Ministry-lens wanted.
+code_reality_check:
+  claims_verified_in_code:
+    - 'FD-002 CAS gate is ADR-0032 + src/actors/Cena.Actors/Cas/ (landed)'
+    - 'FD-014 RTL renderer aligns with non-negotiable #6 + docs/content/arabic-math-lexicon.md'
+    - 'FD-040 Bagrut rubric references partial-credit rules — canonical source pattern available via bagrut-taxonomy-review.md'
+    - 'FD-048 Mashov sync flagged unofficial API — aligns with scripts/README-bagrut-reference.md legal-posture pattern'
+    - 'BagrutTrack enum + SyllabusDocument + ChapterDocument + StudentAdvancement landed per ADR-0034'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'FD-022 "40% planning time reduction" (EJ1475735, 2024) — outside lens; flagged for cogsci'
+    - 'FD-009 Khanmigo "0.2 SD improvement" Stanford/NBER 2025 — flagged for cogsci'
+adr_alignment:
+  honored:
+    - 'ADR-0002 / ADR-0032 (FD-002, FD-028, FD-029 explicitly reference CAS gate)'
+    - 'ADR-0003 (FD-003, FD-029, FD-024 all flagged BORDERLINE on retention)'
+    - 'ADR-0034 (syllabus advancement model implicitly relied on for FD-022, FD-025, FD-027)'
+    - 'Non-negotiable #4 (no FD proposes surfacing raw Bagrut text — good)'
+    - 'Non-negotiable #6 (FD-014 RTL renderer explicit)'
+    - 'Shipgate ban (FD-035 Cooperative Competition is flagged BORDERLINE with shame risk)'
+  violated: []
+  missing_adr_needed:
+    - 'Citation-integrity ADR (flagged in finding_assessment_dr_rami review)'
+    - 'Grade-passback-scope ADR (flagged in axis_10 review)'
+    - 'Parent+teacher Bagrut-readiness framing ADR (flagged in axis_4 + axis_5 reviews)'
+    - 'Accommodations-parity ADR (flagged in axis_3 review)'
+    - 'Peer-generated-math-content gate ADR (flagged in axis_7 review)'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      BORDERLINE table (L1677-L1693) correctly captures the RDY-080
+      prediction-risk pattern across FD-004, FD-025, FD-031. Mitigations
+      listed are text-level ("disclaimer", "framing") — Ministry-lens
+      wants architecture-level enforcement (no theta in student/parent
+      DTOs, no predicted score in any passback payload, no "on track
+      for Nu" copy shippable). See axis_6, axis_4, axis_5, axis_10
+      tasks for arch tests.
+    evidence: 'feature-discovery-2026-04-20.md:L1680-L1687 (BORDERLINE table)'
+    lens_note: |
+      Ministry lens: "disclaimer" is the 2005 compliance approach.
+      2026 shipping means architecture tests.
+  - severity: P1
+    finding: |
+      Top-10 ranks FD-025 "Bagrut-Readiness Tracker" at rank #5
+      equivalent (via FD-022 Smart Lesson Planner pair). Ministry-lens
+      wants FD-025 demoted or reframed (see axis_5 F4 task) —
+      "readiness tracker" implies prediction; should be "coverage
+      tracker".
+    evidence: 'feature-discovery-2026-04-20.md:L1665 (rank 5 FD-022 mentions Bagrut tracker), L1684 (FD-025 BORDERLINE row)'
+    lens_note: |
+      Ministry lens: Top-10 is where stakeholders focus; keep the
+      prediction-risk items out or reframed.
+  - severity: P1
+    finding: |
+      FD-011 Subitizing (accessibility) and FD-012 ADHD Chunking appear
+      in the dyscalculia / accessibility coverage matrix. Ministry-
+      lens reminder (from axis_3): these are remediation content,
+      below Bagrut grade level. Must not be surfaced into the main
+      Bagrut progression for 3U/4U/5U students. Coverage matrix does
+      not mention this constraint.
+    evidence: 'feature-discovery-2026-04-20.md:L1639 (3+ dyscalculia features — FD-011, FD-012, FD-013); axis3_accessibility_accommodations_findings.md (same concern)'
+    lens_note: |
+      Ministry lens: labeling scope prevents inspectors from seeing
+      foundational-level content presented to a 12th-grade 5U student.
+  - severity: P2
+    finding: |
+      The "BORDERLINE with tension discussion" column for FD-024
+      Homework Auto-Generator lists "misconception data retention"
+      with mitigation "Weekly recalculation; 2-week max retention for
+      level profiles". 2-week retention drifts close to ADR-0003''s
+      session-scope rule. Ministry-lens wants clarification: are
+      these "level profiles" misconception data (session-scoped) or
+      calibration data (aggregate, allowed)? If misconception, 2 weeks
+      is an ADR-0003 breach.
+    evidence: 'feature-discovery-2026-04-20.md:L1683 (FD-024 row)'
+    lens_note: |
+      Ministry lens: retention periods need ADR anchoring. 2 weeks
+      for "level profiles" is probably fine if it''s per-student
+      aggregate mastery; not fine if it''s misconception details.
+  - severity: P2
+    finding: |
+      FD-048 Mashov Sync Top-10 rank #10 correctly flags unofficial
+      API. Ministry-lens task (axis_10) adds kill-switch + legal-
+      posture doc; this doc''s mitigation is only "abstraction layer
+      for migration; defensive coding" (L1693). Extend mitigation to
+      include the legal-posture doc.
+    evidence: 'feature-discovery-2026-04-20.md:L1669 (rank 10); L1693 (BORDERLINE mitigation)'
+    lens_note: |
+      Ministry lens: abstraction ≠ legal posture. Both needed.
+already_built:
+  - feature: CAS gate + gate modes + single-writer invariant
+    evidence: src/actors/Cena.Actors/Cas/ + docs/adr/0032-cas-gated-question-ingestion.md
+    note: |
+      FD-002 is largely shipped. Doc correctly treats as infrastructure.
+  - feature: Syllabus advancement model + teacher + student UIs
+    evidence: 'docs/adr/0034-syllabus-advancement-model.md:L167 (landed)'
+    note: |
+      FD-022 Smart Lesson Planner, FD-025 Bagrut Tracker, FD-027 Class
+      Health ride on this. Doc does not cite ADR-0034 — should.
+  - feature: BagrutRecreation pipeline (Phase 1A)
+    evidence: src/actors/Cena.Actors/Content/BagrutRecreation.cs (RDY-072)
+    note: |
+      FD-036 Cultural Problems should ride this, not greenfield.
+  - feature: Shipgate dark-pattern scanner
+    evidence: docs/engineering/shipgate.md
+    note: |
+      FD-035 BORDERLINE mitigation "Design review" is underspecified —
+      the scanner does this already; reference it.
+  - feature: Multi-institute tenancy (Phase 1)
+    evidence: 'memory:project_tenancy_rollout.md'
+    note: |
+      Every FD that reads/writes student data must respect tenant
+      scope; doc is silent — assume shared responsibility with
+      enterprise persona.
+duplicates_of_other_docs:
+  - 'Index doc — all 15 docs trace into or out of this; treat axes + cross-doc as contextual amplification of the index entries.'
+extracted_tasks:
+  - title: Elevate BORDERLINE RDY-080 mitigations from UI copy to architecture tests
+    priority: P1
+    estimate: L
+    suggested_assignee: claude-subagent-rdy080-arch-tests
+    queue_body: |
+      ## Goal
+      For every BORDERLINE finding flagged RDY-080 (FD-004, FD-025,
+      FD-031, and any Bagrut-passback in FD-048/FD-054), convert the
+      text-level "disclaimer / framing" mitigation into an enforced
+      architecture test. No readiness/theta/prediction field may
+      appear in:
+      - Student-facing API DTOs
+      - Parent-facing API DTOs
+      - Teacher-facing API DTOs (teacher coverage view allowed;
+        teacher-facing prediction not)
+      - Any external grade-passback payload
+
+      ## Files
+      - src/actors/Cena.Actors.Tests/Architecture/
+        RDY080PredictionSurfaceTest.cs (new)
+      - src/api/Cena.*.Tests/Architecture/ (audit all endpoints)
+      - Reuses the axis_6 theta-isolation task
+
+      ## Definition of Done
+      - Test asserts no DTO field name matches /theta|readiness|
+        predicted|likelihood|probability[- ]pass|on[- ]track/i on
+        student/parent surfaces
+      - Passes on main (likely most such fields don''t exist yet)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-rdy080-arch-tests --result "<branch>"
+    source_doc_lines: [L1680-L1687]
+  - title: Clarify FD-024 "level profile" retention vs ADR-0003
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Resolve whether FD-024 Homework Auto-Generator''s "level
+      profiles" (2-week retention mitigation) are per-student
+      misconception data (→ ADR-0003 violation, must be session-
+      scoped) or aggregate calibration data (→ allowed). If
+      misconception, revise mitigation. If aggregate, document as
+      such.
+
+      ## Files
+      - pre-release-review/feature-discovery-2026-04-20.md (revise
+        FD-024 BORDERLINE row)
+      - docs/adr/0003-misconception-session-scope.md (clarify scope
+        if needed)
+
+      ## Definition of Done
+      - FD-024 row revised with unambiguous retention semantics
+      - If misconception, retention reduced to session; if aggregate,
+        add architecture-test reference
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L1683]
+  - title: Label remediation content (FD-011, FD-012) as below-Bagrut scope
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Ensure FD-011 Subitizing Support + FD-012 ADHD Chunking + any
+      foundational-number-sense remediation content is tagged
+      `content_level: remedial` (below 3U entry) and filtered out of
+      main Bagrut progression for students on 3U/4U/5U tracks unless
+      the student has an explicit dyscalculia accommodation flag.
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Documents/ (add ContentLevel
+        enum if absent)
+      - src/actors/Cena.Actors/Mastery/AdaptiveScheduler.cs (filter
+        remedial content from non-accommodation students)
+      - Architecture test
+
+      ## Definition of Done
+      - ContentLevel enum (Remedial / Bagrut3U / Bagrut4U / Bagrut5U)
+      - Scheduler respects content level + student accommodation
+      - Test: non-accommodation 5U student never receives remedial
+        content
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L1639, L1646]
+verdict: adopt
+verdict_reason: |
+  The index is well-constructed and Ministry-aware. Borderline table is
+  largely right; just needs elevation from UI-copy mitigations to
+  architecture-enforced ones and one retention-clarity fix on FD-024.
+  All derived axis reviews reconcile back here cleanly.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      Cross-axis effect-size audits (FD-001 corrected to 0.34, FD-011
+      corrected to 0.4-0.6, FD-003 corrected to 60-80%) — verify each
+      correction is propagated wherever that number is cited.
+  - to: persona-enterprise
+    about: |
+      FD-022, FD-027, FD-048, FD-055 bounded-context placement and
+      tenancy-scope reviews.
+  - to: persona-privacy
+    about: |
+      Comprehensive BORDERLINE privacy entries (FD-033/34/35/37) —
+      privacy lens owns RDY-076 / DPA §7 adjudication.
+  - to: persona-ethics
+    about: |
+      FD-035 Cooperative Competition shame-risk, FD-009 Socratic
+      friction — ethics owns the motivation-vs-coercion line.
+  - to: persona-sre
+    about: |
+      FD-053 Offline Mode conflict resolution, FD-055 Multi-Device
+      Continuity sync architecture.

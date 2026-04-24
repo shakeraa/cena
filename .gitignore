@@ -1,0 +1,132 @@
+# ═══════════════════════════════════════════
+# Cena Platform — .gitignore
+# ═══════════════════════════════════════════
+
+# ── Tooling (Ruflo agents, hooks, MCP config — committed for reproducibility) ──
+# .claude/        ← COMMITTED (agent definitions, helpers, settings)
+# .claude-flow/   ← COMMITTED (swarm config, sessions, data)
+# .swarm/         ← COMMITTED (swarm state)
+# .mcp.json       ← COMMITTED (MCP server config)
+
+# ── IDE ──
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ── OS ──
+.DS_Store
+Thumbs.db
+
+# ── Docs assets (large/binary) ──
+docs/example-images/
+
+# ── OCR spike fixtures (reference-only, never committed) ──
+# Bagrut Ministry PDFs are public but copyright stays with MoE — per the
+# `bagrut-reference-only` memory (2026-04-15) student-facing items are
+# AI-authored CAS-gated recreations, never raw Ministry text. Fixtures
+# used for the OCR evaluation spike (RDY-019-OCR-SPIKE / t_a617c472e9f6)
+# are kept local-only.
+corpus/ocr-fixtures/
+scripts/ocr-spike/fixtures/
+scripts/ocr-spike/.venv/
+scripts/ocr-spike/results/
+scripts/ocr-spike/cache/
+scripts/ocr-spike/**/__pycache__/
+scripts/ocr-spike/.claude-flow/
+
+# ── Playwright MCP snapshots (review reference, not source) ──
+docs/reviews/playwright-mcp-snapshots/
+.playwright-mcp/
+
+# ── Secrets (NEVER commit) ──
+.env
+.env.*
+*.env
+secrets/
+credentials.json
+
+# ── Build artifacts ──
+node_modules/
+build/
+dist/
+dist-ssr/
+bin/
+obj/
+*.dll
+*.exe
+
+# ── Admin dashboard (Vuexy) ──
+src/admin/full-version/dist/
+src/admin/full-version/dist-ssr/
+src/admin/full-version/node_modules/
+src/admin/full-version/*.local
+src/admin/full-version/.env*
+!src/admin/full-version/.env.example
+
+# ── Vuexy reference (vendor copy, not committed) ──
+# Local-only reference copy of the upstream Vuexy starter kept at the repo
+# root for cross-checking during student web scaffold (STU-W-00). Never
+# committed — student web lives under src/student/full-version/.
+/full-version/
+
+# ── Multi-agent worktrees (isolated per-worker git worktrees) ──
+# Agents (claude-code, kimi-coder, sub-agents) create git worktrees under
+# these paths when claiming a task so they do not collide in the main
+# working tree. The worktrees share the repo's .git database but live on
+# disk in isolated directories. Source of truth for the convention:
+# .agentdb/QUEUE.md § "Worktrees".
+.claude/worktrees/
+.agentdb/worktrees/
+
+# ── Multi-agent task queue DB (sensitive-ish, local state) ──
+.agentdb/kimi-queue.db
+.agentdb/kimi-queue.db-shm
+.agentdb/kimi-queue.db-wal
+
+# ── .NET ──
+*.user
+*.suo
+packages/
+
+# ── Python ──
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# ── Flutter ──
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+pubspec.lock
+
+# ── Firebase ──
+firebase-debug.log
+.firebase/
+**/service-account-key.json
+**/serviceAccountKey.json
+
+# ── Logs ──
+*.log
+logs/
+
+.fake
+# RDY-019b: Ministry Bagrut reference corpus — NEVER shipped (reference-only).
+# See memory:bagrut_reference_only and ADR-0033. The scraper at
+# scripts/bagrut-scraper.py writes here; analysis.json may be committed
+# (structural summary only), but raw PDFs and extracted text must stay local.
+corpus/bagrut/reference/**
+!corpus/bagrut/reference/analysis.json
+!corpus/bagrut/reference/.gitkeep
+
+# CAS gate operator config (RDY-036): real values never ship
+config/cas-gate/cas-gate.env
+
+# RDY-032: pilot data export output (GDPR — never commit)
+data/pilot/
+
+.knowledgegraph/

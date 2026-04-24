@@ -1,0 +1,13 @@
+GOAL: Implement automated quality gate scoring pipeline that achieves >90% F1 score
+      on a labeled test set of 100 questions (50 good, 50 bad) across 7 dimensions:
+      factual accuracy, language quality, pedagogical quality, distractor quality,
+      stem clarity, Bloom's alignment, and structural validity.
+
+METRIC: dotnet test --filter QualityGate --no-build -v q
+        Outputs: F1 score (harmonic mean of precision and recall)
+        Pass threshold: overall F1 >= 0.90
+        Per-dimension accuracy tracked separately
+
+CONSTRAINT: Only modify files in src/api/Cena.Admin.Api/QualityGate/
+            Do NOT modify existing DTOs, services, or pipeline stages
+            Each iteration changes ONE scoring rule or threshold

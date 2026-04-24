@@ -1,0 +1,120 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 privacy/trust features: explainable AI rationale, student data transparency
+  dashboard, delete-my-journey, consent-revocation UX, age-appropriate privacy
+  communication, data provenance, differential privacy analytics, transparency
+  report. Heavy UX load; privacy copy must be clear in all three locales.
+system_purpose_fit: 4
+  rationale:
+    - F5 'Privacy in Your Language' directly aligns with l10n policy
+    - Consent UIs must be keyboard-accessible, screen-reader-safe
+    - Privacy dashboards surface sensitive data; color + icon must be unambiguous
+    - No dark-pattern violations
+code_reality_check:
+  claims_verified_in_code:
+    - "GDPR self-service flow test: src/student/full-version/tests/e2e/privacy-gdpr-self-service.spec.ts"
+    - "i18n for privacy copy across he/ar/en: src/student/full-version/src/plugins/i18n/locales/"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Age-appropriate privacy explanations (F5) — reading-level-tested copy not in repo"
+    - "Provenance trail UI (F6) — not prototyped"
+adr_alignment:
+  honored:
+    - "ADR-0003 (session-scoped misconceptions) — F1 explanations draw only intra-session"
+  violated: []
+  missing_adr_needed:
+    - "ADR for reading-level standard (e.g., Grade 5 Hebrew, Grade 5 Arabic equivalents) for privacy copy"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: "F5 'Privacy in Your Language' is a direct a11y/l10n feature. Doc doesn't specify the reading-level target. Without one, translations may be legally accurate but unreadable by 12-year-olds. COPPA 2025 requires age-appropriate clarity."
+    evidence: "axis9...md:F5 section"
+    lens_note: "Must pin Flesch-Kincaid or Arabic/Hebrew equivalent and CI-check copy."
+  - severity: P1
+    finding: "F2/F3/F4 consent/deletion/revocation UIs must be fully keyboard-navigable and screen-reader announced. Privacy is where the least accessible UX tends to live ('agree' buttons as links, unlabeled checkboxes)."
+    evidence: "axis9...md:F2-F4 sections"
+    lens_note: "Must pass existing aria-live-on-dynamic, heading-hierarchy, touch-target-size scanners."
+  - severity: P1
+    finding: "F6 data provenance trail ('how did you know that?') renders inference chains that may contain math (e.g., 'You solved 8/10 problems'). Inline fractions/expressions need <bdi>."
+    evidence: "axis9...md:F6 section"
+    lens_note: "'8/10' rendering inside Hebrew/Arabic without <bdi> may break left-to-right."
+  - severity: P1
+    finding: "F8 transparency report — if published as PDF, must be tagged PDF/UA with lang attribute. Public transparency reports in Israel may have legal accessibility requirements (IS 5568/WCAG parallel)."
+    evidence: "axis9...md:F8 section"
+    lens_note: "Israeli law requires AA for public-sector-adjacent content."
+  - severity: P1
+    finding: "Privacy copy must avoid banned terms even when translated (e.g., Hebrew 'אל תאבד את הנתונים שלך!' = 'don't lose your data!' is loss-aversion). Ship-gate scanner must cover privacy namespace."
+    evidence: "axis9...md (multiple features)"
+    lens_note: "Privacy copy is a common source of loss-aversion phrasing."
+  - severity: P2
+    finding: "Deletion confirmation flow (F3) — must use a destructive-action pattern that is accessible: explicit text input 'type DELETE' pattern, not just a color-coded red button."
+    evidence: "axis9...md:F3 section"
+    lens_note: "Red alone fails CVD + WCAG."
+already_built:
+  - feature: "GDPR self-service flow with e2e test"
+    evidence: "src/student/full-version/tests/e2e/privacy-gdpr-self-service.spec.ts"
+    note: "Extend rather than greenfield F2/F3/F4"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: privacy FD entries"
+  - "AXIS_10_Operational_Integration_Features.md: Feature 8 Student Data Portability Export (overlaps F3)"
+extracted_tasks:
+  - title: "Pin reading-level target for privacy copy in he/ar/en"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Decide and document the reading-level target for COPPA-appropriate privacy copy (e.g., Grade 5 Hebrew equivalent). Build a CI test that estimates reading level of privacy strings in all three locales.
+      ## Files
+      - new: docs/accessibility/privacy-reading-level.md
+      - tests/shipgate/reading-level.spec.ts
+      ## Definition of Done
+      - Target reading level pinned per locale
+      - CI test runs on privacy namespace and fails if above target
+      - Translation guidelines updated
+      ## Reporting
+      decision committed; PR merged
+    source_doc_lines: [F5 section]
+  - title: "Extend GDPR e2e test for keyboard-only and screen-reader flows"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Existing privacy-gdpr-self-service.spec.ts covers happy path. Add keyboard-only and axe-core checks for F2/F3/F4 consent/deletion/revocation UIs across all three locales.
+      ## Files
+      - src/student/full-version/tests/e2e/privacy-gdpr-self-service.spec.ts (extend)
+      - src/student/full-version/tests/e2e/a11y-keyboard-nav.spec.ts (extend)
+      ## Definition of Done
+      - All consent actions reachable and activatable via keyboard only
+      - axe-core violations = 0 on consent/deletion pages in he/ar/en
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F2-F4]
+  - title: "Ship-gate scan privacy namespace for loss-aversion translations"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Privacy namespace translations must not drift into loss-aversion framing in any locale. Extend ship-gate scanner.
+      ## Files
+      - tests/shipgate/banned-terms.spec.ts (extend to privacy namespace)
+      - src/student/full-version/src/plugins/i18n/locales/*.json (privacy.* keys)
+      ## Definition of Done
+      - Scanner covers privacy.* keys in all three locales
+      - Native-speaker review on PR
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F2, F4, F5]
+verdict: adopt
+verdict_reason: "Privacy features align with a11y/l10n goals. Three tasks ensure copy is readable at Grade 5 equivalent, consent UIs pass keyboard+SR, and loss-aversion doesn't leak via translation."
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "Differential privacy parameters and 30-day enforcement"
+  - to: persona-enterprise
+    about: "Audit trail storage architecture and tenant isolation"
+  - to: persona-sre
+    about: "Transparency report publication cadence and SLO"

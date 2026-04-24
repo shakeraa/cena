@@ -1,0 +1,77 @@
+// =============================================================================
+// Cena Platform — OCR Cascade DI registration (Infrastructure side)
+//
+//     services.AddOcrCascadeCore(configuration);
+//
+// Registers only pure-C# pieces that live in Cena.Infrastructure:
+//   - IPdfTriage → PdfTriage
+//   - ILayer3Reassemble / ILayer4ConfidenceGate / ILayer5CasValidation (brain)
+//   - ConfidenceGateOptions (bound from "Ocr:ConfidenceGate")
+//   - IOcrCascadeService (orchestrator, scoped)
+//   - TimeProvider.System
+//
+// Does NOT register any stub defaults. Callers must wire every remaining
+// dependency with a REAL implementation — per the no-stubs/production-grade
+// rule. The composition root throws at first resolution if anything is
+// missing, which is the correct failure mode.
+//
+// What the caller MUST register on top of this:
+//   - ILatexValidator         → CasRouterLatexValidator (Cena.Actors, see
+//                                AddOcrCascadeWithCasValidation)
+//   - ILayer0Preprocess       → Layer0Preprocess (Cena.Infrastructure)
+//   - ILayer1Layout           → SuryaSidecarClient (Cena.Infrastructure)
+//   - ILayer2aTextOcr         → TesseractLocalRunner (Cena.Infrastructure)
+//   - ILayer2bMathOcr         → Pix2TexSidecarClient (Cena.Infrastructure)
+//   - ILayer2cFigureExtraction → Layer2cFigureExtraction (Cena.Infrastructure)
+//   - IMathpixRunner           → MathpixRunner (optional; only if API keys set)
+//   - IGeminiVisionRunner      → GeminiVisionRunner (optional; only if key set)
+// =============================================================================
+
+using Cena.Infrastructure.Ocr.Layers;
+using Cena.Infrastructure.Ocr.Observability;
+using Cena.Infrastructure.Ocr.PdfTriage;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+
+namespace Cena.Infrastructure.Ocr.DependencyInjection;
+
+public static class OcrServiceCollectionExtensions
+{
+    public static IServiceCollection AddOcrCascadeCore(
+        this IServiceCollection services,
+        IConfiguration? configuration = null)
+    {
+        services.TryAddSingleton<IPdfTriage, Cena.Infrastructure.Ocr.PdfTriage.PdfTriage>();
+
+        // Real concrete layers — no stubs.
+        services.TryAddSingleton<ILayer0Preprocess, Layer0Preprocess>();
+        services.TryAddSingleton<ILayer2cFigureExtraction, Layer2cFigureExtraction>();
+        services.TryAddSingleton<ILayer3Reassemble, Layer3Reassemble>();
+        services.TryAddSingleton<ILayer4ConfidenceGate, Layer4ConfidenceGate>();
+        services.TryAddSingleton<ILayer5CasValidation, Layer5CasValidation>();
+
+        var gateOptions = new ConfidenceGateOptions();
+        configuration?.GetSection("Ocr:ConfidenceGate").Bind(gateOptions);
+        services.TryAddSingleton(gateOptions);
+
+        var layer0Options = new Layer0PreprocessOptions();
+        configuration?.GetSection("Ocr:Layer0").Bind(layer0Options);
+        services.TryAddSingleton(layer0Options);
+
+        var figureStorage = new FigureStorageOptions();
+        configuration?.GetSection("Ocr:FigureStorage").Bind(figureStorage);
+        services.TryAddSingleton(figureStorage);
+
+        services.TryAddScoped<IOcrCascadeService, OcrCascadeService>();
+        services.TryAddSingleton(TimeProvider.System);
+
+        // RDY-OCR-OBSERVABILITY (Phase 4): OcrMetrics Meter registration.
+        // Hosts must ALSO call .AddMeter("Cena.Infrastructure.Ocr") on their
+        // OpenTelemetry MeterProvider so the counters+histograms are
+        // exported. The Meter name is OcrMetrics.MeterName.
+        services.TryAddSingleton<OcrMetrics>();
+
+        return services;
+    }
+}

@@ -1,0 +1,180 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Mega-index of 55 findings (FD-001 through FD-055) synthesizing the 10 axis
+  research docs + competitive + cross-domain. Executive summary L11-21 claims
+  18 SHIP / 22 SHORTLIST / 12 DEFER / 3 REJECT after cross-examination.
+system_purpose_fit: 3
+  rationale:
+    - This is the index — ethics findings are distributed across the axis
+      YAMLs I've already written. Per SUPERPROMPT L123: "Don't duplicate
+      feature-discovery-2026-04-20.md findings into axis docs if the index
+      covers them — mark as duplicates_of_other_docs."
+    - The reverse also applies: findings I raised on axis docs ARE the
+      authoritative ethics-lens findings on their FD-XXX counterparts here
+    - One ethics-lens note specific to the index: its cross-examination
+      process (Dr. Nadia + Dr. Rami) did NOT include an ethics/dark-pattern
+      reviewer. Axis 7 Feature 3 (FD-035 here) proposes confetti — Nadia
+      and Rami both missed this because they don't review shipgate; ethics
+      lens catches it.
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code:
+    - "L21 Executive Summary claims '8 BORDERLINE features where the tension with GD-004 / ADR-0003 / RDY-080 deserves explicit discussion' — ethics lens audit identifies ~12 such findings, not 8; the index under-counts"
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - "Index explicitly cross-references GD-004 / ADR-0003 / RDY-080 per finding"
+  violated: []
+  missing_adr_needed:
+    - "Cross-examination process should include an ethics/dark-pattern
+      reviewer by default, not only pedagogy + statistics"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      The "cross-examination" process at L7 (Nadia pedagogy + Rami
+      statistics) omits an ethics/dark-pattern lens. This is why
+      FD-035 Team Challenges (Axis 7 F3) passes the index's filter
+      while containing explicit shipgate violations (confetti,
+      "pyramid collapses" loss-framing, Bronze/Silver/Gold tiers).
+      Recommendation: future discovery cycles must include an
+      ethics reviewer (persona-ethics or equivalent) in the cross-
+      examination panel.
+    evidence: feature-discovery-2026-04-20.md:L5, L21
+    lens_note: |
+      Process gap. Three-lens review (pedagogy + statistics +
+      ethics) is the minimum for a minor-education product with a
+      shipgate.
+  - severity: P1
+    finding: |
+      FD-050 Learning Energy Tracker (L1473) and FD-051 Calm
+      Breathing Opener (L1500) both touch mood/affect of minors.
+      Index lists them as "Quick wins <2 engineer-weeks" (L19).
+      Ethics lens strongly advises these are NOT quick wins until
+      PPA consultation and DPIA completed (see axis3, cross_domain
+      findings). Velocity ranking in the index masks regulatory
+      work.
+    evidence: feature-discovery-2026-04-20.md:L19
+    lens_note: |
+      Engineering effort is not the only effort. Legal/privacy
+      work for mood data on minors is substantial.
+  - severity: P2
+    finding: |
+      The Top-10 Shortlist (L1658-L1669) ranks FD-036 Cultural
+      Context #1 but does not carry forward Dr. Rami's REJECT of
+      the 1.16 effect size. The reader of the index may take the #1
+      ranking as an endorsement of the claim, not just the feature.
+      Add provenance note: "Ranked #1 for equity impact; effect
+      size claim under revision per Rami (see finding_assessment_
+      dr_rami.md)."
+    evidence: feature-discovery-2026-04-20.md:L1660
+    lens_note: |
+      Summary rankings lose context unless explicitly carrying
+      critique.
+  - severity: P2
+    finding: |
+      Executive summary (L21) claims "8 BORDERLINE features"
+      deserve explicit discussion. Ethics lens audit of the 55
+      findings identifies BORDERLINE flags in: FD-003 (ADR-0003),
+      FD-004 (RDY-080), FD-009 (autonomy), FD-012 (ADHD),
+      FD-014 (XAI evidence), FD-017-21 (parent surveillance
+      vectors), FD-025 (Bagrut readiness pressure), FD-028 (AI
+      grading DPA §7), FD-031 (Crisis Mode UX), FD-035 (P0 shipgate
+      — cooperative competition), FD-046 (student XAI framing),
+      FD-050/051 (mood data). That's ~12-15, not 8.
+    evidence: feature-discovery-2026-04-20.md:L21
+    lens_note: |
+      Under-counting BORDERLINEs suggests the review pipeline
+      doesn't catch all of them; ethics lens adds ~4-7 more.
+already_built:
+  - feature: "Shipgate CI scanner"
+    evidence: scripts/shipgate/scan.mjs
+    note: "The 'explicit discussion' of BORDERLINE ADR/GD-004 tensions is
+      partially already enforced at CI — the scanner catches banned terms.
+      The index should cite the scanner as the baseline."
+duplicates_of_other_docs:
+  - "ALL 55 findings duplicate the 9 axis docs + competitive + cross-domain"
+  - "All FD-XXX numbered findings map back to features I've already reviewed in axis YAMLs"
+extracted_tasks:
+  - title: "Add ethics reviewer to future discovery-cycle cross-examination"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Formalize: every future broad feature-discovery cycle requires
+      at minimum three cross-examination lenses:
+      (1) Pedagogy (Nadia)
+      (2) Statistics / measurement integrity (Rami)
+      (3) Ethics / dark-pattern / shipgate (new: persona-ethics or
+          equivalent)
+      Cycles that skip ethics review cannot advance past
+      "research-complete" status.
+      ## Files
+      - docs/engineering/feature-discovery-process.md (new)
+      - .github/ISSUE_TEMPLATE/feature-discovery.md (update)
+      ## Definition of Done
+      - Process doc accepted
+      - Template updated
+      - Next discovery cycle uses three-lens review
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L5, L21]
+  - title: "Re-audit 55 findings BORDERLINE count with ethics lens"
+    priority: P2
+    estimate: M
+    suggested_assignee: claude-subagent-ethics-audit
+    queue_body: |
+      ## Goal
+      Per-finding ethics audit: walk through all 55 FD-XXX and
+      produce a canonical BORDERLINE list reflecting ethics +
+      pedagogy + statistics lenses combined. Update
+      feature-discovery-2026-04-20.md executive summary with
+      corrected count. Publish rationale doc.
+      Read .agentdb/AGENT_CODER_INSTRUCTIONS.md before claiming.
+      Worker name: claude-subagent-ethics-audit.
+      ## Files
+      - pre-release-review/reviews/borderline-audit.md (new)
+      - pre-release-review/feature-discovery-2026-04-20.md (update L21)
+      ## Definition of Done
+      - Audit doc enumerates each BORDERLINE with reason + owning axis YAML reference
+      - Index exec summary count corrected
+      - Every BORDERLINE links to its ethics YAML finding
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-ethics-audit --result "<branch>"
+    source_doc_lines: [L21]
+  - title: "Top-10 Shortlist: carry-forward critique annotation"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add to each entry in the index's Top-10 Shortlist (L1658-L1669)
+      a one-line provenance annotation noting any cross-examiner
+      REJECT or WARNING. Example: "FD-036 — Culturally-Contextualized
+      (NOTE: ES 1.16 claim under revision — see finding_
+      assessment_dr_rami.md)."
+      ## Files
+      - pre-release-review/feature-discovery-2026-04-20.md
+      ## Definition of Done
+      - Each Top-10 entry cross-references Rami + Nadia + ethics reviews
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L1658-L1669]
+verdict: revise
+verdict_reason: |
+  The index is structurally sound but missing an ethics reviewer
+  in the cross-examination process. Revise to: add ethics lens to
+  future cycles, re-audit BORDERLINE count, carry-forward critique
+  annotations in the Top-10. Zero ethics retires here that aren't
+  already documented in axis YAMLs; zero new features to ship —
+  this is pure index housekeeping.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "55 findings — primary pedagogy lens"
+  - to: persona-enterprise
+    about: "Index as system-level feature map — alignment with ADR-0012 bounded contexts"
+  - to: persona-sre
+    about: "FD-053 Offline mode, FD-055 Multi-device continuity — SLOs and rollback"

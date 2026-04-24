@@ -1,0 +1,108 @@
+# ============================================================================
+# Cena OCR Cascade — Prometheus alert rules (RDY-OCR-OBSERVABILITY / Phase 4)
+#
+# Import into Prometheus via `rule_files` in prometheus.yml. The alerts fire
+# on metrics emitted by Cena.Infrastructure.Ocr.Observability.OcrMetrics.
+#
+# Runbook links assume the ops repo at /docs/ops/runbooks. Adjust per deploy.
+# ============================================================================
+groups:
+  - name: cena-ocr-cascade
+    interval: 30s
+    rules:
+
+      # --------------------------------------------------------------------
+      # High error rate on Surface A (student). Surface A is latency+
+      # quality critical — an error_rate above 10% for 5 minutes is a
+      # page-now condition.
+      # --------------------------------------------------------------------
+      - alert: OcrCascadeHighErrorRateSurfaceA
+        expr: |
+          (
+            sum(rate(ocr_cascade_requests_total{surface="A", outcome=~"low_conf|cas_fail|circuit_open|input_err"}[5m]))
+            /
+            sum(rate(ocr_cascade_requests_total{surface="A"}[5m]))
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: page
+          service: ocr-cascade
+          surface: student
+        annotations:
+          summary: "OCR cascade Surface A error_rate > 10% (5m)"
+          description: "{{ $value | humanizePercentage }} of student-facing OCR calls returned an error outcome over the last 5 minutes. Check Grafana → OCR Cascade dashboard for layer latency + fallback rate. Runbook: /docs/ops/runbooks/ocr-cascade-errors.md"
+
+      # --------------------------------------------------------------------
+      # p95 latency on Surface A. We budget 15 s end-to-end for student photo
+      # interactive calls (ADR-0033). Alert fires after 5m sustained.
+      # --------------------------------------------------------------------
+      - alert: OcrCascadeHighLatencySurfaceA
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(ocr_cascade_total_latency_milliseconds_bucket{surface="A"}[5m]))
+          ) > 15000
+        for: 5m
+        labels:
+          severity: warn
+          service: ocr-cascade
+          surface: student
+        annotations:
+          summary: "OCR cascade Surface A p95 latency > 15 s (5m)"
+          description: "p95 = {{ $value | humanizeDuration }}ms. Likely causes: cloud fallback firing (Mathpix/Gemini), sidecar slow to respond, or backlog in Layer 1 Surya."
+
+      # --------------------------------------------------------------------
+      # CAS failure spike — indicates content drift or a regression in
+      # the math OCR layer. Fires when more than 20% of cascade outcomes
+      # are cas_fail over a 10m window.
+      # --------------------------------------------------------------------
+      - alert: OcrCasFailureSpike
+        expr: |
+          (
+            sum(rate(ocr_cascade_requests_total{outcome="cas_fail"}[10m]))
+            /
+            sum(rate(ocr_cascade_requests_total[10m]))
+          ) > 0.20
+        for: 10m
+        labels:
+          severity: warn
+          service: ocr-cascade
+        annotations:
+          summary: "OCR CAS failure rate > 20% (10m)"
+          description: "Either a math OCR regression or a content population shift. Compare ocr.cas.verdicts{verdict=failed} vs recent baseline; inspect sample items in the admin review queue."
+
+      # --------------------------------------------------------------------
+      # Layer-4 cloud fallbacks firing at > 40% — both Mathpix and Gemini
+      # Vision are paid services; sustained high fallback usage means our
+      # local layers (Surya + Tesseract + pix2tex) are producing low-conf
+      # results at a cost cliff.
+      # --------------------------------------------------------------------
+      - alert: OcrFallbackOverReliance
+        expr: |
+          (
+            sum(rate(ocr_cascade_fallbacks_fired_total[15m]))
+            /
+            sum(rate(ocr_cascade_requests_total{outcome="ok"}[15m]))
+          ) > 0.40
+        for: 15m
+        labels:
+          severity: info
+          service: ocr-cascade
+        annotations:
+          summary: "OCR cloud fallbacks firing on > 40% of requests (15m)"
+          description: "Local cascade layers are not meeting the τ = 0.65 confidence gate. Investigate Layer 1 Surya model drift, Layer 2a Tesseract language packs, or sidecar health."
+
+      # --------------------------------------------------------------------
+      # Human-review backlog — both surfaces. An elevated flag rate often
+      # precedes a student support ticket surge.
+      # --------------------------------------------------------------------
+      - alert: OcrHumanReviewSurge
+        expr: |
+          sum(rate(ocr_human_review_flagged_total[30m])) > 5
+        for: 30m
+        labels:
+          severity: info
+          service: ocr-cascade
+        annotations:
+          summary: "OCR human-review flags rising (> 5/s, 30m)"
+          description: "Admin review queue is growing. Verify curator capacity or investigate whether a specific content_type is driving the flags."

@@ -1,0 +1,221 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 7 collaboration features: anonymized peer explanation circles, teacher-mediated
+  micro groups, team-vs-challenge cooperative competitions, async anonymous Q&A with peer
+  endorsement, "I'm confused too" anonymous signal, reciprocal peer tutoring matcher,
+  collaborative math whiteboard with teacher oversight. Explicitly cites RDY-076 compliance,
+  two-sided consent, ephemeral design, anonymization.
+
+system_purpose_fit: 4
+  rationale:
+    - Two-sided consent + ephemeral design (24h) are correct patterns
+    - Anonymization architecture shown in Feature 1 with random avatars
+    - Voice capture risk acknowledged with voice-distortion filter
+    - No existing peer-interaction code in src/ — greenfield privacy risk surface
+
+code_reality_check:
+  claims_verified_in_code:
+    - "StudentRecordAccessLog + StudentDataAuditMiddleware exist for cross-student access logging -> src/shared/Cena.Infrastructure/Compliance/StudentDataAuditMiddleware.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "All peer features greenfield; privacy infrastructure (consent states, ephemeral storage) does not exist"
+    - "Voice recording + automated content scanning for names/phone — proposed, not built"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (session scope — features don't attempt misconception profiles)
+    - Tenant isolation implicit (peers within same institute)
+  violated: []
+  missing_adr_needed:
+    - "ADR for peer-to-peer data flows — consent chain, anonymization guarantees, TTL, moderation"
+    - "ADR for voice data processing (Feature 1) — biometric-adjacent per COPPA 2025"
+    - "ADR for cross-tenant peer matching (can Arab school peer with Jewish school?) — community-context sensitive"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 1 voice recordings of minors are biometric-adjacent per COPPA 2025 Final Rule
+      which explicitly expanded "personal information" to include voiceprints. "Light voice
+      distortion filter" is insufficient — voice-recognition-based de-anonymization is
+      trivial at any consumer-grade distortion level. Voice should be banned outright for
+      under-16, and opt-in-only for 16+ with explicit biometric-data consent purpose.
+    evidence: "AXIS_7_Collaboration_Social_Features_Cena.md:95-97 + axis9_data_privacy_trust_mechanics.md:392 (COPPA 2025 biometric expansion)"
+    lens_note: |
+      COPPA 2025 + Israel PPL + PPA AI opinion all converge: voice of minors is elevated
+      biometric category. Text-only collaboration is the compliant default.
+
+  - severity: P0
+    finding: |
+      Feature 1 matches students across the platform by concept-id. If cross-tenant (Arab
+      school <-> Jewish school, or Hasidic <-> secular), community-context sensitive data
+      (religious identity inferred from name pattern, cultural references in voice/text)
+      leaks across community boundaries without consent for cross-community interaction.
+      Must be explicitly tenant-scoped (default) with cross-tenant opt-in.
+    evidence: "AXIS_7_Collaboration_Social_Features_Cena.md:59-71 (matching architecture)"
+    lens_note: |
+      Israeli multi-sector school system (Jewish state, Jewish religious, Arab, Arab
+      Christian, Haredi) means cross-sector peer matching has community-relations
+      implications beyond privacy alone. Tenant-scope by default.
+
+  - severity: P1
+    finding: |
+      "Automated content scanning for names, phone numbers, school references" (Feature 1
+      mitigation L97) needs to process student free-text/voice before human moderators see
+      it, which means an automated PII-detection + potentially LLM-based content moderation
+      pipeline handling minors' data. Needs: (a) PII detector runs locally (no external API);
+      (b) if LLM used for moderation, ZDR required; (c) moderator access is logged.
+    evidence: "AXIS_7_Collaboration_Social_Features_Cena.md:97"
+    lens_note: |
+      Moderation infrastructure can itself become a PII-amplification surface.
+
+  - severity: P1
+    finding: |
+      Features 2 (teacher-mediated micro groups), 6 (peer tutoring matcher), 7 (collab
+      whiteboard with teacher oversight) all introduce teacher-visible peer-interaction
+      data. Teacher is trusted but not data-controller; must be:
+      - logged (who saw what, when)
+      - scoped to teacher's own class
+      - retention-limited (ephemeral unless teacher explicitly saves a moderation incident)
+    evidence: "AXIS_7_Collaboration_Social_Features_Cena.md:25-29 (feature table)"
+    lens_note: |
+      Teacher-as-moderator surface is common in EdTech privacy incidents; audit by default.
+
+  - severity: P1
+    finding: |
+      Feature 5 ("I'm Confused Too" anonymous signal) — anonymity is trivially broken in
+      small classes. If 3 students signal "I'm confused" in a class of 15, and 2 of them
+      have obvious engagement signals (screen activity), teacher can reverse-identify.
+      Need k-anonymity (min 5 signals before display) OR explicit design that never
+      shows signal count to teacher.
+    evidence: "AXIS_7_Collaboration_Social_Features_Cena.md:26-27"
+    lens_note: |
+      "Anonymous to peers" ≠ "anonymous in classroom context".
+
+  - severity: P2
+    finding: |
+      Feature 4 (Async Anonymous Q&A with Peer Endorsement) retains Q&A content.
+      Retention window unspecified. Needs explicit TTL + erasure-cascade inclusion.
+    evidence: "AXIS_7_Collaboration_Social_Features_Cena.md:26"
+    lens_note: |
+      Every new content table = new retention + erasure surface.
+
+already_built: []
+
+duplicates_of_other_docs: []
+
+extracted_tasks:
+  - title: "Ban voice-capture for under-16 + biometric consent for 16+ (Feature 1)"
+    priority: P0
+    estimate: S
+    suggested_assignee: claude-subagent-compliance
+    queue_body: |
+      ## Goal
+      Text-only default for peer explanations. Voice-capture only for 16+ with explicit
+      ProcessingPurpose.BiometricVoiceCollaboration consent + ZDR on voice processing.
+      Voice distortion is NOT a compliant anonymization for COPPA 2025.
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs
+      - ADR: docs/adr/NNNN-biometric-data-policy.md
+      - Feature 1 implementation (future): voice disabled for <16
+
+      ## Definition of Done
+      - ADR bans biometric collection for <16
+      - 16+ requires explicit opt-in with parent co-consent if <18
+      - Privacy page lists voice processing vendor (if any)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-compliance --result "<branch>"
+    source_doc_lines: ["L95-97"]
+
+  - title: "Tenant-scope-by-default for peer matching + explicit cross-tenant opt-in"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Peer-matching queries scoped to tenant (institute) by default. Cross-tenant match
+      requires explicit ProcessingPurpose.CrossTenantPeerMatching + parent co-consent.
+
+      ## Files
+      - Feature 1-7 matching services (future)
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs
+      - Tenant scope middleware
+
+      ## Definition of Done
+      - Default match scope = institute_id = student.institute_id
+      - Cross-tenant requires explicit consent + tenant-admin approval
+      - Test for cross-tenant accidental match
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L59-71"]
+
+  - title: "k-anonymity floor for classroom anonymous signals (Feature 5)"
+    priority: P1
+    estimate: XS
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      "I'm confused too" signal display to teacher requires minimum N signals (default 5)
+      before count shown. Below threshold: show blurred "multiple students".
+
+      ## Definition of Done
+      - Signal aggregator enforces min-cohort threshold
+      - Small-class scenario tested
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L26-27"]
+
+  - title: "Audit + retention for teacher-moderator peer-interaction reads"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Features 2/6/7 expose peer content to teachers. Wrap in StudentDataAuditMiddleware
+      + TTL on peer content (24h matches Feature 1 explanation standard).
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Compliance/StudentDataAuditMiddleware.cs
+      - RetentionWorker add category PeerCollaborationContent (24h default, 7d hard cap)
+
+      ## Definition of Done
+      - All peer endpoints instrumented
+      - Retention category added
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L25-29"]
+
+verdict: revise
+verdict_reason: |
+  Peer-learning is the highest-risk category in the corpus. Features are thoughtfully
+  designed with consent + ephemeral patterns, but voice data (Feature 1) crosses the
+  COPPA 2025 biometric line; cross-community matching needs explicit tenant-gating.
+  After P0 tasks, Features 2/3/5 are shippable; Features 1/6/7 need deeper DPIA.
+
+cross_lens_handoff:
+  - to: persona-redteam
+    about: |
+      Peer features = largest new attack surface. Cross-tenant leak, prompt-injection
+      via peer explanations, voice-recognition deanonymization.
+  - to: persona-ethics
+    about: |
+      Team-vs-challenge competitions — does "cooperative competition" drift into
+      comparative shame territory? Lens check.
+  - to: persona-educator
+    about: |
+      Pedagogical value of Peer Instruction (Mazur) in a Bagrut context vs Israeli classroom norms.
+  - to: persona-a11y
+    about: |
+      Voice-based peer explanations fail for deaf/HoH students; text must be default.
+  - to: persona-enterprise
+    about: |
+      Cross-aggregate peer matching implies event-driven coordination spanning multiple
+      StudentState aggregates — ADR-0012 concern.

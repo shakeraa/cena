@@ -1,0 +1,101 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight accessibility features (subitizing trainer, interactive number line, digital graph paper, ADHD focus/chunking,
+  color-blind palette, MathML screen-reader pipeline, Arabic RTL renderer, anxiety-reducing UI). Heavy on client-side rendering
+  + a11y wiring; low backend weight except for MathML pipeline.
+system_purpose_fit: 4
+  rationale:
+    - Aligns with non-negotiable 6 (PWA-first, RTL w/ bdi).
+    - No SLO / rollout plan per feature; a11y regressions are often invisible until a user files.
+code_reality_check:
+  claims_verified_in_code:
+    - "Existing a11y CI workflow -> .github/workflows/a11y-tests.yml"
+    - "A11y e2e + unit test scaffolds -> src/student/full-version/tests/e2e/a11y-full-page-scan.spec.ts; tests/unit/AnswerFeedback.a11y.spec.ts"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Color-blind-safe palette tokens — no contrast audit artifact referenced"
+    - "MathML + SpokenMath Hebrew/Arabic speech rules — no speech-rule-engine dependency in package.json visible"
+adr_alignment:
+  honored: [Non-negotiable 6 (PWA + RTL); primary color lock]
+  violated: []
+  missing_adr_needed:
+    - "Screen-reader speech-rule localization source-of-truth (Hebrew/Arabic MathML)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Arabic RTL math renderer (Feature 7) is the classic spot where we drop <bdi dir="ltr"> around equations. Any regression
+      gives reversed equations (a bug the user has personally caught). Need a Playwright snapshot test that fails on missing bdi.
+    evidence: axis3_accessibility_accommodations_findings.md Feature 7; user memory: feedback_math_always_ltr.md
+    lens_note: Visual regression must run on every PR touching math rendering.
+  - severity: P1
+    finding: |
+      ADHD Focus Session (Feature 4) changes session length to 10-minute micro-sessions. That multiplies session-start count by ~3x.
+      Capacity model + SignalR connection churn plan must be updated; otherwise exam-week fan-out overwhelms hubs.
+    evidence: axis3_accessibility_accommodations_findings.md Feature 4
+    lens_note: Session design changes always have a throughput tail.
+  - severity: P1
+    finding: |
+      MathML Pipeline (Feature 6) depends on a speech rule engine at render time. If this engine fails offline, screen reader users
+      get raw LaTeX — worse than no change. Needs a graceful fallback (pre-rendered speech strings cached in SW).
+    evidence: axis3_accessibility_accommodations_findings.md Feature 6
+    lens_note: A11y features regressing silently is an incident-class failure.
+  - severity: P2
+    finding: |
+      "Anxiety-reducing UI" and "focus mode" toggles need a per-tenant default config that IT admins can preset. Otherwise each
+      school re-learns the toggle.
+    evidence: axis3_accessibility_accommodations_findings.md Feature 8
+    lens_note: Operational rollout detail — preset defaults avoid support tickets.
+already_built:
+  - feature: A11y CI pipeline
+    evidence: .github/workflows/a11y-tests.yml
+    note: New a11y features must extend this workflow, not bypass it.
+  - feature: A11y unit/e2e test scaffolds
+    evidence: src/student/full-version/tests/**/a11y*
+    note: Reuse for palette + RTL snapshot tests.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-012..FD-016 (ADHD, color-blind, RTL, MathML, calm mode)."
+extracted_tasks:
+  - title: Add RTL <bdi dir="ltr"> regression guard to a11y CI
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Block merges that render math outside a bdi-ltr wrapper in RTL pages. Playwright snapshot + DOM assertion.
+      ## Files
+      .github/workflows/a11y-tests.yml
+      src/student/full-version/tests/e2e/ (new: math-bdi-guard.spec.ts)
+      ## Definition of Done
+      - Test fails if any math expr lacks bdi ancestor on RTL page
+      - Passes on current main
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/rtl-bdi-guard"
+    source_doc_lines: []
+  - title: Model capacity impact of 10-minute ADHD sessions (SignalR fan-out, session starts/sec)
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Update load model to assume 3x session-start rate; re-run cas-load-nightly to confirm SLO; add headroom to HPA.
+      ## Files
+      .github/workflows/cas-load-nightly.yml, e2e-load-nightly.yml
+      deploy/helm/cena/templates/student-hpa.yaml
+      docs/ops/runbooks/exam-day-capacity.md (if exists, extend)
+      ## Definition of Done
+      - Load test passes at new rate x1.5
+      - HPA tuned, alerts reviewed
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/adhd-capacity"
+    source_doc_lines: []
+verdict: revise
+verdict_reason: |
+  A11y direction is correct; SRE needs capacity model + regression guard + SW fallback before SHIP.
+cross_lens_handoff:
+  - to: persona-a11y
+    about: speech-rule engine choice + bdi-ltr enforcement.
+  - to: persona-finops
+    about: ADHD 3x session rate cost envelope.

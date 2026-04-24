@@ -1,0 +1,114 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Rami's statistical honesty + measurement integrity assessment of the
+  20 feature findings. 9 PASS, 8 WARNING, 3 REJECT (FD-003 fabricated 95%,
+  FD-008 Yu et al. 2026 unverifiable citation + DPA §7, FD-011 cherry-picked
+  ES 1.16). Red-team lens: governance + reputational security.
+system_purpose_fit: 5
+  rationale:
+    - Directly enforces non-negotiable 4 (Bagrut reference-only) via RDY-080
+    - Directly enforces ADR-0003 by flagging FD-003 implications
+    - Fabricated-citation flag is a reputational security finding
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - ADR-0003 — FD-003 REJECT
+    - RDY-080 — FD-004 WARNING
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations:
+  - "2 (misconception session scope) — FD-003 would violate as cited"
+  - "4 (Bagrut reference-only / no prediction) — FD-004 WARNING"
+persona_findings:
+  - severity: P0
+    finding: |
+      FD-008 REJECT (Yu et al. 2026 non-existent citation) is both an
+      evidence integrity issue AND a security governance issue. Shipping a
+      feature with fabricated academic backing is a litigation/press risk in
+      a regulated exam-prep market and, if the feature is AI grading, feeds
+      student data into a pipeline with no real provenance for the 90%
+      agreement claim. RED-TEAM POSITION: hard block until citation replaced
+      with a verifiable one AND DPA §7 impact assessment completed.
+    evidence: pre-release-review/finding_assessment_dr_rami.md FD-008
+    lens_note: Audit trail hygiene; regulators notice fabricated citations faster than users.
+  - severity: P0
+    finding: |
+      FD-003 REJECT — aligns with ADR-0003 enforcement. Red-team extension:
+      any "real-time misconception tagging" that is NOT backed by a
+      RetentionWorker-registered store with strict TTL should be blocked at
+      code review. This is the enforcement side of Dr. Rami's verdict.
+    evidence: pre-release-review/finding_assessment_dr_rami.md FD-003
+    lens_note: Pairs with my axis6 P1 RetentionWorker-coverage task.
+  - severity: P1
+    finding: |
+      FD-004 WARNING on IRT-CAT Bagrut prediction — RDY-080 is authoritative.
+      Red-team extension: any numeric readiness output that can be
+      reverse-engineered into a Bagrut score prediction is a reputational
+      attack surface. Must be bounded to ordinal/categorical (e.g., "ready /
+      nearly / not yet") with no numeric value exposed.
+    evidence: pre-release-review/finding_assessment_dr_rami.md FD-004
+    lens_note: Data-shape control as security control.
+  - severity: P2
+    finding: |
+      FD-011 REJECT (cherry-picked ES 1.16) — cultural context generator. Red
+      team cross-ref: axis8 F5 cultural context has a separate stereotype
+      risk. Evidence quality problem is tracked by Dr. Rami; stereotype
+      problem is tracked in my axis8.
+    evidence: pre-release-review/finding_assessment_dr_rami.md FD-011
+    lens_note: Two separate risks; both must be addressed.
+already_built: []
+duplicates_of_other_docs:
+  - "cena_dr_nadia_pedagogical_review_20_findings.md — same FDs different lens"
+  - "feature-discovery-2026-04-20.md — original findings"
+extracted_tasks:
+  - title: Hard-block rule — no feature ships on a REJECTED-for-evidence citation
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Add to ship-gate: a feature with Dr. Rami REJECT verdict for evidence
+      integrity cannot enter the queue until citation is replaced AND
+      re-reviewed. Encode in docs/engineering/shipgate.md.
+      ## Files
+      - docs/engineering/shipgate.md
+      ## Definition of Done
+      - [ ] New rule committed
+      - [ ] Covers FD-008, FD-011, FD-003 explicitly
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L24-L27, L51-L65]
+  - title: Bound Bagrut-readiness outputs to ordinal categories (no numerics)
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Any UI/API that exposes "readiness" for Bagrut returns one of
+      {not_ready, developing, nearly_ready, ready} with no numeric backing.
+      ## Files
+      - future F4 FD-004 endpoint
+      - tests
+      ## Definition of Done
+      - [ ] No numeric readiness in responses
+      - [ ] Translations locked to 4 tokens
+      - [ ] Unit test asserts value is in enum
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L20]
+verdict: adopt
+verdict_reason: |
+  Dr. Rami's verdicts align with Cena non-negotiables. Red-team adds
+  shipgate enforcement + numeric-output bound to operationalize them.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: FD-004 readiness vs RDY-080
+  - to: persona-privacy
+    about: FD-003 + FD-008 data protection implications
+  - to: persona-cogsci
+    about: Evidence provenance is Kenji's lens; I only flag it as a governance red-team concern

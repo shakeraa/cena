@@ -1,0 +1,164 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Rami's statistical-honesty cross-examination of the 20 SHIP-recommended
+  findings. 9 PASS, 8 WARNING, 3 REJECT. Focused on effect-size cherry-picking,
+  cited-citation verifiability, RDY-080 (no Bagrut score prediction), ADR-0003
+  (no persistent misconception data), and DPA §7 (no ML training on student
+  responses). This is the corpus's evidence-honesty canon.
+system_purpose_fit: 5
+  rationale:
+    - Dr. Rami's framework directly maps to Cena's non-negotiables (ADR-0002,
+      ADR-0003, RDY-080, non-neg 3 dark patterns).
+    - The three REJECTs (FD-003 fabricated 95%, FD-008 Yu 2026 unverifiable,
+      FD-011 d=1.16 cherry-picked) are exactly the citation-hygiene failures
+      a cogsci lens also catches. Full concurrence.
+    - Dr. Rami's WARNINGs on FD-001 (d=0.34 not 0.5-0.8) and FD-006 (Foster
+      2021 null achievement result) are evidence-discipline essentials.
+code_reality_check:
+  claims_verified_in_code:
+    - "ADR-0003 session-scope boundary correctly cited in FD-003 reject rationale"
+    - "RDY-080 Bagrut-prediction concern correctly invoked against FD-004"
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+  claims_unsupported_in_literature: []
+adr_alignment:
+  honored:
+    - ADR-0002 (implicitly — no finding reviewed as bypassing CAS)
+    - ADR-0003 (explicit in FD-003 reject)
+    - RDY-080 (explicit in FD-004, FD-020)
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Dr. Rami's FD-003 REJECT (fabricated 95% misconception-resolution figure)
+      is a first-order corpus-quality finding: the exact number is re-cited in
+      AXIS_6_Assessment_Feedback_Research.md:226 and feature-discovery-2026-04-20.md.
+      SYNTHESIS.md must propagate the REJECT/revision across all docs that
+      inherit the citation. Fixing it in one axis doc while leaving it in
+      another is a worse failure than the original.
+    evidence: finding_assessment_dr_rami.md:19, 52-53; AXIS_6:226
+    lens_note: |
+      The cogsci lens concurs fully. Cross-doc citation consistency is the
+      synthesizer's job, and this is the single most important one.
+  - severity: P0
+    finding: |
+      FD-008 REJECT (Yu et al. 2026 unverifiable). Same cross-doc propagation
+      requirement as FD-003. The 90%+ TA-agreement figure is cited in
+      AXIS_6:109-116 and AXIS_6:148-153, and Dr. Nadia gives F3/F4 a PASS
+      without challenging this citation. SYNTHESIS.md must overrule PASS on
+      the Yu citation and require an alternative warrant.
+    evidence: finding_assessment_dr_rami.md:24, 55-56; AXIS_6:109-116
+    lens_note: |
+      Dr. Rami is correct. The feature architecture (CAS-first partial-credit)
+      is defensible; the quantitative headline is not.
+  - severity: P0
+    finding: |
+      FD-011 REJECT (Zayyadi d=1.16 cherry-picked). Dr. Nadia SHIPs this
+      feature on the d=1.16 framing; Dr. Rami REJECTs. Dr. Kenji (cogsci lens)
+      concurs with Dr. Rami. The feature is still worth shipping at honest
+      d=0.4-0.6; the disagreement must be resolved in conflicts.md and the
+      Dr. Rami-correct revision is the one that should land.
+    evidence: finding_assessment_dr_rami.md:27, 58-59; cena_dr_nadia:187-193
+    lens_note: |
+      Evidence-honesty lens wins over pedagogy-lens on effect-size framing.
+      Standard cogsci discipline.
+  - severity: P1
+    finding: |
+      FD-001 WARNING: interleaving d=1.05 (Rohrer 2014) + d=0.34 (Brunmair 2019
+      meta) — Dr. Rami correctly calls this cherry-picking. axis1:27 should
+      lead with d=0.34 and disclose time-on-task confound. This is the single
+      most-cited evidence-honesty pattern in the corpus (citing the large-RCT
+      figure alongside the smaller meta-analytic mean) and appears in at least
+      3 docs. Systemic fix needed at synthesis time.
+    evidence: finding_assessment_dr_rami.md:17
+    lens_note: |
+      Cogsci view: Brunmair's meta-analysis is the headline warrant; Rohrer's
+      n=140 RCT is a confirming data point, not the effect size to plan from.
+  - severity: P1
+    finding: |
+      FD-006 WARNING on confidence calibration (Foster 2021 null achievement
+      result) is important: the confidence-calibration feature (axis2 F5 and
+      axis6 F8) should be framed as a *metacognitive* calibration tool, not
+      an *achievement* booster. Dr. Rami is correct. Framing fix in both docs
+      required.
+    evidence: finding_assessment_dr_rami.md:22
+    lens_note: "Consistent with Klar 2023 bare-prompts anti-pattern; pair calibration with actionable feedback."
+  - severity: P1
+    finding: |
+      FD-004 RDY-080 flag on IRT-CAT placement — Dr. Rami's "readiness score"
+      caveat is important. Any CAT placement that produces a theta estimate
+      must explicitly disclaim Bagrut concordance. This is a product-messaging
+      discipline, not just a caveat in the ADR.
+    evidence: finding_assessment_dr_rami.md:20, 63-65
+    lens_note: "Ministry-handoff touchpoint too."
+already_built:
+  - feature: "ADR-0003 itself (Dr. Rami's reject for FD-003)"
+    evidence: docs/adr/0003-misconception-session-scope.md
+    note: |
+      ADR-0003 is the legal basis for the REJECT. Dr. Rami implicitly cites it.
+duplicates_of_other_docs:
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: parallel adjudication of the same 20 findings on different lens (pedagogy vs honesty)"
+  - "feature-discovery-2026-04-20.md: the 20 findings themselves"
+extracted_tasks:
+  - title: "SYNTHESIS: propagate Dr. Rami's 3 REJECTs across all axis docs"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Ensure Dr. Rami's REJECTs (FD-003, FD-008, FD-011) are reflected in every
+      axis doc that cites the same figures: AXIS_6 (FD-003, FD-008), AXIS_8
+      (FD-011), feature-discovery (all three), and any queue-body inheriting
+      the inflated numbers.
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (3 entries)
+      - pre-release-review/reviews/retired.md (FD-003 fabricated figure)
+      - pre-release-review/reviews/conflicts.md (FD-011 Dr. Nadia vs Dr. Rami resolution)
+
+      ## Definition of Done
+      - Each REJECT documented with evidence citations.
+      - Surviving features (F3/F4 for Yu, F5 for cultural-context) are re-warranted on honest grounds before any queue-ready task ships.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-rami-rejects-propagate"
+    source_doc_lines: [L17-L30, L52-L64]
+  - title: "SYNTHESIS: standard framing fix for FD-001 interleaving d-range"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Wherever interleaving effect size is cited, lead with Brunmair 2019 d=0.34
+      (meta-analytic) and disclose Rohrer 2014 d=1.05 with time-on-task caveat.
+      Apply to axis1, feature-discovery, Dr. Nadia review.
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (citation discipline note)
+
+      ## Definition of Done
+      - Citation pattern standardized across corpus.
+      - Queue bodies use d=0.34 framing.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-fd001-citation-standard"
+    source_doc_lines: [L17]
+verdict: adopt
+verdict_reason: |
+  Dr. Rami's honesty cross-examination is high-quality and cogsci-compatible.
+  The three REJECTs are correct and must propagate. The eight WARNINGs include
+  genuine evidence-discipline calls the cogsci lens also catches. SYNTHESIS.md
+  should treat this doc as the corpus's honesty canon.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: "FD-004 RDY-080 readiness-score disclosure; FD-020 Bagrut rubric engine no-prediction claim."
+  - to: persona-privacy
+    about: "FD-003, FD-008 DPA §7 ML-training concerns."
+  - to: persona-enterprise
+    about: "FD-004 CAT knowledge-state aggregate-root question (ADR-0012)."
+  - to: persona-educator
+    about: "FD-009 Socratic tutor Bagrut-context fit; FD-017 breathing framing."

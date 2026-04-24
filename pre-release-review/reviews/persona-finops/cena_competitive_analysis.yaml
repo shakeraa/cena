@@ -1,0 +1,181 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Ten competitor-adapted features: Socratic AI tutor, real-time scaffolding,
+  AI "Stuck? Ask" button, at-risk alert, virtual manipulatives, parent
+  translation, learning portfolio, Bagrut-aligned engine, TTS+highlighting,
+  math keyboard. Heavy reliance on LLM tutoring mechanics.
+system_purpose_fit: 3
+  rationale:
+    - Four features are LLM-heavy tutoring (F1, F2, F3, F8).
+    - Three are integration features (F4, F6, F7) with modest cost.
+    - Three are client-side (F5, F9, F10) — cheap.
+code_reality_check:
+  claims_verified_in_code:
+    - "TutorEndpoints + TutorActor -> src/api/Cena.Student.Api.Host/Endpoints/TutorEndpoints.cs; src/actors/Cena.Actors/Tutoring/TutorActor.cs"
+    - "Stuck classifier + hint ladder -> src/actors/Cena.Actors/Diagnosis/ and StuckClassifierOptions.cs"
+    - "ADR-026 (tier routing) DOES NOT EXIST in docs/adr/ — only referenced in superprompt/user-memory. Actual routing impl: contracts/llm/routing-config.yaml"
+    - "Per-student $1.50 hard cap -> contracts/llm/routing-config.yaml:286"
+    - "LLM circuit breaker actor -> src/actors/Cena.Actors/Gateway/LlmCircuitBreakerActor.cs"
+  claims_contradicted_by_code:
+    - "Doc F1 implies greenfield Socratic tutor — contradicted by existing TutorActor + socratic_question routing"
+  claims_unverifiable:
+    - "Khanmigo 0.2 SD improvement citation — doc references Stanford/NBER 2025"
+adr_alignment:
+  honored:
+    - "ADR-0002 (CAS oracle) — Socratic tutor should CAS-verify any math"
+  violated: []
+  missing_adr_needed:
+    - "ADR for Socratic tutor per-student daily token budget (currently implicit in routing-config.yaml)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F1 Socratic AI Tutor (No-Answer Mode) — if invoked per-problem per-
+      student, at 10k students x 5 problems/hour x 3 Socratic turns each =
+      150k LLM calls/hour. At Sonnet (socratic_question primary, $3/Min + $15
+      /Mout, ~500 in/200 out each) = ~$0.0045/call. 150k x $0.0045 = $675/hr
+      = $16k/day = $480k/month. 16x global cap. MUST downgrade to Haiku
+      ($1/$5 per Mtok = ~$0.0013/call, $4.5k/day). Still bursty for budget —
+      need per-student daily-tutor-minutes cap (e.g., 30 min/day = ~15 calls).
+    evidence: cena_competitive_analysis.md (F1); contracts/llm/routing-config.yaml:112
+    lens_note: Default Sonnet routing for tutoring is the single largest at-scale cost driver. Downgrade to Haiku + per-student minute cap is mandatory.
+  - severity: P0
+    finding: |
+      F2 Real-Time In-Lesson Scaffolding — implies continuous LLM eval of
+      student work-in-progress. Near-impossible to afford at 10k students.
+      Must be event-triggered (pause > N sec, wrong answer, explicit "stuck"
+      button F3) not continuous. Doc vague about trigger model.
+    evidence: cena_competitive_analysis.md (F2)
+    lens_note: Pin a conservative trigger policy; budget per trigger event.
+  - severity: P1
+    finding: |
+      F3 "Stuck? Ask" Button — event-triggered, student-initiated. Cost is
+      bounded by student action. 10k x ~5 asks/day = 50k/day @ Haiku $0.0013
+      = $65/day = ~$2k/month. FINE. Best-economics LLM feature in the doc.
+    evidence: cena_competitive_analysis.md (F3); src/actors/Cena.Actors/Diagnosis/StuckClassifierOptions.cs
+    lens_note: Already-aligned with existing StuckClassifier pattern (heuristic-first, Haiku fallback).
+  - severity: P1
+    finding: |
+      F4 At-Risk Student Alert System — same as axis5 F5. Nightly batch.
+      Near-zero cost.
+    evidence: cena_competitive_analysis.md (F4)
+    lens_note: Duplicate of axis5 F5 — deduplicate in synthesis.
+  - severity: P1
+    finding: |
+      F5 Interactive Virtual Manipulatives — client-side rendering. Zero
+      runtime cost. But asset creation (SVG/Canvas components) is engineering
+      hours — estimate ~6-8 weeks for Bagrut-relevant manipulatives.
+    evidence: cena_competitive_analysis.md (F5)
+    lens_note: Engineering-hour cost, not runtime. Build once.
+  - severity: P1
+    finding: |
+      F6 Auto-Translation Parent Communications — if messages are translated
+      at send time via LLM, cost scales with messages. Static-template +
+      pre-authored translations (as in axis4 finding) = $0 runtime. Force
+      static pattern.
+    evidence: cena_competitive_analysis.md (F6)
+    lens_note: Same resolution as axis2 F3 Wise Feedback — ship static.
+  - severity: P1
+    finding: |
+      F8 Bagrut-Aligned Practice Engine — overlaps heavily with existing
+      CorpusExpander + AI generation + CAS gate. Already built; doc should
+      cite and extend.
+    evidence: cena_competitive_analysis.md (F8); src/api/Cena.Admin.Api/AiGenerationService.cs
+    lens_note: Retire as greenfield.
+  - severity: P2
+    finding: |
+      F7 Student Learning Portfolio — storage only (artifacts + metadata).
+      ~50KB/student x 100k = 5GB. Trivial S3 cost (~$0.12/month).
+    evidence: cena_competitive_analysis.md (F7)
+    lens_note: Cheap; ship.
+  - severity: P2
+    finding: |
+      F9 TTS + Highlighting — reuse axis3 F6 MathML-SRE stack. Zero runtime
+      cost if authoring-time pre-generation strategy applied.
+    evidence: cena_competitive_analysis.md (F9)
+    lens_note: Duplicate of axis3 F6.
+  - severity: P2
+    finding: |
+      F10 Context-Aware Math Keyboard — pure client component. No LLM.
+    evidence: cena_competitive_analysis.md (F10)
+    lens_note: Ship.
+already_built:
+  - feature: "Tutor actor + endpoints (F1 substrate)"
+    evidence: src/actors/Cena.Actors/Tutoring/TutorActor.cs; src/api/Cena.Student.Api.Host/Endpoints/TutorEndpoints.cs
+    note: F1 extends existing tutor path.
+  - feature: "Stuck classifier with heuristic-first, Haiku fallback (F3 substrate)"
+    evidence: src/actors/Cena.Actors/Diagnosis/StuckClassifierOptions.cs:28
+    note: F3 economics already aligned — validate extension uses the HeuristicSkipLlmThreshold pattern.
+  - feature: "Bagrut-aligned AI generation pipeline (F8 substrate)"
+    evidence: src/api/Cena.Admin.Api/AiGenerationService.cs
+    note: F8 should be extension-only.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-009 (Socratic no-answer) = F1"
+  - "feature-discovery-2026-04-20.md: FD-034 (Auto-translate parent comms) = F6"
+  - "feature-discovery-2026-04-20.md: FD-025 (TTS highlighting) = F9"
+  - "cena_axis5: F5 At-Risk Alert = F4 (DEDUPE)"
+  - "axis_8: F2 CAS-gated generation = F8 (RETIRE as duplicate + already-built)"
+extracted_tasks:
+  - title: "Enforce per-student daily Socratic tutor minute cap (default 30 min/day)"
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F1 Socratic tutor at 10k concurrent students is 16x the global monthly
+      LLM cap unless explicitly bounded. Enforce a per-student daily minute
+      cap with soft degradation: first 30 min/day on Haiku with caching,
+      beyond cap redirects to static hint ladder (no LLM).
+
+      ## Files
+      - src/actors/Cena.Actors/Tutoring/TutorDailyBudget.cs (new)
+      - src/actors/Cena.Actors/Tutoring/TutorActor.cs (integrate)
+      - src/actors/Cena.Actors.Tests/Tutoring/TutorDailyBudgetTests.cs
+
+      ## Definition of Done
+      - Per-student daily cap: 30 tutor-minutes OR 15 LLM calls (whichever first)
+      - Reset at 00:00 student-timezone (Jerusalem)
+      - Degrade to static hint ladder when cap hit
+      - Metric: cena.tutor.daily_cap_exhausted_total
+      - Metric: cena.tutor.cost_usd_per_student_day (p95 < $0.30)
+      - Downgrade socratic_question primary to claude_haiku_4_5 in routing-config.yaml
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L80-L180]
+  - title: "Retire F8 Bagrut Engine proposal — already built, author extension task only"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-docs
+    queue_body: |
+      ## Goal
+      Update cena_competitive_analysis.md to cite existing AiGenerationService
+      + CorpusExpander + CasRouterService instead of proposing greenfield.
+      Extract extension task: what's missing vs existing impl.
+
+      ## Files
+      - pre-release-review/cena_competitive_analysis.md (edit F8 section)
+
+      ## Definition of Done
+      - F8 section reframed as "extension to existing engine"
+      - Gaps enumerated vs src/api/Cena.Admin.Api/AiGenerationService.cs
+      - Link to existing ADR-0032 cas-gated ingestion
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-docs --result "<branch>"
+    source_doc_lines: [L400-L450]
+verdict: revise
+verdict_reason: |
+  F1 at default routing is economically catastrophic (16x global cap). F2
+  trigger model undefined = unbounded cost. F3/F4/F5/F7/F9/F10 are fine. F6
+  should be static. F8 is already built. Revise to tier down F1, pin F2
+  trigger, retire F8 as greenfield.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Is Haiku quality sufficient for Socratic tutoring, or does the pedagogy require Sonnet?"
+  - to: persona-sre
+    about: "F1 daily-cap exhaustion UX: what does the student see when minutes run out?"
+  - to: persona-educator
+    about: "30 min/day tutor cap — pedagogically adequate for Bagrut prep? Or premium tier needed?"

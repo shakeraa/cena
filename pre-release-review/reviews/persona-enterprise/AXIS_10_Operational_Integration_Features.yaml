@@ -1,0 +1,142 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Operational/integration features: Mashov/Google-Classroom sync, calendar integration,
+  LMS exports, SSO, webhooks, observability hooks, school SIS adapters, CSV import/export.
+system_purpose_fit: 3
+  rationale:
+    - Operational integrations are necessary for B2B2C but each is a new tenant-boundary + auth surface.
+    - Observability hooks overlap existing OpenTelemetry setup (M2 in actor-system-review).
+    - Many features are Phase-3-admin-surface (ADR-0001) and inherit Phase 3 prerequisites.
+code_reality_check:
+  claims_verified_in_code:
+    - "Admin API exists with dashboard services -> src/api/Cena.Admin.Api/AdminDashboardService.cs"
+    - "Analytics rollup exists -> src/actors/Cena.Actors/Projections/AnalyticsRollupService.cs"
+    - "Tenancy tests cover admin surface -> src/api/Cena.Admin.Api.Tests/TenantScopeTests.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Presence of OAuth token storage (not located in this pass; likely missing given no OAuth integrations live yet)"
+adr_alignment:
+  honored:
+    - "Non-negotiable 7 (REST + SignalR only — no GraphQL creeps in)"
+  violated: []
+  missing_adr_needed:
+    - "External-integration adapter ADR (shared with axis-5 finding)"
+    - "Webhook delivery guarantees (at-least-once, signing, replay protection)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Webhooks (outbound) are an at-least-once delivery channel. Without signing + replay-protection + dead-letter,
+      any third-party consumer can be spoofed or replayed. Today there's no webhook delivery module visible;
+      building it requires a dedicated bounded context (OutreachScheduler-like) with retry policy.
+    evidence: "AXIS_10_Operational_Integration_Features.md:L~400 (webhooks); no src/.../Webhooks/ directory"
+    lens_note: Enterprise — outbound integrations are first-class infrastructure.
+  - severity: P0
+    finding: |
+      OAuth tokens for Mashov/Google Classroom/SSO are credentials-at-rest. Non-negotiable 8 bans secrets in repo but
+      also implies KMS/vault for at-rest credentials. Doc is silent on token storage strategy.
+    evidence: "AXIS_10_Operational_Integration_Features.md:L~200; CLAUDE.md Security Rules"
+    lens_note: Enterprise — credentials-at-rest architecture must precede integration work.
+  - severity: P1
+    finding: |
+      Observability "hooks" duplicate existing OpenTelemetry metrics + activity sources that live in every actor.
+      M2/M3 in actor-system-review already flagged Meter/ActivitySource disposal issues; don't add more observability
+      before that's cleaned.
+    evidence: "docs/actor-system-review.md:142-156"
+    lens_note: Enterprise — fix infra hygiene before extending.
+  - severity: P1
+    finding: |
+      Calendar integration introduces time-zone discipline. L1 in actor-system-review flagged that current TZ handling
+      (`FindSystemTimeZoneById("Israel")`) is broken on Linux. Any calendar feature must land on IANA IDs first.
+    evidence: "docs/actor-system-review.md:190-197 (L1)"
+    lens_note: Enterprise — correct TZ infrastructure before TZ-dependent features.
+  - severity: P2
+    finding: |
+      CSV export of student analytics is a tenant-bleed vector. Must flow through TenantScope.GetInstituteFilter and
+      explicitly block cross-institute selection in the admin UI.
+    evidence: "src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs:57-75; AXIS_10_Operational_Integration_Features.md:L~550"
+    lens_note: Enterprise — export surfaces are classic tenant-escape vectors.
+already_built:
+  - feature: "Admin dashboard scaffolding"
+    evidence: src/api/Cena.Admin.Api/AdminDashboardService.cs
+    note: "Extend."
+  - feature: "Analytics rollup for admin views"
+    evidence: src/actors/Cena.Actors/Projections/AnalyticsRollupService.cs
+    note: "Foundation for LMS exports."
+duplicates_of_other_docs:
+  - "cena_axis5_teacher_workflow_features.md: Mashov / Google Classroom overlap"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: SSO overlap (family auth)"
+extracted_tasks:
+  - title: "Design webhook delivery context"
+    priority: P0
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Design an outbound webhook subsystem: delivery guarantees (at-least-once), signing (HMAC), rate limits,
+      retry policy, dead-letter queue, audit trail. Event-sourced.
+
+      ## Files
+      - docs/adr/ (new 0023-outbound-webhooks.md)
+      - src/actors/Cena.Actors/Webhooks/ (new)
+
+      ## Definition of Done
+      - ADR published.
+      - Skeleton aggregate + events + tests committed.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~400-L~500]
+  - title: "Secret/token storage ADR + skeleton"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Lock how Cena stores OAuth tokens and per-tenant credentials (Mashov, Google, SSO). KMS/Vault/Firebase
+      secret manager — pick one and write the adapter.
+
+      ## Files
+      - docs/adr/ (new 0024-credential-storage.md)
+      - src/shared/Cena.Infrastructure/Secrets/ (new)
+
+      ## Definition of Done
+      - ADR published + adapter skeleton with no-op provider.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~200-L~350]
+  - title: "Fix TZ infra before calendar features"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Replace FindSystemTimeZoneById("Israel") with cross-platform IANA ("Asia/Jerusalem") + windows fallback per L1
+      finding. Blocks any calendar feature.
+
+      ## Files
+      - src/actors/Cena.Actors/Outreach/OutreachSchedulerActor.cs:29
+      - grep for other FindSystemTimeZoneById uses
+
+      ## Definition of Done
+      - All TZ lookups use IANA first, Windows display-name fallback.
+      - Test proves no throw on Linux.
+      - Full Cena.Actors.sln builds.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~300]
+verdict: revise
+verdict_reason: |
+  Valuable integrations but every one depends on missing infrastructure (webhooks, credentials, TZ). Fix the
+  foundations first; feature-tickets enter backlog after ADRs land.
+cross_lens_handoff:
+  - to: persona-redteam
+    about: "Webhook signing, OAuth token theft, tenant-escape on CSV export."
+  - to: persona-privacy
+    about: "Mashov data shape + consent matrix for SIS integration."
+  - to: persona-sre
+    about: "Integration failure modes, rate-limit behavior, runbook per integration."

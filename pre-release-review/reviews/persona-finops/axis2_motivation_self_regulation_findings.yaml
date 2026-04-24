@@ -1,0 +1,140 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight motivation/SRL features: Socratic self-explanation prompts, if-then
+  planner, wise-feedback engine, mastery path, confidence check-ins,
+  process-praise, SRL micro-strategy prompts, reflective study plan generator.
+  Mix of template-generated (cheap) and LLM-validated (expensive).
+system_purpose_fit: 4
+  rationale:
+    - Most features are UI/template features with low compute cost.
+    - F1 (Socratic self-explanation validation) and F3 (Wise Feedback) are LLM-heavy.
+    - F8 (Reflective Plan Generator) is per-student LLM generation at weekly cadence — moderate cost.
+code_reality_check:
+  claims_verified_in_code:
+    - "SAI-001 static explanations + SAI-003 L2 cache = existing explanation substrate -> tasks/student-ai/done/SAI-003-l2-explanation-cache.md"
+    - "Methodology-aware prompt construction (Socratic,Feynman,WorkedExample) -> src/actors/Cena.Actors/Methodology/ (referenced in SAI-003 key files)"
+    - "Routing task 'socratic_question' exists with Sonnet primary -> contracts/llm/routing-config.yaml:112"
+  claims_contradicted_by_code:
+    - "Doc assumes no existing Socratic prompt infra — contradicted by existing task_routing.socratic_question"
+  claims_unverifiable:
+    - "F3 Wise Feedback translation costs — doc doesn't say per-message or per-session"
+adr_alignment:
+  honored:
+    - "ADR-0003 (session scope) — doc states session-local data"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F1 Socratic Self-Explanation Prompts — proposes LLM validation of minimum
+      conceptual coherence on EVERY step of EVERY problem. No cache strategy.
+      routing-config.yaml:112 already routes socratic_question to claude_sonnet_4_6
+      @ $3/Min input + $15/Mout output. 10k students x 30 steps/session x 2
+      sessions/day = 600k calls/day. Even at 200 input / 100 output tokens each,
+      that's ~$1800/day = $54k/month — DOUBLE the global monthly cap
+      (routing-config.yaml:301: $30k). Feature is unshippable at current tier.
+    evidence: axis2_motivation_self_regulation_findings.md (F1); contracts/llm/routing-config.yaml:301
+    lens_note: Must degrade to Haiku ($1/Min $5/Mout, 5x cheaper) or Kimi k2_0905 (7.5x cheaper with PII strip), AND add template-based fast-path for majority of responses.
+  - severity: P1
+    finding: |
+      F3 Wise Feedback Engine — translates growth-framed phrases into Hebrew/
+      Arabic/Russian/Amharic. Translation is a one-time authoring cost (ship
+      static translated strings) — NOT a runtime LLM call. Doc implies runtime
+      generation which is wasteful.
+    evidence: axis2_motivation_self_regulation_findings.md (F3 ~L140)
+    lens_note: Author once, ship static. Zero runtime LLM cost possible with i18n bundle.
+  - severity: P1
+    finding: |
+      F8 Reflective Study Plan Generator — weekly generation per student. At
+      100k MAU and ~$0.02/plan (Sonnet, 500 in / 500 out), that is $2k/week,
+      $8k/month. Manageable but must be capped. Also: regeneration on every
+      login = runaway cost risk. Need explicit "1/week max" quota.
+    evidence: axis2_motivation_self_regulation_findings.md (F8)
+    lens_note: Fine if hard-capped weekly; dangerous if event-triggered.
+  - severity: P1
+    finding: |
+      F5 Metacognitive Confidence Check-ins — just UI + DB write. Cost ~$0
+      at runtime. Excellent unit economics. Ship first.
+    evidence: axis2_motivation_self_regulation_findings.md (F5)
+    lens_note: Zero LLM dependency — fastest ROI in the doc.
+  - severity: P2
+    finding: |
+      F7 SRL Micro-Strategy Prompts — template library. Cost $0. But doc
+      proposes personalization via LLM; personalization adds cost without
+      clear ROI (template library with demographic targeting is cheaper).
+    evidence: axis2_motivation_self_regulation_findings.md (F7)
+    lens_note: Avoid LLM personalization unless A/B shows clear uplift.
+already_built:
+  - feature: "Methodology-aware Socratic prompt pipeline (RDY-074)"
+    evidence: tasks/readiness/done/RDY-074* and src/actors/Cena.Actors/Methodology/
+    note: Doc F1 partially duplicates existing methodology resolver — extension not greenfield.
+  - feature: "Explanation cache substrate (L1 static + L2 Redis)"
+    evidence: tasks/student-ai/done/SAI-003-l2-explanation-cache.md
+    note: Wise Feedback F3 could piggyback on L1 static table for zero runtime cost.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-006 (Confidence Calibration) — same as F5"
+  - "axis1: F4 Elaborative Interrogation — overlaps with F1 self-explanation"
+extracted_tasks:
+  - title: "Cap Socratic self-explanation validation to 3 LLM calls/student/session"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Prevent unbounded LLM spend on per-step self-explanation validation by
+      enforcing a per-session quota matching SAI-003.4's existing pattern
+      (3 LLM calls/student/minute). Beyond quota, degrade to rubric-based
+      template validation (regex keyword match against expected concepts).
+
+      ## Files
+      - src/actors/Cena.Actors/Explanations/SelfExplanationQuota.cs (new)
+      - src/actors/Cena.Actors/Sessions/LearningSessionActor.cs (integrate)
+      - src/actors/Cena.Actors.Tests/Explanations/SelfExplanationQuotaTests.cs
+
+      ## Definition of Done
+      - Per-student quota: 3 LLM validations per 10-minute window (configurable)
+      - On quota exhaustion, return rubric-only feedback (no LLM)
+      - Metric: cena.selfexplain.quota_exceeded_total
+      - Existing SAI-003 rate limiter reused (no new circuit breaker)
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L40-L90]
+  - title: "Ship static i18n bundle for Wise Feedback phrases (zero runtime LLM)"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Author 50-100 growth-framed feedback phrases in Hebrew/Arabic/English once
+      (optional Russian/Amharic) and ship as static i18n bundle. Avoid all runtime
+      translation LLM cost.
+
+      ## Files
+      - src/student/full-version/src/plugins/i18n/locales/he.json (extend)
+      - src/student/full-version/src/plugins/i18n/locales/ar.json (extend)
+      - src/student/full-version/src/plugins/i18n/locales/en.json (extend)
+      - src/student/full-version/src/composables/useWiseFeedback.ts (new)
+
+      ## Definition of Done
+      - Hebrew/Arabic/English ship; Russian/Amharic marked deferred
+      - Template picks phrase by (mastery_delta, error_type, session_context) triple
+      - NO runtime LLM call in this feature
+      - A11y: RTL preserved, math in <bdi dir="ltr">
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L140-L200]
+verdict: revise
+verdict_reason: |
+  F1 (per-step Socratic validation) is unshippable at proposed cadence; must be
+  quota-capped + tier-downgraded. F3 is miscategorized as LLM feature (should be
+  static). F5/F7 ship as-is with zero LLM cost. F8 ship with weekly hard cap.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Does rubric-only validation retain the g=0.55 effect size, or is LLM validation load-bearing?"
+  - to: persona-ethics
+    about: "Confirm F5 confidence check-ins don't tilt toward dark-pattern engagement in implementation."

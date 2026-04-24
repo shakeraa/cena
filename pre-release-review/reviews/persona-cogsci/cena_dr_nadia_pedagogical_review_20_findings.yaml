@@ -1,0 +1,156 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Nadia's cross-examination of the 20 SHIP-recommended findings (FD-001 through
+  FD-020). Adjudication doc — reads every feature through a pedagogy + Arab-cohort
+  equity + motivation-design lens. 17 PASS, 3 WARNING, 0 REJECT. This is itself a
+  review doc; the cogsci lens cross-checks Dr. Nadia's adjudications.
+system_purpose_fit: 5
+  rationale:
+    - Dr. Nadia's framing closely matches the cogsci + ADR-constraint framing and
+      is internally consistent (she calls out ADR-0003 compliance, ADR-0002 CAS
+      dependency, non-neg 3 ship-gate alignment).
+    - Her three WARNINGs (FD-009 Socratic AI, FD-014 XAI, FD-016 Team Competitions)
+      align with the cogsci concerns I independently raised in axis1, axis7, axis9.
+    - Where the cogsci lens and Dr. Nadia's verdict diverge is on evidence-level
+      honesty for FD-011 (she calls d=1.16 "extraordinary"; Dr. Rami + cogsci
+      view: cherry-picked upper tail).
+code_reality_check:
+  claims_verified_in_code:
+    - "Dr. Nadia correctly cites ADR-0003 for FD-003 and FD-015 Redis-only architecture requirement"
+    - "HLR / Ebbinghaus, BKT + HLR + FSRS in Mastery/ match her claim at FD-001 spaced mastery cross-ref"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Cross-examines claims inherited from axis docs; accuracy depends on the underlying citations (e.g. Yu 2026 for FD-008, Zayyadi d=1.16 for FD-011) which Dr. Rami flags as problematic."
+  claims_unsupported_in_literature:
+    - "FD-011 verdict PASS with 'extraordinary' framing of d=1.16. Dr. Rami REJECTed the same finding. Dr. Nadia's pedagogical-soundness lens and Dr. Rami's evidence-honesty lens diverge. Cogsci concurs with Dr. Rami: d=1.16 is not a defensible warrant."
+adr_alignment:
+  honored:
+    - "Every PASS verdict explicitly references applicable ADRs (-0003, -0002, -0037 implied)"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Dr. Nadia's FD-011 verdict disagrees with Dr. Rami's REJECT. She acknowledges
+      "ES=1.16 is extraordinary" and then SHIPs with a cultural-review-board
+      guardrail. Cogsci lens sides with Dr. Rami: a d=1.16 meta-analytic claim for
+      instructional interventions is almost certainly publication-bias inflation.
+      The feature should ship on the honest d=0.4-0.6 range (still large) — but
+      the "extraordinary" framing misrepresents the evidence base and sets up
+      stakeholder over-promise. Recommend aligning Dr. Nadia's writeup with
+      Dr. Rami's finding at SYNTHESIS.md level.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:187-193 (FD-011); finding_assessment_dr_rami.md:27
+    lens_note: |
+      When two personas disagree on evidence, the honesty lens (Dr. Rami) should
+      win. Citing the upper-tail estimate as "the" effect size is a corpus-wide
+      anti-pattern that SYNTHESIS.md must resolve.
+  - severity: P1
+    finding: |
+      Dr. Nadia's FD-009 (Socratic Tutor) WARNING with required revisions is
+      exactly right from cogsci lens: (1) opt-in per session, (2) always
+      "show me the solution" escape hatch, (3) structured sentence starters
+      not open dialogue, (4) "why" questions not "how", (5) A/B test first.
+      Treat these as **mandatory DoD items** for any Socratic-tutor ticket,
+      not just "recommended".
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:155-167
+    lens_note: "No disagreement; concurring + elevating to DoD requirements."
+  - severity: P2
+    finding: |
+      Dr. Nadia's FD-014 WARNING on XAI "Why This Problem?" notes "thin research
+      base; potential UI clutter". Cogsci addition: as flagged in axis9, Conati's
+      XAI personalization requires a cognitive-trait profile we cannot build
+      under ADR-0003/0037. Cena's XAI must be rule-based + age-level-tone only.
+      Dr. Nadia's warning understates this — it's not UI clutter, it's a
+      scope/privacy constraint.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:23
+    lens_note: "Amplify Dr. Nadia's WARNING with the scope-constraint rationale from axis9."
+  - severity: P2
+    finding: |
+      Dr. Nadia's FD-016 (Team Competitions) WARNING on moderation burden is
+      secondary to the cogsci concern (axis7): team-level comparison activates
+      the same social-evaluative circuitry as individual leaderboards. The
+      WARNING should be upgraded to ship-gate-review-before-build, not just
+      post-build moderation.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:25
+    lens_note: "Primary risk is the mechanic, not the moderation tooling."
+  - severity: P2
+    finding: |
+      Dr. Nadia's FD-002 (CAS-Gated Variation) PASS framing is strong and I
+      concur. Her "template quality control" guardrail at L29 is correct.
+      Add: distractor shapes should come from the existing MisconceptionCatalog
+      (ADR-0031), not a fresh taxonomy.
+    evidence: cena_dr_nadia_pedagogical_review_20_findings.md:22, 65
+    lens_note: "Complement, not disagree."
+already_built:
+  - feature: "N/A - this is a review doc, not a feature doc"
+    evidence: N/A
+    note: |
+      The doc reviews 20 findings that are themselves in other axis docs. Its
+      "already built" analysis inherits from those docs. The cogsci lens does
+      not retire Dr. Nadia's review — it is canonical adjudication.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: this review cross-examines the 20 SHIP findings from there"
+  - "finding_assessment_dr_rami.md: complementary cross-examination on honesty-lens; divergence on FD-011 adjudicated above"
+extracted_tasks:
+  - title: "SYNTHESIS: Resolve FD-011 effect-size disagreement (Dr. Nadia SHIP vs Dr. Rami REJECT)"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      In SYNTHESIS.md, resolve the persona-disagreement on FD-011 cultural-context
+      generator: Dr. Rami REJECT on d=1.16 cherry-picking, Dr. Nadia SHIP with
+      guardrail, Dr. Kenji (cogsci) concurs with Dr. Rami. Resolution: SHIP on
+      honest d=0.4-0.6, not on d=1.16.
+
+      ## Files
+      - pre-release-review/reviews/conflicts.md (new entry)
+      - pre-release-review/reviews/SYNTHESIS.md (FD-011 entry)
+
+      ## Definition of Done
+      - Conflict documented with evidence citations.
+      - Resolution recorded: SHIP with revised framing.
+      - FD-011 queue body references representative meta-analytic range.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-fd011-resolution"
+    source_doc_lines: [L187-L193]
+  - title: "Elevate Dr. Nadia's FD-009 Socratic revisions to mandatory DoD for any Socratic ticket"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Any future Socratic-tutor task must include as DoD items: opt-in per
+      session, escape hatch to full solution after N exchanges, structured
+      starters not open dialogue, "why" questions only, A/B test plan.
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (FD-009 task DoD)
+
+      ## Definition of Done
+      - DoD items enumerated in the task body.
+      - Cross-link Dr. Nadia + cogsci findings.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-fd009-dod-elevation"
+    source_doc_lines: [L155-L167]
+verdict: adopt
+verdict_reason: |
+  Dr. Nadia's review is largely well-calibrated against Cena's ADRs and
+  non-negotiables. Cogsci concurs on 16 of 20 verdicts. Key divergence: FD-011
+  effect-size framing must align with Dr. Rami's finding. FD-014 WARNING
+  should be amplified to scope constraint, not UI concern. FD-016 WARNING
+  should be upgraded to ship-gate-before-build.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: "FD-020 Bagrut rubric engine — Ministry reference-only concern."
+  - to: persona-privacy
+    about: "FD-014 XAI scope constraint (concur amplify Dr. Nadia)."
+  - to: persona-ethics
+    about: "FD-016 team competitions ship-gate review; FD-017 breathing ritual therapy-adjacency."
+  - to: persona-finops
+    about: "Dr. Nadia's PASSes on F3/F6/F8 all imply LLM-heavy workflows — FinOps sizing required."

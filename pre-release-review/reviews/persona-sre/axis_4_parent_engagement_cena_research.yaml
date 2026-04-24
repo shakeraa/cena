@@ -1,0 +1,109 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight parent-engagement features (XAI "Why this topic" card, bilingual parent dashboard, parent-teacher bridge messages,
+  privacy-preserving cohort context, weekly snapshot, encouragement SMS, culturally-localized views, Bagrut crisis countdown).
+  Touches outbound Twilio SMS / WhatsApp and translation pipelines.
+system_purpose_fit: 4
+  rationale:
+    - Fits parent-trust goal without violating ADR-0003.
+    - SRE concerns cluster around outbound messaging rate limits, translation provider failure, and parent-app auth surface.
+code_reality_check:
+  claims_verified_in_code:
+    - "Twilio WhatsApp vendor adapter scaffold -> commit e0c2b21 feat(rdy-069) phase 1B; src/actors/Cena.Actors/ParentDigest/TwilioWhatsAppSender.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Differential-privacy cohort aggregates (k>=5 threshold) — no DP library referenced"
+    - "Auto-translation terminology glossary verified by native speakers — no terminology-QA workflow cited in .github/workflows/translation-qa.yml context"
+adr_alignment:
+  honored: [ADR-0003]
+  violated: []
+  missing_adr_needed:
+    - "Outbound messaging throttling + opt-out + DNC list policy"
+    - "Translation fallback when provider returns untrustworthy output (esp. math terminology)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Weekly parent snapshot (Feature 5) + Encouragement SMS (Feature 6) + Crisis Countdown (Feature 8) all drive outbound
+      high-volume notifications. No rate-limit, no dedup, no quiet-hours policy specified. An email-storm bug during exam week
+      is both a support incident and a PPA-compliance risk.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md Features 5, 6, 8; src/actors/Cena.Actors/ParentDigest/TwilioWhatsAppSender.cs
+    lens_note: Outbound communications are operationally the #1 source of preventable incidents.
+  - severity: P1
+    finding: |
+      Parent-Teacher Bridge Messaging (Feature 3) introduces a new auth surface (parent account) and a new content-moderation
+      queue. Without a moderation runbook and an escalation path for at-risk language (self-harm mentions), on-call will triage
+      blind.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md Feature 3
+    lens_note: Child-safety-adjacent content must have a published escalation SLA.
+  - severity: P1
+    finding: |
+      Privacy-Preserving Cohort Context (Feature 4) uses k-anonymity threshold >=5. In classes with <15 students, the threshold
+      may suppress too much data and the feature silently becomes useless; needs an observable "suppression rate" metric.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md Feature 4
+    lens_note: Silent-degradation is the worst failure mode; instrument it.
+  - severity: P1
+    finding: |
+      Translation pipeline (Features 2, 6, 7) does not specify math-term glossary override path. Machine-translated mathematical
+      terms produce confusing messages that parents flag as errors — an operationally-expensive tail of support load.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md Features 2, 6, 7
+    lens_note: Needs terminology guardrails in CI (translation-qa.yml).
+already_built:
+  - feature: Twilio WhatsApp sender (phase 1B scaffold)
+    evidence: src/actors/Cena.Actors/ParentDigest/TwilioWhatsAppSender.cs; commit e0c2b21
+    note: Feature 6 can extend this; do not re-propose a new sender.
+  - feature: Translation QA CI
+    evidence: .github/workflows/translation-qa.yml
+    note: Extend this workflow with math-glossary assertions.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-017..FD-021 (parent XAI, bilingual, snapshot, crisis)."
+  - "AXIS_10_Operational_Integration_Features.md Feature 7 (Google Classroom) overlaps on parent visibility."
+extracted_tasks:
+  - title: Add outbound-notification rate limiter, dedup + quiet-hours policy
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Introduce a per-parent rate limiter (e.g. <=1 SMS + <=1 email per channel per day, quiet hours 21:00-07:00 local),
+      dedup key per logical message, and a global emergency kill-switch via FeatureFlagActor.
+      ## Files
+      src/actors/Cena.Actors/ParentDigest/ (new NotificationThrottler)
+      src/actors/Cena.Actors/Infrastructure/FeatureFlagActor.cs
+      deploy/observability/alerting-rules.yaml
+      docs/ops/runbooks/ (new: parent-notification-storm.md)
+      ## Definition of Done
+      - Load test: 10k parents x 3 concurrent triggers -> no duplicate send
+      - Kill-switch flips in <60s via flag
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/parent-throttle"
+    source_doc_lines: []
+  - title: Publish math-glossary assertions into translation-qa CI
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Prevent machine-translation from mangling Hebrew/Arabic math terminology. CI must fail on glossary misses in test fixtures.
+      ## Files
+      .github/workflows/translation-qa.yml
+      src/shared/Cena.Infrastructure/Localization/TerminologyLexicon.cs
+      ## Definition of Done
+      - CI run with a bad-translation fixture fails
+      - Current main passes
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/translation-math-glossary"
+    source_doc_lines: []
+verdict: revise
+verdict_reason: |
+  Parent-engagement direction is acceptable; operational controls (throttle, moderation runbook, glossary CI) are missing and
+  must land before SHIP.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: Opt-in consent flow for SMS/WhatsApp under PPA + COPPA.
+  - to: persona-redteam
+    about: Parent-teacher messaging abuse surface.
+  - to: persona-ethics
+    about: Crisis-mode countdown copy passing ship-gate.

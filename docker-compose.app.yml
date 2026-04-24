@@ -1,0 +1,352 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — Application Services Overlay
+#
+# Extends docker-compose.yml with the backend services, SymPy CAS sidecar,
+# and DB migrator. Run with:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.app.yml up -d --build
+#
+# Infra services (postgres/redis/nats/neo4j) come from the base
+# compose file. This overlay adds:
+#   - sympy-sidecar: Python NATS worker for CAS Tier-2 verification
+#   - db-migrator:  one-shot DbUp migration runner
+#   - admin-api:    question bank + AI generation + role administration
+#   - student-api:  sessions + answers + hints + SignalR push
+#   - actor-host:   LearningSession/Student/Question actors on Proto.Cluster
+#
+# Auth note: APIs validate Firebase JWT. For local dev, set
+#   CENA_CAS_GATE_MODE=shadow and interact via admin endpoints that bypass
+#   auth (health + metrics). Full user-log-in requires Firebase emulator
+#   wiring — tracked separately.
+# ═══════════════════════════════════════════════════════════════════════
+
+services:
+  # ── Firebase Auth Emulator (RDY-056 §2.1) ──
+  firebase-emulator:
+    build:
+      context: ./docker/firebase-emulator
+      dockerfile: Dockerfile
+    container_name: cena-firebase-emulator
+    ports:
+      - "9099:9099"   # Auth emulator
+      - "4000:4000"   # Emulator UI
+    volumes:
+      - ./docker/firebase-emulator/seed-dev-users.sh:/seed/seed-dev-users.sh:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:9099/ > /dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 60s
+
+  # ── SymPy CAS Sidecar (Python, NATS request/reply) ──
+  sympy-sidecar:
+    build:
+      context: ./docker/sympy-sidecar
+      dockerfile: Dockerfile
+    container_name: cena-sympy-sidecar
+    depends_on:
+      nats:
+        condition: service_healthy
+    environment:
+      - NATS_URL=nats://cena-nats:4222
+      - NATS_USER=sympy-sidecar
+      - NATS_PASSWORD=${NATS_SYMPY_PASSWORD:-dev_sympy_pass}
+      - LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.settimeout(2); s.connect(('cena-nats',4222)); s.close()\""]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # ── Database Migrator (one-shot) ──
+  db-migrator:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Db.Migrator/Dockerfile
+    container_name: cena-db-migrator
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - CENA_MIGRATOR_CONNECTION_STRING=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password
+    restart: "no"
+
+  # ── Admin API ──
+  admin-api:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Admin.Api.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation. CI populates CENA_GIT_SHA
+      # from the commit short-sha; local dev defaults to "unknown".
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
+    container_name: cena-admin-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+    ports:
+      - "5052:5052"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5052
+      # appsettings.Development.json pins localhost:5433 etc; override via
+      # ConnectionStrings__ so the container talks to the sibling services
+      # on the compose network.
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
+      - NATS_SETUP_PASSWORD=${NATS_SETUP_PASSWORD:-dev_setup_pass}
+      # ADR-0032: shadow mode while bootstrapping — gate runs but does not
+      # block writes on CAS failure. Flip to `enforce` after sympy is green.
+      - CENA_CAS_GATE_MODE=shadow
+      - Marten__AutoCreate=CreateOrUpdate
+      # Firebase: project id + emulator host (RDY-056 §2.2). When
+      # FIREBASE_AUTH_EMULATOR_HOST is set, AddFirebaseAuth swaps to the
+      # emulator issuer and disables signature validation. The Admin SDK
+      # honours this env var natively.
+      - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+      # RDY-056 §3: CORS allows both SPAs' Vite dev ports.
+      - Cors__AllowedOrigins__0=http://localhost:5174
+      - Cors__AllowedOrigins__1=http://localhost:5175
+      # RDY-056 §5: service-monitoring probe URLs — admin-api container
+      # reaches siblings via compose DNS, not its own localhost.
+      - CENA_NATS_MONITORING_URL=http://cena-nats:8222/varz
+      - CENA_ACTOR_STATS_URL=http://cena-actor-host:5050/api/actors/stats
+      - CENA_SKIP_SEED=0
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5052/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  # ── Student API ──
+  student-api:
+    build:
+      context: .
+      dockerfile: src/api/Cena.Student.Api.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
+    container_name: cena-student-api
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+    ports:
+      - "5050:5050"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5050
+      # Override the appsettings.json Kestrel endpoint (which pins port 5051)
+      # so the container listens on the port compose maps (5050).
+      - Kestrel__Endpoints__Http__Url=http://0.0.0.0:5050
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
+      - CENA_CAS_GATE_MODE=shadow
+      - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/live"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  # ── Admin SPA (Vuexy Vue 3, Vite dev server) ──
+  admin-spa:
+    build:
+      context: ./src/admin/full-version
+      dockerfile: dev.Dockerfile
+    container_name: cena-admin-spa
+    depends_on:
+      firebase-emulator:
+        condition: service_started
+      admin-api:
+        condition: service_started
+    # Admin SPA's vite.config.ts pins port 5174 (strictPort). Map host 5174.
+    ports:
+      - "5174:5174"
+    # Bind-mount the host source so Vite's HMR picks up edits without a
+    # container rebuild. node_modules stays inside the container (an
+    # anonymous volume masks any host node_modules) so SDK-bound deps
+    # keep working across host/container architecture differences.
+    volumes:
+      - ./src/admin/full-version/src:/app/src
+      - ./src/admin/full-version/public:/app/public
+      - ./src/admin/full-version/package.json:/app/package.json
+      - ./src/admin/full-version/vite.config.ts:/app/vite.config.ts
+      - /app/node_modules
+    environment:
+      - VITE_FIREBASE_API_KEY=fake-api-key
+      - VITE_FIREBASE_AUTH_DOMAIN=cena-platform.firebaseapp.com
+      - VITE_FIREBASE_PROJECT_ID=cena-platform
+      - VITE_FIREBASE_STORAGE_BUCKET=cena-platform.appspot.com
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
+      - VITE_FIREBASE_APP_ID=1:000000000000:web:dev
+      # Scheme REQUIRED by connectAuthEmulator. SPA runs in the browser, so
+      # we point at the host-visible port 9099, not the container DNS name.
+      - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
+      - VITE_ADMIN_API_BASE_URL=http://localhost:5052
+      # Vite dev-server proxy targets: inside the SPA container, localhost
+      # is the container itself. Forward /api/* to sibling services on the
+      # compose network by DNS name.
+      - VITE_ADMIN_API_PROXY_TARGET=http://cena-admin-api:5052
+      - VITE_ACTOR_API_PROXY_TARGET=http://cena-actor-host:5050
+      # Architecture-diagram port labels (user-visible via the SPA build).
+      - VITE_PORT_FRONTEND=5174
+      - VITE_PORT_STUDENT_SPA=5175
+      - VITE_PORT_ADMIN_API=5052
+      - VITE_PORT_STUDENT_API=5050
+      - VITE_PORT_ACTOR_HOST=5050
+      - VITE_PORT_NATS=4222
+      - VITE_PORT_POSTGRES=5433
+      - VITE_PORT_REDIS=6379
+      - VITE_PORT_FIREBASE_EMU=9099
+      # Browser-facing URLs for cross-service health probes (Student API
+      # /health/live, Student SPA origin). The Firebase emulator host is
+      # already set above for the auth SDK.
+      - VITE_STUDENT_API_BASE_URL=http://localhost:5050
+      - VITE_STUDENT_SPA_URL=http://localhost:5175
+    restart: unless-stopped
+
+  # ── Student SPA (Vuexy Vue 3 PWA, Vite dev server) ──
+  student-spa:
+    build:
+      context: ./src/student/full-version
+      dockerfile: dev.Dockerfile
+    container_name: cena-student-spa
+    depends_on:
+      firebase-emulator:
+        condition: service_started
+      student-api:
+        condition: service_started
+    # Student SPA's vite.config.ts pins port 5175 (strictPort). Map host 5175.
+    ports:
+      - "5175:5175"
+    # Host source → container for Vite HMR. node_modules anonymous volume
+    # keeps the container's installed packages (SDK-bound binaries).
+    volumes:
+      - ./src/student/full-version/src:/app/src
+      - ./src/student/full-version/public:/app/public
+      - ./src/student/full-version/package.json:/app/package.json
+      - ./src/student/full-version/vite.config.ts:/app/vite.config.ts
+      - /app/node_modules
+    environment:
+      - VITE_FIREBASE_API_KEY=fake-api-key
+      - VITE_FIREBASE_AUTH_DOMAIN=cena-platform.firebaseapp.com
+      - VITE_FIREBASE_PROJECT_ID=cena-platform
+      - VITE_FIREBASE_STORAGE_BUCKET=cena-platform.appspot.com
+      - VITE_FIREBASE_MESSAGING_SENDER_ID=000000000000
+      - VITE_FIREBASE_APP_ID=1:000000000000:web:dev
+      - VITE_FIREBASE_AUTH_EMULATOR_HOST=http://localhost:9099
+      - VITE_STUDENT_API_BASE_URL=http://localhost:5050
+      # FIND-ux-014: Hebrew is hideable outside Israel but the dev stack
+      # is Israeli-first (English primary, Arabic + Hebrew secondary per
+      # feedback_language_strategy). Enable Hebrew in dev + local runs.
+      - VITE_ENABLE_HEBREW=true
+    restart: unless-stopped
+
+  # ── Student Emulator (simulated-traffic load tool) ──
+  # Runs N simulated students against the actor cluster via NATS. Off by
+  # default — bring up with an explicit `--profile emulator` so it doesn't
+  # flood the dev stack on `docker compose up`.
+  emulator:
+    build:
+      context: .
+      dockerfile: src/emulator/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
+    container_name: cena-emulator
+    profiles: ["emulator"]
+    depends_on:
+      nats:
+        condition: service_healthy
+      actor-host:
+        condition: service_started
+    environment:
+      - NATS_EMU_USER=emulator
+      - NATS_EMU_PASSWORD=${NATS_EMU_PASSWORD:-dev_emu_pass}
+    command:
+      - "--students=${EMU_STUDENTS:-50}"
+      # Default 5× (was 25×). At 25× with 50 students the event firehose
+      # overwhelms Marten's event-sequence allocator + Postgres I/O,
+      # producing the pkey_mt_events_seq_id duplicate-key collision
+      # tracked in docs/postmortems/mt-events-seq-collision-2026-04-19.md
+      # and has, on separate occasions, hung the host Docker Desktop VM.
+      # 5× gives realistic emulation throughput without overload.
+      # Override via `EMU_SPEED=25 docker compose up -d emulator` when
+      # specifically load-testing the seq-collision reproduction.
+      - "--speed=${EMU_SPEED:-5}"
+      - "--duration=${EMU_DURATION:-300}"
+      - "--nats=nats://cena-nats:4222"
+    restart: "no"
+
+  # ── Actor Host (Proto.Actor cluster) ──
+  actor-host:
+    build:
+      context: .
+      dockerfile: src/actors/Cena.Actors.Host/Dockerfile
+      # RDY-064 / ADR-0058 §3: release correlation.
+      args:
+        CENA_GIT_SHA: ${CENA_GIT_SHA:-unknown}
+    container_name: cena-actor-host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+      db-migrator:
+        condition: service_completed_successfully
+      sympy-sidecar:
+        condition: service_started
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
+      - ConnectionStrings__Redis=cena-redis:6379
+      - ConnectionStrings__NATS=nats://cena-nats:4222
+      - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
+      - NATS_ACTOR_PASSWORD=${NATS_ACTOR_PASSWORD:-dev_actor_pass}
+      - PROTO_CLUSTER_PROVIDER=test
+      - CENA_CAS_GATE_MODE=shadow
+      - CENA_SKIP_SEED=1
+      # appsettings.json pins AllowedHosts=localhost — override so sibling
+      # compose services (admin-api, emulator) can hit /health/live via the
+      # compose DNS name cena-actor-host.
+      - AllowedHosts=*
+      # Firebase JWT validation — match admin-api so the same emulator
+      # token is accepted by both /api/admin/* (admin-api) and
+      # /api/actors/* (actor-host).
+      - Firebase__ProjectId=cena-platform
+      - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+    restart: unless-stopped

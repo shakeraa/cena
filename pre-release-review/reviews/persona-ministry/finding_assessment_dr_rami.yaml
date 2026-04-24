@@ -1,0 +1,128 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Rami''s statistical-honesty assessment of the 20 SHIP-recommended
+  findings. 9 PASS, 8 WARNING, 3 REJECT. Assesses effect-size honesty,
+  citation integrity, RDY-080 Bagrut-prediction risk, ADR-0003 compliance.
+  Ministry lens: Rami''s REJECTs and WARNINGs align tightly with Ministry
+  defensibility concerns — inflated ES and fabricated citations would
+  burn trust with schools and Ministry inspectors.
+system_purpose_fit: 5
+  rationale:
+    - Dr. Rami''s lens is the closest sibling to Ministry-lens in the
+      10-persona panel. Both care about defensibility of claims.
+    - FD-003 REJECT (fabricated 95%), FD-008 REJECT (Yu 2026 non-
+      existent), FD-011 REJECT (ES=1.16) — all three are exactly the
+      kind of claim that would blow up at a school procurement meeting.
+    - FD-004 WARNING (RDY-080 on IRT placement), FD-007 (Crisis Mode),
+      FD-020 (Bagrut rubric) — same RDY-080 concerns Ministry-lens
+      escalates.
+code_reality_check:
+  claims_verified_in_code:
+    - 'RDY-080 compliance concern is a memory-anchored rule: memory:feedback_full_sln_build_gate and related operate in the same defensibility category'
+    - 'ADR-0003 (misconception session-scope) is a committed ADR'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'Fabrication claims against external sources (Yu 2026, Eedi 95%) — we cannot verify in our codebase, but adopt Rami''s conclusion'
+adr_alignment:
+  honored:
+    - 'ADR-0003 flagged per-finding where relevant'
+    - 'RDY-080 prediction-without-evidence rule honored as a filter'
+  violated: []
+  missing_adr_needed:
+    - 'Citation-integrity ADR — policy that every quantitative claim in product copy, marketing decks, or internal specs must cite a source verified in the past N months. Would operationalize Rami''s lens.'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Rami REJECT on FD-003 ("95% misconception resolution" is
+      fabricated) is a direct Ministry-lens concern. A school buyer
+      who Googles the claim finds no source, loses trust, and we lose
+      the contract. The feature can still ship (60-80% is the honest
+      figure), but the claim must be scrubbed from every deck / doc /
+      UI.
+    evidence: 'finding_assessment_dr_rami.md:L19 (FD-003 REJECT); pre-release-review/feature-discovery-2026-04-20.md:L124 (FD-003 source entry)'
+    lens_note: |
+      Ministry lens: fabricated claims are defensibility suicide.
+      Rami''s position stands; adopt.
+  - severity: P0
+    finding: |
+      Rami REJECT on FD-008 ("Yu et al. 2026" does not exist) — same
+      category as FD-003. Ministry-lens: AI partial-credit grading is
+      a valid feature, but not on a fabricated citation. Also DPA §7
+      implications are real. Scrub citation, re-justify from a
+      verifiable source (AXIS_6 F3 / AXIS_8 F3 partial-credit rubric
+      engine already has good citations).
+    evidence: 'finding_assessment_dr_rami.md:L24 (FD-008 REJECT); pre-release-review/AXIS_6_Assessment_Feedback_Research.md (F3); pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md:L104-L143 (F3 rubric engine has legitimate citations)'
+    lens_note: |
+      Ministry lens: replace the claim with citations already in
+      AXIS_8 F3.
+  - severity: P1
+    finding: |
+      Rami REJECT on FD-011 (ES=1.16 cherry-pick) — Ministry-lens
+      agrees fully. Feature is ship-able on 0.4-0.6 ES; the 1.16
+      claim is not. See AXIS_8 task and cena_dr_nadia review task for
+      reconciled position.
+    evidence: 'finding_assessment_dr_rami.md:L27 (FD-011 REJECT)'
+    lens_note: |
+      Ministry lens: Rami''s position fully adopted.
+  - severity: P1
+    finding: |
+      Rami WARNING on FD-004 (RDY-080 risk on IRT-CAT placement) and
+      FD-020 (Bagrut prediction risk on rubric engine) are exactly
+      the Ministry-lens concerns already escalated in AXIS_6 and
+      AXIS_4/AXIS_5 task sets. No new ask; adopt Rami''s position.
+    evidence: 'finding_assessment_dr_rami.md:L20 (FD-004), L36 (FD-020)'
+    lens_note: |
+      Ministry lens: full stack-up with Rami''s flags.
+already_built:
+  - feature: N/A — this is an assessment doc, not a feature proposal
+    evidence: Doc content is verdict table + detailed rationales
+    note: |
+      No already-built items to retire. Doc strengthens filter
+      positions on axis reviews.
+duplicates_of_other_docs:
+  - 'feature-discovery-2026-04-20.md: Rami reviews all 20 FDs; fully redundant with the index as-a-list; Rami''s value is the honesty critique layer'
+  - 'cena_dr_nadia_pedagogical_review_20_findings.md: Dr. Nadia reviews the same 20 from pedagogy lens; combine verdicts via synthesizer'
+extracted_tasks:
+  - title: Citation-integrity policy ADR + scanner
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Codify a citation-integrity policy: every quantitative claim
+      (effect size, accuracy %, participation rate, time-savings %)
+      in docs/marketing/UI must cite a source + retrieval date +
+      verification SHA. Add a CI scanner that flags numeric claims
+      without anchored citations.
+
+      ## Files
+      - docs/adr/00XX-citation-integrity.md (new)
+      - scripts/citation-scanner.py or equivalent (new)
+      - .github/workflows/shipgate-job.yml (add citation scan step)
+
+      ## Definition of Done
+      - ADR drafted
+      - Scanner catches obvious violations in fixture content
+      - Passes on current main branch
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L1-L69]
+verdict: adopt
+verdict_reason: |
+  Dr. Rami''s assessment is a load-bearing filter for Ministry-lens
+  defensibility. Rejects and Warnings align tightly with lens
+  concerns. Adopt all rejects; use the citation-integrity policy
+  task to operationalize.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      Cogsci is Rami''s natural partner lens — verify each of his
+      citations from cogsci-literature familiarity.
+  - to: persona-ethics
+    about: |
+      Fabricated-claim implications beyond defensibility (user harm
+      from over-promised learning outcomes).

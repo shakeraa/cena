@@ -1,0 +1,13 @@
+{{- if .Values.admin.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "cena.fullname" . }}-admin
+  labels:
+    {{- include "cena.componentLabels" (dict "root" . "component" "admin") | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.admin.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "cena.selectorLabels" (dict "root" . "component" "admin") | nindent 6 }}
+{{- end }}

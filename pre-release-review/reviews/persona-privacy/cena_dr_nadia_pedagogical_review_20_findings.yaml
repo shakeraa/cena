@@ -1,0 +1,142 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Nadia (pedagogy) reviews 20 SHIP-recommended findings. 17 PASS, 3 WARNING, 0 REJECT
+  from her lens. Several findings touch privacy boundaries (misconception, session scope,
+  cultural stereotyping, parent-visible readiness). Provides useful privacy-adjacent
+  guardrail notes (e.g., FD-011 requires community review board; FD-015 auto-deletion
+  architecture must be audited).
+
+system_purpose_fit: 4
+  rationale:
+    - Dr. Nadia explicitly cites ADR-0003 compliance as non-negotiable (FD-003)
+    - FD-003 "required guardrails" list is exactly privacy-lens concerns
+    - FD-011 flags stereotyping risk — tangent to special-category data handling
+    - FD-015 flags auto-deletion audit need
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Misconception events [MlExcluded], session-scoped, 30-day retention -> verified in axis9/axis1 reviews"
+    - "Explanation cache keyed by question+errorType+language (not student) -> docs/adr/0003-misconception-session-scope.md:33"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "FD-015 'auto-deletion architecture must be audited' — auto-deletion lives in RetentionWorker.cs but session-misconception path is read-filter not hard-delete; audit raised as P0 in axis9"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (explicitly cited in FD-003 required guardrails: Redis-only, TTL, no SQL persistence, no cross-session tracing, starts each session with clean slate)
+    - ADR-0002 (CAS oracle enforcement affirmed in FD-002)
+  violated: []
+  missing_adr_needed:
+    - "ADR for community review board (FD-011 cultural contextualization)"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      FD-003 "Required Guardrails" list (L81): "Redis-only with TTL; no cross-session
+      knowledge tracing; class overview shows only real-time session-active tags;
+      the student starts each session with a clean slate." This is BOTH architectural
+      and privacy guidance — it mandates Redis over Marten for misconception data.
+      But existing code (MisconceptionEvents.cs) uses Marten event streams. Same
+      reconciliation issue as AXIS 6 F6.
+    evidence: "cena_dr_nadia_pedagogical_review_20_findings.md:81 + src/actors/Cena.Actors/Events/MisconceptionEvents.cs"
+    lens_note: |
+      Two authoritative sources (Dr. Nadia, axis-6 doc) both say Redis-only. Existing
+      code is Marten. Decision needed and ADR update.
+
+  - severity: P1
+    finding: |
+      FD-011 "stereotyping risk; require community review board" — same special-category
+      (ethnic origin) concern as Axis 8 review. Cohort tagging (Arab/Ethiopian/Russian)
+      is Art 9. Dr. Nadia asks for a review board; privacy lens asks for Art 9
+      classification + consent purpose. Both needed.
+    evidence: "cena_dr_nadia_pedagogical_review_20_findings.md:20 + :L11 (verdict table)"
+    lens_note: |
+      Pedagogy + privacy concerns align; combined task.
+
+  - severity: P1
+    finding: |
+      FD-013 "Do not track language proficiency profiles" — same as Axis 8 F6 finding.
+      Confirms cross-lens agreement.
+    evidence: "cena_dr_nadia_pedagogical_review_20_findings.md:22"
+    lens_note: |
+      Cross-lens consensus.
+
+  - severity: P2
+    finding: |
+      FD-015 "Auto-deletion architecture must be audited" — privacy lens agrees.
+      Audit should verify: (a) session misconception purge is actually hard-delete;
+      (b) export filter for [MlExcluded] applied; (c) erasure cascade complete.
+    evidence: "cena_dr_nadia_pedagogical_review_20_findings.md:24"
+    lens_note: |
+      Audit scope = "every per-student data store has documented retention + erasure
+      coverage". Useful checklist item.
+
+  - severity: P2
+    finding: |
+      FD-014 WARNING — "thin research base; potential UI clutter". Privacy lens agrees
+      FD-014 (Why This Problem XAI) UI surface introduces more information per student
+      interaction = more audit/consent surface. Trade-off.
+    evidence: "cena_dr_nadia_pedagogical_review_20_findings.md:23"
+    lens_note: |
+      MVP scope (top 5 inferences only) reduces the audit surface.
+
+  - severity: P2
+    finding: |
+      FD-007 Crisis Mode + FD-005 Formative-Summative signal split — teacher/parent-facing
+      readiness data. Each is per-student profile. Readiness retention + erasure coverage
+      needed per Axis 6 review.
+    evidence: "cena_dr_nadia_pedagogical_review_20_findings.md:14-16"
+    lens_note: |
+      Cross-ref to Axis 6 tasks.
+
+already_built:
+  - feature: "FD-003 session-scope misconception infrastructure"
+    evidence: src/actors/Cena.Actors/Events/MisconceptionEvents.cs with [MlExcluded]
+    note: Architecture exists but Redis-vs-Marten reconciliation open.
+
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-* ids map 1:1"
+  - "axis1/axis6/axis8 findings covered; Dr. Nadia adds pedagogical lens commentary"
+
+extracted_tasks:
+  - title: "Combined FD-003 ADR update: single-store misconception + Redis-vs-Marten decision"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Dr. Nadia's FD-003 guardrails + Axis 6 F6 + existing MisconceptionEvents.cs all point
+      to the same unresolved question: Redis or Marten. Consolidate into one ADR update.
+
+      ## Files
+      - docs/adr/0003-misconception-session-scope.md (add Decision 7)
+      - src/actors/Cena.Actors/Events/MisconceptionEvents.cs
+
+      ## Definition of Done
+      - Single authoritative store chosen
+      - Existing code aligned
+      - Test for no-cross-session-tracing
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L81"]
+
+verdict: adopt
+verdict_reason: |
+  Dr. Nadia's review is supportive and privacy-aware; her WARNING items overlap privacy
+  concerns (stereotyping, auto-deletion audit). Shippable as-is; the tasks extracted are
+  already covered in axis-specific reviews.
+
+cross_lens_handoff:
+  - to: persona-educator
+    about: |
+      Dr. Nadia's pedagogical lens is the primary reviewer here; educator-lens should take
+      her full findings set as input.
+  - to: persona-cogsci
+    about: |
+      Cross-check with Dr. Rami's honesty findings; overlapping FD-003 (fabricated 95%),
+      FD-011 (cherry-picked ES 1.16).

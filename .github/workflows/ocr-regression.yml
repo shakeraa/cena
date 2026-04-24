@@ -1,0 +1,56 @@
+name: OCR Cascade Fixture Regression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/shared/Cena.Infrastructure/Ocr/**'
+      - 'src/shared/Cena.Infrastructure.Tests/Ocr/OcrFixtureRegressionTests.cs'
+      - 'scripts/ocr-spike/dev-fixtures/cascade-results/**'
+  pull_request:
+    paths:
+      - 'src/shared/Cena.Infrastructure/Ocr/**'
+      - 'src/shared/Cena.Infrastructure.Tests/Ocr/OcrFixtureRegressionTests.cs'
+      - 'scripts/ocr-spike/dev-fixtures/cascade-results/**'
+  schedule:
+    # Nightly smoke - catches upstream drift in the reference fixtures.
+    - cron: '23 4 * * *'
+  workflow_dispatch:
+
+# RDY-OCR-REGRESSION (Phase 4):
+# Blocks a PR that (a) breaks OcrCascadeResult contract so a fixture no longer
+# deserializes, or (b) drops overall_confidence by >5 percentage points on any
+# frozen fixture. Baseline numbers live in OcrFixtureRegressionTests.Baselines.
+jobs:
+  ocr-fixture-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Restore
+        run: dotnet restore src/shared/Cena.Infrastructure.Tests/Cena.Infrastructure.Tests.csproj
+
+      - name: Build (Release)
+        run: dotnet build src/shared/Cena.Infrastructure.Tests/Cena.Infrastructure.Tests.csproj --no-restore -c Release
+
+      - name: OCR fixture regression tests
+        run: |
+          dotnet test src/shared/Cena.Infrastructure.Tests/Cena.Infrastructure.Tests.csproj \
+            --no-build -c Release \
+            --filter "FullyQualifiedName~OcrFixtureRegression" \
+            --logger "trx;LogFileName=ocr-regression.trx" \
+            --logger "console;verbosity=normal"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ocr-regression-results
+          path: |
+            **/TestResults/*.trx
+            scripts/ocr-spike/dev-fixtures/cascade-results/*.json

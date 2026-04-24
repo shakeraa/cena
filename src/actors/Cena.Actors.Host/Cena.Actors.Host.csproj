@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Cena.Actors\Cena.Actors.csproj" />
+    <ProjectReference Include="../../api/Cena.Admin.Api/Cena.Admin.Api.csproj" />
+    <ProjectReference Include="../../shared/Cena.Infrastructure/Cena.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Proto.Cluster.TestProvider" Version="1.8.0" />
+    <!-- RDY-025b: Proto.Actor Kubernetes-based service discovery. Watches
+         pods labeled with the configured selector and seeds the cluster
+         membership list from their pod IPs. Requires the pod's service
+         account to have list/watch on pods in its namespace — provisioned
+         by deploy/helm/cena/templates/actors-rbac.yaml. -->
+    <PackageReference Include="Proto.Cluster.Kubernetes" Version="1.8.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.0.0-alpha.5" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.11.0-beta.1" />
+    <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="9.0.0" />
+  </ItemGroup>
+
+</Project>

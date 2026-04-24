@@ -1,0 +1,156 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — Local Development Environment
+# docker compose up — starts all dependencies for local dev
+# ═══════════════════════════════════════════════════════════════════════
+
+services:
+  # ── PostgreSQL 16 (Marten Event Store) ──
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: cena-postgres
+    environment:
+      POSTGRES_DB: cena
+      POSTGRES_USER: cena
+      POSTGRES_PASSWORD: cena_dev_password
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./src/infra/docker/init-db.sql:/docker-entrypoint-initdb.d/01-init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U cena -d cena"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Redis 7 (Cache, Idempotency, Rate Limiting, Token Budget) ──
+  redis:
+    image: redis:7-alpine
+    container_name: cena-redis
+    ports:
+      - "6380:6379"
+    command: >
+      redis-server
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --requirepass ${REDIS_PASSWORD:-cena_dev_redis}
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-cena_dev_redis}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── NATS JetStream (Event Backbone) ──
+  # REV-002: Auth via nats-dev.conf, monitoring port internal-only
+  nats:
+    image: nats:2.10-alpine
+    container_name: cena-nats
+    command: ["-c", "/etc/nats/nats-dev.conf"]
+    ports:
+      - "4222:4222"   # Client
+      - "8222:8222"   # Monitoring (health checks)
+    volumes:
+      - ./config/nats/nats-dev.conf:/etc/nats/nats-dev.conf:ro
+      - nats_data:/data
+    environment:
+      - NATS_ACTOR_PASSWORD=${NATS_ACTOR_PASSWORD:-dev_actor_pass}
+      - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
+      - NATS_EMU_PASSWORD=${NATS_EMU_PASSWORD:-dev_emu_pass}
+      - NATS_SETUP_PASSWORD=${NATS_SETUP_PASSWORD:-dev_setup_pass}
+      - NATS_SYMPY_PASSWORD=${NATS_SYMPY_PASSWORD:-dev_sympy_pass}
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Neo4j 5 (Knowledge Graph) ──
+  neo4j:
+    image: neo4j:5-community
+    container_name: cena-neo4j
+    environment:
+      NEO4J_AUTH: neo4j/cena_dev_password
+      NEO4J_PLUGINS: '["apoc"]'
+      NEO4J_server_memory_heap_initial__size: 256m
+      NEO4J_server_memory_heap_max__size: 512m
+      NEO4J_server_memory_pagecache_size: 128m
+    ports:
+      - "7475:7474"   # Browser
+      - "7688:7687"   # Bolt
+    volumes:
+      - neo4j_data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p cena_dev_password 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # ── NATS Stream Setup (runs once, creates streams + consumers) ──
+  nats-setup:
+    image: natsio/nats-box:latest
+    container_name: cena-nats-setup
+    depends_on:
+      nats:
+        condition: service_healthy
+    volumes:
+      - ./src/infra/docker/nats-setup.sh:/setup.sh
+    environment:
+      - NATS_SETUP_PASSWORD=${NATS_SETUP_PASSWORD:-dev_setup_pass}
+    entrypoint: ["/bin/sh", "/setup.sh"]
+    restart: "no"
+
+  # ── PostgreSQL Backup Sidecar (pg_dump every 6 hours) ──
+  postgres-backup:
+    image: postgres:16-alpine
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./config/backup:/scripts:ro
+      - postgres_backups:/backups
+    environment:
+      PGPASSWORD: ${POSTGRES_PASSWORD:-cena_dev_password}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        echo "Backup scheduler started. First backup in 10s, then every 6 hours."
+        sleep 10
+        while true; do
+          /scripts/backup.sh
+          sleep 21600
+        done
+    restart: unless-stopped
+
+  # ── LocalStack (S3 emulator for dev, profile-gated) ──
+  # ADR-0058: dev/prod parity — dev exercises the same S3 code path
+  # prod does, pointed at a local S3-compatible endpoint. Opt-in:
+  #   docker compose --profile localstack up -d localstack
+  # The init-s3.sh bootstrap script runs on first healthy boot to
+  # create the cena-ingest-dev bucket.
+  localstack:
+    image: localstack/localstack:3
+    container_name: cena-localstack
+    profiles: [ "localstack" ]
+    ports:
+      - "4566:4566"
+    environment:
+      - SERVICES=s3
+      - DEBUG=0
+      - PERSISTENCE=1
+      - LOCALSTACK_HOST=localhost
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - ./config/localstack:/etc/localstack/init/ready.d:ro
+    healthcheck:
+      test: [ "CMD", "sh", "-c", "curl -fsS http://localhost:4566/_localstack/health | grep -q '\"s3\": \"available\"'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  postgres_backups:
+  nats_data:
+  neo4j_data:
+  localstack_data:

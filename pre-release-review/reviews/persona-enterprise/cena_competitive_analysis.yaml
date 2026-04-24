@@ -1,0 +1,81 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Competitive landscape of 30+ platforms (Israeli, global adaptive, AI tutors, assessment,
+  research systems). Identifies feature gaps + differentiators.
+system_purpose_fit: 3
+  rationale:
+    - Competitive doc is a benchmarking artifact, not a feature proposal; enterprise lens treats it as architectural inspiration rather than a backlog.
+    - Several competitor patterns (Khanmigo chat, DreamBox adaptive path) would push Cena toward new bounded contexts.
+code_reality_check:
+  claims_verified_in_code:
+    - "Mentor chat exists (Khanmigo-style chat mapped) -> src/actors/Cena.Actors/Events/MentorChatEvents.cs"
+    - "Adaptive scheduling lives in StudentActor -> src/actors/Cena.Actors/Students/StudentActor.Commands.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Competitor feature claims — external to repo."
+adr_alignment:
+  honored: []
+  violated: []
+  missing_adr_needed:
+    - "Architectural stance on 'chat as primary modality' (Khanmigo pattern) vs 'session-scoped learning flow' (Cena today)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Doc implicitly suggests adopting Khanmigo-style free-form chat. Free-form chat is a known PII-leakage surface
+      and does not fit ADR-0003's session-scope discipline. Any adoption requires explicit gateway-level PII
+      guard + session-scoped chat context, not a general chatbot.
+    evidence: "cena_competitive_analysis.md:L~200 (Khanmigo); docs/adr/0003-misconception-session-scope.md"
+    lens_note: Enterprise — copying competitor chat UX is an architecture commitment, not a feature.
+  - severity: P1
+    finding: |
+      Doc references DreamBox/iReady persistent-profile adaptive models. Those platforms persist misconception history
+      across sessions — which Cena cannot replicate without ADR-0003 violation. Worth a note that Cena's advantage
+      (session-scoped) is architectural, not a gap.
+    evidence: "cena_competitive_analysis.md:L~300 (DreamBox, iReady)"
+    lens_note: Enterprise — frame session-scope as competitive moat, not limitation.
+  - severity: P2
+    finding: |
+      Several competitors (Mashov, GOOL) are Israeli-specific. Integration targets for axis-10 are implied here;
+      mirror those findings into the integrations ADR rather than leaving them in the competitive doc.
+    evidence: "cena_competitive_analysis.md:L~80-L~120 (Israeli platforms)"
+    lens_note: Enterprise — ensure architectural ADRs reference the competitive doc's integration targets.
+already_built:
+  - feature: "Mentor chat as a narrow, event-sourced context"
+    evidence: src/actors/Cena.Actors/Events/MentorChatEvents.cs
+    note: "Contrasts favorably with free-form competitor chat."
+duplicates_of_other_docs:
+  - "cena_axis5_teacher_workflow_features.md: Mashov integration"
+  - "AXIS_10_Operational_Integration_Features.md: SIS bridges"
+extracted_tasks:
+  - title: "Position doc: session-scope as competitive advantage"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Add a one-pager to docs/ explaining why Cena's ADR-0003 (session-scope) is a deliberate architectural
+      differentiator, referencing DreamBox/iReady as contrast. Useful for investor + Ministry conversations.
+
+      ## Files
+      - docs/competition-research/session-scope-advantage.md (new)
+
+      ## Definition of Done
+      - One page published.
+      - Cross-referenced from ADR-0003 and cena_competitive_analysis.md.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~300]
+verdict: revise
+verdict_reason: |
+  Not a feature backlog; treat as architectural input. No direct tasks beyond a positioning note.
+cross_lens_handoff:
+  - to: persona-ministry
+    about: "Competitive comparison for Ministry partnership pitch."
+  - to: persona-finops
+    about: "Cost-structure benchmarks vs competitors."
+  - to: persona-cogsci
+    about: "Evidence quality of competitor claims."

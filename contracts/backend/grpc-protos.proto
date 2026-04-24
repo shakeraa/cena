@@ -1,0 +1,643 @@
+// ═══════════════════════════════════════════════════════════════════════════════
+// Cena Platform — gRPC Protobuf Definitions for LLM Anti-Corruption Layer
+// Package: cena.acl.v1
+// Runtime: Python FastAPI (LLM layer) ←→ .NET 9 (Proto.Actor cluster)
+//
+// DESIGN NOTES:
+//   - This ACL isolates the domain from LLM provider details (Kimi/Claude/Opus).
+//   - Model selection is handled by the Python router — callers specify task type,
+//     not model. See architecture-design.md §7.2 Routing Logic.
+//   - Privacy annotations mark fields that MUST NEVER be sent to Kimi (China-based).
+//     The ACL enforces this at the serialization boundary.
+//   - Per-student token budgets are enforced server-side (25K output tokens/day).
+//     See architecture-design.md §3.2.4 ACL hard rate limiting.
+//   - All student-facing identifiers are anonymized UUIDs. No PII crosses this boundary.
+// ═══════════════════════════════════════════════════════════════════════════════
+
+syntax = "proto3";
+
+package cena.acl.v1;
+
+option csharp_namespace = "Cena.Contracts.Acl.V1";
+option java_package = "com.cena.acl.v1";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. CUSTOM OPTIONS — PRIVACY ANNOTATIONS
+//    Used to mark fields that must be stripped before routing to Kimi (China tier).
+//    The ACL middleware reads these annotations at serialization time.
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Field-level privacy annotation.
+// Usage: string student_name = 5 [(privacy_level) = PRIVACY_PII];
+// Any field marked PRIVACY_PII or PRIVACY_SENSITIVE is stripped before Kimi calls.
+enum PrivacyLevel {
+  PRIVACY_UNSPECIFIED = 0;
+  // Safe to send to any model tier including Kimi.
+  PRIVACY_PUBLIC = 1;
+  // Personally identifiable information. NEVER sent to Kimi. Allowed for Claude.
+  PRIVACY_PII = 2;
+  // Sensitive educational data. Anonymized before Kimi, full context for Claude.
+  PRIVACY_SENSITIVE = 3;
+}
+
+// Extend google.protobuf.FieldOptions with our privacy annotation.
+// In production, register this extension in the ACL middleware.
+extend google.protobuf.FieldOptions {
+  optional PrivacyLevel privacy_level = 50001;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 2. SHARED MESSAGES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// Per-student token budget tracking. Included in every request and response.
+// The ACL enforces the daily cap and returns cached content when exhausted.
+message TokenBudget {
+  // Anonymized student identifier (UUIDv7, not the real student ID).
+  string anonymized_student_id = 1;
+
+  // Tokens consumed today (output tokens, the expensive dimension).
+  int32 tokens_used_today = 2;
+
+  // Daily budget cap (default 25,000 output tokens).
+  int32 daily_budget_limit = 3;
+
+  // Tokens remaining before the ACL switches to cached responses.
+  int32 tokens_remaining = 4;
+
+  // When the budget resets (midnight UTC).
+  google.protobuf.Timestamp budget_resets_at = 5;
+
+  // True if this response was served from cache due to budget exhaustion.
+  bool served_from_cache = 6;
+}
+
+// Model routing metadata. Populated by the ACL, returned to the caller for
+// observability and cost tracking.
+message RoutingMetadata {
+  // Which model actually served this request.
+  string model_id = 1;
+
+  // Model tier: "kimi", "sonnet", "opus"
+  string model_tier = 2;
+
+  // Input tokens consumed by this request.
+  int32 input_tokens = 3;
+
+  // Output tokens consumed by this request.
+  int32 output_tokens = 4;
+
+  // Whether a cache hit was used (Kimi auto-cache or Claude prompt cache).
+  bool cache_hit = 5;
+
+  // Latency: time-to-first-token in milliseconds.
+  int32 ttft_ms = 6;
+
+  // Total request duration in milliseconds.
+  int32 total_duration_ms = 7;
+
+  // Fallback chain: if the primary model failed, which models were attempted.
+  // Empty if the primary model succeeded.
+  repeated string fallback_chain = 8;
+}
+
+// Content language specification.
+enum ContentLanguage {
+  CONTENT_LANGUAGE_UNSPECIFIED = 0;
+  CONTENT_LANGUAGE_HEBREW = 1;
+  CONTENT_LANGUAGE_ARABIC = 2;
+  CONTENT_LANGUAGE_ENGLISH = 3;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 3. SOCRATIC TUTOR SERVICE
+//    Model tier: Claude Sonnet 4.6 (balanced — real-time tutoring quality).
+//    Generates Socratic questions, explanations, and guided discovery prompts.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service SocraticTutorService {
+  // Generate a Socratic question to guide the student toward understanding.
+  rpc GenerateSocraticQuestion(SocraticQuestionRequest) returns (SocraticQuestionResponse);
+
+  // Generate an explanation for a concept, adapted to the student's level.
+  rpc ExplainConcept(ExplainConceptRequest) returns (ExplainConceptResponse);
+
+  // Generate a hint at the specified scaffolding level.
+  rpc GenerateHint(GenerateHintRequest) returns (GenerateHintResponse);
+
+  // Streaming variant for real-time tutoring dialogue.
+  rpc StreamTutoringDialogue(TutoringDialogueRequest) returns (stream TutoringDialogueChunk);
+}
+
+message SocraticQuestionRequest {
+  TokenBudget budget = 1;
+
+  // ── Concept context (safe to send to any tier) ──
+  string concept_id = 2;
+  string concept_name = 3;
+  string concept_category = 4;
+  // Prerequisite concepts the student has already mastered.
+  repeated string mastered_prerequisites = 5;
+
+  // ── Student context (PRIVACY_SENSITIVE: anonymize for Kimi) ──
+  // Current mastery level for this concept (0.0-1.0).
+  double current_mastery = 6 [(privacy_level) = PRIVACY_SENSITIVE];
+  // The student's dominant error type on this concept.
+  string dominant_error_type = 7 [(privacy_level) = PRIVACY_SENSITIVE];
+  // Number of previous attempts on this concept.
+  int32 attempt_count = 8 [(privacy_level) = PRIVACY_SENSITIVE];
+  // Active methodology driving the question style.
+  string active_methodology = 9;
+
+  // ── Student profile (PRIVACY_PII: NEVER sent to Kimi) ──
+  // The student's real name (used for personalized Claude responses only).
+  string student_display_name = 10 [(privacy_level) = PRIVACY_PII];
+
+  // ── Generation parameters ──
+  ContentLanguage language = 11;
+  // Difficulty level: "recall", "comprehension", "application", "analysis"
+  string difficulty_level = 12;
+  // Previous questions on this concept in this session (avoid repetition).
+  repeated string previous_question_ids = 13;
+}
+
+message SocraticQuestionResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  string question_id = 3;
+  // The generated question (may contain LaTeX delimited by $...$, and Markdown).
+  string question_text = 4;
+  // Optional diagram description (for client-side rendering or Remotion pipeline).
+  string diagram_description = 5;
+  // Suggested difficulty classification.
+  string difficulty_level = 6;
+  // Expected answer outline (for the evaluation service, not shown to student).
+  string expected_answer_outline = 7;
+  // Pedagogical reasoning trace (for observability, not shown to student).
+  string reasoning_trace = 8;
+}
+
+message ExplainConceptRequest {
+  TokenBudget budget = 1;
+
+  string concept_id = 2;
+  string concept_name = 3;
+  string concept_category = 4;
+  repeated string mastered_prerequisites = 5;
+  double current_mastery = 6 [(privacy_level) = PRIVACY_SENSITIVE];
+  string student_display_name = 7 [(privacy_level) = PRIVACY_PII];
+  ContentLanguage language = 8;
+
+  // What the student is confused about (from annotation or error pattern).
+  string confusion_context = 9 [(privacy_level) = PRIVACY_SENSITIVE];
+  // Active methodology determines explanation style.
+  string active_methodology = 10;
+  // Preferred explanation style: "concise", "detailed", "visual", "step-by-step"
+  string explanation_style = 11;
+}
+
+message ExplainConceptResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  // The explanation (Markdown + LaTeX).
+  string explanation_text = 3;
+  // Key takeaways (bullet points).
+  repeated string key_takeaways = 4;
+  // Suggested follow-up questions for the student to self-test.
+  repeated string follow_up_questions = 5;
+  // Related concepts the student might want to explore.
+  repeated string related_concept_ids = 6;
+}
+
+message GenerateHintRequest {
+  TokenBudget budget = 1;
+
+  string concept_id = 2;
+  string question_id = 3;
+  string question_text = 4;
+
+  // Hint scaffolding level: 1=gentle nudge, 2=partial reveal, 3=near-answer.
+  int32 hint_level = 5;
+
+  // What the student has attempted so far (hashed, not plaintext).
+  string student_answer_hash = 6 [(privacy_level) = PRIVACY_SENSITIVE];
+  // The expected correct answer outline.
+  string expected_answer_outline = 7;
+  string active_methodology = 8;
+  ContentLanguage language = 9;
+  string student_display_name = 10 [(privacy_level) = PRIVACY_PII];
+}
+
+message GenerateHintResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  string hint_text = 3;
+  // Whether this hint essentially gives away the answer (level 3).
+  bool is_near_answer = 4;
+}
+
+message TutoringDialogueRequest {
+  TokenBudget budget = 1;
+
+  string concept_id = 2;
+  string concept_name = 3;
+  string active_methodology = 4;
+  ContentLanguage language = 5;
+  string student_display_name = 6 [(privacy_level) = PRIVACY_PII];
+
+  // Conversation history for multi-turn dialogue.
+  repeated DialogueTurn history = 7;
+}
+
+message DialogueTurn {
+  // "student" or "tutor"
+  string role = 1;
+  string content = 2;
+  google.protobuf.Timestamp timestamp = 3;
+}
+
+message TutoringDialogueChunk {
+  // Incremental text chunk for streaming display.
+  string text_chunk = 1;
+  // True when the full response is complete.
+  bool is_final = 2;
+  // Populated only on the final chunk.
+  RoutingMetadata routing = 3;
+  TokenBudget updated_budget = 4;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 4. ANSWER EVALUATION SERVICE
+//    Model tier: Kimi K2.5 (fast/cheap — structured evaluation).
+//    PRIVACY: Only anonymized data. No PII fields reach this service's Kimi calls.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service AnswerEvaluationService {
+  // Evaluate a student's answer against the expected answer.
+  rpc EvaluateAnswer(AnswerEvaluationRequest) returns (AnswerEvaluationResponse);
+
+  // Batch evaluation for offline-synced answers.
+  rpc BatchEvaluateAnswers(BatchAnswerEvaluationRequest) returns (BatchAnswerEvaluationResponse);
+}
+
+message AnswerEvaluationRequest {
+  TokenBudget budget = 1;
+
+  string question_id = 2;
+  // The question text (for context).
+  string question_text = 3;
+  // Question type: "multiple_choice", "numeric", "expression", "free_text", etc.
+  string question_type = 4;
+  // The expected correct answer (or answer rubric).
+  string expected_answer = 5;
+  // The student's submitted answer.
+  string student_answer = 6;
+  // Concept being tested.
+  string concept_id = 7;
+  string concept_name = 8;
+
+  ContentLanguage language = 9;
+
+  // ── Fields that MUST be anonymized before Kimi routing ──
+  // These are stripped/anonymized by the ACL middleware automatically.
+  string anonymized_student_id = 10;
+  double current_mastery = 11 [(privacy_level) = PRIVACY_SENSITIVE];
+}
+
+message AnswerEvaluationResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  // Is the answer correct? (binary for BKT update)
+  bool is_correct = 3;
+  // Partial credit score (0.0 - 1.0). Used for nuanced mastery updates.
+  double score = 4;
+  // Structured evaluation explanation (shown to student).
+  string explanation = 5;
+  // Identified error type (feeds into stagnation detection).
+  string error_type = 6;
+  // Specific misconception identified, if any.
+  string identified_misconception = 7;
+  // Confidence in the evaluation (0.0-1.0).
+  double evaluation_confidence = 8;
+  // Suggested next pedagogical action.
+  string suggested_next_action = 9;
+}
+
+message BatchAnswerEvaluationRequest {
+  TokenBudget budget = 1;
+  repeated AnswerEvaluationRequest evaluations = 2;
+}
+
+message BatchAnswerEvaluationResponse {
+  TokenBudget updated_budget = 1;
+  repeated AnswerEvaluationResponse results = 2;
+  // Total tokens consumed across the batch.
+  int32 total_input_tokens = 3;
+  int32 total_output_tokens = 4;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 5. ERROR CLASSIFICATION SERVICE
+//    Model tier: Kimi K2.5 (fast/cheap — classification task).
+//    Classifies errors into the taxonomy used by the MCM graph for methodology
+//    switching decisions.
+//    PRIVACY: Only anonymized data. No PII.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service ErrorClassificationService {
+  // Classify a single error.
+  rpc ClassifyError(ErrorClassificationRequest) returns (ErrorClassificationResponse);
+
+  // Classify errors across a session (batch, for session-end analytics).
+  rpc ClassifySessionErrors(SessionErrorClassificationRequest) returns (SessionErrorClassificationResponse);
+}
+
+message ErrorClassificationRequest {
+  TokenBudget budget = 1;
+
+  string question_id = 2;
+  string question_text = 3;
+  string expected_answer = 4;
+  string student_answer = 5;
+  string concept_id = 6;
+  string concept_category = 7;
+  ContentLanguage language = 8;
+}
+
+message ErrorClassificationResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  // Primary error type: "conceptual", "procedural", "motivational", "none"
+  string primary_error_type = 3;
+  // Confidence in classification (0.0-1.0).
+  double confidence = 4;
+  // Detailed error description for analytics.
+  string error_description = 5;
+  // Whether this error pattern has been seen before for this concept.
+  bool is_repeated_pattern = 6;
+  // Suggested remediation approach.
+  string suggested_remediation = 7;
+}
+
+message SessionErrorClassificationRequest {
+  TokenBudget budget = 1;
+
+  // All incorrect answers from a session.
+  repeated ErrorClassificationRequest errors = 2;
+  string session_id = 3;
+}
+
+message SessionErrorClassificationResponse {
+  TokenBudget updated_budget = 1;
+
+  repeated ErrorClassificationResponse classifications = 2;
+
+  // Session-level error summary.
+  string dominant_error_type = 3;
+  double dominant_error_confidence = 4;
+  // Distribution of error types across the session.
+  map<string, int32> error_type_distribution = 5;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 6. CONTENT GENERATION SERVICE
+//    Model tier: varies by task (Sonnet for generation, Opus for complex pedagogy).
+//    Generates exercise content, worked examples, analogies, and project prompts.
+// ─────────────────────────────────────────────────────────────────────────────
+
+service ContentGenerationService {
+  // Generate an exercise for a specific concept and methodology.
+  rpc GenerateExercise(GenerateExerciseRequest) returns (GenerateExerciseResponse);
+
+  // Generate a worked example with step-by-step solution (Sonnet tier).
+  rpc GenerateWorkedExample(WorkedExampleRequest) returns (WorkedExampleResponse);
+
+  // Generate an analogy to explain a concept (Sonnet tier).
+  rpc GenerateAnalogy(AnalogyRequest) returns (AnalogyResponse);
+
+  // Generate a diagnostic assessment plan for onboarding (Opus tier).
+  rpc GenerateDiagnosticPlan(DiagnosticPlanRequest) returns (DiagnosticPlanResponse);
+
+  // Analyze a student's learning trajectory and recommend next steps (Opus tier).
+  rpc AnalyzeLearningTrajectory(LearningTrajectoryRequest) returns (LearningTrajectoryResponse);
+}
+
+message GenerateExerciseRequest {
+  TokenBudget budget = 1;
+
+  string concept_id = 2;
+  string concept_name = 3;
+  string concept_category = 4;
+  // Target difficulty: "recall", "comprehension", "application", "analysis"
+  string difficulty_level = 5;
+  // Methodology driving the exercise style.
+  string active_methodology = 6;
+  // Question type to generate: "multiple_choice", "numeric", "expression", etc.
+  string question_type = 7;
+  ContentLanguage language = 8;
+
+  // Avoid generating questions similar to these (deduplication).
+  repeated string exclude_question_ids = 9;
+
+  // Student context for personalization (Sonnet/Opus only, stripped for Kimi).
+  double current_mastery = 10 [(privacy_level) = PRIVACY_SENSITIVE];
+  string student_display_name = 11 [(privacy_level) = PRIVACY_PII];
+  // Student's common error patterns on this concept (for targeted exercise design).
+  repeated string common_error_patterns = 12 [(privacy_level) = PRIVACY_SENSITIVE];
+}
+
+message GenerateExerciseResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  string question_id = 3;
+  string question_text = 4;
+  // For multiple-choice questions.
+  repeated ChoiceOption options = 5;
+  // The correct answer (for evaluation service).
+  string correct_answer = 6;
+  // Answer rubric for partial credit (structured JSON).
+  string answer_rubric_json = 7;
+  // Diagram description if the question involves a visual.
+  string diagram_description = 8;
+  // Estimated difficulty on 1-10 scale.
+  int32 estimated_difficulty = 9;
+  // Tags for content analytics.
+  repeated string content_tags = 10;
+}
+
+message ChoiceOption {
+  string id = 1;
+  string text = 2;
+  // Why this is wrong (for hint generation, not shown to student).
+  string distractor_reasoning = 3;
+}
+
+message WorkedExampleRequest {
+  TokenBudget budget = 1;
+
+  string concept_id = 2;
+  string concept_name = 3;
+  string difficulty_level = 4;
+  ContentLanguage language = 5;
+  string student_display_name = 6 [(privacy_level) = PRIVACY_PII];
+
+  // If this is a "faded" example, how many steps to fade (0 = full, N = last N steps blank).
+  // See: Renkl & Atkinson (2003) worked examples with fading.
+  int32 fading_level = 7;
+}
+
+message WorkedExampleResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  // The problem statement.
+  string problem_text = 3;
+  // Step-by-step solution. Each step has text and optionally a LaTeX expression.
+  repeated WorkedStep steps = 4;
+  // Which steps are "faded" (student must fill in).
+  repeated int32 faded_step_indices = 5;
+  // Final answer.
+  string final_answer = 6;
+}
+
+message WorkedStep {
+  int32 step_number = 1;
+  string explanation = 2;
+  string math_expression = 3;
+  // Whether this step is faded (student fills in).
+  bool is_faded = 4;
+}
+
+message AnalogyRequest {
+  TokenBudget budget = 1;
+
+  string concept_id = 2;
+  string concept_name = 3;
+  // What the student is struggling with specifically.
+  string struggle_context = 4 [(privacy_level) = PRIVACY_SENSITIVE];
+  ContentLanguage language = 5;
+  string student_display_name = 6 [(privacy_level) = PRIVACY_PII];
+}
+
+message AnalogyResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  // The analogy explanation.
+  string analogy_text = 3;
+  // The source domain of the analogy (e.g., "water flow" for electricity).
+  string source_domain = 4;
+  // Mapping between source and target concepts.
+  repeated AnalogyMapping mappings = 5;
+  // Limitations of the analogy (important for conceptual accuracy).
+  repeated string limitations = 6;
+}
+
+message AnalogyMapping {
+  string source_element = 1;
+  string target_element = 2;
+  string relationship = 3;
+}
+
+message DiagnosticPlanRequest {
+  TokenBudget budget = 1;
+
+  // Subject being diagnosed.
+  string subject_id = 2;
+  string subject_name = 3;
+  // The curriculum graph for this subject (concept IDs and prerequisite edges).
+  repeated ConceptNode concept_graph = 4;
+  ContentLanguage language = 5;
+  string student_display_name = 6 [(privacy_level) = PRIVACY_PII];
+
+  // Target: generate a Knowledge Space Theory diagnostic (ALEKS-inspired, 10-15 questions).
+  // See: architecture-design.md §3.2.2 onboarding diagnostic.
+  int32 target_question_count = 7;
+}
+
+message ConceptNode {
+  string concept_id = 1;
+  string concept_name = 2;
+  // IDs of prerequisite concepts.
+  repeated string prerequisite_ids = 3;
+  string difficulty_level = 4;
+}
+
+message DiagnosticPlanResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  // Ordered list of diagnostic questions.
+  repeated DiagnosticQuestion questions = 3;
+  // Branching logic: which question to ask next based on answers.
+  repeated BranchingRule branching_rules = 4;
+}
+
+message DiagnosticQuestion {
+  string question_id = 1;
+  string concept_id = 2;
+  string question_text = 3;
+  string question_type = 4;
+  repeated ChoiceOption options = 5;
+  string correct_answer = 6;
+  // Position in the default (non-branching) sequence.
+  int32 default_sequence = 7;
+}
+
+message BranchingRule {
+  // After this question...
+  string after_question_id = 1;
+  // If the answer was correct, go to...
+  string correct_next_question_id = 2;
+  // If incorrect, go to...
+  string incorrect_next_question_id = 3;
+}
+
+message LearningTrajectoryRequest {
+  TokenBudget budget = 1;
+
+  // Anonymized student profile summary (NEVER real name to Opus for this task).
+  string anonymized_student_id = 2;
+  // Mastery map: concept_id -> P(known)
+  map<string, double> mastery_map = 3 [(privacy_level) = PRIVACY_SENSITIVE];
+  // Methodology effectiveness history: methodology -> avg mastery gain per session.
+  map<string, double> methodology_effectiveness = 4 [(privacy_level) = PRIVACY_SENSITIVE];
+  // Recent stagnation events.
+  repeated StagnationSummary recent_stagnations = 5 [(privacy_level) = PRIVACY_SENSITIVE];
+  // Curriculum graph for path planning.
+  repeated ConceptNode concept_graph = 6;
+  string student_display_name = 7 [(privacy_level) = PRIVACY_PII];
+  ContentLanguage language = 8;
+}
+
+message StagnationSummary {
+  string concept_id = 1;
+  double composite_score = 2;
+  string dominant_error_type = 3;
+  int32 consecutive_sessions = 4;
+}
+
+message LearningTrajectoryResponse {
+  TokenBudget updated_budget = 1;
+  RoutingMetadata routing = 2;
+
+  // Recommended learning path (ordered concept IDs).
+  repeated string recommended_path = 3;
+  // Concepts that need immediate review (predicted recall dropping).
+  repeated string urgent_reviews = 4;
+  // Concepts the student should skip for now (too advanced given current state).
+  repeated string defer_concepts = 5;
+  // Overall learning health assessment.
+  string trajectory_assessment = 6;
+  // Reasoning trace for the recommendation.
+  string reasoning_trace = 7;
+}

@@ -1,0 +1,164 @@
+name: cena
+description: >
+  Cena — Adaptive AI Learning Platform for Israeli Bagrut STEM exams.
+  Personal AI mentor for high school students with knowledge graph visualization,
+  offline-first architecture, and gamified learning sessions.
+publish_to: 'none'
+
+version: 0.1.0+1
+
+environment:
+  sdk: '>=3.5.0 <4.0.0'
+  flutter: '>=3.24.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # ---------------------------------------------------------------------------
+  # State Management
+  # ---------------------------------------------------------------------------
+  flutter_riverpod: ^2.3.2
+
+  # ---------------------------------------------------------------------------
+  # Navigation
+  # ---------------------------------------------------------------------------
+  go_router: ^14.0.0                # Declarative routing
+
+  # ---------------------------------------------------------------------------
+  # Networking
+  # ---------------------------------------------------------------------------
+  web_socket_channel: ^3.0.1        # WebSocket transport (SignalR-compatible)
+  dio: ^5.1.1                       # REST API client
+  connectivity_plus: ^6.1.0         # Network connectivity monitoring
+
+  # ---------------------------------------------------------------------------
+  # Local Storage
+  # ---------------------------------------------------------------------------
+  flutter_secure_storage: ^8.0.0    # Secure credential storage
+  shared_preferences: ^2.3.0        # Lightweight key-value storage (onboarding flags)
+  path_provider: ^2.1.5             # App directory paths
+  path: ^1.9.0                      # Path utilities
+
+  # ---------------------------------------------------------------------------
+  # Serialization
+  # ---------------------------------------------------------------------------
+  freezed_annotation: ^2.4.4        # Immutable model annotations
+  json_annotation: ^4.9.0           # JSON serialization annotations
+
+  # ---------------------------------------------------------------------------
+  # UI & Animation
+  # ---------------------------------------------------------------------------
+  google_fonts: ^6.2.1               # Runtime font loading (Heebo, Noto Sans Arabic, Inter)
+  fl_chart: ^0.36.1                 # Charts (progress, analytics)
+  flutter_svg: ^2.0.7               # SVG rendering for diagrams
+  cached_network_image: ^3.4.1      # Cached image loading
+  shimmer: ^2.0.0                   # Loading placeholders
+  flutter_math_fork: ^0.7.2         # LaTeX math rendering
+  rive: ^0.13.0                     # Rive runtime for animated diagrams
+
+  # ---------------------------------------------------------------------------
+  # Authentication
+  # ---------------------------------------------------------------------------
+  firebase_core: ^3.13.0            # Firebase core SDK
+  firebase_auth: ^5.5.3             # Firebase Authentication
+  firebase_analytics: ^11.4.2       # Firebase Analytics
+  google_sign_in: ^6.2.2            # Google Sign-In (Android + iOS)
+  sign_in_with_apple: ^6.1.4        # Apple Sign-In (iOS required, Android optional)
+
+  # ---------------------------------------------------------------------------
+  # Push Notifications
+  # ---------------------------------------------------------------------------
+  firebase_messaging: ^15.2.4          # FCM push notifications
+  # ---------------------------------------------------------------------------
+  # Internationalization (Hebrew + Arabic + English)
+  # ---------------------------------------------------------------------------
+  intl: ^0.19.0                     # must match flutter_localizations SDK pin
+
+  # ---------------------------------------------------------------------------
+  # Utilities
+  # ---------------------------------------------------------------------------
+  uuid: ^4.4.0                      # UUID generation for idempotency keys
+  crypto: ^3.0.6                    # SHA-256 hashing
+  collection: ^1.18.0               # Collection utilities
+  equatable: ^2.0.5                 # Value equality
+  logger: ^2.2.0                    # Structured logging
+  package_info_plus: ^4.0.2         # App version info
+  url_launcher: ^6.2.4              # External URL handling
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  # ---------------------------------------------------------------------------
+  # Code Generation
+  # ---------------------------------------------------------------------------
+  build_runner: ^2.4.9              # Code generation runner
+  freezed: ^2.4.7                   # Immutable model generator
+  json_serializable: ^6.8.0         # JSON serialization generator
+
+  # ---------------------------------------------------------------------------
+  # Testing
+  # ---------------------------------------------------------------------------
+  fake_async: ^1.3.2                # Async test utilities
+
+  # ---------------------------------------------------------------------------
+  # Linting
+  # ---------------------------------------------------------------------------
+  flutter_lints: ^5.0.0             # Official Flutter lint rules
+
+flutter:
+  uses-material-design: true
+  generate: true                    # Enable flutter_gen for localization
+
+  assets:
+    - assets/images/
+    - assets/icons/
+    - assets/animations/
+    - assets/fonts/
+
+  # Fonts loaded at runtime via google_fonts package.
+  # Family names (Heebo, Noto Sans Arabic, Inter, JetBrains Mono) are
+  # referenced in TypographyTokens and resolved by the theme system.
+  # To bundle fonts for offline use, download TTFs from fonts.google.com
+  # and uncomment the font asset declarations below.
+  #
+  # fonts:
+  #   - family: Heebo
+  #     fonts:
+  #       - asset: assets/fonts/Heebo-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/Heebo-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Heebo-Bold.ttf
+  #         weight: 700
+  #       - asset: assets/fonts/Heebo-ExtraBold.ttf
+  #         weight: 800
+  #   - family: Noto Sans Arabic
+  #     fonts:
+  #       - asset: assets/fonts/NotoSansArabic-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/NotoSansArabic-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/NotoSansArabic-Bold.ttf
+  #         weight: 700
+  #       - asset: assets/fonts/NotoSansArabic-ExtraBold.ttf
+  #         weight: 800
+  #   - family: Inter
+  #     fonts:
+  #       - asset: assets/fonts/Inter-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/Inter-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/Inter-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/Inter-Bold.ttf
+  #         weight: 700
+  #   - family: JetBrains Mono
+  #     fonts:
+  #       - asset: assets/fonts/JetBrainsMono-Regular.ttf
+  #         weight: 400
+  #       - asset: assets/fonts/JetBrainsMono-Medium.ttf
+  #         weight: 500

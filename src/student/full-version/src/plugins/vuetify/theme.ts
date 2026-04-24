@@ -1,0 +1,285 @@
+import type { ThemeDefinition } from 'vuetify'
+
+/**
+ * Vuexy Primary Color (#7367F0) - WCAG AA Contrast Analysis
+ *
+ * Contrast ratio with white (#fff): 4.26:1
+ * - FAILS WCAG 2.2 AA requirement for normal text (4.5:1)
+ * - Passes WCAG 2.2 AA requirement for large text (>= 18pt or >= 14pt bold, 3:1)
+ *
+ * Contrast ratio with dark surface (#2F3349): 2.91:1
+ * - FAILS WCAG 2.2 AA requirement for normal text (4.5:1)
+ * - FAILS WCAG 2.2 AA requirement for large text (3:1) — marginal
+ *
+ * Decision: KEEP #7367F0 as the primary brand color. Use it ONLY for:
+ *   - Large text (>= 18pt / >= 14pt bold)
+ *   - Component fills/backgrounds (buttons, chips, badges)
+ *   - Hover/focus states on interactive elements
+ * For normal-size text, use 'primary-text' semantic color which provides
+ * WCAG 2.2 AA compliant darker/lighter variants.
+ *
+ * See: FIND-ux-019
+ */
+export const staticPrimaryColor = '#7367F0'
+export const staticPrimaryDarkenColor = '#675DD8'
+
+/**
+ * WCAG 2.2 AA compliant text variants of the primary color.
+ * Use these for body-size text instead of #7367F0 directly.
+ *
+ * - Light theme: #5B4FC4 on #FFFFFF = ~5.5:1 (AA pass)
+ * - Dark theme:  #B3A9FF on #2F3349 = ~4.7:1 (AA pass)
+ */
+export const primaryTextLight = '#5B4FC4'
+export const primaryTextDark = '#B3A9FF'
+
+/**
+ * Student-specific design tokens (flow state + mastery levels).
+ * Mirrors the mobile `FlowAmbientIndicator` color scheme and the mastery
+ * progression from `docs/student/02-design-system.md`.
+ *
+ * These live as strongly-typed semantic tokens rather than Vuetify color
+ * slots, because Vuetify strips unknown `ThemeDefinition` keys at runtime.
+ * Consumers read them via the `useStudentTheme()` composable which returns
+ * the right variant for the currently active Vuetify theme.
+ */
+export interface StudentFlowTokens {
+  warming: string
+  approaching: string
+  inFlow: string
+  disrupted: string
+  fatigued: string
+}
+
+export interface StudentMasteryTokens {
+  novice: string
+  learning: string
+  proficient: string
+  mastered: string
+  expert: string
+}
+
+export interface StudentThemeExtension {
+  flow: StudentFlowTokens
+  mastery: StudentMasteryTokens
+}
+
+export type FlowState = keyof StudentFlowTokens
+export type MasteryLevel = keyof StudentMasteryTokens
+
+export const studentLight: StudentThemeExtension = {
+  flow: {
+    warming: '#1565C0',
+    approaching: '#FF8F00',
+    inFlow: '#FFB300',
+    disrupted: '#1565C0',
+    fatigued: 'transparent',
+  },
+  mastery: {
+    novice: '#EF5350',
+    learning: '#FFA726',
+    proficient: '#66BB6A',
+    mastered: '#42A5F5',
+    expert: '#AB47BC',
+  },
+}
+
+// Dark variants pre-computed at theme-definition time (not runtime).
+// Per 02-design-system.md §Dark Mode: "all flow / mastery tokens have
+// dark-mode variants pre-computed".
+export const studentDark: StudentThemeExtension = {
+  flow: {
+    warming: '#42A5F5',
+    approaching: '#FFB74D',
+    inFlow: '#FFCA28',
+    disrupted: '#42A5F5',
+    fatigued: 'transparent',
+  },
+  mastery: {
+    novice: '#FF7370',
+    learning: '#FFB74D',
+    proficient: '#81C784',
+    mastered: '#64B5F6',
+    expert: '#BA68C8',
+  },
+}
+
+export const studentTokens = {
+  light: studentLight,
+  dark: studentDark,
+} as const
+
+export function getStudentTokens(themeName: string): StudentThemeExtension {
+  return themeName === 'dark' ? studentDark : studentLight
+}
+
+export const themes: Record<string, ThemeDefinition> = {
+  light: {
+    dark: false,
+    colors: {
+      'primary': staticPrimaryColor,
+      'on-primary': '#fff',
+      'primary-darken-1': '#675DD8',
+      'secondary': '#808390',
+      'on-secondary': '#fff',
+      'secondary-darken-1': '#737682',
+      'success': '#28C76F',
+      'on-success': '#fff',
+      'success-darken-1': '#24B364',
+      'info': '#00BAD1',
+      'on-info': '#fff',
+      'info-darken-1': '#00A7BC',
+      'warning': '#FF9F43',
+      'on-warning': '#fff',
+      'warning-darken-1': '#E68F3C',
+      'error': '#FF4C51',
+      'on-error': '#fff',
+      'error-darken-1': '#E64449',
+      'background': '#F8F7FA',
+      'on-background': '#2F2B3D',
+      'surface': '#fff',
+      'on-surface': '#2F2B3D',
+      'grey-50': '#FAFAFA',
+      'grey-100': '#F5F5F5',
+      'grey-200': '#EEEEEE',
+      'grey-300': '#E0E0E0',
+      'grey-400': '#BDBDBD',
+      'grey-500': '#9E9E9E',
+      'grey-600': '#757575',
+      'grey-700': '#616161',
+      'grey-800': '#424242',
+      'grey-900': '#212121',
+      'grey-light': '#FAFAFA',
+      'perfect-scrollbar-thumb': '#DBDADE',
+      'skin-bordered-background': '#fff',
+      'skin-bordered-surface': '#fff',
+      'expansion-panel-text-custom-bg': '#fafafa',
+      'primary-text': primaryTextLight,
+      'flow-warming': studentLight.flow.warming,
+      'flow-approaching': studentLight.flow.approaching,
+      'flow-in-flow': studentLight.flow.inFlow,
+      'flow-disrupted': studentLight.flow.disrupted,
+      'mastery-novice': studentLight.mastery.novice,
+      'mastery-learning': studentLight.mastery.learning,
+      'mastery-proficient': studentLight.mastery.proficient,
+      'mastery-mastered': studentLight.mastery.mastered,
+      'mastery-expert': studentLight.mastery.expert,
+    },
+
+    variables: {
+      'code-color': '#d400ff',
+      'overlay-scrim-background': '#2F2B3D',
+      'tooltip-background': '#2F2B3D',
+      'overlay-scrim-opacity': 0.5,
+      'hover-opacity': 0.06,
+      'focus-opacity': 0.1,
+      'selected-opacity': 0.08,
+      'activated-opacity': 0.16,
+      'pressed-opacity': 0.14,
+      'dragged-opacity': 0.1,
+      'disabled-opacity': 0.4,
+      'border-color': '#2F2B3D',
+      'border-opacity': 0.12,
+      'table-header-color': '#EAEAEC',
+      'high-emphasis-opacity': 0.9,
+      'medium-emphasis-opacity': 0.7,
+      'switch-opacity': 0.2,
+      'switch-disabled-track-opacity': 0.3,
+      'switch-disabled-thumb-opacity': 0.4,
+      'switch-checked-disabled-opacity': 0.3,
+      'track-bg': '#F1F0F2',
+
+      // Shadows
+      'shadow-key-umbra-color': '#2F2B3D',
+      'shadow-xs-opacity': 0.10,
+      'shadow-sm-opacity': 0.12,
+      'shadow-md-opacity': 0.14,
+      'shadow-lg-opacity': 0.16,
+      'shadow-xl-opacity': 0.18,
+    },
+  },
+  dark: {
+    dark: true,
+    colors: {
+      'primary': staticPrimaryColor,
+      'on-primary': '#fff',
+      'primary-darken-1': '#675DD8',
+      'secondary': '#808390',
+      'on-secondary': '#fff',
+      'secondary-darken-1': '#737682',
+      'success': '#28C76F',
+      'on-success': '#fff',
+      'success-darken-1': '#24B364',
+      'info': '#00BAD1',
+      'on-info': '#fff',
+      'info-darken-1': '#00A7BC',
+      'warning': '#FF9F43',
+      'on-warning': '#fff',
+      'warning-darken-1': '#E68F3C',
+      'error': '#FF4C51',
+      'on-error': '#fff',
+      'error-darken-1': '#E64449',
+      'background': '#25293C',
+      'on-background': '#E1DEF5',
+      'surface': '#2F3349',
+      'on-surface': '#E1DEF5',
+      'grey-50': '#26293A',
+      'grey-100': '#2F3349',
+      'grey-200': '#26293A',
+      'grey-300': '#4A5072',
+      'grey-400': '#5E6692',
+      'grey-500': '#7983BB',
+      'grey-600': '#AAB3DE',
+      'grey-700': '#B6BEE3',
+      'grey-800': '#CFD3EC',
+      'grey-900': '#E7E9F6',
+      'grey-light': '#353A52',
+      'perfect-scrollbar-thumb': '#4A5072',
+      'skin-bordered-background': '#2F3349',
+      'skin-bordered-surface': '#2F3349',
+      'primary-text': primaryTextDark,
+      'flow-warming': studentDark.flow.warming,
+      'flow-approaching': studentDark.flow.approaching,
+      'flow-in-flow': studentDark.flow.inFlow,
+      'flow-disrupted': studentDark.flow.disrupted,
+      'mastery-novice': studentDark.mastery.novice,
+      'mastery-learning': studentDark.mastery.learning,
+      'mastery-proficient': studentDark.mastery.proficient,
+      'mastery-mastered': studentDark.mastery.mastered,
+      'mastery-expert': studentDark.mastery.expert,
+    },
+    variables: {
+      'code-color': '#d400ff',
+      'overlay-scrim-background': '#171925',
+      'tooltip-background': '#F7F4FF',
+      'overlay-scrim-opacity': 0.6,
+      'hover-opacity': 0.06,
+      'focus-opacity': 0.1,
+      'selected-opacity': 0.08,
+      'activated-opacity': 0.16,
+      'pressed-opacity': 0.14,
+      'dragged-opacity': 0.1,
+      'disabled-opacity': 0.4,
+      'border-color': '#E1DEF5',
+      'border-opacity': 0.12,
+      'table-header-color': '#535876',
+      'high-emphasis-opacity': 0.9,
+      'medium-emphasis-opacity': 0.7,
+      'switch-opacity': 0.4,
+      'switch-disabled-track-opacity': 0.4,
+      'switch-disabled-thumb-opacity': 0.8,
+      'switch-checked-disabled-opacity': 0.3,
+      'track-bg': '#3A3F57',
+
+      // Shadows
+      'shadow-key-umbra-color': '#131120',
+      'shadow-xs-opacity': 0.16,
+      'shadow-sm-opacity': 0.18,
+      'shadow-md-opacity': 0.2,
+      'shadow-lg-opacity': 0.22,
+      'shadow-xl-opacity': 0.24,
+    },
+  },
+}
+
+export default themes

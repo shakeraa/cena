@@ -1,0 +1,238 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 assessment/feedback features (formative-summative split,
+  IRT-CAT placement, AI partial-credit grading, free-response CAS grading,
+  per-session error analysis, real-time misconception tagging, Crisis Mode
+  compression schedule, confidence calibration with certainty-based marking).
+system_purpose_fit: 2
+  rationale:
+    - Several features are strong under ethics lens (F1 signal split, F5
+      per-session error analysis, F6 session-scoped misconception tagging)
+    - Two significant ethics hotspots: F7 "Crisis Mode" (same pattern as Axis 4
+      F8) and F8 CBM negative-marking scheme
+    - F6 real-time misconception tagging displays labels in-UI that, even if
+      session-scoped, can feel shaming ("you have misconception X")
+    - F7 uses "topics secured / topics at risk" framing — red/green terms
+      that are loss-aversion adjacent
+code_reality_check:
+  claims_verified_in_code:
+    - "ADR-0003 session-scope enforced via Redis TTL architecture -> cited L245-L247"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Yu et al. 2026 AI grading 90% agreement — Rami already flagged citation unverifiable"
+    - "Eedi/DeepMind 95% misconception resolution — Rami flagged as fabricated"
+adr_alignment:
+  honored:
+    - "ADR-0003 session-scoped misconception (F5, F6)"
+    - "ADR-0002 SymPy CAS oracle (F3, F4, F6)"
+  violated: []
+  missing_adr_needed:
+    - "ADR for CBM (certainty-based marking) — explicit shipgate carve-out or
+      ban; current doc treats it as within policy but the shipgate rule set
+      needs to speak to negative-point scoring specifically"
+    - "ADR for Crisis Mode UI (shared with Axis 4 F8)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F7 Crisis Mode Compression Schedule (L259-294) uses "topics
+      secured (green) vs. topics at risk (red)" framing (L283-L284).
+      "At risk" + red coloring + Bagrut countdown context = direct
+      loss-aversion UX. Author explicitly flags RDY-080 (no Bagrut
+      prediction) but misses the GD-004 ship-gate angle. Ethics lens:
+      (a) "at risk" must become "needs-more-practice" or "next-focus";
+      (b) red coloring reserved only for accessibility requirements,
+      not progress framing; (c) countdown/urgency copy must pass the
+      same shipgate lockdown as Axis 4 F8 (same task).
+    evidence: AXIS_6_Assessment_Feedback_Research.md:L262, L283-L284
+    lens_note: |
+      "At risk" is loss-aversion copy GD-004 was written to stop.
+      Feature must be revised not retired — the spaced-practice
+      compression schedule is legitimate; the framing is not.
+  - severity: P1
+    finding: |
+      F8 Confidence Calibration with Certainty-Based Marking (L299-334)
+      scores students as sum(confidence_correct) - sum(confidence_
+      incorrect). Author mounts an explicit GD-004 defense (L328-331)
+      citing Foster 2021 and arguing "pedagogical, not punitive." BUT
+      Dr. Rami's review (finding_assessment_dr_rami.md L22) flags that
+      Foster 2021 found NO achievement effect. Ethics lens: subtracting
+      points is mechanically loss-aversion. Even if Foster shows
+      students experience it as engaging, the mechanism is the banned
+      one. Recommend:
+      (a) Default scoring formula should be sum(confidence_correct)
+          only — additive, not subtractive.
+      (b) Negative-component (subtraction) mode, if offered, must be
+          explicit student opt-in with a plain-language explanation.
+      (c) Shipgate must explicitly allow-list or forbid the
+          subtractive variant; silence is not acceptable.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:L299-L334
+    lens_note: |
+      Shipgate GD-004 bans "loss-aversion copy" and "variable-ratio
+      rewards on answer correctness." CBM applies a deterministic
+      penalty for wrong+confident — this is loss-aversion by formula,
+      even if transparent. The fact that students report liking it
+      does not exempt it (Cialdini: reciprocity consent can coexist
+      with manipulation). Product decision required.
+  - severity: P2
+    finding: |
+      F6 Real-Time Misconception Tagging (L220-255) shows the student
+      "It looks like you might be subtracting the smaller number from
+      the larger regardless of order" style labels. Session-scoped
+      architecture is well-designed. Ethics concern: the student-facing
+      label ITSELF may feel shaming even when data is ephemeral.
+      Mitigation: (a) label phrased as a diagnostic offer, not a
+      pronouncement ("Want to see why this often trips people up?");
+      (b) student can dismiss without engaging; (c) never show more
+      than one tag per problem.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:L243-L247
+    lens_note: |
+      ADR-0003 governs data; it does not govern UX framing. A
+      session-scoped label is still a label in the moment. The ethics
+      concern is mirror-image of ADR-0003's privacy concern.
+  - severity: P2
+    finding: |
+      F3/F4 AI Partial-Credit Grading uses LLM-evaluated reasoning
+      (L129) with CAS validation underneath (L130). Ethics concern:
+      when LLM disagrees with CAS, whose judgment is presented first
+      to the student? Per the CAS-oracle ADR, CAS wins on math
+      truth. But the student-facing UI order matters — an LLM-
+      authored critique of reasoning shown before the CAS verdict can
+      create harsh feedback loops. Recommend: CAS verdict shown first;
+      LLM commentary shown only as optional "see reasoning feedback"
+      expandable section.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:L129-L137
+    lens_note: |
+      LLM grading of reasoning style is inherently subjective; giving
+      it primary billing over deterministic CAS verdict shifts power
+      from objective math to model opinion. Ethics lens prefers the
+      transparent ground-truth layer first.
+  - severity: P2
+    finding: |
+      F5 Per-Session Error Analysis Report (L181-215) generates a
+      pie-chart of error types (L206). Well-designed otherwise. One
+      concern: the "Practice Similar Problems" button (L207) risks
+      creating a deficit-practice loop. Student who had 3 conceptual
+      errors today is pushed toward more of the same difficulty class
+      — which can compound frustration. Mitigation: always pair with
+      at least one "what you did well" affirmation and an easy
+      "switch topic" escape hatch.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:L205-L208
+    lens_note: |
+      Session-end reports that only show errors are deficit-framed.
+      Ethical-persuasion research requires symmetric positive framing.
+already_built:
+  - feature: "SymPy CAS oracle"
+    evidence: docs/adr/0002-sympy-correctness-oracle.md
+    note: "F3, F4, F6 all build on an ADR already locked"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-003, FD-004, FD-005, FD-006, FD-028, FD-029, FD-031, FD-032"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: F8 Crisis Mode overlaps this F7"
+  - "axis2_motivation_self_regulation_findings.md: F5 confidence check-ins overlaps this F8"
+extracted_tasks:
+  - title: "Crisis Mode red/green UX revision + copy lockdown"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F7 Crisis Mode (and Axis 4 F8): replace "topics secured / topics
+      at risk" with "topics mastered / topics to focus next." Remove
+      red progress coloring (reserve red for errors + accessibility
+      only). Pass shipgate lint forbidding "at risk," "running out,"
+      "only X left," "crisis."
+      ## Files
+      - src/student-web/src/features/exam-proximity/*
+      - scripts/shipgate/banned.json
+      - src/student-web/src/locales/*.json
+      ## Definition of Done
+      - Shipgate lint passes
+      - Visual regression: no red in progress indicators
+      - E2E: all locales render without banned phrases
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L262, L283-L284]
+  - title: "CBM scoring: default additive, subtractive mode opt-in + ADR"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F8 Confidence Calibration:
+      (a) Default scoring: sum(confidence_correct) only — additive,
+          no subtraction.
+      (b) Subtractive "certainty-based marking" mode offered only as
+          explicit student opt-in with plain-language explanation of
+          what it does and why.
+      (c) Write ADR that cites Foster 2021 null-achievement finding and
+          explains the design choice.
+      (d) Update shipgate.md to explicitly address CBM (allowlist the
+          opt-in subtractive mode only, not the default).
+      ## Files
+      - docs/adr/00NN-cbm-scoring-policy.md (new)
+      - docs/engineering/shipgate.md
+      - src/actors/Assessment/ConfidenceScorer.cs
+      - src/student-web/src/features/calibration/*
+      ## Definition of Done
+      - ADR accepted
+      - Default mode additive; subtractive mode gated on opt-in
+      - User-facing copy explains both modes neutrally
+      - Test coverage for both modes + opt-in guard
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L299-L334]
+  - title: "Misconception tag UI: diagnostic-offer framing, dismissible"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F6 real-time misconception tag UI:
+      - Phrasing: "Want a quick note about why this often trips people
+        up?" (not "You might be making misconception X")
+      - Dismissible with no penalty; no record of dismissal
+      - At most one tag per problem
+      ## Files
+      - src/student-web/src/features/misconception-tip/*
+      - src/student-web/src/locales/*.json
+      ## Definition of Done
+      - Shipgate lint forbids "you are / you might be" diagnosis copy
+        in misconception-tip namespace
+      - E2E: dismiss within session, no persistence
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L243-L247]
+  - title: "Per-session error report: symmetric positive + negative framing"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F5 Per-Session Error Analysis Report must show both:
+      - "What went well" — at least 1 affirmation per session
+      - "What to practice next" — existing error view
+      Plus "try different topic" escape hatch always visible.
+      ## Files
+      - src/student-web/src/features/session-report/*
+      ## Definition of Done
+      - Report renders both panels regardless of accuracy
+      - Escape hatch click routes to topic picker
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L205-L208]
+verdict: revise
+verdict_reason: |
+  Assessment axis is split: F1-F5 ship as designed, F6 needs copy
+  framing revision, F7 needs shared Crisis Mode cleanup (same as Axis 4),
+  F8 CBM needs ADR-level decision on subtractive scoring. No retires.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Foster 2021 null-achievement finding vs CBM claims — cite-correction"
+  - to: persona-ministry
+    about: "F2 IRT-CAT placement vs Bagrut concordance (RDY-080)"
+  - to: persona-redteam
+    about: "F4 free-response CAS grading — LLM prompt-injection via student text"
+  - to: persona-enterprise
+    about: "F6 Redis session-scope architecture — verify no SQL leakage"

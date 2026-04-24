@@ -1,0 +1,119 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 cross-domain feature borrowings from non-EdTech: math concept map (Obsidian),
+  pre-session breathing ritual (Calm/Headspace), learning journeys (Fabulous),
+  adaptive flow sessions (games), and more. Mostly UX novelty; a11y load is on
+  new visualizations and animations.
+system_purpose_fit: 3
+  rationale:
+    - Features add visualizations (concept map, journey path) and animations (breathing bubble)
+    - Must honor prefers-reduced-motion (WCAG 2.3.3)
+    - Non-text content (mood emoji) needs aria-labels
+    - Calm/breathing framing can conflict with therapy-claim rules (Dr. Nadia flagged)
+code_reality_check:
+  claims_verified_in_code:
+    - "Reduced-motion scanner already exists: src/student/full-version/tests/a11y/reduced-motion-coverage.spec.ts"
+    - "i18n scaffolding for he/ar/en: src/student/full-version/src/plugins/i18n/"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Concept map visualization component — not in repo"
+    - "Breathing bubble component — not in repo"
+adr_alignment:
+  honored: []
+  violated: []
+  missing_adr_needed:
+    - "ADR for animation policy (duration caps, prefers-reduced-motion handling)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: "F1 Math Concept Map is a graph visualization. Graph views are notoriously inaccessible to blind users. Must provide a text-list view as equivalent representation."
+    evidence: "cena_cross_domain_feature_innovation.md:F1 section"
+    lens_note: "Obsidian graph view has no screen-reader equivalent — we shouldn't import that weakness."
+  - severity: P1
+    finding: "F2 Focus Ritual breathing bubble is animated. Must honor prefers-reduced-motion — either skip the animation or substitute a static breath count."
+    evidence: "cena_cross_domain_feature_innovation.md:F2 section"
+    lens_note: "Existing reduced-motion scanner is in place; new feature must pass it."
+  - severity: P1
+    finding: "F2 mood emoji (😰 😐 🙂) check-in needs explicit aria-label per option; emoji-only controls fail WCAG 1.1.1."
+    evidence: "cena_cross_domain_feature_innovation.md:F2 implementation sketch"
+    lens_note: "Same issue as AXIS 2 F5 confidence check-in — normalize across docs."
+  - severity: P1
+    finding: "F3 Learning Journey path visualization — avatar progression along a path. If avatar motion is continuous, triggers vestibular issues for some users. Must be step-by-step with prefers-reduced-motion fallback."
+    evidence: "cena_cross_domain_feature_innovation.md:F3 section"
+    lens_note: "Vestibular disorders affect ~5% of adults."
+  - severity: P1
+    finding: "F4 adaptive flow sessions — dynamic difficulty adjustment UI must not signal via color alone (e.g., 'red = too hard'). Combine with icon/text."
+    evidence: "cena_cross_domain_feature_innovation.md:F4 section"
+    lens_note: "Flow-state-adjacent UX commonly uses hue-based intensity scales."
+  - severity: P2
+    finding: "All new visualizations must have matching Hebrew/Arabic labels. Cross-domain borrow from English-first products (Obsidian, Calm) doesn't guarantee existing translations."
+    evidence: "entire doc"
+    lens_note: "Risk of shipping English-labeled concept maps in Arabic UI."
+already_built:
+  - feature: "Reduced-motion a11y scanner"
+    evidence: "src/student/full-version/tests/a11y/reduced-motion-coverage.spec.ts"
+    note: "Any new animated component is automatically covered"
+duplicates_of_other_docs:
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: FD-017 Focus Ritual (dup of F2)"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: FD-018 Learning Energy Tracker"
+  - "axis2_motivation_self_regulation_findings.md: metacognitive check-ins (adjacent F5)"
+extracted_tasks:
+  - title: "Concept map (F1) accessibility equivalent: keyboard-navigable text list"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Before any graph visualization of the Bagrut concept map ships, require a parallel text-list representation that is keyboard-navigable and screen-reader-friendly. Users can toggle between graph and list views.
+      ## Files
+      - new component under src/student/full-version/src/components/knowledge/
+      - must integrate with existing ConceptTile.vue
+      ## Definition of Done
+      - Graph and list views present identical data
+      - List view is default when prefers-reduced-motion or screen-reader detected
+      - E2E keyboard test completes concept map exploration
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F1 section]
+  - title: "Animation policy ADR + reduced-motion compliance for F2/F3/F4"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Pin an animation policy: max duration, prefers-reduced-motion behavior, vestibular safety. Applies to breathing bubble (F2), journey path (F3), flow session transitions (F4).
+      ## Files
+      - new: docs/adr/0041-animation-policy.md
+      ## Definition of Done
+      - ADR lists max durations, respects prefers-reduced-motion
+      - Existing reduced-motion scanner extended to enforce ADR
+      ## Reporting
+      decision committed
+    source_doc_lines: [F2, F3, F4]
+  - title: "Localize cross-domain feature copy in he/ar/en"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Before any cross-domain feature ships, ensure all labels/prompts are localized. Cross-domain borrows (Obsidian-style node labels, Calm-style breathing copy) don't ship with Hebrew/Arabic translations.
+      ## Files
+      - src/student/full-version/src/plugins/i18n/locales/*.json (add namespaces as features land)
+      - scanner: parity-check new keys across all three locales
+      ## Definition of Done
+      - All new feature keys present in he/ar/en
+      - Parity-check CI fails on partial translation
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [all features]
+verdict: revise
+verdict_reason: "Cross-domain borrows need a11y retrofit: concept map needs text equivalent, animations need policy + reduced-motion, emoji check-ins need aria-labels, translations must be first-class."
+cross_lens_handoff:
+  - to: persona-ethics
+    about: "F2 breathing ritual vs therapy-claim line (Dr. Nadia flag)"
+  - to: persona-cogsci
+    about: "F4 flow/difficulty science and effect sizes"
+  - to: persona-privacy
+    about: "F2 mood data storage — must be session-local for under-13"

@@ -1,0 +1,91 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Nadia's pedagogical cross-examination of 20 feature findings (FD-001
+  through FD-020). This is meta-review output, not a new feature proposal.
+  Red-team lens is narrow: verify that Dr. Nadia's pedagogy-PASS verdicts
+  don't mask security concerns flagged in the underlying axis docs.
+system_purpose_fit: 4
+  rationale:
+    - Doc is an evaluation lens, not a ship artifact
+    - Red-team's job: confirm that pedagogy-PASS does not override security
+      red flags raised elsewhere
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code:
+    - "Dr. Nadia PASSES FD-003 (Real-Time Misconception Tagging) with ADR-0003 caveat. Dr. Rami REJECTS same finding (fabricated 95% number). Security posture: trust Dr. Rami + ADR-0003 enforcement in code over doc-PASS."
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - Doc recognizes ADR-0002, ADR-0003, RDY-080 throughout
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Dr. Nadia PASSES FD-009 (Socratic AI Tutor) with a WARNING about
+      "friction for time-pressured Bagrut students; needs escape hatch".
+      Red-team concern: any "escape hatch" that lets students bypass the
+      no-answer guard is exactly the answer-leak surface. Escape should
+      mean "fall back to a teacher or a worked example," never "reveal the
+      answer."
+    evidence: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md FD-009 verdict
+    lens_note: Pedagogical friction solution must not compromise the safety invariant.
+  - severity: P1
+    finding: |
+      Dr. Nadia flags FD-016 (Team vs. Challenge Cooperative Competitions)
+      as WARNING for "complex moderation requirements". From a red-team
+      perspective, that is the correct flag but understated — see axis7
+      finding on team-delta shame + moderation cost.
+    evidence: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md FD-016
+    lens_note: Aligned with my axis7 P1 finding.
+  - severity: P2
+    finding: |
+      Dr. Nadia PASSES FD-019 (Mashov Gradebook Sync) with "API is unofficial;
+      build defensively" — correct, but doesn't surface the credential-
+      compromise blast radius flagged in my axis10 review.
+    evidence: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md FD-019
+    lens_note: Cross-ref.
+  - severity: P2
+    finding: |
+      Dr. Nadia's FD-003 PASS is conditional on ADR-0003 compliance. Red-team
+      note: Dr. Rami REJECTS FD-003 for the fabricated 95% claim. Combined
+      verdict should be REJECT unless the evidence is replaced AND a
+      code-level retention enforcer is in place.
+    evidence: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md FD-003; pre-release-review/finding_assessment_dr_rami.md FD-003
+    lens_note: Two reviewers, combined signal is stronger than either alone.
+already_built: []
+duplicates_of_other_docs:
+  - "finding_assessment_dr_rami.md — covers the same FD-001..FD-020 through honesty lens"
+extracted_tasks:
+  - title: Synthesis note — combine Dr. Nadia PASS + Dr. Rami WARN/REJECT verdicts
+    priority: P2
+    estimate: S
+    suggested_assignee: claude-subagent-synth
+    queue_body: |
+      ## Goal
+      When SYNTHESIS.md is assembled, for every FD-xxx with a Dr. Nadia PASS
+      AND a Dr. Rami WARNING/REJECT, the synthesis must default to the
+      stricter verdict and cite both reviewers. Red-team also gets a say for
+      any of: FD-003 (misconception), FD-008 (AI grading), FD-009 (Socratic),
+      FD-019 (Mashov).
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (future)
+      ## Definition of Done
+      - [ ] Synthesis reviewer algorithm documented
+      - [ ] Every FD has final verdict + reviewer chain
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-synth --result "<branch>"
+    source_doc_lines: [L1-L410]
+verdict: adopt
+verdict_reason: |
+  Useful cross-examination doc. Red-team only adds the rule that pedagogy
+  PASS does not override a security or evidence-integrity REJECT from
+  sibling reviewers.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: Evidence integrity per Dr. Rami's parallel review
+  - to: persona-ethics
+    about: FD-016 competition framing

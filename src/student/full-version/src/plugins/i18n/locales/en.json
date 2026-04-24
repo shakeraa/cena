@@ -1,0 +1,1578 @@
+{
+  "2": "2",
+  "3": "3",
+  "5": "5",
+  "10": "10",
+  "20": "20",
+  "25": "25",
+  "50": "50",
+  "100": "100",
+  "UI Elements": "UI Elements",
+  "Forms & Tables": "Forms & Tables",
+  "Pages": "Pages",
+  "Charts & Maps": "Charts & Maps",
+  "Others": "Others",
+  "Typography": "Typography",
+  "Cards": "Cards",
+  "Basic": "Basic",
+  "Advance": "Advance",
+  "Widgets": "Widgets",
+  "Components": "Components",
+  "Alert": "Alert",
+  "Close Alert": "Close Alert",
+  "Avatar": "Avatar",
+  "Badge": "Badge",
+  "Button": "Button",
+  "Calendar": "Calendar",
+  "Kanban": "Kanban",
+  "Image": "Image",
+  "Pagination": "Pagination",
+  "Progress Circular": "Progress Circular",
+  "Progress Linear": "Progress Linear",
+  "Autocomplete": "Autocomplete",
+  "Tooltip": "Tooltip",
+  "Slider": "Slider",
+  "Date Time Picker": "Date Time Picker",
+  "Select": "Select",
+  "Switch": "Switch",
+  "Checkbox": "Checkbox",
+  "Radio": "Radio",
+  "Textarea": "Textarea",
+  "Rating": "Rating",
+  "File Input": "File Input",
+  "Otp Input": "Otp Input",
+  "Form Layout": "Form Layout",
+  "Form Validation": "Form Validation",
+  "Charts": "Charts",
+  "Apex Chart": "Apex Chart",
+  "Chartjs": "Chartjs",
+  "Account Settings": "Account Settings",
+  "User Profile": "User Profile",
+  "FAQ": "FAQ",
+  "Dialog Examples": "Dialog Examples",
+  "Pricing": "Pricing",
+  "List": "List",
+  "Edit": "Edit",
+  "Nav Levels": "Nav Levels",
+  "Level 2.1": "Level 2.1",
+  "Level 2.2": "Level 2.2",
+  "Level 3.1": "Level 3.1",
+  "Level 3.2": "Level 3.2",
+  "Raise Support": "Raise Support",
+  "Documentation": "Documentation",
+  "Dashboards": "Dashboards",
+  "Analytics": "Analytics",
+  "Apps & Pages": "Apps & Pages",
+  "Email": "Email",
+  "Chat": "Chat",
+  "Invoice": "Invoice",
+  "Preview": "Preview",
+  "Add": "Add",
+  "User": "User",
+  "View": "View",
+  "Login v1": "Login v1",
+  "Login v2": "Login v2",
+  "Login": "Login",
+  "Register v1": "Register v1",
+  "Register v2": "Register v2",
+  "Register": "Register",
+  "Forget Password v1": "Forget Password v1",
+  "Forget Password v2": "Forget Password v2",
+  "Forgot Password v1": "Forgot Password v1",
+  "Forgot Password v2": "Forgot Password v2",
+  "Forgot Password": "Forgot Password",
+  "Reset Password v1": "Reset Password v1",
+  "Reset Password v2": "Reset Password v2",
+  "Reset Password": "Reset Password",
+  "Miscellaneous": "Miscellaneous",
+  "Coming Soon": "Coming Soon",
+  "Not Authorized": "Not Authorized",
+  "Under Maintenance": "Under Maintenance",
+  "Error": "Error",
+  "Statistics": "Statistics",
+  "Actions": "Actions",
+  "Access Control": "Access Control",
+  "User Interface": "User Interface",
+  "CRM": "CRM",
+  "eCommerce": "eCommerce",
+  "Icons": "Icons",
+  "Chip": "Chip",
+  "Dialog": "Dialog",
+  "Expansion Panel": "Expansion Panel",
+  "Combobox": "Combobox",
+  "Textfield": "Textfield",
+  "Range Slider": "Range Slider",
+  "Menu": "Menu",
+  "Snackbar": "Snackbar",
+  "Tabs": "Tabs",
+  "Form Elements": "Form Elements",
+  "Form Layouts": "Form Layouts",
+  "Authentication": "Authentication",
+  "Page Not Found - 404": "Page Not Found - 404",
+  "Not Authorized - 401": "Not Authorized - 401",
+  "Server Error - 500": "Server Error - 500",
+  "Forms": "Forms",
+  "Timeline": "Timeline",
+  "Disabled Menu": "Disabled Menu",
+  "Help Center": "Help Center",
+  "Verify Email": "Verify Email",
+  "Verify Email v1": "Verify Email v1",
+  "Verify Email v2": "Verify Email v2",
+  "Two Steps": "Two Steps",
+  "Two Steps v1": "Two Steps v1",
+  "Two Steps v2": "Two Steps v2",
+  "Custom Input": "Custom Input",
+  "Extensions": "Extensions",
+  "Tour": "Tour",
+  "Register Multi-Steps": "Register Multi-Steps",
+  "Wizard Examples": "Wizard Examples",
+  "Checkout": "Checkout",
+  "Create Deal": "Create Deal",
+  "Property Listing": "Property Listing",
+  "Roles & Permissions": "Roles & Permissions",
+  "Roles": "Roles",
+  "Simple Table": "Simple Table",
+  "Tables": "Tables",
+  "Data Table": "Data Table",
+  "Permissions": "Permissions",
+  "Apps": "Apps",
+  "Misc": "Misc",
+  "Wizard Pages": "Wizard Pages",
+  "Form Wizard": "Form Wizard",
+  "Numbered": "Numbered",
+  "ecommerce": "ecommerce",
+  "Ecommerce": "Ecommerce",
+  "Editors": "Editors",
+  "Front Pages": "Front Pages",
+  "Landing": "Landing",
+  "checkout": "checkout",
+  "Payment": "Payment",
+  "Swiper": "Swiper",
+  "Product": "Product",
+  "Category": "Category",
+  "Order": "Order",
+  "Details": "Details",
+  "Customer": "Customer",
+  "Manage Review": "Manage Review",
+  "Referrals": "Referrals",
+  "Settings": "Settings",
+  "Overview": "Overview",
+  "My Course": "My Course",
+  "Course Details": "Course Details",
+  "Academy": "Academy",
+  "Logistics": "Logistics",
+  "Dashboard": "Dashboard",
+  "Fleet": "Fleet",
+  "Shortcut": "Shortcut",
+  "Appointments": "Appointments",
+  "Invoice App": "Invoice App",
+  "Manage Accounts": "Manage Accounts",
+  "Users": "Users",
+  "Manage Users": "Manage Users",
+  "Role Management": "Role Management",
+  "Permission": "Permission",
+  "Dashboard Analytics": "Dashboard Analytics",
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "loading": "Loading…",
+    "error": "Error",
+    "close": "Close",
+    "retry": "Retry",
+    "copy": "Copy",
+    "errorGeneric": "Something went wrong. Please try again."
+  },
+  "nav": {
+    "home": "Home",
+    "sessions": "Sessions",
+    "progress": "Progress",
+    "tutor": "Tutor",
+    "profile": "Profile",
+    "settings": "Settings",
+    "pricing": "Pricing",
+    "subscription": "My subscription",
+    "signOut": "Sign out",
+    "login": "Sign in",
+    "register": "Sign up",
+    "forgotPassword": "Reset password",
+    "onboarding": "Get started",
+    "startSession": "Start Session",
+    "session": "Session",
+    "sessionSummary": "Session Summary",
+    "sessionReplay": "Session Replay",
+    "challenges": "Challenges",
+    "bossBattles": "Boss Battles",
+    "dailyChallenge": "Daily Challenge",
+    "cardChain": "Card Chain",
+    "sessionHistory": "Session History",
+    "sessionDetail": "Session Detail",
+    "mastery": "Mastery",
+    "learningTime": "Learning Time",
+    "knowledgeGraph": "Knowledge Graph",
+    "concept": "Concept",
+    "tutorThread": "Conversation",
+    "classFeed": "Class Feed",
+    "peerSolutions": "Peer Solutions",
+    "leaderboard": "Leaderboard",
+    "friends": "Friends",
+    "diagram": "Diagram",
+    "notifications": "Notifications",
+    "profileEdit": "Edit Profile",
+    "settingsAccount": "Account & Security",
+    "settingsAppearance": "Appearance",
+    "settingsNotifications": "Notification Preferences",
+    "settingsPrivacy": "Data & Privacy",
+    "userMenu": "Account menu for {name}",
+    "notificationsBell": "Notifications",
+    "aiTutor": "AI Tutor",
+    "snapProblem": "Snap Problem",
+    "uploadProblem": "Upload Problem",
+    "overview": "Overview"
+  },
+  "navSection": {
+    "learn": "Learn",
+    "practice": "Practice",
+    "progress": "Progress",
+    "community": "Community",
+    "account": "Account"
+  },
+  "a11y": {
+    "openToolbar": "Open accessibility toolbar",
+    "closeToolbar": "Close accessibility toolbar",
+    "toolbarTitle": "Accessibility",
+    "language": "Language",
+    "textSize": "Text size",
+    "increaseTextSize": "Increase text size",
+    "decreaseTextSize": "Decrease text size",
+    "highContrast": "High contrast",
+    "reducedMotion": "Reduce motion",
+    "dyslexiaFont": "Dyslexia-friendly font",
+    "resetDefaults": "Reset to defaults",
+    "legalNote": "These settings persist on this device. Per the Equal Rights for Persons with Disabilities Law (5758-1998) and Accessibility Regulations (5773-2013).",
+    "accessibilityStatement": "Accessibility statement",
+    "size": {
+      "xsmall": "Extra small",
+      "small": "Small",
+      "medium": "Medium (default)",
+      "large": "Large",
+      "xlarge": "Extra large",
+      "xxlarge": "Maximum"
+    },
+    "numerals": {
+      "label": "Numerals",
+      "auto": "Automatic (follow language)",
+      "western": "Western (0-9)",
+      "eastern": "Eastern Arabic (٠-٩)"
+    },
+    "lineHeight": "Line spacing",
+    "lineHeightHint": "Adjust space between lines for easier reading.",
+    "colorBlindMode": "Color-blind filter",
+    "colorBlindHint": "Simulate what a color-blind student sees — useful for teachers auditing their own materials.",
+    "cbNone": "Off",
+    "cbProtanopia": "Protanopia (red-weak)",
+    "cbDeuteranopia": "Deuteranopia (green-weak)",
+    "cbTritanopia": "Tritanopia (blue-weak)",
+    "underlineLinks": "Underline all links",
+    "shortcutHint": "Tip: press Alt+A to open this toolbar from any screen.",
+    "skipToToolbar": "Skip to accessibility toolbar",
+    "announce": {
+      "textSize": "Text size: {value}",
+      "contrast": "High contrast: {value}",
+      "motion": "Reduce motion: {value}",
+      "dyslexia": "Dyslexia-friendly font: {value}",
+      "lineHeight": "Line spacing: {value}",
+      "colorBlind": "Color-blind filter: {value}",
+      "underlineLinks": "Underline all links: {value}",
+      "language": "Language: {value}",
+      "numerals": "Numerals: {value}",
+      "reset": "Accessibility preferences reset to defaults",
+      "enabled": "on",
+      "disabled": "off"
+    }
+  },
+  "status": {
+    "online": "Online",
+    "offline": "Offline",
+    "syncing": "Syncing…",
+    "saved": "Saved"
+  },
+  "error": {
+    "network": "Network error. Check your connection.",
+    "unauthorized": "You need to sign in to continue.",
+    "notFound": "We couldn't find that.",
+    "serverError": "Something went wrong on our end.",
+    "tryAgain": "Try again",
+    "reportToSupport": "Report to support",
+    "errorCode": "Error code"
+  },
+  "empty": {
+    "noSessions": "No sessions yet",
+    "noSessionsSubtitle": "Start your first learning session to see it here.",
+    "noNotifications": "You're all caught up",
+    "noResults": "No results found"
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signUp": "Sign up",
+    "forgotPassword": "Forgot password",
+    "email": "Email",
+    "password": "Password",
+    "displayName": "Display name",
+    "emailPlaceholder": "Enter your email",
+    "passwordPlaceholder": "Your password",
+    "displayNamePlaceholder": "How should we call you?",
+    "signInCta": "Sign in",
+    "signUpCta": "Create account",
+    "resetPasswordCta": "Send reset link",
+    "noAccount": "New to Cena?",
+    "haveAccount": "Already have an account?",
+    "signInLink": "Sign in",
+    "signUpLink": "Create one",
+    "forgotPasswordLink": "Forgot your password?",
+    "backToSignIn": "Back to sign in",
+    "welcome": "Welcome back",
+    "welcomeSubtitle": "Sign in to continue your learning journey.",
+    "joinCena": "Join Cena",
+    "joinCenaSubtitle": "Create a free account to start learning at your own pace.",
+    "resetYourPassword": "Reset your password",
+    "resetYourPasswordSubtitle": "Enter the email you used to sign up and we'll send a reset link.",
+    "resetUnavailableTitle": "Account recovery isn't available from the app",
+    "resetUnavailableBody": "Self-service password reset isn't wired into this build yet. If you can't sign in, please contact your school admin or teacher — they can reset your password on your behalf.",
+    "resetContactAdmin": "Contact your school admin",
+    "checkEmail": "Check your email",
+    "checkEmailSubtitle": "If an account with that email exists, a reset link has been sent.",
+    "resetRateLimited": "Too many requests. Please try again in a few minutes.",
+    "resetServiceUnavailable": "Service temporarily unavailable. Please try again later.",
+    "resetUnexpectedError": "Something went wrong. Please try again later.",
+    "emailRequired": "Email is required.",
+    "emailInvalid": "Enter a valid email address.",
+    "passwordRequired": "Password is required.",
+    "passwordMinLength": "Password must be at least 6 characters.",
+    "displayNameRequired": "Display name is required.",
+    "invalidCredentials": "That email and password don't match. Try again?",
+    "emailAlreadyExists": "An account with this email already exists.",
+    "tooManyAttempts": "Too many failed attempts. Please try again later.",
+    "tryAgainInSeconds": "Try again in {seconds}s",
+    "accountDisabled": "This account has been disabled. Contact your school admin.",
+    "signInFailed": "Sign in failed. Please try again.",
+    "providerSignInFailed": "Sign in with {provider} failed. Please try again.",
+    "providerSignInCancelled": "Sign in was cancelled.",
+    "networkError": "Network error. Check your connection and try again.",
+    "emailNotVerified": "Please verify your email address before signing in.",
+    "continueWith": "or continue with",
+    "providers": {
+      "google": "Continue with Google",
+      "apple": "Continue with Apple",
+      "microsoft": "Continue with Microsoft",
+      "phone": "Continue with phone",
+      "phoneComingSoon": "SMS sign-in is coming soon. Use email or another provider for now."
+    },
+    "ageGate": {
+      "title": "When were you born?",
+      "subtitle": "We need your date of birth to set up your account safely.",
+      "dobLabel": "Date of birth",
+      "dobRequired": "Date of birth is required.",
+      "dobInvalid": "Please enter a valid date of birth.",
+      "dobFuture": "Date of birth cannot be in the future.",
+      "tooYoung": "You must be at least 4 years old to use Cena.",
+      "ageConfirmed": "You are {age} years old. You can create your account.",
+      "parentRequired": "Because of your age, a parent or guardian needs to give permission before you can create an account.",
+      "privacyNotice": "Your date of birth is stored securely and used only to verify your age. We never share it with other users."
+    },
+    "parentConsent": {
+      "title": "Parent or guardian permission",
+      "subtitle": "Because you are {age} years old, we need your parent or guardian to approve your account.",
+      "emailLabel": "Parent or guardian email",
+      "emailPlaceholder": "parent{'@'}example.com",
+      "emailRequired": "A parent or guardian email is required.",
+      "emailInvalid": "Please enter a valid email address.",
+      "whatWeCollect": "What information we collect",
+      "collectName": "Display name (chosen by the student)",
+      "collectEmail": "Email address (for sign-in and account recovery)",
+      "collectDob": "Date of birth (for age verification only)",
+      "collectProgress": "Learning progress and session activity",
+      "whyWeCollect": "Why we collect this information",
+      "whyExplanation": "Cena is a learning platform that adapts to each student's pace. We collect the minimum information needed to provide a personalized, safe learning experience. We never sell personal data or show advertising.",
+      "consentLabel": "I am the parent or guardian and I give permission for this account to be created.",
+      "verificationNotice": "We will send a verification email to the parent or guardian address. The account will have limited features until the parent confirms."
+    }
+  },
+  "progress": {
+    "sessionsUnavailable": "Could not load your session data. Try again.",
+    "title": "Your progress",
+    "subtitle": "Track your journey, earn rewards, and see where you stand.",
+    "time": {
+      "title": "Learning time",
+      "subtitle": "30 days of minutes studied.",
+      "chartTitle": "Daily minutes",
+      "chartSubtitle": "Last 30 days",
+      "chartAria": "Time breakdown chart: {total} total minute, {avg} average per day | Time breakdown chart: {total} total minutes, {avg} average per day",
+      "avgPerDay": "Avg / day",
+      "today": "Today",
+      "kpi30dayTotal": "30-day total",
+      "kpi7dayTotal": "Last 7 days",
+      "kpi7dayActiveDays": "Days you learned",
+      "ofNDaysWindow": "of 7"
+    },
+    "mastery": {
+      "title": "Subject mastery",
+      "subtitle": "Your progress across every subject you're learning.",
+      "overallLabel": "Overall mastery",
+      "masteryLabel": "Mastery",
+      "questionsAttempted": "{count} question attempted | {count} questions attempted",
+      "accuracy": "{percent}% accuracy",
+      "rowAria": "{subject}: {percent} percent mastery"
+    },
+    "sessions": {
+      "title": "Session history",
+      "subtitle": "Recent learning sessions — tap any to review.",
+      "activeLabel": "Active session",
+      "resume": "Resume",
+      "justNow": "just now",
+      "hoursAgo": "{count}h ago | {count}h ago",
+      "daysAgo": "{count}d ago | {count}d ago"
+    }
+  },
+  "gamification": {
+    "xp": {
+      "levelLabel": "Level",
+      "currentXp": "{current} / {target} XP",
+      "xpToGo": "{count} XP to go | {count} XP to go",
+      "totalEarned": "Total earned: {total} XP | Total earned: {total} XP",
+      "progressAria": "Level progress: {percent} percent"
+    },
+    "badges": {
+      "title": "Badges",
+      "counter": "{earned} of {total} | {earned} of {total}",
+      "earnedHeading": "Earned",
+      "lockedHeading": "Locked",
+      "tier": {
+        "bronze": "Bronze",
+        "silver": "Silver",
+        "gold": "Gold",
+        "platinum": "Platinum"
+      }
+    },
+    "leaderboard": {
+      "title": "Leaderboard",
+      "yourRank": "Your rank: #{rank}",
+      "youChip": "You",
+      "xpLabel": "{xp} XP | {xp} XP",
+      "xpValue": "{xp} XP | {xp} XP"
+    }
+  },
+  "leaderboard": {
+    "unavailable": "Could not load the leaderboard. Try again.",
+    "title": "Leaderboard",
+    "subtitle": "See how you stack up against other learners.",
+    "yourRankLabel": "Your current rank",
+    "yourRankValue": "#{rank}",
+    "youChip": "You",
+    "xpValue": "{xp} XP | {xp} XP",
+    "scope": {
+      "global": "Global",
+      "class": "My class",
+      "friends": "Friends"
+    }
+  },
+  "shortcuts": {
+    "title": "Keyboard shortcuts",
+    "subtitle": "Work faster with your keyboard.",
+    "empty": "No shortcuts registered yet.",
+    "scopes": {
+      "global": "Global",
+      "session": "Learning session",
+      "tutor": "AI tutor",
+      "graph": "Knowledge graph",
+      "palette": "Command palette"
+    }
+  },
+  "commandPalette": {
+    "placeholder": "Type a command or search…",
+    "empty": "No matching commands",
+    "category": {
+      "navigate": "Go to",
+      "action": "Action"
+    },
+    "cmds": {
+      "home": "Go to Home",
+      "startSession": "Start a session",
+      "progress": "View progress",
+      "tutor": "Open AI tutor",
+      "challenges": "View challenges",
+      "knowledgeGraph": "Browse knowledge graph",
+      "leaderboard": "View leaderboard",
+      "social": "Open class feed",
+      "notifications": "View notifications",
+      "profile": "View my profile",
+      "settings": "Open settings",
+      "toggleTheme": "Toggle dark/light theme",
+      "signOut": "Sign out"
+    }
+  },
+  "notifications": {
+    "unavailable": "Could not load notifications. Try again.",
+    "title": "Notifications",
+    "subtitle": "Stay on top of your learning progress.",
+    "markAllRead": "Mark all as read",
+    "unreadCount": "{count} unread | {count} unread",
+    "emptyTitle": "You're all caught up",
+    "emptySubtitle": "No new notifications.",
+    "justNow": "just now",
+    "minutesAgo": "{count}m ago | {count}m ago",
+    "hoursAgo": "{count}h ago | {count}h ago",
+    "daysAgo": "{count}d ago | {count}d ago"
+  },
+  "profile": {
+    "editProfile": "Edit profile",
+    "editTitle": "Edit profile",
+    "editSubtitle": "Update how you appear to classmates.",
+    "editSaved": "Profile saved.",
+    "levelLabel": "Level {level}",
+    "streakLabel": "{count}-day streak | {count}-day streak",
+    "aboutTitle": "About",
+    "bioEmpty": "No bio yet. Add one from edit profile.",
+    "bioLabel": "Bio",
+    "bioPlaceholder": "Tell classmates a bit about yourself…",
+    "favoriteSubjectsTitle": "Favorite subjects",
+    "subjectsEmpty": "No favorite subjects selected yet.",
+    "displayNameLabel": "Display name",
+    "visibilityLabel": "Profile visibility",
+    "visibilityPublic": "Public",
+    "visibilityClass": "Classmates only",
+    "visibilityPrivate": "Private"
+  },
+  "settingsPage": {
+    "title": "Settings",
+    "subtitle": "Customize your Cena experience.",
+    "account": {
+      "title": "Account",
+      "subtitle": "Sign-in info, sign out, delete account",
+      "accountInfo": "Account info",
+      "studentId": "Student ID",
+      "role": "Role",
+      "signOutTitle": "Sign out",
+      "signOutSubtitle": "You'll need to sign back in to continue learning."
+    },
+    "appearance": {
+      "title": "Appearance",
+      "subtitle": "Theme, language, text size",
+      "themeLabel": "Theme",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "languageLabel": "Language"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "subtitle": "Email, push, and reminder preferences",
+      "email": "Email notifications",
+      "push": "Push notifications",
+      "dailyReminder": "Daily study reminder",
+      "weekly": "Weekly progress summary",
+      "streakAlerts": "Streak alerts",
+      "newContent": "New content alerts",
+      "saveError": "Could not save your notification preferences. Please try again."
+    },
+    "privacy": {
+      "title": "Privacy",
+      "subtitle": "Data sharing and visibility",
+      "showProgressToClass": "Show my progress to classmates",
+      "allowPeerComparison": "Allow peer comparison",
+      "shareAnalytics": "Share anonymized analytics",
+      "dataRightsTitle": "Your Data Rights",
+      "dataRightsSubtitle": "Under GDPR and privacy laws, you have the right to access, export, and delete your personal data.",
+      "downloadData": "Download my data",
+      "deleteData": "Request data deletion",
+      "whatData": "What data do you have about me?",
+      "exportDialogTitle": "Download your data",
+      "exportDialogBody": "We will generate a JSON file containing all personal data Cena holds about you, including your profile, learning sessions, and tutor history.",
+      "exportConfirm": "Download",
+      "exportSuccess": "Your data export has been downloaded successfully.",
+      "exportError": "Could not generate your data export. Please try again later.",
+      "erasureDialogTitle": "Request account deletion",
+      "erasureDialogBody": "This will start a 30-day cooling period. During this time you can cancel the request. After 30 days, all your personal data will be permanently deleted and cannot be recovered.",
+      "erasureConfirm": "Request deletion",
+      "erasureSuccess": "Your data deletion request has been submitted. You have 30 days to cancel.",
+      "erasureError": "Could not submit your deletion request. Please try again later.",
+      "erasureActiveBanner": "You have an active deletion request (status: {status}). Data will be deleted after {date}.",
+      "dsarDialogTitle": "Data Subject Access Request",
+      "dsarDialogBody": "Send a request to our Data Protection Officer to learn what data we hold about you and how it is processed. We will respond within 30 days.",
+      "dsarMessageLabel": "Your message",
+      "dsarMessagePlaceholder": "Describe what information you would like to know about...",
+      "dsarConfirm": "Submit request",
+      "dsarSuccess": "Your request has been submitted. Tracking ID: {trackingId}. We will respond within 30 days.",
+      "dsarError": "Could not submit your request. Please try again later."
+    },
+    "studyPlan": {
+      "title": "Study plan",
+      "subtitle": "Manage the exams you're preparing for.",
+      "activeHeading": "Active targets",
+      "archivedHeading": "Archived",
+      "addTarget": "Add a target",
+      "editTarget": "Edit target",
+      "archiveTarget": "Archive target",
+      "archiveConfirm": "Archive this target? You can still see it in the archived list for a retention window.",
+      "archiveConfirmYes": "Archive",
+      "noActiveTargets": "You have no active targets. Add one to get started.",
+      "noArchivedTargets": "No archived targets.",
+      "totalWeeklyHours": "Total weekly hours: {hours}h",
+      "overLimitWarning": "Total weekly hours exceeds 40. Please reduce before saving.",
+      "fields": {
+        "examCode": "Exam",
+        "track": "Track",
+        "sitting": "Sitting",
+        "weeklyHours": "Weekly hours",
+        "reasonTag": "Why"
+      },
+      "actions": {
+        "save": "Save",
+        "cancel": "Cancel",
+        "close": "Close"
+      },
+      "errors": {
+        "loadFailed": "Could not load your study plan. Please try again.",
+        "addFailed": "Could not add the target. Please try again.",
+        "updateFailed": "Could not save your changes. Please try again.",
+        "archiveFailed": "Could not archive the target. Please try again."
+      },
+      "parentVisibility": {
+        "label": "Parent dashboard visibility",
+        "visible": "Visible to parent",
+        "hidden": "Hidden from parent",
+        "helpText": "Students aged 13 and over can decide whether each exam target appears on their parent's dashboard. Safety-flagged targets always remain visible.",
+        "toggleFailed": "Could not update visibility. Please try again."
+      }
+    }
+  },
+  "social": {
+    "feedUnavailable": "Could not load the class feed. Try again.",
+    "friendsUnavailable": "Could not load your friends list. Try again.",
+    "feed": {
+      "title": "Class feed",
+      "subtitle": "See what your classmates are up to.",
+      "justNow": "just now",
+      "minutesAgo": "{count}m ago | {count}m ago",
+      "hoursAgo": "{count}h ago | {count}h ago",
+      "kind": {
+        "achievement": "Achievement",
+        "milestone": "Milestone",
+        "question": "Question",
+        "announcement": "Announcement"
+      },
+      "reactionAriaLabel": "Like, {count} reaction | Like, {count} reactions",
+      "commentAriaLabel": "Comments, {count} | Comments, {count}",
+      "reactionError": "Could not save your reaction. Please try again."
+    },
+    "peers": {
+      "title": "Peer solutions",
+      "subtitle": "Learn from how others solved the same questions.",
+      "forQuestion": "Question #{questionId}",
+      "voteError": "Could not save your vote. Please try again."
+    },
+    "friends": {
+      "title": "Friends",
+      "subtitle": "Your learning circle.",
+      "pendingTitle": "Friend requests",
+      "wantsToConnect": "wants to connect",
+      "accept": "Accept",
+      "listTitle": "Friends ({count}) | Friends ({count})",
+      "level": "Level {level}",
+      "streak": "{count}-day streak | {count}-day streak",
+      "online": "Online",
+      "offline": "Offline",
+      "acceptError": "Could not accept the friend request. Please try again."
+    },
+    "report": {
+      "title": "Report content",
+      "description": "Help us keep the community safe. Select a reason for reporting this content.",
+      "categoryLabel": "Why are you reporting this?",
+      "category": {
+        "bullying": "Bullying or harassment",
+        "inappropriate": "Inappropriate content",
+        "spam": "Spam",
+        "self-harm-risk": "Self-harm or safety concern",
+        "other": "Other"
+      },
+      "reasonLabel": "Additional details (optional)",
+      "reasonPlaceholder": "Tell us more about what happened…",
+      "submitBtn": "Submit report",
+      "submitError": "Could not submit your report. Please try again.",
+      "success": "Thank you. Your report has been submitted and will be reviewed.",
+      "ariaLabel": "Report this content"
+    },
+    "block": {
+      "title": "Block user",
+      "confirmMessage": "Are you sure you want to block {name}? You will no longer see their posts, comments, or solutions.",
+      "confirmBtn": "Block",
+      "error": "Could not block this user. Please try again.",
+      "success": "User blocked. Their content will no longer appear in your feed.",
+      "ariaLabel": "Block {name}"
+    }
+  },
+  "knowledgeGraph": {
+    "unavailable": "Could not load the knowledge graph. Try again.",
+    "title": "Knowledge graph",
+    "subtitle": "Explore concepts, see prerequisites, and plan your learning path.",
+    "progressLabel": "Mastered in this subject",
+    "status": {
+      "locked": "Locked",
+      "available": "Available",
+      "in-progress": "In progress",
+      "mastered": "Mastered"
+    },
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "detail": {
+      "masteryLabel": "Your mastery",
+      "estimatedMinutes": "~{minutes} min | ~{minutes} min",
+      "questionCount": "Questions",
+      "subject": "Subject",
+      "prerequisitesTitle": "Prerequisites",
+      "prerequisitesEmpty": "No prerequisites — you can start this any time.",
+      "dependenciesTitle": "Unlocks",
+      "dependenciesEmpty": "Nothing depends on this concept.",
+      "startSession": "Practice this concept"
+    }
+  },
+  "session": {
+    "setup": {
+      "title": "Start a learning session",
+      "subtitle": "Pick subjects, a duration, and a mode to begin.",
+      "subjectsLabel": "Subjects",
+      "durationLabel": "Duration",
+      "durationMinutes": "{minutes} min | {minutes} min",
+      "modeLabel": "Mode",
+      "startCta": "Start session",
+      "subjectChipGroupLabel": "Select subjects",
+      "subjects": {
+        "math": "Math",
+        "physics": "Physics",
+        "chemistry": "Chemistry",
+        "biology": "Biology",
+        "english": "English",
+        "history": "History"
+      },
+      "modes": {
+        "practice": "Practice",
+        "challenge": "Challenge",
+        "review": "Review",
+        "diagnostic": "Diagnostic"
+      }
+    },
+    "runner": {
+      "questionProgress": "Question {current} of {total} | Question {current} of {total}",
+      "progressAria": "Question {current} of {total} | Question {current} of {total}",
+      "choicesAria": "Answer choices",
+      "submitAnswer": "Submit",
+      "correct": "Correct!",
+      "wrong": "Not quite.",
+      "xpAwarded": "+{xp} XP | +{xp} XP",
+      "exit": "Exit",
+      "exitAria": "Exit session",
+      "sessionIdLabel": "Session",
+      "completing": "Finishing up…",
+      "continueWhenReady": "Continue",
+      "workedExampleLabel": "Worked example",
+      "fadedExampleLabel": "Try completing the remaining steps",
+      "nextStep": "Next step",
+      "stepProgress": "Step {current} of {total}: {description}",
+      "stepAria": "Step {n}: {description}",
+      "fadedStepPlaceholder": "Your answer",
+      "fadedStepCheck": "Check",
+      "fadedStepCorrect": "Correct!",
+      "fadedStepIncorrect": "Expected: {expected}",
+      "hintStep": {
+        "1": "A gentle nudge",
+        "2": "Building the idea",
+        "3": "Walking through it",
+        "4": "The key step",
+        "5": "A worked example"
+      },
+      "hintLadder": {
+        "moreHint": "More help",
+        "previousRungs": "Earlier suggestions",
+        "imStuck": "I'm stuck"
+      },
+      "stuckCta": "I'm stuck",
+      "explanationLangNote": "Explanation (English)",
+      "fbd": {
+        "diagramAria": "Free-body diagram construction area"
+      }
+    },
+    "summary": {
+      "title": "Session complete",
+      "subtitle": "Here's how you did.",
+      "xpEarned": "XP earned",
+      "accuracy": "Accuracy",
+      "correctCount": "Correct",
+      "duration": "Duration",
+      "durationSecs": "{secs}s | {secs}s",
+      "durationMinsSecs": "{mins}m {secs}s | {mins}m {secs}s",
+      "startAnother": "Start another",
+      "backToHome": "Back to home"
+    },
+    "mathInput": {
+      "enterExpression": "Enter math expression",
+      "enterLatex": "Enter LaTeX expression",
+      "verbalExplanation": "Explain your reasoning",
+      "verbalPlaceholder": "Describe your approach…",
+      "normalizedAs": "We understood your input as"
+    }
+  },
+  "sidekick": {
+    "title": "Your study sidekick",
+    "trigger": "Sidekick",
+    "openAria": "Open study sidekick",
+    "closeAria": "Close sidekick",
+    "intent": {
+      "toolbar": "Pick what to explain",
+      "explainQuestion": "Explain this question",
+      "explainStep": "Explain this step",
+      "explainConcept": "Explain the concept",
+      "freeForm": "Ask something",
+      "explainQuestionPrompt": "Can you walk me through this question?",
+      "explainStepPrompt": "Can you explain this step?",
+      "explainConceptPrompt": "Can you explain the underlying concept?"
+    },
+    "context": {
+      "rung": "Hint depth",
+      "lastFocus": "Last focus",
+      "minutesLeft": "Study minutes today"
+    },
+    "composer": {
+      "placeholder": "Ask anything about this problem…",
+      "ariaLabel": "Type a message to your sidekick",
+      "send": "Send"
+    },
+    "stream": {
+      "aria": "Sidekick conversation",
+      "thinking": "Thinking…",
+      "leakRedacted": "I held that answer back — let's work through it together."
+    },
+    "circuit": {
+      "resting": "The sidekick is resting right now — try a hint instead.",
+      "openLadder": "Open hint ladder"
+    }
+  },
+  "challenges": {
+    "unavailable": "Could not load challenges. Try again.",
+    "hub": {
+      "title": "Challenges",
+      "subtitle": "Daily challenges, boss battles, and tournaments to keep your learning streak on fire."
+    },
+    "difficulty": {
+      "easy": "Easy",
+      "medium": "Medium",
+      "hard": "Hard"
+    },
+    "daily": {
+      "label": "Today's daily challenge",
+      "start": "Start challenge",
+      "reattempt": "Try again",
+      "attempted": "Attempted",
+      "expired": "Expired",
+      "timeLeft": "{hours}h {minutes}m left | {hours}h {minutes}m left"
+    },
+    "boss": {
+      "title": "Boss battles",
+      "subtitle": "Test your mastery against our toughest opponents.",
+      "requiresLevel": "Requires mastery level {level}"
+    },
+    "chains": {
+      "title": "Card chains",
+      "subtitle": "Build mastery one concept at a time.",
+      "cardsUnlocked": "{unlocked} / {total} card unlocked | {unlocked} / {total} cards unlocked",
+      "progressAria": "{unlocked} of {total} card unlocked | {unlocked} of {total} cards unlocked"
+    },
+    "tournaments": {
+      "title": "Tournaments",
+      "subtitle": "Compete with students across your class or globally.",
+      "active": "Live",
+      "upcoming": "Upcoming",
+      "participants": "{count} participant | {count} participants",
+      "empty": "No tournaments running right now. Check back soon."
+    }
+  },
+  "tutor": {
+    "threadsUnavailable": "Could not load your tutor conversations. Try again.",
+    "listPage": {
+      "title": "AI Tutor",
+      "subtitle": "Ask anything. Your tutor is here to help you learn.",
+      "newThread": "New conversation",
+      "emptyTitle": "No conversations yet",
+      "emptySubtitle": "Start a new thread to ask your first question."
+    },
+    "threadList": {
+      "messageCount": "{count} message | {count} messages",
+      "justNow": "just now",
+      "minutesAgo": "{count}m ago | {count}m ago",
+      "hoursAgo": "{count}h ago | {count}h ago",
+      "daysAgo": "{count}d ago | {count}d ago"
+    },
+    "thread": {
+      "emptyTitle": "Ask your first question",
+      "emptySubtitle": "Try something like 'Explain photosynthesis' or 'Help me solve x² − 5x + 6 = 0'.",
+      "thinking": "Tutor is thinking…",
+      "dpaDisclosure": "Your conversations are processed by AI. See our Privacy Policy for details."
+    },
+    "compose": {
+      "placeholder": "Ask your tutor anything…",
+      "sendAria": "Send message"
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "Good morning, {name}",
+      "afternoon": "Good afternoon, {name}",
+      "evening": "Good evening, {name}",
+      "night": "Hi {name}",
+      "fallback": "there",
+      "subtitle": "Here's where you left off and what's next."
+    },
+    "streak": {
+      "singular": "day streak",
+      "plural": "day streak",
+      "newBest": "New best!"
+    },
+    "resume": {
+      "label": "Resume session",
+      "cta": "Continue",
+      "minutesAgo": "Started {count} min ago | Started {count} min ago",
+      "hoursAgo": "Started {count} h ago | Started {count} h ago",
+      "progressAria": "Session progress: {percent} percent"
+    },
+    "quick": {
+      "startSession": "Start Session",
+      "startSessionSubtitle": "Jump into a new learning block",
+      "askTutor": "Ask the Tutor",
+      "askTutorSubtitle": "Get hints and explanations",
+      "dailyChallenge": "Daily Challenge",
+      "dailyChallengeSubtitle": "5 minutes, 5 questions",
+      "progress": "View Progress",
+      "progressSubtitle": "See how far you've come"
+    },
+    "errorState": {
+      "title": "Could not load your home dashboard",
+      "fallback": "Try refreshing the page."
+    },
+    "dashboardUnavailable": "Something went wrong loading your home dashboard. Try again.",
+    "statsAriaLabel": "Your learning stats",
+    "quickActionsHeading": "Quick actions",
+    "emptyStats": {
+      "title": "Your stats appear here after your first session",
+      "body": "Finish a learning session and your minutes, questions answered, and accuracy will show up on this dashboard."
+    },
+    "kpi": {
+      "minutesToday": "Minutes today",
+      "questionsAnswered": "Questions answered",
+      "overallAccuracy": "Overall accuracy",
+      "level": "Level {level}",
+      "sessionsValue": "{count} session | {count} sessions",
+      "unavailable": "—"
+    }
+  },
+  "language": {
+    "english": "English",
+    "arabic": "العربية",
+    "hebrew": "עברית",
+    "switchLanguage": "Switch language"
+  },
+  "aria": {
+    "sidebarToggle": "Toggle sidebar navigation",
+    "languageSwitch": "Switch language",
+    "themeSwitch": "Switch theme",
+    "notifications": "Notifications"
+  },
+  "onboarding": {
+    "stepCounter": "Step {current} of {total}",
+    "welcome": {
+      "title": "Welcome to Cena",
+      "subtitle": "Let's personalize your learning journey in just a couple of steps."
+    },
+    "role": {
+      "title": "Who is learning?",
+      "subtitle": "Pick the option that best describes you so we can tailor your experience.",
+      "student": "Student",
+      "studentDescription": "I'm enrolled in a school or university class.",
+      "selfLearner": "Self-learner",
+      "selfLearnerDescription": "I'm learning on my own for curiosity or career.",
+      "testPrep": "Test prep",
+      "testPrepDescription": "I'm preparing for a specific exam or standardized test.",
+      "homeschool": "Homeschool",
+      "homeschoolDescription": "I'm homeschooled or tutoring a family member.",
+      "none": "Not selected"
+    },
+    "language": {
+      "title": "Choose your language",
+      "subtitle": "You can change this anytime from settings.",
+      "sampleEn": "Keep going — you're doing great.",
+      "sampleAr": "استمر — أنت تبلي بلاءً حسنًا.",
+      "sampleHe": "המשך — אתה עושה עבודה נהדרת."
+    },
+    "diagnostic": {
+      "loading": "Loading diagnostic questions…",
+      "questionCount": "Question {current} of {total}",
+      "progressLabel": "Question {current} of {total}",
+      "optionsLabel": "Choose an answer",
+      "skipAll": "Skip quiz",
+      "confirm": "Confirm"
+    },
+    "perTargetDiagnostic": {
+      "title": "Let's calibrate for {target}",
+      "calibrationFraming": "We're learning what you already know — this is calibration, not a test. Skip anything that feels unfamiliar.",
+      "blockCounter": "Calibration block {current} of {total}",
+      "loading": "Loading items…",
+      "fetchFailed": "Couldn't load items — please try again.",
+      "progress": "Item {current} of up to {max}",
+      "optionsLabel": "Choose an answer",
+      "submit": "Continue",
+      "skipItem": "Skip this item",
+      "skipTarget": "Skip this target — I'll come back later",
+      "feelingPrompt": "How do you feel about {target} so far?",
+      "feelingAria": "How you feel about this topic",
+      "feelingSkip": "Skip this question",
+      "feeling": {
+        "solid": "Solid — I've got this",
+        "unsure": "Unsure — I could use some practice",
+        "anxious": "Anxious — this is hard for me",
+        "new": "New — I haven't seen this before"
+      },
+      "provenance": {
+        "aiRecreated": "Practice item inspired by the exam catalog",
+        "teacherAuthored": "Teacher-authored original",
+        "ministryReference": "Reference material (curator view only)"
+      }
+    },
+    "confirm": {
+      "title": "You're all set",
+      "subtitle": "Review your choices and jump right in.",
+      "roleLabel": "Learner type",
+      "languageLabel": "Language",
+      "cta": "Start learning"
+    },
+    "examTargets": {
+      "title": "Pick your exam targets",
+      "subtitle": "Choose up to {max} — you can change this anytime.",
+      "loading": "Loading catalog…",
+      "fetchFailed": "Couldn't load the catalog — please try again.",
+      "groupLabel": "Exam targets",
+      "capReached": "You've reached the {max}-target cap.",
+      "comingSoon": "Coming {cohort}"
+    },
+    "selfAssessment": {
+      "title": "Tell us about yourself",
+      "subtitle": "This helps us meet you where you are. It's optional — you can skip anything.",
+      "confidenceTitle": "How confident do you feel in each subject?",
+      "confidenceSubtitle": "1 = not at all, 5 = very confident",
+      "strengthsTitle": "What are you good at?",
+      "frictionTitle": "What trips you up?",
+      "feelingsTitle": "How do you feel about each topic?",
+      "feelingsSubtitle": "Pick the closest match for each one.",
+      "freeTextTitle": "Anything else you'd like us to know?",
+      "freeTextPlaceholder": "Optional — up to 200 characters.",
+      "freeTextTooLong": "Please keep it under {max} characters.",
+      "skip": "Skip for now",
+      "continue": "Continue",
+      "subject": {
+        "algebra": "Algebra",
+        "functions": "Functions",
+        "calculus": "Calculus",
+        "geometry": "Geometry",
+        "trigonometry": "Trigonometry",
+        "probability": "Probability",
+        "statistics": "Statistics",
+        "vectors": "Vectors"
+      },
+      "strengthTag": {
+        "visualizer": "I'm good at visualizing",
+        "step-by-step": "I work step by step",
+        "formula-memorizer": "I memorize formulas well",
+        "real-examples": "I connect to real examples",
+        "enjoys-proofs": "I enjoy proofs",
+        "pattern-finder": "I spot patterns",
+        "verbal-explainer": "I explain things out loud",
+        "patient-practice": "I'm patient with practice"
+      },
+      "frictionTag": {
+        "word-problems": "Word problems confuse me",
+        "test-anxiety": "I freeze on tests",
+        "no-starting-point": "I don't know where to start",
+        "loses-track": "I lose track in long problems",
+        "memorization": "Memorizing is hard",
+        "symbolic-notation": "Symbols/notation trip me up",
+        "time-pressure": "Timed work stresses me",
+        "multi-step": "Multi-step problems are tough"
+      },
+      "feeling": {
+        "solid": "Solid",
+        "unsure": "Unsure",
+        "anxious": "Anxious",
+        "new": "Haven't seen it"
+      }
+    },
+    "next": "Next",
+    "back": "Back",
+    "getStarted": "Let's get started",
+    "retakeBanner": {
+      "title": "Welcome back — this is retake prep.",
+      "subtitle": "You've studied this material before. This surface focuses on retrieval practice — short, spaced recall exercises — to help what you already know stick more reliably at exam time.",
+      "approachLabel": "Our approach",
+      "approachBody": "Retrieval practice over restudy (Karpicke & Roediger, 2008): testing yourself in short bursts strengthens memory more than re-reading. Expect more questions, fewer worked examples.",
+      "reassurance": "There is no judgment or shame signal in this surface. You picked a date — that's it.",
+      "dismiss": "Got it"
+    }
+  },
+  "flow": {
+    "warming": "Warming up",
+    "approaching": "Building momentum",
+    "inFlow": "In flow",
+    "disrupted": "Refocus",
+    "fatigued": "Rest"
+  },
+  "mastery": {
+    "novice": "Novice",
+    "learning": "Learning",
+    "proficient": "Proficient",
+    "mastered": "Mastered",
+    "expert": "Expert"
+  },
+  "kpi": {
+    "trendUp": "Trending up",
+    "trendDown": "Trending down",
+    "trendFlat": "No change"
+  },
+  "$vuetify": {
+    "badge": "Badge",
+    "noDataText": "No data available",
+    "close": "Close",
+    "open": "open",
+    "loading": "loading",
+    "carousel": {
+      "ariaLabel": {
+        "delimiter": "delimiter"
+      }
+    },
+    "colorPicker": {
+      "ariaLabel": {
+        "hueSlider": "Hue Slider",
+        "eyedropper": "Eye Dropper",
+        "hexInput": "Hex Input"
+      }
+    },
+    "dataFooter": {
+      "itemsPerPageText": "Items per page:",
+      "itemsPerPageAll": "All",
+      "pageText": "{0}-{1} of {2}",
+      "firstPage": "First Page",
+      "prevPage": "Previous Page",
+      "nextPage": "Next Page",
+      "lastPage": "Last Page"
+    },
+    "pagination": {
+      "ariaLabel": {
+        "root": "root",
+        "previous": "previous",
+        "first": "first",
+        "last": "last",
+        "next": "next",
+        "currentPage": "currentPage",
+        "page": "page"
+      }
+    },
+    "input": {
+      "clear": "clear",
+      "appendAction": "appendAction",
+      "prependAction": "prependAction",
+      "counterSize": "counterSize",
+      "otp": "otp"
+    },
+    "fileInput": {
+      "counterSize": "counterSize"
+    },
+    "rating": {
+      "ariaLabel": {
+        "item": "item"
+      }
+    },
+    "video": {
+      "seek": "Seek",
+      "play": "Play",
+      "pause": "Pause",
+      "showVolume": "Show Volume",
+      "enterFullscreen": "Enter Fullscreen",
+      "volume": "Volume"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "title": "Privacy Policy",
+      "lastUpdated": "Last updated: April 2026",
+      "draftNotice": "Draft awaiting Cena legal counsel review",
+      "introTitle": "1. Introduction",
+      "introBody": "Cena (\"we\", \"us\", \"our\") operates the Cena adaptive learning platform (the \"Service\"). This Privacy Policy explains what personal data we collect, why we collect it, how we use it, and what rights you have regarding your data. This policy applies to all users of the Service, including students, parents, guardians, teachers, and administrators.",
+      "dataCollectedTitle": "2. Data We Collect",
+      "dataCollectedIntro": "We collect the minimum data necessary to provide and improve the Service:",
+      "dataEmail": "Email address — used for account creation, authentication, and account recovery.",
+      "dataName": "Display name — chosen by the user, shown to classmates and teachers.",
+      "dataDob": "Date of birth — used for age verification and consent tier classification. Never displayed to other users.",
+      "dataLearning": "Learning activity data — session duration, questions answered, accuracy, mastery levels, and progress metrics.",
+      "dataTutor": "AI tutor conversations — messages exchanged with the AI tutor, used to provide personalized educational guidance.",
+      "dataDevice": "Device and usage data — browser type, operating system, IP address (anonymized), and interaction patterns for service reliability.",
+      "purposeTitle": "3. Purpose of Collection",
+      "purposeAdaptive": "Adaptive learning — to personalize question difficulty, pacing, and content to each learner's level.",
+      "purposeAuth": "Authentication — to verify your identity and protect your account.",
+      "purposeProgress": "Progress tracking — to show you, your teachers, and (for minors) your parents how your learning is progressing.",
+      "purposeSafety": "Safety and compliance — to enforce age-appropriate content policies and comply with applicable laws.",
+      "purposeImprove": "Service improvement — to analyze aggregated, anonymized usage patterns to improve the platform.",
+      "legalBasisTitle": "4. Legal Basis for Processing",
+      "basisConsent": "Consent (GDPR Art 6(1)(a)) — for users aged 16 and above who create an account.",
+      "basisParental": "Parental consent (GDPR Art 8, COPPA) — for users under 16. We collect verifiable parental consent before processing any child's personal data.",
+      "basisContract": "Contract performance (GDPR Art 6(1)(b)) — processing necessary to provide the Service you registered for.",
+      "basisLegitimate": "Legitimate interest (GDPR Art 6(1)(f)) — for anonymized analytics and platform security.",
+      "retentionTitle": "5. Data Retention",
+      "retentionBody": "We retain personal data only as long as necessary. Account data is deleted within 30 days of a deletion request. AI tutor conversations are purged after 12 months. Date of birth is retained in the consent audit trail for the account lifetime plus 3 years. IP addresses are anonymized within 90 days.",
+      "processorsTitle": "6. Third-Party Data Processors",
+      "processorsIntro": "We share personal data with the following processors, each bound by data processing agreements:",
+      "processorAnthropic": "Anthropic (San Francisco, USA) — AI tutor service. Processes conversation messages to generate educational responses. Conversations are not used to train Anthropic's models.",
+      "processorFirebase": "Google Firebase (Google Cloud) — authentication services, database hosting, and analytics.",
+      "transfersTitle": "7. Cross-Border Data Transfers",
+      "transfersBody": "Your data may be transferred to countries outside your jurisdiction, including the United States. We ensure adequate protection through Standard Contractual Clauses (SCCs), adequacy decisions, and supplementary measures. For Israeli users: transfers comply with the Israel Protection of Privacy Regulations.",
+      "rightsTitle": "8. Your Rights",
+      "rightsIntro": "Under GDPR, Israel PPL, and applicable law, you have the right to:",
+      "rightAccess": "Access — request a copy of the personal data we hold about you.",
+      "rightRectify": "Rectification — request correction of inaccurate personal data.",
+      "rightErase": "Erasure — request deletion of your personal data, subject to legal retention obligations.",
+      "rightPortability": "Data portability — receive your personal data in a structured, machine-readable format.",
+      "rightWithdraw": "Withdraw consent — withdraw your consent at any time.",
+      "rightObject": "Object — object to processing based on legitimate interest.",
+      "rightComplain": "Lodge a complaint — file a complaint with your local data protection authority.",
+      "dsarTitle": "9. Data Subject Access Requests",
+      "dsarBody": "To exercise any of your rights, email privacy{'@'}cena.edu with the subject line \"DSAR\". We will verify your identity and respond within 30 calendar days.",
+      "parentRightsTitle": "10. Parent and Guardian Rights",
+      "parentRightsIntro": "Parents and guardians of minor users have additional rights under COPPA and GDPR:",
+      "parentReview": "Review — request a copy of all personal data collected from your child.",
+      "parentDelete": "Delete — request deletion of your child's personal data and account.",
+      "parentRevoke": "Revoke consent — withdraw consent for further data collection, which will result in account deactivation.",
+      "contactTitle": "11. Contact",
+      "contactBody": "For privacy inquiries: privacy{'@'}cena.edu",
+      "dpoContact": "Data Protection Officer: dpo{'@'}cena.edu (appointment pending).",
+      "childrenNoticeLink": "Children's Privacy Notice"
+    },
+    "children": {
+      "title": "Children's Privacy Notice",
+      "lastUpdated": "Last updated: April 2026",
+      "draftNotice": "Draft awaiting Cena legal counsel review",
+      "whatIsThisTitle": "1. What is this page?",
+      "whatIsThisBody": "This page tells you how Cena uses your info. Cena is a learning app. We keep your info safe. Your parent or guardian said it was OK for you to use Cena.",
+      "whatWeCollectTitle": "2. What info do we keep?",
+      "whatWeCollectIntro": "When you use Cena, we keep a small amount of info about you:",
+      "collectName": "Your name — the name you pick when you sign up.",
+      "collectEmail": "Your email — so you can log in.",
+      "collectAge": "Your age — so we know the right rules to follow.",
+      "collectAnswers": "Your answers — the work you do in learning sessions.",
+      "collectChat": "Your chats — what you say to the AI tutor.",
+      "whyWeCollectTitle": "3. Why do we keep it?",
+      "whyWeCollectBody": "We use your info to help you learn. Cena picks questions that are right for you. It tracks how well you are doing so you and your teacher can see your progress. We do NOT sell your info. We do NOT share it with other kids. We do NOT use it to show you ads.",
+      "noAdsTitle": "4. No ads, no tracking",
+      "noAdsBody": "Cena does not show you any ads. We do not track what you do outside of Cena. We do not let other companies track you inside Cena.",
+      "parentPermissionTitle": "5. Your parent gave permission",
+      "parentPermissionBody": "Before you could use Cena, your parent or guardian gave us permission. They told us it was OK to keep your info. If your parent changes their mind, they can ask us to delete all of your info.",
+      "parentActionsTitle": "6. What can your parent do?",
+      "parentActionsIntro": "Your parent or guardian can:",
+      "parentActionSee": "See your info — ask us to show them what we have.",
+      "parentActionDelete": "Delete your info — ask us to erase everything about you.",
+      "parentActionStop": "Stop us from keeping your info — which means your account will close.",
+      "safetyTitle": "7. How we keep your info safe",
+      "safetyBody": "We lock your info with strong security, like a safe. Only the people who need to see it can see it. We check our security often to make sure it stays strong.",
+      "retentionTitle": "8. How long we keep your info",
+      "retentionBody": "We keep your info while you have an account. If your parent asks us to delete it, we do so within 30 days. Your answers and chats are kept for up to 12 months, then we erase them.",
+      "contactTitle": "9. Questions?",
+      "contactBody": "If you or your parent have any questions, email us at privacy{'@'}cena.edu. We will write back within 30 days."
+    },
+    "terms": {
+      "title": "Terms of Service",
+      "lastUpdated": "Last updated: April 2026",
+      "draftNotice": "Draft awaiting Cena legal counsel review",
+      "acceptanceTitle": "1. Acceptance of Terms",
+      "acceptanceBody": "By creating an account or using the Cena platform (\"Service\"), you agree to these Terms of Service. If you do not agree, do not use the Service. For users under 16, a parent or guardian must accept these terms on the user's behalf.",
+      "serviceTitle": "2. The Service",
+      "serviceBody": "Cena is an adaptive learning platform that provides personalized educational experiences through AI-powered tutoring, practice sessions, progress tracking, and social learning features.",
+      "eligibilityTitle": "3. Eligibility and Parental Consent",
+      "eligibilityBody": "Users must be at least 4 years old to use Cena. Users under 16 require verifiable parental or guardian consent before account creation. Parents and guardians are responsible for their minor's use of the Service.",
+      "accountsTitle": "4. Accounts",
+      "accountsBody": "You are responsible for maintaining the confidentiality of your account credentials. You agree to provide accurate information during registration and to update it if it changes. You must notify us immediately if you believe your account has been compromised.",
+      "acceptableUseTitle": "5. Acceptable Use",
+      "acceptableUseIntro": "You agree not to:",
+      "useNoHarm": "Use the Service to harm, bully, or harass other users.",
+      "useNoReverse": "Attempt to reverse-engineer, decompile, or extract source code from the Service.",
+      "useNoScrape": "Use automated tools to scrape, crawl, or collect data from the Service.",
+      "useNoImpersonate": "Impersonate another person or misrepresent your identity or age.",
+      "useNoAbuse": "Attempt to circumvent the age gate, parental consent mechanisms, or other safety features.",
+      "ipTitle": "6. Intellectual Property",
+      "ipBody": "All content, software, designs, and trademarks on the Service are owned by Cena or its licensors. You may not copy, modify, or distribute any part of the Service without written permission.",
+      "aiTitle": "7. AI Tutor",
+      "aiBody": "The AI tutor is powered by third-party language model technology. Tutor responses are generated by artificial intelligence and may contain errors. The tutor is a supplementary learning tool and does not replace human teachers or official curricula.",
+      "disclaimerTitle": "8. Disclaimers",
+      "disclaimerBody": "The Service is provided \"as is\" and \"as available.\" We do not guarantee uninterrupted access, error-free operation, or that the Service will meet all educational needs.",
+      "liabilityTitle": "9. Limitation of Liability",
+      "liabilityBody": "To the maximum extent permitted by law, Cena shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising from your use of the Service.",
+      "terminationTitle": "10. Termination",
+      "terminationBody": "You may delete your account at any time. We may suspend or terminate your account if you violate these terms or if required by law. Data deletion follows the timelines described in our Privacy Policy.",
+      "governingLawTitle": "11. Governing Law",
+      "governingLawBody": "These terms are governed by the laws of the State of Israel. Disputes shall be resolved in the competent courts of Tel Aviv-Yafo, Israel, unless applicable consumer protection law provides otherwise.",
+      "changesTitle": "12. Changes to These Terms",
+      "changesBody": "We may update these terms from time to time. We will notify registered users of material changes via email or in-app notification at least 30 days before they take effect.",
+      "contactTitle": "13. Contact",
+      "contactBody": "For questions about these terms: legal{'@'}cena.edu. For privacy inquiries: privacy{'@'}cena.edu."
+    },
+    "footer": {
+      "privacyLink": "Privacy Policy",
+      "termsLink": "Terms of Service",
+      "childrenLink": "Children's Privacy",
+      "agreementNotice": "By registering, you agree to our {terms} and {privacy}."
+    }
+  },
+  "pwa": {
+    "install": {
+      "title": "Install Cena",
+      "subtitle": "Add to your home screen for quick access",
+      "installButton": "Install",
+      "notNow": "Not now"
+    },
+    "ios": {
+      "title": "Add Cena to Home Screen",
+      "description": "Install Cena for quick access and offline features:",
+      "step1": "Tap the Share button in Safari",
+      "step2": "Select \"Add to Home Screen\"",
+      "step3": "Tap \"Add\" to confirm",
+      "gotIt": "Got it"
+    },
+    "update": {
+      "available": "New version available — tap to update",
+      "sessionActive": "Update will apply after your session ends",
+      "updateButton": "Update",
+      "laterButton": "Later"
+    },
+    "connection": {
+      "offline": "You are offline",
+      "reconnecting": "Reconnecting…",
+      "disconnected": "Disconnected",
+      "connected": "Connected",
+      "queued": "{count} queued"
+    }
+  },
+  "accessibilityStatement": {
+    "title": "Accessibility Statement",
+    "lastReviewedLabel": "Last reviewed",
+    "commitmentTitle": "Our commitment",
+    "commitmentBody": "Cena is committed to making its platform usable by every learner, including those who rely on assistive technologies. We design, build, and test our product against the accessibility guidelines below, and we treat any accessibility gap as a defect to fix.",
+    "conformanceTitle": "Conformance level",
+    "conformanceBody": "This site targets WCAG 2.1 Level AA conformance and is built in line with Israeli Equal Rights for Persons with Disabilities Law (5758-1998) and Accessibility Regulations (5773-2013).",
+    "featuresTitle": "Accessibility features provided",
+    "featureToolbar": "A persistent accessibility toolbar reachable on every screen — including pre-login.",
+    "featureKeyboard": "Full keyboard navigation with a visible focus indicator and a skip-to-content link.",
+    "featureLanguage": "Language switching between English, Arabic, and Hebrew with correct right-to-left handling.",
+    "featureContrast": "A high-contrast mode that preserves brand color identity while boosting text legibility.",
+    "featureTextSize": "Text-size and line-spacing controls that persist per device.",
+    "featureMotion": "A reduced-motion setting that respects both the user choice and the operating-system preference.",
+    "assistiveTechTitle": "Assistive technology tested",
+    "atNvda": "NVDA on Windows (latest stable).",
+    "atJaws": "JAWS on Windows (latest stable).",
+    "atVoiceover": "VoiceOver on macOS and iOS.",
+    "atTalkback": "TalkBack on Android.",
+    "limitationsTitle": "Known limitations",
+    "limitationsIntro": "We are transparent about the areas where our accessibility coverage is still improving:",
+    "limitationMath": "Some math expressions rendered by KaTeX may not be fully announced by all screen readers; an accessible fallback is provided.",
+    "limitationDiagrams": "A small number of decorative diagrams do not yet include full long-description text.",
+    "limitationThirdParty": "Embedded third-party content may follow its provider's own accessibility statement rather than ours.",
+    "remediationTitle": "Remediation and feedback",
+    "remediationBody": "We welcome reports of any barrier you encounter. Please include the page, the assistive technology in use, and a short description. We aim to acknowledge reports within 5 business days and to propose a remediation path within 30 days.",
+    "contactTitle": "Contact",
+    "contactBody": "Accessibility questions, feedback, and complaints can be sent directly to our accessibility team at the address below.",
+    "privacyLink": "Privacy policy",
+    "backToSignIn": "Back to sign in"
+  },
+  "firstRun": {
+    "title": "Choose your language",
+    "subtitle": "You can change this later in the accessibility toolbar.",
+    "continue": "Continue",
+    "tileEnglish": "English",
+    "tileArabic": "العربية",
+    "tileHebrew": "עברית",
+    "tileEnglishHint": "Continue in English",
+    "tileArabicHint": "متابعة بالعربية",
+    "tileHebrewHint": "המשך בעברית"
+  },
+  "pricing": {
+    "page": {
+      "title": "Cena subscriptions",
+      "subtitle": "Full Bagrut preparation, automatic math verification, and one household plan for all of your students.",
+      "loadError": "We couldn't load the pricing catalog. Try refreshing."
+    },
+    "cycle": {
+      "monthly": "per month",
+      "annual": "per year",
+      "annualSavings": "~17% off"
+    },
+    "vatInclusive": "Price includes VAT",
+    "recommended": "Recommended",
+    "guarantee": {
+      "thirtyDay": "30-day money-back guarantee"
+    },
+    "sibling": {
+      "heading": "More than one student?",
+      "body": "Each additional sibling (up to 2) is {firstRate}/month; a third sibling and beyond is {householdCapRate}/each."
+    },
+    "tier": {
+      "basic": {
+        "name": "Basic",
+        "pitch": "Daily practice at your pace, with automatic math verification.",
+        "cta": "Start with Basic"
+      },
+      "plus": {
+        "name": "Plus",
+        "pitch": "Everything in Basic, plus unlimited photo diagnostics and advanced reasoning.",
+        "cta": "Choose Plus"
+      },
+      "premium": {
+        "name": "Premium",
+        "pitch": "The full package: photo diagnostics, parent dashboard, tutor-handoff report, and priority support.",
+        "cta": "Choose Premium"
+      }
+    },
+    "feature": {
+      "coreExamPrep": "Full Bagrut preparation",
+      "cas": "Automatic math verification (CAS)",
+      "photoDiagnosticPremium": "Photo diagnostics: up to 100 per month",
+      "photoDiagnosticPlus": "Photo diagnostics: 20 per month",
+      "photoDiagnosticUnlimited": "Unlimited photo diagnostics",
+      "parentDashboard": "Full parent dashboard",
+      "arabicDashboard": "Parent dashboard with full Arabic",
+      "tutorHandoff": "Tutor-handoff report (PDF)",
+      "prioritySupport": "Priority support"
+    },
+    "redirecting": "Redirecting you to secure Stripe checkout…",
+    "checkoutError": "We couldn't open checkout. Try again in a moment."
+  },
+  "subscriptionConfirm": {
+    "polling": {
+      "title": "Confirming your subscription…",
+      "subtitle": "One moment — finalizing activation."
+    },
+    "active": {
+      "title": "Subscription active",
+      "subtitle": "Welcome to {tier}.",
+      "renewsAt": "Next renewal: {date}",
+      "cta": "Start learning"
+    },
+    "pending": {
+      "title": "Activation on the way",
+      "subtitle": "Payment received. We'll notify you once activation completes.",
+      "cta": "Back to home"
+    },
+    "error": "We couldn't locate your subscription. Please contact support."
+  },
+  "subscriptionCancel": {
+    "title": "Checkout cancelled",
+    "subtitle": "No charge was made. Come back when you're ready to pick a plan.",
+    "backToPricing": "Back to pricing",
+    "goHome": "Back to home"
+  },
+  "softCapUpsell": {
+    "photo": {
+      "heading": "You've been busy this month",
+      "body": "You've used {usage} of {softCap} photo diagnostics this month. You can continue, or book a tutor session to review it all."
+    },
+    "sonnet": {
+      "heading": "Intense week",
+      "body": "Your most active week yet. Continue, or schedule a tutor session to consolidate."
+    },
+    "hint": {
+      "heading": "You've used a lot of hints",
+      "body": "{usage} of {softCap} — all fine. Continue, or take a break and return?"
+    },
+    "bookTutor": "Book a tutor session",
+    "continueAnyway": "Continue anyway",
+    "dismiss": "Close"
+  },
+  "accountSubscription": {
+    "title": "My subscription",
+    "loadError": "We couldn't load your subscription details. Try refreshing.",
+    "actionError": "The action failed. Try again or contact support.",
+    "status": {
+      "unsubscribed": "Not active",
+      "active": "Active",
+      "pastdue": "Payment retry failed",
+      "cancelled": "Cancelled",
+      "refunded": "Refunded"
+    },
+    "renewsAt": "Next renewal: {date}",
+    "seePricing": "See pricing",
+    "common": { "cancel": "Cancel", "back": "Back" },
+    "siblings": {
+      "title": "Students on this plan",
+      "addCta": "Add sibling",
+      "count": "{n} active students"
+    },
+    "manage": {
+      "title": "Manage subscription",
+      "refund": "Request refund (within 30 days)",
+      "cancel": "Cancel subscription"
+    },
+    "refundDialog": {
+      "title": "Refund request",
+      "body": "Your 30-day money-back guarantee is active — you'll get a full refund. Tell us briefly why so we can improve.",
+      "reasonLabel": "Reason (optional)",
+      "confirm": "Confirm refund"
+    },
+    "cancelDialog": {
+      "title": "Cancel subscription",
+      "body": "Your subscription stays active until the end of the current period. Tell us why you're leaving.",
+      "reasonLabel": "Reason (optional)",
+      "confirm": "Confirm cancellation"
+    },
+    "siblingDialog": {
+      "title": "Add a sibling",
+      "body": "Each additional sibling gets their own account with the family discount.",
+      "idLabel": "Student ID",
+      "tierLabel": "Tier",
+      "confirm": "Add"
+    }
+  },
+  "mcOptionsGate": {
+    "placeholder": "Options are hidden. Think about your answer first, then reveal.",
+    "reveal": "Show options",
+    "optionsContainer": "Answer options",
+    "revealedAnnouncement": "Options now visible."
+  },
+  "attemptModeToggle": {
+    "label": "Hide answer options until I'm ready",
+    "description": "Read the question, think about your answer, then reveal the options. Resets each session."
+  },
+  "parentDashboard": {
+    "title": "Parent dashboard",
+    "tierGate": {
+      "title": "Parent dashboard is a Premium feature",
+      "subtitle": "See your students' progress, a weekly report, and a tutor-handoff PDF.",
+      "cta": "Upgrade to Premium"
+    },
+    "household": {
+      "weekly": "This week",
+      "monthly": "This month",
+      "min": "minutes"
+    },
+    "students": {
+      "heading": "Students on this plan",
+      "empty": "No active students yet. Add a sibling from the subscription page.",
+      "unnamed": "Student",
+      "weekly": "This week",
+      "topics": "Topics",
+      "readiness": "Readiness"
+    }
+  }
+}

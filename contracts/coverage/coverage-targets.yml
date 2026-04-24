@@ -1,0 +1,155 @@
+# =============================================================================
+# Cena Platform — Coverage SLO Target Matrix (prr-210)
+#
+# Defines the minimum number of CAS-verified parametric variants required per
+# cell in the coverage matrix. A "cell" is the intersection of four axes:
+#   (topic, difficulty, methodology, track)
+# plus an implicit question-type axis grouped at the default layer.
+#
+# Precedence when computing a cell's required N:
+#   1. If an entry under `cells:` matches every axis literally → use its `min`.
+#   2. Otherwise fall back to `defaults.methodology[<methodology>]` for the
+#      methodology axis keyed by the cell's question-type bucket.
+#   3. Otherwise fall back to `defaults.questionType[<questionType>]`.
+#   4. Otherwise fall back to `defaults.global.min`.
+#
+# Active / draft:
+#   - `active: true`  → cell is SLO-enforced (ship-gate fails CI if below N).
+#   - `active: false` → advisory-only; gate emits a report line but does not
+#                       fail. Use while a new topic is being onboarded.
+#
+# ADR-0043 reminder: only *recreated* (author-owned, CAS-verified) variants
+# count toward coverage. Bagrut-reference items never count.
+# =============================================================================
+
+version: 1
+
+defaults:
+  # Global fallback — used when no more specific default or cell override
+  # matches. Kept deliberately small so a forgotten-to-configure cell cannot
+  # silently pass with zero variants.
+  global:
+    min: 5
+
+  # Per-methodology buffer policy. Halabi is the default teaching track in
+  # Israel and carries the deeper buffer; Rabinovitch is secondary.
+  methodology:
+    Halabi: 5
+    Rabinovitch: 5
+
+  # Per-question-type authoring cost gradient.
+  # MCQ: generation is cheap; hold a deep buffer for exposure control per
+  #      engine doc §25.
+  # step-solver: authoring cost is higher; buffer smaller.
+  # fbd-construct: narrow topic subset; still enforced.
+  questionType:
+    multiple-choice: 10
+    step-solver: 5
+    free-text: 5
+    fbd-construct: 3
+
+# =============================================================================
+# cells: explicit overrides + active flag
+# -----------------------------------------------------------------------------
+# Shape:
+#   - topic: <topic-slug>
+#     difficulty: Easy|Medium|Hard
+#     methodology: Halabi|Rabinovitch
+#     track: FourUnit|FiveUnit
+#     questionType: multiple-choice|step-solver|free-text|fbd-construct
+#     min: <override N>          # optional — omit to use defaults
+#     active: true|false         # required
+#     notes: "<human context>"   # optional
+#
+# Every entry under `cells:` is a cell the SLO code path knows about. Cells
+# not listed here are not graded — a missing cell is a reminder to list it
+# here, which the drift report surfaces as "undeclared".
+# =============================================================================
+
+cells:
+  # ── Algebra / linear equations ─────────────────────────────────────────────
+  - topic: algebra.linear_equations
+    difficulty: Easy
+    methodology: Halabi
+    track: FourUnit
+    questionType: multiple-choice
+    min: 10
+    active: true
+    notes: "4-unit linear equations, Halabi-Easy MCQ — foundational rung."
+
+  - topic: algebra.linear_equations
+    difficulty: Medium
+    methodology: Halabi
+    track: FourUnit
+    questionType: multiple-choice
+    min: 10
+    active: true
+
+  - topic: algebra.linear_equations
+    difficulty: Hard
+    methodology: Halabi
+    track: FourUnit
+    questionType: multiple-choice
+    min: 10
+    active: true
+
+  - topic: algebra.linear_equations
+    difficulty: Easy
+    methodology: Rabinovitch
+    track: FourUnit
+    questionType: multiple-choice
+    min: 10
+    active: true
+    notes: "Rabinovitch parallel — ADR-0040 methodology independence."
+
+  - topic: algebra.linear_equations
+    difficulty: Medium
+    methodology: Rabinovitch
+    track: FourUnit
+    questionType: multiple-choice
+    min: 10
+    active: true
+
+  # ── Algebra / quadratic equations ──────────────────────────────────────────
+  - topic: algebra.quadratic_equations
+    difficulty: Medium
+    methodology: Halabi
+    track: FiveUnit
+    questionType: multiple-choice
+    min: 10
+    active: true
+
+  - topic: algebra.quadratic_equations
+    difficulty: Hard
+    methodology: Halabi
+    track: FiveUnit
+    questionType: step-solver
+    min: 5
+    active: true
+
+  # ── Calculus / differentiation (5-unit only) ───────────────────────────────
+  - topic: calculus.differentiation
+    difficulty: Medium
+    methodology: Halabi
+    track: FiveUnit
+    questionType: step-solver
+    min: 5
+    active: true
+
+  - topic: calculus.differentiation
+    difficulty: Hard
+    methodology: Halabi
+    track: FiveUnit
+    questionType: step-solver
+    min: 5
+    active: true
+
+  # ── Physics FBD (advisory while authoring ramps up) ────────────────────────
+  - topic: physics.free_body_diagrams
+    difficulty: Medium
+    methodology: Halabi
+    track: FiveUnit
+    questionType: fbd-construct
+    min: 3
+    active: false
+    notes: "Draft cell — FBD authoring still ramping; advisory until prr-211 promotes."
