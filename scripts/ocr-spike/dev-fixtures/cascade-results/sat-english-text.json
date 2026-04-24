@@ -1,0 +1,1052 @@
+{
+  "schema_version": "1.0",
+  "runner": "cascade_prototype",
+  "source": "admin-upload://sat/psat_10_2023_english_solution.pdf",
+  "hints": {
+    "subject": "math",
+    "language": "en",
+    "track": null,
+    "source_type": "admin_upload",
+    "taxonomy_node": null,
+    "expected_figures": false
+  },
+  "pdf_triage": "text",
+  "text_blocks": [
+    {
+      "text": "How",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "to",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Calculate",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Your",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Practice",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "Test",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Scores",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "The",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "worksheets",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "on",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "pages",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "4",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "and",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "5",
+      "language": "en",
+      "confidence": 0.92,
+      "is_rtl": false
+    },
+    {
+      "text": "help",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "you",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "calculate",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "your",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "test",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "scores.",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "|",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "iy",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "GET",
+      "language": "en",
+      "confidence": 0.94,
+      "is_rtl": false
+    },
+    {
+      "text": "SET",
+      "language": "en",
+      "confidence": 0.94,
+      "is_rtl": false
+    },
+    {
+      "text": "UP",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "HTM",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "@",
+      "language": "en",
+      "confidence": 0.92,
+      "is_rtl": false
+    },
+    {
+      "text": "i",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "addition",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "to",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "your",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "practice",
+      "language": "en",
+      "confidence": 0.93,
+      "is_rtl": false
+    },
+    {
+      "text": "test,",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "you'll",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "need",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "ESAT",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "10",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "Practice",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Test",
+      "language": "en",
+      "confidence": 0.94,
+      "is_rtl": false
+    },
+    {
+      "text": "Worksheet:",
+      "language": "en",
+      "confidence": 0.87,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "answer",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "key",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "and",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "conversion",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "table",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "on",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "PSAT\"10",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "pages",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "4",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "and",
+      "language": "en",
+      "confidence": 0.72,
+      "is_rtl": false
+    },
+    {
+      "text": "5.",
+      "language": "en",
+      "confidence": 0.72,
+      "is_rtl": false
+    },
+    {
+      "text": "Practice",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Test",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "#1",
+      "language": "en",
+      "confidence": 0.9,
+      "is_rtl": false
+    },
+    {
+      "text": "#",
+      "language": "en",
+      "confidence": 0.79,
+      "is_rtl": false
+    },
+    {
+      "text": "Make",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "itis",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "one",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "time",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "of",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "to",
+      "language": "en",
+      "confidence": 0.94,
+      "is_rtl": false
+    },
+    {
+      "text": "take",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "best",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "ways",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "practice",
+      "language": "en",
+      "confidence": 0.89,
+      "is_rtl": false
+    },
+    {
+      "text": "to",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "get",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "rea",
+      "language": "en",
+      "confidence": 0.93,
+      "is_rtl": false
+    },
+    {
+      "text": "te:",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "for",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.93,
+      "is_rtl": false
+    },
+    {
+      "text": "PSAT™",
+      "language": "en",
+      "confidence": 0.93,
+      "is_rtl": false
+    },
+    {
+      "text": "10.",
+      "language": "en",
+      "confidence": 0.94,
+      "is_rtl": false
+    },
+    {
+      "text": "SCORE",
+      "language": "en",
+      "confidence": 0.88,
+      "is_rtl": false
+    },
+    {
+      "text": "YOUR",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "PRACTICE",
+      "language": "en",
+      "confidence": 0.9,
+      "is_rtl": false
+    },
+    {
+      "text": "TEST",
+      "language": "en",
+      "confidence": 0.9,
+      "is_rtl": false
+    },
+    {
+      "text": "Worksheet",
+      "language": "en",
+      "confidence": 0.65,
+      "is_rtl": false
+    },
+    {
+      "text": "Answer",
+      "language": "en",
+      "confidence": 0.7,
+      "is_rtl": false
+    },
+    {
+      "text": "Rey",
+      "language": "en",
+      "confidence": 0.92,
+      "is_rtl": false
+    },
+    {
+      "text": "Compare",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "your",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "answers",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "to",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "answer",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "key",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "aaa",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "on",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "page",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "4,",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "and",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "count",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "up",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "total",
+      "language": "en",
+      "confidence": 0.92,
+      "is_rtl": false
+    },
+    {
+      "text": "number",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "of",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "lim",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "lig",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "correct",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "answers",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "for",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "each",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "section.",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Write",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "ri_|ti",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "number",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "of",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "correct",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "key",
+      "language": "en",
+      "confidence": 0.94,
+      "is_rtl": false
+    },
+    {
+      "text": "at",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "answers",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "bottom",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "for",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "of",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "each",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "that",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "section",
+      "language": "en",
+      "confidence": 0.93,
+      "is_rtl": false
+    },
+    {
+      "text": "section.",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "in",
+      "language": "en",
+      "confidence": 0.93,
+      "is_rtl": false
+    },
+    {
+      "text": "answer",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "CALCULATE",
+      "language": "en",
+      "confidence": 0.94,
+      "is_rtl": false
+    },
+    {
+      "text": "YOUR",
+      "language": "en",
+      "confidence": 0.94,
+      "is_rtl": false
+    },
+    {
+      "text": "SCORES",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "PSAT",
+      "language": "en",
+      "confidence": 0.92,
+      "is_rtl": false
+    },
+    {
+      "text": "10",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Practice",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "Test",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "Worksheet:",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "3]",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "Using",
+      "language": "en",
+      "confidence": 0.97,
+      "is_rtl": false
+    },
+    {
+      "text": "your",
+      "language": "en",
+      "confidence": 0.93,
+      "is_rtl": false
+    },
+    {
+      "text": "marked-up",
+      "language": "en",
+      "confidence": 0.92,
+      "is_rtl": false
+    },
+    {
+      "text": "answer",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "key",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "and",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Section",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "cc",
+      "language": "en",
+      "confidence": 0.85,
+      "is_rtl": false
+    },
+    {
+      "text": "and",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Total",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "Scores",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "conversion",
+      "language": "en",
+      "confidence": 0.95,
+      "is_rtl": false
+    },
+    {
+      "text": "table,",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "follow",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "the",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "directions",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "on",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "page",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "5",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "to",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "get",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "your",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "section",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "and",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "test",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    },
+    {
+      "text": "scores.",
+      "language": "en",
+      "confidence": 0.96,
+      "is_rtl": false
+    }
+  ],
+  "math_blocks": [
+    {
+      "latex": "\\begin{array}{r l}{\\overbrace{\\mathbb{R}=\\mathbb{R}=\\mathbb{R}=\\mathbb{R}}_{\\parallel\\parallel}}\\\\ {\\ \\{\\infty\\atop\\xrightarrow[{\\frac{1}{\\sqrt{\\frac{1}{2}}}},\\qquad{\\frac{1}{\\not{k}}}\\in\\qquad{\\frac{1}{\\not{k}}}\\}}\\\\ {\\epsilon=\\equiv\\bot}&{{}\\qquad{\\frac{1}{\\equiv}}}\\end{array}",
+      "confidence": 0.9,
+      "sympy_parsed": false,
+      "canonical_form": null
+    }
+  ],
+  "figures": [],
+  "overall_confidence": 0.934,
+  "fallbacks_fired": [
+    "mathpix:mock:\\begin{array}{r l}{\\…",
+    "gemini:mock:|…",
+    "gemini:mock:iy…",
+    "gemini:mock:HTM…",
+    "gemini:mock:i…",
+    "gemini:mock:addition…",
+    "gemini:mock:you'll…",
+    "gemini:mock:need…",
+    "gemini:mock:ESAT…",
+    "gemini:mock:PSAT\"10…",
+    "gemini:mock:itis…",
+    "gemini:mock:aaa…",
+    "gemini:mock:lim…",
+    "gemini:mock:lig…",
+    "gemini:mock:ri_|ti…",
+    "gemini:mock:3]…",
+    "gemini:mock:cc…"
+  ],
+  "cas_validated_math": 0,
+  "cas_failed_math": 1,
+  "human_review_required": true,
+  "reasons_for_review": [
+    "majority_math_failed_cas"
+  ],
+  "layer_timings_seconds": {
+    "layer_0_preprocess": 0.551,
+    "layer_1_layout": 0.967,
+    "layer_2a_text": 1.566,
+    "layer_2b_math": 7.772,
+    "layer_3_reassemble": 0.0,
+    "layer_4_gate": 0.223,
+    "layer_5_cas": 0.0
+  },
+  "total_latency_seconds": 11.081,
+  "captured_at": "2026-04-16T12:00:00Z",
+  "_dev_fixture": {
+    "scenario": "sat_english_text",
+    "source_kind": "admin_upload",
+    "notes": "Wrapped from live cascade run on sat_text_sample.json. Text + math retained (safe to ship).",
+    "scrubbing": "none"
+  }
+}

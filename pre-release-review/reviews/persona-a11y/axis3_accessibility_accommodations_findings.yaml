@@ -1,0 +1,214 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 accessibility features: subitizing trainer, audio-haptic number line,
+  digital graph paper, ADHD focus sessions, color-blind palette, MathML screen-reader
+  pipeline, Arabic RTL math renderer, and anxiety-reducing UI. Three SHIP, three
+  SHORTLIST, two DEFER. This is the primary a11y/l10n doc in the corpus.
+system_purpose_fit: 5
+  rationale:
+    - Hits non-negotiable 6 (math LTR in RTL) directly via Feature 7
+    - Honors non-negotiable 9 (no hue change of #7367F0) — contrast via palette additions not primary recolor
+    - Feature 5 (color-blind) and 6 (MathML) are WCAG 2.2 AA gap closures
+    - Feature 7 (Arabic RTL math) is core wedge requirement
+    - No dark-pattern proposals; COPPA/ADR-0003 respected
+code_reality_check:
+  claims_verified_in_code:
+    - "Arabic RTL renderer (F7) — already partially built via <bdi dir=\"ltr\"> wrapper: src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts:1-40"
+    - "MathML aria-labels (F6) — partial skeleton exists: src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs:1-50"
+    - "KaTeX deployed in student-web: src/student/full-version/package.json, src/student/full-version/src/components/session/WorkedExamplePanel.vue:17-22"
+    - "Arabic-first locale inference already shipped (F7-adjacent): src/student/full-version/src/composables/useLocaleInference.ts:62-80"
+    - "Hebrew gate (hideable outside IL) already in LanguagePicker: src/student/full-version/src/components/onboarding/LanguagePicker.vue:21-60"
+    - "RTL visual regression test exists: src/student/full-version/tests/e2e/rtl-visual-regression.spec.ts"
+    - "Reduced-motion, touch-target, color-contrast, aria-live a11y tests already run: src/student/full-version/tests/a11y/*.spec.ts"
+  claims_contradicted_by_code:
+    - "Doc (F7, L418) claims `.katex { direction: ltr !important; unicode-bidi: isolate; }` needed — code uses <bdi dir=\"ltr\"> element wrapping instead (cleaner, preferred by ADR memory). Doc's CSS-only approach is weaker."
+    - "Doc (F6, L383-388) proposes MathJax server-side; Cena ships KaTeX, not MathJax. Stack mismatch: src/student/full-version/package.json"
+  claims_unverifiable:
+    - "Feature 1 (subitizing) effect sizes — no Cena code to compare; dyscalculia cohort data not collected"
+    - "Eastern Arabic numeral toggle (F7) — not visible in current locale JSON: src/student/full-version/src/plugins/i18n/locales/ar.json"
+    - "Audio-haptic feedback (F2) — Web Audio API / Vibration API not present in current student-web"
+adr_alignment:
+  honored:
+    - "ADR-0004 (figure rendering stack) — F2 number line and F7 Arabic math align with KaTeX/SVG direction"
+    - "ADR-0001 (multi-institute) — F8 per-student UI preferences must respect tenant scoping"
+  violated:
+    - "None directly — but F6 proposes MathJax while ADR-0004 standardizes on KaTeX. Needs ADR amendment or renderer swap."
+  missing_adr_needed:
+    - "ADR for screen-reader math pipeline (MathML vs KaTeX aria-label vs SRE) — Cena currently ships partial aria-label utility without an architectural decision"
+    - "ADR for Eastern Arabic numeral policy (display Western-only vs configurable) — doc proposes toggle but no product decision exists"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: "Feature 7 (Arabic RTL Math) duplicates partially-built work; doc proposes greenfield CSS approach but code already uses <bdi dir=\"ltr\"> element wrapping. Without reconciling, we risk a second, competing RTL strategy."
+    evidence: "src/student/full-version/src/components/session/WorkedExamplePanel.vue:17; axis3...md:L418 (.katex !important CSS)"
+    lens_note: "<bdi> is semantically stronger than CSS !important; the scanner test at tests/a11y/math-ltr-wrapper.spec.ts enforces <bdi>. Doc's approach would regress coverage."
+  - severity: P0
+    finding: "Feature 6 (MathML pipeline) proposes MathJax but production stack is KaTeX. Picking MathJax forces a second math engine (bundle cost, double maintenance) or a KaTeX-to-MathML fork. No ADR covers this."
+    evidence: "src/student/full-version/package.json (katex dep); axis3...md:L383"
+    lens_note: "KaTeX 0.16+ supports output: 'mathml' alongside HTML — cheaper than switching. Must be specified in the extracted task."
+  - severity: P0
+    finding: "Feature 5 (color-blind palette) proposes viridis/cividis as defaults, which would recolor #7367F0. Non-negotiable 9 (Vuexy primary locked) says fix contrast via usage pattern only, not by hue change."
+    evidence: "axis3...md:L320-330; docs/accessibility/WCAG-AA-Primary-Color-Analysis.md:1-40"
+    lens_note: "The palette additions must be scoped to charts/data-viz only. Primary #7367F0 already passes 5.83:1 on white; don't swap it out. Extracted task must fence this."
+  - severity: P1
+    finding: "Feature 7 does not mention the existing Hebrew build-flag gate (VITE_ENABLE_HEBREW) — implementation must preserve 'Hebrew hideable outside Israel' policy."
+    evidence: "axis3...md:L414-478; src/student/full-version/src/components/onboarding/LanguagePicker.vue:21-60"
+    lens_note: "If F7 ships Arabic RTL and also re-enables Hebrew in non-IL builds, it violates language-strategy memory."
+  - severity: P1
+    finding: "Feature 6 spec mandates aria-labels in Hebrew/Arabic, but the existing MathAriaLabels.cs only has English strings (just 'plus', 'over', 'squared')."
+    evidence: "src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs:18-50"
+    lens_note: "This is a real gap: blind Hebrew/Arabic students currently hear English math. Extracted task must localize this utility."
+  - severity: P1
+    finding: "Feature 3 (digital graph paper) proposes PDF export via Puppeteer — no a11y requirement that the PDF carry MathML or tagged structure. Exported PDFs would be inaccessible to screen readers."
+    evidence: "axis3...md:L198-211"
+    lens_note: "If we build this, PDF must be tagged (PDF/UA) or we fail the very users it claims to serve."
+  - severity: P1
+    finding: "Feature 8 (anxiety-reducing UI) mentions amber (#f59e0b) for errors — contrast against white is only 2.1:1 for normal text, fails WCAG AA 4.5:1."
+    evidence: "axis3...md:L520 (--error-amber: #f59e0b)"
+    lens_note: "Must pair amber with darker text (#b45309 or darker) or use amber only as icon/border, not as foreground text color."
+  - severity: P2
+    finding: "Feature 4 (ADHD focus sessions) uses CSS filter blur() on non-essential elements — can interact poorly with reduced-motion preference and magnifier users."
+    evidence: "axis3...md:L263"
+    lens_note: "Must honor prefers-reduced-motion; blur animation transitions should be disabled."
+  - severity: P2
+    finding: "Feature 2 audio-haptic pitch feedback must have a non-audio alternative (WCAG 1.1.1) — dyscalculia users with hearing impairments need visual/haptic redundancy."
+    evidence: "axis3...md:L113-155"
+    lens_note: "Doc mentions haptic on mobile but desktop-only users without vibration need visible position marker."
+already_built:
+  - feature: "Arabic RTL Math Renderer (Feature 7) — <bdi dir=\"ltr\"> wrapping, RTL visual regression tests, Arabic-first locale inference"
+    evidence: "src/student/full-version/src/composables/useLocaleInference.ts; src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts; src/student/full-version/tests/e2e/rtl-visual-regression.spec.ts"
+    note: "Partially built — retire the 'new CSS direction isolation' proposal and extract only the missing pieces (Eastern Arabic numerals toggle, Arabic function name aliases جا/تا/ظا, font stack Noto Naskh)"
+  - feature: "MathML/ARIA skeleton (Feature 6)"
+    evidence: "src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs"
+    note: "Exists but English-only and incomplete — localize and wire into KaTeX output, don't greenfield"
+  - feature: "Vuexy color-contrast audit (Feature 5 adjacent)"
+    evidence: "docs/accessibility/WCAG-AA-Primary-Color-Analysis.md"
+    note: "Primary color already audited; don't recolor — add a separate data-viz palette for charts only"
+  - feature: "Hebrew gate (hideable outside IL)"
+    evidence: "src/student/full-version/src/components/onboarding/LanguagePicker.vue:21-60"
+    note: "Don't re-litigate; preserve build flag across any F7 rework"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-013 Color-Blind Safe Charts (dup of F5)"
+  - "feature-discovery-2026-04-20.md: FD-014 Arabic RTL Math Renderer (dup of F7)"
+  - "feature-discovery-2026-04-20.md: FD-016 MathML Screen-Reader Math (dup of F6)"
+  - "AXIS_8_Content_Authoring_Quality_Research.md: Feature 4 Arabic RTL Math Renderer (dup of F7)"
+  - "cena_competitive_analysis.md: Feature 9 Text-to-Speech + Highlighting (partial overlap with F6)"
+extracted_tasks:
+  - title: "Localize MathAriaLabels.cs for he/ar speech rules"
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Extend src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs from English-only spoken math to Hebrew and Arabic. Blind students on he/ar locales currently hear English words ("squared", "pi") over RTL Hebrew/Arabic UI — a WCAG 1.1.1 and 3.1.1 violation.
+      ## Files
+      - src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.cs (extend; keep <500 LOC)
+      - src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.he.cs (new, if clean split needed)
+      - src/shared/Cena.Infrastructure/Accessibility/MathAriaLabels.ar.cs (new, if clean split needed)
+      - tests under Cena.Infrastructure.Tests/Accessibility/
+      - wire into QuestionCard.vue aria-label generation (student-web side needs companion task)
+      ## Definition of Done
+      - `ToAriaLabel(latex, "he")` returns Hebrew spoken math for the top-30 LaTeX tokens in the Bagrut corpus
+      - Same for `"ar"` with Levantine Arabic terminology (جا for sin, تا for cos, ظا for tan)
+      - Unit tests cover fractions, radicals, powers, trig, logs in all three locales
+      - No new dependencies
+      - Files stay <500 LOC
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: spoken math localized"
+    source_doc_lines: [L350-L410]
+  - title: "Close the KaTeX->MathML gap for screen-reader math"
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-a11y
+    queue_body: |
+      ## Goal
+      Configure KaTeX to emit MathML alongside HTML so NVDA/JAWS/VoiceOver can navigate equations element-by-element. Do NOT switch to MathJax — it would double our math engine footprint and conflict with ADR-0004. Extend QuestionCard.vue / WorkedExamplePanel.vue to pass `output: 'htmlAndMathml'` and attach an aria-label from MathAriaLabels output.
+      ## Files
+      - src/student/full-version/src/components/session/QuestionCard.vue
+      - src/student/full-version/src/components/session/WorkedExamplePanel.vue
+      - src/student/full-version/src/components/session/StepInput.vue
+      - new: src/student/full-version/src/composables/useMathAccessibility.ts
+      - tests/a11y/math-mathml-output.spec.ts (new)
+      ## Definition of Done
+      - Every katex.render / katex-rendered element carries a MathML sibling node
+      - Every math element has an aria-label from backend MathAriaLabels (localized he/ar/en)
+      - New scanner test: every .katex node has either a MathML child or an aria-label
+      - Passes existing math-ltr-wrapper.spec.ts (no regressions)
+      - No MathJax dependency added
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-a11y --result "<branch>"
+    source_doc_lines: [L350-L410]
+  - title: "Ship Eastern Arabic numeral toggle + Arabic math function names"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 7 residual: add a per-student toggle for Eastern Arabic numerals (٠١٢٣٤٥٦٧٨٩) and Arabic math function glyphs (جا/تا/ظا/لو) on the rendering layer only. SymPy keeps canonical Western form; the display profile is client-side.
+      ## Files
+      - src/student/full-version/src/stores/onboardingStore.ts (add numeralSystem field)
+      - src/student/full-version/src/composables/useNumeralDisplay.ts (new)
+      - src/student/full-version/src/plugins/i18n/locales/ar.json (add math.sin→جا etc.)
+      - src/student/full-version/src/components/session/QuestionCard.vue (apply profile)
+      ## Definition of Done
+      - Student profile stores numeralSystem: 'western'|'eastern'|'both'
+      - Display converter wraps KaTeX output without altering underlying LaTeX/SymPy payload
+      - No change to answer validation path (CAS still gets canonical Western)
+      - E2E test: RTL page with Eastern-numeral toggle renders ٢x+٣=٧ in LTR <bdi>
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L414-L478]
+  - title: "Introduce chart-only color-blind palette without touching primary #7367F0"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add a scoped data-viz palette (e.g., Okabe-Ito 8-color) for charts and progress bars only. Primary brand color stays #7367F0 (ADR-locked). Feature 5 in doc wants viridis as default app color — that violates non-negotiable 9; fence the palette to chart components.
+      ## Files
+      - src/student/full-version/src/plugins/vuetify/theme.ts (add viz.* tokens, leave primary untouched)
+      - src/student/full-version/src/components/progress/*.vue (consume viz tokens)
+      - docs/accessibility/data-viz-palette.md (new, one page)
+      ## Definition of Done
+      - primary remains #7367F0; no change to theme.ts primary
+      - charts use 8-color Okabe-Ito palette + pattern differentiation
+      - Contrast check: every pair of adjacent series hits 3:1 non-text contrast
+      - Scanner test flags any new CSS that reassigns --v-theme-primary
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L288-L346]
+  - title: "Fix amber-on-white contrast in proposed CalmAlert"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F8 proposes #f59e0b for amber errors; that's 2.1:1 on white, fails AA. Pair amber with #b45309 text or deeper border. This is a guardrail for any 'calm UI' adoption.
+      ## Files
+      - src/student/full-version/src/plugins/vuetify/theme.ts
+      - src/student/full-version/tests/a11y/color-contrast.spec.ts (extend)
+      ## Definition of Done
+      - amber tokens split into surface vs. text/icon pairs
+      - Existing color-contrast scanner covers warning tokens at 4.5:1
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L483-L541]
+verdict: revise
+verdict_reason: |
+  The doc's intent is correct and 3 of its SHIP items are already partially built in the codebase.
+  Revise to drop greenfield proposals that duplicate existing work, scope color palette change so
+  #7367F0 is untouched, and pick KaTeX->MathML over MathJax to honor ADR-0004. Extract 5 tasks
+  that close real gaps (he/ar speech, KaTeX MathML, Eastern numerals, viz palette, amber contrast).
+cross_lens_handoff:
+  - to: persona-educator
+    about: "Feature 1 subitizing trainer's pedagogical fit for Bagrut-age students (12-18) — most dyscalculia research is K-3"
+  - to: persona-cogsci
+    about: "Feature 4 ADHD chunking effect sizes and cognitive-load framing"
+  - to: persona-privacy
+    about: "Feature 5 'CVD type self-reported or detected' — detection of disability type is special-category data; detection path must be removed or gated by explicit consent"
+  - to: persona-finops
+    about: "Feature 6 MathJax vs KaTeX MathML choice has bundle-size and CDN cost implications"
+  - to: persona-ministry
+    about: "Feature 7 Arabic math function glyph localization (جا/تا/ظا) — confirm Ministry/Bagrut marker acceptance for student-submitted work"

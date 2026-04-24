@@ -1,0 +1,172 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 accessibility features (dyscalculia subitizing trainer, audio-
+  haptic number line, digital graph paper, ADHD focus session builder,
+  color-blind palette, MathML screen reader, Arabic RTL renderer, calm UI).
+  Guardrail table at L96-102, L274-281, L532-538 screens each feature.
+system_purpose_fit: 4
+  rationale:
+    - Accessibility features are intrinsically aligned with ethical persuasion —
+      they expand autonomy for students who otherwise face coercive defaults
+    - F8 "Anxiety-Reducing Predictable UI" (L482-541) is essentially a
+      codification of calm-UX principles the shipgate doc endorses
+    - F4 ADHD session builder self-flags a variable-ratio risk (energy tracker)
+      and proposes mitigation
+    - Small concern: "body doubling" ambient video (L228) needs explicit review
+      for parasocial / surveillance framing
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Calcularis 2.0 efficacy -> cogsci lens"
+    - "ModMath 970K+ downloads -> competitive, not my lens"
+adr_alignment:
+  honored:
+    - "GD-004 shipgate (explicit guardrail tables throughout)"
+    - "ADR-0003 session-scope (F1 dyscalculia trainer has 90-day anonymize flag at L100)"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F4 ADHD Focus Session Builder (L225-284) proposes "Body Doubling
+      Mode — optional virtual study partner feature showing a calming
+      ambient video of another student studying." Ethics concerns:
+      (a) whose video? Real minor's recording = consent/CSAM risk
+      escalation. (b) AI-generated ambient student = deceptive by
+      default (student thinks it's a peer). (c) parasocial attachment
+      risk for neurodivergent minors. Needs hard constraint:
+      ambient video must be (i) non-human (plant, cafe window, clock)
+      OR (ii) clearly labeled AI-generated stock footage with no
+      identifiable individuals.
+    evidence: axis3_accessibility_accommodations_findings.md:L228
+    lens_note: |
+      Shipgate bans manipulation of relatedness needs. A fake "peer
+      studying" trades on social-proof and relatedness without the
+      student's informed consent that they're not with a real person.
+      Fails the "informed student" test.
+  - severity: P1
+    finding: |
+      F4 Energy Tracker (L228, guardrail flag at L277) already flagged
+      BORDERLINE by author for variable-ratio risk. Ethics lens adds:
+      the adjustment "if energy < 3, reduce problem complexity by 1
+      tier" (L259) is a silent difficulty manipulation the student
+      hasn't opted into. Student should SEE and CONFIRM each
+      adjustment, not have the system adjust silently based on a
+      mood-emoji tap. Silent adaptation == manipulation.
+    evidence: axis3_accessibility_accommodations_findings.md:L255-L260, L277
+    lens_note: |
+      Autonomy requires transparency. A student who taps "energy: low"
+      should see "Want to start with lighter warm-ups? [Yes/No]" —
+      not have the session invisibly altered.
+  - severity: P2
+    finding: |
+      F8 Anxiety-Reducing UI (L482-541) specifies "success indicated
+      with subtle green + checkmark (no celebration animations)"
+      (L485). Excellent. However, F4's circular visual timer animation
+      (L261) and F1's subitizing adaptive algorithm (L87-92) are not
+      held to the same no-animation standard. Inconsistency risks
+      anxiety-trigger UI sneaking in via subitizing drills.
+    evidence: axis3_accessibility_accommodations_findings.md:L85-L92, L260-L264, L485
+    lens_note: |
+      The "<200ms animation" rule from F8 should be a design-system
+      commitment that binds F1/F4 too.
+  - severity: P2
+    finding: |
+      F1 Subitizing Trainer (L48-105) uses "presentation time" and
+      "response time" as difficulty inputs (L88). For a dyscalculic
+      minor, time-pressure difficulty is anxiety-inducing by design.
+      Needs a "no-timer mode" as a first-class option, not an
+      afterthought — especially since this is the mode most likely to
+      be used by the very students the rest of the doc protects from
+      time-pressure UIs.
+    evidence: axis3_accessibility_accommodations_findings.md:L85-L92
+    lens_note: |
+      Accommodation-by-default is the ethical-persuasion ideal;
+      timer-first-no-timer-optional is the inverse of that.
+already_built:
+  - feature: "Color-blind safe palette + viridis colormap"
+    evidence: src/student-web (verify)
+    note: |
+      Feature 5 (L288-347) is treated as "proposed" but Cena's locked
+      primary #7367F0 and Vuexy theme imply a theme system already
+      exists. Doc should mark as "retrofit," not "new feature."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-011 through FD-016 covers same 6 features"
+  - "AXIS_8_Content_Authoring_Quality_Research.md: F4 (Arabic RTL) duplicates F7 here"
+extracted_tasks:
+  - title: "Body-doubling mode: ban real-minor recordings, require AI-stock label"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before F4 body-doubling ambient video ships, adopt ADR:
+      - Never use recordings of real students (any age)
+      - Ambient video must be (a) non-human nature/object OR (b)
+        clearly-labeled AI-generated stock with visible "AI-generated
+        ambient scene — no real people" banner
+      - Parental consent required for any human-likeness ambient video
+      ## Files
+      - docs/adr/00NN-body-doubling-policy.md (new)
+      ## Definition of Done
+      - ADR accepted
+      - F4 spec revised accordingly
+      - Shipgate scanner adds rule rejecting "real student" recording in video assets
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L228]
+  - title: "Energy tracker: explicit confirm before difficulty adjustment"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Prevent silent difficulty adjustment. When a student's
+      pre-session energy rating < 3, surface an opt-in dialog:
+      "Want to start with lighter warm-ups?" — adjust only on
+      explicit Yes. Log the consent.
+      ## Files
+      - src/student-web/src/features/focus/EnergyGate.vue (new)
+      - src/actors/SessionGrain/SessionPlannerActor.cs
+      ## Definition of Done
+      - No code path adjusts difficulty based on energy rating without explicit confirmation
+      - Consent logged (student_id, session_id, rating, consented, timestamp)
+      - E2E test: low-energy tap + decline => difficulty unchanged
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L255-L260]
+  - title: "No-timer mode default for dyscalculia subitizing trainer"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F1 Subitizing Trainer must default to no-timer mode for any
+      student with a dyscalculia accommodation flag; timer mode is an
+      explicit opt-in ("I want speed practice") control.
+      ## Files
+      - src/student-web/src/features/dyscalculia/SubitizingTrainer.vue
+      - src/actors/AccommodationActor/AccommodationGrain.cs
+      ## Definition of Done
+      - Accommodation flag disables timer by default
+      - Opt-in toggle visible with neutral copy
+      - a11y + WCAG 2.2 AA
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L85-L92]
+verdict: revise
+verdict_reason: |
+  Accessibility is an ethics ally, not a tension. Revise to fix
+  body-doubling policy, silent-adjustment in energy tracker, and
+  timer-first default in subitizing trainer. F5/F7/F8 ship as designed.
+cross_lens_handoff:
+  - to: persona-a11y
+    about: "Full WCAG 2.2 AA review of F2 audio-haptic feedback, F6 MathML pipeline, F7 Arabic RTL"
+  - to: persona-privacy
+    about: "F4 energy rating + focus event logging — verify retention/scope under ADR-0003"
+  - to: persona-redteam
+    about: "F2 Web Audio / haptic API — verify no fingerprinting vector for minors"

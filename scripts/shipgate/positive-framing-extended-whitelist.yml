@@ -1,0 +1,126 @@
+# =============================================================================
+# Ship-gate whitelist: positive-framing-extended rule pack
+# =============================================================================
+# Files that legitimately need to reference the banned positive-framing tail
+# terms — policy docs, task bodies, retirement logs, research notes, admin
+# analytics surfaces that rank legitimately, and the positive-test fixture.
+#
+# Core principle (inherits from progress-framing-whitelist.yml): admin /
+# educator / researcher surfaces are allowed to discuss the banned copy
+# mechanically (they're analysing it, not directing it at students). The
+# protected surface is the student UI.
+# =============================================================================
+
+whitelist:
+  - path: "scripts/shipgate/positive-framing-extended.yml"
+    reason: "The rule pack itself (patterns quoted in rule definitions)"
+
+  - path: "scripts/shipgate/positive-framing-extended-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "scripts/shipgate/rulepack-scan.mjs"
+    reason: "Scanner source references pack name in comments"
+
+  - path: "shipgate/fixtures/positive-framing-extended-sample.md"
+    reason: "Positive-test fixture: deliberately contains every banned pattern"
+
+  - path: "tests/shipgate/**"
+    reason: "Test fixtures/specs reference banned patterns"
+
+  - path: "docs/adr/**"
+    reason: "ADRs describe positive-framing-extended ban rationale"
+
+  - path: "docs/engineering/**/*.md"
+    reason: "Engineering policy docs cite banned phrasing in rejection context"
+
+  - path: "docs/design/**/*.md"
+    reason: "Design docs describe anti-patterns (including the intrinsic-motivation risk map)"
+
+  - path: "docs/research/**"
+    reason: "Research notes analyse cohort-framing / loss-aversion literature"
+
+  - path: "docs/feature-specs/**/*.md"
+    reason: "Feature specs may cite the banned framing in rationale / alternatives-considered context"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may mention shipgate scanner expansions"
+
+  - path: "pre-release-review/**"
+    reason: "Pre-release review corpus"
+
+  - path: "tasks/pre-release-review/**"
+    reason: "Task bodies define positive-framing extensions and may quote banned copy"
+
+  - path: "CLAUDE.md"
+    reason: "Project rules"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules"
+
+  - path: ".agentdb/**"
+    reason: "Task queue protocol docs"
+
+  # --------------------------------------------------------------------------
+  # Admin / educator surfaces — teachers, principals, ministry reviewers
+  # legitimately need to rank, compare, and describe cohort performance.
+  # prr-163 is student-facing only; admin analytics are allowed.
+  # --------------------------------------------------------------------------
+  - path: "src/admin/full-version/**"
+    reason: "Admin UI is educator-facing; cohort/school-rank analytics are legitimate for teachers and principals"
+
+  - path: "src/api/Cena.Admin.Api/**"
+    reason: "Admin API serves educator/principal analytics (cohort/school rank is by-design for these users)"
+
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Test assertions may reference banned copy in DoesNotContain checks"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may assert banned copy is absent"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant) may assert banned copy is absent"
+
+  # --------------------------------------------------------------------------
+  # Scoring / assessment internal domain code. The words 'points', 'deducted',
+  # 'lost', etc. appear in internal scoring vocabulary — describing what the
+  # scoring algorithm does, not as student-facing copy. The student-facing
+  # rubric-review surface is a different seam and is gated separately.
+  # --------------------------------------------------------------------------
+  - path: "src/actors/Cena.Actors/Pedagogy/**"
+    reason: "Pedagogy domain may reference scoring internals in doc-comments (not student-facing copy)"
+
+  - path: "src/actors/Cena.Actors/Mastery/**"
+    reason: "Mastery / item-routing domain references scoring internals (not student-facing copy)"
+
+  - path: "src/actors/Cena.Actors/Scoring/**"
+    reason: "Scoring domain describes point allocation as internal vocabulary"
+
+  - path: "src/actors/Cena.Actors/Simulation/**"
+    reason: "Student-archetype simulation code for testing (describes simulated behaviours, not student-facing)"
+
+  # --------------------------------------------------------------------------
+  # Pre-existing infrastructure whose retirement is tracked separately.
+  # Time-bound: remove entries when the underlying feature retires.
+  # --------------------------------------------------------------------------
+  - path: "src/shared/Cena.Infrastructure/Gamification/**"
+    reason: "Pre-existing gamification infrastructure (challenge/round vocabulary). Time-bound: remove on challenge-round retirement PR"
+
+  - path: "src/api/Cena.Api.Contracts/Gamification/**"
+    reason: "Pre-existing gamification DTOs (internal transport vocabulary, not student copy)"
+
+  - path: "src/api/Cena.Student.Api.Host/Endpoints/ChallengesEndpoints.cs"
+    reason: "Pre-existing challenges endpoint; retirement tracked separately"
+
+  - path: "src/api/Cena.Student.Api.Host/Endpoints/GamificationEndpoints.cs"
+    reason: "Pre-existing gamification endpoint; retirement tracked separately"
+
+  # --------------------------------------------------------------------------
+  # Pre-existing Vuexy leaderboard/challenge surfaces (the progress-framing
+  # whitelist tracks their full set; this pack inherits only the Challenge
+  # Round / cohort-copy touch points).
+  # --------------------------------------------------------------------------
+  - path: "src/student/full-version/src/plugins/i18n/locales/*.json"
+    reason: "Pre-existing i18n bundles may carry Challenge Round / cohort keys. Time-bound: remove on copy-migration PR"
+
+  - path: "src/student/full-version/src/plugins/fake-api/**"
+    reason: "Pre-existing Vuexy fake-API mocks"

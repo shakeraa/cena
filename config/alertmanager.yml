@@ -1,0 +1,51 @@
+# =============================================================================
+# Cena Platform — Alertmanager Configuration (EPIC-PRR-L PRR-434)
+#
+# Routes Prometheus alerts to the operator notification channel. Real
+# channel (PagerDuty, OpsGenie, Slack webhook) wired via the `receivers`
+# block — current config is the null-webhook default for dev/test.
+# Production composition overrides via config/alertmanager.production.yml.
+# =============================================================================
+
+global:
+  resolve_timeout: 5m
+
+route:
+  # All alerts go to the default receiver unless a child route matches first.
+  receiver: "cena-critical-default"
+  group_by: ["alertname", "service"]
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 4h
+  routes:
+    - match:
+        severity: critical
+      receiver: "cena-critical-default"
+      group_wait: 5s
+      repeat_interval: 1h
+    - match:
+        severity: warning
+      receiver: "cena-warnings-default"
+      repeat_interval: 12h
+
+receivers:
+  - name: "cena-critical-default"
+    # Dev/test null webhook — production replaces this receiver with the
+    # real PagerDuty/Slack/OpsGenie integration.
+    webhook_configs:
+      - url: "http://host.docker.internal:9094/alert-sink-null"
+        send_resolved: true
+
+  - name: "cena-warnings-default"
+    webhook_configs:
+      - url: "http://host.docker.internal:9094/alert-sink-null"
+        send_resolved: true
+
+inhibit_rules:
+  # When the CAS sidecar is down, suppress downstream error-rate alerts
+  # that are the symptom of the same outage.
+  - source_match:
+      alert_id: "ALERT-CAS-001"
+    target_match:
+      alert_id: "ALERT-ERR-001"
+    equal: ["service"]

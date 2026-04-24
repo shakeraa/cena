@@ -1,0 +1,154 @@
+doc_path: pre-release-review/finding_assessment_dr_rami.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Rami (statistical/evidence honesty) reviews 20 findings. 9 PASS, 8 WARNING, 3 REJECT.
+  Explicitly flags DPA §7 (ML training on student data) and ADR-0003 (session-scoped
+  misconception) as privacy-relevant constraints applied throughout. Useful cross-check
+  on privacy-adjacent features.
+
+system_purpose_fit: 5
+  rationale:
+    - Assessment framework explicitly includes DPA §7 and ADR-0003 as criteria
+    - FD-003 REJECT partly on ADR-0003 violation risk (persistent misconception tracking)
+    - FD-008 REJECT partly on DPA §7 violation (AI grading training pipeline)
+    - FD-009 WARNING flags LLM tutor data governance
+    - Every WARNING/REJECT has explicit privacy-lens reasoning
+
+code_reality_check:
+  claims_verified_in_code:
+    - "FD-003 '95% misconception resolution' as claimed does imply persistent tracking -> session-scoped architecture exists (MisconceptionEvents.cs) but vendor's 95% claim not replicable without cross-session data"
+    - "FD-008 AI grading DPA §7 concern -> raised as P0 in AXIS 6 review (ZDR requirement)"
+    - "FD-009 LLM tutor prompt logging -> ClaudeTutorLlmService.cs confirmed; Anthropic ZDR question raised in cena_competitive_analysis review"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "FD-011 ES 1.16 cherry-picking — outside privacy lens"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (explicitly framed as criterion)
+    - DPA §7 (explicitly framed as criterion)
+    - RDY-080 (explicitly framed as criterion)
+  violated: []
+  missing_adr_needed: []
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      FD-003 REJECT: Dr. Rami notes "95% misconception resolution" implies persistent
+      misconception tracking — direct ADR-0003 violation. Privacy lens concurs. Even the
+      "eventual" 95% framing (multi-session) would require cross-session retention.
+      Any feature proposal citing 95% in marketing/planning docs must be struck.
+    evidence: "finding_assessment_dr_rami.md:19, :52-53"
+    lens_note: |
+      Statistical dishonesty + privacy violation in one fabricated number.
+
+  - severity: P0
+    finding: |
+      FD-008 REJECT: "Yu et al. 2026" unverifiable + DPA §7 violation via AI grading
+      training pipeline. Privacy lens already raised this as P0 in AXIS 6 review.
+      Cross-confirmation: do not build AI grading until DPIA + ZDR confirmed + vendor
+      agreement bans training on student work.
+    evidence: "finding_assessment_dr_rami.md:24, :55-56"
+    lens_note: |
+      Double-flag = double-priority. DPIA is the gate.
+
+  - severity: P1
+    finding: |
+      FD-009 WARNING: Socratic tutor prompt logging + fine-tuning pipelines. Privacy
+      lens raised as P0 in competitive-analysis review. Cross-confirmation that Anthropic
+      ZDR + data-governance clarity required before ship.
+    evidence: "finding_assessment_dr_rami.md:25"
+    lens_note: |
+      Existing code (ClaudeTutorLlmService) already ships; confirm vendor posture
+      immediately.
+
+  - severity: P2
+    finding: |
+      FD-004 WARNING RDY-080 — readiness scores as implicit prediction. Privacy lens
+      concerns: a "Bagrut readiness score" per student becomes a follow-the-student
+      profile for 7 years (StudentRecord retention). Must be disclaimed + student
+      right-to-object + teacher-view audit-logged.
+    evidence: "finding_assessment_dr_rami.md:20"
+    lens_note: |
+      Same privacy concerns as AXIS 6 F2 IRT-CAT.
+
+  - severity: P2
+    finding: |
+      FD-011 REJECT (cherry-picked ES 1.16) + stereotyping risk (Dr. Nadia). Privacy
+      lens adds: cohort-based content selection uses ethnic-origin tag (Art 9). Triple-flag.
+    evidence: "finding_assessment_dr_rami.md:27, :58-59"
+    lens_note: |
+      Triple cross-lens flag = retire or substantially revise.
+
+already_built: []
+
+duplicates_of_other_docs:
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: same FD-001..FD-020 set with different lens"
+  - "axis1/axis6/axis8 findings: many overlap"
+
+extracted_tasks:
+  - title: "Retract 95% misconception resolution claim from all roadmaps (FD-003)"
+    priority: P0
+    estimate: XS
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Dr. Rami REJECTED FD-003 due to fabricated 95% figure. Any Cena planning doc or
+      marketing material citing this number must be corrected to ~60-80% (actual Eedi/DeepMind
+      reported range). Prevents downstream compliance + honesty issues.
+
+      ## Files
+      - Scan: feature-discovery-2026-04-20.md, axis6 doc, any plan docs
+      - Replace with range (60-80%) and cite correct condition
+
+      ## Definition of Done
+      - All references updated
+      - Note in roadmap reflects honest range
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L19", "L52-53"]
+
+  - title: "Gate AI grading (FD-008) behind completed DPIA + ZDR + verified citation"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Formal moratorium on Feature 3/4 AI grading until: (a) Yu et al. 2026 citation
+      replaced with verifiable source; (b) DPIA completed; (c) vendor ZDR + no-training
+      agreement executed.
+
+      ## Files
+      - docs/compliance/dpia-ai-grading.md
+      - Planning docs: mark Feature 3/4 DEFER
+
+      ## Definition of Done
+      - Moratorium documented in product roadmap
+      - Gate conditions listed
+      - Any work on Feature 3/4 blocked until all conditions met
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L24", "L55-56"]
+
+verdict: adopt
+verdict_reason: |
+  Dr. Rami's evidence-honesty lens materially strengthens privacy posture. REJECTS are
+  correctly identifying privacy-violating features. No new privacy tasks beyond the two
+  above; existing axis reviews cover the rest.
+
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      Dr. Rami is the primary statistical-integrity reviewer; cogsci lens should consume
+      her full set.
+  - to: persona-educator
+    about: |
+      Pedagogical claims in rejected features need re-framing.
+  - to: persona-ministry
+    about: |
+      RDY-080 Bagrut concordance concerns (FD-004, FD-020).

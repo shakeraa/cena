@@ -1,0 +1,198 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Surveys 30+ competitor platforms and extracts 10 adoption-candidate
+  features. Explicitly rejects streak/leaderboard/variable-ratio /
+  ML-training / under-13 silent collection patterns (L16). Also documents
+  rejected categories at L434-462.
+system_purpose_fit: 3
+  rationale:
+    - The "Rejected" section (L434-462) is ethics-aligned: streaks,
+      leaderboards, variable-ratio rewards, cross-session misconception,
+      ML-training on student data all correctly rejected
+    - However, the Top-10 adoption candidates include at least one
+      P0 shipgate violation (Feature 7 "practice streaks") and one
+      borderline pattern (Feature 8 countdown timer, Feature 3 pulse
+      animation)
+    - Overall ethics-lens verdict: author understands the rules but
+      the Feature 7 "streak" word slipped through
+code_reality_check:
+  claims_verified_in_code:
+    - "docs/engineering/shipgate.md:L17 explicitly bans streak counters that can go to zero — L282 here uses the word 'streak'"
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - "Rejected list honors GD-004 / ADR-0003 / DPA §7 correctly (L434-462)"
+  violated:
+    - "GD-004 shipgate: Feature 7 (L282) explicitly proposes 'practice streaks (personal only — not comparative)' — the word 'streak' is hard-banned regardless of 'personal only' qualifier"
+  missing_adr_needed: []
+non_negotiable_violations:
+  - "3: No dark-pattern engagement — Feature 7 proposes 'practice streaks'"
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 7 "Student Learning Portfolio with Parent Visibility"
+      (L272-308) proposes (L282) a portfolio showing "Current focus
+      areas with practice streaks (personal only — not comparative)."
+      The word "streak" triggers automatic P0 under the banned-terms
+      rule. Shipgate.md:L17 bans "Streak counters that can go to
+      zero" — the "personal only" qualifier does not exempt it; the
+      Duolingo-style "personal streak" is the exact pattern banned.
+      Must be revised to "consistency calendar" (the doc itself offers
+      this as the borderline-alternative at L441) or removed.
+    evidence: cena_competitive_analysis.md:L282
+    lens_note: |
+      The doc itself documents the rejection of streaks at L438-441
+      and offers "consistency calendar" as the accepted alternative.
+      Feature 7 should adopt that language. This is a drafting bug,
+      not an intent bug — but it will get caught by ship-gate CI on
+      any commit and should be preemptively fixed in the spec.
+  - severity: P1
+    finding: |
+      Feature 8 "Bagrut-Aligned Practice Engine with Exam Simulation"
+      (L312-352) proposes "נותרו X ימים לבגרות" countdown (L348).
+      Author flags BORDERLINE (L350) and recommends "focus on you're
+      making progress" framing. Ethics lens: same shared revision as
+      Axis 4 F8 / Axis 6 F7 — countdown must be collapsed by default,
+      no urgency language, no red coloring, no animation, and (for
+      parent-visible views) per-semester opt-in.
+    evidence: cena_competitive_analysis.md:L348-L350
+    lens_note: |
+      Cross-axis finding: at least three docs propose "X days to
+      Bagrut" countdowns. Single shared ADR covers all three.
+  - severity: P2
+    finding: |
+      Feature 3 "AI-Powered Stuck? Ask Button" (L115-148) proposes
+      (L140) "subtle pulse animation when student has been idle >2
+      minutes." Author flags BORDERLINE (L146). Ethics lens: animated
+      UI to re-engage an idle minor is attention-capture / nagging
+      by design. Recommend: no animation; optional discrete bubble
+      can fade-in once at 5 min; never after 1st dismiss.
+    evidence: cena_competitive_analysis.md:L140, L146
+    lens_note: |
+      "Subtle" is a common defense word for attention-capture UI.
+      The threshold is: would the student appreciate knowing the
+      animation is designed to pull them back? If no, retire it.
+  - severity: P2
+    finding: |
+      Feature 4 "At-Risk Student Alert System" (L152-189) frames
+      students as "at-risk" and uses red severity indicators (L181).
+      Teacher-facing, but the label "at-risk" carrying case-file
+      energy for a minor whose attention dropped 50% for 3 days
+      medicalizes normal variance. Recommend: "students to check in
+      with" or "attention needed" — same information, no case-file
+      framing.
+    evidence: cena_competitive_analysis.md:L152-L189
+    lens_note: |
+      Clinical/risk framing in teacher dashboards is known to alter
+      teacher perception of students (labeling effect). Shipgate
+      should forbid "at-risk" in teacher-facing copy.
+already_built: []
+duplicates_of_other_docs:
+  - "cena_axis5_teacher_workflow_features.md: F4 At-Risk overlaps FD-022 smart planner"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: F6 Auto-Translation overlaps F2 there"
+  - "axis3_accessibility_accommodations_findings.md: F9 TTS overlaps F6 there"
+  - "feature-discovery-2026-04-20.md: broad overlap with all FD-xxx"
+extracted_tasks:
+  - title: "Competitive doc Feature 7: rename 'practice streaks' -> 'consistency calendar'"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Edit cena_competitive_analysis.md Feature 7 (L282) to replace
+      "practice streaks (personal only — not comparative)" with
+      "consistency calendar (personal only — not comparative)." Update
+      the feature description consistently (L297-303). This is a
+      documentation hygiene change that aligns with the doc's own
+      Rejected-Features section (L441).
+      Separately, add shipgate rule rejecting the word "streak" in any
+      feature spec under pre-release-review/ with an allowlist
+      exception for competitive-analysis-context-only mentions (i.e.
+      when quoting a competitor's banned pattern).
+      ## Files
+      - pre-release-review/cena_competitive_analysis.md
+      - scripts/shipgate/banned.json
+      - scripts/shipgate/allowlist.json (add context-only exceptions)
+      ## Definition of Done
+      - Feature 7 language updated
+      - Shipgate scan passes on competitive-analysis doc
+      - Lint blocks the word "streak" in feature proposals going forward
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L282]
+  - title: "Cross-doc Bagrut countdown revision (shared with Axis 4 F8, Axis 6 F7)"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Single ADR covering all Bagrut-proximity countdown UIs across
+      pre-release-review/ (Axis 4 F8, Axis 6 F7, competitive Feature 8):
+      - Rename "Crisis Mode" -> neutral
+      - Countdown collapsed by default, never animated, no red
+      - Parent visibility per-semester opt-in only
+      - Shipgate banned copy list updated
+      This task is referenced from three review YAMLs; only one
+      implementation is needed.
+      ## Files
+      - docs/adr/00NN-exam-proximity-ui-policy.md (new)
+      - scripts/shipgate/banned.json
+      ## Definition of Done
+      - ADR accepted
+      - All three specs revised to reference it
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L348-L350]
+  - title: "Ban 'at-risk' student framing in teacher-facing copy"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Shipgate scanner rejects "at-risk" / "at risk" / "high-risk"
+      student terminology in any teacher-facing locale namespace.
+      Suggested replacements: "students to check in with,"
+      "attention needed," "reach out."
+      ## Files
+      - scripts/shipgate/banned.json
+      - src/teacher-web/src/locales/*.json
+      ## Definition of Done
+      - Lint blocks banned phrases
+      - Existing teacher-web strings audited and migrated
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L152-L189]
+  - title: "Retire idle-pulse animation in Stuck? Ask button"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 3 "Stuck? Ask" help button: no animation. Optional one-
+      time fade-in cue at 5 min idle, never repeated within session,
+      dismissible.
+      ## Files
+      - src/student-web/src/components/help/StuckButton.vue
+      ## Definition of Done
+      - No CSS animation on help button
+      - One-time fade-in cue with localStorage dismiss flag
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L140, L146]
+verdict: revise
+verdict_reason: |
+  The doc is largely ethics-aligned — its own Rejected-Features
+  section is textbook shipgate compliance. But P0 "practice streaks"
+  wording in Feature 7 must be fixed immediately; countdown framing
+  in Feature 8 shares revision with Axis 4/6; Feature 3 animation
+  and Feature 4 at-risk terminology need minor clean-up.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Feature 1 Socratic AI effect-size claims (0.2 SD Stanford/NBER) — Rami flagged"
+  - to: persona-privacy
+    about: "Feature 6 auto-translation routes student content through translation APIs"
+  - to: persona-ministry
+    about: "Feature 8 Bagrut-aligned simulation fidelity — Ministry concordance?"

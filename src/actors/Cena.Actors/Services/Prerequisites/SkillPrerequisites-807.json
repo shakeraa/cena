@@ -1,0 +1,30 @@
+{
+  "track": "MATH-BAGRUT-807",
+  "description": "Bagrut Mathematics 807 — Calculus & Probability (5 units)",
+  "skills": {
+    "algebra-basics": { "prerequisites": [], "category": "conceptual" },
+    "algebra-linear-equations": { "prerequisites": ["algebra-basics"], "category": "procedural" },
+    "algebra-quadratic-equations": { "prerequisites": ["algebra-linear-equations"], "category": "procedural" },
+    "algebra-polynomial-operations": { "prerequisites": ["algebra-basics"], "category": "procedural" },
+    "functions-basics": { "prerequisites": ["algebra-basics"], "category": "conceptual" },
+    "functions-linear": { "prerequisites": ["functions-basics", "algebra-linear-equations"], "category": "mixed" },
+    "functions-quadratic": { "prerequisites": ["functions-basics", "algebra-quadratic-equations"], "category": "mixed" },
+    "functions-exponential": { "prerequisites": ["functions-basics"], "category": "mixed" },
+    "functions-logarithmic": { "prerequisites": ["functions-exponential"], "category": "procedural" },
+    "trigonometry-basics": { "prerequisites": ["algebra-basics"], "category": "mixed" },
+    "trigonometry-identities": { "prerequisites": ["trigonometry-basics"], "category": "procedural" },
+    "calculus-limits": { "prerequisites": ["functions-basics", "algebra-polynomial-operations"], "category": "conceptual" },
+    "calculus-derivatives-basics": { "prerequisites": ["calculus-limits"], "category": "mixed" },
+    "calculus-derivatives-rules": { "prerequisites": ["calculus-derivatives-basics"], "category": "procedural" },
+    "calculus-derivatives-applications": { "prerequisites": ["calculus-derivatives-rules", "functions-quadratic"], "category": "metacognitive" },
+    "calculus-integrals-basics": { "prerequisites": ["calculus-derivatives-basics"], "category": "mixed" },
+    "calculus-integrals-applications": { "prerequisites": ["calculus-integrals-basics"], "category": "metacognitive" },
+    "probability-basics": { "prerequisites": ["algebra-basics"], "category": "conceptual" },
+    "probability-combinatorics": { "prerequisites": ["probability-basics", "algebra-polynomial-operations"], "category": "procedural" },
+    "probability-conditional": { "prerequisites": ["probability-basics"], "category": "conceptual" },
+    "probability-distributions": { "prerequisites": ["probability-conditional", "probability-combinatorics"], "category": "mixed" },
+    "probability-normal-distribution": { "prerequisites": ["probability-distributions", "calculus-integrals-basics"], "category": "procedural" },
+    "statistics-descriptive": { "prerequisites": ["probability-basics"], "category": "procedural" },
+    "statistics-inference": { "prerequisites": ["probability-distributions", "statistics-descriptive"], "category": "metacognitive" }
+  }
+}

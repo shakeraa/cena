@@ -1,0 +1,182 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Seven collaboration features: anonymised peer explanation circles, teacher-
+  mediated micro-groups, cooperative competitions, async anonymous Q&A, "I'm
+  confused too" signal, reciprocal peer tutoring matcher, collaborative math
+  whiteboard. Two-sided consent + ephemerality emphasized throughout.
+system_purpose_fit: 3
+  rationale:
+    - Peer Instruction (Crouch & Mazur 2001) and self-explanation (Chi 1989) are
+      cogsci-warranted mechanisms for F1; the other features are primarily
+      social/moderation engineering with weak cogsci warrants.
+    - Anonymous ephemeral peer-explanation is ADR-0003-adjacent: even a 24h
+      retained voice recording of a student's explanation is a behavioral
+      artifact. Architecture in doc addresses this but the storage surface is
+      bigger than Redis-only misconception tags.
+    - F3 "Team vs Challenge cooperative competitions" imports a social-comparison
+      mechanic into a product whose ship-gate forbids comparative shame. The
+      doc's own mitigations require Dr. Rami-style honesty about what changes
+      when the comparison is "team" not "individual" — comparative pressure
+      persists at the cohort level.
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "'Nearpod Collaborate Board' competitive claim (AXIS_7:118) — verified as a real product, but the teacher-moderation evidence is marketing, not peer-reviewed outcome data."
+  claims_unsupported_in_literature:
+    - "AXIS_7:38 cites Crouch & Mazur 2001 'correct responses increase from ~59% to ~80% after peer discussion'. This is from a physics concept-inventory context (Force Concept Inventory). Transfer of the specific lift to (a) asynchronous digital explanation circles, (b) secondary-school math, (c) Hebrew/Arabic cross-cohort pairs — is a cogsci leap. Doc should frame as 'Peer Instruction substrate, not predicted lift.'"
+adr_alignment:
+  honored:
+    - ADR-0003 (F1 explanation content 24h TTL, metadata purged after 7d)
+    - Non-negotiable 3 (opt-in participation; no coerced peer pairing)
+  violated:
+    - "Potentially non-neg 3 for F3 'Team vs Challenge Cooperative Competitions'. Ship-gate banned terms include variable-ratio rewards and comparative shame; team-level competition preserves comparative structure even if individual identities are hidden. Needs explicit ship-gate review."
+  missing_adr_needed:
+    - "Peer-content retention ADR: F1 voice recordings, F7 whiteboard strokes — all are student-produced artifacts that *could* encode PII or misconceptions. Need ADR defining retention, purpose, and deletion triggers for peer-produced content."
+non_negotiable_violations:
+  - "3 (no dark patterns): F3 team competitions risk re-introducing comparative shame at cohort level, even with individual anonymisation. Requires ship-gate review before SHIP verdict stands."
+persona_findings:
+  - severity: P1
+    finding: |
+      F1 (Anonymized Peer Explanation Circles) is the cogsci-strongest feature
+      in the doc — self-explanation (Chi 1989) + Peer Instruction (Crouch & Mazur
+      2001) are real mechanisms. But effect sizes for *asynchronous digital*
+      peer explanation in mixed-ability classrooms are much weaker than the
+      Mazur-style synchronous PI in a concept-inventory context. The
+      "~59%→80% correct" lift is not a Cena prediction. Reframe as "low-cost
+      social scaffold; effect size uncertain in Cena context; pilot".
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:38
+    lens_note: |
+      Mechanism mismatch is the standard cogsci critique here. Worth building;
+      don't promise the Mazur lift.
+  - severity: P1
+    finding: |
+      F3 (Team vs Challenge Cooperative Competitions) relies on "cooperative
+      competition" research (Ke & Grabowski 2007, Slavin). Dr. Kenji concurs
+      with Dr. Rami's PASS verdict on that citation's pedigree but notes: Ke &
+      Grabowski studied *in-classroom* cooperative games, not a multi-week
+      async digital team vs team competition. The mechanism transfer is weaker
+      than the citation class suggests, and team-vs-team structures activate
+      the same social-comparison circuitry that the ship-gate bans for individuals.
+      Recommend ship-gate review or retire.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:(feature 3 section; doc prose)
+    lens_note: |
+      Cogsci lens reading of "comparative shame" — it's about the evaluative
+      comparison mechanism, not the unit of comparison (individual vs team).
+      Team-level still produces social-evaluative threat (Steele's work).
+  - severity: P2
+    finding: |
+      F5 "I'm Confused Too" anonymous signal — a clean cogsci feature
+      (metacognitive monitoring made social without shame). Cheap, safe, and
+      the doc architects it correctly. Ships cleanly.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:Feature 5 section
+    lens_note: "No concerns; this is the low-risk win of the doc."
+  - severity: P2
+    finding: |
+      F6 (Reciprocal Peer Tutoring Matcher) requires learner-profile matching
+      ("knows skill X, doesn't know skill Y"). Even if implemented on aggregate
+      mastery snapshots (ADR-0003-clean), the *fact of matching* reveals inter-
+      student ability differences to the system. Add explicit ADR: matcher uses
+      only coarse buckets (familiar / proficient) not fine-grained mastery
+      probabilities.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:Feature 6 section
+    lens_note: "Transfer-of-learning concern: peer tutoring produces larger gains for the tutor than the tutee (Fuchs et al. 2001) — feature framing should emphasise benefits for both."
+  - severity: P2
+    finding: |
+      F1 / F7 voice and whiteboard artifacts: session content is essentially
+      student-created derivative work. Cogsci-adjacent privacy risk: a student
+      explaining their misconception out loud is producing richer error-pattern
+      data than the session-scoped misconception tag Cena already rejected in
+      ADR-0003. The 24h TTL is adequate *if* the architecture can prove the
+      artifact is never ingested by any ML training pipeline (DPA §7). Needs
+      explicit safeguard in DoD.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md:73-91
+    lens_note: "Misconception-data-shaped content leaking via the social surface is the subtlest ADR-0003 risk in the corpus."
+already_built:
+  - feature: "Session-scoped ephemeral content pattern (F1 voice, F7 whiteboard)"
+    evidence: docs/adr/0003-misconception-session-scope.md:49-52 (session aggregate pattern)
+    note: "The session-scoped + TTL pattern is already the Cena norm; F1/F7 should reuse the same enforcement infrastructure, not invent their own."
+duplicates_of_other_docs:
+  - "cena_cross_domain_feature_innovation.md: Feature 6 Study Circles overlaps F4 async Q&A here"
+  - "feature-discovery-2026-04-20.md: FD-030 'I'm Confused Too' signal = F5 here"
+extracted_tasks:
+  - title: "Ship F5 'I'm Confused Too' anonymous signal"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      On-problem "I'm confused too" 1-tap button; aggregates anonymously per-
+      problem per-class; teacher dashboard sees count only. Never reveals
+      identities, never exposes individual click history.
+
+      ## Files
+      - src/actors/Cena.Actors/Classroom/ConfusionSignal.cs (new)
+      - src/student-web/src/components/ConfusionButton.vue (new)
+      - src/teacher-web/src/features/class-pulse/ConfusionHeatmap.vue
+
+      ## Definition of Done
+      - No per-student click log retained.
+      - Button enforces cooldown to prevent spam.
+      - Hebrew/Arabic copy vetted against ship-gate banned terms.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-confused-too-signal"
+    source_doc_lines: [Feature 5 section]
+  - title: "Ship-gate review required before F3 Team Cooperative Competitions"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any work on F3 (Team vs Challenge Cooperative Competitions), run the
+      ship-gate banned-terms scanner (docs/engineering/shipgate.md) + a
+      persona-ethics review. If team-level comparison is judged to activate
+      social-evaluative threat equivalent to individual leaderboards, retire or
+      rewrite to cooperative-only (no opposing team).
+
+      ## Files
+      - ops/shipgate-reports/f3-team-competitions-<date>.md (new)
+
+      ## Definition of Done
+      - Ship-gate scan outcome documented.
+      - persona-ethics sign-off or redesign brief.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f3-shipgate-review"
+    source_doc_lines: [Feature 3 section]
+  - title: "F1 Peer Explanation: ADR pinning no-ML-training on peer-produced content"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      ADR that (a) peer-produced voice/text/whiteboard content is excluded from
+      any ML corpus (DPA §7), (b) retention cap is 24h hard, (c) content never
+      feeds downstream mastery or misconception inference.
+
+      ## Files
+      - docs/adr/00XX-peer-content-retention-and-ml-exclusion.md
+
+      ## Definition of Done
+      - ADR written and linked from F1 and F7 sections of axis7 doc.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-peer-content-adr"
+    source_doc_lines: [L73-L91]
+verdict: revise
+verdict_reason: |
+  F5 is a clean ship. F1 is a ship with re-framed effect-size claim + explicit
+  ML-exclusion ADR. F3 must pass ship-gate review or retire. F2, F4, F6, F7 are
+  outside the cogsci primary lens and handed off.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "All peer-produced artifact retention, two-sided consent flows, parent consent for under-18."
+  - to: persona-ethics
+    about: "F3 team competitions — comparative mechanic review. F6 ability-based matching."
+  - to: persona-redteam
+    about: "F1 voice: voice-biometric deanonymisation risk; F4 anonymous Q&A: harassment attack vectors."
+  - to: persona-educator
+    about: "F2 teacher-mediated micro-groups — is moderation burden acceptable in Israeli classroom context?"

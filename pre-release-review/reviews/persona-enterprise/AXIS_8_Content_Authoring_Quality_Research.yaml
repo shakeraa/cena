@@ -1,0 +1,143 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Content-authoring/quality features: CAS-gated problem variation, author review workflow,
+  question quality gate, Arabic-medium content pipeline, localized variants, provenance
+  tracking, item-bank versioning.
+system_purpose_fit: 5
+  rationale:
+    - Direct fit for architecture-audit C5 gap (no content authoring context).
+    - CAS-gating is non-negotiable 1; features align.
+    - Item-bank versioning is exactly the missing piece to unlock Arabic cohort scaling.
+code_reality_check:
+  claims_verified_in_code:
+    - "Question event family exists -> src/actors/Cena.Actors/Events/QuestionEvents.cs"
+    - "Question-locale events exist (multi-language) -> src/actors/Cena.Actors/Events/QuestionLocaleEvents.cs"
+    - "Question recreation events exist -> src/actors/Cena.Actors/Events/QuestionRecreationEvents.cs"
+    - "Ingest module exists -> src/actors/Cena.Actors/Ingest/"
+    - "CAS module exists -> src/actors/Cena.Actors/Cas/"
+  claims_contradicted_by_code:
+    - "Doc treats Content Authoring as a green-field; repo already has Ingest + Questions + Cas + QuestionRecreation + QuestionLocale."
+  claims_unverifiable:
+    - "Whether an author-facing UI exists (Admin Dashboard path src/admin/full-version/ per memory) — not audited in this pass"
+adr_alignment:
+  honored:
+    - "ADR-0002 (CAS oracle)"
+    - "ADR-0032 (CAS-gated ingestion)"
+  violated: []
+  missing_adr_needed:
+    - "Item-bank versioning strategy (semver vs content-hash vs event-sourced item version)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Item-bank versioning is architecturally unclear. Questions mutate (typo fixes, improved distractors) but are
+      also referenced by frozen session attempts. ItemVersionFreeze exists under Sessions/ but policy is not written
+      down. Without policy, content edits silently invalidate in-flight session attempts.
+    evidence: "src/actors/Cena.Actors/Sessions/ItemVersionFreeze.cs; architecture-audit C5 gap"
+    lens_note: Enterprise — item-bank mutation + session freeze is a classic event-sourcing consistency trap.
+  - severity: P1
+    finding: |
+      Arabic-medium pipeline writes new QuestionLocale events per translation. Each translation pass is an LLM call
+      needing tier routing (ADR-026). Doc silent on tier + cost envelope.
+    evidence: "src/actors/Cena.Actors/Events/QuestionLocaleEvents.cs; CLAUDE.md ADR-026"
+    lens_note: Enterprise — LLM calls need tier routing.
+  - severity: P1
+    finding: |
+      CAS-gated variation requires a worker pool (SymPy is Python; we're .NET). Failure modes of the Python sidecar
+      (timeouts, OOM on complex expressions) become a production-grade concern — item authoring blocks on SymPy being
+      healthy. Needs a degraded-mode path (reject, not pass, on SymPy failure).
+    evidence: "src/actors/Cena.Actors/Cas/ (directory); docs/adr/0002-sympy-correctness-oracle.md"
+    lens_note: Enterprise — external-process dependency; must fail closed.
+  - severity: P2
+    finding: |
+      Provenance tracking (who authored, when, through which tool, with which LLM model) is a governance-critical
+      audit trail. No ADR formalizes the provenance schema; each axis adds ad-hoc fields. Centralize.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L~200
+    lens_note: Enterprise — audit schema fragmentation leads to incomplete trails.
+already_built:
+  - feature: "Question events + localization + recreation"
+    evidence: "src/actors/Cena.Actors/Events/QuestionEvents.cs, QuestionLocaleEvents.cs, QuestionRecreationEvents.cs"
+    note: "Three event families already support the axis-8 core scope."
+  - feature: "CAS module + ingest pipeline"
+    evidence: "src/actors/Cena.Actors/Cas/, src/actors/Cena.Actors/Ingest/"
+    note: "Extend; do not re-author."
+  - feature: "Item version freeze"
+    evidence: src/actors/Cena.Actors/Sessions/ItemVersionFreeze.cs
+    note: "Key invariant already expressed; formalize into ADR."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-002 (CAS-gated variation engine)"
+extracted_tasks:
+  - title: "ADR: Item-bank versioning + session freeze invariants"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Formalize how question content versions interact with in-flight sessions and historical attempt events.
+      Clarify: is question immutable once referenced? Semver vs content-hash vs event-sourced version pointer?
+
+      ## Files
+      - docs/adr/ (new 0020-item-bank-versioning.md)
+      - src/actors/Cena.Actors/Sessions/ItemVersionFreeze.cs (implementation reference)
+
+      ## Definition of Done
+      - ADR published.
+      - Session start path + attempt replay tested under a content edit.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~200-L~350]
+  - title: "Fail-closed guard on SymPy sidecar"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Any content-authoring operation that times out or errors from SymPy must fail the authoring attempt, never
+      silently emit un-gated content.
+
+      ## Files
+      - src/actors/Cena.Actors/Cas/
+      - src/actors/Cena.Actors/Ingest/
+
+      ## Definition of Done
+      - Unit test: SymPy down -> authoring rejected.
+      - Circuit-breaker state exposed via health endpoint.
+      - Full Cena.Actors.sln builds.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~100-L~150]
+  - title: "Author provenance schema unification"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      One Provenance value-object used across QuestionEvents, QuestionLocaleEvents, QuestionRecreationEvents.
+      Fields: authorId, toolId, llmModel, llmTier, timestamp.
+
+      ## Files
+      - src/actors/Cena.Actors/Events/ (all Question*Events.cs)
+      - upcasters for V1 -> V2 on each
+
+      ## Definition of Done
+      - Shared Provenance struct; all three event families carry it.
+      - Upcasters committed.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~250]
+verdict: adopt
+verdict_reason: |
+  Directly closes a critical architecture gap (C5). Existing context scaffolding supports it. Adoption gated on
+  item-bank-versioning ADR + SymPy fail-closed + provenance unification.
+cross_lens_handoff:
+  - to: persona-educator
+    about: "Pedagogical soundness of CAS-generated variants."
+  - to: persona-privacy
+    about: "Author identity in provenance — handle vs personal name."
+  - to: persona-finops
+    about: "Translation + CAS worker pool cost envelope."

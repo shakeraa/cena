@@ -1,0 +1,144 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight operational / integration features (Google SSO, Mashov sync read-only, CSV bulk roster, offline-first practice,
+  multi-device sync, school IT admin dashboard, Google Classroom grade passback, data portability export). This doc is entirely
+  in my lens — I can be direct.
+system_purpose_fit: 5
+  rationale:
+    - Every feature here is operational table-stakes.
+    - Alignment with non-negotiables 5 (tenant isolation) and 2 (retention/scope) is explicit.
+code_reality_check:
+  claims_verified_in_code:
+    - "Migrator job + schema-assert health check -> deploy/helm/cena/templates/migrator-job.yaml; docs/operations/deploy-runbook.md"
+    - "Existing Helm chart covers student/admin/actors + HPA + PDB + ingress -> deploy/helm/cena/templates/"
+    - "Deploy-health Grafana dashboard -> deploy/observability/dashboards/cena-deploy-health.json"
+    - "CD workflow + sbom + schema-drift -> .github/workflows/cd-deploy.yml, sbom.yml, schema-drift.yml"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Clever 85% login support reduction — external vendor claim, non-verifiable in our code"
+    - "Duolingo 30% DAU lift from offline — external claim"
+    - "Kolibri LAN sync model — not a current Cena deployment topology"
+adr_alignment:
+  honored: [ADR-0001 (tenancy), non-negotiable 6 (PWA), non-negotiable 7 (REST + SignalR)]
+  violated: []
+  missing_adr_needed:
+    - "Offline-first sync + conflict resolution semantics"
+    - "Third-party integration SLA + circuit-breaker policy"
+    - "Data-portability export format + retention"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 2 (Mashov) stores teacher credentials at rest and runs daily unattended sync. Requirements: AES-256 + Vault/Secret
+      Manager, zero credential in logs, rotation runbook, abuse monitor (unexpected volume), and a hard kill-switch. Without all
+      four, credential storage for 1550 schools is an incident-waiting.
+    evidence: AXIS_10_Operational_Integration_Features.md:L100-L128
+    lens_note: Stored third-party credentials are the highest-value target; operate accordingly.
+  - severity: P0
+    finding: |
+      Feature 4 (Offline-First) sketch labels "adaptive algorithm client-side" and "last-write-wins" conflict resolution. LWW is
+      acceptable only if every write has a durable server timestamp — not a client clock. Without this, students lose answers on
+      clock skew. Need an explicit conflict-resolution ADR + telemetry on "discarded local writes".
+    evidence: AXIS_10_Operational_Integration_Features.md:L220-L266
+    lens_note: Offline data loss is the feature's silent failure mode.
+  - severity: P1
+    finding: |
+      Feature 5 (Multi-Device sync) event stream contains "detailed interaction data" and explicitly says "Must NOT use this for
+      ML training". Need a log-sink scrubber + prompt-injection guard before events hit long-term storage.
+    evidence: AXIS_10_Operational_Integration_Features.md:L296-L328
+    lens_note: Event-stream governance needs a sink-side control, not just a client-side rule.
+  - severity: P1
+    finding: |
+      Feature 7 (Google Classroom grade passback) is one-way. If Cena scores are wrong and we have passed them back, we need
+      a "grade-recall" runbook + proper retry-on-429 handling. Google Classroom rate limits are strict; peak-hour bursts will fail.
+    evidence: AXIS_10_Operational_Integration_Features.md:L400-L462
+    lens_note: Any one-way external write needs a named recall procedure.
+  - severity: P1
+    finding: |
+      Feature 6 (School IT admin dashboard) surfaces "error logs" to non-technical admins. Any unredacted raw error could leak
+      other tenants or student PII. Must route through ExceptionScrubber + a tenant-isolation filter.
+    evidence: AXIS_10_Operational_Integration_Features.md:L333-L397; src/shared/Cena.Infrastructure.Tests/Observability/ExceptionScrubberTests.cs
+    lens_note: Admin-facing error panes are a classic leak vector.
+  - severity: P2
+    finding: |
+      Feature 8 (Data portability export) 7-day retention + secure link is sensible; need to add audit ("who downloaded when") and
+      rate-limit on export generation to prevent export-bombing a tenant.
+    evidence: AXIS_10_Operational_Integration_Features.md:L464-L541
+    lens_note: Self-serve exports are a cheap DoS vector.
+already_built:
+  - feature: Helm chart + migrator job + HPA + PDB + ingress + deploy runbook + dashboards
+    evidence: deploy/helm/cena/templates/; docs/operations/deploy-runbook.md; deploy/observability/dashboards/cena-deploy-health.json
+    note: Feature 6 admin dashboard can consume these; don't rebuild.
+  - feature: Admin action audit middleware + retention worker + exception scrubber
+    evidence: src/shared/Cena.Infrastructure.Tests/Compliance/AdminActionAuditMiddlewareTests.cs; src/actors/Cena.Actors.Tests/Compliance/RetentionWorkerTests.cs; src/shared/Cena.Infrastructure.Tests/Observability/ExceptionScrubberTests.cs
+    note: Features 2, 6, 8 must depend on these.
+  - feature: CD deploy + schema-drift + sbom workflows
+    evidence: .github/workflows/cd-deploy.yml, schema-drift.yml, sbom.yml
+    note: SSO + export features must pass these gates.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-019, FD-041..FD-044 (SSO, Mashov, roster, offline, classroom)."
+extracted_tasks:
+  - title: Store Mashov credentials in a dedicated secrets tier with rotation runbook
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before Feature 2 ships: credentials in Vault/Secret Manager, never in DB plaintext, rotation runbook, scrubbed logs,
+      abuse-detection probe, kill-switch via FeatureFlagActor.
+      ## Files
+      deploy/helm/cena/templates/ (secret refs)
+      src/api/Cena.Admin.Api/Ingestion/ (MashovSync)
+      docs/ops/runbooks/ (new: mashov-secrets.md)
+      ## Definition of Done
+      - Rotation exercise completed in staging
+      - Logs verified scrubbed under chaos test
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/mashov-secrets"
+    source_doc_lines: [L100-L128]
+  - title: ADR for offline-first sync conflict resolution + durable server timestamp
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Adopt an ADR specifying: durable monotonic server timestamp as tiebreaker, idempotency keys required on every replay,
+      telemetry on discarded local writes, and a 30-day envelope for client-side encrypted local data.
+      ## Files
+      docs/adr/ (new ADR number)
+      docs/engineering/offline-sync-design.md (extend)
+      ## Definition of Done
+      - ADR merged
+      - Telemetry spec finalized
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/offline-adr"
+    source_doc_lines: [L220-L266]
+  - title: Grade-recall runbook + 429-safe queue for Google Classroom passback
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Grade passback goes through a durable queue with exponential backoff for 429, plus a runbook step to recall a bad grade
+      (Cena -> GC patch with corrected value) and a sampled audit of successful writes.
+      ## Files
+      src/api/Cena.Admin.Api/ (new GoogleClassroomPassbackWorker)
+      docs/ops/runbooks/ (new: grade-passback.md)
+      ## Definition of Done
+      - Chaos test: 20% 429s -> no lost writes
+      - Recall procedure integration-tested
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/gc-passback"
+    source_doc_lines: [L400-L462]
+verdict: adopt
+verdict_reason: |
+  This is the doc most aligned with SRE lens; adopt with extracted tasks + ADRs to harden.
+cross_lens_handoff:
+  - to: persona-redteam
+    about: SSO scope creep + Mashov credential storage threat model.
+  - to: persona-privacy
+    about: PPA Amendment 13 data portability export scope.
+  - to: persona-enterprise
+    about: Offline-first + event-sourced consistency trade-offs.

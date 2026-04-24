@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cena.platform/contracts/ministry-exports/schema.json",
+  "title": "Ministry reporting export — JSON format",
+  "description": "JSON schema for GET /api/export/exam-targets?format=json. Spec-only at Launch; spec-owned by docs/api/ministry-reporting-export-spec.md (prr-235). Implementation deferred to Q3.",
+  "type": "object",
+  "required": ["export_meta", "rows"],
+  "additionalProperties": false,
+  "properties": {
+    "export_meta": {
+      "type": "object",
+      "description": "Non-student-identifying metadata about this export call.",
+      "required": ["schema_version", "tenant_id", "enrollment_id", "as_of", "include", "generated_at", "row_count"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "type": "string",
+          "const": "1.0",
+          "description": "Export schema version. Bump when the rows shape changes."
+        },
+        "tenant_id": {
+          "type": "string",
+          "pattern": "^inst-[a-z0-9-]+$",
+          "description": "Tenant identifier per ADR-0001. Derived from JWT; never from URL path."
+        },
+        "enrollment_id": {
+          "type": "string",
+          "pattern": "^enr-[a-z0-9-]+$",
+          "description": "Enrollment identifier scoped to this export."
+        },
+        "as_of": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Point-in-time snapshot anchor. Defaults to the request processing time."
+        },
+        "include": {
+          "type": "string",
+          "enum": ["active", "all"],
+          "description": "active = ArchivedAt is null; all = include archived targets too."
+        },
+        "generated_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "UTC timestamp the export was produced."
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Number of row entries in rows[]. Matches rows.length for the page; use next_page_token for full traversal."
+        },
+        "next_page_token": {
+          "type": ["string", "null"],
+          "description": "Opaque continuation token. Null when this is the last page."
+        }
+      }
+    },
+    "rows": {
+      "type": "array",
+      "description": "Per-ExamTarget rows. Field set mirrors docs/api/ministry-reporting-export-spec.md §4.",
+      "items": { "$ref": "#/$defs/ExamTargetExportRow" }
+    }
+  },
+  "$defs": {
+    "ExamTargetExportRow": {
+      "type": "object",
+      "required": [
+        "student_id",
+        "enrollment_id",
+        "exam_code",
+        "ministry_subject_code",
+        "ministry_question_paper_codes",
+        "track",
+        "sitting_code",
+        "academic_year",
+        "season",
+        "moed",
+        "source",
+        "assigned_by_id",
+        "weekly_hours",
+        "reason_tag",
+        "created_at",
+        "archived_at",
+        "export_readiness"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "student_id": {
+          "type": "string",
+          "description": "Tenant-local stable id. Never a national id."
+        },
+        "enrollment_id": {
+          "type": "string",
+          "description": "ADR-0001 enrollment reference."
+        },
+        "exam_code": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9_]+$",
+          "description": "Catalog primary key per ADR-0050."
+        },
+        "ministry_subject_code": {
+          "type": ["string", "null"],
+          "description": "Ministry subject code e.g. '035'. Null for non-Ministry catalogs (SAT/PET/IB)."
+        },
+        "ministry_question_paper_codes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "שאלון codes. Non-empty for Bagrut-family ExamCodes, empty otherwise."
+        },
+        "track": {
+          "type": ["string", "null"],
+          "description": "'2U'|'3U'|'4U'|'5U'|'ModuleA'..'ModuleG' or null when the exam has no track concept."
+        },
+        "sitting_code": {
+          "type": "string",
+          "description": "Canonical sitting identifier, e.g. 'תשפ\\\"ו/Summer/A'."
+        },
+        "academic_year": {
+          "type": "string",
+          "description": "Hebrew academic-year string (Ministry catalogs) or Gregorian year (non-Ministry)."
+        },
+        "season": {
+          "type": "string",
+          "enum": ["Summer", "Winter"]
+        },
+        "moed": {
+          "type": "string",
+          "enum": ["A", "B", "C", "Special"]
+        },
+        "source": {
+          "type": "string",
+          "enum": ["Student", "Classroom", "Tenant", "Migration"],
+          "description": "Who assigned the target per ADR-0050 §Q3 lawful basis."
+        },
+        "assigned_by_id": {
+          "type": "string",
+          "description": "User id of the assigner."
+        },
+        "weekly_hours": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 40,
+          "description": "Hours per week committed to this target."
+        },
+        "reason_tag": {
+          "type": ["string", "null"],
+          "enum": ["Retake", "NewSubject", "ReviewOnly", "Enrichment", "SafetyFlag", null],
+          "description": "Enum-only per ADR-0050 §1. Free-text banned."
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "archived_at": {
+          "type": ["string", "null"],
+          "format": "date-time",
+          "description": "Null while active; terminal once set per ADR-0050 §6."
+        },
+        "export_readiness": {
+          "type": "string",
+          "enum": ["Exportable", "RequiresConsent"],
+          "description": "Classroom|Tenant → Exportable; Student|Migration → RequiresConsent (unless student consented)."
+        }
+      }
+    }
+  }
+}

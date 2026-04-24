@@ -1,0 +1,26 @@
+GOAL: Comprehensive, multi-perspective research foundation for Focus Degradation & Student Resilience
+TARGET: 20 iterations, 40+ new insights/citations from all points of view
+METRIC: Number of new validated findings, citations, counter-arguments, and novel perspectives added
+CONSTRAINT: Only add well-sourced, verifiable research from peer-reviewed or reputable sources
+
+RESEARCH ANGLES (20 iterations):
+1. Vigilance decrement in mobile/digital learning (2020-2026 updates)
+2. Flow state detection via behavioral signals in EdTech
+3. Productive failure in mathematics education (recent meta-analyses)
+4. Grit critiques and alternative frameworks (post-Credé 2017)
+5. Response time variability as attention marker in complex tasks
+6. Adolescent attention spans (16-18) in digital environments
+7. Circadian rhythm effects on student learning and attention
+8. Break timing, microbreaks, and attention restoration in learning
+9. Affect detection in intelligent tutoring systems (ITS)
+10. RTL language and cognitive load (Hebrew/Arabic)
+11. Self-regulated learning and metacognition in EdTech
+12. Gamification effects on attention and engagement
+13. ADHD and attention patterns in digital learning
+14. Mind-wandering during educational activities
+15. Cognitive load theory and attention management
+16. Boredom and disengagement in online learning
+17. Neuroscience of attention in educational contexts
+18. Cultural factors in student resilience (Israeli/Middle Eastern)
+19. AI-driven adaptive learning and attention modeling
+20. Spaced practice, interleaving, and attention restoration

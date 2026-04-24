@@ -1,0 +1,258 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 content-authoring + quality features: Bayesian IRT small-sample
+  calibration, SymPy CAS-gated problem variation engine, Bagrut-aligned
+  partial-credit rubric engine, Arabic RTL math renderer with notation
+  localization, culturally-contextualized problem generator, mother-tongue
+  mediated hints, self-efficacy-calibrated difficulty presentation, hybrid
+  Elo + expert-judgment difficulty calibration.
+
+system_purpose_fit: 5
+  rationale:
+    - This doc is the backbone of content correctness + equity. Every
+      feature strengthens ADR-0002 or directly serves the Arab cohort.
+    - SymPy CAS-gated variation engine (F2) is Cena's soul. Already
+      exists (CasGatedQuestionPersister).
+    - Cultural-context generator (F5) is the highest-leverage Arab-cohort
+      equity feature — but ES=1.16 is cherry-picked per Dr Rami. Use
+      d=0.4-0.6 in internal communication.
+    - Mother-tongue-mediated hints (F6) is pragmatic translanguaging that
+      respects "Hebrew is Bagrut language" reality.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "CAS-gated question persister exists" -> src/actors/Cena.Actors/Cas/CasGatedQuestionPersister.cs
+    - "CAS router + LaTeX validator" -> src/actors/Cena.Actors/Cas/CasRouterLatexValidator.cs, CasRouterService.cs
+    - "SymPy sidecar client + MathNet fallback" -> src/actors/Cena.Actors/Cas/SymPySidecarClient.cs, MathNetVerifier.cs
+    - "CAS conformance baseline + suite + runner" -> src/actors/Cena.Actors/Cas/CasConformanceSuite.cs + CasConformanceSuiteRunner.cs + CasConformanceBaseline.cs
+    - "CasGateMode + CasGateExceptions" -> src/actors/Cena.Actors/Cas/CasGateMode.cs + CasGateExceptions.cs
+    - "IRT calibration pipeline" -> src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs
+    - "Elo difficulty + Irt-Elo conversion" -> src/actors/Cena.Actors/Services/EloDifficultyService.cs + IrtEloConversion.cs
+    - "Cultural context service" -> src/actors/Cena.Actors/Services/CulturalContextService.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Arabic RTL math renderer" — SymPy + canonical rendering exist, but
+      Arabic-notation profile + Arabic-Indic numerals toggle not apparent.
+    - "Mother-tongue hint system" — hints exist; bilingual/translanguaging
+      version not apparent.
+    - "Bayesian small-sample correction (PyMC/Stan)" — not apparent; IRT
+      pipeline uses standard EAP/MLE from what code indicates.
+    - "Bagrut partial-credit rubric engine" — step verifier exists, rubric
+      layer not apparent (shared gap with AXIS_5 / AXIS_6).
+
+adr_alignment:
+  honored:
+    - ADR-0002 (F2 is the ADR-0002 enforcement mechanism)
+    - ADR-0032 (cas-gated-question-ingestion) — F2 aligns tightly
+    - ADR-0003 (F2 distractors generated algebraically from misconception
+      categories, not from student data)
+  violated: []
+  missing_adr_needed:
+    - Cultural-context validation ADR — the "community review board"
+      guardrail Dr Nadia calls out (FD-011) should be ADR-locked, not
+      left to feature-level documentation.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 5 (Culturally-Contextualized Problem Generator) — Dr Rami
+      correctly flagged ES=1.16 as likely cherry-picked. In my
+      pedagogue experience, culturally-relevant problems move engagement
+      and some conceptual understanding (likely d=0.3-0.6) but they do
+      *not* substitute for Bagrut-exam-structure problems. Ship the
+      feature, but:
+      - internal metrics language uses d=0.3-0.6 (not 1.16)
+      - every culturally-contextualized problem must have an equivalent
+        "Bagrut-structure" variant for exam transfer
+      - community review board is non-optional (ADR-lock it)
+      - stereotyping risk: "olive harvest ratios" is fine; ensure no
+        problems stereotype by religion, gender, or sect.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L193-L236, finding_assessment_dr_rami.md FD-011 REJECT
+    lens_note: |
+      Bedouin folklore math is pedagogically authentic. "All Arab students
+      live in villages and harvest olives" is not. The review board is
+      the difference.
+  - severity: P1
+    finding: |
+      Feature 6 (Mother-Tongue-Mediated Hint System) — the proposed model
+      (hint body in mother tongue, mathematical terms preserved in Hebrew
+      as the language of the Bagrut) is pragmatically correct. But:
+      "Clickable mathematical terms show Hebrew equivalents" creates a
+      vocabulary-learning bridge only if the Hebrew term is the *official
+      Ministry-approved* term, not a machine translation. Build the term
+      glossary against the Ministry curriculum document, not LLM output.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L216-L240
+    lens_note: |
+      Arab-Israeli students need the *right* Hebrew word to pass the Bagrut.
+      Vague synonyms lose marks on the exam.
+  - severity: P1
+    finding: |
+      Feature 3 (Bagrut-Aligned Partial Credit Rubric Engine) — this is
+      the feature that Bagrut teachers have been asking for since the
+      first Cena demo. Already covered by axis5/axis6 extract tasks;
+      deduplicate. The Ministry scoring rules evolve every 2-3 years —
+      version pinning per rubric is non-negotiable.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L104-L142
+    lens_note: |
+      Same feature proposed three times (axis5 F5, axis6 F3, axis8 F3).
+      Ship it once, well.
+  - severity: P2
+    finding: |
+      Feature 4 (Arabic RTL Math Renderer) — already covered by axis3 F7
+      task. Dedupe. Ministry of Education curriculum for Arab-sector 4/5-
+      unit math does *not* use Arabic-Indic numerals for the answer key;
+      be careful: students can read Arabic-Indic numerals comfortably but
+      must produce Hindu-Arabic on the Bagrut exam. Renderer toggle must
+      default to Hindu-Arabic for *answer* entry even when display is
+      Arabic-notation.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L147-L187
+    lens_note: |
+      Students must write answers in the script the exam accepts. Display
+      ≠ input. Critical subtle detail.
+  - severity: P2
+    finding: |
+      Feature 2 (SymPy CAS-Gated Variation Engine) is already substantially
+      built (CasGatedQuestionPersister, CasConformanceSuite, CasRouter
+      exist). What's missing per doc: template-DSL for authors + automated
+      distractor generation. Those are valuable incremental builds, not
+      a from-scratch "feature." Doc should retire the "build F2" framing.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L61-L102, src/actors/Cena.Actors/Cas/CasGatedQuestionPersister.cs
+    lens_note: |
+      Good — the foundation is already there. Scope correctly.
+
+already_built:
+  - feature: "SymPy CAS-Gated Problem Variation Engine (F2)"
+    evidence: src/actors/Cena.Actors/Cas/CasGatedQuestionPersister.cs, CasConformanceSuite.cs, CasRouterService.cs, SymPySidecarClient.cs, MathNetVerifier.cs
+    note: |
+      Foundation is built; what remains: template DSL for content authors
+      + algebraic distractor generator. Scope accordingly.
+  - feature: "IRT calibration pipeline (F1/F8 infrastructure)"
+    evidence: src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs, IrtEloConversion.cs, EloDifficultyService.cs
+    note: |
+      Pipeline exists; Bayesian small-sample correction not apparent.
+      F1 is additive work, not from-scratch.
+  - feature: "Cultural context service (F5 foundation)"
+    evidence: src/actors/Cena.Actors/Services/CulturalContextService.cs
+    note: |
+      Partial — service exists but content library + community-review
+      board are not. Scope F5 to the content + governance layer.
+
+duplicates_of_other_docs:
+  - cena_axis5_teacher_workflow_features.md: F5 Bagrut Rubric Alignment (same as F3 here)
+  - AXIS_6_Assessment_Feedback_Research.md: F3 Partial-Credit Grading + F4 Free-Response CAS-Validated (partner features to F3 here)
+  - axis3_accessibility_accommodations_findings.md: F7 Arabic RTL Math Renderer (same as F4 here)
+  - feature-discovery-2026-04-20.md: FD-002 (same as F2), FD-011 (same as F5), FD-013 (same as F6), FD-012 (same as F1), FD-020 (same as F3), FD-010 (same as F4)
+  - cena_dr_nadia_pedagogical_review_20_findings.md: FD-002/010/011/012/013/020
+
+extracted_tasks:
+  - title: "Template DSL + algebraic distractor generator on top of CAS gate"
+    priority: P1
+    estimate: L
+    suggested_assignee: claude-subagent-content
+    queue_body: |
+      ## Goal
+      Extend CAS-gate with a template DSL for content authors (parameterized
+      problem schemas, solution expression, distractor rules derived from
+      MisconceptionCatalog) and an automated distractor generator that
+      produces ≥3 plausible wrong answers per item, all CAS-validated.
+      ## Files
+      - src/actors/Cena.Actors/Cas/ (new TemplateDsl.cs, DistractorGenerator.cs)
+      - src/actors/Cena.Actors/Services/MisconceptionCatalog.cs (reuse as
+        source of misconception categories → distractor rules; no student data)
+      - src/admin/full-version/src/views/apps/content-authoring/ (author UI)
+      ## Definition of Done
+      - Template DSL produces parametrized problem variants.
+      - Distractor generator outputs ≥3 CAS-validated wrong answers per
+        item, tagged with the misconception category (static catalog, not
+        student-learned).
+      - Authoring UI: author writes template → live CAS validation → commit.
+      - Test: 50 seed templates each produce ≥10 distinct CAS-validated
+        variants with ≥3 valid distractors.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-content --result "<branch>: template-dsl-distractor-gen"
+    source_doc_lines: [L61-L102]
+  - title: "Ministry-vocabulary glossary for mother-tongue hint bridge"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Build the Hebrew ↔ Arabic math vocabulary bridge for F6 mother-tongue
+      hints. Source terms exclusively from the Ministry of Education
+      Arab-sector math curriculum document (לא תרגום חופשי, רק המונחים
+      הרשמיים). Ship as a static, curriculum-authored glossary, not LLM.
+      ## Files
+      - content/math-vocabulary-glossary/ (he-ar JSON keyed by Ministry
+        topic code)
+      - src/actors/Cena.Actors/Services/ (new MathVocabularyService.cs)
+      - src/actors/Cena.Actors/Services/HintGenerationService.cs (consumes
+        glossary)
+      ## Definition of Done
+      - ≥300 terms covering the 3/4/5-unit syllabi.
+      - Each term has Ministry-curriculum citation.
+      - Reviewed by ≥1 Arab-sector math teacher.
+      - No LLM generation of glossary entries.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: ministry-math-glossary"
+    source_doc_lines: [L215-L240]
+  - title: "Cultural-context community review board + stereotype-guard ADR"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F5 culturally-contextualized problems require a community-review
+      board with cohort representatives (Arab, Ethiopian, Russian, Druze,
+      Bedouin teachers). Every cultural context goes through board
+      approval before deployment. Also author stereotype-guard criteria:
+      no religion-specific, gender-specific, or sect-specific assumptions.
+      ## Files
+      - docs/adr/ (new ADR: "cultural-context-community-review-board")
+      - content/cultural-contexts/ (versioned per cohort, with review
+        status field)
+      - src/actors/Cena.Actors/Services/CulturalContextService.cs
+      ## Definition of Done
+      - ADR locks the board + stereotype-guard criteria.
+      - Every context has: cohort tag, review-board approver, approval date.
+      - Contexts without approval cannot be activated.
+      - Effect-size internal comms use d=0.3-0.6 range, not 1.16.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: cultural-context-review-board"
+    source_doc_lines: [L193-L236]
+
+verdict: adopt
+verdict_reason: |
+  Strong content-infrastructure doc. Most features either already exist
+  (F2, F4-partial, F5-partial) or ship cleanly with pedagogue guardrails
+  (F3 rubric versioning, F5 community board + stereotype guard, F6
+  Ministry vocabulary). Defer the cherry-picked effect-size language;
+  retire "build F2" framing since foundation exists.
+
+cross_lens_handoff:
+  - to: persona-a11y
+    about: |
+      F4 Arabic RTL renderer — a11y should own the notation-profile +
+      Arabic-Indic vs Hindu-Arabic numeral subtlety.
+  - to: persona-ministry
+    about: |
+      F3 Bagrut rubric versioning + F6 Ministry vocabulary glossary —
+      ministry-lens owns the source-of-truth confirmation.
+  - to: persona-cogsci
+    about: |
+      F5 effect-size discussion — cogsci should verify Zayyadi 2024
+      meta-analysis inclusion criteria, or recommend the d=0.3-0.6
+      range the dr_rami review suggests.
+  - to: persona-privacy
+    about: |
+      F5 "cohort tagging per problem" — privacy should confirm that
+      tagging students by their cohort-of-interest does not accidentally
+      create a sensitive-attribute profile.
+  - to: persona-enterprise
+    about: |
+      Template DSL + distractor generator architecture — enterprise
+      should ensure this fits the aggregate-decomposition pattern
+      (ADR-0012) for the Questions bounded context.

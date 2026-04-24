@@ -1,0 +1,167 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight assessment/feedback features (formative-summative split, IRT 2PL-CAT,
+  AI partial-credit grading, free-response CAS-validated AI grading,
+  per-session error analysis, real-time misconception tagging, crisis-mode
+  compression, confidence-based marking). The AI-grading features are the
+  highest CAS-bypass risk in the whole corpus.
+system_purpose_fit: 3
+  rationale:
+    - F3 "AI partial-credit grading with step-level rubrics" is exactly the
+      LLM-explains-without-verification pattern ADR-0002 forbids unless every
+      step is CAS-gated
+    - F4 "Free-Response CAS-Validated AI Grading" is OK if CAS truly gates,
+      but prior ingestion history (RDY-037, RDY-038) shows CAS gating can be
+      bypassed via parseability-only NormalForm probes
+    - F6 real-time misconception tagging is the session-scoped version of
+      FD-003 which Dr. Rami flagged as fabricated evidence
+code_reality_check:
+  claims_verified_in_code:
+    - "CAS gate is mandatory for all math persistence -> docs/adr/0032-cas-gated-question-ingestion.md §16.1"
+    - "Gate distinguishes Verified vs Unverifiable -> ADR-0032 §17 (RDY-038)"
+    - "Architecture test enforces single-writer invariant -> SeedLoaderMustUseQuestionBankServiceTest (referenced by ADR-0032)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "F3 step-level rubric CAS binding — no per-step CAS binding exists; current binding is whole-question"
+    - "F6 misconception tagging 'auto-purge Redis' — not implemented today"
+adr_alignment:
+  honored:
+    - ADR-0002 (CAS oracle) — F2/F4/F8 design aware
+    - ADR-0032 — F4 structure mirrors the persister pattern
+  violated:
+    - "ADR-0002 (latent) — F3 AI partial-credit grading without per-step CAS is unverified math feedback"
+    - "ADR-0003 — F6 if student_id persisted with misconception_tag"
+  missing_adr_needed:
+    - "Per-step CAS binding ADR — formalize the step-level invariant"
+non_negotiable_violations:
+  - "1 (CAS sole oracle) — F3 grades student free-text without per-step CAS verification"
+  - "2 (misconception session scope) — F6 unless strict Redis + TTL"
+persona_findings:
+  - severity: P0
+    finding: |
+      F3 AI Partial-Credit Grading emits a numeric score per step based on
+      LLM rubric judgment. Without a per-step CAS verifier, the LLM is the
+      sole correctness oracle for a score that feeds grade reports — direct
+      ADR-0002 violation. ADR-0032 §17 already warned about "parseability vs
+      correctness"; step-level has the same failure mode.
+    evidence: pre-release-review/AXIS_6_Assessment_Feedback_Research.md Feature 3; docs/adr/0032-cas-gated-question-ingestion.md §17
+    lens_note: This is the single highest-risk item in the corpus. Ship-blocker until per-step CAS binding exists.
+  - severity: P0
+    finding: |
+      Dr. Rami's independent review flags Yu et al. 2026 citation for F3 as
+      fabricated. Ship ban stands until replaced. Red-team concern: feature
+      built on fabricated evidence is high risk for litigation/press in a
+      regulated exam-prep market.
+    evidence: pre-release-review/finding_assessment_dr_rami.md FD-008
+    lens_note: Not a technical finding but a governance red-team flag.
+  - severity: P1
+    finding: |
+      F4 "Free-Response CAS-Validated AI Grading" — relies on CAS.Equivalence,
+      which per ADR-0032 §17 is only trustworthy when the stem is
+      extractable. For prose/word problems with extraction fallback to
+      NormalForm, the binding is `Unverifiable` and may still get surfaced as
+      a grade. Need: F4 UI must refuse to auto-grade `Unverifiable` and route
+      to human.
+    evidence: pre-release-review/AXIS_6_Assessment_Feedback_Research.md Feature 4; docs/adr/0032-cas-gated-question-ingestion.md §17
+    lens_note: CAS is robust; surface that shows CAS result can lie if it doesn't distinguish outcomes.
+  - severity: P1
+    finding: |
+      F6 Real-Time Misconception Tagging — session-scoped is the claim, but
+      without an enforcer (RetentionWorker already exists at
+      src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs) covering
+      the new misconception store, ADR-0003 is a doc-only promise. Attacker
+      model: insider/analyst runs ad-hoc query, retains an export — 30-day
+      promise becomes 300 days on a laptop.
+    evidence: pre-release-review/AXIS_6_Assessment_Feedback_Research.md Feature 6; src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs
+    lens_note: Compliance enforcement is only as strong as the retention worker's coverage.
+  - severity: P2
+    finding: |
+      F2 IRT 2PL-CAT placement produces a numeric ability estimate that can
+      be scraped/cached by a student client to predict their next question
+      and pre-compute answers. Not catastrophic but incentivises gaming.
+    evidence: pre-release-review/AXIS_6_Assessment_Feedback_Research.md Feature 2
+    lens_note: Low severity; noting for completeness.
+already_built:
+  - feature: CAS gate + CasGatedQuestionPersister single-writer invariant
+    evidence: docs/adr/0032-cas-gated-question-ingestion.md §16.1
+    note: F4 MUST route through this; proposal already aligns.
+  - feature: RetentionWorker infrastructure
+    evidence: src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs
+    note: F6 misconception store must be registered here before ship.
+  - feature: Architecture test for CAS bypass
+    evidence: SeedLoaderMustUseQuestionBankServiceTest (per ADR-0032)
+    note: Extend to forbid new grade-emitting paths without CAS binding ref.
+duplicates_of_other_docs:
+  - "finding_assessment_dr_rami.md: FD-008 fabricated citation; FD-003 ADR-0003"
+  - "AXIS_8_Content_Authoring_Quality_Research.md: F2 STACK/CAS overlaps F4"
+extracted_tasks:
+  - title: Block F3 AI partial-credit grading until per-step CAS binding ADR lands
+    priority: P0
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Formalize a per-step CAS-binding contract (extension of
+      QuestionCasBinding to StepCasBinding) before any AI partial-credit
+      grader ships. Without it, F3 is an ADR-0002 violation by construction.
+      ## Files
+      - docs/adr/0032-cas-gated-question-ingestion.md (addendum §21)
+      - src/actors/Cena.Actors/Cas/ (new StepCasBinding types)
+      ## Definition of Done
+      - [ ] ADR addendum accepted by owner
+      - [ ] Step-binding schema defined
+      - [ ] Arch-test: any endpoint that emits step-level score references a StepCasBinding
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L120-L180]
+  - title: F4 free-response grader must refuse Unverifiable CAS bindings
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Any grader that consumes QuestionCasBinding MUST explicitly branch on
+      Status == Verified. Unverifiable/Failed/null → route to human review,
+      never emit a numeric score to student.
+      ## Files
+      - Future F4 grader entry point (src/actors/Cena.Actors)
+      - src/actors/Cena.Actors.Tests
+      ## Definition of Done
+      - [ ] Unit test: Unverifiable binding -> no score emitted, review event fired
+      - [ ] Metric `cena_grader_unverifiable_seen_total`
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L180-L230]
+  - title: Register F6 misconception store with RetentionWorker before release
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Any new misconception store (Redis or otherwise) is registered with the
+      existing RetentionWorker with a 30-day max TTL per ADR-0003. No feature
+      flag, no exceptions.
+      ## Files
+      - src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs
+      - new misconception store (future)
+      ## Definition of Done
+      - [ ] RetentionWorker loops prove <30-day TTL on new keys
+      - [ ] Test asserts key eviction after TTL
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L260-L310]
+verdict: revise
+verdict_reason: |
+  F1/F5/F7/F8 OK with minor guard. F3 is a ship-blocker until step-level CAS
+  binding exists. F4 needs explicit Unverifiable refusal. F6 needs retention
+  worker coverage. Dr. Rami's fabricated-citation finding on F3 compounds the
+  risk.
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: StepCasBinding aggregate design — fits into ADR-0012 aggregate decomposition
+  - to: persona-privacy
+    about: F6 misconception store retention enforcement
+  - to: persona-cogsci
+    about: FD-008 fabricated citation follow-up

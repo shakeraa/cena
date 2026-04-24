@@ -1,0 +1,168 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight content-authoring/quality features (Bayesian IRT calibration, SymPy
+  CAS-gated variation engine, Bagrut rubric engine, Arabic RTL renderer,
+  culturally-contextualized generator, mother-tongue hint system, self-
+  efficacy difficulty presentation, Elo + expert hybrid calibration). Direct
+  touchpoints with the CAS gate + ingestion pipeline — the heart of ADR-0002
+  enforcement.
+system_purpose_fit: 4
+  rationale:
+    - F2 CAS-gated variation engine aligns perfectly with ADR-0002/0032
+    - F5 Culturally-contextualized generator must produce CAS-verifiable
+      problems; templated generation + SymPy verification is the right pattern
+    - F6 Mother-tongue hint system adds L12N surface for LLM hints — must pass
+      through TutorSafetyGuard
+code_reality_check:
+  claims_verified_in_code:
+    - "Single CAS writer invariant is enforced -> docs/adr/0032-cas-gated-question-ingestion.md §16.1"
+    - "Stem solution extractor exists per RDY-038 -> ADR-0032 §17"
+    - "LaTeXSanitizer exists -> src/shared/Cena.Infrastructure/Security/LaTeXSanitizer.cs"
+    - "AiGenerationService integrates CAS gate in batch flow -> ADR-0032 §12"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "F1 'Bayesian IRT' requires PyMC/Stan — no such sidecar in repo today"
+    - "F5 cultural-contextualization LLM generator: no existing cultural-safety filter"
+adr_alignment:
+  honored:
+    - ADR-0002 / ADR-0032 — F2/F8 design conforms
+    - ADR-0003 — calibration doesn't depend on identified student trajectories
+  violated: []
+  missing_adr_needed:
+    - "Cultural-safety filter ADR for F5 — preventing stereotype amplification & offensive content in generated problems"
+    - "Expert-judge identity/provenance ADR for F8 — who is an 'expert' and how is collusion prevented"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F2 Problem Variation Engine is excellent but Dr. Rami flagged FD-002 as
+      PASS only when the template is author-owned. If an authoring UI lets
+      less-trusted authors submit raw SymPy templates, a template can run
+      arbitrary Python via SymPy's `sympify(eval=True)` or custom methods.
+      Templates MUST be parsed in a restricted expression-only mode; never
+      exec'd. Doc doesn't mention sandboxing.
+    evidence: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md Feature 2
+    lens_note: `sympy.sympify("__import__('os').system('...')")` is the canonical attack.
+  - severity: P1
+    finding: |
+      F5 Culturally-Contextualized Problem Generator — LLM prompted with
+      cultural context creates a stereotype-amplification + offensive-content
+      risk. Worst case: problems generated for Arab cohort contain biased or
+      insensitive contexts. Need a pre-publication content-safety gate
+      (human review + LLM judge + toxicity filter) distinct from the math
+      CAS gate.
+    evidence: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md Feature 5
+    lens_note: Political + press risk; very high in the IL/AR context.
+  - severity: P1
+    finding: |
+      F6 Mother-Tongue-Mediated Hint System — hints generated in Arabic/Hebrew
+      by LLM must pass through TutorSafetyGuard with the Hebrew + Arabic
+      blocklists already present at TutorSafetyGuard.cs:59-80. If the hint
+      service is new, ensure it actually wires the guard and doesn't skip
+      because it's "trusted system output."
+    evidence: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md Feature 6; src/actors/Cena.Actors/Tutoring/TutorSafetyGuard.cs:59
+    lens_note: Indirect injection via the multi-lingual path is a specific worry.
+  - severity: P2
+    finding: |
+      F1 Bayesian IRT introduces a new sidecar (PyMC/Stan). Must follow the
+      circuit-breaker + timeout pattern from RDY-012 and must not be reachable
+      from the public network. Plus: response data feeds into the prior update
+      loop — confirm that student_id is stripped before entering the
+      calibration store (ADR-0003 spirit).
+    evidence: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md Feature 1
+    lens_note: New sidecars = new SSRF / pod-network misconfig risk.
+  - severity: P2
+    finding: |
+      F8 Hybrid Elo + Expert Judgment — "expert" ratings entered by named
+      humans become a collusion surface (experts pre-rate their own
+      questions). Need: (a) expert identity bound to Firebase role with audit,
+      (b) quorum requirement (≥ 2 experts), (c) rating tamper detection.
+    evidence: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md Feature 8
+    lens_note: Low odds, but easy to design the integrity check up-front.
+already_built:
+  - feature: Single CAS writer (CasGatedQuestionPersister)
+    evidence: docs/adr/0032-cas-gated-question-ingestion.md §16.1
+    note: F2/F5/F8 all feed into this — no new write paths permitted.
+  - feature: Hebrew/Arabic prompt-injection blocklist
+    evidence: src/actors/Cena.Actors/Tutoring/TutorSafetyGuard.cs:59
+    note: Directly applicable to F6 Mother-Tongue Hints.
+  - feature: Stem-driven CAS equivalence (RDY-038)
+    evidence: docs/adr/0032-cas-gated-question-ingestion.md §17
+    note: F2/F5 generated items inherit the Verified-vs-Unverifiable distinction.
+duplicates_of_other_docs:
+  - "finding_assessment_dr_rami.md FD-002 / FD-011 / FD-012"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md FD-002 / FD-011"
+extracted_tasks:
+  - title: Sandbox SymPy template evaluation in problem-variation engine
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-sec
+    queue_body: |
+      ## Goal
+      Any SymPy template ingested from the authoring UI MUST be parsed in
+      expression-only mode (no `eval`, no `__import__`, no arbitrary
+      attribute access). Use `sympify(s, evaluate=False)` with an allow-list
+      of symbols + operations. Reject templates that fail parsing in the
+      restricted mode.
+      ## Files
+      - Future authoring service (src/api/Cena.Admin.Api or src/actors)
+      - Tests under src/actors/Cena.Actors.Tests
+      ## Definition of Done
+      - [ ] Template `__import__('os')` rejected with 400
+      - [ ] Allow-list covers +, -, *, /, **, sin, cos, log, exp, sqrt, piecewise, symbols
+      - [ ] Perf: parse <50ms p95
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-sec --result "<branch>"
+    source_doc_lines: [L60-L140]
+  - title: Pre-publication content-safety gate for cultural-context generator
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F5-generated problem bodies must pass a toxicity/stereotype filter plus
+      human review before reaching any student. Reuse the moderation pipeline
+      primitives already deployed for photo uploads.
+      ## Files
+      - src/api/Cena.Admin.Api/ContentModerationService.cs
+      - new generation path (future)
+      ## Definition of Done
+      - [ ] Generator output gated behind moderation verdict
+      - [ ] Human-review queue required for any flag
+      - [ ] Arabic + Hebrew test corpus covers known sensitive contexts
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L220-L300]
+  - title: Wire Mother-Tongue hint generator through TutorSafetyGuard
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F6 hint service output flows through existing TutorSafetyGuard before
+      reaching student. Language-specific tests for Hebrew and Arabic
+      blocked phrases.
+      ## Files
+      - new F6 service
+      - src/actors/Cena.Actors.Tests/Tutoring/TutorSafetyGuardTests.cs
+      ## Definition of Done
+      - [ ] Integration test: generator returns Hebrew injection phrase -> guard blocks
+      - [ ] Same for Arabic
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L310-L370]
+verdict: revise
+verdict_reason: |
+  Content authoring features align well with CAS invariants. Three concrete
+  security hardening tasks needed (template sandbox, content-safety gate,
+  hint guard wiring). Dr. Rami's FD-011 cherry-picked effect size for F5 is
+  an evidence-quality problem tracked elsewhere.
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: New PyMC/Stan sidecar network boundary design
+  - to: persona-ministry
+    about: F5 cultural-context risk in Bagrut-aligned materials
+  - to: persona-ethics
+    about: F5 stereotype-amplification risk

@@ -1,0 +1,101 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 motivation/SRL features: Socratic self-explanation prompts, if-then session planner,
+  wise feedback, mastery path progress, metacognitive check-ins, process-praise,
+  SRL micro-strategy, reflective study plan. All explicitly screened against streaks
+  /loss-aversion/variable-ratio guardrails.
+system_purpose_fit: 4
+  rationale:
+    - Features explicitly honor ship-gate banned terms (streaks, loss-aversion)
+    - Arabic-cohort framing is called out as a primary persona
+    - Sentence starters are mentioned as bilingual (he+ar)
+    - Gap: no explicit bidi/a11y spec for microcopy or progress views
+code_reality_check:
+  claims_verified_in_code:
+    - "i18n scaffolding present for he/ar/en: src/student/full-version/src/plugins/i18n/locales/*.json"
+    - "Mastery-path view exists: src/student/full-version/src/pages/progress/index.vue"
+    - "Onboarding role selector with RTL consideration: src/student/full-version/src/components/onboarding/RoleSelector.vue"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Wise-feedback microcopy library in he/ar — doc mentions but no locale file commit exists"
+    - "If-then session planner RTL layout — no prototype in repo"
+adr_alignment:
+  honored:
+    - "Ship-gate banned-terms rule (no streaks) — doc explicitly opts for non-loss mastery path"
+    - "ADR-0003 — metacognitive check-ins are session-scoped"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: "Feature 1 sentence-starter buttons must be bilingual (Arabic RTL + Hebrew RTL + English LTR). Doc says 'Arabic + Hebrew' but doesn't mandate dir-isolation on mixed content (e.g., student name + math expression)."
+    evidence: "axis2...md:L28-L32"
+    lens_note: "Sentence starter like 'בחרתי ב-x+3 כי...' needs <bdi> around x+3."
+  - severity: P1
+    finding: "Feature 4 'Mastery Path Progress (Non-Loss)' — progress indicators must not rely on color alone (WCAG 1.4.1). Doc doesn't specify shape/pattern differentiation."
+    evidence: "axis2...md:F4 section"
+    lens_note: "Existing memory: primary #7367F0 locked. Progress states must use icon+shape+position, not just purple variants."
+  - severity: P2
+    finding: "Feature 2 if-then planner: date/time input fields must honor locale-aware numeral display (Hindu-Arabic 0-9 vs Eastern Arabic ٠-٩ preference)."
+    evidence: "axis2...md:F2 section"
+    lens_note: "Connects to Eastern-Arabic-numerals task in AXIS 3 review."
+  - severity: P2
+    finding: "Feature 6 process-praise response system — any pre-authored message library must pass ship-gate banned-terms scanner in all three locales (streaks, 'don't break your chain' etc. must not sneak in via translation)."
+    evidence: "axis2...md:F6 section"
+    lens_note: "Translations are a common back-door for banned terms."
+  - severity: P2
+    finding: "Feature 5 metacognitive check-ins use emoji + slider. Emoji have inconsistent screen-reader announcements cross-locale; ensure explicit aria-label per option (not just the emoji character)."
+    evidence: "axis2...md:F5 section"
+    lens_note: "NVDA reads 😊 as 'slightly smiling face' in en but may stay silent on he-IL voice pack."
+already_built:
+  - feature: "Localized progress page skeleton"
+    evidence: "src/student/full-version/src/pages/progress/index.vue"
+    note: "Can host F4 mastery path without greenfield"
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-010 Wise Feedback Engine"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: Feature 6 Encouragement Nudges (adjacent)"
+extracted_tasks:
+  - title: "Extend ship-gate banned-terms scanner to all three locale files"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Ship-gate CI currently scans source code. Extend it to run against the full i18n locale JSON files so banned terms (streak, don't lose, hot streak, days in a row, etc.) cannot enter via translation. Covers he/ar/en and any future microcopy libraries.
+      ## Files
+      - docs/engineering/shipgate.md (reference)
+      - tests/shipgate/banned-terms.spec.ts (or existing scanner location — find it first)
+      - src/student/full-version/src/plugins/i18n/locales/{he,ar,en}.json
+      ## Definition of Done
+      - CI fails if any locale key maps to a banned-term phrase (with he/ar synonyms: רצף-ניצחונות, سلسلة متتالية, etc.)
+      - Banned-term synonym list reviewed by a Hebrew and an Arabic native speaker (doc-linked PR approval)
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L1-L60]
+  - title: "Add explicit aria-label for emoji-based confidence check-ins (F5)"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 5 uses emoji + slider. Enforce explicit aria-label per control so screen readers in he/ar don't fall silent on emoji glyphs.
+      ## Files
+      - src/student/full-version/src/components/session/FatigueCheck.vue (or confidence-check component when built)
+      - src/student/full-version/tests/a11y/*.spec.ts (scanner)
+      ## Definition of Done
+      - Every emoji-bearing option has a key-derived aria-label in all three locales
+      - Scanner flags new emoji uses without aria-label
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [F5 section]
+verdict: adopt
+verdict_reason: "Motivation features are mostly honored by existing guardrails; revise to add a11y/bidi contract for microcopy and emoji controls before they ship."
+cross_lens_handoff:
+  - to: persona-ethics
+    about: "F4 non-loss mastery path framing — confirm it doesn't drift into loss-aversion in translation"
+  - to: persona-cogsci
+    about: "F5 calibration gains effect sizes"
+  - to: persona-educator
+    about: "Sentence-starter pedagogical design for Arabic-speaking students"

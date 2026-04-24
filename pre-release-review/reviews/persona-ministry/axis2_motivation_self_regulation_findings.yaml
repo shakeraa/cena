@@ -1,0 +1,176 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight motivation / self-regulation features (Socratic self-explanation,
+  if-then session planner, wise feedback, mastery path progress, metacognitive
+  confidence check-ins, process-praise, SRL micro-strategies, reflective study
+  plan). Axis explicitly excludes streaks / variable-ratio rewards / loss-
+  aversion — good. Lens-relevant question: does anything surface raw Ministry
+  text, make unsupported Bagrut-outcome claims, or break the 3U/4U/5U scope?
+system_purpose_fit: 3
+  rationale:
+    - Pure behavior/motivation layer — does not touch question authoring or
+      Ministry-text pipeline, so the bagrut-reference-only rule is not
+      directly threatened.
+    - Several features (#4 Mastery Path Progress, #7 SRL Micro-Strategy, #8
+      Reflective Study Plan) reach into syllabus structure (chapters,
+      prereqs, "which topic next"). If they read the wrong progression, they
+      advance students past their track — Ministry-scope risk.
+    - #3 Wise Feedback Engine is copy-heavy in Hebrew + Arabic — any copy
+      claiming "this will help you pass Bagrut" without evidence would be a
+      Ministry-defensibility problem (RDY-080 flag).
+code_reality_check:
+  claims_verified_in_code:
+    - 'Advancement aggregate exists: src/actors/Cena.Actors/Advancement/StudentAdvancementService.cs (ADR-0034)'
+    - 'Syllabus + chapter definitions: src/shared/Cena.Infrastructure/Documents/SyllabusDocument.cs'
+    - 'Shipgate dark-pattern ban enforced: docs/engineering/shipgate.md + CI scanner (per CLAUDE.md non-negotiable #3)'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'Feature #3 "Wise Feedback Engine" claims +0.11-0.15 grade-point lift on Arabic cohort — no concordance study design supplied, no Bagrut-outcome calibration'
+    - 'Feature #8 "Reflective Study Plan Generator" d=0.71 — doc does not disclose whether the cited population matches Israeli 3U/4U/5U students'
+adr_alignment:
+  honored:
+    - 'ADR-0003 (all features explicitly session-scoped or aggregate-only)'
+    - 'Shipgate dark-pattern ban (doc opens with explicit "no streak/loss-aversion" on L69)'
+  violated: []
+  missing_adr_needed:
+    - 'Feature #4 "Mastery Path Progress (Non-Loss)" — needs explicit tie-in to ADR-0034 StudentAdvancement aggregate, not a parallel progress notion'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature #8 "Reflective Study Plan Generator" proposes the system
+      generate a study plan across chapters. Without binding this to the
+      ADR-0034 StudentAdvancement aggregate + ChapterDocument prereq graph,
+      two students on the same 5U track could receive incompatible plans
+      (one recommending a locked chapter early). This is a Ministry-scope
+      risk — the plan must only recommend chapters the student has
+      unlocked per the prereq DAG.
+    evidence: 'axis2_motivation_self_regulation_findings.md:L~380 (F8 section); docs/adr/0034-syllabus-advancement-model.md:L31-L52; src/actors/Cena.Actors/Advancement/StudentAdvancementService.cs'
+    lens_note: |
+      Ministry lens: a study plan that skips prereqs would misadvise a
+      student and, if plan output were ever shared with a teacher/parent,
+      expose us to "Cena told my kid to study the wrong thing" complaints
+      that inspectors take seriously.
+  - severity: P1
+    finding: |
+      Feature #3 "Wise Feedback Engine" cites "+0.11-0.15 grade-point lift"
+      as outcome and proposes bilingual copy. Any copy that implies a
+      Bagrut-score lift without a calibrated concordance study is an
+      RDY-080 violation (prediction-without-evidence). The axis is a
+      motivation feature — reframe outcome as "engagement / self-efficacy",
+      not "grade points".
+    evidence: 'axis2_motivation_self_regulation_findings.md:L79 (summary table claims "d=0.11-0.15 grade pts"); pre-release-review/finding_assessment_dr_rami.md:L20 (RDY-080 flag pattern)'
+    lens_note: |
+      Ministry lens: RDY-080 exists precisely because a platform that
+      claims to predict Bagrut scores must back it with a concordance
+      study. "Wise feedback" is motivation research; keep the outcome
+      honest.
+  - severity: P2
+    finding: |
+      Feature #7 "SRL Micro-Strategy Prompts" cites d=0.69-1.00. This
+      effect size, like FD-011''s 1.16, sits at the extreme upper tail of
+      SRL literature. Dr. Rami''s lens already flags cherry-picking
+      patterns; from a Ministry lens, we must not surface these claims to
+      school buyers.
+    evidence: 'axis2_motivation_self_regulation_findings.md:L83 (summary table); pre-release-review/finding_assessment_dr_rami.md:L17'
+    lens_note: |
+      Ministry lens: school procurement decks that overclaim are a
+      reputational risk once a Ministry inspector runs the numbers.
+  - severity: P2
+    finding: |
+      Feature #4 "Mastery Path Progress (Non-Loss)" proposes a progress
+      visualization without referencing the existing SyllabusMap /
+      StudentAdvancement UI from RDY-061. If a second progress notion
+      ships, students see two conflicting maps.
+    evidence: 'axis2_motivation_self_regulation_findings.md:L80; docs/adr/0034-syllabus-advancement-model.md:L167 (landed student SyllabusMap)'
+    lens_note: |
+      Ministry lens: consistent progress framing is a credibility anchor;
+      dueling maps undermine it.
+already_built:
+  - feature: Student advancement / chapter progression visualization
+    evidence: 'docs/adr/0034-syllabus-advancement-model.md:L167 (SyllabusMap + StudentSyllabusAdvancement landed)'
+    note: |
+      Doc feature #4 "Mastery Path Progress" should extend the existing
+      SyllabusMap rather than introduce a parallel surface.
+  - feature: Shipgate dark-pattern scanner
+    evidence: 'docs/engineering/shipgate.md + CI job (per CLAUDE.md non-negotiable #3)'
+    note: |
+      Doc celebrates "no streak/loss-aversion" as a choice; it is actually
+      enforced by CI already.
+duplicates_of_other_docs:
+  - 'feature-discovery-2026-04-20.md: FD-009 Socratic AI Tutor partially overlaps F1 Socratic self-explanation'
+  - 'axis1_pedagogy_mechanics_cena.md: F4 Elaborative Interrogation Prompts overlaps axis2 F1 Socratic self-explanation'
+extracted_tasks:
+  - title: Bind reflective-study-plan generator to StudentAdvancement prereq DAG
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-study-plan-prereq
+    queue_body: |
+      ## Goal
+      Ensure any reflective-study-plan output (Feature #8) only recommends
+      chapters with state Unlocked or InProgress per the student''s
+      StudentAdvancement aggregate, and never a Locked chapter.
+
+      ## Files
+      - src/actors/Cena.Actors/Advancement/StudentAdvancementService.cs
+        (add `GetPlannableChaptersAsync` API)
+      - src/api/Cena.Student.Api.Host/Endpoints/StudyPlanEndpoints.cs (new)
+      - src/actors/Cena.Actors.Tests/Advancement/StudyPlanPrereqGuardTests.cs
+
+      ## Definition of Done
+      - Study-plan API returns only Unlocked/InProgress chapters for the
+        student''s current track
+      - Architecture test: any StudyPlanItem references a chapter whose
+        prereq set is a subset of student''s Mastered chapters
+      - Full sln build green
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-study-plan-prereq --result "<branch>"
+    source_doc_lines: [L~380-L420]
+  - title: Remove "grade-point lift" claims from wise-feedback copy
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Strip any implied Bagrut-score prediction from Feature #3 "Wise
+      Feedback Engine" outcome framing. Replace with engagement / self-
+      efficacy outcomes. Aligns with RDY-080 (no Bagrut prediction without
+      concordance study).
+
+      ## Files
+      - pre-release-review/axis2_motivation_self_regulation_findings.md
+        (revise outcome claim in F3)
+      - Any downstream marketing copy draft (none found yet, check
+        docs/engineering/shipgate.md for banned-term patterns to reuse)
+
+      ## Definition of Done
+      - F3 row of summary table re-labeled outcome as "self-efficacy +
+        engagement", not "grade pts"
+      - Explicit note added that any grade-lift claim requires RDY-080
+        concordance sign-off
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L79, L~175]
+verdict: revise
+verdict_reason: |
+  Motivation axis is shipgate-compliant in intent but leaks two Ministry-
+  lens concerns — prediction-without-evidence on wise-feedback and
+  plan-without-prereq-guard on reflective-study-plan. Fix those two and
+  the rest is adopt-grade.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      Effect-size audits on F7/F8 (d=0.69-1.00, d=0.71) — cogsci lens
+      owns evidence-integrity calls.
+  - to: persona-ethics
+    about: |
+      F6 process-praise / F7 SRL prompts border motivation-vs-coercion
+      — ethics lens is canonical for those calls.
+  - to: persona-educator
+    about: |
+      Whether Socratic self-explanation (F1) aligns with how Israeli math
+      teachers actually scaffold — educator owns that.

@@ -1,0 +1,64 @@
+# Full OCR-spike deps — installs every runner.
+#
+# On Apple Silicon, install PyTorch with MPS first:
+#   pip install --pre torch torchvision --index-url https://download.pytorch.org/whl/nightly/cpu
+# then install this file.
+#
+# Some packages fetch large HF models on first use (multi-GB). Point HF cache at
+# scripts/ocr-spike/cache/ before running:
+#   export HF_HOME=$(pwd)/cache
+#   export TRANSFORMERS_CACHE=$(pwd)/cache
+#
+# Runner-by-runner requirements are also annotated for selective install:
+
+-r requirements-core.txt
+
+# ── ML runtime ─────────────────────────────────────────────────────────────
+torch>=2.3              # MPS backend on M-series
+torchvision>=0.18
+transformers>=4.40
+accelerate>=0.30
+einops>=0.8
+safetensors>=0.4
+onnxruntime>=1.17
+
+# ── Tesseract runner ──────────────────────────────────────────────────────
+# Requires system Tesseract: `brew install tesseract tesseract-lang`
+# (tesseract-lang gives us heb.traineddata)
+pytesseract>=0.3.10
+
+# ── Surya (VikParuchuri) ──────────────────────────────────────────────────
+# Layout detection + OCR, supports Hebrew via mm_text_recognition model
+surya-ocr>=0.6
+
+# ── Marker (VikParuchuri) ─────────────────────────────────────────────────
+# PDF → Markdown, uses Surya internally
+marker-pdf>=0.3
+
+# ── olmOCR (AllenAI, 2025) ────────────────────────────────────────────────
+# Qwen2-VL-7B finetune; note: may be heavy on 16 GB — prefer 32 GB+
+# olmocr is installed from HF, not PyPI. See runner.
+# (no pip line — handled in runner setup)
+
+# ── MinerU (OpenDataLab, 2024) ────────────────────────────────────────────
+magic-pdf[full]>=0.8
+
+# ── pix2tex / LaTeX-OCR ───────────────────────────────────────────────────
+pix2tex>=0.1.4
+
+# ── PaddleOCR + PP-FormulaNet ─────────────────────────────────────────────
+# Paddle on macOS arm64 is flaky — runner falls back to CPU wheel.
+paddlepaddle>=2.6
+paddleocr>=2.7
+
+# ── Nougat (Meta) ─────────────────────────────────────────────────────────
+nougat-ocr>=0.1.17
+
+# ── docTR (Mindee) ────────────────────────────────────────────────────────
+python-doctr[torch]>=0.8
+
+# ── Cloud fallbacks (Layer 4a / 4b) — imported only when benchmarking hybrid ──
+google-generativeai>=0.7   # Gemini Vision
+mathpix>=0.1.1
+# openai — not used; Claude Vision accessed via anthropic SDK if enabled
+anthropic>=0.28

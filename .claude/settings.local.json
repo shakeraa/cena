@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:products.wolframalpha.com)",
+      "WebFetch(domain:www.wolfram.com)",
+      "WebFetch(domain:developer.wolframalpha.com)",
+      "WebFetch(domain:reference.wolfram.com)",
+      "WebFetch(domain:community.wolfram.com)",
+      "WebFetch(domain:docs.sympy.org)"
+    ]
+  }
+}

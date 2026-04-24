@@ -1,0 +1,119 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight privacy + trust features (Why This Problem XAI, My Cena Profile dashboard, Delete My Journey erasure,
+  consent-revocation UX, age-appropriate privacy comms, data-provenance trail, differential-privacy cohort insights,
+  periodic transparency report). Operationally large: erasure, consent, audit all need infrastructure.
+system_purpose_fit: 4
+  rationale:
+    - Directly supports non-negotiables 2 (ADR-0003 scope) and 5 (tenant isolation).
+    - Every feature implies audit + observability work — aligns naturally with SRE lens.
+code_reality_check:
+  claims_verified_in_code:
+    - "Admin action audit middleware exists (tests) -> src/shared/Cena.Infrastructure.Tests/Compliance/AdminActionAuditMiddlewareTests.cs"
+    - "Retention worker exists -> src/actors/Cena.Actors.Tests/Compliance/RetentionWorkerTests.cs"
+    - "Exception scrubber for PII -> src/shared/Cena.Infrastructure.Tests/Observability/ExceptionScrubberTests.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Differential-privacy epsilon budget management (Feature 7) — no DP budget state cited"
+    - "End-to-end data erasure across event store + projections + backups (Feature 3) — no erasure manifest"
+adr_alignment:
+  honored: [ADR-0003, ADR-0001]
+  violated: []
+  missing_adr_needed:
+    - "Data-erasure procedure across event store + projections + backups (GDPR Art17 / PPA)"
+    - "Differential privacy epsilon budget and reporting"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 3 (Delete My Journey) is a GDPR/PPA right-of-erasure feature. In an event-sourced system, "delete" means
+      tombstones + projection rebuild + backup retention policy + audit log proving destruction. Without a comprehensive
+      erasure runbook + verification probe, we will fail a regulator request at the worst possible moment.
+    evidence: axis9_data_privacy_trust_mechanics.md Feature 3; src/actors/Cena.Actors.Tests/Compliance/RetentionWorkerTests.cs
+    lens_note: Erasure in event-sourced systems is non-trivial; runbook must be real before launch.
+  - severity: P0
+    finding: |
+      Feature 7 (Differential-Privacy cohort insights) must publish + enforce an epsilon budget with an operational controller.
+      "DP noise" without budget accounting is the classic privacy leak — repeated queries can still de-anonymize. Need a
+      budget store + alert on exhaustion.
+    evidence: axis9_data_privacy_trust_mechanics.md Feature 7
+    lens_note: DP without budget accounting is security-theatre.
+  - severity: P1
+    finding: |
+      Feature 4 (consent-revocation UX) revokes consent but the downstream propagation (stop LLM calls, purge caches, revoke
+      tokens) is a multi-system operation. Need an explicit consent-propagation SLA (e.g. revocation reflected in <5 min).
+    evidence: axis9_data_privacy_trust_mechanics.md Feature 4
+    lens_note: Slow-revocation is a regulator-facing issue.
+  - severity: P1
+    finding: |
+      Feature 8 (Transparency Report) auto-generates regulator-facing documents from production metrics. A bad metric -> bad
+      public statement. Needs a review gate + reproducibility (metrics source, query, timestamp) captured per number.
+    evidence: axis9_data_privacy_trust_mechanics.md Feature 8
+    lens_note: Auto-published reports are a common source of public-statement incidents.
+  - severity: P2
+    finding: |
+      Feature 6 (Data Provenance trail) is exactly the trace needed for post-incident forensics — lean into it as first-class
+      observability, not just a parent-facing UI.
+    evidence: axis9_data_privacy_trust_mechanics.md Feature 6
+    lens_note: Provenance trail doubles as SRE debugging gold.
+already_built:
+  - feature: Admin audit middleware
+    evidence: src/shared/Cena.Infrastructure.Tests/Compliance/AdminActionAuditMiddlewareTests.cs
+    note: Feature 3 erasure audit can reuse it.
+  - feature: Retention worker
+    evidence: src/actors/Cena.Actors.Tests/Compliance/RetentionWorkerTests.cs
+    note: Foundation for Feature 3 erasure.
+  - feature: Exception scrubber for PII
+    evidence: src/shared/Cena.Infrastructure.Tests/Observability/ExceptionScrubberTests.cs
+    note: Key control against accidental log leakage.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-033..FD-040 coverage of privacy/trust."
+  - "AXIS_10_Operational_Integration_Features.md Feature 8 (data portability)."
+extracted_tasks:
+  - title: Publish event-sourced erasure runbook + verification probe
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      End-to-end erasure covering event store tombstones, projection rebuild, cache invalidation, backup retention policy,
+      auditable completion certificate. Verification probe runs monthly.
+      ## Files
+      src/actors/Cena.Actors/Compliance/ (RetentionWorker extensions)
+      docs/ops/runbooks/ (new: erasure.md)
+      ops/reports/ (erasure audit schema)
+      ## Definition of Done
+      - Synthetic erasure request end-to-end <= 30 days
+      - Probe alerts on miss
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/erasure-runbook"
+    source_doc_lines: []
+  - title: Implement differential-privacy epsilon budget controller + alert
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      All cohort-aggregate queries go through a DP budget controller per tenant + per cohort. Exhaustion alerts, query denied
+      when budget empty, audit log per consumption.
+      ## Files
+      src/api/Cena.Admin.Api/ (new DpBudgetController)
+      deploy/observability/alerting-rules.yaml
+      docs/engineering/ (new: dp-budget.md)
+      ## Definition of Done
+      - Query denied when budget empty
+      - Alerts + dashboard
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/dp-budget"
+    source_doc_lines: []
+verdict: adopt
+verdict_reason: |
+  Privacy/trust features align cleanly with non-negotiables and make SRE's job easier (audit, provenance, retention).
+  Extract operational tasks and proceed.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: Lead on consent + erasure specification; SRE follows their binding decisions.
+  - to: persona-enterprise
+    about: Event-sourced tombstone pattern choice.

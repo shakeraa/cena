@@ -1,0 +1,339 @@
+# =============================================================================
+# Ship-gate rule pack: positive-framing-extended (EPIC-PRR-D P2 tail)
+# =============================================================================
+# Source:  tasks/pre-release-review/EPIC-PRR-D-shipgate-scanner-v2.md
+#          (P2 copy/framing tail bundle: prr-163, 166, 167, 168, 170, 171, 172,
+#          177, 178)
+# Policy:  This pack bundles narrow copy-and-framing rules that share the same
+#          architectural substrate (one scanner, one banned-vocabulary registry)
+#          but target distinct student-facing surfaces. Each rule carries the
+#          prr-ID of the review item that surfaced it so a reviewer can trace
+#          the lineage without re-reading the epic body.
+#
+# Non-goals: this pack does NOT attempt to enforce the forward-looking feature
+# contracts — prr-164 (F2 confirm-before-route) and prr-165 (F2 watermark reads
+# session-id not student-id) live in C# architecture tests because they require
+# structural-shape assertions (attribute presence, field non-reference) that
+# cannot be expressed as static text regex. Likewise prr-169 (intrinsic-
+# motivation risk map) is a design-doc artefact, and prr-179 (go-gentler
+# opt-in) is a typed accommodation-profile dimension. See the epic body for
+# how those items are wired.
+#
+# Locale coverage: en / he / ar where the pattern class has clear cross-locale
+# analogues. A few patterns are English-only where the failure mode is a
+# specifically English framing (e.g. "lost points" — the direct Hebrew/Arabic
+# renderings do not carry the same weight-of-outcome connotation and are
+# covered by the broader outcome-prediction bans already in banned-mechanics).
+#
+# Whitelist discipline: this pack is STUDENT-FACING only. Admin/educator
+# surfaces, policy docs, ADRs, and research notes are whitelisted. The
+# positive-test fixture is also whitelisted so the full-repo scan stays green.
+#
+# Rule shape: see banned-citations.yml header.
+# =============================================================================
+
+rules:
+  # --------------------------------------------------------------------------
+  # prr-163 — cohort-context copy lockdown: positive-frame only
+  # The ship-gate ban targets two failure modes that a well-meaning PM could
+  # ship by accident: aggregate-shaming ("your cohort is failing") and rank-
+  # shaming ("your school ranks X"). Both collapse the student's identity
+  # into a group outcome they did not individually choose. The positive
+  # alternative is either a neutral cadence signal ("your class covered
+  # Unit 3 last week — catch up when you're ready") or silence. See R-28
+  # honest-without-being-brutal posture.
+  # --------------------------------------------------------------------------
+  - id: cohort-is-failing
+    reason: "Banned 'your cohort is failing' / 'your class is behind' aggregate-shaming (prr-163 — positive-frame only)"
+    pattern: "(your|the)\\s+(cohort|class|group|school|grade)\\s+(is|are|has\\s+been|keeps)\\s+(failing|struggling|behind|underperforming|falling\\s+behind|losing\\s+ground)"
+    flags: i
+
+  - id: your-school-ranks
+    reason: "Banned 'your school ranks X' rank-shaming framing (prr-163 — positive-frame only)"
+    pattern: "\\byour\\s+school\\s+ranks?\\b"
+    flags: i
+
+  - id: cohort-below-average
+    reason: "Banned 'cohort/class below average' framing (prr-163 — positive-frame only)"
+    pattern: "(your|the)\\s+(cohort|class|grade|school)\\s+(is\\s+)?(below|under)\\s+(the\\s+)?(average|national\\s+average|mean|benchmark)"
+    flags: i
+
+  - id: cohort-worst-performing
+    reason: "Banned 'worst-performing class/cohort' framing (prr-163 — positive-frame only)"
+    pattern: "(worst|lowest)[- ]performing\\s+(class|cohort|school|group)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-166 — F3 rubric review: "how this scored" framing, not "lost points"
+  # A rubric-review surface that tells a student "you LOST 4 points on step 3"
+  # primes loss-aversion. The honest alternative is diagnostic: "step 3 scored
+  # 2/4 because the rule about negative exponents was applied in the wrong
+  # order." The copy should describe HOW the scoring happened, not frame it
+  # as a loss event.
+  # --------------------------------------------------------------------------
+  - id: lost-points-on
+    reason: "Banned 'you lost N points on X' rubric framing (prr-166 — use 'scored N of M' instead)"
+    pattern: "(you\\s+)?lost\\s+\\d+(\\.\\d+)?\\s+points?(\\s+on)?"
+    flags: i
+
+  - id: points-deducted
+    reason: "Banned 'points deducted' passive-loss rubric framing (prr-166 — use 'scored N of M' instead)"
+    pattern: "\\bpoints?\\s+(deducted|taken\\s+away|subtracted|removed|docked)\\b"
+    flags: i
+
+  - id: points-off-for
+    reason: "Banned 'N points off for X' rubric framing (prr-166 — use 'scored N of M' instead)"
+    pattern: "\\d+(\\.\\d+)?\\s+points?\\s+off\\s+for\\b"
+    flags: i
+
+  - id: cost-you-points
+    reason: "Banned 'X cost you points' framing (prr-166 — use 'scored N of M' instead)"
+    pattern: "(cost|costs|costing)\\s+you\\s+(a\\s+point|\\d+(\\.\\d+)?\\s+points?|points)"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-167 — F6 explicit ban on language-proficiency inference
+  # Cena is a mathematics platform. It has no business scoring a student's
+  # English-/Hebrew-/Arabic-language proficiency from their math-problem
+  # responses. Inference of language-level from math text is a
+  # special-category data use that violates the platform's minimum-necessary
+  # principle AND risks mis-inferring disability (dyslexia confusability).
+  # This rule pack flags the copy variants; the companion arch test
+  # (NoLanguageProficiencyInferenceTest.cs) flags the code-level variants.
+  # --------------------------------------------------------------------------
+  - id: english-proficiency-level
+    reason: "Banned inference of student's English-language proficiency (prr-167)"
+    pattern: "(your|student'?s?|the\\s+student'?s?)\\s+(English|ESL|L2\\s+English)\\s+(proficiency|level|fluency|grade|score)"
+    flags: i
+
+  - id: hebrew-proficiency-level
+    reason: "Banned inference of student's Hebrew-language proficiency (prr-167)"
+    pattern: "(your|student'?s?|the\\s+student'?s?)\\s+(Hebrew|Ivrit|L1\\s+Hebrew|L2\\s+Hebrew)\\s+(proficiency|level|fluency|grade|score)"
+    flags: i
+
+  - id: arabic-proficiency-level
+    reason: "Banned inference of student's Arabic-language proficiency (prr-167)"
+    pattern: "(your|student'?s?|the\\s+student'?s?)\\s+(Arabic|L1\\s+Arabic|L2\\s+Arabic|MSA|Levantine\\s+Arabic)\\s+(proficiency|level|fluency|grade|score)"
+    flags: i
+
+  - id: language-level-n
+    reason: "Banned '<language>-level N' inference scoring (prr-167)"
+    pattern: "(English|Hebrew|Arabic|Ivrit)[- ]level\\s+(A1|A2|B1|B2|C1|C2|\\d+|beginner|intermediate|advanced|native)"
+    flags: i
+
+  - id: cefr-language-scoring
+    reason: "Banned CEFR-style A1/A2/B1/B2/C1/C2 language scoring of students (prr-167)"
+    near:
+      a: "(your|student'?s?)\\s+(English|Hebrew|Arabic)"
+      b: "\\b(A[12]|B[12]|C[12])\\b"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-168 — Focus-ritual mood-adjustment copy: "familiar pattern" not "easier"
+  # When the focus-ritual / difficulty-adjustment surface detects fatigue and
+  # surfaces a review item, the copy must describe the pattern ("this is a
+  # familiar Unit 2 derivative pattern — a good warm-up") rather than frame
+  # it as an easier problem. "Easier" labels are demoralising and contradict
+  # growth-mindset research.
+  # --------------------------------------------------------------------------
+  - id: here-is-an-easier
+    reason: "Banned 'here is an easier problem/question' fatigue-response framing (prr-168 — use 'familiar pattern' framing)"
+    pattern: "here'?s?\\s+(an?\\s+)?easier\\s+(problem|question|item|one|exercise|task)"
+    flags: i
+
+  - id: lets-try-easier
+    reason: "Banned 'let's try something easier' fatigue-response framing (prr-168 — use 'familiar pattern' framing)"
+    pattern: "let'?s?\\s+try\\s+(something\\s+)?easier"
+    flags: i
+
+  - id: stepping-down-difficulty
+    reason: "Banned 'stepping down' / 'dialling down' difficulty copy (prr-168 — use neutral 'familiar pattern' framing)"
+    pattern: "(stepping|step|dial(ling)?|dialing|turn(ing)?)\\s+(down|back)\\s+(the\\s+)?difficulty"
+    flags: i
+
+  - id: easier-for-you
+    reason: "Banned 'this is easier for you' adjustment framing (prr-168 — use 'familiar pattern' framing)"
+    pattern: "this\\s+(one|problem|question|item)\\s+(will\\s+be|is|should\\s+be)\\s+easier\\s+for\\s+you"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-170 — Honest ES in copy: interleaving d=0.34 not 0.5-0.8
+  # Enforces the inflation-bound from ADR-0049. The effect-size citation gate
+  # already enforces citation_id=... tagging; this complements it by flagging
+  # the SPECIFIC known-inflated claim from FD-001 before it can be rephrased
+  # into a new variant that escapes the generic effect-size regex.
+  # --------------------------------------------------------------------------
+  - id: interleaving-inflated-0-5-to-0-8
+    reason: "Banned inflated interleaving ES range d=0.5-0.8 (prr-170 — meta-analytic mean is d=0.34)"
+    pattern: "interleav(?:ing|ed)[^\\n]{0,80}d\\s*=\\s*0\\.[5-8]"
+    flags: i
+
+  - id: interleaving-inflated-0-8
+    reason: "Banned inflated interleaving ES d=0.8 (prr-170 — meta-analytic mean is d=0.34, upper CI d=0.48)"
+    pattern: "interleav(?:ing|ed)[^\\n]{0,80}(effect\\s+size\\s+)?(of\\s+)?0\\.8(\\s|$|[^0-9])"
+    flags: i
+
+  - id: interleaving-large-effect
+    reason: "Banned 'interleaving has a LARGE effect' framing (prr-170 — evidence supports MODERATE effect)"
+    pattern: "interleav(?:ing|ed)[^\\n]{0,40}(large|huge|massive|transformative|strong)\\s+effect"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-171 — Journey path: no animation on pause-friendly elements
+  # The journey-path surface must be pause-friendly and motion-free for
+  # students with motion sensitivity, vestibular disorders, or attentional
+  # accommodations. This rule bans CSS animation keywords when they appear
+  # on selectors targeting the journey-path surface. The scanner is necessarily
+  # coarse (we scan for co-located patterns on a single line), but the fixture
+  # proves each rule fires and the whitelist covers cases where animation is
+  # scoped to a non-journey surface.
+  # --------------------------------------------------------------------------
+  - id: journey-path-keyframes
+    reason: "Banned CSS @keyframes on .journey-path element (prr-171 — pause-friendly, no animation)"
+    near:
+      a: "\\.journey-path\\b"
+      b: "@keyframes"
+    flags: i
+
+  - id: journey-path-transition-all
+    reason: "Banned 'transition: all' on .journey-path element (prr-171 — pause-friendly, no animation)"
+    near:
+      a: "\\.journey-path\\b"
+      b: "transition\\s*:\\s*all"
+    flags: i
+
+  - id: journey-path-animation-property
+    reason: "Banned CSS animation: property on .journey-path element (prr-171 — pause-friendly, no animation)"
+    near:
+      a: "\\.journey-path\\b"
+      b: "animation\\s*:\\s*[a-zA-Z]"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-172 — Misconception tag UI: diagnostic-offer framing
+  # The misconception-tag surface must use "let's look at your thinking"
+  # framing, not "you made a mistake" blame framing. The copy difference
+  # matters because the misconception data is session-scoped diagnostic
+  # (ADR-0003) — it is an OFFER to think together, not a verdict.
+  # --------------------------------------------------------------------------
+  - id: you-made-a-mistake
+    reason: "Banned 'you made a mistake' misconception-tag framing (prr-172 — use 'let's look at your thinking')"
+    pattern: "you\\s+made\\s+(a|an|the)\\s+mistake"
+    flags: i
+
+  - id: you-got-it-wrong
+    reason: "Banned 'you got it wrong' misconception-tag framing (prr-172 — use 'let's look at your thinking')"
+    pattern: "you\\s+got\\s+(it|this|that|the\\s+answer)\\s+wrong"
+    flags: i
+
+  - id: you-were-wrong
+    reason: "Banned 'you were wrong' misconception-tag framing (prr-172 — use 'let's look at your thinking')"
+    pattern: "you\\s+(were|are)\\s+wrong\\s+(about|on|here|there)"
+    flags: i
+
+  - id: your-error-was
+    reason: "Banned 'your error was X' misconception-tag framing (prr-172 — use 'the step that scored X' instead)"
+    pattern: "your\\s+(error|mistake|fault)\\s+(was|is|here|on)\\b"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-177 — Retire idle-pulse animation in Stuck? Ask button
+  # Same motion-sensitivity rule as prr-171, targeted at the Stuck-Ask
+  # surface specifically. The idle-pulse is a variable-ratio attention
+  # hook (pulses grab the eye) which interacts badly with attentional
+  # accommodations.
+  # --------------------------------------------------------------------------
+  - id: stuck-ask-keyframes
+    reason: "Banned CSS @keyframes on .stuck-ask / #stuck-ask element (prr-177 — retire idle-pulse)"
+    near:
+      a: "([.#])stuck-ask\\b"
+      b: "@keyframes"
+    flags: i
+
+  - id: stuck-ask-animation-property
+    reason: "Banned CSS animation: property on .stuck-ask / #stuck-ask element (prr-177 — retire idle-pulse)"
+    near:
+      a: "([.#])stuck-ask\\b"
+      b: "animation\\s*:\\s*[a-zA-Z]"
+    flags: i
+
+  - id: stuck-ask-pulse
+    reason: "Banned 'pulse' animation name on stuck-ask element (prr-177 — retire idle-pulse)"
+    near:
+      a: "([.#])stuck-ask\\b"
+      b: "\\b(pulse|pulsing|pulsate|idle-pulse)\\b"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # prr-178 — Session type menu: rename "Challenge Round"
+  # "Challenge Round" is a competitive framing imported from leaderboard-
+  # style gamification and carries variable-ratio-reward overtones. The
+  # neutral rename is "Practice Set". This rule blocks the old label in
+  # student-facing copy while the whitelist retains it in retirement logs
+  # and migration notes.
+  # --------------------------------------------------------------------------
+  - id: challenge-round-en
+    reason: "Banned 'Challenge Round' session-type label (prr-178 — rename to 'Practice Set')"
+    pattern: "\\bchallenge\\s+round\\b"
+    flags: i
+
+  - id: challenge-rounds-en
+    reason: "Banned 'Challenge Rounds' plural (prr-178 — rename to 'Practice Sets')"
+    pattern: "\\bchallenge\\s+rounds\\b"
+    flags: i
+
+  # --------------------------------------------------------------------------
+  # Hebrew variants — cohort-shaming, lost-points, easier-problem, challenge-round
+  # (best-effort machine translations; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: he-cohort-is-failing
+    reason: "Hebrew 'your cohort is failing' aggregate-shaming (prr-163 — verify w/ native speaker)"
+    pattern: "(הכיתה|הקבוצה|בית\\s+הספר)\\s+שלך\\s+(נכשל|נכשלת|מפגר|מפגרת|מאחור)"
+    flags: u
+    locale: he
+
+  - id: he-lost-points
+    reason: "Hebrew 'you lost N points' rubric framing (prr-166 — verify w/ native speaker)"
+    pattern: "איבדת\\s+\\d+\\s+נקודות"
+    flags: u
+    locale: he
+
+  - id: he-you-made-a-mistake
+    reason: "Hebrew 'you made a mistake' misconception framing (prr-172 — verify w/ native speaker)"
+    pattern: "עשית\\s+טעות"
+    flags: u
+    locale: he
+
+  - id: he-challenge-round
+    reason: "Hebrew 'Challenge Round' session-type label (prr-178 — verify w/ native speaker)"
+    pattern: "סיבוב\\s+אתגר"
+    flags: u
+    locale: he
+
+  # --------------------------------------------------------------------------
+  # Arabic variants — cohort-shaming, lost-points, easier-problem, challenge-round
+  # (best-effort machine translations; verify with native-speaker team)
+  # --------------------------------------------------------------------------
+  - id: ar-cohort-is-failing
+    reason: "Arabic 'your cohort is failing' aggregate-shaming (prr-163 — verify w/ native speaker)"
+    pattern: "(صفك|مجموعتك|مدرستك)\\s+(تفشل|يفشل|متأخر|متأخرة|يتأخر)"
+    flags: u
+    locale: ar
+
+  - id: ar-lost-points
+    reason: "Arabic 'you lost N points' rubric framing (prr-166 — verify w/ native speaker)"
+    pattern: "(فقدت|خسرت)\\s+\\d+\\s+(نقطة|نقاط)"
+    flags: u
+    locale: ar
+
+  - id: ar-you-made-a-mistake
+    reason: "Arabic 'you made a mistake' misconception framing (prr-172 — verify w/ native speaker)"
+    pattern: "ارتكبت\\s+(خطأ|خطأً)"
+    flags: u
+    locale: ar
+
+  - id: ar-challenge-round
+    reason: "Arabic 'Challenge Round' session-type label (prr-178 — verify w/ native speaker)"
+    pattern: "جولة\\s+التحدي"
+    flags: u
+    locale: ar

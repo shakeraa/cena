@@ -1,0 +1,174 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 motivation / self-regulation features: Socratic self-explanation prompts,
+  if-then planner, wise feedback engine, mastery-path non-loss visualization, confidence
+  check-ins, process-praise response, SRL micro-prompts, reflective study-plan generator.
+  Explicitly bans streaks/loss-aversion/variable-ratio to honor GD-004 ship-gate.
+
+system_purpose_fit: 4
+  rationale:
+    - Ship-gate banned terms (#3) explicitly honored
+    - Cross-cutting notes call out COPPA-aligned ephemeral text processing
+    - Feature 8 study-plan includes parent-share — needs consent gating
+    - Free-text student reflections carry PII risk if stored raw
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Ship-gate scanner bans streak/loss-aversion language -> docs/engineering/shipgate.md (per CLAUDE.md)"
+    - "Age-based default consents deny marketing for minors -> src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs:213-217"
+    - "Parental-consent flow exists -> src/student/full-version/src/components/onboarding/ParentalConsentStep.vue"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Implementation intentions, SRL prompt, study-plan tables not present in src/ — proposed"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (Feature 5 confidence data session-local, no misconception linkage)
+    - Ship-gate (#3) — no streak/loss-aversion
+  violated: []
+  missing_adr_needed:
+    - "ADR for parent-visible student data (Feature 8 parent share) — explicit student-consent + parent-consent dual gate needed"
+    - "ADR for WhatsApp/SMS reminder channels (Feature 2) — Twilio sub-processor, minor messaging, opt-in rules"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 8 (Reflective Study Plan Generator) proposes parent-shareable plans.
+      For under-16 in Israel (PPL minor = under 18), parent has legal access; but
+      student-owned-data principle + Feature 4 of Axis 9 (consent UX) requires the
+      STUDENT to explicitly grant parent-share consent, separate from parent's own
+      right of access. Doc does not surface this dual-consent requirement.
+    evidence: "axis2_motivation_self_regulation_findings.md:307-311, 333-336"
+    lens_note: |
+      Default-parent-visible for 14-year-old creates a "parental surveillance" surface
+      that Israeli PPA draft opinion (Feb 2025) on minors' dignity warns against.
+
+  - severity: P1
+    finding: |
+      Feature 1 (Self-Explanation Prompts) uses LLM to validate conceptual coherence of
+      student free-text. Raw student free-text goes to LLM. Same issue as Axis 1 Feature 4.
+      PII-scrubber required before LLM call; response storage needs scrubbing too.
+    evidence: "axis2_motivation_self_regulation_findings.md:52-54"
+    lens_note: |
+      Cross-cutting note at L357 says "reflection text processed ephemerally"  but LLM
+      API call to Anthropic IS persistence (30d default) unless Anthropic ZDR agreement exists.
+
+  - severity: P1
+    finding: |
+      Feature 2 (If-Then Planner) proposes WhatsApp / SMS reminders. Twilio is a
+      sub-processor (not yet disclosed in any privacy page). Minor messaging adds
+      COPPA §312.5(a)(2) specific-disclosure + PPA consent requirement. Opt-in UX
+      must be parent-verified for under-13.
+    evidence: "axis2_motivation_self_regulation_findings.md:66-68, :87-89"
+    lens_note: |
+      Related to RDY-069 (F5b WhatsApp phase 1B — Twilio adapter scaffold, per recent commit
+      e0c2b21) — this feature intersects an in-flight engineering task.
+
+  - severity: P2
+    finding: |
+      Feature 7 (SRL Micro-Strategy Prompts) stores strategy-selection text. Aggregate
+      strategy profile per student is a learning-style inference — per GDPR Art 22
+      it may be "profiling" if used to adjust recommendations. Needs transparency /
+      data-subject-access coverage in dashboard.
+    evidence: "axis2_motivation_self_regulation_findings.md:292-294"
+    lens_note: |
+      StudentStrategyProfile table (as drafted) becomes another per-student surface
+      that must flow through erasure cascade.
+
+  - severity: P2
+    finding: |
+      Cross-cutting note L358-361 promises "no behavioral profiling or predictive modeling
+      on individual students" — but Feature 5 calibration tracking IS per-student
+      confidence-vs-accuracy profiling. Doc contradicts itself. Needs reconciliation
+      language: "rule-based self-reflection, not predictive modeling" or similar.
+    evidence: "axis2_motivation_self_regulation_findings.md:208-210, :358-361"
+    lens_note: |
+      Inconsistent privacy claims in the same doc = audit risk.
+
+already_built:
+  - feature: Ship-gate banned-terms scanner (enforces no-streak / no-loss-aversion)
+    evidence: docs/engineering/shipgate.md (referenced in CLAUDE.md)
+    note: |
+      Features 4 and 6 design assertions (no streak mechanics) are already CI-enforced;
+      no new infrastructure needed.
+  - feature: Minor-denied marketing default consent
+    evidence: src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs:213-217
+    note: |
+      Feature 2 SMS / WhatsApp reminders must route through ProcessingPurpose enum
+      (add ReminderNotifications?) with under-16 default=false.
+
+duplicates_of_other_docs:
+  - "axis1_pedagogy_mechanics_cena.md: Feature 3 (Retrieval Micro-Checks) overlaps Feature 1 here (both free-text)"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: Feature 5 (Weekly Chapter Snapshot) overlaps Feature 8 here (parent-facing weekly plan)"
+
+extracted_tasks:
+  - title: "Add ProcessingPurpose.ReminderNotifications + parent-share consent purpose"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 2 WhatsApp/SMS reminders and Feature 8 parent-share both need explicit
+      ProcessingPurpose entries so HasConsentAsync can gate them. Age-based defaults
+      must deny both for under-16 unless VPC completed.
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs (add enum values)
+      - src/shared/Cena.Infrastructure/Compliance/GdprConsentManager.cs:206-225 (defaults)
+      - src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs (surface new purposes)
+      - src/student/full-version/src/pages/settings/privacy.vue (UI toggles)
+
+      ## Definition of Done
+      - Two new purposes: ReminderNotifications, ParentSharing
+      - Under-13 defaults: both false, require VPC
+      - 13-15 defaults: both false, require parent notification
+      - 16+ defaults: ReminderNotifications false (opt-in), ParentSharing false
+      - Consent-check middleware required before Twilio / email send
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L66-68", "L307-311"]
+
+  - title: "Reflective-text PII scrub before persistence + LLM (cross-axis)"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-privacy
+    queue_body: |
+      ## Goal
+      Cross-references Axis 1 task: FreeTextPiiScrubber needed for self-explanation,
+      elaboration, SRL reflection responses. Single scrubber, many call sites.
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Privacy/FreeTextPiiScrubber.cs
+      - Call sites: self-explanation, elaboration, SRL prompts, confidence check-in free-text
+
+      ## Definition of Done
+      Covered by Axis 1 task — this task ensures Axis 2 call sites wire it in.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-privacy --result "<branch>"
+    source_doc_lines: ["L52-54", "L262-266"]
+
+verdict: adopt
+verdict_reason: |
+  Privacy-aware design; features 1-4 SHIP-ready after consent-purpose + PII-scrub tasks.
+  Feature 8 (parent-share) needs explicit dual-consent ADR before build. Ship-gate covers
+  the biggest privacy-adjacent harm surface (dark patterns).
+
+cross_lens_handoff:
+  - to: persona-ethics
+    about: |
+      Features 4 (mastery path), 5 (confidence check-in), 6 (process praise) sit on the
+      ethical-persuasion boundary — lens check needed on subtle coercion via goal-gradient.
+  - to: persona-enterprise
+    about: |
+      Feature 8 parent-share view requires cross-aggregate composition (StudentState +
+      WeeklyStudyPlan + parent auth). Aggregate boundary design (ADR-0012) implication.
+  - to: persona-sre
+    about: |
+      WhatsApp/SMS reminder delivery SLO + retry / silent-fail behavior; messaging minors
+      is a sensitive failure mode.

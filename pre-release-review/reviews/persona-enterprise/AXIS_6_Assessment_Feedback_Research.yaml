@@ -1,0 +1,143 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight assessment/feedback features: IRT-driven CAT, item-response calibration,
+  diagnostic quiz, explanatory feedback, confidence calibration, mastery summaries,
+  exam-simulation scoring, adaptive hint loop.
+system_purpose_fit: 4
+  rationale:
+    - Assessment features live in the Assessment bounded context, which exists in code.
+    - IRT calibration + item-bank management crosses into Content Authoring context (C5 gap in architecture-audit).
+    - Exam simulation must honor bagrut-reference-only non-negotiable.
+code_reality_check:
+  claims_verified_in_code:
+    - "Assessment bounded context exists -> src/actors/Cena.Actors/Assessment/"
+    - "Exam simulation events exist -> src/actors/Cena.Actors/Events/ExamSimulationEvents.cs (cited in ADR-0012:61)"
+    - "Question recreation events exist -> src/actors/Cena.Actors/Events/QuestionRecreationEvents.cs"
+    - "Diagnostic algorithm actor exists -> src/actors/Cena.Actors/Diagnosis/ (directory)"
+  claims_contradicted_by_code:
+    - "Doc proposes IRT-CAT as new; diagnostic context already exists. Should extend, not re-author."
+  claims_unverifiable:
+    - "Item-bank size sufficient for IRT calibration (N>~300 per item) — no question count visible in repo"
+adr_alignment:
+  honored:
+    - "ADR-0002 (SymPy CAS is the oracle — all feedback ultimately routed through CAS)"
+    - "ADR-0032 (CAS-gated question ingestion) — 'adaptive hint loop' features must not emit un-gated hints"
+    - "Bagrut reference-only non-negotiable"
+  violated: []
+  missing_adr_needed:
+    - "IRT calibration + item-bank sizing ADR (when can we trust item parameters?)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Exam-simulation scoring proposals risk becoming a side-channel for raw Bagrut items. Non-negotiable 4 is strict:
+      student-facing items are AI-recreated + CAS-gated. Doc must explicitly state "simulation uses recreated items only"
+      or this is a ship-blocker.
+    evidence: "AXIS_6_Assessment_Feedback_Research.md:L~250 (exam-simulation); memory project_bagrut_reference_only"
+    lens_note: Enterprise (with ministry overlap) — aggregate boundary alone doesn't prevent text reuse; policy must be in code.
+  - severity: P1
+    finding: |
+      IRT calibration requires per-item response logs. Today ConceptAttempted_V3 carries EnrollmentId; tenant isolation
+      means calibration must aggregate across enrollments but respect institute boundaries. Unclear whether calibration
+      is platform-global or institute-scoped.
+    evidence: "src/actors/Cena.Actors/Events/StudentProfileSnapshot.cs (ConceptAttempted handlers); ADR-0001 (tenant scope rules)"
+    lens_note: Enterprise — calibration aggregation is a tenant-boundary decision; must be explicit.
+  - severity: P1
+    finding: |
+      "Explanatory feedback" features expand the LLM-generated content surface. Every such call must route through ADR-026
+      tiers and through the CAS oracle. Doc lacks routing specification.
+    evidence: "AXIS_6_Assessment_Feedback_Research.md:L~180; CLAUDE.md ADR-026 table"
+    lens_note: Enterprise — LLM calls without tier routing are banned.
+  - severity: P2
+    finding: |
+      Confidence calibration stores a student self-report per attempt. If stored in StudentProfileSnapshot it grows the
+      god-aggregate (ADR-0012). Belongs on LearningSession attempt record.
+    evidence: "AXIS_6_Assessment_Feedback_Research.md:L~150; docs/adr/0012-aggregate-decomposition.md:47-56"
+    lens_note: Enterprise — place state in the right aggregate.
+already_built:
+  - feature: "Exam simulation events"
+    evidence: src/actors/Cena.Actors/Events/ExamSimulationEvents.cs (referenced in ADR-0012)
+    note: "Extend; do not author parallel exam-simulation events."
+  - feature: "Diagnostic context (diagnostic quiz)"
+    evidence: src/actors/Cena.Actors/Diagnosis/
+    note: "Doc's 'diagnostic quiz' feature should extend."
+  - feature: "Question recreation events"
+    evidence: src/actors/Cena.Actors/Events/QuestionRecreationEvents.cs
+    note: "Directly supports bagrut-reference-only compliance for exam sim."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-004 (IRT-driven adaptive placement)"
+  - "axis1_pedagogy_mechanics_cena.md: desirable difficulty overlaps CAT"
+extracted_tasks:
+  - title: "Lock 'recreated items only' policy in exam-simulation code path"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Hard-enforce that exam simulation can only serve questions with a verified CAS-gated recreation chain. Block any
+      simulation that references a raw Ministry item.
+
+      ## Files
+      - src/actors/Cena.Actors/Simulation/ (exam simulation module)
+      - src/actors/Cena.Actors/Events/ExamSimulationEvents.cs
+      - Test: CrossTenantWriteEnforcementTests or new BagrutReferenceOnlyTests
+
+      ## Definition of Done
+      - Simulation start path fails-closed if any question lacks QuestionRecreation provenance.
+      - Unit test proves a raw-Ministry-item simulation is rejected.
+      - Full Cena.Actors.sln builds.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~250]
+  - title: "ADR: IRT calibration tenant scope"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Decide: IRT parameters calibrated platform-wide (all institutes share), per-institute, or per-curriculum-track.
+      Pick one; document consequences; specify minimum-N to trust a parameter.
+
+      ## Files
+      - docs/adr/ (new 0018-irt-calibration-scope.md)
+
+      ## Definition of Done
+      - ADR published; references ADR-0001 and the psychometrics docs.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~100-L~200]
+  - title: "Wire explanatory feedback through tier router"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Per ADR-026: every LLM-generated explanation passes through the 3-tier router with a cache key on
+      (conceptId, errorClass, language, methodology).
+
+      ## Files
+      - src/actors/Cena.Actors/Gateway/LlmGatewayActor.cs
+      - src/actors/Cena.Actors/Explanations/
+
+      ## Definition of Done
+      - Integration test hits cache on second identical request.
+      - Tier selection metric surfaced.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~180]
+verdict: adopt
+verdict_reason: |
+  Assessment features fit Cena's purpose and existing Assessment/Diagnosis contexts. Adoption gated on three items
+  (recreated-items-only enforcement, calibration-scope ADR, tier-router wiring).
+cross_lens_handoff:
+  - to: persona-ministry
+    about: "Bagrut-reference-only enforcement for exam simulation."
+  - to: persona-cogsci
+    about: "Validity of confidence-calibration and IRT claims; citation hygiene."
+  - to: persona-finops
+    about: "Feedback LLM-call budget per student-hour."

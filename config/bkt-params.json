@@ -1,0 +1,59 @@
+{
+  "BktCalibration": {
+    "$comment": "RDY-024: BKT calibration parameters per subject. Phase A defaults match BktParameters.Default. Phase B (post-pilot) replaces these with EM-estimated values from scripts/bkt-calibration.py.",
+
+    "version": 1,
+    "calibratedAt": null,
+    "calibrationSource": "defaults (Corbett & Anderson 1994)",
+
+    "defaults": {
+      "pLearning": 0.10,
+      "pSlip": 0.05,
+      "pGuess": 0.20,
+      "pForget": 0.02,
+      "pInitial": 0.10
+    },
+
+    "subjects": {
+      "algebra": {
+        "pLearning": 0.10,
+        "pSlip": 0.05,
+        "pGuess": 0.20,
+        "pForget": 0.02,
+        "pInitial": 0.10
+      },
+      "geometry": {
+        "pLearning": 0.10,
+        "pSlip": 0.05,
+        "pGuess": 0.20,
+        "pForget": 0.02,
+        "pInitial": 0.10
+      },
+      "trigonometry": {
+        "pLearning": 0.10,
+        "pSlip": 0.05,
+        "pGuess": 0.20,
+        "pForget": 0.02,
+        "pInitial": 0.10
+      },
+      "calculus": {
+        "pLearning": 0.10,
+        "pSlip": 0.05,
+        "pGuess": 0.20,
+        "pForget": 0.02,
+        "pInitial": 0.10
+      },
+      "statistics": {
+        "pLearning": 0.10,
+        "pSlip": 0.05,
+        "pGuess": 0.20,
+        "pForget": 0.02,
+        "pInitial": 0.10
+      }
+    }
+  },
+
+  "FeatureFlags": {
+    "BktCalibratedParams": false
+  }
+}

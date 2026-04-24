@@ -1,0 +1,52 @@
+# SAT Math (College Board).
+
+exam_code: SAT_MATH
+family: STANDARDIZED
+track: null
+units: null
+region: International-SAT
+regulator: collegeboard
+ministry_subject_code: null
+ministry_question_paper_codes: []
+availability: roadmap
+available_from: "2026-Q4"
+item_bank_status: reference-only
+passback_eligible: false
+default_lead_days: 90
+sittings:
+  - code: SAT_2026_MARCH
+    academic_year: "2026"
+    season: spring
+    moed: A
+    canonical_date: "2026-03-08"
+  - code: SAT_2026_MAY
+    academic_year: "2026"
+    season: spring
+    moed: B
+    canonical_date: "2026-05-03"
+display:
+  en:
+    name: "SAT Math"
+    short_description: "College Board SAT mathematics section."
+  he:
+    name: "SAT — מתמטיקה"
+    short_description: "החלק המתמטי של מבחן ה-SAT של הקולג' בורד."
+  ar:
+    name: "SAT — الرياضيات"
+    short_description: "القسم الرياضي من اختبار SAT."
+topics:
+  - topic_id: algebra.linear
+    display:
+      en: "Heart of algebra"
+      he: "ליבת האלגברה"
+      ar: "جوهر الجبر"
+  - topic_id: problem_solving
+    display:
+      en: "Problem solving and data analysis"
+      he: "פתרון בעיות וניתוח נתונים"
+      ar: "حل المسائل وتحليل البيانات"
+  - topic_id: advanced_math
+    display:
+      en: "Passport to advanced math"
+      he: "אלגברה מתקדמת"
+      ar: "الجبر المتقدم"

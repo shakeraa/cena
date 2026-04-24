@@ -1,0 +1,179 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight privacy/trust features: "Why This Problem" explainable AI, "My Cena
+  Profile" data transparency, "Delete My Journey" erasure, consent-revocation
+  UX, age-appropriate privacy copy, data-provenance trail, differential-
+  privacy cohort analytics, periodic transparency report. Ministry lens:
+  privacy is mostly the privacy-persona''s lens, but Ministry-lens cares
+  about transparency reports and explainability because Ministry inspectors
+  consume them.
+system_purpose_fit: 4
+  rationale:
+    - F1 "Why This Problem" explainable AI is Ministry-relevant — an
+      inspector or school buyer can use it to audit what Cena is doing.
+      Template-based (not LLM) is the right call.
+    - F8 "Cena Transparency Report" is directly a Ministry artefact
+      candidate — we can submit it to PPA (Privacy Protection Authority)
+      and Ministry annually. Needs to include Bagrut-content audit
+      numbers (how many items CAS-verified, how many rubrics match
+      Ministry version).
+    - Doc is guardrail-compliant by design (all features explicitly
+      ADR-0003 + DPA §7 aware).
+code_reality_check:
+  claims_verified_in_code:
+    - 'ADR-0003 session-scope rule in force: docs/adr/0003-misconception-session-scope.md'
+    - 'CAS gate audit trail via QuestionCasBinding events per ADR-0032 §16.1'
+    - 'BagrutTrack field per-question for coverage accounting'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'F7 differential-privacy cohort analytics — no DP implementation found in code (grep)'
+    - 'F6 "data provenance / inference trail" — partially exists via event sourcing, but student-facing surfacing does not'
+adr_alignment:
+  honored:
+    - 'ADR-0003 (all features explicitly session-scope-aware)'
+    - 'ADR-0032 (F1 can use CAS binding as provenance source)'
+  violated: []
+  missing_adr_needed:
+    - 'Annual Ministry transparency report ADR — what fields it contains (CAS-verification rate, Bagrut-rubric version in use, coverage vs Ministry syllabus, retention ceilings respected)'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 8 "Cena Transparency Report" is framed as a periodic
+      algorithmic-accountability artefact. From a Ministry lens, this
+      is the perfect venue to publish curriculum + exam-fidelity
+      metrics: CAS-verification coverage (% of published math with
+      Verified binding per ADR-0032 §20), rubric version in use per
+      track, coverage vs Ministry syllabus (per content coverage
+      service), accommodation parity. Doc mentions AI-accountability
+      but not curriculum-fidelity. Widen scope.
+    evidence: 'axis9_data_privacy_trust_mechanics.md:L453 (F8 entry); docs/adr/0032-cas-gated-question-ingestion.md:L190 (cena_cas_binding_coverage_ratio gauge); src/api/Cena.Admin.Api/Content/ContentCoverageService.cs'
+    lens_note: |
+      Ministry lens: an inspector''s checklist reads like the union of
+      privacy + curriculum-fidelity claims. One report serves both.
+  - severity: P1
+    finding: |
+      Feature 1 "Why This Problem" must cite the ChapterDocument +
+      prereq chain (from ADR-0034) in the explanation, not just
+      "you got 8/10 on fractions". A Ministry-inspector reading a
+      student''s "why this problem" screenshot should see Ministry
+      syllabus references. Otherwise the feature is transparent about
+      AI but opaque about curriculum.
+    evidence: 'axis9_data_privacy_trust_mechanics.md:L461-L495 (F1 section); docs/adr/0034-syllabus-advancement-model.md:L56-L66 (chapter hierarchy)'
+    lens_note: |
+      Ministry lens: "ministry syllabus says chapter X requires Y
+      first" is the gold-standard explainability.
+  - severity: P2
+    finding: |
+      Feature 6 "Data Provenance / Inference Trail" could partly ride
+      the existing event-sourced aggregates + CasVerificationGate
+      audit events. Doc does not reference those. Pointing to event
+      sourcing as the trail source would reduce build cost and align
+      with ADR-0032''s audit trail.
+    evidence: 'axis9_data_privacy_trust_mechanics.md (F6 description); docs/adr/0032-cas-gated-question-ingestion.md:L97 (QuestionCasBinding events)'
+    lens_note: |
+      Ministry lens: the existing audit trail is the trail.
+  - severity: P2
+    finding: |
+      Feature 4 "Privacy Settings That Grow With You" (consent-
+      revocation) must include a revocation path for accommodation
+      settings and Bagrut track enrollment — parents consent on
+      student behalf when under 13/16 (depending on law), and revoking
+      consent must not strand a student mid-Bagrut-year without
+      accommodations. Edge case.
+    evidence: 'axis9_data_privacy_trust_mechanics.md:L449 (F4 entry)'
+    lens_note: |
+      Ministry lens: revocation during exam year is a known regulated
+      case; doc is silent.
+already_built:
+  - feature: Event-sourced DDD aggregates
+    evidence: Per CLAUDE.md non-negotiable #8 + src/actors/Cena.Actors/ structure
+    note: |
+      F6 "data provenance trail" largely already exists as event history.
+  - feature: CAS binding audit trail
+    evidence: docs/adr/0032-cas-gated-question-ingestion.md §16.1, §18
+    note: |
+      F1 "Why This Problem" can surface the binding status (Verified /
+      OverriddenByOperator / Unverifiable) as part of the explanation.
+  - feature: Content coverage service
+    evidence: src/api/Cena.Admin.Api/Content/ContentCoverageService.cs
+    note: |
+      F8 transparency report coverage-metric source.
+duplicates_of_other_docs:
+  - 'AXIS_4_Parent_Engagement_Cena_Research.md: F1 "Why This Topic" explainability card is a parent-facing variant of axis9 F1 student-facing explainability'
+  - 'feature-discovery-2026-04-20.md: FD-014 "Why This Problem?" Explainable AI — canonical index entry'
+extracted_tasks:
+  - title: Widen F8 transparency report to include curriculum-fidelity metrics
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Extend F8 "Cena Transparency Report" spec to cover curriculum-
+      fidelity metrics as first-class fields:
+      - CAS verification coverage ratio (cena_cas_binding_coverage_ratio)
+      - Per-track rubric version in use
+      - Coverage gap vs Ministry syllabus (from ContentCoverageService)
+      - Accommodations parity checklist (from the new ministry-
+        accommodations ADR once landed)
+
+      ## Files
+      - pre-release-review/axis9_data_privacy_trust_mechanics.md (F8
+        section, revise)
+      - docs/adr/00XX-annual-transparency-report.md (new)
+      - src/api/Cena.Admin.Api/Transparency/TransparencyReportService.cs
+        (scaffolding if F8 moves forward)
+
+      ## Definition of Done
+      - Report schema documented including curriculum-fidelity fields
+      - ADR drafted
+      - Report generator reads from ContentCoverageService and cena_cas
+        gauges
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L453]
+  - title: Reference Ministry chapter + prereq in F1 "Why This Problem" templates
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Every F1 "Why This Problem" student-facing explanation template
+      must cite: (a) the current ChapterDocument.Name + syllabus track,
+      (b) the prereq ChapterDocument.Name that drove the recommendation.
+
+      ## Files
+      - src/api/Cena.Student.Api.Host/Endpoints/ExplanationEndpoints.cs
+        (new or check)
+      - Template schema must reference chapter_id from ChapterDocument
+
+      ## Definition of Done
+      - Architecture test: explanation response DTOs include chapter_id
+      - Test: explanation for a given recommendation resolves to an
+        extant ChapterDocument
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L461-L495]
+verdict: adopt
+verdict_reason: |
+  Privacy-focused axis is largely outside lens, but F8 (transparency
+  report) and F1 (explainability) have direct Ministry-defensibility
+  value once widened to include curriculum-fidelity signals. No
+  violations.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      All F1-F8 details on consent, erasure, COPPA, PPL, DP — privacy
+      lens is canonical.
+  - to: persona-redteam
+    about: |
+      F6 data-provenance trail attack surface (can it leak cross-tenant
+      data?) — redteam owns.
+  - to: persona-enterprise
+    about: |
+      F2 "My Cena Profile" data-transparency dashboard bounded-context
+      placement; event sourcing surfacing.

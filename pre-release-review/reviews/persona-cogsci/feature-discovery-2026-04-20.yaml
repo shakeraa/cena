@@ -1,0 +1,208 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  1727-line index / mega-doc synthesizing 97 raw findings across 12 research
+  streams into 55 non-overlapping findings, cross-examined by Dr. Nadia
+  (pedagogy), Dr. Rami (honesty), Prof. Amjad (Arabic cohort), Tamar (a11y),
+  Dr. Lior (Israeli market). The corpus spine — most other docs cite findings
+  here. Cogsci review focuses on the Axis 1-2 cogsci-heavy findings + the
+  adjudication patterns across the doc.
+system_purpose_fit: 4
+  rationale:
+    - The doc explicitly respects non-negotiables 1-9 at per-finding level; the
+      cross-examination by Dr. Nadia + Dr. Rami enforces ADR-0003 and ADR-0002
+      as hard constraints on SHIP status.
+    - The meta-finding "3 REJECTED (fabricated citation, cherry-picked ES,
+      ADR-0003 violation)" (L7) is evidence the doc self-polices citation
+      hygiene. Dr. Rami's REJECTs are reflected.
+    - Limitation: the doc's SHIP inventory carries forward effect-size framings
+      that Dr. Rami flagged as WARNINGs (interleaving d=0.5-0.8 rather than
+      d=0.34, for example). The synthesizer must resolve WARNING-level
+      inheritance, not just REJECT-level.
+code_reality_check:
+  claims_verified_in_code:
+    - "FD-003 session-scoped Redis-only misconception architecture matches ADR-0003 -> docs/adr/0003-misconception-session-scope.md:49-52"
+    - "FD-007 spaced practice maps to existing HLR/BKT implementation -> src/actors/Cena.Actors/Mastery/HlrCalculator.cs"
+    - "FD-042 Google SSO already in scope per AXIS_10 L18-L68"
+    - "FD-019 Mashov sync (cited in FD-050 and AXIS_10) — no existing code; feature is genuinely new"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "'Zayyadi et al. 2024 meta-analysis d=0.4-0.6' (L15) — doc itself here uses d=0.4-0.6, which is the honest Dr. Rami-compatible range. This is better than AXIS_8 which uses 1.16. Inconsistency across the corpus."
+    - "'DeepMind/Eedi (2025) arXiv:2512.23633 60-80% success' (FD-003 L124) — honest framing here, conflicts with AXIS_6:226 which says 95.4%. The synthesizer picked the right number; downstream docs did not."
+  claims_unsupported_in_literature:
+    - "FD-001 (L65-66) cites d=0.34 (Brunmair) with up-to-d=0.83 caveat — the correct framing Dr. Rami asked for. But the axis1 doc still leads with d=1.05. Cross-doc propagation needed."
+adr_alignment:
+  honored:
+    - ADR-0002 (FD-002, FD-008, FD-020 explicitly CAS-first)
+    - ADR-0003 (FD-003, FD-006, FD-015 Redis-only; FD-018 session-local mood correctly framed)
+    - ADR-0026 (model routing implied but not per-finding called out)
+    - ADR-0037 (not yet existing at corpus-write time, but FD-018 Learning Energy framing compatible)
+  violated:
+    - "FD-018 'Learning Energy Tracker' allows correlation of mood with performance for 13+ — retrospectively clashes with ADR-0037's ban on affective signal as persistent per-student attribute. The doc pre-dates ADR-0037."
+  missing_adr_needed:
+    - "Global 'RDY-080 Bagrut readiness disclosure' ADR — Dr. Rami's WARNING on FD-004 applies across FD-007, FD-020 also. Needs one global ADR rather than per-feature mitigation."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      This doc is the authoritative source that downstream axis docs cite;
+      where its honest framings (FD-001 d=0.34, FD-003 60-80% resolution,
+      FD-011 d=0.4-0.6) are *not* propagated into axis1 / AXIS_6 / AXIS_8,
+      the corpus is internally inconsistent. The synthesizer (11th agent) must
+      treat this doc's honest figures as the canonical source and propagate
+      corrections into the axis docs.
+    evidence: feature-discovery-2026-04-20.md:15, 65-66, L124; vs axis1:27, AXIS_6:226, AXIS_8:F5 section
+    lens_note: |
+      Citation-discipline lens: when multiple docs cite the same finding with
+      different numbers, the doc's internal consistency is only as good as the
+      worst citation. This mega-doc is in fact the most disciplined — the
+      problem is downstream.
+  - severity: P1
+    finding: |
+      The "Top-10 Quick Wins" list (L19) bundles features whose cogsci evidence
+      classes are heterogeneous: FD-017 Focus Ritual (thin evidence, Dr. Rami
+      WARNING), FD-018 Learning Energy Tracker (ADR-0037 scope concern),
+      FD-014 Explainable Recommendations (Dr. Nadia WARNING). These should
+      not be bundled with the genuinely-quick-wins (Google SSO, CSV roster,
+      Auto-Translation). The "quick wins" framing obscures evidence quality.
+    evidence: feature-discovery-2026-04-20.md:19
+    lens_note: |
+      Cogsci view: "quick win" means low effort + solid evidence + clean
+      guardrails. Thin-evidence features are not quick wins; they are cheap
+      experiments. Re-bucket.
+  - severity: P1
+    finding: |
+      FD-018 (Learning Energy Tracker) in this doc is framed as SHIP with
+      per-session mood emoji. ADR-0037 (post-doc, 2026-04-19) now says
+      affective self-signal is tie-breaker only, never cross-student/cohort
+      use at per-student level, never ML training. The doc should be
+      retroactively amended (or overridden in SYNTHESIS.md) to constrain
+      FD-018 to ADR-0037 scope: no weekly mood-performance correlation
+      report, no persistent per-student energy profile.
+    evidence: feature-discovery-2026-04-20.md:(FD-018 entry); docs/adr/0037-affective-signal-in-pedagogy.md:26-54
+    lens_note: "ADR-0037 is the newer constraint; the doc is out-of-date on this axis."
+  - severity: P1
+    finding: |
+      The "3 REJECTED" list names FD-003, FD-008, FD-011 (L7). Correct. But
+      FD-003 carries forward as SHIP in the body text of this mega-doc
+      (L123-L144) with a "60-80% success" honest framing. That is actually
+      fine — the REJECTion was of the 95% claim, not the feature. Downstream
+      docs don't make the distinction clearly: AXIS_6:226 resurrects the 95%.
+      Synthesizer should explicitly separate "rejected framing" from
+      "rejected feature" in conflicts.md.
+    evidence: feature-discovery-2026-04-20.md:7, 123-144; AXIS_6:226
+    lens_note: "Taxonomy: figure-level reject ≠ feature-level reject. Corpus needs this distinction."
+  - severity: P2
+    finding: |
+      Doc at L15 correctly names the biggest findings: cultural localization
+      (FD-011 with honest d=0.4-0.6), teacher-workflow integration, crisis
+      mode, session-scoped misconception resolution. This prioritisation
+      matches cogsci read of leverage. Useful corpus spine.
+    evidence: feature-discovery-2026-04-20.md:15
+    lens_note: "Concurring — this is good synthesis work."
+already_built:
+  - feature: "HLR / BKT decay computation (FD-007 and related)"
+    evidence: src/actors/Cena.Actors/Mastery/HlrCalculator.cs
+    note: "Several FD entries propose what the mastery subsystem already does; scope tasks to policy layer only."
+  - feature: "MisconceptionCatalog + ErrorPatternMatcherEngine (FD-003 substrate)"
+    evidence: docs/adr/0031-error-pattern-matching-approach.md:31-42
+    note: "FD-003 real-time tagger should reuse, not duplicate."
+  - feature: "Stuck-type ontology (substrate for FD-009, FD-050 hint-related features)"
+    evidence: docs/adr/0036-stuck-type-ontology.md:26-34
+  - feature: "Onboarding self-assessment + ADR-0037 scope (FD-018 mood features)"
+    evidence: docs/adr/0037-affective-signal-in-pedagogy.md:26-54
+duplicates_of_other_docs:
+  - "This doc IS the index. Axis docs 1-10 and Dr. Nadia / Dr. Rami reviews all flow into and out of it. Every finding traces here."
+extracted_tasks:
+  - title: "Synthesizer: enforce canonical effect-size figures from this mega-doc into axis docs"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      For each finding where feature-discovery-2026-04-20.md uses honest figures
+      (FD-001 d=0.34, FD-003 60-80%, FD-011 d=0.4-0.6) and a downstream axis
+      doc inflates them (axis1 d=1.05, AXIS_6 95.4%, AXIS_8 d=1.16), produce
+      a SYNTHESIS.md table of standardized figures and require the axis docs
+      to match before any queue task is enqueued.
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (citation-discipline section)
+
+      ## Definition of Done
+      - Standardized figure table in SYNTHESIS.md.
+      - retired.md lists all inflated figures retired.
+      - Downstream axis docs revised (or queue-body guidance imposes the honest figure regardless).
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-effect-size-canon"
+    source_doc_lines: [L7, L15, L19, L65-L66, L123-L144]
+  - title: "Constrain FD-018 Learning Energy Tracker to ADR-0037 scope"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Override FD-018 SHIP status in SYNTHESIS.md: no weekly mood-performance
+      correlation report, no persistent per-student energy profile. Mood
+      emoji may serve as session-opener tie-breaker only.
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (FD-018 entry)
+      - Optionally amend feature-discovery-2026-04-20.md with a dated footnote.
+
+      ## Definition of Done
+      - FD-018 scope explicitly bounded by ADR-0037.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-fd018-adr0037"
+    source_doc_lines: [FD-018 entry]
+  - title: "Re-bucket 'Top-10 Quick Wins' by evidence-quality tier"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Separate the L19 "Quick Wins" list into (a) Tier 1: low effort + strong
+      evidence (SSO, CSV roster, Auto-Translation, Confidence Calibration with
+      feedback pairing), (b) Tier 2: low effort + cheap experiment status
+      (Focus Ritual, Learning Energy, Explainable Recs, I'm Confused Too,
+      Session Type Menu).
+
+      ## Files
+      - pre-release-review/reviews/SYNTHESIS.md (bucketing table)
+
+      ## Definition of Done
+      - Two-tier bucketing with rationale per entry.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-quickwins-rebucket"
+    source_doc_lines: [L19]
+verdict: adopt
+verdict_reason: |
+  This is the corpus spine and its synthesis discipline is high-quality. The
+  cogsci-relevant issues are (a) citation-propagation failures to downstream
+  axis docs (the synthesizer should fix this), (b) FD-018 pre-dates ADR-0037
+  and must be retroactively scope-constrained, (c) "Quick Wins" bucketing
+  should separate evidence-solid from cheap-experiment. No features need to
+  be retired at this doc level beyond what Dr. Rami already REJECTed.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "FD-018 ADR-0037 retroactive scope; FD-003 DPA §7; FD-048 Session Type Menu preference tracking."
+  - to: persona-enterprise
+    about: "Aggregate-root design for FD-003 (session-scoped), FD-004 (CAT placement), FD-011 (cultural context)."
+  - to: persona-ministry
+    about: "FD-004 + FD-007 Bagrut readiness disclosure; FD-020 rubric encoding (non-neg 4)."
+  - to: persona-ethics
+    about: "FD-017 breathing therapy-adjacency; FD-016 team competitions; FD-018 mood data framing."
+  - to: persona-finops
+    about: "LLM-call budget for FD-008 (partial-credit grading), FD-003 (misconception tagging), FD-009 (Socratic)."
+  - to: persona-a11y
+    about: "FD-010 Arabic RTL, FD-013 mother-tongue hints, FD-025 TTS — primary a11y."
+  - to: persona-redteam
+    about: "FD-008 AI grading bypass vectors; FD-002 CAS-gated variation distractor leaks."
+  - to: persona-sre
+    about: "FD-003 Redis session-scoped misconception — observability + auto-purge reliability."
+  - to: persona-educator
+    about: "FD-009 Socratic Bagrut-context fit; FD-011 cultural context authenticity review board."

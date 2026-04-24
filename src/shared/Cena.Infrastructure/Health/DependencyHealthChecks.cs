@@ -1,0 +1,280 @@
+// =============================================================================
+// Cena Platform — Dependency Health Checks (RDY-011)
+// Real connectivity checks for PostgreSQL (Marten), Redis, NATS.
+// Used by /health/ready to tell K8s whether the pod can serve traffic.
+// =============================================================================
+
+using Cena.Infrastructure.Resilience;
+using Marten;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Microsoft.Extensions.Logging;
+using StackExchange.Redis;
+
+namespace Cena.Infrastructure.Health;
+
+/// <summary>
+/// RDY-011: Checks PostgreSQL connectivity via Marten.
+/// Runs a lightweight query (SELECT 1) with a 3-second timeout.
+/// </summary>
+public sealed class PostgresHealthCheck : IHealthCheck
+{
+    private readonly IDocumentStore _store;
+    private readonly ILogger<PostgresHealthCheck> _logger;
+
+    public PostgresHealthCheck(IDocumentStore store, ILogger<PostgresHealthCheck> logger)
+    {
+        _store = store;
+        _logger = logger;
+    }
+
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            cts.CancelAfter(TimeSpan.FromSeconds(3));
+
+            await using var session = _store.QuerySession();
+            // Lightweight connectivity test via Npgsql
+            var conn = session.Connection;
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT 1";
+            cmd.CommandTimeout = 3;
+            await cmd.ExecuteScalarAsync(cts.Token);
+
+            return HealthCheckResult.Healthy("PostgreSQL is reachable");
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("PostgreSQL health check timed out (>3s)");
+            return HealthCheckResult.Unhealthy("PostgreSQL health check timed out");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PostgreSQL health check failed");
+            return HealthCheckResult.Unhealthy("PostgreSQL is unreachable", ex);
+        }
+    }
+}
+
+/// <summary>
+/// RDY-011: Checks Redis connectivity via StackExchange.Redis PING.
+/// </summary>
+public sealed class RedisHealthCheck : IHealthCheck
+{
+    private readonly IConnectionMultiplexer _redis;
+    private readonly ILogger<RedisHealthCheck> _logger;
+
+    public RedisHealthCheck(IConnectionMultiplexer redis, ILogger<RedisHealthCheck> logger)
+    {
+        _redis = redis;
+        _logger = logger;
+    }
+
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            var db = _redis.GetDatabase();
+            var latency = await db.PingAsync();
+
+            if (latency > TimeSpan.FromSeconds(3))
+            {
+                _logger.LogWarning("Redis PING latency {Latency}ms exceeds 3s threshold", latency.TotalMilliseconds);
+                return HealthCheckResult.Degraded($"Redis latency high: {latency.TotalMilliseconds:F0}ms");
+            }
+
+            return HealthCheckResult.Healthy($"Redis OK ({latency.TotalMilliseconds:F0}ms)");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Redis health check failed");
+            return HealthCheckResult.Unhealthy("Redis is unreachable", ex);
+        }
+    }
+}
+
+/// <summary>
+/// RDY-011: Checks NATS connectivity.
+/// NATS down = degraded (REST still works, real-time features disabled).
+/// </summary>
+public sealed class NatsHealthCheck : IHealthCheck
+{
+    private readonly NATS.Client.Core.INatsConnection _nats;
+    private readonly ILogger<NatsHealthCheck> _logger;
+
+    public NatsHealthCheck(NATS.Client.Core.INatsConnection nats, ILogger<NatsHealthCheck> logger)
+    {
+        _nats = nats;
+        _logger = logger;
+    }
+
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            // Check connection state
+            var state = _nats.ConnectionState;
+            if (state == NATS.Client.Core.NatsConnectionState.Open)
+            {
+                return HealthCheckResult.Healthy("NATS connected");
+            }
+
+            _logger.LogWarning("NATS connection state: {State}", state);
+            return HealthCheckResult.Degraded($"NATS connection state: {state}");
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "NATS health check failed — degraded (REST still functional)");
+            return HealthCheckResult.Degraded("NATS unreachable — real-time features disabled", ex);
+        }
+    }
+}
+
+/// <summary>
+/// RDY-012: Checks HTTP client circuit breaker states.
+/// Reports degraded if any circuit is open or half-open.
+/// </summary>
+public sealed class HttpCircuitBreakerHealthCheck : IHealthCheck
+{
+    private readonly ILogger<HttpCircuitBreakerHealthCheck> _logger;
+
+    public HttpCircuitBreakerHealthCheck(ILogger<HttpCircuitBreakerHealthCheck> logger)
+    {
+        _logger = logger;
+    }
+
+    public Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        var states = HttpPolicies.GetAllStates();
+        var openClients = states.Where(kv => kv.Value == 2).Select(kv => kv.Key).ToList();
+        var halfOpenClients = states.Where(kv => kv.Value == 1).Select(kv => kv.Key).ToList();
+
+        if (openClients.Count > 0)
+        {
+            var msg = $"Circuit OPEN for: {string.Join(", ", openClients)}";
+            _logger.LogWarning("[CIRCUIT_BREAKER] Health check: {Status}", msg);
+            return Task.FromResult(HealthCheckResult.Degraded(msg));
+        }
+
+        if (halfOpenClients.Count > 0)
+        {
+            var msg = $"Circuit HALF-OPEN for: {string.Join(", ", halfOpenClients)}";
+            _logger.LogInformation("[CIRCUIT_BREAKER] Health check: {Status}", msg);
+            return Task.FromResult(HealthCheckResult.Degraded(msg));
+        }
+
+        return Task.FromResult(HealthCheckResult.Healthy(
+            $"All {states.Count} HTTP circuits closed"));
+    }
+}
+
+/// <summary>
+/// RDY-017: Checks NATS DLQ stream depth.
+/// Reports degraded if DLQ has unprocessed events above threshold.
+/// RDY-017a: threshold logic extracted to <see cref="BuildResult"/> so the
+/// alert boundary + <c>dlq_depth</c> data-key contract can be unit-tested
+/// without a live Postgres instance (the raw COUNT(*) query is validated
+/// end-to-end by the nightly NATS staging sweep).
+/// </summary>
+public sealed class NatsDlqHealthCheck : IHealthCheck
+{
+    internal const int AlertThreshold = 50;
+    internal const string DepthKey = "dlq_depth";
+
+    private readonly Marten.IDocumentStore _store;
+    private readonly ILogger<NatsDlqHealthCheck> _logger;
+
+    public NatsDlqHealthCheck(Marten.IDocumentStore store, ILogger<NatsDlqHealthCheck> logger)
+    {
+        _store = store;
+        _logger = logger;
+    }
+
+    public async Task<HealthCheckResult> CheckHealthAsync(
+        HealthCheckContext context,
+        CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await using var session = _store.QuerySession();
+            // Query DLQ count via raw SQL — Infrastructure cannot reference Actors
+            var conn = session.Connection;
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT COUNT(*) FROM mt_doc_natsoutboxdeadletter";
+            cmd.CommandTimeout = 3;
+            var result = await cmd.ExecuteScalarAsync(cancellationToken);
+            var dlqCount = Convert.ToInt32(result ?? 0);
+
+            return BuildResult(dlqCount, _logger);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[DLQ] Health check query failed");
+            return HealthCheckResult.Degraded("DLQ depth check failed", ex);
+        }
+    }
+
+    /// <summary>
+    /// Pure threshold-to-result mapping. Returned for dlqCount &gt;=
+    /// <see cref="AlertThreshold"/>: <c>Degraded</c> with data.<c>dlq_depth</c>.
+    /// Otherwise: <c>Healthy</c> with data.<c>dlq_depth</c>. Emits a
+    /// structured warning log on the degraded branch so ops can correlate
+    /// with Prometheus alerts.
+    /// </summary>
+    internal static HealthCheckResult BuildResult(int dlqCount, ILogger<NatsDlqHealthCheck>? logger = null)
+    {
+        if (dlqCount >= AlertThreshold)
+        {
+            logger?.LogWarning("[DLQ] Health check: {Count} dead-lettered events (threshold={Threshold})",
+                dlqCount, AlertThreshold);
+            return HealthCheckResult.Degraded(
+                $"DLQ depth {dlqCount} exceeds threshold {AlertThreshold}",
+                data: new Dictionary<string, object> { [DepthKey] = dlqCount });
+        }
+
+        return HealthCheckResult.Healthy(
+            $"DLQ depth: {dlqCount}",
+            data: new Dictionary<string, object> { [DepthKey] = dlqCount });
+    }
+}
+
+/// <summary>
+/// RDY-011: Extension methods to register dependency health checks.
+/// </summary>
+public static class HealthCheckRegistration
+{
+    /// <summary>
+    /// Register Student API health checks: PostgreSQL (critical), Redis (critical), NATS (degraded).
+    /// RDY-012: Also monitors HTTP client circuit breaker states.
+    /// </summary>
+    public static IHealthChecksBuilder AddCenaStudentHealthChecks(this IHealthChecksBuilder builder)
+    {
+        return builder
+            .AddCheck<PostgresHealthCheck>("postgresql", HealthStatus.Unhealthy, new[] { "ready", "db" })
+            .AddCheck<RedisHealthCheck>("redis", HealthStatus.Unhealthy, new[] { "ready", "cache" })
+            .AddCheck<NatsHealthCheck>("nats", HealthStatus.Degraded, new[] { "ready", "messaging" })
+            .AddCheck<HttpCircuitBreakerHealthCheck>("http-circuit-breakers", HealthStatus.Degraded, new[] { "ready", "external" })
+            .AddCheck<NatsDlqHealthCheck>("nats-dlq", HealthStatus.Degraded, new[] { "ready", "messaging" });
+    }
+
+    /// <summary>
+    /// Register Admin API health checks: PostgreSQL (critical), Redis (critical).
+    /// Admin API does not use NATS directly.
+    /// </summary>
+    public static IHealthChecksBuilder AddCenaAdminHealthChecks(this IHealthChecksBuilder builder)
+    {
+        return builder
+            .AddCheck<PostgresHealthCheck>("postgresql", HealthStatus.Unhealthy, new[] { "ready", "db" })
+            .AddCheck<RedisHealthCheck>("redis", HealthStatus.Unhealthy, new[] { "ready", "cache" });
+    }
+}
