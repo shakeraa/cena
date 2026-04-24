@@ -1,0 +1,107 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight motivation / self-regulation features (self-explanation prompts, if-then planner, wise feedback, non-loss mastery path,
+  metacognitive check-ins, process-praise, SRL micro-strategy, reflective study plan). Most are UI nudges + small backend state.
+  LLM used for coherence scoring in Feature 1.
+system_purpose_fit: 4
+  rationale:
+    - Explicitly screens against GD-004 (streaks / loss-aversion / variable-ratio rewards) — aligned with shipgate.md.
+    - SRE gap: doc does not address what happens when LLM sidecar (coherence scoring) is unavailable — student flow would stall.
+code_reality_check:
+  claims_verified_in_code:
+    - "LlmJudgeSidecar exists (Socratic explain-it-back) -> commit d6ecfac feat(rdy-074) F1 phase 1B"
+    - "CI ship-gate scanner for banned motivation copy -> docs/engineering/shipgate.md:1; ci-prohibited-metrics-rules.md"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Mastery-Path Progress (Feature 4) as non-loss framing — needs runtime check against shipgate banned-term list"
+    - "Metacognitive check-in (Feature 5) — storage location not specified; session-local or Redis?"
+adr_alignment:
+  honored: [ADR-0003 (session-scoped), GD-004 (no dark patterns)]
+  violated: []
+  missing_adr_needed:
+    - "LLM coherence-scorer fallback policy (bypass vs block) when sidecar is down"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 1 (Self-Explanation Prompts) makes LLM coherence scoring a blocking step ("mandatory but low-stakes"). Without a
+      circuit-breaker + graceful-degrade ("accept and continue"), a single LLM sidecar outage halts every answer submission.
+      Must specify degraded-mode contract before SHIP.
+    evidence: axis2_motivation_self_regulation_findings.md:L35-L55
+    lens_note: Every external model call needs a 2xx-or-pass-through contract for learning flow.
+  - severity: P1
+    finding: |
+      Feature 4 (Mastery-Path Progress "non-loss") is the kind of feature the ship-gate scanner was built to police. Need a CI
+      rule that greps the PR for banned terms (streak / lose / combo / variable-ratio) and fails on match.
+    evidence: axis2_motivation_self_regulation_findings.md (Feature 4); docs/engineering/shipgate.md; docs/engineering/ci-prohibited-metrics-rules.md
+    lens_note: Guardrails are only real if enforced in CI.
+  - severity: P1
+    finding: |
+      Mood/emoji check-in telemetry (Feature 5 & 6) must be classified as "affective signal" per ADR-0037 and treated with
+      session-scope + no-profile storage. Doc assumes this but does not bind to the ADR.
+    evidence: axis2_motivation_self_regulation_findings.md (Features 5, 6); docs/adr/0037-affective-signal-in-pedagogy.md
+    lens_note: Affective data is high-sensitivity; incident from leak is reputation-level.
+  - severity: P2
+    finding: |
+      If-Then Planner (Feature 2) stores plan in session context only — this disappears on device switch. Need explicit decision
+      on whether to sync via Feature 5 multi-device, or accept the UX loss.
+    evidence: axis2_motivation_self_regulation_findings.md Feature 2; AXIS_10:L269 (multi-device sync)
+    lens_note: Cross-doc dependency that should be an ADR.
+already_built:
+  - feature: LLM Judge sidecar HTTP adapter
+    evidence: commit d6ecfac
+    note: Feature 1 coherence scoring can reuse this adapter.
+  - feature: Ship-gate banned terms scanner
+    evidence: docs/engineering/shipgate.md
+    note: Feature 4 must pass scanner on every PR.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-007/FD-008/FD-010: self-explanation / if-then / process-praise."
+extracted_tasks:
+  - title: Define LLM-sidecar degraded-mode contract for pedagogy features
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      When LlmJudgeSidecar is unreachable / >p99 latency, pedagogy features (self-explanation, elaborative prompts) MUST
+      accept the student's input, log a degraded-mode trace, and proceed. No blocked flow.
+      ## Files
+      src/actors/Cena.Actors/Services/ (LlmJudgeSidecar)
+      src/api/Cena.Student.Api.Host/Endpoints/TutorEndpoints.cs
+      deploy/observability/alerting-rules.yaml
+      docs/ops/runbooks/ (new: llm-sidecar-degraded.md)
+      ## Definition of Done
+      - Chaos test: sidecar returns 503 -> student flow unblocked
+      - Alert on sustained degraded mode
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/llm-degraded"
+    source_doc_lines: [L35-L55]
+  - title: Extend shipgate scanner to cover the axis-2 motivation vocabulary
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add explicit regex rules for axis-2 banned copy ("streak", "don't break", "combo", "chance") and fail CI on match.
+      ## Files
+      docs/engineering/ci-prohibited-metrics-rules.md
+      scripts/ (or existing shipgate scanner)
+      .github/workflows/ci.yml
+      ## Definition of Done
+      - New rule set active on next CI run
+      - Sample-violation PR blocked
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/shipgate-axis2"
+    source_doc_lines: []
+verdict: revise
+verdict_reason: |
+  Intent aligns with non-negotiables; requires explicit degraded-mode + CI enforcement before SHIP.
+cross_lens_handoff:
+  - to: persona-ethics
+    about: Mastery-path / process-praise framing passing ship-gate.
+  - to: persona-privacy
+    about: Affective signal handling per ADR-0037.
+  - to: persona-finops
+    about: LLM coherence scoring cost per student-hour (ADR-026 tier).

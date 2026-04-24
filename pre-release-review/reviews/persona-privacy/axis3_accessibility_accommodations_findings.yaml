@@ -1,0 +1,185 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 accessibility features: dyscalculia trainer (subitizing), number line with
+  audio-haptic, digital graph paper, ADHD session builder, color-blind palette,
+  MathML screen-reader pipeline, Arabic RTL math renderer, anxiety-reducing predictable UI.
+  Explicitly flags dyscalculia trainer BORDERLINE on misconception retention for
+  under-13 with "anonymize after 90 days, allow deletion".
+
+system_purpose_fit: 4
+  rationale:
+    - Most features are presentation-layer / no new PII surface
+    - Feature 1 (Subitizing Trainer) correctly flags ADR-0003 tension with adaptive-level tracking
+    - Feature 4 (ADHD Session Builder) implies behavioral data — under-review
+    - Accommodation profile data is sensitive health-adjacent data (SCN Art 9 special category under GDPR)
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Accommodation profile exists -> src/actors/Cena.Actors/Accommodations/AccommodationProfile.cs"
+    - "Admin accommodations endpoint exists -> src/api/Cena.Admin.Api/Features/ParentConsole/AccommodationsEndpoints.cs"
+    - "Age gate + parental consent onboarding -> src/student/full-version/src/components/onboarding/ParentalConsentStep.vue + AgeGateStep.vue"
+  claims_contradicted_by_code:
+    - "Feature 1 (Subitizing) mitigation 'anonymize after 90 days' is stricter than general COPPA profile; current AccommodationProfile has no anonymization pipeline attached -> AccommodationProfile.cs needs review"
+  claims_unverifiable:
+    - "MathML + SpokenMath pipeline not in src/ — proposed"
+    - "Audio-haptic number line not in src/ — proposed"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (feature 1 flags session-local ans_strength_estimate)
+  violated: []
+  missing_adr_needed:
+    - "ADR for accommodation data classification as special-category (health-adjacent) — dyscalculia / ADHD / anxiety diagnoses have elevated GDPR Art 9 protection"
+    - "ADR for haptic/audio feedback device-fingerprinting risk (feature 2 vibration API)"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Accommodation profile data (dyscalculia flag, ADHD flag, anxiety flag) is GDPR
+      Art 9 special-category "health-adjacent" data for minors. Current
+      AccommodationProfile.cs is a plain document with no encryption-at-rest flag,
+      no access logging distinction, and no explicit consent purpose mapped.
+      Israeli Privacy Regulations (Data Security) Medium/High security tier applies.
+    evidence: "axis3_accessibility_accommodations_findings.md:100-105 + src/actors/Cena.Actors/Accommodations/AccommodationProfile.cs"
+    lens_note: |
+      "My 14-year-old is dyscalculic" is highly sensitive. Must be: (a) consent-gated
+      separate from general analytics, (b) encrypted at rest, (c) access-logged, (d)
+      scrubbed from any teacher dashboard unless explicit per-incident consent.
+
+  - severity: P1
+    finding: |
+      Feature 4 (ADHD Session Builder) implies continuous behavioral monitoring (timer
+      compliance, break acceptance, focus indicators). These data combined with
+      accommodation profile flag = profile of ADHD behavior patterns of a minor. GDPR
+      Art 22 profiling territory; PPA April 2025 AI opinion applies.
+    evidence: "axis3_accessibility_accommodations_findings.md (ADHD feature section referenced in exec summary L31-32)"
+    lens_note: |
+      "ADHD-Daniel" persona behavioral trace can be reverse-engineered to the individual.
+      Strongly session-scoped aggregate only; no cross-session ADHD behavioral profile.
+
+  - severity: P1
+    finding: |
+      Feature 1 mitigation "anonymize after 90 days" contradicts ADR-0003's 30-day
+      session misconception default. If adaptive_level and ans_strength_estimate are
+      per-student, retention must follow ADR-0003 (30/90) not some new 90-day figure.
+      Misaligned retention windows = audit finding.
+    evidence: "axis3_accessibility_accommodations_findings.md:99-101 + src/shared/Cena.Infrastructure/Compliance/DataRetentionPolicy.cs:58-65"
+    lens_note: |
+      Every new retention window must map to an existing DataCategory or add one
+      with explicit ADR. 90-day number feels like guesswork.
+
+  - severity: P2
+    finding: |
+      Feature 2 haptic + audio pitch feedback uses Web Audio API + Vibration API.
+      Both are fingerprintable (microphone-related quirks, vibration pattern support)
+      and trigger permission prompts. Minors should have minimal fingerprint surface.
+      Document should note no audio capture (speaker-only), and explicit permission UI.
+    evidence: "axis3_accessibility_accommodations_findings.md:112-116"
+    lens_note: |
+      Child-fingerprinting via exotic browser APIs = regulator flag.
+
+  - severity: P2
+    finding: |
+      Feature 7 (Arabic RTL math renderer) is pure presentation, no privacy delta.
+      Already addressed by non-negotiable #6 (bdi dir=ltr). Already-built in part.
+    evidence: "axis3_accessibility_accommodations_findings.md:7-10 (feature list) + project_math_always_ltr memory"
+    lens_note: |
+      Retire-in-backend, UI work only.
+
+already_built:
+  - feature: AccommodationProfile document
+    evidence: src/actors/Cena.Actors/Accommodations/AccommodationProfile.cs + src/api/Cena.Admin.Api/Features/ParentConsole/AccommodationsEndpoints.cs
+    note: |
+      Surface exists but encryption-at-rest + Art-9 classification not verified.
+      Feature 4 (ADHD) likely extends existing profile rather than new table.
+  - feature: Age gate / parental consent
+    evidence: src/student/full-version/src/components/onboarding/*.vue
+    note: Covers COPPA §312.5(b)(2), ICO Children's Code Std 11.
+  - feature: Math-LTR (bdi dir=ltr) for RTL pages
+    evidence: Non-negotiable #6 enforced; Feature 7 is UI polish
+    note: "Feature 7 partially built; retire the infrastructure portion"
+
+duplicates_of_other_docs:
+  - "AXIS_8_Content_Authoring_Quality_Research.md: Feature 4 (Arabic RTL Math Renderer) overlaps Feature 7 here"
+  - "feature-discovery-2026-04-20.md: FD-010 (Arabic RTL Math Renderer) same"
+
+extracted_tasks:
+  - title: "Classify accommodation data as GDPR Art 9 special-category + encrypt at rest"
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-compliance
+    queue_body: |
+      ## Goal
+      Dyscalculia / ADHD / anxiety flags on AccommodationProfile are health-adjacent
+      special-category data. Current storage appears plain JSON in Marten. Need:
+      (a) [SpecialCategoryPii] attribute on relevant fields,
+      (b) column-level encryption (at minimum application-layer for sensitive flags),
+      (c) explicit consent purpose = AccommodationDataProcessing,
+      (d) access-logged via StudentDataAuditMiddleware on every read.
+
+      ## Files
+      - src/actors/Cena.Actors/Accommodations/AccommodationProfile.cs
+      - src/shared/Cena.Infrastructure/Compliance/ComplianceContracts.cs (PiiAttribute)
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs
+      - Test: AccommodationProfileSensitiveFieldsAccessLoggedTests
+
+      ## Definition of Done
+      - Fields marked [Pii(Level=SpecialCategory, Category=HealthAdjacent, RequiresEncryption=true)]
+      - Read path wraps in audit log entry
+      - Consent purpose check before write
+      - GDPR export annotates fields correctly
+      - Erasure cascade hard-deletes (not hash) these fields
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-compliance --result "<branch>"
+    source_doc_lines: ["L100-105"]
+
+  - title: "Align Feature 1 retention to ADR-0003 windows (30/90) not 90-day"
+    priority: P1
+    estimate: XS
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 1 Subitizing Trainer doc proposes 90-day anonymize which conflicts with
+      ADR-0003 Decision 2 (session misconception = 30 days, 90-day hard cap). Either
+      classify trainer data as SessionMisconception or as StudentRecord; either way,
+      retention follows existing policy.
+
+      ## Files
+      - pre-release-review/axis3_accessibility_accommodations_findings.md (update mitigation text)
+      - If trainer implemented: ensure data category maps to existing DataCategory enum
+
+      ## Definition of Done
+      - Mitigation text updated to reference DataRetentionPolicy constants
+      - Any new data types added to DataCategory enum with ADR
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L99-101"]
+
+verdict: revise
+verdict_reason: |
+  Presentation-layer features are fine; accommodation data is under-classified relative
+  to its special-category status. Feature 7 is partially built — retire duplicate work.
+  Fix retention-window alignment + Art 9 classification before shipping Feature 1/4.
+
+cross_lens_handoff:
+  - to: persona-a11y
+    about: |
+      Features 5 (color-blind palette), 6 (MathML screen reader), 7 (RTL math) are lens-core;
+      WCAG 2.2 AA and bdi dir=ltr compliance audit.
+  - to: persona-enterprise
+    about: |
+      AccommodationProfile classification affects aggregate boundary — is it inside
+      StudentState or its own aggregate (ADR-0012)?
+  - to: persona-educator
+    about: |
+      Are subitizing / number line interventions pedagogically sound for Bagrut-age
+      (12-18) students, or is the evidence base in younger-child contexts?
+  - to: persona-redteam
+    about: |
+      Web Audio + Vibration API fingerprinting surface on mobile devices.

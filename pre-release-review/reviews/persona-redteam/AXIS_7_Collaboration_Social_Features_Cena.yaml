@@ -1,0 +1,171 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Seven collaboration/social features for a platform serving minors:
+  anonymized peer explanation circles (voice/text), teacher-mediated micro
+  groups, team vs. challenge competitions, async Q&A, "I'm confused too"
+  signal, reciprocal peer tutoring, collaborative whiteboard. This is the
+  highest-risk doc: student-to-student communication channels on a minor-
+  serving platform.
+system_purpose_fit: 2
+  rationale:
+    - Voice recording + peer-share on a platform serving 12-18 year-olds
+      (including under-13 per the doc framing) is a major safeguarding surface
+    - "Anonymized" is insufficient; voice prints, writing style, and metadata
+      allow re-identification
+    - Several features (F1, F4, F6, F7) set up cross-student channels that
+      become grooming / harassment vectors without heavy moderation
+code_reality_check:
+  claims_verified_in_code:
+    - "Moderation pipeline exists for photo uploads -> src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:113"
+    - "RDY-001 CSAM/content-safety pipeline referenced -> docs/adr/0033-cena-ocr-stack.md (CSAM references)"
+  claims_contradicted_by_code:
+    - "Doc F1 says 'voice distortion filter' as mitigation — not implemented; voice-recording endpoint doesn't exist yet"
+  claims_unverifiable:
+    - "'Two-sided DPIA gate' exists per RDY-076 — the RDY-076 artifact is referenced but the guard has not been audited end-to-end"
+    - "'Encrypted ephemeral blob storage with lifecycle policy' — not a primitive in the current codebase"
+adr_alignment:
+  honored:
+    - ADR-0003 (session scope) — doc claims 24h TTL for voice blobs
+    - RDY-076 (two-sided consent) — cited
+  violated: []
+  missing_adr_needed:
+    - "Minor-to-minor communication ADR (voice, text, whiteboard) — safeguarding, moderation SLOs, law-enforcement interface"
+    - "Voice-biometric de-identification ADR — because anonymization of voice is a known-hard problem"
+non_negotiable_violations:
+  - "3 (no dark patterns) — F3 'Team vs Challenge' needs hard scrutiny for variable-ratio reward mechanics; leaderboards even scoped to teams drift toward comparative-percentile shame"
+persona_findings:
+  - severity: P0
+    finding: |
+      F1 Anonymized Peer Explanation Circles with voice recording is the
+      highest-severity feature in the corpus. Voice data of minors is
+      biometric (GDPR Art. 9, Israeli PPL definition). "Light voice distortion
+      filter" is not a sufficient de-identification method — voice-print
+      models recover speakers across standard distortions. Blast radius: voice
+      of a 12-year-old leaks to another student with screen-recording. Ship
+      gates required: (a) text-only default with voice opt-in gated by parent
+      consent, (b) server-side ASR-to-text transcription before any peer
+      hears audio, (c) no raw audio ever leaves server; peers receive
+      synthesized voice from transcript, (d) full moderation of transcript
+      + metadata retention per ADR-0003.
+    evidence: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md Feature 1
+    lens_note: Real EdTech incidents 2022-2025 have involved exactly this pattern. Legal + reputational disaster if shipped as described.
+  - severity: P0
+    finding: |
+      F7 Collaborative Math Whiteboard proposes real-time shared canvas with
+      teacher oversight. Canvases allow free-draw which bypasses every
+      text-moderation pipeline. Attack: student draws phone number, URL, or
+      inappropriate content. The existing PhotoDNA/PhotoNLP moderation only
+      runs on uploads, not ephemeral canvas strokes. Canvas must have
+      keystroke-level moderation or be dropped.
+    evidence: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md Feature 7
+    lens_note: Free-draw is moderation-hostile by design.
+  - severity: P1
+    finding: |
+      F6 Reciprocal Peer Tutoring Matcher pairs students. Without strict
+      same-class, teacher-approved, within-tenant scoping, this becomes a
+      "random stranger on the internet" feature for minors. Doc mentions
+      DPIA but no code-level scope constraint.
+    evidence: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md Feature 6
+    lens_note: Tenant scoping on peer-matching is the fix; TenantScope.cs already has the primitive.
+  - severity: P1
+    finding: |
+      F4 Async Q&A with endorsement — endorsement creates a reputation score
+      that is a variable-ratio reward surface (GD-004 concern). Students
+      will post more to chase endorsements. Strongly risks ship-gate banned
+      terms.
+    evidence: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md Feature 4
+    lens_note: Cross-lens to ethics; red-team notes the gamification attack surface.
+  - severity: P1
+    finding: |
+      F3 "Team vs Challenge" competitions — even team-level points become
+      per-student deltas ("student X dragged the team down"). Social-pressure
+      shame is worse than individual percentile shame. Must not persist team
+      rankings and must not reveal per-student contribution.
+    evidence: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md Feature 3
+    lens_note: Cross-lens to ethics.
+  - severity: P2
+    finding: |
+      F5 "I'm Confused Too" anonymous signal — if the aggregate count per
+      concept is below a threshold (e.g., n=1), the signaler is trivially
+      re-identifiable by process of elimination.
+    evidence: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md Feature 5
+    lens_note: Same minimum-cell-size issue as axis5.
+already_built:
+  - feature: Photo-upload moderation pipeline (CSAM/AI safety)
+    evidence: src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:113
+    note: Should be extended to cover any new user-to-user content channel.
+  - feature: TenantScope institute filter
+    evidence: src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs:57
+    note: Peer matching MUST ride this — no cross-institute pairing.
+duplicates_of_other_docs:
+  - "AXIS_4_Parent_Engagement_Cena_Research.md F3 (bridge messages) — similar minor-safeguarding risk"
+extracted_tasks:
+  - title: Block F1 voice-recording peer share until ASR-only flow is designed
+    priority: P0
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Voice of minors may not be shared peer-to-peer in any form. F1 must ship,
+      if at all, as: student speech → server-side ASR → sanitized transcript
+      → optional synthesized TTS read-back for recipient. No raw audio
+      persisted or relayed. Draft an ADR before any implementation.
+      ## Files
+      - docs/adr/ (new: minor-voice-handling)
+      - pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md (doc revise)
+      ## Definition of Done
+      - [ ] ADR accepted
+      - [ ] Pipeline spec has explicit "no raw audio leaves server" clause
+      - [ ] Parental-consent gate specified
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L35-L100]
+  - title: Drop F7 whiteboard free-draw until real-time moderation exists
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Collaborative canvas with free-draw cannot be moderated at scale. Either
+      (a) constrain input to stamped math symbols/templates or (b) block the
+      feature entirely until a real-time vision-moderation pipeline is
+      budgeted and tested.
+      ## Files
+      - pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md (doc revise)
+      ## Definition of Done
+      - [ ] Spec either drops free-draw or cites the moderation pipeline
+      - [ ] Retirement note written if dropped
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L480-L560]
+  - title: Enforce intra-institute scoping on every peer-matching feature
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F1/F4/F6 peer matching must filter candidates by
+      TenantScope.GetInstituteFilter — no cross-institute pairing, ever.
+      ## Files
+      - future matching service
+      - tests using the TeacherHeatmapScopeGuardTests pattern
+      ## Definition of Done
+      - [ ] Unit test: matcher with two institutes returns no cross-pairs
+      - [ ] Scope-guard test per endpoint
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L220-L300, L400-L480]
+verdict: revise
+verdict_reason: |
+  F1 + F7 are ship-blockers as described. F3/F4 need ethics review. F2/F5
+  are shippable with minimum-cell-size + tenant scoping. Retire the voice-
+  recording variant outright until the ASR-only ADR lands.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: Voice biometric handling + parental consent; minor→minor messaging at platform serving under-13s
+  - to: persona-ethics
+    about: F3/F4 gamification + endorsement loops — ship-gate banned terms audit
+  - to: persona-sre
+    about: Moderation queue SLO for user-to-user content

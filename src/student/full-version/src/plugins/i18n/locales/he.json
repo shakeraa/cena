@@ -1,0 +1,1549 @@
+{
+  "2": "2",
+  "3": "3",
+  "5": "5",
+  "10": "10",
+  "20": "20",
+  "25": "25",
+  "50": "50",
+  "100": "100",
+  "UI Elements": "רכיבי ממשק",
+  "Forms & Tables": "טפסים וטבלאות",
+  "Pages": "דפים",
+  "Charts & Maps": "תרשימים ומפות",
+  "Others": "אחרים",
+  "Typography": "טיפוגרפיה",
+  "Cards": "כרטיסים",
+  "Basic": "בסיסי",
+  "Advance": "מתקדם",
+  "Widgets": "ווידג׳טים",
+  "Components": "רכיבים",
+  "Alert": "התראה",
+  "Close Alert": "סגור התראה",
+  "Avatar": "אווטאר",
+  "Badge": "תג",
+  "Button": "כפתור",
+  "Calendar": "לוח שנה",
+  "Kanban": "קנבן",
+  "Image": "תמונה",
+  "Pagination": "ניווט עמודים",
+  "Progress Circular": "התקדמות מעגלית",
+  "Progress Linear": "התקדמות ליניארית",
+  "Autocomplete": "השלמה אוטומטית",
+  "Tooltip": "טולטיפ",
+  "Slider": "מחוון",
+  "Date Time Picker": "בוחר תאריך ושעה",
+  "Select": "בחירה",
+  "Switch": "מתג",
+  "Checkbox": "תיבת סימון",
+  "Radio": "רדיו",
+  "Textarea": "אזור טקסט",
+  "Rating": "דירוג",
+  "File Input": "העלאת קובץ",
+  "Otp Input": "קלט OTP",
+  "Form Layout": "פריסת טופס",
+  "Form Validation": "אימות טופס",
+  "Charts": "תרשימים",
+  "Apex Chart": "Apex Chart",
+  "Chartjs": "Chart.js",
+  "Account Settings": "הגדרות חשבון",
+  "User Profile": "פרופיל משתמש",
+  "FAQ": "שאלות נפוצות",
+  "Dialog Examples": "דוגמאות דיאלוג",
+  "Pricing": "תמחור",
+  "List": "רשימה",
+  "Edit": "ערוך",
+  "Nav Levels": "רמות ניווט",
+  "Level 2.1": "רמה 2.1",
+  "Level 2.2": "רמה 2.2",
+  "Level 3.1": "רמה 3.1",
+  "Level 3.2": "רמה 3.2",
+  "Raise Support": "העלה תמיכה",
+  "Documentation": "תיעוד",
+  "Dashboards": "לוחות בקרה",
+  "Analytics": "אנליטיקה",
+  "Apps & Pages": "אפליקציות ודפים",
+  "Email": "דוא״ל",
+  "Chat": "צ׳אט",
+  "Invoice": "חשבונית",
+  "Preview": "תצוגה מקדימה",
+  "Add": "הוסף",
+  "User": "משתמש",
+  "View": "צפייה",
+  "Login v1": "כניסה v1",
+  "Login v2": "כניסה v2",
+  "Login": "כניסה",
+  "Register v1": "הרשמה v1",
+  "Register v2": "הרשמה v2",
+  "Register": "הרשמה",
+  "Forget Password v1": "שכחת סיסמה v1",
+  "Forget Password v2": "שכחת סיסמה v2",
+  "Forgot Password v1": "שכחת סיסמה v1",
+  "Forgot Password v2": "שכחת סיסמה v2",
+  "Forgot Password": "שכחת סיסמה",
+  "Reset Password v1": "איפוס סיסמה v1",
+  "Reset Password v2": "איפוס סיסמה v2",
+  "Reset Password": "איפוס סיסמה",
+  "Miscellaneous": "שונות",
+  "Coming Soon": "בקרוב",
+  "Not Authorized": "לא מורשה",
+  "Under Maintenance": "בתחזוקה",
+  "Error": "שגיאה",
+  "Statistics": "סטטיסטיקה",
+  "Actions": "פעולות",
+  "Access Control": "בקרת גישה",
+  "User Interface": "ממשק משתמש",
+  "CRM": "CRM",
+  "eCommerce": "מסחר אלקטרוני",
+  "Icons": "אייקונים",
+  "Chip": "צ׳יפ",
+  "Dialog": "דיאלוג",
+  "Expansion Panel": "לוח הרחבה",
+  "Combobox": "קומבובוקס",
+  "Textfield": "שדה טקסט",
+  "Range Slider": "מחוון טווח",
+  "Menu": "תפריט",
+  "Snackbar": "סנאקבר",
+  "Tabs": "לשוניות",
+  "Form Elements": "רכיבי טופס",
+  "Form Layouts": "פריסות טפסים",
+  "Authentication": "אימות",
+  "Page Not Found - 404": "עמוד לא נמצא - 404",
+  "Not Authorized - 401": "לא מורשה - 401",
+  "Server Error - 500": "שגיאת שרת - 500",
+  "Forms": "טפסים",
+  "Timeline": "ציר זמן",
+  "Disabled Menu": "תפריט מושבת",
+  "Help Center": "מרכז עזרה",
+  "Verify Email": "אמת דוא״ל",
+  "Verify Email v1": "אמת דוא״ל v1",
+  "Verify Email v2": "אמת דוא״ל v2",
+  "Two Steps": "שני שלבים",
+  "Two Steps v1": "שני שלבים v1",
+  "Two Steps v2": "שני שלבים v2",
+  "Custom Input": "קלט מותאם",
+  "Extensions": "הרחבות",
+  "Tour": "סיור",
+  "Register Multi-Steps": "הרשמה רב-שלבית",
+  "Wizard Examples": "דוגמאות אשף",
+  "Checkout": "תשלום",
+  "Create Deal": "צור עסקה",
+  "Property Listing": "רישום נכס",
+  "Roles & Permissions": "תפקידים והרשאות",
+  "Roles": "תפקידים",
+  "Simple Table": "טבלה פשוטה",
+  "Tables": "טבלאות",
+  "Data Table": "טבלת נתונים",
+  "Permissions": "הרשאות",
+  "Apps": "אפליקציות",
+  "Misc": "שונות",
+  "Wizard Pages": "דפי אשף",
+  "Form Wizard": "אשף טפסים",
+  "Numbered": "ממוספר",
+  "ecommerce": "מסחר אלקטרוני",
+  "Ecommerce": "מסחר אלקטרוני",
+  "Editors": "עורכים",
+  "Front Pages": "עמודי חזית",
+  "Landing": "דף נחיתה",
+  "checkout": "תשלום",
+  "Payment": "תשלום",
+  "Swiper": "סוויפר",
+  "Product": "מוצר",
+  "Category": "קטגוריה",
+  "Order": "הזמנה",
+  "Details": "פרטים",
+  "Customer": "לקוח",
+  "Manage Review": "ניהול ביקורות",
+  "Referrals": "הפניות",
+  "Settings": "הגדרות",
+  "Overview": "סקירה כללית",
+  "My Course": "הקורס שלי",
+  "Course Details": "פרטי קורס",
+  "Academy": "אקדמיה",
+  "Logistics": "לוגיסטיקה",
+  "Dashboard": "לוח בקרה",
+  "Fleet": "צי",
+  "Shortcut": "קיצור דרך",
+  "Appointments": "פגישות",
+  "Invoice App": "אפליקציית חשבוניות",
+  "Manage Accounts": "ניהול חשבונות",
+  "Users": "משתמשים",
+  "Manage Users": "ניהול משתמשים",
+  "Role Management": "ניהול תפקידים",
+  "Permission": "הרשאה",
+  "Dashboard Analytics": "אנליטיקת לוח בקרה",
+  "common": {
+    "save": "שמור",
+    "cancel": "בטל",
+    "delete": "מחק",
+    "edit": "ערוך",
+    "loading": "טוען…",
+    "error": "שגיאה",
+    "close": "סגור",
+    "retry": "נסה שוב",
+    "copy": "העתק",
+    "errorGeneric": "משהו השתבש. נסה שוב."
+  },
+  "nav": {
+    "home": "בית",
+    "sessions": "שיעורים",
+    "progress": "התקדמות",
+    "tutor": "מורה",
+    "profile": "פרופיל",
+    "settings": "הגדרות",
+    "pricing": "מחירים",
+    "subscription": "המנוי שלי",
+    "signOut": "התנתק",
+    "login": "התחברות",
+    "register": "הרשמה",
+    "forgotPassword": "איפוס סיסמה",
+    "onboarding": "בואו נתחיל",
+    "startSession": "התחל שיעור",
+    "session": "שיעור",
+    "sessionSummary": "סיכום שיעור",
+    "sessionReplay": "שידור חוזר",
+    "challenges": "אתגרים",
+    "bossBattles": "קרבות בוס",
+    "dailyChallenge": "אתגר יומי",
+    "cardChain": "שרשרת כרטיסים",
+    "sessionHistory": "היסטוריית שיעורים",
+    "sessionDetail": "פרטי שיעור",
+    "mastery": "שליטה",
+    "learningTime": "זמן למידה",
+    "knowledgeGraph": "גרף ידע",
+    "concept": "מושג",
+    "tutorThread": "שיחה",
+    "classFeed": "פיד כיתתי",
+    "peerSolutions": "פתרונות עמיתים",
+    "leaderboard": "טבלת מובילים",
+    "friends": "חברים",
+    "diagram": "דיאגרמה",
+    "notifications": "התראות",
+    "profileEdit": "עריכת פרופיל",
+    "settingsAccount": "חשבון ואבטחה",
+    "settingsAppearance": "מראה",
+    "settingsNotifications": "הגדרות התראות",
+    "settingsPrivacy": "נתונים ופרטיות",
+    "userMenu": "תפריט חשבון עבור {name}",
+    "notificationsBell": "התראות",
+    "aiTutor": "מורה AI",
+    "snapProblem": "צילום שאלה",
+    "uploadProblem": "העלאת שאלה",
+    "overview": "סקירה כללית"
+  },
+  "navSection": {
+    "learn": "למידה",
+    "practice": "תרגול",
+    "progress": "התקדמות",
+    "community": "קהילה",
+    "account": "חשבון"
+  },
+  "a11y": {
+    "openToolbar": "פתיחת סרגל נגישות",
+    "closeToolbar": "סגירת סרגל נגישות",
+    "toolbarTitle": "נגישות",
+    "language": "שפה",
+    "textSize": "גודל טקסט",
+    "increaseTextSize": "הגדלת טקסט",
+    "decreaseTextSize": "הקטנת טקסט",
+    "highContrast": "ניגודיות גבוהה",
+    "reducedMotion": "הפחתת תנועה",
+    "dyslexiaFont": "גופן ידידותי לדיסלקציה",
+    "resetDefaults": "איפוס לברירת מחדל",
+    "legalNote": "ההעדפות נשמרות במכשיר זה לפי חוק שוויון זכויות לאנשים עם מוגבלות (התשנ\"ח-1998) ותקנות הנגישות (התשע\"ג-2013).",
+    "accessibilityStatement": "הצהרת נגישות",
+    "size": {
+      "xsmall": "קטן מאוד",
+      "small": "קטן",
+      "medium": "בינוני (ברירת מחדל)",
+      "large": "גדול",
+      "xlarge": "גדול מאוד",
+      "xxlarge": "מקסימום"
+    },
+    "numerals": {
+      "label": "ספרות",
+      "auto": "אוטומטי (לפי השפה)",
+      "western": "מערביות (0-9)",
+      "eastern": "ערביות מזרחיות (٠-٩)"
+    },
+    "lineHeight": "מרווח בין שורות",
+    "lineHeightHint": "התאמת המרווח בין השורות לקריאה נוחה יותר.",
+    "colorBlindMode": "מסנן עיוורון צבעים",
+    "colorBlindHint": "סימולציה של מה שרואה תלמיד עם עיוורון צבעים — שימושי למורים שבודקים את החומרים שלהם.",
+    "cbNone": "כבוי",
+    "cbProtanopia": "פרוטאנופיה (חולשת אדום)",
+    "cbDeuteranopia": "דאוטרנופיה (חולשת ירוק)",
+    "cbTritanopia": "טריטנופיה (חולשת כחול)",
+    "underlineLinks": "קו תחתון על כל הקישורים",
+    "shortcutHint": "טיפ: לחץ Alt+A לפתיחת סרגל הנגישות מכל מסך.",
+    "skipToToolbar": "דילוג לסרגל הנגישות",
+    "announce": {
+      "textSize": "גודל טקסט: {value}",
+      "contrast": "ניגודיות גבוהה: {value}",
+      "motion": "הפחתת תנועה: {value}",
+      "dyslexia": "גופן ידידותי לדיסלקציה: {value}",
+      "lineHeight": "מרווח בין שורות: {value}",
+      "colorBlind": "מסנן עיוורון צבעים: {value}",
+      "underlineLinks": "קו תחתון על קישורים: {value}",
+      "language": "שפה: {value}",
+      "numerals": "ספרות: {value}",
+      "reset": "העדפות הנגישות אופסו לברירת מחדל",
+      "enabled": "פעיל",
+      "disabled": "כבוי"
+    }
+  },
+  "status": {
+    "online": "מחובר",
+    "offline": "לא מחובר",
+    "syncing": "מסנכרן…",
+    "saved": "נשמר"
+  },
+  "error": {
+    "network": "שגיאת רשת. בדוק את החיבור שלך.",
+    "unauthorized": "עליך להתחבר כדי להמשיך.",
+    "notFound": "לא הצלחנו למצוא זאת.",
+    "serverError": "משהו השתבש אצלנו.",
+    "tryAgain": "נסה שוב",
+    "reportToSupport": "דווח לתמיכה",
+    "errorCode": "קוד שגיאה"
+  },
+  "empty": {
+    "noSessions": "אין שיעורים עדיין",
+    "noSessionsSubtitle": "התחל את שיעור הלימוד הראשון שלך כדי לראות אותו כאן.",
+    "noNotifications": "אין הודעות חדשות",
+    "noResults": "לא נמצאו תוצאות"
+  },
+  "auth": {
+    "signIn": "התחברות",
+    "signUp": "הרשמה",
+    "forgotPassword": "שכחת סיסמה",
+    "email": "דוא״ל",
+    "password": "סיסמה",
+    "displayName": "שם תצוגה",
+    "emailPlaceholder": "הזן את הדוא״ל שלך",
+    "passwordPlaceholder": "הסיסמה שלך",
+    "displayNamePlaceholder": "איך נקרא לך?",
+    "signInCta": "התחברות",
+    "signUpCta": "צור חשבון",
+    "resetPasswordCta": "שלח קישור לאיפוס",
+    "noAccount": "חדש בסינה?",
+    "haveAccount": "כבר יש לך חשבון?",
+    "signInLink": "התחברות",
+    "signUpLink": "צור חשבון",
+    "forgotPasswordLink": "שכחת סיסמה?",
+    "backToSignIn": "חזרה להתחברות",
+    "welcome": "ברוך שובך",
+    "welcomeSubtitle": "התחבר כדי להמשיך את מסע הלמידה שלך.",
+    "joinCena": "הצטרף לסינה",
+    "joinCenaSubtitle": "צור חשבון חינם כדי להתחיל ללמוד בקצב שלך.",
+    "resetYourPassword": "איפוס סיסמה",
+    "resetYourPasswordSubtitle": "הזן את הדוא״ל שבו נרשמת ונשלח לך קישור לאיפוס.",
+    "resetUnavailableTitle": "שחזור חשבון אינו זמין מהאפליקציה",
+    "resetUnavailableBody": "איפוס סיסמה עצמאי אינו מחווט לגרסה זו עדיין. אם אינך מצליח להיכנס, אנא פנה למנהל בית הספר או למורה שלך — הם יוכלו לאפס את הסיסמה עבורך.",
+    "resetContactAdmin": "פנה למנהל בית הספר",
+    "checkEmail": "בדוק את הדוא״ל שלך",
+    "checkEmailSubtitle": "אם קיים חשבון התואם לדוא״ל הזה, קישור לאיפוס נשלח.",
+    "resetRateLimited": "יותר מדי בקשות. אנא נסה שוב בעוד מספר דקות.",
+    "resetServiceUnavailable": "השירות אינו זמין באופן זמני. אנא נסה שוב מאוחר יותר.",
+    "resetUnexpectedError": "משהו השתבש. אנא נסה שוב מאוחר יותר.",
+    "emailRequired": "דוא״ל נדרש.",
+    "emailInvalid": "הזן כתובת דוא״ל תקינה.",
+    "passwordRequired": "סיסמה נדרשת.",
+    "passwordMinLength": "הסיסמה חייבת להכיל לפחות 6 תווים.",
+    "displayNameRequired": "שם תצוגה נדרש.",
+    "invalidCredentials": "הדוא״ל והסיסמה אינם תואמים. לנסות שוב?",
+    "emailAlreadyExists": "כבר קיים חשבון עם הדוא״ל הזה.",
+    "tooManyAttempts": "יותר מדי ניסיונות כושלים. נסה שוב מאוחר יותר.",
+    "tryAgainInSeconds": "נסה שוב בעוד {seconds} שניות",
+    "accountDisabled": "חשבון זה הושבת. פנה למנהל בית הספר.",
+    "signInFailed": "ההתחברות נכשלה. נסה שוב.",
+    "providerSignInFailed": "ההתחברות עם {provider} נכשלה. נסה שוב.",
+    "providerSignInCancelled": "ההתחברות בוטלה.",
+    "networkError": "שגיאת רשת. בדוק את החיבור ונסה שוב.",
+    "emailNotVerified": "אנא אמת את כתובת הדוא״ל שלך לפני ההתחברות.",
+    "continueWith": "או המשך עם",
+    "providers": {
+      "google": "המשך עם Google",
+      "apple": "המשך עם Apple",
+      "microsoft": "המשך עם Microsoft",
+      "phone": "המשך עם טלפון",
+      "phoneComingSoon": "התחברות באמצעות SMS תגיע בקרוב. השתמש בדוא״ל או בספק אחר בינתיים."
+    },
+    "ageGate": {
+      "title": "מתי נולדת?",
+      "subtitle": "אנחנו צריכים את תאריך הלידה שלך כדי להגדיר את החשבון בבטחה.",
+      "dobLabel": "תאריך לידה",
+      "dobRequired": "תאריך לידה נדרש.",
+      "dobInvalid": "אנא הזן תאריך לידה תקין.",
+      "dobFuture": "תאריך לידה לא יכול להיות בעתיד.",
+      "tooYoung": "עליך להיות בן 4 לפחות כדי להשתמש בסינה.",
+      "ageConfirmed": "אתה בן {age}. אתה יכול ליצור את החשבון שלך.",
+      "parentRequired": "בגלל הגיל שלך, הורה או אפוטרופוס צריך לתת אישור לפני שתוכל ליצור חשבון.",
+      "privacyNotice": "תאריך הלידה שלך נשמר בצורה מאובטחת ומשמש רק לאימות גיל. אנחנו אף פעם לא משתפים אותו עם משתמשים אחרים."
+    },
+    "parentConsent": {
+      "title": "אישור הורה או אפוטרופוס",
+      "subtitle": "מכיוון שאתה בן {age}, אנחנו צריכים שההורה או האפוטרופוס שלך יאשרו את החשבון.",
+      "emailLabel": "דוא״ל הורה או אפוטרופוס",
+      "emailPlaceholder": "parent{'@'}example.com",
+      "emailRequired": "דוא״ל הורה או אפוטרופוס נדרש.",
+      "emailInvalid": "אנא הזן כתובת דוא״ל תקינה.",
+      "whatWeCollect": "איזה מידע אנחנו אוספים",
+      "collectName": "שם תצוגה (נבחר על ידי התלמיד)",
+      "collectEmail": "כתובת דוא״ל (להתחברות ושחזור חשבון)",
+      "collectDob": "תאריך לידה (לאימות גיל בלבד)",
+      "collectProgress": "התקדמות בלמידה ופעילות שיעורים",
+      "whyWeCollect": "למה אנחנו אוספים מידע זה",
+      "whyExplanation": "סינה היא פלטפורמת למידה שמתאימה את עצמה לקצב של כל תלמיד. אנחנו אוספים את המינימום הנדרש כדי לספק חוויית למידה מותאמת אישית ובטוחה. אנחנו אף פעם לא מוכרים מידע אישי ולא מציגים פרסומות.",
+      "consentLabel": "אני ההורה או האפוטרופוס ואני נותן אישור ליצירת חשבון זה.",
+      "verificationNotice": "נשלח דוא״ל אימות לכתובת ההורה או האפוטרופוס. לחשבון יהיו תכונות מוגבלות עד שההורה יאשר."
+    }
+  },
+  "progress": {
+    "sessionsUnavailable": "לא ניתן לטעון את נתוני השיעורים. נסה שוב.",
+    "title": "ההתקדמות שלך",
+    "subtitle": "עקוב אחר המסע, זכה בתגמולים וראה איפה אתה עומד.",
+    "time": {
+      "title": "זמן לימוד",
+      "subtitle": "30 ימים של דקות לימוד.",
+      "chartTitle": "דקות יומיות",
+      "chartSubtitle": "30 הימים האחרונים",
+      "chartAria": "תרשים זמן: 0 דקות, ממוצע {avg} ליום | תרשים זמן: דקה אחת, ממוצע {avg} ליום | תרשים זמן: שתי דקות, ממוצע {avg} ליום | תרשים זמן: {total} דקות, ממוצע {avg} ליום",
+      "avgPerDay": "ממוצע יומי",
+      "today": "היום",
+      "kpi30dayTotal": "סך 30 ימים",
+      "kpi7dayTotal": "7 ימים אחרונים",
+      "kpi7dayActiveDays": "ימים שלמדת",
+      "ofNDaysWindow": "מתוך 7"
+    },
+    "mastery": {
+      "title": "שליטה במקצועות",
+      "subtitle": "ההתקדמות שלך בכל מקצוע שאתה לומד.",
+      "overallLabel": "שליטה כוללת",
+      "masteryLabel": "שליטה",
+      "questionsAttempted": "לא נוסו שאלות | שאלה אחת נוסתה | שתי שאלות נוסו | {count} שאלות נוסו",
+      "accuracy": "{percent}% דיוק",
+      "rowAria": "{subject}: {percent} אחוז שליטה"
+    },
+    "sessions": {
+      "title": "היסטוריית שיעורים",
+      "subtitle": "שיעורי לימוד אחרונים — לחץ על אחד לסקירה.",
+      "activeLabel": "שיעור פעיל",
+      "resume": "המשך",
+      "justNow": "הרגע",
+      "hoursAgo": "הרגע | לפני שעה | לפני שעתיים | לפני {count} שעות",
+      "daysAgo": "היום | לפני יום | לפני יומיים | לפני {count} ימים"
+    }
+  },
+  "gamification": {
+    "xp": {
+      "levelLabel": "רמה",
+      "currentXp": "{current} / {target} נק׳",
+      "xpToGo": "אין נקודות נותרו | נקודה אחת נותרה | שתי נקודות נותרו | {count} נקודות נותרו",
+      "totalEarned": "0 נק׳ | נקודה אחת | שתי נקודות | סך הכול: {total} נק׳",
+      "progressAria": "התקדמות רמה: {percent} אחוז"
+    },
+    "badges": {
+      "title": "תגים",
+      "counter": "אין תגים מתוך {total} | תג אחד מתוך {total} | שני תגים מתוך {total} | {earned} מתוך {total}",
+      "earnedHeading": "הושגו",
+      "lockedHeading": "נעולים",
+      "tier": {
+        "bronze": "ברונזה",
+        "silver": "כסף",
+        "gold": "זהב",
+        "platinum": "פלטינה"
+      }
+    },
+    "leaderboard": {
+      "title": "טבלת מובילים",
+      "yourRank": "הדירוג שלך: #{rank}",
+      "youChip": "אתה",
+      "xpLabel": "0 נק׳ | נק׳ אחת | שתי נק׳ | {xp} נק׳",
+      "xpValue": "0 נק׳ | נק׳ אחת | שתי נק׳ | {xp} נק׳"
+    }
+  },
+  "leaderboard": {
+    "unavailable": "לא ניתן לטעון את טבלת המובילים. נסה שוב.",
+    "title": "טבלת מובילים",
+    "subtitle": "בדוק איפה אתה עומד ביחס ללומדים אחרים.",
+    "yourRankLabel": "הדירוג הנוכחי שלך",
+    "yourRankValue": "#{rank}",
+    "youChip": "אתה",
+    "xpValue": "0 נק׳ | נק׳ אחת | שתי נק׳ | {xp} נק׳",
+    "scope": {
+      "global": "גלובלי",
+      "class": "הכיתה שלי",
+      "friends": "חברים"
+    }
+  },
+  "shortcuts": {
+    "title": "קיצורי מקלדת",
+    "subtitle": "עבוד מהר יותר עם המקלדת.",
+    "empty": "אין קיצורים רשומים עדיין.",
+    "scopes": {
+      "global": "גלובלי",
+      "session": "שיעור לימוד",
+      "tutor": "מורה AI",
+      "graph": "מפת ידע",
+      "palette": "לוח פקודות"
+    }
+  },
+  "commandPalette": {
+    "placeholder": "הקלד פקודה או חפש…",
+    "empty": "לא נמצאו פקודות תואמות",
+    "category": {
+      "navigate": "עבור אל",
+      "action": "פעולה"
+    },
+    "cmds": {
+      "home": "לבית",
+      "startSession": "התחל שיעור",
+      "progress": "צפה בהתקדמות",
+      "tutor": "פתח מורה AI",
+      "challenges": "צפה באתגרים",
+      "knowledgeGraph": "עיין במפת ידע",
+      "leaderboard": "צפה בטבלת מובילים",
+      "social": "פתח פיד כיתתי",
+      "notifications": "צפה בהתראות",
+      "profile": "צפה בפרופיל שלי",
+      "settings": "פתח הגדרות",
+      "toggleTheme": "החלף בין בהיר/כהה",
+      "signOut": "התנתק"
+    }
+  },
+  "notifications": {
+    "unavailable": "לא ניתן לטעון התראות. נסה שוב.",
+    "title": "התראות",
+    "subtitle": "הישאר מעודכן בהתקדמות הלמידה שלך.",
+    "markAllRead": "סמן הכל כנקרא",
+    "unreadCount": "אין שלא נקראו | הודעה אחת שלא נקראה | שתיים שלא נקראו | {count} שלא נקראו",
+    "emptyTitle": "הכל מעודכן",
+    "emptySubtitle": "אין התראות חדשות.",
+    "justNow": "הרגע",
+    "minutesAgo": "הרגע | לפני דקה | לפני שתי דקות | לפני {count} דקות",
+    "hoursAgo": "הרגע | לפני שעה | לפני שעתיים | לפני {count} שעות",
+    "daysAgo": "היום | לפני יום | לפני יומיים | לפני {count} ימים"
+  },
+  "profile": {
+    "editProfile": "ערוך פרופיל",
+    "editTitle": "ערוך פרופיל",
+    "editSubtitle": "עדכן איך אתה נראה לחברים לכיתה.",
+    "editSaved": "הפרופיל נשמר.",
+    "levelLabel": "רמה {level}",
+    "streakLabel": "אין ימים ברצף | יום אחד רצוף | יומיים רצופים | רצף של {count} ימים",
+    "aboutTitle": "אודות",
+    "bioEmpty": "אין ביוגרפיה עדיין.",
+    "bioLabel": "ביוגרפיה",
+    "bioPlaceholder": "ספר קצת על עצמך…",
+    "favoriteSubjectsTitle": "מקצועות מועדפים",
+    "subjectsEmpty": "אין מקצועות מועדפים עדיין.",
+    "displayNameLabel": "שם תצוגה",
+    "visibilityLabel": "נראות פרופיל",
+    "visibilityPublic": "ציבורי",
+    "visibilityClass": "חברים לכיתה בלבד",
+    "visibilityPrivate": "פרטי"
+  },
+  "settingsPage": {
+    "title": "הגדרות",
+    "subtitle": "התאם אישית את חווית סינה שלך.",
+    "account": {
+      "title": "חשבון",
+      "subtitle": "פרטי התחברות ויציאה",
+      "accountInfo": "פרטי חשבון",
+      "studentId": "מזהה תלמיד",
+      "role": "תפקיד",
+      "signOutTitle": "התנתק",
+      "signOutSubtitle": "תצטרך להתחבר שוב."
+    },
+    "appearance": {
+      "title": "מראה",
+      "subtitle": "ערכת נושא ושפה",
+      "themeLabel": "ערכת נושא",
+      "themeLight": "בהיר",
+      "themeDark": "כהה",
+      "languageLabel": "שפה"
+    },
+    "notifications": {
+      "title": "התראות",
+      "subtitle": "דוא״ל ודחיפה",
+      "email": "התראות דוא״ל",
+      "push": "התראות דחיפה",
+      "dailyReminder": "תזכורת לימוד יומית",
+      "weekly": "סיכום שבועי",
+      "streakAlerts": "התראות רצף",
+      "newContent": "התראות תוכן חדש",
+      "saveError": "לא ניתן לשמור את הגדרות ההתראות. נסה שוב."
+    },
+    "privacy": {
+      "title": "פרטיות",
+      "subtitle": "שיתוף נתונים",
+      "showProgressToClass": "הצג את התקדמותי לחברים לכיתה",
+      "allowPeerComparison": "אפשר השוואת עמיתים",
+      "shareAnalytics": "שתף נתונים אנונימיים",
+      "dataRightsTitle": "זכויות הנתונים שלך",
+      "dataRightsSubtitle": "על פי חוקי הגנת הפרטיות, יש לך את הזכות לגשת, לייצא ולמחוק את הנתונים האישיים שלך.",
+      "downloadData": "הורד את הנתונים שלי",
+      "deleteData": "בקש מחיקת נתונים",
+      "whatData": "אילו נתונים יש לכם עליי?",
+      "exportDialogTitle": "הורד את הנתונים שלך",
+      "exportDialogBody": "נייצר קובץ JSON המכיל את כל הנתונים האישיים שסינה שומרת עליך, כולל הפרופיל שלך, מפגשי הלמידה והיסטוריית המורה.",
+      "exportConfirm": "הורד",
+      "exportSuccess": "ייצוא הנתונים שלך הורד בהצלחה.",
+      "exportError": "לא ניתן לייצר את ייצוא הנתונים. נסה שוב מאוחר יותר.",
+      "erasureDialogTitle": "בקש מחיקת חשבון",
+      "erasureDialogBody": "פעולה זו תתחיל תקופת המתנה של 30 יום. במהלך תקופה זו תוכל לבטל את הבקשה. לאחר 30 יום, כל הנתונים האישיים שלך יימחקו לצמיתות ולא ניתן יהיה לשחזרם.",
+      "erasureConfirm": "בקש מחיקה",
+      "erasureSuccess": "בקשת מחיקת הנתונים שלך הוגשה. יש לך 30 יום לביטול.",
+      "erasureError": "לא ניתן להגיש את בקשת המחיקה. נסה שוב מאוחר יותר.",
+      "erasureActiveBanner": "יש לך בקשת מחיקה פעילה (סטטוס: {status}). הנתונים יימחקו לאחר {date}.",
+      "dsarDialogTitle": "בקשת גישה לנתונים",
+      "dsarDialogBody": "שלח בקשה לממונה על הגנת הנתונים שלנו כדי ללמוד אילו נתונים אנו שומרים עליך וכיצד הם מעובדים. נשיב תוך 30 יום.",
+      "dsarMessageLabel": "ההודעה שלך",
+      "dsarMessagePlaceholder": "תאר אילו מידע תרצה לדעת...",
+      "dsarConfirm": "שלח בקשה",
+      "dsarSuccess": "הבקשה שלך הוגשה. מספר מעקב: {trackingId}. נשיב תוך 30 יום.",
+      "dsarError": "לא ניתן להגיש את הבקשה. נסה שוב מאוחר יותר."
+    },
+    "studyPlan": {
+      "title": "תוכנית לימודים",
+      "subtitle": "נהל את הבחינות שאליהן אתה מתכונן.",
+      "activeHeading": "יעדים פעילים",
+      "archivedHeading": "בארכיון",
+      "addTarget": "הוסף יעד",
+      "editTarget": "ערוך יעד",
+      "archiveTarget": "העבר לארכיון",
+      "archiveConfirm": "להעביר את היעד לארכיון? ניתן לשחזר בתוך חלון השמירה.",
+      "archiveConfirmYes": "העבר לארכיון",
+      "noActiveTargets": "אין יעדים פעילים. הוסף אחד כדי להתחיל.",
+      "noArchivedTargets": "אין יעדים בארכיון.",
+      "totalWeeklyHours": "סה״כ שעות שבועיות: {hours}",
+      "overLimitWarning": "הסכום חורג מ-40 שעות. הפחת לפני שמירה.",
+      "fields": {
+        "examCode": "בחינה",
+        "track": "מסלול",
+        "sitting": "מועד",
+        "weeklyHours": "שעות/שבוע",
+        "reasonTag": "סיבה"
+      },
+      "actions": {
+        "save": "שמור",
+        "cancel": "ביטול",
+        "close": "סגור"
+      },
+      "errors": {
+        "loadFailed": "לא ניתן לטעון את תוכנית הלימודים. נסה שוב.",
+        "addFailed": "לא ניתן להוסיף את היעד. נסה שוב.",
+        "updateFailed": "לא ניתן לשמור את השינויים. נסה שוב.",
+        "archiveFailed": "לא ניתן להעביר לארכיון. נסה שוב."
+      },
+      "parentVisibility": {
+        "label": "נראות דשבורד הורים",
+        "visible": "נראה להורה",
+        "hidden": "מוסתר מההורה",
+        "helpText": "תלמידים מגיל 13 יכולים להחליט אם כל יעד מופיע בדשבורד ההורה. יעדים בדגל בטיחות נשארים תמיד נראים.",
+        "toggleFailed": "לא ניתן לעדכן נראות. נסה שוב."
+      }
+    }
+  },
+  "social": {
+    "feedUnavailable": "לא ניתן לטעון את הפיד הכיתתי. נסה שוב.",
+    "friendsUnavailable": "לא ניתן לטעון את רשימת החברים. נסה שוב.",
+    "feed": {
+      "title": "פיד כיתתי",
+      "subtitle": "ראה מה חבריך לכיתה עושים.",
+      "justNow": "הרגע",
+      "minutesAgo": "הרגע | לפני דקה | לפני שתי דקות | לפני {count} דקות",
+      "hoursAgo": "הרגע | לפני שעה | לפני שעתיים | לפני {count} שעות",
+      "kind": {
+        "achievement": "הישג",
+        "milestone": "אבן דרך",
+        "question": "שאלה",
+        "announcement": "הודעה"
+      },
+      "reactionAriaLabel": "אין תגובות | לייק, תגובה אחת | לייק, שתי תגובות | לייק, {count} תגובות",
+      "commentAriaLabel": "אין תגובות | תגובה אחת | שתי תגובות | {count} תגובות"
+    },
+    "peers": {
+      "title": "פתרונות עמיתים",
+      "subtitle": "למד מאיך אחרים פתרו את אותן שאלות.",
+      "forQuestion": "שאלה #{questionId}"
+    },
+    "friends": {
+      "title": "חברים",
+      "subtitle": "מעגל הלמידה שלך.",
+      "pendingTitle": "בקשות חברות",
+      "wantsToConnect": "רוצה להתחבר",
+      "accept": "אשר",
+      "listTitle": "אין חברים | חבר אחד | שני חברים | חברים ({count})",
+      "level": "רמה {level}",
+      "streak": "אין ימים ברצף | יום אחד רצוף | יומיים רצופים | רצף של {count} ימים",
+      "online": "מחובר",
+      "offline": "מנותק"
+    },
+    "report": {
+      "title": "דווח על תוכן",
+      "description": "עזור לנו לשמור על בטיחות הקהילה. בחר סיבה לדיווח על תוכן זה.",
+      "categoryLabel": "למה אתה מדווח על זה?",
+      "category": {
+        "bullying": "בריונות או הטרדה",
+        "inappropriate": "תוכן לא הולם",
+        "spam": "ספאם",
+        "self-harm-risk": "פגיעה עצמית או חשש לבטיחות",
+        "other": "אחר"
+      },
+      "reasonLabel": "פרטים נוספים (אופציונלי)",
+      "reasonPlaceholder": "ספר לנו עוד על מה שקרה…",
+      "submitBtn": "שלח דיווח",
+      "submitError": "לא ניתן לשלוח את הדיווח. נסה שוב.",
+      "success": "תודה. הדיווח שלך נשלח וייבדק.",
+      "ariaLabel": "דווח על תוכן זה"
+    },
+    "block": {
+      "title": "חסום משתמש",
+      "confirmMessage": "האם אתה בטוח שברצונך לחסום את {name}? לא תראה עוד את הפוסטים, התגובות או הפתרונות שלו.",
+      "confirmBtn": "חסום",
+      "error": "לא ניתן לחסום משתמש זה. נסה שוב.",
+      "success": "המשתמש נחסם. התוכן שלו לא יופיע עוד בפיד שלך.",
+      "ariaLabel": "חסום את {name}"
+    }
+  },
+  "knowledgeGraph": {
+    "unavailable": "לא ניתן לטעון את מפת הידע. נסה שוב.",
+    "title": "מפת ידע",
+    "subtitle": "גלה מושגים, ראה דרישות מוקדמות, ותכנן את מסלול הלמידה.",
+    "progressLabel": "מושגים שנשלטו",
+    "status": {
+      "locked": "נעול",
+      "available": "זמין",
+      "in-progress": "בתהליך",
+      "mastered": "נשלט"
+    },
+    "difficulty": {
+      "beginner": "מתחיל",
+      "intermediate": "בינוני",
+      "advanced": "מתקדם"
+    },
+    "detail": {
+      "masteryLabel": "השליטה שלך",
+      "estimatedMinutes": "0 דק | ~דקה | ~שתי דקות | ~{minutes} דקות",
+      "questionCount": "שאלות",
+      "subject": "מקצוע",
+      "prerequisitesTitle": "דרישות מוקדמות",
+      "prerequisitesEmpty": "אין דרישות מוקדמות.",
+      "dependenciesTitle": "פותח",
+      "dependenciesEmpty": "שום דבר לא תלוי במושג זה.",
+      "startSession": "תרגל את המושג"
+    }
+  },
+  "session": {
+    "setup": {
+      "title": "התחל שיעור לימוד",
+      "subtitle": "בחר נושאים, משך וסגנון כדי להתחיל.",
+      "subjectsLabel": "נושאים",
+      "durationLabel": "משך",
+      "durationMinutes": "0 דקות | דקה אחת | שתי דקות | {minutes} דקות",
+      "modeLabel": "מצב",
+      "startCta": "התחל שיעור",
+      "subjectChipGroupLabel": "בחר נושאים",
+      "subjects": {
+        "math": "מתמטיקה",
+        "physics": "פיזיקה",
+        "chemistry": "כימיה",
+        "biology": "ביולוגיה",
+        "english": "אנגלית",
+        "history": "היסטוריה"
+      },
+      "modes": {
+        "practice": "תרגול",
+        "challenge": "אתגר",
+        "review": "סקירה",
+        "diagnostic": "אבחון"
+      }
+    },
+    "runner": {
+      "questionProgress": "אין שאלות | שאלה {current} מתוך {total} | שאלה {current} מתוך {total} | שאלה {current} מתוך {total}",
+      "progressAria": "אין שאלות | שאלה {current} מתוך {total} | שאלה {current} מתוך {total} | שאלה {current} מתוך {total}",
+      "choicesAria": "אפשרויות תשובה",
+      "submitAnswer": "שלח",
+      "correct": "נכון!",
+      "wrong": "לא בדיוק.",
+      "xpAwarded": "+0 נק׳ | +נק׳ אחת | +שתי נק׳ | +{xp} נק׳",
+      "exit": "יציאה",
+      "exitAria": "יציאה מהשיעור",
+      "sessionIdLabel": "שיעור",
+      "completing": "מסיים…",
+      "continueWhenReady": "המשך",
+      "workedExampleLabel": "דוגמה מלאה",
+      "fadedExampleLabel": "נסה להשלים את השלבים הנותרים",
+      "nextStep": "שלב הבא",
+      "stepProgress": "שלב {current} מתוך {total}: {description}",
+      "stepAria": "שלב {n}: {description}",
+      "fadedStepPlaceholder": "התשובה שלך",
+      "fadedStepCheck": "בדוק",
+      "fadedStepCorrect": "!נכון",
+      "fadedStepIncorrect": "צפוי: {expected}",
+      "hintStep": {
+        "1": "הכוונה עדינה",
+        "2": "בונים את הרעיון",
+        "3": "הולכים צעד-צעד",
+        "4": "הצעד העיקרי",
+        "5": "דוגמה פתורה"
+      },
+      "hintLadder": {
+        "moreHint": "עוד עזרה",
+        "previousRungs": "הכוונות קודמות",
+        "imStuck": "עזרה בבקשה"
+      },
+      "stuckCta": "עזרה בבקשה",
+      "explanationLangNote": "הסבר (באנגלית)",
+      "fbd": {
+        "diagramAria": "Free-body diagram construction area"
+      }
+    },
+    "summary": {
+      "title": "השיעור הושלם",
+      "subtitle": "זה הביצוע שלך.",
+      "xpEarned": "נקודות שהושגו",
+      "accuracy": "דיוק",
+      "correctCount": "תשובות נכונות",
+      "duration": "משך",
+      "durationSecs": "0 ש׳ | {secs} ש׳ | {secs} ש׳ | {secs} ש׳",
+      "durationMinsSecs": "0 ד {secs} ש׳ | {mins} ד {secs} ש׳ | {mins} ד {secs} ש׳ | {mins} ד {secs} ש׳",
+      "startAnother": "התחל עוד שיעור",
+      "backToHome": "חזרה הביתה"
+    },
+    "mathInput": {
+      "enterExpression": "הזן ביטוי מתמטי",
+      "enterLatex": "הזן ביטוי LaTeX",
+      "verbalExplanation": "הסבר את הגישה שלך",
+      "verbalPlaceholder": "תאר את הדרך שלך…",
+      "normalizedAs": "הבנו את הקלט שלך בתור"
+    }
+  },
+  "sidekick": {
+    "title": "Your study sidekick",
+    "trigger": "Sidekick",
+    "openAria": "Open study sidekick",
+    "closeAria": "Close sidekick",
+    "intent": {
+      "toolbar": "Pick what to explain",
+      "explainQuestion": "Explain this question",
+      "explainStep": "Explain this step",
+      "explainConcept": "Explain the concept",
+      "freeForm": "Ask something",
+      "explainQuestionPrompt": "Can you walk me through this question?",
+      "explainStepPrompt": "Can you explain this step?",
+      "explainConceptPrompt": "Can you explain the underlying concept?"
+    },
+    "context": {
+      "rung": "Hint depth",
+      "lastFocus": "Last focus",
+      "minutesLeft": "Study minutes today"
+    },
+    "composer": {
+      "placeholder": "Ask anything about this problem…",
+      "ariaLabel": "Type a message to your sidekick",
+      "send": "Send"
+    },
+    "stream": {
+      "aria": "Sidekick conversation",
+      "thinking": "Thinking…",
+      "leakRedacted": "I held that answer back — let's work through it together."
+    },
+    "circuit": {
+      "resting": "The sidekick is resting right now — try a hint instead.",
+      "openLadder": "Open hint ladder"
+    }
+  },
+  "challenges": {
+    "unavailable": "לא ניתן לטעון אתגרים. נסה שוב.",
+    "hub": {
+      "title": "אתגרים",
+      "subtitle": "אתגרים יומיים, קרבות בוסים וטורנירים שיעזרו לך להמשיך ללמוד."
+    },
+    "difficulty": {
+      "easy": "קל",
+      "medium": "בינוני",
+      "hard": "קשה"
+    },
+    "daily": {
+      "label": "האתגר היומי",
+      "start": "התחל אתגר",
+      "reattempt": "נסה שוב",
+      "attempted": "בוצע ניסיון",
+      "expired": "הסתיים",
+      "timeLeft": "הזמן עבר | נותר שעה {minutes}ד | נותרו שעתיים {minutes}ד | נותרו {hours}ש {minutes}ד"
+    },
+    "boss": {
+      "title": "קרבות בוסים",
+      "subtitle": "בחן את השליטה שלך מול היריבים הקשים ביותר.",
+      "requiresLevel": "דרוש שליטה ברמה {level}"
+    },
+    "chains": {
+      "title": "שרשרות כרטיסים",
+      "subtitle": "בנה שליטה מושג אחד בכל פעם.",
+      "cardsUnlocked": "לא נפתחו כרטיסים מתוך {total} | כרטיס אחד מתוך {total} נפתח | שני כרטיסים מתוך {total} נפתחו | {unlocked} מתוך {total} כרטיסים נפתחו",
+      "progressAria": "לא נפתחו כרטיסים מתוך {total} | כרטיס אחד מתוך {total} נפתח | שני כרטיסים מתוך {total} נפתחו | {unlocked} מתוך {total} כרטיסים נפתחו"
+    },
+    "tournaments": {
+      "title": "טורנירים",
+      "subtitle": "התחרו בתלמידים מהכיתה או מכל העולם.",
+      "active": "פעיל",
+      "upcoming": "בקרוב",
+      "participants": "אין משתתפים | משתתף אחד | שני משתתפים | {count} משתתפים",
+      "empty": "אין טורנירים כרגע."
+    }
+  },
+  "tutor": {
+    "threadsUnavailable": "לא ניתן לטעון את שיחות המורה. נסה שוב.",
+    "listPage": {
+      "title": "מורה AI",
+      "subtitle": "שאל כל שאלה. המורה שלך כאן כדי לעזור לך ללמוד.",
+      "newThread": "שיחה חדשה",
+      "emptyTitle": "עדיין אין שיחות",
+      "emptySubtitle": "התחל שרשור חדש כדי לשאול את השאלה הראשונה."
+    },
+    "threadList": {
+      "messageCount": "אין הודעות | הודעה אחת | שתי הודעות | {count} הודעות",
+      "justNow": "הרגע",
+      "minutesAgo": "הרגע | לפני דקה | לפני שתי דקות | לפני {count} דקות",
+      "hoursAgo": "הרגע | לפני שעה | לפני שעתיים | לפני {count} שעות",
+      "daysAgo": "היום | לפני יום | לפני יומיים | לפני {count} ימים"
+    },
+    "thread": {
+      "emptyTitle": "שאל את השאלה הראשונה",
+      "emptySubtitle": "נסה משהו כמו 'הסבר פוטוסינתזה'.",
+      "thinking": "המורה חושב…",
+      "dpaDisclosure": "השיחות שלך מעובדות באמצעות בינה מלאכותית. ראה מדיניות הפרטיות שלנו לפרטים."
+    },
+    "compose": {
+      "placeholder": "שאל את המורה שלך…",
+      "sendAria": "שלח הודעה"
+    }
+  },
+  "home": {
+    "greeting": {
+      "morning": "בוקר טוב, {name}",
+      "afternoon": "צהריים טובים, {name}",
+      "evening": "ערב טוב, {name}",
+      "night": "היי {name}",
+      "fallback": "חבר",
+      "subtitle": "כאן עצרת בפעם הקודמת, ומה הלאה."
+    },
+    "streak": {
+      "singular": "יום רצוף",
+      "plural": "ימים ברצף",
+      "newBest": "שיא חדש!"
+    },
+    "resume": {
+      "label": "המשך שיעור",
+      "cta": "המשך",
+      "minutesAgo": "התחלת הרגע | התחלת לפני דקה | התחלת לפני שתי דקות | התחלת לפני {count} דקות",
+      "hoursAgo": "התחלת הרגע | התחלת לפני שעה | התחלת לפני שעתיים | התחלת לפני {count} שעות",
+      "progressAria": "התקדמות השיעור: {percent} אחוזים"
+    },
+    "quick": {
+      "startSession": "התחל שיעור",
+      "startSessionSubtitle": "קפוץ ישר לבלוק לימוד חדש",
+      "askTutor": "שאל את המורה",
+      "askTutorSubtitle": "קבל רמזים והסברים",
+      "dailyChallenge": "אתגר יומי",
+      "dailyChallengeSubtitle": "5 דקות, 5 שאלות",
+      "progress": "צפה בהתקדמות",
+      "progressSubtitle": "ראה עד כמה התקדמת"
+    },
+    "errorState": {
+      "title": "לא ניתן לטעון את לוח הבית שלך",
+      "fallback": "נסה לרענן את העמוד."
+    },
+    "dashboardUnavailable": "משהו השתבש בטעינת לוח הבית. נסה שוב.",
+    "statsAriaLabel": "נתוני הלמידה שלך",
+    "quickActionsHeading": "פעולות מהירות",
+    "emptyStats": {
+      "title": "הנתונים שלך יופיעו כאן אחרי השיעור הראשון",
+      "body": "סיים שיעור אחד והדקות, השאלות שענית עליהן והדיוק שלך יופיעו בלוח הבקרה הזה."
+    },
+    "kpi": {
+      "minutesToday": "דקות היום",
+      "questionsAnswered": "שאלות שנענו",
+      "overallAccuracy": "דיוק כולל",
+      "level": "רמה {level}",
+      "sessionsValue": "אין שיעורים | שיעור אחד | שני שיעורים | {count} שיעורים",
+      "unavailable": "—"
+    }
+  },
+  "language": {
+    "english": "English",
+    "arabic": "العربية",
+    "hebrew": "עברית",
+    "switchLanguage": "החלף שפה"
+  },
+  "aria": {
+    "sidebarToggle": "החלף סרגל ניווט צדדי",
+    "languageSwitch": "החלף שפה",
+    "themeSwitch": "החלף ערכת נושא",
+    "notifications": "התראות"
+  },
+  "onboarding": {
+    "stepCounter": "שלב {current} מתוך {total}",
+    "welcome": {
+      "title": "ברוכים הבאים לסינה",
+      "subtitle": "בואו נתאים אישית את מסע הלמידה שלך בכמה צעדים פשוטים."
+    },
+    "role": {
+      "title": "מי לומד?",
+      "subtitle": "בחר את האפשרות שמתארת אותך כדי שנוכל להתאים את החוויה.",
+      "student": "תלמיד",
+      "studentDescription": "אני לומד בבית ספר או באוניברסיטה.",
+      "selfLearner": "לומד עצמאי",
+      "selfLearnerDescription": "אני לומד לבד מתוך סקרנות או לקריירה.",
+      "testPrep": "הכנה למבחן",
+      "testPrepDescription": "אני נערך למבחן או בחינה סטנדרטית.",
+      "homeschool": "חינוך ביתי",
+      "homeschoolDescription": "אני לומד בבית או מלמד בן משפחה.",
+      "none": "לא נבחר"
+    },
+    "language": {
+      "title": "בחר את השפה שלך",
+      "subtitle": "ניתן לשנות זאת בכל עת מההגדרות.",
+      "sampleEn": "Keep going — you're doing great.",
+      "sampleAr": "استمر — أنت تبلي بلاءً حسنًا.",
+      "sampleHe": "המשך — אתה עושה עבודה נהדרת."
+    },
+    "diagnostic": {
+      "loading": "טוען שאלות אבחון…",
+      "questionCount": "שאלה {current} מתוך {total}",
+      "progressLabel": "שאלה {current} מתוך {total}",
+      "optionsLabel": "בחר תשובה",
+      "skipAll": "דלג על המבחן",
+      "confirm": "אישור"
+    },
+    "confirm": {
+      "title": "הכל מוכן",
+      "subtitle": "סקור את הבחירות שלך ובוא נתחיל.",
+      "roleLabel": "סוג לומד",
+      "languageLabel": "שפה",
+      "cta": "התחל ללמוד"
+    },
+    "examTargets": {
+      "title": "בחר יעדי בחינה",
+      "subtitle": "בחר עד {max} — תמיד אפשר לשנות.",
+      "loading": "טוען קטלוג…",
+      "fetchFailed": "טעינת הקטלוג נכשלה — נסה שוב.",
+      "groupLabel": "יעדי בחינה",
+      "capReached": "הגעת למכסה של {max} יעדים.",
+      "comingSoon": "מגיע ב-{cohort}"
+    },
+    "selfAssessment": {
+      "title": "ספר לנו קצת על עצמך",
+      "subtitle": "זה עוזר לנו להתאים עצמנו אליך. השדות אופציונליים — אפשר לדלג.",
+      "confidenceTitle": "כמה בטוח אתה מרגיש בכל נושא?",
+      "confidenceSubtitle": "1 = בכלל לא, 5 = בטוח מאוד",
+      "strengthsTitle": "במה אתה חזק?",
+      "frictionTitle": "מה מקשה עליך?",
+      "feelingsTitle": "איך אתה מרגיש לגבי כל נושא?",
+      "feelingsSubtitle": "בחר את ההתאמה הקרובה ביותר לכל אחד.",
+      "freeTextTitle": "יש עוד משהו שכדאי שנדע?",
+      "freeTextPlaceholder": "אופציונלי — עד 200 תווים.",
+      "freeTextTooLong": "נא לקצר מתחת ל-{max} תווים.",
+      "skip": "דלג בינתיים",
+      "continue": "המשך",
+      "subject": {
+        "algebra": "אלגברה",
+        "functions": "פונקציות",
+        "calculus": "חשבון דיפרנציאלי",
+        "geometry": "גיאומטריה",
+        "trigonometry": "טריגונומטריה",
+        "probability": "הסתברות",
+        "statistics": "סטטיסטיקה",
+        "vectors": "וקטורים"
+      },
+      "strengthTag": {
+        "visualizer": "אני טוב בהמחשה חזותית",
+        "step-by-step": "אני עובד שלב אחר שלב",
+        "formula-memorizer": "אני זוכר נוסחאות היטב",
+        "real-examples": "אני מחבר לדוגמאות מהחיים",
+        "enjoys-proofs": "אני אוהב הוכחות",
+        "pattern-finder": "אני מזהה דפוסים",
+        "verbal-explainer": "אני מסביר בקול",
+        "patient-practice": "אני סבלני עם תרגול"
+      },
+      "frictionTag": {
+        "word-problems": "שאלות מילוליות מבלבלות אותי",
+        "test-anxiety": "אני נתקע במבחנים",
+        "no-starting-point": "אני לא יודע מאיפה להתחיל",
+        "loses-track": "אני מאבד את החוט בבעיות ארוכות",
+        "memorization": "קשה לי לשנן",
+        "symbolic-notation": "סמלים ונוסחאות מבלבלים אותי",
+        "time-pressure": "עבודה בלחץ זמן מלחיצה אותי",
+        "multi-step": "בעיות רב-שלביות קשות לי"
+      },
+      "feeling": {
+        "solid": "מרגיש בטוח",
+        "unsure": "לא בטוח",
+        "anxious": "לחוץ",
+        "new": "לא ראיתי"
+      }
+    },
+    "next": "הבא",
+    "back": "הקודם",
+    "getStarted": "בואו נתחיל",
+    "retakeBanner": {
+      "title": "ברוך שובך — זהו מסך הכנה למועד חוזר.",
+      "subtitle": "כבר למדת את החומר. המסך הזה מתמקד בתרגול אחזור — תרגילי היזכרות קצרים ומרווחים — כדי שמה שאתה יודע יישאר זמין במבחן.",
+      "approachLabel": "הגישה שלנו",
+      "approachBody": "תרגול אחזור על פני לימוד חוזר (קרפיקי ורודיגר, 2008): בדיקה עצמית קצרה מחזקת את הזיכרון יותר מקריאה חוזרת. צפה ליותר שאלות, פחות דוגמאות מעובדות.",
+      "reassurance": "אין כאן שיפוט ואין אות של בושה. בחרת תאריך — זה הכול.",
+      "dismiss": "הבנתי"
+    }
+  },
+  "flow": {
+    "warming": "התחממות",
+    "approaching": "צובר תאוצה",
+    "inFlow": "בזרימה",
+    "disrupted": "חזרה למיקוד",
+    "fatigued": "מנוחה"
+  },
+  "mastery": {
+    "novice": "מתחיל",
+    "learning": "לומד",
+    "proficient": "מיומן",
+    "mastered": "שולט",
+    "expert": "מומחה"
+  },
+  "kpi": {
+    "trendUp": "במגמת עלייה",
+    "trendDown": "במגמת ירידה",
+    "trendFlat": "ללא שינוי"
+  },
+  "$vuetify": {
+    "badge": "תג",
+    "noDataText": "אין נתונים זמינים",
+    "close": "סגור",
+    "open": "פתח",
+    "loading": "טוען",
+    "dataFooter": {
+      "itemsPerPageText": "פריטים בעמוד:",
+      "itemsPerPageAll": "הכל",
+      "pageText": "{0}-{1} מתוך {2}",
+      "firstPage": "עמוד ראשון",
+      "prevPage": "עמוד קודם",
+      "nextPage": "עמוד הבא",
+      "lastPage": "עמוד אחרון"
+    },
+    "pagination": {
+      "ariaLabel": {
+        "root": "שורש",
+        "previous": "הקודם",
+        "first": "ראשון",
+        "last": "אחרון",
+        "next": "הבא",
+        "currentPage": "עמוד נוכחי",
+        "page": "עמוד"
+      }
+    },
+    "input": {
+      "clear": "נקה",
+      "otp": "OTP",
+      "appendAction": "פעולה מצורפת",
+      "prependAction": "פעולה קודמת",
+      "counterSize": "גודל מונה"
+    },
+    "carousel": {
+      "ariaLabel": {
+        "delimiter": "מפריד"
+      }
+    },
+    "colorPicker": {
+      "ariaLabel": {
+        "hueSlider": "מחוון גוון",
+        "eyedropper": "טפטפת",
+        "hexInput": "קלט הקס"
+      }
+    },
+    "fileInput": {
+      "counterSize": "גודל מונה קבצים"
+    },
+    "rating": {
+      "ariaLabel": {
+        "item": "פריט"
+      }
+    },
+    "video": {
+      "seek": "חפש",
+      "play": "נגן",
+      "pause": "השהה",
+      "showVolume": "הצג עוצמה",
+      "enterFullscreen": "מסך מלא",
+      "volume": "עוצמה"
+    }
+  },
+  "legal": {
+    "privacy": {
+      "title": "מדיניות פרטיות",
+      "lastUpdated": "עדכון אחרון: אפריל 2026",
+      "draftNotice": "טיוטה בהמתנה לביקורת היועץ המשפטי של סינא",
+      "introTitle": "1. מבוא",
+      "introBody": "סינא (\"אנחנו\", \"שלנו\") מפעילה את פלטפורמת הלמידה ההסתגלנית סינא (\"השירות\"). מדיניות פרטיות זו מסבירה אילו נתונים אישיים אנו אוספים, מדוע אנו אוספים אותם, כיצד אנו משתמשים בהם, ומהן זכויותיך.",
+      "dataCollectedTitle": "2. נתונים שאנו אוספים",
+      "dataCollectedIntro": "אנו אוספים את המינימום הנדרש לספק ולשפר את השירות:",
+      "dataEmail": "כתובת דוא\"ל — ליצירת חשבון, אימות ושחזור חשבון.",
+      "dataName": "שם תצוגה — נבחר על ידי המשתמש, מוצג לחברי כיתה ומורים.",
+      "dataDob": "תאריך לידה — לאימות גיל וסיווג רמת הסכמה. לעולם לא מוצג למשתמשים אחרים.",
+      "dataLearning": "נתוני פעילות למידה — משך הפגישה, שאלות שנענו, דיוק, רמות שליטה.",
+      "dataTutor": "שיחות עם המורה החכם — הודעות שהוחלפו עם המורה החכם לצורך הנחיה חינוכית.",
+      "dataDevice": "נתוני מכשיר ושימוש — סוג דפדפן, מערכת הפעלה, כתובת IP (אנונימית).",
+      "purposeTitle": "3. מטרת האיסוף",
+      "purposeAdaptive": "למידה מותאמת — להתאים את רמת הקושי והתוכן לרמת כל לומד.",
+      "purposeAuth": "אימות — לאמת את זהותך ולהגן על חשבונך.",
+      "purposeProgress": "מעקב התקדמות — להציג לך, למוריך ולהוריך (לקטינים) את התקדמות הלמידה.",
+      "purposeSafety": "בטיחות וציות — ליישם מדיניות תוכן מותאמת גיל.",
+      "purposeImprove": "שיפור השירות — לנתח דפוסי שימוש מצטברים ואנונימיים.",
+      "legalBasisTitle": "4. הבסיס החוקי לעיבוד",
+      "basisConsent": "הסכמה — למשתמשים בני 16 ומעלה.",
+      "basisParental": "הסכמת הורים — למשתמשים מתחת לגיל 16. אנו אוספים הסכמת הורים מאומתת לפני עיבוד נתוני ילד.",
+      "basisContract": "קיום חוזה — עיבוד נדרש לספק את השירות שנרשמת אליו.",
+      "basisLegitimate": "אינטרס לגיטימי — לניתוח אנונימי ואבטחת הפלטפורמה.",
+      "retentionTitle": "5. שמירת נתונים",
+      "retentionBody": "אנו שומרים נתונים אישיים רק כל עוד נדרש. נתוני חשבון נמחקים תוך 30 יום מבקשת מחיקה. שיחות המורה החכם נמחקות לאחר 12 חודשים. כתובות IP הופכות לאנונימיות תוך 90 יום.",
+      "processorsTitle": "6. מעבדי נתונים חיצוניים",
+      "processorsIntro": "אנו משתפים נתונים אישיים עם המעבדים הבאים, כל אחד מחויב בהסכם עיבוד נתונים:",
+      "processorAnthropic": "Anthropic (סן פרנסיסקו, ארה\"ב) — שירות המורה החכם. השיחות לא משמשות לאימון מודלים של Anthropic.",
+      "processorFirebase": "Google Firebase (ענן Google) — שירותי אימות ואירוח מסד נתונים.",
+      "transfersTitle": "7. העברות נתונים חוצות גבולות",
+      "transfersBody": "הנתונים שלך עשויים להיות מועברים למדינות מחוץ לתחום השיפוט שלך. אנו מבטיחים הגנה נאותה באמצעות סעיפים חוזיים סטנדרטיים, החלטות התאמה ואמצעים משלימים. למשתמשים ישראלים: ההעברות עומדות בתקנות הגנת הפרטיות.",
+      "rightsTitle": "8. הזכויות שלך",
+      "rightsIntro": "על פי החוק החל, יש לך זכות:",
+      "rightAccess": "גישה — לבקש עותק של הנתונים האישיים שלך.",
+      "rightRectify": "תיקון — לבקש תיקון נתונים אישיים לא מדויקים.",
+      "rightErase": "מחיקה — לבקש מחיקת הנתונים האישיים שלך.",
+      "rightPortability": "ניידות נתונים — לקבל את הנתונים שלך בפורמט מובנה וקריא למכונה.",
+      "rightWithdraw": "שלילת הסכמה — לשלול את הסכמתך בכל עת.",
+      "rightObject": "התנגדות — להתנגד לעיבוד המבוסס על אינטרס לגיטימי.",
+      "rightComplain": "הגשת תלונה — להגיש תלונה לרשות להגנת הפרטיות.",
+      "dsarTitle": "9. בקשות גישה לנתונים",
+      "dsarBody": "למימוש זכויותיך, שלח דוא\"ל ל-privacy{'@'}cena.edu עם נושא \"DSAR\". נשיב תוך 30 יום.",
+      "parentRightsTitle": "10. זכויות הורים ואפוטרופסים",
+      "parentRightsIntro": "להורים ולאפוטרופסים של קטינים זכויות נוספות:",
+      "parentReview": "סקירה — לבקש עותק של כל הנתונים שנאספו מילדכם.",
+      "parentDelete": "מחיקה — לבקש מחיקת הנתונים של ילדכם וחשבונו.",
+      "parentRevoke": "ביטול הסכמה — לשלול הסכמה לאיסוף נתונים נוסף.",
+      "contactTitle": "11. צור קשר",
+      "contactBody": "לפניות פרטיות: privacy{'@'}cena.edu",
+      "dpoContact": "ממונה על הגנת מידע: dpo{'@'}cena.edu (מינוי בהמתנה).",
+      "childrenNoticeLink": "הודעת פרטיות לילדים"
+    },
+    "children": {
+      "title": "הודעת פרטיות לילדים",
+      "lastUpdated": "עדכון אחרון: אפריל 2026",
+      "draftNotice": "טיוטה בהמתנה לביקורת היועץ המשפטי של סינא",
+      "whatIsThisTitle": "1. מה זה העמוד הזה?",
+      "whatIsThisBody": "העמוד הזה מספר לך איך סינא משתמשת במידע שלך. סינא היא אפליקציית למידה. אנחנו שומרים על המידע שלך בטוח. ההורה או האפוטרופוס שלך אמר שזה בסדר שתשתמש בסינא.",
+      "whatWeCollectTitle": "2. איזה מידע אנחנו שומרים?",
+      "whatWeCollectIntro": "כשאתה משתמש בסינא, אנחנו שומרים קצת מידע עליך:",
+      "collectName": "השם שלך — השם שבחרת כשנרשמת.",
+      "collectEmail": "הדוא\"ל שלך — כדי שתוכל להתחבר.",
+      "collectAge": "הגיל שלך — כדי שנדע אילו כללים לעקוב אחריהם.",
+      "collectAnswers": "התשובות שלך — העבודה שאתה עושה בשיעורים.",
+      "collectChat": "הצ'אטים שלך — מה שאתה אומר למורה החכם.",
+      "whyWeCollectTitle": "3. למה אנחנו שומרים את זה?",
+      "whyWeCollectBody": "אנחנו משתמשים במידע שלך כדי לעזור לך ללמוד. סינא בוחרת שאלות שמתאימות לך. אנחנו לא מוכרים את המידע שלך. לא משתפים אותו עם ילדים אחרים. לא משתמשים בו כדי להראות לך פרסומות.",
+      "noAdsTitle": "4. בלי פרסומות, בלי מעקב",
+      "noAdsBody": "סינא לא מראה לך פרסומות. אנחנו לא עוקבים אחרי מה שאתה עושה מחוץ לסינא. אנחנו לא נותנים לחברות אחרות לעקוב אחריך בתוך סינא.",
+      "parentPermissionTitle": "5. ההורה שלך נתן רשות",
+      "parentPermissionBody": "לפני שיכולת להשתמש בסינא, ההורה או האפוטרופוס שלך נתן לנו רשות. אם ההורה שלך משנה את דעתו, הוא יכול לבקש מאיתנו למחוק את כל המידע שלך.",
+      "parentActionsTitle": "6. מה ההורה שלך יכול לעשות?",
+      "parentActionsIntro": "ההורה או האפוטרופוס שלך יכול:",
+      "parentActionSee": "לראות את המידע שלך — לבקש מאיתנו להראות מה יש לנו.",
+      "parentActionDelete": "למחוק את המידע שלך — לבקש מאיתנו למחוק הכל עליך.",
+      "parentActionStop": "לעצור אותנו מלשמור את המידע שלך — מה שאומר שהחשבון שלך ייסגר.",
+      "safetyTitle": "7. איך אנחנו שומרים על המידע שלך בטוח",
+      "safetyBody": "אנחנו נועלים את המידע שלך עם אבטחה חזקה, כמו כספת. רק האנשים שצריכים לראות אותו יכולים לראות אותו.",
+      "retentionTitle": "8. כמה זמן אנחנו שומרים את המידע שלך",
+      "retentionBody": "אנחנו שומרים את המידע שלך כל עוד יש לך חשבון. אם ההורה שלך מבקש מאיתנו למחוק, אנחנו עושים זאת תוך 30 יום. התשובות והצ'אטים שלך נשמרים עד 12 חודשים ואז אנחנו מוחקים אותם.",
+      "contactTitle": "9. שאלות?",
+      "contactBody": "אם לך או להורה שלך יש שאלות, שלחו לנו דוא\"ל ל-privacy{'@'}cena.edu. נשיב תוך 30 יום."
+    },
+    "terms": {
+      "title": "תנאי שימוש",
+      "lastUpdated": "עדכון אחרון: אפריל 2026",
+      "draftNotice": "טיוטה בהמתנה לביקורת היועץ המשפטי של סינא",
+      "acceptanceTitle": "1. קבלת התנאים",
+      "acceptanceBody": "ביצירת חשבון או שימוש בפלטפורמת סינא (\"השירות\"), אתה מסכים לתנאי שימוש אלה. למשתמשים מתחת לגיל 16, הורה או אפוטרופוס חייב לקבל תנאים אלה בשמם.",
+      "serviceTitle": "2. השירות",
+      "serviceBody": "סינא היא פלטפורמת למידה מותאמת המספקת חוויות חינוכיות מותאמות אישית באמצעות הוראה מונעת בינה מלאכותית, שיעורי תרגול ומעקב התקדמות.",
+      "eligibilityTitle": "3. כשירות והסכמת הורים",
+      "eligibilityBody": "המשתמשים חייבים להיות בני 4 לפחות. משתמשים מתחת לגיל 16 זקוקים להסכמת הורים מאומתת. הורים אחראים לשימוש של הקטין בשירות.",
+      "accountsTitle": "4. חשבונות",
+      "accountsBody": "אתה אחראי לשמירה על סודיות פרטי החשבון שלך. עליך להודיע לנו מיד אם אתה מאמין שחשבונך נפרץ.",
+      "acceptableUseTitle": "5. שימוש מקובל",
+      "acceptableUseIntro": "אתה מסכים לא:",
+      "useNoHarm": "להשתמש בשירות כדי לפגוע, להציק או להטריד משתמשים אחרים.",
+      "useNoReverse": "לנסות הנדסה הפוכה, פירוק או חילוץ קוד מקור מהשירות.",
+      "useNoScrape": "להשתמש בכלים אוטומטיים לאיסוף נתונים מהשירות.",
+      "useNoImpersonate": "להתחזות לאדם אחר או להציג מצג שווא לגבי זהותך או גילך.",
+      "useNoAbuse": "לנסות לעקוף את שער הגיל, מנגנוני הסכמת הורים או תכונות בטיחות אחרות.",
+      "ipTitle": "6. קניין רוחני",
+      "ipBody": "כל התכנים, התוכנות, העיצובים וסימני המסחר בשירות הם בבעלות סינא או מעניקי הרישיון שלה.",
+      "aiTitle": "7. המורה החכם",
+      "aiBody": "המורה החכם מופעל על ידי טכנולוגיית מודל שפה של צד שלישי. תגובות המורה עשויות להכיל שגיאות. המורה הוא כלי לימוד משלים ואינו מחליף מורים אנושיים.",
+      "disclaimerTitle": "8. הצהרת אחריות",
+      "disclaimerBody": "השירות ניתן \"כמות שהוא\" ו\"בכפוף לזמינות\". אנו לא מבטיחים גישה רציפה או פעולה ללא שגיאות.",
+      "liabilityTitle": "9. הגבלת אחריות",
+      "liabilityBody": "במידה המרבית המותרת בחוק, סינא לא תהיה אחראית לכל נזק עקיף, מקרי, מיוחד או תוצאתי.",
+      "terminationTitle": "10. סיום",
+      "terminationBody": "באפשרותך למחוק את חשבונך בכל עת. מחיקת נתונים עוקבת אחר לוחות הזמנים המתוארים במדיניות הפרטיות שלנו.",
+      "governingLawTitle": "11. דין חל",
+      "governingLawBody": "תנאים אלה כפופים לחוקי מדינת ישראל. סכסוכים ייפתרו בבתי המשפט המוסמכים בתל אביב-יפו.",
+      "changesTitle": "12. שינויים בתנאים אלה",
+      "changesBody": "אנו עשויים לעדכן תנאים אלה מעת לעת. נודיע למשתמשים רשומים על שינויים מהותיים 30 יום מראש לפחות.",
+      "contactTitle": "13. צור קשר",
+      "contactBody": "לשאלות על תנאים אלה: legal{'@'}cena.edu. לפניות פרטיות: privacy{'@'}cena.edu."
+    },
+    "footer": {
+      "privacyLink": "מדיניות פרטיות",
+      "termsLink": "תנאי שימוש",
+      "childrenLink": "פרטיות ילדים",
+      "agreementNotice": "בהרשמה, אתה מסכים ל{terms} ול{privacy}."
+    }
+  },
+  "pwa": {
+    "install": {
+      "title": "התקן את Cena",
+      "subtitle": "הוסף למסך הבית לגישה מהירה",
+      "installButton": "התקן",
+      "notNow": "לא עכשיו"
+    },
+    "ios": {
+      "title": "הוסף את Cena למסך הבית",
+      "description": "התקן את Cena לגישה מהירה ולעבודה אופליין:",
+      "step1": "לחץ על כפתור השיתוף ב-Safari",
+      "step2": "בחר \"הוסף למסך הבית\"",
+      "step3": "לחץ \"הוסף\" לאישור",
+      "gotIt": "הבנתי"
+    },
+    "update": {
+      "available": "גרסה חדשה זמינה — לחץ לעדכון",
+      "sessionActive": "העדכון יופעל בסיום השיעור",
+      "updateButton": "עדכן",
+      "laterButton": "אחר כך"
+    },
+    "connection": {
+      "offline": "אתה לא מחובר",
+      "reconnecting": "מתחבר מחדש…",
+      "disconnected": "מנותק",
+      "connected": "מחובר",
+      "queued": "{count} בתור"
+    }
+  },
+  "accessibilityStatement": {
+    "title": "הצהרת נגישות",
+    "lastReviewedLabel": "נבדק לאחרונה",
+    "commitmentTitle": "המחויבות שלנו",
+    "commitmentBody": "Cena מחויבת להפוך את הפלטפורמה שלה לשמישה עבור כל לומד, לרבות מי שמסתמכים על טכנולוגיות מסייעות. אנו מתכננים, בונים ובודקים את המוצר שלנו מול הנחיות הנגישות להלן, ומתייחסים לכל פער נגישות ככשל שיש לתקן.",
+    "conformanceTitle": "רמת התאמה",
+    "conformanceBody": "אתר זה מכוון להתאמה לרמת WCAG 2.1 AA ונבנה בהתאם לחוק שוויון זכויות לאנשים עם מוגבלות (התשנ\"ח-1998) ותקנות הנגישות (התשע\"ג-2013).",
+    "featuresTitle": "תכונות הנגישות המוצעות",
+    "featureToolbar": "סרגל נגישות קבוע וזמין בכל מסך — כולל לפני התחברות.",
+    "featureKeyboard": "ניווט מלא במקלדת עם מחוון מיקוד נראה וקישור דילוג לתוכן.",
+    "featureLanguage": "החלפת שפה בין אנגלית, ערבית ועברית עם טיפול נכון בכיוון ימין-לשמאל.",
+    "featureContrast": "מצב ניגודיות גבוהה השומר על זהות המותג ומעלה את קריאות הטקסט.",
+    "featureTextSize": "בקרות לגודל טקסט ומרווח שורות הנשמרות לכל מכשיר.",
+    "featureMotion": "הגדרת הפחתת תנועה המכבדת הן את בחירת המשתמש והן את העדפת מערכת ההפעלה.",
+    "assistiveTechTitle": "טכנולוגיות מסייעות שנבדקו",
+    "atNvda": "NVDA במערכת Windows (הגרסה היציבה העדכנית).",
+    "atJaws": "JAWS במערכת Windows (הגרסה היציבה העדכנית).",
+    "atVoiceover": "VoiceOver ב-macOS וב-iOS.",
+    "atTalkback": "TalkBack ב-Android.",
+    "limitationsTitle": "מגבלות ידועות",
+    "limitationsIntro": "אנו שקופים לגבי תחומים שבהם כיסוי הנגישות עדיין משתפר:",
+    "limitationMath": "חלק מביטויים מתמטיים המוצגים על ידי KaTeX עשויים שלא להיקרא במלואם בכל קוראי המסך; מסופק חלופה נגישה.",
+    "limitationDiagrams": "מספר קטן של תרשימים דקורטיביים עדיין אינם כוללים תיאור מלא.",
+    "limitationThirdParty": "תוכן מוטמע של צד שלישי עשוי לעקוב אחר הצהרת הנגישות של הספק שלו ולא שלנו.",
+    "remediationTitle": "טיפול ומשוב",
+    "remediationBody": "אנו מברכים על דיווחים על כל מכשול שאתם נתקלים בו. אנא ציינו את העמוד, הטכנולוגיה המסייעת בה אתם משתמשים ותיאור קצר. אנו שואפים לאשר קבלת דיווחים תוך 5 ימי עסקים ולהציע מסלול תיקון תוך 30 יום.",
+    "contactTitle": "יצירת קשר",
+    "contactBody": "ניתן לשלוח שאלות, משוב ותלונות בנושא נגישות ישירות לצוות הנגישות שלנו בכתובת שלהלן.",
+    "privacyLink": "מדיניות פרטיות",
+    "backToSignIn": "חזרה להתחברות"
+  },
+  "firstRun": {
+    "title": "בחר את השפה שלך",
+    "subtitle": "ניתן לשנות זאת מאוחר יותר בסרגל הנגישות.",
+    "continue": "המשך",
+    "tileEnglish": "English",
+    "tileArabic": "العربية",
+    "tileHebrew": "עברית",
+    "tileEnglishHint": "Continue in English",
+    "tileArabicHint": "متابعة بالعربية",
+    "tileHebrewHint": "המשך בעברית"
+  },
+  "pricing": {
+    "page": {
+      "title": "מנויי Cena",
+      "subtitle": "הכנה מלאה לבגרות, אימות מתמטי אוטומטי ומשפחה אחת לכל הילדים.",
+      "loadError": "לא הצלחנו לטעון את קטלוג המחירים. נסה לרענן."
+    },
+    "cycle": {
+      "monthly": "לחודש",
+      "annual": "לשנה",
+      "annualSavings": "חסכון של כ-17%"
+    },
+    "vatInclusive": "המחיר כולל מע\"מ",
+    "recommended": "הבחירה המומלצת",
+    "guarantee": {
+      "thirtyDay": "ערובת החזרה במשך 30 ימים"
+    },
+    "sibling": {
+      "heading": "יש יותר מילד אחד?",
+      "body": "כל אח/ות נוספ/ת (עד 2 אחים) {firstRate} לחודש, והחל מהשלישי {householdCapRate} לחודש."
+    },
+    "tier": {
+      "basic": {
+        "name": "בסיסי",
+        "pitch": "הכנה יומיומית בקצב שלך, עם אימות מתמטי אוטומטי.",
+        "cta": "התחל עם בסיסי"
+      },
+      "plus": {
+        "name": "פלוס",
+        "pitch": "כל מה שבבסיסי, בתוספת אבחון תמונה וחשיבה מתקדמת ללא הגבלה.",
+        "cta": "בחר פלוס"
+      },
+      "premium": {
+        "name": "פרימיום",
+        "pitch": "הכל כלול: אבחון תמונה, לוח הורים מלא, דוח למורה הפרטי ותמיכה מהירה.",
+        "cta": "בחר פרימיום"
+      }
+    },
+    "feature": {
+      "coreExamPrep": "הכנה מלאה לבגרות",
+      "cas": "אימות מתמטי אוטומטי (CAS)",
+      "photoDiagnosticPremium": "אבחון תמונה: עד 100 לחודש",
+      "photoDiagnosticPlus": "אבחון תמונה: 20 לחודש",
+      "photoDiagnosticUnlimited": "אבחון תמונה ללא הגבלה",
+      "parentDashboard": "לוח הורים מלא",
+      "arabicDashboard": "לוח הורים בערבית מלאה",
+      "tutorHandoff": "דוח למורה פרטי (PDF)",
+      "prioritySupport": "תמיכה מהירה"
+    },
+    "redirecting": "מעביר אותך לתשלום מאובטח ב-Stripe…",
+    "checkoutError": "לא הצלחנו לפתוח תשלום. נסה שוב בעוד רגע."
+  },
+  "subscriptionConfirm": {
+    "polling": {
+      "title": "מאמת את המנוי…",
+      "subtitle": "רק רגע — מסיים את הפעלת המנוי."
+    },
+    "active": {
+      "title": "המנוי פעיל",
+      "subtitle": "ברוך/ה הבא/ה ל-{tier}.",
+      "renewsAt": "החידוש הבא: {date}",
+      "cta": "להתחלת לימוד"
+    },
+    "pending": {
+      "title": "ההפעלה בדרך",
+      "subtitle": "התשלום נקלט. ברגע שנאשר את ההפעלה, תקבל עדכון.",
+      "cta": "חזרה לדף הבית"
+    },
+    "error": "אירעה שגיאה באיתור המנוי. נא לפנות לתמיכה."
+  },
+  "subscriptionCancel": {
+    "title": "ביטלת את התשלום",
+    "subtitle": "לא חויבת. אפשר לחזור לבחור מסלול כשתהיה/י מוכן/ה.",
+    "backToPricing": "חזרה למחירים",
+    "goHome": "חזרה לדף הבית"
+  },
+  "softCapUpsell": {
+    "photo": {
+      "heading": "עבדת קשה החודש",
+      "body": "השתמשת ב-{usage} מתוך {softCap} ניתוחי צילום החודש. אפשר להמשיך, וגם לקבוע שיעור פרטי לסיכום."
+    },
+    "sonnet": {
+      "heading": "שבוע אינטנסיבי",
+      "body": "זה השבוע הפעיל ביותר שלך. אפשר להמשיך, או לתזמן שיעור פרטי לסיכום."
+    },
+    "hint": {
+      "heading": "השתמשת בהרבה רמזים החודש",
+      "body": "{usage} רמזים מתוך {softCap} — הכל תקין. להמשיך או לנוח ולחזור?"
+    },
+    "bookTutor": "קבע שיעור פרטי",
+    "continueAnyway": "להמשיך בכל זאת",
+    "dismiss": "סגור"
+  },
+  "accountSubscription": {
+    "title": "המנוי שלי",
+    "loadError": "לא הצלחנו לטעון את פרטי המנוי. נסה לרענן.",
+    "actionError": "הפעולה נכשלה. נסה שוב או פנה לתמיכה.",
+    "status": {
+      "unsubscribed": "לא פעיל",
+      "active": "פעיל",
+      "pastdue": "תשלום חוזר נכשל",
+      "cancelled": "בוטל",
+      "refunded": "הוחזר"
+    },
+    "renewsAt": "חידוש הבא: {date}",
+    "seePricing": "ראה מסלולים",
+    "common": { "cancel": "ביטול", "back": "חזרה" },
+    "siblings": {
+      "title": "ילדים במנוי",
+      "addCta": "הוספת אח/ות",
+      "count": "{n} ילדים פעילים"
+    },
+    "manage": {
+      "title": "ניהול מנוי",
+      "refund": "בקשת החזר (בתוך 30 יום)",
+      "cancel": "ביטול מנוי"
+    },
+    "refundDialog": {
+      "title": "בקשת החזר כספי",
+      "body": "ערובת 30 יום פעילה — תקבל החזר מלא. ספר לנו בקצרה את הסיבה כדי שנוכל להשתפר.",
+      "reasonLabel": "סיבה (אופציונלי)",
+      "confirm": "אשר החזר"
+    },
+    "cancelDialog": {
+      "title": "ביטול מנוי",
+      "body": "המנוי יישאר פעיל עד סוף התקופה הנוכחית. ספר לנו למה אתה עוזב.",
+      "reasonLabel": "סיבה (אופציונלי)",
+      "confirm": "אשר ביטול"
+    },
+    "siblingDialog": {
+      "title": "הוספת אח/ות",
+      "body": "כל אח/ות נוספ/ת מקבל/ת חשבון משלו עם הנחת משפחה.",
+      "idLabel": "מזהה תלמיד/ה",
+      "tierLabel": "מסלול",
+      "confirm": "הוסף"
+    }
+  },
+  "mcOptionsGate": {
+    "placeholder": "האפשרויות מוסתרות. חשוב/י על תשובה קודם, אחר כך חשוף/י.",
+    "reveal": "הצג אפשרויות",
+    "optionsContainer": "אפשרויות תשובה",
+    "revealedAnnouncement": "האפשרויות גלויות כעת."
+  },
+  "attemptModeToggle": {
+    "label": "הסתר אפשרויות תשובה עד שאחליט שאני מוכנ/ה",
+    "description": "קרא/י את השאלה, חשוב/י על תשובה, ואז חשוף/י את האפשרויות. איפוס בכל שיעור חדש."
+  },
+  "parentDashboard": {
+    "title": "לוח הורים",
+    "tierGate": {
+      "title": "לוח ההורים פתוח במסלול פרימיום",
+      "subtitle": "צפה בהתקדמות של הילדים, דוח שבועי, ודוח למורה הפרטי.",
+      "cta": "עבור לפרימיום"
+    },
+    "household": {
+      "weekly": "השבוע",
+      "monthly": "החודש",
+      "min": "דקות"
+    },
+    "students": {
+      "heading": "ילדים במנוי",
+      "empty": "עדיין אין ילדים פעילים. הוסף אח/ות בעמוד המנוי.",
+      "unnamed": "תלמיד/ה",
+      "weekly": "השבוע",
+      "topics": "נושאים",
+      "readiness": "מוכנות"
+    }
+  }
+}

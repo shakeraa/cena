@@ -1,0 +1,138 @@
+{
+  "schema_version": "1.0",
+  "runner": "cascade_prototype",
+  "source": "admin-upload://pdf_04_scanned_bad_ocr_layer.pdf",
+  "hints": {
+    "subject": "math",
+    "language": null,
+    "track": null,
+    "source_type": "admin_upload",
+    "taxonomy_node": null,
+    "expected_figures": null
+  },
+  "pdf_triage": "scanned_bad_ocr",
+  "text_blocks": [
+    {
+      "text": null,
+      "text_length": 14,
+      "text_hash": "5213aa5389b8",
+      "bbox": {
+        "x": 40,
+        "y": 120,
+        "w": 28,
+        "h": 14,
+        "page": 1
+      },
+      "language": "unknown",
+      "confidence": 0.18,
+      "is_rtl": false,
+      "_redacted": "bagrut-reference-only"
+    },
+    {
+      "text": null,
+      "text_length": 14,
+      "text_hash": "1c6e403f0427",
+      "bbox": {
+        "x": 70,
+        "y": 120,
+        "w": 28,
+        "h": 14,
+        "page": 1
+      },
+      "language": "unknown",
+      "confidence": 0.22999999999999998,
+      "is_rtl": false,
+      "_redacted": "bagrut-reference-only"
+    },
+    {
+      "text": null,
+      "text_length": 14,
+      "text_hash": "b57cfc5eefc9",
+      "bbox": {
+        "x": 100,
+        "y": 120,
+        "w": 28,
+        "h": 14,
+        "page": 1
+      },
+      "language": "unknown",
+      "confidence": 0.28,
+      "is_rtl": false,
+      "_redacted": "bagrut-reference-only"
+    },
+    {
+      "text": null,
+      "text_length": 14,
+      "text_hash": "ec34b8202009",
+      "bbox": {
+        "x": 130,
+        "y": 120,
+        "w": 28,
+        "h": 14,
+        "page": 1
+      },
+      "language": "unknown",
+      "confidence": 0.18,
+      "is_rtl": false,
+      "_redacted": "bagrut-reference-only"
+    },
+    {
+      "text": null,
+      "text_length": 14,
+      "text_hash": "8155779c1a31",
+      "bbox": {
+        "x": 160,
+        "y": 120,
+        "w": 28,
+        "h": 14,
+        "page": 1
+      },
+      "language": "unknown",
+      "confidence": 0.22999999999999998,
+      "is_rtl": false,
+      "_redacted": "bagrut-reference-only"
+    },
+    {
+      "text": null,
+      "text_length": 14,
+      "text_hash": "90e1d91db9d6",
+      "bbox": {
+        "x": 190,
+        "y": 120,
+        "w": 28,
+        "h": 14,
+        "page": 1
+      },
+      "language": "unknown",
+      "confidence": 0.28,
+      "is_rtl": false,
+      "_redacted": "bagrut-reference-only"
+    }
+  ],
+  "math_blocks": [],
+  "figures": [],
+  "overall_confidence": 0.21,
+  "fallbacks_fired": [],
+  "cas_validated_math": 0,
+  "cas_failed_math": 0,
+  "human_review_required": true,
+  "reasons_for_review": [
+    "low_overall_confidence"
+  ],
+  "layer_timings_seconds": {
+    "layer_0_preprocess": 0.46,
+    "layer_1_layout": 0.82,
+    "layer_2a_text": 2.11,
+    "layer_2b_math": 0.0,
+    "layer_3_reassemble": 0.0,
+    "layer_4_gate": 0.0,
+    "layer_5_cas": 0.0
+  },
+  "total_latency_seconds": 3.39,
+  "captured_at": "2026-04-16T12:00:00Z",
+  "_dev_fixture": {
+    "scenario": "pdf_scanned_bad_ocr",
+    "source_kind": "synthesized",
+    "notes": "Triage catches garbled text layer. Falls to full cascade, confidence stays low, goes to human-review queue."
+  }
+}

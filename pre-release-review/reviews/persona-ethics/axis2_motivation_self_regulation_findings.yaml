@@ -1,0 +1,220 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 motivation & self-regulation features (self-explanation prompts,
+  if-then planners, wise feedback, non-loss mastery path, confidence check-ins,
+  process praise, SRL micro-prompts, reflective plan generator). Explicitly
+  guard-railed against streak/loss-aversion/variable-ratio (L6).
+system_purpose_fit: 5
+  rationale:
+    - This is the axis most directly aligned with ethical-persuasion research
+    - Every feature builds on autonomy (If-Then = student-authored plans),
+      competence (process praise, calibration feedback), relatedness (wise
+      feedback + cultural framing)
+    - Feature 4 "Mastery Path (Non-Loss Visualization)" (L142-176) is the
+      textbook anti-streak UI — accumulation only, no decay, no "days missed"
+    - Feature 6 process-praise explicitly cites Dweck/Hattie and frames as
+      "feedback design" not "mindset intervention" (L252-253) — honest
+      positioning that survives the informed-student test
+    - One soft concern: mid-session prompts (F7, L264-268) can interrupt flow
+      state; already mitigated
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "g=0.55 self-explanation meta-analysis -> cogsci lens"
+    - "g=0.31 implementation intentions in children -> cogsci lens"
+    - "d=0.11-0.22 growth mindset (Yeager 2019) -> cogsci lens"
+adr_alignment:
+  honored:
+    - "GD-004 (shipgate) honored explicitly L6"
+    - "ADR-0003 misconception-session-scope honored L358 under-18 section"
+  violated: []
+  missing_adr_needed:
+    - "Self-Determination Theory as explicit design principle — worth an ADR so
+      future features can be reviewed against autonomy/competence/relatedness
+      criteria, not just banned-term lists"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 2 "If-Then Session Planner" (L64-98) proposes WhatsApp/SMS
+      reminder scheduling based on student-set triggers. Author flags
+      (L95) "frame positively." Ethics lens requires stronger guardrails:
+      (a) hard-cap reminder frequency at 3/week per student; (b) every
+      message must include a one-tap opt-out link; (c) no reminder may
+      be sent between 21:00-07:00 local time (dark-time respect).
+      Without these, good-intent reminders become notification spam for
+      minors who cannot disable push on school-issued devices.
+    evidence: axis2_motivation_self_regulation_findings.md:L67, L89-L95
+    lens_note: |
+      Digital wellbeing research (docs/ethical-persuasion-digital-wellbeing-research.md)
+      is clear: any notification system aimed at minors must have
+      frequency caps, dark-time respect, and friction-free opt-out. The
+      current design leaves these to runtime policy — they need to be
+      product-level commitments, not admin toggles.
+  - severity: P1
+    finding: |
+      Feature 3 "Wise Feedback Engine" (L102-138) proposes
+      persona-targeted feedback templates and optional
+      "collective-achievement lens" for Arabic-speaking students
+      ("Your preparation matters for your future and your community",
+      L105). BORDERLINE: framing minority-group students with
+      collective-identity messages is ethically sensitive — it can
+      reinforce in-group/out-group distinctions even with good intent.
+      Needs explicit user-research review with Arab-Israeli students
+      before ship, not just "user-test with Arabic-speaking students"
+      (L135).
+    evidence: axis2_motivation_self_regulation_findings.md:L104-L108, L133-L136
+    lens_note: |
+      Culturally-targeted motivational messaging risks becoming a
+      stereotype-reinforcement pattern. The ethical-persuasion
+      "informed student" test applies: would an Arab-Israeli student
+      appreciate knowing the system is routing them a different
+      motivation template than a Jewish-Israeli peer?
+  - severity: P2
+    finding: |
+      Feature 5 "Metacognitive Confidence Check-ins" (L180-216) stores
+      per-problem confidence ratings (L208). Even if stored session-
+      locally, the aggregate "calibration chart" (L207) creates a
+      persistent self-image as "overconfident" or "underconfident" — a
+      label that can become self-fulfilling. Mitigation: the chart
+      should include an always-visible disclaimer that calibration is
+      a session-level pattern, not a trait, and an easy "reset" button.
+    evidence: axis2_motivation_self_regulation_findings.md:L183, L207-L213
+    lens_note: |
+      Labels create identity (cf. Dweck growth-mindset research cited
+      in the doc itself). A "Your Calibration Score: underconfident"
+      label applied to a minor violates the self-image-neutrality
+      principle even if data is session-scoped.
+  - severity: P2
+    finding: |
+      Feature 6 "Process-Praise Response System" (L220-257) is
+      well-designed but proposes (L247) a "weekly summary highlighting
+      process improvements." A weekly cadence creates a soft
+      expectation of weekly engagement — a de-facto streak without the
+      banned vocabulary. Recommend: no scheduled weekly summary;
+      summary available on-demand only.
+    evidence: axis2_motivation_self_regulation_findings.md:L246-L248
+    lens_note: |
+      GD-004 bans explicit streak counters, but the intent is to ban
+      loss-framed rhythm pressure. A "we missed you this week" implicit
+      in a weekly summary is the same dark pattern in different
+      clothing.
+  - severity: P2
+    finding: |
+      Feature 8 "Reflective Study Plan Generator" (L305-339) proposes
+      parent-visible weekly plan sharing (L308). Parent visibility is
+      opt-in (L336 mitigation) but the default state is not stated.
+      Ethics lens requires: default must be student-only; parent
+      sharing must be per-plan opt-in (not account-level) so the
+      student retains agency over each weekly disclosure.
+    evidence: axis2_motivation_self_regulation_findings.md:L307-L308, L335-L336
+    lens_note: |
+      Parent-engagement surveillance is a known EdTech dark-pattern
+      (AXIS_4 docs reinforce this). Granular per-share consent is the
+      baseline autonomy requirement.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-007 (Self-Explanation), FD-008 (If-Then), FD-010 (Process Praise)"
+  - "axis1_pedagogy_mechanics_cena.md: F4 (Elaborative Interrogation) overlaps with F1 here"
+extracted_tasks:
+  - title: "Notification policy: cap, dark-time, opt-out for SMS/WhatsApp reminders"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Enforce three product-level rules for any push/SMS/WhatsApp
+      reminder sent to a student account:
+        1. Max 3 per student per rolling 7 days
+        2. Quiet hours 21:00-07:00 local time (per student locale)
+        3. Every message includes tap-to-mute link that mutes for 30 days
+      ## Files
+      - src/notifications/NotificationPolicy.cs (new)
+      - tests/Cena.Notifications.Tests/PolicyTests.cs
+      - docs/engineering/notification-policy.md
+      ## Definition of Done
+      - Policy enforced at send-time (not at UI layer)
+      - Unit tests cover cap/clock/opt-out paths
+      - Policy doc linked from shipgate.md
+      - E2E test sends 5 rapid reminders and asserts only 3 delivered
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L67, L89-L95]
+  - title: "User research: Arab-Israeli review of 'wise feedback' persona templates"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any Arabic-persona feedback template ships (Feature 3),
+      commission 8-12 interviews with Arab-Israeli Bagrut students to
+      validate whether collective-achievement framing ("your preparation
+      matters for your future and your community") resonates as
+      supportive or patronizing. Exclusion criterion: if >=3/12
+      participants flag it as culturally tone-deaf, the
+      collective-achievement track is dropped from F3 entirely.
+      ## Files
+      - docs/research/arab-cohort-feedback-template-study.md (new)
+      ## Definition of Done
+      - IRB-equivalent consent process documented
+      - Interview protocol reviewed by Arab-speaking educator
+      - Findings published in docs/research/
+      - Ship/revise/retire decision on Arabic feedback templates recorded
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L104-L108, L133-L136]
+  - title: "Confidence calibration UI: no trait labels, session-only framing"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Ensure the F5 Metacognitive Confidence Check-in UI never
+      displays trait-like labels ("you are overconfident") and always
+      frames calibration as a session-level pattern with a one-tap
+      reset. Forbid cross-session trait persistence at the UI layer.
+      ## Files
+      - src/student-web/src/components/session/CalibrationCard.vue
+      - src/student-web/src/locales/*.json (copy lockdown)
+      ## Definition of Done
+      - Linter rejects strings matching /you (are|tend to be) (over|under)confident/
+      - UI shows "this session" badge on any calibration chart
+      - Reset button clears the chart; no trait persists past session end
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L183, L207-L213]
+  - title: "Weekly summaries opt-in only, per-share parent disclosure"
+    priority: P2
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Change F6 weekly process-praise summaries to on-demand only (no
+      scheduled push). Change F8 parent plan sharing to per-week
+      opt-in (not account-level).
+      ## Files
+      - src/student-web/src/features/summary/*.vue
+      - src/actors/ParentSharing/ShareGrainActor.cs
+      - tests/parent-sharing/PerWeekConsent.test.ts
+      ## Definition of Done
+      - No cron/scheduled summary job exists
+      - Parent share requires per-week student confirmation
+      - Audit log records each share event with timestamp + student-initiated flag
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L246-L248, L307-L308, L335-L336]
+verdict: revise
+verdict_reason: |
+  Strongest ethics-aligned axis in the corpus. Revise to add notification
+  policy, cultural-messaging research, calibration UI framing, and
+  opt-in-only weekly summaries / parent sharing. No P0 findings.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Growth-mindset effect-size claims (d=0.11-0.22) vs Macnamara 2023 null"
+  - to: persona-privacy
+    about: "Per-problem confidence ratings storage — verify session-only enforcement end-to-end"
+  - to: persona-a11y
+    about: "If-then planner modal (L89) — RTL + keyboard + screen-reader review needed"

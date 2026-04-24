@@ -2,261 +2,328 @@
 
 ## Overview
 
-Cena is a personal mentor system designed for high-grade students. It serves as an intelligent companion that remembers, organizes, and builds upon each student's learning journey. Unlike existing EdTech tools, Cena combines a visible knowledge graph, adaptive teaching methodology, cognitive load personalization, and curriculum-agnostic architecture into a single mentor experience.
+Cena is a personal mentor system designed for high-grade students. It serves as an intelligent companion that remembers, organizes, and builds upon each student's learning journey.
 
----
+## Core Capabilities
 
-## 1. Core Capabilities
-
-### 1.1 Memory & Knowledge Tracking
+### Memory & Knowledge Tracking
 - Remembers learned concepts, ideas, thoughts, and skills
-- Organizes knowledge into structured, interconnected maps (knowledge graph)
+- Organizes knowledge into structured, interconnected maps
 - Tracks progression and mastery levels per topic
 - Identifies knowledge gaps and areas for reinforcement
-- Captures student annotations, thoughts, and insights as graph input
 
-### 1.2 Personalized Mentoring
+### Personalized Mentoring
 - Adapts to each student's learning style and pace
 - Applies specific methodologies to enhance skills and knowledge
-- Provides targeted exercises, challenges, and scenarios
-- Offers contextual guidance based on the student's full history
-- Acts as a persistent mentor relationship — not just a tool
+- Provides targeted exercises and challenges
+- Offers contextual guidance based on the student's history
 
-### 1.3 Skill Enhancement
+### Skill Enhancement
 - Monitors skill development over time
 - Suggests next steps based on current proficiency
 - Connects new material to previously learned concepts
 - Reinforces weak areas through spaced repetition and practice
-- **Skill proficiency meters** — at-a-glance mastery percentages per domain (e.g., Systems Thinking 89.9%, Mechanics 91.4%)
 
----
+## Target Users
 
-## 2. Target Audience
+- High-grade students seeking structured personal mentorship
+- Students who want to organize and retain their learning effectively
 
-### 2.1 Syllabus-Agnostic Design
-- The system supports **any country's syllabus** as structured input
-- Syllabus defines the curriculum tree, subjects, and depth levels for that country
-- The architecture does not hardcode any specific curriculum
-
-### 2.2 Initial Target: Bagrut (Israeli Matriculation)
+### Initial Target: Bagrut (Israeli Matriculation)
 - First deployment targets students preparing for **Bagrut** exams
 - Syllabus follows the Israeli Ministry of Education curriculum
 - STEM subjects: Mathematics, Physics, Chemistry, Biology, Computer Science
 - Depth levels align with the Bagrut study units system (3/4/5 units per subject)
 
-### 2.3 Expansion Path
+### Expansion Path
 - After Israel: AP exams (US), A-Levels (UK), JEE/NEET (India), Gaokao (China)
-- Each market is massive and has expensive private tutoring alternatives
+- Each market is large and already supports expensive tutoring alternatives
 
----
+## Methodology Approach
 
-## 3. Methodology Approach
-
-### 3.1 Adaptive Methodology Selection
-- The system selects the best methodology per student **automatically**
-- Supported methods include:
-  - **Socratic method** — guiding through questions
-  - **Spaced repetition** — revisiting at optimal intervals
-  - **Project-based learning** — applying knowledge through real projects
-  - **Bloom's taxonomy progression** — recall -> understanding -> application -> analysis -> evaluation -> creation
-  - **Feynman technique** — explain in simple terms to reveal gaps
-  - **Challenge-based / scenario learning** — system-based challenges and real-world problem scenarios
-- The system profiles each student to determine which method is most effective
+### Adaptive Methodology Selection
+- The system selects the best methodology per student automatically
+- Supported methods include: Socratic method (2024 UK RCT: AI Socratic tutors matched human tutors, +5.5pp on novel problems — arxiv.org/html/2512.23633v1), spaced repetition (Cepeda et al., 2006, Psychological Bulletin: 839 assessments confirming spacing effect), project-based learning (Chen & Yang, 2019 meta-analysis: d=0.71 across 12,585 students), Bloom's taxonomy progression (Anderson & Krathwohl, 2001 revised taxonomy), Feynman technique (elaborative interrogation — Pressley et al., 1987), worked examples with fading (Renkl & Atkinson, 2003, Educational Psychologist: fading triggers self-explanation), analogy-based instruction (Gentner, 1983 structure-mapping theory, Cognitive Science 7(2)), retrieval practice (Roediger & Karpicke, 2006: testing > restudying for long-term retention), and challenge-based / scenario learning for motivation recovery and real-world transfer
+- The system profiles each student to determine which method is most effective for them
 - Tracks per-student method effectiveness over time
 
-### 3.2 Stagnation Detection & Switching
+### Stagnation Detection & Switching
 - Monitors progress and detects when a student plateaus
 - Automatically switches to a different methodology when stagnation is detected
 - The switch happens **seamlessly** — the student is not made aware of the methodology change
-- **Composite stagnation score** based on:
-  1. Accuracy plateau (<5% improvement over last N attempts)
-  2. Response time drift (increasing average)
-  3. Session abandonment (ending earlier than personal baseline)
-  4. Error type repetition (same error pattern recurring)
-  5. Annotation sentiment (frustration or confusion signals)
-- **Multi-modal error analysis** drives method selection:
-  - Rule-based errors -> drill/practice
-  - Conceptual misunderstanding -> Socratic dialogue
-  - Motivational stagnation -> project-based or Feynman technique
-- Logs methodology at switch time to build per-student effectiveness profile
+- Stagnation detection uses a **composite score** from five signals:
+  1. **Accuracy plateau**: Less than 5% improvement over the last 10 attempts on a concept cluster
+  2. **Response time drift**: Rolling average response time increases by more than 20% compared to the student's baseline for similar-difficulty problems
+  3. **Session abandonment**: Student ends sessions more than 30% earlier than their personal average session duration
+  4. **Error type repetition**: The same error pattern (classified by error taxonomy) recurs 3 or more times across sessions
+  5. **Annotation sentiment**: NLP analysis of student annotations detects frustration or confusion signals
+- A methodology switch is triggered when the composite stagnation score exceeds a threshold of 0.7 (on a 0–1 normalized scale) for 3 consecutive sessions
+- The switching strategy is error-type-driven, with explicit precedence and cycling prevention. **Prior work:** Chi, VanLehn & Litman (2011, IJAIED 21:83–113) demonstrated that reinforcement learning can induce effective pedagogical policies in ITS, significantly improving learning gains. Cena's approach differs: instead of RL-induced policies (which require large training datasets), Cena uses a hand-crafted MCM lookup with data-driven confidence updates — a pragmatic choice for a pre-launch system that will migrate to RL-based policy optimization once sufficient interaction data exists (see `docs/intelligence-layer.md` Flywheel 1).
 
-### 3.3 Student Control
+**Methodology selection algorithm:**
+1. **Classify the dominant error type** from the last 3 sessions' error logs. If multiple error types are present, use precedence order: conceptual > procedural > motivational (conceptual errors are hardest to overcome and most damaging if left unaddressed).
+2. **Consult the MCM graph** (see `docs/architecture-design.md` Section 3.2.3 and below) for the (error_type, concept_category) → methodology mapping.
+3. **Exclude previously attempted methods**: The `StudentProfile` actor maintains a `method_attempt_history` per concept cluster — a list of (methodology, outcome) pairs. Any methodology attempted in the last 3 stagnation cycles for this concept is excluded from candidates.
+4. **Select from remaining candidates**: If multiple candidates remain, choose the one with the highest MCM confidence score. If only one remains, use it. If NO candidates remain (all methodologies exhausted for this concept), escalate — see below.
+5. **Apply 3-session cooldown**: The new methodology runs for a minimum of 3 sessions before re-evaluating stagnation. This prevents rapid cycling.
+
+**Error type → methodology mapping (with tie-breaking precedence):**
+
+| Priority | Error Type | Primary Methodology | Secondary (if primary exhausted) |
+|---|---|---|---|
+| 1 (highest) | Conceptual misunderstanding | Socratic dialogue | Feynman technique |
+| 2 | Procedural / rule-based errors | Drill-and-practice | Worked examples with fading |
+| 3 | Motivational stagnation | Project-based learning | Analogy-based instruction |
+
+**Escalation when all methodologies exhausted for a concept:**
+- If a student has cycled through all 8 methodologies on a concept cluster without resolving stagnation (rare — requires 8 × 3 = 24+ sessions of stagnation), the system:
+  1. Flags the concept as "mentor-resistant" in the student's profile
+  2. Suggests the student skip to a related concept and return later (prerequisite graph allows this if the concept is not blocking)
+  3. If the concept IS a prerequisite blocker, surfaces a recommendation: "This concept may benefit from human tutoring — consider asking your teacher or a tutor for 1-on-1 help"
+  4. Logs the escalation for analytics (these cases are high-value data for improving the MCM graph)
+
+### Student Control
 - Students can request a different learning approach at any time (e.g., "I'd rather learn this through a project")
 - The system honors the request without exposing internal methodology labels
+- Request mechanism: a persistent "Change approach" button in the learning session UI opens a natural-language picker with student-friendly labels (e.g., "Explain it differently", "Give me practice problems", "Show me a real-world example", "Let me explain it back")
+- Each student-friendly label maps to an internal methodology: "Explain it differently" -> Feynman technique, "Give me practice problems" -> drill-and-practice, "Show me a real-world example" -> project-based learning, "Let me explain it back" -> retrieval practice
+- Student-initiated switches are logged as `MethodologySwitched` events with trigger = `student_requested` and are weighted higher in the per-student methodology effectiveness profile
 
----
+## Knowledge Storage
 
-## 4. Knowledge Storage & Visualization
-
-### 4.1 Knowledge Graph
-- Student knowledge is stored as a **knowledge graph**
-- Concepts are nodes, relationships are edges
-- **Edge types**: prerequisite, builds-on, related-to, conflicts-with (for common misconceptions)
+### Knowledge Graph
+- Student knowledge is stored as a **knowledge graph** (systematic review of KG applications in education: Heliyon 2024, S2405-8440(24)01414-2 — five primary domains including adaptive learning, concept mapping, and learning path recommendation)
+- Concepts are nodes, relationships are edges (prerequisite, builds-on, related-to, conflicts-with for common misconceptions)
 - Each node tracks: mastery level, date learned, review history, method effectiveness
-- **Two-layer architecture**:
-  - **Domain graph** (shared) — what exists to learn in the syllabus
-  - **Student overlay** (personal) — what this student knows, their mastery, their annotations
-- **Temporal tracking**: when each node was learned, last reviewed, mastery trajectory over time
-- Enables spaced repetition scheduling and knowledge decay prediction
-- **Construction**: LLM-assisted extraction from syllabi and textbooks + human expert validation (scalable alternative to Squirrel AI's fully manual 30K points per subject)
+- The graph powers gap detection, learning path suggestions, and concept connections
 
-### 4.2 Interactive Visualization
-- Students see an **interactive visual map** of their knowledge graph
+### Visualization
+- Students see an interactive visual map of their knowledge graph
 - Node colors/sizes reflect mastery level (mastered, in progress, weak)
 - Edges show how concepts relate to each other
 - Clusters group related topics naturally
-- Graph **grows visibly** over time as the student learns — serves as motivation and reward
-- The graph is **beautiful, shareable** — students screenshot and share (viral acquisition mechanic)
-- Research confirms: visible knowledge states improve self-regulated learning, goal setting, and help-seeking behavior
-- Honest mastery-level coloring serves as a reality check (students tend to overestimate their knowledge)
+- Graph grows visibly over time as the student learns — serves as motivation
 
-### 4.3 Skill Proficiency Meters
-- Quick at-a-glance **mastery percentages per domain** alongside the knowledge graph
-- E.g., "Systems Thinking 89.9% | Mechanics 91.4% | Logic & Circuits 37.5%"
-- Provides a simpler view for quick progress checks without diving into the full graph
-
----
-
-## 5. Interaction & Platform
-
-### 5.1 Multi-Level Interaction
-- Interaction is not a single mode — the system dynamically presents what's relevant
-- **Interactive sessions** — guided mentoring conversations
-- **Concept visualization** — knowledge graph, concept maps, relationships shown in context
-- **Thought tracking** — surfaces the student's own recorded thoughts and ideas
-- **Data presentation** — progress metrics, mastery levels, learning patterns
-- **Challenge-based scenarios** — real-world problem-solving exercises
-- The UI is a **living workspace** that adapts based on what the student is doing
-
-### 5.2 Student Annotations
-- Students can annotate concepts — add their own thoughts, notes, and ideas
-- Annotations are captured by the system as input to understand the student's thinking
-- The knowledge graph is updated based on annotations (new connections, thoughts, insights)
-
-### 5.3 Platforms
-- **Web app** and **mobile app** (mobile-first approach)
-- Consistent experience across both platforms
-- Mobile positioning: **"Replace scrolling with learning"** — learning as a replacement for doomscrolling, not an addition to the schedule
-
----
-
-## 6. Subjects & Scope
+## Subjects & Scope
 
 - **Initial focus: STEM** (Science, Technology, Engineering, Mathematics)
 - Syllabus-based — aligned to high-grade curriculum standards
 - **Depth levels** — each topic has multiple levels of depth, allowing students to go from surface understanding to deep mastery
 - Syllabus will be provided to the system as structured input
 
----
+## Interaction & Platform
 
-## 7. Visual Design
+### Multi-Level Interaction
+- Interaction is not a single mode — the system dynamically presents what's relevant
+- **Interactive sessions** — guided mentoring conversations
+- **Concept visualization** — knowledge graph, concept maps, relationships shown in context
+- **Thought tracking** — surfaces the student's own recorded thoughts and ideas
+- **Data presentation** — progress metrics, mastery levels, learning patterns
+- The UI is a **living workspace** that adapts based on what the student is doing
 
-### 7.1 Graphic Style
-- **Flat illustration style** for concept diagrams — clean, clear layouts with arrows and graphic elements showing processes and relationships (FigureLabs reference)
-- **Concept cards with formulas** — labeled illustrations paired with core equations, each concept gets a visual + its key formula (SmartyMe reference: aerodynamics wing + L=1/2pv^2SC_L)
-- **Colorful icon cards** for topic navigation — each concept/topic gets a distinct colored card with a simple illustrative icon and label (SmartyMe grid reference)
-- **Tech-inspired visuals** for the knowledge graph and brand — glowing network nodes, interconnected data points, dark backgrounds with vibrant highlights (Technion/HUJI reference)
-- **Skill proficiency meters** — clean icon + percentage display per domain (Nibble reference)
+### Student Annotations
+- Students can annotate concepts — add their own thoughts, notes, and ideas
+- Annotations are captured by the system as input to understand the student's thinking
+- The knowledge graph is updated based on annotations (new connections, thoughts, insights)
+
+### Platforms
+- **Mobile app** (primary platform, mobile-first): React Native for iOS and Android from a single codebase — developed using AI coding agents (Claude Code, Kimi) for 3–5× development velocity
+- **Web app** (secondary platform): React-based progressive web app (PWA) sharing component library with mobile — AI agents generate shared component library across both platforms
+- Consistent experience across both platforms via shared design system and API layer
+- Offline support: core learning sessions and knowledge graph browsable offline, synced when connectivity returns
+- Push notifications for streak reminders, session nudges, and spaced repetition review alerts
+- Minimum supported versions: iOS 15+, Android 10+, modern evergreen browsers (Chrome, Safari, Firefox, Edge)
+
+### Performance SLAs
+
+| Operation | P50 | P95 | P99 | Notes |
+|---|---|---|---|---|
+| Question generation (Socratic) | < 1.5s | < 3s | < 5s | Includes LLM call via Sonnet; user sees typing indicator |
+| Answer evaluation | < 800ms | < 2s | < 4s | BKT update + LLM grading; optimistic UI shows "checking..." |
+| Knowledge graph render (initial) | < 500ms | < 1.2s | < 2s | Client-side rendering of pre-fetched graph data |
+| Knowledge graph update (after mastery) | < 200ms | < 500ms | < 1s | SignalR push + client-side animation |
+| Page load (cold start) | < 2s | < 4s | < 6s | Service worker caches shell; data fetched in parallel |
+| Diagnostic quiz question selection | < 100ms | < 300ms | < 500ms | KST posterior update is O(n) on concept count |
+| Offline sync (50 events) | < 2s | < 5s | < 10s | Bulk replay; larger batches processed async via SignalR push |
+
+**Measurement**: All SLAs are measured end-to-end from client perspective using OpenTelemetry distributed tracing (see `docs/operations.md` Section 3). P99 violations trigger on-call alerts when sustained for > 5 minutes.
+
+## Target Audience
+
+### Syllabus-Agnostic Design
+- The system is designed to support **any country's syllabus** as structured input
+- Syllabus defines the curriculum tree, subjects, and depth levels for that country
+- The architecture does not hardcode any specific curriculum
+
+### Initial Target: Bagrut (Israeli Matriculation)
+- First deployment targets students preparing for **Bagrut** exams
+- Syllabus follows the Israeli Ministry of Education curriculum
+- STEM subjects: Mathematics, Physics, Chemistry, Biology, Computer Science
+- Depth levels align with the Bagrut study units system (3/4/5 units per subject)
+
+## Visual Design
+
+### Graphic Style
+- **Flat illustration style** for concept diagrams — clean, clear layouts with arrows and graphic elements showing processes and relationships (similar to FigureLabs scientific figures)
+- **Concept cards with formulas** — each concept can pair a visual illustration with its key formula or equation for quick recognition and review
+- **Colorful icon cards** for topic navigation — each concept/topic gets a distinct colored card with a simple illustrative icon and label (similar to smartyme_physics grid style)
+- **Tech-inspired visuals** for the knowledge graph and brand — glowing network nodes, interconnected data points, dark backgrounds with vibrant highlights (similar to Technion/HUJI AI course visuals)
+- **Skill proficiency meters** — clean icon + percentage summaries per domain for fast progress scanning
 - White/clean backgrounds for learning content; dark/immersive backgrounds for the knowledge graph visualization
 
-### 7.2 Dynamic Diagram Generation
+### Dynamic Diagram Generation
 - The system must be capable of **generating or serving concept diagrams on-the-fly** for any topic in the syllabus
-- **Concept cards** — labeled illustrations paired with core formulas/equations
+- **Concept cards** — labeled illustrations paired with core formulas/equations (e.g., aerodynamics wing diagram + L = 1/2pv^2SC_L)
 - **Process flow diagrams** — step-by-step visual flows with arrows showing how things work (chemical reactions, biological processes, circuit flows)
 - **Icon-based topic grids** — color-coded navigational cards per topic area, each with a distinct icon
 - Diagrams are not static assets — they are generated/composed per concept so the system can scale across any syllabus without manually creating thousands of images
-- Potential approaches: AI-generated SVGs, templated illustration engine, or a hybrid with a curated asset library + dynamic composition
+- **Implementation approach**: Hybrid system — a templated SVG engine (using D3.js and React components) composes diagrams from a curated asset library of ~200 base shapes and symbols per subject, combined with LLM-generated layout instructions (Kimi K2.5 outputs structured JSON describing element placement, labels, and connections). For concepts where templates are insufficient, the LLM generates raw SVG markup validated by a deterministic sanitizer before rendering. This hybrid avoids the quality risk of pure AI generation while scaling beyond a fixed asset library
 
-### 7.3 Design Principles
-- Visuals should make complex concepts feel **approachable and clear**
-- Every diagram, figure, and concept should have a **consistent illustrative style**
-- The overall aesthetic should feel **modern, tech-forward, and engaging** for students
-- Concept diagrams should be **self-contained** — a single card should explain a concept visually without needing external context
+### Design Principles
+- Visuals should make complex concepts feel approachable and clear — measured by A/B testing diagram comprehension rates (target: >80% of students correctly interpret a diagram's key relationship on first exposure)
+- Every diagram, figure, and concept card follows a single illustrative style guide: flat vector style, 4-color palette per subject (e.g., Math = blue/teal, Physics = orange/amber, Chemistry = green/emerald, Biology = purple/violet, CS = gray/slate), consistent stroke width (2px), rounded corners (8px radius), and Hebrew-first text with LTR fallback for formulas
+- The overall aesthetic targets the visual language of apps that Israeli teens already use (Duolingo, Instagram, TikTok) — high contrast, generous whitespace, micro-animations on state transitions, dark mode support from launch
+- Concept visuals should be self-contained enough that a student can glance at one card and recover the core relationship without needing surrounding context
 
-### 7.4 Visual References
+## Gamification
 
-| Reference | Style | What to Adopt |
-|-----------|-------|---------------|
-| **FigureLabs** | Flat scientific illustration, clean white background, process flows with arrows | Concept diagram style for processes and relationships |
-| **SmartyMe (Physics/Engineering)** | Colorful icon grids, concept cards with formulas, "addictive game" framing | Topic navigation grids, concept card format with illustration + equation |
-| **Technion/HUJI ads** | Glowing network nodes, dark backgrounds, tech-inspired data visuals | Knowledge graph visualization aesthetic, brand imagery |
-| **Nibble** | Skill proficiency meters with icons, "Replace Scrolling" positioning, challenge-based | Domain mastery meters, mobile positioning, scenario-based challenges |
+- Learning progress is gamified to keep students motivated and engaged
+- Elements include: XP/points for completing concepts, streaks for daily engagement, badges/achievements for milestones
+- Leveling system tied to mastery depth — unlocking deeper levels feels like progression
+- Leaderboards (optional) for friendly competition
+- The knowledge graph itself serves as a visual reward — watching it grow is inherently motivating
 
----
+## Cognitive Load Management
 
-## 8. Gamification
-
-### 8.1 Core Elements
-- **XP/points** for completing concepts
-- **Streaks** for daily engagement (single most powerful retention mechanic — 7-day streak = 3.6x retention)
-- **Badges/achievements** for milestones — representing intellectual achievement ("Mastered Integration," "Connected 50 Concepts") not just activity
-- **Leveling system** tied to mastery depth — unlocking deeper levels feels like progression
-- **Leaderboards** (optional) — leagues with promotion/demotion, not global rankings
-- **Knowledge graph growth** as visual reward — watching it expand is inherently motivating
-
-### 8.2 "Stealth Gamification" Approach
-- Embed rewards into the learning process naturally, not bolted on
-- The growing knowledge graph is the primary reward — lean into this heavily
-- **Adaptive gamification intensity**: more game elements for struggling/unmotivated students; less for intrinsically motivated ones
-- **Loss aversion > reward seeking**: streak mechanics and "protect your progress" framing outperform pure rewards
-- **Social proof without toxic competition**: "X students mastered this concept this week" rather than rank-ordered leaderboards
-
-### 8.3 Risks to Manage
-- Extrinsic rewards can harm intrinsically motivated students — adapt intensity per student
-- Novelty effect decay — gamification must evolve (new badge categories, seasonal events, changing challenges)
-- Leaderboard anxiety — keep leaderboards opt-in
-- Dependency on instant gratification — gradually shift emphasis from extrinsic to intrinsic rewards as mastery deepens
-
----
-
-## 9. Cognitive Load Management
-
-### 9.1 Quantum Learning (Small Units of Information)
+### Quantum Learning (Small Units of Information)
 - Content is delivered in **small, digestible quants** — bite-sized pieces that prevent cognitive overload
-- **Microlearning sweet spot: 5-10 minutes** per focused learning unit
 - Each learning session is calibrated to avoid exhausting the student
-- Learning quanta must be genuinely atomic — don't require holding too many new ideas simultaneously
-- **"5-minute lessons that actually stick"** — short enough to fit into any schedule (Nibble reference)
-
-### 9.2 Threshold Detection
 - The system learns each student's **personal thresholds** — how much new information they can absorb before fatigue
-- **Fatigue detection metrics** (behavioral proxies):
-  1. Response time increase (rolling average drift)
-  2. Accuracy drop-off within a session
-  3. Interaction pattern changes (less scrolling, shorter answers, more re-reads)
-  4. Session duration patterns vs personal baseline
-  5. Time-of-day effects (circadian rhythm performance variation)
+
+### Threshold Detection
+- Monitors engagement signals (response time, accuracy drop-off, session duration patterns)
 - Builds a per-student cognitive load profile over time
-- Cap sessions at **20-25 minutes** before suggesting a break (adjustable per student)
-- Some students handle 30-min sessions; others fatigue at 12 minutes
+- Adjusts session length and content density dynamically based on the student's current state
+- **Cognitive load threshold formula**: The system computes a real-time fatigue score per session:
 
-### 9.3 Fatigue Response
-- Don't hard-stop — offer lighter **"cooldown" activities** (review mastered content, explore knowledge graph, read own annotations)
-- The system caring about the student's wellbeing ("the app told me to take a break") builds trust and differentiates from platforms that optimize for time-on-app
+  ```text
+  fatigue_score = w1 * accuracy_drop + w2 * rt_increase + w3 * time_fraction
+  ```
 
-### 9.4 Estimated Timelines
+  Where:
+  - `accuracy_drop` = max(0, baseline_accuracy - rolling_accuracy_last_5) / baseline_accuracy, normalized to [0, 1]
+  - `rt_increase` = max(0, rolling_rt_last_5 - baseline_rt) / baseline_rt, normalized to [0, 1]
+  - `time_fraction` = elapsed_minutes / student_max_session_minutes (from per-student profile, default 25 min, range 12–30 min)
+  - Default weights: w1=0.4, w2=0.3, w3=0.3
+  - **Session end trigger**: fatigue_score > 0.7 for 2 consecutive questions → system suggests a break and emits `CognitiveLoadCooldownComplete` after a configurable cooldown (default: 15 min)
+  - See `docs/engagement-signals-research.md` for signal calibration research
+
+  **Baseline definitions** (critical for implementation — `baseline_accuracy` and `baseline_rt` must be computed identically by all consumers):
+  - `baseline_accuracy` is the student's **per-concept-cluster trailing median accuracy over the last 20 questions** in that cluster. For new students with <20 questions, use the global population median for that concept's difficulty level (bootstrapped from diagnostic quiz data). Per-concept-cluster (not global) because a student strong in algebra may be weak in geometry — a global baseline would under-trigger for weak areas and over-trigger for strong ones.
+  - `baseline_rt` is the student's **per-question-type trailing median response time over the last 20 questions** of that type (e.g., MCQ vs free-text vs numeric). Per-type because MCQ response times are structurally different from free-text. For new students, use population median for that question type and difficulty level.
+  - `rolling_accuracy_last_5` and `rolling_rt_last_5` are computed over the **last 5 questions in the current session** (not across sessions). This ensures the fatigue detector responds to within-session degradation, not inter-session variance.
+  - **Baseline update frequency**: Baselines are recomputed after each session ends, incorporating the session's data into the trailing 20-question window. They are NOT updated mid-session (to avoid the fatigue detector chasing its own tail).
+
+### Estimated Timelines
 - The system provides **personalized time estimates** for achieving specific goals (e.g., "Master 5-unit Math by Bagrut exam date")
 - Timelines factor in: current knowledge level, learning pace, available study time, and historical performance
 - Estimates update dynamically as the student progresses
-- Connects daily effort to long-term goals: "You're 67% of the way to mastering 5-unit Math"
 
----
+## AI/LLM Integration Strategy
 
-## 10. Key Takeaways & Decisions
+### Model Architecture
+- **Tiered multi-model routing** behind an Anti-Corruption Layer (see `docs/llm-routing-strategy.md` for full analysis):
+  - **Fast/Cheap tier**: Kimi K2.5 (Moonshot AI) for classification, extraction, structured evaluation — $0.45/MTok input, no PII sent
+  - **Balanced tier**: Claude Sonnet 4.6 (Anthropic) for real-time tutoring, Socratic dialogue, explanation generation — $3.00/MTok input
+  - **Reasoning tier**: Claude Opus 4.6 (Anthropic) for methodology switching decisions, complex pedagogical reasoning — $5.00/MTok input
+- **Embedding model**: text-embedding-3-small (OpenAI) for knowledge graph semantic search and concept similarity scoring (see `docs/intelligence-layer.md`)
+- The system is designed with a **model-agnostic abstraction layer** — all LLM calls go through a unified interface (Python FastAPI Anti-Corruption Layer) that handles prompt formatting, token tracking, model routing, and provider fallback
 
-| Decision | Detail |
-|----------|--------|
-| **Target** | Bagrut students (Israeli matriculation), syllabus-agnostic architecture |
-| **Subjects** | STEM initially, depth levels aligned to study units |
-| **Knowledge model** | Two-layer knowledge graph (domain + student overlay) with temporal tracking |
-| **Visualization** | Interactive graph + skill proficiency meters, shareable |
-| **Methodology** | Adaptive per-student, seamless switching on stagnation via composite score |
-| **Student awareness** | Student is NOT aware of methodology switches; CAN request different approach |
-| **Gamification** | Stealth gamification, adaptive intensity, knowledge graph growth as primary reward |
-| **Cognitive load** | 5-10 min learning units, 20-25 min session cap, per-student fatigue profiles |
-| **Timelines** | Personalized goal estimates, dynamically updated |
-| **Platforms** | Web + mobile (mobile-first), "replace scrolling with learning" |
-| **Visual style** | Flat illustrations + formula cards + icon grids + tech-inspired graph |
-| **Diagram generation** | Dynamic/on-the-fly, not static assets, scalable across syllabi |
-| **Annotations** | Students annotate freely; system captures and updates knowledge graph |
-| **Interaction** | Living workspace — sessions, visualization, thought tracking, challenges |
+### LLM Use Cases
+1. **Socratic tutoring conversations**: Multi-turn dialogue with per-student context window (learning history, current mastery, active methodology)
+2. **Knowledge graph construction**: LLM extracts concept nodes and prerequisite edges from syllabus documents and textbooks (batch processing, not real-time)
+3. **Stagnation analysis**: LLM classifies error types from student responses (procedural vs. conceptual vs. motivational) to inform methodology switching
+4. **Annotation understanding**: NLP analysis of student-written notes to detect confusion, insight, or frustration signals
+5. **Dynamic diagram generation**: LLM generates SVG diagram descriptions from concept definitions, rendered by a deterministic SVG engine
+6. **Personalized explanation generation**: Adapts explanation depth and analogy selection based on student's knowledge graph state
+
+### Cost Management
+- **Per-student monthly LLM cost**: ~$13.32/month with tiered routing (~$10.26 Sonnet + $2.40 Opus + $0.66 Kimi), approximately 40% cheaper than a Sonnet-only approach ($22.05). See `docs/llm-routing-strategy.md` Section 4 for full breakdown.
+- **Token optimization**: Prompt caching (60% cache hit target on tutoring context reduces Sonnet costs by 30-40%); Kimi K2.5 for high-frequency classification tasks at 6.7x lower cost; batch API for async tasks at 50% discount
+- **Batch vs. real-time**: Knowledge graph construction and content pre-generation run as offline batch jobs; only tutoring conversations and annotation analysis are real-time
+- **Rate limiting**: Students limited to 50 LLM-powered interactions per day (sufficient for 2–3 learning sessions); prevents abuse while keeping costs predictable
+
+### Prompt Engineering
+- **System prompts per methodology**: Each teaching method (Socratic, Feynman, spaced repetition) has a dedicated system prompt that shapes the LLM's behavior
+- **Student context injection**: Each request includes a compressed summary of the student's knowledge state (mastered concepts, current gaps, recent errors, active methodology)
+- **Safety rails**: Content filtered to stay within curriculum scope; LLM cannot provide direct answers during Socratic mode; age-appropriate language enforcement
+
+## Security & Privacy
+
+### Data Protection
+- **Student data classification**: All student data (learning history, annotations, knowledge graph state, engagement metrics) classified as **PII** and treated accordingly
+- **Encryption**: AES-256 at rest for all databases; TLS 1.3 in transit for all API communication; field-level encryption for sensitive student identifiers
+- **Data residency**: Primary storage in AWS eu-west-1 (Ireland) or il-central-1 (Tel Aviv) to comply with Israeli Privacy Protection Law (5741-1981)
+- **Data retention**: Active student data retained for duration of subscription + 12 months; anonymized aggregate data retained indefinitely for model improvement; full deletion within 30 days of request
+
+### Regulatory Compliance
+- **Israeli Privacy Protection Law (5741-1981)**: Registration with the Israeli Law, Information and Technology Authority (ILITA) database registry; compliance with data processing requirements
+- **GDPR readiness**: Architecture designed for GDPR compliance from day one (EU expansion planned within 18 months) — data portability, right to erasure, consent management, DPO appointment
+- **COPPA considerations**: While primary target is ages 16-18 (Bagrut), system architecture supports parental consent flows for any future expansion to younger students (<16 under Israeli law, <13 under COPPA)
+- **Ministry of Education**: No formal approval required for supplementary ed-tech tools in Israel, but content alignment with official Bagrut syllabi will be independently verified by licensed teachers
+
+### Authentication & Access Control
+- **Student authentication**: Email/password with bcrypt hashing + optional social login (Google); mandatory email verification
+- **MFA**: Optional TOTP-based MFA for students; mandatory for admin and teacher accounts
+- **Session management**: JWT tokens with 1-hour expiry, refresh tokens with 30-day expiry, device-based session tracking with anomaly detection
+- **Role-based access**: Four roles — student, parent (read-only view of child's progress), teacher (class dashboard), admin (system management)
+
+### LLM-Specific Security
+- **No student PII in LLM prompts**: Student context passed to LLMs uses anonymized identifiers; real names, emails, and school names are never included in API calls to third-party model providers
+- **Prompt injection protection**: Input sanitization layer between student text input and LLM prompts; output validation ensures responses stay within educational context
+- **Audit logging**: All LLM interactions logged (prompt hash + response hash, not full content) for abuse detection and cost monitoring
+
+## Onboarding Flow Specification
+
+### Design Principle
+- The first 5 minutes must deliver immediate value — the student sees their knowledge graph populated and growing before being asked to pay or commit
+- Total onboarding target: under 4 minutes to first "aha moment" (seeing their personal knowledge map for the first time)
+
+### Step-by-Step Flow
+
+**Step 1: Signup (30 seconds)**
+- Email + password or Google social login
+- Name, grade level (11th/12th), and primary Bagrut subjects (multi-select from: Mathematics, Physics, Chemistry, Biology, Computer Science)
+- No school name required (reduces friction); optional field for cohort features later
+
+**Step 2: Diagnostic Assessment (2–3 minutes)**
+- Adaptive 10–15 question diagnostic quiz on the selected primary subject
+- Questions span Bloom's taxonomy levels (recall → application → analysis) to map depth, not just breadth
+- Uses the ALEKS-inspired Knowledge Space approach: each answer eliminates a cluster of concepts from "unknown" status
+- UI: clean, one-question-at-a-time, progress bar showing "Building your knowledge map..."
+- Student can skip questions they don't understand (skip = signal of gap, not penalized)
+
+**Step 3: Knowledge Graph Reveal (30 seconds)**
+- Animated reveal of the student's personal knowledge graph based on diagnostic results
+- Mastered concepts glow green, gaps shown as dim/gray nodes, connections animate in
+- Key moment: student sees the visual scope of what they know vs. what they need to learn
+- Call to action: "Let's light up your next node" → starts first micro-lesson
+
+**Step 4: First Micro-Lesson (2–3 minutes)**
+- System selects the highest-impact concept adjacent to an existing mastered node (minimizes cognitive load, maximizes perceived progress)
+- Lesson uses the methodology best suited to the student's diagnostic error patterns (default: Socratic for conceptual, spaced repetition for factual)
+- Lesson completes with a mastery check (2–3 questions)
+- On success: knowledge graph animates — new node lights up green, edge connects to existing knowledge
+- This is the "aha moment": the student visually sees their graph grow from their own effort
+
+**Step 5: Session Summary & Hook (30 seconds)**
+- "You mastered [concept name] and connected it to [existing concept]. Your graph grew by 1 node."
+- Streak initialized: "Day 1 — come back tomorrow to keep your streak alive"
+- Free tier limit explained: "You have 2 more concepts today, or unlock unlimited with Premium"
+- Push notification permission request (framed as "streak reminders")
+
+### Onboarding Success Criteria
+- **Completion rate target**: >75% of signups complete through Step 4 (first micro-lesson)
+- **Time to value**: <5 minutes from signup to first knowledge graph node earned
+- **Day 1 → Day 2 return rate**: >50% (driven by streak initialization and push notification opt-in)
+- **Diagnostic skip rate**: <20% of questions skipped (if higher, diagnostic is too hard or too long)

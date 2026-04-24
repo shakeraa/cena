@@ -1,0 +1,155 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Master index of 55 dedup'd findings (FD-001 through FD-055 approx) across
+  the 10 axes + competitive + cross-domain. 18 SHIP, 22 SHORTLIST, 12 DEFER,
+  3 REJECT. Red-team does not re-review each finding (covered in axis docs);
+  focuses on cross-cutting surfaces introduced collectively.
+system_purpose_fit: 4
+  rationale:
+    - Dedup + cross-examination discipline is security-positive
+    - The top-10 shortlist aligns with Cena non-negotiables
+    - Cross-cutting risks (SMS abuse, LLM cost/injection, CSV, SSO) repeat
+      across findings — a batched hardening push beats per-feature fixes
+code_reality_check:
+  claims_verified_in_code:
+    - "Single CAS writer invariant -> docs/adr/0032-cas-gated-question-ingestion.md §16.1"
+    - "TutorSafetyGuard with multilingual injection corpus -> src/actors/Cena.Actors/Tutoring/TutorSafetyGuard.cs:38-80"
+    - "Photo upload with magic-byte + moderation -> src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs"
+    - "Tenant/institute filter -> src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs"
+    - "Compliance: AdminActionAuditMiddleware + RetentionWorker -> src/shared/Cena.Infrastructure/Compliance/*"
+  claims_contradicted_by_code:
+    - "Multiple SHIP findings assume 'session token in localStorage' pattern; Cena should use httpOnly cookies — conflict with AXIS_10 L52 flagged already"
+    - "EXIF strip advertised but not implemented -> src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:241-248"
+  claims_unverifiable:
+    - "Several findings assume a non-existent parent→child claim; needs ADR (see axis4 task)"
+adr_alignment:
+  honored:
+    - ADR-0001, ADR-0002, ADR-0003, ADR-0032, ADR-0033, RDY-080
+  violated:
+    - "FD-003 as cited violates ADR-0003; FD-008 as cited violates ADR-0002"
+  missing_adr_needed:
+    - "Parent→child claim ADR (axis4)"
+    - "Minor-to-minor comms ADR (axis7)"
+    - "Wellness LLM ADR (cross-domain F5)"
+    - "CSV / SSO / offline-device policies (axis10)"
+non_negotiable_violations:
+  - "1 (CAS) — FD-008 AI grading without per-step CAS"
+  - "2 (misconception) — FD-003 as cited"
+  - "3 (dark patterns) — FD-016 team competition drift + FD-004 endorsement reputation in axis7"
+  - "4 (Bagrut reference-only) — FD-004 readiness numeric drift"
+persona_findings:
+  - severity: P0
+    finding: |
+      Six cross-cutting surfaces appear in ≥ 3 findings each and should be
+      hardened as a BATCH before individual features ship:
+      (1) LLM inbound injection guard — self-explanation / wise feedback /
+          coherence scoring / companion / socratic / wellness / translation
+      (2) Outbound SMS/WhatsApp content sanitizer — parent nudges, reminders,
+          mother-tongue messaging
+      (3) Parent→child claim binding — every parent-facing endpoint
+      (4) Minimum-cell-size / k-anonymity on class aggregates — heatmap,
+          class health pulse, cohort insights
+      (5) CSV / SSO / offline-device hardening — roster import, Google SSO,
+          offline practice mode
+      (6) RetentionWorker coverage audit — every new PII store registered
+    evidence: pre-release-review/feature-discovery-2026-04-20.md (index across axes)
+    lens_note: Red-team recommends investing in the six primitives first, then features inherit hardening.
+  - severity: P0
+    finding: |
+      The index repeats two findings that directly violate non-negotiables:
+      FD-003 (misconception 95% claim) and FD-008 (Yu et al. 2026). Both
+      surfaces must be blocked at the ship-gate until evidence is replaced
+      AND ADR-0003 / ADR-0002 technical enforcement is verified.
+    evidence: pre-release-review/feature-discovery-2026-04-20.md (index listing); pre-release-review/finding_assessment_dr_rami.md FD-003, FD-008
+    lens_note: Governance + code enforcement both needed.
+  - severity: P1
+    finding: |
+      "Quick wins" list includes Google SSO, CSV import, parent auto-
+      translation — each has the specific security caveats flagged in axis10
+      / axis4 / competitive reviews. "Quick" should not mean skipping the
+      hardening tasks.
+    evidence: pre-release-review/feature-discovery-2026-04-20.md L19 quick-wins list
+    lens_note: "Ship in <2 weeks" usually means shortcuts on auth hardening.
+  - severity: P1
+    finding: |
+      WhatsApp / SMS features appear across axis2, axis4, and competitive.
+      Implies one Twilio-like adapter. ONE outbound sanitizer + STOP-list +
+      audit pipeline must land before any of these ship, owned at the
+      infrastructure layer, not feature code.
+    evidence: pre-release-review/feature-discovery-2026-04-20.md (axis2 FD-023, axis4 FD-035, etc.)
+    lens_note: Shared infra beats feature-level copies.
+  - severity: P2
+    finding: |
+      Dedup discipline is good but one gap: RDY-069 Twilio scaffold is
+      already in the repo. The index should cross-reference in-flight RDYs
+      so security reviewers can tell "new surface" from "hardening existing
+      surface."
+    evidence: recent commit "feat(rdy-069): F5b WhatsApp phase 1B — Twilio vendor adapter scaffold"; pre-release-review/feature-discovery-2026-04-20.md
+    lens_note: Meta-critique of the index form.
+already_built:
+  - feature: Most of the platform primitives the index relies on
+    evidence: "src/shared/Cena.Infrastructure/Tenancy/TenantScope.cs; src/actors/Cena.Actors/Tutoring/TutorSafetyGuard.cs; src/shared/Cena.Infrastructure/Security/LaTeXSanitizer.cs; src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs; docs/adr/0032"
+    note: Red-team's job is to make sure features ride these rather than duplicate or bypass.
+duplicates_of_other_docs:
+  - "This IS the index — see axis1..axis10 + competitive + cross-domain + Rami + Nadia per-finding coverage"
+extracted_tasks:
+  - title: Ship the six cross-cutting hardening primitives as a batch before features
+    priority: P0
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any of the 18 SHIP findings enter the queue, land six platform
+      hardening primitives:
+      (1) TutorSafetyGuard.ValidateInbound(text) — reject-on-injection
+      (2) OutboundMessageSanitizer service for any vendor (Twilio, WhatsApp)
+      (3) TenantScope.GetChildrenFilter(user) — parent→child claim helper
+      (4) KAnonymityGate.Suppress(cells, k=5) — aggregate suppression helper
+      (5) CsvRosterValidator — size/row caps, CSV-injection reject, UTF-8
+      (6) RetentionInventory arch-test + doc — forbid new PII store without
+          registration
+      Each primitive gets its own follow-up task; this is the umbrella.
+      ## Files
+      - src/shared/Cena.Infrastructure/
+      - src/actors/Cena.Actors/Tutoring/
+      - docs/engineering/shipgate.md
+      ## Definition of Done
+      - [ ] All six primitives merged to main with tests
+      - [ ] ShipGate updated to require each
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L1-L1727]
+  - title: ShipGate rule — block features whose evidence Dr. Rami REJECTED
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Extend docs/engineering/shipgate.md with an "evidence integrity"
+      gate: Dr. Rami REJECT verdicts require replaced citation + second
+      review before the feature can enter the queue. Applies to FD-003,
+      FD-008, FD-011.
+      ## Files
+      - docs/engineering/shipgate.md
+      ## Definition of Done
+      - [ ] Rule committed
+      - [ ] FD-003, FD-008, FD-011 listed as currently blocked
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L7]
+verdict: revise
+verdict_reason: |
+  Index is high quality. Red-team recommends a batch hardening investment
+  before individual features ship — the same primitives solve threats that
+  recur across ≥3 findings each.
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: Primitives (3)(4)(6) fit bounded-context + aggregate design review
+  - to: persona-privacy
+    about: Primitives (1)(6) + retention inventory
+  - to: persona-sre
+    about: Primitive (2) outbound sanitizer needs observable cost + error surface
+  - to: persona-ethics
+    about: FD-016 / FD-004 reward / dark-pattern drift

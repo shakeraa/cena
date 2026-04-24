@@ -1,0 +1,239 @@
+doc_path: pre-release-review/axis2_motivation_self_regulation_findings.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight motivation/self-regulation features: Socratic SE prompts, if-then planners,
+  wise feedback, mastery-path visual, confidence check-ins, process-praise, SRL
+  micro-strategy prompts, and reflective study-plan generator. Research hygiene is
+  generally honest (acknowledges Macnamara/Burgoyne 2023 d=0.05 growth-mindset null).
+system_purpose_fit: 4
+  rationale:
+    - F1 (SE), F2 (implementation intentions), F5 (metacog calibration), F7 (SRL)
+      are all well-warranted cogsci interventions and fit Cena's session shape.
+    - F3 (Wise Feedback) and F6 (Process Praise) depend on social-psychology
+      priming effects with contested replication records — doc acknowledges but
+      the feature framing still leans on them.
+    - F8 (Reflective Study Plan) cites Hattie d=1.44 "self-reported grades" as
+      anchor — this is one of Hattie's most-criticized effect sizes (the measure
+      is self-prediction, not an intervention); using it to warrant a planner
+      is citation abuse.
+code_reality_check:
+  claims_verified_in_code:
+    - "Onboarding self-assessment exists and is protected by ADR-0037 -> docs/adr/0037-affective-signal-in-pedagogy.md:14-16"
+    - "Stuck-type ontology for metacognitive scaffolds -> docs/adr/0036-stuck-type-ontology.md:26-34"
+    - "CAS router for feedback on incorrect answers -> docs/adr/0031-error-pattern-matching-approach.md"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "'Growth mindset + classroom-context interaction effect' from Yeager 2019 (axis2:108-116) — cited values (0.11 grade pts, doubling in supportive classrooms) are correct but inference to Cena's product mechanism is a leap."
+  claims_unsupported_in_literature:
+    - "axis2:311 cites Hattie d=1.44 self-reported grades as warrant for F8 Study Plan Generator. This effect size is for student self-prediction of grades, not for planning interventions. The causal inference is upside-down — high self-predictors tend to be high performers; planning tools do not inherit that effect. Must be removed or retitled."
+    - "axis2:226-228 explicitly flags that standalone growth-mindset interventions have d=0.05-0.09 (Macnamara 2023; Burnette 2023). Credit for disclosing, but F3 + F6 still cite Yeager 2014/2019 as positive warrants without weighting for the 2023 null meta-analyses. The framing is inconsistent."
+adr_alignment:
+  honored:
+    - ADR-0003 (session-scoped metacog data; F5 explicitly stores session_confidence_ratings Redis-only)
+    - ADR-0037 (F2's if-then planner reads onboarding self-assessment; must stay tie-breaker only)
+  violated: []
+  missing_adr_needed:
+    - "F5 calibration — is per-session confidence aggregate a 'profile attribute'? Needs scope ADR cross-refed to ADR-0037."
+    - "F8 parent-shareable plan — parent-facing behavioral summary crosses COPPA/Israel-PPL boundary; needs privacy ADR (handoff to persona-privacy)."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F8 (Reflective Study Plan Generator) cites Hattie d=1.44 "self-reported grades"
+      as headline warrant. This is a well-known misuse of that meta-analysis — the
+      effect is student self-prediction accuracy, not an effect of planning
+      interventions. Citation must be removed; feature downgraded to DEFER until a
+      legitimate warrant is found (Winne nStudy is a usable one for the SRL-planning
+      mechanism).
+    evidence: axis2_motivation_self_regulation_findings.md:311, 316
+    lens_note: |
+      This is the single clearest "big claim, wrong mechanism" finding in the doc.
+      Dr. Kenji's citation-hygiene lens specifically flags this pattern.
+  - severity: P1
+    finding: |
+      F3 (Wise Feedback) frames Yeager's mistrust-bridging research as a core
+      mechanism for Cena. The Yeager 2014 work is on *written essay feedback in a
+      US racial context*; the transfer to Israeli Hebrew/Arabic math feedback is
+      non-trivial and the doc's claim that it addresses "Arabic-cohort trust
+      barriers" needs pilot-RCT language, not SHIP language. Replicability of
+      wise-feedback effects is contested outside the original contexts.
+    evidence: axis2_motivation_self_regulation_findings.md:107-111, 367
+    lens_note: |
+      Stay-in-lens: the *design* (high-standards + assurance-of-potential template)
+      is a sound feedback-design principle independent of the wise-feedback effect
+      size. Reframe as "two-part feedback template" and drop the mistrust-bridging
+      effect-size claim.
+  - severity: P1
+    finding: |
+      F7 (SRL Micro-Strategy Prompts) claims math-specific SRL intervention d=1.00
+      from Dignath 2008 (axis2:271-276). The 2008 meta-analysis found d=1.00 for
+      *primary-school math SRL training programs* delivered over multiple sessions.
+      Using it as the effect-size warrant for in-session micro-prompts at Bagrut
+      level is a transfer claim the literature does not support — effect sizes for
+      single-prompt in-flow interventions are typically d=0.2-0.4 at best.
+    evidence: axis2_motivation_self_regulation_findings.md:270-276
+    lens_note: |
+      Mechanism mismatch: macro SRL curriculum ≠ micro in-session prompt. Feature
+      is still worth shipping; just not at the d=1.00 advertised gain.
+  - severity: P1
+    finding: |
+      F1 (Socratic Self-Explanation Prompts) proposes LLM-validation of response
+      "conceptual coherence" (axis2:52-54). Per ADR-0003 and ADR-0037, the student's
+      free-text reasoning must not be allowed to feed a persistent mastery or
+      affective model. The doc's "stored only as aggregate scores" (axis2:357) is
+      correct in spirit, but "coherence_score" fields stored per-event (axis2:53)
+      could trivially become a behavioral profile. Must be session-scoped (Redis,
+      TTL) and explicitly excluded from any ML corpus.
+    evidence: axis2_motivation_self_regulation_findings.md:52-54, 357-358
+    lens_note: |
+      Worth keeping the SE prompt — strong cogsci warrant (Bisra 2018 g=0.55,
+      Rittle-Johnson 2017 g=0.27). But data architecture must match F5's Redis-only
+      pattern, not the default SQL storage implied by "SelfExplanationAttempt table".
+  - severity: P2
+    finding: |
+      F4 (Mastery Path Progress) frames the goal-gradient effect (Hull 1932) as
+      a warrant while *also* explicitly banning streaks and loss-mechanics (axis2:148).
+      The cogsci tension: goal-gradient research shows effort increases near goals
+      precisely because people feel the pull of an almost-closed gap — that *is*
+      a loss-proximity signal. The design (accumulation-only, no decay) likely
+      neutralizes the effect. Honest framing: "visual progress tree" without
+      invoking goal-gradient as the expected lift.
+    evidence: axis2_motivation_self_regulation_findings.md:148-154
+    lens_note: |
+      Minor — the feature is still SHIP-worthy as a cognitive-load reduction
+      ("you can see the landscape") rather than a motivational goal-gradient lever.
+already_built:
+  - feature: "Onboarding self-assessment with per-concept affective tags (F2 planner substrate)"
+    evidence: docs/adr/0037-affective-signal-in-pedagogy.md:14-16
+    note: |
+      F2's implementation intentions feature can read the existing OnboardingSelfAssessmentDocument
+      flags ("anxious" concepts) for trigger conditions. No new data model needed.
+  - feature: "Feedback-on-error surface (F3 Wise Feedback target)"
+    evidence: docs/adr/0031-error-pattern-matching-approach.md:31-42
+    note: |
+      MisconceptionCatalog + ErrorPatternMatcherEngine already classify wrong answers
+      into types. F3 needs only a feedback-template library keyed by (error_type, language).
+duplicates_of_other_docs:
+  - "axis1_pedagogy_mechanics_cena.md: F4 (Elaborative Interrogation) overlaps F1 here (Socratic SE)"
+  - "AXIS_6_Assessment_Feedback_Research.md: F8 (Confidence Calibration CBM) is the stronger version of F5 here"
+  - "feature-discovery-2026-04-20.md: FD-014 (Explainable recommendations) overlaps cogsci narrative if applied to student"
+extracted_tasks:
+  - title: "Ship F2 If-Then Session Planner reading onboarding affective tags"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Implement implementation-intentions planner that stores 1-2 student-authored
+      if-then plans per session; surface the relevant plan when trigger fires
+      (e.g., 3 wrong on geometry proof → show student's own "I will watch hint
+      video" plan). Reads existing onboarding self-assessment; does not create
+      new affective profile.
+
+      ## Files
+      - src/actors/Cena.Actors/SelfRegulation/ImplementationIntentionStore.cs (new)
+      - src/student-web/src/features/session-planner/*.vue (new)
+      - Plans scoped per session; TTL 90 days max per ADR-0003 alignment.
+
+      ## Definition of Done
+      - Plan appears at session end as 1-tap dropdown + short text.
+      - Plan is surfaced (at most once per problem) on matching triggers.
+      - Plan never influences BKT / mastery model (ADR-0037 tie-breaker only).
+      - Framing copy is "your plan", never "you failed to follow your plan".
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-if-then-planner"
+    source_doc_lines: [L64-L98]
+  - title: "Retire F8 Reflective Study Plan Generator citation of Hattie d=1.44"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Remove Hattie self-reported-grades d=1.44 citation from F8. Either re-warrant
+      using Winne nStudy / Dignath SRL evidence at realistic effect sizes, or mark
+      feature DEFER. This is a ship-blocker for evidence hygiene.
+
+      ## Files
+      - pre-release-review/axis2_motivation_self_regulation_findings.md (edit F8 section)
+      - SYNTHESIS.md should capture the retire-or-revise decision.
+
+      ## Definition of Done
+      - Hattie d=1.44 is removed as warrant.
+      - Feature either has a defensible effect-size claim or is explicitly downgraded.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f8-citation-fix"
+    source_doc_lines: [L311-L316]
+  - title: "Ship F5 Metacognitive Confidence Check-in session-scoped with Redis TTL"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Pre-problem 3-point confidence (😐 low/med/high), post-problem calibration
+      message, session-end calibration chart. Per-item data Redis-only; only an
+      aggregate calibration_r may be retained (aggregate, non-identifying).
+
+      ## Files
+      - src/actors/Cena.Actors/Metacognition/ConfidenceScorer.cs (new)
+      - src/student-web/src/features/confidence/*.vue (new)
+      - Redis key: session:{id}:confidence:{problemId} with TTL = session lifetime.
+
+      ## Definition of Done
+      - No SQL table storing per-item confidence ratings.
+      - Calibration feedback always includes an encouraging frame for under-confident students.
+      - Feature flag to disable per cohort for anxious-cohort pilots.
+      - Bare-prompts-no-feedback anti-pattern (Klar 2023) is NOT shipped — every
+        rating is paired with a calibration message.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-confidence-calibration"
+    source_doc_lines: [L180-L217]
+  - title: "F1 Socratic SE prompt — enforce Redis-only storage for responses"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      If F1 ships, ensure `SelfExplanationAttempt` is a session-scoped Redis record,
+      not a SQL table. Aggregate-only counters may be retained for engagement metrics.
+
+      ## Files
+      - src/actors/Cena.Actors/Metacognition/SelfExplanationStore.cs (new, Redis-backed)
+      - Remove SQL persistence from axis2 F1 sketch (L52-L54)
+
+      ## Definition of Done
+      - No PII-adjacent free-text stored longer than session TTL.
+      - LLM coherence scoring is one-shot; score not retained per-item.
+      - ADR-0037 referenced in code comments.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-se-redis"
+    source_doc_lines: [L52-L54]
+verdict: revise
+verdict_reason: |
+  F1, F2, F4, F5 are solid and ship-ready with the data-architecture fixes noted.
+  F3, F6 need the growth-mindset-null meta-analyses reflected in their framing.
+  F7 needs its d=1.00 claim re-scoped to single-prompt effect sizes. F8 must
+  strip the Hattie d=1.44 citation or DEFER. The doc is honest enough to
+  acknowledge many of these tensions itself — the revision is making the framing
+  match the evidence everywhere, not just in the "Research Gaps" section.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      F8 parent-share of study plans, F5 calibration aggregate retention, F2 reminders
+      via WhatsApp — all need explicit COPPA/Israel-PPL review.
+  - to: persona-ethics
+    about: |
+      F4 goal-gradient framing could slide into loss-aversion if "almost mastered"
+      copy is too urgent. Ship-gate review needed.
+  - to: persona-educator
+    about: |
+      F7 SRL prompts risk feeling interruptive to Bagrut-pressured students. Pilot
+      UX test before scaling.
+  - to: persona-finops
+    about: |
+      F1 LLM per-response coherence scoring = 1 Haiku-class call per SE prompt.
+      At high frequency this is the biggest per-student marginal cost in axis2.

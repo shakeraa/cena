@@ -1,0 +1,175 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight parent-engagement features: "Why This Topic" explainability, bilingual
+  dashboard, parent-teacher bridge messages, privacy-preserving cohort context,
+  weekly 3-2-1 snapshot, encouragement SMS nudges, culturally-localized parent
+  views, and Bagrut countdown dashboard. Primarily a UX/communication doc — only
+  narrow cogsci claims to evaluate.
+system_purpose_fit: 3
+  rationale:
+    - Most features are parent-UX engineering with light cogsci warrants; they
+      do not touch Cena's core learning loop.
+    - F6 "growth-framed SMS nudges" cites behavioral-economics + FASTalk but
+      edges into the same replication-fragile growth-mindset territory axis2
+      already flags.
+    - F4 (privacy-preserving cohort context) and F5 (3-2-1 weekly snapshot) are
+      cognitive-load-reduction plays for parents and fit docs/cognitive-load-progressive-disclosure-research.md
+      principles applied to the parent surface.
+code_reality_check:
+  claims_verified_in_code:
+    - "Bilingual (he/ar) strings framework already in scope (memory: feedback_language_strategy) — F2 is reassertion."
+    - "Misconception data session-scoped (F4's differential-privacy framing honors ADR-0003)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "F6 'Bedtime Math Berkowitz 2015 Science DOI:10.1126/science.aac7427' — citation exists but the finding (parent-child interaction overcoming parent math anxiety) is narrow to family routines; extrapolation to SMS nudges is an inference leap."
+  claims_unsupported_in_literature:
+    - "F6 claim that FASTalk SMS produces '0.5-1.1 months additional growth' is from a single eval in Oakland, with strong contextual caveats Dr. Rami would catch. Doc does not disclose that Welch 2018 was a district-scale program evaluation, not a controlled RCT."
+    - "F3 ClassDojo structured-messaging claim (93% of families 'learning new ways to support') is self-report from a program designer — not peer-reviewed evidence."
+adr_alignment:
+  honored:
+    - ADR-0003 (F4 differential privacy; F5 'uses only completion/progress metrics')
+    - "Non-negotiable 3 (no dark patterns) — all parent-facing features explicitly bar loss-framing"
+  violated: []
+  missing_adr_needed:
+    - "F7 'cultural_view_profile' enum assigns collectivist/individualist dashboard variants. Profile is parent-selected (not auto-assigned), but the construct could shift to auto-classification later. Needs explicit ADR banning auto-classification by language/demographic."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F6 (Encouragement Nudges via SMS) draws evidence from Berkowitz 2015 Bedtime
+      Math (a parent-child interaction study, N≈600 families, first-grade, app-
+      mediated problems at home) to warrant SMS growth-mindset messages to
+      parents of 12-18-year-olds. The mechanism, age range, and delivery channel
+      are all different. Keep the feature (low-cost, well-designed) but replace
+      the effect-size framing with "behavior-nudge evidence, effect size uncertain
+      in this context; pilot required".
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:232-241
+    lens_note: |
+      Stay in lens: the cogsci claim is about how the parent supports the learner.
+      Berkowitz's finding is about parent-child co-doing-math; SMS to parents
+      is at best a downstream motivational prompt. Evidence transfer is weak.
+  - severity: P2
+    finding: |
+      F4 (Privacy-Preserving Cohort Context) frames "social norm information is
+      motivating when presented anonymously" from general behavioral-econ. For
+      12-18-year-olds' parents in a high-stakes exam context, social-norm
+      information can *increase* anxiety (Dr. Nadia might add: collectivist-culture
+      Arab parents may read "students like yours typically need 15-20 problems"
+      as competitive benchmark not reassurance). The doc flags this at L180 as
+      borderline and proposes content-design review. That mitigation must be in
+      DoD — not a post-hoc hope.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:150-182
+    lens_note: |
+      Cognitive-load / anxiety interaction. Parent-facing "norm" copy is a classic
+      case where cogsci evidence in one context (health choice architecture) is
+      not transferable without user research.
+  - severity: P2
+    finding: |
+      F1 ("Why This Topic" Explainability Card) and the companion axis9 feature
+      (explainable AI) both operate on the diagnostic-result level. Cogsci view:
+      transparency aids *trust* (meta-analytic trust literature) but the
+      learning-outcome effect of parent-facing explanations on the *student* is
+      not established. Feature is worth shipping for trust reasons; do not claim
+      learning lift without evidence.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:30-40
+    lens_note: "Trust ≠ learning. Keep claims scoped to parent NPS, not student outcomes."
+  - severity: P2
+    finding: |
+      F8 (Bagrut Countdown Dashboard) relies on deadline-driven urgency. Cena's
+      non-negotiable 3 bans loss-aversion, not urgency per se, but a 180-day
+      countdown is psychologically close enough to deserve explicit ship-gate
+      review. Doc's own mitigation ("'You have time to master 3 more topics' >
+      'Only 45 days left!'") is correct; belongs in DoD.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:312-344
+    lens_note: "Hand off to persona-ethics — this is primarily a dark-pattern-adjacent call."
+already_built:
+  - feature: "Bilingual he/ar framework (F2)"
+    evidence: "User memory feedback_language_strategy; existing i18n infra in Cena admin/student-web."
+    note: "F2 is reassertion; scope should be 'translation coverage expansion + RTL parent view'."
+duplicates_of_other_docs:
+  - "axis9_data_privacy_trust_mechanics.md: Feature 1 'Why This Problem' overlaps F1 here"
+  - "axis9_data_privacy_trust_mechanics.md: Feature 7 'Cohort Insights' overlaps F4 here"
+  - "cena_competitive_analysis.md: FEATURE 6 Auto-Translation Parent Communications overlaps F2 here"
+  - "AXIS_10_Operational_Integration_Features.md: Feature 8 Data Portability overlaps F1's transparency angle"
+extracted_tasks:
+  - title: "Ship F5 Weekly 3-2-1 Snapshot using existing progress metrics only"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Weekly cron composes a 3-2-1 (accomplishments, current topics, support tip)
+      email/SMS for parents from existing aggregate progress data. No misconception
+      content ever included (ADR-0003). Language from parent profile.
+
+      ## Files
+      - src/admin/api/ParentDigestJob.cs (new)
+      - src/actors/Cena.Actors/Outreach/WeeklyDigestBuilder.cs (new)
+
+      ## Definition of Done
+      - No per-error-type data in digest body.
+      - Celebration-only framing; no percentile comparisons.
+      - Parent opt-in; send frequency capped.
+      - He/ar/ru/am translation pipeline used.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-weekly-321-snapshot"
+    source_doc_lines: [L186-L223]
+  - title: "Pilot F6 SMS Nudges with effect-size-honest framing + hard opt-out"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Ship first 20 Hebrew/Arabic nudge templates with 2-3x/week cap and hard opt-out.
+      Remove the Berkowitz 2015 "0.5-1.1 month" claim from framing; replace with
+      "pilot; uncalibrated effect in Cena context."
+
+      ## Files
+      - src/actors/Cena.Actors/Outreach/ParentNudgeScheduler.cs
+      - Content packs under data/nudge-templates/{he,ar,ru,am}/ (20 each)
+
+      ## Definition of Done
+      - Parent can opt out in 1 tap; opt-out state never lost.
+      - Template text reviewed for no-shame / no-loss-aversion.
+      - No student PII in SMS body.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-parent-nudges"
+    source_doc_lines: [L227-L266]
+  - title: "ADR: parent 'cultural view' must be self-selected, never auto-classified"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Write ADR banning any auto-classification of parent or student into
+      'collectivist/individualist' or cultural dashboard variants. If F7 ships,
+      profile must be explicit parent selection only.
+
+      ## Files
+      - docs/adr/00XX-no-cultural-auto-classification.md
+
+      ## Definition of Done
+      - ADR accepted and linked from F7 feature doc.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-cultural-adr"
+    source_doc_lines: [L269-L305]
+verdict: adopt
+verdict_reason: |
+  From the cogsci lens, only F4, F5, F6 have substantive cogsci claims to evaluate;
+  the rest are parent-UX/a11y/privacy. F5 is ship-ready. F6 needs citation-honesty
+  revision. F4 needs the anxiety-interaction mitigation baked into DoD. Other
+  features are adopt-with-handoff to the right lens.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "F1 transparency, F4 differential privacy, F8 bagrut-exam-date storage — all privacy-first."
+  - to: persona-a11y
+    about: "F2 bilingual dashboard RTL, F7 cultural localization — a11y lens core."
+  - to: persona-ethics
+    about: "F8 countdown timer — dark-pattern-adjacent; ship-gate review."
+  - to: persona-ministry
+    about: "F8 Bagrut-date accuracy + F4 reference data claims need Bagrut-examiner lens review."

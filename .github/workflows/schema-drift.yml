@@ -1,0 +1,170 @@
+# =============================================================================
+# DB-04: Schema-drift CI gate
+#
+# Runs on every PR that touches backend code or migration files.
+# 1. Spins up a fresh Postgres 16 + pgvector container
+# 2. Applies all committed migrations via Cena.Db.Migrator
+# 3. Enforces append-only migration discipline (no edits to merged V*.sql)
+# 4. Enforces monotonic version numbering
+#
+# NOTE: The current Cena.Db.Migrator (DB-02) does not yet have a `validate`
+# sub-command to diff Marten config against the applied schema. When DB-03
+# ships the Marten reconciliation mode, add a step here:
+#   - name: Validate Marten config matches DB
+#     run: dotnet run --project src/api/Cena.Db.Migrator -c Release -- validate
+#     env:
+#       ConnectionStrings__cena_migrator: "${{ env.CONN }}"
+# =============================================================================
+
+name: Schema Drift Gate
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'db/migrations/**'
+      - 'src/api/Cena.Db.Migrator/**'
+      - 'src/actors/Cena.Actors/Configuration/MartenConfiguration.cs'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'db/migrations/**'
+      - 'src/api/Cena.Db.Migrator/**'
+      - 'src/actors/Cena.Actors/Configuration/MartenConfiguration.cs'
+
+env:
+  CONN: "Host=localhost;Port=5432;Database=cena;Username=cena;Password=cena"
+
+jobs:
+  schema-drift:
+    name: Schema drift detection
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: cena
+          POSTGRES_PASSWORD: cena
+          POSTGRES_DB: cena
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      - name: Create cena schema
+        run: |
+          PGPASSWORD=cena psql -h localhost -U cena -d cena -c "CREATE SCHEMA IF NOT EXISTS cena;"
+
+      - name: Restore and build Migrator
+        run: |
+          dotnet restore src/api/Cena.Db.Migrator/Cena.Db.Migrator.csproj
+          dotnet build src/api/Cena.Db.Migrator/Cena.Db.Migrator.csproj -c Release --no-restore
+
+      - name: Apply migrations
+        run: dotnet run --project src/api/Cena.Db.Migrator -c Release --no-build -- "$CONN"
+
+      # -----------------------------------------------------------------
+      # Marten validate step -- uncomment when DB-03 ships validate mode
+      # - name: Validate Marten config matches DB
+      #   run: dotnet run --project src/api/Cena.Db.Migrator -c Release -- validate
+      #   env:
+      #     ConnectionStrings__cena_migrator: "${{ env.CONN }}"
+      # -----------------------------------------------------------------
+
+  migration-discipline:
+    name: Migration append-only + monotonic numbering
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce append-only migrations
+        run: |
+          echo "::group::Checking for modified (non-new) migration files"
+          # Files in db/migrations/V*.sql that changed between main and this branch
+          CHANGED=$(git diff --name-only origin/main...HEAD -- 'db/migrations/V*.sql' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No migration files changed -- OK"
+            exit 0
+          fi
+
+          VIOLATIONS=""
+          for f in $CHANGED; do
+            # If the file exists on origin/main, it was modified (not newly added)
+            if git show "origin/main:$f" > /dev/null 2>&1; then
+              VIOLATIONS="$VIOLATIONS\n  - $f"
+            fi
+          done
+
+          if [ -n "$VIOLATIONS" ]; then
+            echo "::error::Existing migration files were modified. Migrations are append-only."
+            echo ""
+            echo "The following files exist on main and were edited in this PR:"
+            echo -e "$VIOLATIONS"
+            echo ""
+            echo "Fix: revert changes to these files and create a new V*__*.sql migration instead."
+            exit 1
+          fi
+
+          echo "All changed migration files are new additions -- OK"
+          echo "::endgroup::"
+
+      - name: Enforce monotonic version numbering
+        run: |
+          echo "::group::Checking migration version numbering"
+
+          # Extract the highest version number on main
+          MAIN_MAX=$(git ls-tree -r --name-only origin/main -- db/migrations/ \
+            | grep -oP 'V\K[0-9]+' \
+            | sort -n \
+            | tail -1 || echo "0")
+          MAIN_MAX=${MAIN_MAX:-0}
+          # Strip leading zeros for arithmetic
+          MAIN_MAX=$((10#$MAIN_MAX))
+          echo "Highest migration version on main: V$(printf '%04d' $MAIN_MAX)"
+
+          # Find new migration files added in this PR
+          NEW_FILES=$(git diff --name-only --diff-filter=A origin/main...HEAD -- 'db/migrations/V*.sql' || true)
+          if [ -z "$NEW_FILES" ]; then
+            echo "No new migration files in this PR -- OK"
+            exit 0
+          fi
+
+          echo "New migration files in this PR:"
+          echo "$NEW_FILES"
+          echo ""
+
+          # Extract and sort version numbers from new files
+          VERSIONS=$(echo "$NEW_FILES" | grep -oP 'V\K[0-9]+' | sort -n)
+
+          EXPECTED=$((MAIN_MAX + 1))
+          FAIL=false
+          for v in $VERSIONS; do
+            ACTUAL=$((10#$v))
+            if [ "$ACTUAL" -ne "$EXPECTED" ]; then
+              echo "::error::Migration version gap: expected V$(printf '%04d' $EXPECTED) but found V$(printf '%04d' $ACTUAL)"
+              FAIL=true
+              break
+            fi
+            EXPECTED=$((EXPECTED + 1))
+          done
+
+          if [ "$FAIL" = true ]; then
+            echo ""
+            echo "Fix: rename your migration(s) so versions are contiguous starting from V$(printf '%04d' $((MAIN_MAX + 1)))"
+            exit 1
+          fi
+
+          echo "Migration version numbering is monotonic and contiguous -- OK"
+          echo "::endgroup::"

@@ -1,0 +1,223 @@
+doc_path: pre-release-review/AXIS_4_Parent_Engagement_Cena_Research.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 parent-engagement features: "why this topic" card, bilingual dashboard,
+  parent-teacher bridge messages, privacy-preserving cohort context, weekly
+  3-2-1 chapter snapshot, growth-framed SMS nudges, culturally-localized
+  parent views, Bagrut countdown crisis mode. SHIP: F1-3, F5, F6, F8. SHORTLIST: F4, F7.
+
+system_purpose_fit: 3
+  rationale:
+    - Parent-engagement features are important for retention but largely
+      orthogonal to the pedagogical lens. Some sub-details (what "progress"
+      is shared, Bagrut-countdown tone) directly affect whether the student
+      experiences healthy study pressure vs. parental anxiety bleed-through.
+    - ADR-0003 respected — no misconception sharing with parents.
+    - Minus because the "Bagrut countdown" feature risks operationalizing
+      exam-anxiety rather than helping, and the "share with parent" posture
+      in F3 bridge-messages can short-circuit teacher autonomy.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "ParentDigest system exists" -> src/actors/Cena.Actors/ParentDigest/
+    - "Parental controls exist" -> src/actors/Cena.Actors/ParentalControls/
+    - "Explanation generator exists — could back F1 Why-This-Topic card" -> src/actors/Cena.Actors/Services/ExplanationGenerator.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Differential privacy pipeline for F4 cohort context" — no evidence of DP/k-anonymity infrastructure.
+
+adr_alignment:
+  honored:
+    - ADR-0003 (no per-student misconception data shared with parents)
+    - Ship-gate (F5 3-2-1 snapshot avoids loss framing; F8 countdown "needs
+      careful design" per doc)
+  violated:
+    - Potentially non-negotiable #3 (no dark-pattern engagement). F8
+      "Crisis Mode Bagrut Countdown Dashboard" is a countdown timer — one
+      of the classic loss-aversion patterns the ship-gate bans. Verdict
+      section says "ensure positive framing" but the mechanic itself is
+      loss-aversion. Needs revise/retire.
+  missing_adr_needed:
+    - Parent-data-scope ADR: what exactly can parents see? Topic names vs
+      accuracy rates vs time-on-task. Needs explicit policy.
+
+non_negotiable_violations:
+  - "#3 (no dark-pattern engagement): F8 Bagrut Countdown is a countdown
+    timer — this is loss-aversion by mechanic, not by framing."
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 8 (Crisis Mode Bagrut Countdown Dashboard) is a countdown
+      timer showing days-until-exam. Countdown timers are a textbook
+      loss-aversion pattern — every day that passes is a "loss" from the
+      student's remaining prep runway. The doc mentions "positive framing"
+      as a mitigation but the mechanic itself is the problem. A veteran
+      teacher knows: parents who see "18 days until Bagrut" get anxious and
+      pressurize the child; the child's anxiety goes up; performance goes
+      down. Ship-gate bans this class of mechanic (GD-004 banned-terms list).
+      Retire the countdown; replace with "this week's focus" rolling view.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md summary table row F8, docs/engineering/shipgate.md
+    lens_note: |
+      I have watched parents print countdown timers and tape them to
+      fridges. It does not help the kid. It helps the parent feel active.
+  - severity: P1
+    finding: |
+      Feature 3 (Parent-Teacher Bridge Messages) pre-populates messages with
+      student progress context (completion %, gap skills). In IL classroom
+      culture, a parent forwarding an AI-generated "Cena identified gaps in
+      X" message to a teacher can feel like second-guessing the teacher's
+      own assessment — and teachers push back hard. Field-test the message
+      templates with real IL teachers, not just ClassDojo/IXL precedents.
+      Consider: default to "celebrating progress" templates only; only
+      "discuss gaps" templates require the teacher to have enabled them.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L108-L142
+    lens_note: |
+      Teacher-parent rapport in Israel is a delicate thing. An EdTech
+      product handing parents ammunition is a quick way to get banned
+      school-wide.
+  - severity: P1
+    finding: |
+      Feature 5 (Weekly 3-2-1 Snapshot) includes "1 way to support at home"
+      as a directive to parents. The implicit assumption is that parents can
+      support Bagrut math at home — which is false for 70%+ of parents
+      whose own math stopped at 3-unit level. Worse, an incorrect "support"
+      suggestion can teach the student a wrong method that conflicts with
+      Cena's CAS-verified approach. Suggestions should either be purely
+      affective ("ask her what she's most proud of this week"), or gated to
+      non-math tasks (study schedule support, nutrition, sleep).
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L188-L199
+    lens_note: |
+      "Support at home" in math is a minefield. I've seen parents teach
+      long division the "wrong way" (that worked in 1980) and kids fail
+      standardized tests as a result. Keep parents in the emotional-support
+      lane.
+  - severity: P2
+    finding: |
+      Feature 1 (Why This Topic Card) — excellent in concept. The doc says
+      "template-based NLG, not LLM, to avoid hallucination" — this is correct
+      and aligns with Cena's ExplanationGenerator (src/actors/Cena.Actors/
+      Services/ExplanationGenerator.cs). Make sure the card is kept to ≤3
+      sentences; parents do not read long explanations. Also: explanations
+      must reference what the student *did in the session*, not just "the
+      diagnostic says X," because sessions are what parents can see via
+      ParentDigest — any reference to something beyond the session risks
+      ADR-0003 ambiguity.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L27-L62, src/actors/Cena.Actors/ParentDigest/, src/actors/Cena.Actors/Services/ExplanationGenerator.cs
+    lens_note: |
+      Good feature, small guardrails needed on length and data sourcing.
+  - severity: P2
+    finding: |
+      Feature 2 (Bilingual Parent Dashboard) — "Hebrew, Arabic, Russian,
+      Amharic." Amharic is listed as future — per memory
+      feedback_language_strategy.md, the stack is English primary, Hebrew
+      /Arabic secondary. Russian is an Israel-specific add; Amharic
+      likely DEFER. The math-term translation table needs pedagogue review
+      per dialect (Lebanese/Palestinian Arabic math terms can differ from
+      MSA). Don't ship "Russian and Amharic" as same-sprint claim.
+    evidence: AXIS_4_Parent_Engagement_Cena_Research.md:L86-L102
+    lens_note: |
+      Realistic scope: he/ar first, en backstop, ru optional, am deferred.
+
+already_built:
+  - feature: "Parent digest / parental controls"
+    evidence: src/actors/Cena.Actors/ParentDigest/, src/actors/Cena.Actors/ParentalControls/
+    note: |
+      The digest + controls infrastructure exists. F1/F5/F6 can ride on
+      this; F4/F8 need new infra.
+
+duplicates_of_other_docs:
+  - cena_competitive_analysis.md: Feature 6 Auto-Translation Parent Communications (same as F2+F3)
+  - AXIS_10_Operational_Integration_Features.md: Google Classroom, Mashov (overlapping data sources for parent views)
+  - feature-discovery-2026-04-20.md: FD-034 Auto-translation for parents (same as F3)
+
+extracted_tasks:
+  - title: "Retire Bagrut countdown timer; replace with rolling week-focus card"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Explicitly retire F8 "Crisis Mode Bagrut Countdown Dashboard" as
+      violating non-negotiable #3 (no dark-pattern engagement — loss-
+      aversion mechanic). Replace with a "this week's focus" rolling view
+      that does not surface days-to-exam as a countdown.
+      ## Files
+      - docs/adr/ (new ADR: "no-countdown-timers")
+      - pre-release-review/reviews/retired.md (append)
+      ## Definition of Done
+      - ADR locks the retirement with reference to shipgate.md + GD-004.
+      - Replacement card design brief: 3 topics this week, no countdown.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: retire-bagrut-countdown"
+    source_doc_lines: [L21 summary row F8]
+  - title: "Gate parent-teacher bridge messages behind teacher opt-in"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F3 bridge-messages must not surface "discuss gaps" templates to a
+      parent unless the teacher has enabled that teacher-facing feature.
+      Default parent templates are "celebrate progress" only. Teacher can
+      opt-in to receiving gap/discussion messages.
+      ## Files
+      - src/actors/Cena.Actors/Outreach/ (new BridgeMessageGate.cs)
+      - src/admin/full-version/ (teacher settings page for bridge-message
+        opt-in)
+      ## Definition of Done
+      - Teacher-scope opt-in persisted per class.
+      - Parent UI only shows gap-discussion templates when teacher opted in.
+      - Test: opt-out teacher → parent sees only celebration templates.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: bridge-message-teacher-opt-in"
+    source_doc_lines: [L108-L142]
+  - title: "Constrain weekly 3-2-1 'support at home' suggestions to non-math"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F5 weekly snapshot "1 way to support at home" template library must
+      never suggest a math teaching action. Options limited to: (a) ask
+      child what they're proud of, (b) schedule-support, (c) sleep/
+      nutrition-support, (d) celebrate effort.
+      ## Files
+      - content/parent-snapshot-templates/ (new)
+      - src/actors/Cena.Actors/ParentDigest/ (template loader)
+      ## Definition of Done
+      - No "help them practice X" or "try Y method" templates.
+      - Template library reviewed by IL classroom teacher.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: non-math-parent-support-templates"
+    source_doc_lines: [L188-L199]
+
+verdict: revise
+verdict_reason: |
+  F8 Bagrut countdown must be retired (violates ship-gate dark-pattern
+  rules). F3 bridge messages and F5 parent support suggestions need
+  pedagogue-level guardrails to prevent parent-teacher friction and wrong-
+  method teaching at home. The rest are workable.
+
+cross_lens_handoff:
+  - to: persona-ethics
+    about: |
+      F8 Bagrut countdown — primary ethics review. F5 micro-milestone
+      celebrations frequency also needs ethics-lens review for variable-
+      ratio risk.
+  - to: persona-privacy
+    about: |
+      F4 differential-privacy cohort context — privacy should validate
+      the proposed epsilon=1.0 budget against ADR-0003 and the k≥10
+      anonymity rule; also F3 message privacy (parent sees child's gaps
+      — consent + student's age-of-reason).
+  - to: persona-a11y
+    about: |
+      F2 Bilingual RTL dashboard — a11y should validate RTL mirroring,
+      contrast for age-appropriate reading, and WCAG for parents who may be
+      older/low-literacy.
+  - to: persona-ministry
+    about: |
+      F1 Why-this-topic card must not imply a guaranteed Bagrut outcome
+      (RDY-080) when explaining "this topic connects to Bagrut requirements."

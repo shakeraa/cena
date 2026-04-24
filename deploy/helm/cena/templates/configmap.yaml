@@ -1,0 +1,18 @@
+# RDY-025: Non-secret configuration. All secrets live in separate Secret resources
+# referenced by name via values.yaml (firebase.secretName, nats.secretName, etc.).
+#
+# NOTE: Cluster:Provider is NOT set here. Proto.Cluster.Kubernetes NuGet is not
+# yet installed in Cena.Actors.Host.csproj — Program.cs:334-338 throws when
+# Cluster:Provider=kubernetes. Deploy will crashloop until RDY-025b is done.
+# See deploy/DEPLOYMENT.md § Known Blockers.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "cena.fullname" . }}-config
+  labels:
+    {{- include "cena.labels" . | nindent 4 }}
+data:
+  firebase.projectId: {{ .Values.firebase.projectId | quote }}
+  cluster.name: {{ .Values.actors.cluster.name | quote }}
+  logging.level: {{ .Values.logging.level | quote }}
+  aspnetcore.environment: {{ .Values.aspnetcoreEnvironment | quote }}

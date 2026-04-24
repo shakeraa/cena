@@ -1,0 +1,84 @@
+# =============================================================================
+# Cena Platform — Critical alert rules (EPIC-PRR-L PRR-434)
+#
+# Materializes the 6 CriticalAlert records from
+# src/shared/Cena.Infrastructure/Observability/ObservabilityConfiguration.cs
+# as live Prometheus alert rules. Keep IDs in sync with that file — the
+# ObservabilityAudit test (PRR-434 DoD) enforces that every CriticalAlert
+# record has a matching Prometheus rule here and vice versa.
+#
+# Alertmanager routing lives in config/alertmanager.yml — this file only
+# defines which conditions fire which alert.
+# =============================================================================
+
+groups:
+  - name: cena-critical-alerts
+    interval: 30s
+    rules:
+      # ALERT-CAS-001 — SymPy sidecar unreachable
+      - alert: CasSidecarDown
+        expr: up{service="sympy-sidecar"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          alert_id: ALERT-CAS-001
+        annotations:
+          summary: "CAS sidecar down (SymPy verification degraded)"
+          description: "SymPy sidecar hasn't reported healthy for 2 minutes. Step-solver verification is degraded; students will see 'verification unavailable' fallback. Check docker logs cena-sympy-sidecar."
+
+      # ALERT-COST-001 — Daily LLM cost exceeded
+      - alert: DailyCostExceeded
+        expr: cena_llm_daily_cost_usd > cena_llm_daily_cost_budget_usd
+        for: 1h
+        labels:
+          severity: warning
+          alert_id: ALERT-COST-001
+        annotations:
+          summary: "Daily LLM cost exceeded budget"
+          description: "Aggregated LLM token spend for today exceeds the configured daily budget. Investigate traffic anomaly or a leaky loop. Circuit breaker should have fired — verify cena_cost_circuit_breaker_state."
+
+      # ALERT-ERR-001 — API error rate > 5%
+      - alert: ErrorRateHigh
+        expr: |
+          sum(rate(http_server_requests_seconds_count{service=~"admin-api|student-api|actor-host",status=~"5.."}[5m]))
+            / sum(rate(http_server_requests_seconds_count{service=~"admin-api|student-api|actor-host"}[5m])) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          alert_id: ALERT-ERR-001
+        annotations:
+          summary: "API 5xx rate > 5% (critical)"
+          description: "5xx rate across Cena APIs exceeds 5% over the last 5m. Check the service dimension to identify the affected host. Usually correlates with a downstream dependency failing."
+
+      # ALERT-QUEUE-001 — NATS queue depth > 100
+      - alert: QueueDepthHigh
+        expr: nats_jetstream_stream_state_messages > 100
+        for: 5m
+        labels:
+          severity: warning
+          alert_id: ALERT-QUEUE-001
+        annotations:
+          summary: "NATS queue depth > 100"
+          description: "NATS/outbox queue depth has stayed above 100 for 5 minutes — consumers are falling behind. Check cena-actor-host NatsOutboxPublisher logs."
+
+      # ALERT-EXAM-001 — Exam integrity violation
+      - alert: ExamIntegrityViolation
+        expr: increase(cena_exam_integrity_violations_total[1m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          alert_id: ALERT-EXAM-001
+        annotations:
+          summary: "Exam integrity anomaly detected"
+          description: "High-confidence anomaly flagged during an active exam simulation. Immediate review required — see structured log emitted by AnomalyDetector."
+
+      # ALERT-CSAM-001 — CSAM detection
+      - alert: CsamDetection
+        expr: increase(cena_photo_csam_flags_total[30s]) > 0
+        for: 0s
+        labels:
+          severity: critical
+          alert_id: ALERT-CSAM-001
+        annotations:
+          summary: "CSAM flag fired in photo ingestion pipeline"
+          description: "Photo ingestion flagged content requiring immediate review. Quarantine workflow should have fired automatically — verify and follow NCMEC workflow (EPIC-PRR-H §3.1 PRR-249)."

@@ -1,0 +1,80 @@
+{
+  "schema_version": "1.0",
+  "runner": "cascade_prototype",
+  "source": "synthetic://student_photo/calculus_01",
+  "hints": {
+    "subject": "math",
+    "language": "he",
+    "track": "5u",
+    "source_type": "student_photo",
+    "taxonomy_node": null,
+    "expected_figures": false
+  },
+  "pdf_triage": null,
+  "text_blocks": [
+    {
+      "text": "חשב את הנגזרת: f(x) = x^3 - 2x^2 + 5x - 7, f'(x) = ?",
+      "bbox": {
+        "x": 62,
+        "y": 180,
+        "w": 520,
+        "h": 38,
+        "page": 1
+      },
+      "language": "he",
+      "confidence": 0.91,
+      "is_rtl": true
+    }
+  ],
+  "math_blocks": [
+    {
+      "latex": "f(x) = x^3 - 2x^2 + 5x - 7",
+      "bbox": {
+        "x": 180,
+        "y": 220,
+        "w": 200,
+        "h": 30,
+        "page": 1
+      },
+      "confidence": 0.87,
+      "sympy_parsed": true,
+      "canonical_form": "auto"
+    },
+    {
+      "latex": "f'(x)",
+      "bbox": {
+        "x": 180,
+        "y": 260,
+        "w": 200,
+        "h": 30,
+        "page": 1
+      },
+      "confidence": 0.87,
+      "sympy_parsed": true,
+      "canonical_form": "auto"
+    }
+  ],
+  "figures": [],
+  "overall_confidence": 0.89,
+  "fallbacks_fired": [],
+  "cas_validated_math": 2,
+  "cas_failed_math": 0,
+  "human_review_required": false,
+  "reasons_for_review": [],
+  "layer_timings_seconds": {
+    "layer_0_preprocess": 0.42,
+    "layer_1_layout": 0.78,
+    "layer_2a_text": 1.15,
+    "layer_2b_math": 0.32,
+    "layer_3_reassemble": 0.01,
+    "layer_4_gate": 0.0,
+    "layer_5_cas": 0.01
+  },
+  "total_latency_seconds": 2.69,
+  "captured_at": "2026-04-16T12:00:00Z",
+  "_dev_fixture": {
+    "scenario": "student-photo-calculus-5u",
+    "source_kind": "synthesized",
+    "notes": "Synthetic student photo — safe to ship verbatim."
+  }
+}

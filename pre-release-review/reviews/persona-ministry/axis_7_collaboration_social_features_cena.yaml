@@ -1,0 +1,184 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Seven privacy-preserving peer-learning features: anonymized peer explanation
+  circles, teacher-mediated micro groups, team-vs-challenge cooperative
+  competitions, async anonymous Q&A with endorsement, "I''m confused too"
+  signal, reciprocal peer tutoring matcher, collaborative whiteboard with
+  teacher oversight. Ministry lens: peer-generated mathematical content
+  becomes a Bagrut-fidelity question (are peer explanations CAS-verifiable?)
+  and a Ministry-trust question (schools answerable for peer-to-peer content).
+system_purpose_fit: 2
+  rationale:
+    - Peer explanations (F1) are mathematical content generated outside the
+      CAS-gate ingestion pipeline. ADR-0002 non-negotiable #4 says no math
+      reaches students unverified. A peer-recorded 30-second explanation
+      with a wrong method or a wrong answer would violate that — fidelity
+      hole.
+    - F2, F5, F6, F7 involve content routing between students. Under-18
+      cohort + Israeli school context means this is regulated speech.
+      Ministry lens cares about (a) accuracy of math content, (b) child-
+      safeguarding under PPD/COPPA, (c) school-consent traceability.
+    - F3 Team vs. Challenge Cooperative Competitions is the closest thing
+      to the shipgate-banned variable-ratio reward mechanics — needs
+      explicit audit.
+code_reality_check:
+  claims_verified_in_code:
+    - 'Shipgate banned-term scanner exists: docs/engineering/shipgate.md + memory:feedback_shipgate_banned_terms.md (streak counters, loss-aversion, variable-ratio)'
+    - 'ADR-0002 / CAS gate per-question is mandatory for math content reaching students'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'F1 "ephemeral 24-hour retention" of peer voice explanations — no storage design found'
+    - 'F3 "team vs challenge competition" mechanics — whether these trigger shipgate scanner depends on copy'
+adr_alignment:
+  honored:
+    - 'ADR-0003 session-scope honored in most features (F5 "confused too" signal is explicitly ephemeral)'
+  violated:
+    - 'ADR-0002 potentially — F1 peer explanations are math content reaching students without SymPy verification. The spec says "ephemeral" but ephemeral-and-wrong still mis-teaches a student.'
+  missing_adr_needed:
+    - 'Peer-generated-math-content ADR — whether peer content is treated as CAS-gated (requires validation) or as "non-math UI chat" (exempt but policed). Current doc is silent on this.'
+non_negotiable_violations:
+  - 4  # Bagrut reference-only / CAS-gated content — peer explanations sidestep this
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 1 "Anonymized Peer Explanation Circles" lets a peer record a
+      30-second explanation shown to a struggling peer. If that peer''s
+      explanation is mathematically wrong, Cena has shipped unverified
+      math content to a student — a direct ADR-0002 / non-negotiable #1
+      violation. The "ephemeral 24-hour" retention does not mitigate
+      this; the harm is "student saw and internalized a wrong
+      explanation". Either: (a) peer explanations must pass a
+      lightweight CAS gate (semantic equivalence check vs the known
+      solution path), or (b) peer explanations are routed to teacher
+      moderation before the other student sees them. Neither is in
+      the spec.
+    evidence: 'AXIS_7_Collaboration_Social_Features_Cena.md:L408-L435 (F1 description); docs/adr/0002-sympy-correctness-oracle.md; docs/adr/0032-cas-gated-question-ingestion.md (gate applies to all math-reaching-students paths)'
+    lens_note: |
+      Ministry lens: peer-mediated instruction is pedagogically valid
+      but the *platform* is still responsible for the math content
+      accuracy. "Ephemeral" does not absolve us.
+  - severity: P1
+    finding: |
+      Feature 3 "Team vs. Challenge Cooperative Competitions" is the
+      feature most likely to attract shipgate scanner hits (variable-
+      ratio rewards, loss-aversion framing around team vs challenge).
+      Doc claims guardrail compliance but doesn''t show how the
+      competition is designed to avoid streak/variable-ratio mechanics.
+      Needs an explicit audit.
+    evidence: 'AXIS_7_Collaboration_Social_Features_Cena.md:L396 (summary row); docs/engineering/shipgate.md; memory:feedback_shipgate_banned_terms.md'
+    lens_note: |
+      Ministry lens: competition = gamification = scanner trip-wire
+      zone. Pre-audit required.
+  - severity: P1
+    finding: |
+      Feature 7 "Collaborative Math Whiteboard" — realtime whiteboard
+      with peer and teacher — generates math content that reaches
+      students. Same ADR-0002 concern as F1, plus real-time data flow
+      that is harder to audit. For Ministry-lens: the teacher oversight
+      mentioned must be structural (teacher approves before student
+      peer sees), not just "teacher can view".
+    evidence: 'AXIS_7_Collaboration_Social_Features_Cena.md:L402 (F7 row)'
+    lens_note: |
+      Ministry lens: whiteboards are classroom artefacts that the
+      teacher owns. Platform-supplied whiteboard where a peer writes
+      math the other peer sees without teacher gate is a step beyond
+      what a normal classroom offers — and makes Cena liable for the
+      content.
+  - severity: P2
+    finding: |
+      Nothing in this axis sources peer content from Ministry Bagrut
+      text — good, no raw-Ministry-text risk. But we should make that
+      rule explicit: peer explanations must never quote from Bagrut
+      exam items verbatim (only AI-recreated items per
+      memory:project_bagrut_reference_only).
+    evidence: 'AXIS_7_Collaboration_Social_Features_Cena.md (absence across features); scripts/README-bagrut-reference.md (legal posture: no raw Ministry text to students)'
+    lens_note: |
+      Ministry lens: belt-and-suspenders — our peer channels should
+      never relay raw Ministry text either.
+already_built:
+  - feature: Shipgate banned-term scanner
+    evidence: docs/engineering/shipgate.md + CI wiring
+    note: |
+      F3 competition feature must run through scanner before shipping.
+  - feature: CAS gate + gate modes (Off/Shadow/Enforce)
+    evidence: docs/adr/0032-cas-gated-question-ingestion.md
+    note: |
+      Peer content could reuse the Shadow-mode gate while we calibrate
+      false-positive rates — not greenfield.
+duplicates_of_other_docs:
+  - 'feature-discovery-2026-04-20.md: FD-016 Team vs Challenge Cooperative Competitions, FD-030 "I''m Confused Too" signal'
+  - 'axis2_motivation_self_regulation_findings.md: F1 Socratic self-explanation overlaps F1 peer explanation circles in intent'
+extracted_tasks:
+  - title: CAS-gate or teacher-moderate peer math explanations before delivery
+    priority: P0
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Close the ADR-0002 hole in F1 Anonymized Peer Explanation Circles
+      (and F7 Collaborative Whiteboard). Peer-generated math content
+      reaching another student must either (a) pass a lightweight CAS
+      equivalence check against the canonical solution for the
+      problem, or (b) be teacher-moderated before delivery.
+
+      ## Files
+      - docs/adr/00XX-peer-generated-math-content-gate.md (new ADR)
+      - src/actors/Cena.Actors/Cas/ICasVerificationGate.cs (reuse
+        existing gate)
+      - Peer-explanation pipeline design in
+        pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+
+      ## Definition of Done
+      - ADR drafted and linked
+      - Implementation plan references reuse of existing
+        CasVerificationGate (Shadow mode initially)
+      - F1 spec revised with the gate step
+      - No peer explanation can reach a peer without either gate
+        pass or teacher approval
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L408-L435]
+  - title: Shipgate scanner audit for competition feature copy
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Run the shipgate scanner against any draft copy for F3 Team vs.
+      Challenge Cooperative Competitions; confirm no banned-term hits
+      (streak, variable-ratio, loss-aversion framings). Add specific
+      patterns for competition mechanics.
+
+      ## Files
+      - docs/engineering/shipgate.md (scanner patterns)
+      - ops/reports/shipgate-last-run.json (verify baseline)
+
+      ## Definition of Done
+      - Scanner patterns explicitly include: /lose.*streak/i,
+        /don''t break.*chain/i, /X days in a row/i, /random bonus/i
+      - Existing F3 spec scanned — any hits documented
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L396, L~520 (F3 section)]
+verdict: revise
+verdict_reason: |
+  F1 and F7 are P0 must-revise before ship — peer math content cannot
+  reach students unverified. F3 needs a shipgate audit. F2/F4/F5/F6
+  are adopt-grade with minor Ministry-text-exclusion note.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: |
+      Two-sided consent / DPIA gate / ephemeral retention — privacy lens
+      is canonical for RDY-076.
+  - to: persona-redteam
+    about: |
+      Peer channels are an attack surface (impersonation, bullying,
+      prompt injection via peer-authored content).
+  - to: persona-ethics
+    about: |
+      F3 competition framing — ethics is canonical for persuasion-vs-
+      coercion line.

@@ -1,0 +1,241 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 assessment features: formative-summative split dashboard, IRT 2PL-CAT placement,
+  AI partial-credit grading with step-level rubrics, free-response CAS-validated AI grading,
+  per-session error analysis, real-time misconception tagging (session-scoped), crisis-mode
+  compression, confidence calibration with certainty-based marking. Explicitly cites
+  ADR-0003 and RDY-080 in constraints.
+
+system_purpose_fit: 4
+  rationale:
+    - ADR-0003 explicitly honored in Feature 6 (session-scoped misconception tagging)
+    - RDY-080 (no numeric Bagrut prediction) correctly flagged in Features 2, 7
+    - ADR-0002 (SymPy oracle) used throughout — not bypassed
+    - Feature 3/4 AI grading = free-text student work to LLM — PII surface
+    - Feature 5 per-session error analysis = by design session-scoped
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Misconception events are session-scoped and [MlExcluded] -> src/actors/Cena.Actors/Events/MisconceptionEvents.cs"
+    - "SymPy CAS infrastructure -> referenced throughout Cena.Actors/Services/"
+    - "Stuck diagnosis classifier stack -> src/actors/Cena.Actors/Diagnosis/"
+    - "Hint level adjuster (used by Feature 5) -> src/actors/Cena.Actors/Diagnosis/DiagnosisHintLevelAdjuster.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "IRT 2PL-CAT placement engine not in src/ — proposed"
+    - "AI partial-credit grading not in src/ — proposed"
+    - "Confidence-calibration dashboards not in src/ — proposed"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (Feature 6 Redis-only session storage proposed)
+    - ADR-0002 (SymPy oracle on all features)
+    - RDY-080 (Features 2, 7 disclaim Bagrut prediction)
+  violated: []
+  missing_adr_needed:
+    - "ADR for AI grading data flow — Features 3/4 send student free-text answers to LLM; needs explicit policy per ADR-0002/DPA §7"
+    - "ADR for summative retention (Feature 1 claims 'retained long-term' without a window)"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Features 3 (AI Partial-Credit Grading) and 4 (Free-Response CAS-Validated AI Grading)
+      send student free-text work to an LLM. This is the LARGEST LLM PII surface in the
+      proposal set. Required before build: (a) ZDR contract with LLM vendor; (b) PII scrub
+      on student text (likely to include their name/school if they sign work);
+      (c) consent-gated since minor's written work is GDPR Art 9-adjacent; (d) no prompt
+      logs kept by vendor.
+    evidence: "AXIS_6_Assessment_Feedback_Research.md:7 (constraint list) + Dr. Rami finding FD-008 (finding_assessment_dr_rami.md:24 flags DPA §7 violation)"
+    lens_note: |
+      Student written math work often contains context the student doesn't realize is PII
+      (teacher name, cohort, school, personal reference in word problem commentary).
+      Sending this to Anthropic/OpenAI without ZDR = DPA §7 violation.
+
+  - severity: P0
+    finding: |
+      Feature 6 (Real-Time Misconception Tagging) is the most ADR-0003-sensitive feature
+      in the whole corpus. Doc proposes Redis-only with TTL + no SQL persistence — correct
+      design. BUT the existing MisconceptionEvents.cs emits events to Marten event stream
+      (durable, append-only) — this EXISTING architecture must be reconciled:
+      either Feature 6 replaces event-stream emit with Redis-only, OR Feature 6's
+      Redis layer is a read cache over existing retention-limited events.
+      Doc does not address which path.
+    evidence: "AXIS_6_Assessment_Feedback_Research.md (Feature 6 section) + src/actors/Cena.Actors/Events/MisconceptionEvents.cs:22-60"
+    lens_note: |
+      Two persistence layers both claiming compliance = neither is verifiable. Pick one
+      source of truth and document.
+
+  - severity: P1
+    finding: |
+      Feature 1 (Formative-Summative Signal Split) claims formative data session-scoped,
+      summative "retained for progress tracking" — no retention window specified. Needs
+      explicit DataCategory mapping and retention constant. Probably StudentRecord (7 years
+      FERPA) but doc must say so.
+    evidence: "AXIS_6_Assessment_Feedback_Research.md:51"
+    lens_note: |
+      "Retained long-term" is not a policy; it's a TODO.
+
+  - severity: P1
+    finding: |
+      Feature 2 (IRT 2PL-CAT) creates per-student knowledge_state (topic_id,
+      mastery_probability) retained across sessions. This is the "mastery vs misconception"
+      boundary from ADR-0003 Decision 6 — knowledge state is allowed persistent, misconception
+      is not. Doc correctly invokes the boundary but must NOT later infer misconceptions
+      from the state. Code reviewer must block any derived-misconception-from-theta logic.
+    evidence: "AXIS_6_Assessment_Feedback_Research.md:93-94 + docs/adr/0003-misconception-session-scope.md:107-116"
+    lens_note: |
+      This is a policy boundary that requires code-review discipline, not architectural
+      enforcement. Needs linting / convention test.
+
+  - severity: P1
+    finding: |
+      Feature 8 (Confidence Calibration) stores per-student calibration history. Per
+      Dr. Rami (finding_assessment_dr_rami.md:22), Foster 2021 found no achievement effect.
+      From privacy lens: confidence-vs-accuracy pairs over time = behavioral profile,
+      Art 22 territory. Ensure student can see their own calibration (right of access)
+      and delete (right to erasure).
+    evidence: "AXIS_6_Assessment_Feedback_Research.md (Feature 8 section)"
+    lens_note: |
+      Every per-student-indexed metric = erasure cascade + audit + consent mapping.
+
+  - severity: P2
+    finding: |
+      Feature 5 per-session error analysis report — by design session-scoped so privacy-clean.
+      Just ensure Feature 5 errors don't leak into Feature 6 Redis cache in a way that
+      extends retention.
+    evidence: "AXIS_6_Assessment_Feedback_Research.md (Feature 5 section)"
+    lens_note: |
+      Component-composition retention risk: A alone is 24h, B alone is 24h, A+B together
+      = joined table retained longer.
+
+already_built:
+  - feature: Session misconception events with [MlExcluded] attribute + 30-day default retention
+    evidence: src/actors/Cena.Actors/Events/MisconceptionEvents.cs + src/shared/Cena.Infrastructure/Compliance/DataRetentionPolicy.cs:58
+    note: |
+      Feature 6 architecture DIFFERS from existing (Redis vs Marten events) — doc must
+      reconcile rather than build in parallel.
+  - feature: Stuck classifier + hint-level adjuster (used by Feature 5)
+    evidence: src/actors/Cena.Actors/Diagnosis/
+    note: Per-session error analysis extends existing diagnosis.
+
+duplicates_of_other_docs:
+  - "axis1_pedagogy_mechanics_cena.md: Feature 8 adaptive fading overlaps Features 1+5 here"
+  - "feature-discovery-2026-04-20.md: FD-003 (misconception tagging) = Feature 6 here; FD-004 = Feature 2"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: FD-003 covered"
+
+extracted_tasks:
+  - title: "Reconcile misconception persistence: Marten events vs Feature 6 Redis-only"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Existing code (MisconceptionEvents.cs) emits Misconception events to Marten event
+      streams (durable, retention-filtered). Feature 6 proposes Redis-only + auto-purge.
+      Decide which is the system of record; both cannot claim ADR-0003 compliance
+      independently.
+
+      ## Files
+      - docs/adr/0003-misconception-session-scope.md (add Decision 7: single store)
+      - src/actors/Cena.Actors/Events/MisconceptionEvents.cs
+
+      ## Definition of Done
+      - ADR Decision 7 documents: "misconception events live in X; Y is a derived cache"
+      - If Marten: ensure hard-delete (see axis9 task)
+      - If Redis: remove Marten emit path
+      - Test confirms only one durable store
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: []
+
+  - title: "LLM-PII + ZDR posture for student-work AI grading (Features 3/4)"
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-compliance
+    queue_body: |
+      ## Goal
+      AI grading sends free-text student work to LLM. Pre-build: (a) ZDR/no-retention
+      contract with chosen LLM vendor; (b) PII scrubber on student work;
+      (c) ProcessingPurpose.AiGrading with VPC for <13, opt-in 13+;
+      (d) DPIA per Israeli PPL / GDPR Art 35 since AI grading + minor = high-risk profiling.
+
+      ## Files
+      - docs/compliance/dpia-ai-grading.md (new DPIA doc)
+      - src/shared/Cena.Infrastructure/Privacy/FreeTextPiiScrubber.cs (shared with Axis 1 task)
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs (new purpose)
+
+      ## Definition of Done
+      - DPIA completed and signed by DPO
+      - PII scrubber applied before every LLM call
+      - Consent check in AI grading path
+      - Vendor ZDR agreement in place
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-compliance --result "<branch>"
+    source_doc_lines: ["L7"]
+
+  - title: "Retention window for summative attempts (Feature 1)"
+    priority: P1
+    estimate: XS
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Map summative_attempts to DataCategory.StudentRecord (7-year FERPA) or new SummativeAssessment
+      category. Document in ADR + DataRetentionPolicy.cs.
+
+      ## Definition of Done
+      - Summative attempts have explicit retention constant
+      - RetentionWorker covers the category
+      - ADR cross-reference
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L51"]
+
+  - title: "Lint rule: no inference-of-misconception-from-knowledge-state (Feature 2 boundary)"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Knowledge state (P(mastered) per topic) is persistent-allowed. Inferring
+      specific misconceptions from knowledge state crosses ADR-0003 Decision 6. Add
+      test/lint preventing code paths that produce misconception tags from theta.
+
+      ## Files
+      - New test: AdrComplianceBoundaryTests
+      - Possible analyzer/rule
+
+      ## Definition of Done
+      - Test fails if any code in Cena.Actors reads knowledge_state and emits MisconceptionDetected_V1
+      - Review checklist updated
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L93-94"]
+
+verdict: revise
+verdict_reason: |
+  Strong ADR awareness; Features 1/2/5/6/7/8 shippable after the 4 tasks above land.
+  Features 3/4 (AI grading) are P0-risk until the DPIA + ZDR work completes — defer
+  those specifically. Feature 6 architecture reconciliation is the top priority.
+
+cross_lens_handoff:
+  - to: persona-ministry
+    about: |
+      RDY-080 — Features 2/7 readiness scores without concordance; Ministry defensibility.
+  - to: persona-cogsci
+    about: |
+      Dr. Rami flagged FD-003 95% misconception resolution as fabricated (REJECT) and
+      FD-006 Foster 2021 null result as selective citation. Cross-lens evidence audit.
+  - to: persona-redteam
+    about: |
+      Feature 3/4 AI grading — prompt injection via student answer text; cheat vectors.
+  - to: persona-enterprise
+    about: |
+      Feature 6 single-store ADR is an aggregate-boundary concern.

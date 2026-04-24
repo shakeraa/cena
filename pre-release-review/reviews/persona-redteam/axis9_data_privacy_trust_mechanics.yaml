@@ -1,0 +1,171 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-redteam
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight privacy/trust features (Why-This-Problem XAI, My Cena Profile
+  dashboard, Delete My Journey erasure, consent revocation UX, age-appropriate
+  privacy comms, Data provenance trail, Differential Privacy cohort insights,
+  Transparency Report). Privacy-positive on their face — red-team concern is
+  that the features themselves create new data surfaces (audit logs,
+  inference trails, deletion-request queues) that can become leak vectors.
+system_purpose_fit: 5
+  rationale:
+    - Strongly aligned with ADR-0003 intent
+    - F3 "Delete My Journey" MUST work at code level, not as doc promise —
+      the RetentionWorker + TenantScope give the primitives
+    - Transparency surface (F8) and provenance log (F6) add a new audit-log
+      surface that must itself be access-controlled
+code_reality_check:
+  claims_verified_in_code:
+    - "RetentionWorker exists -> src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs"
+    - "AdminActionAuditMiddleware logs admin actions -> src/shared/Cena.Infrastructure/Compliance/AdminActionAuditMiddleware.cs"
+    - "MeGdprEndpoints exist at student API -> src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs"
+    - "GdprEndpoints at Admin API -> src/api/Cena.Admin.Api/GdprEndpoints.cs (per grep)"
+  claims_contradicted_by_code:
+    - "PhotoUpload EXIF strip is a stub but response claims ExifStripped=true -> src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:241-248 and :211"
+  claims_unverifiable:
+    - "F7 Differential Privacy analytics — no DP library or epsilon accounting in repo today"
+adr_alignment:
+  honored:
+    - ADR-0003 — F1, F6, F8 are literal implementations
+    - ADR-0001 — F2 dashboard must scope per institute
+  violated: []
+  missing_adr_needed:
+    - "Differential privacy epsilon budget ADR (if F7 ships) — who manages epsilon, how replays are prevented"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Cena currently LIES to students about EXIF stripping. The response
+      field `ExifStripped: !isPdf` is returned `true` for images but
+      StripExifMetadata is a no-op stub that returns the bytes unchanged
+      (GPS + device metadata flows through to moderation + OCR). This is a
+      direct violation of the spirit of F2/F6 "data transparency" and is
+      exploitable: an attacker who receives (or reconstructs) image bytes
+      from a downstream store gets GPS of the minor's home. This is a
+      pre-existing bug, not a proposal — must fix before any axis9 feature
+      ships that relies on "we don't keep your metadata."
+    evidence: src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:211 (ExifStripped true); src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs:241-248 (method is documented stub)
+    lens_note: Mismatch between "label" and "data" — exactly the pattern memory/feedback_labels_match_data.md bans.
+  - severity: P1
+    finding: |
+      F3 Delete My Journey — without an explicit data-inventory map, deletion
+      is best-effort. The current RetentionWorker covers compliance
+      documents, but no comprehensive inventory of "where does student data
+      live" exists in the repo. Parents trigger delete → some data persists
+      in Marten events / NATS JetStream / Redis session / cache. Must build
+      inventory before this feature ships, else it's a compliance mirage.
+    evidence: pre-release-review/axis9_data_privacy_trust_mechanics.md Feature 3; src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs
+    lens_note: Deletion promises are the highest-scrutiny claims.
+  - severity: P1
+    finding: |
+      F6 Data Provenance Trail — every adaptive decision is logged. This log
+      itself becomes a high-value target (contains per-student inference
+      reasoning). Must be access-scoped tighter than student data itself
+      (student can read own trail, parent can read child's, admin with audit
+      reason only). Doc proposes it casually.
+    evidence: pre-release-review/axis9_data_privacy_trust_mechanics.md Feature 6
+    lens_note: "Audit log" is often less protected than the data it audits.
+  - severity: P1
+    finding: |
+      F7 Differential Privacy analytics — DP is only safe under a global
+      epsilon budget. Without replay protection (attacker re-queries the same
+      cohort to accumulate deltas), the privacy guarantee is zero. Real DP
+      deployments need an epsilon accountant and rate-limited query access —
+      doc doesn't mention either.
+    evidence: pre-release-review/axis9_data_privacy_trust_mechanics.md Feature 7
+    lens_note: DP without epsilon tracking is marketing, not privacy.
+  - severity: P2
+    finding: |
+      F1 "Why This Problem?" explanations — the explanation text itself can
+      leak inference details ("because you got problem X wrong twice") that
+      the session-scope rule intends to hide. Templates must avoid exposing
+      cross-session signals the student couldn't otherwise infer.
+    evidence: pre-release-review/axis9_data_privacy_trust_mechanics.md Feature 1
+    lens_note: Subtle leak via UI strings.
+already_built:
+  - feature: Admin action audit middleware
+    evidence: src/shared/Cena.Infrastructure/Compliance/AdminActionAuditMiddleware.cs
+    note: Reusable for F6 provenance surface access logging.
+  - feature: GDPR endpoints at both student + admin APIs
+    evidence: src/api/Cena.Student.Api.Host/Endpoints/MeGdprEndpoints.cs; src/api/Cena.Admin.Api/GdprEndpoints.cs
+    note: F3 erasure extends these rather than duplicates.
+  - feature: Retention worker
+    evidence: src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs
+    note: F3 depends on all new stores being registered here.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-014 Why-This-Problem overlaps F1"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md F1 Why-This-Topic overlaps F1"
+extracted_tasks:
+  - title: Fix EXIF stripping bug — stop lying in PhotoUploadResponse
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      StripExifMetadata is a stub but response reports ExifStripped=true for
+      all images. Either implement EXIF strip (MetadataExtractor + re-encode
+      via ImageSharp) or set ExifStripped=false until implemented. Never ship
+      a "label that lies about the data" (per CLAUDE.md memory).
+      ## Files
+      - src/api/Cena.Student.Api.Host/Endpoints/PhotoUploadEndpoints.cs (lines 241-248, 211)
+      - src/api/Cena.Student.Api.Host.Tests/Endpoints/PhotoUploadEndpointsPhase2Tests.cs
+      ## Definition of Done
+      - [ ] Real EXIF strip implemented OR response reports accurate false
+      - [ ] Golden test: uploaded JPEG with GPS EXIF → processed bytes have no GPS
+      - [ ] Audit log emits `[PII_STRIP] exif_tags_removed=N`
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L100-L160]
+  - title: Build repository-wide student data inventory before F3 erasure ships
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Enumerate every data store touching student PII (Marten streams, Redis,
+      NATS JetStream, cache, logs, BQ exports if any). Register each with
+      RetentionWorker + provide a delete-by-student_id path. Output: inventory
+      doc + architecture test asserting every new store lands in the inventory.
+      ## Files
+      - docs/engineering/student-data-inventory.md (new)
+      - src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs
+      - new arch-test
+      ## Definition of Done
+      - [ ] Every named store has a deletion path + retention TTL
+      - [ ] Arch-test fails if a new IDocumentStore aggregate is added without inventory entry
+      - [ ] F3 workflow uses the inventory
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L190-L260]
+  - title: Access-scope the F6 provenance trail tighter than underlying data
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Provenance trail endpoints scoped per-student with owner check + parent
+      binding (axis4). Admin access requires an audit reason that lands in
+      AdminActionAuditMiddleware.
+      ## Files
+      - new F6 endpoints
+      - src/shared/Cena.Infrastructure/Compliance/AdminActionAuditMiddleware.cs
+      ## Definition of Done
+      - [ ] Student can view own trail only
+      - [ ] Parent view gated by parent_of claim (see axis4 task)
+      - [ ] Admin access forces reason param logged to audit middleware
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L300-L360]
+verdict: adopt
+verdict_reason: |
+  Privacy-positive proposals; adopt with the three concrete hardening tasks.
+  The EXIF-strip lie must be fixed regardless of these proposals — it's a
+  pre-existing bug that undermines all axis9 trust claims.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: DP epsilon budget design for F7
+  - to: persona-sre
+    about: Provenance trail storage SLO + retention policy
+  - to: persona-enterprise
+    about: Data inventory aggregate modeling

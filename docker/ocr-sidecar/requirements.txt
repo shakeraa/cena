@@ -1,0 +1,36 @@
+# OCR Sidecar — pinned dependencies
+# Do NOT bump without running the benchmark harness at
+# scripts/ocr-spike/benchmark.py against the regression fixture set.
+# See README.md § Pinned dependencies for rationale.
+
+# ── gRPC ──────────────────────────────────────────────────────────────────
+grpcio>=1.60,<1.70
+grpcio-health-checking>=1.60,<1.70
+grpcio-reflection>=1.60,<1.70
+grpcio-tools>=1.60,<1.70
+protobuf>=4.25,<5.0
+
+# ── ML runtime ────────────────────────────────────────────────────────────
+torch==2.3.*
+torchvision==0.18.*
+# Must stay <4.45 — newer transformers breaks SuryaDecoderConfig.pad_token_id
+transformers>=4.40,<4.45
+safetensors>=0.4
+accelerate>=0.30
+einops>=0.8
+
+# ── OCR runners ───────────────────────────────────────────────────────────
+# Pinned to last known-good before the 0.6 API restructure
+surya-ocr>=0.5,<0.6
+# Math-to-LaTeX
+pix2tex>=0.1.4
+
+# ── Image + PDF handling ──────────────────────────────────────────────────
+Pillow>=10.0
+opencv-python-headless>=4.9
+pdf2image>=1.17
+pypdf>=4.0
+
+# ── Observability ─────────────────────────────────────────────────────────
+structlog>=24.1
+prometheus-client>=0.20

@@ -1,0 +1,91 @@
+AUTORESEARCH LOG — Focus Degradation & Student Resilience
+Started: 2026-03-27
+Document: docs/focus-degradation-research.md
+==================================================
+
+[2026-03-27] Iteration #1  | Topic: Vigilance decrement in digital/mobile learning | Result: IMPROVED | New findings: vigilance can drop in 5min under stress, digital distraction systematic review 2025, executive control decrement co-occurs with vigilance decrement (Thomson 2022)
+[2026-03-27] Iteration #2  | Topic: Flow state detection via behavioral signals | Result: IMPROVED | New findings: behavioral log data CAN predict flow (SLE 2021), multimodal engagement detection without biometrics trending, 2025 Nature benchmark dataset for group engagement
+[2026-03-27] Iteration #3  | Topic: Productive failure meta-analysis | Result: IMPROVED | New findings: Sinha & Kapur 2021 meta-analysis N=12,000+, d=0.36-0.58, solution diversity is KEY predictor, prior math achievement matters less than inventive production
+[2026-03-27] Iteration #4  | Topic: Grit critiques and alternatives | Result: IMPROVED | New findings: COI negatively predicts in exam-oriented systems (BMC Psychology 2026), emotional regulation as complementary framework, SDT integration with grit-perseverance
+[2026-03-27] Iteration #5  | Topic: RT variability in complex tasks | Result: IMPROVED | New findings: PISA 2012 item-level RT analysis, EEG+LSTM real-time attention prediction during math, working memory link to RT variance
+[2026-03-27] Iteration #6  | Topic: Adolescent attention spans | Result: IMPROVED | New findings: 28-48 min capacity (14-16 yr olds) when motivated, prefrontal cortex vulnerability to digital stimulation, bidirectional screen time relationship
+[2026-03-27] Iteration #7  | Topic: Circadian effects on learning | Result: IMPROVED | New findings: chronotype-performance non-linear relationship, phase misalignment → lower GPA, physical activity timing can mitigate deficits
+[2026-03-27] Iteration #8  | Topic: Microbreaks and attention restoration | Result: IMPROVED (CRITICAL) | New findings: 90s microbreaks every 10min, Cohen's d=1.784 (massive), delayed vigilance decrement onset by 2 timepoints, 20.6% advantage during critical middle period
+[2026-03-27] Iteration #9  | Topic: Affect detection in ITS | Result: IMPROVED | New findings: 7 classroom emotions recognized by AI, sensor-free frustration detection from logs, multimodal real-time affect-cognition frameworks
+[2026-03-27] Iteration #10 | Topic: RTL language cognitive load | Result: PARTIAL | New findings: bilingual cognitive load effects confirmed, cognitive flexibility advantages, but NO Hebrew/Arabic-specific RTL attention studies found — remains a research gap
+[2026-03-27] Iteration #11 | Topic: Self-regulated learning in EdTech | Result: IMPROVED | New findings: SRL involves goal setting/strategy planning/progress monitoring, AI applications support metacognitive regulation, learning analytics dashboards help adjustment
+[2026-03-27] Iteration #12 | Topic: Gamification effects on attention | Result: IMPROVED (WARNING) | New findings: g=0.822 overall, BUT novelty wears off after 1 semester (negligible/negative effect). Competition+collaboration most effective. Autonomy enhanced, competence not.
+[2026-03-27] Iteration #13 | Topic: ADHD in digital learning | Result: IMPROVED | New findings: AI-adaptive platforms 17.5-24.1% retention improvement, smartwatch 88.9% emotion recognition, 40% quiz improvement, privacy concerns raised
+[2026-03-27] Iteration #14 | Topic: Mind-wandering in education | Result: IMPROVED (NEW SECTION) | New findings: 30% of educational time, aware vs unaware types, video-based detection generalizes from lab to wild, multimodal detection advances
+[2026-03-27] Iteration #15 | Topic: Cognitive load theory | Result: IMPROVED (NEW SECTION) | New findings: neural signatures discovered for intrinsic/extraneous/germane load (2024), CLAM framework, digital-specific extraneous load sources
+[2026-03-27] Iteration #16 | Topic: Boredom and disengagement | Result: IMPROVED (NEW SECTION) | New findings: 3 learner profiles, boredom as "silent emotion", Control-Value Theory, boredom mediates digital distraction, "better frustrated than bored" (Baker)
+[2026-03-27] Iteration #17 | Topic: Neuroscience of attention | Result: IMPROVED | New findings: dopamine ensemble activity sustains ~20 min (neurological basis for vigilance window), distributional reinforcement learning in prefrontal cortex
+[2026-03-27] Iteration #18 | Topic: Cultural factors in Israeli context | Result: IMPROVED (NEW SECTION) | New findings: Jewish/Arab self-efficacy differences, collective resilience patterns, cultural background as top stress predictor, language barriers
+[2026-03-27] Iteration #19 | Topic: AI adaptive learning | Result: IMPROVED | New findings: LLM+RAG ITS, real-time assessment via RT+accuracy metrics, transformer attention mechanisms, bibliometric explosion in AI+math education
+[2026-03-27] Iteration #20 | Topic: Spaced practice & desirable difficulties | Result: IMPROVED (NEW SECTION) | New findings: spacing effect, interleaving as desirable difficulty, student preference paradox, low-achievers need initial blocking, spaced learning supports productive struggle
+
+BONUS DEEP-DIVES:
+[2026-03-27] Bonus #1 | Topic: Microbreak quantitative data | Result: IMPROVED | Extracted: 90s/10min, η²p=0.766, d=1.784, 20.6% advantage, decline delayed from timepoint 3→5
+[2026-03-27] Bonus #2 | Topic: D'Mello & Graesser affect dynamics | Result: IMPROVED (NEW SECTION) | New findings: confusion as productive emotion, cognitive disequilibrium framework, non-linear dynamical systems model (LAK 2024)
+[2026-03-27] Bonus #3 | Topic: Sensor-free disengagement detection | Result: IMPROVED | New findings: clickstream/log-based detection without sensors, real-time rule-based decision support, first indicators via login frequency + clickstream + participation
+
+==================================================
+SUMMARY:
+- Iterations completed: 20 + 3 bonus deep-dives
+- New sections added: 7 (Mind-Wandering, Confusion, Circadian, Microbreaks, CLT, Boredom, Adolescent Attention)
+- New subsections added: 8 (Affect Detection, SRL, Gamification, ADHD, Neuroscience, Cultural, AI Adaptive, Spaced Practice)
+- Existing sections enriched: 5 (all original sections updated with 2022-2025 evidence)
+- New citations added: 40+
+- New research gaps identified: 6 (total now 12)
+- Critical design changes suggested: 8
+- Document expanded: ~222 lines → ~610 lines
+- Most impactful finding: PROACTIVE MICROBREAKS (d=1.784) — potentially transformative for Cena's break model
+
+==================================================
+AUTORESEARCH LOG — Syllabus & Corpus Strategy
+Started: 2026-03-27
+Document: docs/syllabus-corpus-strategy.md
+==================================================
+
+ITERATION 1-6 (parallel): 6 research agents launched simultaneously
+  1. Israeli copyright law for education — COMPLETE
+  2. Kimi K2.5 LLM capabilities — COMPLETE
+  3. Bagrut exam corpus availability — COMPLETE
+  4. EdTech corpus pipeline patterns — COMPLETE
+  5. Arabic math education specifics — COMPLETE
+  6. Timeline and effort validation — COMPLETE
+
+FINDINGS: 3 critical errors, 5 corrections, 8 enhancements
+  - CRIT-1: "Public domain" legal claim is WRONG (copyrighted State works, 50-year term)
+  - CRIT-2: Kimi K2.5 is a poor fit (weak Hebrew/Arabic, China-based API friction)
+  - CRIT-3: Math Bagrut has NO MCQs — distractor extraction from exams is invalid
+
+OUTPUTS:
+  - docs/autoresearch/syllabus-corpus-research.md (consolidated report)
+  - docs/arabic-math-education-research.md (Arabic specifics, ~450 lines)
+
+SOURCES: 50+ citations across legal, technical, educational, and competitive domains
+
+==================================================
+AUTORESEARCH LOG — Question Ingestion & Normalization Pipeline
+Started: 2026-03-27
+Extends: docs/syllabus-corpus-strategy.md (gap: no interactive/on-demand ingestion flow)
+==================================================
+
+ITERATION 1-3 (parallel): 3 research agents launched simultaneously
+  1. Math OCR benchmarks (Mathpix, Gemini, Nougat, GOT-OCR, etc.) — COMPLETE
+  2. Question ingestion pipeline architecture (7 areas: OCR, extraction, schema, quality, dedup, watching, caching) — COMPLETE
+  3. Assessment item schemas (QTI 3.0, Khan Perseus, Learnosity, custom) — COMPLETE
+
+KEY FINDINGS:
+  - OCR: Gemini 2.5 Flash primary + Mathpix fallback. Tesseract/Nougat ruled out.
+  - Schema: QTI 3.0 is overkill (XML-only, no adaptive fields). Build Cena-specific JSON.
+  - Bloom's: SVM+TF-IDF outperforms LLMs (94% vs 72-73% zero-shot)
+  - Dedup: 3-level (exact SHA-256, structural math AST, semantic embedding)
+  - Cost: ~$25-50 one-time for full corpus, ~$30/month infra
+
+OUTPUTS:
+  - docs/autoresearch/question-ingestion-research.md (consolidated pipeline spec)
+  - docs/math-ocr-research.md (OCR tool comparison)
+  - docs/question-ingestion-pipeline-research.md (full architecture, 7 areas)
+  - docs/assessment-item-schema-research.md (schema design, 1,289 lines, 7 JSON blocks)

@@ -1,0 +1,79 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Ten adaptable features mined from 30+ competitors (Khanmigo Socratic, DreamBox real-time scaffolding, GOOL stuck-ask button,
+  ALEKS at-risk alerts, DreamBox virtual manipulatives, ClassDojo auto-translation parent comms, Seesaw portfolio, Bagrut
+  practice engine, plus more). Synthesis doc — each feature is re-stated elsewhere.
+system_purpose_fit: 3
+  rationale:
+    - Most features already appear in axis docs; this is a synthesis.
+    - Operationally, competitor features don't come with Cena's constraints (ADR-0003, GD-004) — extraction must re-screen.
+code_reality_check:
+  claims_verified_in_code:
+    - "Existing adaptive mechanics + CAS gating in student flow -> src/api/Cena.Student.Api.Host/Endpoints/**"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "At-risk student alert system (FD-ish) — no risk-classifier cited; would need new pipeline + human-review"
+    - "Interactive virtual manipulatives — no client module referenced"
+adr_alignment:
+  honored: []
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      "At-Risk Student Alert System" (Feature 4 SHORTLIST) is close to behavioral profiling. Any alert that persists student risk
+      label across sessions violates ADR-0003 and PPL; alerts must be session-scoped + teacher-facing only + auto-expire.
+    evidence: cena_competitive_analysis.md Feature 4 ("At-Risk Student Alert")
+    lens_note: Risk labels are the classic compliance+incident tripwire.
+  - severity: P1
+    finding: |
+      "AI-Powered 'Stuck? Ask' Button" (Feature 3) funnels LLM traffic from every session. Must route via ADR-026 tier and
+      share the LLM sidecar degraded-mode contract proposed in axis2.
+    evidence: cena_competitive_analysis.md Feature 3
+    lens_note: Hot-path LLM call without tier + backoff = bad exam-morning.
+  - severity: P1
+    finding: |
+      "Student Learning Portfolio" (Feature 7) is persistent by nature. Need a retention policy compatible with ADR-0003 — either
+      restrict to teacher-visible aggregates (session-summaries) or re-scope.
+    evidence: cena_competitive_analysis.md Feature 7
+    lens_note: Portfolio features frequently collide with retention policy.
+  - severity: P2
+    finding: |
+      Competitive-analysis tasks should be cross-checked against axis/index docs before entering queue; high duplication risk.
+    evidence: cena_competitive_analysis.md (whole doc)
+    lens_note: Synthesis docs tend to create duplicate queue entries.
+already_built:
+  - feature: CAS-gated adaptive practice for Bagrut (Feature 8 in doc)
+    evidence: OCR pipeline + CAS gate + curator metadata (see axis 8 YAML)
+    note: Already the core product; do not re-propose.
+duplicates_of_other_docs:
+  - "All 10 features overlap axis docs or feature-discovery-2026-04-20.md — treat as supplemental."
+extracted_tasks:
+  - title: Scope Feature 4 (at-risk alerts) to session-only + teacher-facing + auto-expire
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Add a design constraint before any "at-risk alert" work starts: alerts are session-scoped, teacher-visible, auto-expire in
+      <=30 days, never persisted on student profile. Encode as ADR update.
+      ## Files
+      docs/adr/ (extend 0003 or new supplementary ADR)
+      docs/engineering/ (scope doc)
+      ## Definition of Done
+      - ADR merged
+      - Referenced in any future at-risk alert task body
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/at-risk-adr"
+    source_doc_lines: []
+verdict: merge-with:feature-discovery-2026-04-20.md
+verdict_reason: |
+  Treat this doc as supplemental color for the index — don't spin separate tasks that duplicate axis work.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: Risk labels and portfolio retention under ADR-0003 + PPL.
+  - to: persona-finops
+    about: LLM "stuck? ask" call rate + ADR-026 tier.

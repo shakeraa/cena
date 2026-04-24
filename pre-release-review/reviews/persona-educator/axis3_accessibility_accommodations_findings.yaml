@@ -1,0 +1,229 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 accessibility features: subitizing/magnitude trainer, interactive number
+  line, digital graph paper, ADHD focus session builder, colour-blind-safe
+  palette, MathML screen-reader pipeline, Arabic RTL math renderer, anxiety-
+  reducing predictable UI. SHIP: #2, #5, #7. SHORTLIST: #1, #4, #6. DEFER: #3, #8.
+
+system_purpose_fit: 4
+  rationale:
+    - Bagrut accommodation law in Israel (התאמות בבחינות הבגרות) entitles LD
+      /ADHD students to specific tools; some of these features map directly
+      to what they'll be allowed on the real exam, strengthening transfer.
+    - ADR-0002 respected — CAS validates everything.
+    - Number line (F2), RTL renderer (F7) are pedagogically non-negotiable
+      for the target cohorts; rest range from differentiating to optional.
+    - Minus one because the subitizing trainer (F1) and graph paper (F3)
+      are explicitly dyscalculia-focused but Cena's grade 9-12 user base
+      has already survived 8-12 years of arithmetic — subitizing training at
+      age 16 is too late to reshape the ANS. Better to invest in graph paper
+      + number line + RTL renderer.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Accommodations subsystem exists" -> src/actors/Cena.Actors/Accommodations/
+    - "CAS validation gates every expression" -> src/actors/Cena.Actors/Cas/CasVerificationGate.cs
+    - "Student state has accommodation fields (implied by Accommodations folder)" -> src/actors/Cena.Actors/Accommodations/
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Interactive number line / digital graph paper / MathML screen-reader pipeline" — no visible implementation, appears fully new.
+
+adr_alignment:
+  honored:
+    - ADR-0002 (all features route answers through CAS)
+    - ADR-0003 (F1 subitizing anonymizes after 90 days — though I'd argue
+      still too long)
+    - Non-negotiable #6 (PWA, not Flutter) — doc correctly assumes web-first
+  violated: []
+  missing_adr_needed:
+    - Accessibility policy ADR: should document which features qualify as
+      "reasonable accommodations" under Bagrut law vs. universal design.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 7 (Arabic RTL Math Renderer) is not a proposal — it's a
+      correctness requirement. The memory note "Math always LTR" means
+      Hebrew pages wrap math in <bdi dir="ltr">, but Arabic math notation
+      *itself* is RTL (Arabic-Indic numerals, mirrored sigma/sqrt, Arabic
+      variable letters). Without this, Arabic-medium students cannot trust
+      what they see. Raise priority from SHIP to blocker.
+    evidence: axis3_accessibility_accommodations_findings.md:L146 (feature), memory-file feedback_math_always_ltr.md
+    lens_note: |
+      A veteran math teacher can tell you: a misread equation is an
+      immediate trust-break. For Arabic students, we currently render math
+      in the "wrong" direction. That's not an accessibility enhancement; it's
+      a defect.
+  - severity: P1
+    finding: |
+      Feature 1 (Subitizing & Magnitude Trainer) targets "dyscalculia core
+      deficit" — ANS/number-sense training. The research cited (Calcularis,
+      Kucian 2011/2020) was conducted on ages 7-10, not 15-18. At 16, ANS
+      plasticity is largely closed; students who are behind at this age
+      need applied scaffolding (number line during problem-solving, formula
+      sheet orientation) not foundational subitizing drills. SHORTLIST
+      should be downgraded to DEFER for Cena's age band, or re-scoped to
+      "diagnostic only, not intervention."
+    evidence: axis3_accessibility_accommodations_findings.md:L51-L106
+    lens_note: |
+      30 years of watching remediation attempts on high-schoolers. Dot-
+      array training for grade 11 is a well-intentioned Ed.D. thesis
+      project that doesn't move Bagrut outcomes. Don't invest 3-4 sprints
+      of engineering here.
+  - severity: P1
+    finding: |
+      Feature 2 (Interactive Number Line) is excellent but needs explicit
+      Bagrut-exam mode. The real Bagrut allows students graph paper and a
+      calculator, but *not* an interactive scaled number line. If students
+      over-rely on the tool in practice, they won't have it on exam day.
+      Recommend: "training mode" (feedback, adaptive zoom) + "exam mode"
+      (static, paper-like) and require students to progressively shift from
+      one to the other as exam date approaches.
+    evidence: axis3_accessibility_accommodations_findings.md:L111-L163
+    lens_note: |
+      Transfer from practice to exam is the whole point. A practice tool
+      the student can't use on the real exam must be weaned, not shipped
+      and forgotten.
+  - severity: P2
+    finding: |
+      Feature 3 (Digital Graph Paper) suffers the same transfer problem as
+      F2 but less acutely — Bagrut students *do* use graph paper on the
+      exam. However, the "smart alignment" auto-center and context-aware
+      keypad go beyond what the exam permits. DEFER is correct but for the
+      right reason: not "no research base," rather "breaks transfer to exam
+      conditions unless carefully paired with an exam-like mode."
+    evidence: axis3_accessibility_accommodations_findings.md:L168-L200
+    lens_note: |
+      Dysgraphia accommodations on the Bagrut allow a scribe, not a smart
+      keypad. Mirror the exam affordances, then offer extra training scaffolds
+      that fade.
+  - severity: P2
+    finding: |
+      Feature 4 (ADHD Focus Session Builder with Visual Timer) must not
+      become a streak mechanism. "8-10 minute capped session" is pedagogically
+      right for ADHD students but needs to resist the "5 days in a row!"
+      dopamine-loop temptation. Since dark-pattern engagement is banned
+      (ship-gate), the doc should make this explicit — timer success lives
+      and dies within the session, never as a profile streak.
+    evidence: axis3_accessibility_accommodations_findings.md (Feature 4 section), docs/engineering/shipgate.md
+    lens_note: |
+      ADHD students are the *most* vulnerable to intermittent-reinforcement
+      patterns. Ship-gate rule must be highlighted for F4 specifically.
+
+already_built:
+  - feature: "Accommodations infrastructure"
+    evidence: src/actors/Cena.Actors/Accommodations/ (directory exists)
+    note: |
+      Accommodation state wiring exists. What's not yet built: specific UI
+      surfaces (number line, RTL math render, timer). The backend
+      Accommodations state should be reused, not re-proposed.
+
+duplicates_of_other_docs:
+  - feature-discovery-2026-04-20.md: FD-010 Arabic RTL Math Renderer (same as F7)
+  - AXIS_8_Content_Authoring_Quality_Research.md: Feature 4 Arabic RTL Math Renderer (same feature, dedupe)
+  - cena_dr_nadia_pedagogical_review_20_findings.md: FD-010 (PASS)
+  - AXIS_7_Collaboration_Social_Features_Cena.md: F8 anxiety-reducing UI overlaps this F8
+  - cena_cross_domain_feature_innovation.md: Feature 2 Focus Ritual overlaps F4
+
+extracted_tasks:
+  - title: "Ship Arabic RTL math renderer with <bdi dir=ltr> and notation profile"
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-a11y
+    queue_body: |
+      ## Goal
+      Render KaTeX math respecting student notation profile: RTL flow for
+      Arabic-medium students; mirrored sigma/sqrt where canonical; Arabic-
+      Indic numerals as optional toggle; variable letters follow profile.
+      Canonical CAS calculations remain LTR; rendering layer translates.
+      ## Files
+      - src/student/student-web/ (KaTeX wrapper)
+      - src/actors/Cena.Actors/Cas/ (no change — CAS stays canonical)
+      - notation profile schema (new)
+      ## Definition of Done
+      - Arabic student sees RTL math with <bdi dir="ltr"> isolating embedded
+        non-Arabic tokens.
+      - Toggle between "Arab-Israeli notation" and "Hebrew/English notation."
+      - Visual regression tests for at least 10 canonical Bagrut expressions
+        in both directions.
+      - Math-always-LTR memory rule explicitly addressed (LTR for Hebrew
+        pages; RTL for Arabic pages only on user-selected notation profile).
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-a11y --result "<branch>: RTL math renderer"
+    source_doc_lines: [L145-L165 (AXIS_8 feature 4), axis3 F7 section]
+  - title: "Interactive number line with training/exam modes"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Ship the interactive number line (F2) with two modes: training (audio/
+      haptic, adaptive zoom) and exam (static, paper-like). Student UI
+      progressively shifts from training to exam mode based on weeks-to-
+      Bagrut. Placement accuracy feeds into formative signals, not
+      misconception tags.
+      ## Files
+      - src/student/student-web/ (new NumberLine component)
+      - src/actors/Cena.Actors/Cas/ (reuse CasRouterLatexValidator for
+        fraction/expression placement validation)
+      ## Definition of Done
+      - Training + exam modes switchable per student; default = training.
+      - Session-scoped placement data only; no persistent misconception tag.
+      - A11y: keyboard placement, screen-reader output, colour-blind-safe
+        magnitude bands with pattern fill.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: number-line training+exam"
+    source_doc_lines: [L109-L163]
+  - title: "Defer subitizing trainer (F1); scope to diagnostic-only"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Write an ADR rejecting the subitizing *intervention* for ages 15-18,
+      while accepting its use as a brief *diagnostic* to flag students who
+      may benefit from human-tutor referral rather than in-app intervention.
+      Saves 3-4 sprints of misplaced investment.
+      ## Files
+      - docs/adr/ (new ADR: "subitizing-training-out-of-age-band")
+      ## Definition of Done
+      - ADR cites Kucian 2020 age band (7-10) vs Cena target (15-18).
+      - ADR describes the diagnostic-only alternative.
+      - No engineering work until ADR is approved.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: subitizing-age-band ADR"
+    source_doc_lines: [L49-L106]
+
+verdict: revise
+verdict_reason: |
+  Feature 7 (RTL math) should be a blocker, not a SHIP-verdict feature.
+  Feature 2 (number line) is great but needs exam-mode for transfer.
+  Feature 1 (subitizing) is age-inappropriate for Bagrut cohort and should
+  be rescoped or retired. Most other features are solid with small revisions.
+
+cross_lens_handoff:
+  - to: persona-a11y
+    about: |
+      This whole doc is primarily your lens — please validate WCAG 2.2 AA
+      compliance details (contrast without hue change, keyboard reachability,
+      reduced-motion respected across F4 timer and F8 predictable-UI).
+  - to: persona-privacy
+    about: |
+      F1's "anonymize after 90 days" is longer than ADR-0003's 30-day
+      active window. Review whether 90d is justifiable even for subitizing
+      training data.
+  - to: persona-enterprise
+    about: |
+      MathML screen-reader pipeline (F6) implies a standardized MathML
+      representation from the question-bank source of truth — needs
+      alignment with the Cas/CasRouterLatexValidator pipeline to avoid a
+      second math-AST.
+  - to: persona-ministry
+    about: |
+      Confirm which exam-accommodation tools (number line, calc, scribe)
+      IL Ministry permits on 3/4/5-unit Bagrut, so the "exam mode" surface
+      matches the actual allowed affordances.

@@ -1,0 +1,209 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight assessment/feedback features: formative-summative split dashboard,
+  IRT 2PL adaptive placement CAT, AI partial-credit grading with step-level
+  rubrics, free-response CAS-validated AI grading, per-session error analysis
+  report, real-time session-scoped misconception tagging, crisis-mode
+  compression, confidence calibration (CBM). Ministry lens: this is the
+  highest-stakes axis — partial-credit grading and mock-exam scoring touch
+  the exam contract directly. Also, several features sit on the RDY-080
+  prediction line.
+system_purpose_fit: 4
+  rationale:
+    - F1 formative-summative split honors ADR-0003 explicitly (session-
+      scoped formative, retained summative) and avoids Bagrut prediction
+      — defensible.
+    - F4 "Free-Response CAS-Validated AI Grading" is ADR-0002 incarnate for
+      student-response evaluation — the strongest defensibility story.
+    - F2 IRT-CAT theta estimate MUST not be labeled "Bagrut-ready" without
+      concordance. Doc correctly flags this (RDY-080) but we must verify
+      the UI copy is held.
+    - F3 step-rubric grading must anchor to Ministry-published Bagrut
+      scoring rubrics (AXIS 8 F3 already proposes this as a separate
+      rubric engine); otherwise we invent a rubric that diverges from
+      what the Ministry awards.
+code_reality_check:
+  claims_verified_in_code:
+    - 'SymPy CAS oracle is the non-negotiable per ADR-0002 — F4 rides that'
+    - 'CAS gate primitives live in src/actors/Cena.Actors/Cas/ per ADR-0032 §16'
+    - 'Misconception session-scope rule per ADR-0003 — F6 rides it'
+    - 'QuestionState has BagrutTrack + structure to tag mock items per track'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'F3 "step-level rubric" — no existing rubric DSL found; F3 and AXIS_8 F3 propose the same thing twice'
+    - 'F5 per-session error analysis "auto-delete after session" — need architecture evidence that implements the purge'
+adr_alignment:
+  honored:
+    - 'ADR-0002 (F4 makes SymPy the oracle for free-response)'
+    - 'ADR-0003 (F1 formative session-scoped, F6 explicitly Redis-only + TTL)'
+    - 'ADR-0032 (F4 routes through CAS gate)'
+  violated: []
+  missing_adr_needed:
+    - 'Partial-credit rubric alignment ADR — codifies that Cena''s rubric DSL encodes Ministry-published Bagrut scoring rules and cannot diverge without a documented exception'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 6 "Real-Time Misconception Tagging (Session-Scoped)" is
+      ADR-0003 adjacent. Dr. Rami''s FD-003 REJECT flagged the "95%
+      misconception resolution" claim as fabricated; doc claims 60-80%.
+      From a Ministry lens: any misconception data that leaks into
+      per-student persistent storage is an ADR-0003 breach. Doc says
+      "Redis with TTL, never SQL" (L~210) — but this must be enforced
+      by architecture test, not document copy.
+    evidence: 'AXIS_6_Assessment_Feedback_Research.md:L329 (F6 row); docs/adr/0003-misconception-session-scope.md; pre-release-review/finding_assessment_dr_rami.md:L19 (FD-003 REJECT)'
+    lens_note: |
+      Ministry lens: ADR-0003 is a hard promise. A Ministry inspector
+      with a FOIA-like request pattern expects to see zero per-student
+      misconception data beyond session TTL.
+  - severity: P1
+    finding: |
+      Feature 3 "AI Partial-Credit Grading with Step-Level Rubrics" must
+      use Ministry-published Bagrut rubric rules (computational error -10%,
+      illegal-operation -15%, no-work = 0, "carry error forward if
+      subsequent work sound", etc — AXIS 8 F3 summarizes these). Diverging
+      from Ministry rules would produce scores that do not match what a
+      real Bagrut examiner awards — a direct fidelity breach.
+    evidence: 'AXIS_6_Assessment_Feedback_Research.md (F3 description); pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md:L106-L143 (F3 Bagrut-Aligned Partial Credit Rubric Engine — same feature, more detail)'
+    lens_note: |
+      Ministry lens: if we claim "Bagrut-aligned grading", the rubric
+      must match what the Ministry rubric awards. Otherwise we train
+      students to score our way, not theirs.
+  - severity: P1
+    finding: |
+      Feature 2 IRT-CAT "theta estimate mapped to knowledge states
+      across Bagrut topics" — doc (feature-discovery FD-004) correctly
+      flags RDY-080 BORDERLINE. Ministry-lens requires: theta output
+      is never rendered to student/teacher/parent surfaces as "Bagrut
+      readiness"; it is an internal mastery-frontier input to the
+      scheduler. This requires an architectural constraint, not just
+      UI copy hygiene.
+    evidence: 'AXIS_6_Assessment_Feedback_Research.md:L325 (F2 row); pre-release-review/feature-discovery-2026-04-20.md:L170 (FD-004 RDY-080 BORDERLINE)'
+    lens_note: |
+      Ministry lens: theta-as-Bagrut-prediction is RDY-080''s exact
+      concern. Enforce via architecture test on exposed endpoints.
+  - severity: P2
+    finding: |
+      Feature 8 "Confidence Calibration with Certainty-Based Marking"
+      (CBM) — Dr. Rami flagged Foster 2021 null-achievement finding
+      (FD-006 WARNING). Ministry lens: framing matters. CBM is a
+      metacognitive calibration tool; don''t advertise it as a score
+      lift.
+    evidence: 'AXIS_6_Assessment_Feedback_Research.md:L331 (F8 row); pre-release-review/finding_assessment_dr_rami.md:L22 (FD-006 WARNING)'
+    lens_note: |
+      Ministry lens: overclaiming outcome is defensibility-grade.
+already_built:
+  - feature: CAS gate (ADR-0002 + ADR-0032)
+    evidence: src/actors/Cena.Actors/Cas/, docs/adr/0032-cas-gated-question-ingestion.md
+    note: |
+      F4 CAS-validated free-response grading rides the existing gate;
+      not a new build.
+  - feature: Bagrut track + chapter structure for mock-item tagging
+    evidence: 'src/actors/Cena.Actors/Questions/QuestionState.cs (BagrutTrack), src/shared/Cena.Infrastructure/Documents/SyllabusDocument.cs'
+    note: |
+      Formative-summative split (F1) can tag mock items by track
+      without new schema work.
+duplicates_of_other_docs:
+  - 'AXIS_8_Content_Authoring_Quality_Research.md: F3 Bagrut-Aligned Partial Credit Rubric Engine — same feature as F3 here; AXIS_8 has more implementation detail'
+  - 'feature-discovery-2026-04-20.md: FD-003 (F6), FD-004 (F2), FD-005 (F1), FD-006 (F8), FD-007 (F7), FD-008 (F3), FD-015 (F5) — all canonical index entries'
+  - 'axis1_pedagogy_mechanics_cena.md: F3 retrieval micro-checks overlaps F5 per-session error analysis'
+extracted_tasks:
+  - title: Architecture test — no per-student misconception data crosses session boundary
+    priority: P0
+    estimate: M
+    suggested_assignee: claude-subagent-adr0003-arch-test
+    queue_body: |
+      ## Goal
+      Add an architecture test that fails the build if any
+      misconception-tagged record is written to a persistent store
+      (Marten event stream, SQL table, Redis with unbounded TTL). This
+      makes ADR-0003 enforceable rather than aspirational.
+
+      ## Files
+      - src/actors/Cena.Actors.Tests/Architecture/
+        MisconceptionPersistenceGuardTest.cs (new)
+      - Possibly extend SeedLoaderMustUseQuestionBankServiceTest-style
+        scanner
+
+      ## Definition of Done
+      - Test scans for misconception-related event/state types and
+        asserts none are written via IDocumentSession / StartStream
+        outside session-scoped Redis paths
+      - Fails if any misconception field appears in QuestionState-like
+        persistent aggregates
+      - Passes on current main branch
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-adr0003-arch-test --result "<branch>"
+    source_doc_lines: [L329-L345]
+  - title: Encode Ministry Bagrut scoring rubric as rubric DSL (from AXIS_8 F3)
+    priority: P1
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Encode the Ministry-published Bagrut partial-credit scoring rules
+      as a deterministic rubric DSL. Serves F3 here and AXIS_8 F3 (same
+      feature). Must be signed off by curriculum expert (Amjad-
+      designated) against Ministry source.
+
+      ## Files
+      - src/actors/Cena.Actors/Grading/BagrutRubricDsl.cs (new)
+      - config/rubrics/bagrut-5u.yaml (new, per-track)
+      - config/rubrics/bagrut-4u.yaml (new)
+      - config/rubrics/bagrut-3u.yaml (new)
+      - docs/curriculum/bagrut-rubric-review.md (new, sign-off doc
+        mirroring bagrut-taxonomy-review.md pattern)
+
+      ## Definition of Done
+      - Rubric DSL encodes all published penalty rules per track
+      - Architecture test: every RubricAppliedEvent references a DSL
+        version + rule id
+      - Sign-off row pending curriculum expert
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~155 (F3 section)]
+  - title: IRT theta output architecturally isolated from student-visible surfaces
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-theta-isolation
+    queue_body: |
+      ## Goal
+      Enforce RDY-080 compliance on IRT theta: make theta an internal
+      scheduler input only, not returned from any student/teacher/
+      parent-facing endpoint.
+
+      ## Files
+      - src/api/Cena.Student.Api.Host/ (audit endpoints)
+      - src/api/Cena.Admin.Api/ (audit teacher-facing endpoints)
+      - New architecture test:
+        src/api/Cena.*.Tests/Architecture/ThetaNotExposedEndpointTest.cs
+
+      ## Definition of Done
+      - Test asserts no endpoint response DTO has a theta/ability field
+      - Passes on main
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-theta-isolation --result "<branch>"
+    source_doc_lines: [L325, L~410 (F2 section)]
+verdict: adopt
+verdict_reason: |
+  F1, F4, F5, F7 are defensible as drafted. F2/F3/F6/F8 need architecture-
+  test + rubric-alignment work to make guardrails enforceable. No RDY-080
+  prediction claims need retirement here — they are correctly flagged.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: |
+      Effect-size integrity across F1-F8 — especially Koenig 84%
+      misattribution (FD-012) and Foster 2021 null result (FD-006).
+  - to: persona-privacy
+    about: |
+      F5 auto-delete per-session error analysis architecture and
+      F6 Redis-only TTL — privacy lens owns retention verification.
+  - to: persona-redteam
+    about: |
+      F4 free-response AI grading attack surface (prompt injection in
+      student text) — redteam is canonical.

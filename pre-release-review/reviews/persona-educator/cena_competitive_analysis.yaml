@@ -1,0 +1,195 @@
+doc_path: pre-release-review/cena_competitive_analysis.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  10 features adapted from competitive EdTech landscape: Socratic AI tutor,
+  real-time in-lesson scaffolding, AI-powered "stuck? ask" button, at-risk
+  student alerts, interactive virtual manipulatives, auto-translation parent
+  comms, student learning portfolio, Bagrut-aligned practice engine, TTS +
+  highlighting, context-aware math keyboard.
+
+system_purpose_fit: 4
+  rationale:
+    - Grounded in real competitors (Khanmigo, DreamBox, GOOL, ALEKS,
+      ClassDojo) and the IL market context. Useful calibration.
+    - Most features are covered more thoroughly by the axis docs; this one
+      is a dedup/sanity-check layer.
+    - F1 Socratic tutor + F3 "stuck? ask" both require strict ADR-0002
+      adherence (CAS validates every hint).
+    - Minus because several "easy wins" (F9 TTS, F10 math keyboard) are
+      treated as one-off sprint items when they actually require
+      pedagogue review (RTL math, Ministry-vocabulary alignment — covered
+      in AXIS_8).
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Claude tutor LLM service" -> src/actors/Cena.Actors/Tutor/ClaudeTutorLlmService.cs
+    - "Tutor message service with Socratic guardrails" -> src/actors/Cena.Actors/Tutor/TutorMessageService.cs, TutorPromptScrubber.cs
+    - "Safeguarding classifier + escalation" -> src/actors/Cena.Actors/Tutor/SafeguardingClassifier.cs + SafeguardingEscalation.cs
+    - "Hint generator + adjustment" -> src/actors/Cena.Actors/Services/HintGenerator.cs + HintGenerationService.cs + HintAdjustedBktService.cs
+    - "CAS verification gate stops LLM claims" -> src/actors/Cena.Actors/Cas/CasVerificationGate.cs + CasLlmOutputVerifier.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Bagrut-aligned practice engine" — exists in pieces (BagrutAnchorProvider,
+      BagrutTopicWeights) but the integrated practice engine layer
+      alignment is unclear.
+
+adr_alignment:
+  honored:
+    - ADR-0002 (F1 Socratic tutor must CAS-verify every mathematical claim)
+    - Ship-gate banned terms (F5 manipulatives explicitly no leaderboards)
+    - ADR-0003 (F7 portfolio must be student-controlled + session-scoped
+      aggregates)
+  violated: []
+  missing_adr_needed: []
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 1 (Socratic AI Tutor No-Answer Mode) — Khanmigo's "Socratic
+      only" pedagogy earned Dr Nadia's WARNING (FD-009) for exactly the
+      right reason: for time-pressured Bagrut students, a tutor that
+      refuses to give an answer after 2 exchanges is an enemy, not a
+      teacher. The doc correctly cites the Stanford/NBER 2025 d≈0.2 but
+      underweights the dropout risk. Cena's TutorMessageService already
+      has a turn-budget per ADR-0002 Decision 6; the extracted task
+      should be surfacing the "show me the solution" escape hatch
+      prominently, not building new Socratic logic.
+    evidence: cena_competitive_analysis.md:L39-L74, docs/adr/0002-sympy-correctness-oracle.md Decision 6, src/actors/Cena.Actors/Tutor/TutorMessageService.cs
+    lens_note: |
+      Socratic is beautiful when the student has time. In week 4 before
+      Bagrut? Give them the answer and walk them through it.
+  - severity: P1
+    finding: |
+      Feature 3 (AI-Powered "Stuck? Ask" Button with pulse animation when
+      idle) — the pulse animation when student has been idle >2 minutes is
+      a nudge mechanism. For anxious students, "the app noticed I'm stuck"
+      is shame-triggering, not helpful. Make the idle-detection silent
+      (the button is always visible); no pulsing.
+    evidence: cena_competitive_analysis.md:L140-L146
+    lens_note: |
+      Don't draw attention to the student's struggle with UI animation.
+      Struggling is normal; showcasing it is humiliating.
+  - severity: P2
+    finding: |
+      Feature 4 (At-Risk Student Alert System) — ALEKS's "unusual learning
+      (possible cheating)" signal is the one concerning pattern. Flagging
+      a student as possibly cheating based on sudden accuracy jump is a
+      false-positive machine — students learn, students get tutoring
+      outside Cena. Drop that specific alert; keep the other three
+      (stuck-on-topic, decreased-learning, procrastination).
+    evidence: cena_competitive_analysis.md:L153-L173
+    lens_note: |
+      Cheating accusations from an algorithm destroy teacher-student
+      trust. I've seen the tutors in every town in Israel — students DO
+      get sudden jumps, and it's almost never cheating.
+  - severity: P2
+    finding: |
+      Feature 7 (Student Learning Portfolio) — portfolios are pedagogy
+      gold if they include student-annotated work ("this is my best
+      factoring solution"), and bureaucratic weight if they just
+      accumulate auto-graded scores. Require student reflection attached
+      to every portfolio-submitted piece. Optional: teacher can comment.
+    evidence: cena_competitive_analysis.md Feature 7 section
+    lens_note: |
+      Show, don't tell. A portfolio of *scores* is a transcript; a
+      portfolio of *annotated work + reflection* is a pedagogical tool.
+
+already_built:
+  - feature: "Socratic AI tutor infrastructure (F1)"
+    evidence: src/actors/Cena.Actors/Tutor/ClaudeTutorLlmService.cs, TutorMessageService.cs, TutorPromptScrubber.cs
+    note: |
+      F1's backend substantially exists (Claude LLM wiring, Socratic
+      prompt scrubber, safeguarding classifier). The CAS verification
+      gate (src/actors/Cena.Actors/Cas/CasVerificationGate.cs) is
+      exactly the ADR-0002 enforcement the doc implies is needed. Retire
+      "build F1" framing; scope to escape-hatch UX surfacing.
+  - feature: "Hint generation / stuck? ask (F3)"
+    evidence: src/actors/Cena.Actors/Services/HintGenerator.cs + HintGenerationService.cs, src/actors/Cena.Actors/Diagnosis/HintStuckDecisionService.cs
+    note: |
+      Hint + stuck detection exist. F3 is a UI surfacing (the help
+      button), not new backend.
+  - feature: "At-risk alert candidates (F4)"
+    evidence: src/actors/Cena.Actors/Services/DisengagementClassifier.cs, StagnationDetector.cs (in Mastery/)
+    note: |
+      Disengagement + stagnation detectors exist. F4 is a teacher-
+      notification + dashboard build on top; not from scratch.
+
+duplicates_of_other_docs:
+  - axis1_pedagogy_mechanics_cena.md: F5 Productive Struggle Hint Governor (overlaps F2 real-time scaffolding + F3 stuck-ask)
+  - AXIS_4_Parent_Engagement_Cena_Research.md: F2 Bilingual Parent Dashboard (same as F6 auto-translation here)
+  - cena_axis5_teacher_workflow_features.md: F8 Class Health Pulse (similar to F4 at-risk alerts)
+  - AXIS_8_Content_Authoring_Quality_Research.md: F3 Bagrut Rubric + F2 CAS Variation (overlaps F8 Bagrut-aligned practice engine)
+  - feature-discovery-2026-04-20.md: dedup entries for most of these 10
+
+extracted_tasks:
+  - title: "Surface 'show me the solution' escape hatch prominently in tutor UI"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Cena's TutorMessageService already enforces ADR-0002 turn-budget
+      (12 turns standard, 20 boss). The Socratic flow needs a visible
+      "show me the full solution" button *from turn 1*, not hidden until
+      turn 5. Reduces Bagrut-prep frustration without breaking ADR-0002.
+      ## Files
+      - src/student/student-web/ (tutor chat surface)
+      - src/actors/Cena.Actors/Tutor/TutorMessageService.cs (expose
+        "can-reveal-solution" state)
+      ## Definition of Done
+      - Button always visible, copy reflects gate state (locked for
+        first N attempts per ADR-0002 reveal gate, unlocked thereafter).
+      - Unlock condition: student attempted problem ≥1 OR ≥2 hint ladder
+        rungs consumed.
+      - No UI animation/pulsing.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: solution-escape-hatch-visible"
+    source_doc_lines: [cena_competitive_analysis.md:L39-L74, docs/adr/0002-sympy-correctness-oracle.md]
+  - title: "Remove 'possible cheating' alert from at-risk alert system"
+    priority: P2
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Policy-level decision: F4 at-risk alert system will NOT include
+      "unusual learning (possible cheating)" signal. High false-positive
+      rate; damages teacher-student trust. ADR records the rejection.
+      ## Files
+      - docs/adr/ (new ADR: "no-cheating-inference-alerts")
+      - src/actors/Cena.Actors/Services/DisengagementClassifier.cs
+      ## Definition of Done
+      - ADR locks the policy.
+      - Classifier enumeration does not include a cheating signal.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>: no-cheating-alert-policy"
+    source_doc_lines: [L153-L173]
+
+verdict: revise
+verdict_reason: |
+  Good competitive-landscape calibration. Most features map to already-
+  built backends (Socratic tutor, hints, disengagement classifier). The
+  reviser notes: drop pulsing UI (shame risk), drop cheating-inference
+  alert (trust risk), require portfolio reflection.
+
+cross_lens_handoff:
+  - to: persona-ministry
+    about: |
+      F8 "Bagrut-aligned practice engine" — ministry should confirm the
+      practice engine respects Bagrut curriculum versioning.
+  - to: persona-a11y
+    about: |
+      F9 TTS + highlighting — a11y owns RTL, Arabic pronunciation, math
+      spoken-expression (MathJax speech-rule-engine output).
+  - to: persona-redteam
+    about: |
+      F6 auto-translation parent comms: redteam should probe translation
+      injection attacks (malicious student text causing a translation
+      that tricks a parent into a dangerous action).
+  - to: persona-finops
+    about: |
+      Many of these features call LLMs repeatedly (F1, F2, F3); finops
+      should ensure 3-tier routing (ADR-026) is honored — simple hints
+      ≠ Opus.

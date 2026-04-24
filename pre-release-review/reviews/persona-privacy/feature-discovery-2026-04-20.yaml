@@ -1,0 +1,185 @@
+doc_path: pre-release-review/feature-discovery-2026-04-20.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  1,727-line index/mega-doc synthesizing 97 raw findings into 55 substantial findings
+  across 10 axes + competitive + cross-domain. 18 SHIP-ready, 22 SHORTLIST, 12 DEFER,
+  3 REJECTED. Each finding is cited across axes. Serves as cross-reference index for the
+  other 14 docs. Explicitly enumerates 8 BORDERLINE features with GD-004/ADR-0003/RDY-080
+  tensions.
+
+system_purpose_fit: 5
+  rationale:
+    - Methodology explicitly requires >=2 independent sources per finding
+    - Cross-examined through Dr. Nadia (pedagogy) + Dr. Rami (evidence honesty) lenses
+    - Explicit guardrail tension notes on each finding
+    - 3 REJECTIONS (FD-003 fabricated 95%, FD-008 fake citation + DPA §7, FD-011 ES 1.16) — quality gate worked
+    - 8 BORDERLINE flagged — most privacy-adjacent concerns raised
+
+code_reality_check:
+  claims_verified_in_code:
+    - "FD-003 Redis-only architectural constraint claim -> existing MisconceptionEvents.cs uses Marten; reconciliation needed per Axis 6 / Dr. Nadia reviews"
+    - "FD-042 Google SSO scope limitation claim -> Firebase auth already exists; Google SSO is extension"
+    - "FD-044 CSV bulk roster import — not in src/, proposed"
+    - "ADR-0003 + DPA §7 + RDY-080 cited throughout correctly"
+  claims_contradicted_by_code:
+    - "FD-003 Redis-only with TTL contradicts existing Marten event stream architecture for MisconceptionEvents"
+  claims_unverifiable:
+    - Most FD-* items unverifiable as code because most are proposals (18 SHIP / 22 SHORTLIST / 12 DEFER)
+
+adr_alignment:
+  honored:
+    - ADR-0003 (explicit criterion; FD-003 rejected partly on this)
+    - ADR-0002 (SymPy oracle enforcement; FD-002 celebrated)
+    - RDY-080 (Bagrut prediction criterion; FD-004/FD-020 flagged)
+    - Ship-gate banned terms (no streak/loss-aversion/variable-ratio)
+  violated: []
+  missing_adr_needed:
+    - "ADR for misconception-store-of-record (Redis vs Marten) — repeat across FD-003 + Axis 6 F6 + Dr. Nadia"
+    - "ADR for sub-processor inventory — LLM / Twilio / Mashov / Google"
+    - "ADR for cohort/ethnic-origin tag (Art 9) — FD-011 cultural contextualization"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Index correctly identifies 3 REJECTIONS that protect privacy posture — but the
+      ADR-0003 reconciliation issue (FD-003 Redis vs existing Marten code) is raised
+      as "architectural constraints" L142 without assigning resolution. This is the
+      central unresolved privacy architectural question in the entire corpus.
+    evidence: "feature-discovery-2026-04-20.md:118-144 + src/actors/Cena.Actors/Events/MisconceptionEvents.cs"
+    lens_note: |
+      Mega-doc is the best place to force the decision: single store of record for
+      misconception data, documented in ADR-0003 Decision 7.
+
+  - severity: P0
+    finding: |
+      Quick-wins list (L19) includes Google SSO (FD-042), Auto-Translation (FD-034),
+      Focus Ritual (FD-017) — all have undisclosed sub-processors. Before any "quick win"
+      ships, the sub-processor inventory + DPA + privacy-page update must land. Treat
+      this as a gate-task.
+    evidence: "feature-discovery-2026-04-20.md:19"
+    lens_note: |
+      "Quick win" compliance-wise is still real work. Don't let the label skip the DPIA.
+
+  - severity: P1
+    finding: |
+      Doc lists 8 BORDERLINE features "where the tension with GD-004/ADR-0003/RDY-080
+      deserves explicit discussion, not silent dropping" — privacy lens agrees explicit
+      discussion is required. Each BORDERLINE should get a decision record before shipping.
+    evidence: "feature-discovery-2026-04-20.md:21"
+    lens_note: |
+      A "borderlines-decisions" batch ADR / review session should precede Q3 planning.
+
+  - severity: P1
+    finding: |
+      Dedup work done in the mega-doc reduces duplicate tasks but does not deduplicate
+      privacy surfaces. E.g., self-efficacy profile appears in Axis 6 F8, Axis 8 F7,
+      cross-domain feature innovation; index treats them as separate findings but they
+      hit the same storage surface. Cross-finding privacy consolidation needed.
+    evidence: "feature-discovery-2026-04-20.md whole doc"
+    lens_note: |
+      Per-finding dedup ≠ per-privacy-surface dedup.
+
+  - severity: P2
+    finding: |
+      Index doc is the ideal place to track the sub-processor inventory at the feature
+      level. Each FD-* row could have "sub-processor" column. Suggest augmenting.
+    evidence: "feature-discovery-2026-04-20.md metadata columns"
+    lens_note: |
+      Structural suggestion rather than a finding.
+
+already_built:
+  - feature: See per-axis reviews for already-built mapping
+    evidence: Consolidated from axis1, axis2, axis6, axis9, axis10 reviews
+    note: |
+      Summary of already-built items (privacy-relevant): GDPR self-service, Right to Erasure
+      with 30d cooling, Consent change audit, [MlExcluded] attribute + filter on export,
+      Retention policy constants (including session-misconception 30/90), Parental
+      consent onboarding, AccommodationProfile, Ship-gate banned-terms enforcement.
+
+duplicates_of_other_docs: []
+
+extracted_tasks:
+  - title: "Batch ADR session: resolve 8 BORDERLINE features + 2 misconception-store decisions"
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Feature-discovery mega-doc lists 8 BORDERLINE features + the unresolved FD-003
+      Redis-vs-Marten question. Run one focused architecture/compliance session to
+      issue 8-10 ADR decisions in batch, unblocking Q3 planning.
+
+      ## Topics
+      1. Misconception store of record (Redis vs Marten) — ADR-0003 Decision 7
+      2. Sub-processor inventory + DPA for Google, Anthropic, Twilio, Mashov
+      3. Cohort/ethnic-origin tag = GDPR Art 9 classification (FD-011)
+      4. Self-efficacy/confidence profile — one store, one retention, one consent
+      5. Teacher-vs-admin-vs-student visibility matrix (Axis 5)
+      6. Parent-visible age-band policy (under 13 / 13-15 / 16-17 / 18+)
+      7. AI grading (FD-008) moratorium conditions
+      8. Cross-tenant peer matching (Axis 7)
+      9. Biometric (voice) policy for minors (Axis 7 F1)
+      10. At-risk classification DPIA (Competitive F4)
+
+      ## Files
+      - docs/adr/NNNN-*.md × ~10
+      - docs/compliance/sub-processors.md
+
+      ## Definition of Done
+      - One ADR per topic (may reference existing)
+      - Clear disposition for every BORDERLINE feature
+      - Privacy-page / consent-purpose enum updated per decisions
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: ["L21", "L118-144"]
+
+  - title: "Augment mega-doc with sub-processor column per finding"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add a "Sub-processors" row to every FD-* finding that uses external services.
+      Makes privacy review per-finding trivial going forward.
+
+      ## Files
+      - pre-release-review/feature-discovery-2026-04-20.md (structural edit)
+
+      ## Definition of Done
+      - Each finding metadata includes sub-processor list (or "none")
+      - Template updated for future adds
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: []
+
+verdict: adopt
+verdict_reason: |
+  The index doc is the right structure; 3 REJECTIONS + 8 BORDERLINE flags indicate quality
+  gates working. The single highest-impact privacy action is the batch ADR session to
+  close the BORDERLINES in one decision pass.
+
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: |
+      Architectural decisions (ADR-0003 Redis vs Marten, aggregate boundaries) need
+      enterprise lens input; drive the batch ADR session.
+  - to: persona-cogsci
+    about: |
+      Evidence quality of 55 findings — Dr. Rami's REJECT/WARNING set is relevant.
+  - to: persona-ministry
+    about: |
+      Bagrut-relevant findings (FD-005/7/20) need Ministry defensibility review.
+  - to: persona-sre
+    about: |
+      Quick-wins list includes ops-heavy items (SSO, Mashov, CSV import); runbooks needed.
+  - to: persona-redteam
+    about: |
+      55 findings = largest combined attack surface in corpus; threat modeling session needed.
+  - to: persona-finops
+    about: |
+      Per-student cost implications of 18 SHIP-ready features combined; tier routing discipline.

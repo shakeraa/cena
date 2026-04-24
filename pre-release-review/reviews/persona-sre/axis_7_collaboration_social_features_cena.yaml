@@ -1,0 +1,106 @@
+doc_path: pre-release-review/AXIS_7_Collaboration_Social_Features_Cena.md
+reviewer: persona-sre
+reviewed_at: 2026-04-20
+doc_summary: |
+  Seven collaboration/social features (anonymized peer explanation circles, teacher-mediated micro-groups, team vs challenge
+  cooperative competitions, async anonymous Q&A with peer endorsement, "I'm confused too" signal, reciprocal peer tutoring matcher,
+  collaborative whiteboard). Heavy on user-generated content, ephemeral storage, and moderation.
+system_purpose_fit: 3
+  rationale:
+    - Privacy framing (two-sided consent, ephemeral 24h retention) aligns with ADR-0003 spirit.
+    - Multiple features introduce UGC, which is operationally the highest-risk category (moderation, abuse, safety).
+    - Doc acknowledges complexity but does not spec moderation SLAs or incident severity taxonomy.
+code_reality_check:
+  claims_verified_in_code:
+    - "Content moderation interfaces exist (IContentSafetyClient, IPhotoDnaClient) -> src/shared/Cena.Infrastructure/Moderation/"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Ephemeral encrypted blob storage with 24h auto-delete -> no S3 lifecycle policy manifest in repo"
+    - "Two-sided consent matching engine -> no peer-matching projection cited"
+adr_alignment:
+  honored: [ADR-0003 (ephemeral), GD-004 (cooperative, not competitive)]
+  violated: []
+  missing_adr_needed:
+    - "UGC moderation SLA + escalation taxonomy (self-harm, bullying, PII leak)"
+    - "Voice recording retention + transcript handling (Feature 1 30-second voice explanations)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 1 (Anonymous peer voice explanations) and Feature 7 (Collaborative whiteboard) are UGC surfaces aimed at minors.
+      Any production launch requires: (a) pre-moderation OR fast-path reactive moderation with SLA, (b) self-harm/abuse
+      detection pipeline, (c) safeguarding escalation runbook, (d) law-enforcement data-request playbook. Shipping UGC without
+      these is a category-1 ops risk.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md Features 1, 7
+    lens_note: Minors + UGC + voice/video = highest-sensitivity operational category.
+  - severity: P1
+    finding: |
+      24h auto-delete of explanation content + 7d metadata retention is asserted but not enforced by any policy-as-code. Need
+      a visible S3 lifecycle rule + a weekly probe that confirms deletion, otherwise ADR-0003 compliance is claim-only.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md Feature 1 privacy section
+    lens_note: "Ephemeral" without probe = persistent under any outage.
+  - severity: P1
+    finding: |
+      Peer tutoring matcher (Feature 6) and Q&A endorsement (Feature 4) are abuse targets: collusion rings, self-upvoting.
+      Need rate-limiter + anomaly detection from day 1.
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md Features 4, 6
+    lens_note: Any "peer endorsement" UI without rate-limit becomes a gaming surface.
+  - severity: P2
+    finding: |
+      Collaborative whiteboard (Feature 7) is realtime CRDT — distinct infrastructure from existing event-sourced stack.
+      Before SHORTLIST becomes SHIP, demand a capacity + failure-mode study (Yjs/Automerge/Liveblocks etc.).
+    evidence: AXIS_7_Collaboration_Social_Features_Cena.md Feature 7
+    lens_note: CRDT infra is a new ops domain for this team.
+already_built:
+  - feature: Content safety + PhotoDNA interfaces
+    evidence: src/shared/Cena.Infrastructure/Moderation/IContentSafetyClient.cs; IPhotoDnaClient.cs
+    note: Any new UGC surface must route through these; do not bypass.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md FD-029..FD-032 (peer circles, I'm confused too)."
+extracted_tasks:
+  - title: Define UGC moderation SLA + escalation taxonomy + safeguarding runbook
+    priority: P0
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any UGC-producing feature (peer circles, whiteboard, Q&A) ships, publish:
+      - severity taxonomy (self-harm P0, bullying P1, PII leak P1, spam P2)
+      - SLA per severity
+      - escalation path to human safeguarding officer
+      - retention for takedown evidence
+      ## Files
+      docs/ops/runbooks/ (new: ugc-moderation.md)
+      docs/engineering/ (new: ugc-sla.md)
+      src/shared/Cena.Infrastructure/Moderation/ (wire escalation)
+      ## Definition of Done
+      - Runbook published; tabletop exercise passed
+      - Synthetic abuse event routed end-to-end
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch:sre/ugc-sla"
+    source_doc_lines: []
+  - title: Add ephemeral-store deletion probe for 24h-retention claim
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Weekly probe writes a peer-explanation artifact, advances clock, asserts it is gone in <=24h. Fail loudly if not.
+      ## Files
+      scripts/ (new: ephemeral-probe)
+      deploy/observability/alerting-rules.yaml
+      ## Definition of Done
+      - Probe runs via CI cron; alert wired
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch:kimi-coder/ephemeral-probe"
+    source_doc_lines: []
+verdict: revise
+verdict_reason: |
+  Collaboration features will not pass SRE ship-gate until moderation SLA + ephemeral-store probe are real and tested.
+cross_lens_handoff:
+  - to: persona-redteam
+    about: Abuse + collusion threat model for Features 4, 6, 7.
+  - to: persona-privacy
+    about: Voice recording retention + transcript handling under COPPA + PPL.
+  - to: persona-ethics
+    about: Team vs challenge mechanics passing ship-gate for no-variable-ratio.

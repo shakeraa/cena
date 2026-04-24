@@ -1,0 +1,244 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight assessment/feedback features: formative-summative split, IRT-CAT placement,
+  AI partial-credit grading, free-response CAS-validated grading, per-session
+  error analysis, real-time misconception tagging (session-scoped), crisis mode,
+  confidence calibration with CBM. Doc has the strongest psychometric rigor of
+  the corpus.
+system_purpose_fit: 5
+  rationale:
+    - Every feature is explicit about CAS-oracle dependency (non-neg 1) and ADR-0003
+      session-scoping (non-neg 2).
+    - F5 and F6 architect themselves around Redis-only storage with TTL — the correct
+      pattern for ADR-0003 compliance.
+    - F8 (CBM confidence calibration) is the right complement to the axis2 F5
+      confidence check-in; this one has deeper evidence and lower effort.
+code_reality_check:
+  claims_verified_in_code:
+    - "ICasRouterService is the CAS oracle -> docs/adr/0031-error-pattern-matching-approach.md:14-16"
+    - "Misconception catalog already exists (baseline for F6 taxonomy) -> docs/adr/0031-error-pattern-matching-approach.md:31-42"
+    - "Session aggregate is the ADR-0003 boundary -> docs/adr/0003-misconception-session-scope.md:49-52"
+    - "ExplanationCacheService uses (questionId, errorType, language) key -> docs/adr/0003-misconception-session-scope.md:32-33 — provides F5 caching substrate"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "'Yu et al. 2026 arXiv:2603.00895' (F3/F4) — Dr. Rami flagged this citation as fabricated/unverifiable (finding_assessment_dr_rami.md:24). Must be verified before any SHIP claim about 90%+ TA-agreement."
+    - "DeepMind/Eedi (2025) arXiv:2512.23633 (F6) — Dr. Rami: 95% misconception resolution figure is not found in the cited Eedi/DeepMind literature at that level. Must be verified or revised."
+  claims_unsupported_in_literature:
+    - "F3 headline '90%+ score agreement with human TAs' traces to Yu 2026 arXiv. Even if citation is real, 90% agreement is 'approaches human inter-rater disagreement levels' not 'near-perfect' (Dr. Rami FD-008). Framing must be honest."
+    - "F6 95.4% misconception-resolution — must be traced to the specific DeepMind/Eedi paper and the specific condition. Dr. Rami finding_assessment_dr_rami.md:19 flags this figure as not supported by the actual literature."
+adr_alignment:
+  honored:
+    - ADR-0002 (F2, F3, F4, F5, F6 all CAS-first)
+    - ADR-0003 (F5, F6 Redis-only TTL, no SQL persistence of error patterns; explicitly called out)
+    - ADR-0031 (F6 misconception taxonomy matches the CAS-grounded approach)
+  violated: []
+  missing_adr_needed:
+    - "F2 'knowledge state' (CAT placement result) retention — is it a persistent mastery snapshot? Needs an ADR distinguishing placement-snapshot from cross-session misconception. Doc at L94 claims it's outside ADR-0003 scope; that is defensible but should be explicit in an ADR."
+    - "F7 crisis-mode 'topic priority score from historical Bagrut frequency' — confirm this is aggregate statistical data, not per-student predictive score (RDY-080 boundary)."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F3 and F4 lean on Yu et al. 2026 (arXiv:2603.00895) as the primary
+      effect-size warrant. Dr. Rami's assessment (finding_assessment_dr_rami.md:24)
+      flags this citation as unverifiable — the year 2026 has not occurred
+      in a way that permits retrospective large-scale empirical studies at
+      this citation's claimed scope. Until the arXiv ID is independently verified,
+      the 90% agreement claim must be treated as unsourced. Feature can still be
+      built on the AI-grading + rubric-guided-LLM + CAS-oracle pattern (which is
+      sound on other grounds), but the quantitative claim must be removed.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:109-116, 148-153
+    lens_note: |
+      Citation-hygiene lens: a fabricated or hallucinated citation carrying the
+      headline effect size is a ship-blocker for credibility. Even if the
+      feature is still a good idea, the framing depends on a verifiable number.
+  - severity: P0
+    finding: |
+      F6 (Real-Time Misconception Tagging) cites 95.4% misconception resolution
+      from DeepMind/Eedi 2025. Dr. Rami (FD-003) flags this as not supported by
+      the Eedi/DeepMind literature (actual rates ~60-80% across conditions). The
+      feature itself is fine (strong ADR-0003-compliant architecture, session-
+      scoped Redis). But the headline claim must be revised down to the honest
+      rate before anything ships.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:225-226
+    lens_note: |
+      This is the #1 example in the corpus of "the architecture is correct, the
+      framing is inflated". The cogsci/psychometric lens must not let a good
+      feature survive with a bad number.
+  - severity: P1
+    finding: |
+      F2 (IRT-CAT Placement) at L94 argues the "knowledge state" is not
+      misconception data and falls outside ADR-0003. Cogsci view: this is
+      defensible (mastery snapshot ≠ behavioral profile), but the ADR-0003
+      authors may disagree on scope. Need an explicit ADR decision (mastery
+      placement snapshot retention + Bayesian EAP posterior storage are allowed;
+      item-level response patterns are not). Without that, a later privacy
+      audit could re-classify and force a rewrite.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:92-95
+    lens_note: "Preempt the re-classification risk with an ADR."
+  - severity: P1
+    finding: |
+      F1 (Formative-Summative Split) is the right cogsci framing — the
+      "expertise reversal" risk of relying on hint-heavy formative signals is
+      real. The dashboard should frame the "gap" between signals as a hypothesis
+      (you may be relying on hints) rather than a deficit. Copy review against
+      the ship-gate banned-terms list (user memory feedback_shipgate_banned_terms).
+    evidence: AXIS_6_Assessment_Feedback_Research.md:49-52
+    lens_note: "Strong feature; just watch the copy."
+  - severity: P1
+    finding: |
+      F7 (Crisis Mode) proposes "explicit de-prioritization of deep conceptual
+      exploration in favor of exam-relevant procedural fluency" (AXIS_6:262).
+      Cogsci honesty: this is a pragmatic trade-off that *will* reduce far-
+      transfer (VERIFY-0001). Any shipped crisis mode must label itself as
+      such to the student ("Crisis mode prioritises points over depth") and
+      allow one-tap return to the balanced mode. The doc says "should be
+      transparent to students" (AXIS_6:295) — that must be enforced in DoD.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:262, 295
+    lens_note: |
+      Transfer-of-learning (docs/research/VERIFY-0001-transfer-of-learning.md)
+      is a standing design concern. A crisis mode that silently trades transfer
+      for procedural-fluency would be a product lie.
+  - severity: P2
+    finding: |
+      F8 (CBM confidence calibration) flags loss-aversion concern at AXIS_6:331
+      and defends: "Foster explicitly designed this as low-stakes formative
+      assessment". Cogsci concurrence: CBM with negative marking in a *learning*
+      context is materially different from CBM used for grading. Feature ships
+      cleanly as long as the CBM score is presented as a calibration indicator,
+      not as "points lost". Copy review required.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:328-332
+    lens_note: "Keep it. The banned-term scanner may trip on 'negative marking'; doc should use 'calibration score'."
+  - severity: P2
+    finding: |
+      F5 (Per-Session Error Analysis) data model uses Redis TTL 24h with no
+      persistent SQL error table (AXIS_6:207). Exactly the right architecture.
+      The "Practice Similar Problems" post-session recommendation (L212) is the
+      only possible leak — doc's mitigation (exercises tied to session, expire
+      with it) is correct; add automated test that the generated exercise set
+      is purged from user storage after 24h.
+    evidence: AXIS_6_Assessment_Feedback_Research.md:207-212
+    lens_note: "Architecture is clean; test coverage matters."
+already_built:
+  - feature: "MisconceptionCatalog + ErrorPatternMatcherEngine (F6 taxonomy substrate)"
+    evidence: docs/adr/0031-error-pattern-matching-approach.md:31-42
+    note: "F6's real-time tagger should route through the existing engine, not build a parallel one."
+  - feature: "ExplanationCacheService with (questionId, errorType, language) key"
+    evidence: docs/adr/0003-misconception-session-scope.md:32-33
+    note: "F5 error-explanation surface can cache via this service; already ADR-0003 compliant."
+  - feature: "3-tier CAS router (MathNet + SymPy + fallback)"
+    evidence: docs/adr/0031-error-pattern-matching-approach.md:14-16
+    note: "F3/F4 partial-credit and equivalence checks must route through ICasRouterService."
+duplicates_of_other_docs:
+  - "axis1_pedagogy_mechanics_cena.md: F5 Productive Struggle Hint Governor overlaps F1 crisis/formative split"
+  - "axis2_motivation_self_regulation_findings.md: F5 Confidence Check-ins is weaker than F8 CBM here; dedup to F8"
+  - "feature-discovery-2026-04-20.md: FD-003, FD-004, FD-005, FD-006, FD-007, FD-008, FD-015 all trace here"
+  - "cena_dr_nadia_pedagogical_review_20_findings.md: cross-examines F6 and F8 favourably"
+extracted_tasks:
+  - title: "Replace Yu 2026 citation in F3/F4 with verifiable source + honest effect framing"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Remove the Yu et al. 2026 arXiv citation (flagged unverifiable) from F3 and
+      F4 framing. Replace with: rubric-guided LLM grading evidence base (Dunlosky
+      2013 on retrieval + AI-assisted grading literature 2408.11728), paired with
+      CAS-oracle architectural guarantee. Drop the "90%+ TA agreement" headline.
+
+      ## Files
+      - pre-release-review/AXIS_6_Assessment_Feedback_Research.md (edit F3, F4 evidence sections)
+      - pre-release-review/feature-discovery-2026-04-20.md FD-008 if it inherits the citation
+
+      ## Definition of Done
+      - Citation removed.
+      - Honest framing: "AI grading + CAS verification; effect size pending calibration with Israeli Bagrut markers."
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-yu2026-citation-fix"
+    source_doc_lines: [L109-L116, L148-L153]
+  - title: "Correct F6 DeepMind/Eedi misconception-resolution headline"
+    priority: P0
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Rewrite F6 headline claim from "95.4% misconception resolution" to honest
+      figures (60-80% across conditions per Dr. Rami review). Feature architecture
+      does not change.
+
+      ## Files
+      - pre-release-review/AXIS_6_Assessment_Feedback_Research.md (F6 evidence section)
+
+      ## Definition of Done
+      - Headline reflects Dr. Rami's verified range.
+      - Feature architecture (Redis-only, session-scoped) preserved.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-f6-eedi-citation-fix"
+    source_doc_lines: [L222-L226]
+  - title: "Ship F8 CBM Confidence Calibration (session-scoped, framed as calibration-not-penalty)"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Post-answer confidence slider 0-10; CBM score Σ(conf|correct) − Σ(conf|incorrect);
+      session-end calibration chart. Per-item data Redis only; one aggregate
+      calibration_r may be retained.
+
+      ## Files
+      - src/actors/Cena.Actors/Assessment/ConfidenceCalibrationService.cs (new)
+      - src/student-web/src/features/confidence-cbm/*.vue (new)
+
+      ## Definition of Done
+      - UI label is "calibration score" never "negative marking".
+      - Underconfidence message is encouraging.
+      - No per-item confidence data in SQL.
+      - Feature flag allows cohort-level disable.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-cbm-calibration"
+    source_doc_lines: [L299-L334]
+  - title: "F7 Crisis Mode: transparency label + one-tap return to balanced mode"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      When Crisis Mode activates, student sees explicit label "Focused on exam-style
+      practice; depth of concept coverage reduced." One-tap exit returns to
+      balanced-mode problem selection.
+
+      ## Files
+      - src/student-web/src/features/crisis-mode/*.vue
+      - src/actors/Cena.Actors/Scheduling/CrisisSchedulerGuardrails.cs
+
+      ## Definition of Done
+      - Mode toggle is reversible intra-session.
+      - No implied Bagrut score prediction anywhere (RDY-080).
+      - Far-transfer problems are not entirely removed; they reappear as a weekly "depth" session.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-crisis-transparency"
+    source_doc_lines: [L261-L295]
+verdict: revise
+verdict_reason: |
+  Architecturally one of the two strongest docs in the corpus (along with axis1).
+  The citation inflation in F3/F4/F6 is the only blocker; once corrected, F1, F5,
+  F6, F7, F8 are all ship-ready. F2 needs a placement-snapshot ADR. F3/F4 need
+  the Yu 2026 citation addressed before any quantitative claim enters product
+  messaging.
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: "F2 CAT placement 'knowledge state' retention — aggregate root design per ADR-0012."
+  - to: persona-privacy
+    about: "F3/F4 retained graded submissions + rubric results; confirm retention policy matches COPPA/PPL."
+  - to: persona-ministry
+    about: "F3 partial credit rules encoded from Bagrut rubrics; Bagrut is reference-only (non-neg 4)."
+  - to: persona-finops
+    about: "F3/F4 per-submission LLM grading is the single biggest marginal cost in the axis6 set; sizing needed."
+  - to: persona-educator
+    about: "F8 CBM scoring — is the classical 'Σ(confidence) − Σ(confidence|wrong)' formula appropriate for Bagrut-prep students under high stakes?"

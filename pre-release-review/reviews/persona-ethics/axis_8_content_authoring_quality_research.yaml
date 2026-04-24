@@ -1,0 +1,211 @@
+doc_path: pre-release-review/AXIS_8_Content_Authoring_Quality_Research.md
+reviewer: persona-ethics
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 content-authoring & quality features (Bayesian IRT small-sample
+  calibration, SymPy CAS variation engine, Bagrut rubric engine, Arabic RTL
+  renderer, culturally-contextualized problem generator, mother-tongue hints,
+  self-efficacy-calibrated difficulty presentation, hybrid Elo+expert
+  calibration).
+system_purpose_fit: 3
+  rationale:
+    - Most features are infrastructure / authoring — low direct ethics surface
+    - F5 (cultural context) and F7 (self-efficacy difficulty presentation) have
+      specific ethics concerns
+    - F7 proposes "displays peer comparison only when student is above median
+      to avoid demotivation" — this is deceptive-by-design, fails the
+      informed-student test
+    - F5 cultural context generator is ethically sound IF community review is
+      enforced; current proposal leaves this as "mitigation" not requirement
+code_reality_check:
+  claims_verified_in_code: []
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Zayyadi 2024 ES=1.16 -> Rami flagged as cherry-picked"
+    - "Koenig 2025 84% bias reduction -> Rami flagged misattribution"
+adr_alignment:
+  honored:
+    - "ADR-0002 SymPy CAS oracle (F2, F3)"
+    - "GD-004 positive-framing (F7)"
+  violated: []
+  missing_adr_needed:
+    - "ADR on any selective display of peer/cohort comparisons — policy that
+      either comparisons are never shown OR are shown honestly (never hidden
+      when unfavorable)"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F7 Self-Efficacy-Calibrated Difficulty Presentation (L279-319)
+      proposes "displays peer comparison only when student is above
+      median to avoid demotivation" (L282). This is deceptive-by-design:
+      the system hides information (you are below median) that the
+      student has an interest in knowing, while selectively surfacing
+      it when favorable. This fails the "informed student" test
+      (ethical-persuasion-research.md:L34): if the student knew the
+      system was gating their comparison view on whether it flattered
+      them, they would not appreciate the technique. It is also
+      operationally problematic — the moment a student is shown
+      comparison information and then STOPS being shown it, they
+      correctly infer they dropped below median, reintroducing the
+      demotivation the feature claimed to avoid.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L282
+    lens_note: |
+      Correct patterns: (a) never show peer comparison at all, or
+      (b) show honestly with supportive framing. Selective-suppression
+      is a dark pattern even when well-intended.
+  - severity: P1
+    finding: |
+      F5 Culturally-Contextualized Problem Generator (L191-232) has
+      extraordinary effect-size claims (cited ES=1.16, Rami flagged as
+      cherry-picked). The ethics concern is separate from effect size:
+      the feature creates per-cohort problem wrappers (Palestinian
+      tatreez, Ethiopian buna, Russian Soviet olympiad style). Risk:
+      students auto-routed to their "cultural" wrapper by language or
+      demographic signal may perceive segregated content streams.
+      Author flags stereotyping concern (L228) with "community review
+      board" mitigation. Ethics lens requires this to be hard
+      requirement, not mitigation:
+      (a) Community review board per cohort, with sign-off documented
+          in code repository
+      (b) Routing decided by explicit student preference, never
+          inferred
+      (c) Student can always view "standard" (non-culturally-wrapped)
+          problems alongside or instead
+      (d) Cross-cohort browsing enabled and encouraged (student sees
+          tatreez + buna + Soviet contexts as options)
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L228
+    lens_note: |
+      Culturally-authentic content is a powerful engagement lever. It
+      is also a segregation-amplification risk if routed by demographic
+      inference. Belt AND suspenders required.
+  - severity: P2
+    finding: |
+      F6 Mother-Tongue-Mediated Hint System (L235-276) is sound. One
+      ethics note: "Store only language preference, not interaction
+      analytics. No cross-session language-profile tracking" (L272) is
+      the right policy. Add explicit ADR entry or shipgate rule
+      forbidding language-profile derivation from keystroke patterns,
+      dwell-time, or code-switching frequency — the obvious next-step
+      temptation for an ML team.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L272
+    lens_note: |
+      Language-proficiency inference of minors is regulated data
+      under Israeli PPL and under GDPR special-category-adjacent
+      protections. Explicit architectural ban is cheap insurance.
+  - severity: P2
+    finding: |
+      F3 Bagrut-Aligned Partial Credit Rubric Engine (L104-143):
+      proposes (L132) "Student sees step-by-step scoring on review;
+      'Why did I lose points?' breakdown." The "lost points" framing
+      is loss-aversion copy. Recommend: "How this scored / What
+      strengthened your answer / What to focus next" framing.
+    evidence: AXIS_8_Content_Authoring_Quality_Research.md:L131-L132
+    lens_note: |
+      Rubric transparency is good; "you lost points" phrasing is
+      the shipgate-adjacent drift.
+already_built: []
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-036 through FD-041 covers same features"
+  - "axis3_accessibility_accommodations_findings.md: F7 Arabic RTL = F4 here"
+  - "AXIS_6_Assessment_Feedback_Research.md: F2 CAS variation overlaps"
+extracted_tasks:
+  - title: "F7 peer-comparison: remove selective-display-when-flattering logic"
+    priority: P1
+    estimate: S
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F7 Self-Efficacy-Calibrated Difficulty Presentation must not
+      include selective peer-comparison display. Options:
+      (a) Remove peer comparison entirely (preferred)
+      (b) Show consistently with supportive framing regardless of
+          student's relative position
+      Selective-display-when-favorable is banned as deceptive-by-design.
+      ## Files
+      - docs/adr/00NN-no-selective-comparison-display.md (new)
+      - AXIS_8 spec revision
+      ## Definition of Done
+      - ADR accepted
+      - F7 spec revised
+      - Shipgate lint forbids conditional-visibility logic on comparison components
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L282]
+  - title: "F5 cultural wrappers: hard requirements for community review + student choice"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Before any culturally-contextualized problem ships:
+      - Community review board established for each cohort (Arab,
+        Ethiopian, Russian, etc.) with documented sign-off
+      - Routing ALWAYS by student explicit preference, never from
+        inferred demographic data
+      - "Standard" (non-wrapped) view available at all times
+      - Cross-cohort browsing enabled by default
+      - Annual review of which wrappers are being used by whom
+      ## Files
+      - docs/adr/00NN-cultural-wrapper-governance.md (new)
+      - docs/research/cultural-wrapper-review-board.md (new)
+      ## Definition of Done
+      - ADR accepted
+      - Board membership documented
+      - Routing code path inspectable: no demographic inference
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L228]
+  - title: "F6 explicit ban on language-proficiency inference"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add shipgate / architecture rule: no code path may infer a
+      student's language proficiency from keystroke patterns, dwell
+      time, code-switching frequency, or hint-language toggles.
+      Language preference is student-set only.
+      ## Files
+      - docs/adr/00NN-no-language-proficiency-inference.md (new)
+      - scripts/shipgate/scan.mjs (add rule)
+      ## Definition of Done
+      - ADR accepted
+      - Shipgate blocks any commit with `language_proficiency_score` field
+      - Code review checklist updated
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L272]
+  - title: "F3 rubric review: 'how this scored' framing, not 'lost points'"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F3 Bagrut rubric review UI: replace "why I lost points" with
+      "how this scored / what strengthened this / what to focus on
+      next" framing. Shipgate lint adds "lost points" to banned list
+      in rubric-review namespace.
+      ## Files
+      - src/student-web/src/features/rubric-review/*
+      - src/student-web/src/locales/*.json
+      - scripts/shipgate/banned.json
+      ## Definition of Done
+      - All rubric-review strings pass lint
+      - User-facing text uses competence framing
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L131-L132]
+verdict: revise
+verdict_reason: |
+  Content-authoring axis is mostly infrastructure with two ethics
+  hotspots: F7 selective-comparison (P1, must remove) and F5 cultural
+  wrappers (P1, need stronger governance). F1, F2, F3, F4, F6, F8 ship
+  after F3 copy fix.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "F5 ES=1.16 cherry-picking concern, F1 Koenig 2025 misattribution"
+  - to: persona-ministry
+    about: "F5 cultural wrappers for Bedouin / Druze / Ethiopian Bagrut prep — Ministry approval?"
+  - to: persona-privacy
+    about: "F6 language preference storage, F7 self-efficacy proxy behavioral signals"

@@ -1,0 +1,25 @@
+GOAL: Production-grade Student Screenshot Question Analyzer with defense-in-depth security
+TARGET: 10 iterations, each producing a proof article with citations, code samples, test results
+METRIC: Security Robustness Score (0-100) — cumulative defense depth across all attack vectors
+CONSTRAINT: Must maintain <2s end-to-end latency; must integrate with existing Cena CAS pipeline
+
+RESEARCH ITERATIONS:
+1. Vision model safety — adversarial image attacks and defenses
+2. Multimodal prompt injection — academic research on OCR/vision injection
+3. LaTeX sanitization — code execution prevention via malicious LaTeX
+4. Content moderation for minors — NSFW/PII/violence filtering
+5. Rate limiting patterns for image upload APIs
+6. Privacy-preserving image processing — no PII retention
+7. Academic integrity — exam cheating detection
+8. Accessibility of photo-based input — screen reader, alt-text flow
+9. Error handling and graceful degradation when vision fails
+10. End-to-end proof — attack simulation and defense verification
+
+ARCHITECTURE CONTEXT:
+- Existing Path B pipeline: Student photo → Gemini 2.5 Flash → LaTeX → CAS validation
+- CAS: MathNet (in-process) → SymPy (sidecar) → Wolfram (admin fallback)
+- Compliance: COPPA, GDPR-K, FERPA (minors, session-scoped telemetry only)
+- Cost: ~$200/month at 100K photos (Gemini vision)
+- Stack: .NET backend, Vue 3 student web, Flutter mobile, NATS bus
+
+STARTED: 2026-04-12

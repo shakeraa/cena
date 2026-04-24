@@ -1,0 +1,137 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight features inspired by non-EdTech domains: Math Concept Map (Obsidian),
+  Pre-Session Focus Ritual (Calm/Headspace), Learning Journeys (Fabulous),
+  and presumably 5 others (doc truncated at L240 in input sample but full
+  doc is 240 lines so likely 8 total). Ministry lens: cross-domain
+  innovations are mostly syllabus-agnostic wellbeing/UX features. The
+  concept map is the main curriculum-touching feature.
+system_purpose_fit: 3
+  rationale:
+    - Focus Ritual (F2) is Ministry-neutral wellbeing UX; doc guards
+      against therapy-claim (good).
+    - Learning Journeys (F3) "themed progression paths" touches syllabus
+      — paths must follow ADR-0034 prereq DAG, not a narrative arc
+      invented by the feature.
+    - Math Concept Map (F1) displays the Ministry syllabus taxonomy
+      directly — this is actually useful for a Ministry inspector to
+      audit our coverage; must reference the canonical taxonomy +
+      chapter graph.
+code_reality_check:
+  claims_verified_in_code:
+    - 'Canonical Ministry taxonomy + prereq graph: scripts/bagrut-taxonomy.json + ChapterDocument per ADR-0034'
+    - 'Shipgate dark-pattern ban: docs/engineering/shipgate.md'
+  claims_contradicted_by_code: []
+  claims_unverifiable: []
+adr_alignment:
+  honored:
+    - 'Shipgate dark-pattern ban (doc pre-empts with explicit "no streaks/loss-aversion" screening per L627)'
+    - 'ADR-0034 prereq DAG (F1 Concept Map should project from it)'
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 1 "Math Concept Map (Knowledge Graph)" renders a visual
+      map of all Bagrut math topics. This must project from
+      scripts/bagrut-taxonomy.json + the ADR-0034 SyllabusDocument +
+      ChapterDocument + prereq DAG, not a hand-authored graph. Doc
+      L640 says "map full Bagrut math curriculum as a directed graph
+      (100-150 nodes)" — if this is a new graph, we have two
+      ontologies. Ministry-lens requires the map is the canonical
+      taxonomy projected for visual use.
+    evidence: 'cena_cross_domain_feature_innovation.md:L640 (F1 implementation sketch); scripts/bagrut-taxonomy.json (42 subtopics for Math-5U per docs/curriculum/bagrut-taxonomy-review.md:L4); docs/adr/0034-syllabus-advancement-model.md:L56-L66'
+    lens_note: |
+      Ministry lens: if the concept map shows a chapter we do not
+      actually serve, or omits a syllabus chapter, we have made a
+      visible curriculum-coverage claim we can''t back.
+  - severity: P2
+    finding: |
+      Feature 3 "Learning Journeys — Themed Progression Paths" (habit-
+      formation inspiration) risks coercing students along a narrative
+      arc that does not match the prereq DAG. The journey''s
+      progression must be a valid topological traversal of the DAG.
+    evidence: 'cena_cross_domain_feature_innovation.md:L681-L683 (F3 description); docs/adr/0034-syllabus-advancement-model.md:L85 (prereq cascade)'
+    lens_note: |
+      Ministry lens: narrative + syllabus can co-exist only if
+      narrative respects the DAG. Otherwise a Fabulous-style journey
+      is behavioural coercion dressed as pedagogy.
+  - severity: P2
+    finding: |
+      Feature 2 "Focus Ritual — 60-Second Breathing Opener" — Dr. Rami
+      flagged the citation "US DoE breathing anxiety research" as
+      unverifiable (FD-017 WARNING). Doc already notes "not framed as
+      therapy" (L664). Ministry-lens: the feature is fine; the
+      citation must be swapped for a peer-reviewed source.
+    evidence: 'cena_cross_domain_feature_innovation.md:L669; pre-release-review/finding_assessment_dr_rami.md:L33 (FD-017 WARNING)'
+    lens_note: |
+      Ministry lens: weak citations on wellbeing features = low-stakes
+      but fix-able.
+already_built:
+  - feature: Canonical Ministry taxonomy + prereq graph
+    evidence: scripts/bagrut-taxonomy.json + docs/curriculum/bagrut-taxonomy-review.md + ChapterDocument (ADR-0034)
+    note: |
+      F1 Concept Map must project from these; no new graph needed.
+  - feature: Student advancement aggregate
+    evidence: 'src/actors/Cena.Actors/Advancement/StudentAdvancementService.cs (ADR-0034)'
+    note: |
+      F1 Concept Map node coloring (Mastered / Unlocked / Locked) reads
+      directly from this.
+  - feature: Shipgate scanner
+    evidence: docs/engineering/shipgate.md
+    note: |
+      Doc''s pre-screening for "no streaks/loss-aversion" is what the
+      scanner already enforces; frame accordingly.
+duplicates_of_other_docs:
+  - 'axis2_motivation_self_regulation_findings.md: F2 If-Then Session Planner overlaps this doc''s F3 Learning Journeys'
+  - 'cena_competitive_analysis.md: F5 Interactive Virtual Manipulatives may overlap visual manipulatives inspiration here (if doc has a similar item in the unread 5 features)'
+  - 'feature-discovery-2026-04-20.md: FD-017 Focus Ritual = F2; FD-018 Learning Energy Tracker likely overlaps F4 of this doc if present'
+extracted_tasks:
+  - title: Bind Math Concept Map to canonical taxonomy + prereq DAG
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-concept-map-projection
+    queue_body: |
+      ## Goal
+      Build the Math Concept Map (F1) as a projection from the
+      canonical scripts/bagrut-taxonomy.json + ChapterDocument +
+      prereq DAG — never a parallel graph. Node coloring reads from
+      StudentAdvancement aggregate.
+
+      ## Files
+      - src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs
+        (expose a projection API)
+      - src/api/Cena.Student.Api.Host/Endpoints/ConceptMapEndpoints.cs
+        (new)
+      - src/admin/full-version/src/views/student/ConceptMap.vue (new)
+
+      ## Definition of Done
+      - API response is a projection of bagrut-taxonomy.json structure
+      - Architecture test: concept-map API response only contains
+        ChapterDocument ids
+      - Node coloring projected from StudentAdvancement events
+      - Full sln build green
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-concept-map-projection --result "<branch>"
+    source_doc_lines: [L640]
+verdict: adopt
+verdict_reason: |
+  Cross-domain wellbeing / visualization features are mostly Ministry-
+  neutral. F1 needs taxonomy-projection binding; F3 needs DAG-respect
+  constraint. Low-stakes overall.
+cross_lens_handoff:
+  - to: persona-ethics
+    about: |
+      F3 Learning Journeys narrative-arc framing (coercion vs
+      motivation) — ethics owns this.
+  - to: persona-cogsci
+    about: |
+      F2 breathing-ritual citation integrity (Dr. Rami FD-017).
+  - to: persona-a11y
+    about: |
+      F1 concept-map visual rendering in RTL + screen-reader
+      traversal.

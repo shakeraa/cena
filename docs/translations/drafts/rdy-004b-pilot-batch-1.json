@@ -1,0 +1,570 @@
+{
+  "$schema": "../translation-draft-schema.json",
+  "batchId": "rdy-004b-pilot-batch-1",
+  "generatedAt": "2026-04-17",
+  "generator": "claude-opus-4-7",
+  "source": "machine-draft",
+  "status": "pending-peer-review",
+  "doNotMergeUntil": "both reviewers sign off + translation-qa.mjs passes",
+  "notes": {
+    "policyCompliance": "RDY-004b §Notes explicitly bans MT-in-seed. This file is a DRAFT aid for the native-speaker translator workflow. It MUST NOT be lifted into QuestionBankSeedData.cs without two-translator peer review and glossary-anchored QA.",
+    "glossaryAnchor": "config/glossary.json v1.0.0 (271 terms, last 2026-04-14). Every boldface term in the Arabic output maps to a glossary id.",
+    "mathDirection": "All math notation stays LTR; Western Arabic numerals 0–9 per Israeli Arab textbook convention.",
+    "reviewCheckpoints": "Each entry lists specific gender-agreement and verb-conjugation judgments the reviewer must validate. AI cannot self-verify these."
+  },
+  "entries": [
+    {
+      "id": "RDY-004B-001",
+      "source": {
+        "stem": "Find all x satisfying |2x-3| < 5",
+        "language": "en",
+        "subject": "Math",
+        "topic": "Inequalities",
+        "grade": "3 Units",
+        "concepts": ["inequalities"],
+        "seedRef": "QuestionBankSeedData.cs:244"
+      },
+      "arabicDraft": {
+        "stem": "جِد جميع قيم x التي تحقق: |2x-3| < 5",
+        "options": [
+          { "label": "A", "text": "-1 < x < 4", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "x < 4", "isCorrect": false, "distractorRationale": "يُهمل الحدّ الأيسر" },
+          { "label": "C", "text": "-4 < x < 1", "isCorrect": false, "distractorRationale": "خطأ في الإشارة" },
+          { "label": "D", "text": "x > -1", "isCorrect": false, "distractorRationale": "يُهمل الحدّ الأيمن" }
+        ]
+      },
+      "glossaryTermsUsed": ["alg_inequality (implicit — |·|<·)", "alg_variable (x)"],
+      "reviewCheckpoints": [
+        "Verb 'جِد' (imperative, m.sg.) is the Bagrut-convention imperative. Confirm vs 'أوجد' (same root; some textbooks prefer)."
+      ]
+    },
+    {
+      "id": "RDY-004B-002",
+      "source": {
+        "stem": "פתור את המשוואה: 3x - 7 = 14",
+        "language": "he",
+        "subject": "Math",
+        "topic": "Linear Equations",
+        "grade": "3 Units",
+        "concepts": ["linear-equations"],
+        "seedRef": "QuestionBankSeedData.cs:250"
+      },
+      "arabicDraft": {
+        "stem": "حُلّ المعادلة: 3x - 7 = 14",
+        "options": [
+          { "label": "A", "text": "x = 7", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "x = 3", "isCorrect": false, "distractorRationale": "خطأ في الحساب" },
+          { "label": "C", "text": "x = 21", "isCorrect": false, "distractorRationale": "نسي القسمة" },
+          { "label": "D", "text": "x = -7", "isCorrect": false, "distractorRationale": "خطأ في الإشارة" }
+        ]
+      },
+      "glossaryTermsUsed": ["alg_equation → معادلة (f)"],
+      "reviewCheckpoints": [
+        "'حُلّ' imperative m.sg. matches standard Bagrut phrasing.",
+        "'المعادلة' with definite article — noun is f; no adjective, so agreement not at risk."
+      ]
+    },
+    {
+      "id": "RDY-004B-003",
+      "source": {
+        "stem": "Evaluate lim(x→0) sin(3x)/x",
+        "language": "en",
+        "subject": "Math",
+        "topic": "Limits",
+        "grade": "5 Units",
+        "concepts": ["derivatives"],
+        "seedRef": "QuestionBankSeedData.cs:247"
+      },
+      "arabicDraft": {
+        "stem": "احسب النهاية: lim(x→0) sin(3x)/x",
+        "options": [
+          { "label": "A", "text": "3", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "1", "isCorrect": false, "distractorRationale": "نسي معامل 3" },
+          { "label": "C", "text": "0", "isCorrect": false, "distractorRationale": "تطبيق خاطئ لقاعدة لوبيتال" },
+          { "label": "D", "text": "∞", "isCorrect": false, "distractorRationale": "يظن أنها تتباعد" }
+        ]
+      },
+      "glossaryTermsUsed": ["calc_limit → نهاية (f)"],
+      "reviewCheckpoints": [
+        "'احسب' (imperative m.sg.) vs 'أوجد' — both acceptable in Bagrut; pick one convention.",
+        "'لوبيتال' transliteration — confirm vs 'لوبيتال / لوبيتال ' variants (Palestinian curriculum convention)."
+      ]
+    },
+    {
+      "id": "RDY-004B-004",
+      "source": {
+        "stem": "Solve the inequality: 2x - 3 > 7",
+        "language": "en",
+        "subject": "Math",
+        "topic": "Inequalities",
+        "grade": "3 Units",
+        "concepts": ["inequalities"],
+        "seedRef": "QuestionBankSeedData.cs:259"
+      },
+      "arabicDraft": {
+        "stem": "حُلّ المتباينة: 2x - 3 > 7",
+        "options": [
+          { "label": "A", "text": "x > 5", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "x > 2", "isCorrect": false, "distractorRationale": "لم يُضِف 3" },
+          { "label": "C", "text": "x < 5", "isCorrect": false, "distractorRationale": "اتجاه خاطئ" },
+          { "label": "D", "text": "x > 10", "isCorrect": false, "distractorRationale": "لم يقسم على 2" }
+        ]
+      },
+      "glossaryTermsUsed": ["alg_inequality → متباينة (f)"],
+      "reviewCheckpoints": [
+        "'المتباينة' is f; matches glossary. No gender-bearing adjective in stem.",
+        "'لم يُضِف' vs 'لم يَجمع' — both correct MSA; Bagrut textbooks tend to use 'يَجمع' for arithmetic operations."
+      ]
+    },
+    {
+      "id": "RDY-004B-005",
+      "source": {
+        "stem": "Determine the slope of the tangent to y = x³ at x = 2",
+        "language": "en",
+        "subject": "Math",
+        "topic": "Derivatives",
+        "grade": "5 Units",
+        "concepts": ["derivatives"],
+        "seedRef": "QuestionBankSeedData.cs:262"
+      },
+      "arabicDraft": {
+        "stem": "جِد ميل المماس للدالة y = x³ عند x = 2",
+        "options": [
+          { "label": "A", "text": "12", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "8", "isCorrect": false, "distractorRationale": "استخدم f(2) بدل f'(2)" },
+          { "label": "C", "text": "6", "isCorrect": false, "distractorRationale": "اشتقاق خاطئ" },
+          { "label": "D", "text": "3", "isCorrect": false, "distractorRationale": "نسي قاعدة القوى" }
+        ]
+      },
+      "glossaryTermsUsed": ["func_slope → ميل (m)", "func_function → دالة (f)"],
+      "reviewCheckpoints": [
+        "'ميل المماس للدالة' — 'للدالة' is f; 'المماس' m; idafa chain is grammatical. Confirm preferred Bagrut phrasing: 'ميل المماس لمنحنى الدالة' is more explicit.",
+        "'قاعدة القوى' (power rule) — confirm vs 'قاعدة الأس'."
+      ]
+    },
+    {
+      "id": "RDY-004B-006",
+      "source": {
+        "stem": "חשב את הנגזרת של f(x) = sin(2x)",
+        "language": "he",
+        "subject": "Math",
+        "topic": "Derivatives",
+        "grade": "5 Units",
+        "concepts": ["derivatives", "trigonometry"],
+        "seedRef": "QuestionBankSeedData.cs:265"
+      },
+      "arabicDraft": {
+        "stem": "احسب مشتقة الدالة f(x) = sin(2x)",
+        "options": [
+          { "label": "A", "text": "2cos(2x)", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "cos(2x)", "isCorrect": false, "distractorRationale": "نسي قاعدة السلسلة" },
+          { "label": "C", "text": "-2cos(2x)", "isCorrect": false, "distractorRationale": "خطأ في الإشارة" },
+          { "label": "D", "text": "2sin(2x)", "isCorrect": false, "distractorRationale": "لم يستبدل sin بـ cos" }
+        ]
+      },
+      "glossaryTermsUsed": ["calc_derivative → مشتقة (f)", "func_function → دالة (f)"],
+      "reviewCheckpoints": [
+        "'مشتقة الدالة' idafa — both f. Clean.",
+        "'قاعدة السلسلة' (chain rule) — confirm Bagrut convention."
+      ]
+    },
+    {
+      "id": "RDY-004B-007",
+      "source": {
+        "stem": "Find the area under f(x) = 2x + 1 from x = 0 to x = 3",
+        "language": "en",
+        "subject": "Math",
+        "topic": "Integrals",
+        "grade": "5 Units",
+        "concepts": ["integrals"],
+        "seedRef": "QuestionBankSeedData.cs:268"
+      },
+      "arabicDraft": {
+        "stem": "جِد المساحة المحصورة تحت الدالة f(x) = 2x + 1 بين x = 0 و x = 3",
+        "options": [
+          { "label": "A", "text": "12", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "7", "isCorrect": false, "distractorRationale": "حسب f(3) فقط" },
+          { "label": "C", "text": "9", "isCorrect": false, "distractorRationale": "نسي الثابت" },
+          { "label": "D", "text": "21", "isCorrect": false, "distractorRationale": "ضرب f(3) في 3" }
+        ]
+      },
+      "glossaryTermsUsed": ["geom_area → مساحة (f)", "func_function → دالة (f)"],
+      "reviewCheckpoints": [
+        "'المساحة المحصورة' — adjective 'المحصورة' agrees f. ✔",
+        "'تحت الدالة' vs 'تحت منحنى الدالة' — latter more explicit; Bagrut texts vary."
+      ]
+    },
+    {
+      "id": "RDY-004B-008",
+      "source": {
+        "stem": "מצא את שיפוע הישר העובר דרך (0,0) ו-(6,3)",
+        "language": "he",
+        "subject": "Math",
+        "topic": "Linear Equations",
+        "grade": "3 Units",
+        "concepts": ["linear-equations"],
+        "seedRef": "QuestionBankSeedData.cs:271"
+      },
+      "arabicDraft": {
+        "stem": "جِد ميل المستقيم المار عبر النقطتين (0,0) و (6,3)",
+        "options": [
+          { "label": "A", "text": "0.5", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "2", "isCorrect": false, "distractorRationale": "عكس النسبة" },
+          { "label": "C", "text": "3", "isCorrect": false, "distractorRationale": "استخدم y فقط" },
+          { "label": "D", "text": "6", "isCorrect": false, "distractorRationale": "استخدم x فقط" }
+        ]
+      },
+      "glossaryTermsUsed": ["func_slope → ميل (m)"],
+      "reviewCheckpoints": [
+        "'المستقيم' m; 'المار' adjective m.sg. ✔",
+        "'النقطتين' dual form — confirm over 'النقاط'.",
+        "'عبر' vs 'من خلال' — both acceptable."
+      ]
+    },
+    {
+      "id": "RDY-004B-009",
+      "source": {
+        "stem": "Find the probability of rolling a sum of 7 with two dice",
+        "language": "en",
+        "subject": "Math",
+        "topic": "Probability",
+        "grade": "4 Units",
+        "concepts": ["probability"],
+        "seedRef": "QuestionBankSeedData.cs:274"
+      },
+      "arabicDraft": {
+        "stem": "جِد احتمال الحصول على مجموع 7 عند رمي حجري نرد",
+        "options": [
+          { "label": "A", "text": "1/6", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "1/12", "isCorrect": false, "distractorRationale": "عدّ ٣ حالات فقط" },
+          { "label": "C", "text": "7/36", "isCorrect": false, "distractorRationale": "عدّ ٧ بدل ٦" },
+          { "label": "D", "text": "1/36", "isCorrect": false, "distractorRationale": "زوج واحد فقط" }
+        ]
+      },
+      "glossaryTermsUsed": ["prob_probability → احتمال (m)"],
+      "reviewCheckpoints": [
+        "'حجري نرد' dual form; 'النرد' used for dice singular in MSA. Confirm over 'زهرَي نرد' (textbook variant).",
+        "Eastern Arabic numerals ٣/٧/٦ used in rationales for prose; question text keeps 1/6/etc Western per math-notation rule — confirm consistency preference."
+      ]
+    },
+    {
+      "id": "RDY-004B-010",
+      "source": {
+        "stem": "How many ways can 5 students be arranged in a line?",
+        "language": "en",
+        "subject": "Math",
+        "topic": "Combinatorics",
+        "grade": "4 Units",
+        "concepts": ["combinatorics"],
+        "seedRef": "QuestionBankSeedData.cs:241"
+      },
+      "arabicDraft": {
+        "stem": "بكم طريقة يمكن ترتيب 5 طلاب في صف واحد؟",
+        "options": [
+          { "label": "A", "text": "120", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "25", "isCorrect": false, "distractorRationale": "استخدم n²" },
+          { "label": "C", "text": "10", "isCorrect": false, "distractorRationale": "استخدم C(5,2)" },
+          { "label": "D", "text": "5", "isCorrect": false, "distractorRationale": "لم يضرب" }
+        ]
+      },
+      "glossaryTermsUsed": ["prob_permutation → تبديل (m)"],
+      "reviewCheckpoints": [
+        "GENDER RISK: 'طلاب' is m.pl. generic. In Israeli Arab schools, classes are mixed; Bagrut convention is m.pl as default. Reviewer: confirm vs 'طالبًا وطالبة' (inclusive phrasing).",
+        "'صف واحد' — 'صف' can mean row OR classroom; 'صف واحد' = one row here. Alternative: 'في صفٍّ مستقيم' for unambiguous 'line'."
+      ]
+    },
+    {
+      "id": "RDY-004B-011",
+      "source": {
+        "stem": "A car accelerates from rest at 2 m/s². Velocity after 5 seconds?",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Kinematics",
+        "grade": "4 Units",
+        "concepts": ["kinematics"],
+        "seedRef": "QuestionBankSeedData.cs:291"
+      },
+      "arabicDraft": {
+        "stem": "تتسارع سيارة من السكون بمعدل 2 م/ث². ما سرعتها بعد 5 ثوانٍ؟",
+        "options": [
+          { "label": "A", "text": "10 م/ث", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "7 م/ث", "isCorrect": false, "distractorRationale": "صيغة خاطئة" },
+          { "label": "C", "text": "25 م/ث", "isCorrect": false, "distractorRationale": "استخدم صيغة المسافة" },
+          { "label": "D", "text": "2.5 م/ث", "isCorrect": false, "distractorRationale": "قسم بدل أن يضرب" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_velocity → سرعة (f)", "phys_acceleration → تسارع (m)"],
+      "reviewCheckpoints": [
+        "'تتسارع سيارة' — verb 'تتسارع' f.sg agrees with 'سيارة' f. ✔",
+        "'سرعتها' — pronominal suffix 'ها' refers back to f 'سيارة'. ✔",
+        "Units 'م/ث' (metre/second) — Israeli Arab textbooks use 'م/ث' or 'م/ثا'; confirm."
+      ]
+    },
+    {
+      "id": "RDY-004B-012",
+      "source": {
+        "stem": "A ball is thrown upward at 20 m/s. Calculate maximum height.",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Kinematics",
+        "grade": "4 Units",
+        "concepts": ["kinematics"],
+        "seedRef": "QuestionBankSeedData.cs:294"
+      },
+      "arabicDraft": {
+        "stem": "تُقذف كرة إلى الأعلى بسرعة 20 م/ث. احسب أقصى ارتفاع تبلغه.",
+        "options": [
+          { "label": "A", "text": "20 م", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "40 م", "isCorrect": false, "distractorRationale": "لم يقسم على 2g" },
+          { "label": "C", "text": "10 م", "isCorrect": false, "distractorRationale": "استخدم g خاطئة" },
+          { "label": "D", "text": "2 م", "isCorrect": false, "distractorRationale": "قسم v على g²" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_velocity → سرعة (f)"],
+      "reviewCheckpoints": [
+        "GENDER CRITICAL: 'كرة' is f; 'تُقذف' passive f.sg ✔. 'تبلغه' — verb 'تبلغ' f.sg referring to 'كرة'; pronominal 'ـه' refers to m 'ارتفاع'. Confirm.",
+        "'أقصى ارتفاع' — 'أقصى' is invariable superlative form."
+      ]
+    },
+    {
+      "id": "RDY-004B-013",
+      "source": {
+        "stem": "Calculate work done by F=10N over d=5m at 30° angle",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Energy & Work",
+        "grade": "4 Units",
+        "concepts": ["energy"],
+        "seedRef": "QuestionBankSeedData.cs:297"
+      },
+      "arabicDraft": {
+        "stem": "احسب الشغل المبذول بقوة F=10N على مسافة d=5m بزاوية 30°",
+        "options": [
+          { "label": "A", "text": "43.3 J", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "50 J", "isCorrect": false, "distractorRationale": "تجاهل الزاوية" },
+          { "label": "C", "text": "25 J", "isCorrect": false, "distractorRationale": "استخدم sin بدل cos" },
+          { "label": "D", "text": "5 J", "isCorrect": false, "distractorRationale": "قسم F على d" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_work → شغل (m)", "phys_force → قوة (f)"],
+      "reviewCheckpoints": [
+        "'الشغل المبذول' — 'المبذول' adjective m.sg agreeing with 'شغل' m. ✔",
+        "'بقوة' — prep+f noun (definite form would be 'بالقوة'). Confirm indefinite vs definite."
+      ]
+    },
+    {
+      "id": "RDY-004B-014",
+      "source": {
+        "stem": "Kinetic energy of a 3 kg object at 4 m/s",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Energy & Work",
+        "grade": "3 Units",
+        "concepts": ["energy"],
+        "seedRef": "QuestionBankSeedData.cs:306"
+      },
+      "arabicDraft": {
+        "stem": "احسب الطاقة الحركية لجسم كتلته 3 كغ ويتحرك بسرعة 4 م/ث",
+        "options": [
+          { "label": "A", "text": "24 J", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "12 J", "isCorrect": false, "distractorRationale": "استخدم KE=mv" },
+          { "label": "C", "text": "48 J", "isCorrect": false, "distractorRationale": "ضاعف" },
+          { "label": "D", "text": "6 J", "isCorrect": false, "distractorRationale": "نسي التربيع" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_kinetic_energy → طاقة حركية (f)", "phys_mass → كتلة (f)", "phys_velocity → سرعة (f)"],
+      "reviewCheckpoints": [
+        "'الطاقة الحركية' — both f. ✔",
+        "'لجسم كتلته' — 'كتلته' m-suffix on 'جسم' (m). ✔",
+        "'ويتحرك' — verb m.sg agreeing with 'جسم'. ✔"
+      ]
+    },
+    {
+      "id": "RDY-004B-015",
+      "source": {
+        "stem": "Find equivalent resistance: three 6Ω resistors in parallel",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Electricity",
+        "grade": "4 Units",
+        "concepts": ["electricity"],
+        "seedRef": "QuestionBankSeedData.cs:303"
+      },
+      "arabicDraft": {
+        "stem": "جِد المقاومة المكافئة لثلاث مقاومات قيمة كلٍّ منها 6Ω موصولة على التوازي",
+        "options": [
+          { "label": "A", "text": "2 Ω", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "18 Ω", "isCorrect": false, "distractorRationale": "جَمَع (توصيل تسلسلي)" },
+          { "label": "C", "text": "6 Ω", "isCorrect": false, "distractorRationale": "مقاومة واحدة فقط" },
+          { "label": "D", "text": "0.5 Ω", "isCorrect": false, "distractorRationale": "خطأ حسابي" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_resistance → مقاومة (f)"],
+      "reviewCheckpoints": [
+        "'المقاومة المكافئة' — both f. ✔",
+        "'موصولة' f.sg adjective — agrees with 'مقاومات' (f.pl, triggering f.sg adjective per Arabic rule). ✔",
+        "'على التوازي' vs 'بالتوازي' — Bagrut textbooks use 'على التوازي'; confirm."
+      ]
+    },
+    {
+      "id": "RDY-004B-016",
+      "source": {
+        "stem": "Period of a simple pendulum of length 1.5m",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Oscillations",
+        "grade": "4 Units",
+        "concepts": ["oscillations"],
+        "seedRef": "QuestionBankSeedData.cs:312"
+      },
+      "arabicDraft": {
+        "stem": "احسب زمن دورة بندول بسيط طوله 1.5 م",
+        "options": [
+          { "label": "A", "text": "≈2.46 ث", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "≈1.23 ث", "isCorrect": false, "distractorRationale": "نسي 2π" },
+          { "label": "C", "text": "≈0.64 ث", "isCorrect": false, "distractorRationale": "استخدم 1/T" },
+          { "label": "D", "text": "≈5 ث", "isCorrect": false, "distractorRationale": "صيغة خاطئة" }
+        ]
+      },
+      "glossaryTermsUsed": ["trig_period → دورة (f)"],
+      "reviewCheckpoints": [
+        "TERMINOLOGY RISK: 'زمن دورة' vs 'الزمن الدوري' (الـ T) — Bagrut physics textbooks commonly use 'الزمن الدوري'. Confirm preferred term; glossary has only trig 'period' = دورة which may not be the physics-period convention.",
+        "'طوله' m-suffix on 'بندول' (m). ✔"
+      ]
+    },
+    {
+      "id": "RDY-004B-017",
+      "source": {
+        "stem": "Heat to raise 500g water from 20°C to 80°C",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Thermodynamics",
+        "grade": "4 Units",
+        "concepts": ["thermodynamics"],
+        "seedRef": "QuestionBankSeedData.cs:318"
+      },
+      "arabicDraft": {
+        "stem": "ما كمية الحرارة اللازمة لرفع درجة حرارة 500 غ من الماء من 20°C إلى 80°C؟",
+        "options": [
+          { "label": "A", "text": "125.4 kJ", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "60 kJ", "isCorrect": false, "distractorRationale": "حرارة نوعية خاطئة" },
+          { "label": "C", "text": "250.8 kJ", "isCorrect": false, "distractorRationale": "ضاعف" },
+          { "label": "D", "text": "4.18 kJ", "isCorrect": false, "distractorRationale": "استخدم 1 غ بدل 500 غ" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_heat → حرارة (f)"],
+      "reviewCheckpoints": [
+        "'كمية الحرارة اللازمة' — 'اللازمة' f.sg adjective ✔",
+        "'درجة حرارة' (temperature) — idafa of two f nouns ✔",
+        "Units 'غ' (gram) — Israeli Arab textbook convention; confirm vs 'جم'."
+      ]
+    },
+    {
+      "id": "RDY-004B-018",
+      "source": {
+        "stem": "Determine resultant force: 3N east and 4N north",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Dynamics",
+        "grade": "4 Units",
+        "concepts": ["dynamics"],
+        "seedRef": "QuestionBankSeedData.cs:324"
+      },
+      "arabicDraft": {
+        "stem": "جِد محصلة قوتين: 3N باتجاه الشرق و 4N باتجاه الشمال",
+        "options": [
+          { "label": "A", "text": "5 N", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "7 N", "isCorrect": false, "distractorRationale": "جَمَع المقاديرَ" },
+          { "label": "C", "text": "1 N", "isCorrect": false, "distractorRationale": "طرح" },
+          { "label": "D", "text": "12 N", "isCorrect": false, "distractorRationale": "ضرب" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_force → قوة (f)"],
+      "reviewCheckpoints": [
+        "'محصلة قوتين' — 'محصلة' f; 'قوتين' dual f-genitive of 'قوة'. ✔",
+        "'المقاديرَ' — accusative plural, final fatha explicit. Bagrut prose-style is usually unvowelled; reviewer decide vowel convention for whole batch."
+      ]
+    },
+    {
+      "id": "RDY-004B-019",
+      "source": {
+        "stem": "Calculate wavelength of light at 6×10¹⁴ Hz (c=3×10⁸)",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Waves",
+        "grade": "5 Units",
+        "concepts": ["waves", "optics"],
+        "seedRef": "QuestionBankSeedData.cs:327"
+      },
+      "arabicDraft": {
+        "stem": "احسب طول موجة ضوء تردده 6×10¹⁴ Hz (c=3×10⁸)",
+        "options": [
+          { "label": "A", "text": "5×10⁻⁷ م", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "2×10⁶ م", "isCorrect": false, "distractorRationale": "ضرب" },
+          { "label": "C", "text": "5×10⁷ م", "isCorrect": false, "distractorRationale": "أس خاطئ" },
+          { "label": "D", "text": "1.8×10²³ م", "isCorrect": false, "distractorRationale": "ضرب f×c" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_wavelength → طول الموجة (m)", "phys_frequency → تردد (m)"],
+      "reviewCheckpoints": [
+        "'طول موجة ضوء' — indefinite idafa chain; 'طول' m; 'موجة' f; 'ضوء' m. ✔",
+        "'تردده' m-suffix on 'ضوء'. ✔"
+      ]
+    },
+    {
+      "id": "RDY-004B-020",
+      "source": {
+        "stem": "Momentum of a 5kg object moving at 10m/s",
+        "language": "en",
+        "subject": "Physics",
+        "topic": "Momentum",
+        "grade": "3 Units",
+        "concepts": ["momentum"],
+        "seedRef": "QuestionBankSeedData.cs:348"
+      },
+      "arabicDraft": {
+        "stem": "احسب كمية حركة جسم كتلته 5 كغ ويتحرك بسرعة 10 م/ث",
+        "options": [
+          { "label": "A", "text": "50 كغ·م/ث", "isCorrect": true, "distractorRationale": null },
+          { "label": "B", "text": "15 كغ·م/ث", "isCorrect": false, "distractorRationale": "جَمَع" },
+          { "label": "C", "text": "2 كغ·م/ث", "isCorrect": false, "distractorRationale": "قسم" },
+          { "label": "D", "text": "500 كغ·م/ث", "isCorrect": false, "distractorRationale": "ربّع السرعة" }
+        ]
+      },
+      "glossaryTermsUsed": ["phys_momentum → كمية الحركة (f)", "phys_mass → كتلة (f)", "phys_velocity → سرعة (f)"],
+      "reviewCheckpoints": [
+        "'كمية حركة جسم' — idafa chain, indefinite; 'كمية' f; 'حركة' f; 'جسم' m. ✔",
+        "'كتلته' m-suffix on 'جسم' ✔. 'ويتحرك' m-verb ✔.",
+        "Units 'كغ·م/ث' — confirm over 'كجم·م/ث' or separator style."
+      ]
+    }
+  ],
+  "stats": {
+    "entriesTotal": 20,
+    "byDomain": {
+      "algebra": 3,
+      "calculus": 4,
+      "geometry": 1,
+      "probability": 1,
+      "combinatorics": 1,
+      "physics_kinematics": 2,
+      "physics_energy": 2,
+      "physics_electricity": 1,
+      "physics_oscillations": 1,
+      "physics_thermo": 1,
+      "physics_dynamics": 1,
+      "physics_waves": 1,
+      "physics_momentum": 1
+    },
+    "glossaryTermsDistinct": 18,
+    "reviewCheckpointsTotal": 53,
+    "genderCriticalFlags": 1
+  },
+  "reviewerSignOff": {
+    "translatorA": { "name": null, "signedAt": null, "notes": null },
+    "translatorB": { "name": null, "signedAt": null, "notes": null },
+    "qaPassedAt": null,
+    "mergeAuthorizedBy": null,
+    "mergedTo": null
+  }
+}

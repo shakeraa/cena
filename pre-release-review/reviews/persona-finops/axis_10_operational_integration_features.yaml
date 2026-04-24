@@ -1,0 +1,163 @@
+doc_path: pre-release-review/AXIS_10_Operational_Integration_Features.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight operational/integration features: Google SSO, Mashov gradebook sync,
+  CSV roster import, offline-first practice, multi-device continuity, IT
+  admin dashboard, Google Classroom passback, Israeli data portability export.
+  Pure engineering integrations — zero LLM cost, moderate infra/storage cost.
+system_purpose_fit: 5
+  rationale:
+    - All features are plumbing; no LLM dependency.
+    - Offline-first (F4) is a storage economics question (per-device cache).
+    - Multi-device sync (F5) is bandwidth / sync conflict cost.
+code_reality_check:
+  claims_verified_in_code:
+    - "Offline sync handler + Marten ledger -> src/actors/Cena.Actors.Tests/Sync/OfflineSyncHandlerTests.cs; src/actors/Cena.Actors/Sessions/MartenOfflineSyncLedger.cs"
+    - "Firebase Auth (cena-platform) for SSO substrate -> memory: project_admin_dashboard"
+    - "Admin API for roster endpoints -> src/api/Cena.Admin.Api/AdminApiEndpoints.cs"
+    - "StudentAuthEndpoints tests -> src/api/Cena.Admin.Api.Tests/StudentAuthEndpointsTests.cs"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Mashov API SLA + rate limits — unofficial API, variable"
+adr_alignment:
+  honored:
+    - "ADR-0001 (multi-institute) — SSO/roster features tenant-scoped"
+    - "PWA-first (feedback_flutter_mobile memory) — F4 offline-PWA aligns"
+  violated: []
+  missing_adr_needed:
+    - "ADR for offline-cache storage ceiling per device"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F4 Offline-First Practice Mode — offline cache stores questions + user
+      progress on device (IndexedDB). At 500 problems x 50KB each = 25MB/
+      device. Acceptable. BUT: sync-conflict resolution on reconnect can
+      explode DB writes (ledger append per event). At 10k students
+      reconnecting simultaneously (exam day), expect 100k+ writes/sec.
+      Marten ledger must be load-tested.
+    evidence: AXIS_10_Operational_Integration_Features.md (F4); src/actors/Cena.Actors/Sessions/MartenOfflineSyncLedger.cs
+    lens_note: Reconnect-storm is the cost risk. Solve with ledger batching + queued replay.
+  - severity: P1
+    finding: |
+      F2 Mashov Gradebook Sync (read-only) — unofficial API, expect rate
+      limits + occasional breakage. Cost implication: maintenance overhead
+      per Mashov API change (engineering hours). Defensive implementation
+      (response-schema validation + auto-disable on breakage) required.
+    evidence: AXIS_10_Operational_Integration_Features.md (F2)
+    lens_note: Vendor risk = maintenance cost line, not runtime $.
+  - severity: P1
+    finding: |
+      F7 Google Classroom Assignment & Grade Passback — Classroom API free,
+      Google rate limits generous. Zero runtime $ cost. Engineering integration
+      ~2-4 weeks.
+    evidence: AXIS_10_Operational_Integration_Features.md (F7)
+    lens_note: Ship — good ROI.
+  - severity: P1
+    finding: |
+      F1 Google SSO — Firebase Auth already has Google provider ready. Zero
+      marginal cost (Firebase free tier covers 50k MAU sign-ins). S effort.
+    evidence: AXIS_10_Operational_Integration_Features.md (F1); memory: project_admin_dashboard (Firebase Auth cena-platform)
+    lens_note: Cheapest + highest-impact ship in the whole doc.
+  - severity: P2
+    finding: |
+      F3 CSV Bulk Roster Import — one-time admin op. Trivial cost.
+    evidence: AXIS_10_Operational_Integration_Features.md (F3)
+    lens_note: Ship.
+  - severity: P2
+    finding: |
+      F5 Multi-Device Session Continuity — SignalR + session-state ledger.
+      Bandwidth cost scales with connected-devices-per-student (~2 avg).
+      Fine at proposed scope.
+    evidence: AXIS_10_Operational_Integration_Features.md (F5)
+    lens_note: Ship.
+  - severity: P2
+    finding: |
+      F6 School IT Admin Dashboard — read-only admin view. Zero runtime cost
+      beyond DB queries.
+    evidence: AXIS_10_Operational_Integration_Features.md (F6)
+    lens_note: Ship.
+  - severity: P2
+    finding: |
+      F8 Student Data Portability Export — on-demand job, rare. Cost per
+      export is S3 storage fees (~$0.02/GB). Rate-limit to 1 export per
+      student per 30 days.
+    evidence: AXIS_10_Operational_Integration_Features.md (F8)
+    lens_note: Per-user quota controls cost.
+already_built:
+  - feature: "Firebase Auth w/ Google provider"
+    evidence: "memory: project_admin_dashboard (cena-platform)"
+    note: F1 is wiring-only, not greenfield.
+  - feature: "Offline sync ledger (Marten)"
+    evidence: src/actors/Cena.Actors/Sessions/MartenOfflineSyncLedger.cs
+    note: F4 extends, doesn't build from scratch.
+  - feature: "Student auth endpoints"
+    evidence: src/api/Cena.Admin.Api.Tests/StudentAuthEndpointsTests.cs
+    note: SSO integration plug-in point exists.
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-042 (Google SSO) = F1"
+  - "feature-discovery-2026-04-20.md: FD-019 (Mashov sync) = F2"
+  - "feature-discovery-2026-04-20.md: FD-044 (CSV roster import) = F3"
+extracted_tasks:
+  - title: "Load-test offline-sync reconnect-storm at 10k concurrent replay"
+    priority: P1
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F4 offline reconnect pattern must survive 10k concurrent students
+      replaying ledgers simultaneously (exam-day scenario). Add batch
+      ingestion + write-queue backpressure to Marten ledger.
+
+      ## Files
+      - src/actors/Cena.Actors/Sessions/OfflineReplayBatcher.cs (new)
+      - tests/load/offline-sync-reconnect.js (new)
+      - ops/grafana/offline-sync.json (new)
+
+      ## Definition of Done
+      - Load test sustains 10k concurrent replays without error
+      - Write throughput to Marten bounded (configurable, default 5k writes/sec)
+      - Metric: cena.offline.replay_queue_depth
+      - Alert: queue_depth > 50k for 5min
+      - Infra cost projection: < $500/month for reconnect-storm handling
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L180-L260]
+  - title: "Ship Google SSO (Firebase provider wiring)"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F1 Google SSO: wire Firebase Auth Google provider into student + teacher
+      flows. Zero marginal infra cost (Firebase free tier), highest UX impact.
+
+      ## Files
+      - src/student/full-version/src/composables/useGoogleSignIn.ts (new)
+      - src/admin/full-version/src/composables/useGoogleSignIn.ts (new)
+      - src/api/Cena.Admin.Api/Auth/GoogleSsoEndpoints.cs (new, if not present)
+
+      ## Definition of Done
+      - Google login button on student + admin login screens
+      - Tenant-resolution by email domain (ADR-0001 compliant)
+      - Session issued via existing Firebase Auth path
+      - e2e test: google sign in -> session -> tenant resolved
+      - No additional $ cost — verify Firebase free-tier coverage
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L20-L90]
+verdict: adopt
+verdict_reason: |
+  All 8 features have clean unit economics. F1 and F3 are quick wins with
+  immediate UX+cost benefit. F4 needs reconnect-storm load test before
+  production. F2 Mashov carries maintenance risk but no runtime $ risk.
+cross_lens_handoff:
+  - to: persona-sre
+    about: "F4 reconnect storm — confirm observability + rollback plan."
+  - to: persona-enterprise
+    about: "Mashov API resilience patterns + vendor SLA handling."
+  - to: persona-privacy
+    about: "F8 portability export must include DP-compliant subset when student is under-13."

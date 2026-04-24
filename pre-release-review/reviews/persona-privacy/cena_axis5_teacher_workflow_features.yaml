@@ -1,0 +1,201 @@
+doc_path: pre-release-review/cena_axis5_teacher_workflow_features.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 teacher features: smart lesson planner from class weakness profile, homework
+  auto-generator, in-class diagnostic sprint, auto-generated student conference prep,
+  Bagrut-readiness tracking, class health pulse (privacy-preserving), student grouping
+  assistant, parent-teacher comms. Explicit guardrail: "no individual student data
+  exposed without consent".
+
+system_purpose_fit: 3
+  rationale:
+    - "Class-level aggregate only" stance is good, but several features surface individual data
+    - Feature 2 BORDERLINE (homework profile persisted across sessions) — ADR-0003 tension acknowledged
+    - Feature 4 (conference prep with strength-first talking points) exposes per-student behavioral inferences
+    - Teacher-admin privilege boundary is not well-defined
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Class mastery heatmap projection exists -> src/actors/Cena.Actors/Projections/ClassMasteryHeatmapProjection.cs"
+    - "Student record access log exists -> src/shared/Cena.Infrastructure/Documents/AuditEventDocument.cs + StudentDataAuditMiddleware"
+    - "Syllabus endpoints exist -> src/api/Cena.Admin.Api/Syllabus/SyllabusEndpoints.cs"
+    - "Stuck-diagnosis system scaffolded -> src/actors/Cena.Actors/Diagnosis/"
+  claims_contradicted_by_code:
+    - "Feature 2 mitigation 'profiles recalculated fresh each week' is a claim without mechanism — no scheduled anonymization job exists for homework profiles"
+  claims_unverifiable:
+    - "Smart lesson planner + homework auto-generator not in src/"
+    - "In-class diagnostic sprint / class health pulse not in src/"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (Feature 2 BORDERLINE acknowledged and mitigation proposed)
+  violated: []
+  missing_adr_needed:
+    - "ADR for teacher-vs-admin visibility matrix (who sees what per-student data)"
+    - "ADR for 'class aggregate' minimum-cohort-size rule (when N<10 do we suppress or blur)"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P0
+    finding: |
+      Feature 1 (Smart Lesson Planner) BORDERLINE note acknowledges small-class
+      reidentification risk ("individual struggling students if class sizes are very small")
+      but mitigation is "aggregate only; plans reference common errors without naming students".
+      This is insufficient — small Arab-medium 4-unit classes may have 5-8 students; a
+      single "common error" can identify the individual. Need explicit k-anonymity floor
+      (same issue as Axis 9 Feature 7).
+    evidence: "cena_axis5_teacher_workflow_features.md:51"
+    lens_note: |
+      Teachers are trusted parties but not data-controllers; narrowly-scoped teacher access
+      still needs minimum-cohort threshold. Arab-cohort and religious-stream classes are
+      both at higher risk.
+
+  - severity: P0
+    finding: |
+      Feature 2 (Homework Auto-Generator) mitigation "profiles recalculated fresh each week
+      from recent performance; historical misconception tags not retained beyond 2 weeks"
+      proposes a 2-week misconception window — inconsistent with ADR-0003's 30-day default
+      AND with the doc's own claim of session-scope. Pick one: 30 days (ADR-aligned),
+      session only (ADR-aligned cleaner), or raise an ADR to change the policy.
+    evidence: "cena_axis5_teacher_workflow_features.md:85-87 + src/shared/Cena.Infrastructure/Compliance/DataRetentionPolicy.cs:58"
+    lens_note: |
+      A new retention window smuggled in via a feature proposal = governance failure.
+      All retention windows must live in DataRetentionPolicy.cs.
+
+  - severity: P1
+    finding: |
+      Feature 4 (Auto-Generated Student Conference Prep) synthesizes "strength-first
+      talking points" for each student from their behavioral trace. This is a per-student
+      inference surface — GDPR Art 22 profiling applies. Must be: (a) logged in audit trail
+      as a sensitive read, (b) include evidence citation so teacher can verify, (c)
+      opt-out for students 16+ (right to object to profiling).
+    evidence: "cena_axis5_teacher_workflow_features.md:14 (exec summary) + general feature framing"
+    lens_note: |
+      "AI-generated talking points about my child" is exactly the surface Conati et al. 2021
+      argued needs personalized explainability AND consent.
+
+  - severity: P1
+    finding: |
+      Feature 7 (Student Grouping Assistant) forms small groups based on performance/
+      misconception patterns. If groups are visible to students ("you're in group B with
+      Alice and Bob"), it implicitly discloses Alice/Bob's relative performance level to
+      the student. Classroom-dignity concern.
+    evidence: "cena_axis5_teacher_workflow_features.md:14 (summary listing)"
+    lens_note: |
+      Israeli Education Law + PPA position against public shaming in educational settings.
+      Groups should be teacher-visible only with non-disclosing student-facing labels.
+
+  - severity: P2
+    finding: |
+      Feature 5 (Bagrut-Readiness Tracking) surfaces per-student readiness. RDY-080
+      constrains numeric Bagrut prediction without concordance study. Teacher dashboard
+      variant must honor same constraint.
+    evidence: "cena_axis5_teacher_workflow_features.md:14"
+    lens_note: |
+      Same RDY-080 issue as AXIS 6 IRT-CAT. Teacher-facing predictions without concordance
+      data = regulatory + educational-ethics concern.
+
+already_built:
+  - feature: Class mastery heatmap projection
+    evidence: src/actors/Cena.Actors/Projections/ClassMasteryHeatmapProjection.cs
+    note: Features 1, 3, 6 likely build on this projection rather than new data pipelines.
+  - feature: Student record access audit
+    evidence: src/shared/Cena.Infrastructure/Compliance/StudentDataAuditMiddleware.cs
+    note: Teacher reads already instrumented. Ensure new feature endpoints inherit this.
+  - feature: Stuck-diagnosis (per-student)
+    evidence: src/actors/Cena.Actors/Diagnosis/HybridStuckClassifier
+    note: Feature 4 conference prep can reuse; avoid reinventing diagnosis layer.
+
+duplicates_of_other_docs:
+  - "AXIS_10_Operational_Integration_Features.md: Mashov sync (doc axis 10 Feature 2) overlaps grading infra here"
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: Feature 3 (Parent-Teacher Bridge) mirrors teacher-side of parent features"
+
+extracted_tasks:
+  - title: "Minimum-cohort-size enforcement for teacher-facing class aggregates"
+    priority: P0
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Teacher dashboards surfacing "common error" or "class struggling with X" must
+      suppress or blur when cohort N < threshold (default 8, tenant-configurable).
+
+      ## Files
+      - src/actors/Cena.Actors/Projections/ClassMasteryHeatmapProjection.cs
+      - New: src/shared/Cena.Infrastructure/Analytics/CohortSizeGate.cs
+      - Test: SmallClassSuppressionTests
+
+      ## Definition of Done
+      - Gate applied to all teacher-facing aggregate projections
+      - Tenant override clamped to minimum 3 (absolute floor)
+      - Small-class scenario returns "insufficient cohort" badge, not raw data
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L51"]
+
+  - title: "Reconcile homework-profile retention to ADR-0003 windows"
+    priority: P0
+    estimate: XS
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 2 introduces implicit 2-week misconception retention — inconsistent with
+      ADR-0003. Either document as session-scope (reset each week = session) OR raise ADR.
+
+      ## Files
+      - pre-release-review/cena_axis5_teacher_workflow_features.md (update text)
+      - docs/adr/0003-misconception-session-scope.md (cross-reference if needed)
+
+      ## Definition of Done
+      - Feature text references DataRetentionPolicy constants
+      - No new hardcoded windows
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L85-87"]
+
+  - title: "Audit + opt-out for AI-synthesized per-student inferences (Feature 4)"
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-compliance
+    queue_body: |
+      ## Goal
+      Teacher conference-prep AI synthesis is Art 22 profiling. Surface: audit log entry
+      per synthesis, evidence trail visible to student on request, opt-out purpose
+      ProcessingPurpose.AiSynthesizedTeacherBriefing (default deny 16+, opt-in).
+
+      ## Files
+      - src/shared/Cena.Infrastructure/Compliance/ProcessingPurpose.cs
+      - New endpoint for students to see what teacher sees
+      - Audit middleware captures synthesis events
+
+      ## Definition of Done
+      - New purpose with age-band defaults
+      - Student transparency endpoint (my teacher sees...)
+      - Audit log for every synthesis read
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-compliance --result "<branch>"
+    source_doc_lines: ["L14"]
+
+verdict: revise
+verdict_reason: |
+  Teacher workflow is legitimate but the "aggregate only" guarantee is not enforced by a
+  k-anonymity gate. Feature 2 smuggles a new retention window past ADR-0003. Feature 4
+  needs Art 22 profiling transparency. Ship after these three tasks land.
+
+cross_lens_handoff:
+  - to: persona-enterprise
+    about: |
+      Teacher role / permission matrix — RBAC design against StudentState access.
+  - to: persona-ministry
+    about: |
+      Bagrut-readiness teacher-facing surface (Feature 5) needs Ministry defensibility
+      sign-off; same RDY-080 issue as elsewhere.
+  - to: persona-sre
+    about: |
+      In-class diagnostic sprint (Feature 3) needs sub-second latency for classroom
+      use; observability for teacher-visible failures.

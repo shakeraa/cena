@@ -1,0 +1,9 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: cena-platform
+resources:
+  - configmap.yaml
+  - secret.yaml
+# The deployment-patch.yaml is NOT included in resources — it's a
+# strategic-merge patch consumed by the parent overlay that also declares
+# the cena-admin-api / cena-actors-host Deployments.

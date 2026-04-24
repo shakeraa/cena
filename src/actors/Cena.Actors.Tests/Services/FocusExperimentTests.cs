@@ -1,0 +1,349 @@
+using Cena.Actors.Services;
+
+namespace Cena.Actors.Tests.Services;
+
+/// <summary>
+/// FOC-010: Focus A/B Testing Framework tests.
+/// Covers deterministic assignment, multi-arm support, experiment lifecycle,
+/// and metrics collection.
+/// </summary>
+public sealed class FocusExperimentTests
+{
+    // ═══════════════════════════════════════════════════════════════
+    // FOC-010.1: Experiment Assignment
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Assignment_Deterministic_SameStudentSameArm()
+    {
+        var service = new FocusExperimentService();
+        var studentId = Guid.Parse("11111111-1111-1111-1111-111111111111");
+
+        var arm1 = service.GetAssignment(studentId, "foc-microbreaks");
+        var arm2 = service.GetAssignment(studentId, "foc-microbreaks");
+
+        Assert.Equal(arm1, arm2);
+    }
+
+    [Fact]
+    public void Assignment_DifferentStudents_DifferentArms()
+    {
+        var service = new FocusExperimentService();
+
+        // Generate enough students to statistically ensure both arms are represented
+        var arms = new HashSet<ExperimentArm>();
+        for (int i = 0; i < 100; i++)
+        {
+            var arm = service.GetAssignment(Guid.NewGuid(), "foc-microbreaks");
+            arms.Add(arm);
+        }
+
+        // With 100 students in a 50/50 split, both arms should appear
+        Assert.Contains(ExperimentArm.Control, arms);
+        Assert.Contains(ExperimentArm.Treatment, arms);
+    }
+
+    [Fact]
+    public void Assignment_DifferentExperiments_IndependentAssignment()
+    {
+        var service = new FocusExperimentService();
+        var studentId = Guid.NewGuid();
+
+        // A student can be in control for one experiment and treatment for another
+        var arms = new HashSet<ExperimentArm>();
+        foreach (var exp in FocusExperimentService.DefaultExperiments)
+        {
+            arms.Add(service.GetAssignment(studentId, exp.ExperimentId));
+        }
+
+        // With 9 experiments (including multi-arm SAI), verify all returned arms are valid enum values
+        Assert.All(arms, arm => Assert.True(
+            arm == ExperimentArm.Control || arm == ExperimentArm.Treatment
+            || arm == ExperimentArm.TreatmentB || arm == ExperimentArm.TreatmentC));
+    }
+
+    [Fact]
+    public void Assignment_UnknownExperiment_ReturnsControl()
+    {
+        var service = new FocusExperimentService();
+        var arm = service.GetAssignment(Guid.NewGuid(), "nonexistent-experiment");
+        Assert.Equal(ExperimentArm.Control, arm);
+    }
+
+    [Fact]
+    public void PredefinedExperiments_Exist()
+    {
+        Assert.Equal(9, FocusExperimentService.DefaultExperiments.Count);
+
+        var ids = new HashSet<string>();
+        foreach (var exp in FocusExperimentService.DefaultExperiments)
+        {
+            ids.Add(exp.ExperimentId);
+            Assert.False(string.IsNullOrEmpty(exp.Name));
+            Assert.False(string.IsNullOrEmpty(exp.Description));
+            Assert.False(string.IsNullOrEmpty(exp.PrimaryMetric));
+            Assert.True(exp.Arms.Count >= 2);
+        }
+
+        Assert.Contains("foc-microbreaks", ids);
+        Assert.Contains("foc-boredom-fatigue", ids);
+        Assert.Contains("foc-confusion-patience", ids);
+        Assert.Contains("foc-peak-time", ids);
+        Assert.Contains("foc-solution-diversity", ids);
+        Assert.Contains("foc-sensor-enhanced", ids);
+
+        // 3 SAI-006 Student AI Interaction experiments (multi-arm, opt-in)
+        Assert.Contains(FocusExperimentService.SaiExplanationTiers, ids);
+        Assert.Contains(FocusExperimentService.SaiHintBktCredit, ids);
+        Assert.Contains(FocusExperimentService.SaiConfusionGating, ids);
+    }
+
+    [Fact]
+    public void Assignment_5050Split_ApproximatelyBalanced()
+    {
+        var service = new FocusExperimentService();
+        int controlCount = 0;
+        int treatmentCount = 0;
+        const int total = 1000;
+
+        for (int i = 0; i < total; i++)
+        {
+            var arm = service.GetAssignment(Guid.NewGuid(), "foc-microbreaks");
+            if (arm == ExperimentArm.Control) controlCount++;
+            else treatmentCount++;
+        }
+
+        // With 1000 samples, expect roughly 50/50 (allow 40-60% range)
+        double controlPct = (double)controlCount / total;
+        Assert.InRange(controlPct, 0.35, 0.65);
+    }
+
+    [Fact]
+    public void IsActive_FocusExperiments_AllActive()
+    {
+        var service = new FocusExperimentService();
+        // The 6 original focus experiments are always active
+        Assert.True(service.IsActive("foc-microbreaks"));
+        Assert.True(service.IsActive("foc-boredom-fatigue"));
+        Assert.True(service.IsActive("foc-confusion-patience"));
+        Assert.True(service.IsActive("foc-peak-time"));
+        Assert.True(service.IsActive("foc-solution-diversity"));
+        Assert.True(service.IsActive("foc-sensor-enhanced"));
+    }
+
+    [Fact]
+    public void IsActive_SaiExperiments_RegisteredInDefaultList()
+    {
+        // SAI experiments are registered in DefaultExperiments and discoverable
+        var service = new FocusExperimentService();
+        var active = service.GetActiveExperiments();
+        // SAI experiments use SaiOptInStartDate (2099) — verify they exist in the list
+        var allIds = FocusExperimentService.DefaultExperiments.Select(e => e.ExperimentId).ToList();
+        Assert.Contains(FocusExperimentService.SaiExplanationTiers, allIds);
+        Assert.Contains(FocusExperimentService.SaiHintBktCredit, allIds);
+        Assert.Contains(FocusExperimentService.SaiConfusionGating, allIds);
+    }
+
+    [Fact]
+    public void IsActive_ExpiredExperiment_ReturnsFalse()
+    {
+        var expiredExperiment = new FocusExperiment(
+            ExperimentId: "expired-test",
+            Name: "Expired",
+            Description: "Test",
+            PrimaryMetric: "test_metric",
+            Arms: new[]
+            {
+                new ExperimentArmConfig(ExperimentArm.Control, 50, "Control"),
+                new ExperimentArmConfig(ExperimentArm.Treatment, 50, "Treatment")
+            },
+            StartDate: DateTimeOffset.UtcNow.AddDays(-30),
+            EndDate: DateTimeOffset.UtcNow.AddDays(-1)
+        );
+
+        var service = new FocusExperimentService(new[] { expiredExperiment });
+        Assert.False(service.IsActive("expired-test"));
+    }
+
+    [Fact]
+    public void GetActiveExperiments_ReturnsOnlyActive()
+    {
+        var expired = new FocusExperiment("expired", "Expired", "Test", "m",
+            new[] { new ExperimentArmConfig(ExperimentArm.Control, 100, "c") },
+            DateTimeOffset.UtcNow.AddDays(-30), DateTimeOffset.UtcNow.AddDays(-1));
+
+        var active = new FocusExperiment("active", "Active", "Test", "m",
+            new[] { new ExperimentArmConfig(ExperimentArm.Control, 50, "c"),
+                    new ExperimentArmConfig(ExperimentArm.Treatment, 50, "t") },
+            DateTimeOffset.UtcNow.AddDays(-1), DateTimeOffset.UtcNow.AddDays(30));
+
+        var service = new FocusExperimentService(new[] { expired, active });
+        var activeList = service.GetActiveExperiments();
+
+        Assert.Single(activeList);
+        Assert.Equal("active", activeList[0].ExperimentId);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // SAI-006: Multi-arm experiment assignment
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ExplanationTiers_Has4Arms_ControlLimitedTo10Percent()
+    {
+        var experiment = FocusExperimentService.DefaultExperiments
+            .First(e => e.ExperimentId == FocusExperimentService.SaiExplanationTiers);
+
+        Assert.Equal(4, experiment.Arms.Count);
+        Assert.Equal(ExperimentArm.Control, experiment.Arms[0].Arm);
+        Assert.Equal(10, experiment.Arms[0].PercentageAllocation);
+        Assert.Equal(100, experiment.Arms.Sum(a => a.PercentageAllocation));
+    }
+
+    [Fact]
+    public void HintBktCredit_Has3Arms()
+    {
+        var experiment = FocusExperimentService.DefaultExperiments
+            .First(e => e.ExperimentId == FocusExperimentService.SaiHintBktCredit);
+
+        Assert.Equal(3, experiment.Arms.Count);
+        Assert.Equal(100, experiment.Arms.Sum(a => a.PercentageAllocation));
+    }
+
+    [Fact]
+    public void ConfusionGating_Has3Arms()
+    {
+        var experiment = FocusExperimentService.DefaultExperiments
+            .First(e => e.ExperimentId == FocusExperimentService.SaiConfusionGating);
+
+        Assert.Equal(3, experiment.Arms.Count);
+        Assert.Equal(100, experiment.Arms.Sum(a => a.PercentageAllocation));
+    }
+
+    [Fact]
+    public void ExplanationTiers_DeterministicAssignment_AcrossSessions()
+    {
+        // SAI experiments need an active date range to test assignment
+        var active = FocusExperimentService.DefaultExperiments.Select(e =>
+            e.ExperimentId.StartsWith("sai-")
+                ? e with { StartDate = DateTimeOffset.MinValue }
+                : e).ToArray();
+        var service = new FocusExperimentService(active);
+        var studentId = Guid.NewGuid();
+
+        var arm1 = service.GetAssignment(studentId, FocusExperimentService.SaiExplanationTiers);
+        var arm2 = service.GetAssignment(studentId, FocusExperimentService.SaiExplanationTiers);
+
+        Assert.Equal(arm1, arm2);
+    }
+
+    [Fact]
+    public void ExplanationTiers_DistributesAcrossAll4Arms()
+    {
+        var active = FocusExperimentService.DefaultExperiments.Select(e =>
+            e.ExperimentId.StartsWith("sai-")
+                ? e with { StartDate = DateTimeOffset.MinValue }
+                : e).ToArray();
+        var service = new FocusExperimentService(active);
+
+        var arms = new HashSet<ExperimentArm>();
+        for (int i = 0; i < 500; i++)
+            arms.Add(service.GetAssignment(Guid.NewGuid(), FocusExperimentService.SaiExplanationTiers));
+
+        // With 500 students and 10/30/30/30 split, all 4 arms should appear
+        Assert.Contains(ExperimentArm.Control, arms);
+        Assert.Contains(ExperimentArm.Treatment, arms);
+        Assert.Contains(ExperimentArm.TreatmentB, arms);
+        Assert.Contains(ExperimentArm.TreatmentC, arms);
+    }
+
+    // ═══════════════════════════════════════════════════════════════
+    // FOC-010.2: Experiment Metrics Collector
+    // ═══════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void Collector_RecordAndRetrieveMetrics()
+    {
+        var collector = new FocusExperimentCollector();
+        var studentId = Guid.NewGuid();
+
+        var metrics = new ExperimentSessionMetrics(
+            StudentId: studentId,
+            SessionId: Guid.NewGuid(),
+            ExperimentId: "foc-microbreaks",
+            Arm: ExperimentArm.Treatment,
+            Timestamp: DateTimeOffset.UtcNow,
+            FocusStateAccuracy: 0.85,
+            BreakEffectiveness: 0.12,
+            MicrobreakComplianceRate: 0.75,
+            ReturnedNextSession: true,
+            NextSessionPerformanceDelta: 0.05,
+            ProductiveStrugglePrecision: 0.9,
+            SelfReportedFocus: 4,
+            SelfReportLanguage: "he",
+            ExplanationSource: null,
+            HintCreditMultiplier: null,
+            DeliveryGateAction: null,
+            MasteryGainDelta: null,
+            HintUsageRate: null,
+            ConfusionResolutionRate: null,
+            SelfReportedUnderstanding: null
+        );
+
+        collector.RecordSessionMetrics(metrics);
+
+        var retrieved = collector.GetMetrics("foc-microbreaks");
+        Assert.Single(retrieved);
+        Assert.Equal(studentId, retrieved[0].StudentId);
+        Assert.Equal(0.85, retrieved[0].FocusStateAccuracy);
+
+        var byStudent = collector.GetMetricsForStudent(studentId, "foc-microbreaks");
+        Assert.Single(byStudent);
+    }
+
+    [Fact]
+    public void Collector_FiltersByExperiment()
+    {
+        var collector = new FocusExperimentCollector();
+        var studentId = Guid.NewGuid();
+
+        collector.RecordSessionMetrics(new ExperimentSessionMetrics(
+            studentId, Guid.NewGuid(), "foc-microbreaks", ExperimentArm.Control,
+            DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null));
+
+        collector.RecordSessionMetrics(new ExperimentSessionMetrics(
+            studentId, Guid.NewGuid(), "foc-boredom-fatigue", ExperimentArm.Treatment,
+            DateTimeOffset.UtcNow, null, null, null, null, null, null, null, null,
+            null, null, null, null, null, null, null));
+
+        Assert.Single(collector.GetMetrics("foc-microbreaks"));
+        Assert.Single(collector.GetMetrics("foc-boredom-fatigue"));
+        Assert.Empty(collector.GetMetrics("nonexistent"));
+    }
+
+    [Fact]
+    public void Collector_SelfReport_SupportsHebrewAndArabic()
+    {
+        var collector = new FocusExperimentCollector();
+
+        collector.RecordSessionMetrics(new ExperimentSessionMetrics(
+            Guid.NewGuid(), Guid.NewGuid(), "foc-microbreaks", ExperimentArm.Control,
+            DateTimeOffset.UtcNow, null, null, null, null, null, null,
+            SelfReportedFocus: 3, SelfReportLanguage: "he",
+            ExplanationSource: null, HintCreditMultiplier: null, DeliveryGateAction: null,
+            MasteryGainDelta: null, HintUsageRate: null, ConfusionResolutionRate: null, SelfReportedUnderstanding: null));
+
+        collector.RecordSessionMetrics(new ExperimentSessionMetrics(
+            Guid.NewGuid(), Guid.NewGuid(), "foc-microbreaks", ExperimentArm.Treatment,
+            DateTimeOffset.UtcNow, null, null, null, null, null, null,
+            SelfReportedFocus: 4, SelfReportLanguage: "ar",
+            ExplanationSource: null, HintCreditMultiplier: null, DeliveryGateAction: null,
+            MasteryGainDelta: null, HintUsageRate: null, ConfusionResolutionRate: null, SelfReportedUnderstanding: null));
+
+        var metrics = collector.GetMetrics("foc-microbreaks");
+        Assert.Equal(2, metrics.Count);
+        Assert.Contains(metrics, m => m.SelfReportLanguage == "he");
+        Assert.Contains(metrics, m => m.SelfReportLanguage == "ar");
+    }
+}

@@ -1,0 +1,198 @@
+doc_path: pre-release-review/axis3_accessibility_accommodations_findings.md
+reviewer: persona-cogsci
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight accessibility features for dyscalculia, ADHD, color-blindness, screen-reader,
+  Arabic RTL, and anxiety-reducing UI. Most proposals are outside the cogsci lens
+  (pure a11y engineering), but F1 (subitizing trainer), F2 (number line), F4 (ADHD
+  focus/Pomodoro), and F8 (anxiety-reducing UI) have direct cognitive-science
+  warrants that deserve review.
+system_purpose_fit: 4
+  rationale:
+    - Every feature acknowledges Cena's no-streak, no-ML-training, no-misconception-retention
+      constraints and respects ADR-0003.
+    - Dyscalculia-focused features (F1, F2) fill a literature-backed gap that
+      existing spacing/interleaving does not address — they target the approximate
+      number system (ANS), which is pre-symbolic and downstream cogsci-relevant.
+    - F8 anxiety-reducing UI echoes the cognitive-load progressive-disclosure
+      research Cena already has (docs/cognitive-load-progressive-disclosure-research.md)
+      — strong alignment.
+code_reality_check:
+  claims_verified_in_code:
+    - "Progressive disclosure and calm-UI principles already catalogued -> docs/cognitive-load-progressive-disclosure-research.md:80-91"
+    - "RTL + <bdi dir='ltr'> for math already a locked project rule (user memory: math_always_ltr) — F7 matches existing policy"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "F1 dyscalculia effect sizes (g=0.32 subitizing, g=0.52 number comparison) cite 'MDPI Information journal systematic review 2025' without article title. Verify citation exists."
+  claims_unsupported_in_literature:
+    - "F1 extrapolates Kucian/Calcularis 3-month-follow-up results (primary-grade N≤60) to Cena's age 12-18 Bagrut-prep population. Dyscalculia intervention evidence is dominated by primary-grade subitizing deficits; adolescents are far less studied. Doc should disclose."
+    - "F4 Pomodoro (Cirillo 1980s) is not a peer-reviewed empirical claim; the doc slips it in as cogsci-grade evidence via the Ersozlu 2024 review, which does not itself test Pomodoro."
+adr_alignment:
+  honored:
+    - ADR-0002 (F6 MathML pipeline + SpokenMath use CAS-verified expressions upstream)
+    - ADR-0003 (F1 accuracy data anonymized after 90 days)
+  violated: []
+  missing_adr_needed:
+    - "F1 'ans_strength_estimate' latent-trait field — is this a retained student attribute? Needs ADR to clarify if it's session-scoped or a placement snapshot (ADR-0003 analogous to mastery state)."
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F1 (Subitizing/Magnitude Trainer) is motivated by dyscalculia literature almost
+      entirely from primary-grade interventions (Calcularis 2.0, Kucian 2011,
+      Käser 2013). The doc proposes this for Israeli *Bagrut-prep* students aged
+      12-18. The ANS-deficit-remediation evidence for adolescents is weak. If shipped,
+      this should be framed as "foundational remediation opt-in for flagged
+      students", not as a core Cena feature, and evaluated against spacing/interleaving
+      (which have age-broad evidence) for limited engineering investment.
+    evidence: axis3_accessibility_accommodations_findings.md:52-65, 105
+    lens_note: |
+      Transfer-of-learning lens: there is no evidence that adolescent subitizing
+      training transfers to Bagrut calculus/algebra performance. The cogsci warrant
+      is for identification + remediation of ANS deficit in *early* grades.
+  - severity: P1
+    finding: |
+      F8 (Anxiety-Reducing Predictable UI) is strong cogsci content but is mislabeled
+      as "DEFER" (axis3:540). The whole docs/cognitive-load-progressive-disclosure-research.md
+      corpus argues these are first-order design principles, not a module. The doc
+      acknowledges this at L541 but then assigns P3 priority. Cognitive-load
+      management is P0 for a Bagrut-prep app by virtue of its Sweller-based
+      intrinsic-load math content. Elevating this to design-system-principle P0
+      (not feature P3) is the correct framing.
+    evidence: axis3_accessibility_accommodations_findings.md:482-541
+    lens_note: |
+      Cena already has the theory written down. The gap is enforcement, not
+      research. A lint rule + component-library pattern that forbids (a) position-
+      changing nav, (b) red error states, (c) animations >200ms is a shippable
+      cogsci win.
+  - severity: P2
+    finding: |
+      F4 (ADHD Focus Session Builder) cites Pomodoro as evidence-based; it is not,
+      in the empirical-psychology sense. The Ersozlu 2024 review cited does not
+      test Pomodoro. The "Body Doubling Mode — calming ambient video" has zero
+      empirical support in the doc. These should be labeled "design-pattern
+      community practice" rather than evidence-class PEER-REVIEWED.
+    evidence: axis3_accessibility_accommodations_findings.md:230-242
+    lens_note: |
+      Citation-type honesty: community/design-pattern claims are fine; mislabeling
+      them as PEER-REVIEWED dilutes the rest of the doc's credibility.
+  - severity: P2
+    finding: |
+      F2 (Interactive Number Line with audio-haptic) is well-warranted for
+      dyscalculia but also cites "Kucian 2011 brain activation changes" as part of
+      the motivation. Neuroimaging findings are the noisiest class of cogsci
+      evidence; behavioral gains are the relevant warrant. Recommend pruning the
+      fMRI framing to reduce the "neuroscience gloss" that marketing often
+      inherits from such docs.
+    evidence: axis3_accessibility_accommodations_findings.md:115-116
+    lens_note: |
+      Minor. The feature itself is solid on behavioral grounds alone.
+  - severity: P2
+    finding: |
+      F1 data model includes `ans_strength_estimate: float // latent trait estimate`
+      (axis3:89). A latent-trait estimate that persists per student is functionally
+      a profile attribute and needs the same data-governance treatment as BKT
+      mastery state. Either make it session-scoped (re-estimated each session) or
+      add an explicit ADR.
+    evidence: axis3_accessibility_accommodations_findings.md:88-91
+    lens_note: "Same data-governance pattern as the F1/F8 tension in axis1."
+already_built:
+  - feature: "Progressive disclosure / calm-UI principles (F8)"
+    evidence: docs/cognitive-load-progressive-disclosure-research.md (full doc)
+    note: "F8 restates existing research docs as a proposal; retire as a feature, enforce as a system-level principle."
+  - feature: "Math LTR in RTL containers (F7)"
+    evidence: "User memory 'Math always LTR'; math_always_ltr rule is already enforced project-wide."
+    note: "F7 is reassertion of existing policy, not new work — ship only the Arabic-function-name localization piece."
+  - feature: "WCAG AA contrast + Vuexy primary color (F5)"
+    evidence: "project_primary_color_locked memory: Vuexy #7367F0 locked; fix contrast via usage pattern"
+    note: "F5 mostly proposes what's already in scope; focus the task on viridis/cividis for CHARTS only."
+duplicates_of_other_docs:
+  - "AXIS_8_Content_Authoring_Quality_Research.md: F4 Arabic RTL Math Renderer duplicates F7 here"
+  - "cena_competitive_analysis.md: FEATURE 9 Text-to-Speech + Highlighting partially overlaps F6 here"
+extracted_tasks:
+  - title: "Promote F8 Calm UI from feature to design-system lint rules"
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-design-system
+    queue_body: |
+      ## Goal
+      Convert F8 "Anxiety-Reducing Predictable UI" from a product feature to a set
+      of enforced design-system rules: (a) no nav position changes, (b) no red
+      error color on incorrect answers (amber + constructive copy), (c) animations
+      ≤200ms, (d) session preview modal shared component.
+
+      ## Files
+      - src/student-web/design-system/tokens.css (amber error, calm backgrounds)
+      - src/student-web/design-system/rules.md (new linting guide)
+      - eslint-plugin-cena (optional) or equivalent documented review checklist
+
+      ## Definition of Done
+      - Component library exposes CalmAlert, ProgressiveDisclosure, SessionPreview.
+      - Error states never use pure red in student-web; tokens enforce amber.
+      - Animation duration linted or test-enforced.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-design-system --result "branch: claude-subagent-design-system/<id>-calm-ui-rules"
+    source_doc_lines: [L482-L541]
+  - title: "Ship F2 Number Line with session-scoped accuracy scoring"
+    priority: P2
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Implement interactive number line component with audio feedback (Web Audio
+      API) and haptic where available. Snap-to-tick for motor-impaired students.
+      Scoring (linearity r²) is session-scoped; no persistent latent-trait.
+
+      ## Files
+      - src/student-web/src/components/NumberLine.vue (new)
+      - src/actors/Cena.Actors/NumberLine/PlacementScorer.cs (new)
+      - CAS validates fraction/expression equivalence for target value.
+
+      ## Definition of Done
+      - Audio pitch maps to distance; optional per student preference.
+      - No student-profile "number-line-linearity" field; session-only metric.
+      - Color-blind-safe magnitude bands (honors F5 palette).
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "branch: kimi-coder/<id>-number-line"
+    source_doc_lines: [L109-L163]
+  - title: "Re-scope F1 Dyscalculia Subitizing Trainer to opt-in remediation pilot"
+    priority: P2
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      F1 is an opt-in remediation module for flagged students only, not a core
+      feature. Also replace `ans_strength_estimate` persistent float with a
+      session-scoped snapshot + explicit ADR (same pattern as mastery state).
+
+      ## Files
+      - docs/adr/00XX-dyscalculia-signal-scope.md (new)
+      - Reduce F1 scope in axis3 doc to "opt-in remediation pilot for students
+        flagged by teacher or self-diagnosis".
+
+      ## Definition of Done
+      - Feature is not default-on.
+      - Latent-trait estimate has clear ADR-governed scope and retention policy.
+      - Evidence framing is "dyscalculia remediation, adolescent-evidence caveat".
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "branch: human-architect/<id>-dyscalculia-scope-adr"
+    source_doc_lines: [L48-L105]
+verdict: revise
+verdict_reason: |
+  F5 (color-blind palette), F7 (Arabic RTL math — already locked policy), F2
+  (number line) are ship-ready. F8 should be reframed as design-system rules
+  not a feature. F1 must be re-scoped to opt-in remediation pilot with explicit
+  ADR for the latent-trait field. F4 needs citation-class honesty for Pomodoro
+  and body-doubling. F3, F6 are outside the cogsci lens.
+cross_lens_handoff:
+  - to: persona-a11y
+    about: "F3 (graph paper), F5 (palette), F6 (MathML/SRE), F7 (Arabic RTL) — all primary a11y lens."
+  - to: persona-privacy
+    about: "F1 'ans_strength_estimate' persistence; F6 'aria_label' localization may encode student language preference."
+  - to: persona-educator
+    about: "Is a Pomodoro-style focus timer helpful or disruptive in a Bagrut-pressured session flow?"
+  - to: persona-finops
+    about: "F6 MathML SRE per-equation spoken-label generation at scale — cost of multi-language SRE needs sizing."

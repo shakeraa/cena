@@ -1,0 +1,155 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-finops
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight pedagogy-mechanics features (interleaving, spaced mastery, retrieval
+  micro-checks, elaborative interrogation, hint governor, desirable difficulty,
+  transfer sequencing, worked-example fading w/ self-explanation). Pitched as
+  core adaptive mechanics with evidence citations; most are algorithmic, a few
+  involve LLM-graded self-explanation.
+system_purpose_fit: 4
+  rationale:
+    - Adaptive scheduling is in-scope for Bagrut prep and largely deterministic (cheap).
+    - Self-explanation grading (F4, F8) is the only meaningful LLM spend driver.
+    - Hint governor (F5) can be cheap (rule-based) or expensive (LLM-scored) depending on impl.
+code_reality_check:
+  claims_verified_in_code:
+    - "LLM ACL + circuit breaker exist -> src/llm-acl/Cena.LlmAcl/ILlmGateway.cs:1"
+    - "Task-to-model routing (sonnet/haiku/kimi/opus) defined -> contracts/llm/routing-config.yaml:111"
+    - "Per-student daily cost cap ($1.50 hard, $0.70 warn) -> contracts/llm/routing-config.yaml:285"
+    - "Global cost circuit breaker with fail-closed -> src/actors/Cena.Actors/RateLimit/RedisCostCircuitBreaker.cs:53"
+    - "L2 explanation cache (Redis, 30d TTL, keyed on questionId+ErrorType) exists -> tasks/student-ai/done/SAI-003-l2-explanation-cache.md:44"
+    - "CAS 3-tier router (MathNet->SymPy->fallback) -> src/actors/Cena.Actors/Cas/CasRouterService.cs:29"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Interleaving scheduler production-grade -> no IrtCalibrationPipeline+InterleavingScheduler code pair found"
+    - "Elaborative-interrogation prompts CAS-graded -> doc implies LLM grading but pattern not implemented"
+adr_alignment:
+  honored:
+    - ADR-0002 (CAS oracle) — doc routes self-explanation grading through CAS-compatible pipeline
+  violated: []
+  missing_adr_needed:
+    - "ADR for LLM self-explanation grading cost budget — F4/F8 grade open text at scale; need explicit per-call tier assignment (Haiku/Kimi) and cache strategy"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      F4 (Elaborative Interrogation) and F8 (Worked-Example Fading w/ self-explanation)
+      propose LLM grading of free-text student explanations on every step. At 10k
+      concurrent students with ~20 explanations/hour, this is ~200k calls/hr. Doc
+      does not specify tier. If routed to Sonnet (~$0.005/call avg) that is ~$1k/hr
+      = $24k/day — blows through global cap (routing-config.yaml:301: $30k/month).
+      Must be routed to Kimi k2_0905 (feynman_explanation is listed as Sonnet in
+      routing-config.yaml:167 which is ALREADY too expensive at scale).
+    evidence: axis1_pedagogy_mechanics_cena.md (F4, F8 sections); contracts/llm/routing-config.yaml:167
+    lens_note: Untiered LLM grading at per-step granularity is the single biggest cost blow-up risk in the proposal set.
+  - severity: P0
+    finding: |
+      No self-explanation caching strategy proposed. Unlike SAI-003 explanation
+      cache (keyed on question+ErrorType), self-explanation grading input is the
+      student's free text — unhashable as-is. Need semantic/embedding-based cache
+      or template rubric grading (deterministic) to avoid per-student cost.
+    evidence: axis1_pedagogy_mechanics_cena.md (F4,F8); no corresponding cache in src/actors/Cena.Actors/Explanations/
+    lens_note: Without cache, every student's every step is a cold LLM call. Breaks 60% target hit rate from routing-config.yaml:345.
+  - severity: P1
+    finding: |
+      F5 Hint Governor — if LLM-scored stuck detection replaces heuristic path,
+      costs jump. Current Haiku-based StuckClassifier has PerCallCostUsd=0.001
+      (StuckClassifierOptions.cs:82) and HeuristicSkipLlmThreshold=0.7 to skip LLM
+      on strong heuristic signals. Doc does not acknowledge this existing tier;
+      proposal may duplicate or regress the tiering.
+    evidence: src/actors/Cena.Actors/Diagnosis/StuckClassifierOptions.cs:28
+    lens_note: Already-built feature; extension should reuse the heuristic-skip pattern.
+  - severity: P1
+    finding: |
+      F1 Adaptive Interleaving and F7 Near-to-Far Transfer Sequencing are pure
+      scheduling algorithms — zero LLM cost. Highest ROI per engineering hour in
+      this doc. Ship first, defer LLM-heavy F4/F8 until caching strategy proven.
+    evidence: axis1_pedagogy_mechanics_cena.md (F1, F7)
+    lens_note: Favorable unit economics — deterministic logic runs for the CPU cost of a DB fetch.
+  - severity: P2
+    finding: |
+      F6 Desirable Difficulty Targeting relies on IRT calibration (cheap once
+      calibrated) but calibration itself requires N>=200/item. At 10k students
+      warming up simultaneously (exam-day spike), IRT updates via Kafka-style
+      recalibration could explode DB write IOPS. No proposed batching strategy.
+    evidence: axis1_pedagogy_mechanics_cena.md (F6)
+    lens_note: Storage/compute ceiling — solvable via nightly batch recalibration instead of per-response update.
+already_built:
+  - feature: "L2 ErrorType explanation cache (analog for self-explanation feedback)"
+    evidence: tasks/student-ai/done/SAI-003-l2-explanation-cache.md
+    note: "Pattern exists — new self-explanation features MUST reuse cache pipeline, not reinvent."
+  - feature: "Per-student daily LLM budget (hard $1.50, warn $0.70)"
+    evidence: contracts/llm/routing-config.yaml:285
+    note: "Any new LLM feature in this doc inherits the cap. Doc does not mention budget contention."
+  - feature: "Global cost circuit breaker"
+    evidence: src/actors/Cena.Actors/RateLimit/RedisCostCircuitBreaker.cs
+    note: "Already fail-closes on threshold. Doc silently assumes infinite LLM budget."
+duplicates_of_other_docs:
+  - "feature-discovery-2026-04-20.md: FD-001 (Interleaving) — identical"
+  - "feature-discovery-2026-04-20.md: FD-008 (self-explanation / partial-credit grading) — same cost profile"
+extracted_tasks:
+  - title: "Route self-explanation grading to Kimi k2_0905 with embedding cache"
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Elaborative-interrogation / worked-example-fading features require LLM-graded
+      free-text at per-step granularity. Route via task_routing.feynman_explanation
+      but SWITCH from claude_sonnet_4_6 to kimi_k2_0905 (PII-stripped) for an ~8x
+      cost reduction, and add embedding-based grading cache to hit 60%+ hit rate.
+
+      ## Files
+      - contracts/llm/routing-config.yaml (swap primary/fallback for feynman_explanation)
+      - src/actors/Cena.Actors/Explanations/SelfExplanationGrader.cs (new)
+      - src/actors/Cena.Actors/Explanations/EmbeddingGradingCache.cs (new)
+      - src/actors/Cena.Actors.Tests/Explanations/SelfExplanationGraderTests.cs
+
+      ## Definition of Done
+      - feynman_explanation primary = kimi_k2_0905 (cost per MTok output drops from $15 -> $2)
+      - Embedding cache keyed on sha256(question_id + rubric_id + embedding_bucket)
+      - Cache hit rate telemetry: cena.selfexplain.cache_hit_rate (target >=60%)
+      - Per-student rate limit: max 20 graded explanations/hour (backpressure to heuristic)
+      - Unit tests for cache hit, cache miss, rate limit, PII stripping
+      - Load test: 1k concurrent students x 5 explanations/min stays under $50/hr
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L50-L95, L380-L420]
+  - title: "Add cost projection dashboard for per-feature LLM spend"
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-finops
+    queue_body: |
+      ## Goal
+      Each new LLM-using feature should be projected at 10k-concurrent load before
+      merge. Extend ops/grafana with per-task_type spend panels from existing
+      llm_cost_usd counter (routing-config.yaml:514) so PM/eng can compare
+      projected vs actual and kill features that overrun.
+
+      ## Files
+      - ops/grafana/llm-cost-per-feature.json (new)
+      - docs/engineering/cost-projection-template.md (new)
+
+      ## Definition of Done
+      - Grafana dashboard: spend by task_type, 1h/24h/7d windows
+      - Alert at 70% of per_model_monthly cap (routing-config.yaml:292)
+      - Template md requires every new LLM feature PR to cite projected daily $ at 10k students
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-finops --result "<branch>"
+    source_doc_lines: [L1-L540]
+verdict: revise
+verdict_reason: |
+  Scheduling features (F1,F6,F7) are cheap and ship-worthy; LLM-graded features
+  (F4,F5,F8) need explicit tier + cache before any commitment. Doc must be
+  revised to assign each LLM call to a routing-config.yaml task and show
+  per-feature daily-$ projection at 10k concurrency.
+cross_lens_handoff:
+  - to: persona-cogsci
+    about: "Is F4/F8 evidence base robust enough to justify the LLM grading spend, or does simpler rubric/CAS grading suffice?"
+  - to: persona-sre
+    about: "Exam-day traffic spike: does global breaker at $30k/month cope with a 3-day Bagrut review burst?"
+  - to: persona-redteam
+    about: "Embedding-cache poisoning vector — adversarial student inputs designed to collide with cached 'good' gradings?"

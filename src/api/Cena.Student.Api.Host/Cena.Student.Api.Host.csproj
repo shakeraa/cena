@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cena.Actors.Tests" />
+    <!-- FIND-ux-006b: Cena.Admin.Api.Tests hosts the AuthEndpoints
+         password-reset tests so CI picks them up via the existing backend
+         workflow; those tests invoke the internal handler directly. -->
+    <InternalsVisibleTo Include="Cena.Admin.Api.Tests" />
+    <InternalsVisibleTo Include="Cena.Student.Api.Host.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\actors\Cena.Actors\Cena.Actors.csproj" />
+    <ProjectReference Include="..\..\shared\Cena.Infrastructure\Cena.Infrastructure.csproj" />
+    <ProjectReference Include="..\Cena.Admin.Api\Cena.Admin.Api.csproj" />
+    <ProjectReference Include="..\Cena.Api.Contracts\Cena.Api.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Process" Version="1.0.0-alpha.5" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.Prometheus.AspNetCore" Version="1.11.0-beta.1" />
+    <PackageReference Include="Microsoft.Extensions.Http.Polly" Version="9.0.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
+  </ItemGroup>
+
+  <!-- RDY-009: Generate OpenAPI document after build.
+       Skipped in container builds (SkipOpenApiGeneration=true). -->
+  <Target Name="GenerateOpenApi" AfterTargets="Build" Condition="'$(SkipOpenApiGeneration)' != 'true'">
+    <Exec Command="dotnet swagger tofile --output $(OutputPath)openapi.json $(TargetPath) v1" EnvironmentVariables="CENA_OPENAPI_GEN=1;CENA_SKIP_SEED=1;ASPNETCORE_ENVIRONMENT=Development;Firebase__ProjectId=cena-openapi-gen;Kestrel__Endpoints__Http__Url=http://127.0.0.1:0" />
+  </Target>
+
+</Project>

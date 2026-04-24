@@ -1,0 +1,6 @@
+GOAL: Improve docs/mastery-measurement-research.md to be a production-grade research reference
+TARGET: Composite score from 309 to 600+ across 10 iterations
+METRIC: scripts/measure_mastery_doc.sh (citations, DOIs, math, Cena specifics, missing methods)
+CONSTRAINT: Only modify docs/mastery-measurement-research.md. Keep aligned with Cena's tech stack (Proto.Actor/.NET 9, Neo4j, NATS JetStream, PostgreSQL/Marten) and domain model (8 bounded contexts, 6 domain events, event sourcing).
+ITERATIONS: 10
+BASELINE: 309

@@ -1,0 +1,107 @@
+// PWA-003: Mobile viewport, touch, and UX hardening
+
+// ── Safe Area Insets (notched devices) ──────────────────────
+:root {
+  --safe-area-top: env(safe-area-inset-top, 0px);
+  --safe-area-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-left: env(safe-area-inset-left, 0px);
+  --safe-area-right: env(safe-area-inset-right, 0px);
+  --keyboard-height: 0px;
+}
+
+// ── Pull-to-Refresh Prevention ─────────────────────────────
+// In standalone PWA mode, Chrome adds pull-to-refresh by default.
+// This conflicts with scrollable content (question lists, mastery map).
+body {
+  overscroll-behavior-y: contain;
+}
+
+// ── Touch Target Minimum (WCAG 2.5.5 Level AAA) ───────────
+// All interactive elements must have at least 44×44px tap area.
+.touch-target {
+  min-width: 44px;
+  min-height: 44px;
+  position: relative;
+}
+
+// Expand tap area without changing visual size
+.touch-target-expand::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+// Vuetify small/x-small icon buttons: ensure minimum 44px tap area
+// even though they render visually smaller. We use min-height/min-width
+// so the tap target meets WCAG 2.5.5 without changing visual design.
+.v-btn--icon.v-btn--size-small,
+.v-btn--icon.v-btn--size-x-small {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+// ── Input Zoom Prevention ──────────────────────────────────
+// iOS Safari zooms on focus when font-size < 16px. Instead of
+// allowing zoom (which breaks layout), we ensure all inputs are ≥16px.
+input,
+textarea,
+select,
+.v-field__input,
+.v-textarea textarea {
+  font-size: max(16px, 1rem) !important;
+}
+
+// ── Text Selection Controls ────────────────────────────────
+// Prevent accidental selection on interactive elements
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+// Content that students may want to copy — always selectable
+.question-content,
+.explanation,
+.hint-text,
+.v-card-text {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+// ── Reduced Motion ─────────────────────────────────────────
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+// ── Safe Area Application ──────────────────────────────────
+// App header padding for notched devices
+.v-app-bar,
+.layout-navbar {
+  padding-top: var(--safe-area-top);
+}
+
+// Bottom navigation/action padding for home indicator
+.v-bottom-navigation,
+.layout-footer,
+.v-navigation-drawer--bottom {
+  padding-bottom: var(--safe-area-bottom);
+}
+
+// Full-width containers respect side insets
+.v-container {
+  padding-inline: max(16px, var(--safe-area-left));
+}
+
+// ── Keyboard-Aware Layout ──────────────────────────────────
+// When the virtual keyboard is open, fixed bottom elements should
+// adjust so they don't hide behind the keyboard.
+.keyboard-aware-bottom {
+  transition: padding-bottom 0.2s ease;
+  padding-bottom: calc(var(--keyboard-height) + var(--safe-area-bottom));
+}

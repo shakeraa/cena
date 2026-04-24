@@ -1,0 +1,77 @@
+# ═══════════════════════════════════════════════════════════════════════
+# Cena Platform — Docker build context exclusions
+#
+# Keeps the build context small (repo-root COPY . .) so the .NET restore
+# cache layer isn't busted by artifacts, worktrees, or SPA bundles.
+# ═══════════════════════════════════════════════════════════════════════
+
+# Version control
+.git
+.github
+.gitignore
+.gitattributes
+
+# Agentic worktrees and scratch (huge duplicated trees + corrupted artifacts)
+.agentdb
+.claude
+.cursor
+.loopbench
+
+# .NET build output
+**/bin
+**/obj
+**/TestResults
+**/coverage.cobertura.xml
+
+# Node / SPA build artifacts (not needed by .NET image builds)
+**/node_modules
+**/.nuxt
+**/.next
+**/.vite
+**/.cache
+**/dist
+**/build
+
+# IDE / OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Logs
+**/*.log
+/logs
+/tmp
+/temp
+
+# Secrets & local config
+.env
+.env.local
+**/appsettings.Development.json
+**/appsettings.Local.json
+**/secrets.json
+**/firebase-credentials*.json
+
+# Docker itself (avoid recursion)
+Dockerfile*
+docker-compose*.yml
+!src/**/Dockerfile
+
+# Documentation and task tracking (not needed at build time)
+/docs
+/tasks
+/tests/load
+/ops
+/memory-bank
+/.roo
+
+# Python sidecar (has its own build context) — but keep ocr.proto which
+# Cena.Infrastructure.csproj references for protobuf codegen.
+/docker
+!/docker/ocr-sidecar/app/ocr.proto
+
+# Benchmarks
+/benchmarks
+/loopbench-runs

@@ -1,0 +1,86 @@
+name: CAS Load (Nightly)
+
+# RDY-051: Runs the k6 load script at tests/load/cas-gate-load.js against
+# whichever Admin API URL is provided via secrets. When CENA_ADMIN_URL is
+# absent (e.g. a forked-PR run), the job still executes the k6 script's
+# syntax-check phase so regressions in the script itself are caught — it
+# just does not fire traffic. This keeps the workflow always-safe while
+# delivering real measurement once the staging URL + token are wired into
+# GitHub secrets.
+#
+# Target SLO (RDY-036 paragraph 10):
+#   - 100 concurrent VUs, 2 min sustained
+#   - p95 < 3000 ms
+#   - http_req_failed < 1%
+# Thresholds are encoded inside the script itself — failures exit non-zero
+# and mark the workflow red.
+#
+# Security: inputs/secrets are referenced only via env: blocks (never
+# interpolated directly into run: bodies) per the GitHub Actions workflow
+# injection guide.
+
+on:
+  schedule:
+    - cron: '47 3 * * *'
+  workflow_dispatch:
+    inputs:
+      admin_url:
+        description: 'Admin API URL override (defaults to CENA_ADMIN_URL secret)'
+        required: false
+
+jobs:
+  cas-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install k6
+        run: |
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg \
+            --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" \
+            | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Validate k6 script
+        run: k6 archive --out /tmp/cas-gate.tar tests/load/cas-gate-load.js
+
+      - name: Resolve Admin URL
+        id: admin
+        env:
+          DISPATCH_URL: ${{ github.event.inputs.admin_url }}
+          SECRET_URL: ${{ secrets.CENA_ADMIN_URL }}
+        run: |
+          URL="${DISPATCH_URL:-$SECRET_URL}"
+          if [ -z "$URL" ]; then
+            echo "url=" >> "$GITHUB_OUTPUT"
+            echo "has_target=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::CENA_ADMIN_URL not set — skipping traffic phase."
+          else
+            echo "url=$URL" >> "$GITHUB_OUTPUT"
+            echo "has_target=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run k6 load script
+        if: steps.admin.outputs.has_target == 'true'
+        env:
+          CENA_ADMIN_URL: ${{ steps.admin.outputs.url }}
+          CENA_ADMIN_TOKEN: ${{ secrets.CENA_ADMIN_TOKEN }}
+        run: |
+          mkdir -p ops/reports
+          k6 run \
+            --summary-export ops/reports/cas-load-summary.json \
+            -e CENA_ADMIN_URL="$CENA_ADMIN_URL" \
+            -e CENA_ADMIN_TOKEN="$CENA_ADMIN_TOKEN" \
+            tests/load/cas-gate-load.js
+
+      - name: Upload load summary
+        if: always() && steps.admin.outputs.has_target == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: cas-load-summary
+          path: ops/reports/cas-load-summary.json
+          if-no-files-found: warn

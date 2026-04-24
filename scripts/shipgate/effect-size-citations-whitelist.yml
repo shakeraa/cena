@@ -1,0 +1,113 @@
+# =============================================================================
+# Ship-gate whitelist: effect-size-citations rule pack (ADR-0049)
+# =============================================================================
+# Files that legitimately reference bare effect-size numbers without a
+# citation_id= tag — research notes, persona-review analyses, retired
+# citations, ADRs that critique past usage, test assertions.
+#
+# Everything not on this list is scanned for effect-size claims and required
+# to carry a resolvable citation_id tag.
+# =============================================================================
+
+whitelist:
+  # -- ADR-family -----------------------------------------------------------
+  - path: "docs/adr/**"
+    reason: "ADRs routinely cite past effect-size claims in 'alternatives considered' / 'context' sections"
+
+  # -- Engineering / design reference docs where we critique or pair ban/allow copy
+  - path: "docs/engineering/shipgate.md"
+    reason: "Ship-gate policy doc references banned patterns"
+
+  - path: "docs/engineering/mastery-trajectory-honest-framing.md"
+    reason: "Honest-framing policy doc critiques cherry-picked ES"
+
+  - path: "docs/engineering/ci-prohibited-metrics-rules.md"
+    reason: "Prohibited-metrics policy doc cites banned patterns"
+
+  - path: "docs/engineering/feature-success-metrics.md"
+    reason: "Metrics policy doc references the enforcement regex"
+
+  - path: "docs/engineering/metrics-pre-registration-template.md"
+    reason: "Template references ES patterns as examples"
+
+  - path: "docs/engineering/offline-sync-design.md"
+    reason: "Design doc quotes ES patterns in negation/rationale"
+
+  - path: "docs/engineering/feature-discovery-*.md"
+    reason: "Feature-discovery analyses quote ES claims under review"
+
+  - path: "docs/design/**"
+    reason: "Design reference docs pair banned copy with target copy"
+
+  # -- Research notes (pre-production analyses) ----------------------------
+  - path: "docs/research/**"
+    reason: "Research notes analyse primary-study ES values as research context"
+
+  - path: "docs/decisions/**"
+    reason: "Decision notes may cite ES claims while rejecting them"
+
+  # -- Pre-release-review artefacts ----------------------------------------
+  - path: "pre-release-review/**"
+    reason: "Persona reviews, historical scans, and finding docs analyse ES claims by design"
+
+  # -- Task bodies that define the enforcement patterns --------------------
+  - path: "tasks/pre-release-review/**"
+    reason: "Task bodies reference ES patterns as the thing being enforced"
+
+  # -- Citation manifest and scanner source --------------------------------
+  - path: "contracts/citations/approved-citations.yml"
+    reason: "The citation manifest itself quotes approved ES values"
+
+  - path: "contracts/citations/**"
+    reason: "Citation manifest directory"
+
+  - path: "scripts/shipgate/effect-size-citations.yml"
+    reason: "This rule pack's own patterns"
+
+  - path: "scripts/shipgate/effect-size-citations-whitelist.yml"
+    reason: "This whitelist (self)"
+
+  - path: "scripts/shipgate/banned-citations.yml"
+    reason: "Sibling rule pack quotes ES values in patterns"
+
+  - path: "scripts/shipgate/citation-integrity-scan.mjs"
+    reason: "Companion cross-reference scanner source"
+
+  - path: "scripts/shipgate/rulepack-scan.mjs"
+    reason: "Scanner source quotes patterns in comments"
+
+  - path: "scripts/shipgate/scan.mjs"
+    reason: "Scanner source quotes ES patterns in comments"
+
+  - path: "scripts/shipgate/README.md"
+    reason: "Future scanner README"
+
+  # -- Test fixtures -------------------------------------------------------
+  - path: "shipgate/fixtures/**"
+    reason: "Positive-test fixtures deliberately contain every rule pattern"
+
+  - path: "tests/shipgate/**"
+    reason: "Test spec files quote ES patterns in assertions"
+
+  # -- Test projects (may cite ES in test data) ----------------------------
+  - path: "src/actors/Cena.Actors.Tests/**"
+    reason: "Test assertions may quote ES claims to verify absence"
+
+  - path: "src/api/**/*Tests*/**"
+    reason: "API test projects may quote ES claims"
+
+  - path: "src/api/**/*.Tests/**"
+    reason: "API test projects (dotted variant)"
+
+  # -- Project-rules / coordination docs -----------------------------------
+  - path: "CLAUDE.md"
+    reason: "Project-rules file may reference ES policy"
+
+  - path: "AGENTS.md"
+    reason: "Cross-agent rules mirror CLAUDE.md"
+
+  - path: ".agentdb/**"
+    reason: "Task-queue protocol docs may reference enforcement"
+
+  - path: "docs/handoff/**"
+    reason: "Handoff notes may reference enforcement expansions"

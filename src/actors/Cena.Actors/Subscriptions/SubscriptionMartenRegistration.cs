@@ -1,0 +1,55 @@
+// =============================================================================
+// Cena Platform — SubscriptionMartenRegistration (EPIC-PRR-I, ADR-0057)
+//
+// Bounded-context owns its own Marten event + projection registration. Called
+// by AddSubscriptionsMarten() via services.ConfigureMarten so the subscription
+// registration lives inside this namespace rather than in the cross-cutting
+// MartenConfiguration file (which is under the 500-LOC ratchet per ADR-0012).
+// =============================================================================
+
+using Cena.Actors.Subscriptions.Events;
+using JasperFx.Events.Projections;
+using Marten;
+
+namespace Cena.Actors.Subscriptions;
+
+/// <summary>Marten event + projection registration for the Subscriptions bounded context.</summary>
+public static class SubscriptionMartenRegistration
+{
+    /// <summary>
+    /// Register all subscription event types, the student-entitlement document
+    /// schema, and the inline StudentEntitlementProjection.
+    /// </summary>
+    public static void RegisterSubscriptionsContext(this StoreOptions opts)
+    {
+        opts.Events.AddEventType<SubscriptionActivated_V1>();
+        opts.Events.AddEventType<TierChanged_V1>();
+        opts.Events.AddEventType<BillingCycleChanged_V1>();
+        opts.Events.AddEventType<SiblingEntitlementLinked_V1>();
+        opts.Events.AddEventType<SiblingEntitlementUnlinked_V1>();
+        opts.Events.AddEventType<RenewalProcessed_V1>();
+        opts.Events.AddEventType<PaymentFailed_V1>();
+        opts.Events.AddEventType<SubscriptionCancelled_V1>();
+        opts.Events.AddEventType<SubscriptionRefunded_V1>();
+        opts.Events.AddEventType<EntitlementSoftCapReached_V1>();
+
+        opts.Schema.For<StudentEntitlementDocument>().Identity(d => d.Id);
+        opts.Projections.Add<StudentEntitlementProjection>(ProjectionLifecycle.Inline);
+
+        // PRR-330 — Weekly unit-economics snapshot. One row per week keyed
+        // by the Sunday-anchored id ("week-YYYY-MM-DD") so the admin
+        // history chart renders trend lines by cheap index scan instead
+        // of replaying the subscription event stream on every page load.
+        opts.Schema.For<UnitEconomicsSnapshotDocument>().Identity(d => d.Id);
+
+        // PRR-344 — Alpha-migration grace marker + operator seed list.
+        //   AlphaGraceMarker        : one row per granted parent (Id =
+        //                              parentSubjectIdEncrypted).
+        //   AlphaMigrationSeedDocument: singleton row (Id = "current") carrying
+        //                              the operator-supplied seed list so the
+        //                              worker, admin endpoint, and replicas
+        //                              share one canonical source.
+        opts.Schema.For<AlphaGraceMarker>().Identity(d => d.Id);
+        opts.Schema.For<AlphaMigrationSeedDocument>().Identity(d => d.Id);
+    }
+}

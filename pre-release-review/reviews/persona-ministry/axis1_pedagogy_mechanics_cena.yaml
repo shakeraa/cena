@@ -1,0 +1,183 @@
+doc_path: pre-release-review/axis1_pedagogy_mechanics_cena.md
+reviewer: persona-ministry
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight pedagogy-mechanics features (interleaving scheduler, spaced mastery,
+  retrieval micro-checks, elaborative interrogation, productive-struggle hint
+  governor, desirable-difficulty targeting, near-to-far transfer, worked-
+  example fading). Pitched against Bagrut as the outcome but the features
+  themselves are syllabus-agnostic — they operate on "problems" and "skills"
+  without touching how those problems are authored or sourced.
+system_purpose_fit: 4
+  rationale:
+    - Interleaving (F1) directly mirrors Bagrut exam skill — "identify which
+      technique applies without being told the unit" (doc L24) — that is a
+      real Bagrut competency worth defending before the Ministry.
+    - Near-to-far transfer (F7) and worked-example fading (F8) are syllabus-
+      neutral and compatible with any track (3U/4U/5U) — good.
+    - Gaps: zero mention of per-track (3U/4U/5U) calibration, Ministry
+      syllabus chapters, or how the scheduler respects the prerequisite DAG
+      already wired in ADR-0034 §Architecture.
+    - Desirable-difficulty targeting (F6) without per-track bands could
+      surface 5U-only items to a 3U student — syllabus-scope violation risk.
+code_reality_check:
+  claims_verified_in_code:
+    - 'Adaptive scheduler already exists: src/actors/Cena.Actors/Mastery/AdaptiveScheduler.cs'
+    - 'Prerequisite DAG already wired: src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs'
+    - 'Syllabus + chapter aggregates exist: src/shared/Cena.Infrastructure/Documents/SyllabusDocument.cs (per ADR-0034)'
+    - 'BagrutTrack enum (None/3U/4U/5U) landed per ADR-0034 §Grade cleanup — QuestionState.BagrutTrack'
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - 'F1 "strategy discrimination" score — no evidence such a matrix exists in code; proposed as new infra without checking AdaptiveScheduler already handles topic mixing'
+    - 'F5 productive-struggle "hint governor" — AdaptiveScheduler has hint-count tracking but no documented governor policy'
+adr_alignment:
+  honored:
+    - 'ADR-0002 (none of the F1–F8 features bypass SymPy — scheduling layer sits above CAS)'
+    - 'ADR-0003 (doc L59 explicitly marks discrimination scores as session-local/anonymized)'
+  violated: []
+  missing_adr_needed:
+    - 'Per-track difficulty band policy — F6 "desirable difficulty" must be bounded by the student''s Bagrut track or 3U/4U students receive items outside their exam scope'
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: |
+      F6 "Desirable Difficulty Targeting" as written has no Bagrut-track
+      guard. A 3-unit student who is doing well could be surfaced a 5U-only
+      item (e.g. complex numbers, vectors in R³) — that is not "desirable
+      difficulty", it is out-of-syllabus and would undermine Ministry
+      defensibility. The feature must clamp to track scope before sampling.
+    evidence: 'axis1_pedagogy_mechanics_cena.md:L~180 (F6 section); docs/adr/0034-syllabus-advancement-model.md:L97 (BagrutTrack enum exists for exactly this gating)'
+    lens_note: |
+      Ministry lens: a 3U student seeing a 5U item is a syllabus breach
+      regardless of pedagogical intent. The Bagrut contract says 3U
+      students prepare for the 3U exam — we must honor that envelope.
+  - severity: P1
+    finding: |
+      F1 Interleaving doc specifies "no explicit label of which unit/skill
+      the problem belongs to" (L54) as a pedagogical feature. This is sound
+      for strategy-discrimination within the student''s track, but doc does
+      not specify that the pool must be restricted to the student''s
+      syllabus chapters + mastered prereqs. Without that guard, interleaving
+      could surface an unlocked-chapter item and trigger a Ministry-level
+      scope violation.
+    evidence: 'axis1_pedagogy_mechanics_cena.md:L54; docs/adr/0034-syllabus-advancement-model.md:L31-L52 (advancement is gated by prior learning + chapter prereqs)'
+    lens_note: |
+      ADR-0034 §Decision rule 1 is explicit — advancement is gated by prior
+      learning, not age. Interleaving must respect that gate; otherwise
+      ADR-0034 is decorative.
+  - severity: P2
+    finding: |
+      F7 "Near-to-Far Transfer Sequencing" references no Bagrut-specific
+      transfer targets. The Bagrut exam has a known pattern of
+      cross-chapter transfer (e.g. calculus applied to trig identities,
+      vectors to geometry). Without a taxonomy-aligned transfer map, the
+      feature becomes generic cross-topic routing with no exam fidelity
+      argument.
+    evidence: 'axis1_pedagogy_mechanics_cena.md (F7 section); scripts/bagrut-taxonomy.json (42 concepts mapped) is the natural home for the transfer graph'
+    lens_note: |
+      Ministry lens: a transfer claim without syllabus grounding is a
+      pedagogy claim, not an exam-prep claim. If we advertise Bagrut prep,
+      the transfer map must anchor to Ministry chapters.
+  - severity: P2
+    finding: |
+      No mention of 3U/4U/5U cut-overs. A Cena student who advances from 4U
+      to 5U mid-year (realistic — students retake at 5U) needs an
+      explicit re-calibration of their scheduler state. The doc treats
+      "track" as a static attribute.
+    evidence: 'axis1_pedagogy_mechanics_cena.md (absence across all 8 features)'
+    lens_note: |
+      Ministry lens: track migration is a normal Israeli-pupil lifecycle;
+      the scheduler must handle it or we will mis-place students at exam
+      time.
+already_built:
+  - feature: Adaptive scheduler core
+    evidence: src/actors/Cena.Actors/Mastery/AdaptiveScheduler.cs
+    note: |
+      Doc treats interleaving as a new scheduler; codebase already has
+      AdaptiveScheduler. F1 should be framed as "add interleaving weights
+      to existing AdaptiveScheduler", not a green-field service.
+  - feature: Prerequisite DAG / chapter prereqs
+    evidence: src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs + docs/adr/0034-syllabus-advancement-model.md §Architecture
+    note: |
+      F5 "hint governor" and F7 "transfer sequencing" both need a prereq
+      graph; it already exists. Doc does not reference it.
+  - feature: BagrutTrack enum + syllabus/chapter documents
+    evidence: 'src/shared/Cena.Infrastructure/Documents/SyllabusDocument.cs, QuestionState.BagrutTrack (per ADR-0034)'
+    note: |
+      Any per-track clamp in F6 / F1 should read these, not introduce a
+      new "track" concept.
+duplicates_of_other_docs:
+  - 'feature-discovery-2026-04-20.md: FD-001 (interleaving), FD-002 (CAS variation), FD-006 (desirable difficulty) — same features, index is canonical'
+extracted_tasks:
+  - title: Clamp adaptive scheduler sampling to student BagrutTrack
+    priority: P1
+    estimate: S
+    suggested_assignee: claude-subagent-scheduler-track-clamp
+    queue_body: |
+      ## Goal
+      Prevent the AdaptiveScheduler from surfacing items whose
+      QuestionState.BagrutTrack exceeds the student''s enrolled track
+      (3U < 4U < 5U). A 3U student must never see a 5U-only item; a 4U
+      student must never see a 5U-only item. 5U students see all tracks.
+
+      ## Files
+      - src/actors/Cena.Actors/Mastery/AdaptiveScheduler.cs (add track filter)
+      - src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs (surface item track)
+      - src/actors/Cena.Actors.Tests/Mastery/AdaptiveSchedulerTrackClampTests.cs (new)
+
+      ## Definition of Done
+      - Scheduler respects `StudentProfile.EnrolledTrack` on every sample call
+      - Test: 3U student never receives a 5U item across 1000 sampled
+      - Test: 4U student never receives a 5U-only item across 1000 sampled
+      - Test: 5U student can receive items from any track
+      - `dotnet test Cena.Actors.Tests` green on full sln
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-scheduler-track-clamp --result "<branch>"
+    source_doc_lines: [L~180-L220]
+  - title: Add Bagrut-chapter-aligned transfer map for F7 near-to-far transfer
+    priority: P2
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Ground any "near-to-far transfer" feature in the existing Ministry
+      chapter taxonomy. Without a taxonomy-aligned edge set, transfer
+      sequencing is generic and loses Bagrut-defensibility.
+
+      ## Files
+      - scripts/bagrut-taxonomy.json (add `transfer_edges` field per chapter)
+      - docs/curriculum/bagrut-taxonomy-review.md (extend review scope to
+        cover transfer edges)
+      - src/actors/Cena.Actors/Mastery/TopicPrerequisiteGraph.cs (add
+        distinct transfer-edge iterator)
+
+      ## Definition of Done
+      - Transfer edges drafted for Math-5U (42 subtopics) by Amjad-designated
+        curriculum expert
+      - Architecture test asserting transfer edges only cross chapter
+        boundaries, not within-chapter
+      - Sign-off row added to bagrut-taxonomy-review.md
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~280-L340]
+verdict: revise
+verdict_reason: |
+  Pedagogy is sound but features are syllabus-blind. Ship F1/F6/F7 only
+  after adding track clamp + chapter-scope guards. F2-F5 can proceed as
+  drafted — they operate within already-unlocked material.
+cross_lens_handoff:
+  - to: persona-educator
+    about: |
+      Whether "strategy discrimination" as defined in F1 matches how
+      Bagrut questions actually cue technique selection — educator is
+      better placed to validate the prompt design.
+  - to: persona-cogsci
+    about: |
+      Effect-size claims (d=0.34 meta-analytic vs d=1.05 primary) —
+      Dr. Rami''s FD-001 flag applies; evidence lens owns this.
+  - to: persona-enterprise
+    about: |
+      AdaptiveScheduler is already in src/actors/Cena.Actors/Mastery/ —
+      whether F1/F6 should extend it or fork is a bounded-context call.

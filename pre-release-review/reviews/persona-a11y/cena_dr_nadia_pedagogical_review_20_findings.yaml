@@ -1,0 +1,87 @@
+doc_path: pre-release-review/cena_dr_nadia_pedagogical_review_20_findings.md
+reviewer: persona-a11y
+reviewed_at: 2026-04-20
+doc_summary: |
+  Dr. Nadia cross-examines 20 SHIP-recommended findings from pedagogy lens. Results:
+  17 PASS, 3 WARNING (FD-009 Socratic escape, FD-014 'Why this problem' UI clutter,
+  FD-016 team competitions moderation), 0 REJECT. A11y-relevant: FD-010 Arabic RTL
+  math, FD-013 mother-tongue hints.
+system_purpose_fit: 3
+  rationale:
+    - Provides pedagogical validation of features that must still pass a11y
+    - FD-010 Arabic RTL explicitly called 'core requirement, not optional' — aligns non-negotiable 6
+    - FD-013 mother-tongue hints raise language-attribute handling
+code_reality_check:
+  claims_verified_in_code:
+    - "Arabic RTL partial impl: src/student/full-version/tests/a11y/math-ltr-wrapper.spec.ts"
+    - "i18n for he/ar/en: src/student/full-version/src/plugins/i18n/"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Nadia's pedagogical judgments — out of this persona's lens"
+adr_alignment:
+  honored:
+    - "FD-010 honors non-negotiable 6"
+    - "FD-003 references ADR-0003 compliance as non-negotiable"
+  violated: []
+  missing_adr_needed: []
+non_negotiable_violations: []
+persona_findings:
+  - severity: P1
+    finding: "FD-010 'Arabic RTL is core requirement, not optional' — agreed from a11y lens. But Nadia's review doesn't reference existing partial impl. Synthesizer must note: existing code path (<bdi> element) is the authoritative approach; FD-010 must not spawn a competing CSS-only impl."
+    evidence: "cena_dr_nadia...md:FD-010"
+    lens_note: "Reinforces the dedup finding from AXIS 3 and AXIS 8 reviews."
+  - severity: P1
+    finding: "FD-013 mother-tongue hints WARNING ('do not track language proficiency profiles'). From a11y lens, even session-scoped: each rendered hint paragraph needs lang + dir attribute so screen readers switch voice packs correctly."
+    evidence: "cena_dr_nadia...md:FD-013"
+    lens_note: "Ties to AXIS 8 F6 task."
+  - severity: P1
+    finding: "FD-009 Socratic escape hatch — when student signals 'give me the answer', UI must be large-touch-target (≥44x44), keyboard accessible, and not buried. Accessibility matters more when students are stuck and anxious."
+    evidence: "cena_dr_nadia...md:FD-009"
+    lens_note: "Existing touch-target-size scanner should cover."
+  - severity: P2
+    finding: "FD-014 'Why this problem?' UI clutter warning — a11y risk is also clutter. Info icons must have aria-labels; popovers need focus management."
+    evidence: "cena_dr_nadia...md:FD-014"
+    lens_note: "Common regression in explainability panels."
+  - severity: P2
+    finding: "FD-017 Focus Ritual 'never frame as therapy' — localization risk: Hebrew/Arabic translation may use medical/therapeutic language by accident. Translation review required."
+    evidence: "cena_dr_nadia...md:FD-017"
+    lens_note: "'ריטואל נשימה' vs 'תרגיל נשימה' carry different weights; 'טיפול' (treatment) is banned."
+  - severity: P2
+    finding: "FD-011 Culturally-contextualized problems — name rendering in RTL with Arabic+Hebrew mix requires font stack that covers both scripts and proper <bdi> for proper nouns."
+    evidence: "cena_dr_nadia...md:FD-011"
+    lens_note: "Already captured in AXIS 8 F5 finding."
+already_built:
+  - feature: "Arabic RTL partial renderer"
+    evidence: "tests/a11y/math-ltr-wrapper.spec.ts"
+    note: "FD-010 must not greenfield"
+  - feature: "Touch-target size scanner"
+    evidence: "src/student/full-version/tests/a11y/touch-target-size.spec.ts"
+    note: "Covers FD-009 escape-hatch button size"
+duplicates_of_other_docs:
+  - "All 20 findings overlap with axis docs and feature-discovery mega-doc"
+extracted_tasks:
+  - title: "Translation review gate for therapy/medical language (FD-017)"
+    priority: P2
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Add Hebrew/Arabic medical/therapeutic-language blocklist to ship-gate scanner. Translations for wellness features (breathing ritual, energy tracker) must not use words like 'טיפול' (treatment), 'علاج' (cure), 'therapy' etc.
+      ## Files
+      - tests/shipgate/banned-terms.spec.ts (extend with medical blocklist per locale)
+      - src/student/full-version/src/plugins/i18n/locales/*.json
+      ## Definition of Done
+      - Medical-language blocklist enforced in CI
+      - Native-speaker review on any change to wellness namespace
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [FD-017]
+verdict: adopt
+verdict_reason: "Dr. Nadia's review is largely out of this lens; the a11y/l10n touch points (FD-010, FD-013, FD-017) are handled by tasks already extracted from axis docs. One small task added: medical-language blocklist."
+cross_lens_handoff:
+  - to: persona-educator
+    about: "Full pedagogical review (FD-001 through FD-020)"
+  - to: persona-ethics
+    about: "FD-017 therapy-claim line and FD-018 energy-tracker framing"
+  - to: persona-ministry
+    about: "FD-011 stereotyping risk requires community review board — Ministry framing"

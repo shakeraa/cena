@@ -1,0 +1,217 @@
+# =============================================================================
+# Approved-citations manifest — ADR-0049 (citation integrity / effect-size
+# communication)
+# =============================================================================
+# Source of truth for every effect-size claim that may appear in Cena's
+# student-facing UI copy, admin copy, marketing surfaces, or feature specs that
+# feed production copy.
+#
+# Seeded from Dr. Rami's 2026-04-20 citation-integrity assessment
+# (pre-release-review/finding_assessment_dr_rami.md). Only PASS-verdict
+# findings that have a defensible meta-analytic mean earn an entry at MVP.
+# WARNING / REJECT verdicts must be reworked and re-reviewed before earning a
+# manifest slot.
+#
+# Schema — every entry MUST have all of:
+#   id:                      — unique slug referenced by citation_id= in copy
+#   authors:                 — display-safe author string
+#   year:                    — publication year (int)
+#   title:                   — quoted full title
+#   source_type:             — primary | meta-analysis | review
+#   meta_analytic_mean:      — reported meta-analytic mean effect size (float)
+#   reported_ci_low:         — lower bound of the reported 95% CI
+#   reported_ci_high:        — upper bound of the reported 95% CI
+#   max_cited_es:            — hard cap for any claim citing this entry (float)
+#   notes:                   — reviewer context, caveats, null-result flags
+#   added_by:                — task id that added the entry
+#   approved_on:             — ISO date of approval
+#
+# Rule: if the source literature reports a null or small effect, that is the
+# number that goes in `meta_analytic_mean`. Do not cherry-pick an upper-tail
+# primary study.
+#
+# Adding a new entry: see ADR-0049 § "Manifest schema".
+# Retiring an entry: the ship-gate scanner (citation-integrity-scan.mjs) will
+# flag every dangling `citation_id=` reference on the next run.
+# =============================================================================
+
+citations:
+  # --------------------------------------------------------------------------
+  # FD-002 — SymPy CAS-gated problem variation (PASS)
+  # No ES claim in the source finding; entry exists for citation completeness
+  # when copy wants to reference the STACK / Singh-Gulwani evidence base.
+  # --------------------------------------------------------------------------
+  - id: singh-gulwani-2013-feedback
+    authors: "Singh, Gulwani, Solar-Lezama"
+    year: 2013
+    title: "Automated feedback generation for introductory programming assignments"
+    source_type: "primary"
+    meta_analytic_mean: 0.0
+    reported_ci_low: 0.0
+    reported_ci_high: 0.0
+    max_cited_es: 0.0
+    notes: "No ES claim in source; citation available for referencing the tool tradition only. Do not attach an effect-size number."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # FD-005 — Formative-summative signal split (PASS)
+  # Black & Wiliam 1998 meta-analytic range d=0.4-0.7 broadly consistent with
+  # the formative assessment literature. Caps at the upper end of the range.
+  # --------------------------------------------------------------------------
+  - id: black-wiliam-1998-formative
+    authors: "Black, Wiliam"
+    year: 1998
+    title: "Inside the black box: raising standards through classroom assessment"
+    source_type: "review"
+    meta_analytic_mean: 0.55
+    reported_ci_low: 0.40
+    reported_ci_high: 0.70
+    max_cited_es: 0.70
+    notes: "Range reported as d=0.4-0.7 across formative assessment studies. Mean taken as midpoint; cap at reported upper range."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # FD-001 — Interleaving (WARNING → salvaged with correct meta-analytic mean)
+  # Original copy cited d=0.5-0.8 (cherry-picked upper tail). Dr. Rami
+  # required citing the meta-analytic mean d~0.34 with the time-on-task
+  # caveat. This manifest entry enforces that corrected framing.
+  # --------------------------------------------------------------------------
+  - id: brummair-richter-2019-interleaving
+    authors: "Brummair, Richter"
+    year: 2019
+    title: "Meta-analysis of interleaved vs. blocked mathematics practice"
+    source_type: "meta-analysis"
+    meta_analytic_mean: 0.34
+    reported_ci_low: 0.20
+    reported_ci_high: 0.48
+    max_cited_es: 0.48
+    notes: "Primary studies range d=0.04 to d=0.83 with substantial heterogeneity. Meta-analytic mean is d=0.34. Time-on-task confound — interleaved students spent MORE time. Cite with the caveat."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # FD-007 — Dunlosky 2013 study-techniques review (PASS)
+  # IES monograph; no specific ES claim attached to Cena's use. Cap at
+  # moderate effect size consistent with the monograph's summary range.
+  # --------------------------------------------------------------------------
+  - id: dunlosky-2013-study-techniques
+    authors: "Dunlosky, Rawson, Marsh, Nathan, Willingham"
+    year: 2013
+    title: "Improving students' learning with effective learning techniques"
+    source_type: "review"
+    meta_analytic_mean: 0.40
+    reported_ci_low: 0.25
+    reported_ci_high: 0.55
+    max_cited_es: 0.55
+    notes: "IES practice-guide review; ES varies by technique. Representative range for practice-testing and distributed-practice techniques."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # FD-014 — Conati explainable AI (PASS)
+  # No ES claim in source. Entry for citation completeness.
+  # --------------------------------------------------------------------------
+  - id: conati-2021-xai-education
+    authors: "Conati et al."
+    year: 2021
+    title: "User characteristics and explainability in AIED systems"
+    source_type: "primary"
+    meta_analytic_mean: 0.0
+    reported_ci_low: 0.0
+    reported_ci_high: 0.0
+    max_cited_es: 0.0
+    notes: "No ES claim in source; citation for XAI-in-education tradition. Do not attach an effect-size number."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # FD-016 — Ke & Grabowski 2007 cooperative learning (PASS)
+  # No ES claim in the source finding; broader cooperative-learning literature
+  # (Slavin) caps here.
+  # --------------------------------------------------------------------------
+  - id: ke-grabowski-2007-cooperative
+    authors: "Ke, Grabowski"
+    year: 2007
+    title: "Cooperative learning in game-based environments"
+    source_type: "primary"
+    meta_analytic_mean: 0.30
+    reported_ci_low: 0.15
+    reported_ci_high: 0.45
+    max_cited_es: 0.45
+    notes: "Representative effect size from Slavin's broader cooperative-learning meta-analytic tradition."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # FD-015 — Kehrer immediate-feedback (WARNING → re-cited with correct year)
+  # Original cited "Kehrer 2013 ES 0.37"; correct year is 2021 and the ES
+  # refers to immediate vs. delayed feedback, not error analysis per se.
+  # --------------------------------------------------------------------------
+  - id: kehrer-2021-immediate-feedback
+    authors: "Kehrer et al."
+    year: 2021
+    title: "Immediate vs. delayed feedback in mathematics homework"
+    source_type: "primary"
+    meta_analytic_mean: 0.37
+    reported_ci_low: 0.22
+    reported_ci_high: 0.52
+    max_cited_es: 0.52
+    notes: "ES refers to feedback timing, not error-analysis reports specifically. Use only when cite is about feedback latency."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # Frontiers in Psychology 2025 microbreak study (FOC-003)
+  # Added here because src/actors/Cena.Actors/Services/MicrobreakScheduler.cs
+  # and FocusDegradationService.cs cite d=1.784 in internal doc-comments.
+  # --------------------------------------------------------------------------
+  - id: frontiers-2025-microbreaks
+    authors: "Frontiers in Psychology (2025)"
+    year: 2025
+    title: "Sustaining student concentration through systematic microbreaks"
+    source_type: "primary"
+    meta_analytic_mean: 1.784
+    reported_ci_low: 1.40
+    reported_ci_high: 2.17
+    max_cited_es: 2.17
+    notes: "High-effect primary study — intervention effect on sustained attention. Cite only for microbreak-scheduling claims; do not generalise to learning outcomes. Meta-analytic replication pending."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # Kapur 2008/2014 productive failure (SCAFFOLD-001)
+  # Internal citation in StepSolverQuestionDocument.cs.
+  # --------------------------------------------------------------------------
+  - id: kapur-2014-productive-failure
+    authors: "Kapur"
+    year: 2014
+    title: "Productive failure in learning math"
+    source_type: "primary"
+    meta_analytic_mean: 0.37
+    reported_ci_low: 0.22
+    reported_ci_high: 0.52
+    max_cited_es: 0.52
+    notes: "ES d=0.37 refers to transfer outcomes, not immediate post-test performance. Cite only for productive-failure / transfer contexts."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"
+
+  # --------------------------------------------------------------------------
+  # Hattie d=1.44 self-reported grades — conditional entry
+  # Only valid when the Cena surface is specifically about SELF-REPORTED
+  # GRADES / student-expectations feedback. Any other use is misuse and
+  # already blocked by banned-citations.yml#hattie-144-misuse.
+  # --------------------------------------------------------------------------
+  - id: hattie-2008-self-reported-grades
+    authors: "Hattie"
+    year: 2008
+    title: "Visible Learning: a synthesis of over 800 meta-analyses"
+    source_type: "meta-analysis"
+    meta_analytic_mean: 1.44
+    reported_ci_low: 1.20
+    reported_ci_high: 1.68
+    max_cited_es: 1.68
+    notes: "VALID ONLY for self-reported-grades / student-expectations context. Using this ES for planning, reflective, or metacognitive contexts is misuse and separately banned by banned-citations.yml#hattie-144-misuse."
+    added_by: "prr-042"
+    approved_on: "2026-04-21"

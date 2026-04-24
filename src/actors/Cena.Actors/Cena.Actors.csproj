@@ -1,0 +1,39 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cena.Actors.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../shared/Cena.Infrastructure/Cena.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Anthropic" Version="12.9.0" />
+    <PackageReference Include="Marten" Version="8.26.2" />
+    <PackageReference Include="Npgsql" Version="9.0.4" />
+    <PackageReference Include="NATS.Net" Version="2.7.3" />
+    <PackageReference Include="Neo4j.Driver" Version="6.0.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageReference Include="Proto.Actor" Version="1.8.0" />
+    <PackageReference Include="Proto.Cluster" Version="1.8.0" />
+    <PackageReference Include="Proto.Remote" Version="1.8.0" />
+    <PackageReference Include="MailKit" Version="4.11.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageReference Include="StackExchange.Redis" Version="2.12.8" />
+    <PackageReference Include="Stripe.net" Version="47.4.0" />
+    <PackageReference Include="Lib.Net.Http.WebPush" Version="3.3.1" />
+    <PackageReference Include="MathNet.Symbolics" Version="0.25.0" />
+  </ItemGroup>
+
+</Project>

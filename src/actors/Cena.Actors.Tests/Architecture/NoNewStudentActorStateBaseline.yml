@@ -1,0 +1,53 @@
+# =============================================================================
+# Generated 2026-04-20 per ADR-0012 Schedule Lock
+# (docs/adr/0012-aggregate-decomposition.md — "Enforcement" section)
+#
+# Event-handler count inside StudentActor*.cs is capped at this baseline.
+#
+# An "event handler" for this file-set is counted as a `case <EventType>_V<N>:`
+# line inside a switch over an incoming domain event (the StudentActor fans
+# out delegated events to _state.Apply via `switch (del.Event)`). This is the
+# canonical mechanical signal — every new event type that the actor must
+# handle adds exactly one such case line. Proto.Actor lifecycle hooks
+# (OnStarted/OnStopping/OnPassivation/OnRestarting/OnStopped) are NOT counted:
+# they are per-actor infrastructure, not event-type state.
+#
+# Rules (enforced by NoNewStudentActorStateTest):
+#   - A PR MUST NOT raise baseline_count. New event handlers must land in
+#     LearningSessionActor (available post Sprint 1, 2026-05-03) or in a
+#     temporary `StudentActor.Pending` seam documented in the PR description.
+#   - A PR MAY lower baseline_count when an event type migrates out. Lower
+#     the number in the same PR that removes the case line.
+#   - This baseline monotonically decreases as events migrate to successor
+#     aggregates; by end of Sprint 6 (2026-06-07) it should reach 0 and
+#     StudentActor*.cs should be removed entirely.
+# =============================================================================
+handler_count:
+  path_glob: "src/actors/Cena.Actors/Students/StudentActor*.cs"
+  baseline_count: 18
+  counted_pattern: '^\s*case\s+[A-Za-z_][A-Za-z0-9_]*_V\d+\b'
+  per_file_breakdown:
+    StudentActor.cs: 0
+    StudentActor.Commands.cs: 0
+    StudentActor.Mastery.cs: 0
+    StudentActor.Methodology.cs: 0
+    StudentActor.Queries.cs: 18
+  events_at_baseline:
+    - ConceptAttempted_V1
+    - ConceptMastered_V1
+    - SessionStarted_V1
+    - SessionEnded_V1
+    - MethodologySwitched_V1
+    - XpAwarded_V1
+    - StreakUpdated_V1
+    - AnnotationAdded_V1
+    - StagnationDetected_V1
+    - HintRequested_V1
+    - QuestionSkipped_V1
+    - MethodologyConfidenceReached_V1
+    - MethodologySwitchDeferred_V1
+    - TeacherMethodologyOverride_V1
+    - TutoringSessionStarted_V1
+    - TutoringMessageSent_V1
+    - TutoringSessionEnded_V1
+    - TutoringEpisodeCompleted_V1

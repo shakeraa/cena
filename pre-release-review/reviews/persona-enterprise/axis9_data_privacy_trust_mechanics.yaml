@@ -1,0 +1,141 @@
+doc_path: pre-release-review/axis9_data_privacy_trust_mechanics.md
+reviewer: persona-enterprise
+reviewed_at: 2026-04-20
+doc_summary: |
+  Eight privacy/trust features for minors: data-export, consent ledger, granular opt-ins,
+  audit trail, session scoping UI, parent-visibility switches, deletion/forgetting, PII-in-prompts
+  guardrails.
+system_purpose_fit: 4
+  rationale:
+    - Features align with ADR-0003 and non-negotiable 2 (session-scoped misconceptions).
+    - Consent-ledger + audit-trail belong in their own bounded context; doc implies but doesn't name.
+    - Deletion/forgetting is the event-sourcing consistency nightmare — must be designed, not retrofitted.
+code_reality_check:
+  claims_verified_in_code:
+    - "GDPR resource guard exists -> src/shared/Cena.Infrastructure/Compliance/GdprResourceGuard.cs"
+    - "Resource ownership guard exists -> src/shared/Cena.Infrastructure/Auth/ResourceOwnershipGuard.cs"
+    - "Cross-tenant write-enforcement tests exist -> src/api/Cena.Admin.Api.Tests/CrossTenantWriteEnforcementTests.cs"
+  claims_contradicted_by_code:
+    - "Doc treats audit trail as missing; GdprResourceGuard indicates partial audit infrastructure."
+  claims_unverifiable:
+    - "Consent ledger presence — no ConsentEvents.cs located in this pass."
+adr_alignment:
+  honored:
+    - "ADR-0003 (session-scope for misconception)"
+  violated: []
+  missing_adr_needed:
+    - "Event-sourced deletion policy (tombstone + projection rebuild vs cryptographic erasure)"
+    - "Consent-ledger aggregate + event schema"
+non_negotiable_violations: []
+persona_findings:
+  - severity: P0
+    finding: |
+      Event-sourced deletion is architecturally incompatible with naive "hard delete". Options are (a) crypto-shredding
+      (store PII encrypted, discard key on deletion), (b) tombstone events that nullify fields in projections, (c)
+      stream removal (destroys audit trail). Doc calls for "right-to-be-forgotten" without picking. Must pick before
+      any deletion UI ships, or first DSAR will corrupt history.
+    evidence: "axis9_data_privacy_trust_mechanics.md:L~300-L~400 (deletion features); ADR literature"
+    lens_note: Enterprise — event-sourcing + forgetting requires deliberate architecture.
+  - severity: P1
+    finding: |
+      Consent must be event-sourced (when was consent granted, withdrawn, by whom, for what). Doc hints at consent
+      ledger but doesn't scope it to an aggregate. Candidate: ConsentAggregate per (subject, purpose) tuple, stream
+      key `consent-{subjectId}-{purpose}`.
+    evidence: "axis9_data_privacy_trust_mechanics.md:L~100-L~200; src/actors/Cena.Actors/ (no ConsentEvents.cs visible)"
+    lens_note: Enterprise — consent is an aggregate, not a column.
+  - severity: P1
+    finding: |
+      "PII in prompts" guardrail must be enforced at the LLM Gateway boundary. LlmGatewayActor exists; policy must
+      be added as middleware that strips/rejects PII before any LLM call. Otherwise every new LLM caller site is a
+      potential leak.
+    evidence: "src/actors/Cena.Actors/Gateway/ (LlmGateway); axis9_data_privacy_trust_mechanics.md:L~350"
+    lens_note: Enterprise — enforce at the gateway, not at N caller sites.
+  - severity: P2
+    finding: |
+      Granular opt-ins risk consent fatigue + inconsistent application. A single ConsentPolicy per-enrollment with
+      typed flags is better than N boolean columns.
+    evidence: axis9_data_privacy_trust_mechanics.md:L~150
+    lens_note: Enterprise — design for consistency, not feature-by-feature flags.
+already_built:
+  - feature: "GDPR resource guard"
+    evidence: src/shared/Cena.Infrastructure/Compliance/GdprResourceGuard.cs
+    note: "Existing infrastructure; extend rather than author parallel."
+  - feature: "Cross-tenant write enforcement tests"
+    evidence: src/api/Cena.Admin.Api.Tests/CrossTenantWriteEnforcementTests.cs
+    note: "Pattern to extend for new privacy tests."
+duplicates_of_other_docs:
+  - "AXIS_4_Parent_Engagement_Cena_Research.md: consent overlap"
+  - "feature-discovery-2026-04-20.md: privacy cluster findings"
+extracted_tasks:
+  - title: "ADR: Right-to-be-forgotten in event-sourced Cena"
+    priority: P0
+    estimate: L
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Pick and document the event-sourced deletion strategy (crypto-shred, tombstone, or hybrid). Implementation
+      implications for Marten, projection rebuild, offline replay, and audit trail must be written down.
+
+      ## Files
+      - docs/adr/ (new 0021-right-to-be-forgotten.md)
+      - docs/adr/0003-misconception-session-scope.md (link)
+
+      ## Definition of Done
+      - ADR approved.
+      - Proof-of-concept deletion for one fake subject, validated against a projection rebuild.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~300-L~400]
+  - title: "LLM Gateway PII guard middleware"
+    priority: P0
+    estimate: M
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Single middleware on LlmGatewayActor that scans every outbound prompt for PII (name, phone, ID number, address)
+      and rejects (or strips with explicit opt-in). Fail-closed on suspected leaks.
+
+      ## Files
+      - src/actors/Cena.Actors/Gateway/
+      - Test: new LlmGatewayPiiGuardTests.cs
+
+      ## Definition of Done
+      - Middleware wired into every LLM call path.
+      - Unit tests cover IL ID number, Hebrew/Arabic names, phone numbers.
+      - Full Cena.Actors.sln builds.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: [L~350]
+  - title: "Design ConsentAggregate + events"
+    priority: P1
+    estimate: M
+    suggested_assignee: human-architect
+    queue_body: |
+      ## Goal
+      Event-sourced ConsentAggregate keyed by (subjectId, purpose). Events: ConsentGranted_V1, ConsentWithdrawn_V1,
+      ConsentExpired_V1. Include minor/guardian distinction.
+
+      ## Files
+      - docs/adr/ (new 0022-consent-aggregate.md)
+      - src/actors/Cena.Actors/Events/ (new ConsentEvents.cs)
+
+      ## Definition of Done
+      - ADR + events published.
+      - Reference aggregate root + Apply handlers committed.
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker human-architect --result "<branch>"
+    source_doc_lines: [L~100-L~200]
+verdict: adopt
+verdict_reason: |
+  Privacy features directly protect the platform's license to operate. Adoption is urgent but gated on three ADRs
+  (forgetting, consent, PII gateway). Existing compliance scaffolding is a strong foundation.
+cross_lens_handoff:
+  - to: persona-privacy
+    about: "Legal correctness of consent + forgetting design (GDPR + IL PPD + COPPA)."
+  - to: persona-sre
+    about: "Deletion/rebuild runbook + RTO/RPO implications."
+  - to: persona-redteam
+    about: "PII guard bypasses via tool calls, images, and multi-turn leaks."

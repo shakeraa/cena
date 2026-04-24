@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "cena.fullname" . }}-student
+  labels:
+    {{- include "cena.componentLabels" (dict "root" . "component" "student") | nindent 4 }}
+spec:
+  replicas: {{ .Values.student.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "cena.selectorLabels" (dict "root" . "component" "student") | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "cena.componentLabels" (dict "root" . "component" "student") | nindent 8 }}
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    spec:
+      {{- include "cena.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "cena.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: student
+          image: "{{ .Values.student.image.repository }}:{{ .Values.student.image.tag }}"
+          imagePullPolicy: {{ .Values.student.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.student.service.targetPort }}
+              protocol: TCP
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.student.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.student.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.student.probes.readiness.periodSeconds }}
+            failureThreshold: {{ .Values.student.probes.readiness.failureThreshold }}
+            timeoutSeconds: {{ .Values.student.probes.readiness.timeoutSeconds }}
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.student.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.student.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.student.probes.liveness.periodSeconds }}
+            failureThreshold: {{ .Values.student.probes.liveness.failureThreshold }}
+            timeoutSeconds: {{ .Values.student.probes.liveness.timeoutSeconds }}
+          env:
+            - name: ConnectionStrings__Cena
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.secretName }}
+                  key: connection-string-student
+            - name: ASPNETCORE_URLS
+              value: "http://+:{{ .Values.student.service.targetPort }}"
+            {{- range .Values.student.env }}
+            - name: {{ .name }}
+              {{- if .value }}
+              value: {{ .value | quote }}
+              {{- end }}
+              {{- if .valueFrom }}
+              valueFrom:
+                {{- toYaml .valueFrom | nindent 16 }}
+              {{- end }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.student.resources | nindent 12 }}
+          volumeMounts:
+            # RDY-025: ASP.NET Core needs writable /tmp even with readOnlyRootFilesystem
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

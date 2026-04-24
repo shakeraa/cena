@@ -1,0 +1,121 @@
+doc_path: pre-release-review/cena_cross_domain_feature_innovation.md
+reviewer: persona-privacy
+reviewed_at: 2026-04-20
+doc_summary: |
+  Proposes 8 features cross-adapted from non-EdTech domains: math concept-map knowledge
+  graph (Obsidian), pre-session focus ritual (Calm/Headspace), learning journeys (Fabulous),
+  adaptive flow sessions (Tetris), and 4 more. Explicit guardrail-check column per feature.
+
+system_purpose_fit: 4
+  rationale:
+    - Every feature has explicit Guardrail Check row
+    - Feature 2 (breathing) correctly notes "never frame as therapy" — matches Dr. Nadia's warning
+    - Feature 5/6/etc unexamined here (doc truncated at 90 lines in read)
+    - Most features are UI/UX level — minimal PII surface
+
+code_reality_check:
+  claims_verified_in_code:
+    - "Bagrut curriculum data exists (used by Feature 1 concept map) -> src/actors/Cena.Actors/Advancement/ (advancement model)"
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "Concept map, focus ritual, learning journeys, flow sessions not in src/ — proposed"
+
+adr_alignment:
+  honored:
+    - ADR-0003 (Feature 1 gaps live-calculated, not stored)
+    - Non-negotiable #3 (Feature 2 explicitly opt-in every time, no streak tracking)
+  violated: []
+  missing_adr_needed:
+    - "ADR for mood-based session adjustment (Feature 2) — mood data classification, retention"
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 2 (Focus Ritual) proposes one-tap mood emoji (😰 😐 🙂) used to adjust
+      session difficulty. Self-reported mood of minors is sensitive (GDPR Art 9 adjacent
+      as mental-state data). Doc claims "mood data is session-local, not profile-stored
+      for under-13 users" — but the adjustment-to-difficulty logic implies the system
+      reads it. Needs explicit retention: session-only, never persisted.
+    evidence: "cena_cross_domain_feature_innovation.md:43 + :44 (guardrail check)"
+    lens_note: |
+      "Session-local for under-13" is not enough — should be session-local for all ages
+      to avoid Art 9 classification cost. And the adjustment model must not feedback-loop
+      into profiling ("student anxious often → recommend easier topics long-term").
+
+  - severity: P1
+    finding: |
+      Feature 1 (Concept Map Knowledge Graph) — "AI identifies structural gaps" is
+      a potentially-profiling inference per Art 22. Doc says "gaps live-calculated,
+      not stored as deficit data" which is ADR-0003 compliant. Ensure
+      implementation honors this: compute → display → discard, never logged.
+    evidence: "cena_cross_domain_feature_innovation.md:22 (guardrail check)"
+    lens_note: |
+      Good design; needs code-level enforcement (no gap_analysis persistent table).
+
+  - severity: P2
+    finding: |
+      Feature 3 (Learning Journeys) stores per-student journey progress. This is
+      mastery-adjacent persistent data — ADR-0003 Decision 6 "persistent mastery OK" applies.
+      Ensure: erasure cascade covers JourneyProgress table, no misconception tagging
+      derived from journey pauses.
+    evidence: "cena_cross_domain_feature_innovation.md:65 (guardrail check)"
+    lens_note: |
+      Pattern: every persistent per-student state adds to erasure surface.
+
+  - severity: P2
+    finding: |
+      Feature 4 (Adaptive Flow Sessions - Dynamic Difficulty) — real-time tracking of
+      accuracy / time / hint usage. Session-local per doc. Borderline with Axis 1
+      Feature 6 (desirable difficulty). Deduplicate.
+    evidence: "cena_cross_domain_feature_innovation.md:87 (guardrail check)"
+    lens_note: |
+      Same as Axis 1 F6; combine.
+
+already_built: []
+
+duplicates_of_other_docs:
+  - "axis1_pedagogy_mechanics_cena.md: Feature 6 (desirable difficulty) = Feature 4 here"
+  - "axis2_motivation_self_regulation_findings.md: Feature 4 (mastery path) overlaps Feature 1 concept map and Feature 3 learning journey"
+  - "axis9_data_privacy_trust_mechanics.md: Feature 6 (inference trail) relates to Feature 1 gap-analysis"
+
+extracted_tasks:
+  - title: "Mood signal is session-only, never persistent"
+    priority: P1
+    estimate: XS
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      Feature 2 mood emoji must write only to session state, never to StudentState / profile /
+      analytics tables. Convention documented + test.
+
+      ## Files
+      - Feature 2 implementation (future)
+      - Convention test: no field named *mood* on StudentState or projections
+
+      ## Definition of Done
+      - ADR note in docs/adr/0003-misconception-session-scope.md Decision 7 area
+      - Test ensures no mood persistence across sessions
+
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>"
+    source_doc_lines: ["L43-44"]
+
+verdict: adopt
+verdict_reason: |
+  Cross-domain innovations are generally low privacy risk and well-designed with
+  explicit guardrail checks. One mood-data clarification + deduplication with
+  other axis docs = shippable.
+
+cross_lens_handoff:
+  - to: persona-ethics
+    about: |
+      Breathing/mindfulness feature — ethical boundary "not therapy" (doc correctly notes);
+      Feature 3 habit journeys potential goal-gradient concerns.
+  - to: persona-cogsci
+    about: |
+      Evidence base for Calm/Fabulous / Tetris flow transfer to math learning.
+  - to: persona-a11y
+    about: |
+      Feature 2 breathing animations + mood emoji must be accessible (screen reader labels).

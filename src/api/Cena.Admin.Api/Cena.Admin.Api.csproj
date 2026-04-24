@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../../shared/Cena.Infrastructure/Cena.Infrastructure.csproj" />
+    <ProjectReference Include="../../actors/Cena.Actors/Cena.Actors.csproj" />
+    <ProjectReference Include="../Cena.Api.Contracts/Cena.Api.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Anthropic" Version="12.9.0" />
+    <PackageReference Include="MailKit" Version="4.11.0" />
+    <PackageReference Include="AWSSDK.S3" Version="3.7.415.4" />
+    <PackageReference Include="Azure.Storage.Blobs" Version="12.24.0" />
+    <PackageReference Include="Google.Cloud.Storage.V1" Version="4.11.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Cena.Actors.Tests" />
+    <InternalsVisibleTo Include="Cena.Admin.Api.Tests" />
+  </ItemGroup>
+
+  <!-- prr-244: ship the default-pricing.yml into the bin output so the
+       resolver finds it via AppContext.BaseDirectory in published images. -->
+  <ItemGroup>
+    <None Include="../../../contracts/pricing/default-pricing.yml"
+          Link="contracts/pricing/default-pricing.yml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

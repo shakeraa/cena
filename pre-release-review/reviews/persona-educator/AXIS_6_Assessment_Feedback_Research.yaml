@@ -1,0 +1,258 @@
+doc_path: pre-release-review/AXIS_6_Assessment_Feedback_Research.md
+reviewer: persona-educator
+reviewed_at: 2026-04-20
+doc_summary: |
+  8 assessment/feedback features: formative-summative signal split, IRT 2PL-CAT
+  placement engine, AI partial-credit grading with step rubrics, free-response
+  CAS-validated AI grading, per-session error analysis report, real-time
+  session-scoped misconception tagging, crisis-mode compression schedule,
+  confidence calibration with certainty-based marking.
+
+system_purpose_fit: 5
+  rationale:
+    - This is the deepest pedagogue-relevant doc. Every feature either hardens
+      the CAS-as-oracle architecture (ADR-0002) or protects ADR-0003 scope.
+    - Formative-summative split, step-level rubrics, session-scoped mis-
+      conception tagging are exactly what a veteran teacher would design.
+    - Explicit RDY-080 awareness throughout ("exam readiness is not a Bagrut
+      prediction").
+    - Confidence calibration (F8) is a gem if implemented correctly — but
+      see Dr Rami's note on Foster 2021 null effect.
+
+code_reality_check:
+  claims_verified_in_code:
+    - "CAS-verified LLM output pipeline exists" -> src/actors/Cena.Actors/Cas/CasLlmOutputVerifier.cs
+    - "Step verifier service" -> src/actors/Cena.Actors/Cas/StepVerifierService.cs
+    - "CAS conformance suite (500+ pair test harness)" -> src/actors/Cena.Actors/Cas/CasConformanceSuite.cs, CasConformanceBaseline.cs, CasConformanceSuiteRunner.cs
+    - "Session misconception detection (session-scoped)" -> src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs + MisconceptionCatalog.cs
+    - "ML exclusion enforcement tests for misconception pipeline" -> src/actors/Cena.Actors.Tests/Compliance/MlExclusionEnforcementTests.cs
+    - "Retention worker + data retention policy" -> src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs, DataRetentionPolicy.cs
+    - "Session misconception tests" -> src/actors/Cena.Actors.Tests/Session/SessionMisconceptionDetectionTests.cs
+    - "IRT calibration pipeline + BKT + Elo scoring" -> src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs, IrtEloConversion.cs, Mastery/BktService.cs, Mastery/EloScoring.cs
+    - "Confusion detector" -> src/actors/Cena.Actors/Services/ConfusionDetector.cs + ConfusionResolutionTracker.cs
+  claims_contradicted_by_code: []
+  claims_unverifiable:
+    - "2PL-CAT placement engine with ≥500-item calibrated bank" — IRT
+      calibration pipeline exists but item-bank maturity unclear.
+    - "AI partial-credit grading with step-level rubrics" — step verifier
+      exists but the rubric-scoring layer is not apparent.
+
+adr_alignment:
+  honored:
+    - ADR-0002 (CAS-first for every feature; F3/F4 explicitly note "LLM
+      cannot override CAS on mathematical truth")
+    - ADR-0003 (F5 "all error pattern data is session-scoped and discarded
+      after the session ends"; F6 is literally named "session-scoped")
+    - RDY-080 (F1 "Exam Readiness score is NOT a Bagrut prediction"; F2
+      theta-to-Bagrut concordance requires separate calibration)
+  violated: []
+  missing_adr_needed:
+    - Rubric-versioning ADR (shared with axis5) — partial-credit rubric
+      engine needs version pinning so old scores aren't retroactively
+      changed.
+    - "Crisis mode honesty" ADR — F7 compression schedule shouldn't over-
+      promise outcomes for students starting <4 weeks before exam.
+
+non_negotiable_violations: []
+
+persona_findings:
+  - severity: P1
+    finding: |
+      Feature 6 (Real-Time Misconception Tagging Session-Scoped) is the
+      highest-leverage pedagogical feature in the whole doc, AND the one
+      most likely to leak beyond ADR-0003 if implementation is sloppy. I
+      have verified the code already uses MisconceptionDetectionService
+      (session-scoped) and there are ML exclusion tests. Good. The extra
+      guardrail: the *admin dashboard* that shows "class-active misconceptions"
+      to a teacher in real time must purge when the session ends, not
+      aggregate overnight. The doc says "session-scoped" but a teacher
+      dashboard that collates session tags across students across hours is
+      a soft profile.
+    evidence: AXIS_6_Assessment_Feedback_Research.md Feature 6 section; src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs; src/actors/Cena.Actors.Tests/Compliance/MlExclusionEnforcementTests.cs
+    lens_note: |
+      Teachers will ask for this view. The answer must be: "you see
+      misconceptions live during class; after 24h the view resets." Lock
+      that behavior architecturally, not via setting.
+  - severity: P1
+    finding: |
+      Feature 7 (Crisis Mode Compression Schedule) — the priority scoring
+      "exam frequency × point weight × gap severity" is sound pedagogy for
+      students with 4-8 weeks. For students with <2 weeks, this becomes
+      false hope. A veteran teacher knows: with <2 weeks, the best
+      intervention is confidence-consolidation on topics *already mastered*,
+      not frantic new-topic cramming. Make the time-remaining a routing
+      variable: >4w = gap-fill mode; 2-4w = mixed; <2w = consolidation-only.
+    evidence: AXIS_6_Assessment_Feedback_Research.md Feature 7 section
+    lens_note: |
+      A student with 10 days left who is told "focus on your worst topics"
+      fails the exam and quits math forever. Ten-day crisis is emotional,
+      not cognitive — reinforce what they know.
+  - severity: P1
+    finding: |
+      Feature 8 (Confidence Calibration with Certainty-Based Marking) —
+      dr_rami assessment notes Foster 2021 found NO effect on math achievement.
+      CBM is a calibration tool, not a learning booster. Must be framed
+      accordingly: surface it as "know what you know" insight, not as a
+      score-improvement mechanic. Certainty-based *scoring* (penalize
+      overconfident wrong answers more than cautious wrong answers) must
+      stay out of the student-facing score, only the post-problem
+      reflection panel.
+    evidence: AXIS_6_Assessment_Feedback_Research.md Feature 8 section; finding_assessment_dr_rami.md FD-006 WARNING
+    lens_note: |
+      Negative-marking schemes in high-stakes test prep destroy willingness
+      to attempt hard problems. Keep the calibration insight, drop the
+      penalty.
+  - severity: P2
+    finding: |
+      Feature 2 (IRT 2PL-CAT Placement) — the "Bayesian EAP ability
+      estimator" requires a well-calibrated item bank. Doc XL effort
+      estimate is realistic. But the sub-requirement the doc implies
+      but doesn't state: items need ongoing calibration as student pool
+      grows (online calibration), and parameters change per cohort (Arab
+      vs Hebrew medium). Per AXIS_8 F1 Bayesian small-sample correction,
+      these features *must* ship together or not at all for Arab cohort
+      equity.
+    evidence: AXIS_6_Assessment_Feedback_Research.md F2, AXIS_8_Content_Authoring_Quality_Research.md F1
+    lens_note: |
+      Doc order matters here — don't ship IRT-CAT without Bayesian small-
+      sample correction; Arab students will get mistargeted difficulty on
+      day one.
+  - severity: P2
+    finding: |
+      Feature 3/4 (AI Partial-Credit Grading) — the architecture (LLM
+      evaluates reasoning, CAS confirms truth) is correct. Two pedagogue
+      concerns: (1) for multi-step problems, *order* of operations often
+      matters for Bagrut partial credit (e.g., calculus: differentiate
+      before substituting is a specific rubric requirement) — the LLM
+      reasoning eval must include order checking; (2) Arab-Israeli
+      students writing solutions in Arabic need the LLM to read Arabic
+      math prose without translating it to Hebrew first (translation
+      drift is a grading-accuracy risk).
+    evidence: AXIS_6_Assessment_Feedback_Research.md F3, F4
+    lens_note: |
+      Bagrut "method marks" are specific. A vague rubric approach like
+      "award credit for correct approach" will mis-award. Needs step-order
+      sensitivity.
+
+already_built:
+  - feature: "Real-Time Session-Scoped Misconception Tagging (F6)"
+    evidence: src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs, MisconceptionCatalog.cs, src/actors/Cena.Actors.Tests/Compliance/MlExclusionEnforcementTests.cs, src/shared/Cena.Infrastructure/Compliance/RetentionWorker.cs
+    note: |
+      F6 is the clearest "already built" in the whole corpus. ML exclusion
+      is enforced by test. The remaining work is the *admin dashboard
+      purge cadence* (see finding above), not the pipeline itself.
+  - feature: "CAS-LLM verification pipeline (F4)"
+    evidence: src/actors/Cena.Actors/Cas/CasLlmOutputVerifier.cs + StepVerifierService.cs + CasConformanceSuite.cs
+    note: |
+      F4's "dual-validation architecture" (LLM reasoning, CAS truth) is
+      partially built. The step-verifier ships (RDY-073 phase 1B done).
+      What's missing: the rubric-scoring layer on top (F3).
+  - feature: "IRT calibration + Elo + BKT infrastructure"
+    evidence: src/actors/Cena.Actors/Services/IrtCalibrationPipeline.cs, Mastery/EloScoring.cs, Mastery/BktService.cs
+    note: |
+      F2's IRT-CAT backend foundation partially exists. The adaptive
+      item selector + Bayesian EAP is not apparent yet. Not a from-
+      scratch build; scope to the selector + stopping-rule layer.
+
+duplicates_of_other_docs:
+  - feature-discovery-2026-04-20.md: FD-003 Misconception Tagging (same as F6), FD-004 IRT-CAT (same as F2), FD-005 Formative/Summative (same as F1), FD-006 Confidence Calibration (same as F8), FD-007 Crisis Mode (same as F7), FD-008 AI Partial-Credit Grading (same as F3), FD-015 Session Error Analysis (same as F5)
+  - cena_axis5_teacher_workflow_features.md: F5 Bagrut Rubric Alignment Engine (partner feature to F3 here)
+  - AXIS_8_Content_Authoring_Quality_Research.md: F3 Bagrut rubric (same), F1 Bayesian IRT (companion to F2)
+  - cena_dr_nadia_pedagogical_review_20_findings.md: FD-003/004/005/006/007/008/015 all reviewed
+  - finding_assessment_dr_rami.md: FD-003 REJECT (95% fabricated), FD-008 REJECT (Yu 2026 unverifiable), FD-006 WARNING
+
+extracted_tasks:
+  - title: "Architectural purge of teacher dashboard misconception-view on session-end"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F6 session-scoped misconception tags are stored in the session actor
+      and expire with it. The teacher-dashboard "class active misconceptions"
+      view must purge tags as sessions end — no overnight aggregation of
+      misconception tags across students. Aggregate stats allowed only at
+      k≥10 anonymity threshold per axis5 review.
+      ## Files
+      - src/actors/Cena.Actors/Services/MisconceptionDetectionService.cs
+      - src/admin/full-version/src/views/apps/pedagogy/ (teacher dashboard)
+      - src/actors/Cena.Actors.Tests/Compliance/ (new DashboardMisconceptionPurgeTests.cs)
+      ## Definition of Done
+      - Teacher view queries live session actors, not a rolled-up table.
+      - When session ends, its misconceptions disappear from view.
+      - Test: simulate 2 sessions ending, verify teacher view no longer
+        displays their tags.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: teacher-dashboard-misconception-purge"
+    source_doc_lines: [L185-L199 (F6 section), Dr Rami FD-003]
+  - title: "Crisis-mode schedule branches by weeks-to-exam"
+    priority: P1
+    estimate: M
+    suggested_assignee: claude-subagent-pedagogy
+    queue_body: |
+      ## Goal
+      F7 crisis mode must route by time remaining: >4 weeks = gap-fill
+      priority algorithm; 2-4 weeks = mixed with exam-format practice; <2
+      weeks = confidence-consolidation on already-mastered topics + test-
+      taking strategy. Reject the one-size compression schedule.
+      ## Files
+      - src/actors/Cena.Actors/Advancement/ (new CrisisModeScheduler.cs)
+      - docs/adr/ (new ADR: "crisis-mode-routing-by-weeks-to-exam")
+      ## Definition of Done
+      - Three routing branches with distinct item selectors.
+      - Student-facing copy reflects the mode ("your focus this week is X").
+      - ADR records the pedagogue rationale + rejects flat compression.
+      - Test: 2-week-remaining student gets consolidation items, not
+        new-topic items.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker claude-subagent-pedagogy --result "<branch>: crisis-mode-weeks-branch"
+    source_doc_lines: [AXIS_6_Assessment_Feedback_Research.md Feature 7 section]
+  - title: "Reframe confidence calibration as insight, not score penalty"
+    priority: P1
+    estimate: S
+    suggested_assignee: kimi-coder
+    queue_body: |
+      ## Goal
+      F8 certainty-based marking. Student-facing scores DO NOT include
+      confidence penalties. Calibration reported separately in a personal
+      calibration insight panel only. Avoids the Foster 2021 null-effect
+      risk of pretending CBM is an achievement tool.
+      ## Files
+      - src/actors/Cena.Actors/Pedagogy/ (new ConfidenceInsightService.cs)
+      - src/actors/Cena.Actors/Assessment/ (scoring unchanged)
+      ## Definition of Done
+      - Confidence data collected, but scoring engine ignores it.
+      - Calibration chart visible to student in insight panel.
+      - No negative-marking in any student-facing score display.
+      ## Reporting
+      complete via: node .agentdb/kimi-queue.js complete <id> --worker kimi-coder --result "<branch>: confidence-insight-not-penalty"
+    source_doc_lines: [AXIS_6_Assessment_Feedback_Research.md Feature 8, finding_assessment_dr_rami.md FD-006]
+
+verdict: adopt
+verdict_reason: |
+  The strongest doc in the corpus from a pedagogue perspective. Most
+  features align tightly with ADR-0002/0003/RDY-080. Three shipping-time
+  revisions (teacher-dashboard purge, crisis-mode routing, calibration
+  not-a-score-penalty) address real risks. F3/F4 partial-credit grading
+  needs pairing with F5 rubric engine from axis5.
+
+cross_lens_handoff:
+  - to: persona-ministry
+    about: |
+      F2 IRT theta-to-Bagrut concordance (must run actual concordance
+      study), F3/F4 AI grading partial-credit alignment to Ministry rubrics,
+      F7 crisis mode honesty of outcomes — all need ministry-lens review.
+  - to: persona-privacy
+    about: |
+      F5 per-session error-analysis report auto-deletion cron job audit —
+      privacy-lens confirmation that deletion is real, not just UI hiding.
+  - to: persona-cogsci
+    about: |
+      F8 certainty-based marking — cogsci should verify Foster 2021 null
+      finding and whether the confidence-insight-not-penalty framing still
+      captures the documented calibration benefit.
+  - to: persona-enterprise
+    about: |
+      F2 IRT item bank — enterprise should model it as an event-sourced
+      aggregate per ADR-0012, with parameter-update events as first-class
+      domain events.
