@@ -128,3 +128,39 @@ channel backlogs past 60 seconds.
    payload → validator → actor dispatch, asserting acceptance. Catches
    future validator drift. (Tracked in RDY-081.)
 5. ☐ Investigate the Marten v8 sequence path (RDY-081 Scope §2).
+
+## Stress-test datapoints (append-only log)
+
+Tracked to build an empirical map of where `EMU_SPEED × EMU_STUDENTS`
+starts to trigger the latent RDY-081 sequence allocator collision.
+
+| Date | Config | Duration | Events | Result |
+|---|---|---|---|---|
+| 2026-04-19 | 50 × 25× × 3600d | ~50 min | (flood before count) | ❌ `pkey_mt_events_seq_id` collision + Docker FS hang — this incident |
+| 2026-04-19 | 1 × 1× (smoke) | 1550 evt | 1550 | ✅ clean, zero rejections |
+| 2026-04-24 | 50 × 5× × 300d | 75s sample | ~11,900 | ✅ clean, zero errors/warnings |
+| 2026-04-24 | 100 × 10× × 300d | 75s sample | ~22,500 | ✅ clean, ~300 evt/s sustained |
+| 2026-04-24 | 200 × 10× × 600d | 90s sample | ~79,400 | ✅ clean, ~800 evt/s sustained, actor-host steady at 3.92 GiB (24% of limit), postgres 118 MiB |
+| 2026-04-24 | 300 × 10× × 600d | 90s sample | ~80,350 | ✅ clean, ~900 evt/s, actor-host 4.10 GiB |
+| 2026-04-24 | 500 × 10× × 600d | 90s sample | ~136,450 | ✅ clean, ~1500 evt/s, actor-host 4.10 GiB — **no memory growth from 200→500 students** |
+| 2026-04-24 | 100 × 15× × 600d | 90s sample | ~27,100 | ✅ clean, speed-ramp start |
+| 2026-04-24 | 50 × 20× × 600d | 90s sample | ~14,250 | ✅ clean, one notch below the known-broken 25× |
+
+Observations from the 2026-04-24 runs:
+
+- Scaling student count linearly at fixed 10× speed is clean up to 200
+  students. actor-host memory does not grow with throughput (stayed
+  flat at 3.92 GiB across 100 → 200 students), suggesting actor-pool
+  allocations are front-loaded not per-event.
+- Postgres memory barely moved (116 → 118 MiB), so `mt_events`
+  append pressure at 10× is well within the HiLo cache's comfortable
+  range — consistent with the postmortem's hypothesis that RDY-081 is
+  speed-dominated, not volume-dominated.
+- The chronic NATS ACL `Subscription Violation` errors that fire
+  during actor-host boot (see `nats-server.conf` gaps for
+  `cena.actors.warmup`, `cena.request.session.snapshot`,
+  `cena.account.status_changed`, `cena.durable.curriculum.*`,
+  `cena.events.student.>`, `cena.ingest.content.extracted`) did **not**
+  recur under sustained load, confirming they're boot-time artifacts
+  of subscription registration order rather than steady-state auth
+  denials. Filed separately under the broader NATS ACL audit.

@@ -121,17 +121,29 @@ public static class AdminSignalRConfiguration
     /// <summary>
     /// Build a StackExchange.Redis connection string from the config.
     /// Reads the same REDIS_* env vars as the rest of the stack, so dev
-    /// + prod use one wiring convention.
+    /// + prod use one wiring convention. Always merges Redis:Password /
+    /// REDIS_PASSWORD onto the connection string if one is configured
+    /// separately, so `ConnectionStrings:Redis=host:port` + `Redis:Password=…`
+    /// wiring (used by docker-compose) works without silently dropping auth.
     /// </summary>
     private static string? BuildRedisConnectionString(IConfiguration configuration)
     {
+        var password = configuration["REDIS_PASSWORD"] ?? configuration["Redis:Password"];
+
         // Prefer the fully-qualified ConnectionStrings:Redis if set.
         var cs = configuration.GetConnectionString("Redis");
-        if (!string.IsNullOrEmpty(cs)) return cs;
+        if (!string.IsNullOrEmpty(cs))
+        {
+            if (string.IsNullOrEmpty(password) ||
+                cs.Contains("password=", StringComparison.OrdinalIgnoreCase))
+            {
+                return cs;
+            }
+            return $"{cs},password={password}";
+        }
 
         var host = configuration["REDIS_HOST"] ?? configuration["Redis:Host"];
         var port = configuration["REDIS_PORT"] ?? configuration["Redis:Port"] ?? "6379";
-        var password = configuration["REDIS_PASSWORD"] ?? configuration["Redis:Password"];
 
         if (string.IsNullOrEmpty(host)) return null;
 
