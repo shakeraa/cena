@@ -778,6 +778,11 @@ public partial class Program
     // ---- FERPA Compliance endpoints (FIND-arch-008) ----
     app.MapComplianceEndpoints();
 
+    // ---- Test-only: e2e-flow LLM recorder query endpoint ----
+    // Gated by `Cena:Testing:LlmRecorderEnabled` + Development + localhost.
+    // See Cena.Admin.Api/LlmRecorderEndpoints.cs for the triple-gate rationale.
+    app.MapLlmRecorderTestEndpoints(builder.Configuration, app.Environment);
+
     // prr-035: Sub-processor registry (read-only admin surface)
     //   GET /api/admin/privacy/sub-processors
     //   GET /api/admin/privacy/sub-processors/parent

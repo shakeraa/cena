@@ -504,8 +504,26 @@ builder.Services.AddSingleton<Cena.Infrastructure.Compliance.IErasureProjectionC
 
 // SAI-000: LLM client abstraction and usage tracking
 builder.Services.AddSingleton<AnthropicLlmClient>();
-builder.Services.AddSingleton<ILlmClient, LlmClientRouter>();
 builder.Services.AddSingleton<LlmUsageTracker>();
+
+// e2e-flow: optionally wrap the LlmClientRouter in a RecordingLlmClient
+// decorator that persists every (request, response) pair to Marten so
+// Playwright specs can assert PII scrubbing (EPIC-E2E-I-05 / EPIC-E2E-D-05)
+// and stem-grounded-only hint prompting (EPIC-E2E-D-07). The flag is only
+// set in dev compose overrides; production never enables it. See
+// src/shared/Cena.Infrastructure/Llm/RecordingLlmClient.cs.
+if (builder.Configuration.GetValue<bool>("Cena:Testing:LlmRecorderEnabled"))
+{
+    builder.Services.AddSingleton<LlmClientRouter>();
+    builder.Services.AddSingleton<ILlmClient>(sp => new Cena.Actors.Gateway.RecordingLlmClient(
+        sp.GetRequiredService<LlmClientRouter>(),
+        sp.GetRequiredService<Marten.IDocumentStore>(),
+        sp.GetRequiredService<ILogger<Cena.Actors.Gateway.RecordingLlmClient>>()));
+}
+else
+{
+    builder.Services.AddSingleton<ILlmClient, LlmClientRouter>();
+}
 
 // =============================================================================
 // 6. PROTO.ACTOR CLUSTER

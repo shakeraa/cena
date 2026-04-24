@@ -496,7 +496,22 @@ public partial class Program
     // (ADR-0002). Matchers short-circuit by subject, so registering the full
     // set here has near-zero cost on non-math/physics paths.
     builder.Services.AddSingleton<Cena.Actors.Gateway.AnthropicLlmClient>();
-    builder.Services.AddSingleton<Cena.Actors.Gateway.ILlmClient, Cena.Actors.Gateway.LlmClientRouter>();
+    // e2e-flow: optional Recording decorator wraps the router so PII-scrub +
+    // stem-grounded hint assertions can read the actual captured prompt.
+    // See Cena.Actors.Gateway.RecordingLlmClient for the triple-gate rationale.
+    if (builder.Configuration.GetValue<bool>("Cena:Testing:LlmRecorderEnabled"))
+    {
+        builder.Services.AddSingleton<Cena.Actors.Gateway.LlmClientRouter>();
+        builder.Services.AddSingleton<Cena.Actors.Gateway.ILlmClient>(sp =>
+            new Cena.Actors.Gateway.RecordingLlmClient(
+                sp.GetRequiredService<Cena.Actors.Gateway.LlmClientRouter>(),
+                sp.GetRequiredService<Marten.IDocumentStore>(),
+                sp.GetRequiredService<ILogger<Cena.Actors.Gateway.RecordingLlmClient>>()));
+    }
+    else
+    {
+        builder.Services.AddSingleton<Cena.Actors.Gateway.ILlmClient, Cena.Actors.Gateway.LlmClientRouter>();
+    }
 
     // prr-046: per-feature LLM cost metric. Fail-loud pricing from routing-config.yaml.
     builder.Services.AddLlmCostMetric(Path.Combine(
