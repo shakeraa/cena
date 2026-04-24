@@ -79,8 +79,22 @@ public static class MartenConfiguration
         opts.Events.MetadataConfig.EnableAll();
         opts.Events.TenancyStyle = Marten.Storage.TenancyStyle.Single;
 
-        // DATA-010: Optimistic concurrency — Marten v8 uses Quick append mode by default.
-        // Concurrent writes to the same stream raise an exception caught by middleware/retry.
+        // RDY-081 Phase 1 — pin append mode to Rich explicitly.
+        // Rich uses SELECT-FOR-UPDATE on the stream row during append, which
+        // serializes concurrent appends to the same stream and is the
+        // safe-by-default choice when multiple DocumentStore instances
+        // (admin-api, student-api, actor-host) write to the same
+        // `mt_events` table. Pinning guards against future Marten default
+        // flips; it is NOT a behavioural change on the 8.26.2 pin — Rich
+        // is already the library default there. The architectural fix
+        // (single-writer refactor) is RDY-081 Phase 2. See
+        // ~/.claude/projects/-Users-shaker-edu-apps-cena/memory/project_rdy081_fix_plan.md
+        // for sequencing and Phase 2 scope.
+        //
+        // DATA-010: Optimistic concurrency — concurrent writes to the same
+        // stream raise an exception caught by middleware/retry regardless
+        // of append mode.
+        opts.Events.AppendMode = JasperFx.Events.EventAppendMode.Rich;
 
         // ── Serialization: System.Text.Json with camelCase ──
         opts.UseSystemTextJsonForSerialization(
