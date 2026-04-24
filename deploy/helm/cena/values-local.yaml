@@ -1,0 +1,160 @@
+# =============================================================================
+# Cena Platform — Helm Values for local M1 Kubernetes (k3d)
+# =============================================================================
+# Override layer for `helm install -f values-local.yaml`. Targets a k3d
+# cluster on an M1 Mac, reusing the docker-compose dev infra (postgres,
+# redis, nats, firebase-emulator) on `host.docker.internal` so that a
+# single set of credentials + single data volume backs both stacks.
+#
+# Prereqs (enforced by scripts/k8s-local-up.sh):
+#   - docker-compose infra up: postgres(:5433), redis(:6380), nats(:4222),
+#     firebase-emulator(:9099)
+#   - k3d cluster created with `--port 5050:30050@loadbalancer ...`
+#   - Local images built and `k3d image import`ed into the cluster.
+#
+# What this file does NOT do: production hardening, TLS, IRSA, sealed
+# secrets. See values.yaml (defaults) and values-production.yaml for prod.
+# =============================================================================
+
+aspnetcoreEnvironment: Development
+
+logging:
+  level: Debug
+
+# -- External service secrets -------------------------------------------------
+# Created by scripts/k8s-local-up.sh via `kubectl create secret generic`
+# pointing at host.docker.internal. Never committed.
+
+database:
+  secretName: cena-db-credentials     # up-script creates this
+
+redis:
+  secretName: cena-redis-credentials  # up-script creates this
+
+nats:
+  secretName: cena-nats-credentials   # up-script creates this
+
+firebase:
+  projectId: cena-platform
+  secretName: cena-firebase-credentials  # up-script creates a stub (dev only)
+
+# -- Actor Host ---------------------------------------------------------------
+# replicaCount=3 is the point of this local stack: prove Proto.Cluster
+# membership stabilises across multiple pods. Resources halved vs default.
+
+actors:
+  replicaCount: 3
+  image:
+    # Matches the tag the local Docker build produces; imported into
+    # k3d via `k3d image import`. IfNotPresent so k8s doesn't try to
+    # pull from ghcr.
+    repository: ghcr.io/cena-platform/cena-actors-host
+    tag: local
+    pullPolicy: IfNotPresent
+  cluster:
+    name: cena-cluster-local
+    provider: kubernetes
+  resources:
+    requests:
+      cpu: 200m
+      memory: 384Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+  probes:
+    readiness:
+      initialDelaySeconds: 20
+      periodSeconds: 5
+      failureThreshold: 5
+    liveness:
+      initialDelaySeconds: 45
+      periodSeconds: 20
+      failureThreshold: 6
+  pdb:
+    enabled: true
+    minAvailable: 2
+  terminationGracePeriodSeconds: 30
+
+# -- Migrator -----------------------------------------------------------------
+
+migrator:
+  image:
+    repository: ghcr.io/cena-platform/cena-db-migrator
+    tag: local
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      cpu: 250m
+      memory: 192Mi
+
+# -- Student API --------------------------------------------------------------
+
+student:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/cena-platform/cena-student-api
+    tag: local
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 80
+    targetPort: 5051
+    nodePort: 30050
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
+  hpa:
+    enabled: false    # single-replica local, no autoscale
+    minReplicas: 1
+    maxReplicas: 1
+  pdb:
+    enabled: false
+
+# -- Admin API ----------------------------------------------------------------
+
+admin:
+  replicaCount: 1
+  image:
+    repository: ghcr.io/cena-platform/cena-admin-api
+    tag: local
+    pullPolicy: IfNotPresent
+  service:
+    type: NodePort
+    port: 80
+    targetPort: 5052
+    nodePort: 30052
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 400m
+      memory: 384Mi
+  hpa:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 1
+  pdb:
+    enabled: false
+  studentSoakSeconds: 20   # shorter vs prod — local feedback loop
+
+# -- Ingress ------------------------------------------------------------------
+# Off for local — use NodePorts via k3d --port mapping instead.
+
+ingress:
+  enabled: false
+
+# -- Pod security -------------------------------------------------------------
+# Inherit hardened defaults from values.yaml (runAsNonRoot, read-only fs,
+# drop ALL caps). Leaving unset here = use defaults.
+
+# -- Image pull secrets -------------------------------------------------------
+# Empty — images are k3d-imported locally, no registry pull happens.
+imagePullSecrets: []
