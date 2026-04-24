@@ -62,7 +62,7 @@
 | [RDY-023](../../tasks/readiness/done/RDY-023-diagnostic-onboarding.md) | Diagnostic Quiz (IRT theta init) | 1 week | — | **Done** |
 | [RDY-024](../../tasks/readiness/done/RDY-024-bkt-calibration.md) | BKT Calibration Phase A | 3-4 weeks | RDY-023 | **Done** |
 | [RDY-024b](../../tasks/readiness/RDY-024b-bkt-calibration-phase-b.md) | BKT Calibration Phase B | 1-2 weeks | RDY-024, RDY-032 | Pending (blocked on pilot data) |
-| [RDY-025](../../tasks/readiness/RDY-025-deployment-manifests.md) | Deployment Manifests (K8s/Docker) | 3-4 weeks | — | Pending |
+| [RDY-025](../../tasks/readiness/RDY-025-deployment-manifests.md) | Deployment Manifests (K8s/Docker) | 3-4 weeks | — | **Done** (Helm chart at `deploy/helm/cena/`, CD workflow, runbook, local-M1 k3d path; RDY-025b Proto.Cluster.Kubernetes wired) |
 | [RDY-031](../../tasks/readiness/done/RDY-031-task-dependency-graph.md) | Task Dependency Graph | 1 day | — | **Done** |
 
 ## Summary
