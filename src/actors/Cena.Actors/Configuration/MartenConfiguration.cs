@@ -74,6 +74,13 @@ public static class MartenConfiguration
         };
         opts.DatabaseSchemaName = "cena";
 
+        // ── Custom event-store indexes (RDY-perf 2026-04-26) ──
+        // Marten reconciliation drops indexes on mt_events that aren't part
+        // of its tracked schema. Registering them via IFeatureSchema makes
+        // Marten own them, so they survive ApplyAllConfiguredChangesToDatabaseAsync.
+        // See CenaEventStoreIndexes.cs for the full rationale.
+        opts.Storage.Add(new CenaEventStoreIndexes(opts));
+
         // ── Event Store Settings ──
         opts.Events.StreamIdentity = StreamIdentity.AsString;
         opts.Events.MetadataConfig.EnableAll();
