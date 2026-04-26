@@ -6,7 +6,8 @@
       "WebFetch(domain:developer.wolframalpha.com)",
       "WebFetch(domain:reference.wolfram.com)",
       "WebFetch(domain:community.wolfram.com)",
-      "WebFetch(domain:docs.sympy.org)"
+      "WebFetch(domain:docs.sympy.org)",
+      "WebFetch(domain:www.nimrodplus.co.il)"
     ]
   }
 }

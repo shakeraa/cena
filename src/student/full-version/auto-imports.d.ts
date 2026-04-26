@@ -224,6 +224,7 @@ declare global {
   const useCamera: typeof import('./src/composables/useCamera')['useCamera']
   const useCeil: typeof import('@vueuse/math')['useCeil']
   const useCelebration: typeof import('./src/composables/useCelebration')['useCelebration']
+  const useCheckoutSession: typeof import('./src/composables/useCheckoutSession')['useCheckoutSession']
   const useClamp: typeof import('@vueuse/math')['useClamp']
   const useClipboard: typeof import('@vueuse/core')['useClipboard']
   const useClipboardItems: typeof import('@vueuse/core')['useClipboardItems']
@@ -653,6 +654,7 @@ declare module 'vue' {
     readonly useCamera: UnwrapRef<typeof import('./src/composables/useCamera')['useCamera']>
     readonly useCeil: UnwrapRef<typeof import('@vueuse/math')['useCeil']>
     readonly useCelebration: UnwrapRef<typeof import('./src/composables/useCelebration')['useCelebration']>
+    readonly useCheckoutSession: UnwrapRef<typeof import('./src/composables/useCheckoutSession')['useCheckoutSession']>
     readonly useClamp: UnwrapRef<typeof import('@vueuse/math')['useClamp']>
     readonly useClipboard: UnwrapRef<typeof import('@vueuse/core')['useClipboard']>
     readonly useClipboardItems: UnwrapRef<typeof import('@vueuse/core')['useClipboardItems']>
