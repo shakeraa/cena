@@ -78,23 +78,11 @@ if (!app.Environment.IsDevelopment())
 }
 
 
-// RDY-056 §1.1: Warm Marten schema before hosted services start (see Admin Host).
-if (app.Environment.IsDevelopment())
-{
-    using var warmScope = app.Services.CreateScope();
-    var warmLogger = warmScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var warmStore = warmScope.ServiceProvider.GetRequiredService<Marten.IDocumentStore>();
-    try
-    {
-        warmLogger.LogInformation("[MARTEN_SCHEMA_WARM] applying configured changes...");
-        await warmStore.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
-        warmLogger.LogInformation("[MARTEN_SCHEMA_READY] schema warm complete");
-    }
-    catch (Exception ex)
-    {
-        warmLogger.LogError(ex, "[MARTEN_SCHEMA_WARM] failed — host will still start");
-    }
-}
+// Marten schema warm is owned by actor-host (see Cena.Actors.Host/Program.cs).
+// admin-api / student-api wait for actor-host's healthcheck via compose
+// depends_on, so by the time we get here the schema is already reconciled
+// by exactly one host. Avoids the 3-way DDL race documented in
+// CenaEventStoreIndexes.cs.
 
 app.Lifetime.ApplicationStarted.Register(async () =>
 {

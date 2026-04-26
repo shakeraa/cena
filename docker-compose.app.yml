@@ -95,6 +95,10 @@ services:
         condition: service_completed_successfully
       sympy-sidecar:
         condition: service_started
+      # actor-host owns Marten schema warm — wait until it's reconciled
+      # the schema before this API touches Marten on its own.
+      actor-host:
+        condition: service_healthy
     ports:
       - "5052:5052"
     environment:
@@ -113,7 +117,13 @@ services:
       # ADR-0032: shadow mode while bootstrapping — gate runs but does not
       # block writes on CAS failure. Flip to `enforce` after sympy is green.
       - CENA_CAS_GATE_MODE=shadow
-      - Marten__AutoCreate=CreateOrUpdate
+      # AutoCreate=None: actor-host owns Marten schema reconciliation (it
+      # depends on the migrator and runs schema warm in dev). admin-api
+      # waits on actor-host's healthcheck before starting and trusts the
+      # schema as-is. Without this override, admin-api's lazy reconciliation
+      # would re-evaluate features and the events feature would drop our
+      # custom ix_mt_events_active_stream_seq index every boot.
+      - Marten__AutoCreate=None
       # Firebase: project id + emulator host (RDY-056 §2.2). When
       # FIREBASE_AUTH_EMULATOR_HOST is set, AddFirebaseAuth swaps to the
       # emulator issuer and disables signature validation. The Admin SDK
@@ -156,6 +166,10 @@ services:
         condition: service_completed_successfully
       sympy-sidecar:
         condition: service_started
+      # actor-host owns Marten schema warm — wait until it's reconciled
+      # the schema before this API touches Marten on its own.
+      actor-host:
+        condition: service_healthy
     ports:
       - "5050:5050"
     environment:
@@ -171,6 +185,10 @@ services:
       - Redis__Password=${REDIS_PASSWORD:-cena_dev_redis}
       - NATS_API_PASSWORD=${NATS_API_PASSWORD:-dev_api_pass}
       - CENA_CAS_GATE_MODE=shadow
+      # AutoCreate=None: actor-host owns Marten schema reconciliation. See
+      # admin-api comment above for the full rationale (events feature
+      # would otherwise drop our custom event-store indexes on every boot).
+      - Marten__AutoCreate=None
       - Firebase__ProjectId=cena-platform
       - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
     restart: unless-stopped
@@ -350,3 +368,14 @@ services:
       - Firebase__ProjectId=cena-platform
       - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
     restart: unless-stopped
+    # actor-host owns Marten schema warm (CenaEventStoreIndexes etc).
+    # admin-api / student-api wait on this healthcheck via service_healthy
+    # before starting so only one host runs the schema reconcile, eliminating
+    # the 3-way DDL race we hit on pg_class_relname_nsp_index. /health/live
+    # only flips to "Healthy" after Marten reconciliation is complete.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 90s

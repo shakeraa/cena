@@ -66,27 +66,12 @@ if (!app.Environment.IsDevelopment())
 }
 
 
-// RDY-056 §1.1: Warm Marten schema BEFORE hosted services start so seeders
-// (CulturalContextSeeder et al.) don't all race on Weasel's TimedLock.
-// In Development with AutoCreate=CreateOrUpdate, concurrent first-touch
-// queries time out at the schema-ensure lock; warming up-front serialises
-// the DDL and lets IHostedService.StartAsync run against a ready schema.
-if (app.Environment.IsDevelopment())
-{
-    using var warmScope = app.Services.CreateScope();
-    var warmLogger = warmScope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-    var warmStore = warmScope.ServiceProvider.GetRequiredService<Marten.IDocumentStore>();
-    try
-    {
-        warmLogger.LogInformation("[MARTEN_SCHEMA_WARM] applying configured changes...");
-        await warmStore.Storage.ApplyAllConfiguredChangesToDatabaseAsync();
-        warmLogger.LogInformation("[MARTEN_SCHEMA_READY] schema warm complete");
-    }
-    catch (Exception ex)
-    {
-        warmLogger.LogError(ex, "[MARTEN_SCHEMA_WARM] failed — host will still start; seeders may retry");
-    }
-}
+// Marten schema warm is owned by actor-host (see Cena.Actors.Host/Program.cs).
+// admin-api / student-api wait for actor-host's healthcheck via compose
+// depends_on, so by the time we get here the schema is already reconciled
+// by exactly one host. This avoids the 3-way DDL race on
+// pg_class_relname_nsp_index that we hit when every host ran the warm in
+// parallel — see CenaEventStoreIndexes.cs for the full incident notes.
 
 app.Lifetime.ApplicationStarted.Register(async () =>
 {
