@@ -12,6 +12,14 @@ services:
       POSTGRES_DB: cena
       POSTGRES_USER: cena
       POSTGRES_PASSWORD: cena_dev_password
+    # random_page_cost: PG default is 4.0 (HDD assumption from the spinning-
+    # disk era). Container storage on the dev Mac (Docker Desktop virtiofs
+    # backed by APFS on NVMe) is effectively SSD, where random reads cost
+    # roughly the same as sequential. With the default, the planner
+    # under-costs the bitmap+sort path and over-costs pure index scans for
+    # mt_events reads — see V0003 migration header for the EXPLAIN evidence.
+    # 1.1 is the standard SSD-tuned value (PostgreSQL docs §19.7.2).
+    command: ["postgres", "-c", "random_page_cost=1.1"]
     ports:
       - "5433:5432"
     volumes:
