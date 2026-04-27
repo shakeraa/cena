@@ -168,8 +168,11 @@ async function loadCurrentQuestion() {
     if (question.value && (question.value as any).sessionStartedAt) {
       sessionStartedAt.value = (question.value as any).sessionStartedAt
     }
-    // Seed the Sidekick context on first question load so open() is instant.
-    sidekickRef.value?.refreshContext?.()
+    // Sidekick context is fetched on first open() — no eager pre-warm here.
+    // The previous eager call raced against the LearningSessionQueueProjection
+    // which is async-built off the student stream; for fresh sessions it
+    // produced a 404 in chrome console on every session-load. Lazy fetch
+    // is fast enough on warm Marten (single LoadAsync + Redis hit).
   }
   catch (err) {
     error.value = (err as Error).message || t('error.serverError')

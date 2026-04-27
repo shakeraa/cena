@@ -71,7 +71,20 @@ public static class TutorContextEndpoint
                 var queue = await session.LoadAsync<LearningSessionQueueProjection>(
                     sessionId, ctx.RequestAborted);
                 if (queue is null)
-                    return Results.NotFound(new { error = "Session not found" });
+                {
+                    // Projection lag: a freshly-started session emits its
+                    // LearningSessionStarted_V1 to the STUDENT stream
+                    // (per SessionEndpoints, line `session.Events.Append(studentId,
+                    // startedEvent)`), and the LearningSessionQueueProjection
+                    // builds asynchronously keyed by sessionId. There's a
+                    // sub-second window where this projection doesn't exist
+                    // yet for fresh sessions. We can't cheaply fall back to
+                    // the event stream (sessionId isn't a stream key) — so
+                    // return 404 with a stable code the SPA recognises.
+                    // The Sidekick composable already catches this without
+                    // crashing; no console-level error is surfaced.
+                    return Results.NotFound(new { error = "Session not ready (projection lag)" });
+                }
 
                 if (!string.Equals(queue.StudentId, studentId, StringComparison.Ordinal))
                 {

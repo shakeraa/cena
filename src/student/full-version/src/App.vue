@@ -7,6 +7,7 @@ import initCore from '@core/initCore'
 import { initConfigStore, useConfigStore } from '@core/stores/config'
 import { hexToRgb } from '@core/utils/colorConverter'
 import { useLocaleStore } from '@/stores/localeStore'
+import { useLocaleSideEffects } from '@/composables/useLocaleSideEffects'
 
 const { global } = useTheme()
 
@@ -21,6 +22,15 @@ const configStore = useConfigStore()
 // cena-student-locale) are upcast to `{ code, locked: true }` by the store's
 // loader, so they never see the chooser.
 const localeStore = useLocaleStore()
+
+// Apply the persisted locale on initial mount. The store reads code +
+// locked from localStorage but does NOT call useLocaleSideEffects.apply()
+// itself — that's the side-effect seam (vue-i18n + vuetify + html
+// lang/dir). Without this call, a returning student with a locked ar/he
+// locale gets the default LTR layout on every refresh until they
+// interact with the language switcher. EPIC-L journey caught this.
+const { apply: applyLocaleSideEffects } = useLocaleSideEffects()
+applyLocaleSideEffects(localeStore.code)
 </script>
 
 <template>
