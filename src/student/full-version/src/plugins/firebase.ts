@@ -13,6 +13,7 @@ import type { Auth } from 'firebase/auth'
 import { useAuthStore } from '@/stores/authStore'
 import { useMeStore } from '@/stores/meStore'
 import { ability, studentAbilityRules } from '@/plugins/casl/ability'
+import { router } from '@/plugins/1.router'
 
 /**
  * Firebase Auth plugin — FIND-ux-023: real Firebase Auth.
@@ -247,6 +248,25 @@ export default function install(_app: App) {
       clearAbilityCookie()
 
       console.info('[firebase] Auth state: signed out')
+
+      // Cross-tab sign-out propagation: when Firebase fires the
+      // signed-out state on this tab because *another* tab signed
+      // out (shared IndexedDB), the router guard does NOT re-fire
+      // for the current tab — we're sitting idle on a signed-in
+      // route. Push the user to /login explicitly so tab B does
+      // not display stale signed-in chrome with no auth behind it.
+      const current = router.currentRoute.value
+      const requiresAuth = current.meta?.requiresAuth !== false
+      const isPublic = current.path === '/login'
+        || current.path === '/register'
+        || current.path === '/forgot-password'
+        || current.path.startsWith('/_dev/')
+      if (requiresAuth && !isPublic) {
+        router.replace({
+          path: '/login',
+          query: { returnTo: current.fullPath },
+        }).catch(() => { /* navigation cancelled — guard will retry */ })
+      }
     }
 
     authStore.__setReady()
