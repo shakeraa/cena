@@ -48,11 +48,17 @@ const fetchGraph = async () => {
   try {
     const data = await $api<McmGraphResponse>('/admin/pedagogy/mcm-graph')
 
-    errorTypes.value = data.errorTypes
-    conceptCategories.value = data.conceptCategories
+    // Defensive: if the API returns 200 with a partial body (e.g. an
+    // empty corpus where the backend omits the array fields entirely),
+    // we must not let `undefined.length` crash the template render —
+    // that's what surfaced as "Cannot read properties of undefined" in
+    // EPIC-G admin-pages-smoke. Fall back to empty arrays so the
+    // v-else-if empty-state path renders cleanly.
+    errorTypes.value = data.errorTypes ?? []
+    conceptCategories.value = data.conceptCategories ?? []
 
     const map: Record<string, CellData> = {}
-    for (const edge of data.edges) {
+    for (const edge of data.edges ?? []) {
       map[cellKey(edge.errorType, edge.conceptCategory)] = {
         methodology: edge.methodology,
         confidence: edge.confidence,

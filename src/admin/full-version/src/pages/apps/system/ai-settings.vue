@@ -288,10 +288,18 @@ onMounted(fetchSettings)
             </VCardText>
           </VCard>
 
-          <!-- Provider Configuration -->
-          <VCard class="mb-6">
+          <!-- Provider Configuration — gated on activeProviderConfig
+               so the `v-model="activeProviderConfig!.modelId"` etc.
+               below don't dereference undefined when the API returns
+               an empty providers array (e.g. fresh install / mis-seed).
+               Without this guard the page throws "Cannot read
+               properties of undefined (reading 'modelId')" on mount. -->
+          <VCard
+            v-if="activeProviderConfig"
+            class="mb-6"
+          >
             <VCardItem>
-              <VCardTitle>{{ activeProviderConfig?.displayName ?? 'Provider' }} Configuration</VCardTitle>
+              <VCardTitle>{{ activeProviderConfig.displayName }} Configuration</VCardTitle>
             </VCardItem>
             <VCardText>
               <VRow>

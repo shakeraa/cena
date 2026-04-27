@@ -41,7 +41,18 @@ const fetchData = async () => {
       $api<TokenBudgetResponse>('/admin/system/token-budget'),
       $api<TrendPoint[]>('/admin/system/token-budget/trend?days=7'),
     ])
-    budget.value = budgetData
+    // Defensive: the page's statCards computed dereferences fields
+    // like `estimatedCost.toFixed(2)`. If the API returns 200 with a
+    // partial body (e.g. empty corpus), undefined.toFixed crashes the
+    // template render. Merge over the initial defaults so every field
+    // has a numeric value. Surfaced by EPIC-G admin-pages-smoke.
+    budget.value = {
+      totalTokensToday:        budgetData?.totalTokensToday        ?? 0,
+      estimatedCost:           budgetData?.estimatedCost           ?? 0,
+      studentsNearLimit:       budgetData?.studentsNearLimit       ?? 0,
+      budgetUtilizationPercent: budgetData?.budgetUtilizationPercent ?? 0,
+      students:                budgetData?.students                ?? [],
+    }
     trend.value = trendData ?? []
   }
   catch (err: any) {
