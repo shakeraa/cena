@@ -25,6 +25,7 @@
 // =============================================================================
 
 import { e2eTest as test, expect, tenantDebugString } from '../fixtures/tenant'
+import { probeStudentProfile } from '../probes/db-probe'
 
 // Minimal JWT payload decoder — no external dep. Firebase idTokens are
 // standard unsigned-from-the-client JWTs; we only read the claims bundle.
@@ -160,27 +161,29 @@ test.describe('E2E-A-01 student registration', () => {
     expect(claims.school_id, 'JWT must carry school_id claim').toBeTruthy()
 
     // ── Boundary 4a: DB — StudentProfile row under caller's tenant ──
-    // Interim assertion via the SPA read-model. This is the same precedent
-    // the flagship subscription-happy-path uses: API-layer agreement today,
-    // direct DB probe when PRR-436 lands.
-    const profileResp = await page.request.get('/api/me/profile', {
-      headers: { Authorization: `Bearer ${idToken}` },
-    })
-    expect(
-      profileResp.ok(),
-      `GET /api/me/profile must succeed after on-first-sign-in (tenant=${tenant.id})`,
+    // PRR-436 admin test probe: read the canonical Marten state directly
+    // (AdminUser doc + StudentProfileSnapshot). Replaces the prior
+    // /api/me/profile read-model fallback. Tenant verification is enforced
+    // server-side: a probe with the wrong tenantId returns found=false.
+    const uid = claims.user_id as string ?? claims.sub as string
+    expect(uid, 'JWT must carry uid (sub/user_id)').toBeTruthy()
+    const probed = await probeStudentProfile({ tenantId: tenant.id, uid })
+    expect(probed.found,
+      `db-probe must find StudentProfile for uid=${uid} tenant=${tenant.id}`,
     ).toBe(true)
-    const profile = await profileResp.json() as {
-      uid: string
-      email: string
-      tenantId?: string
-      tenant_id?: string
-      role?: string
-    }
-    expect(profile.email).toBe(email)
-    // Backend contract has drifted between snake/camel historically; accept either
-    // rather than let a naming bikeshed mask a real tenant bleed.
-    expect(profile.tenantId ?? profile.tenant_id).toBe(tenant.id)
+    expect(probed.data?.email).toBe(email)
+    expect(probed.data?.tenantId).toBe(tenant.id)
+    expect(probed.data?.role).toBe('student')
+
+    // Cross-tenant defence: probing the same uid under a different tenant
+    // must come back found=false (no cross-institute bleed).
+    const wrongTenantProbe = await probeStudentProfile({
+      tenantId: `${tenant.id}-WRONG`,
+      uid,
+    })
+    expect(wrongTenantProbe.found,
+      'db-probe must report found=false when tenantId mismatches AdminUser.School',
+    ).toBe(false)
 
     // ── Boundary 4b: Bus — StudentOnboardedV1 on cena.events.student.*.onboarded ──
     // The probe subscribed before the submit, so the event (published by the

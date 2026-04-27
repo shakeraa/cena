@@ -13,6 +13,7 @@
 // =============================================================================
 
 import { e2eTest as test, expect, tenantDebugString } from '../fixtures/tenant'
+import { probeSubscription } from '../probes/db-probe'
 
 test.describe('E2E-001 subscription happy path', () => {
   test('plus annual: pricing → checkout-session → stripe success → confirm-active', async ({
@@ -76,9 +77,7 @@ test.describe('E2E-001 subscription happy path', () => {
       `Subscription never reached Active state for ${authUser.email} / ${tenant.id}`,
     ).toBeVisible({ timeout: 15_000 })
 
-    // 7. Boundary assertion — the SPA's /api/me/subscription read-model
-    //    agrees with the DOM. (DB + bus assertions land in the PRR-436
-    //    follow-up once /api/admin/test/probe exists.)
+    // 7. Boundary assertion — API-layer read-model agrees with the DOM.
     const subscriptionState = await page.request.get('/api/me/subscription', {
       headers: { Authorization: `Bearer ${authUser.idToken}` },
     })
@@ -91,5 +90,20 @@ test.describe('E2E-001 subscription happy path', () => {
     expect(body.state).toBe('Active')
     expect(body.tier).toBe('Plus')
     expect(body.cycle).toBe('Annual')
+
+    // 8. DB boundary — PRR-436 admin test probe reads the canonical
+    // SubscriptionAggregate state directly, not the read-model. Catches
+    // bugs where the read-model lies about aggregate state (e.g. caches
+    // stale projections during the webhook race window).
+    const probed = await probeSubscription({
+      tenantId: tenant.id,
+      parentSubjectId: authUser.uid,
+    })
+    expect(probed.found,
+      `db-probe must find SubscriptionAggregate for parentSubjectId=${authUser.uid}`,
+    ).toBe(true)
+    expect(probed.data?.status).toBe('Active')
+    expect(probed.data?.tier).toBe('Plus')
+    expect(probed.data?.cycle).toBe('Annual')
   })
 })
