@@ -181,6 +181,16 @@ public static class SubscriptionManagementEndpoints
         {
             return Results.BadRequest(new { error = "command_rejected", details = ex.Message });
         }
+        catch (Marten.Exceptions.ExistingStreamIdCollisionException)
+        {
+            // Burst-write race: a sibling request just created the stream
+            // between our Load and AppendAsync. The first writer won;
+            // collapse to the same idempotent 409 shape the pre-load
+            // guard returns. This is the load-bearing assertion in
+            // E2E-J-05 (5 burst /activate calls produce exactly one
+            // net transition; the others must surface 409, not 500).
+            return Results.Conflict(new { error = "already_active" });
+        }
         return Results.Ok(ToStatusDto(aggregate.State));
     }
 
