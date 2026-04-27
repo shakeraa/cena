@@ -98,8 +98,14 @@ public static class StudentDataExporter
 
         await using var session = store.QuerySession();
 
-        // 1. Profile snapshot (use lightweight POCO — same table via Marten convention)
-        var snapshot = await session.LoadAsync<StudentProfileRef>(studentId);
+        // 1. Profile snapshot — read directly from the snapshot table.
+        // The owning type (Cena.Actors.Events.StudentProfileSnapshot) is in
+        // Cena.Actors which would create a cycle if referenced from
+        // Cena.Infrastructure, so we query the JSONB column via raw SQL
+        // and pluck only the fields we need. The previous LoadAsync<T>
+        // approach mapped to the wrong table (mt_doc_studentprofileref)
+        // because Marten resolves the table by .NET type name.
+        var snapshot = await LoadSnapshotRefAsync(session, studentId);
         var profileFields = snapshot != null
             ? ExtractFields(snapshot)
             : new List<ExportedField>();
@@ -210,6 +216,58 @@ public static class StudentDataExporter
     /// </summary>
     public static bool IsMlExcluded(Type eventType) =>
         eventType.GetCustomAttribute<MlExcludedAttribute>() != null;
+
+    private static async Task<StudentProfileRef?> LoadSnapshotRefAsync(IQuerySession session, string studentId)
+    {
+        // mt_doc_studentprofilesnapshot is owned by the actors-side
+        // StudentProfileSnapshot projection. We only pluck the fields
+        // the GDPR exporter declares on StudentProfileRef so the JSON
+        // shape stays bounded.
+        const string sql = @"
+            SELECT
+                data->>'Id'             AS id,
+                data->>'FullName'       AS full_name,
+                data->>'DisplayName'    AS display_name,
+                data->>'Bio'            AS bio,
+                data->>'DateOfBirth'    AS date_of_birth,
+                data->>'ParentEmail'    AS parent_email,
+                data->>'AccountStatus'  AS account_status,
+                data->>'SchoolId'       AS school_id
+            FROM cena.mt_doc_studentprofilesnapshot
+            WHERE id = @sid
+            LIMIT 1";
+
+        await using var cmd = session.Connection!.CreateCommand();
+        cmd.CommandText = sql;
+        var p = cmd.CreateParameter();
+        p.ParameterName = "sid";
+        p.Value = studentId;
+        cmd.Parameters.Add(p);
+
+        await using var reader = await cmd.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+            return null;
+
+        DateOnly? dob = null;
+        if (!reader.IsDBNull(4))
+        {
+            var raw = reader.GetString(4);
+            if (DateOnly.TryParse(raw, out var parsed))
+                dob = parsed;
+        }
+
+        return new StudentProfileRef
+        {
+            Id = reader.IsDBNull(0) ? "" : reader.GetString(0),
+            FullName = reader.IsDBNull(1) ? null : reader.GetString(1),
+            DisplayName = reader.IsDBNull(2) ? null : reader.GetString(2),
+            Bio = reader.IsDBNull(3) ? null : reader.GetString(3),
+            DateOfBirth = dob,
+            ParentEmail = reader.IsDBNull(5) ? null : reader.GetString(5),
+            AccountStatus = reader.IsDBNull(6) ? null : reader.GetString(6),
+            SchoolId = reader.IsDBNull(7) ? null : reader.GetString(7),
+        };
+    }
 
     private static List<ExportedField> ExtractFields(object dataObject)
     {

@@ -133,6 +133,24 @@ public static class MartenConfiguration
         opts.Schema.For<Cena.Actors.Parent.ParentBindInviteDocument>()
             .Identity(d => d.Id);
 
+        // EPIC-I/GDPR Article 17: erasure request log. The /api/me/gdpr/erasure*
+        // endpoints query and write ErasureRequest documents — without a
+        // schema entry, hosts running with Marten__AutoCreate=None get
+        // 42P01 "relation cena.mt_doc_erasurerequest does not exist".
+        opts.Schema.For<Cena.Infrastructure.Compliance.ErasureRequest>()
+            .Identity(d => d.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.Status);
+
+        // EPIC-I/GDPR Article 12 + Israel PPL 13: DSAR submission log.
+        // /api/me/dsar persists one DsarRecord per request. Same registration
+        // gap as ErasureRequest — surfaced by the EPIC-I journey when the
+        // student SPA's privacy page tries to submit a DSAR.
+        opts.Schema.For<Cena.Infrastructure.Compliance.DsarRecord>()
+            .Identity(d => d.Id)
+            .Index(x => x.StudentId)
+            .Index(x => x.Status);
+
         // ── Question Read Model (inline projection for list queries) ──
         opts.Projections.Add<QuestionListProjection>(ProjectionLifecycle.Inline);
 

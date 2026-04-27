@@ -37,8 +37,13 @@ namespace Cena.Infrastructure.Compliance;
 /// pulling in the Cena.Actors assembly. Marten resolves by document type name
 /// at runtime, so we configure the table mapping via StoreOptions in the host.
 /// Contains only the fields needed for GDPR erasure anonymization.
+///
+/// Public so Marten's runtime codegen (LoadAsync&lt;T&gt; / Identity(T)) can
+/// reference it from the dynamically-emitted document-storage class —
+/// internal-with-InternalsVisibleTo would also work but Marten's
+/// generated assembly name varies, so public is the simplest fix.
 /// </summary>
-internal class StudentProfileRef
+public class StudentProfileRef
 {
     public string Id { get; set; } = "";
     public string? FullName { get; set; }

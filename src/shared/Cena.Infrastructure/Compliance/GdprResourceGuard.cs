@@ -10,20 +10,12 @@ using Marten;
 namespace Cena.Infrastructure.Compliance;
 
 /// <summary>
-/// Lightweight POCO used by <see cref="GdprResourceGuard"/> to verify school
-/// membership without pulling in the Cena.Actors assembly. The real projection
-/// lives in Cena.Actors.Events.StudentProfileSnapshot; Marten resolves the
-/// table by document type name at runtime, which matches as long as the
-/// schema is the same.
-/// </summary>
-internal class StudentProfileSnapshotRef
-{
-    public string Id { get; set; } = "";
-    public string? SchoolId { get; set; }
-}
-
-/// <summary>
-/// Guards GDPR operations against cross-tenant access.
+/// Guards GDPR operations against cross-tenant access. Reads school
+/// membership directly from the Marten snapshot table via raw SQL —
+/// the snapshot type lives in Cena.Actors and pulling it across the
+/// project boundary would create a cycle. The previous LoadAsync&lt;T&gt;
+/// approach silently mapped to a non-existent mt_doc_studentprofilesnapshotref
+/// table; this rewrite hits the real mt_doc_studentprofilesnapshot row.
 /// </summary>
 public static class GdprResourceGuard
 {
@@ -44,14 +36,21 @@ public static class GdprResourceGuard
         }
 
         await using var session = store.QuerySession();
-        var student = await session.LoadAsync<StudentProfileSnapshotRef>(studentId);
+        await using var cmd = session.Connection!.CreateCommand();
+        cmd.CommandText = "SELECT data->>'SchoolId' FROM cena.mt_doc_studentprofilesnapshot WHERE id = @sid LIMIT 1";
+        var p = cmd.CreateParameter();
+        p.ParameterName = "sid";
+        p.Value = studentId;
+        cmd.Parameters.Add(p);
 
-        if (student is null)
+        var schoolId = await cmd.ExecuteScalarAsync() as string;
+
+        if (string.IsNullOrEmpty(schoolId))
         {
             throw new KeyNotFoundException($"Student '{studentId}' not found");
         }
 
-        if (student.SchoolId != callerSchoolId)
+        if (schoolId != callerSchoolId)
         {
             // Return 404 to avoid leaking existence
             throw new KeyNotFoundException($"Student '{studentId}' not found");

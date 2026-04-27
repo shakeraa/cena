@@ -541,7 +541,14 @@ public partial class Program
     // Students must be able to exercise data rights (consent, export, erasure, DSAR)
     // without going through an admin. GDPR Art 12-22, COPPA 312.6, Israel PPL 13.
     builder.Services.AddScoped<IGdprConsentManager, GdprConsentManager>();
-    builder.Services.AddScoped<IRightToErasureService, RightToErasureService>();
+    // EPIC-I: route through the canonical extension. The previous direct
+    // AddScoped<IRightToErasureService, RightToErasureService>() left
+    // IErasureManifestBuilder + IErasureCryptoConfig unregistered, so any
+    // /api/me/gdpr/erasure* call (incl. the privacy page's status fetch
+    // on mount) crashed with InvalidOperationException at activation.
+    builder.Services.AddRightToErasureService(
+        builder.Configuration.GetValue<string>("Cena:Compliance:ErasurePepper")
+        ?? "change-me-in-production");
 
     // ---- HARDEN TutorEndpoints: LLM Service ----
     // prr-012: Socratic call budget + static hint fallback + daily tutor time cap.
