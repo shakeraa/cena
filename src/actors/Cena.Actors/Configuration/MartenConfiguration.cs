@@ -673,6 +673,7 @@ public static class MartenConfiguration
         opts.Events.AddEventType<LearningSessionEnded_V1>();
         opts.Events.AddEventType<QuestionFallbackLanguage_V1>();
         opts.Events.AddEventType<OnboardingCompleted_V1>(); // STB-00
+        opts.Events.AddEventType<StudentOnboardedV1>(); // emitted by StudentOnboardingService at sign-up; admin-api event-stream surface fails to deserialize without this
         opts.Events.AddEventType<AgeAndConsentRecorded_V1>(); // FIND-privacy-001
         // prr-052: student parent-visibility veto / restore events.
         opts.Events.AddEventType<Cena.Actors.Consent.Events.StudentVisibilityVetoed_V1>();
