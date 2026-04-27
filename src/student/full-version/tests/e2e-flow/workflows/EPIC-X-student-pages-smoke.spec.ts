@@ -34,6 +34,11 @@ interface PageProbeResult {
 
 // Static signed-in student routes. Anything under /_dev/* skipped
 // because those are scaffold pages not in the user-facing surface.
+//
+// /parent/* is intentionally NOT in this list: a STUDENT-role caller
+// is correctly denied by /api/parent/* (403), which surfaces as a
+// console-error and would fail this smoke spec for the wrong reason.
+// Parent surface is exercised from a parent persona in EPIC-K.
 const SIGNED_IN_ROUTES = [
   '/home',
   '/account/subscription',
@@ -42,7 +47,6 @@ const SIGNED_IN_ROUTES = [
   '/challenges/daily',
   '/knowledge-graph',
   '/notifications',
-  '/parent/dashboard',
   '/pricing',
   '/profile',
   '/profile/edit',
