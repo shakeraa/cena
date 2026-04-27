@@ -48,9 +48,12 @@ const meStore = useMeStore()
 const { registerWithEmail, onFirstSignIn, errorKey } = useFirebaseAuth()
 
 // TASK-E2E-A-01-BE-01: backend bootstrap target for the on-first-sign-in
-// callback. Vite dev proxies /api/* to the student-api host, so the empty
-// base hits the proxy. Production deployments override via VITE_STUDENT_API_BASE_URL.
-const studentApiBaseUrl = import.meta.env.VITE_STUDENT_API_BASE_URL ?? ''
+// callback. Always a relative path ('' base) so fetch goes through the
+// vite /api proxy in dev (same-origin) and the same-origin path in prod.
+// We deliberately do NOT honour VITE_STUDENT_API_BASE_URL here — in dev
+// that var points at the host port (cross-origin from the SPA's 5175),
+// which fails CORS at the browser layer. The proxy is the contract.
+const studentApiBaseUrl = ''
 
 const loading = ref(false)
 const errorMessage = ref('')

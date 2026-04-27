@@ -172,8 +172,71 @@ public sealed class FirebaseAdminService : IFirebaseAdminService
 
     public async Task SetCustomClaimsAsync(string uid, Dictionary<string, object> claims)
     {
+        // Dev/E2E path: Firebase Admin SDK fails to initialize in the dev
+        // stack (no GCP credentials by design — the dev student-api shouldn't
+        // need them). Detect emulator mode and call the emulator's
+        // Identity-Toolkit REST endpoint directly with `Bearer owner`. This
+        // is the same shape `tests/e2e-flow/fixtures/auth.ts` uses on the
+        // test side; production is unaffected because the env var is
+        // only set on dev / emu containers.
+        var emulatorHost = Environment.GetEnvironmentVariable("FIREBASE_AUTH_EMULATOR_HOST");
+        if (!_initialized && !string.IsNullOrWhiteSpace(emulatorHost))
+        {
+            await SetCustomClaimsViaEmulatorAsync(emulatorHost, uid, claims).ConfigureAwait(false);
+            return;
+        }
+
         await FirebaseAuth.DefaultInstance.SetCustomUserClaimsAsync(uid, claims);
         _logger.LogInformation("Updated custom claims for {Uid}: {Claims}",
+            uid, string.Join(", ", claims.Select(c => $"{c.Key}={c.Value}")));
+    }
+
+    /// <summary>
+    /// Emulator-REST fallback for SetCustomClaimsAsync when the Admin SDK
+    /// failed to initialize (dev stack runs without GCP credentials). Calls
+    /// <c>POST /identitytoolkit.googleapis.com/v1/projects/{projectId}/accounts:update</c>
+    /// with <c>Authorization: Bearer owner</c>, the well-known emulator
+    /// admin token. Production deployments never hit this path because
+    /// FIREBASE_AUTH_EMULATOR_HOST is unset.
+    /// </summary>
+    private async Task SetCustomClaimsViaEmulatorAsync(
+        string emulatorHost, string uid, Dictionary<string, object> claims)
+    {
+        // The configuration's ProjectId is the canonical answer; fall back to
+        // env var the SDK itself reads when configuration is missing.
+        var projectId = Environment.GetEnvironmentVariable("Firebase__ProjectId")
+            ?? Environment.GetEnvironmentVariable("GOOGLE_CLOUD_PROJECT")
+            ?? "cena-platform";
+
+        // The emulator host env is "host:port" (no scheme). Prepend http:// —
+        // the emulator only speaks HTTP.
+        var url = $"http://{emulatorHost}/identitytoolkit.googleapis.com/v1/projects/{projectId}/accounts:update";
+
+        using var http = new HttpClient();
+        http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", "owner");
+
+        var body = new
+        {
+            localId = uid,
+            customAttributes = System.Text.Json.JsonSerializer.Serialize(claims),
+        };
+        var content = new StringContent(
+            System.Text.Json.JsonSerializer.Serialize(body),
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        var resp = await http.PostAsync(url, content).ConfigureAwait(false);
+        if (!resp.IsSuccessStatusCode)
+        {
+            var errorBody = await resp.Content.ReadAsStringAsync().ConfigureAwait(false);
+            _logger.LogError(
+                "Firebase emulator setCustomClaims failed for {Uid}: {Status} {Body}",
+                uid, (int)resp.StatusCode, errorBody);
+            throw new InvalidOperationException(
+                $"Firebase emulator setCustomClaims failed: {(int)resp.StatusCode} {errorBody}");
+        }
+        _logger.LogInformation(
+            "Updated custom claims via emulator REST for {Uid}: {Claims}",
             uid, string.Join(", ", claims.Select(c => $"{c.Key}={c.Value}")));
     }
 

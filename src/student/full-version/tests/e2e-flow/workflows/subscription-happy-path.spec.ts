@@ -27,6 +27,16 @@ test.describe('E2E-001 subscription happy path', () => {
       description: tenantDebugString(tenant, page),
     })
 
+    // Lock the locale before navigation so the FirstRunLanguageChooser
+    // modal does not intercept pointer events on the pricing-cycle toggle
+    // and tier cards. Same pattern student-register.spec.ts uses.
+    await page.addInitScript(() => {
+      window.localStorage.setItem(
+        'cena-student-locale',
+        JSON.stringify({ code: 'en', locked: true, version: 1 }),
+      )
+    })
+
     // 1. Pricing page renders + tier cards visible
     await page.goto('/pricing')
     await expect(page.getByTestId('pricing-page')).toBeVisible()
@@ -47,7 +57,10 @@ test.describe('E2E-001 subscription happy path', () => {
     await page.route('**://checkout.stripe.com/**', route => route.abort('aborted'))
 
     // Click Plus tier (tier ids match the CheckoutSessionInput contract).
-    await page.getByTestId('tier-card-plus').click()
+    // Click the CTA button inside the Plus card. The card's outer wrapper
+    // is informational only — only `tier-card-plus-cta` fires the
+    // `select` emit that triggers /api/me/subscription/checkout-session.
+    await page.getByTestId('tier-card-plus-cta').click()
 
     const checkoutResp = await checkoutRequest
     expect(

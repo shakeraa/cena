@@ -121,6 +121,18 @@ public static class MartenConfiguration
         opts.Schema.For<CenaRoleDefinition>()
             .Identity(x => x.Id);
 
+        // ── Parent-Child Binding (prr-009 + TASK-E2E-A-04-BE) ──
+        // Both ParentChildBindingDocument (existing) and the new
+        // ParentBindInviteDocument (single-use invite jti store) need a
+        // place in the central schema so actor-host's schema warm creates
+        // their tables + upsert functions. Without this, hosts that
+        // run with Marten__AutoCreate=None (student-api, admin-api) get
+        // 42883 "function mt_upsert_... does not exist" at runtime.
+        opts.Schema.For<Cena.Actors.Parent.ParentChildBindingDocument>()
+            .Identity(d => d.Id);
+        opts.Schema.For<Cena.Actors.Parent.ParentBindInviteDocument>()
+            .Identity(d => d.Id);
+
         // ── Question Read Model (inline projection for list queries) ──
         opts.Projections.Add<QuestionListProjection>(ProjectionLifecycle.Inline);
 

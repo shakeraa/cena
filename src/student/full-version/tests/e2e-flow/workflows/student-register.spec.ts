@@ -150,12 +150,43 @@ test.describe('E2E-A-01 student registration', () => {
     ).toBeLessThan(300)
 
     // ── Boundary 3: Firebase JWT custom claims ──
-    // The SPA stores the idToken (post-claims-refresh) in localStorage.
-    // Decode it and assert the three claims the task body names.
-    const idToken = await page.evaluate(() => window.localStorage.getItem('cena-auth-token'))
-    expect(idToken, 'cena-auth-token missing in localStorage after register').toBeTruthy()
+    // After the on-first-sign-in callback, the SPA force-refreshes the
+    // idToken so the new claims (role/tenant_id/school_id) land client-side.
+    // We don't read localStorage — the Firebase JS SDK persists the token
+    // through IndexedDB, not a known string key, so the test fetches a
+    // fresh token via the Firebase auth API directly and decodes it.
+    const idToken = await page.evaluate(async () => {
+      // The Firebase JS SDK exposes auth.currentUser globally on `window` only
+      // when explicitly wired; safer to call into the same composable the SPA
+      // uses. The SPA's plugin attaches `firebase.auth` for debugging — read
+      // it here, fall back to async getAuth() import if the symbol is absent.
+      type FirebaseUser = { getIdToken: (force?: boolean) => Promise<string> }
+      type Win = Window & {
+        __firebase_auth?: { currentUser?: FirebaseUser | null }
+      }
+      const w = window as Win
+      const user = w.__firebase_auth?.currentUser
+      if (!user)
+        return null
+      return await user.getIdToken(true)
+    })
 
-    const claims = decodeJwtClaims(idToken!)
+    // Fall back: if the SPA doesn't expose __firebase_auth, fetch a fresh
+    // idToken from the emulator using the email/password we just registered.
+    // This is the test-only path; production tests will rely on the SPA hook.
+    let resolvedIdToken = idToken
+    if (!resolvedIdToken) {
+      const fbResp = await page.request.post(
+        `http://${process.env.FIREBASE_EMU_HOST ?? 'localhost:9099'}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`,
+        { data: { email, password, returnSecureToken: true } },
+      )
+      expect(fbResp.ok(), 'Firebase emu re-signin must succeed for claims read').toBe(true)
+      const body = await fbResp.json() as { idToken: string }
+      resolvedIdToken = body.idToken
+    }
+
+    expect(resolvedIdToken, 'must obtain a refreshed idToken to decode claims').toBeTruthy()
+    const claims = decodeJwtClaims(resolvedIdToken!)
     expect(claims.role, 'JWT must carry role=student claim').toBe('student')
     expect(claims.tenant_id, 'JWT must carry tenant_id claim').toBe(tenant.id)
     expect(claims.school_id, 'JWT must carry school_id claim').toBeTruthy()
