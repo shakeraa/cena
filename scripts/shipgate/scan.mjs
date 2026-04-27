@@ -21,54 +21,72 @@ const ROOT = resolve(import.meta.dirname, "../..");
 // ---------------------------------------------------------------------------
 // Banned terms by language
 // ---------------------------------------------------------------------------
+// Rule schema:
+//   pattern    — RegExp tested against each line
+//   reason     — human-readable category
+//   allowlist  — substring escapes that suppress a match on the same line
+//   scope      — "all" (default) | "ui"
+//                "ui" restricts the rule to user-facing surfaces (locale
+//                JSON + Vue templates). Use this for rules whose dark-pattern
+//                concern only surfaces in rendered UI text — domain code
+//                that happens to use the same English word is a false
+//                positive (e.g. "the controller lives at..." in a code
+//                comment is not a "lives currency" UI mechanic).
 const BANNED = {
   en: [
     { pattern: /\bstreak\b/i, reason: "streak counter (loss-aversion)", allowlist: ["streak current", "streaked", "electrical streak"] },
-    { pattern: /don['']t break/i, reason: "loss-aversion copy" },
-    { pattern: /keep the chain/i, reason: "streak/chain mechanic" },
-    { pattern: /lose your/i, reason: "loss-aversion copy" },
+    { pattern: /don['']t break/i, reason: "loss-aversion copy", scope: "ui" },
+    { pattern: /keep the chain/i, reason: "streak/chain mechanic", scope: "ui" },
+    { pattern: /lose your/i, reason: "loss-aversion copy", scope: "ui" },
     { pattern: /daily streak/i, reason: "streak counter" },
-    { pattern: /\bhearts\b/i, reason: "lives/hearts currency", allowlist: ["heart rate", "cardiac", "heart of"] },
-    { pattern: /\blives\b/i, reason: "lives currency", allowlist: ["lives in", "lives at", "who lives", "he lives", "she lives", "it lives"] },
-    { pattern: /you['']ll lose/i, reason: "loss-aversion threat" },
-    { pattern: /don['']t miss/i, reason: "FOMO urgency" },
-    { pattern: /running out of time/i, reason: "artificial urgency" },
+    { pattern: /\bhearts\b/i, reason: "lives/hearts currency", allowlist: ["heart rate", "cardiac", "heart of"], scope: "ui" },
+    { pattern: /\blives\b/i, reason: "lives currency", allowlist: ["lives in", "lives at", "lives on", "lives across", "lives behind", "lives next to", "lives near", "lives here", "lives outside", "lives inside", "lives within", "who lives", "he lives", "she lives", "it lives", "what lives"], scope: "ui" },
+    { pattern: /you['']ll lose/i, reason: "loss-aversion threat", scope: "ui" },
+    { pattern: /don['']t miss/i, reason: "FOMO urgency", scope: "ui" },
+    { pattern: /running out of time/i, reason: "artificial urgency", scope: "ui" },
     // RDY-065 (F11): anxiety-safe hint ladder — student-facing hint UI must
     // never display penalty counters, numeric hint levels, or comparative
     // shame. Backend adjusts BKT assisted credit internally; UI stays silent.
-    { pattern: /\(\s*\{?\s*(remaining|hintsRemaining|hintsLeft)\s*\}?\s+(left|remaining|to go)\s*\)/i, reason: "penalty-style hint counter (RDY-065)" },
-    { pattern: /\bhint\s+\{?level\}?\b/i, reason: "numeric hint level display (RDY-065 — use qualitative labels)" },
-    { pattern: /you['']re\s+behind/i, reason: "comparative shame (RDY-065)" },
-    { pattern: /slower than (\d+%|\w+ of)/i, reason: "comparative percentile shame (RDY-065)" },
-    { pattern: /behind\s+\d+%\s+of/i, reason: "comparative percentile shame (RDY-065)" },
-    { pattern: /-\s*\d+%\s*(credit|score|mastery|points)/i, reason: "visible BKT penalty (RDY-065 — must stay internal)" },
-    { pattern: /\bhints?\s+used\b/i, reason: "hints-used counter (RDY-065)" },
+    // All RDY-065 patterns are UI-scoped: domain code that documents these
+    // rules in comments (interfaces, services, projections) is precisely
+    // the contract the rule wants to enforce — flagging it is a false alarm.
+    { pattern: /\(\s*\{?\s*(remaining|hintsRemaining|hintsLeft)\s*\}?\s+(left|remaining|to go)\s*\)/i, reason: "penalty-style hint counter (RDY-065)", scope: "ui" },
+    { pattern: /\bhint\s+\{?level\}?\b/i, reason: "numeric hint level display (RDY-065 — use qualitative labels)", scope: "ui" },
+    { pattern: /you['']re\s+behind/i, reason: "comparative shame (RDY-065)", scope: "ui" },
+    { pattern: /slower than (\d+%|\w+ of)/i, reason: "comparative percentile shame (RDY-065)", scope: "ui" },
+    { pattern: /behind\s+\d+%\s+of/i, reason: "comparative percentile shame (RDY-065)", scope: "ui" },
+    { pattern: /-\s*\d+%\s*(credit|score|mastery|points)/i, reason: "visible BKT penalty (RDY-065 — must stay internal)", scope: "ui" },
+    { pattern: /\bhints?\s+used\b/i, reason: "hints-used counter (RDY-065)", scope: "ui" },
     // RDY-071 (F8): honest-framing contract. Until RDY-080 concordance
     // study produces an approved ConcordanceMapping with
     // F8PointEstimateEnabled=true, student-facing surfaces MUST NOT
     // claim a numeric Bagrut prediction. See
     // docs/engineering/mastery-trajectory-honest-framing.md.
-    { pattern: /predicted\s+bagrut/i, reason: "predicted Bagrut score (RDY-071 — blocked until RDY-080 calibration approved)" },
-    { pattern: /your\s+bagrut\s+score/i, reason: "possessive Bagrut score framing (RDY-071)" },
-    { pattern: /bagrut\s+score\s+will\s+be/i, reason: "future-tense Bagrut assertion (RDY-071)" },
-    { pattern: /expected\s+(grade|score)/i, reason: "expected-grade/score forward extrapolation (RDY-071)" },
-    { pattern: /we\s+predict\s+you['']ll\s+score/i, reason: "conversational score prediction (RDY-071)" },
-    { pattern: /your\s+score\s+will\s+be/i, reason: "future-tense score assertion (RDY-071)" },
-    { pattern: /you\s+will\s+score/i, reason: "future-tense score prediction (RDY-071)" },
-    { pattern: /you['']ll\s+get\s+a?\s*\d/i, reason: "numeric score prediction (RDY-071)" },
-    { pattern: /predicted\s+score\s*:?/i, reason: "predicted score label (RDY-071)" },
-    { pattern: /bagrut\s+prediction/i, reason: "Bagrut prediction label (RDY-071)" },
-    { pattern: /grade\s+prediction/i, reason: "grade prediction label (RDY-071)" },
-    { pattern: /\d{2,3}\s+on\s+(your|the)\s+bagrut/i, reason: "numeric on-the-Bagrut prediction (RDY-071)" },
+    // All RDY-071 patterns are UI-scoped: the rule is about what the student
+    // SEES; the same phrases in domain code comments are documenting the rule.
+    { pattern: /predicted\s+bagrut/i, reason: "predicted Bagrut score (RDY-071 — blocked until RDY-080 calibration approved)", scope: "ui" },
+    { pattern: /your\s+bagrut\s+score/i, reason: "possessive Bagrut score framing (RDY-071)", scope: "ui" },
+    { pattern: /bagrut\s+score\s+will\s+be/i, reason: "future-tense Bagrut assertion (RDY-071)", scope: "ui" },
+    { pattern: /expected\s+(grade|score)/i, reason: "expected-grade/score forward extrapolation (RDY-071)", scope: "ui" },
+    { pattern: /we\s+predict\s+you['']ll\s+score/i, reason: "conversational score prediction (RDY-071)", scope: "ui" },
+    { pattern: /your\s+score\s+will\s+be/i, reason: "future-tense score assertion (RDY-071)", scope: "ui" },
+    { pattern: /you\s+will\s+score/i, reason: "future-tense score prediction (RDY-071)", scope: "ui" },
+    { pattern: /you['']ll\s+get\s+a?\s*\d/i, reason: "numeric score prediction (RDY-071)", scope: "ui" },
+    { pattern: /predicted\s+score\s*:?/i, reason: "predicted score label (RDY-071)", scope: "ui" },
+    { pattern: /bagrut\s+prediction/i, reason: "Bagrut prediction label (RDY-071)", scope: "ui" },
+    { pattern: /grade\s+prediction/i, reason: "grade prediction label (RDY-071)", scope: "ui" },
+    { pattern: /\d{2,3}\s+on\s+(your|the)\s+bagrut/i, reason: "numeric on-the-Bagrut prediction (RDY-071)", scope: "ui" },
     // RDY-077 (F12): parent time-budget soft-cap UI MUST NOT use FOMO /
     // scarcity / red-countdown framing. See
-    // docs/design/parent-time-budget-design.md when it ships.
-    { pattern: /only\s+\d+\s+min(ute)?s?\s+left/i, reason: "FOMO countdown on time budget (RDY-077)" },
-    { pattern: /\bout of time\b/i, reason: "scarcity framing on time budget (RDY-077)" },
-    { pattern: /time['']s\s+up/i, reason: "lockout framing on time budget (RDY-077)" },
-    { pattern: /hurry\s+(up|before)/i, reason: "urgency framing (RDY-077)" },
-    { pattern: /don['']t\s+waste/i, reason: "loss-aversion on time budget (RDY-077)" },
-    { pattern: /you\s+must\s+stop\s+now/i, reason: "hard-cap lockout framing (RDY-077)" },
+    // docs/design/parent-time-budget-design.md when it ships. UI-only —
+    // domain code rate-limiters that mention "out of time" in comments are
+    // not the dark pattern.
+    { pattern: /only\s+\d+\s+min(ute)?s?\s+left/i, reason: "FOMO countdown on time budget (RDY-077)", scope: "ui" },
+    { pattern: /\bout of time\b/i, reason: "scarcity framing on time budget (RDY-077)", scope: "ui" },
+    { pattern: /time['']s\s+up/i, reason: "lockout framing on time budget (RDY-077)", scope: "ui" },
+    { pattern: /hurry\s+(up|before)/i, reason: "urgency framing (RDY-077)", scope: "ui" },
+    { pattern: /don['']t\s+waste/i, reason: "loss-aversion on time budget (RDY-077)", scope: "ui" },
+    { pattern: /you\s+must\s+stop\s+now/i, reason: "hard-cap lockout framing (RDY-077)", scope: "ui" },
   ],
   ar: [
     { pattern: /سلسلة(?!.*كهرب)/u, reason: "سلسلة as streak (not electrical chain)" },
@@ -165,6 +183,14 @@ function scan() {
     return "en";
   }
 
+  // UI surface = locale JSON + Vue templates. A "ui"-scoped rule only fires
+  // against these paths; domain code (.cs/.ts) using the same English word
+  // would be a false positive.
+  function isUiPath(filepath) {
+    return /\/locales\/[a-z]{2}\.json$/.test(filepath)
+        || filepath.endsWith(".vue");
+  }
+
   // Scan a single file
   function scanFile(filepath) {
     if (!existsSync(filepath)) return;
@@ -172,10 +198,19 @@ function scan() {
     const lines = content.split("\n");
     const lang = getLang(filepath);
     const rules = [...BANNED.en, ...(BANNED[lang] || [])];
+    const ui = isUiPath(filepath);
+
+    // Dedup per (line, term) — when multiple rules match the same line+term
+    // (e.g. /\bstreak\b/ AND /daily streak/ both fire on "daily streak"),
+    // the most-specific rule's reason wins and the hit is reported once.
+    const perLineHits = new Map();
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       for (const rule of rules) {
+        // Path-scope gate: skip ui-only rules on non-UI files.
+        if (rule.scope === "ui" && !ui) continue;
+
         const match = line.match(rule.pattern);
         if (!match) continue;
 
@@ -189,14 +224,27 @@ function scan() {
         );
         if (isAllowed) continue;
 
-        violations.push({
-          file: rel,
-          line: i + 1,
-          term: match[0],
-          reason: rule.reason,
-          context: line.trim().slice(0, 120),
-        });
+        const key = `${i + 1}|${match[0]}`;
+        const existing = perLineHits.get(key);
+        // Prefer the more-specific rule (longer pattern source) when two
+        // rules match the same line+term. Keeps the report focused on the
+        // highest-signal reason without losing the count.
+        if (!existing || rule.pattern.source.length > existing.patternLength) {
+          perLineHits.set(key, {
+            file: rel,
+            line: i + 1,
+            term: match[0],
+            reason: rule.reason,
+            context: line.trim().slice(0, 120),
+            patternLength: rule.pattern.source.length,
+          });
+        }
       }
+    }
+
+    for (const hit of perLineHits.values()) {
+      const { patternLength, ...rest } = hit;
+      violations.push(rest);
     }
   }
 
