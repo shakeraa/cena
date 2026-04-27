@@ -24,6 +24,11 @@ namespace Cena.Admin.Api;
 
 public static class GdprEndpoints
 {
+    // Marker for ILogger<T>. The non-generic ILogger isn't registered
+    // by AddLogging(), so [FromServices] ILogger params 500'd at
+    // dispatch — surfaced by EPIC-G-08. Mirrors MeGdprEndpoints.GdprLoggerMarker.
+    private sealed class GdprAdminLogMarker { }
+
     private static readonly TimeSpan CoolingPeriod = TimeSpan.FromDays(30);
 
     public static RouteGroupBuilder MapGdprEndpoints(this IEndpointRouteBuilder app)
@@ -42,7 +47,7 @@ public static class GdprEndpoints
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger logger) =>
+            [FromServices] ILogger<GdprAdminLogMarker> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
@@ -65,7 +70,7 @@ public static class GdprEndpoints
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger logger) =>
+            [FromServices] ILogger<GdprAdminLogMarker> logger) =>
         {
             if (!Enum.TryParse<ProcessingPurpose>(request.Purpose, true, out var purpose))
                 return Results.BadRequest(new { error = $"Invalid consent purpose: {request.Purpose}" });
@@ -92,7 +97,7 @@ public static class GdprEndpoints
             [FromServices] IGdprConsentManager consentManager,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger logger) =>
+            [FromServices] ILogger<GdprAdminLogMarker> logger) =>
         {
             if (!Enum.TryParse<ProcessingPurpose>(consentType, true, out var purpose))
                 return Results.BadRequest(new { error = $"Invalid consent purpose: {consentType}" });
@@ -120,7 +125,7 @@ public static class GdprEndpoints
             string studentId,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger logger) =>
+            [FromServices] ILogger<GdprAdminLogMarker> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
@@ -157,7 +162,7 @@ public static class GdprEndpoints
             [FromServices] IRightToErasureService erasureService,
             [FromServices] IDocumentStore store,
             HttpContext httpContext,
-            [FromServices] ILogger logger) =>
+            [FromServices] ILogger<GdprAdminLogMarker> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school (CRITICAL - destructive operation)
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, httpContext.User, store);
@@ -203,7 +208,7 @@ public static class GdprEndpoints
             [FromServices] IRightToErasureService erasureService,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger logger) =>
+            [FromServices] ILogger<GdprAdminLogMarker> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);
@@ -271,7 +276,7 @@ public static class GdprEndpoints
             [FromServices] IRightToErasureService erasureService,
             [FromServices] IDocumentStore store,
             HttpContext ctx,
-            [FromServices] ILogger logger) =>
+            [FromServices] ILogger<GdprAdminLogMarker> logger) =>
         {
             // FIND-sec-011: Verify student belongs to caller's school
             await GdprResourceGuard.VerifyStudentBelongsToCallerSchoolAsync(studentId, ctx.User, store);

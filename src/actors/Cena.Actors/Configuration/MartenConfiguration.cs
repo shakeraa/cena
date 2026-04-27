@@ -151,6 +151,14 @@ public static class MartenConfiguration
             .Index(x => x.StudentId)
             .Index(x => x.Status);
 
+        // prr-034: cultural-context review-board DLQ. /api/admin/moderation/
+        // cultural-context-dlq queries this document; without a schema
+        // entry every list/detail call 42P01-not-found. Surfaced by EPIC-G-06.
+        opts.Schema.For<Cena.Infrastructure.Documents.CulturalContextReviewBoardDocument>()
+            .Identity(d => d.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.Status);
+
         // ── Question Read Model (inline projection for list queries) ──
         opts.Projections.Add<QuestionListProjection>(ProjectionLifecycle.Inline);
 
