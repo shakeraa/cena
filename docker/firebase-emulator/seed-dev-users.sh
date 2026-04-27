@@ -45,14 +45,34 @@ create_user() {
 JSON
 )
 
+  # Use -s (no -f) so the body is captured even on 4xx — we need to
+  # see EMAIL_EXISTS to fall through to the existing-user lookup.
   local resp
-  resp=$(curl -fsS -X POST "${CREATE_URL}" \
+  resp=$(curl -sS -X POST "${CREATE_URL}" \
     -H "${AUTH_HEADER}" \
     -H "Content-Type: application/json" \
     -d "${create_payload}" || echo '{}')
 
   local uid
   uid=$(echo "${resp}" | sed -n 's/.*"localId":"\([^"]*\)".*/\1/p')
+
+  # EMAIL_EXISTS = a previous run (or interactive test) already created
+  # this account. Don't bail under `set -e` — recover the uid via
+  # signInWithPassword (we know the password, it's hard-coded above)
+  # and continue to the claims-update step so the roster stays
+  # consistent with the latest claim definitions.
+  if [ -z "${uid}" ] && echo "${resp}" | grep -q 'EMAIL_EXISTS'; then
+    local lookup
+    lookup=$(curl -sS -X POST "http://${EMU_HOST}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key" \
+      -H 'Content-Type: application/json' \
+      -d "{\"email\":\"${email}\",\"password\":\"${password}\",\"returnSecureToken\":true}" || echo '{}')
+    uid=$(echo "${lookup}" | sed -n 's/.*"localId":"\([^"]*\)".*/\1/p' | head -1)
+    if [ -n "${uid}" ]; then
+      echo "${email} already exists (uid=${uid}); refreshing claims" >&2
+    else
+      echo "${email} EMAIL_EXISTS but signIn failed; password may have drifted: ${lookup}" >&2
+    fi
+  fi
 
   if [ -z "${uid}" ]; then
     echo "FAIL creating ${email}: ${resp}" >&2
