@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-H](EPIC-E2E-H-multi-tenant-isolation.md)
 **Tag**: `@tenant @billing @compliance @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/institute-pricing-tenant-scope.spec.ts`
+**Prereqs**: PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

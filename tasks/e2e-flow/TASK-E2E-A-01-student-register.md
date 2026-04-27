@@ -1,6 +1,6 @@
 # TASK-E2E-A-01: Student registration → Firebase → tenant → home
 
-**Status**: Proposed
+**Status**: Spec landed (`workflows/student-register.spec.ts`) — blocked on BE-01 + BE-02. Will fail boundaries 2–4 until backend ships.
 **Priority**: P0
 **Epic**: [EPIC-E2E-A](EPIC-E2E-A-auth-onboarding.md)
 **Tag**: `@auth @p0`

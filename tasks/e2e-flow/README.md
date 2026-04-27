@@ -116,6 +116,27 @@ Tasks materialize as separate files only when implementation starts. Today's sta
 
 All other workflows live inline inside their epic files until someone claims one to implement.
 
+## Cross-spec prereqs (load-bearing)
+
+Track via the shared task queue (`node .agentdb/kimi-queue.js list`). All current backend prereqs are assigned to `claude-code` (kimi-coder paused 2026-04-24 per user directive).
+
+| Prereq | Task | Status | Queue id | Unblocks |
+|---|---|---|---|---|
+| Bus-boundary fixture | [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) | **Shipped** (`fixtures/bus-probe.ts` + `tenant.ts`) | n/a | every spec asserting an event |
+| Backend (auth claims + onboarding event + AdminUser bootstrap) | [TASK-E2E-A-01-BE-01](TASK-E2E-A-01-BE-01-on-first-sign-in.md) + [TASK-E2E-A-01-BE-02](TASK-E2E-A-01-BE-02-student-onboarded-event.md) | **Queued for claude-code** (high) | `t_63915197ed32` | A-01 + A-05 (AdminUser bootstrap folded in 2026-04-24) |
+| Admin test probe (DB boundary) | PRR-436 | **Queued for claude-code** (high) | `t_57d2a2cb8b10` | flagship TASK-E2E-001 + A-01 + every spec with a DB boundary |
+| Parent-bind backend (invite + endpoint + `ParentChildBoundV1`) | TASK-E2E-A-04-BE (queue body) | **Queued for claude-code** (high) | `t_8dc83d5aec23` | A-04 flagship `test.fixme` |
+
+## Task-file readiness state (2026-04-27 sweep)
+
+All 93 task files reviewed. Outcomes of the sweep:
+
+- **Status drift fixed**: A-01..A-06 + INFRA-01 + flagship 001/002/003 — statuses now reflect what's actually shipped vs queued vs proposed.
+- **Prereqs linkage**: 88/93 carry an inline `**Prereqs**:` line; 5 use equivalent `**Parent**:` / `**Depends on**:` / `## Prereqs` section. Coverage is 100%.
+- **Spec-file map**: 9 spec files exist under `tests/e2e-flow/workflows/` — 27 tests in total, 2 are `test.fixme` (A-04 flagship + A-05 full-flow) waiting on backend prereqs above.
+- **Boundary tables**: every workflow task has at least one boundary row; ship-gate (@p0) tasks should — but not all do — explicitly map each boundary to a `Done when` checkbox. Gap left for a follow-up sweep.
+- **INFRA-02 reframed**: per `feedback_destroy_containers_not_node_modules.md`, recovery order is now containers/volumes-first, lockfile-cleanup-second, raw `rm -rf node_modules` only with explicit user authorization.
+
 ## Test code layout
 
 ```

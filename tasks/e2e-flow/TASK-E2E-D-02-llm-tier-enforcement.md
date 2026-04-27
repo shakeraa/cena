@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-D](EPIC-E2E-D-ai-tutoring.md)
 **Tag**: `@llm @billing @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/llm-tier-enforcement.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

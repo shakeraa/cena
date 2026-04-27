@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-G](EPIC-E2E-G-admin-operations.md)
 **Tag**: `@gdpr @compliance @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/rtbf-admin.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

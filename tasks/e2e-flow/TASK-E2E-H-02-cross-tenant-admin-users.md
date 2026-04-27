@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-H](EPIC-E2E-H-multi-tenant-isolation.md)
 **Tag**: `@tenant @rbac @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/cross-tenant-admin-users.spec.ts`
+**Prereqs**: PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-J](EPIC-E2E-J-resilience-failure-modes.md)
 **Tag**: `@resilience @realtime @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/signalr-reconnect.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

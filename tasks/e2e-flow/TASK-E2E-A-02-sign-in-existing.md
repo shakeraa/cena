@@ -1,10 +1,11 @@
 # TASK-E2E-A-02: Sign-in path (existing account)
 
-**Status**: Proposed
+**Status**: Spec landed at `tests/e2e-flow/workflows/sign-in.spec.ts` (note: filename `sign-in.spec.ts`). 2 tests listed: happy path + wrong-password rejection.
 **Priority**: P0
 **Epic**: [EPIC-E2E-A](EPIC-E2E-A-auth-onboarding.md)
 **Tag**: `@auth @p0`
-**Spec path**: `src/student/full-version/tests/e2e-flow/workflows/sign-in-existing.spec.ts`
+**Spec path**: `src/student/full-version/tests/e2e-flow/workflows/sign-in.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

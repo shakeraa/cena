@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-K](EPIC-E2E-K-offline-pwa.md)
 **Tag**: `@offline @pwa @p2`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/offline-question-cache.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

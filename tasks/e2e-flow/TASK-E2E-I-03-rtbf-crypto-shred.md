@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-I](EPIC-E2E-I-gdpr-compliance.md)
 **Tag**: `@gdpr @compliance @ship-gate @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/rtbf-crypto-shred.spec.ts`
+**Prereqs**: PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

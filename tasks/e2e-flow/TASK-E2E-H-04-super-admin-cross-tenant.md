@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-H](EPIC-E2E-H-multi-tenant-isolation.md)
 **Tag**: `@tenant @rbac @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/super-admin-cross-tenant.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

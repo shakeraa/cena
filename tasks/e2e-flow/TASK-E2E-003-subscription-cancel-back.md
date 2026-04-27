@@ -2,7 +2,10 @@
 
 **Priority**: P1
 **Status**: Spec'd
+**Epic**: [EPIC-E2E-B](EPIC-E2E-B-subscription-billing.md) — workflow B-03
 **Spec**: `src/student/full-version/tests/e2e-flow/workflows/subscription-cancel-back.spec.ts`
+**Tag**: `@billing @p1`
+**Prereqs**: TASK-E2E-001 spike (shared fixtures + checkout flow)
 
 ---
 

@@ -1,10 +1,11 @@
 # TASK-E2E-A-03: Password reset
 
-**Status**: Proposed
+**Status**: Spec landed at `tests/e2e-flow/workflows/password-reset.spec.ts`. 2 tests listed: full reset via emu OOB + no-enumeration on unknown email.
 **Priority**: P1
 **Epic**: [EPIC-E2E-A](EPIC-E2E-A-auth-onboarding.md)
 **Tag**: `@auth @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/password-reset.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

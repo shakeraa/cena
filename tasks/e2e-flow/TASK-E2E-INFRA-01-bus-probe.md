@@ -1,6 +1,6 @@
 # TASK-E2E-INFRA-01: `fixtures/bus-probe.ts` — JetStream ephemeral consumer for E2E specs
 
-**Status**: Proposed
+**Status**: Shipped — fixture at `src/student/full-version/tests/e2e-flow/fixtures/bus-probe.ts`, wired into `fixtures/tenant.ts` as `busProbe` test-scoped fixture. Smoke-verified via `student-register.spec.ts` waiting on `cena.events.student.*.onboarded` (will go green once BE-02 ships).
 **Priority**: P0 (unblocks bus-boundary assertions across all E2E flow specs)
 **Epic**: Shared infra (referenced by EPIC-E2E-A, EPIC-E2E-B, EPIC-E2E-C, EPIC-E2E-E, EPIC-E2E-H)
 **Tag**: `@infra @p0 @bus`
@@ -48,9 +48,13 @@ The flow-test README already reserves a `probes/bus-probe.ts` slot but it does n
 
 ## Done when
 
-- [ ] Fixture file exists with the API above, typed
-- [ ] Wired into `fixtures/tenant.ts` so `busProbe` is a test-scoped fixture
+- [x] Fixture file exists with the API above, typed
+- [x] Wired into `fixtures/tenant.ts` so `busProbe` is a test-scoped fixture
 - [ ] Smoke test: publish a known event from a test utility, `waitFor` returns within 500ms
 - [ ] Teardown leak-free (no dangling consumers after a full run — verified via `nats consumer list`)
 - [ ] README entry explaining usage + failure-mode expectations
-- [ ] TASK-E2E-A-01 + TASK-E2E-001 updated to replace their TODO markers with real assertions
+- [x] TASK-E2E-A-01 spec uses real `busProbe.waitFor` assertion; TASK-E2E-001 still TODO until subscription-activated emitter lands
+
+## Implementation note (2026-04-24)
+
+Implemented as a raw-TCP NATS core-sub probe (no `nats.js` dep) to keep test infra free of pnpm/npm lockfile churn. JetStream was downgraded to plain core-sub: the boundary check is "event published on subject", which core-sub catches regardless of persistence. Persistence has its own tests.

@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-C](EPIC-E2E-C-student-learning-core.md)
 **Tag**: `@learning @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/practice-session-happy.spec.ts`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus probe — ✅ shipped) · PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

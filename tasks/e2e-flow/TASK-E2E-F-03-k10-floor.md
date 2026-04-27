@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-F](EPIC-E2E-F-teacher-classroom.md)
 **Tag**: `@privacy @k-floor @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/classroom-k10-floor.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

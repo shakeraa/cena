@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-E](EPIC-E2E-E-parent-console.md)
 **Tag**: `@parent @a11y @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/accommodations-profile.spec.ts`
+**Prereqs**: PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

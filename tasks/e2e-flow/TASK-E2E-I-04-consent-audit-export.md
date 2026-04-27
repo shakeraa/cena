@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-I](EPIC-E2E-I-gdpr-compliance.md)
 **Tag**: `@compliance @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/consent-audit-export.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

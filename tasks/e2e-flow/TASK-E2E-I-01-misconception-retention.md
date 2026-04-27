@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-I](EPIC-E2E-I-gdpr-compliance.md)
 **Tag**: `@compliance @ship-gate @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/misconception-retention.spec.ts`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus probe — ✅ shipped)
 
 ## Journey
 

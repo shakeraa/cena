@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-D](EPIC-E2E-D-ai-tutoring.md)
 **Tag**: `@cas @compliance @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/stem-grounded-hints.spec.ts`
+**Prereqs**: PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-H](EPIC-E2E-H-multi-tenant-isolation.md)
 **Tag**: `@tenant @compliance @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/cross-tenant-nats.spec.ts`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus probe — ✅ shipped; required to assert cross-tenant subscriber receives 0 events)
 
 ## Journey
 

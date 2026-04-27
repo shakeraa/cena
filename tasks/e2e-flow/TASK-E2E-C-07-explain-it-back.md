@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-C](EPIC-E2E-C-student-learning-core.md)
 **Tag**: `@learning @llm @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/explain-it-back.spec.ts`
+**Prereqs**: PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

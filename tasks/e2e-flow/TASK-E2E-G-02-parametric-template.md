@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-G](EPIC-E2E-G-admin-operations.md)
 **Tag**: `@admin @cas @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/parametric-template.spec.ts`
+**Prereqs**: PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

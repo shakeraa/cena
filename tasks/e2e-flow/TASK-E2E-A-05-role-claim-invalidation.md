@@ -1,10 +1,11 @@
 # TASK-E2E-A-05: Role-claim cache invalidation
 
-**Status**: Proposed
+**Status**: Spec landed at `tests/e2e-flow/workflows/role-claim-invalidation.spec.ts`. 4 tests listed: auth-required check, SUPER_ADMIN-only enforcement, 404 on unknown user, full promotion flow (BLOCKED_ON `AdminUser bootstrap for STUDENT role` per spec annotation).
 **Priority**: P0
 **Epic**: [EPIC-E2E-A](EPIC-E2E-A-auth-onboarding.md)
 **Tag**: `@auth @rbac @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/role-claim-invalidation.spec.ts`
+**Prereqs**: shared fixtures · **Backend prereq**: AdminUser bootstrap path that creates a STUDENT role row visible to the role-update endpoint — not yet queued; needs a TASK-E2E-A-05-BE-01
 
 ## Journey
 

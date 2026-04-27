@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-J](EPIC-E2E-J-resilience-failure-modes.md)
 **Tag**: `@resilience @llm @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/llm-429-circuit-breaker.spec.ts`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus probe — ✅ shipped)
 
 ## Journey
 

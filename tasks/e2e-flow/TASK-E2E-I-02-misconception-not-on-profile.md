@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-I](EPIC-E2E-I-gdpr-compliance.md)
 **Tag**: `@compliance @ship-gate @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/misconception-not-on-profile.spec.ts`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus probe — ✅ shipped; for the event-stream scan) · PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`; for profile-shape assertion)
 
 ## Journey
 

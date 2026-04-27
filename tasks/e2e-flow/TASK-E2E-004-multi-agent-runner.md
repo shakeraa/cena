@@ -2,7 +2,9 @@
 
 **Priority**: P2 (layer-2 on top of working suite; doesn't gate the suite itself)
 **Status**: Proposed
-**Depends on**: TASK-E2E-001 / 002 / 003 shipped and green
+**Epic**: Cross-epic infra (referenced from [README.md](README.md))
+**Tag**: `@infra @triage @p2`
+**Depends on**: TASK-E2E-001 / 002 / 003 shipped and green; suite running on CI
 
 ---
 

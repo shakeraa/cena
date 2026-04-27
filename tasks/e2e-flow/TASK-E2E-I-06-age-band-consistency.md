@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-I](EPIC-E2E-I-gdpr-compliance.md)
 **Tag**: `@compliance @parent @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/age-band-consistency.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-G](EPIC-E2E-G-admin-operations.md)
 **Tag**: `@admin @ship-gate @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/bagrut-ingestion.spec.ts`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus probe — ✅ shipped) · PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

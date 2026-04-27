@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-J](EPIC-E2E-J-resilience-failure-modes.md)
 **Tag**: `@resilience @parent @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/smtp-down-fallback.spec.ts`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus probe — ✅ shipped) · PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

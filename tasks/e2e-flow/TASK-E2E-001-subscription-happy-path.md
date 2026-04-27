@@ -2,7 +2,10 @@
 
 **Priority**: P0 (flagship spec — validates the pattern)
 **Status**: Spike shipped (workflow skeleton); assertions at all 4 boundaries scheduled next iteration.
+**Epic**: [EPIC-E2E-B](EPIC-E2E-B-subscription-billing.md) — workflow B-01
 **Spec**: `src/student/full-version/tests/e2e-flow/workflows/subscription-happy-path.spec.ts`
+**Tag**: `@billing @p0`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus boundary, ✅ shipped) · PRR-436 admin test probe (DB boundary, pending)
 
 ---
 

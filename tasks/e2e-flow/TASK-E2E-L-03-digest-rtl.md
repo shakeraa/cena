@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-L](EPIC-E2E-L-accessibility-i18n.md)
 **Tag**: `@i18n @parent @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/digest-rtl.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-G](EPIC-E2E-G-admin-operations.md)
 **Tag**: `@admin @sse @p2`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/live-monitor.spec.ts`
+**Prereqs**: none beyond shared fixtures (`tenant`, `authUser`, `stripeScope` — wired in `fixtures/tenant.ts`)
 
 ## Journey
 

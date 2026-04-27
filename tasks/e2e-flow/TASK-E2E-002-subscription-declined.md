@@ -2,7 +2,10 @@
 
 **Priority**: P1
 **Status**: Spec'd (skeleton to be implemented alongside TASK-E2E-001's boundary-assertion pass)
+**Epic**: [EPIC-E2E-B](EPIC-E2E-B-subscription-billing.md) — workflow B-02
 **Spec**: `src/student/full-version/tests/e2e-flow/workflows/subscription-declined.spec.ts`
+**Tag**: `@billing @p1`
+**Prereqs**: TASK-E2E-001 spike (shared fixtures + checkout flow)
 
 ---
 

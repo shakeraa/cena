@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-B](EPIC-E2E-B-subscription-billing.md)
 **Tag**: `@billing @p0`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/subscription-upgrade.spec.ts`
+**Prereqs**: [TASK-E2E-INFRA-01](TASK-E2E-INFRA-01-bus-probe.md) (bus probe — ✅ shipped) · PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 

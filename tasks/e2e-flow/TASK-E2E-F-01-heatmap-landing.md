@@ -5,6 +5,7 @@
 **Epic**: [EPIC-E2E-F](EPIC-E2E-F-teacher-classroom.md)
 **Tag**: `@teacher @privacy @p1`
 **Spec path**: `src/student/full-version/tests/e2e-flow/workflows/teacher-heatmap.spec.ts`
+**Prereqs**: PRR-436 admin test probe (DB boundary — queue id `t_57d2a2cb8b10`)
 
 ## Journey
 
