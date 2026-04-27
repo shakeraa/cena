@@ -220,18 +220,29 @@ export default function install(_app: App) {
         ability.update(studentAbilityRules)
         writeAbilityCookie(studentAbilityRules)
 
+        // Hydrate meStore from /api/me so the router guard's
+        // `isOnboarded` check reflects backend reality. Without this the
+        // guard sees `profile == null` for every fresh sign-in and
+        // bounces the user to /onboarding even though the projection
+        // already has `onboardedAt`. 404 is a normal "no snapshot yet"
+        // state — leave the profile minimal so /onboarding is the
+        // landing route.
+        await hydrateMeFromApi(idToken, firebaseUser, meStore)
+
         console.info('[firebase] Auth state: signed in as', firebaseUser.uid)
       }
       catch (err) {
         console.error('[firebase] Failed to process auth state change:', err)
         await signOut(auth)
         authStore.__firebaseSignOut()
+        meStore.__setProfile(null)
         ability.update([])
         clearAbilityCookie()
       }
     }
     else {
       authStore.__firebaseSignOut()
+      meStore.__setProfile(null)
       ability.update([])
       clearAbilityCookie()
 
@@ -240,4 +251,75 @@ export default function install(_app: App) {
 
     authStore.__setReady()
   })
+}
+
+/**
+ * Fetch /api/me with the freshly issued Firebase idToken and populate
+ * meStore.profile. The route guard reads `meStore.isOnboarded` to decide
+ * /home vs /onboarding; without this hydration the guard always sees
+ * `profile == null` and bounces signed-in users to /onboarding.
+ *
+ * Failure modes:
+ *   - 404: no StudentProfileSnapshot yet → seed profile with
+ *     onboardedAt=null so guard correctly routes to /onboarding
+ *   - 401/5xx/network: leave the previous profile in place — auth state
+ *     already changed, the next render will surface the error elsewhere
+ */
+async function hydrateMeFromApi(
+  idToken: string,
+  firebaseUser: { uid: string; email: string | null; displayName: string | null },
+  meStore: ReturnType<typeof useMeStore>,
+): Promise<void> {
+  // Use a relative path so the request goes through vite's /api proxy
+  // in dev (same-origin) and through the same-origin path in prod.
+  // Earlier this read VITE_STUDENT_API_BASE_URL=http://localhost:5050,
+  // which is cross-origin from the SPA at localhost:5175; that triggered
+  // CORS net::ERR_FAILED, the catch swallowed it, meStore stayed
+  // unhydrated with onboardedAt:null, and the router guard bounced
+  // every signed-in student back to /onboarding.
+  const url = '/api/me'
+
+  try {
+    const resp = await fetch(url, {
+      method: 'GET',
+      headers: {
+        Authorization: `Bearer ${idToken}`,
+        Accept: 'application/json',
+      },
+    })
+
+    if (resp.status === 404) {
+      // Brand-new user — projection hasn't been seeded yet. The next
+      // /onboarding submit will write the snapshot.
+      meStore.__setProfile({
+        uid: firebaseUser.uid,
+        displayName: firebaseUser.displayName ?? '',
+        email: firebaseUser.email ?? '',
+        locale: 'en',
+        onboardedAt: null,
+      })
+      return
+    }
+
+    if (!resp.ok) {
+      console.warn(`[firebase] GET /api/me ${resp.status} — meStore left as-is`)
+      return
+    }
+
+    const body = await resp.json() as {
+      displayName?: string
+      locale?: string
+      onboardedAt?: string | null
+    }
+    meStore.__setProfile({
+      uid: firebaseUser.uid,
+      displayName: body.displayName ?? firebaseUser.displayName ?? '',
+      email: firebaseUser.email ?? '',
+      locale: (body.locale === 'ar' || body.locale === 'he') ? body.locale : 'en',
+      onboardedAt: typeof body.onboardedAt === 'string' ? body.onboardedAt : null,
+    })
+  }
+  catch (err) {
+    console.warn('[firebase] /api/me hydration failed:', err)
+  }
 }

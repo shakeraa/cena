@@ -351,6 +351,18 @@ public sealed class FirebaseAdminService : IFirebaseAdminService
         // LinkGenerated + UserNotFound is the caller's job. This method
         // reports the true outcome so internal telemetry (hashed only) can
         // still distinguish them.
+        //
+        // Dev/E2E path: Firebase Admin SDK fails to initialize without GCP
+        // credentials. Same emulator-REST fallback shape used by
+        // SetCustomClaimsAsync — gated on FIREBASE_AUTH_EMULATOR_HOST so
+        // production never hits this branch.
+        var emulatorHost = Environment.GetEnvironmentVariable("FIREBASE_AUTH_EMULATOR_HOST");
+        if (!_initialized && !string.IsNullOrWhiteSpace(emulatorHost))
+        {
+            return await GeneratePasswordResetViaEmulatorAsync(emulatorHost, email, cancellationToken)
+                .ConfigureAwait(false);
+        }
+
         if (!_initialized)
         {
             _logger.LogError(
@@ -393,6 +405,73 @@ public sealed class FirebaseAdminService : IFirebaseAdminService
                 "Firebase password-reset failed for {EmailHash}: {Code}",
                 EmailHasher.Hash(email),
                 ex.AuthErrorCode);
+            return PasswordResetOutcome.FirebaseUnavailable;
+        }
+    }
+
+    /// <summary>
+    /// Emulator-REST fallback for password-reset OOB generation. Calls the
+    /// Identity Toolkit emulator's <c>accounts:sendOobCode</c> directly so
+    /// the OOB code is dropped into the emulator's in-memory store
+    /// (retrievable via <c>/emulator/v1/projects/{p}/oobCodes</c> by tests
+    /// or by the SPA's reset-link follow-up). OWASP enumeration parity is
+    /// preserved — UserNotFound is mapped from the emulator's
+    /// <c>EMAIL_NOT_FOUND</c> response. Production never reaches this
+    /// path because <c>FIREBASE_AUTH_EMULATOR_HOST</c> is unset there.
+    /// </summary>
+    private async Task<PasswordResetOutcome> GeneratePasswordResetViaEmulatorAsync(
+        string emulatorHost,
+        string email,
+        CancellationToken cancellationToken)
+    {
+        var url = $"http://{emulatorHost}/identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=fake-api-key";
+
+        var body = new
+        {
+            requestType = "PASSWORD_RESET",
+            email = email,
+        };
+        var content = new StringContent(
+            System.Text.Json.JsonSerializer.Serialize(body),
+            System.Text.Encoding.UTF8,
+            "application/json");
+
+        try
+        {
+            using var http = new HttpClient();
+            var resp = await http.PostAsync(url, content, cancellationToken).ConfigureAwait(false);
+            var respBody = await resp.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+            if (resp.IsSuccessStatusCode)
+            {
+                _logger.LogInformation(
+                    "Password reset link generated via emulator for {EmailHash}",
+                    EmailHasher.Hash(email));
+                return PasswordResetOutcome.LinkGenerated;
+            }
+
+            // Emulator returns 400 with `{"error":{"message":"EMAIL_NOT_FOUND"}}`
+            // for unknown addresses. Treat that as UserNotFound — the caller
+            // is responsible for the OWASP-uniform response shape.
+            if (respBody.Contains("EMAIL_NOT_FOUND", StringComparison.Ordinal))
+            {
+                _logger.LogInformation(
+                    "Password reset requested for unknown email {EmailHash} (emulator)",
+                    EmailHasher.Hash(email));
+                return PasswordResetOutcome.UserNotFound;
+            }
+
+            _logger.LogError(
+                "Firebase emulator sendOobCode failed for {EmailHash}: {Status} {Body}",
+                EmailHasher.Hash(email), (int)resp.StatusCode, respBody);
+            return PasswordResetOutcome.FirebaseUnavailable;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Firebase emulator sendOobCode threw for {EmailHash}",
+                EmailHasher.Hash(email));
             return PasswordResetOutcome.FirebaseUnavailable;
         }
     }

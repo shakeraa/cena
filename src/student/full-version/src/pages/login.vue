@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref } from 'vue'
+import { computed, onBeforeUnmount, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
@@ -120,9 +120,29 @@ async function handleFirebaseSubmit(payload: { email: string; password: string }
   try {
     await loginWithEmail(payload.email, payload.password)
 
-    // onAuthStateChanged in firebase.ts plugin will update the auth store.
-    // We just need to navigate. Wait a tick for the listener to fire.
-    await new Promise(resolve => setTimeout(resolve, 50))
+    // Wait for firebase.ts's onAuthStateChanged handler to (a) update
+    // authStore via __firebaseSignIn and (b) hydrate meStore from
+    // /api/me. Without (b) the route guard sees `profile == null` for
+    // every fresh sign-in and bounces signed-in students to /onboarding
+    // even when the projection has `onboardedAt`. The previous 50ms
+    // timeout was too short to race the /api/me round-trip.
+    await new Promise<void>(resolve => {
+      if (meStore.profile) {
+        resolve()
+        return
+      }
+      const stop = watch(
+        () => meStore.profile,
+        profile => {
+          if (profile) {
+            stop()
+            resolve()
+          }
+        },
+      )
+      // Hard cap so a backend hiccup doesn't strand the user on /login.
+      setTimeout(() => { stop(); resolve() }, 5_000)
+    })
 
     loading.value = false
     await navigateAfterLogin()
