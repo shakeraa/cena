@@ -242,6 +242,16 @@ export default function install(_app: App) {
       }
     }
     else {
+      // Snapshot whether THIS tab thought it was signed in BEFORE we
+      // clear authStore. The two scenarios that reach this branch:
+      //   (a) Initial app boot with no Firebase session — wasSignedIn
+      //       is false here, this is normal init, do NOT redirect.
+      //   (b) User signed out (this tab OR a sibling tab via IDB sync)
+      //       — wasSignedIn was true, push to /login if we're on a
+      //       requiresAuth route so the user doesn't sit on stale
+      //       signed-in chrome.
+      const wasSignedIn = authStore.isSignedIn
+
       authStore.__firebaseSignOut()
       meStore.__setProfile(null)
       ability.update([])
@@ -249,23 +259,24 @@ export default function install(_app: App) {
 
       console.info('[firebase] Auth state: signed out')
 
-      // Cross-tab sign-out propagation: when Firebase fires the
-      // signed-out state on this tab because *another* tab signed
-      // out (shared IndexedDB), the router guard does NOT re-fire
-      // for the current tab — we're sitting idle on a signed-in
-      // route. Push the user to /login explicitly so tab B does
-      // not display stale signed-in chrome with no auth behind it.
-      const current = router.currentRoute.value
-      const requiresAuth = current.meta?.requiresAuth !== false
-      const isPublic = current.path === '/login'
-        || current.path === '/register'
-        || current.path === '/forgot-password'
-        || current.path.startsWith('/_dev/')
-      if (requiresAuth && !isPublic) {
-        router.replace({
-          path: '/login',
-          query: { returnTo: current.fullPath },
-        }).catch(() => { /* navigation cancelled — guard will retry */ })
+      // Cross-tab sign-out propagation. Skip on initial boot
+      // (wasSignedIn=false) — the route guard already handles
+      // unauthenticated requiresAuth navigations on the next routing
+      // decision; redirecting here on boot incorrectly bounces
+      // public routes like /register and /forgot-password to /login.
+      if (wasSignedIn) {
+        const current = router.currentRoute.value
+        const requiresAuth = current.meta?.requiresAuth !== false
+        const isPublic = current.path === '/login'
+          || current.path === '/register'
+          || current.path === '/forgot-password'
+          || current.path.startsWith('/_dev/')
+        if (requiresAuth && !isPublic) {
+          router.replace({
+            path: '/login',
+            query: { returnTo: current.fullPath },
+          }).catch(() => { /* navigation cancelled — guard will retry */ })
+        }
       }
     }
 
