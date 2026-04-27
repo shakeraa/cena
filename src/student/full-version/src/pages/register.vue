@@ -45,7 +45,12 @@ const { t } = useI18n()
 const router = useRouter()
 const authStore = useAuthStore()
 const meStore = useMeStore()
-const { registerWithEmail, errorKey } = useFirebaseAuth()
+const { registerWithEmail, onFirstSignIn, errorKey } = useFirebaseAuth()
+
+// TASK-E2E-A-01-BE-01: backend bootstrap target for the on-first-sign-in
+// callback. Vite dev proxies /api/* to the student-api host, so the empty
+// base hits the proxy. Production deployments override via VITE_STUDENT_API_BASE_URL.
+const studentApiBaseUrl = import.meta.env.VITE_STUDENT_API_BASE_URL ?? ''
 
 const loading = ref(false)
 const errorMessage = ref('')
@@ -174,6 +179,20 @@ async function handleFirebaseSubmit(payload: { email: string; password: string; 
     // onAuthStateChanged in firebase.ts plugin will update the auth store.
     // Wait a tick for the listener to fire.
     await new Promise(resolve => setTimeout(resolve, 50))
+
+    // TASK-E2E-A-01-BE-01: bind the freshly-created Firebase user to a Cena
+    // tenant by calling the backend bootstrap. This sets custom claims
+    // (role/tenant_id/school_id), creates AdminUser+StudentProfile docs, and
+    // emits StudentOnboardedV1 on NATS. The composable also force-refreshes
+    // the idToken so the new claims land before the SPA's next /api/me call.
+    //
+    // Failure here is fatal — we MUST NOT redirect to /onboarding with a
+    // partially-bootstrapped account because every downstream /api/me call
+    // would then 401-loop. Surface the error to the user.
+    await onFirstSignIn({
+      apiBaseUrl: studentApiBaseUrl,
+      displayName: payload.displayName,
+    })
 
     // Fresh registrations start NOT onboarded.
     meStore.__setProfile({

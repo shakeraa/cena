@@ -682,6 +682,14 @@ public partial class Program
     // self-service forgot-password flow has a real implementation on both sides.
     builder.Services.AddSingleton<IFirebaseAdminService, FirebaseAdminService>(); Cena.Student.Api.Host.Catalog.CatalogServiceRegistration.AddCenaExamCatalog(builder.Services, builder.Configuration, builder.Environment); // prr-220 ADR-0050
 
+    // TASK-E2E-A-01-BE-01: first-sign-in onboarding service. Scoped because it
+    // takes IDocumentStore-derived sessions per call and uses transient claim
+    // sets. Singleton would still be safe (no per-call state on the service
+    // itself) but Scoped lines up with how the other Marten-aware services in
+    // this host are registered.
+    builder.Services.AddScoped<Cena.Actors.Onboarding.IStudentOnboardingService,
+        Cena.Actors.Onboarding.StudentOnboardingService>();
+
     // PRR-243: wire the catalog-backed שאלון validator (replaces the
     // permissive AllowAll registered by AddStudentPlanServices). Must run
     // AFTER AddCenaExamCatalog so IExamCatalogService is resolvable.

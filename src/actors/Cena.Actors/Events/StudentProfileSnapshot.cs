@@ -245,6 +245,24 @@ public class StudentProfileSnapshot
     }
 
     /// <summary>
+    /// TASK-E2E-A-01-BE-02: Apply first-sign-in event. Bootstraps the StudentProfile
+    /// row when the Firebase uid first hits the backend (before the onboarding
+    /// wizard). Sets the school binding (first-wins) and the creation timestamp
+    /// (only if the stream has nothing earlier). Idempotent under replay — if the
+    /// event re-runs from the stream after an OnboardingCompleted_V1, the
+    /// guarded assignments are no-ops.
+    /// </summary>
+    public void Apply(StudentOnboardedV1 e)
+    {
+        StudentId = e.Uid;
+        SchoolId ??= e.SchoolId;
+        if (CreatedAt == default)
+        {
+            CreatedAt = e.OnboardedAt;
+        }
+    }
+
+    /// <summary>
     /// STB-00: Apply onboarding completion event.
     /// FIND-data-007: This is the canonical profile-creation event for a student.
     /// On snapshot rebuild from the event stream, this handler is responsible for

@@ -8,8 +8,10 @@
 // =============================================================================
 
 using System.ComponentModel.DataAnnotations;
+using System.Security.Claims;
 using System.Security.Cryptography;
 using Cena.Actors.Events;
+using Cena.Actors.Onboarding;
 using Cena.Infrastructure.Network;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Firebase;
@@ -86,6 +88,48 @@ public static class AuthEndpoints
         bool Verified,
         string StudentId);
 
+    // ── TASK-E2E-A-01-BE-01: on-first-sign-in DTOs ──
+
+    /// <summary>
+    /// Request body for <c>POST /api/auth/on-first-sign-in</c>. The caller is an
+    /// authenticated Firebase user whose idToken has no Cena custom claims yet.
+    /// The body carries the tenant binding the SPA needs to attach to the
+    /// fresh account.
+    /// </summary>
+    /// <param name="TenantId">
+    /// Cena institute id (ADR-0001 multi-tenant). E2E trusted-mode reads this
+    /// directly from the SPA fixture; production reads it from a verified
+    /// invite-code (separate follow-up — endpoint rejects with 501 for now in
+    /// that path).
+    /// </param>
+    /// <param name="SchoolId">
+    /// Optional explicit school binding. Defaults to <see cref="TenantId"/>
+    /// when omitted — most current institutes use a 1:1 school-to-tenant map.
+    /// </param>
+    /// <param name="DisplayName">
+    /// Optional display name. Falls back to email on the AdminUser doc.
+    /// </param>
+    public sealed record OnFirstSignInRequest(
+        [property: Required] string TenantId,
+        string? SchoolId,
+        string? DisplayName);
+
+    /// <summary>
+    /// Response body for <c>POST /api/auth/on-first-sign-in</c>. The SPA forces
+    /// a Firebase idToken refresh after this returns so the new custom claims
+    /// land before any /api/me call.
+    /// </summary>
+    /// <param name="WasNewlyOnboarded">
+    /// True for a first-time call, false for an idempotent replay. Surfaced
+    /// for observability only — the SPA flow is the same in both cases.
+    /// </param>
+    public sealed record OnFirstSignInResponse(
+        string Uid,
+        string TenantId,
+        string SchoolId,
+        string Role,
+        bool WasNewlyOnboarded);
+
     public static IEndpointRouteBuilder MapAuthEndpoints(this IEndpointRouteBuilder app)
     {
         // Anonymous group — these routes back public forms on the unauthed
@@ -124,6 +168,26 @@ public static class AuthEndpoints
         group.MapPost("/parent-consent-verify/{token}", ParentConsentVerify)
             .WithName("PostParentConsentVerify")
             .WithSummary("Verify a parent consent token and mark consent as active.");
+
+        // TASK-E2E-A-01-BE-01: authenticated bootstrap. Caller's idToken has no
+        // custom claims yet, so this lives in its own group that REQUIRES auth
+        // (vs. the surrounding anonymous group). The Firebase JwtBearer scheme
+        // accepts the no-claims token because validation is lifetime + issuer
+        // + audience only — see FirebaseAuthExtensions.AddFirebaseAuth.
+        var authedGroup = app.MapGroup("/api/auth")
+            .WithTags("Auth")
+            .RequireAuthorization()
+            .RequireRateLimiting("api");
+
+        authedGroup.MapPost("/on-first-sign-in", OnFirstSignIn)
+            .WithName("PostOnFirstSignIn")
+            .WithSummary("Bootstrap a freshly-signed-up Firebase user: set custom claims, create AdminUser + StudentProfile, emit StudentOnboardedV1.")
+            .Produces<OnFirstSignInResponse>(StatusCodes.Status200OK)
+            .Produces<CenaError>(StatusCodes.Status400BadRequest)
+            .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+            .Produces<CenaError>(StatusCodes.Status409Conflict)
+            .Produces<CenaError>(StatusCodes.Status501NotImplemented)
+            .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
@@ -417,6 +481,144 @@ public static class AuthEndpoints
             token.Length > 8 ? token[..8] : token);
 
         return TypedResults.NotFound(new AuthErrorResponse("Consent token not found or already used."));
+    }
+
+    // =========================================================================
+    // TASK-E2E-A-01-BE-01: First-sign-in bootstrap handler
+    // =========================================================================
+
+    /// <summary>
+    /// Env-var gate that opens the trusted-tenant path for E2E flow tests.
+    /// Production deployments leave this unset; the endpoint then refuses any
+    /// caller-supplied tenantId and points at the (yet-unbuilt) invite-code
+    /// path. Per memory <c>feedback_no_stubs_production_grade.md</c>, this is
+    /// fail-closed behaviour, not a stub.
+    /// </summary>
+    internal const string TrustedRegistrationEnvVar = "CENA_E2E_TRUSTED_REGISTRATION";
+
+    /// <summary>
+    /// POST /api/auth/on-first-sign-in
+    ///
+    /// Caller: authenticated Firebase user whose idToken has no Cena custom
+    /// claims yet (just-after-registerWithEmail). Body carries the tenant
+    /// binding to attach.
+    ///
+    /// Idempotent: a second call with the same uid returns 200 with
+    /// <see cref="OnFirstSignInResponse.WasNewlyOnboarded"/>=false.
+    /// </summary>
+    internal static async Task<IResult> OnFirstSignIn(
+        [FromBody] OnFirstSignInRequest? request,
+        [FromServices] IStudentOnboardingService onboarding,
+        [FromServices] ILogger<AuthLoggerMarker> logger,
+        HttpContext ctx,
+        CancellationToken cancellationToken)
+    {
+        // ── Caller identity from validated idToken ──
+        var uid = ctx.User.FindFirst(ClaimTypes.NameIdentifier)?.Value
+            ?? ctx.User.FindFirst("sub")?.Value
+            ?? ctx.User.FindFirst("user_id")?.Value;
+        var email = ctx.User.FindFirst("email")?.Value
+            ?? ctx.User.FindFirst(ClaimTypes.Email)?.Value;
+
+        if (string.IsNullOrWhiteSpace(uid))
+        {
+            // RequireAuthorization should have caught this, but defence in depth.
+            return TypedResults.Unauthorized();
+        }
+        if (string.IsNullOrWhiteSpace(email))
+        {
+            return TypedResults.BadRequest(new AuthErrorResponse(
+                "Firebase idToken did not carry an email claim — cannot onboard."));
+        }
+
+        // ── Body validation ──
+        if (request is null || string.IsNullOrWhiteSpace(request.TenantId))
+        {
+            return TypedResults.BadRequest(new AuthErrorResponse("TenantId is required."));
+        }
+
+        // ── Trusted-mode gate ──
+        // Production path (invite-code resolution) is a separate task; for now
+        // the only way to onboard is via the E2E trusted env var. Production
+        // callers get 501 with a clear reason — do not silently accept untrusted
+        // tenant binding.
+        var trustedRegistration = string.Equals(
+            Environment.GetEnvironmentVariable(TrustedRegistrationEnvVar),
+            "true",
+            StringComparison.OrdinalIgnoreCase);
+
+        if (!trustedRegistration)
+        {
+            logger.LogWarning(
+                "[ON-FIRST-SIGN-IN] uid={Uid} rejected: {EnvVar}=false (production invite-code path not yet wired)",
+                uid, TrustedRegistrationEnvVar);
+            return TypedResults.Json<CenaError>(
+                new CenaError(
+                    Code: "on_first_sign_in_invite_path_not_implemented",
+                    Message: "Production registration must use a verified invite code; that path ships under a follow-up task.",
+                    Category: ErrorCategory.Internal,
+                    Details: null,
+                    CorrelationId: null),
+                statusCode: StatusCodes.Status501NotImplemented);
+        }
+
+        var tenantId = request.TenantId.Trim();
+        var schoolId = string.IsNullOrWhiteSpace(request.SchoolId)
+            ? tenantId
+            : request.SchoolId.Trim();
+
+        // Correlation id for trace stitching across HTTP → Marten → NATS.
+        var correlationHeader = ctx.Request.Headers["X-Correlation-Id"].ToString();
+        var correlationId = Guid.TryParse(correlationHeader, out var parsed)
+            ? parsed
+            : Guid.NewGuid();
+
+        try
+        {
+            var result = await onboarding.OnboardAsync(
+                new StudentOnboardingRequest(
+                    Uid: uid,
+                    Email: email,
+                    TenantId: tenantId,
+                    SchoolId: schoolId,
+                    DisplayName: request.DisplayName,
+                    CorrelationId: correlationId),
+                cancellationToken)
+                .ConfigureAwait(false);
+
+            return TypedResults.Ok(new OnFirstSignInResponse(
+                Uid: result.Uid,
+                TenantId: result.TenantId,
+                SchoolId: result.SchoolId,
+                Role: result.Role,
+                WasNewlyOnboarded: result.WasNewlyOnboarded));
+        }
+        catch (InvalidOperationException ex) when (ex.Message.Contains("already exists"))
+        {
+            // Uid collision: same Firebase user is already in AdminUser as a
+            // non-student role. Refuse rather than silently downgrade — the
+            // SPA must surface this to the user (or to support).
+            logger.LogWarning(ex, "[ON-FIRST-SIGN-IN] uid={Uid} role collision", uid);
+            return TypedResults.Json<CenaError>(
+                new CenaError(
+                    Code: "on_first_sign_in_role_collision",
+                    Message: ex.Message,
+                    Category: ErrorCategory.Conflict,
+                    Details: null,
+                    CorrelationId: null),
+                statusCode: StatusCodes.Status409Conflict);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            return TypedResults.StatusCode(499);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex,
+                "[ON-FIRST-SIGN-IN] uid={Uid} tenant={TenantId} unexpected failure",
+                uid, tenantId);
+            return TypedResults.StatusCode(StatusCodes.Status500InternalServerError);
+        }
     }
 
     // ── FIND-privacy-001: Helper ──

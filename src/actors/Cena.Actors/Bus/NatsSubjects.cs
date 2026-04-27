@@ -47,6 +47,21 @@ public static class NatsSubjects
     public const string StudentTutoringStarted     = "tutoring_started";
     public const string StudentTutorMessage        = "tutor_message";
     public const string StudentTutoringEnded       = "tutoring_ended";
+    /// <summary>
+    /// TASK-E2E-A-01-BE-02: per-student onboarding event-type token. Combined via
+    /// <see cref="StudentEvent(string, string)"/> yields
+    /// <c>cena.events.student.{uid}.onboarded</c>.
+    /// </summary>
+    public const string StudentOnboarded           = "onboarded";
+
+    /// <summary>
+    /// TASK-E2E-A-01-BE-02: wildcard subscription matching every onboarded event
+    /// across every student. Used by E2E flow tests
+    /// (`tests/e2e-flow/fixtures/bus-probe.ts`) and by downstream consumers
+    /// (admin analytics, parent-notification fanout) that don't know the uid in
+    /// advance.
+    /// </summary>
+    public const string AllStudentOnboardedEvents  = "cena.events.student.*.onboarded";
 
     /// <summary>
     /// Wildcard subscription for all events of a specific student.

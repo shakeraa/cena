@@ -311,6 +311,35 @@ public record OnboardingCompleted_V1(
 ) : IDelegatedEvent;
 
 /// <summary>
+/// TASK-E2E-A-01-BE-02: Emitted the first time a Firebase user (student role) hits
+/// the backend via <c>POST /api/auth/on-first-sign-in</c>. Distinct from
+/// <see cref="OnboardingCompleted_V1"/> — that one fires when the student finishes
+/// the onboarding wizard. <c>StudentOnboardedV1</c> fires earlier: at sign-up, before
+/// the wizard, and binds the Firebase uid to a Cena tenant + school.
+///
+/// <para>Stream key: Firebase uid. The event is appended to the per-student stream
+/// so the inline <see cref="StudentProfileSnapshot"/> projection bootstraps an
+/// empty profile on first call. Subsequent calls with the same uid are no-ops at
+/// the service layer (idempotent) and never re-emit.</para>
+///
+/// <para>NATS subject: <c>cena.events.student.{uid}.onboarded</c> — see
+/// <see cref="Bus.NatsSubjects.StudentEvent(string, string)"/> with event-type
+/// constant <see cref="Bus.NatsSubjects.StudentOnboarded"/>.</para>
+///
+/// <para>Header convention on NATS: <c>tenant_id</c> header carries
+/// <see cref="TenantId"/> so multi-tenant subscribers can filter without parsing
+/// the payload.</para>
+/// </summary>
+public record StudentOnboardedV1(
+    string Uid,
+    string Email,
+    string TenantId,
+    string SchoolId,
+    DateTimeOffset OnboardedAt,
+    Guid CorrelationId
+) : IDelegatedEvent;
+
+/// <summary>
 /// FIND-data-007b: emitted when a student updates their profile
 /// (display name, bio, favorite subjects, visibility). Nullable fields
 /// signal "do not change" so MeEndpoints.UpdateProfile can patch

@@ -191,6 +191,12 @@ services:
       - Marten__AutoCreate=None
       - Firebase__ProjectId=cena-platform
       - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+      # TASK-E2E-A-01-BE-01: open the trusted-tenant on-first-sign-in path so
+      # the e2e-flow student-register spec can bind a Firebase user to the
+      # worker's per-tenant. Production deployments leave this UNSET — when
+      # absent, the endpoint returns 501 (invite-code path is the production
+      # contract, tracked under a follow-up task).
+      - CENA_E2E_TRUSTED_REGISTRATION=true
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/live"]

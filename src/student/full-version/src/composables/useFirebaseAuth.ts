@@ -227,6 +227,79 @@ export function useFirebaseAuth() {
     }
   }
 
+  /**
+   * TASK-E2E-A-01-BE-01: bridge a freshly-registered Firebase user into Cena.
+   *
+   * Calls `POST /api/auth/on-first-sign-in` with the just-issued idToken so the
+   * backend can: (1) set Cena custom claims (role, tenant_id, school_id),
+   * (2) create the StudentProfile + AdminUser docs, and (3) emit
+   * `StudentOnboardedV1` on NATS. Then forces an idToken refresh so the new
+   * claims land on the client side BEFORE any /api/me call fires.
+   *
+   * Tenant resolution:
+   *   - E2E: read `cena-e2e-tenant-id` from localStorage (Playwright fixture
+   *     injects it via addInitScript before the register flow runs).
+   *   - Production: invite-code path (TODO — endpoint returns 501 until that
+   *     follow-up ships, see task TASK-E2E-A-04-BE-* in the queue).
+   *
+   * Throws on non-2xx so the caller can surface the failure to the user
+   * rather than silently proceeding with a half-bootstrapped account.
+   */
+  async function onFirstSignIn(opts: {
+    apiBaseUrl: string
+    displayName?: string
+  }): Promise<{ tenantId: string; schoolId: string; role: string; wasNewlyOnboarded: boolean }> {
+    if (useMockAuth)
+      throw new Error('[useFirebaseAuth] onFirstSignIn called in mock auth mode.')
+
+    const idToken = await getIdToken(false)
+    if (!idToken)
+      throw new Error('[useFirebaseAuth] onFirstSignIn: no idToken available — register/sign-in must run first.')
+
+    // Per the BE task body: E2E reads tenantId from a known localStorage key
+    // populated by the Playwright fixture's `addInitScript`. Production-mode
+    // callers (no env-var on backend) will get a 501 from the endpoint and the
+    // SPA surfaces that error verbatim.
+    const tenantId = window.localStorage.getItem('cena-e2e-tenant-id') ?? ''
+
+    const resp = await fetch(`${opts.apiBaseUrl}/api/auth/on-first-sign-in`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({
+        tenantId,
+        schoolId: null,
+        displayName: opts.displayName ?? null,
+      }),
+    })
+
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => '')
+      console.error('[useFirebaseAuth] on-first-sign-in failed:', resp.status, text)
+      throw new Error(`on-first-sign-in returned ${resp.status}: ${text}`)
+    }
+
+    const body = await resp.json() as {
+      uid: string
+      tenantId: string
+      schoolId: string
+      role: string
+      wasNewlyOnboarded: boolean
+    }
+
+    // Force-refresh so the next /api/me call carries the new custom claims.
+    await getIdToken(true)
+
+    return {
+      tenantId: body.tenantId,
+      schoolId: body.schoolId,
+      role: body.role,
+      wasNewlyOnboarded: body.wasNewlyOnboarded,
+    }
+  }
+
   return {
     isLoading,
     errorKey,
@@ -235,6 +308,7 @@ export function useFirebaseAuth() {
     loginWithProvider,
     logout,
     getIdToken,
+    onFirstSignIn,
     mapFirebaseErrorToI18nKey,
   }
 }
