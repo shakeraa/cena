@@ -20,6 +20,14 @@
 
 import { defineConfig, devices } from '@playwright/test'
 
+// PRR-436: keep the dev probe token in sync with docker-compose.app.yml's
+// student-api env (`CENA_TEST_PROBE_TOKEN`). Tests fall back to this default
+// when the env isn't explicitly set so a developer can run the suite without
+// extra env juggling. CI overrides via repository secret.
+if (!process.env.CENA_TEST_PROBE_TOKEN) {
+  process.env.CENA_TEST_PROBE_TOKEN = 'dev-only-test-probe-token-do-not-ship'
+}
+
 export default defineConfig({
   testDir: './tests/e2e-flow/workflows',
   timeout: 60_000, // full-stack flows need headroom

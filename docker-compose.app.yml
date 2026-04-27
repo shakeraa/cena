@@ -197,6 +197,12 @@ services:
       # absent, the endpoint returns 501 (invite-code path is the production
       # contract, tracked under a follow-up task).
       - CENA_E2E_TRUSTED_REGISTRATION=true
+      # PRR-436: shared secret for /api/admin/test/probe (E2E DB-boundary
+      # probe). Production deployments MUST NOT set this env var — its
+      # absence makes the endpoint return 404 to every caller. The
+      # e2e-flow Playwright fixtures pass the same value in the
+      # X-Test-Probe-Token header. Rotate by updating both sides.
+      - CENA_TEST_PROBE_TOKEN=dev-only-test-probe-token-do-not-ship
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/live"]

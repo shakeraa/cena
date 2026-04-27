@@ -1051,7 +1051,7 @@ public partial class Program
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
     // Anonymous auth recovery endpoints (FIND-ux-006b) — password reset only
-    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapBankTransferEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapHouseholdDashboardEndpoints(); app.MapTutorHandoffEndpoints(); app.MapTypedStepsDiagnosticEndpoint(); app.MapSessionAttemptModeEndpoints(); app.MapMeEndpoints(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + /bank-transfer PRR-304 + Stripe webhook + parent dashboard + PRR-324 household dashboard + PRR-325 tutor-handoff HTML report; PRR-384 typed-steps accessibility path; STB-00 Me/Profile
+    app.MapAuthEndpoints(); app.MapCatalogEndpoints(); app.MapSubscriptionEndpoints(); app.MapSubscriptionManagementEndpoints(); app.MapBankTransferEndpoints(); app.MapStripeWebhook(); app.MapParentDashboardEndpoints(); app.MapHouseholdDashboardEndpoints(); app.MapTutorHandoffEndpoints(); app.MapTypedStepsDiagnosticEndpoint(); app.MapSessionAttemptModeEndpoints(); app.MapMeEndpoints(); app.MapTestProbeEndpoint(); // prr-011; prr-220 ADR-0050; EPIC-PRR-I / ADR-0057 pricing + /api/me/subscription + /bank-transfer PRR-304 + Stripe webhook + parent dashboard + PRR-324 household dashboard + PRR-325 tutor-handoff HTML report; PRR-384 typed-steps accessibility path; STB-00 Me/Profile; PRR-436 e2e DB-boundary probe
     app.MapSelfAssessmentEndpoints();
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
