@@ -73,5 +73,11 @@ public static class ParentChildBindingMartenRegistration
     {
         opts.Schema.For<ParentChildBindingDocument>()
             .Identity(d => d.Id);
+
+        // TASK-E2E-A-04-BE: ParentBindInviteDocument lives in the same parent
+        // context — it's the persistence side of the issue/consume token
+        // service. Identity = jti (Marten Id is the JWT's jti claim).
+        opts.Schema.For<ParentBindInviteDocument>()
+            .Identity(d => d.Id);
     }
 }
