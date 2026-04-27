@@ -5,9 +5,14 @@ import type { DailyChallengeDto } from '@/api/types/common'
 
 interface Props {
   challenge: DailyChallengeDto
+  /** Disables the start button while a /start request is in flight. */
+  starting?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { starting: false })
+const emit = defineEmits<{
+  start: [challengeId: string]
+}>()
 const { t } = useI18n()
 
 const difficultyColor = computed(() => {
@@ -29,7 +34,11 @@ const timeLeft = computed(() => {
   const hours = Math.floor(diffMs / 3600_000)
   const minutes = Math.floor((diffMs % 3600_000) / 60_000)
 
-  return t('challenges.daily.timeLeft', hours, { hours, minutes })
+  // vue-i18n v11: positional `t(key, count, named)` does not interpolate
+  // named values (renders "h m left" with empty substitutions). Use the
+  // explicit plural option form instead — it preserves both pluralization
+  // and named interpolation under the v11 stricter picker.
+  return t('challenges.daily.timeLeft', { hours, minutes }, { plural: hours })
 })
 </script>
 
@@ -106,6 +115,9 @@ const timeLeft = computed(() => {
         color="white"
         variant="flat"
         data-testid="daily-start"
+        :loading="starting"
+        :disabled="starting"
+        @click="emit('start', challenge.challengeId)"
       >
         {{ challenge.attempted ? t('challenges.daily.reattempt') : t('challenges.daily.start') }}
       </VBtn>

@@ -5,11 +5,29 @@ import type { BossBattleSummary } from '@/api/types/common'
 interface Props {
   boss: BossBattleSummary
   locked?: boolean
+  /** Disables the tile while a /start request is in flight. */
+  starting?: boolean
 }
 
-withDefaults(defineProps<Props>(), { locked: false })
+const props = withDefaults(defineProps<Props>(), { locked: false, starting: false })
+const emit = defineEmits<{
+  select: [bossBattleId: string]
+}>()
 
 const { t } = useI18n()
+
+function onActivate() {
+  if (props.locked || props.starting)
+    return
+  emit('select', props.boss.bossBattleId)
+}
+
+function onKey(event: KeyboardEvent) {
+  if (event.key === 'Enter' || event.key === ' ') {
+    event.preventDefault()
+    onActivate()
+  }
+}
 </script>
 
 <template>
@@ -18,7 +36,13 @@ const { t } = useI18n()
     :variant="locked ? 'outlined' : 'flat'"
     :color="locked ? undefined : 'surface-variant'"
     class="boss-tile pa-4"
-    :class="{ 'boss-tile--locked': locked }"
+    :class="{ 'boss-tile--locked': locked, 'boss-tile--interactive': !locked }"
+    :tabindex="locked ? -1 : 0"
+    :role="locked ? 'group' : 'button'"
+    :aria-disabled="locked || starting"
+    :aria-busy="starting"
+    @click="onActivate"
+    @keydown="onKey"
   >
     <div class="d-flex align-center">
       <VAvatar
@@ -67,5 +91,14 @@ const { t } = useI18n()
 <style scoped>
 .boss-tile--locked {
   opacity: 0.7;
+}
+
+.boss-tile--interactive {
+  cursor: pointer;
+}
+
+.boss-tile--interactive:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
 }
 </style>

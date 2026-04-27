@@ -72,4 +72,63 @@ describe('BossBattleTile', () => {
     expect(wrapper.find('[data-testid="boss-lock-reason"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="boss-lock-reason"]').text()).toContain('8')
   })
+
+  it('emits "select" with the boss id when an unlocked tile is activated', async () => {
+    const wrapper = mount(BossBattleTile, {
+      props: {
+        boss: {
+          bossBattleId: 'boss-9',
+          name: 'Motion Master',
+          subject: 'physics',
+          difficulty: 'medium',
+          requiredMasteryLevel: 4,
+        },
+      },
+      global: { plugins: [makeI18n(), makeVuetify()] },
+    })
+
+    await wrapper.find('[data-testid="boss-boss-9"]').trigger('click')
+
+    expect(wrapper.emitted('select')).toEqual([['boss-9']])
+  })
+
+  it('does not emit "select" for a locked tile', async () => {
+    const wrapper = mount(BossBattleTile, {
+      props: {
+        boss: {
+          bossBattleId: 'boss-locked',
+          name: 'Calculus King',
+          subject: 'math',
+          difficulty: 'hard',
+          requiredMasteryLevel: 8,
+        },
+        locked: true,
+      },
+      global: { plugins: [makeI18n(), makeVuetify()] },
+    })
+
+    await wrapper.find('[data-testid="boss-boss-locked"]').trigger('click')
+
+    expect(wrapper.emitted('select')).toBeUndefined()
+  })
+
+  it('does not emit while a previous start is still pending', async () => {
+    const wrapper = mount(BossBattleTile, {
+      props: {
+        boss: {
+          bossBattleId: 'boss-busy',
+          name: 'Algebra Overlord',
+          subject: 'math',
+          difficulty: 'hard',
+          requiredMasteryLevel: 5,
+        },
+        starting: true,
+      },
+      global: { plugins: [makeI18n(), makeVuetify()] },
+    })
+
+    await wrapper.find('[data-testid="boss-boss-busy"]').trigger('click')
+
+    expect(wrapper.emitted('select')).toBeUndefined()
+  })
 })
