@@ -2,8 +2,10 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
+import { signOut as firebaseSignOut } from 'firebase/auth'
 import { useAuthStore } from '@/stores/authStore'
 import { useMeStore } from '@/stores/meStore'
+import { getFirebaseAuth, useMockAuth } from '@/plugins/firebase'
 
 const router = useRouter()
 const { t } = useI18n()
@@ -25,6 +27,21 @@ const initials = computed(() => {
 })
 
 async function signOut() {
+  // Real Firebase Auth path: clear the IndexedDB-persisted session
+  // BEFORE clearing local stores. Without this, Firebase's
+  // onAuthStateChanged auto-restores the user on the next navigation
+  // and the route guard treats them as still signed in. The local
+  // authStore.__signOut path alone is not enough — it leaves the
+  // Firebase JS SDK with a usable session that re-hydrates on demand.
+  if (!useMockAuth) {
+    try {
+      await firebaseSignOut(getFirebaseAuth())
+    }
+    catch (err) {
+      console.warn('[user-profile] firebase.signOut() failed:', err)
+    }
+  }
+
   authStore.__signOut()
   meStore.__setProfile(null)
   if (typeof localStorage !== 'undefined') {
