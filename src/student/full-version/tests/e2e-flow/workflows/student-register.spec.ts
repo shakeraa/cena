@@ -187,7 +187,9 @@ test.describe('E2E-A-01 student registration', () => {
 
     expect(resolvedIdToken, 'must obtain a refreshed idToken to decode claims').toBeTruthy()
     const claims = decodeJwtClaims(resolvedIdToken!)
-    expect(claims.role, 'JWT must carry role=student claim').toBe('student')
+    // Role claim is uppercase ("STUDENT") to match the CenaRole enum that
+    // RoleAuthorizationGuard reads. The seeder uses the same casing.
+    expect(claims.role, 'JWT must carry role=STUDENT claim').toBe('STUDENT')
     expect(claims.tenant_id, 'JWT must carry tenant_id claim').toBe(tenant.id)
     expect(claims.school_id, 'JWT must carry school_id claim').toBeTruthy()
 
