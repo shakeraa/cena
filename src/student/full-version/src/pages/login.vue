@@ -223,10 +223,15 @@ async function handleSubmit(payload: { email: string; password: string }) {
     />
     <AuthProviderButtons mode="login" />
     <div class="mt-4 text-center text-body-2">
+      <!-- text-high-emphasis pins the link to the theme's high-contrast
+           text color (~near-black on light, near-white on dark). The
+           default RouterLink color was ~3.4:1 against the auth-card
+           background, failing WCAG 2.1 AA color-contrast (rule
+           color-contrast). Same rationale on the footer link below. -->
       <RouterLink
         to="/forgot-password"
         data-testid="login-forgot-link"
-        class="text-decoration-underline"
+        class="text-high-emphasis text-decoration-underline"
       >
         {{ t('auth.forgotPasswordLink') }}
       </RouterLink>
@@ -236,7 +241,7 @@ async function handleSubmit(payload: { email: string; password: string }) {
       <RouterLink
         to="/register"
         data-testid="login-register-link"
-        class="ms-1 text-decoration-underline"
+        class="ms-1 text-high-emphasis text-decoration-underline"
       >
         {{ t('auth.signUpLink') }}
       </RouterLink>

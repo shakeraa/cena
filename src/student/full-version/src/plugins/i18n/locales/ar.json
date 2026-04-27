@@ -743,7 +743,7 @@
       "subtitle": "اختر المواضيع والمدة والنمط للبدء.",
       "subjectsLabel": "المواضيع",
       "durationLabel": "المدة",
-      "durationMinutes": "{minutes} د | {minutes} د | {minutes} د | {minutes} د | {minutes} د | {minutes} د",
+      "durationMinutes": "{minutes} د",
       "modeLabel": "الوضع",
       "startCta": "ابدأ الجلسة",
       "subjectChipGroupLabel": "اختر المواضيع",

@@ -284,6 +284,8 @@ watch(i18nLocale, () => {
             :step="1"
             hide-details
             aria-labelledby="a11y-size-label"
+            :aria-label="t('a11y.textSize')"
+            :aria-valuetext="sizeMarks[a11y.prefs.textSize].label"
             data-testid="a11y-text-size-slider"
             class="flex-grow-1"
             @end="onSetTextSize($event as number)"
@@ -321,6 +323,8 @@ watch(i18nLocale, () => {
           :step="1"
           hide-details
           aria-labelledby="a11y-line-height-label"
+          :aria-label="t('a11y.lineHeight')"
+          :aria-valuetext="`${LINE_HEIGHT_STEPS[a11y.prefs.lineHeight].toFixed(1)}×`"
           data-testid="a11y-line-height-slider"
           @end="onSetLineHeight($event as number)"
           @update:model-value="(v) => a11y.setLineHeight(Math.max(0, Math.min(4, Math.round(v as number))) as 0 | 1 | 2 | 3 | 4)"

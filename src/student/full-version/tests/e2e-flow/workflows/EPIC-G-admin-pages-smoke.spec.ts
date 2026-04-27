@@ -198,23 +198,45 @@ test.describe('EPIC_G_ADMIN_PAGES_SMOKE', () => {
 
     // SOFT FAIL with explicit allowlist: console-error (which usually
     // means a 4xx/5xx the page didn't model). Each entry below is a
-    // KNOWN BACKEND/INTEGRATION GAP surfaced by the smoke run on
-    // 2026-04-27. Each must have either a queue task to fix or be
-    // here intentionally (third-party 503, etc.). When you fix one of
-    // these, REMOVE the entry — the test will then enforce that the
-    // page stays green.
-    const KNOWN_BROKEN_ROUTES: Record<string, string> = {
-      '/apps/ingestion/pipeline':   'admin-api: GET /api/admin/ingestion/{stats,pipeline-status} 500 — queue backend fix',
-      '/apps/questions/languages':  'admin-api: GET /api/admin/questions/languages 500 — queue backend fix',
-      '/apps/questions/list':       'admin-api: GET /api/admin/questions list 500 — queue backend fix',
-      '/apps/sessions/live':        'admin-api: 401 from realtime endpoint — token shape mismatch',
-      '/apps/system/ai-settings':   'admin-api: GET /api/admin/ai/settings 500 — queue backend fix (page now renders empty-state cleanly after JS-undefined fix)',
-      '/apps/sessions/monitor':     'admin-api: SignalR /sessionMonitor hub negotiate 404 — hub not mapped',
-      '/apps/system/actors':        'admin-api: SignalR /actors hub negotiate 404 — hub not mapped',
-      '/apps/system/architecture':  'admin-api: SignalR /architecture hub negotiate 404 — hub not mapped',
-      '/apps/system/events':        'admin-api: SignalR /events hub negotiate 404 — hub not mapped',
-      '/instructor':                'admin-api: GET /api/instructor/* 404 — endpoint missing',
-      '/mentor':                    'admin-api: GET /api/mentor/institutes 404 — endpoint missing',
+    // KNOWN BACKEND/INTEGRATION GAP surfaced by the smoke run.
+    //
+    // INFRA-05 staleness contract:
+    //   - reason:     1-line explanation of WHY this route is broken
+    //   - surfacedAt: ISO date — entries older than 30 days fail in CI
+    //   - ticket:     reference to the queued fix (TASK-E2E-BG-NN)
+    //
+    // When you fix the underlying backend gap, REMOVE the entry —
+    // the test then enforces the route stays green. Stale-entry
+    // detection (route no longer reproduces) ALSO fails, so the
+    // allowlist self-cleans.
+    interface KnownBrokenEntry {
+      reason: string
+      surfacedAt: string  // ISO yyyy-mm-dd
+      ticket?: string
+    }
+    const KNOWN_BROKEN_ROUTES: Record<string, KnownBrokenEntry> = {
+      '/apps/ingestion/pipeline':   { reason: 'admin-api: GET /api/admin/ingestion/{stats,pipeline-status} 500',     surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-03' },
+      '/apps/questions/languages':  { reason: 'admin-api: GET /api/admin/questions/languages 500',                    surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-02' },
+      '/apps/questions/list':       { reason: 'admin-api: GET /api/admin/questions list 500',                         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-02' },
+      '/apps/sessions/live':        { reason: 'admin-api: 401 from realtime endpoint — token shape mismatch',         surfacedAt: '2026-04-27' },
+      '/apps/system/ai-settings':   { reason: 'admin-api: GET /api/admin/ai/settings 500 (renders empty-state cleanly after JS-undefined fix)', surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-01' },
+      '/apps/sessions/monitor':     { reason: 'admin-api: SignalR /sessionMonitor hub negotiate 404',                surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
+      '/apps/system/actors':        { reason: 'admin-api: SignalR /actors hub negotiate 404',                         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
+      '/apps/system/architecture':  { reason: 'admin-api: SignalR /architecture hub negotiate 404',                   surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
+      '/apps/system/events':        { reason: 'admin-api: SignalR /events hub negotiate 404',                         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
+      '/instructor':                { reason: 'admin-api: GET /api/instructor/* 404 — endpoint missing',              surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-05' },
+      '/mentor':                    { reason: 'admin-api: GET /api/mentor/institutes 404 — endpoint missing',         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-05' },
+    }
+
+    // Allowlist budget cap: if the team adds entries faster than they
+    // fix them, the cap creates friction that forces triage.
+    const ALLOWLIST_BUDGET = 15
+    const entryCount = Object.keys(KNOWN_BROKEN_ROUTES).length
+    if (entryCount > ALLOWLIST_BUDGET) {
+      testInfo.annotations.push({
+        type: 'warning',
+        description: `KNOWN_BROKEN_ROUTES has ${entryCount} entries — exceeds budget of ${ALLOWLIST_BUDGET}. Triage and fix instead of allowlisting more.`,
+      })
     }
 
     // 429s are an artifact of smoke-iteration speed, not product bugs.
@@ -232,18 +254,48 @@ test.describe('EPIC_G_ADMIN_PAGES_SMOKE', () => {
       '\nIf this is a new gap, add it to KNOWN_BROKEN_ROUTES with a reason. If a previously-broken page now passes, remove it from the allowlist.',
     ).toEqual([])
 
-    // Sanity: every entry in the allowlist must still be reproduced —
-    // i.e. if a page was once broken and is now green, the allowlist
-    // gets stale. This catches silent fixes that should remove the
-    // entry to keep the test honest.
+    // INFRA-05 staleness gate (1): every entry in the allowlist must
+    // still be reproduced — if a page was once broken and is now green,
+    // the entry is stale. In CI this hard-fails so the allowlist
+    // self-cleans; locally it warns to avoid churning while iterating.
     const stale = Object.keys(KNOWN_BROKEN_ROUTES).filter(route =>
       !consoleErrors.some(r => r.route === route),
     )
     if (stale.length > 0) {
-      testInfo.annotations.push({
-        type: 'warning',
-        description: `KNOWN_BROKEN_ROUTES has stale entries (page now passes): ${stale.join(', ')} — remove from allowlist.`,
-      })
+      const msg = `KNOWN_BROKEN_ROUTES has ${stale.length} stale entries (page now passes — REMOVE these): ${stale.join(', ')}`
+      if (process.env.CI) {
+        expect(stale, msg).toEqual([])
+      }
+      else {
+        testInfo.annotations.push({ type: 'warning', description: msg })
+      }
+    }
+
+    // INFRA-05 staleness gate (2): entries older than 30 days are stale
+    // by time — either the gap was forgotten about or no one is
+    // tracking the queued ticket. Forces a re-triage every 30 days.
+    const STALE_DAYS = 30
+    const now = Date.now()
+    const tooOld: { route: string; surfacedAt: string; ageDays: number }[] = []
+    for (const [route, entry] of Object.entries(KNOWN_BROKEN_ROUTES)) {
+      const surfacedMs = new Date(entry.surfacedAt + 'T00:00:00Z').getTime()
+      const ageDays = Math.floor((now - surfacedMs) / (24 * 60 * 60 * 1000))
+      if (ageDays > STALE_DAYS) {
+        tooOld.push({ route, surfacedAt: entry.surfacedAt, ageDays })
+      }
+    }
+    if (tooOld.length > 0) {
+      const msg =
+        `${tooOld.length} KNOWN_BROKEN_ROUTES entries are >${STALE_DAYS} days old. ` +
+        `Either fix the underlying backend gap, refresh the surfacedAt date with a re-triage note, ` +
+        `or escalate. Stale entries:\n` +
+        JSON.stringify(tooOld, null, 2)
+      if (process.env.CI) {
+        expect(tooOld, msg).toEqual([])
+      }
+      else {
+        testInfo.annotations.push({ type: 'warning', description: msg })
+      }
     }
 
     if (empty.length > 0) {

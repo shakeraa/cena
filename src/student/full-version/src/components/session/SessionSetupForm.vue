@@ -97,6 +97,10 @@ function handleSubmit() {
       <div class="text-subtitle-1 mb-3">
         {{ t('session.setup.durationLabel') }}
       </div>
+      <!-- bg-surface to give the toggle an explicit container; flex-wrap
+           so on narrow viewports (especially RTL where Arabic glyphs
+           push width) we don't squeeze each button to a single
+           character. -->
       <VBtnToggle
         v-model="durationMinutes"
         mandatory
@@ -104,6 +108,7 @@ function handleSubmit() {
         variant="outlined"
         divided
         data-testid="setup-duration"
+        class="flex-wrap ga-1"
       >
         <VBtn
           v-for="d in DURATIONS"
@@ -111,7 +116,11 @@ function handleSubmit() {
           :value="d"
           :data-testid="`setup-duration-${d}`"
         >
-          {{ t('session.setup.durationMinutes', d, { minutes: d }) }}
+          <!-- bdi keeps the digit + unit suffix in one bidi-isolated run.
+               Without it Unicode bidi can split the digit (LTR-strong)
+               from the unit (RTL-strong) inside narrow buttons and
+               clip one of them. Surfaced 2026-04-27 on /session ar. -->
+          <bdi>{{ t('session.setup.durationMinutes', d, { minutes: d }) }}</bdi>
         </VBtn>
       </VBtnToggle>
     </section>
@@ -127,6 +136,7 @@ function handleSubmit() {
         variant="outlined"
         divided
         data-testid="setup-mode"
+        class="flex-wrap ga-1"
       >
         <VBtn
           v-for="m in MODES"
