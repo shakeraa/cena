@@ -21,6 +21,12 @@ export const { themeConfig, layoutConfig } = defineThemeConfig({
     contentWidth: ContentWidth.Boxed,
     contentLayoutNav: AppContentLayoutNav.Vertical,
     overlayNavFromBreakpoint: breakpointsVuetifyV3.lg - 1, // 1 for matching with vuetify breakpoint. Docs: https://next.vuetifyjs.com/en/features/display-and-platform/
+
+    // App-shell default direction. Per-locale RTL is applied at runtime by
+    // initCore.ts:54 reading the active langConfig entry's `isRTL` and
+    // pushing it onto configStore.isAppRTL — this static value is just the
+    // shell-default before i18n boots.
+    isRTL: false,
     i18n: {
       enable: true,
       defaultLocale: 'en',

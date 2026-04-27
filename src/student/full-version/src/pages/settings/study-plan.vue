@@ -435,7 +435,6 @@ onMounted(() => listQuery.refresh())
 
     <!-- Archive confirm dialog -->
     <VDialog
-      v-model:model-value="archiveConfirmFor"
       :model-value="archiveConfirmFor !== null"
       max-width="480"
       @update:model-value="archiveConfirmFor = null"

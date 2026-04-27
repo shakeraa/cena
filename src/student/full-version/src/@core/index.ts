@@ -12,6 +12,7 @@ export const defineThemeConfig = (userConfig: UserThemeConfig): { themeConfig: U
         contentWidth: userConfig.app.contentWidth,
         contentLayoutNav: userConfig.app.contentLayoutNav,
         overlayNavFromBreakpoint: userConfig.app.overlayNavFromBreakpoint,
+        isRTL: userConfig.app.isRTL,
         i18n: {
           enable: userConfig.app.i18n.enable,
         },

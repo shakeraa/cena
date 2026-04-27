@@ -5,9 +5,15 @@ import type { DailyChallengeLeaderboardDto } from '@/api/types/common'
 
 interface Props {
   leaderboard: DailyChallengeLeaderboardDto
+  /**
+   * Suppress the internal title row when the parent page already owns a
+   * title (so we don't render two h-tags). Default false to preserve the
+   * standalone hub-card use case.
+   */
+  hideTitle?: boolean
 }
 
-const props = defineProps<Props>()
+const props = withDefaults(defineProps<Props>(), { hideTitle: false })
 const { t } = useI18n()
 
 const ownRank = computed(() => props.leaderboard.currentStudentRank ?? null)
@@ -29,22 +35,26 @@ function fmtTime(seconds: number): string {
     class="pa-0"
   >
     <div class="pa-4 pb-2">
-      <div class="text-subtitle-1 font-weight-medium">
-        {{ t('challenges.daily.leaderboard.title') }}
-      </div>
-      <div class="text-caption text-medium-emphasis">
-        {{ t('challenges.daily.leaderboard.subtitle') }}
-      </div>
+      <template v-if="!hideTitle">
+        <div class="text-subtitle-1 font-weight-medium">
+          {{ t('challenges.daily.leaderboard.title') }}
+        </div>
+        <div class="text-caption text-medium-emphasis">
+          {{ t('challenges.daily.leaderboard.subtitle') }}
+        </div>
+      </template>
       <div
         v-if="ownRank !== null"
-        class="text-caption text-primary mt-1"
+        class="text-caption text-primary"
+        :class="{ 'mt-1': !hideTitle }"
         data-testid="daily-leaderboard-own-rank"
       >
         {{ t('challenges.daily.leaderboard.yourRank', { rank: ownRank }) }}
       </div>
       <div
         v-else
-        class="text-caption text-medium-emphasis mt-1"
+        class="text-caption text-medium-emphasis"
+        :class="{ 'mt-1': !hideTitle }"
         data-testid="daily-leaderboard-no-rank"
       >
         {{ t('challenges.daily.leaderboard.noRankYet') }}

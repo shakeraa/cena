@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useApiQuery } from '@/composables/useApiQuery'
+import { ApiError, useApiQuery } from '@/composables/useApiQuery'
 import { $api } from '@/api/$api'
 import type { LeaderboardDto, LeaderboardEntry, MeBootstrapDto } from '@/api/types/common'
 
@@ -28,7 +28,7 @@ const meQuery = useApiQuery<MeBootstrapDto>('/api/me')
 
 const data = ref<LeaderboardDto | null>(null)
 const loading = ref(false)
-const error = ref<Error | null>(null)
+const error = ref<ApiError | null>(null)
 
 watch(
   () => initialQuery.data.value,
@@ -53,7 +53,23 @@ async function setScope(next: Scope) {
   }
   catch (err) {
     console.error('[FIND-ux-011] leaderboard scope-switch failed', { scope: next, error: err })
-    error.value = err as Error
+    // $api throws raw; wrap into ApiError so the alert template's
+    // `error.i18nKey` resolves consistently with useApiQuery callers.
+    const status = (err as { statusCode?: number; status?: number })?.statusCode
+      ?? (err as { status?: number })?.status
+      ?? 0
+    const code = status === 429
+      ? 'RATE_LIMITED'
+      : status >= 500
+        ? 'SERVER_ERROR'
+        : status > 0
+          ? `HTTP_${status}`
+          : 'FETCH_FAILED'
+    error.value = new ApiError(
+      err instanceof Error ? err.message : String(err),
+      'leaderboard.unavailable',
+      code,
+    )
   }
   finally {
     loading.value = false
@@ -231,7 +247,7 @@ function rankColor(rank: number): string | undefined {
           </VListItemTitle>
           <template #append>
             <div class="text-body-1 font-weight-medium">
-              {{ t('leaderboard.xpValue', entry.xp, { xp: entry.xp }) }}
+              {{ t('leaderboard.xpValue', { xp: entry.xp }, { plural: entry.xp }) }}
             </div>
           </template>
         </VListItem>

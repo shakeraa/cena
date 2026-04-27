@@ -17,10 +17,10 @@ const resumeUrl = computed(() => `/session/${props.sessionId}`)
 const startedAtRelative = computed(() => {
   const mins = Math.max(1, Math.floor((Date.now() - new Date(props.startedAt).getTime()) / 60_000))
   if (mins < 60)
-    return t('home.resume.minutesAgo', mins, { count: mins })
+    return t('home.resume.minutesAgo', { count: mins }, { plural: mins })
   const hours = Math.floor(mins / 60)
 
-  return t('home.resume.hoursAgo', hours, { count: hours })
+  return t('home.resume.hoursAgo', { count: hours }, { plural: hours })
 })
 </script>
 

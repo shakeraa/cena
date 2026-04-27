@@ -56,7 +56,7 @@ const statusColor = computed(() => {
             variant="outlined"
             prepend-icon="tabler-clock"
           >
-            {{ t('knowledgeGraph.detail.estimatedMinutes', concept.estimatedMinutes, { minutes: concept.estimatedMinutes }) }}
+            {{ t('knowledgeGraph.detail.estimatedMinutes', { minutes: concept.estimatedMinutes }, { plural: concept.estimatedMinutes }) }}
           </VChip>
         </div>
         <h1

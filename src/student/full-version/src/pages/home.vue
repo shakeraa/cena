@@ -25,9 +25,16 @@ definePage({
   },
 })
 
-// ── Bootstrap: identity + level + streak days (real endpoint). ────────────
+// ── Bootstrap: identity + level (real endpoint). ──────────────────────────
 // MSW mocks `/api/me` in dev (see src/plugins/fake-api/handlers/student-me);
 // production hits the real Cena.Student.Api.Host endpoint.
+//
+// `streakDays` is intentionally NOT consumed here. ADR-0048 +
+// docs/engineering/shipgate.md ban streak counters as a dark-pattern
+// engagement mechanic. Backend may still emit the field for compatibility,
+// but the SPA must not render a streak counter. See
+// tasks/student-web/STU-W-11-followup-gaps.md §C1 for the full deprecation
+// plan.
 const {
   data: me,
   error: meError,
@@ -59,7 +66,6 @@ const error = computed(() => meError.value)
 
 // Derived identity/profile values from the real /api/me payload.
 const level = computed(() => me.value?.level ?? 1)
-const streakDays = computed(() => me.value?.streakDays ?? 0)
 
 // ── Derived values from /api/analytics/summary. ───────────────────────────
 const hasSummary = computed(() => summary.value !== null && !summaryError.value)
@@ -221,13 +227,10 @@ const activeSession = (() => {
         </h2>
 
         <!--
-          Streak is always rendered — it comes from the real /api/me payload
-          and is 0 for brand-new students. A 0-day streak is an honest value.
+          Streak counter intentionally removed (ADR-0048 / shipgate ship-gate
+          ban). See tasks/student-web/STU-W-11-followup-gaps.md §C1 for the
+          full deprecation plan across types, mock, and backend.
         -->
-        <StreakWidget
-          :days="streakDays"
-          :is-new-best="false"
-        />
 
         <!--
           Minutes today: rendered only when the time-breakdown endpoint
@@ -275,7 +278,7 @@ const activeSession = (() => {
         -->
         <KpiCard
           :label="t('home.kpi.level', { level })"
-          :value="totalSessions != null ? t('home.kpi.sessionsValue', totalSessions, { count: totalSessions }) : t('home.kpi.unavailable')"
+          :value="totalSessions != null ? t('home.kpi.sessionsValue', { count: totalSessions }, { plural: totalSessions }) : t('home.kpi.unavailable')"
           icon="tabler-bolt"
           data-testid="kpi-level"
         />
@@ -284,8 +287,8 @@ const activeSession = (() => {
       <!--
         Empty state: if /api/me succeeds but every analytics KPI above
         has no data (new student, or analytics endpoint errors) we tell
-        the user explicitly what will appear here, instead of silently
-        collapsing to a single streak card.
+        the user explicitly what will appear here, instead of rendering
+        an empty KPI strip.
       -->
       <VAlert
         v-if="!hasSummary && !hasAnyAnalyticsKpi"

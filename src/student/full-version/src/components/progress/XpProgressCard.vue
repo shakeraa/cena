@@ -66,7 +66,7 @@ const xpRemaining = computed(() => Math.max(0, props.xp.xpToNextLevel - props.xp
         {{ t('gamification.xp.currentXp', { current: xp.currentXp, target: xp.xpToNextLevel }) }}
       </div>
       <div class="text-caption text-white opacity-90">
-        {{ t('gamification.xp.xpToGo', xpRemaining, { count: xpRemaining }) }}
+        {{ t('gamification.xp.xpToGo', { count: xpRemaining }, { plural: xpRemaining }) }}
       </div>
     </div>
 

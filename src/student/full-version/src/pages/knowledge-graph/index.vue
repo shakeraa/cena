@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import ConceptTile from '@/components/knowledge/ConceptTile.vue'
 import { $api } from '@/api/$api'
+import { ApiError } from '@/composables/useApiQuery'
 import type { ConceptListDto, ConceptSummary } from '@/api/types/common'
 
 definePage({
@@ -25,7 +26,7 @@ type Subject = typeof SUBJECTS[number]
 const subject = ref<Subject>('math')
 const concepts = ref<ConceptSummary[]>([])
 const loading = ref(false)
-const error = ref<Error | null>(null)
+const error = ref<ApiError | null>(null)
 
 async function loadConcepts(next: Subject) {
   loading.value = true
@@ -36,7 +37,23 @@ async function loadConcepts(next: Subject) {
     concepts.value = res.items
   }
   catch (err) {
-    error.value = err as Error
+    // $api throws raw; wrap into ApiError so the template's
+    // `error.i18nKey` resolves consistently with useApiQuery callers.
+    const status = (err as { statusCode?: number; status?: number })?.statusCode
+      ?? (err as { status?: number })?.status
+      ?? 0
+    const code = status === 429
+      ? 'RATE_LIMITED'
+      : status >= 500
+        ? 'SERVER_ERROR'
+        : status > 0
+          ? `HTTP_${status}`
+          : 'FETCH_FAILED'
+    error.value = new ApiError(
+      err instanceof Error ? err.message : String(err),
+      'knowledgeGraph.unavailable',
+      code,
+    )
   }
   finally {
     loading.value = false

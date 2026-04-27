@@ -895,7 +895,9 @@
         "you": "You",
         "yourRank": "Your rank: {rank}",
         "noRankYet": "Finish today's challenge to see your rank.",
-        "empty": "No one has finished today's challenge yet — be first."
+        "empty": "No one has finished today's challenge yet — be first.",
+        "refresh": "Refresh",
+        "refreshAria": "Refresh today's leaderboard"
       }
     },
     "boss": {

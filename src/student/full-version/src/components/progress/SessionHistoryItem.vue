@@ -24,9 +24,9 @@ const relativeDate = computed(() => {
   if (diffHours < 1)
     return t('progress.sessions.justNow')
   if (diffHours < 24)
-    return t('progress.sessions.hoursAgo', diffHours, { count: diffHours })
+    return t('progress.sessions.hoursAgo', { count: diffHours }, { plural: diffHours })
 
-  return t('progress.sessions.daysAgo', diffDays, { count: diffDays })
+  return t('progress.sessions.daysAgo', { count: diffDays }, { plural: diffDays })
 })
 
 const durationLabel = computed(() => {
