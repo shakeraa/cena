@@ -143,10 +143,23 @@ public sealed class StudentOnboardingService : IStudentOnboardingService
                     $"Uid {request.Uid} already exists as {existing.Role}, refusing to re-bind as STUDENT.");
             }
 
+            // Idempotent re-call: still re-push Firebase claims. The
+            // claims-transformer + RoleAuthorizationGuard treat the Firebase
+            // claim as authoritative; if a previous run wrote a stale value
+            // (bad casing, wrong tenant) Marten's AdminUser is still the
+            // canonical record but the JWT carries the wrong role. Re-pushing
+            // on every idempotent call keeps the two in sync.
+            await _firebase.SetCustomClaimsAsync(request.Uid, new Dictionary<string, object>
+            {
+                ["role"] = "STUDENT",
+                ["tenant_id"] = request.TenantId,
+                ["school_id"] = existing.School ?? request.SchoolId,
+            }).ConfigureAwait(false);
+
             IdempotentReplays.Add(1);
             _logger.LogInformation(
-                "[ONBOARDING] uid={Uid} tenant={TenantId} school={SchoolId} idempotent re-call (already onboarded)",
-                request.Uid, existing.School ?? "(unset)", existing.School ?? "(unset)");
+                "[ONBOARDING] uid={Uid} tenant={TenantId} school={SchoolId} idempotent re-call (already onboarded; claims refreshed)",
+                request.Uid, request.TenantId, existing.School ?? "(unset)");
 
             return new StudentOnboardingResult(
                 Uid: existing.Id,
@@ -162,9 +175,13 @@ public sealed class StudentOnboardingService : IStudentOnboardingService
         // (next call sees no AdminUser, retries cleanly). If Marten persistence
         // succeeded but Firebase failed, the user gets a 401 loop — much worse
         // recovery story.
+        //
+        // Role is the uppercase CenaRole enum string ("STUDENT") to match the
+        // claims-transformer + RoleAuthorizationGuard. Lowercase fails with
+        // CENA_AUTH_IDOR_VIOLATION on every /api/me/* call.
         await _firebase.SetCustomClaimsAsync(request.Uid, new Dictionary<string, object>
         {
-            ["role"] = "student",
+            ["role"] = "STUDENT",
             ["tenant_id"] = request.TenantId,
             ["school_id"] = request.SchoolId,
         }).ConfigureAwait(false);

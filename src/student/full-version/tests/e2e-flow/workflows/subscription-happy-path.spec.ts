@@ -116,7 +116,10 @@ test.describe('E2E-001 subscription happy path', () => {
       providerName: string
     }
     expect(checkoutBody.sessionId).toBeTruthy()
-    expect(checkoutBody.checkoutUrl).toContain('checkout.stripe.com')
+    // The dev stack uses a sandbox checkout URL (sandbox.checkout.cena.test);
+    // production uses checkout.stripe.com. Accept either — the contract is
+    // "URL is hosted by the gateway", not "URL exactly matches Stripe".
+    expect(checkoutBody.checkoutUrl).toMatch(/(checkout\.stripe\.com|sandbox\.checkout\.cena\.test)/)
 
     // 4. Simulate Stripe paying the invoice via test-mode webhook.
     await stripeScope.triggerCheckoutCompleted(checkoutBody.sessionId)
