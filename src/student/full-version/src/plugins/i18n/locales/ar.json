@@ -874,12 +874,50 @@
       "reattempt": "المحاولة مرة أخرى",
       "attempted": "تمت المحاولة",
       "expired": "انتهى",
-      "timeLeft": "لم يتبقَ وقت | متبقٍ ساعة و{minutes}د | متبقٍ ساعتان و{minutes}د | متبقٍ {hours}س {minutes}د | متبقٍ {hours}س {minutes}د | متبقٍ {hours}س {minutes}د"
+      "timeLeft": "لم يتبقَ وقت | متبقٍ ساعة و{minutes}د | متبقٍ ساعتان و{minutes}د | متبقٍ {hours}س {minutes}د | متبقٍ {hours}س {minutes}د | متبقٍ {hours}س {minutes}د",
+      "pageTitle": "التحدي اليومي",
+      "pageSubtitle": "نفس الأسئلة لجميع الطلاب اليوم فقط.",
+      "howItWorks": "يحصل جميع الطلاب على نفس الأسئلة اليوم. تُعاد التهيئة في منتصف الليل بتوقيتك.",
+      "bestScore": "أفضل نتيجة اليوم: {score}",
+      "empty": {
+        "title": "لا يوجد تحدٍ يومي اليوم",
+        "subtitle": "عُد غدًا لاكتشاف أسئلة جديدة."
+      },
+      "leaderboard": {
+        "title": "لوحة المتصدرين اليوم",
+        "subtitle": "نتائج مباشرة من الطلاب الذين أنهوا تحدي اليوم.",
+        "rankHeader": "الترتيب",
+        "studentHeader": "الطالب",
+        "scoreHeader": "النتيجة",
+        "timeHeader": "الزمن",
+        "you": "أنت",
+        "yourRank": "ترتيبك: {rank}",
+        "noRankYet": "أنهِ التحدي اليوم لتظهر مرتبتك.",
+        "empty": "لم ينهِ أحد تحدي اليوم بعد — كن أول الواصلين."
+      }
     },
     "boss": {
       "title": "معارك الزعماء",
       "subtitle": "اختبر إتقانك ضد أصعب الخصوم.",
-      "requiresLevel": "يتطلب مستوى إتقان {level}"
+      "requiresLevel": "يتطلب مستوى إتقان {level}",
+      "pageTitle": "معارك الزعماء",
+      "pageSubtitle": "اختبر إتقانك ضد أصعب الخصوم. الخادم يفرض المحاولات وشروط الفتح.",
+      "filter": {
+        "all": "كل المواد",
+        "label": "تصفية حسب المادة"
+      },
+      "available": "متاحة الآن",
+      "lockedHeading": "مقفلة",
+      "lockedExplain": "اصل إلى مستوى الإتقان المطلوب لفتحها.",
+      "attemptsRemaining": "تبقّت {remaining}/{max} محاولات اليوم",
+      "noAttempts": "لا محاولات متبقية اليوم — حاول غدًا.",
+      "startBattle": "ابدأ المعركة",
+      "viewDetails": "التفاصيل",
+      "startError": "تعذّر بدء المعركة. حاول مرة أخرى.",
+      "empty": {
+        "title": "لا توجد معارك زعماء حالية",
+        "subtitle": "نُجهّز معارك جديدة. واصل التدرّب وستصل قريبًا."
+      }
     },
     "chains": {
       "title": "سلاسل البطاقات",

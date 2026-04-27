@@ -21,7 +21,7 @@ function makeI18n() {
             reattempt: 'Try again',
             attempted: 'Attempted',
             expired: 'Expired',
-            timeLeft: '{hours}h {minutes}m left',
+            timeLeft: '{hours}h {minutes}m left | {hours}h {minutes}m left',
           },
           difficulty: {
             easy: 'Easy',
@@ -113,5 +113,26 @@ describe('DailyChallengeCard', () => {
     expect(wrapper.find('[data-testid="daily-time-left"]').text()).toContain('3h 30m')
 
     vi.useRealTimers()
+  })
+
+  it('emits "start" with the challenge id when the CTA is clicked', async () => {
+    const wrapper = mount(DailyChallengeCard, {
+      props: { challenge: makeChallenge({ challengeId: 'daily-2026-04-27' }) },
+      global: { plugins: [makeI18n(), makeVuetify()] },
+    })
+
+    await wrapper.find('[data-testid="daily-start"]').trigger('click')
+
+    expect(wrapper.emitted('start')).toEqual([['daily-2026-04-27']])
+  })
+
+  it('disables the CTA while a /start request is in flight', () => {
+    const wrapper = mount(DailyChallengeCard, {
+      props: { challenge: makeChallenge(), starting: true },
+      global: { plugins: [makeI18n(), makeVuetify()] },
+    })
+
+    const btn = wrapper.find('[data-testid="daily-start"]')
+    expect(btn.attributes('disabled')).toBeDefined()
   })
 })

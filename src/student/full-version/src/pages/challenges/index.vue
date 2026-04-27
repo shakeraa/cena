@@ -1,12 +1,15 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
+import { useRouter } from 'vue-router'
 import DailyChallengeCard from '@/components/challenges/DailyChallengeCard.vue'
 import BossBattleTile from '@/components/challenges/BossBattleTile.vue'
 import { useApiQuery } from '@/composables/useApiQuery'
+import { useApiMutation } from '@/composables/useApiMutation'
 import type {
   BossBattleListDto,
   CardChainListDto,
+  ChallengeStartResponse,
   DailyChallengeDto,
   TournamentListDto,
 } from '@/api/types/common'
@@ -24,6 +27,7 @@ definePage({
 })
 
 const { t } = useI18n()
+const router = useRouter()
 
 const dailyQuery = useApiQuery<DailyChallengeDto>('/api/challenges/daily')
 const bossQuery = useApiQuery<BossBattleListDto>('/api/challenges/boss')
@@ -43,6 +47,54 @@ const anyError = computed(() =>
   || chainsQuery.error.value
   || tournamentsQuery.error.value,
 )
+
+// STU-W-11: navigate into a real /session on successful /start. Network
+// failures bubble through useApiMutation.error — kept simple at the hub
+// level; the dedicated /challenges/daily and /challenges/boss pages render
+// richer error chrome.
+const dailyStart = useApiMutation<ChallengeStartResponse, Record<string, never>>(
+  '/api/challenges/daily/start',
+  'POST',
+)
+const startingDaily = ref(false)
+const startingBossId = ref<string | null>(null)
+
+async function onStartDaily() {
+  if (startingDaily.value)
+    return
+  startingDaily.value = true
+  try {
+    const res = await dailyStart.execute({})
+    await router.push(`/session/${res.sessionId}`)
+  }
+  catch {
+    // surfaced via dailyStart.error.value
+  }
+  finally {
+    startingDaily.value = false
+  }
+}
+
+async function onSelectBoss(bossBattleId: string) {
+  if (startingBossId.value)
+    return
+  startingBossId.value = bossBattleId
+  try {
+    const mutation = useApiMutation<ChallengeStartResponse, Record<string, never>>(
+      `/api/challenges/boss/${encodeURIComponent(bossBattleId)}/start`,
+      'POST',
+    )
+    const res = await mutation.execute({})
+    await router.push(`/session/${res.sessionId}`)
+  }
+  catch {
+    // The boss page will surface a richer error; on the hub we simply
+    // release the loading state.
+  }
+  finally {
+    startingBossId.value = null
+  }
+}
 </script>
 
 <template>
@@ -80,6 +132,8 @@ const anyError = computed(() =>
         <DailyChallengeCard
           v-if="dailyQuery.data.value"
           :challenge="dailyQuery.data.value"
+          :starting="startingDaily"
+          @start="onStartDaily"
         />
       </section>
 
@@ -100,6 +154,8 @@ const anyError = computed(() =>
             v-for="b in bossQuery.data.value.available"
             :key="b.bossBattleId"
             :boss="b"
+            :starting="startingBossId === b.bossBattleId"
+            @select="onSelectBoss"
           />
           <BossBattleTile
             v-for="b in bossQuery.data.value.locked"
@@ -138,16 +194,16 @@ const anyError = computed(() =>
               color="primary"
               height="8"
               rounded
-              :aria-label="t('challenges.chains.progressAria', chain.cardsUnlocked, {
+              :aria-label="t('challenges.chains.progressAria', {
                 unlocked: chain.cardsUnlocked,
                 total: chain.cardsTotal,
-              })"
+              }, { plural: chain.cardsUnlocked })"
             />
             <div class="text-caption text-medium-emphasis mt-2">
-              {{ t('challenges.chains.cardsUnlocked', chain.cardsUnlocked, {
+              {{ t('challenges.chains.cardsUnlocked', {
                 unlocked: chain.cardsUnlocked,
                 total: chain.cardsTotal,
-              }) }}
+              }, { plural: chain.cardsUnlocked }) }}
             </div>
           </VCard>
         </div>
@@ -195,7 +251,7 @@ const anyError = computed(() =>
               {{ tourn.name }}
             </div>
             <div class="text-caption text-white opacity-90 mt-1">
-              {{ t('challenges.tournaments.participants', tourn.participantCount, { count: tourn.participantCount }) }}
+              {{ t('challenges.tournaments.participants', { count: tourn.participantCount }, { plural: tourn.participantCount }) }}
             </div>
           </VCard>
           <VCard
@@ -217,7 +273,7 @@ const anyError = computed(() =>
               {{ tourn.name }}
             </div>
             <div class="text-caption text-medium-emphasis mt-1">
-              {{ t('challenges.tournaments.participants', tourn.participantCount, { count: tourn.participantCount }) }}
+              {{ t('challenges.tournaments.participants', { count: tourn.participantCount }, { plural: tourn.participantCount }) }}
             </div>
           </VCard>
         </div>

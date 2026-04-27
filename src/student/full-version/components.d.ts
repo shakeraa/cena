@@ -55,6 +55,7 @@ declare module 'vue' {
     CustomRadiosWithIcon: typeof import('./src/@core/components/app-form-elements/CustomRadiosWithIcon.vue')['default']
     CustomRadiosWithImage: typeof import('./src/@core/components/app-form-elements/CustomRadiosWithImage.vue')['default']
     DailyChallengeCard: typeof import('./src/components/challenges/DailyChallengeCard.vue')['default']
+    DailyChallengeLeaderboard: typeof import('./src/components/challenges/DailyChallengeLeaderboard.vue')['default']
     DiagnosticQuiz: typeof import('./src/components/onboarding/DiagnosticQuiz.vue')['default']
     DialogCloseBtn: typeof import('./src/@core/components/DialogCloseBtn.vue')['default']
     DropZone: typeof import('./src/@core/components/DropZone.vue')['default']

@@ -167,4 +167,35 @@ export const handlerStudentChallenges = [
   http.get('/api/challenges/chains', () => HttpResponse.json(mockChains)),
 
   http.get('/api/challenges/tournaments', () => HttpResponse.json(mockTournaments)),
+
+  // STU-W-11: navigates the student into a real /session/:id flow. The
+  // server returns a fresh learning-session id; we mirror its shape with a
+  // deterministic-ish id so Playwright can assert on the navigation target.
+  http.post('/api/challenges/daily/start', () => {
+    const sessionId = `challenge_daily_${Date.now().toString(36)}`
+    return HttpResponse.json({
+      sessionId,
+      challengeId: mockDaily.challengeId,
+      expiresAt: mockDaily.expiresAt,
+    })
+  }),
+
+  http.post('/api/challenges/boss/:id/start', ({ params }) => {
+    const id = String(params.id)
+    const all = [...mockBoss.available, ...mockBoss.locked]
+    const boss = all.find(b => b.bossBattleId === id)
+    // 404 mirror of ChallengesEndpoints.cs
+    if (!boss)
+      return HttpResponse.json({ error: 'Boss battle not found' }, { status: 404 })
+    // 403 mirror — locked bosses must not be startable from the UI
+    if (mockBoss.locked.some(b => b.bossBattleId === id))
+      return HttpResponse.json({ error: 'Mastery requirement not met' }, { status: 403 })
+
+    const sessionId = `challenge_boss_${Date.now().toString(36)}`
+    return HttpResponse.json({
+      sessionId,
+      bossBattleId: id,
+      attemptsRemaining: 2,
+    })
+  }),
 ]

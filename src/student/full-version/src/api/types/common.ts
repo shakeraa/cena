@@ -203,6 +203,59 @@ export interface BossBattleListDto {
   locked: BossBattleSummary[]
 }
 
+/**
+ * Daily-challenge leaderboard. Mirrors `GET /api/challenges/daily/leaderboard`
+ * (STB-05). Used by `<DailyChallengeLeaderboard>`.
+ */
+export interface DailyChallengeLeaderboardEntry {
+  rank: number
+  studentId: string
+  displayName: string
+  score: number
+  timeSeconds: number
+}
+
+export interface DailyChallengeLeaderboardDto {
+  entries: DailyChallengeLeaderboardEntry[]
+  /** Caller's own rank if they have submitted, else `null`. */
+  currentStudentRank: number | null
+}
+
+/**
+ * Boss-battle detail. Mirrors `GET /api/challenges/boss/{id}` (STB-05). The
+ * server computes attempts-remaining server-side; the UI only displays it.
+ */
+export interface BossBattleRewardItem {
+  type: 'xp' | 'badge' | string
+  amount: number
+}
+
+export interface BossBattleDetailDto {
+  bossBattleId: string
+  name: string
+  description: string
+  subject: string
+  difficulty: string
+  attemptsRemaining: number
+  attemptsMax: number
+  rewards: BossBattleRewardItem[]
+}
+
+/**
+ * Response from `POST /api/challenges/{type}/start` (STB-05b). The session
+ * id is what the UI navigates to (`/session/{sessionId}`); the rest is
+ * informational.
+ */
+export interface ChallengeStartResponse {
+  sessionId: string
+  challengeId?: string
+  bossBattleId?: string
+  /** ISO-8601. Daily challenges expire at end-of-day. */
+  expiresAt?: string
+  /** Boss-battle attempts remaining after this start consumed one. */
+  attemptsRemaining?: number
+}
+
 export interface CardChainSummary {
   chainId: string
   name: string

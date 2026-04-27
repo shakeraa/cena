@@ -876,12 +876,50 @@
       "reattempt": "Try again",
       "attempted": "Attempted",
       "expired": "Expired",
-      "timeLeft": "{hours}h {minutes}m left | {hours}h {minutes}m left"
+      "timeLeft": "{hours}h {minutes}m left | {hours}h {minutes}m left",
+      "pageTitle": "Daily challenge",
+      "pageSubtitle": "Same questions for everyone, today only.",
+      "howItWorks": "All students get the same set of questions today. The clock resets at midnight in your timezone.",
+      "bestScore": "Best score today: {score}",
+      "empty": {
+        "title": "No daily challenge today",
+        "subtitle": "Check back tomorrow for a fresh set of questions."
+      },
+      "leaderboard": {
+        "title": "Today's leaderboard",
+        "subtitle": "Live results from students who finished today's challenge.",
+        "rankHeader": "#",
+        "studentHeader": "Student",
+        "scoreHeader": "Score",
+        "timeHeader": "Time",
+        "you": "You",
+        "yourRank": "Your rank: {rank}",
+        "noRankYet": "Finish today's challenge to see your rank.",
+        "empty": "No one has finished today's challenge yet — be first."
+      }
     },
     "boss": {
       "title": "Boss battles",
       "subtitle": "Test your mastery against our toughest opponents.",
-      "requiresLevel": "Requires mastery level {level}"
+      "requiresLevel": "Requires mastery level {level}",
+      "pageTitle": "Boss battles",
+      "pageSubtitle": "Pit your mastery against the toughest opponents. Server enforces attempts and unlock rules.",
+      "filter": {
+        "all": "All subjects",
+        "label": "Filter by subject"
+      },
+      "available": "Available now",
+      "lockedHeading": "Locked",
+      "lockedExplain": "Reach the listed mastery level to unlock.",
+      "attemptsRemaining": "{remaining}/{max} attempts left today",
+      "noAttempts": "No attempts left today — try again tomorrow.",
+      "startBattle": "Start battle",
+      "viewDetails": "View details",
+      "startError": "Could not start the boss battle. Try again.",
+      "empty": {
+        "title": "No boss battles available",
+        "subtitle": "We're cooking up new bosses. Keep practising — they'll arrive soon."
+      }
     },
     "chains": {
       "title": "Card chains",
