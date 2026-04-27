@@ -72,12 +72,22 @@ test.describe('E2E-A-01 student registration', () => {
     // intercept pointer events on the age-gate. Real students dismiss it
     // by picking a tile; tests can't afford the extra step per spec and
     // the locale choice is not what this flow is guarding.
-    await page.addInitScript(() => {
+    //
+    // Also seed the per-worker tenant id under `cena-e2e-tenant-id`: the
+    // SPA's `useFirebaseAuth.onFirstSignIn` reads this key when calling
+    // `POST /api/auth/on-first-sign-in` so the freshly-registered Firebase
+    // user gets bound to THIS worker's tenant (no cross-worker bleed).
+    // Production builds ignore the key — they resolve tenant from an invite
+    // code, and the backend rejects this trusted-mode path unless
+    // CENA_E2E_TRUSTED_REGISTRATION=true (set in docker-compose.app.yml for
+    // the dev stack).
+    await page.addInitScript((tenantId: string) => {
       window.localStorage.setItem(
         'cena-student-locale',
         JSON.stringify({ code: 'en', locked: true, version: 1 }),
       )
-    })
+      window.localStorage.setItem('cena-e2e-tenant-id', tenantId)
+    }, tenant.id)
 
     await page.goto('/register')
     await expect(page.getByTestId('age-gate-step')).toBeVisible()
