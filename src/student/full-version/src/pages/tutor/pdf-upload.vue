@@ -15,7 +15,10 @@
 import { ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { $api } from '@/utils/api'
+// /api/$api.ts attaches the Firebase idToken via getIdToken(); the
+// legacy /utils/api.ts only reads a non-existent `accessToken` cookie
+// and therefore POSTs unauthenticated → 401. Surfaced by EPIC-C-04.
+import { $api } from '@/api/$api'
 
 definePage({
   meta: {
@@ -79,7 +82,10 @@ async function handleFiles(files: FileList | null) {
   form.append('photo', file, file.name)
 
   try {
-    const res = await $api<PhotoUploadResponse>('/api/student/photo/upload', { method: 'POST', body: form })
+    // Backend mounts the photo endpoints under MapGroup("/api/photos"),
+    // not "/api/student/photo". The previous path 404'd in production
+    // — surfaced by EPIC-C-04 photo-upload journey spec.
+    const res = await $api<PhotoUploadResponse>('/api/photos/upload', { method: 'POST', body: form })
     outcome.value = { kind: 'ok', data: res }
   }
   catch (e: any) {

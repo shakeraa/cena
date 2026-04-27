@@ -15,7 +15,10 @@ import { onMounted, onBeforeUnmount, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { useCamera, type CaptureResult } from '@/composables/useCamera'
-import { $api } from '@/utils/api'
+// /api/$api.ts attaches the Firebase idToken via getIdToken(); the
+// legacy /utils/api.ts only reads a non-existent `accessToken` cookie
+// and therefore POSTs unauthenticated → 401. Surfaced by EPIC-C-04.
+import { $api } from '@/api/$api'
 
 definePage({
   meta: {
@@ -96,7 +99,10 @@ async function upload(capture: CaptureResult) {
   form.append('photo', capture.blob, `capture-${Date.now()}.jpg`)
 
   try {
-    const res = await $api<PhotoCaptureResponse>('/api/student/photo/capture', {
+    // Backend mounts the photo endpoints under MapGroup("/api/photos"),
+    // not "/api/student/photo". The previous path 404'd in production
+    // — surfaced by EPIC-C-04 photo-upload journey spec.
+    const res = await $api<PhotoCaptureResponse>('/api/photos/capture', {
       method: 'POST',
       body: form,
     })
