@@ -18,6 +18,7 @@ import type { Page } from '@playwright/test'
 import { createFirebaseUser, signInFirebaseUser, type FirebaseAuthUser } from './auth'
 import { createStripeScope, type StripeScope } from './stripe'
 import { createBusProbe, type BusProbe } from './bus-probe'
+import { createDynamicSeed, type DynamicSeed } from './dynamic-seed'
 
 export interface TenantContext {
   /**
@@ -41,6 +42,7 @@ export interface E2EFixtures {
   authUser: FirebaseAuthUser
   stripeScope: StripeScope
   busProbe: BusProbe
+  dynamicSeed: DynamicSeed
 }
 
 function buildTenantId(workerIndex: number, runId: string): string {
@@ -102,6 +104,22 @@ export const e2eTest = base.extend<E2EFixtures, { tenant: TenantContext }>({
     }
     finally {
       await probe.close()
+    }
+  },
+
+  // Test-scoped: TASK-E2E-INFRA-03 dynamic-route seed fixture. Each
+  // spec gets its own DynamicSeed instance bound to the worker's
+  // tenant. Tracked Firebase emu users are deleted on teardown
+  // (best-effort). Tests for [id] routes (mastery/student/[id],
+  // tutor/[threadId], etc.) consume this to plant ids without each
+  // spec re-implementing the provisioning boilerplate.
+  dynamicSeed: async ({ tenant }, use) => {
+    const seed = createDynamicSeed({ tenantId: tenant.id })
+    try {
+      await use(seed)
+    }
+    finally {
+      await seed.cleanup()
     }
   },
 })
