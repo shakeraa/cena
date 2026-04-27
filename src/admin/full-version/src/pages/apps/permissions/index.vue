@@ -55,27 +55,36 @@ const orderedRoles = computed(() => {
     .filter((rp): rp is RolePermissions => rp !== undefined)
 })
 
+// Defensive: API response shape isn't always perfect — a category
+// without a `name` field or with null/undefined entries inside
+// `actions` will throw `Cannot read properties of undefined
+// (reading 'toLowerCase')` on filter. Coerce to string before
+// lowercasing so a malformed payload renders as an empty match
+// rather than crashing the page. Surfaced 2026-04-27 by EPIC-G
+// permissions functional spec.
+const safeLower = (s: unknown): string => typeof s === 'string' ? s.toLowerCase() : ''
+
 const filteredCategories = computed(() => {
   if (!search.value.trim())
     return permissionCategories.value
 
   const query = search.value.toLowerCase()
   return permissionCategories.value.filter(cat => {
-    const categoryMatch = cat.name.toLowerCase().includes(query)
-    const actionMatch = cat.actions.some(a => a.toLowerCase().includes(query))
+    const categoryMatch = safeLower(cat?.name).includes(query)
+    const actionMatch = (cat?.actions ?? []).some(a => safeLower(a).includes(query))
     return categoryMatch || actionMatch
   })
 })
 
 const filteredActions = (category: PermissionCategory): string[] => {
   if (!search.value.trim())
-    return category.actions
+    return category?.actions ?? []
 
   const query = search.value.toLowerCase()
-  if (category.name.toLowerCase().includes(query))
-    return category.actions
+  if (safeLower(category?.name).includes(query))
+    return category?.actions ?? []
 
-  return category.actions.filter(a => a.toLowerCase().includes(query))
+  return (category?.actions ?? []).filter(a => safeLower(a).includes(query))
 }
 
 const toggleCategory = (categoryName: string) => {
