@@ -151,6 +151,22 @@ public static class MartenConfiguration
             .Index(x => x.StudentId)
             .Index(x => x.Status);
 
+        // prr-034: cultural-context review-board DLQ. /api/admin/moderation/
+        // cultural-context-dlq queries this document; without a schema
+        // entry every list/detail call 42P01-not-found. Surfaced by EPIC-G-06.
+        opts.Schema.For<Cena.Infrastructure.Documents.CulturalContextReviewBoardDocument>()
+            .Identity(d => d.Id)
+            .Index(x => x.SchoolId)
+            .Index(x => x.Status);
+
+        // EPIC-I-01: retention-worker run history. /api/admin/compliance/
+        // data-retention reads the most-recent RetentionRunHistory row
+        // to surface enforcement state; without a schema entry every
+        // call 42P01-not-found.
+        opts.Schema.For<Cena.Infrastructure.Compliance.RetentionRunHistory>()
+            .Identity(d => d.Id)
+            .Index(x => x.RunAt);
+
         // ── Question Read Model (inline projection for list queries) ──
         opts.Projections.Add<QuestionListProjection>(ProjectionLifecycle.Inline);
 
