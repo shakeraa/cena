@@ -131,16 +131,41 @@ test.describe('EPIC_X_PERFORMANCE_BUDGETS', () => {
     test.setTimeout(180_000)
     await provisionAndLogin(page)
 
-    // One representative page per top-level area. We don't measure
-    // every page — that adds wall time without much new signal once
-    // the auth shell is hot. These are the most-visited surfaces.
-    const PAGES = [
-      `${STUDENT_SPA_BASE_URL}/home`,
-      `${STUDENT_SPA_BASE_URL}/pricing`,
-      `${STUDENT_SPA_BASE_URL}/profile`,
-      `${STUDENT_SPA_BASE_URL}/settings`,
-      `${STUDENT_SPA_BASE_URL}/tutor`,
+    // COV-01: full route matrix. Each route gets ~3 s in `measure`
+    // (goto + 1.5 s LCP-settle + perf-entry read). 29 routes × 3 s
+    // ≈ 90 s wall, which fits inside the 180 s test timeout.
+    const STUDENT_PATHS = [
+      '/home',
+      '/account/subscription',
+      '/challenges',
+      '/challenges/boss',
+      '/challenges/daily',
+      '/knowledge-graph',
+      '/notifications',
+      '/parent/dashboard',
+      '/pricing',
+      '/profile',
+      '/profile/edit',
+      '/progress',
+      '/progress/mastery',
+      '/progress/sessions',
+      '/progress/time',
+      '/session',
+      '/settings',
+      '/settings/account',
+      '/settings/appearance',
+      '/settings/notifications',
+      '/settings/privacy',
+      '/settings/study-plan',
+      '/social',
+      '/social/friends',
+      '/social/leaderboard',
+      '/social/peers',
+      '/tutor',
+      '/tutor/pdf-upload',
+      '/tutor/photo-capture',
     ]
+    const PAGES = STUDENT_PATHS.map(p => `${STUDENT_SPA_BASE_URL}${p}`)
 
     const all: Metrics[] = []
     for (const url of PAGES) {
@@ -185,12 +210,37 @@ test.describe('EPIC_X_PERFORMANCE_BUDGETS', () => {
     await page.locator('button[type="submit"]').click()
     await page.waitForURL(url => !url.pathname.startsWith('/login'), { timeout: 20_000 })
 
-    const PAGES = [
-      `${ADMIN_SPA_BASE_URL}/dashboards/admin`,
-      `${ADMIN_SPA_BASE_URL}/apps/permissions`,
-      `${ADMIN_SPA_BASE_URL}/apps/moderation/queue`,
-      `${ADMIN_SPA_BASE_URL}/apps/system/health`,
+    // COV-01: full route matrix. Skips routes in EPIC-G admin-pages-smoke
+    // KNOWN_BROKEN_ROUTES allowlist — those have backend gaps that
+    // distort load timings (some return 500 fast, some hang on SignalR
+    // negotiate). Once BG-01..05 land they can be added back.
+    const ADMIN_PATHS = [
+      '/dashboards/admin',
+      '/apps/cultural/dashboard',
+      '/apps/diagnostics/stuck-types',
+      '/apps/experiments',
+      '/apps/focus/dashboard',
+      '/apps/ingestion/settings',
+      '/apps/mastery/dashboard',
+      '/apps/messaging',
+      '/apps/moderation/queue',
+      '/apps/outreach/dashboard',
+      '/apps/pedagogy/mcm-graph',
+      '/apps/pedagogy/methodology',
+      '/apps/pedagogy/methodology-hierarchy',
+      '/apps/permissions',
+      '/apps/roles',
+      '/apps/system/audit-log',
+      '/apps/system/dead-letters',
+      '/apps/system/embeddings',
+      '/apps/system/explanation-cache',
+      '/apps/system/health',
+      '/apps/system/settings',
+      '/apps/system/token-budget',
+      '/apps/tutoring/sessions',
+      '/apps/user/list',
     ]
+    const PAGES = ADMIN_PATHS.map(p => `${ADMIN_SPA_BASE_URL}${p}`)
 
     const all: Metrics[] = []
     for (const url of PAGES) {
