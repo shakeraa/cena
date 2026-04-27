@@ -116,6 +116,40 @@ Tasks materialize as separate files only when implementation starts. Today's sta
 
 All other workflows live inline inside their epic files until someone claims one to implement.
 
+## Coverage-matrix tasks (added 2026-04-27 by claude-1)
+
+These tasks close the per-page coverage gap — every page × every axis (correctness / functionality / performance / visual / a11y / cross-page). Surfaced from the shipped EPIC-G + EPIC-X smoke matrices.
+
+| Task | Axis | Status | Surface |
+|---|---|---|---|
+| [TASK-E2E-COV-01](TASK-E2E-COV-01-per-page-performance.md) | Performance per route (47 admin + student) | Proposed | All routes; depends on INFRA-04 for prod numbers |
+| [TASK-E2E-COV-02](TASK-E2E-COV-02-axe-a11y-per-page.md) | axe-core a11y per page (WCAG 2.1 AA) | Proposed (P0 — Israeli law) | All routes × en/ar/he |
+| [TASK-E2E-COV-03](TASK-E2E-COV-03-visual-regression.md) | Visual snapshot regression | Proposed (P2) | All routes × 3 viewports |
+| [TASK-E2E-COV-04](TASK-E2E-COV-04-admin-per-page-functional.md) | Admin per-page functional (10 sub-specs) | Proposed | 39 admin pages |
+| [TASK-E2E-COV-05](TASK-E2E-COV-05-student-per-page-functional.md) | Student per-page functional (7 sub-specs) | Proposed | 29 student pages |
+| [TASK-E2E-COV-06](TASK-E2E-COV-06-cross-page-flow-matrix.md) | Cross-page flow matrix (10 flows) | Proposed | returnTo, deep-links, back-button, multi-tab, PWA |
+
+## Backend gap fix tasks (added 2026-04-27 by claude-1)
+
+Real backend gaps surfaced by EPIC-G admin smoke. Each is owned by admin-api maintainers, with a queue-task and a removal contract on the EPIC-G allowlist.
+
+| Task | Endpoint | Status | Severity |
+|---|---|---|---|
+| [TASK-E2E-BG-01](TASK-E2E-BG-01-admin-ai-settings-500.md) | `GET /api/admin/ai/settings` 500 | Proposed | P1 (blocks LLM provider config) |
+| [TASK-E2E-BG-02](TASK-E2E-BG-02-admin-questions-500.md) | `GET /api/admin/questions/{,languages}` 500 | Proposed | P1 (blocks question bank admin + RDY-004a translation QA) |
+| [TASK-E2E-BG-03](TASK-E2E-BG-03-admin-ingestion-500.md) | `GET /api/admin/ingestion/{stats,pipeline-status}` 500 | Proposed | P0 (blocks Bagrut ingestion E2E + RDY-057) |
+| [TASK-E2E-BG-04](TASK-E2E-BG-04-admin-signalr-hubs-404.md) | 4 SignalR hubs 404 on negotiate | Proposed | P1 (blocks J-09 SignalR resilience) |
+| [TASK-E2E-BG-05](TASK-E2E-BG-05-instructor-mentor-endpoints.md) | `/api/instructor/*` + `/api/mentor/institutes` 404 | Proposed | P1 (half-implemented — no-stubs violation) |
+
+## Infrastructure tasks (added 2026-04-27 by claude-1)
+
+| Task | Purpose | Status |
+|---|---|---|
+| [TASK-E2E-INFRA-03](TASK-E2E-INFRA-03-dynamic-route-seed.md) | Dynamic-route seed fixture for `[id]` routes | Proposed (P0 — blocks 20% of admin coverage) |
+| [TASK-E2E-INFRA-04](TASK-E2E-INFRA-04-prod-build-perf.md) | Production-build perf measurement (real LCP) | Proposed |
+| [TASK-E2E-INFRA-05](TASK-E2E-INFRA-05-allowlist-staleness-gate.md) | Allowlist auto-decay + staleness CI gate | Proposed |
+| [TASK-E2E-INFRA-06](TASK-E2E-INFRA-06-smoke-ci-integration.md) | CI integration (.github/workflows/e2e-flow.yml) | Proposed (P0 — specs exist but nobody runs them in CI) |
+
 ## Cross-spec prereqs (load-bearing)
 
 Track via the shared task queue (`node .agentdb/kimi-queue.js list`). All current backend prereqs are assigned to `claude-code` (kimi-coder paused 2026-04-24 per user directive).
