@@ -251,6 +251,17 @@ public static class ComplianceEndpoints
                         retentionDays = DataRetentionPolicy.EngagementRetention.Days,
                         retentionYears = DataRetentionPolicy.EngagementRetention.Days / 365,
                         description = "XP, streaks, badges (1 year after inactivity)"
+                    },
+                    new
+                    {
+                        // ADR-0003 Decision 2: misconception data is session-scoped
+                        // with a hard 30-day TTL (90-day legal cap). External
+                        // auditors must be able to read this constant from the
+                        // compliance surface, not from source code only.
+                        category = "Session Misconceptions",
+                        retentionDays = DataRetentionPolicy.SessionMisconceptionRetention.Days,
+                        retentionYears = 0,
+                        description = "Per-session misconception tags pruned after 30 days (ADR-0003 Decision 2; 90-day hard cap)"
                     }
                 },
                 enforcement = new
