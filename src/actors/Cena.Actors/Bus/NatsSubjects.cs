@@ -63,6 +63,29 @@ public static class NatsSubjects
     /// </summary>
     public const string AllStudentOnboardedEvents  = "cena.events.student.*.onboarded";
 
+    // ── Per-Parent Events (TASK-E2E-A-04-BE: parent-bind backend) ──
+    // Pattern: cena.events.parent.{parentUid}.{event_type}
+
+    /// <summary>
+    /// TASK-E2E-A-04-BE: per-parent "child binding accepted" event-type token.
+    /// Combined via <see cref="ParentEvent(string, string)"/> yields
+    /// <c>cena.events.parent.{parentUid}.bound</c>.
+    /// </summary>
+    public const string ParentChildBound          = "bound";
+
+    /// <summary>
+    /// TASK-E2E-A-04-BE: wildcard subscription matching every parent-bound
+    /// event across every parent. Used by the e2e-flow A-04 spec and by
+    /// downstream parent-notification consumers.
+    /// </summary>
+    public const string AllParentBoundEvents      = "cena.events.parent.*.bound";
+
+    /// <summary>
+    /// Build per-parent subject: <c>cena.events.parent.{parentUid}.{eventType}</c>.
+    /// </summary>
+    public static string ParentEvent(string parentUid, string eventType)
+        => $"cena.events.parent.{parentUid}.{eventType}";
+
     /// <summary>
     /// Wildcard subscription for all events of a specific student.
     /// </summary>
