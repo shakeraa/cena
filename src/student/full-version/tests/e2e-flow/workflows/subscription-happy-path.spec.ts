@@ -27,14 +27,12 @@
 import { e2eTest as test, expect } from '../fixtures/tenant'
 import { probeSubscription } from '../probes/db-probe'
 
-const SEEDED_STUDENT_EMAIL = 'student1@cena.local'
-const SEEDED_STUDENT_PASSWORD = 'DevStudent123!'
-const SEEDED_STUDENT_TENANT = 'cena'
+const TENANT_ID = 'cena'
+const SCHOOL_ID = 'cena-platform'
 
 test.describe('E2E-001 subscription happy path', () => {
   test('plus annual: pricing → checkout-session → stripe success → confirm-active', async ({
     page,
-    stripeScope,
   }) => {
     // Lock the locale before navigation so the FirstRunLanguageChooser
     // modal does not intercept pointer events on /login or /pricing.
@@ -45,15 +43,38 @@ test.describe('E2E-001 subscription happy path', () => {
       )
     })
 
-    // 0. Drive the SPA's real /login form. Firebase JS SDK in the page
-    //    persists the session via IndexedDB (the SPA's actual auth path).
+    // 0a. Provision a fresh per-run student. Using a seeded user runs into
+    // 409 "already_active" on the second activation; a fresh user gets a
+    // clean subscription aggregate every time. The flow is: create via
+    // Firebase emu signUp, run on-first-sign-in to bootstrap Marten state
+    // (AdminUser doc + StudentProfileSnapshot via StudentOnboardedV1),
+    // then drive /login to populate the SPA's Firebase IndexedDB.
+    const email = `e2e-sub-${Date.now()}-${Math.random().toString(36).slice(2, 8)}@cena.test`
+    const password = `e2e-${Math.random().toString(36).slice(2, 12)}`
+
+    const signupResp = await page.request.post(
+      `http://${process.env.FIREBASE_EMU_HOST ?? 'localhost:9099'}/identitytoolkit.googleapis.com/v1/accounts:signUp?key=fake-api-key`,
+      { data: { email, password, returnSecureToken: true } },
+    )
+    expect(signupResp.ok(), 'Firebase emu signUp must succeed').toBe(true)
+    const signup = await signupResp.json() as { idToken: string; localId: string }
+
+    const onboardResp = await page.request.post('/api/auth/on-first-sign-in', {
+      headers: { Authorization: `Bearer ${signup.idToken}` },
+      data: { tenantId: TENANT_ID, schoolId: SCHOOL_ID, displayName: 'E2E Sub' },
+    })
+    expect(
+      onboardResp.status(),
+      'on-first-sign-in must bootstrap Marten state for the fresh student',
+    ).toBe(200)
+
+    // 0b. Drive the SPA's real /login form so the Firebase JS SDK in the
+    //     page populates IndexedDB and the SPA treats the user as
+    //     authenticated for any UI-level interactions later.
     await page.goto('/login')
-    await page.getByTestId('auth-email').locator('input').fill(SEEDED_STUDENT_EMAIL)
-    await page.getByTestId('auth-password').locator('input').fill(SEEDED_STUDENT_PASSWORD)
+    await page.getByTestId('auth-email').locator('input').fill(email)
+    await page.getByTestId('auth-password').locator('input').fill(password)
     await page.getByTestId('auth-submit').click()
-    // Wait until the SPA exits /login. Where it lands depends on
-    // onboarding state (could be /home, /onboarding, etc.) — we just
-    // need to know we're past the login form before driving /pricing.
     await page.waitForURL(url => !url.pathname.startsWith('/login'), { timeout: 15_000 })
 
     // 1. DOM boundary — pricing page renders, tier cards visible
@@ -76,13 +97,14 @@ test.describe('E2E-001 subscription happy path', () => {
     //
     //    page.request inherits cookies but not the Authorization header
     //    the SPA's useApi composable attaches via Firebase getIdToken.
-    //    Mint a fresh idToken via the emulator REST so the page.request
-    //    POSTs authenticate the same way the SPA's POST would.
+    //    Re-sign-in via emulator REST after on-first-sign-in so the
+    //    refreshed idToken carries the role/tenant/school custom claims
+    //    that the just-shipped onboarding service set.
     const tokenResp = await page.request.post(
       `http://${process.env.FIREBASE_EMU_HOST ?? 'localhost:9099'}/identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=fake-api-key`,
-      { data: { email: SEEDED_STUDENT_EMAIL, password: SEEDED_STUDENT_PASSWORD, returnSecureToken: true } },
+      { data: { email, password, returnSecureToken: true } },
     )
-    expect(tokenResp.ok(), 'Firebase emu signInWithPassword must succeed for the seeded student').toBe(true)
+    expect(tokenResp.ok(), 'Firebase emu signInWithPassword must succeed').toBe(true)
     const { idToken } = await tokenResp.json() as { idToken: string }
     expect(idToken, 'Firebase idToken must be returned').toBeTruthy()
 
@@ -121,34 +143,56 @@ test.describe('E2E-001 subscription happy path', () => {
     // "URL is hosted by the gateway", not "URL exactly matches Stripe".
     expect(checkoutBody.checkoutUrl).toMatch(/(checkout\.stripe\.com|sandbox\.checkout\.cena\.test)/)
 
-    // 4. Simulate Stripe paying the invoice via test-mode webhook.
-    await stripeScope.triggerCheckoutCompleted(checkoutBody.sessionId)
+    // 4. Activate the subscription. The dev stack runs SandboxCheckoutSessionProvider
+    //    which doesn't actually call Stripe — instead it pairs with a
+    //    `POST /api/me/subscription/activate` endpoint that simulates the
+    //    webhook-driven activation. We call that directly.
+    //
+    //    Production flow goes Stripe Checkout → webhook → SubscriptionActivated_V1.
+    //    Dev sandbox swaps the webhook for the activate endpoint with the
+    //    same payload shape. The aggregate state-transition is identical.
+    const idemKey = `e2e-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    const activateResp = await page.request.post('/api/me/subscription/activate', {
+      headers: { Authorization: `Bearer ${idToken}` },
+      data: {
+        primaryStudentId,
+        tier: 'Plus',
+        billingCycle: 'Annual',
+        paymentIdempotencyKey: idemKey,
+      },
+    })
+    expect(
+      activateResp.status(),
+      'POST /api/me/subscription/activate must return 200 (sandbox webhook simulator)',
+    ).toBe(200)
 
     // 5. Navigate SPA-side to the confirm page (the real redirect would
     //    come from Stripe's success_url; we drive there directly).
     await page.goto(`/subscription/confirm?session=${checkoutBody.sessionId}`)
 
     // 6. Confirm-active view rendered within the 10s expect timeout
-    //    (the backend polls SubscriptionAggregate state; webhook→actor
-    //    processing is sub-second on a warm stack).
+    //    (the backend polls SubscriptionAggregate state; activation
+    //    POST is synchronous on the warm dev stack).
     await expect(
       page.getByTestId('subscription-confirm-active'),
-      `Subscription never reached Active state for ${SEEDED_STUDENT_EMAIL}`,
+      `Subscription never reached Active state for ${email}`,
     ).toBeVisible({ timeout: 15_000 })
 
     // 7. Boundary assertion — API-layer read-model agrees with the DOM.
+    // Wire shape per SubscriptionStatusDto: { status, currentTier,
+    // currentBillingCycle, activatedAt, renewsAt, linkedStudentCount }.
     const subscriptionState = await page.request.get('/api/me/subscription', {
       headers: { Authorization: `Bearer ${idToken}` },
     })
     expect(subscriptionState.ok()).toBe(true)
     const body = await subscriptionState.json() as {
-      state: string
-      tier: string
-      cycle: string
+      status: string
+      currentTier: string | null
+      currentBillingCycle: string | null
     }
-    expect(body.state).toBe('Active')
-    expect(body.tier).toBe('Plus')
-    expect(body.cycle).toBe('Annual')
+    expect(body.status).toBe('Active')
+    expect(body.currentTier).toBe('Plus')
+    expect(body.currentBillingCycle).toBe('Annual')
 
     // 8. DB boundary — PRR-436 admin test probe reads the canonical
     // SubscriptionAggregate state directly, not the read-model. The
@@ -164,7 +208,7 @@ test.describe('E2E-001 subscription happy path', () => {
     expect(parentSubjectId, '/api/me must carry the student id').toBeTruthy()
 
     const probed = await probeSubscription({
-      tenantId: SEEDED_STUDENT_TENANT,
+      tenantId: TENANT_ID,
       parentSubjectId: parentSubjectId!,
     })
     expect(probed.found,
