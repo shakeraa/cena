@@ -23,6 +23,17 @@
     <ProjectReference Include="..\Cena.Api.Contracts\Cena.Api.Contracts.csproj" />
   </ItemGroup>
 
+  <!-- ADR-0026 §1: bundle the LLM routing config so AddLlmCostMetric
+       resolves {ContentRoot}/contracts/llm/routing-config.yaml at runtime.
+       Same fix as the admin host — the student API also calls AddLlmCostMetric
+       and would 500 on tutor / LLM endpoints without the file present. -->
+  <ItemGroup>
+    <None Include="../../../contracts/llm/routing-config.yaml"
+          Link="contracts/llm/routing-config.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />

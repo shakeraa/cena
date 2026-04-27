@@ -12,6 +12,15 @@
     <ProjectReference Include="../../shared/Cena.Infrastructure/Cena.Infrastructure.csproj" />
   </ItemGroup>
 
+  <!-- ADR-0026 §1: bundle the LLM routing config so AddLlmCostMetric
+       resolves {ContentRoot}/contracts/llm/routing-config.yaml at runtime. -->
+  <ItemGroup>
+    <None Include="../../../contracts/llm/routing-config.yaml"
+          Link="contracts/llm/routing-config.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Proto.Cluster.TestProvider" Version="1.8.0" />
     <!-- RDY-025b: Proto.Actor Kubernetes-based service discovery. Watches

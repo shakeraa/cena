@@ -18,6 +18,18 @@
     <ProjectReference Include="..\Cena.Api.Contracts\Cena.Api.Contracts.csproj" />
   </ItemGroup>
 
+  <!-- ADR-0026 §1: bundle the LLM routing config into the publish output
+       so AddLlmCostMetric can resolve {ContentRoot}/contracts/llm/routing-config.yaml
+       at runtime. Without this, /app/contracts/llm/routing-config.yaml
+       does not exist in the docker image and any LLM-emitting endpoint
+       (recreate-from-reference, ai-generation, etc.) 500s. -->
+  <ItemGroup>
+    <None Include="../../../contracts/llm/routing-config.yaml"
+          Link="contracts/llm/routing-config.yaml">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <!-- RDY-060: SignalR + Redis backplane for multi-replica admin hub -->
