@@ -79,5 +79,20 @@ public static class SubscriptionMartenRegistration
         //                              share one canonical source.
         opts.Schema.For<AlphaGraceMarker>().Identity(d => d.Id);
         opts.Schema.For<AlphaMigrationSeedDocument>().Identity(d => d.Id);
+
+        // Phase 1B trial-then-paywall — L3a card-fingerprint defense layer.
+        //   TrialFingerprintLedger        : singleton-per-fingerprint document
+        //                                   (Id = SHA-256 hash of Stripe's
+        //                                   card.fingerprint). Survives RTBF
+        //                                   per GDPR Art 17(3)(e) — see
+        //                                   docs/design/trial-recycle-defense-
+        //                                   001-research.md §1.5a + companion
+        //                                   brief §5.12.
+        //   TrialFingerprintRecorded_V1   : audit event appended to the
+        //                                   parent's existing subscription-
+        //                                   {parentSubjectIdEncrypted} stream
+        //                                   on each successful record.
+        opts.Events.AddEventType<TrialFingerprintRecorded_V1>();
+        opts.Schema.For<TrialFingerprintLedger>().Identity(d => d.Id);
     }
 }
