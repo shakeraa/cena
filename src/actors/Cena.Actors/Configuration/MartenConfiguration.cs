@@ -133,6 +133,25 @@ public static class MartenConfiguration
         opts.Schema.For<Cena.Actors.Parent.ParentBindInviteDocument>()
             .Identity(d => d.Id);
 
+        // ── Bagrut Reference Corpus (PRR-242 + PRR-251 dev-bootstrap) ──
+        // Without the explicit schema registration, hosts running with
+        // Marten__AutoCreate=None error 42P01 on the corpus query path,
+        // and the seed step (BagrutCorpusSeedData) silently fails to
+        // create rows on first boot. Register here so admin-api +
+        // student-api + actor-host all see the table.
+        //
+        // Indexes use explicit short Names to dodge Postgres's 64-char
+        // identifier limit (NAMEDATALEN). Marten's auto-generated names
+        // would be like `mt_doc_bagrutcorpusitemdocument_idx_ministry_…`
+        // which exceeds 64 chars and trips PostgresqlIdentifierTooLong
+        // at schema-warm time.
+        opts.Schema.For<Cena.Infrastructure.Documents.BagrutCorpusItemDocument>()
+            .Identity(d => d.Id)
+            .Index(d => d.MinistrySubjectCode, idx => idx.Name = "idx_bagrut_corpus_subj")
+            .Index(d => d.MinistryQuestionPaperCode, idx => idx.Name = "idx_bagrut_corpus_paper")
+            .Index(d => d.Year, idx => idx.Name = "idx_bagrut_corpus_year")
+            .Index(d => d.TopicId, idx => idx.Name = "idx_bagrut_corpus_topic");
+
         // EPIC-I/GDPR Article 17: erasure request log. The /api/me/gdpr/erasure*
         // endpoints query and write ErasureRequest documents — without a
         // schema entry, hosts running with Marten__AutoCreate=None get
