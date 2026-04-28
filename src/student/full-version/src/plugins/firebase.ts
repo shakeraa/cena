@@ -159,6 +159,15 @@ export default function install(_app: App) {
     return
   }
 
+  // E2E-K-04 test seam: in dev/test only, expose meStore.__setActiveSession
+  // on `window` so a Playwright spec can flip `hasActiveSession` true/false
+  // without first having to /POST /api/sessions/start. Statically tree-
+  // shaken from any production build by Vite (DEV / MODE='test' guards).
+  if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+    ;(window as unknown as { __cenaTestSetActiveSession?: (id: string | null) => void })
+      .__cenaTestSetActiveSession = (id) => meStore.__setActiveSession(id)
+  }
+
   // ── Mock auth path (dev only, explicit opt-in) ──
   if (useMockAuth) {
     console.info('[firebase] Mock auth mode enabled (VITE_USE_MOCK_AUTH=true)')
