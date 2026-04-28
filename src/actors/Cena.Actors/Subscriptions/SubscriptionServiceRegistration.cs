@@ -201,6 +201,18 @@ public static class SubscriptionServiceRegistration
             services.AddSingleton<ICheckoutSessionProvider, SandboxCheckoutSessionProvider>();
         }
 
+        // Phase 1C trial-then-paywall §4.0: payment-method tokenization seam.
+        // InMemory default — deterministic SHA256 fingerprints, all five
+        // §4.0.1 failure modes exercisable via the scenario factory.
+        // StripeServiceRegistration.AddStripeCheckoutIfConfigured replaces
+        // this with StripeSetupIntentProvider when both StripeOptions is
+        // fully configured AND StripeOptions.EnableSetupIntents is true.
+        if (!services.Any(d => d.ServiceType == typeof(IPaymentMethodSetupProvider)))
+        {
+            services.AddSingleton<IPaymentMethodSetupProvider>(
+                _ => new InMemorySetupIntentProvider());
+        }
+
         // PRR-306 refund workflow composition:
         //   - Default refund gateway = sandbox. StripeServiceRegistration
         //     replaces this with StripeRefundGatewayService when Stripe

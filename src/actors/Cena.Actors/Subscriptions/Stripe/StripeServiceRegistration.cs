@@ -73,6 +73,24 @@ public static class StripeServiceRegistration
         // PromotionCodes.
         services.RemoveAll<IDiscountCouponProvider>();
         services.AddSingleton<IDiscountCouponProvider, StripeDiscountCouponProvider>();
+
+        // Phase 1C trial-then-paywall §4.0: payment-method tokenization seam.
+        // Replace the InMemory provider (registered in SubscriptionServiceRegistration)
+        // with the Stripe-backed adapter ONLY when the dashboard toggle for
+        // "Use Radar on payment methods saved for future use" has also been
+        // flipped on for the account (per
+        // docs/design/trial-recycle-defense-001-research.md §1.3). This is
+        // surfaced as the StripeOptions.EnableSetupIntents flag so production
+        // opts in explicitly: minting SetupIntents without Radar coverage
+        // defeats the §5.7 fingerprint-ledger anti-abuse pairing.
+        // When the flag is false, the InMemory provider stays wired — the
+        // consuming endpoints can be developed against the seam now and the
+        // production toggle flipped on later without touching code.
+        if (options.EnableSetupIntents)
+        {
+            services.RemoveAll<IPaymentMethodSetupProvider>();
+            services.AddSingleton<IPaymentMethodSetupProvider, StripeSetupIntentProvider>();
+        }
         return true;
     }
 
