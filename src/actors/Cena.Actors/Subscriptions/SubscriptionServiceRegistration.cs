@@ -109,6 +109,15 @@ public static class SubscriptionServiceRegistration
         // Non-Marten hosts (tests, dev single-host) can still exercise the
         // pure RunOnceAsync logic directly via unit tests.
         services.AddHostedService<SubscriptionLifecycleEmailWorker>();
+
+        // Phase 1B trial-then-paywall — L3a card-fingerprint ledger.
+        // Replace the InMemory default with the Marten-backed store so the
+        // ledger row survives pod restarts and is shared across replicas
+        // (recording on pod A is visible to the trial-start path on pod B).
+        // The GDPR-retention behaviour (row survives crypto-shred, parent
+        // ref cleared) is identical between InMemory and Marten variants.
+        services.Replace(ServiceDescriptor.Singleton<ITrialFingerprintLedgerStore,
+            MartenTrialFingerprintLedgerStore>());
         return services;
     }
 
@@ -159,6 +168,14 @@ public static class SubscriptionServiceRegistration
         services.TryAddSingleton<IDiscountCouponProvider, InMemoryDiscountCouponProvider>();
         services.TryAddSingleton<IDiscountIssuedEmailDispatcher, NullDiscountIssuedEmailDispatcher>();
         services.AddSingleton<DiscountAssignmentService>();
+
+        // Phase 1B trial-then-paywall — L3a card-fingerprint ledger.
+        //   Default store = InMemory (production-grade for single-host).
+        //   AddSubscriptionsMarten replaces with MartenTrialFingerprintLedgerStore
+        //   so multi-replica deployments share one canonical ledger.
+        // TryAdd so a host that has already bound a custom impl wins.
+        services.TryAddSingleton<ITrialFingerprintLedgerStore,
+            InMemoryTrialFingerprintLedgerStore>();
 
         // PRR-344 alpha-migration defaults (InMemory). AddSubscriptionsMarten
         // swaps these for the Marten-backed variants so the seed list and
