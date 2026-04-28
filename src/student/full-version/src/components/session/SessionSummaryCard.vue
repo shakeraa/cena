@@ -16,7 +16,7 @@ const durationLabel = computed(() => {
   if (mins === 0)
     return t('session.summary.durationSecs', { secs })
 
-  return t('session.summary.durationMinsSecs', mins, { mins, secs })
+  return t('session.summary.durationMinsSecs', { mins, secs }, { plural: mins })
 })
 </script>
 

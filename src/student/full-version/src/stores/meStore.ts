@@ -69,6 +69,14 @@ export const useMeStore = defineStore('me', () => {
     return !!(profile.value?.onboardedAt)
   })
 
+  // Stable identifier consumed by callers that don't care about the auth
+  // shape (Firebase uid vs synth uid in tests). Falls through to `null` so
+  // call sites can `?? authStore.uid` for a final fallback.
+  const studentId = computed<string | null>(() => {
+    const uid = profile.value?.uid
+    return typeof uid === 'string' && uid.length > 0 ? uid : null
+  })
+
   const hasActiveSession = computed(() => activeSessionId.value !== null)
 
   function __setProfile(next: MeProfile | null) {
@@ -106,6 +114,7 @@ export const useMeStore = defineStore('me', () => {
     activeSessionId,
     isOnboarded,
     hasActiveSession,
+    studentId,
     __setProfile,
     __setOnboardedAt,
     __setActiveSession,

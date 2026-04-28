@@ -80,7 +80,7 @@ async function handleMarkAllRead() {
         variant="flat"
         prepend-icon="tabler-bell"
       >
-        {{ t('notifications.unreadCount', unreadCount, { count: unreadCount }) }}
+        {{ t('notifications.unreadCount', { count: unreadCount }, { plural: unreadCount }) }}
       </VChip>
     </div>
 

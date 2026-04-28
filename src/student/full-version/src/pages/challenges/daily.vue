@@ -12,6 +12,9 @@ import type {
   DailyChallengeLeaderboardDto,
 } from '@/api/types/common'
 
+// TODO(trial-then-paywall): once route guards land, gate this route with
+//   meta.requiresActiveEntitlement: true.
+//   See docs/design/trial-then-paywall-001-discussion.md (claude-2's brief).
 definePage({
   meta: {
     layout: 'default',
@@ -144,6 +147,22 @@ async function onStart() {
       </div>
 
       <section data-testid="daily-leaderboard-section">
+        <div class="d-flex align-center justify-space-between mb-2">
+          <h2 class="text-h6 ma-0">
+            {{ t('challenges.daily.leaderboard.title') }}
+          </h2>
+          <VBtn
+            variant="text"
+            size="small"
+            prepend-icon="tabler-refresh"
+            :loading="leaderboardQuery.loading.value"
+            :aria-label="t('challenges.daily.leaderboard.refreshAria')"
+            data-testid="daily-leaderboard-refresh"
+            @click="leaderboardQuery.refresh()"
+          >
+            {{ t('challenges.daily.leaderboard.refresh') }}
+          </VBtn>
+        </div>
         <div
           v-if="leaderboardQuery.loading.value && !leaderboardQuery.data.value"
           class="d-flex justify-center py-6"
@@ -154,6 +173,7 @@ async function onStart() {
         <DailyChallengeLeaderboard
           v-else-if="leaderboardQuery.data.value"
           :leaderboard="leaderboardQuery.data.value"
+          hide-title
         />
         <VAlert
           v-else-if="leaderboardQuery.error.value"

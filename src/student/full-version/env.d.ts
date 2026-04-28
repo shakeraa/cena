@@ -5,7 +5,21 @@ declare module 'vue-router' {
     subject?: string
     layoutWrapperClasses?: string
     navActiveLink?: RouteLocationRaw
-    layout?: 'blank' | 'default'
+    /**
+     * Layout to wrap the page in. Mirrors files under `src/layouts/`.
+     * Keep this union in sync with the layout files actually present.
+     */
+    layout?: 'blank' | 'default' | 'auth'
+    /** Page title (resolved through i18n by AppBar/breadcrumbs). */
+    title?: string
+    /** Show breadcrumbs in the AppBar for this route. */
+    breadcrumbs?: boolean
+    /** Hide the persistent sidebar on this route. */
+    hideSidebar?: boolean
+    /** Require an authenticated session. */
+    requiresAuth?: boolean
+    /** Require the student to have completed onboarding. */
+    requiresOnboarded?: boolean
     unauthenticatedOnly?: boolean
     public?: boolean
   }

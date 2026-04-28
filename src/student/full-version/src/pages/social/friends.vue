@@ -165,7 +165,7 @@ async function handleAccept(requestId: string) {
 
       <section data-testid="friends-list-section">
         <h2 class="text-h6 mb-3">
-          {{ t('social.friends.listTitle', friendsQuery.data.value.friends.length, { count: friendsQuery.data.value.friends.length }) }}
+          {{ t('social.friends.listTitle', { count: friendsQuery.data.value.friends.length }, { plural: friendsQuery.data.value.friends.length }) }}
         </h2>
         <FriendRow
           v-for="f in friendsQuery.data.value.friends"

@@ -38,11 +38,11 @@ const relativeTime = computed(() => {
   if (diffMin < 1)
     return t('notifications.justNow')
   if (diffMin < 60)
-    return t('notifications.minutesAgo', diffMin, { count: diffMin })
+    return t('notifications.minutesAgo', { count: diffMin }, { plural: diffMin })
   if (diffHour < 24)
-    return t('notifications.hoursAgo', diffHour, { count: diffHour })
+    return t('notifications.hoursAgo', { count: diffHour }, { plural: diffHour })
 
-  return t('notifications.daysAgo', diffDay, { count: diffDay })
+  return t('notifications.daysAgo', { count: diffDay }, { plural: diffDay })
 })
 
 function handleClick() {

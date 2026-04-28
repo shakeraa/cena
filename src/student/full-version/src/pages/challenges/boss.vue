@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import BossBattleTile from '@/components/challenges/BossBattleTile.vue'
 import { useApiQuery } from '@/composables/useApiQuery'
 import { useApiMutation } from '@/composables/useApiMutation'
@@ -11,6 +11,9 @@ import type {
   ChallengeStartResponse,
 } from '@/api/types/common'
 
+// TODO(trial-then-paywall): once route guards land, gate this route with
+//   meta.requiresActiveEntitlement: true.
+//   See docs/design/trial-then-paywall-001-discussion.md (claude-2's brief).
 definePage({
   meta: {
     layout: 'default',
@@ -25,13 +28,28 @@ definePage({
 
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 
 const bossQuery = useApiQuery<BossBattleListDto>('/api/challenges/boss')
 
 const startingId = ref<string | null>(null)
 const startError = ref<ApiError | null>(null)
 
-const subjectFilter = ref<string>('all')
+// Subject filter — read from `?subject=` so refresh / share-link preserves
+// selection. Defaults to 'all' when absent or invalid.
+const initialFilter = (() => {
+  const raw = route.query.subject
+  return typeof raw === 'string' && raw.length > 0 ? raw : 'all'
+})()
+const subjectFilter = ref<string>(initialFilter)
+
+// Mirror the filter back into the URL without polluting browser history.
+watch(subjectFilter, (next) => {
+  const target = next === 'all' ? undefined : next
+  if (route.query.subject === target)
+    return
+  router.replace({ query: { ...route.query, subject: target } })
+}, { flush: 'post' })
 
 const subjectOptions = computed(() => {
   const data = bossQuery.data.value

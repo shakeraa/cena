@@ -120,7 +120,7 @@ function handleSubmit() {
                Without it Unicode bidi can split the digit (LTR-strong)
                from the unit (RTL-strong) inside narrow buttons and
                clip one of them. Surfaced 2026-04-27 on /session ar. -->
-          <bdi>{{ t('session.setup.durationMinutes', d, { minutes: d }) }}</bdi>
+          <bdi>{{ t('session.setup.durationMinutes', { minutes: d }, { plural: d }) }}</bdi>
         </VBtn>
       </VBtnToggle>
     </section>
