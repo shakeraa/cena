@@ -1,6 +1,6 @@
 # ADR-0060 — Session mode is a first-class discriminator: `exam-prep` vs `freestyle`
 
-- **Status**: Proposed
+- **Status**: Accepted (2026-04-28 via coordinator delegation per user "do all" directive). Implementation deviation (additive ExamScope+ActiveExamTargetId, no Mode rename) merged at sha 8eadb079 — see §History. §Decision retained as historical-design record; §Invariants stay authoritative.
 - **Date proposed**: 2026-04-28
 - **Deciders**: Shaker (project owner), claude-code (coordinator)
 - **Related**:

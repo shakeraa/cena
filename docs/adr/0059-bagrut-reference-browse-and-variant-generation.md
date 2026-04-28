@@ -1,6 +1,6 @@
 # ADR-0059 — Reference-browse surface for ingested past-Bagrut corpus + student-side variant generation
 
-- **Status**: Proposed — pending revision per 2026-04-28 6-persona review (verdicts: 2 red, 1 yellow→red, 3 yellow). See §14 Persona Review Synthesis. ADR cannot move to Accepted until §14.4 mitigations are scheduled into PRR-245 (and dependent ADR sections rewritten accordingly).
+- **Status**: Accepted — §15 below supersedes §1-§6 where they conflict. Original draft retained for audit. Flag-flip remains gated on R7-R9 launch items (PRR-249 legal memo, PRR-254 takedown runbook, PRR-251 corpus dev-ingest).
 - **Date proposed**: 2026-04-28
 - **Deciders**: Shaker (project owner), claude-code (coordinator)
 - **Extends**: [ADR-0043 (Bagrut reference-only enforcement)](0043-bagrut-reference-only-enforcement.md) — this ADR carves out the *reference-browse* seam from the strict delivery ban, with its own consent-token, audit, and arch-test discipline.
@@ -290,3 +290,122 @@ These remain open after the 6-lens review:
 PRR-245 task body MUST be updated to reflect R1-R13 before any implementation starts. Coordinator (claude-code) will append a "Revised Scope (post-PRR-248)" section to PRR-245 in a follow-up commit.
 
 No new tasks added beyond PRR-251/252/253 (already filed). The R10-R13 mitigations land *inside* PRR-245's existing scope, not as new sub-tasks.
+
+### 14.6 Decision record — 2026-04-28 (Shaker via coordinator delegation)
+
+User directive 2026-04-28 "do all" — coordinator (claude-code) ratifies Q-A through Q-E per the §14.5 recommendations.
+
+| Q | Decision | Rationale |
+|---|---|---|
+| **Q-A** | Free tier defaults to **structural** (not parametric). Parametric becomes paid-tier only. | Ministry §16 derivative-works distance + cogsci's worked-example anchor logic both favor structural. Cost surfaces correctly via PRR-253 institute-tunable rate-limits + cogsci's per-source caps. |
+| **Q-B** | **Accept** the three-locale × four-screen-reader prototype gate on PRR-245. | The carve-out is too valuable to descope; the gate forces honest a11y posture. Same shape as ADR-0050 VDatePicker resolution. |
+| **Q-C** | **Yes** — always-Western-digits for Ministry codes regardless of PRR-032 numerals preference. | Ministry codes are catalog primary keys per ADR-0050 Item 2; numerals preference does not apply. Arch-test + shipgate-scanner enforce. |
+| **Q-D** | Takedown-response runbook lives in **SRE lane**. New task PRR-254 enqueued (extends PRR-016 exam-day SLO change-freeze pattern). | Regulatory/legal surface needs SRE muscle for the 30-min kill-switch. |
+| **Q-E** | **claude-3** owns PRR-251 corpus dev-ingest verification (low-risk investigative, matches her L-batch + verification-sweep pattern from claude-1's PRR-250). PRR-242 author can be looped in async. | Don't block on the original author returning; we have an active worker with the right pattern. |
+
+---
+
+## 15. Revised Decision (Accepted, supersedes §1-§6 where conflicting)
+
+§1-§6 above are retained as the original draft for audit. The persona-review synthesis (§14) and Q-A through Q-E (§14.6) modify the design as follows. **Where §1-§6 and §15 conflict, §15 wins.**
+
+### 15.1 `Reference<T>` factory + opaque `variantQuestionId` (supersedes §1)
+
+```csharp
+public readonly record struct Reference<T>(
+    T Value,
+    Provenance Provenance,            // MinistryBagrut allowed here
+    ConsentTokenId ConsentToken,      // 24h wire HMAC, see §15.3
+    ReferenceContextKind Context);    // BrowseLibrary | VariantSourceCitation
+```
+
+`Reference<T>.From(value, provenance, consentToken, context)` invariants:
+
+1. Requires `provenance.Kind == MinistryBagrut`.
+2. Validates `consentToken` is non-expired AND HMAC-binding holds (see §15.3) AND `consentToken.Context == context` (no cross-context reuse).
+3. Emits `EventId(8009, "BagrutReferenceBrowsed")` with structured `Provenance.Source` slash-delimited form `"ministry-bagrut/{שאלון}/{year}/{season}/{moed}/q{n}"` (ministry §14.2 item 5 — SIEM tractable).
+4. **Never logs raw item body.**
+
+`variantQuestionId` MUST be opaque server-side: HMAC-SHA256 over `{tenantId, studentId, sourceShailonCode, questionIndex, variationKind, parametricSeed?}` with a server-pepper. **Not** the deterministic dedup-key (redteam IDOR fix). Endpoint-layer ownership gate via `ResourceOwnershipGuard.VerifyStudentAccess` on every variant read (matching commit 5a030d24 cross-tenant guard pattern).
+
+### 15.2 Reference items have no answer affordances + ARIA contract (supersedes §2)
+
+Render path strips input controls (per original §2). **Plus normative §15.6 ARIA contract below.**
+
+### 15.3 Consent disclosure — HMAC token + 24h wire TTL + one-click revoke (supersedes §3)
+
+Consent disclosure surfaces inline (not modal) on first reference-page reach. Confirmation:
+
+- Emits `BagrutReferenceConsentGranted_V1` on student stream — event-sourced fact, retained per ADR-0042 ConsentAggregate (90d functional + RTBF-shreddable).
+- Returns a wire `ConsentTokenId` = HMAC-SHA256 over `{studentId, contextKind, issuedAt, expiresAt}` with **24-hour wire TTL** (redteam: minimizes forgery blast radius). Token re-issued silently from the 90d event-sourced fact on next reference-page hit when wire token expires.
+
+**One-click revoke MUST live on the reference page itself** (privacy: GDPR Art. 7(3) compliance — settings-only is borderline, deep-link-only non-compliant). Revoke emits `BagrutReferenceConsentRevoked_V1` + invalidates the current wire token + triggers RTBF cascade on the audit-event projection (§15.5).
+
+Localization: en/he/ar with `<bdi dir="ltr">` per §15.6.
+
+### 15.4 Reference filter scope (unchanged from §4)
+
+§4 stands. Bagrut targets contribute their `QuestionPaperCodes`; non-Bagrut targets get no Bagrut reference library; freestyle students opt-in via settings.
+
+### 15.5 Variant generation — revised cadence + per-source caps + structural-default-on-free (supersedes §5)
+
+| Tier | Mechanism | Per-source cap | Per-day cap | Free-tier | Paid-tier |
+|---|---|---|---|---|---|
+| **Structural** (default) | Tier-3 LLM via `GenerateSimilarHandler` + Haiku second-pass equivalence-check (§15.7) | 2 per source | 6/day | Available, gated by payment-method or institute-SSO verification (redteam: defeats account-rotation cache exfiltration) | 25/day |
+| **Parametric** (paid-only) | Deterministic parameter substitution + SymPy verify | 5 per source | 15/day | **Not available** (Q-A: ministry §16 derivative-works distance) | 50/day |
+
+Server-side enforcement:
+- Rate-limit at per-(student, day) AND per-(institute, day) AND per-(IP/device, day) levels via ASP.NET `RequireRateLimiting` + `AddRateLimiter` policies (corrected per PRR-250 §5).
+- Limits configurable per `IInstitutePricingResolver` once PRR-253 extends `ResolvedPricing` with `VariantStructuralPerDay`, `VariantParametricPerDay`, `VariantStructuralPerSource`, `VariantParametricPerSource`, burst.
+- Cohort single-flight write lock on variant generation (Redis): 30-student classroom burst → 1 author + 29 readers (R11; lessons from RDY-081 single-writer).
+- Persisted variant dedup key extended: `{sourceShailonCode, questionIndex, variationKind, track, stream, localeHint, parametricSeed?, payloadHashSafetyV1}` (finops §14.2 item 1 — closes 30× variance).
+- Free-tier structural calls require valid payment-method OR institute-SSO verification before the endpoint dispatches the LLM call (redteam M-1).
+
+### 15.6 Browse-history scope limitation (new — privacy §14.2 item 6)
+
+Browse history is high-fidelity learning-weakness inference data. The following 5 controls are normative invariants enforced by code review + arch-test:
+
+1. **No teacher / parent / tenant-admin visibility.** Browse history is not exposed via parent-aggregate (ADR-0042) projections, teacher dashboards (PRR-058), or tenant-admin reports.
+2. **No browse → mastery / scheduler / misconception coupling.** BKT (ADR-0050 Item 4) does not read browse signal. Scheduler (PRR-226) does not weight on browse. Misconception detection (ADR-0003) does not consume browse events.
+3. **No browse fields in LLM prompts** (per ADR-0022 PII-in-prompts ban). Hint generation, tutor-context, variant-authoring prompts must NOT receive `lastReferencedShailon`, browse counts, or browse timestamps.
+4. **k≥10 floor on aggregates** (per PRR-026 anonymity). Any analytics / coverage-matrix exposure of browse counts honors the existing k-anonymity policy.
+5. **Raw extracts banned outright.** No CSV / JSONL export of `BagrutReferenceItemRendered_V1` events. Audit access is per-event-by-id only, RBAC-gated to security-incident response.
+
+### 15.7 Audit event retention + RTBF cascade (new — privacy §14.2 item 2)
+
+`BagrutReferenceItemRendered_V1`:
+- **Retention horizon: 180 days** post-emit. Beyond 180d, RetentionWorker shreds the event (privacy: PPL Amendment 13 + GDPR Art. 5(1)(e) purpose-limitation).
+- **RTBF cascade**: registered with PRR-015 / PRR-218 RetentionWorker pattern. On student RTBF erasure, all `BagrutReference*` events for that student crypto-shred via the same pipeline as misconception data (ADR-0003 cascade pattern).
+- **No backfill via legacy retention.** Events emitted before this ADR landed are not retroactively retained; the ADR's first-emit date is the retention clock start.
+
+`BagrutReferenceConsentGranted_V1` / `BagrutReferenceConsentRevoked_V1`:
+- Per ADR-0042 ConsentAggregate. 90d functional retention; RTBF-shreddable on the same path.
+
+### 15.8 Cognitive-equivalence gate on structural variants (new — cogsci R13)
+
+Before a structural variant renders to a student:
+
+1. Tier-3 LLM authors the candidate variant.
+2. SymPy CAS oracle (ADR-0002) verifies math correctness.
+3. **Tier-2 Haiku second-pass** scores the candidate against the source on a 3-axis rubric: Bloom level, difficulty band, skill scope. Reject + regenerate (max 3 attempts) if any axis drifts beyond a configured threshold.
+4. On reject after 3 attempts, fall back to "Practice a similar problem from the catalog" affordance (no variant served). User-facing copy explains the fallback honestly.
+
+The Haiku second-pass adds ~$0.0002 + ~500ms per variant — finops-acceptable, cogsci-required.
+
+### 15.9 BKT discounting for reference-anchored attempts (new — cogsci R12)
+
+Variant attempts where the source was rendered within the last 5 minutes get **0.5× posterior weighting** in the BKT update (cogsci: defends against worked-example transient inflating immediate-test performance). Beyond 5 minutes, full posterior weighting resumes.
+
+The discount is recorded on the per-attempt event for analytics + BKT calibration. Spacing benefit (ADR-0050 Item 4) is preserved.
+
+### 15.10 Normative §"Accessibility" (new — a11y R6)
+
+Required spec for the reference-library + variant surfaces:
+
+- **Consent disclosure** — `aria-live="polite"`, non-trapping focus, dismissible via Enter (acknowledge) and Escape (dismiss → return to /home or settings — DOES NOT bypass disclosure; user gets re-prompted on next reference-page reach until acknowledged or revoked). Re-prompt path on 24h wire token expiry: silent re-issue from event-sourced fact (no re-disclosure); on 90d event-sourced consent expiry: full re-prompt.
+- **RTL + math + numerals** — every math fragment in `<bdi dir="ltr">`. Every שאלון code, MoedSlug, MinistryQuestionPaperCode, year, season in `<bdi dir="ltr">` AND **always Western digits regardless of PRR-032 student numerals preference** (Q-C: Ministry codes are catalog primary keys per ADR-0050 Item 2). Arch-test `MinistryCodeLatinDigitsTest` enforces. Shipgate scanner extension catches violations in localized strings.
+- **Variant-tier picker** — Vuetify segmented button with 2 options (parametric / structural for paid; single structural CTA for free). Each option `aria-describedby` cost + cap badge. Keyboard: Tab to focus, Arrow-keys cycle, Enter selects, Escape closes. No mouse required.
+- **Reduced-motion** (per PRR-070) — reference→variant route transitions respect `prefers-reduced-motion`. No spring animations on the segmented button.
+- **PRR-245 prototype gate** — three locales (en / he / ar) × four screen readers (NVDA / JAWS / VoiceOver-macOS / VoiceOver-iOS) ≈ 12 prototype cells minimum, expanded to ~30 with affordance variations. Prototype runs MUST land before any production code on PRR-245 ships. Failures fall back to metadata-only render (no raw Ministry text) for affected locale until prototype passes.
+
+---
