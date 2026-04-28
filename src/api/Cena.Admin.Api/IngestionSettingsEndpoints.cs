@@ -5,6 +5,7 @@
 // =============================================================================
 
 using System.Security.Claims;
+using System.Text.Json;
 using Cena.Infrastructure.Auth;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -60,12 +61,15 @@ public static class IngestionSettingsEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-        // POST — test email connection
-        group.MapPost("/test-email", async (
-            TestEmailRequest request,
-            IIngestionSettingsService service) =>
+        // POST — test email connection.
+        // Accepts either {config, password} (TestEmailRequest) or a bare EmailIngestionConfig
+        // — the SPA currently posts the bare shape; tolerate both so existing callers don't break.
+        group.MapPost("/test-email", async (HttpContext ctx, IIngestionSettingsService service) =>
         {
-            var result = await service.TestEmailConnectionAsync(request.Config, request.Password);
+            var (config, password) = await ReadEmailBodyAsync(ctx);
+            if (config is null)
+                return Results.BadRequest(new { error = "Invalid request body: missing email config." });
+            var result = await service.TestEmailConnectionAsync(config, password);
             return Results.Ok(new
             {
                 connected = result.Success,
@@ -74,16 +78,20 @@ public static class IngestionSettingsEndpoints
             });
         }).WithName("TestEmailIngestionConnection")
     .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-        // POST — test cloud directory connection
-        group.MapPost("/test-cloud-dir", async (
-            TestCloudDirRequest request,
-            IIngestionSettingsService service) =>
+        // POST — test cloud directory connection.
+        // Accepts either {config, secretKey} (TestCloudDirRequest) or a bare CloudDirConfig
+        // — the SPA currently posts the bare shape; tolerate both so existing callers don't break.
+        group.MapPost("/test-cloud-dir", async (HttpContext ctx, IIngestionSettingsService service) =>
         {
-            var result = await service.TestCloudDirAsync(request.Config, request.SecretKey);
+            var (config, secretKey) = await ReadCloudDirBodyAsync(ctx);
+            if (config is null)
+                return Results.BadRequest(new { error = "Invalid request body: missing cloud directory config." });
+            var result = await service.TestCloudDirAsync(config, secretKey);
             return Results.Ok(new
             {
                 connected = result.Success,
@@ -92,19 +100,66 @@ public static class IngestionSettingsEndpoints
             });
         }).WithName("TestCloudDirConnection")
     .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status400BadRequest)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         return app;
     }
+
+    private static readonly JsonSerializerOptions BodyJsonOptions = new(JsonSerializerDefaults.Web);
+
+    // Reads either {config: {...}, secretKey?: "..."} or a bare CloudDirConfig from the request body.
+    private static async Task<(CloudDirConfig? config, string? secretKey)> ReadCloudDirBodyAsync(HttpContext ctx)
+    {
+        try
+        {
+            using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return (null, null);
+
+            if (root.TryGetProperty("config", out var cfgEl) && cfgEl.ValueKind == JsonValueKind.Object)
+            {
+                var cfg = cfgEl.Deserialize<CloudDirConfig>(BodyJsonOptions);
+                string? secret = null;
+                if (root.TryGetProperty("secretKey", out var skEl) && skEl.ValueKind == JsonValueKind.String)
+                    secret = skEl.GetString();
+                return (cfg, secret);
+            }
+
+            // Bare CloudDirConfig
+            return (root.Deserialize<CloudDirConfig>(BodyJsonOptions), null);
+        }
+        catch (JsonException)
+        {
+            return (null, null);
+        }
+    }
+
+    // Reads either {config: {...}, password?: "..."} or a bare EmailIngestionConfig from the request body.
+    private static async Task<(EmailIngestionConfig? config, string? password)> ReadEmailBodyAsync(HttpContext ctx)
+    {
+        try
+        {
+            using var doc = await JsonDocument.ParseAsync(ctx.Request.Body);
+            var root = doc.RootElement;
+            if (root.ValueKind != JsonValueKind.Object) return (null, null);
+
+            if (root.TryGetProperty("config", out var cfgEl) && cfgEl.ValueKind == JsonValueKind.Object)
+            {
+                var cfg = cfgEl.Deserialize<EmailIngestionConfig>(BodyJsonOptions);
+                string? pwd = null;
+                if (root.TryGetProperty("password", out var pwEl) && pwEl.ValueKind == JsonValueKind.String)
+                    pwd = pwEl.GetString();
+                return (cfg, pwd);
+            }
+
+            return (root.Deserialize<EmailIngestionConfig>(BodyJsonOptions), null);
+        }
+        catch (JsonException)
+        {
+            return (null, null);
+        }
+    }
 }
-
-// Request DTOs for test endpoints
-public sealed record TestEmailRequest(
-    EmailIngestionConfig Config,
-    string? Password);
-
-public sealed record TestCloudDirRequest(
-    CloudDirConfig Config,
-    string? SecretKey);
