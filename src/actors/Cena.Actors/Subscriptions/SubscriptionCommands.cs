@@ -33,8 +33,13 @@ public sealed class SubscriptionCommandException : Exception
 public static class SubscriptionCommands
 {
     /// <summary>
-    /// Validate and produce an activation event. Reject if the state is not
-    /// in the Unsubscribed lifecycle.
+    /// Validate and produce an activation event. Allowed from
+    /// <see cref="SubscriptionStatus.Unsubscribed"/> (first activation),
+    /// <see cref="SubscriptionStatus.Trialing"/> (paid conversion — caller
+    /// SHOULD also append <see cref="TrialConverted_V1"/> as a marker
+    /// before calling this), and <see cref="SubscriptionStatus.Expired"/>
+    /// (re-purchase after a non-converting trial — design §3 Expired→Active
+    /// transition; no second trial is permitted on the stream).
     /// </summary>
     public static SubscriptionActivated_V1 Activate(
         SubscriptionState currentState,
@@ -45,7 +50,9 @@ public static class SubscriptionCommands
         string paymentTransactionIdEncrypted,
         DateTimeOffset activatedAt)
     {
-        if (currentState.Status != SubscriptionStatus.Unsubscribed)
+        if (currentState.Status is not (SubscriptionStatus.Unsubscribed
+            or SubscriptionStatus.Trialing
+            or SubscriptionStatus.Expired))
         {
             throw new SubscriptionCommandException(
                 $"Cannot activate; subscription is already in status {currentState.Status}. " +
@@ -334,6 +341,221 @@ public static class SubscriptionCommands
             RefundedAmountAgorot: refundedAmountAgorot,
             Reason: reason,
             RefundedAt: now);
+    }
+
+    // ----- Trial commands (design §3, task body item 4) ------------------
+
+    /// <summary>
+    /// Start a trial. Allowed only from <see cref="SubscriptionStatus.Unsubscribed"/>
+    /// — once a stream has trialled, it cannot trial again (abuse defense
+    /// per design §5.7; the fingerprint ledger and admin-override paths
+    /// live in sibling tasks). Validates that the caps snapshot has at
+    /// least one non-zero knob; rejects with <c>trial_not_offered</c>
+    /// when the platform-wide allotment is fully zero. Validates that
+    /// <paramref name="trialEndsAt"/> is strictly later than
+    /// <paramref name="trialStartedAt"/> when the duration knob is
+    /// non-zero; equality is allowed only on cap-only trials (duration
+    /// knob = 0).
+    /// </summary>
+    /// <param name="currentState">The aggregate's current state.</param>
+    /// <param name="parentSubjectIdEncrypted">Encrypted parent subject id.</param>
+    /// <param name="primaryStudentSubjectIdEncrypted">Encrypted primary student id.</param>
+    /// <param name="trialKind">Origin of the trial (self-pay, parent-pay, institute-code).</param>
+    /// <param name="trialStartedAt">UTC start instant.</param>
+    /// <param name="trialEndsAt">UTC end instant. Equals <paramref name="trialStartedAt"/> for cap-only trials.</param>
+    /// <param name="fingerprintHash">SHA-256 digest of Stripe card.fingerprint, or empty string for InstituteCode trials.</param>
+    /// <param name="experimentVariantId">Pricing-experiment variant locked at trial-start (design §5.21). Empty defaults to <c>v1-baseline</c>.</param>
+    /// <param name="capsSnapshot">Caps pinned from <see cref="TrialAllotmentConfig"/>.</param>
+    public static TrialStarted_V1 StartTrial(
+        SubscriptionState currentState,
+        string parentSubjectIdEncrypted,
+        string primaryStudentSubjectIdEncrypted,
+        TrialKind trialKind,
+        DateTimeOffset trialStartedAt,
+        DateTimeOffset trialEndsAt,
+        string fingerprintHash,
+        string experimentVariantId,
+        TrialCapsSnapshot capsSnapshot)
+    {
+        ArgumentNullException.ThrowIfNull(currentState);
+        ArgumentNullException.ThrowIfNull(capsSnapshot);
+
+        if (string.IsNullOrWhiteSpace(parentSubjectIdEncrypted))
+        {
+            throw new SubscriptionCommandException(
+                "Parent subject id (encrypted) is required to start a trial.");
+        }
+        if (string.IsNullOrWhiteSpace(primaryStudentSubjectIdEncrypted))
+        {
+            throw new SubscriptionCommandException(
+                "Primary student subject id (encrypted) is required to start a trial.");
+        }
+
+        if (currentState.Status != SubscriptionStatus.Unsubscribed)
+        {
+            throw new SubscriptionCommandException(
+                $"Cannot start trial; subscription is in status {currentState.Status}. " +
+                "Trials are allowed only from Unsubscribed (no second-trial path on this stream).");
+        }
+
+        if (!capsSnapshot.HasAnyAllotment)
+        {
+            // Mirrors the §11.2 410 trial_not_offered case at the domain
+            // boundary so a caller that bypasses the endpoint validator
+            // still cannot smuggle an empty trial through.
+            throw new SubscriptionCommandException("trial_not_offered");
+        }
+
+        if (capsSnapshot.TrialDurationDays > 0 && trialEndsAt <= trialStartedAt)
+        {
+            throw new SubscriptionCommandException(
+                $"trialEndsAt ({trialEndsAt:o}) must be strictly later than trialStartedAt " +
+                $"({trialStartedAt:o}) when TrialDurationDays > 0 is set on the caps snapshot.");
+        }
+        if (capsSnapshot.TrialDurationDays == 0 && trialEndsAt != trialStartedAt)
+        {
+            throw new SubscriptionCommandException(
+                "Cap-only trial (TrialDurationDays = 0) requires trialEndsAt == trialStartedAt; " +
+                "the daemon never expires this trial on calendar grounds.");
+        }
+
+        // Empty fingerprintHash is legitimate ONLY for InstituteCode trials.
+        // SelfPay and ParentPay both come from a SetupIntent and MUST carry
+        // a digest. Defending here, not just at the endpoint, so a caller
+        // bypassing the endpoint cannot smuggle an empty fingerprint.
+        var fp = fingerprintHash ?? string.Empty;
+        if (trialKind != TrialKind.InstituteCode && string.IsNullOrWhiteSpace(fp))
+        {
+            throw new SubscriptionCommandException(
+                $"fingerprintHash is required for trial-kind {trialKind} (only InstituteCode " +
+                "trials may omit the fingerprint).");
+        }
+
+        var variantId = string.IsNullOrWhiteSpace(experimentVariantId)
+            ? "v1-baseline"
+            : experimentVariantId;
+
+        return new TrialStarted_V1(
+            ParentSubjectIdEncrypted: parentSubjectIdEncrypted,
+            PrimaryStudentSubjectIdEncrypted: primaryStudentSubjectIdEncrypted,
+            TrialKind: trialKind,
+            TrialStartedAt: trialStartedAt,
+            TrialEndsAt: trialEndsAt,
+            FingerprintHash: fp,
+            ExperimentVariantId: variantId,
+            CapsSnapshot: capsSnapshot);
+    }
+
+    /// <summary>
+    /// Convert a trialling stream to paid. Emits a marker event; the caller
+    /// is responsible for then calling <see cref="Activate"/> to land the
+    /// commercial state. Rejects when the stream is not currently
+    /// <see cref="SubscriptionStatus.Trialing"/> or when the target tier is
+    /// not retail (Basic/Plus/Premium).
+    /// </summary>
+    public static TrialConverted_V1 ConvertTrial(
+        SubscriptionState currentState,
+        SubscriptionTier convertedToTier,
+        BillingCycle billingCycle,
+        string paymentTransactionIdEncrypted,
+        TrialUtilization utilizationAtConversion,
+        DateTimeOffset convertedAt)
+    {
+        ArgumentNullException.ThrowIfNull(currentState);
+        ArgumentNullException.ThrowIfNull(utilizationAtConversion);
+
+        if (currentState.Status != SubscriptionStatus.Trialing)
+        {
+            throw new SubscriptionCommandException(
+                $"Cannot convert trial; subscription is in status {currentState.Status}. " +
+                "ConvertTrial requires Trialing.");
+        }
+        if (!TierCatalog.Get(convertedToTier).IsRetail)
+        {
+            throw new SubscriptionCommandException(
+                $"Cannot convert trial to non-retail tier {convertedToTier}; " +
+                "only Basic/Plus/Premium are valid conversion targets.");
+        }
+        if (billingCycle == BillingCycle.None)
+        {
+            throw new SubscriptionCommandException(
+                "ConvertTrial requires a concrete BillingCycle (Monthly or Annual).");
+        }
+        if (string.IsNullOrWhiteSpace(paymentTransactionIdEncrypted))
+        {
+            throw new SubscriptionCommandException(
+                "ConvertTrial requires a non-empty payment transaction id (encrypted).");
+        }
+
+        // Days into trial: whole UTC calendar days between start and conversion.
+        // Negative deltas (clock-skew or replayed event) clamp to 0 so analytics
+        // never sees a negative bucket.
+        var startedAt = currentState.TrialStartedAt
+            ?? throw new SubscriptionCommandException(
+                "Trial state is missing TrialStartedAt — stream is corrupt.");
+        var daysIntoTrial = (int)Math.Max(0, (convertedAt.UtcDateTime.Date - startedAt.UtcDateTime.Date).TotalDays);
+
+        var parentId = currentState.ParentSubjectIdEncrypted
+            ?? throw new SubscriptionCommandException(
+                "Trial state is missing ParentSubjectIdEncrypted — stream is corrupt.");
+        var primaryId = currentState.LinkedStudents.FirstOrDefault()?.StudentSubjectIdEncrypted
+            ?? throw new SubscriptionCommandException(
+                "Trial state has no linked primary student — stream is corrupt.");
+
+        return new TrialConverted_V1(
+            ParentSubjectIdEncrypted: parentId,
+            PrimaryStudentSubjectIdEncrypted: primaryId,
+            ConvertedAt: convertedAt,
+            DaysIntoTrial: daysIntoTrial,
+            ConvertedToTier: convertedToTier,
+            BillingCycle: billingCycle,
+            PaymentTransactionIdEncrypted: paymentTransactionIdEncrypted,
+            UtilizationAtConversion: utilizationAtConversion);
+    }
+
+    /// <summary>
+    /// Expire a trialling stream on calendar timeout. Idempotent on
+    /// re-call against an already-Expired stream (returns a fresh event
+    /// with the original <c>TrialEndsAt</c>); the caller is expected to
+    /// either skip the duplicate append or rely on the underlying
+    /// store's idempotency guard. Rejects when called from any state
+    /// that is neither Trialing nor Expired.
+    /// </summary>
+    public static TrialExpired_V1 ExpireTrial(
+        SubscriptionState currentState,
+        TrialUtilization utilization,
+        DateTimeOffset trialEndedAt)
+    {
+        ArgumentNullException.ThrowIfNull(currentState);
+        ArgumentNullException.ThrowIfNull(utilization);
+
+        if (currentState.Status is not (SubscriptionStatus.Trialing or SubscriptionStatus.Expired))
+        {
+            throw new SubscriptionCommandException(
+                $"Cannot expire trial; subscription is in status {currentState.Status}. " +
+                "ExpireTrial requires Trialing (or already-Expired for idempotent re-call).");
+        }
+
+        var parentId = currentState.ParentSubjectIdEncrypted
+            ?? throw new SubscriptionCommandException(
+                "Trial state is missing ParentSubjectIdEncrypted — stream is corrupt.");
+        var primaryId = currentState.LinkedStudents.FirstOrDefault()?.StudentSubjectIdEncrypted
+            ?? throw new SubscriptionCommandException(
+                "Trial state has no linked primary student — stream is corrupt.");
+
+        // Idempotent re-call: pin the event to the originally-pinned
+        // TrialEndsAt rather than `now`, so replays produce identical
+        // streams regardless of when ExpireTrial fires post-deadline.
+        var endedAt = currentState.TrialEndsAt is { } pinned && pinned <= trialEndedAt
+            ? pinned
+            : trialEndedAt;
+
+        return new TrialExpired_V1(
+            ParentSubjectIdEncrypted: parentId,
+            PrimaryStudentSubjectIdEncrypted: primaryId,
+            TrialEndedAt: endedAt,
+            Outcome: TrialExpired_V1.OutcomeExpired,
+            Utilization: utilization);
     }
 
     /// <summary>Compute the next renewal boundary given activation time + cycle.</summary>

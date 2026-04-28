@@ -80,6 +80,15 @@ public sealed class SubscriptionAggregate
             case EntitlementSoftCapReached_V1 softCap:
                 State.Apply(softCap);
                 break;
+            case TrialStarted_V1 trialStarted:
+                State.Apply(trialStarted);
+                break;
+            case TrialConverted_V1 trialConverted:
+                State.Apply(trialConverted);
+                break;
+            case TrialExpired_V1 trialExpired:
+                State.Apply(trialExpired);
+                break;
         }
     }
 
