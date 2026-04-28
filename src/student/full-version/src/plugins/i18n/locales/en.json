@@ -762,7 +762,19 @@
         "challenge": "Challenge",
         "review": "Review",
         "diagnostic": "Diagnostic"
-      }
+      },
+      "examScopeLabel": "What kind of practice?",
+      "examScope": {
+        "examPrep": "Exam prep",
+        "freestyle": "Freestyle",
+        "examPrepAria": "Exam prep — practice scoped to your exam target",
+        "freestyleAria": "Freestyle — open practice across the whole subject",
+        "examPrepHelper": "Targeted practice — questions scoped to your selected exam.",
+        "freestyleHelper": "Open practice — no specific exam, the whole subject is in play.",
+        "noTargetsHelper": "Add an exam target on your plan to unlock exam-prep mode."
+      },
+      "targetLabel": "Exam target",
+      "targetAria": "Choose which exam to practice for"
     },
     "runner": {
       "questionProgress": "Question {current} of {total} | Question {current} of {total}",

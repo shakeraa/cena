@@ -130,6 +130,49 @@ export const handlerStudentMe = [
     return HttpResponse.json({ success: true, redirectTo: '/home' })
   }),
 
+  // PRR-256 / ADR-0050 — exam-targets list. Mirrors
+  // ExamTargetListResponseDto from ExamTargetEndpoints.cs. Two active
+  // targets so the SessionSetupForm picker has something to show in dev.
+  http.get('/api/me/exam-targets', () => {
+    return HttpResponse.json({
+      items: [
+        {
+          id: 'et_dev_bagrut_math_5u',
+          source: 'Student',
+          assignedById: 'self',
+          enrollmentId: null,
+          examCode: 'bagrut-math-5u',
+          track: '5u',
+          sitting: { academicYear: '2025-2026', season: 'Summer', moed: 'A' },
+          weeklyHours: 6,
+          reasonTag: null,
+          isActive: true,
+          archivedAt: null,
+          questionPaperCodes: ['35581', '35582'],
+          perPaperSittingOverride: null,
+          parentVisibility: 'Visible',
+        },
+        {
+          id: 'et_dev_bagrut_physics_5u',
+          source: 'Student',
+          assignedById: 'self',
+          enrollmentId: null,
+          examCode: 'bagrut-physics-5u',
+          track: '5u',
+          sitting: { academicYear: '2025-2026', season: 'Summer', moed: 'A' },
+          weeklyHours: 4,
+          reasonTag: null,
+          isActive: true,
+          archivedAt: null,
+          questionPaperCodes: ['36991'],
+          perPaperSittingOverride: null,
+          parentVisibility: 'Visible',
+        },
+      ],
+      includeArchived: false,
+    })
+  }),
+
   // FIND-ux-032: GET /api/me/settings — returns merged settings state
   http.get('/api/me/settings', () => {
     return HttpResponse.json(settingsStore)

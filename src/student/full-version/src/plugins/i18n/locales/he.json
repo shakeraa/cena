@@ -759,7 +759,19 @@
         "challenge": "אתגר",
         "review": "סקירה",
         "diagnostic": "אבחון"
-      }
+      },
+      "examScopeLabel": "איזה סוג תרגול?",
+      "examScope": {
+        "examPrep": "הכנה לבחינה",
+        "freestyle": "תרגול חופשי",
+        "examPrepAria": "הכנה לבחינה — תרגול ממוקד ביעד הבחינה שלך",
+        "freestyleAria": "חופשי — תרגול פתוח לכל המקצוע",
+        "examPrepHelper": "תרגול ממוקד — שאלות ביעד הבחינה שבחרת.",
+        "freestyleHelper": "תרגול חופשי — בלי בחינה ספציפית, כל המקצוע פתוח.",
+        "noTargetsHelper": "הוסף יעד בחינה בתוכנית שלך כדי לפתוח את מצב הכנה לבחינה."
+      },
+      "targetLabel": "יעד בחינה",
+      "targetAria": "בחר לאיזו בחינה לתרגל"
     },
     "runner": {
       "questionProgress": "אין שאלות | שאלה {current} מתוך {total} | שאלה {current} מתוך {total} | שאלה {current} מתוך {total}",

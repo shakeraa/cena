@@ -760,7 +760,19 @@
         "challenge": "تحدٍّ",
         "review": "مراجعة",
         "diagnostic": "تشخيص"
-      }
+      },
+      "examScopeLabel": "أيّ نوع من التدريب؟",
+      "examScope": {
+        "examPrep": "تحضير للامتحان",
+        "freestyle": "تدريب حرّ",
+        "examPrepAria": "تحضير للامتحان — تدريب موجَّه إلى هدفك الامتحاني",
+        "freestyleAria": "حرّ — تدريب مفتوح على المادة كاملة",
+        "examPrepHelper": "تدريب موجَّه — أسئلة محصورة في الامتحان الذي اخترته.",
+        "freestyleHelper": "تدريب مفتوح — لا امتحان محدّد، المادة كاملة متاحة.",
+        "noTargetsHelper": "أضِف هدف امتحان في خطّتك لتمكين وضع التحضير للامتحان."
+      },
+      "targetLabel": "هدف الامتحان",
+      "targetAria": "اختر الامتحان الذي تتحضّر له"
     },
     "runner": {
       "questionProgress": "لا أسئلة | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total} | السؤال {current} من {total}",
