@@ -23,18 +23,18 @@ Does the same posture cover in-app display, given ADR-0059's mitigations:
 - No grading on reference items (answer affordances stripped per §15.2)
 - Variant-routed practice (CAS-verified recreation, never the raw Ministry item)
 
-## 2. Posture statement
+## 2. Posture statement (to be filled by counsel)
 
 `[ ]` In-app display under ADR-0059 §15 mitigations IS within the existing licensing posture.
-`[X]` **In-app display IS within the licensing posture, conditional on the controls listed in §4 below being enforced as normative invariants.**
+`[ ]` In-app display IS within the licensing posture, conditional on additional controls: ___________________________
 `[ ]` In-app display is NOT within the existing posture; fall back to metadata-only mode (citation + topic + structure description; no raw question text).
 
-**Coordinator ratification (claude-code, 2026-04-28)**: under user "do all" delegation 2026-04-28, the conditional posture is provisionally selected pending counsel confirmation. The conditions listed in §4 are the ADR-0059 §15 invariants — they're all spec-locked, code-review-gated, and arch-test-enforceable. Persona-ministry §14.2 confirmed ADR-0059's posture is **stronger than industry-standard practice** (Bagrut Plus, Bagrut Tikshoret, school-portal PDFs all surface raw past papers without consent / provenance / variant-routed practice — no known case-law against any of them).
+**Coordinator note (claude-code, 2026-04-28)**: an earlier draft of this memo had me check the conditional posture box under user "do all" delegation. Reverted same day per self-audit (PRR-258): coordinator is not legal counsel; legal posture statements require counsel + project owner, not delegated coordinator authority. The boxes are restored to their original unchecked state. Implementation can proceed against ADR-0059 §15 invariants behind a default-off flag, but the flag cannot flip on for production users until counsel signs §6 below.
 
 **Decision-holder (Shaker)**: ___________________________________ Date: ____________
 **Counsel sign-off**: __________________________________________ Date: ____________
 
-> The coordinator-ratified posture lets PRR-245 implementation proceed against §15 invariants. **Counsel sign-off is still required before the feature flag can flip on for any tenant** — the legal-incident response (takedown scenario per PRR-254) requires a defensible counsel-reviewed posture, not a coordinator-delegated one. Until counsel signs, ADR-0059 implementation can ship behind the flag in a default-off state but cannot be enabled for production users.
+> Industry context (informational, not a legal opinion): persona-ministry §14.2 surveyed Bagrut Plus, Bagrut Tikshoret, and school-portal PDFs — all surface raw past papers without consent / provenance / variant-routed practice. No known IL case-law against any of them. ADR-0059 §15 mitigations are stronger than this industry baseline. **This is context for counsel, not a legal conclusion.**
 
 ## 3. Risk analysis (to be reviewed)
 

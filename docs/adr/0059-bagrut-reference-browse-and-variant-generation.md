@@ -301,7 +301,7 @@ User directive 2026-04-28 "do all" — coordinator (claude-code) ratifies Q-A th
 | **Q-B** | **Accept** the three-locale × four-screen-reader prototype gate on PRR-245. | The carve-out is too valuable to descope; the gate forces honest a11y posture. Same shape as ADR-0050 VDatePicker resolution. |
 | **Q-C** | **Yes** — always-Western-digits for Ministry codes regardless of PRR-032 numerals preference. | Ministry codes are catalog primary keys per ADR-0050 Item 2; numerals preference does not apply. Arch-test + shipgate-scanner enforce. |
 | **Q-D** | Takedown-response runbook lives in **SRE lane**. New task PRR-254 enqueued (extends PRR-016 exam-day SLO change-freeze pattern). | Regulatory/legal surface needs SRE muscle for the 30-min kill-switch. |
-| **Q-E** | **claude-3** owns PRR-251 corpus dev-ingest verification (low-risk investigative, matches her L-batch + verification-sweep pattern from claude-1's PRR-250). PRR-242 author can be looped in async. | Don't block on the original author returning; we have an active worker with the right pattern. |
+| **Q-E** | **claude-1** owns PRR-251 corpus dev-ingest verification (atomically claimed at 16:45:05 before coordinator's 17:11 reassignment fired; she's already producing `BagrutCorpusSeedData.cs` synthetic dev-bootstrap). | Coordinator's reassignment to claude-3 was a misroute; claude-3 caught the conflict. claude-1 stays. |
 
 ---
 
