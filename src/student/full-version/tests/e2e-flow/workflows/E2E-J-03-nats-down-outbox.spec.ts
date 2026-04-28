@@ -28,24 +28,22 @@ const SCHOOL_ID = 'cena-platform'
 const EMU_HOST = process.env.FIREBASE_EMU_HOST ?? 'localhost:9099'
 
 // =============================================================================
-// KNOWN BUG — surfaced by this spec on first run:
-// StudentOnboardingService.PublishOnboardedEventAsync awaits
-// `_nats.PublishAsync(...)` directly. When NATS is down, NATS.NET v2's
-// PublishAsync waits for reconnect rather than throwing immediately —
-// the onboarding HTTP request hangs indefinitely (240s test budget
-// exceeded). The endpoint is supposed to be outbox-safe per the file
-// banner ("best-effort, after persistence; failures here log + metric
-// but do not roll back"), but in practice it BLOCKS the request.
+// FIXED (queue task t_da5547fa8553):
+// StudentOnboardingService now uses
+// NatsPublishExtensions.PublishWithDeadlineAsync (2s default budget) so
+// a disconnected NATS broker no longer pins the on-first-sign-in HTTP
+// request thread. The publish either completes, or the deadline fires
+// and the existing catch block logs + metrics the failure without
+// throwing — Marten remains source of truth.
 //
-// Production-grade fix: wrap the publish in a short-deadline pattern,
-// e.g. Task.Run + WhenAny(publish, Task.Delay(2_000)) so a stalled NATS
-// connection doesn't propagate to the request thread. Carry-over task
-// enqueued (see queue) — this fixme'd spec turns green when the publish
-// becomes deadline-bounded.
+// Sibling request-path publishers (SessionNatsPublisher,
+// MessagingNatsPublisher) got the same treatment; outbox-/background-
+// dispatchers (NatsBusRouter, NatsOutboxPublisher, ReindexCoordinator)
+// already have their own retry/circuit semantics and were left as-is.
 // =============================================================================
 
 test.describe('E2E_J_03_NATS_DOWN_OUTBOX', () => {
-  test.fixme('student writes during NATS outage stay 2xx @epic-j @resilience @ship-gate @blocked-on-publish-deadline', async ({ page }) => {
+  test('student writes during NATS outage stay 2xx @epic-j @resilience @ship-gate', async ({ page }) => {
     test.setTimeout(240_000)
     console.log('\n=== E2E_J_03_NATS_DOWN_OUTBOX ===\n')
 

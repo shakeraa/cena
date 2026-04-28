@@ -253,7 +253,12 @@ public sealed class StudentOnboardingService : IStudentOnboardingService
                 ["correlation_id"] = evt.CorrelationId.ToString("N"),
             };
 
-            await _nats.PublishAsync(subject, data, headers: headers, cancellationToken: ct)
+            // Deadline-bounded: NATS.NET v2 blocks on a disconnected connection
+            // waiting for reconnect. Without the deadline the on-first-sign-in
+            // request hangs indefinitely on a NATS outage. Marten is canonical;
+            // a missed publish is logged + metric'd and recoverable via outbox
+            // backfill (E2E-J-03 invariant).
+            await _nats.PublishWithDeadlineAsync(subject, data, headers: headers, cancellationToken: ct)
                 .ConfigureAwait(false);
         }
         catch (Exception ex)

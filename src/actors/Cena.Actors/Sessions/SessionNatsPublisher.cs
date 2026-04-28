@@ -101,7 +101,10 @@ public sealed class SessionNatsPublisher : ISessionEventPublisher
             // INF-020: Propagate W3C trace context through NATS messages
             NatsTracePropagation.InjectTraceContext(headers);
 
-            await _nats.PublishAsync(subject, data, headers: headers);
+            // Deadline-bounded — request-path publisher (turn streaming).
+            // A stuck NATS connection must not block the student tutoring
+            // loop; Marten persistence is the source of truth.
+            await _nats.PublishWithDeadlineAsync(subject, data, headers: headers);
 
             Published.Add(1, new KeyValuePair<string, object?>("event_type",
                 subject[(subject.LastIndexOf('.') + 1)..]));

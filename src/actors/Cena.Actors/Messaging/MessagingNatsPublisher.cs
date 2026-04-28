@@ -9,6 +9,7 @@ using System.Diagnostics.Metrics;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Cena.Actors.Bus;
 using Cena.Actors.Events;
 using Cena.Infrastructure.Tracing;
 using Microsoft.Extensions.Logging;
@@ -70,7 +71,10 @@ public sealed class MessagingNatsPublisher : IMessagingEventPublisher
             // INF-020: Propagate W3C trace context through NATS messages
             NatsTracePropagation.InjectTraceContext(headers);
 
-            await _nats.PublishAsync(subject, data, headers: headers);
+            // Deadline-bounded — request-path publisher (inbound message
+            // ack). Redis is the hot store; a NATS publish stall must not
+            // block the synchronous request thread.
+            await _nats.PublishWithDeadlineAsync(subject, data, headers: headers);
 
             Published.Add(1, new KeyValuePair<string, object?>("subject", subject));
         }
