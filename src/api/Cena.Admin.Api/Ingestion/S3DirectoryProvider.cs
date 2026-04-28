@@ -48,14 +48,21 @@ public sealed class S3DirectoryProvider : ICloudDirectoryProvider
         [".xlsx"] = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     };
 
-    private readonly IAmazonS3 _s3;
+    // Lazy<IAmazonS3>: defers AWS SDK client construction until first
+    // operation actually needs it. Without this, registering the
+    // provider in DI resolves IAmazonS3 eagerly — and the factory in
+    // CloudDirectoryServiceCollectionExtensions throws when the
+    // Ingestion:S3 config section is null in dev, causing /api/admin/
+    // ingestion/* to 500 on a stack that never opted into S3.
+    // Surfaced by EPIC-G admin smoke (BG-03).
+    private readonly Lazy<IAmazonS3> _s3;
     private readonly IDocumentStore _store;
     private readonly IIngestionOrchestrator? _orchestrator;
     private readonly IngestionOptions _options;
     private readonly ILogger<S3DirectoryProvider> _logger;
 
     public S3DirectoryProvider(
-        IAmazonS3 s3,
+        Lazy<IAmazonS3> s3,
         IDocumentStore store,
         IOptions<IngestionOptions> options,
         ILogger<S3DirectoryProvider> logger,
@@ -95,7 +102,7 @@ public sealed class S3DirectoryProvider : ICloudDirectoryProvider
         ListObjectsV2Response listResponse;
         try
         {
-            listResponse = await _s3.ListObjectsV2Async(listRequest, ct).ConfigureAwait(false);
+            listResponse = await _s3.Value.ListObjectsV2Async(listRequest, ct).ConfigureAwait(false);
         }
         catch (AmazonS3Exception ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
         {
@@ -200,7 +207,7 @@ public sealed class S3DirectoryProvider : ICloudDirectoryProvider
             GetObjectResponse getResponse;
             try
             {
-                getResponse = await _s3.GetObjectAsync(new GetObjectRequest
+                getResponse = await _s3.Value.GetObjectAsync(new GetObjectRequest
                 {
                     BucketName = bucket,
                     Key = key
@@ -275,7 +282,7 @@ public sealed class S3DirectoryProvider : ICloudDirectoryProvider
         string? continuationToken = null;
         do
         {
-            var response = await _s3.ListObjectsV2Async(new ListObjectsV2Request
+            var response = await _s3.Value.ListObjectsV2Async(new ListObjectsV2Request
             {
                 BucketName = bucket,
                 Prefix = string.IsNullOrEmpty(prefix) ? null : prefix,
