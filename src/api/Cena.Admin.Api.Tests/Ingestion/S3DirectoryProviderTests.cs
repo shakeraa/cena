@@ -135,7 +135,7 @@ public sealed class S3DirectoryProviderTests
         Cena.Actors.Ingest.IIngestionOrchestrator? orchestrator = null)
     {
         return new S3DirectoryProvider(
-            s3: Substitute.For<IAmazonS3>(),
+            s3: new Lazy<IAmazonS3>(() => Substitute.For<IAmazonS3>()),
             store: Substitute.For<IDocumentStore>(),
             options: Options.Create(options),
             logger: NullLogger<S3DirectoryProvider>.Instance,

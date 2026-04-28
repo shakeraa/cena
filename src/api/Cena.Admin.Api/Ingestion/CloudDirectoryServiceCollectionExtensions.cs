@@ -44,12 +44,21 @@ public static class CloudDirectoryServiceCollectionExtensions
         // resolve time, so if S3 is disabled in config the client is never
         // actually constructed (the S3DirectoryProvider.IsEnabled check
         // short-circuits dispatch before IAmazonS3 is resolved).
-        services.AddSingleton<IAmazonS3>(sp =>
+        // Lazy<IAmazonS3>: deferred construction. The factory below only
+        // runs when something calls `.Value`, NOT at provider-registration
+        // time. Without this, `S3DirectoryProvider`'s ctor (a singleton
+        // created when CloudDirectoryProviderRegistry enumerates all
+        // providers at first resolve) eagerly resolves IAmazonS3 — which
+        // throws when Ingestion:S3 isn't configured in dev. The
+        // S3DirectoryProvider.IsEnabled check is the gate; the AWS
+        // client is only constructed when a request actually targets S3.
+        // Surfaced + fixed by EPIC-G admin smoke (BG-03).
+        services.AddSingleton<Lazy<IAmazonS3>>(sp => new Lazy<IAmazonS3>(() =>
         {
             var opts = sp.GetRequiredService<IOptions<IngestionOptions>>().Value.S3
                 ?? throw new InvalidOperationException(
-                    "Ingestion:S3 configuration section is missing, but IAmazonS3 was resolved. " +
-                    "Check dispatch flow — S3DirectoryProvider.IsEnabled should have short-circuited.");
+                    "Ingestion:S3 configuration section is missing. " +
+                    "S3DirectoryProvider.IsEnabled should have short-circuited before this Lazy resolved.");
 
             var config = new AmazonS3Config
             {
@@ -74,7 +83,7 @@ public static class CloudDirectoryServiceCollectionExtensions
                     : FallbackCredentialsFactory.GetCredentials();
 
             return new AmazonS3Client(credentials, config);
-        });
+        }));
         services.AddSingleton<ICloudDirectoryProvider, S3DirectoryProvider>();
 
         services.AddSingleton<ICloudDirectoryProviderRegistry, CloudDirectoryProviderRegistry>();
