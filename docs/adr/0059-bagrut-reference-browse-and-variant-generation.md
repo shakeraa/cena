@@ -1,6 +1,6 @@
 # ADR-0059 — Reference-browse surface for ingested past-Bagrut corpus + student-side variant generation
 
-- **Status**: Proposed (pending persona review — see §Open Questions)
+- **Status**: Proposed — pending revision per 2026-04-28 6-persona review (verdicts: 2 red, 1 yellow→red, 3 yellow). See §14 Persona Review Synthesis. ADR cannot move to Accepted until §14.4 mitigations are scheduled into PRR-245 (and dependent ADR sections rewritten accordingly).
 - **Date proposed**: 2026-04-28
 - **Deciders**: Shaker (project owner), claude-code (coordinator)
 - **Extends**: [ADR-0043 (Bagrut reference-only enforcement)](0043-bagrut-reference-only-enforcement.md) — this ADR carves out the *reference-browse* seam from the strict delivery ban, with its own consent-token, audit, and arch-test discipline.
@@ -204,4 +204,89 @@ Every task that touches the reference library, variant-generation endpoint, or `
 ## History
 
 - 2026-04-28 proposed: user directive surfaced the gap; coordinator drafted as senior-architect work. Pending persona reviews + legal-delta memo before acceptance. Implementation (PRR-245) blocked on Q1 + Q2 resolution.
-- 2026-04-28 verification sweep (PRR-250): claude-1 read-only audit of the 7 faith-based references in this ADR + PRR-245. Findings: [tasks/pre-release-review/reviews/PRR-250-verification-sweep-findings.md](../../tasks/pre-release-review/reviews/PRR-250-verification-sweep-findings.md). Two items rated **BLOCKER** for implementation: (a) BagrutCorpusItemDocument has no Marten table in dev (corpus never ingested) — ADR-0059 §3+§4 filter scope is moot until corpus is populated; (b) ICasGatedQuestionPersister is registered ONLY in Admin.Api DI today — student-api needs its own DI registration + endpoint-layer auth gate before student-side variants are reachable. Five lower-severity items captured (rate-limit override resolver gap, corpus field-name mismatches, missing IFeatureFlagReader facade, decorator naming, single dangling EPIC-PRR-H link in PRR-245).
+- 2026-04-28 verification sweep (PRR-250): claude-1 read-only audit of the 7 faith-based references in this ADR + PRR-245. Findings: [tasks/pre-release-review/reviews/PRR-250-verification-sweep-findings.md](../../tasks/pre-release-review/reviews/PRR-250-verification-sweep-findings.md). Two items rated **BLOCKER** for implementation: (a) BagrutCorpusItemDocument has no Marten table in dev (corpus never ingested) — ADR-0059 §3+§4 filter scope is moot until corpus is populated; (b) ICasGatedQuestionPersister is registered ONLY in Admin.Api DI today — student-api needs its own DI registration + endpoint-layer auth gate before student-side variants are reachable. Five lower-severity items captured (rate-limit override resolver gap, corpus field-name mismatches, missing IFeatureFlagReader facade, decorator naming, single dangling EPIC-PRR-H link in PRR-245). Follow-up tasks filed: PRR-251/252/253.
+- 2026-04-28 ADR §5 amendment: dropped fictional "RateLimitedEndpoint decorator" language; canonical primitive is ASP.NET `RequireRateLimiting` + `AddRateLimiter`. Institute-tunable limits gated on PRR-253 extending `IInstitutePricingResolver`.
+- 2026-04-28 6-persona review (PRR-248): synthesis below. Status flipped to "Proposed — pending revision."
+
+---
+
+## 14. Persona Review Synthesis (2026-04-28)
+
+Six lenses ran in parallel against ADR-0059 §1-6 and §Q1-Q5. Findings filed under [pre-release-review/reviews/persona-{lens}/reference-library-findings.md](../../pre-release-review/reviews/) per the same schema as the ADR-0050 review.
+
+### 14.1 Verdict roll-up
+
+| Persona | Verdict | Findings file |
+|---|---|---|
+| privacy | yellow → red | [reference-library-findings.md](../../pre-release-review/reviews/persona-privacy/reference-library-findings.md) |
+| ministry | yellow | [reference-library-findings.md](../../pre-release-review/reviews/persona-ministry/reference-library-findings.md) |
+| cogsci | yellow | [reference-library-findings.md](../../pre-release-review/reviews/persona-cogsci/reference-library-findings.md) |
+| finops | yellow | [reference-library-findings.md](../../pre-release-review/reviews/persona-finops/reference-library-findings.md) |
+| **redteam** | **red** | [reference-library-findings.md](../../pre-release-review/reviews/persona-redteam/reference-library-findings.md) |
+| **a11y** | **red** | [reference-library-findings.md](../../pre-release-review/reviews/persona-a11y/reference-library-findings.md) |
+
+Two red verdicts (a11y, redteam) and one yellow→red (privacy) block ADR-0059 from moving to Accepted. None demand a redesign — all are spec tightenings against existing primitives plus measurable scope reductions.
+
+### 14.2 Convergent findings (multi-lens agreement — load-bearing)
+
+The following items were flagged by ≥2 lenses and are not optional:
+
+1. **§5 cadence is wrong, two ways** *(cogsci + finops + redteam converge)*. The 20/3 free-tier and 100/25 paid-tier daily caps are simultaneously *too generous per source* (cogsci: encourages over-practice on a single Ministry question, dilutes spacing benefit) and *too cheap per institute* (finops: cost claims understated 3×, real per-call cost ~$0.045 once retry-tax + cache-miss are baked; per-student paid worst-case $22-34/mo breaches ADR-0026's $20 cap saved only by daily backstop). Replace with: per-source caps (5 parametric / 2 structural per source) AND per-institute rate-limit fields (PRR-253 extension) AND free-tier structural = 0 until payment-method or institute-SSO verified (redteam: defeats account-rotation cache exfiltration of the entire corpus for ~$0).
+
+2. **Audit-event retention vacuum** *(privacy + redteam converge, ministry-adjacent)*. `BagrutReferenceItemRendered_V1` has no stated retention horizon, no RTBF cascade-shred registration, and no SIEM-tractable structured key (only free-text `Provenance.Source`). GDPR Art. 17(1)(c) violation window once events ship. Required: 180-day retention horizon (privacy), structured slash-delimited Provenance.Source `ministry-bagrut/035582/2024/summer/A/q3` (ministry; audit-by-paper-code tractable for takedown), RTBF cascade registered with PRR-015/PRR-218 RetentionWorker BEFORE any emitter ships.
+
+3. **Authorization gaps fail the redteam threat model** *(redteam + privacy converge)*. (a) `variantQuestionId` is currently a deterministic dedup-key — IDOR enumeration trivial. Must be opaque server-side HMAC with server-pepper + endpoint ownership gate. (b) `ConsentTokenId` lacks crypto-binding spec — forgery-resistant requires HMAC over `{studentId, contextKind, issuedAt, expiresAt}` with 24h wire TTL (vs 90-day event-sourced fact via ADR-0042 ConsentAggregate), context-scoped to prevent BrowseLibrary token from satisfying VariantSourceCitation validation. (c) Rate limits per-student only — defeated by account-rotation; required: per-student AND per-institute AND per-IP/device.
+
+4. **Consent disclosure under-specified** *(privacy + a11y converge)*. §3 "inline disclosure card" is a name, not a contract. Required normative spec: ARIA `aria-live` + non-trapping focus + Enter/Escape contracts + defined re-prompt path on token expiry. Disclosure copy must cover audit-event lifecycle (privacy: PPL Art. 11 transparency + GDPR Art. 7(3)), and a one-click revoke surface MUST live on the reference page itself — settings-only revoke is borderline; deep-link-only is non-compliant.
+
+5. **Ministry-canonical citation form** *(ministry, ratified by privacy + redteam)*. Current §6 example "קיץ תשפ״ד" is ambiguous. Canonical = "קיץ תשפ״ד מועד א׳". `Provenance.Source` must populate structured slash-delimited form (see §14.2 item 2).
+
+6. **Browse-history scope limitation** *(privacy, ratified by cogsci)*. Ministry-question browse history is high-fidelity learning-weakness + anxiety inference data; a 30-item browse signature triggers Sweeney/Narayanan-Shmatikov re-identification. Required §"Browse-history scope limitation" with 5 controls: no teacher/parent/tenant-admin visibility; no browse → mastery/scheduler/misconception coupling (cogsci agrees: BKT must not read browse signal); no browse fields in LLM prompts (per ADR-0022); k≥10 floor on aggregates (per PRR-026); raw extracts banned outright.
+
+### 14.3 Cross-lens tensions (decision-holder must call)
+
+1. **Parametric vs structural at free tier** *(cogsci ↔ ministry)*. cogsci says favor parametric (cheap, deterministic, lower BKT-inflation risk per its M-1). Ministry says parametric is *more legally exposed* under Israeli Copyright Law §16 (parameter substitutions retain more of the source — derivative-works distance). Reconciliation needed: structural is **legally safer** (different scenario = §16 distance) but **more expensive** (Tier-3 LLM) and **more cognitively risky** (Bloom-drift; cogsci's M-3 mitigation: Haiku second-pass equivalence check). Recommend: free-tier defaults to structural (with cogsci's Haiku-rubric gate), parametric is *paid-only* — flips the current draft. Confirms finops worst-case math.
+
+2. **Three-locale × four-screen-reader prototype gate on PRR-245** *(a11y red blocker)*. Same shape as ADR-0050's VDatePicker red gate. ~30-cell test matrix before implementation; failures fall back to metadata-only render. Decision: **accept the gate or descope to metadata-only Day 1**. (Coordinator recommendation: accept the gate; the carve-out is too valuable to descope, and the gate forces honest a11y posture.)
+
+3. **Consent-token wire TTL: 24h vs 90d** *(redteam ↔ privacy)*. redteam wants 24h wire token (HMAC short-TTL minimizes forgery blast radius) backed by 90d event-sourced consent fact. privacy is fine with this. Resolved: 24h wire + 90d event-sourced. Update ADR §3 normative text.
+
+### 14.4 Required mitigations summary (prioritized)
+
+**P0 — Block ADR-0059 acceptance:**
+
+- **R1** Rewrite §5 cadence: per-source caps (5 parametric / 2 structural), per-institute fields (PRR-253), free-tier structural = 0 until payment/SSO verified.
+- **R2** Add normative §"Retention" + §"Audit event retention" — 180d horizon for `BagrutReferenceItemRendered_V1`, RTBF cascade registered with RetentionWorker, structured `Provenance.Source` form.
+- **R3** Tighten §3 ConsentToken spec: HMAC binding over `{studentId, contextKind, issuedAt, expiresAt}`, 24h wire TTL, context-scoped, one-click revoke on reference page.
+- **R4** Tighten §1 `Reference<T>` factory: opaque `variantQuestionId` (HMAC + pepper, not deterministic key), endpoint ownership gate, CasGatedQuestionPersister student-api DI registration (PRR-252).
+- **R5** Add normative §"Browse-history scope limitation" with the 5 privacy controls (§14.2 item 6).
+- **R6** Add normative §"Accessibility" specifying ARIA contract for §3 disclosure, RTL+math+numerals rule (every שאלון/MoedSlug in `<bdi dir="ltr">` AND always Western digits), and three-locale × four-screen-reader prototype gate on PRR-245.
+
+**P0 — Block feature-flag flip-on (separate from ADR acceptance):**
+
+- **R7** PRR-249 legal-delta memo (Israeli Copyright Law §19 fair-use + §16 derivative-works) — confirms Q1 resolution.
+- **R8** Takedown-response runbook at `docs/ops/runbooks/ministry-takedown.md` — 30-min global feature-flag kill-switch (must bypass §3 90d consent cache), audit-log preservation, per-source-paper-code variant purge.
+- **R9** PRR-251 corpus dev-ingest verification — until `mt_doc_bagrutcorpusitemdocument` is non-empty in dev, PRR-245 implementation cannot be tested end-to-end.
+
+**P1 — Concurrent with implementation:**
+
+- **R10** Per-`{variation_kind, cache_layer}` observability on PRR-047 hit-rate metric; explicit `cache_control` breakpoints on variant prompts (finops: prevents <10% hit-rate regression).
+- **R11** Cohort single-flight write lock on variant generation (Redis): 30-student classroom burst → 1 author + 29 readers, not 30 parallel authors. Lessons from RDY-081 single-writer.
+- **R12** Cogsci M-1: BKT discounting for reference-anchored attempts — 0.5× posterior weight (or deferred update) for ~5 min post-source-render.
+- **R13** Cogsci M-3: Tier-2 Haiku second-pass scoring variant against source on 3-axis rubric (Bloom / difficulty / skill) before render; reject on mismatch.
+
+### 14.5 Outstanding questions back to decision-holder (Shaker)
+
+These remain open after the 6-lens review:
+
+- **Q-A** (§14.3.1) Free-tier defaults to structural (legally safer) instead of parametric (cheaper)? Coordinator recommendation: yes. Implications: free tier needs payment/SSO before any variant generation; structural-only on free; Haiku equivalence-check gate required.
+- **Q-B** (§14.3.2) Accept the three-locale × four-screen-reader prototype gate on PRR-245, or descope to metadata-only display Day 1? Coordinator recommendation: accept the gate.
+- **Q-C** (R6) Reference page wraps Ministry codes in `<bdi dir="ltr">` AND always-Western-digits regardless of student PRR-032 numerals preference? a11y requires this for catalog primary-key parity.
+- **Q-D** (R8) Takedown-response runbook owner. Coordinator recommendation: SRE lane (extends PRR-016 exam-day SLO change-freeze pattern).
+- **Q-E** (R9) Who closes PRR-251 corpus dev-ingest? PRR-242 author has best context but is unassigned in queue today.
+
+### 14.6 Revised task slate
+
+PRR-245 task body MUST be updated to reflect R1-R13 before any implementation starts. Coordinator (claude-code) will append a "Revised Scope (post-PRR-248)" section to PRR-245 in a follow-up commit.
+
+No new tasks added beyond PRR-251/252/253 (already filed). The R10-R13 mitigations land *inside* PRR-245's existing scope, not as new sub-tasks.

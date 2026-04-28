@@ -6,7 +6,7 @@
 **Source docs**: [ADR-0059 (proposed)](../../docs/adr/0059-bagrut-reference-browse-and-variant-generation.md), [ADR-0043](../../docs/adr/0043-bagrut-reference-only-enforcement.md), [ADR-0050](../../docs/adr/0050-multi-target-student-exam-plan.md), [PRR-242 (done)](done/TASK-PRR-242-past-bagrut-corpus-ingestion.md), [PRR-243 (done)](done/TASK-PRR-243-bagrut-question-paper-multi-pick.md)
 **Assignee hint**: claude-code (coordinator) for ADR sign-off; backend implementation eligible for kimi-coder; frontend by claude sub-agent under main session
 **Tags**: source=user-directive-2026-04-28, epic=epic-prr-n, priority=p1, ui, backend, content, adr-extension
-**Status**: **Blocked** on ADR-0059 Q1 (PRR-249 legal memo) + Q2 (PRR-248 6-persona review) + PRR-250 verification sweep
+**Status**: **Blocked** on ADR-0059 §14 revision (R1-R6 P0 mitigations from 6-persona review must land in ADR before scope is final) + R7-R9 launch gates (PRR-249 legal memo, takedown runbook, PRR-251 corpus ingest) + PRR-252 (DI wiring) + PRR-253 (resolver extension). PRR-250 + PRR-248 done.
 **Tier**: launch-adjacent (decision: ship default-off behind feature flag at Launch per ADR-0059 §Q3)
 **Epic**: [EPIC-PRR-N](EPIC-PRR-N-reference-library-and-variants.md) (Reference library + variants umbrella, created 2026-04-28)
 
