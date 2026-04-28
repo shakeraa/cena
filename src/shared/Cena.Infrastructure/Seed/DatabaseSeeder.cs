@@ -86,6 +86,15 @@ public static class DatabaseSeeder
         // 4c. Session questions (HARDEN SessionEndpoints)
         await SessionQuestionSeedData.SeedSessionQuestionsAsync(store, logger);
 
+        // 4d. Bagrut reference corpus dev-bootstrap (PRR-251).
+        //     Closes the PRR-250 §2 BLOCKER: synthetic items so
+        //     ADR-0059 §3+§4 reference-page filter scope has data
+        //     in dev. Production runs corpus ingest via the admin
+        //     upload flow; the synthetic rows are clearly marked
+        //     [DEV-FIXTURE] and use deterministic ids so they
+        //     coexist with real ingest without clash.
+        await BagrutCorpusSeedData.SeedAsync(store, logger);
+
         // 5. Simulated students (300 across 8 archetypes)
         await UserSeedData.SeedSimulatedStudentsAsync(store, logger, simulatedStudentCount);
 
