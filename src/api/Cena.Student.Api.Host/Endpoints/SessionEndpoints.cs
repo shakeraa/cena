@@ -87,6 +87,23 @@ public static class SessionEndpoints
             if (request.Mode is not ("practice" or "challenge" or "review" or "diagnostic"))
                 return Results.BadRequest(new { error = "Invalid mode. Must be 'practice', 'challenge', 'review', or 'diagnostic'" });
 
+            // PRR-247 (ADR-0060): SessionMode discriminator gates exam-prep
+            // pool scoping in PRR-246 (downstream). Today the values are
+            // validated + threaded; the actual MartenQuestionPool filter
+            // behavior lands in PRR-246 once this contract change merges.
+            // No silent fallback: malformed combinations are rejected at the
+            // validator boundary, never silently degraded inside the pool
+            // loader. Legacy clients (no ExamScope) are accepted unchanged
+            // — they get today's freestyle behavior.
+            if (request.ExamScope is not (null or "exam-prep" or "freestyle"))
+                return Results.BadRequest(new { error = "Invalid examScope. Must be 'exam-prep', 'freestyle', or omitted." });
+
+            if (request.ExamScope == "exam-prep" && string.IsNullOrWhiteSpace(request.ActiveExamTargetId))
+                return Results.BadRequest(new { error = "activeExamTargetId is required when examScope='exam-prep'." });
+
+            if ((request.ExamScope is null or "freestyle") && !string.IsNullOrWhiteSpace(request.ActiveExamTargetId))
+                return Results.BadRequest(new { error = "activeExamTargetId must be omitted unless examScope='exam-prep'." });
+
             await using var session = store.LightweightSession();
 
             // Check for existing active session (idempotency)

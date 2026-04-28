@@ -75,10 +75,19 @@ public sealed record QuestionAttemptDto(
 // STB-01: Session Start + Active Session DTOs
 // =============================================================================
 
+// PRR-247 (ADR-0060) — `Mode` carries pedagogy (practice / challenge / review /
+// diagnostic). The new `ExamScope` discriminates exam-prep vs freestyle pool
+// scoping. Today the actual filter behavior lives in PRR-246 (downstream); this
+// record + the endpoint validator (SessionEndpoints.cs) ship the contract +
+// invariant gate so PRR-246 can plug in the filter without a second contract
+// change. Legacy clients (no ExamScope) are accepted as freestyle today and
+// flip to exam-prep only when they start sending the new fields.
 public sealed record SessionStartRequest(
     string[] Subjects,
     int DurationMinutes,     // 5 | 10 | 15 | 30 | 45 | 60
-    string Mode);            // 'practice' | 'challenge' | 'review' | 'diagnostic'
+    string Mode,             // 'practice' | 'challenge' | 'review' | 'diagnostic' (pedagogy)
+    string? ExamScope = null,           // 'exam-prep' | 'freestyle' | null (legacy)
+    string? ActiveExamTargetId = null); // required iff ExamScope == 'exam-prep'
 
 public sealed record SessionStartResponse(
     string SessionId,
