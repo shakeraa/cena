@@ -40,6 +40,14 @@ public static class SubscriptionServiceRegistration
     public static IServiceCollection AddSubscriptionsMarten(this IServiceCollection services)
     {
         services.AddSingleton<ISubscriptionAggregateStore, MartenSubscriptionAggregateStore>();
+
+        // task t_b89826b8bd60 production wiring: replace the InMemory
+        // trial-allotment store with the Marten-backed singleton + audit-
+        // event store so super-admin changes survive pod restarts and the
+        // audit trail is durable.
+        services.Replace(ServiceDescriptor.Singleton<ITrialAllotmentConfigStore,
+            MartenTrialAllotmentConfigStore>());
+
         services.ConfigureMarten(opts => opts.RegisterSubscriptionsContext());
         AddSharedServices(services);
 
@@ -100,6 +108,13 @@ public static class SubscriptionServiceRegistration
     private static void AddSharedServices(IServiceCollection services)
     {
         services.AddSingleton<IStudentEntitlementResolver, StudentEntitlementResolver>();
+
+        // task t_b89826b8bd60 — platform-wide trial-allotment config.
+        // InMemory default; AddSubscriptionsMarten swaps for the Marten-
+        // backed singleton document + audit-event-stream variant. TryAdd so
+        // a host that has already bound a custom impl wins.
+        services.TryAddSingleton<ITrialAllotmentConfigStore,
+            InMemoryTrialAllotmentConfigStore>();
 
         // PRR-304 bank-transfer reservation. InMemory default for single-host;
         // Marten variant is a follow-up when multi-replica parents need a

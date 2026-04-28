@@ -812,6 +812,15 @@ public partial class Program
     Cena.Admin.Api.Host.Endpoints.DiagnosticAuditEndpoints
         .MapDiagnosticAuditEndpoints(app);
 
+    // task t_b89826b8bd60 — platform-wide trial-allotment configuration.
+    //   GET   /api/admin/platform-config/trial-allotment  — read knobs
+    //   PATCH /api/admin/platform-config/trial-allotment  — overwrite
+    // Defaults are all-zero per user directive ("I do not want to give
+    // away for free. Default 0."). Trial flow is opt-in: admin sets at
+    // least one knob > 0 to enable trials platform-wide.
+    Cena.Admin.Api.Host.Endpoints.PlatformConfigEndpoints
+        .MapPlatformConfigEndpoints(app);
+
     // ---- Root endpoint ----
     app.MapGet("/", () => Results.Ok(new 
     { 
