@@ -236,7 +236,7 @@ const submitUrl = async () => {
           size="small"
           @click="handleClose"
         >
-          <VIcon icon="ri-close-line" />
+          <VIcon icon="tabler-x" />
         </VBtn>
       </VCardTitle>
 
@@ -249,21 +249,21 @@ const submitUrl = async () => {
         >
           <VTab value="file">
             <VIcon
-              icon="ri-upload-2-line"
+              icon="tabler-upload"
               start
             />
             File Upload
           </VTab>
           <VTab value="url">
             <VIcon
-              icon="ri-link"
+              icon="tabler-link"
               start
             />
             URL
           </VTab>
           <VTab value="cloud">
             <VIcon
-              icon="ri-cloud-line"
+              icon="tabler-cloud"
               start
             />
             Cloud Dir
@@ -278,7 +278,7 @@ const submitUrl = async () => {
               label="Select files"
               placeholder="Drop files here or click to browse"
               prepend-icon=""
-              prepend-inner-icon="ri-upload-cloud-2-line"
+              prepend-inner-icon="tabler-cloud-upload"
               multiple
               show-size
               counter
@@ -304,7 +304,7 @@ const submitUrl = async () => {
               @click="submitFile"
             >
               <VIcon
-                icon="ri-upload-2-line"
+                icon="tabler-upload"
                 start
               />
               Upload Files
@@ -316,7 +316,7 @@ const submitUrl = async () => {
               v-model="urlInput"
               label="Content URL"
               placeholder="https://example.com/document.pdf"
-              prepend-inner-icon="ri-link"
+              prepend-inner-icon="tabler-link"
               :disabled="uploading"
             />
 
@@ -329,7 +329,7 @@ const submitUrl = async () => {
               @click="submitUrl"
             >
               <VIcon
-                icon="ri-send-plane-line"
+                icon="tabler-send"
                 start
               />
               Submit URL
@@ -351,7 +351,7 @@ const submitUrl = async () => {
               v-model="cloudPath"
               :label="cloudProvider === 's3' ? 'Bucket Name' : 'Directory Path'"
               :placeholder="cloudProvider === 's3' ? 'my-ingest-bucket' : '/Users/shaker/edu-apps/cena/data/ingest'"
-              prepend-inner-icon="ri-folder-line"
+              prepend-inner-icon="tabler-folder"
               :disabled="cloudScanning || cloudIngesting"
               class="mb-3"
             />
@@ -360,7 +360,7 @@ const submitUrl = async () => {
               v-model="cloudPrefix"
               label="Prefix / Subfolder (optional)"
               placeholder="exams/2026"
-              prepend-inner-icon="ri-folder-open-line"
+              prepend-inner-icon="tabler-folder-open"
               :disabled="cloudScanning || cloudIngesting"
               class="mb-3"
             />
@@ -374,7 +374,7 @@ const submitUrl = async () => {
               @click="scanCloudDir"
             >
               <VIcon
-                icon="ri-search-line"
+                icon="tabler-search"
                 start
               />
               Scan Directory
@@ -424,7 +424,7 @@ const submitUrl = async () => {
                 @click="ingestCloudFiles"
               >
                 <VIcon
-                  icon="ri-upload-cloud-2-line"
+                  icon="tabler-cloud-upload"
                   start
                 />
                 Ingest Selected ({{ cloudSelected.length }})

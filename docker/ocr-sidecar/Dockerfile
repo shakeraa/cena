@@ -68,6 +68,17 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 COPY app/ /app/
 
+# Generate gRPC stubs from ocr.proto. Without this, server.py imports
+# `ocr_pb2_grpc` fails at startup and the OcrSidecar servicer never
+# registers, so /healthcheck stays NOT_SERVING regardless of model state.
+# grpcio-tools is already pinned in requirements.txt and lives in
+# /opt/venv copied from the builder stage.
+RUN python -m grpc_tools.protoc \
+        -I/app \
+        --python_out=/app \
+        --grpc_python_out=/app \
+        /app/ocr.proto
+
 # Non-root user
 RUN useradd --create-home --shell /bin/bash --uid 10001 ocr && \
     mkdir -p /hf-cache && chown -R ocr:ocr /app /hf-cache

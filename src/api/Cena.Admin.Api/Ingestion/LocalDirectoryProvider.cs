@@ -12,6 +12,7 @@
 using System.Security.Cryptography;
 using Cena.Actors.Ingest;
 using Marten;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using IngestionDto = Cena.Api.Contracts.Admin.Ingestion;
@@ -38,7 +39,8 @@ public sealed class LocalDirectoryProvider : ICloudDirectoryProvider
 
     private readonly IDocumentStore _store;
     private readonly IIngestionOrchestrator? _orchestrator;
-    private readonly IReadOnlyList<string> _allowedDirs;
+    private readonly IReadOnlyList<string> _staticAllowedDirs;
+    private readonly IServiceScopeFactory _scopeFactory;
     private readonly IngestionOptions _options;
     private readonly ILogger<LocalDirectoryProvider> _logger;
 
@@ -46,18 +48,29 @@ public sealed class LocalDirectoryProvider : ICloudDirectoryProvider
         IDocumentStore store,
         IOptions<IngestionOptions> options,
         ILogger<LocalDirectoryProvider> logger,
+        IServiceScopeFactory scopeFactory,
         IIngestionOrchestrator? orchestrator = null)
     {
         _store = store;
         _orchestrator = orchestrator;
         _options = options.Value;
-        _allowedDirs = _options.CloudWatchDirs;
+        _staticAllowedDirs = _options.CloudWatchDirs;
+        _scopeFactory = scopeFactory;
         _logger = logger;
     }
 
     public string ProviderId => "local";
 
-    public bool IsEnabled => _allowedDirs.Count > 0;
+    // The provider is now driven by two sources of truth:
+    //   1) Ingestion:CloudWatchDirs (appsettings static allowlist)
+    //   2) IngestionSettingsDocument.CloudDirectories (runtime, edited
+    //      via the admin Settings UI; merged at request-time inside
+    //      ListAsync / IngestAsync)
+    // Either one being non-empty is enough to consider the provider
+    // enabled. We do not async-check the settings doc here — that runs
+    // per-request — but we permit dispatch so the admin Settings page
+    // can drive ingestion even when the appsettings allowlist is empty.
+    public bool IsEnabled => true;
 
     public async Task<IngestionDto.CloudDirListResponse> ListAsync(
         IngestionDto.CloudDirListRequest request,
@@ -65,13 +78,15 @@ public sealed class LocalDirectoryProvider : ICloudDirectoryProvider
     {
         EnsureEnabled();
 
+        var allowedDirs = await GetMergedAllowedDirsAsync();
         var resolvedPath = Path.GetFullPath(request.BucketOrPath);
-        if (!_allowedDirs.Any(d => resolvedPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
+        if (!allowedDirs.Any(d => resolvedPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
         {
             _logger.LogWarning("Cloud dir path rejected (directory traversal prevention): {Path}", request.BucketOrPath);
             throw new UnauthorizedAccessException(
                 $"Path '{request.BucketOrPath}' is not under an allowed ingest directory. " +
-                "Configure Ingestion:CloudWatchDirs in appsettings.json.");
+                "Add it via the admin Ingestion Settings page or configure " +
+                "Ingestion:CloudWatchDirs in appsettings.json.");
         }
 
         var searchPath = string.IsNullOrEmpty(request.Prefix)
@@ -121,8 +136,9 @@ public sealed class LocalDirectoryProvider : ICloudDirectoryProvider
 
         // Security-first: validate inputs before revealing any server-
         // side state (orchestrator availability, etc.).
+        var allowedDirs = await GetMergedAllowedDirsAsync();
         var resolvedPath = Path.GetFullPath(request.BucketOrPath);
-        if (!_allowedDirs.Any(d => resolvedPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
+        if (!allowedDirs.Any(d => resolvedPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
         {
             _logger.LogWarning("Cloud dir ingest path rejected: {Path}", request.BucketOrPath);
             throw new UnauthorizedAccessException(
@@ -172,7 +188,7 @@ public sealed class LocalDirectoryProvider : ICloudDirectoryProvider
             ct.ThrowIfCancellationRequested();
 
             var fullPath = Path.GetFullPath(filePath);
-            if (!_allowedDirs.Any(d => fullPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
+            if (!allowedDirs.Any(d => fullPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
             {
                 _logger.LogWarning("Skipping file outside allowed dirs: {Path}", filePath);
                 filesSkipped++;
@@ -238,5 +254,47 @@ public sealed class LocalDirectoryProvider : ICloudDirectoryProvider
             throw new InvalidOperationException(
                 "Local cloud-directory provider is not configured. " +
                 "Add paths to Ingestion:CloudWatchDirs in appsettings.json.");
+    }
+
+    // Merges the static appsettings allowlist with the runtime allowlist
+    // persisted in IngestionSettingsDocument.CloudDirectories (admin
+    // Settings UI). Called once per request so a freshly-saved directory
+    // works without an app restart. Disabled and non-local entries are
+    // excluded; the static allowlist is preserved exactly so existing
+    // CI / curator workflows continue to work.
+    private async Task<IReadOnlyList<string>> GetMergedAllowedDirsAsync()
+    {
+        var merged = new List<string>(_staticAllowedDirs);
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var settingsService = scope.ServiceProvider
+                .GetService<IIngestionSettingsService>();
+            if (settingsService is null) return merged;
+
+            var settings = await settingsService.GetSettingsAsync();
+            foreach (var entry in settings.CloudDirectories)
+            {
+                if (!entry.Enabled) continue;
+                if (!string.Equals(entry.Provider, "local", StringComparison.OrdinalIgnoreCase)) continue;
+                if (string.IsNullOrWhiteSpace(entry.Path)) continue;
+                if (entry.Path.Contains("..") || entry.Path.Contains('~'))
+                {
+                    _logger.LogWarning(
+                        "Skipping saved cloud-dir entry with invalid characters: {Path}",
+                        entry.Path);
+                    continue;
+                }
+                merged.Add(entry.Path);
+            }
+        }
+        catch (Exception ex)
+        {
+            // Settings load failure should not bring down ingestion that
+            // was already legitimised by appsettings — log and fall back.
+            _logger.LogWarning(ex,
+                "Failed to merge IngestionSettingsDocument.CloudDirectories into allowlist");
+        }
+        return merged;
     }
 }

@@ -11,6 +11,7 @@ using Cena.Admin.Api.Ingestion;
 using Cena.Api.Contracts.Admin.Ingestion;
 using Marten;
 using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using NSubstitute;
 
@@ -145,6 +146,7 @@ public sealed class LocalDirectoryProviderTests
             store: Substitute.For<IDocumentStore>(),
             options: Options.Create(options),
             logger: NullLogger<LocalDirectoryProvider>.Instance,
+            scopeFactory: Substitute.For<IServiceScopeFactory>(),
             orchestrator: orchestrator);
     }
 }

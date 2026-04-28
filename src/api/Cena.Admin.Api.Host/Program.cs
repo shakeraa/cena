@@ -27,7 +27,9 @@ using Cena.Infrastructure.Configuration;
 using Cena.Infrastructure.Correlation;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Firebase;
+using Cena.Actors.Cas;
 using Cena.Infrastructure.Llm;
+using Cena.Infrastructure.Ocr.DependencyInjection;
 using Cena.Infrastructure.Observability;
 using Cena.Infrastructure.Observability.ErrorAggregator;
 using Marten;
@@ -339,10 +341,16 @@ public partial class Program
     //   builder.Services.AddSingleton<ILayer2bMathOcr, Pix2TexLayer2bMathOcr>();
     // See tasks/readiness/RDY-056-dev-stack-boot.md §"Still pending".
     //
-    // Cena.Infrastructure.Ocr.DependencyInjection.OcrServiceCollectionExtensions
-    //     .AddOcrCascadeCore(builder.Services, builder.Configuration);
-    // builder.Services.AddSingleton<Cena.Infrastructure.Ocr.Cas.ILatexValidator,
-    //     Cena.Actors.Cas.CasRouterLatexValidator>();
+    // Real OCR cascade (ADR-0033) — same runner block as actor-host, factored
+    // into Cena.Infrastructure.Ocr.DependencyInjection.AddOcrCascadeWithRunners.
+    // Brings up: Layer 0/2c/3/4/5 (brain) + Tesseract (Layer 2a) + Surya
+    // sidecar (Layer 1) + pix2tex sidecar (Layer 2b) + conditional Mathpix
+    // and Gemini Vision (Layer 4 fallbacks, gated on Ocr:Mathpix:AppId /
+    // Ocr:Gemini:ApiKey). Sidecar URL via Ocr:Sidecar (default
+    // http://cena-ocr-sidecar:50051 in compose, http://localhost:50051 dev).
+    // Keys flow in via env vars from the gitignored repo-root .env.
+    builder.Services.AddOcrCascadeWithRunners(builder.Configuration);
+    builder.Services.AddOcrCascadeWithCasValidation();
 
     builder.Services.AddCenaAdminServices();
 

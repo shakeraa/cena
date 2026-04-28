@@ -4,6 +4,8 @@ import { themeConfig } from '@themeConfig'
 
 // Components
 import Footer from '@/layouts/components/Footer.vue'
+import IngestionJobsDrawer from '@/layouts/components/IngestionJobsDrawer.vue'
+import NavBarIngestionJobs from '@/layouts/components/NavBarIngestionJobs.vue'
 import NavBarNotifications from '@/layouts/components/NavBarNotifications.vue'
 import NavSearchBar from '@/layouts/components/NavSearchBar.vue'
 import NavbarShortcuts from '@/layouts/components/NavbarShortcuts.vue'
@@ -54,6 +56,7 @@ const visibleLangConfig = computed(() =>
         />
         <NavbarThemeSwitcher />
         <NavbarShortcuts />
+        <NavBarIngestionJobs class="me-1" />
         <NavBarNotifications class="me-1" />
         <UserProfile />
       </div>
@@ -66,6 +69,9 @@ const visibleLangConfig = computed(() =>
     <template #footer>
       <Footer />
     </template>
+
+    <!-- 👉 Ingestion Jobs side drawer (right) -->
+    <IngestionJobsDrawer />
 
     <!-- 👉 Customizer -->
     <TheCustomizer />

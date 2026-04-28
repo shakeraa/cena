@@ -3,6 +3,7 @@ import PipelineStats from '@/views/apps/ingestion/PipelineStats.vue'
 import ItemDetailPanel from '@/views/apps/ingestion/ItemDetailPanel.vue'
 import UploadDialog from '@/views/apps/ingestion/UploadDialog.vue'
 import BagrutUploadDialog from '@/views/apps/ingestion/BagrutUploadDialog.vue'
+import ManualIngestDialog from '@/views/apps/ingestion/ManualIngestDialog.vue'
 import { $api } from '@/utils/api'
 
 definePage({
@@ -49,6 +50,7 @@ const selectedItemId = ref('')
 const isDetailOpen = ref(false)
 const isUploadOpen = ref(false)
 const isBagrutOpen = ref(false)   // RDY-057 — Bagrut-specific ingest dialog
+const isManualIngestOpen = ref(false)  // Manual cloud-dir ingest dialog
 let refreshInterval: ReturnType<typeof setInterval> | null = null
 
 // ── Phase 3.4: review-screen filters (pure client-side on cached data) ──
@@ -443,7 +445,7 @@ const formatTimeAgo = (timestamp: string): string => {
       @click="isUploadOpen = true"
     >
       <VIcon
-        icon="ri-add-line"
+        icon="tabler-plus"
         size="28"
       />
       <VTooltip
@@ -475,6 +477,12 @@ const formatTimeAgo = (timestamp: string): string => {
       @ingested="fetchPipeline"
     />
 
+    <!-- Manual cloud-directory ingest dialog -->
+    <ManualIngestDialog
+      v-model="isManualIngestOpen"
+      @ingested="fetchPipeline"
+    />
+
     <!-- Secondary FAB for Bagrut ingest -->
     <VBtn
       icon
@@ -484,12 +492,30 @@ const formatTimeAgo = (timestamp: string): string => {
       elevation="4"
       @click="isBagrutOpen = true"
     >
-      <VIcon icon="ri-file-pdf-2-line" size="22" />
+      <VIcon icon="tabler-file-type-pdf" size="22" />
       <VTooltip
         activator="parent"
         location="start"
       >
         Upload Bagrut PDF
+      </VTooltip>
+    </VBtn>
+
+    <!-- Tertiary FAB for manual cloud-directory scan -->
+    <VBtn
+      icon
+      color="info"
+      size="small"
+      class="pipeline-manual-fab"
+      elevation="4"
+      @click="isManualIngestOpen = true"
+    >
+      <VIcon icon="tabler-folder-down" size="22" />
+      <VTooltip
+        activator="parent"
+        location="start"
+      >
+        Manual ingest from cloud directory
       </VTooltip>
     </VBtn>
   </div>
@@ -499,6 +525,13 @@ const formatTimeAgo = (timestamp: string): string => {
 .pipeline-bagrut-fab {
   position: fixed;
   bottom: 6rem;
+  inset-inline-end: 2rem;
+  z-index: 9;
+}
+
+.pipeline-manual-fab {
+  position: fixed;
+  bottom: 9.5rem;
   inset-inline-end: 2rem;
   z-index: 9;
 }

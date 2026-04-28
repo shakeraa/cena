@@ -30,9 +30,13 @@
 using Cena.Infrastructure.Ocr.Layers;
 using Cena.Infrastructure.Ocr.Observability;
 using Cena.Infrastructure.Ocr.PdfTriage;
+using Cena.Infrastructure.Ocr.Runners;
+using Cena.Infrastructure.Resilience;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Cena.Infrastructure.Ocr.DependencyInjection;
 
@@ -71,6 +75,62 @@ public static class OcrServiceCollectionExtensions
         // OpenTelemetry MeterProvider so the counters+histograms are
         // exported. The Meter name is OcrMetrics.MeterName.
         services.TryAddSingleton<OcrMetrics>();
+
+        return services;
+    }
+
+    /// <summary>
+    /// Adds <see cref="AddOcrCascadeCore"/> plus the standard runner bundle:
+    /// Tesseract (Layer 2a), Surya sidecar (Layer 1), pix2tex sidecar (Layer
+    /// 2b), and conditionally Mathpix + Gemini Vision (Layer 4 fallbacks)
+    /// when their credentials are present. Used by every host that runs the
+    /// ADR-0033 cascade — keeps admin-api and actor-host on identical
+    /// runner wiring instead of inline-duplicating the block.
+    ///
+    /// Caller still needs <c>AddOcrCascadeWithCasValidation()</c> from
+    /// Cena.Actors.Cas to bind the Layer-5 ILatexValidator → CasRouter
+    /// bridge. (We can't call it here without inverting the layer
+    /// direction Infrastructure → Actors.)
+    /// </summary>
+    public static IServiceCollection AddOcrCascadeWithRunners(
+        this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.AddOcrCascadeCore(configuration);
+
+        // Layer 2a — Tesseract local (no sidecar dependency).
+        services.Configure<TesseractOptions>(configuration.GetSection("Ocr:Tesseract"));
+        services.TryAddSingleton<ILayer2aTextOcr>(sp =>
+        {
+            var opts = sp.GetRequiredService<IOptions<TesseractOptions>>().Value;
+            var log  = sp.GetService<ILogger<TesseractLocalRunner>>();
+            return new TesseractLocalRunner(opts, log);
+        });
+
+        // Layer 1 + 2b — Surya layout + pix2tex math, both via the OCR
+        // sidecar (docker-compose.ocr-sidecar.yml; default
+        // http://localhost:50051 — overrideable per host via Ocr:Sidecar).
+        services.Configure<OcrSidecarOptions>(configuration.GetSection("Ocr:Sidecar"));
+        services.TryAddSingleton<ILayer1Layout, SuryaSidecarClient>();
+        services.TryAddSingleton<ILayer2bMathOcr, Pix2TexSidecarClient>();
+
+        // Layer 4 fallbacks — opt-in by credentials. Resilience pipelines
+        // mirror actor-host's names so any policy config carries over.
+        var mathpixAppId = configuration["Ocr:Mathpix:AppId"];
+        if (!string.IsNullOrWhiteSpace(mathpixAppId))
+        {
+            services.Configure<MathpixOptions>(configuration.GetSection("Ocr:Mathpix"));
+            services.AddHttpClient<IMathpixRunner, MathpixRunner>()
+                .AddCenaResilience("OcrMathpix");
+        }
+
+        var geminiApiKey = configuration["Ocr:Gemini:ApiKey"];
+        if (!string.IsNullOrWhiteSpace(geminiApiKey))
+        {
+            services.Configure<GeminiVisionOptions>(configuration.GetSection("Ocr:Gemini"));
+            services.AddHttpClient<IGeminiVisionRunner, GeminiVisionRunner>()
+                .AddCenaResilience("OcrGeminiVision");
+        }
 
         return services;
     }

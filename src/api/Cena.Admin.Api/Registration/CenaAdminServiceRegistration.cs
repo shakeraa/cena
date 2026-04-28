@@ -218,6 +218,27 @@ public static class CenaAdminServiceRegistration
         // when S3DirectoryProvider is actually dispatched (IsEnabled gate).
         services.AddCloudDirectoryProviders();
 
+        // Auto-watch background scanner: drives the AutoWatch toggle on
+        // saved cloud directories. Idempotent re-scan thanks to SHA-256
+        // dedup; per-dir interval honoured via WatchIntervalMinutes.
+        services.AddHostedService<Ingestion.CloudDirectoryWatcherHostedService>();
+
+        // Async ingestion job tracking. Channel<string> is a singleton job
+        // id queue; the runner BackgroundService consumes it. Strategies
+        // are picked up via IIngestionJobStrategy enumeration.
+        services.AddSingleton(System.Threading.Channels.Channel.CreateUnbounded<string>(
+            new System.Threading.Channels.UnboundedChannelOptions
+            {
+                SingleReader = true,
+                SingleWriter = false,
+            }));
+        services.AddScoped<Ingestion.IIngestionJobService, Ingestion.IngestionJobService>();
+        services.AddScoped<Ingestion.IBagrutDraftPersistence, Ingestion.BagrutDraftPersistence>();
+        services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.BagrutIngestionJobStrategy>();
+        services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.CloudDirIngestionJobStrategy>();
+        services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.GenerateVariantsJobStrategy>();
+        services.AddHostedService<Ingestion.IngestionJobRunnerHostedService>();
+
         services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
         // RDY-OCR-WIREUP-C (Phase 2.3): Bagrut PDF ingestion routes through
         // the real OCR cascade (IOcrCascadeService, ADR-0033). No stubs.
@@ -414,6 +435,10 @@ public static class CenaAdminServiceRegistration
         // RDY-057 (Phase 3): POST /api/admin/ingestion/bagrut — SuperAdmin-only
         // PDF ingest trigger that routes to BagrutPdfIngestionService.
         app.MapBagrutIngestEndpoints();
+
+        // Async tracking surface for long-running ingestion ops (Bagrut +
+        // cloud-dir). Drives the IngestionJobsDrawer in the admin SPA.
+        app.MapIngestionJobsEndpoints();
 
         // RDY-058: POST /api/admin/questions/{id}/generate-similar — one-click
         // variant generation from an existing question. Routes through

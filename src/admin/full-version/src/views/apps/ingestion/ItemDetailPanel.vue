@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { $api } from '@/utils/api'
+import { useIngestionJobs } from '@/composables/useIngestionJobs'
 import CuratorMetadataPanel from './CuratorMetadataPanel.vue'
 
 interface ProcessingStage {
@@ -35,7 +36,9 @@ interface QualityGateScores {
 interface ItemDetail {
   id: string
   originalFilename: string
-  sourceType: 'url' | 's3' | 'photo' | 'batch'
+  // 'bagrut' added by BagrutDraftPersistence — Bagrut PDFs land in the
+  // kanban as PipelineItemDocument rows with sourceType="bagrut".
+  sourceType: 'url' | 's3' | 'photo' | 'batch' | 'bagrut'
   currentStage: string
   questionCount: number
   qualityScores: QualityScores | null
@@ -62,6 +65,74 @@ const emit = defineEmits<Emit>()
 const item = ref<ItemDetail | null>(null)
 const loading = ref(false)
 const actionLoading = ref(false)
+
+// Generate-variants dialog state (option 2)
+const variantsDialogOpen = ref(false)
+const variantsSubmitting = ref(false)
+const variantsFlagEnabled = ref<boolean | null>(null)
+const variantsFlagReason = ref<string>('')
+const variantsForm = ref({
+  subject: 'math',
+  topic: '',
+  grade: '11',
+  bloomsLevel: 3,
+  language: 'en',
+  count: 5,
+  minDifficulty: 0.4,
+  maxDifficulty: 0.7,
+})
+
+// ADR-0059 §15.5 + PRR-249: source-anchored variant flow is
+// implementation-complete but gated on legal sign-off. Probe the
+// feature-flag readback when the dialog opens so we render the
+// 'Disabled' banner up front rather than failing on submit.
+import { watch } from 'vue'
+watch(variantsDialogOpen, async (open) => {
+  if (!open) return
+  variantsFlagEnabled.value = null
+  try {
+    const data = await $api<{ bagrutSeedToLlmEnabled: boolean, bagrutSeedDisabledReason: string }>(
+      '/admin/ingestion/jobs/feature-flags',
+    )
+    variantsFlagEnabled.value = !!data.bagrutSeedToLlmEnabled
+    variantsFlagReason.value = data.bagrutSeedDisabledReason ?? ''
+  }
+  catch {
+    variantsFlagEnabled.value = false
+    variantsFlagReason.value = 'Could not load feature flag state — check admin-api connectivity.'
+  }
+})
+
+const { openDrawer: openJobsDrawer } = useIngestionJobs()
+
+const enqueueVariants = async () => {
+  if (!item.value) return
+  variantsSubmitting.value = true
+  try {
+    await $api('/admin/ingestion/jobs/generate-variants', {
+      method: 'POST',
+      body: {
+        draftId: item.value.id,
+        count: Math.max(1, Math.min(20, variantsForm.value.count)),
+        subject: variantsForm.value.subject,
+        topic: variantsForm.value.topic || null,
+        grade: variantsForm.value.grade,
+        bloomsLevel: variantsForm.value.bloomsLevel,
+        minDifficulty: variantsForm.value.minDifficulty,
+        maxDifficulty: variantsForm.value.maxDifficulty,
+        language: variantsForm.value.language,
+      },
+    })
+    variantsDialogOpen.value = false
+    openJobsDrawer()
+  }
+  catch (err: any) {
+    console.error('enqueueVariants failed', err)
+  }
+  finally {
+    variantsSubmitting.value = false
+  }
+}
 
 const fetchDetail = async () => {
   if (!props.itemId)
@@ -106,13 +177,13 @@ const sourceTypeColor = (type: string): string => {
 
 const stageStatusIcon = (status: string): string => {
   const map: Record<string, string> = {
-    completed: 'ri-checkbox-circle-line',
-    in_progress: 'ri-loader-4-line',
-    pending: 'ri-time-line',
-    failed: 'ri-close-circle-line',
+    completed: 'tabler-circle-check',
+    in_progress: 'tabler-loader-2',
+    pending: 'tabler-clock',
+    failed: 'tabler-circle-x',
   }
 
-  return map[status] ?? 'ri-question-line'
+  return map[status] ?? 'tabler-question-mark'
 }
 
 const stageStatusColor = (status: string): string => {
@@ -426,7 +497,7 @@ const moveToReview = async () => {
               @click="retryItem"
             >
               <VIcon
-                icon="ri-refresh-line"
+                icon="tabler-refresh"
                 start
               />
               Retry
@@ -438,7 +509,7 @@ const moveToReview = async () => {
               @click="rejectItem"
             >
               <VIcon
-                icon="ri-close-line"
+                icon="tabler-x"
                 start
               />
               Reject
@@ -450,15 +521,187 @@ const moveToReview = async () => {
               @click="moveToReview"
             >
               <VIcon
-                icon="ri-eye-line"
+                icon="tabler-eye"
                 start
               />
               Move to Review
+            </VBtn>
+
+            <!-- Option 2: AI variant generation from Bagrut drafts. Sends
+                 the draft id + curator-chosen subject/grade/blooms to a
+                 background job; results surface in the Ingestion Jobs
+                 drawer. ADR-0043 isomorph rejector still gates each
+                 candidate. -->
+            <VBtn
+              v-if="item && item.sourceType === 'bagrut'"
+              color="info"
+              variant="tonal"
+              @click="variantsDialogOpen = true"
+            >
+              <VIcon
+                icon="tabler-wand"
+                start
+              />
+              Generate variants
             </VBtn>
           </div>
         </VCardText>
       </VCard>
     </PerfectScrollbar>
+
+    <!-- Generate Variants dialog (option 2) -->
+    <VDialog
+      v-model="variantsDialogOpen"
+      max-width="560"
+    >
+      <VCard>
+        <VCardTitle class="d-flex align-center gap-2">
+          <VIcon icon="tabler-wand" />
+          <span>Generate AI variants</span>
+          <VSpacer />
+          <VBtn
+            icon="tabler-x"
+            variant="text"
+            size="small"
+            @click="variantsDialogOpen = false"
+          />
+        </VCardTitle>
+        <VDivider />
+        <VCardText class="pt-4">
+          <!-- ADR-0059 §15.5 + PRR-249 feature-flag gate. Implementation
+               is production-grade; legal sign-off is a separate gate. -->
+          <VAlert
+            v-if="variantsFlagEnabled === false"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            <div class="font-weight-medium mb-1">
+              Disabled pending legal sign-off (PRR-249)
+            </div>
+            <div class="text-body-2">
+              {{ variantsFlagReason }}
+            </div>
+          </VAlert>
+          <VAlert
+            v-else
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+          >
+            ADR-0059 §15.5: the LLM receives the Bagrut draft as creative seed
+            with explicit do-not-copy guardrails. Each candidate routes through
+            the CAS gate (ADR-0002) + quality gate before persisting as a
+            draft question with full provenance lineage to the source.
+          </VAlert>
+          <VRow>
+            <VCol cols="6">
+              <VSelect
+                v-model="variantsForm.subject"
+                :items="['math','physics','chemistry','biology']"
+                label="Subject"
+                density="compact"
+              />
+            </VCol>
+            <VCol cols="6">
+              <VSelect
+                v-model="variantsForm.grade"
+                :items="['9','10','11','12']"
+                label="Grade"
+                density="compact"
+              />
+            </VCol>
+            <VCol cols="6">
+              <VSelect
+                v-model="variantsForm.bloomsLevel"
+                :items="[
+                  { title: '1 — Remember', value: 1 },
+                  { title: '2 — Understand', value: 2 },
+                  { title: '3 — Apply', value: 3 },
+                  { title: '4 — Analyze', value: 4 },
+                  { title: '5 — Evaluate', value: 5 },
+                  { title: '6 — Create', value: 6 },
+                ]"
+                label="Bloom's level"
+                density="compact"
+              />
+            </VCol>
+            <VCol cols="6">
+              <VSelect
+                v-model="variantsForm.language"
+                :items="['en','he','ar']"
+                label="Language"
+                density="compact"
+              />
+            </VCol>
+            <VCol cols="6">
+              <VTextField
+                v-model="variantsForm.topic"
+                label="Topic (optional)"
+                placeholder="e.g. quadratic equations"
+                density="compact"
+              />
+            </VCol>
+            <VCol cols="6">
+              <VTextField
+                v-model.number="variantsForm.count"
+                type="number"
+                label="Count (1–20)"
+                :min="1"
+                :max="20"
+                density="compact"
+              />
+            </VCol>
+            <VCol cols="6">
+              <VTextField
+                v-model.number="variantsForm.minDifficulty"
+                type="number"
+                step="0.05"
+                :min="0"
+                :max="1"
+                label="Min difficulty"
+                density="compact"
+              />
+            </VCol>
+            <VCol cols="6">
+              <VTextField
+                v-model.number="variantsForm.maxDifficulty"
+                type="number"
+                step="0.05"
+                :min="0"
+                :max="1"
+                label="Max difficulty"
+                density="compact"
+              />
+            </VCol>
+          </VRow>
+        </VCardText>
+        <VDivider />
+        <VCardActions class="pa-4">
+          <VSpacer />
+          <VBtn
+            variant="text"
+            @click="variantsDialogOpen = false"
+          >
+            Cancel
+          </VBtn>
+          <VBtn
+            color="primary"
+            :loading="variantsSubmitting"
+            :disabled="variantsFlagEnabled === false"
+            @click="enqueueVariants"
+          >
+            <VIcon
+              icon="tabler-player-play"
+              start
+            />
+            Enqueue ({{ variantsForm.count }})
+          </VBtn>
+        </VCardActions>
+      </VCard>
+    </VDialog>
 
     <div
       v-if="!item && !loading"

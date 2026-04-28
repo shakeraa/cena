@@ -219,6 +219,21 @@ public static class MartenConfiguration
             .Index(x => x.ContentHash)
             .Index(x => x.SubmittedAt);
 
+        // ── Ingestion Job Document (async tracking for Bagrut + cloud-dir) ──
+        opts.Schema.For<Cena.Infrastructure.Documents.IngestionJobDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.Status)
+            .Index(x => x.CreatedAt);
+
+        // ── Bagrut Draft Payload Document (option-2 variant generation) ──
+        // Same Id as the sibling PipelineItemDocument; holds the actual
+        // extracted prompt+LaTeX so AiGenerationService can use the draft
+        // as a seed for ADR-0043 isomorph-rejected variant batches.
+        opts.Schema.For<Cena.Infrastructure.Documents.BagrutDraftPayloadDocument>()
+            .Identity(x => x.Id)
+            .Index(x => x.SourcePdfId)
+            .Index(x => x.ExamCode);
+
         // ── Question CAS Binding (ADR-0032 §4 / RDY-049) ──
         // Unique index on (QuestionId, CorrectAnswerHash) gives us
         // concurrency-safe idempotency: two racing verify calls on the

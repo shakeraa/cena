@@ -138,6 +138,21 @@ services:
       - CENA_NATS_MONITORING_URL=http://cena-nats:8222/varz
       - CENA_ACTOR_STATS_URL=http://cena-actor-host:5050/api/actors/stats
       - CENA_SKIP_SEED=0
+      # OCR runner credentials (optional). Substituted from the
+      # repo-root .env (gitignored). When OCR_GEMINI_API_KEY is set,
+      # admin-api activates the real Gemini Vision runner; otherwise
+      # NotConfiguredOcrCascadeService stays registered and Bagrut
+      # ingest returns 503 ocr_circuit_open with remediation copy.
+      - Ocr__Gemini__ApiKey=${OCR_GEMINI_API_KEY:-}
+      - Ocr__Gemini__Model=${OCR_GEMINI_MODEL:-gemini-1.5-pro}
+      - Ocr__Mathpix__AppId=${OCR_MATHPIX_APP_ID:-}
+      - Ocr__Mathpix__AppKey=${OCR_MATHPIX_APP_KEY:-}
+      # OCR sidecar (Surya layout + pix2tex math). Same DNS name actor-host
+      # uses; both hosts hit a single sidecar.
+      - Ocr__Sidecar__BaseUrl=${OCR_SIDECAR_URL:-http://cena-ocr-sidecar:50051}
+      # ADR-0059 §15.5 + PRR-249 — source-anchored variant flow. Flag-flip
+      # ONLY after legal-delta memo signs §6. See docs/engineering/feature-flags.md.
+      - Cena__Variants__BagrutSeedToLlmEnabled=${OCR_VARIANTS_BAGRUT_SEED_ENABLED:-false}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5052/health/live"]
@@ -379,6 +394,17 @@ services:
       # /api/actors/* (actor-host).
       - Firebase__ProjectId=cena-platform
       - FIREBASE_AUTH_EMULATOR_HOST=cena-firebase-emulator:9099
+      # OCR runner credentials (optional). Substituted from repo-root .env
+      # (gitignored). Same set as admin-api so both hosts use identical
+      # cascade configuration via Cena.Infrastructure.Ocr.AddOcrCascadeWithRunners.
+      - Ocr__Gemini__ApiKey=${OCR_GEMINI_API_KEY:-}
+      - Ocr__Gemini__Model=${OCR_GEMINI_MODEL:-gemini-1.5-pro}
+      - Ocr__Mathpix__AppId=${OCR_MATHPIX_APP_ID:-}
+      - Ocr__Mathpix__AppKey=${OCR_MATHPIX_APP_KEY:-}
+      # OCR sidecar URL — admin-api & actor-host both reach the sidecar
+      # via the compose network DNS name when docker-compose.ocr-sidecar.yml
+      # is up. The sidecar's docker-compose listens on host port 50051.
+      - Ocr__Sidecar__BaseUrl=${OCR_SIDECAR_URL:-http://cena-ocr-sidecar:50051}
     restart: unless-stopped
     # actor-host owns Marten schema warm (CenaEventStoreIndexes etc).
     # admin-api / student-api wait on this healthcheck via service_healthy

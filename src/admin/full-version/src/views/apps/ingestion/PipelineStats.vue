@@ -101,7 +101,7 @@ const formatDuration = (seconds: number): string => {
               size="42"
             >
               <VIcon
-                icon="ri-speed-line"
+                icon="tabler-gauge"
                 size="26"
               />
             </VAvatar>
@@ -144,7 +144,7 @@ const formatDuration = (seconds: number): string => {
               size="42"
             >
               <VIcon
-                icon="ri-error-warning-line"
+                icon="tabler-alert-triangle"
                 size="26"
               />
             </VAvatar>
@@ -177,7 +177,7 @@ const formatDuration = (seconds: number): string => {
               size="42"
             >
               <VIcon
-                icon="ri-timer-line"
+                icon="tabler-clock"
                 size="26"
               />
             </VAvatar>
@@ -210,7 +210,7 @@ const formatDuration = (seconds: number): string => {
               size="42"
             >
               <VIcon
-                icon="ri-stack-line"
+                icon="tabler-stack-2"
                 size="26"
               />
             </VAvatar>

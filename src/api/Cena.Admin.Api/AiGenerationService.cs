@@ -125,6 +125,12 @@ public sealed record AiGenerateResponse(
 /// <summary>
 /// Generate N questions that share the same subject/topic/grade/Bloom/difficulty parameters.
 /// count is clamped to 1-20 per call.
+///
+/// SourceContext (optional, ADR-0059 §15.5): when set, the LLM receives the
+/// content as creative starting point with explicit "do not copy literally"
+/// guardrails. Used by the Bagrut variant-generation flow to produce
+/// competency-equivalent variants of past Ministry questions. Null
+/// produces today's metadata-only behaviour.
 /// </summary>
 public sealed record BatchGenerateRequest(
     int Count,                     // 1-20 questions
@@ -134,7 +140,9 @@ public sealed record BatchGenerateRequest(
     int BloomsLevel,
     float MinDifficulty,
     float MaxDifficulty,
-    string Language);
+    string Language,
+    string? SourceContext = null,
+    string? SourceLatex = null);
 
 public sealed record BatchGenerateResult(
     AiGeneratedQuestion Question,
@@ -458,9 +466,33 @@ public sealed class AiGenerationService : IAiGenerationService
 
         if (!string.IsNullOrEmpty(req.Context))
         {
-            sb.AppendLine("Context/Source material (use this as the basis for question generation):");
-            sb.AppendLine(req.Context);
-            sb.AppendLine();
+            // ADR-0059 §15.5 structural-variant: when the BatchGenerateAsync
+            // caller marked the context with [SOURCE-AS-CREATIVE-SEED], emit
+            // explicit do-not-copy guardrails so the LLM produces a
+            // competency-equivalent variant rather than a near-clone.
+            if (req.Context.StartsWith("[SOURCE-AS-CREATIVE-SEED]", StringComparison.Ordinal))
+            {
+                sb.AppendLine("CREATIVE SEED — the question below is a Ministry past-paper item. " +
+                              "It is provided as inspiration ONLY. Generate questions that:");
+                sb.AppendLine("  • Test the SAME skill / competency at the SAME Bloom level");
+                sb.AppendLine("  • Use a DIFFERENT scenario, DIFFERENT numbers, DIFFERENT framing");
+                sb.AppendLine("  • Vary in difficulty across the band (some easier, some harder)");
+                sb.AppendLine("  • Optionally split a multi-part source question into atomic single-skill items");
+                sb.AppendLine("  • DO NOT reuse the source wording verbatim or near-verbatim");
+                sb.AppendLine("  • DO NOT copy figure/diagram captions verbatim");
+                sb.AppendLine();
+                sb.AppendLine("Source (do not copy):");
+                // Strip the marker from the body before printing.
+                var body = req.Context.Substring("[SOURCE-AS-CREATIVE-SEED]".Length).TrimStart();
+                sb.AppendLine(body);
+                sb.AppendLine();
+            }
+            else
+            {
+                sb.AppendLine("Context/Source material (use this as the basis for question generation):");
+                sb.AppendLine(req.Context);
+                sb.AppendLine();
+            }
         }
 
         if (!string.IsNullOrEmpty(req.ImageBase64))
@@ -798,6 +830,26 @@ public sealed class AiGenerationService : IAiGenerationService
         var max   = Math.Clamp(req.MaxDifficulty, 0f, 1f);
         if (max < min) (min, max) = (max, min);
 
+        // ADR-0059 §15.5 structural-variant payload: build a "creative seed"
+        // string from SourceContext (+ optional LaTeX). BuildPrompt detects
+        // the [SOURCE-AS-CREATIVE-SEED] marker and emits the do-not-copy
+        // guardrails so the LLM produces competency-equivalent variants
+        // rather than near-clones.
+        string? context = null;
+        if (!string.IsNullOrWhiteSpace(req.SourceContext))
+        {
+            var sb = new System.Text.StringBuilder();
+            sb.AppendLine("[SOURCE-AS-CREATIVE-SEED]");
+            sb.AppendLine(req.SourceContext.Trim());
+            if (!string.IsNullOrWhiteSpace(req.SourceLatex))
+            {
+                sb.AppendLine();
+                sb.AppendLine("Source LaTeX:");
+                sb.AppendLine(req.SourceLatex.Trim());
+            }
+            context = sb.ToString();
+        }
+
         var generateReq = new AiGenerateRequest(
             Subject:          req.Subject,
             Topic:            req.Topic,
@@ -806,7 +858,7 @@ public sealed class AiGenerationService : IAiGenerationService
             MinDifficulty:    min,
             MaxDifficulty:    max,
             Language:         req.Language,
-            Context:          null,
+            Context:          context,
             ImageBase64:      null,
             FileName:         null,
             StyleContext:     null,

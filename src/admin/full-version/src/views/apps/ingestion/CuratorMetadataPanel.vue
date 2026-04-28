@@ -183,7 +183,7 @@ watch(() => props.itemId, load)
       </VChip>
       <VSpacer />
       <VBtn
-        icon="ri-refresh-line"
+        icon="tabler-refresh"
         variant="text"
         size="small"
         :loading="loading"
@@ -228,7 +228,7 @@ watch(() => props.itemId, load)
           </VChip>
           <VBtn
             v-if="edits.subject"
-            icon="ri-close-line"
+            icon="tabler-x"
             variant="text"
             size="x-small"
             @click="clearField('subject')" />
@@ -251,7 +251,7 @@ watch(() => props.itemId, load)
           </VChip>
           <VBtn
             v-if="edits.language"
-            icon="ri-close-line"
+            icon="tabler-x"
             variant="text"
             size="x-small"
             @click="clearField('language')" />
@@ -274,7 +274,7 @@ watch(() => props.itemId, load)
           </VChip>
           <VBtn
             v-if="edits.track"
-            icon="ri-close-line"
+            icon="tabler-x"
             variant="text"
             size="x-small"
             @click="clearField('track')" />
@@ -297,7 +297,7 @@ watch(() => props.itemId, load)
           </VChip>
           <VBtn
             v-if="edits.sourceType"
-            icon="ri-close-line"
+            icon="tabler-x"
             variant="text"
             size="x-small"
             @click="clearField('source_type')" />
@@ -313,7 +313,7 @@ watch(() => props.itemId, load)
             @update:model-value="markEdited('taxonomyNode')" />
           <VBtn
             v-if="edits.taxonomyNode"
-            icon="ri-close-line"
+            icon="tabler-x"
             variant="text"
             size="x-small"
             @click="clearField('taxonomy_node')" />
@@ -334,7 +334,7 @@ watch(() => props.itemId, load)
           </VChip>
           <VBtn
             v-if="edits.expectedFigures != null"
-            icon="ri-close-line"
+            icon="tabler-x"
             variant="text"
             size="x-small"
             @click="clearField('expected_figures')" />

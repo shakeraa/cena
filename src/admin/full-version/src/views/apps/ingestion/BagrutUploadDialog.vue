@@ -9,6 +9,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { $api } from '@/utils/api'
+import { useIngestionJobs } from '@/composables/useIngestionJobs'
 
 interface IngestionDraftQuestion {
   draftId: string
@@ -47,6 +48,14 @@ const uploading = ref(false)
 const error = ref<string | null>(null)
 const result = ref<PdfIngestionResult | null>(null)
 
+// Ministry metadata (optional) — when both subject + paper codes are
+// present, the server populates BagrutCorpusItemDocument so the
+// ADR-0043 isomorph rejector has reference text for variant generation.
+const ministrySubjectCode = ref('')
+const ministryQuestionPaperCode = ref('')
+const examYear = ref<number | null>(null)
+const examUnits = ref<number | null>(null)
+
 const examCodeValid = computed(() => EXAM_CODE_RX.test(examCode.value.trim().toLowerCase()))
 const canSubmit = computed(() =>
   examCodeValid.value && !!file.value && file.value.size <= MAX_SIZE_BYTES && !uploading.value,
@@ -75,18 +84,23 @@ async function submit() {
   error.value = null
   result.value = null
   try {
-    const form = new FormData()
-    form.append('examCode', examCode.value.trim().toLowerCase())
-    form.append('file', file.value, file.value.name)
-    const res = await $api<PdfIngestionResult>('/admin/ingestion/bagrut', {
-      method: 'POST',
-      body: form,
+    // Enqueue as background job — endpoint returns 202 with {jobId}
+    // immediately; the IngestionJobsDrawer surfaces progress and the
+    // terminal state (drafts persisted as PipelineItemDocument rows
+    // with sourceType=bagrut, visible on the In Review kanban column).
+    const { enqueueBagrut, openDrawer } = useIngestionJobs()
+    const jobId = await enqueueBagrut(file.value, examCode.value.trim().toLowerCase(), {
+      ministrySubjectCode: ministrySubjectCode.value.trim() || null,
+      ministryQuestionPaperCode: ministryQuestionPaperCode.value.trim() || null,
+      year: examYear.value ?? null,
+      units: examUnits.value ?? null,
     })
-    result.value = res
-    emit('ingested', res)
+    emit('ingested', { jobId })
+    openDrawer()
+    close()
   }
   catch (e: any) {
-    error.value = e?.data?.message ?? e?.message ?? 'Upload failed'
+    error.value = e?.data?.message ?? e?.data?.error ?? e?.message ?? 'Upload failed'
   }
   finally {
     uploading.value = false
@@ -104,6 +118,10 @@ watch(() => props.modelValue, (open) => {
     file.value = null
     result.value = null
     error.value = null
+    ministrySubjectCode.value = ''
+    ministryQuestionPaperCode.value = ''
+    examYear.value = null
+    examUnits.value = null
   }
 })
 
@@ -126,10 +144,10 @@ function warningSeverity(w: string): 'error' | 'warning' | 'info' | 'success' {
   >
     <VCard>
       <VCardTitle class="d-flex align-center gap-2">
-        <VIcon icon="ri-file-pdf-2-line" />
+        <VIcon icon="tabler-file-type-pdf" />
         <span>Upload Bagrut PDF (reference-only)</span>
         <VSpacer />
-        <VBtn icon="ri-close-line" variant="text" size="small" @click="close" />
+        <VBtn icon="tabler-x" variant="text" size="small" @click="close" />
       </VCardTitle>
 
       <VCardText class="pt-3">
@@ -147,9 +165,53 @@ function warningSeverity(w: string): 'error' | 'warning' | 'info' | 'success' {
           class="mb-3"
         />
 
+        <!-- Ministry metadata (optional). When subject + paper code are
+             both filled, the server populates BagrutCorpusItemDocument so
+             the ADR-0043 isomorph rejector has reference text for variant
+             generation. Leave blank if you only want draft persistence. -->
+        <VRow class="mb-1">
+          <VCol cols="6">
+            <VTextField
+              v-model="ministrySubjectCode"
+              label="Ministry subject code"
+              placeholder="e.g. 35"
+              density="compact"
+              hint="Required for ADR-0043 isomorph rejection"
+              persistent-hint
+            />
+          </VCol>
+          <VCol cols="6">
+            <VTextField
+              v-model="ministryQuestionPaperCode"
+              label="Ministry question-paper code"
+              placeholder="e.g. 581"
+              density="compact"
+            />
+          </VCol>
+          <VCol cols="6">
+            <VTextField
+              v-model.number="examYear"
+              type="number"
+              :min="2000"
+              :max="2100"
+              label="Year"
+              density="compact"
+            />
+          </VCol>
+          <VCol cols="6">
+            <VSelect
+              v-model="examUnits"
+              :items="[3, 4, 5]"
+              label="Units (track)"
+              density="compact"
+              clearable
+            />
+          </VCol>
+        </VRow>
+
         <div class="mb-3">
           <VBtn
-            prepend-icon="ri-upload-2-line"
+            prepend-icon="tabler-upload"
             variant="outlined"
             @click="fileInput?.click()"
           >
