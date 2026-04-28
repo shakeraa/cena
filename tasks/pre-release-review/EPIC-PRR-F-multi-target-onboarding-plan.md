@@ -59,6 +59,8 @@ This epic is a **launch blocker** for the multi-target product positioning. It a
 | [PRR-237](TASK-PRR-237-within-session-cross-target-interleaving.md) | Within-session cross-target interleaving | P1 | scheduler (promoted to Launch 2026-04-21) |
 | [PRR-238](TASK-PRR-238-retake-cohort-surface.md) | Retake-cohort surface + retrieval-strength framing | P1 | pedagogy (promoted to Launch 2026-04-21) |
 | [PRR-243](TASK-PRR-243-bagrut-question-paper-multi-pick.md) | Bagrut שאלון multi-pick sub-step + per-שאלון sitting override (extends ADR-0050) | P0 | aggregate + UI (added 2026-04-21) |
+| [PRR-247](TASK-PRR-247-adr-0060-session-mode-wiring.md) | ADR-0060 acceptance + SessionMode discriminator wiring (gates PRR-246) | P0 | contract + ADR (added 2026-04-28) |
+| [PRR-246](TASK-PRR-246-marten-question-pool-exam-target-filter.md) | MartenQuestionPool exam-target filter — closes original 2026-04-27 trace gap | P0 | backend + projection (added 2026-04-28) |
 
 ## Blockers outbound
 
