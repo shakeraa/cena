@@ -628,6 +628,16 @@ public static class SessionEndpoints
             if (queue == null)
                 return Results.NotFound(new { error = "Session not found" });
 
+            // Cross-tenant guard: VerifyStudentAccess above only checks
+            // that the caller's claim matches their own studentId; it
+            // does NOT check that the requested session belongs to the
+            // caller. Without this check, a student could read another
+            // student's current question (subject, prompt, choices). This
+            // mirrors the same pattern already in place on /history (~line
+            // 452), /resume (~553), and /replay (~497).
+            if (queue.StudentId != studentId)
+                return Results.Forbid();
+
             // Check if session has ended
             if (queue.EndedAt.HasValue)
             {
@@ -821,6 +831,13 @@ public static class SessionEndpoints
             var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
             if (queue == null)
                 return Results.NotFound(new { error = "Session not found" });
+
+            // Cross-tenant guard — see /current-question for rationale.
+            // /answer is a WRITE; without this check an attacker could
+            // submit answers into another student's session, polluting
+            // their BKT/Elo/mastery state.
+            if (queue.StudentId != studentId)
+                return Results.Forbid();
 
             if (queue.EndedAt.HasValue)
                 return Results.Conflict(new { error = "Session already completed" });
@@ -1109,6 +1126,12 @@ public static class SessionEndpoints
             var queue = await session.LoadAsync<LearningSessionQueueProjection>(sessionId);
             if (queue == null)
                 return Results.NotFound(new { error = "Session not found" });
+
+            // Cross-tenant guard — see /current-question for rationale.
+            // /complete is a WRITE; without this check an attacker could
+            // mark another student's in-flight session as ended.
+            if (queue.StudentId != studentId)
+                return Results.Forbid();
 
             if (queue.EndedAt.HasValue)
                 return Results.Conflict(new { error = "Session already completed" });
