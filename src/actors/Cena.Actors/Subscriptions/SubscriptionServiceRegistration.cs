@@ -43,6 +43,13 @@ public static class SubscriptionServiceRegistration
         services.ConfigureMarten(opts => opts.RegisterSubscriptionsContext());
         AddSharedServices(services);
 
+        // Per-user discount-codes: replace the InMemory store with the
+        // Marten-backed store so discount issuances persist across pod
+        // restarts and are visible across replicas (admin issues on pod A,
+        // student lookup on pod B finds it).
+        services.Replace(ServiceDescriptor.Singleton<IDiscountAssignmentStore,
+            MartenDiscountAssignmentStore>());
+
         // PRR-344 production grace wiring:
         //   - Replace the InMemory seed source with Marten so the admin-
         //     supplied seed list survives pod restarts and is shared
@@ -123,6 +130,20 @@ public static class SubscriptionServiceRegistration
         services.TryAddSingleton<ISubscriptionLifecycleEmailDispatcher,
             NullSubscriptionLifecycleEmailDispatcher>();
         services.AddOptions<SubscriptionLifecycleEmailWorkerOptions>();
+
+        // Per-user discount-codes: store, coupon provider, dispatcher, service.
+        //   Default store      = InMemory (single-host); AddSubscriptionsMarten
+        //                        replaces with Marten-backed.
+        //   Default coupon prv = InMemory (StripeServiceRegistration replaces
+        //                        with StripeDiscountCouponProvider when Stripe
+        //                        is configured).
+        //   Default dispatcher = Null (host wires concrete impl with localized
+        //                        templates).
+        //   Service is Singleton (stateless orchestrator).
+        services.TryAddSingleton<IDiscountAssignmentStore, InMemoryDiscountAssignmentStore>();
+        services.TryAddSingleton<IDiscountCouponProvider, InMemoryDiscountCouponProvider>();
+        services.TryAddSingleton<IDiscountIssuedEmailDispatcher, NullDiscountIssuedEmailDispatcher>();
+        services.AddSingleton<DiscountAssignmentService>();
 
         // PRR-344 alpha-migration defaults (InMemory). AddSubscriptionsMarten
         // swaps these for the Marten-backed variants so the seed list and

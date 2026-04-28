@@ -33,6 +33,18 @@ namespace Cena.Actors.Subscriptions;
 /// </param>
 /// <param name="SuccessUrl">Where the gateway redirects on payment success.</param>
 /// <param name="CancelUrl">Where the gateway redirects on cancellation.</param>
+/// <param name="PromotionCodeId">
+/// Optional gateway promotion-code id (Stripe: <c>promo_…</c>). When set,
+/// the gateway adapter attaches it to the session so the discount auto-
+/// applies at checkout. When null/empty the session has no discount.
+/// Backwards-compatible: existing callers pass null and behaviour is
+/// unchanged.
+/// </param>
+/// <param name="DiscountAssignmentId">
+/// Optional Cena-side discount assignment id. Set together with
+/// <see cref="PromotionCodeId"/> so the Stripe webhook handler can
+/// reconstruct which assignment was redeemed via session metadata.
+/// </param>
 public sealed record CheckoutSessionRequest(
     string ParentSubjectIdEncrypted,
     string PrimaryStudentSubjectIdEncrypted,
@@ -40,7 +52,9 @@ public sealed record CheckoutSessionRequest(
     BillingCycle Cycle,
     string IdempotencyKey,
     string SuccessUrl,
-    string CancelUrl);
+    string CancelUrl,
+    string? PromotionCodeId = null,
+    string? DiscountAssignmentId = null);
 
 /// <summary>
 /// Created checkout session. <see cref="CheckoutUrl"/> is the redirect target;

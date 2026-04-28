@@ -33,6 +33,11 @@ public static class SubscriptionMartenRegistration
         opts.Events.AddEventType<SubscriptionRefunded_V1>();
         opts.Events.AddEventType<EntitlementSoftCapReached_V1>();
 
+        // Per-user discount-codes feature: discount-{assignmentId} streams.
+        opts.Events.AddEventType<DiscountIssued_V1>();
+        opts.Events.AddEventType<DiscountRedeemed_V1>();
+        opts.Events.AddEventType<DiscountRevoked_V1>();
+
         opts.Schema.For<StudentEntitlementDocument>().Identity(d => d.Id);
         opts.Projections.Add<StudentEntitlementProjection>(ProjectionLifecycle.Inline);
 

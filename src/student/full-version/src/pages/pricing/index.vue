@@ -10,7 +10,7 @@
 // a session cookie, otherwise redirect to /register with returnTo=/pricing.
 // =============================================================================
 
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/authStore'
@@ -18,9 +18,18 @@ import { useMeStore } from '@/stores/meStore'
 import { usePricingCatalog } from '@/composables/usePricingCatalog'
 import type { RetailTierDto } from '@/composables/usePricingCatalog'
 import { useCheckoutSession } from '@/composables/useCheckoutSession'
+import { $api } from '@/utils/api'
 import TierCard from '@/components/pricing/TierCard.vue'
 import GuaranteeBadge from '@/components/pricing/GuaranteeBadge.vue'
 import SiblingDiscountNote from '@/components/pricing/SiblingDiscountNote.vue'
+
+interface ApplicableDiscount {
+  assignmentId: string
+  discountKind: 'PercentOff' | 'AmountOff'
+  discountValue: number
+  durationMonths: number
+  status: string
+}
 
 definePage({
   meta: {
@@ -44,6 +53,46 @@ const { startCheckout, submitting: checkoutSubmitting, error: checkoutError } = 
 
 const annual = ref(false)
 const redirectingToStripe = ref(false)
+
+// Per-user discount-codes feature: fetched on mount when the caller is
+// authenticated. Anonymous visitors see no banner.
+const applicableDiscount = ref<ApplicableDiscount | null>(null)
+
+const discountBannerText = computed(() => {
+  const d = applicableDiscount.value
+  if (!d) return ''
+  const months = d.durationMonths
+  if (d.discountKind === 'PercentOff') {
+    // basis points → percent
+    const pct = (d.discountValue / 100).toString().replace(/\.0+$/, '')
+    return t('pricing.discount.bannerPercent', {
+      percent: pct,
+      months,
+    })
+  }
+  // agorot → shekels
+  const ils = (d.discountValue / 100).toFixed(2).replace(/\.00$/, '')
+  return t('pricing.discount.bannerAmount', {
+    amount: ils,
+    months,
+  })
+})
+
+/**
+ * Apply the active discount to a displayed monthly/annual price (in agorot).
+ * Used by the banner subtext to show "your effective price" — the actual
+ * billed amount is computed by Stripe from the attached coupon.
+ */
+function applyDiscountToPriceAgorot(priceAgorot: number): number {
+  const d = applicableDiscount.value
+  if (!d) return priceAgorot
+  if (d.discountKind === 'PercentOff') {
+    const factor = 1 - (d.discountValue / 10_000)
+    return Math.max(0, Math.round(priceAgorot * factor))
+  }
+  // AmountOff in agorot
+  return Math.max(0, priceAgorot - d.discountValue)
+}
 
 // Premium is the marketing-recommended target tier (per ADR-0057 §review).
 const isRecommended = (tier: RetailTierDto) => tier.tierId === 'Premium'
@@ -94,11 +143,32 @@ const handleSelect = (tier: RetailTierDto) => {
 }
 
 /**
+ * Fetch the active personal discount, if any, for the authenticated user.
+ * 404 (the common case) is silently absorbed.
+ */
+async function fetchApplicableDiscount() {
+  if (!authStore.isSignedIn) return
+  try {
+    const resp = await $api<ApplicableDiscount>('/me/applicable-discount')
+    applicableDiscount.value = resp ?? null
+  }
+  catch {
+    // 404 == no applicable discount; any other error == ignore + render
+    // page without banner. Pricing visibility must not depend on this.
+    applicableDiscount.value = null
+  }
+}
+
+/**
  * Auto-resume flow: if the page loads with ?tier=&cycle= query params AND
  * the user is authenticated (just finished register), trigger the Stripe
  * redirect automatically. Anonymous visitors keep the card visible.
  */
 onMounted(async () => {
+  // Discount lookup runs concurrently with the auto-resume flow; banner
+  // can render late without breaking checkout.
+  fetchApplicableDiscount()
+
   const queryTier = typeof route.query.tier === 'string' ? route.query.tier : null
   const queryCycle = typeof route.query.cycle === 'string' ? route.query.cycle : null
   if (!queryTier || !queryCycle) return
@@ -138,6 +208,24 @@ onMounted(async () => {
       data-testid="pricing-checkout-error"
     >
       {{ t('pricing.checkoutError') }}
+    </VAlert>
+
+    <!-- Per-user discount banner: visible only when an active personal
+         discount applies to the authenticated caller's email. Date-statement
+         framing only — never time-pressure copy. -->
+    <VAlert
+      v-if="applicableDiscount"
+      type="success"
+      variant="tonal"
+      class="mb-4"
+      data-testid="pricing-discount-banner"
+    >
+      <div class="font-weight-medium">
+        {{ discountBannerText }}
+      </div>
+      <div class="text-body-2 mt-1">
+        {{ t('pricing.discount.autoApplied') }}
+      </div>
     </VAlert>
 
     <div class="text-center mb-8">

@@ -1466,7 +1466,12 @@
       "prioritySupport": "תמיכה מהירה"
     },
     "redirecting": "מעביר אותך לתשלום מאובטח ב-Stripe…",
-    "checkoutError": "לא הצלחנו לפתוח תשלום. נסה שוב בעוד רגע."
+    "checkoutError": "לא הצלחנו לפתוח תשלום. נסה שוב בעוד רגע.",
+    "discount": {
+      "bannerPercent": "יש לך הנחה של {percent}% למשך {months} חודשים.",
+      "bannerAmount": "יש לך הנחה של ₪{amount} למשך {months} חודשים.",
+      "autoApplied": "ההנחה מוחלת אוטומטית בעת התשלום."
+    }
   },
   "subscriptionConfirm": {
     "polling": {

@@ -46,17 +46,21 @@ public sealed class StripeWebhookHandler
     private readonly ISubscriptionAggregateStore _store;
     private readonly IProcessedWebhookLog _processedLog;
     private readonly TimeProvider _clock;
+    private readonly DiscountAssignmentService? _discountService;
 
     public StripeWebhookHandler(
         StripeOptions options,
         ISubscriptionAggregateStore store,
         IProcessedWebhookLog processedLog,
-        TimeProvider clock)
+        TimeProvider clock,
+        DiscountAssignmentService? discountService = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _processedLog = processedLog ?? throw new ArgumentNullException(nameof(processedLog));
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
+        // Optional — hosts that don't wire the discount-codes feature pass null.
+        _discountService = discountService;
     }
 
     /// <summary>
@@ -144,6 +148,21 @@ public sealed class StripeWebhookHandler
             aggregate.State, parentId, studentId, tier, cycle,
             paymentTransactionIdEncrypted: session.Id, activatedAt: _clock.GetUtcNow());
         await _store.AppendAsync(parentId, evt, ct);
+
+        // Per-user discount-codes: if the session metadata carries an
+        // assignment id, mark it redeemed. RedeemAsync is idempotent on
+        // already-terminal state, so webhook redeliveries are safe.
+        if (_discountService is not null
+            && session.Metadata is not null
+            && session.Metadata.TryGetValue("cena_discount_assignment_id", out var assignmentId)
+            && !string.IsNullOrWhiteSpace(assignmentId))
+        {
+            await _discountService.RedeemAsync(
+                assignmentId: assignmentId,
+                parentSubjectIdEncrypted: parentId,
+                stripeSubscriptionId: session.SubscriptionId ?? string.Empty,
+                ct: ct).ConfigureAwait(false);
+        }
     }
 
     private async Task HandleInvoicePaidAsync(Event ev, CancellationToken ct)

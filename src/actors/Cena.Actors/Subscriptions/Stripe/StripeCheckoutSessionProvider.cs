@@ -62,6 +62,31 @@ public sealed class StripeCheckoutSessionProvider : ICheckoutSessionProvider
 
         var priceId = _priceResolver.Resolve(request.Tier, request.Cycle);
 
+        var sessionMetadata = new Dictionary<string, string>
+        {
+            ["cena_parent_id"] = request.ParentSubjectIdEncrypted,
+            ["cena_primary_student_id"] = request.PrimaryStudentSubjectIdEncrypted,
+            ["cena_tier"] = request.Tier.ToString(),
+            ["cena_cycle"] = request.Cycle.ToString(),
+        };
+        var subscriptionMetadata = new Dictionary<string, string>
+        {
+            ["cena_parent_id"] = request.ParentSubjectIdEncrypted,
+            ["cena_primary_student_id"] = request.PrimaryStudentSubjectIdEncrypted,
+            ["cena_tier"] = request.Tier.ToString(),
+            ["cena_cycle"] = request.Cycle.ToString(),
+        };
+        if (!string.IsNullOrWhiteSpace(request.DiscountAssignmentId))
+        {
+            // Carry the discount-assignment id via both session-level and
+            // subscription-level metadata so the webhook handler can
+            // redeem the correct assignment when Stripe carries the
+            // metadata back on checkout.session.completed and on
+            // customer.subscription.created.
+            sessionMetadata["cena_discount_assignment_id"] = request.DiscountAssignmentId;
+            subscriptionMetadata["cena_discount_assignment_id"] = request.DiscountAssignmentId;
+        }
+
         var options = new SessionCreateOptions
         {
             Mode = "subscription",
@@ -72,24 +97,25 @@ public sealed class StripeCheckoutSessionProvider : ICheckoutSessionProvider
             SuccessUrl = request.SuccessUrl,
             CancelUrl = request.CancelUrl,
             ClientReferenceId = request.ParentSubjectIdEncrypted,
-            Metadata = new Dictionary<string, string>
-            {
-                ["cena_parent_id"] = request.ParentSubjectIdEncrypted,
-                ["cena_primary_student_id"] = request.PrimaryStudentSubjectIdEncrypted,
-                ["cena_tier"] = request.Tier.ToString(),
-                ["cena_cycle"] = request.Cycle.ToString(),
-            },
+            Metadata = sessionMetadata,
             SubscriptionData = new SessionSubscriptionDataOptions
             {
-                Metadata = new Dictionary<string, string>
-                {
-                    ["cena_parent_id"] = request.ParentSubjectIdEncrypted,
-                    ["cena_primary_student_id"] = request.PrimaryStudentSubjectIdEncrypted,
-                    ["cena_tier"] = request.Tier.ToString(),
-                    ["cena_cycle"] = request.Cycle.ToString(),
-                },
+                Metadata = subscriptionMetadata,
             },
         };
+
+        // Discount attachment: Stripe accepts ONE coupon per subscription;
+        // per the LOCKED stacking decision the per-user discount overrides
+        // any sibling-discount the user might also be entitled to. Sibling
+        // discount is computed at price-resolution time (line-item level),
+        // not via Stripe Coupon, so the two paths don't fight here.
+        if (!string.IsNullOrWhiteSpace(request.PromotionCodeId))
+        {
+            options.Discounts = new List<SessionDiscountOptions>
+            {
+                new() { PromotionCode = request.PromotionCodeId },
+            };
+        }
 
         var requestOptions = new RequestOptions { IdempotencyKey = request.IdempotencyKey };
         var session = await _sessionService.CreateAsync(options, requestOptions, ct);

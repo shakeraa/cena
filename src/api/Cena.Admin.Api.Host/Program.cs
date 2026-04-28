@@ -806,6 +806,14 @@ public partial class Program
     Cena.Admin.Api.Host.Endpoints.BankTransferAdminEndpoints
         .MapBankTransferAdminEndpoints(app);
 
+    // Per-user discount-codes feature: super-admin issues / lists / revokes
+    // personal Stripe-coupon discounts pre-bound to a target email.
+    //   POST   /api/admin/discounts                 (issue)
+    //   GET    /api/admin/discounts[?email=...]     (list / search)
+    //   DELETE /api/admin/discounts/{assignmentId}  (revoke)
+    Cena.Admin.Api.Host.Endpoints.DiscountAdminEndpoints
+        .MapDiscountAdminEndpoints(app);
+
     // PRR-390 diagnostic-audit detail: support agent reads a single
     // disputed diagnostic's envelope metadata. Photo/CAS-chain/narration
     // fields are null until upstream capture writers land.
