@@ -30,6 +30,23 @@
     </None>
   </ItemGroup>
 
+  <!-- RDY-070 (F6 teacher heatmap): bundle the syllabi YAML files into
+       the publish output. IMinistryTopicHierarchy walks up looking for
+       {ContentRoot}/config/syllabi at startup; without this the docker
+       image lacks the directory and every /api/v1/institutes/{id}/
+       classrooms/{id}/mastery-heatmap call 500's with
+       DirectoryNotFoundException. Surfaced + fixed by EPIC-F-02. -->
+  <ItemGroup>
+    <None Include="../../../config/syllabi/**/*.yaml"
+          Link="config/syllabi/%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+    <None Include="../../../config/syllabi/**/*.yml"
+          Link="config/syllabi/%(RecursiveDir)%(Filename)%(Extension)">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.0" />
     <!-- RDY-060: SignalR + Redis backplane for multi-replica admin hub -->
