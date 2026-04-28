@@ -50,6 +50,19 @@ public sealed class StripeOptions
     /// <summary>Where Stripe redirects on cancel/back.</summary>
     public string CancelUrl { get; set; } = "https://cena.test/pricing";
 
+    /// <summary>
+    /// Opt-in flag for the Phase 1C SetupIntent (trial-then-paywall §4.0)
+    /// adapter. Default <c>false</c>: hosts that wire the seam should fall
+    /// back to <c>InMemorySetupIntentProvider</c> until the Stripe Dashboard
+    /// toggle "Use Radar on payment methods saved for future use" has been
+    /// flipped on for the account (per
+    /// <c>docs/design/trial-recycle-defense-001-research.md §1.3</c> — Radar
+    /// SetupIntent compatibility is opt-in). Flipping this flag without
+    /// also flipping the dashboard toggle means SetupIntents are created
+    /// but not Radar-scored — defeats the point of the §5.7 ledger pairing.
+    /// </summary>
+    public bool EnableSetupIntents { get; set; }
+
     /// <summary>True if all required fields are present.</summary>
     public bool IsConfigured =>
         !string.IsNullOrWhiteSpace(SecretKey) &&
