@@ -1469,7 +1469,12 @@
       "prioritySupport": "دعم ذو أولوية"
     },
     "redirecting": "جاري تحويلك إلى صفحة الدفع الآمنة في Stripe…",
-    "checkoutError": "تعذّر فتح صفحة الدفع. حاول مجددًا بعد قليل."
+    "checkoutError": "تعذّر فتح صفحة الدفع. حاول مجددًا بعد قليل.",
+    "discount": {
+      "bannerPercent": "لديك خصم بنسبة {percent}% لمدة {months} أشهر.",
+      "bannerAmount": "لديك خصم بقيمة ₪{amount} لمدة {months} أشهر.",
+      "autoApplied": "يُطبَّق الخصم تلقائيًا عند الدفع."
+    }
   },
   "subscriptionConfirm": {
     "polling": {

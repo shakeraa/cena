@@ -66,6 +66,13 @@ public static class StripeServiceRegistration
         // that never call AddStripeCheckoutIfConfigured (unit test setups).
         services.RemoveAll<IRefundGatewayService>();
         services.AddSingleton<IRefundGatewayService, StripeRefundGatewayService>();
+
+        // Per-user discount-codes: replace the InMemory coupon provider
+        // (registered in SubscriptionServiceRegistration) with the Stripe
+        // adapter so admin-issued discounts mint real Stripe Coupons +
+        // PromotionCodes.
+        services.RemoveAll<IDiscountCouponProvider>();
+        services.AddSingleton<IDiscountCouponProvider, StripeDiscountCouponProvider>();
         return true;
     }
 

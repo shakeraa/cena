@@ -90,6 +90,7 @@ public static class SubscriptionManagementEndpoints
         HttpContext http,
         [FromBody] CheckoutSessionRequestDto body,
         [FromServices] ICheckoutSessionProvider provider,
+        [FromServices] DiscountAssignmentService discountService,
         CancellationToken ct)
     {
         var parentId = RequireParentId(http);
@@ -108,6 +109,24 @@ public static class SubscriptionManagementEndpoints
             return Results.BadRequest(new { error = "idempotency_key_required" });
         }
 
+        // Per-user discount-codes: look up the active discount for the
+        // caller's email and pass through to the gateway. Pre-bound to the
+        // email by Stripe metadata; no code-entry from the user.
+        string? promotionCodeId = null;
+        string? discountAssignmentId = null;
+        var callerEmail = http.User.FindFirst("email")?.Value
+            ?? http.User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value;
+        if (!string.IsNullOrWhiteSpace(callerEmail))
+        {
+            var active = await discountService.FindActiveForEmailAsync(callerEmail, ct);
+            if (active is not null)
+            {
+                promotionCodeId = string.IsNullOrWhiteSpace(active.StripePromotionCodeId)
+                    ? null : active.StripePromotionCodeId;
+                discountAssignmentId = active.AssignmentId;
+            }
+        }
+
         // Success/cancel URLs come from provider options (Stripe) or sandbox
         // defaults. The caller doesn't pass these — the gateway owns them.
         var req = new Cena.Actors.Subscriptions.CheckoutSessionRequest(
@@ -117,7 +136,9 @@ public static class SubscriptionManagementEndpoints
             Cycle: cycle,
             IdempotencyKey: body.IdempotencyKey,
             SuccessUrl: "https://cena.test/subscription/confirm",
-            CancelUrl: "https://cena.test/pricing");
+            CancelUrl: "https://cena.test/pricing",
+            PromotionCodeId: promotionCodeId,
+            DiscountAssignmentId: discountAssignmentId);
 
         var result = await provider.CreateSessionAsync(req, ct);
         return Results.Ok(new CheckoutSessionResponseDto(

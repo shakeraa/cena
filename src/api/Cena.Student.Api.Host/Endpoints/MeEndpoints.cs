@@ -90,6 +90,10 @@ public static class MeEndpoints
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
+        // Per-user discount-codes: registered separately via
+        // ApplicableDiscountEndpoint to keep MeEndpoints.cs under the
+        // 500-LOC architecture rule (FileSize500LocTest).
+
         return app;
     }
 

@@ -46,6 +46,12 @@ public static class SubscriptionMartenRegistration
         opts.Events.AddEventType<TrialAllotmentConfigChanged_V1>();
         opts.Schema.For<TrialAllotmentConfig>().Identity(d => d.Id);
 
+        // task t_bae6b9216b3e — per-user discount-codes (Stripe-backed).
+        // discount-{assignmentId} streams; independent of trial-allotment.
+        opts.Events.AddEventType<DiscountIssued_V1>();
+        opts.Events.AddEventType<DiscountRedeemed_V1>();
+        opts.Events.AddEventType<DiscountRevoked_V1>();
+
         opts.Schema.For<StudentEntitlementDocument>().Identity(d => d.Id);
         opts.Projections.Add<StudentEntitlementProjection>(ProjectionLifecycle.Inline);
 

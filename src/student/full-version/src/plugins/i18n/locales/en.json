@@ -1497,7 +1497,12 @@
       "prioritySupport": "Priority support"
     },
     "redirecting": "Redirecting you to secure Stripe checkout…",
-    "checkoutError": "We couldn't open checkout. Try again in a moment."
+    "checkoutError": "We couldn't open checkout. Try again in a moment.",
+    "discount": {
+      "bannerPercent": "You have a {percent}% discount applied for {months} months.",
+      "bannerAmount": "You have a ₪{amount} discount applied for {months} months.",
+      "autoApplied": "Discount applies automatically at checkout."
+    }
   },
   "subscriptionConfirm": {
     "polling": {
