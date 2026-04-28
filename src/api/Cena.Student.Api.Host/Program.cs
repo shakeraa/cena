@@ -170,6 +170,10 @@ public partial class Program
     // prr-148: StudentPlan + EPIC-PRR-I / ADR-0057 Subscription + PRR-301 Stripe (if configured). TimeProvider registered later via ClockRegistration.AddClock.
     builder.Services.AddStudentPlanServices(); Cena.Actors.Subscriptions.SubscriptionServiceRegistration.AddSubscriptionsMarten(builder.Services); Cena.Actors.Subscriptions.Stripe.StripeServiceRegistration.AddStripeCheckoutIfConfigured(builder.Services, builder.Configuration);
 
+    // Mock-exam שאלון playbook runner — registers ExamSimulationState as a
+    // Marten doc + the V1/V2 events + IMockExamRunService scoped lifetime.
+    Cena.Actors.Assessment.MockExamRunServiceRegistration.AddMockExamRunner(builder.Services);
+
     // PRR-324: household-dashboard card source. NoopHouseholdCardSource is
     // the legitimate zero-data default (see its file banner for why this
     // is not a stub). Uses TryAddSingleton so a production host can
@@ -1070,6 +1074,7 @@ public partial class Program
 
     // prr-218/prr-234: legacy /api/me/study-plan removed; /api/me/exam-targets supersedes it per ADR-0050.
     app.MapExamTargetEndpoints();        // prr-218: multi-target /api/me/exam-targets per ADR-0050
+    app.MapMockExamRunEndpoints();        // mock-exam שאלון playbook runner (ExamFormat 806/807/036)
     app.MapExamTargetQuestionPaperEndpoints(); // prr-243: שאלון post-hoc PATCH endpoints per ADR-0050 §1
     app.MapExamTargetParentVisibilityEndpoint(); // prr-230: POST /api/me/exam-targets/{id}/visibility
     app.MapDiagnosticEndpoints();        // RDY-023 + prr-228: legacy + per-target diagnostic blocks

@@ -1558,7 +1558,10 @@
     },
     "renewsAt": "Next renewal: {date}",
     "seePricing": "See pricing",
-    "common": { "cancel": "Cancel", "back": "Back" },
+    "common": {
+      "cancel": "Cancel",
+      "back": "Back"
+    },
     "siblings": {
       "title": "Students on this plan",
       "addCta": "Add sibling",
@@ -1618,6 +1621,77 @@
       "weekly": "This week",
       "topics": "Topics",
       "readiness": "Readiness"
+    }
+  },
+  "examPrep": {
+    "title": "Mock exam (Bagrut runner)",
+    "subtitle": "Run a full Bagrut paper to scale: same time limit, same section structure, freshly drawn questions every run.",
+    "format": {
+      "title": "Choose a format"
+    },
+    "formats": {
+      "806": "Math 5U (Bagrut 806) — 3 hours",
+      "807": "Math 4U (Bagrut 807) — 3 hours",
+      "036": "Physics (Bagrut 036) — 3 hours"
+    },
+    "paperCodeLabel": "Optional שאלון code",
+    "paperCodePlaceholder": "e.g. 035582",
+    "paperCodeHelp": "If you remember the Ministry שאלון code, paste it here. Display only — questions are drawn from your published practice pool either way.",
+    "preview": {
+      "title": "What to expect",
+      "timeLimit": "Time limit",
+      "minutes": "minutes",
+      "partACount": "Part A questions",
+      "partBCount": "Part B questions",
+      "questions": "questions",
+      "chooseOf": "choose {required} of {total}",
+      "totalQuestions": "Total questions you'll answer",
+      "modeNotice": "Real exam rules: no hints, no per-question feedback. You'll see the mark sheet after submit."
+    },
+    "startButton": "Start the run",
+    "errors": {
+      "startFailed": "Could not start the run. Try again.",
+      "notFound": "This run could not be found.",
+      "pickPartB": "Pick exactly {required} Part B questions before continuing.",
+      "partBFailed": "Could not save your Part B selection.",
+      "answerFailed": "Could not save your answer.",
+      "submitFailed": "Could not submit the run."
+    },
+    "runner": {
+      "title": "Mock exam in progress",
+      "heading": "Bagrut format",
+      "partA": "Part A — answer all",
+      "partB": "Part B — pick + answer",
+      "partBPickerHelp": "Pick the questions you'll answer. Once locked, the others won't be graded.",
+      "questionLabel": "Question {n}",
+      "partBQuestionLabel": "Part B Question {n}",
+      "answerLabel": "Your answer",
+      "chooseN": "Choose {required} of {total}",
+      "confirmPartB": "Lock my Part B picks",
+      "progress": "Answered {answered} of {total}",
+      "submitButton": "Submit final"
+    },
+    "result": {
+      "title": "Mock exam result",
+      "heading": "Mock exam result",
+      "scoreTitle": "Score",
+      "scoreSummary": "{correct} correct out of {attempted} attempted (of {total})",
+      "timeTaken": "Time taken",
+      "gradingTitle": "Grading",
+      "gradingHonest": "Each free-text answer is verified by the CAS oracle (MathNet for arithmetic / SymPy for symbolic).",
+      "gradingNote": "Percentage is over GRADABLE attempted answers. Items without a canonical answer are listed but excluded from the percentage.",
+      "partAHeading": "Part A breakdown",
+      "partBHeading": "Part B breakdown",
+      "col": {
+        "question": "Question",
+        "attempted": "Attempted",
+        "correct": "Correct",
+        "engine": "Engine",
+        "yes": "Yes",
+        "no": "No",
+        "notGraded": "—"
+      },
+      "startAnother": "Run another mock"
     }
   }
 }

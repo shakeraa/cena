@@ -1529,7 +1529,10 @@
     },
     "renewsAt": "חידוש הבא: {date}",
     "seePricing": "ראה מסלולים",
-    "common": { "cancel": "ביטול", "back": "חזרה" },
+    "common": {
+      "cancel": "ביטול",
+      "back": "חזרה"
+    },
     "siblings": {
       "title": "ילדים במנוי",
       "addCta": "הוספת אח/ות",
@@ -1589,6 +1592,77 @@
       "weekly": "השבוע",
       "topics": "נושאים",
       "readiness": "מוכנות"
+    }
+  },
+  "examPrep": {
+    "title": "מבחן בגרות מדומה",
+    "subtitle": "ריצה של שאלון בגרות שלם בקנה מידה אמיתי: אותו זמן, אותו מבנה, שאלות חדשות בכל ריצה.",
+    "format": {
+      "title": "בחירת פורמט"
+    },
+    "formats": {
+      "806": "מתמטיקה 5 יח״ל (בגרות 806) — 3 שעות",
+      "807": "מתמטיקה 4 יח״ל (בגרות 807) — 3 שעות",
+      "036": "פיזיקה (בגרות 036) — 3 שעות"
+    },
+    "paperCodeLabel": "קוד שאלון (אופציונלי)",
+    "paperCodePlaceholder": "לדוגמה 035582",
+    "paperCodeHelp": "אם זכור לך קוד השאלון, ניתן להזין אותו כאן. תצוגה בלבד — השאלות נדגמות מהמאגר.",
+    "preview": {
+      "title": "מה צפוי",
+      "timeLimit": "מגבלת זמן",
+      "minutes": "דקות",
+      "partACount": "שאלות בפרק א׳",
+      "partBCount": "שאלות בפרק ב׳",
+      "questions": "שאלות",
+      "chooseOf": "בחירה של {required} מתוך {total}",
+      "totalQuestions": "סך השאלות שתענה",
+      "modeNotice": "כללי בגרות אמיתיים: ללא רמזים, ללא משוב במהלך הריצה. דף הציון מוצג בסיום."
+    },
+    "startButton": "התחלה",
+    "errors": {
+      "startFailed": "אי אפשר היה להתחיל ריצה. נסה שוב.",
+      "notFound": "הריצה לא נמצאה.",
+      "pickPartB": "יש לבחור בדיוק {required} שאלות בפרק ב׳.",
+      "partBFailed": "לא הצלחנו לשמור את בחירת פרק ב׳.",
+      "answerFailed": "לא הצלחנו לשמור את התשובה.",
+      "submitFailed": "לא הצלחנו לשלוח את הריצה."
+    },
+    "runner": {
+      "title": "ריצת בגרות מדומה",
+      "heading": "פורמט בגרות",
+      "partA": "פרק א׳ — לענות על כל השאלות",
+      "partB": "פרק ב׳ — בחירה + מענה",
+      "partBPickerHelp": "בחר את השאלות שתענה עליהן. לאחר נעילה, היתר לא ייבדקו.",
+      "questionLabel": "שאלה {n}",
+      "partBQuestionLabel": "פרק ב׳ שאלה {n}",
+      "answerLabel": "התשובה שלך",
+      "chooseN": "לבחור {required} מתוך {total}",
+      "confirmPartB": "נעילת בחירת פרק ב׳",
+      "progress": "נענו {answered} מתוך {total}",
+      "submitButton": "סיום ושליחה"
+    },
+    "result": {
+      "title": "תוצאות בגרות מדומה",
+      "heading": "תוצאות בגרות מדומה",
+      "scoreTitle": "ציון",
+      "scoreSummary": "{correct} נכונות מתוך {attempted} שנענו (מתוך {total})",
+      "timeTaken": "זמן ריצה",
+      "gradingTitle": "בדיקה",
+      "gradingHonest": "כל תשובה חופשית מאומתת על ידי מנוע CAS (MathNet לחשבון / SymPy לסמלי).",
+      "gradingNote": "האחוז מחושב מעל תשובות שניתן היה לדרג. שאלות ללא תשובה קנונית מופיעות אבל לא משפיעות על האחוז.",
+      "partAHeading": "פירוט פרק א׳",
+      "partBHeading": "פירוט פרק ב׳",
+      "col": {
+        "question": "שאלה",
+        "attempted": "נענה",
+        "correct": "נכון",
+        "engine": "מנוע",
+        "yes": "כן",
+        "no": "לא",
+        "notGraded": "—"
+      },
+      "startAnother": "ריצה נוספת"
     }
   }
 }

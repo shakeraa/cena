@@ -146,6 +146,14 @@ builder.Services.AddMarten(opts =>
     opts.ConfigureCenaEventStore(pgConnectionString, martenAutoCreate);
 }).UseNpgsqlDataSource();
 
+// Mock-exam שאלון playbook runner — register the ExamSimulationState
+// document + the V1/V2 events here so actor-host's schema reconciler
+// (Marten:AutoCreate is the canonical schema owner) creates the
+// `mt_doc_examsimulationstate` table. Student-api also registers the
+// same context for its own DI, but only actor-host actually mutates
+// the schema. Same pattern as StudentPlan / Subscription contexts.
+Cena.Actors.Assessment.MockExamRunServiceRegistration.AddMockExamRunner(builder.Services);
+
 // =============================================================================
 // 3. REDIS
 // =============================================================================
