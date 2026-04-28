@@ -33,6 +33,19 @@ public static class SubscriptionMartenRegistration
         opts.Events.AddEventType<SubscriptionRefunded_V1>();
         opts.Events.AddEventType<EntitlementSoftCapReached_V1>();
 
+        // task t_b89826b8bd60 — platform-wide trial-allotment config.
+        //   TrialAllotmentConfig         : singleton row (Id = "current")
+        //                                  holding the four trial knobs
+        //                                  (duration days + 3 quotas). All
+        //                                  defaults = 0 → no trial offered
+        //                                  out of the box.
+        //   TrialAllotmentConfigChanged_V1: audit-trail event appended to
+        //                                  the singleton stream
+        //                                  "trial-allotment-config" on every
+        //                                  super-admin update.
+        opts.Events.AddEventType<TrialAllotmentConfigChanged_V1>();
+        opts.Schema.For<TrialAllotmentConfig>().Identity(d => d.Id);
+
         opts.Schema.For<StudentEntitlementDocument>().Identity(d => d.Id);
         opts.Projections.Add<StudentEntitlementProjection>(ProjectionLifecycle.Inline);
 
