@@ -182,8 +182,12 @@ public static class CenaAdminServiceRegistration
         });
         services.TryAddSingleton<Cena.Actors.Pricing.IInstitutePricingOverrideStore,
             Cena.Actors.Pricing.InMemoryInstitutePricingOverrideStore>();
-        services.TryAddSingleton<Cena.Actors.Pricing.IPricingCache,
-            Cena.Actors.Pricing.NullPricingCache>();
+        // NullPricingCache has a private ctor (singleton-by-instance pattern).
+        // Type-based registration trips DI activation with "no suitable
+        // constructor". Use the explicit Instance accessor — surfaced by
+        // EPIC-H-05 institute-pricing cross-tenant probe.
+        services.TryAddSingleton<Cena.Actors.Pricing.IPricingCache>(
+            Cena.Actors.Pricing.NullPricingCache.Instance);
         services.TryAddSingleton<Cena.Actors.Pricing.IInstitutePricingResolver,
             Cena.Actors.Pricing.InstitutePricingResolver>();
         services.TryAddSingleton<Cena.Admin.Api.Features.Pricing.IInstitutePricingEventPublisher,
