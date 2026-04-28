@@ -158,6 +158,20 @@ public static class TierCatalog
         PhotoDiagnosticsHardCapPerMonth: 0,
         HintRequestsPerMonth: 0);
 
+    // TrialPlus catalog caps. Values are int.MaxValue sentinels (NOT
+    // UsageCaps.Unlimited / -1) per task body item 9: the catalog entry
+    // is required for catalog totality, but the StudentEntitlementResolver
+    // is responsible for synthesising the per-student trial view from the
+    // pinned TrialCapsSnapshot at request time. A caller that mis-uses the
+    // catalog directly (instead of the resolver) gets a permissive ceiling
+    // rather than a silent zero — this surfaces the wiring bug under load
+    // testing instead of corrupting an active trial.
+    private static readonly UsageCaps TrialPlusCaps = new(
+        SonnetEscalationsPerWeek: int.MaxValue,
+        PhotoDiagnosticsPerMonth: int.MaxValue,
+        PhotoDiagnosticsHardCapPerMonth: int.MaxValue,
+        HintRequestsPerMonth: int.MaxValue);
+
     // ----- Features -----
     private static readonly TierFeatureFlags BasicFeatures = new(
         ParentDashboard: false, TutorHandoffPdf: false, ArabicDashboard: false,
@@ -184,6 +198,17 @@ public static class TierCatalog
         Sso: true);
 
     private static readonly TierFeatureFlags UnsubscribedFeatures = new(
+        ParentDashboard: false, TutorHandoffPdf: false, ArabicDashboard: false,
+        PrioritySupport: false, ClassroomDashboard: false,
+        TeacherAssignedPractice: false, Sso: false);
+
+    // Trial features mirror Plus per design §4.2 "trial = Plus-equivalent
+    // sample of the product" — Sonnet on hint-escalation, photo diagnostic
+    // available, no parent dashboard (parent-discovery happens post-trial).
+    // Marked false here even though they're false on Plus too, for clarity:
+    // any later change to PlusFeatures must NOT silently propagate to a
+    // running trial offering — that would change the trial bargain mid-flight.
+    private static readonly TierFeatureFlags TrialPlusFeatures = new(
         ParentDashboard: false, TutorHandoffPdf: false, ArabicDashboard: false,
         PrioritySupport: false, ClassroomDashboard: false,
         TeacherAssignedPractice: false, Sso: false);
@@ -238,6 +263,15 @@ public static class TierCatalog
             Caps: UnsubscribedCaps,
             Features: UnsubscribedFeatures,
             IsRetail: false,
+            IsDecoy: false),
+
+        SubscriptionTier.TrialPlus => new TierDefinition(
+            Tier: SubscriptionTier.TrialPlus,
+            MonthlyPrice: Money.ZeroIls,    // trial is free — no commercial price
+            AnnualPrice: Money.ZeroIls,
+            Caps: TrialPlusCaps,            // permissive sentinel; resolver fans live snapshot
+            Features: TrialPlusFeatures,
+            IsRetail: false,                // not a directly purchasable tier
             IsDecoy: false),
 
         _ => throw new ArgumentOutOfRangeException(

@@ -43,4 +43,18 @@ public enum SubscriptionTier
     /// per ADR-0057 §8.
     /// </summary>
     SchoolSku = 4,
+
+    /// <summary>
+    /// Trial entitlement (synthetic). Carried on <see cref="StudentEntitlementView.EffectiveTier"/>
+    /// while the parent stream is in <see cref="SubscriptionStatus.Trialing"/>.
+    /// Caps are resolved from the per-trial <see cref="Events.TrialCapsSnapshot"/>
+    /// pinned at trial-start, NOT from this tier's catalog entry — the
+    /// <see cref="TierCatalog"/> entry exists so the catalog lookup is total
+    /// (every value of this enum has a definition). The catalog entry's caps
+    /// are deliberately set to <see cref="int.MaxValue"/> sentinels so a
+    /// caller that mis-uses the catalog directly (instead of the resolver-
+    /// synthesised view) cannot accidentally over-restrict a trial; the
+    /// resolver fans the live snapshot caps onto the view.
+    /// </summary>
+    TrialPlus = 5,
 }

@@ -23,12 +23,21 @@ namespace Cena.Actors.Subscriptions;
 /// <param name="SourceParentSubjectIdEncrypted">Parent that entitled this student (encrypted).</param>
 /// <param name="ValidUntil">When this entitlement expires (renewal boundary).</param>
 /// <param name="LastUpdatedAt">Projection update timestamp.</param>
+/// <param name="EffectiveStatus">
+/// Current lifecycle status the entitlement is sourced from. UI distinguishes
+/// "trialing" from "paid" by reading this; the LLM router reads this to keep
+/// trial sessions on Haiku-default per design §4.2 (Trialing tier maps to
+/// Haiku via <see cref="TierLlmRoutingPolicy"/> on the synthesised TrialPlus
+/// tier). Defaults to <see cref="SubscriptionStatus.Active"/> for backward
+/// compatibility with pre-trial call sites that pre-date this field.
+/// </param>
 public sealed record StudentEntitlementView(
     string StudentSubjectIdEncrypted,
     SubscriptionTier EffectiveTier,
     string SourceParentSubjectIdEncrypted,
     DateTimeOffset? ValidUntil,
-    DateTimeOffset LastUpdatedAt)
+    DateTimeOffset LastUpdatedAt,
+    SubscriptionStatus EffectiveStatus = SubscriptionStatus.Active)
 {
     /// <summary>Lookup the tier caps from the catalog for this entitlement.</summary>
     public UsageCaps Caps => TierCatalog.Get(EffectiveTier).Caps;

@@ -82,10 +82,31 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
                 "Student subject id must be non-empty.", nameof(studentSubjectIdEncrypted));
         }
 
-        // In the Marten-backed deployment, this scans a materialized view
-        // (a student→entitlement Marten document, populated by a projection).
-        // Pilot-scale implementation walks the subscription streams via the
-        // store; the cache-friendly API surface is what matters.
+        // task t_dc70d2cd9ab9 — trial-then-paywall §5.5.1 precedence scan.
+        // We walk the parent-bindings reverse index, load each parent's
+        // subscription aggregate, and collect ALL candidate views. The
+        // §5.5.1 ordering then picks one:
+        //
+        //     Active > Trialing > PastDue > Expired/Cancelled/Unsubscribed
+        //
+        // (Institute-seat is the highest tier in §5.5.1 but is wired in a
+        // sibling task — slot left for it in <see cref="PrecedenceRank"/>
+        // but not exercised here.) Running this scan FIRST honours the
+        // §5.5.1 rule that a paid Active stream from one parent outranks
+        // a Trialing stream from another parent, even if the Marten doc
+        // (which is keyed on student id, projected by the existing
+        // StudentEntitlementProjection) reflects a different one.
+        if (_parentBindings is not null)
+        {
+            var precedenceWinner = await ResolveViaSubscriptionStreamsAsync(
+                studentSubjectIdEncrypted, ct);
+            if (precedenceWinner is not null) return precedenceWinner;
+        }
+
+        // Marten doc lookup. In the Marten-backed deployment, this scans a
+        // materialized view populated by StudentEntitlementProjection. Used
+        // when we have no parent-bindings store wired (legacy hosts) and the
+        // projection is the authoritative source.
         if (_documentStore is not null)
         {
             var marten = await ResolveViaMartenAsync(studentSubjectIdEncrypted, ct);
@@ -104,6 +125,150 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
         // Fallback: synthesize an Unsubscribed view. Never returns null so
         // the hot path always has a live object to enforce against.
         return SynthesizeUnsubscribed(studentSubjectIdEncrypted);
+    }
+
+    /// <summary>
+    /// Walk the parent bindings for a student, load each parent's
+    /// subscription aggregate, and return the highest-precedence view per
+    /// design §5.5.1. Returns null when no parent stream produces an
+    /// effective entitlement (then the caller falls through to alpha-grace
+    /// + unsubscribed).
+    /// </summary>
+    private async Task<StudentEntitlementView?> ResolveViaSubscriptionStreamsAsync(
+        string studentSubjectIdEncrypted, CancellationToken ct)
+    {
+        var parentIds = await EnumerateParentsForStudentAsync(
+            studentSubjectIdEncrypted, ct);
+        if (parentIds.Count == 0) return null;
+
+        var now = _clock.GetUtcNow();
+        StudentEntitlementView? best = null;
+        int bestRank = int.MaxValue;
+
+        foreach (var parentId in parentIds)
+        {
+            var aggregate = await _store.LoadAsync(parentId, ct);
+            var view = SynthesizeFromAggregate(
+                studentSubjectIdEncrypted, parentId, aggregate.State, now);
+            if (view is null) continue;
+
+            var rank = PrecedenceRank(view.EffectiveStatus);
+            if (rank < bestRank)
+            {
+                best = view;
+                bestRank = rank;
+                // Active is the strongest signal we can find here (Institute
+                // is enqueued for a later task). Short-circuit on Active so
+                // we don't keep loading further aggregates.
+                if (rank == ActiveRank) break;
+            }
+        }
+
+        return best;
+    }
+
+    // ----- Precedence rank helpers --------------------------------------
+    //
+    // Lower rank = higher precedence. The constants are spaced so the
+    // future Institute-seat winner can slot in below Active without
+    // renumbering. Aligns 1:1 with design §5.5.1.
+
+    /// <summary>Reserved for future institute-seat slot.</summary>
+    internal const int InstituteRank = 0;
+    internal const int ActiveRank = 10;
+    internal const int TrialingRank = 20;
+    internal const int PastDueRank = 30;
+    // Expired / Cancelled / Refunded / Unsubscribed are not winners; we
+    // synthesize Unsubscribed-equivalent and never make them rank-winners.
+
+    private static int PrecedenceRank(SubscriptionStatus s) => s switch
+    {
+        SubscriptionStatus.Active => ActiveRank,
+        SubscriptionStatus.Trialing => TrialingRank,
+        SubscriptionStatus.PastDue => PastDueRank,
+        _ => int.MaxValue,
+    };
+
+    /// <summary>
+    /// Build a candidate <see cref="StudentEntitlementView"/> from a single
+    /// parent's subscription aggregate, applying the §5.5.1 mapping:
+    ///
+    ///   Active  → use the parent's currently-active tier.
+    ///   Trialing→ TrialPlus + EffectiveStatus=Trialing + ValidUntil = trial end.
+    ///   PastDue → keep the parent's tier (grace window per design §5.16; the
+    ///             actual grace-window expiry guard lives in the cap enforcer).
+    ///   Expired / Cancelled / Refunded / Unsubscribed → null (no precedence
+    ///             candidate; resolver falls through to unsubscribed-equivalent).
+    ///
+    /// Returns null when the candidate is not a precedence winner so the
+    /// scan can shortcut on Active without false positives from terminal
+    /// states.
+    /// </summary>
+    private static StudentEntitlementView? SynthesizeFromAggregate(
+        string studentSubjectIdEncrypted,
+        string parentSubjectIdEncrypted,
+        SubscriptionState state,
+        DateTimeOffset now)
+    {
+        // Only return a candidate if THIS student is linked to THIS parent's
+        // subscription. A student bound to a parent that has never linked
+        // them on the subscription stream gets no entitlement from that
+        // parent. Empty linked-student list (fresh-stream Unsubscribed) also
+        // returns null.
+        var hasStudent = state.LinkedStudents
+            .Any(ls => string.Equals(
+                ls.StudentSubjectIdEncrypted,
+                studentSubjectIdEncrypted,
+                StringComparison.Ordinal));
+        if (!hasStudent && state.Status != SubscriptionStatus.Trialing)
+        {
+            // For trials we still allow synthesis even if the linked-student
+            // record was added late — the trial cycle pins a primary student
+            // at start, but the parent-binding reverse index is the
+            // authoritative "is this my child?" check.
+            return null;
+        }
+
+        switch (state.Status)
+        {
+            case SubscriptionStatus.Active:
+                return new StudentEntitlementView(
+                    StudentSubjectIdEncrypted: studentSubjectIdEncrypted,
+                    EffectiveTier: state.CurrentTier,
+                    SourceParentSubjectIdEncrypted: parentSubjectIdEncrypted,
+                    ValidUntil: state.RenewsAt,
+                    LastUpdatedAt: now,
+                    EffectiveStatus: SubscriptionStatus.Active);
+
+            case SubscriptionStatus.Trialing:
+                // Calendar boundary check: if the trial has passed its
+                // pinned end without a TrialExpired_V1 yet, treat as not
+                // entitled (the worker will catch up; the SPA must not
+                // see one extra "free" call). Cap-only trials
+                // (TrialEndsAt == TrialStartedAt) stay effective.
+                if (!state.IsTrialingAsOf(now)) return null;
+                return new StudentEntitlementView(
+                    StudentSubjectIdEncrypted: studentSubjectIdEncrypted,
+                    EffectiveTier: SubscriptionTier.TrialPlus,
+                    SourceParentSubjectIdEncrypted: parentSubjectIdEncrypted,
+                    ValidUntil: state.TrialEndsAt,
+                    LastUpdatedAt: now,
+                    EffectiveStatus: SubscriptionStatus.Trialing);
+
+            case SubscriptionStatus.PastDue:
+                return new StudentEntitlementView(
+                    StudentSubjectIdEncrypted: studentSubjectIdEncrypted,
+                    EffectiveTier: state.CurrentTier,
+                    SourceParentSubjectIdEncrypted: parentSubjectIdEncrypted,
+                    ValidUntil: state.RenewsAt,
+                    LastUpdatedAt: now,
+                    EffectiveStatus: SubscriptionStatus.PastDue);
+
+            // Expired / Cancelled / Refunded / Unsubscribed: not a
+            // precedence winner. Caller falls through.
+            default:
+                return null;
+        }
     }
 
     private async Task<StudentEntitlementView?> ResolveViaMartenAsync(
@@ -175,6 +340,8 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
     /// <summary>
     /// Build an Unsubscribed entitlement view. Hot-path callers always get a
     /// non-null view to enforce caps against (zero-cap Unsubscribed tier).
+    /// Used as the canonical fallback for expired-and-equivalent terminal
+    /// states per design §5.5.1 (Expired returns the same paywall-hit view).
     /// </summary>
     public static StudentEntitlementView SynthesizeUnsubscribed(string studentSubjectIdEncrypted) =>
         new(
@@ -182,7 +349,8 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
             EffectiveTier: SubscriptionTier.Unsubscribed,
             SourceParentSubjectIdEncrypted: string.Empty,
             ValidUntil: null,
-            LastUpdatedAt: DateTimeOffset.UtcNow);
+            LastUpdatedAt: DateTimeOffset.UtcNow,
+            EffectiveStatus: SubscriptionStatus.Unsubscribed);
 
     /// <summary>
     /// Build a Premium entitlement view sourced from an alpha-migration
@@ -202,7 +370,8 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
             EffectiveTier: SubscriptionTier.Premium,
             SourceParentSubjectIdEncrypted: AlphaGraceSourcePrefix + parentSubjectIdEncrypted,
             ValidUntil: marker.GraceEndAt,
-            LastUpdatedAt: DateTimeOffset.UtcNow);
+            LastUpdatedAt: DateTimeOffset.UtcNow,
+            EffectiveStatus: SubscriptionStatus.Active);
     }
 }
 

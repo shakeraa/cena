@@ -33,6 +33,15 @@ public static class SubscriptionMartenRegistration
         opts.Events.AddEventType<SubscriptionRefunded_V1>();
         opts.Events.AddEventType<EntitlementSoftCapReached_V1>();
 
+        // task t_dc70d2cd9ab9 — trial-then-paywall Phase 1A: trial state machine.
+        // The three trial events live on the same parent-keyed stream as the
+        // paid-subscription events; the trial sub-cycle is bracketed by
+        // TrialStarted_V1 and TrialExpired_V1 (or TrialConverted_V1 + the
+        // existing SubscriptionActivated_V1). See design doc §3 + §11.
+        opts.Events.AddEventType<TrialStarted_V1>();
+        opts.Events.AddEventType<TrialConverted_V1>();
+        opts.Events.AddEventType<TrialExpired_V1>();
+
         // task t_b89826b8bd60 — platform-wide trial-allotment config.
         //   TrialAllotmentConfig         : singleton row (Id = "current")
         //                                  holding the four trial knobs
