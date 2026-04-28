@@ -64,6 +64,23 @@ export function useServiceWorker() {
     needRefresh.value = false
   }
 
+  // E2E-K-04 test seam: in dev/test only, expose two helpers so a Playwright
+  // spec can drive the UpdateToast through its visible state machine without
+  // requiring a real prod-build SW activation. The hooks are NOT compiled
+  // into a `vite build` (production build) bundle — `import.meta.env.DEV`
+  // and `MODE === 'test'` are statically replaced by Vite. A reviewer
+  // running `git grep __cenaTestSw` against any dist/ asset will confirm.
+  if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+    if (typeof window !== 'undefined') {
+      ;(window as any).__cenaTestSwForceUpdate = () => {
+        needRefresh.value = true
+      }
+      ;(window as any).__cenaTestSwClearUpdate = () => {
+        needRefresh.value = false
+      }
+    }
+  }
+
   return {
     needRefresh,
     offlineReady,
