@@ -360,6 +360,8 @@ Server-side enforcement:
 - Cohort single-flight write lock on variant generation (Redis): 30-student classroom burst → 1 author + 29 readers (R11; lessons from RDY-081 single-writer).
 - Persisted variant dedup key extended: `{sourceShailonCode, questionIndex, variationKind, track, stream, localeHint, parametricSeed?, payloadHashSafetyV1}` (finops §14.2 item 1 — closes 30× variance).
 - Free-tier structural calls require valid payment-method OR institute-SSO verification before the endpoint dispatches the LLM call (redteam M-1).
+- **Coverage-SLO eligibility (PRR-272 amendment, 2026-04-29)**: persisted variants carry `coverage_eligible: bool`. Structural ⇒ `true`; parametric ⇒ `false`. `CoverageTargetManifest` reader filters cell counts on `coverage_eligible == true` so that a 30-student classroom drilling שאלון 035582 q3 with parametric variants does NOT inflate the coverage SLO ship-gate. Pedagogically the cell still has *one* underlying question; coverage stays honest. See ADR-0043 §1.1 + PRR-272.
+- **Methodology axis on persisted variants (PRR-273 amendment, 2026-04-29)**: variants carry `Methodology: "Halabi" | "Rabinovitch" | null` resolved authoring-time from `ExamTarget.TrackPolicy.Methodology` → `InstitutePricingResolver.MethodologyDefault` → `null`. `CoverageTargetManifest` cells are keyed on the methodology axis directly. Variants with `Methodology = null` count toward methodology-agnostic defaults, not Halabi/Rabinovitch buckets specifically. See PRR-273.
 
 ### 15.6 Browse-history scope limitation (new — privacy §14.2 item 6)
 
