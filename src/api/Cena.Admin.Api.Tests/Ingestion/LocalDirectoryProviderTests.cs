@@ -20,10 +20,16 @@ namespace Cena.Admin.Api.Tests.Ingestion;
 public sealed class LocalDirectoryProviderTests
 {
     [Fact]
-    public void IsEnabled_false_when_allowlist_empty()
+    public void IsEnabled_always_true_post_2c99e5f9()
     {
+        // PRR-314 + 2c99e5f9 intent: IsEnabled is permanently true so the
+        // runtime-add path (admin Settings UI adds a CloudDirectory entry
+        // to IngestionSettingsDocument) can dispatch even when the static
+        // appsettings allowlist is empty. The "configuration empty" case
+        // is now caught at request-time inside ListAsync (see
+        // ListAsync_throws_InvalidOperationException_when_no_allowed_dirs).
         var provider = Build(new IngestionOptions { CloudWatchDirs = { } });
-        Assert.False(provider.IsEnabled);
+        Assert.True(provider.IsEnabled);
     }
 
     [Fact]
@@ -42,8 +48,12 @@ public sealed class LocalDirectoryProviderTests
     }
 
     [Fact]
-    public async Task ListAsync_throws_when_disabled()
+    public async Task ListAsync_throws_InvalidOperationException_when_no_allowed_dirs()
     {
+        // PRR-314: the merged allowlist (static + runtime) being empty at
+        // request time is "provider not configured" — InvalidOperationException
+        // (caught by callers as a 500 with a clear "configure the provider"
+        // hint), not UnauthorizedAccessException ("path traversal").
         var provider = Build(new IngestionOptions { CloudWatchDirs = { } });
 
         var req = new CloudDirListRequest(
