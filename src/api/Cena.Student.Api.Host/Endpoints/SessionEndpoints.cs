@@ -17,7 +17,9 @@ using Cena.Actors.Projections;
 using Cena.Actors.Questions;
 using Cena.Actors.Services;
 using Cena.Actors.Serving;
+using Cena.Actors.Subscriptions;
 using Cena.Actors.Tutoring;
+using Cena.Api.Host.Filters;
 using Cena.Api.Contracts.Sessions;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Documents;
@@ -307,7 +309,9 @@ public static class SessionEndpoints
                 HubGroupName: $"session-{sessionId}",
                 FirstQuestionId: firstQuestionId));
         })
-        .WithName("StartSession");
+        .WithName("StartSession")
+        .RequireActiveEntitlement(Cena.Actors.Subscriptions.EntitlementFeature.PracticeSession) // Phase 1E
+        .Produces(StatusCodes.Status402PaymentRequired);
 
         // GET /api/sessions/active — check if student has an active session (STB-01)
         group.MapGet("/active", async (

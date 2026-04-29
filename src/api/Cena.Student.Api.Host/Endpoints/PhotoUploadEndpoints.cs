@@ -21,6 +21,8 @@
 // =============================================================================
 
 using System.Security.Claims;
+using Cena.Actors.Subscriptions;
+using Cena.Api.Host.Filters;
 using Cena.Infrastructure.Errors;
 using Cena.Infrastructure.Media;
 using Cena.Infrastructure.Moderation;
@@ -52,8 +54,10 @@ public static class PhotoUploadEndpoints
             .WithName("UploadPhoto")
             .RequireRateLimiting("photo")
             .RequireImageUploadEnabled()
+            .RequireActiveEntitlement(EntitlementFeature.PhotoDiagnostic) // Phase 1E
             .Produces<PhotoUploadResponse>(200)
             .Produces(400)
+            .Produces(402) // Phase 1E — paywall + trial cap
             .Produces(403)
             .Produces(413)
             .Produces(422)

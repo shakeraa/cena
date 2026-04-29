@@ -8,7 +8,9 @@ using System.Security.Claims;
 using System.Text.Json;
 using Cena.Api.Contracts.Tutor;
 using Cena.Actors.Events;
+using Cena.Actors.Subscriptions;
 using Cena.Actors.Tutor;
+using Cena.Api.Host.Filters;
 using Cena.Actors.Tutoring;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Compliance;
@@ -56,27 +58,32 @@ public static class TutorEndpoints
         // FIND-arch-004: SendMessage now calls the real LLM via ITutorMessageService,
         // so it must share the same rate limit as /stream (10 msg/min/student).
         // FIND-sec-015: Chained with global and per-tenant limits for cost protection.
+        // Phase 1E: paywall + trial cap (TutorTurn) — atomic increment in filter.
         group.MapPost("/threads/{threadId}/messages", SendMessage)
             .WithName("SendTutorMessage")
             .RequireRateLimiting("tutor")      // Per-user: 10 msg/min/student
             .RequireRateLimiting("tutor-tenant") // Per-tenant: 200 msg/min/school
             .RequireRateLimiting("tutor-global") // Global: 1000 msg/min across all users
             .RequireConsent(ProcessingPurpose.ThirdPartyAi)
+            .RequireActiveEntitlement(EntitlementFeature.TutorTurn)
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status400BadRequest)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status402PaymentRequired)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         // SSE streaming endpoint (HARDEN: Real LLM with rate limiting)
         // Requires ThirdPartyAI consent
         // FIND-sec-015: Chained rate limits for cost protection
+        // Phase 1E: paywall + trial cap (TutorTurn) — atomic increment in filter.
         group.MapPost("/threads/{threadId}/stream", StreamMessage)
             .WithName("StreamTutorMessage")
             .RequireRateLimiting("tutor")      // Per-user: 10 msg/min/student
-            .RequireRateLimiting("tutor-tenant") // Per-tenant: 200 msg/min/school  
+            .RequireRateLimiting("tutor-tenant") // Per-tenant: 200 msg/min/school
             .RequireRateLimiting("tutor-global") // Global: 1000 msg/min across all users
-            .RequireConsent(ProcessingPurpose.ThirdPartyAi);
+            .RequireConsent(ProcessingPurpose.ThirdPartyAi)
+            .RequireActiveEntitlement(EntitlementFeature.TutorTurn);
 
         return app;
     }
