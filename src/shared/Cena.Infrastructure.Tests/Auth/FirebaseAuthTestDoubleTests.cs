@@ -74,16 +74,30 @@ public class FirebaseAuthTestDoubleTests : IDisposable
         var token = _authDouble.GenerateTestToken(user);
         var signingKey = _authDouble.GetJwks().GetSigningKeys().First();
 
+        // PRR-255: this test asserts the JWKS-validation pipeline (issuer,
+        // audience, signing key). Token lifetime is NOT the SUT here —
+        // the production tokens carry a 1h exp baked at generation time,
+        // so leaving lifetime validation enabled makes the test depend on
+        // wall-clock recency of the GenerateTestToken call. Disable
+        // lifetime validation explicitly so the test stays stable
+        // regardless of the gap between token mint and validation.
         var validationParams = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidIssuer = "https://securetoken.google.com/cena-test",
             ValidateAudience = true,
             ValidAudience = "cena-test",
-            IssuerSigningKey = signingKey
+            IssuerSigningKey = signingKey,
+            ValidateLifetime = false,
         };
 
-        var principal = new JwtSecurityTokenHandler().ValidateToken(token, validationParams, out _);
+        // PRR-255: disable inbound claim-type mapping so the test can
+        // probe the canonical "sub" name. With default mapping,
+        // JwtSecurityTokenHandler rewrites "sub" to ClaimTypes.NameIdentifier
+        // and FindFirst("sub") returns null — a test-rot bug independent
+        // of any production SUT.
+        var handler = new JwtSecurityTokenHandler { MapInboundClaims = false };
+        var principal = handler.ValidateToken(token, validationParams, out _);
 
         Assert.NotNull(principal);
         Assert.Equal("test-789", principal.FindFirst("sub")?.Value);

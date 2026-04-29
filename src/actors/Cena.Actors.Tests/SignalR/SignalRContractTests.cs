@@ -40,6 +40,13 @@ public class SignalRContractTests
         NatsSubjects.StudentStagnationDetected,
         NatsSubjects.StudentTutoringStarted,
         NatsSubjects.StudentTutoringEnded,
+        // PRR-255: NatsSubjects.StudentOnboarded ("onboarded") is the
+        // bridge-emit for the StudentOnboarded_V1 stream event. It is
+        // backend-only (admin analytics + future mobile); no v1 SPA
+        // subscription. Categorize as hub-caller-only so the contract
+        // test's "every NatsSubjects const must be in one list" gate
+        // holds.
+        NatsSubjects.StudentOnboarded,
     ];
 
     [Fact]
