@@ -233,6 +233,27 @@ public sealed class EntitlementEndpointsTests
     }
 
     [Fact]
+    public async Task StartTrial_returns_410_parent_erased_when_parent_key_tombstoned()
+    {
+        // Phase 1D-fix-2 item N5: graceful failure when the parent has been
+        // RTBF-erased between binding creation and start-trial. Encryptor
+        // throws InvalidOperationException; endpoint must translate to 410.
+        var fx = await NewFixtureAsync();
+        await fx.EnableTrialAllotmentAsync();
+        await fx.SeedParentBindingAsync();
+        // Tombstone the parent's key BEFORE the start-trial call so the
+        // EncryptAsync inside the handler throws.
+        await fx.KeyStore.DeleteAsync(ParentId, CancellationToken.None);
+        fx.PaymentProvider.QueueVerify("seti_ok",
+            new SetupIntentVerifyResult(
+                SetupIntentStatus.Succeeded, "card_fp_xyz", "pm_abc", null));
+        var ctx = fx.HttpContext();
+        var body = new StartTrialRequestDto("SelfPay", "seti_ok", null, null);
+        var result = await CallStartTrial(ctx, body, fx);
+        AssertJson(result, expectedStatus: 410, expectedError: "parent_erased");
+    }
+
+    [Fact]
     public async Task StartTrial_SelfPay_persists_real_encrypted_pm_id_recoverable_at_conversion()
     {
         // Phase 1D-fix-2 item 1 lock: the persisted pm-id MUST decrypt back
@@ -376,6 +397,7 @@ public sealed class EntitlementEndpointsTests
         public FakePaymentProvider PaymentProvider { get; } = new();
         public DiscountAssignmentService Discounts { get; }
         public StudentEntitlementResolver Resolver { get; }
+        public InMemorySubjectKeyStore KeyStore { get; }
         public EncryptedFieldAccessor Encryptor { get; }
         public FakeTimeProvider Clock { get; } = new(Now);
 
@@ -392,8 +414,8 @@ public sealed class EntitlementEndpointsTests
                 new InMemoryDiscountCouponProvider(),
                 new NullDiscountIssuedEmailDispatcher(),
                 Clock);
-            Encryptor = new EncryptedFieldAccessor(
-                new InMemorySubjectKeyStore(SubjectKeyDerivation.FromEnvironment()));
+            KeyStore = new InMemorySubjectKeyStore(SubjectKeyDerivation.FromEnvironment());
+            Encryptor = new EncryptedFieldAccessor(KeyStore);
         }
 
         public HttpContext HttpContext(bool withSubject = true)

@@ -288,16 +288,22 @@ public static class EntitlementEndpoints
             }
             fingerprintHash = "card:" + Hash(verify.CardFingerprint);
             // Phase 1D-fix-2 item 1: real AES-GCM encryption via the parent
-            // subject's derived key (ADR-0038 crypto-shred). The on-stream
-            // value is the wire-format ciphertext; conversion-flow decrypts
-            // back to the original Stripe pm_… id via the same accessor +
-            // the parent's RequestAborted scope. RTBF on the parent
-            // tombstones the key → ciphertext becomes undecryptable per
-            // ADR-0038 read-path contract (returns ErasedSentinel).
-            paymentMethodIdEncrypted = await encryptor
-                .EncryptAsync(verify.PaymentMethodId ?? string.Empty, parentId, ct)
-                .ConfigureAwait(false)
-                ?? string.Empty;
+            // subject's derived key (ADR-0038, ADR-0061 §"Encryption").
+            // EncryptAsync throws InvalidOperationException when the parent's
+            // key has been tombstoned by RTBF → translate to graceful 410
+            // rather than letting it bubble as 500.
+            try
+            {
+                paymentMethodIdEncrypted = await encryptor
+                    .EncryptAsync(verify.PaymentMethodId ?? string.Empty, parentId, ct)
+                    .ConfigureAwait(false)
+                    ?? string.Empty;
+            }
+            catch (InvalidOperationException)
+            {
+                return ProblemJson(410, "parent_erased",
+                    "the parent's data has been erased; a new subscription stream is required");
+            }
         }
 
         var email = ExtractEmail(ctx) ?? string.Empty;
