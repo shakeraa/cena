@@ -31,8 +31,10 @@
 //     for first ship; MathLive integration is GD-006 spike work.
 // =============================================================================
 
+using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Cena.Actors.Cas;
+using Cena.Actors.Content;
 using Cena.Actors.Events;
 using Cena.Actors.Questions;
 using Cena.Infrastructure.Documents;
@@ -46,6 +48,7 @@ public sealed class MockExamRunService : IMockExamRunService
     private readonly IDocumentStore _store;
     private readonly ICasRouterService _cas;
     private readonly IBagrutPaperStructureCatalog _structureCatalog;
+    private readonly IItemDeliveryGate _deliveryGate;
     private readonly ILogger<MockExamRunService> _logger;
     private readonly TimeProvider _clock;
 
@@ -58,17 +61,28 @@ public sealed class MockExamRunService : IMockExamRunService
         Meter.CreateCounter<long>("cena_mock_exam_answers_submitted_total");
     private static readonly Counter<long> SlotFallbacks =
         Meter.CreateCounter<long>("cena_mock_exam_slot_fallback_total");
+    /// <summary>Phase 3 — time-to-grade observability. Histogram so the
+    /// SLO dashboard can track p50/p95/p99 grading latency separately
+    /// from the broader endpoint latency.</summary>
+    private static readonly Histogram<double> GradeDurationMs =
+        Meter.CreateHistogram<double>("cena_mock_exam_grade_duration_ms");
+
+    /// <summary>Process-scoped counter mixed into the run-shuffle seed
+    /// so two starts within the same tick still produce different draws.</summary>
+    private static long s_seedCounter;
 
     public MockExamRunService(
         IDocumentStore store,
         ICasRouterService cas,
         IBagrutPaperStructureCatalog structureCatalog,
+        IItemDeliveryGate deliveryGate,
         ILogger<MockExamRunService> logger,
         TimeProvider? clock = null)
     {
         _store = store;
         _cas = cas;
         _structureCatalog = structureCatalog;
+        _deliveryGate = deliveryGate;
         _logger = logger;
         _clock = clock ?? TimeProvider.System;
     }
@@ -144,7 +158,13 @@ public sealed class MockExamRunService : IMockExamRunService
             .GroupBy(q => q.Topic)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        var rng = new Random(HashCode.Combine(studentId, request.ExamCode, _clock.GetUtcNow().Ticks));
+        // Phase 3 #2 — stronger seed. Guid.NewGuid + per-process atomic
+        // counter ensures two starts in the same tick get different
+        // shuffles (the old (studentId, examCode, ticks) tuple collided
+        // when called twice within a tick). Hash-mix down to int for
+        // Random's seed.
+        var seedSource = $"{studentId}|{request.ExamCode}|{Guid.NewGuid():N}|{System.Threading.Interlocked.Increment(ref s_seedCounter)}";
+        var rng = new Random(seedSource.GetHashCode());
 
         var partAIds = new List<string>();
         var partBIds = new List<string>();
@@ -325,6 +345,54 @@ public sealed class MockExamRunService : IMockExamRunService
         return BuildStateResponse(state);
     }
 
+    public async Task<MockExamRunStateResponse> SubmitAnswersBulkAsync(
+        string studentId, string runId, SubmitAnswersBulkRequest request, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+        if (request.Answers is null || request.Answers.Count == 0)
+            throw new ArgumentException("answers list must be non-empty.", nameof(request));
+
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (state.IsSubmitted)
+            throw new InvalidOperationException("Run already submitted.");
+        if (state.IsExpired(_clock.GetUtcNow()))
+            throw new InvalidOperationException("Run deadline elapsed.");
+
+        var validIds = state.PartAQuestionIds
+            .Concat(state.PartBSelectedIds.Count > 0
+                ? state.PartBSelectedIds
+                : state.PartBQuestionIds)
+            .ToHashSet();
+
+        // Validate the whole batch FIRST so we never partially apply.
+        foreach (var a in request.Answers)
+        {
+            if (!validIds.Contains(a.QuestionId))
+                throw new ArgumentException(
+                    $"questionId {a.QuestionId} is not part of this run.");
+        }
+
+        foreach (var a in request.Answers)
+        {
+            var key = string.IsNullOrWhiteSpace(a.SubpartId)
+                ? a.QuestionId
+                : $"{a.QuestionId}:{a.SubpartId}";
+            state.Answers[key] = a.Answer ?? "";
+        }
+
+        session.Store(state);
+        await session.SaveChangesAsync(ct);
+
+        AnswersSubmitted.Add(request.Answers.Count,
+            new KeyValuePair<string, object?>("path", "bulk"));
+        return BuildStateResponse(state);
+    }
+
     public async Task<MockExamResultResponse> SubmitAsync(
         string studentId, string runId, CancellationToken ct)
     {
@@ -390,6 +458,14 @@ public sealed class MockExamRunService : IMockExamRunService
         var multipart = await session.LoadAsync<BagrutMultipartQuestion>(questionId, ct);
         if (multipart is not null)
         {
+            // ADR-0043 chokepoint — derive provenance from the doc and
+            // throw on MinistryBagrut. Today TeacherAuthoredOriginal +
+            // AiRecreated are the only legitimate writers; the gate is
+            // belt-and-braces against a future writer slipping a Ministry
+            // doc into the multi-part pool. Throw escapes to the endpoint
+            // as 5xx (P0 SIEM alarm), which is correct.
+            AssertDeliverable(multipart.SourceType, questionId, runId, studentId);
+
             return new MockExamQuestionPreview(
                 QuestionId: questionId,
                 Prompt: multipart.Stem,
@@ -404,12 +480,41 @@ public sealed class MockExamRunService : IMockExamRunService
         var doc = await session.LoadAsync<QuestionDocument>(questionId, ct);
         if (doc is null) return null;
 
+        // For single-cell Q's the derivation is "every active doc is
+        // AiRecreated" by the same convention DiagnosticEndpoints uses
+        // (see DeriveProvenanceKind). Belt-and-braces.
+        AssertDeliverable(rm?.SourceType ?? "AiRecreated", questionId, runId, studentId);
+
         return new MockExamQuestionPreview(
             QuestionId: questionId,
             Prompt: doc.Prompt,
             Topic: doc.Topic ?? rm?.Topic,
             BloomsLevel: rm?.BloomsLevel ?? 0,
             Subparts: null);
+    }
+
+    /// <summary>
+    /// Maps the doc's stored SourceType label to a Provenance + invokes
+    /// the central gate. Throws on MinistryBagrut.
+    /// </summary>
+    private void AssertDeliverable(string sourceType, string itemId, string sessionId, string actorId)
+    {
+        var kind = sourceType switch
+        {
+            "TeacherAuthoredOriginal" => ProvenanceKind.TeacherAuthoredOriginal,
+            "AiRecreated"             => ProvenanceKind.AiRecreated,
+            "MinistryBagrut"          => ProvenanceKind.MinistryBagrut,
+            _                          => ProvenanceKind.AiRecreated, // pragmatic default
+        };
+        // Best-effort tenantId — the runner state doesn't carry one
+        // today (the run is keyed on studentId only). Gate logs both
+        // sessionId + actorId, so trace+SIEM remain correlatable.
+        _deliveryGate.AssertDeliverable(
+            provenance: new Provenance(kind, _clock.GetUtcNow(), sourceType),
+            itemId: itemId,
+            sessionId: sessionId,
+            tenantId: "(exam-prep-runner)",
+            actorId: actorId);
     }
 
     // ── Slot-aware draw ────────────────────────────────────────────
@@ -492,8 +597,24 @@ public sealed class MockExamRunService : IMockExamRunService
         return matching[rng.Next(matching.Count)];
     }
 
-    // ── Grading (Phase 1E + 1H) ────────────────────────────────────
+    // ── Grading (Phase 1E + 1H + 3 grade-timer) ─────────────────────
     private async Task<MockExamResultResponse> GradeAsync(
+        IQuerySession session, ExamSimulationState state, CancellationToken ct)
+    {
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            return await GradeInternalAsync(session, state, ct);
+        }
+        finally
+        {
+            sw.Stop();
+            GradeDurationMs.Record(sw.Elapsed.TotalMilliseconds,
+                new KeyValuePair<string, object?>("examCode", state.ExamCode));
+        }
+    }
+
+    private async Task<MockExamResultResponse> GradeInternalAsync(
         IQuerySession session, ExamSimulationState state, CancellationToken ct)
     {
         var structure = await _structureCatalog.GetAsync(state.ExamCode, paperCode: null, ct);
@@ -561,20 +682,36 @@ public sealed class MockExamRunService : IMockExamRunService
                 // proportionally to the subpart's declared Points (so a
                 // 25-pt slot with 10/15 subpart split awards 10/15 of the
                 // 25-pt envelope, not the raw subpart points).
+                //
+                // Phase 3 #3 — Math.Round per subpart can leak rounding
+                // (25 split as 33/33/34 → 8.25 + 8.25 + 8.5 → 8/8/9 = 25 ✓
+                // but 30/35/35 of 100 → 30/35/35 = 100 ✓; 10/15/25 of 25 →
+                // 5/7.5/12.5 → 5/8/13 = 26 ✗). Compute floor for all
+                // subparts then assign the remainder to the LAST subpart
+                // so envelope == sum-of-shares is invariant.
                 var subpartTotal = multipart.TotalPoints;
+                var subpartShares = new int[multipart.Subparts.Count];
+                if (subpartTotal > 0)
+                {
+                    for (var i = 0; i < multipart.Subparts.Count; i++)
+                        subpartShares[i] = (int)((long)slotPts * multipart.Subparts[i].Points / subpartTotal);
+                    var assigned = subpartShares.Sum();
+                    if (subpartShares.Length > 0)
+                        subpartShares[^1] += slotPts - assigned;
+                }
+
                 var qAttempted = false;
                 var qPointsAwarded = 0;
                 var subpartLines = new List<MockExamSubpartResult>();
 
-                foreach (var subpart in multipart.Subparts)
+                for (var i = 0; i < multipart.Subparts.Count; i++)
                 {
+                    var subpart = multipart.Subparts[i];
                     var key = $"{qid}:{subpart.PartId}";
                     var hasSubAnswer = state.Answers.TryGetValue(key, out var studentSubAnswer)
                         && !string.IsNullOrWhiteSpace(studentSubAnswer);
 
-                    var envelopeShare = subpartTotal == 0
-                        ? 0
-                        : (int)Math.Round((double)slotPts * subpart.Points / subpartTotal);
+                    var envelopeShare = subpartShares[i];
 
                     if (!hasSubAnswer)
                     {

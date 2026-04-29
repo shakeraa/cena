@@ -1672,7 +1672,8 @@
       "progress": "Answered {answered} of {total}",
       "submitButton": "Submit final",
       "unsavedDrafts": "{n} unsaved draft answer(s) — saving on blur or in 600ms",
-      "ptsLabel": "pts"
+      "ptsLabel": "pts",
+      "autoSubmitting": "Time's up — submitting your answers..."
     },
     "result": {
       "title": "Mock exam result",

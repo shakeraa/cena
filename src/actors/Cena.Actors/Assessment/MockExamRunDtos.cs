@@ -86,6 +86,14 @@ public sealed record SubmitAnswerRequest(
     string Answer,
     string? SubpartId = null);
 
+/// <summary>
+/// Phase 3 #8 — bulk-answer submission. The runner uses this on submit-
+/// flush so a multi-part exam (3 subparts × 7 Q's = 21 surfaces)
+/// collapses to one round-trip instead of 21. Server applies all
+/// entries atomically; whole batch rolls back on validation failure.
+/// </summary>
+public sealed record SubmitAnswersBulkRequest(IReadOnlyList<SubmitAnswerRequest> Answers);
+
 /// <summary>Per-section breakdown on the mark sheet (Ministry-style).</summary>
 public sealed record MockExamSectionResult(
     string SectionLabel,    // "A" / "B"

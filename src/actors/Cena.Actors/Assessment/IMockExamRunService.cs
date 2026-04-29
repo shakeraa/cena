@@ -48,6 +48,16 @@ public interface IMockExamRunService
         CancellationToken ct);
 
     /// <summary>
+    /// Phase 3 #8 — bulk apply N answers atomically. Either all entries
+    /// land or none. Same validation rules as <see cref="SubmitAnswerAsync"/>.
+    /// </summary>
+    Task<MockExamRunStateResponse> SubmitAnswersBulkAsync(
+        string studentId,
+        string runId,
+        SubmitAnswersBulkRequest request,
+        CancellationToken ct);
+
+    /// <summary>
     /// Final submit. Triggers grading (CAS-routed per question), persists
     /// the result, emits <c>ExamSimulationSubmitted_V2</c>, returns the
     /// mark sheet.

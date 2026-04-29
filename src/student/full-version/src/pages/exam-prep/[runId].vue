@@ -28,6 +28,7 @@ import {
   getMockExamRunState,
   selectMockExamPartB,
   submitMockExamAnswer,
+  submitMockExamAnswersBulk,
   submitMockExamRun,
 } from '@/api/exam-prep'
 import type {
@@ -58,6 +59,9 @@ const answers = ref<Record<string, string>>({})
 const previews = ref<Record<string, ExamPrepQuestionPreview>>({})
 const partBPicked = ref<string[]>([])
 const submitting = ref(false)
+// Phase 3 #6 — separate flag for the auto-submit-on-deadline path so
+// the SPA can render a distinct "Time's up — submitting..." banner.
+const autoSubmitting = ref(false)
 const error = ref<string | null>(null)
 
 // Per-key debounce timers + dirty set so the unload guard knows whether
@@ -182,27 +186,27 @@ async function onBlur(qid: string, subpartId?: string) {
   await persistAnswer(qid, subpartId)
 }
 
-async function submitRun() {
+async function submitRun(opts: { auto?: boolean } = {}) {
   if (submitting.value) return
   submitting.value = true
+  if (opts.auto) autoSubmitting.value = true
   try {
-    // Cancel pending debounce timers + flush any unsaved.
+    // Cancel pending debounce timers.
     for (const key of Object.keys(debounceTimers)) {
       clearTimeout(debounceTimers[key])
     }
-    // Flush every dirty key (single + multi-part composite).
+    // Phase 3 #8 — bulk-flush every dirty key in ONE round-trip.
+    const pending: { questionId: string; answer: string; subpartId?: string }[] = []
     for (const key of [...dirty.value]) {
       const val = (answers.value[key] ?? '').trim()
       if (!val) continue
       const sepIdx = key.indexOf(':')
       const qid = sepIdx >= 0 ? key.slice(0, sepIdx) : key
       const subpartId = sepIdx >= 0 ? key.slice(sepIdx + 1) : undefined
-      await submitMockExamAnswer(runId.value, {
-        questionId: qid,
-        answer: val,
-        subpartId,
-      })
+      pending.push({ questionId: qid, answer: val, subpartId })
     }
+    if (pending.length > 0)
+      await submitMockExamAnswersBulk(runId.value, pending)
     await submitMockExamRun(runId.value)
     dirty.value.clear()
     await router.push(`/exam-prep/${runId.value}/result`)
@@ -211,6 +215,7 @@ async function submitRun() {
     error.value = (err as { data?: { error?: string } })?.data?.error
       ?? t('examPrep.errors.submitFailed')
     submitting.value = false
+    autoSubmitting.value = false
   }
 }
 
@@ -226,7 +231,7 @@ onMounted(async () => {
   tickInterval = setInterval(() => {
     now.value = Date.now()
     if (remainingMs.value === 0 && !submitting.value && !state.value?.isSubmitted) {
-      submitRun()
+      submitRun({ auto: true })
     }
   }, 1000)
 })
@@ -268,6 +273,17 @@ watch(
         </VChip>
       </VCol>
     </VRow>
+
+    <VAlert
+      v-if="autoSubmitting"
+      type="warning"
+      variant="tonal"
+      class="mt-4"
+      data-testid="exam-prep-auto-submitting"
+    >
+      <VProgressCircular indeterminate size="20" width="2" class="me-3" />
+      {{ t('examPrep.runner.autoSubmitting') }}
+    </VAlert>
 
     <VAlert
       v-if="error"

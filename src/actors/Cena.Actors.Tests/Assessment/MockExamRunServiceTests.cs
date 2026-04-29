@@ -70,7 +70,8 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
             _store, NullLogger<BagrutPaperStructureCatalog>.Instance);
         // Persist seed structures so the service can resolve them during tests.
         await catalog.UpsertSeedStructuresAsync(CancellationToken.None);
-        _service = new MockExamRunService(_store, _cas, catalog, NullLogger<MockExamRunService>.Instance, _clock);
+        var gate = new ItemDeliveryGate(NullLogger<ItemDeliveryGate>.Instance);
+        _service = new MockExamRunService(_store, _cas, catalog, gate, NullLogger<MockExamRunService>.Instance, _clock);
 
         // Seed published math questions across all topics referenced by
         // the seeded BagrutPaperStructure (806/*). 12 topics × 3 blooms =
@@ -307,6 +308,63 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
             new StartMockExamRunRequest("807", null, ExtraTimePercent: -50),
             CancellationToken.None);
         Assert.Equal(0, run2.ExtraTimeMinutes);
+    }
+
+    [Fact]
+    public async Task ConcurrentStarts_DifferentStudents_GetDifferentSeeds()
+    {
+        // Phase 3 #2 — two starts in tight succession should not collide
+        // on the run shuffle. With the old (studentId, examCode, ticks)
+        // seed, two students starting in the same tick yielded identical
+        // partA/partB orderings.
+        var run1 = await _service.StartAsync("seed-test-1",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+        var run2 = await _service.StartAsync("seed-test-2",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        // The two runs should pick different question orderings (almost
+        // certainly different sets given the pool size; at minimum
+        // different orderings).
+        Assert.NotEqual(run1.PartAQuestionIds, run2.PartAQuestionIds);
+    }
+
+    [Fact]
+    public async Task BulkAnswerSubmission_AppliesAllOrNothing()
+    {
+        // Phase 3 #8 — bulk endpoint applies the whole batch atomically.
+        var run = await _service.StartAsync("bulk-test",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        var batch = run.PartAQuestionIds
+            .Select(qid => new SubmitAnswerRequest(qid, $"x = {qid}"))
+            .ToList();
+
+        var state = await _service.SubmitAnswersBulkAsync("bulk-test", run.RunId,
+            new SubmitAnswersBulkRequest(batch), CancellationToken.None);
+
+        Assert.Equal(run.PartAQuestionIds.Count, state.AnsweredIds.Count);
+    }
+
+    [Fact]
+    public async Task BulkAnswerSubmission_RejectsBatchWithInvalidQid()
+    {
+        var run = await _service.StartAsync("bulk-test-bad",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        var batch = new List<SubmitAnswerRequest>
+        {
+            new(run.PartAQuestionIds[0], "x = 1"),
+            new("not-in-this-run", "x = 2"),
+        };
+
+        await Assert.ThrowsAsync<ArgumentException>(() =>
+            _service.SubmitAnswersBulkAsync("bulk-test-bad", run.RunId,
+                new SubmitAnswersBulkRequest(batch), CancellationToken.None));
+
+        // Verify NOTHING got persisted (atomicity).
+        await using var qs = _store.QuerySession();
+        var state = await qs.LoadAsync<ExamSimulationState>(run.RunId);
+        Assert.Empty(state!.Answers);
     }
 
     [Fact]

@@ -85,6 +85,10 @@ public static class MockExamRunEndpoints
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            // Phase 3 #5 — IDOR / claim-mismatch guard. Other endpoints
+            // call this to ensure the bearer token's claims actually
+            // identify the student. Throws on mismatch (fast-fail).
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
             try
             {
@@ -110,6 +114,10 @@ public static class MockExamRunEndpoints
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            // Phase 3 #5 — IDOR / claim-mismatch guard. Other endpoints
+            // call this to ensure the bearer token's claims actually
+            // identify the student. Throws on mismatch (fast-fail).
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
             var state = await service.GetStateAsync(studentId, runId, ct);
             return state is null ? Results.NotFound() : Results.Ok(state);
@@ -125,6 +133,10 @@ public static class MockExamRunEndpoints
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            // Phase 3 #5 — IDOR / claim-mismatch guard. Other endpoints
+            // call this to ensure the bearer token's claims actually
+            // identify the student. Throws on mismatch (fast-fail).
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
             try
             {
@@ -147,10 +159,37 @@ public static class MockExamRunEndpoints
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            // Phase 3 #5 — IDOR / claim-mismatch guard. Other endpoints
+            // call this to ensure the bearer token's claims actually
+            // identify the student. Throws on mismatch (fast-fail).
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
             try
             {
                 var state = await service.SubmitAnswerAsync(studentId, runId, request, ct);
+                return Results.Ok(state);
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (ArgumentException ex) { return Results.BadRequest(new { error = ex.Message }); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+        });
+
+        // POST /{runId}/answers (bulk)  — Phase 3 #8
+        group.MapPost("/{runId}/answers", async (
+            string runId,
+            HttpContext ctx,
+            [FromServices] IMockExamRunService service,
+            SubmitAnswersBulkRequest request,
+            CancellationToken ct) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            try
+            {
+                var state = await service.SubmitAnswersBulkAsync(studentId, runId, request, ct);
                 return Results.Ok(state);
             }
             catch (KeyNotFoundException) { return Results.NotFound(); }
@@ -168,6 +207,10 @@ public static class MockExamRunEndpoints
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            // Phase 3 #5 — IDOR / claim-mismatch guard. Other endpoints
+            // call this to ensure the bearer token's claims actually
+            // identify the student. Throws on mismatch (fast-fail).
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
             try
             {
@@ -188,6 +231,10 @@ public static class MockExamRunEndpoints
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            // Phase 3 #5 — IDOR / claim-mismatch guard. Other endpoints
+            // call this to ensure the bearer token's claims actually
+            // identify the student. Throws on mismatch (fast-fail).
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
             var result = await service.GetResultAsync(studentId, runId, ct);
             return result is null ? Results.NotFound() : Results.Ok(result);
@@ -206,6 +253,10 @@ public static class MockExamRunEndpoints
         {
             var studentId = GetStudentId(ctx.User);
             if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            // Phase 3 #5 — IDOR / claim-mismatch guard. Other endpoints
+            // call this to ensure the bearer token's claims actually
+            // identify the student. Throws on mismatch (fast-fail).
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
 
             var preview = await service.GetQuestionPreviewAsync(studentId, runId, qid, ct);
             return preview is null ? Results.NotFound() : Results.Ok(preview);

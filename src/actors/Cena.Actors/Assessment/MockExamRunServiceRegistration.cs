@@ -30,6 +30,10 @@ public static class MockExamRunServiceRegistration
         services.ConfigureMarten(opts => opts.RegisterMockExamRunContext());
         services.TryAddScoped<IMockExamRunService, MockExamRunService>();
         services.TryAddScoped<IBagrutPaperStructureCatalog, BagrutPaperStructureCatalog>();
+        // ItemDeliveryGate isn't always registered globally — register it
+        // here so MockExamRunService can resolve. TryAddSingleton so a host
+        // that already registered a custom impl wins.
+        services.TryAddSingleton<IItemDeliveryGate, ItemDeliveryGate>();
 
         // Dev seeder only registered if the host opts in (configuration null
         // = registered, lets the worker decide via env). Production hosts

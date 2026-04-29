@@ -41,6 +41,8 @@ public sealed class MockExamDevDataSeeder : IHostedService
     private readonly ILogger<MockExamDevDataSeeder> _logger;
     private readonly bool _enabled;
 
+    private readonly IHostEnvironment _env;
+
     public MockExamDevDataSeeder(
         IServiceProvider services,
         ILogger<MockExamDevDataSeeder> logger,
@@ -49,6 +51,7 @@ public sealed class MockExamDevDataSeeder : IHostedService
     {
         _services = services;
         _logger = logger;
+        _env = env;
         // Default ON in dev, OFF elsewhere.
         _enabled = config.GetValue<bool?>("Cena:ExamPrep:DevSeed:Enabled")
             ?? env.IsDevelopment();
@@ -56,6 +59,21 @@ public sealed class MockExamDevDataSeeder : IHostedService
 
     public async Task StartAsync(CancellationToken ct)
     {
+        // Phase 3 #4 — hard production guard. Even if config flips
+        // Cena:ExamPrep:DevSeed:Enabled=true on a production host, refuse
+        // to run unless ASPNETCORE_ENVIRONMENT == Development. This
+        // closes the failure mode "ops misconfigures env, seed pollutes
+        // prod question bank with TeacherAuthoredOriginal placeholder
+        // items". The flag exists for dev opt-out; production opt-in
+        // is intentionally not supported.
+        if (!_env.IsDevelopment())
+        {
+            _logger.LogInformation(
+                "[EXAM-PREP-SEED] non-Development environment ({Env}); refusing to seed regardless of config",
+                _env.EnvironmentName);
+            return;
+        }
+
         if (!_enabled)
         {
             _logger.LogInformation("[EXAM-PREP-SEED] disabled by config; skipping");

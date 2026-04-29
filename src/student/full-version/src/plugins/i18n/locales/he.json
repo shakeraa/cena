@@ -1643,7 +1643,8 @@
       "progress": "נענו {answered} מתוך {total}",
       "submitButton": "סיום ושליחה",
       "unsavedDrafts": "{n} תשובות שעוד לא נשמרו — שמירה ב-600 מילישניות או בעת יציאה מהשדה",
-      "ptsLabel": "נק'"
+      "ptsLabel": "נק'",
+      "autoSubmitting": "הזמן נגמר — שולחים את התשובות..."
     },
     "result": {
       "title": "תוצאות בגרות מדומה",
