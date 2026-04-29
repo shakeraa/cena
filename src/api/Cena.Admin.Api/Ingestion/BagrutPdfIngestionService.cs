@@ -337,7 +337,13 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
                 });
 
             drafts.Add(new IngestionDraftQuestion(
-                DraftId: $"draft-{examCode}-p{page.PageNumber}-{Guid.NewGuid().ToString("N")[..6]}",
+                // Idempotent draft id: stable across re-uploads of the
+                // same (examCode, page). Marten upserts on Id collision,
+                // so re-running the same Bagrut PDF refreshes the draft
+                // in place rather than creating new rows. Was previously
+                // suffixed with Guid[..6] which produced a fresh row per
+                // run (user reported 17 rows for one upload, 2026-04-29).
+                DraftId: $"draft-{examCode}-p{page.PageNumber}",
                 SourcePage: page.PageNumber,
                 Prompt: promptPreview,
                 LatexContent: sanitizedLatex,

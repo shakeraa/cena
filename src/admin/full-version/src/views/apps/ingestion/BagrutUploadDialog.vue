@@ -48,9 +48,11 @@ const uploading = ref(false)
 const error = ref<string | null>(null)
 const result = ref<PdfIngestionResult | null>(null)
 
-// Ministry metadata (optional) — when both subject + paper codes are
-// present, the server populates BagrutCorpusItemDocument so the
-// ADR-0043 isomorph rejector has reference text for variant generation.
+// Ministry metadata (optional). Off by default — most uploads don't
+// need it. When the user toggles on, the four code/year/units fields
+// appear; when both codes get filled, the server populates
+// BagrutCorpusItemDocument for the ADR-0043 isomorph rejector.
+const isMinistryReference = ref(false)
 const ministrySubjectCode = ref('')
 const ministryQuestionPaperCode = ref('')
 const examYear = ref<number | null>(null)
@@ -90,6 +92,7 @@ async function submit() {
     // with sourceType=bagrut, visible on the In Review kanban column).
     const { enqueueBagrut, openDrawer } = useIngestionJobs()
     const jobId = await enqueueBagrut(file.value, examCode.value.trim().toLowerCase(), {
+      isMinistryReference: isMinistryReference.value,
       ministrySubjectCode: ministrySubjectCode.value.trim() || null,
       ministryQuestionPaperCode: ministryQuestionPaperCode.value.trim() || null,
       year: examYear.value ?? null,
@@ -118,6 +121,7 @@ watch(() => props.modelValue, (open) => {
     file.value = null
     result.value = null
     error.value = null
+    isMinistryReference.value = false
     ministrySubjectCode.value = ''
     ministryQuestionPaperCode.value = ''
     examYear.value = null
@@ -165,25 +169,34 @@ function warningSeverity(w: string): 'error' | 'warning' | 'info' | 'success' {
           class="mb-3"
         />
 
-        <!-- Ministry metadata (optional). When subject + paper code are
-             both filled, the server populates BagrutCorpusItemDocument so
-             the ADR-0043 isomorph rejector has reference text for variant
-             generation. Leave blank if you only want draft persistence. -->
+        <!-- Ministry-reference flag. This boolean is persisted on the
+             draft (BagrutDraftPayloadDocument.IsMinistryReference)
+             regardless of whether the metadata fields below are filled
+             — it's a signal, not a gate. The fields below are always
+             optional; filling subject + paper code separately triggers
+             the corpus side-effect for ADR-0043 isomorph rejection. -->
+        <VSwitch
+          v-model="isMinistryReference"
+          color="primary"
+          density="compact"
+          hide-details
+          label="Mark as Ministry past-Bagrut reference"
+          class="mb-2"
+        />
+
         <VRow class="mb-1">
           <VCol cols="6">
             <VTextField
               v-model="ministrySubjectCode"
-              label="Ministry subject code"
+              label="Ministry subject code (optional)"
               placeholder="e.g. 35"
               density="compact"
-              hint="Required for ADR-0043 isomorph rejection"
-              persistent-hint
             />
           </VCol>
           <VCol cols="6">
             <VTextField
               v-model="ministryQuestionPaperCode"
-              label="Ministry question-paper code"
+              label="Ministry question-paper code (optional)"
               placeholder="e.g. 581"
               density="compact"
             />
@@ -194,7 +207,7 @@ function warningSeverity(w: string): 'error' | 'warning' | 'info' | 'success' {
               type="number"
               :min="2000"
               :max="2100"
-              label="Year"
+              label="Year (optional)"
               density="compact"
             />
           </VCol>
@@ -202,7 +215,7 @@ function warningSeverity(w: string): 'error' | 'warning' | 'info' | 'success' {
             <VSelect
               v-model="examUnits"
               :items="[3, 4, 5]"
-              label="Units (track)"
+              label="Units / track (optional)"
               density="compact"
               clearable
             />

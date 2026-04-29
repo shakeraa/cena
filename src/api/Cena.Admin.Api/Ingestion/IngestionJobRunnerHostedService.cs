@@ -275,6 +275,7 @@ internal sealed class BagrutIngestionJobStrategy : IIngestionJobStrategy
             sourceFilename: payload.SourceFilename,
             submittedBy: payload.UploadedBy,
             drafts: result.Drafts,
+            isMinistryReference: payload.IsMinistryReference,
             ct: ct);
 
         // ADR-0043 §runtime-gate: write BagrutCorpusItemDocument rows so the
@@ -333,11 +334,14 @@ internal sealed class BagrutIngestionJobStrategy : IIngestionJobStrategy
 // inside IngestionJobDocument.PayloadJson; deserialized by the strategy.
 // MinistrySubjectCode + MinistryQuestionPaperCode (when both present) trigger
 // the BagrutCorpusItemDocument write — feeds the ADR-0043 isomorph rejector.
+// IsMinistryReference is independent — a persisted boolean tag on the
+// draft document, set by curator at upload time and queryable later.
 public sealed record BagrutJobPayload(
     string ExamCode,
     string UploadedBy,
     string? SourceFilename,
     byte[] FileBytes,
+    bool IsMinistryReference = false,
     string? MinistrySubjectCode = null,
     string? MinistryQuestionPaperCode = null,
     int? Units = null,

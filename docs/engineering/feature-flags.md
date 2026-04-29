@@ -11,11 +11,11 @@ the gating reason. Flip a flag → update the table.
 
 | Field | Value |
 |---|---|
-| **Default** | `false` |
+| **Current state** | **ON** as of 2026-04-29 (was `false` by default in initial commit) |
 | **Env var** | `OCR_VARIANTS_BAGRUT_SEED_ENABLED` (substituted into compose) |
 | **Owner** | Shaker + claude-code (coordinator) |
 | **Owning ADR** | [ADR-0059 §15.5](../adr/0059-bagrut-reference-browse-and-variant-generation.md) |
-| **Gating PRR** | PRR-249 (legal-delta memo, §6 sign-off required for flip-on) |
+| **Originally gating** | PRR-249 (legal-delta memo); **user (Shaker) accepted the legal posture directly on 2026-04-29 without waiting for counsel memo** |
 | **Reads at** | `Cena.Admin.Api.Ingestion.GenerateVariantsJobStrategy.ExecuteAsync` |
 | **Surfaces to SPA via** | `GET /api/admin/ingestion/jobs/feature-flags` |
 | **Symptoms when off** | `GenerateVariantsJobStrategy` throws `InvalidOperationException` with code `SOURCE_ANCHORED_VARIANTS_DISABLED`. Admin SPA "Generate variants" dialog renders the warning banner *"Disabled pending legal sign-off (PRR-249)"* and disables the **Enqueue** button. |

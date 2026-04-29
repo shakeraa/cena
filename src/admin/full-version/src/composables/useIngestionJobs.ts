@@ -80,6 +80,11 @@ function stopPolling() {
 }
 
 interface BagrutMeta {
+  // Persisted boolean flag on BagrutDraftPayloadDocument; independent of
+  // whether ministrySubjectCode / ministryQuestionPaperCode are filled.
+  // Lets curators tag drafts as Ministry-derived without forcing them
+  // through the corpus-write metadata workflow.
+  isMinistryReference?: boolean
   ministrySubjectCode?: string | null
   ministryQuestionPaperCode?: string | null
   year?: number | null
@@ -91,6 +96,8 @@ async function enqueueBagrut(file: File, examCode: string, meta?: BagrutMeta): P
   const form = new FormData()
   form.append('file', file)
   form.append('examCode', examCode)
+  if (meta?.isMinistryReference != null)
+    form.append('isMinistryReference', String(meta.isMinistryReference))
   if (meta?.ministrySubjectCode) form.append('ministrySubjectCode', meta.ministrySubjectCode)
   if (meta?.ministryQuestionPaperCode) form.append('ministryQuestionPaperCode', meta.ministryQuestionPaperCode)
   if (meta?.year != null) form.append('year', String(meta.year))

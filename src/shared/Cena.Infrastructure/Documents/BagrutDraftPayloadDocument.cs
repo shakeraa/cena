@@ -30,6 +30,17 @@ public sealed class BagrutDraftPayloadDocument
     public string? FigureSpecJson { get; set; }
     public double ExtractionConfidence { get; set; }
 
+    /// <summary>
+    /// Persisted flag set by the curator at upload time — signals that
+    /// this draft was derived from a Ministry-published past Bagrut
+    /// (independent of whether MinistrySubjectCode / MinistryQuestionPaperCode
+    /// are filled, which separately drives the BagrutCorpusItemDocument
+    /// side-effect for the ADR-0043 isomorph rejector). Filterable so
+    /// curators can scope the kanban / variant-generation flow to
+    /// Ministry-only or non-Ministry-only items.
+    /// </summary>
+    public bool IsMinistryReference { get; set; }
+
     public List<string> ReviewNotes { get; set; } = new();
 
     public DateTimeOffset CreatedAt { get; set; }

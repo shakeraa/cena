@@ -134,16 +134,89 @@ const enqueueVariants = async () => {
   }
 }
 
+// Backend response shape (snake-→camel by ASP.NET JSON defaults):
+//   { id, sourceFilename, sourceType, sourceUrl, submittedAt, completedAt,
+//     currentStage, stageHistory: [...], ocrResult, quality:
+//     { mathCorrectness, languageQuality, pedagogicalQuality, plagiarismScore },
+//     extractedQuestions: [...] }
+// Frontend ItemDetail interface uses different names (originalFilename,
+// stages, createdAt, qualityScores, errors). Pre-existing mismatch —
+// adapt at the boundary so the rest of the component doesn't churn.
+interface BackendStageInfo {
+  stage: string
+  startedAt: string | null
+  completedAt: string | null
+  status: string
+  errorMessage: string | null
+}
+interface BackendQuality {
+  mathCorrectness: number
+  languageQuality: number
+  pedagogicalQuality: number
+  plagiarismScore: number
+}
+interface BackendDetailResponse {
+  id: string
+  sourceFilename: string
+  sourceType: string
+  sourceUrl: string | null
+  submittedAt: string
+  completedAt: string | null
+  currentStage: string
+  stageHistory: BackendStageInfo[]
+  ocrResult: { extractedText: string, confidence: number } | null
+  quality: BackendQuality | null
+  extractedQuestions: Array<{ index: number, text: string, confidence: number }>
+}
+
+const stageStatusMap: Record<string, ProcessingStage['status']> = {
+  processing: 'in_progress',
+  completed: 'completed',
+  failed: 'failed',
+  pending: 'pending',
+}
+
 const fetchDetail = async () => {
   if (!props.itemId)
     return
 
   loading.value = true
   try {
-    item.value = await $api(`/admin/ingestion/items/${props.itemId}/detail`)
+    const resp = await $api<BackendDetailResponse>(
+      `/admin/ingestion/items/${props.itemId}/detail`,
+    )
+    item.value = {
+      id: resp.id,
+      originalFilename: resp.sourceFilename,
+      sourceType: (resp.sourceType as ItemDetail['sourceType']),
+      currentStage: resp.currentStage,
+      questionCount: resp.extractedQuestions?.length ?? 0,
+      qualityScores: resp.quality
+        ? {
+            mathCorrectness: resp.quality.mathCorrectness,
+            languageQuality: resp.quality.languageQuality,
+            pedagogicalQuality: resp.quality.pedagogicalQuality,
+            plagiarismScore: resp.quality.plagiarismScore,
+          }
+        : null,
+      qualityGate: null,
+      stages: (resp.stageHistory ?? []).map(s => ({
+        name: s.stage,
+        status: stageStatusMap[s.status] ?? 'pending',
+        startedAt: s.startedAt,
+        completedAt: s.completedAt,
+        error: s.errorMessage,
+      })),
+      errors: (resp.stageHistory ?? [])
+        .filter(s => s.errorMessage)
+        .map(s => `${s.stage}: ${s.errorMessage}`),
+      createdAt: resp.submittedAt,
+      updatedAt: resp.completedAt ?? resp.submittedAt,
+    }
   }
   catch (error) {
     console.error('Failed to fetch item detail:', error)
+    item.value = null
   }
   finally {
     loading.value = false

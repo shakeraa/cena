@@ -16,12 +16,27 @@ definePage({
 interface PipelineItem {
   id: string
   sourceFilename: string
-  sourceType: 'url' | 's3' | 'photo' | 'batch'
+  // Bagrut drafts persisted via BagrutDraftPersistence (2026-04-29) carry
+  // sourceType="bagrut" — extending the union so they render correctly
+  // on the kanban without a TS narrow-cast error.
+  sourceType: 'url' | 's3' | 'photo' | 'batch' | 'bagrut'
   questionCount: number
   qualityScore: number | null
   stageEnteredAt: string
   hasFailed: boolean
   errorSummary: string | null
+}
+
+// ── Backend → frontend stage-id alias map ──────────────────────────────────
+// IngestionPipelineService emits stageIds 'ocr' / 'recreated' / 'review';
+// this kanban's STAGES use 'ocr_processing' / 're_created' / 'in_review'.
+// Pre-existing mismatch surfaced when Bagrut drafts (which land in
+// InReview) didn't render. Alias here so we don't churn either side's
+// stable identifier.
+const STAGE_ID_ALIASES: Record<string, string> = {
+  ocr: 'ocr_processing',
+  recreated: 're_created',
+  review: 'in_review',
 }
 
 interface PipelineStage {
@@ -118,14 +133,60 @@ const totalsSummary = computed(() => {
   return { total: all.length, visible, failed, stuck }
 })
 
+interface BackendItem {
+  id: string
+  sourceFilename: string
+  sourceType: string
+  questionCount: number
+  qualityScore: number | null
+  timestamp: string
+  errorMessage: string | null
+  hasError: boolean
+}
+
+interface BackendStage {
+  stageId: string
+  name: string
+  count: number
+  status: string
+  items: BackendItem[]
+}
+
+interface PipelineStatusResponse {
+  updatedAt: string
+  stages: BackendStage[]
+}
+
 const fetchPipeline = async () => {
   try {
-    const response = await $api('/admin/ingestion/pipeline-status') as Record<string, PipelineItem[]>
+    // Backend returns { updatedAt, stages: [{ stageId, items, ... }] }.
+    // Translate to a stage-keyed map, applying STAGE_ID_ALIASES so
+    // 'review' rows land under the kanban's 'in_review' column. Item
+    // field names also need aliasing: backend uses timestamp/hasError/
+    // errorMessage; the kanban interface uses stageEnteredAt/hasFailed/
+    // errorSummary. Pre-existing wrapper + naming mismatches — all
+    // adapted here in one place.
+    const response = await $api<PipelineStatusResponse>('/admin/ingestion/pipeline-status')
+
+    const itemsByStageKey: Record<string, PipelineItem[]> = {}
+    for (const s of response.stages ?? []) {
+      const key = STAGE_ID_ALIASES[s.stageId] ?? s.stageId
+      itemsByStageKey[key] = (s.items ?? []).map(item => ({
+        id: item.id,
+        sourceFilename: item.sourceFilename,
+        sourceType: item.sourceType as PipelineItem['sourceType'],
+        questionCount: item.questionCount,
+        qualityScore: item.qualityScore,
+        stageEnteredAt: item.timestamp,
+        hasFailed: item.hasError,
+        errorSummary: item.errorMessage,
+      }))
+    }
 
     pipelineData.value = STAGES.map(stage => ({
       name: stage.name,
       key: stage.key,
-      items: response[stage.key] ?? [],
+      items: itemsByStageKey[stage.key] ?? [],
     }))
   }
   catch (error) {

@@ -193,11 +193,17 @@ public static class IngestionJobsEndpoints
             // reference text to compare against during variant generation.
             // Backwards compatible: missing fields disable only the corpus
             // side-effect; ingest + draft persistence still run.
+            // Persisted Ministry-reference flag — independent of the
+            // optional metadata codes. "true" / "false" string tolerated
+            // (HTML form encoding); default false when missing.
+            var isMinistry = bool.TryParse(form["isMinistryReference"], out var im) && im;
+
             var payload = new BagrutJobPayload(
                 ExamCode: examCode,
                 UploadedBy: uploadedBy,
                 SourceFilename: file.FileName,
                 FileBytes: ms.ToArray(),
+                IsMinistryReference: isMinistry,
                 MinistrySubjectCode: NullIfBlank(form["ministrySubjectCode"].ToString()),
                 MinistryQuestionPaperCode: NullIfBlank(form["ministryQuestionPaperCode"].ToString()),
                 Units: int.TryParse(form["units"], out var u) ? u : null,

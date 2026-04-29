@@ -63,6 +63,22 @@ watch(() => groupedJobs.value.active.map(j => j.id).join(','), () => {
     selectedJobId.value = groupedJobs.value.active[0].id
 })
 
+// Tab-switch UX fix: when the user clicks the Active or History tab and
+// the currently-selected job isn't in the visible tab's list, auto-pick
+// the first job in the visible list. Otherwise the bottom log panel
+// keeps showing the previous tab's selection — confusing on the
+// Active→History→Active path the user reported.
+watch(activeTab, (tab) => {
+  const list = tab === 'active' ? groupedJobs.value.active : groupedJobs.value.history
+  if (list.length === 0) {
+    selectedJobId.value = null
+    return
+  }
+  const stillVisible = list.some(j => j.id === selectedJobId.value)
+  if (!stillVisible)
+    selectedJobId.value = list[0].id
+})
+
 const selectedJob = computed(() =>
   selectedJobId.value
     ? jobs.value.find(j => j.id === selectedJobId.value) ?? null
@@ -80,6 +96,10 @@ function selectJob(jobId: string) {
 }
 
 async function loadLogs(jobId: string) {
+  // (C) Skip if a previous fetch is still in flight. Without this the
+  // 1.5s poll could overlap a slow request and flip logsLoading on/off
+  // repeatedly, leaving the panel stuck on "Loading…".
+  if (logsLoading.value) return
   logsLoading.value = true
   try {
     logEntries.value = await fetchLogs(jobId, 200)
@@ -95,10 +115,21 @@ async function loadLogs(jobId: string) {
 function startLogPolling() {
   stopLogPolling()
   if (!selectedJobId.value) return
+  // (B) Only poll while the selected job is still active. Terminal
+  // jobs had their logs loaded once on selection — that's enough.
+  // Previously the `|| logEntries.length === 0` clause caused infinite
+  // polling on terminal jobs that legitimately produced no logs.
+  if (!isActive(selectedJob.value)) return
   logPollHandle = setInterval(() => {
-    if (!selectedJobId.value) return
-    if (isActive(selectedJob.value) || logEntries.value.length === 0)
-      loadLogs(selectedJobId.value)
+    if (!selectedJobId.value) {
+      stopLogPolling()
+      return
+    }
+    if (!isActive(selectedJob.value)) {
+      stopLogPolling()
+      return
+    }
+    loadLogs(selectedJobId.value)
   }, 1500)
 }
 

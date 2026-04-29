@@ -232,7 +232,11 @@ public static class MartenConfiguration
         opts.Schema.For<Cena.Infrastructure.Documents.BagrutDraftPayloadDocument>()
             .Identity(x => x.Id)
             .Index(x => x.SourcePdfId)
-            .Index(x => x.ExamCode);
+            .Index(x => x.ExamCode)
+            // Filterable Ministry-reference tag (curator-set at upload).
+            // Indexed so the kanban can scope to Ministry-only or
+            // non-Ministry-only views without scanning the full table.
+            .Index(x => x.IsMinistryReference);
 
         // ── Question CAS Binding (ADR-0032 §4 / RDY-049) ──
         // Unique index on (QuestionId, CorrectAnswerHash) gives us

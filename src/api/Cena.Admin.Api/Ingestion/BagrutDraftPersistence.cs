@@ -29,6 +29,7 @@ public interface IBagrutDraftPersistence
         string? sourceFilename,
         string submittedBy,
         IReadOnlyList<IngestionDraftQuestion> drafts,
+        bool isMinistryReference = false,
         CancellationToken ct = default);
 }
 
@@ -51,6 +52,7 @@ public sealed class BagrutDraftPersistence : IBagrutDraftPersistence
         string? sourceFilename,
         string submittedBy,
         IReadOnlyList<IngestionDraftQuestion> drafts,
+        bool isMinistryReference = false,
         CancellationToken ct = default)
     {
         if (drafts.Count == 0) return Array.Empty<string>();
@@ -109,6 +111,7 @@ public sealed class BagrutDraftPersistence : IBagrutDraftPersistence
                 LatexContent = d.LatexContent,
                 FigureSpecJson = d.FigureSpecJson,
                 ExtractionConfidence = d.ExtractionConfidence,
+                IsMinistryReference = isMinistryReference,
                 ReviewNotes = d.ReviewNotes.ToList(),
                 CreatedAt = now,
             });
