@@ -153,11 +153,11 @@ public sealed class TaxonomyReviewReportWorker : BackgroundService
         var todayMidnightUtc = new DateTimeOffset(
             nowUtc.Year, nowUtc.Month, nowUtc.Day, 0, 0, 0, TimeSpan.Zero);
         var todayHourUtc = todayMidnightUtc.AddHours(hourUtc);
-        var daysUntilMonday = ((int)DayOfWeek.Monday - (int)todayMidnightUtc.DayOfWeek + 7) % 7;
+        var daysToNextMonday = ((int)DayOfWeek.Monday - (int)todayMidnightUtc.DayOfWeek + 7) % 7;
         var nextMonday = todayHourUtc.AddDays(
-            daysUntilMonday == 0 && nowUtc.TimeOfDay >= TimeSpan.FromHours(hourUtc)
+            daysToNextMonday == 0 && nowUtc.TimeOfDay >= TimeSpan.FromHours(hourUtc)
                 ? 7
-                : daysUntilMonday);
+                : daysToNextMonday);
         var result = nextMonday - nowUtc;
         return result < TimeSpan.Zero ? TimeSpan.FromMinutes(1) : result;
     }
