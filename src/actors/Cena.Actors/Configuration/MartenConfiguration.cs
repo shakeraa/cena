@@ -457,48 +457,11 @@ public static class MartenConfiguration
             .Index(x => x.StudentId)
             .Index(x => x.CreatedAt);
 
-        // ── Social Documents (STB-06b) ──
-        opts.Schema.For<CommentDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.ItemId)
-            .Index(x => x.AuthorStudentId)
-            .Index(x => x.PostedAt);
-
-        opts.Schema.For<FriendRequestDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.FromStudentId)
-            .Index(x => x.ToStudentId)
-            .Index(x => x.Status);
-
-        opts.Schema.For<FriendshipDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.StudentAId)
-            .Index(x => x.StudentBId);
-
-        opts.Schema.For<StudyRoomDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.HostStudentId)
-            .Index(x => x.IsPublic);
-
-        opts.Schema.For<StudyRoomMembershipDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.RoomId)
-            .Index(x => x.StudentId)
-            .Index(x => x.IsActive);
-
-        // ── Class Feed Documents (HARDEN SocialEndpoints) ──
-        opts.Schema.For<ClassFeedItemDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.ClassroomId)
-            .Index(x => x.Kind)
-            .Index(x => x.AuthorStudentId)
-            .Index(x => x.PostedAt);
-
-        opts.Schema.For<PeerSolutionDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.QuestionId)
-            .Index(x => x.AuthorStudentId)
-            .Index(x => x.PostedAt);
+        // PRR-304: Social bounded-context documents
+        // (Comment / FriendRequest / Friendship / StudyRoom /
+        // StudyRoomMembership / ClassFeedItem / PeerSolution) extracted to
+        // MartenSocialRegistration.RegisterSocialContext.
+        opts.RegisterSocialContext();
 
         // ── Question Document (HARDEN SessionEndpoints) ──
         opts.Schema.For<QuestionDocument>()
@@ -544,45 +507,12 @@ public static class MartenConfiguration
             .Index(x => x.ObservedExposureRate)
             .Index(x => x.LastAdministeredAt);
 
-        // ── Boss Attempt Document (STB-05b) ──
-        opts.Schema.For<BossAttemptDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.StudentId)
-            .Index(x => x.BossBattleId)
-            .Index(x => x.Date);
-
-        // ── Challenge Catalog Documents (HARDEN STB-05) ──
-        opts.Schema.For<DailyChallengeDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.Date)
-            .Index(x => x.Locale);
-
-        opts.Schema.For<DailyChallengeCompletionDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.StudentId)
-            .Index(x => x.Date)
-            .Index(x => x.Score);
-
-        opts.Schema.For<CardChainDefinitionDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.ChainId)
-            .Index(x => x.Subject);
-
-        opts.Schema.For<CardChainProgressDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.StudentId)
-            .Index(x => x.ChainId);
-
-        opts.Schema.For<TournamentDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.IsActive)
-            .Index(x => x.StartsAt)
-            .Index(x => x.EndsAt);
-
-        opts.Schema.For<TournamentRegistrationDocument>()
-            .Identity(x => x.Id)
-            .Index(x => x.StudentId)
-            .Index(x => x.TournamentId);
+        // PRR-304: Challenge / Gamification bounded-context documents
+        // (BossAttempt / DailyChallenge / DailyChallengeCompletion /
+        // CardChainDefinition / CardChainProgress / Tournament /
+        // TournamentRegistration) extracted to
+        // MartenChallengeRegistration.RegisterChallengeContext.
+        opts.RegisterChallengeContext();
 
         // ── Content Catalog Documents (STB-08b) ──
         opts.Schema.For<ConceptDocument>()
