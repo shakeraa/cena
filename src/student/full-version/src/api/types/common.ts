@@ -288,10 +288,56 @@ export interface TournamentListDto {
  */
 export type SessionMode = 'practice' | 'challenge' | 'review' | 'diagnostic'
 
+/**
+ * PRR-247 / ADR-0060 — session-mode discriminator on top of the legacy
+ * pedagogy `mode` field. The server validator enforces:
+ *   • `examScope` ∈ {undefined, 'exam-prep', 'freestyle'}
+ *   • `examScope === 'exam-prep'` ⇒ `activeExamTargetId` non-empty (else 400)
+ *   • `examScope` undefined or 'freestyle' ⇒ `activeExamTargetId` must be
+ *     undefined (else 400)
+ *
+ * The fields are nullable on the wire — when the form picks Freestyle we
+ * OMIT both fields entirely (do NOT send `examScope: 'freestyle'` with
+ * an undefined target alongside; the additive contract treats null/omit
+ * as legacy = freestyle).
+ */
+export type ExamScope = 'exam-prep' | 'freestyle'
+
 export interface SessionStartRequest {
   subjects: string[]
   durationMinutes: number
   mode: SessionMode
+  examScope?: ExamScope
+  activeExamTargetId?: string
+}
+
+/**
+ * PRR-218 / ADR-0050 — `GET /api/me/exam-targets` response. Mirrors
+ * `Cena.Student.Api.Host.Endpoints.ExamTargetResponseDto`. Only the
+ * fields SessionSetupForm needs are typed strictly; the rest are kept
+ * loose for forward-compat with prr-22x evolution.
+ */
+export interface ExamSittingDto {
+  academicYear: string
+  season: string
+  moed: string
+}
+
+export interface ExamTargetDto {
+  id: string
+  source: string
+  examCode: string
+  track?: string | null
+  sitting: ExamSittingDto
+  weeklyHours: number
+  isActive: boolean
+  archivedAt?: string | null
+  questionPaperCodes: readonly string[]
+}
+
+export interface ExamTargetListDto {
+  items: ExamTargetDto[]
+  includeArchived: boolean
 }
 
 export interface SessionStartResponse {
