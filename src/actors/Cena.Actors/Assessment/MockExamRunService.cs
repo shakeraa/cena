@@ -473,6 +473,52 @@ public sealed class MockExamRunService : IMockExamRunService
         return await GradeAsync(session, state, ct);
     }
 
+    public async Task<MockExamRunStateResponse> PauseAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (state.IsSubmitted)
+            throw new InvalidOperationException("Run already submitted; nothing to pause.");
+        if (state.IsPaused) return BuildStateResponse(state); // idempotent
+
+        state.PausedAt = _clock.GetUtcNow();
+        session.Store(state);
+        await session.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "[MOCK-EXAM] Paused runId={RunId} studentId={StudentId} totalPausedMs={Total}",
+            runId, studentId, state.TotalPausedMs);
+        return BuildStateResponse(state);
+    }
+
+    public async Task<MockExamRunStateResponse> ResumeAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (state.IsSubmitted)
+            throw new InvalidOperationException("Run already submitted; nothing to resume.");
+        if (!state.IsPaused) return BuildStateResponse(state); // idempotent
+
+        var pausedDuration = _clock.GetUtcNow() - state.PausedAt!.Value;
+        state.TotalPausedMs += (long)Math.Max(0, pausedDuration.TotalMilliseconds);
+        state.PausedAt = null;
+        session.Store(state);
+        await session.SaveChangesAsync(ct);
+
+        _logger.LogInformation(
+            "[MOCK-EXAM] Resumed runId={RunId} studentId={StudentId} pausedThisRoundMs={Round} totalPausedMs={Total}",
+            runId, studentId, (long)pausedDuration.TotalMilliseconds, state.TotalPausedMs);
+        return BuildStateResponse(state);
+    }
+
     public async Task<IReadOnlyList<MockExamRunSummary>> GetRecentRunsAsync(
         string studentId, string? examCode, string? paperCode, int limit, CancellationToken ct)
     {
@@ -1084,5 +1130,7 @@ public sealed class MockExamRunService : IMockExamRunService
             PartBSelectedIds: s.PartBSelectedIds,
             AnsweredIds: s.Answers.Keys.ToList(),
             CalculatorPolicy: string.IsNullOrEmpty(s.CalculatorPolicy) ? "Allowed" : s.CalculatorPolicy,
-            FormulaSheetMode: string.IsNullOrEmpty(s.FormulaSheetMode) ? "None" : s.FormulaSheetMode);
+            FormulaSheetMode: string.IsNullOrEmpty(s.FormulaSheetMode) ? "None" : s.FormulaSheetMode,
+            IsPaused: s.IsPaused,
+            TotalPausedMs: s.TotalPausedMs);
 }

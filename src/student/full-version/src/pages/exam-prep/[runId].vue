@@ -26,7 +26,9 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   getMockExamQuestionPreview,
   getMockExamRunState,
+  pauseMockExamRun,
   reportMockExamVisibility,
+  resumeMockExamRun,
   selectMockExamPartB,
   submitMockExamAnswer,
   submitMockExamAnswersBulk,
@@ -239,6 +241,36 @@ const totalAnsweredCount = computed(() => {
     .filter(([k, v]) => v.trim().length > 0 && !state.value!.answeredIds.includes(k))
     .length
 })
+
+// PRR-287 — pause + resume + save-and-exit. Pause stops the deadline
+// countdown server-side; the timer freezes; navigation away is OK.
+// Resume re-arms the timer with the paused-duration credited back.
+const pausing = ref(false)
+
+async function pauseAndExit() {
+  if (pausing.value) return
+  pausing.value = true
+  try {
+    state.value = await pauseMockExamRun(runId.value)
+    // Navigate to entry so the student can pick up later.
+    await router.push('/exam-prep')
+  }
+  catch (err: unknown) {
+    error.value = (err as { data?: { error?: string } })?.data?.error
+      ?? t('examPrep.errors.pauseFailed')
+    pausing.value = false
+  }
+}
+
+async function resumeRun() {
+  try {
+    state.value = await resumeMockExamRun(runId.value)
+  }
+  catch (err: unknown) {
+    error.value = (err as { data?: { error?: string } })?.data?.error
+      ?? t('examPrep.errors.resumeFailed')
+  }
+}
 
 async function submitRun(opts: { auto?: boolean } = {}) {
   if (submitting.value) return
@@ -583,6 +615,28 @@ function cancelEmptySubmit() {
       </VCardText>
     </VCard>
 
+    <!-- PRR-287 — paused overlay -->
+    <VAlert
+      v-if="state.isPaused"
+      type="info"
+      variant="tonal"
+      class="mt-4"
+      data-testid="exam-prep-paused-banner"
+    >
+      <div class="d-flex align-center">
+        <span class="me-3"><strong>{{ t('examPrep.runner.pausedTitle') }}</strong> — {{ t('examPrep.runner.pausedBody') }}</span>
+        <VBtn
+          color="primary"
+          variant="flat"
+          size="small"
+          data-testid="exam-prep-resume-btn"
+          @click="resumeRun"
+        >
+          {{ t('examPrep.runner.resumeButton') }}
+        </VBtn>
+      </div>
+    </VAlert>
+
     <!-- Submit -->
     <VRow class="mt-4">
       <VCol cols="12" md="6">
@@ -598,10 +652,22 @@ function cancelEmptySubmit() {
       </VCol>
       <VCol cols="12" md="6" class="d-flex justify-end">
         <VBtn
+          color="grey"
+          variant="outlined"
+          size="large"
+          class="me-2"
+          :loading="pausing"
+          :disabled="state.isPaused || state.isSubmitted"
+          data-testid="exam-prep-pause-btn"
+          @click="pauseAndExit"
+        >
+          {{ t('examPrep.runner.pauseAndExitButton') }}
+        </VBtn>
+        <VBtn
           color="success"
           size="large"
           :loading="submitting"
-          :disabled="!partBSelectionLocked"
+          :disabled="!partBSelectionLocked || state.isPaused"
           data-testid="exam-prep-submit-btn"
           @click="submitRun"
         >

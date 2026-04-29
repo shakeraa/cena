@@ -43,6 +43,14 @@ export function submitMockExamAnswer(
   return $api<MockExamRunStateResponse>(`${ROOT}/${runId}/answer`, { method: 'POST', body })
 }
 
+/** PRR-287 — pause + resume the run. */
+export function pauseMockExamRun(runId: string): Promise<MockExamRunStateResponse> {
+  return $api<MockExamRunStateResponse>(`${ROOT}/${runId}/pause`, { method: 'POST' })
+}
+export function resumeMockExamRun(runId: string): Promise<MockExamRunStateResponse> {
+  return $api<MockExamRunStateResponse>(`${ROOT}/${runId}/resume`, { method: 'POST' })
+}
+
 /** Phase 3 #8 — bulk submit. Used by the runner on submit-flush so a
  * 7-Q exam with multi-part subparts collapses to one round-trip. */
 export function submitMockExamAnswersBulk(

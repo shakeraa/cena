@@ -391,6 +391,42 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task PauseResume_ExtendsDeadlineByPausedDuration()
+    {
+        // PRR-287 — pause + resume should add the paused duration to
+        // the effective deadline. Idempotent: re-pause / re-resume
+        // are no-ops.
+        var run = await _service.StartAsync("pause-test",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+        var initialDeadline = run.Deadline;
+
+        var paused = await _service.PauseAsync("pause-test", run.RunId, CancellationToken.None);
+        Assert.True(paused.IsPaused);
+
+        // Idempotent re-pause.
+        var paused2 = await _service.PauseAsync("pause-test", run.RunId, CancellationToken.None);
+        Assert.True(paused2.IsPaused);
+        Assert.Equal(paused.TotalPausedMs, paused2.TotalPausedMs);
+
+        // Advance the clock by 5 minutes.
+        _clock.Advance(TimeSpan.FromMinutes(5));
+
+        var resumed = await _service.ResumeAsync("pause-test", run.RunId, CancellationToken.None);
+        Assert.False(resumed.IsPaused);
+        Assert.True(resumed.TotalPausedMs >= TimeSpan.FromMinutes(5).TotalMilliseconds - 100,
+            $"Expected ~5min paused; got {resumed.TotalPausedMs}ms");
+
+        // Effective deadline = initial + ~5min.
+        Assert.True(resumed.Deadline > initialDeadline.AddMinutes(4),
+            $"Resumed deadline should be ~5min later. Was {initialDeadline}, now {resumed.Deadline}");
+
+        // Idempotent re-resume.
+        var resumed2 = await _service.ResumeAsync("pause-test", run.RunId, CancellationToken.None);
+        Assert.False(resumed2.IsPaused);
+        Assert.Equal(resumed.TotalPausedMs, resumed2.TotalPausedMs);
+    }
+
+    [Fact]
     public async Task SubmitAnswer_HebrewBidiMarkedAnswer_GraderHandlesGracefully()
     {
         // PRR-277 — when a Hebrew-locale student types "x = 2" in an

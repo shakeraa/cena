@@ -256,6 +256,49 @@ public static class MockExamRunEndpoints
             catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
         });
 
+        // POST /{runId}/pause + POST /{runId}/resume — PRR-287
+        // Save-and-resume. Practice-mode affordance: real Ministry exam
+        // day doesn't pause, but exam-prep practice often spans
+        // multiple sessions. Pause stops the deadline countdown;
+        // resume re-arms it with paused-duration added to the budget.
+        group.MapPost("/{runId}/pause", async (
+            string runId,
+            HttpContext ctx,
+            [FromServices] IMockExamRunService service,
+            CancellationToken ct) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            try
+            {
+                return Results.Ok(await service.PauseAsync(studentId, runId, ct));
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+        });
+
+        group.MapPost("/{runId}/resume", async (
+            string runId,
+            HttpContext ctx,
+            [FromServices] IMockExamRunService service,
+            CancellationToken ct) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            try
+            {
+                return Results.Ok(await service.ResumeAsync(studentId, runId, ct));
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+        });
+
         // GET /history?examCode=...&paperCode=...&limit=...  — PRR-294
         // Recent submitted runs for this student. Powers the
         // "your last N runs on this paper" trend card on the result

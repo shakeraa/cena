@@ -106,6 +106,27 @@ public interface IMockExamRunService
         CancellationToken ct);
 
     /// <summary>
+    /// PRR-287 — pause a run. Real-Ministry-strict mode does not permit
+    /// pauses; this is a practice-mode affordance. Idempotent: pausing
+    /// an already-paused run is a no-op. Rejected if the run is
+    /// submitted (no point pausing a finalized run).
+    /// </summary>
+    Task<MockExamRunStateResponse> PauseAsync(
+        string studentId,
+        string runId,
+        CancellationToken ct);
+
+    /// <summary>
+    /// PRR-287 — resume a paused run. Computes the paused duration,
+    /// adds to <c>TotalPausedMs</c>, clears <c>PausedAt</c>. Idempotent:
+    /// resuming an already-resumed run is a no-op.
+    /// </summary>
+    Task<MockExamRunStateResponse> ResumeAsync(
+        string studentId,
+        string runId,
+        CancellationToken ct);
+
+    /// <summary>
     /// PRR-294 — recent submitted runs for this student, optionally
     /// filtered by examCode + paperCode. Used by the result page to
     /// render a "your last 3 runs on this paper" trend card. Limit

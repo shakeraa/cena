@@ -81,7 +81,13 @@ public sealed record MockExamRunStateResponse(
     /// banner. Defaults to "Allowed" / "None" when state was created
     /// before these fields existed (back-compat).</summary>
     string CalculatorPolicy = "Allowed",
-    string FormulaSheetMode = "None");
+    string FormulaSheetMode = "None",
+    /// <summary>PRR-287 — pause state. <c>true</c> while currently
+    /// paused. The deadline is computed against TotalPausedMs +
+    /// (currently-paused-elapsed) so the timer doesn't tick down
+    /// while paused.</summary>
+    bool IsPaused = false,
+    long TotalPausedMs = 0);
 
 /// <summary>Student picks the Part-B subset they will answer.</summary>
 public sealed record SelectPartBRequest(IReadOnlyList<string> SelectedQuestionIds);

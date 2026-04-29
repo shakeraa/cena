@@ -135,9 +135,41 @@ public sealed class ExamSimulationState
     public string CalculatorPolicy { get; set; } = "Allowed";
     public string FormulaSheetMode { get; set; } = "None";
 
+    /// <summary>
+    /// PRR-287 — save-and-resume. When non-null, the run is currently
+    /// paused; the deadline computation pauses while this is set and
+    /// resumes when <see cref="ResumeAsync"/> is called. Real-Ministry-
+    /// strict mode is "no pause"; this is a practice-mode affordance.
+    /// </summary>
+    public DateTimeOffset? PausedAt { get; set; }
+
+    /// <summary>
+    /// PRR-287 — accumulated paused duration in milliseconds. Added
+    /// to the effective deadline computation so a 60-min pause shifts
+    /// the end time by 60 min; paused intervals don't count against
+    /// the time-limit budget. Per-resume increment.
+    /// </summary>
+    public long TotalPausedMs { get; set; }
+
+    /// <summary>True iff this run is currently paused (PRR-287).</summary>
+    public bool IsPaused => PausedAt.HasValue;
+
     public DateTimeOffset Deadline =>
-        StartedAt.AddMinutes(Format.TimeLimitMinutes + ExtraTimeMinutes);
-    public bool IsExpired(DateTimeOffset now) => now >= Deadline;
+        StartedAt
+            .AddMinutes(Format.TimeLimitMinutes + ExtraTimeMinutes)
+            // PRR-287 — accumulated pauses extend the deadline by exactly
+            // the paused duration. While paused, the deadline keeps
+            // sliding forward (callers should consult IsPaused too if
+            // they need the "is the timer ticking right now" question).
+            .AddMilliseconds(TotalPausedMs)
+            // While currently paused, also extend by the elapsed-since-
+            // pause so the displayed deadline reflects "won't expire
+            // while you're paused" reality. The actual TotalPausedMs
+            // isn't bumped until Resume — this read-only adjustment is
+            // for the UI's countdown only.
+            .AddMilliseconds(IsPaused ? Math.Max(0, (DateTimeOffset.UtcNow - PausedAt!.Value).TotalMilliseconds) : 0);
+
+    public bool IsExpired(DateTimeOffset now) => !IsPaused && now >= Deadline;
     public bool IsSubmitted => SubmittedAt.HasValue;
 
     /// <summary>Tab-switch/minimize events detected via Visibility API.</summary>

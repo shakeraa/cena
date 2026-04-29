@@ -1656,7 +1656,9 @@
       "partBFailed": "Could not save your Part B selection.",
       "answerFailed": "Could not save your answer.",
       "submitFailed": "Could not submit the run.",
-      "runnerDisabled": "Mock-exam runner is currently disabled. Try again later."
+      "runnerDisabled": "Mock-exam runner is currently disabled. Try again later.",
+      "pauseFailed": "Could not pause the run.",
+      "resumeFailed": "Could not resume the run."
     },
     "runner": {
       "title": "Mock exam in progress",
@@ -1691,7 +1693,11 @@
         "mathbasic": "Math 4U basic",
         "mathadvanced": "Math 5U advanced",
         "physicsstandard": "Physics standard"
-      }
+      },
+      "pausedTitle": "Run paused",
+      "pausedBody": "Timer is frozen. Resume when you're ready.",
+      "resumeButton": "Resume",
+      "pauseAndExitButton": "Save & exit"
     },
     "result": {
       "title": "Mock exam result",

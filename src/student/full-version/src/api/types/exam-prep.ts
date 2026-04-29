@@ -51,6 +51,9 @@ export interface MockExamRunStateResponse {
   answeredIds: string[]
   calculatorPolicy: 'Allowed' | 'Restricted' | 'Prohibited'
   formulaSheetMode: 'None' | 'MathBasic' | 'MathAdvanced' | 'PhysicsStandard'
+  /** PRR-287 — pause state. */
+  isPaused: boolean
+  totalPausedMs: number
 }
 
 export interface SelectPartBRequest {
