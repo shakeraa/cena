@@ -48,6 +48,17 @@ internal static class ConsentAuditRowRenderer
     /// <summary>Source tag emitted for the parent-review workflow.</summary>
     public const string SourceParentReview = "parent-review";
 
+    /// <summary>Source tag emitted for Bagrut reference-library renders (ADR-0059 §15.7).</summary>
+    public const string SourceBagrutReference = "bagrut-reference";
+
+    /// <summary>
+    /// Sentinel Purpose label for Bagrut reference-library consent events. Bagrut
+    /// reference is its own consent surface (ADR-0059 §15.3) — separate from the
+    /// general <see cref="ConsentPurpose"/> enum, so the audit row carries an
+    /// explicit string label rather than an enum cast.
+    /// </summary>
+    public const string PurposeBagrutReference = "BagrutReference";
+
     /// <summary>Placeholder shown when decryption fails (erased stream).</summary>
     public const string ErasedPlaceholder = "(erased)";
 
@@ -73,6 +84,9 @@ internal static class ConsentAuditRowRenderer
             StudentVisibilityVetoed_V1 v => await RenderVetoAsync(v, studentAnonId, pii, ct).ConfigureAwait(false),
             StudentVisibilityRestored_V1 rs => await RenderRestoreAsync(rs, studentAnonId, pii, ct).ConfigureAwait(false),
             AdminConsentOverridden_V1 ao => await RenderAdminOverrideAsync(ao, studentAnonId, pii, ct).ConfigureAwait(false),
+            BagrutReferenceConsentGranted_V1 bg => RenderBagrutReferenceGrant(bg),
+            BagrutReferenceConsentRevoked_V1 br => RenderBagrutReferenceRevoke(br),
+            BagrutReferenceItemRendered_V1 bi => RenderBagrutReferenceRender(bi),
             _ => null,
         };
     }
@@ -261,6 +275,90 @@ internal static class ConsentAuditRowRenderer
             Scope: string.Empty,
             InstituteId: e.InstituteId ?? string.Empty,
             TraceId: string.Empty,
+            ExpiresAt: string.Empty);
+    }
+
+    // ── Bagrut reference-library (ADR-0059 §15.3 / §15.7) ───────────────
+    //
+    // Bagrut reference is its own consent surface: a 90-day grant + 24h
+    // wire token + per-render audit log. The events live alongside the
+    // general consent stream (single per-student aggregate), so the audit
+    // export must surface them. StudentId on these events is already an
+    // anon id (PRR-267 wire contract), so no decryption pass is needed —
+    // unlike the general grant/revoke events whose ActorId is encrypted.
+
+    private static ConsentAuditRowDto RenderBagrutReferenceGrant(
+        BagrutReferenceConsentGranted_V1 e)
+    {
+        return new ConsentAuditRowDto(
+            EventType: nameof(BagrutReferenceConsentGranted_V1),
+            Timestamp: FormatIso(e.GrantedAt),
+            Purpose: PurposeBagrutReference,
+            ActorRole: ActorRole.Student.ToString(),
+            ActorAnonId: e.StudentId,
+            PolicyVersionAccepted: e.DisclosureVersion,
+            Source: SourceBagrutReference,
+            // UA + IP-hash are forensic context (ADR-0059 §15.3 — captured
+            // at grant time for SIEM correlation). Surface UA in Reason
+            // (free-form short string) and the IP-hash in Scope.
+            Reason: e.UserAgent ?? string.Empty,
+            Scope: e.IpAddressHash ?? string.Empty,
+            InstituteId: string.Empty,
+            TraceId: string.Empty,
+            ExpiresAt: string.Empty);
+    }
+
+    private static ConsentAuditRowDto RenderBagrutReferenceRevoke(
+        BagrutReferenceConsentRevoked_V1 e)
+    {
+        // Reason field on the event is one of: "user-initiated" |
+        // "policy-cascade" | "admin-action". Map to the standard source
+        // tags so downstream filtering on Source works the same way as
+        // general consent revokes.
+        var source = e.Reason switch
+        {
+            "policy-cascade" => SourceSystemRetention,
+            "admin-action"   => SourceAdminOverride,
+            _                => SourceBagrutReference,
+        };
+        return new ConsentAuditRowDto(
+            EventType: nameof(BagrutReferenceConsentRevoked_V1),
+            Timestamp: FormatIso(e.RevokedAt),
+            Purpose: PurposeBagrutReference,
+            ActorRole: ActorRole.Student.ToString(),
+            ActorAnonId: e.StudentId,
+            PolicyVersionAccepted: string.Empty,
+            Source: source,
+            Reason: e.Reason ?? string.Empty,
+            Scope: string.Empty,
+            InstituteId: string.Empty,
+            TraceId: string.Empty,
+            ExpiresAt: string.Empty);
+    }
+
+    private static ConsentAuditRowDto RenderBagrutReferenceRender(
+        BagrutReferenceItemRendered_V1 e)
+    {
+        // Per-render audit row (180-day retention, ADR-0059 §15.7). Scope
+        // gets the slash-delimited ProvenanceSource so SIEM can grep
+        // "ministry-bagrut/{paperCode}/..." for per-paper takedown.
+        // Reason carries the ContextKind (BrowseLibrary | VariantSourceCitation)
+        // so reviewers can split usage by surface.
+        return new ConsentAuditRowDto(
+            EventType: nameof(BagrutReferenceItemRendered_V1),
+            Timestamp: FormatIso(e.RenderedAt),
+            Purpose: PurposeBagrutReference,
+            ActorRole: ActorRole.Student.ToString(),
+            ActorAnonId: e.StudentId,
+            PolicyVersionAccepted: string.Empty,
+            Source: SourceBagrutReference,
+            Reason: e.ContextKind ?? string.Empty,
+            Scope: e.ProvenanceSource ?? string.Empty,
+            InstituteId: string.Empty,
+            // ItemId is the deterministic per-question id; surface it via
+            // TraceId so the audit row links back to the rendered draft
+            // without bloating the existing Scope column.
+            TraceId: e.ItemId ?? string.Empty,
             ExpiresAt: string.Empty);
     }
 

@@ -85,8 +85,17 @@ async function load () {
       `/api/admin/ingestion/pipeline/${props.itemId}/metadata`,
       { method: 'GET' })
     data.value = res
-    // Seed local edits with current values so field bindings work.
-    edits.value = { ...(res.current ?? {}) }
+    // Seed local edits: start from auto-extracted suggestions, then
+    // overlay any saved curator values (curator's saved values WIN
+    // when both exist). Without the auto-extracted overlay, the
+    // dropdowns sit empty even when the persistence layer has fully
+    // populated AutoExtractedMetadata — surfaced by user 2026-04-29
+    // staring at empty Subject/Language/Track/SourceType chips that
+    // showed "auto 95%" confidence but no selected option.
+    edits.value = {
+      ...(res.autoExtracted?.extracted ?? {}),
+      ...(res.current ?? {}),
+    }
     editedFields.value.clear()
   } catch (e: any) {
     error.value = e?.data?.message ?? e?.message ?? 'Failed to load metadata'
@@ -109,7 +118,13 @@ async function save () {
       `/api/admin/ingestion/pipeline/${props.itemId}/metadata`,
       { method: 'PATCH', body: patch })
     data.value = res
-    edits.value = { ...(res.current ?? {}) }
+    // Same overlay rule as load() — curator saved values win, but
+    // the auto-extracted suggestion seeds any unset field so the UI
+    // doesn't drop back to empty after a partial save.
+    edits.value = {
+      ...(res.autoExtracted?.extracted ?? {}),
+      ...(res.current ?? {}),
+    }
     editedFields.value.clear()
     if (res.metadataState === 'confirmed') emit('confirmed', props.itemId)
   } catch (e: any) {
@@ -127,7 +142,12 @@ async function clearField (field: string) {
       `/api/admin/ingestion/pipeline/${props.itemId}/metadata/${field}`,
       { method: 'DELETE' })
     data.value = res
-    edits.value = { ...(res.current ?? {}) }
+    // After clearField, fall back to auto-extracted suggestion (if any)
+    // for the cleared field instead of leaving it empty.
+    edits.value = {
+      ...(res.autoExtracted?.extracted ?? {}),
+      ...(res.current ?? {}),
+    }
     editedFields.value.delete(field)
   } catch (e: any) {
     error.value = e?.data?.message ?? e?.message ?? `Failed to clear ${field}`

@@ -228,9 +228,39 @@ const sourceTypeColor = (type: string): string => {
     s3: 'primary',
     photo: 'warning',
     batch: 'secondary',
+    bagrut: 'success',
   }
 
   return map[type] ?? 'default'
+}
+
+// Bagrut DraftId pattern from BagrutDraftPersistence is
+// `draft-{examCode}-p{N}` (one PipelineItem per page). Extract the page
+// number for the kanban label so a 5-page upload doesn't render as 5
+// indistinguishable cards. Returns null for non-bagrut ids.
+const bagrutPageOf = (id: string): number | null => {
+  const m = /-p(\d+)(?:$|-)/.exec(id)
+
+  return m ? Number(m[1]) : null
+}
+
+const cardLabel = (item: PipelineItem): string => {
+  if (item.sourceType === 'bagrut') {
+    const page = bagrutPageOf(item.id)
+
+    return page != null
+      ? `${item.sourceFilename} · Page ${page}`
+      : item.sourceFilename
+  }
+
+  return item.sourceFilename
+}
+
+const cardCountLabel = (item: PipelineItem): string => {
+  if (item.sourceType === 'bagrut')
+    return `${item.questionCount} variants`
+
+  return `${item.questionCount} Q`
 }
 
 const cardColor = (item: PipelineItem): string => {
@@ -436,9 +466,9 @@ const formatTimeAgo = (timestamp: string): string => {
                 <span
                   class="text-body-2 font-weight-medium text-truncate"
                   style="max-inline-size: 160px;"
-                  :title="item.sourceFilename"
+                  :title="cardLabel(item)"
                 >
-                  {{ item.sourceFilename }}
+                  {{ cardLabel(item) }}
                 </span>
                 <VChip
                   :color="sourceTypeColor(item.sourceType)"
@@ -450,7 +480,7 @@ const formatTimeAgo = (timestamp: string): string => {
               </div>
 
               <div class="d-flex align-center gap-2 text-body-2 text-medium-emphasis">
-                <span>{{ item.questionCount }} Q</span>
+                <span>{{ cardCountLabel(item) }}</span>
                 <template v-if="item.qualityScore !== null">
                   <VDivider
                     vertical

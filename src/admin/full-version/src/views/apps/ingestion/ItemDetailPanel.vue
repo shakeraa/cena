@@ -366,7 +366,8 @@ const moveToReview = async () => {
                 {{ item.sourceType.toUpperCase() }}
               </VChip>
               <span class="text-body-2 text-medium-emphasis">
-                {{ item.questionCount }} questions
+                {{ item.questionCount }}
+                {{ item.sourceType === 'bagrut' ? 'variants' : 'questions' }}
               </span>
             </div>
             <p class="text-body-2 text-medium-emphasis mb-0">
