@@ -79,6 +79,24 @@ public sealed class LocalDirectoryProvider : ICloudDirectoryProvider
         EnsureEnabled();
 
         var allowedDirs = await GetMergedAllowedDirsAsync();
+
+        // PRR-314: when BOTH the static appsettings allowlist AND the
+        // runtime IngestionSettingsDocument.CloudDirectories are empty,
+        // there is no configured ingest directory at all. Surface this
+        // as InvalidOperationException so callers can distinguish "you
+        // forgot to configure the provider" from "the path you supplied
+        // is outside the allowlist" (UnauthorizedAccessException below).
+        // IsEnabled stays true so the runtime-add admin-Settings flow
+        // can dispatch (per 2c99e5f9 intent), but ListAsync MUST refuse
+        // when the merged set is still empty at request time.
+        if (allowedDirs.Count == 0)
+        {
+            throw new InvalidOperationException(
+                "Local cloud-directory provider has no allowed directories. " +
+                "Add a directory via the admin Ingestion Settings page or " +
+                "configure Ingestion:CloudWatchDirs in appsettings.json.");
+        }
+
         var resolvedPath = Path.GetFullPath(request.BucketOrPath);
         if (!allowedDirs.Any(d => resolvedPath.StartsWith(Path.GetFullPath(d), StringComparison.Ordinal)))
         {
