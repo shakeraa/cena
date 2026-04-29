@@ -311,6 +311,105 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task UpsertSeedStructures_IsIdempotent()
+    {
+        // PRR-279 — re-running the seed should leave the catalog row
+        // count unchanged (Marten upsert on Id). Catches a regression
+        // where someone accidentally switches Store→Insert and the
+        // seed worker starts duplicating canonical rows on every
+        // dev restart.
+        var catalog = new BagrutPaperStructureCatalog(
+            _store, NullLogger<BagrutPaperStructureCatalog>.Instance);
+
+        await catalog.UpsertSeedStructuresAsync(CancellationToken.None);
+        await using (var qs1 = _store.QuerySession())
+        {
+            var firstCount = await qs1.Query<BagrutPaperStructureDocument>().CountAsync();
+            Assert.True(firstCount >= 5,
+                $"Expected at least 5 seeded structures (806/default + 806/035582 + 806/035581 + 807/default + 036/default); got {firstCount}");
+        }
+
+        // Run again — count must not change.
+        await catalog.UpsertSeedStructuresAsync(CancellationToken.None);
+        await catalog.UpsertSeedStructuresAsync(CancellationToken.None);
+
+        await using var qs2 = _store.QuerySession();
+        var afterCount = await qs2.Query<BagrutPaperStructureDocument>().CountAsync();
+        await using var qs3 = _store.QuerySession();
+        var firstAgain = await qs3.Query<BagrutPaperStructureDocument>().CountAsync();
+        Assert.Equal(firstAgain, afterCount);
+    }
+
+    [Fact]
+    public async Task Regrade_WithCorrectedCanonical_UpdatesScore()
+    {
+        // PRR-298 — submit with all-wrong answers, then "fix" the
+        // canonical answer in the doc, re-grade, score increases.
+        var run = await _service.StartAsync("regrade-test",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        var pickedB = run.PartBQuestionIds.Take(2).ToList();
+        await _service.SelectPartBAsync("regrade-test", run.RunId,
+            new SelectPartBRequest(pickedB), CancellationToken.None);
+
+        // Answer everything with "intentionally-wrong" so the first
+        // grade is 0%.
+        foreach (var qid in run.PartAQuestionIds.Concat(pickedB))
+        {
+            await _service.SubmitAnswerAsync("regrade-test", run.RunId,
+                new SubmitAnswerRequest(qid, "definitely-wrong"), CancellationToken.None);
+        }
+        var initial = await _service.SubmitAsync("regrade-test", run.RunId, CancellationToken.None);
+        Assert.True(initial.PointsAwarded < initial.TotalPoints);
+
+        // Now "correct" the canonical answer for the first Part-A Q so
+        // "definitely-wrong" matches it. Real-world: a re-graded item
+        // because the seeded answer was a typo.
+        var firstQid = run.PartAQuestionIds[0];
+        await using (var sess = _store.LightweightSession())
+        {
+            var doc = await sess.LoadAsync<QuestionDocument>(firstQid)
+                ?? throw new InvalidOperationException("question doc missing");
+            doc.CorrectAnswer = "definitely-wrong";
+            sess.Store(doc);
+            await sess.SaveChangesAsync();
+        }
+
+        var regraded = await _service.RegradeAsync("regrade-test", run.RunId, CancellationToken.None);
+        Assert.True(regraded.PointsAwarded > initial.PointsAwarded,
+            $"Re-grade should award more points after canonical correction; was {initial.PointsAwarded}, now {regraded.PointsAwarded}");
+    }
+
+    [Fact]
+    public async Task Regrade_BeforeSubmit_Rejects()
+    {
+        var run = await _service.StartAsync("regrade-pre",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.RegradeAsync("regrade-pre", run.RunId, CancellationToken.None));
+    }
+
+    [Fact]
+    public async Task SubmitAnswer_EmitsAnswerSubmittedV1()
+    {
+        // PRR-283 — the per-answer audit event must fire on every write.
+        var run = await _service.StartAsync("audit-test",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+        await _service.SubmitAnswerAsync("audit-test", run.RunId,
+            new SubmitAnswerRequest(run.PartAQuestionIds[0], "x = 1"),
+            CancellationToken.None);
+
+        await using var qs = _store.QuerySession();
+        var events = await qs.Events.FetchStreamAsync("audit-test");
+        var auditEvents = events.Where(e => e.Data is ExamSimulationAnswerSubmitted_V1).ToList();
+        Assert.NotEmpty(auditEvents);
+        var ev = (ExamSimulationAnswerSubmitted_V1)auditEvents[0].Data;
+        Assert.Equal(run.PartAQuestionIds[0], ev.ItemId);
+        Assert.True(ev.HadContent);
+    }
+
+    [Fact]
     public async Task ConcurrentStarts_DifferentStudents_GetDifferentSeeds()
     {
         // Phase 3 #2 — two starts in tight succession should not collide

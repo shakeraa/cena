@@ -1673,7 +1673,11 @@
       "submitButton": "Submit final",
       "unsavedDrafts": "{n} unsaved draft answer(s) — saving on blur or in 600ms",
       "ptsLabel": "pts",
-      "autoSubmitting": "Time's up — submitting your answers..."
+      "autoSubmitting": "Time's up — submitting your answers...",
+      "emptySubmitTitle": "Submit with no answers?",
+      "emptySubmitBody": "You haven't answered any questions yet. Submit anyway?",
+      "emptySubmitCancel": "Keep working",
+      "emptySubmitConfirm": "Submit empty"
     },
     "result": {
       "title": "Mock exam result",

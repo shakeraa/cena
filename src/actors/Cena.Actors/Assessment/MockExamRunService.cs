@@ -337,8 +337,19 @@ public sealed class MockExamRunService : IMockExamRunService
             ? request.QuestionId
             : $"{request.QuestionId}:{request.SubpartId}";
 
-        state.Answers[answerKey] = request.Answer ?? "";
+        var answerValue = request.Answer ?? "";
+        state.Answers[answerKey] = answerValue;
         session.Store(state);
+
+        // PRR-283 — per-answer audit event.
+        session.Events.Append(studentId, new ExamSimulationAnswerSubmitted_V1(
+            StudentId: studentId,
+            SimulationId: state.SimulationId,
+            ItemId: request.QuestionId,
+            SubpartId: string.IsNullOrWhiteSpace(request.SubpartId) ? null : request.SubpartId,
+            HadContent: !string.IsNullOrWhiteSpace(answerValue),
+            SubmittedAt: _clock.GetUtcNow()));
+
         await session.SaveChangesAsync(ct);
 
         AnswersSubmitted.Add(1);
@@ -377,12 +388,26 @@ public sealed class MockExamRunService : IMockExamRunService
                     $"questionId {a.QuestionId} is not part of this run.");
         }
 
+        var ts = _clock.GetUtcNow();
         foreach (var a in request.Answers)
         {
             var key = string.IsNullOrWhiteSpace(a.SubpartId)
                 ? a.QuestionId
                 : $"{a.QuestionId}:{a.SubpartId}";
-            state.Answers[key] = a.Answer ?? "";
+            var value = a.Answer ?? "";
+            state.Answers[key] = value;
+
+            // PRR-283 — emit one per-answer event per submission, so the
+            // stream resolution matches the single-answer path. Bulk
+            // doesn't dedup; the audit semantics are "every answer write
+            // produces one event".
+            session.Events.Append(studentId, new ExamSimulationAnswerSubmitted_V1(
+                StudentId: studentId,
+                SimulationId: state.SimulationId,
+                ItemId: a.QuestionId,
+                SubpartId: string.IsNullOrWhiteSpace(a.SubpartId) ? null : a.SubpartId,
+                HadContent: !string.IsNullOrWhiteSpace(value),
+                SubmittedAt: ts));
         }
 
         session.Store(state);
@@ -440,6 +465,24 @@ public sealed class MockExamRunService : IMockExamRunService
         var state = await session.LoadAsync<ExamSimulationState>(runId, ct);
         if (state is null || state.StudentId != studentId) return null;
         if (!state.IsSubmitted) return null;
+        return await GradeAsync(session, state, ct);
+    }
+
+    public async Task<MockExamResultResponse> RegradeAsync(
+        string studentId, string runId, CancellationToken ct)
+    {
+        await using var session = _store.QuerySession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        if (!state.IsSubmitted)
+            throw new InvalidOperationException("Run not yet submitted; cannot re-grade.");
+
+        // Re-run the grader. GradeAsync reads the CURRENT canonical
+        // answers from Marten — so a corrected QuestionDocument /
+        // BagrutMultipartQuestion gets picked up automatically.
+        // Original Submitted_V2 event stays untouched on the stream.
         return await GradeAsync(session, state, ct);
     }
 

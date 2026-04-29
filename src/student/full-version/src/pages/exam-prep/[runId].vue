@@ -187,8 +187,30 @@ async function onBlur(qid: string, subpartId?: string) {
   await persistAnswer(qid, subpartId)
 }
 
+// PRR-281 — empty-submit confirmation modal. If the student tries to
+// manually submit with zero answers (everything blank), prompt before
+// proceeding. Auto-submit on deadline bypasses (real exam day: time
+// expired = submit whatever you have).
+const showEmptyConfirmDialog = ref(false)
+const pendingSubmitOpts = ref<{ auto?: boolean }>({})
+
+const totalAnsweredCount = computed(() => {
+  // Counts both single-cell + per-subpart answers (composite keys
+  // like 'qid:subpartId' are stored on the same Answers dict).
+  if (!state.value) return 0
+  return state.value.answeredIds.length + Object.entries(answers.value)
+    .filter(([k, v]) => v.trim().length > 0 && !state.value!.answeredIds.includes(k))
+    .length
+})
+
 async function submitRun(opts: { auto?: boolean } = {}) {
   if (submitting.value) return
+  // PRR-281 — guard manual submits against a fully-blank run.
+  if (!opts.auto && totalAnsweredCount.value === 0) {
+    pendingSubmitOpts.value = opts
+    showEmptyConfirmDialog.value = true
+    return
+  }
   submitting.value = true
   if (opts.auto) autoSubmitting.value = true
   try {
@@ -274,6 +296,16 @@ watch(
   () => state.value?.partBSelectedIds,
   () => loadPreviews(),
 )
+
+async function confirmEmptySubmit() {
+  showEmptyConfirmDialog.value = false
+  await submitRun({ ...pendingSubmitOpts.value, auto: true })
+}
+
+function cancelEmptySubmit() {
+  showEmptyConfirmDialog.value = false
+  pendingSubmitOpts.value = {}
+}
 </script>
 
 <template>
@@ -507,4 +539,21 @@ watch(
   <VContainer v-else>
     <VProgressLinear indeterminate color="primary" />
   </VContainer>
+
+  <!-- PRR-281 — empty-submit confirmation modal -->
+  <VDialog v-model="showEmptyConfirmDialog" max-width="500" data-testid="exam-prep-empty-submit-dialog">
+    <VCard>
+      <VCardTitle>{{ t('examPrep.runner.emptySubmitTitle') }}</VCardTitle>
+      <VCardText>{{ t('examPrep.runner.emptySubmitBody') }}</VCardText>
+      <VCardActions>
+        <VSpacer />
+        <VBtn variant="text" data-testid="exam-prep-empty-submit-cancel" @click="cancelEmptySubmit">
+          {{ t('examPrep.runner.emptySubmitCancel') }}
+        </VBtn>
+        <VBtn color="warning" variant="flat" data-testid="exam-prep-empty-submit-confirm" @click="confirmEmptySubmit">
+          {{ t('examPrep.runner.emptySubmitConfirm') }}
+        </VBtn>
+      </VCardActions>
+    </VCard>
+  </VDialog>
 </template>

@@ -104,6 +104,28 @@ public interface IMockExamRunService
         string runId,
         VisibilityEventReport report,
         CancellationToken ct);
+
+    /// <summary>
+    /// PRR-298 — re-grade a finalized run. Useful when the canonical
+    /// answer for one of the served items was discovered to be wrong
+    /// (CAS-bug, typo in seed, Ministry-corrected key) and the
+    /// previously-frozen mark sheet needs to reflect the corrected
+    /// canonical answer.
+    ///
+    /// Authorization: today this is callable by the run's own student
+    /// (sanity self-recheck). Admin-side override is a follow-up; not
+    /// in scope for this task.
+    ///
+    /// Behavior: re-runs <c>GradeAsync</c> against the current Marten
+    /// state of QuestionDocument / BagrutMultipartQuestion. Does NOT
+    /// re-emit <c>ExamSimulationSubmitted_V2</c> — the original
+    /// submission event stays in the stream. The mark sheet returned
+    /// is recomputed; the SubmittedAt timestamp is preserved.
+    /// </summary>
+    Task<MockExamResultResponse> RegradeAsync(
+        string studentId,
+        string runId,
+        CancellationToken ct);
 }
 
 public sealed record VisibilityEventReport(

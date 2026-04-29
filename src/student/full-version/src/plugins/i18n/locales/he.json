@@ -1644,7 +1644,11 @@
       "submitButton": "סיום ושליחה",
       "unsavedDrafts": "{n} תשובות שעוד לא נשמרו — שמירה ב-600 מילישניות או בעת יציאה מהשדה",
       "ptsLabel": "נק'",
-      "autoSubmitting": "הזמן נגמר — שולחים את התשובות..."
+      "autoSubmitting": "הזמן נגמר — שולחים את התשובות...",
+      "emptySubmitTitle": "שליחה ללא תשובות?",
+      "emptySubmitBody": "עדיין לא ענית על אף שאלה. לשלוח בכל זאת?",
+      "emptySubmitCancel": "להמשיך לעבוד",
+      "emptySubmitConfirm": "שליחה ריקה"
     },
     "result": {
       "title": "תוצאות בגרות מדומה",

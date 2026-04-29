@@ -55,5 +55,8 @@ public static class MockExamRunMartenRegistration
         opts.Events.AddEventType<ExamSimulationSubmitted_V2>();
         opts.Events.AddEventType<ExamSimulationItemDelivered_V1>();
         opts.Events.AddEventType<ExamVisibilityWarning_V1>();
+        // PRR-283 — per-answer audit so subpart-level interaction is
+        // recoverable from the stream.
+        opts.Events.AddEventType<ExamSimulationAnswerSubmitted_V1>();
     }
 }

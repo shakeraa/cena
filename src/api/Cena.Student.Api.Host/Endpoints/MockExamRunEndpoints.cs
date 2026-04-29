@@ -222,6 +222,30 @@ public static class MockExamRunEndpoints
             catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
         });
 
+        // POST /{runId}/regrade  — PRR-298. Re-runs the grader against
+        // the current canonical answers; useful when a seeded answer
+        // is corrected after submit. Original Submitted_V2 event is
+        // preserved.
+        group.MapPost("/{runId}/regrade", async (
+            string runId,
+            HttpContext ctx,
+            [FromServices] IMockExamRunService service,
+            CancellationToken ct) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            try
+            {
+                var result = await service.RegradeAsync(studentId, runId, ct);
+                return Results.Ok(result);
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+            catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+        });
+
         // GET /{runId}/result
         group.MapGet("/{runId}/result", async (
             string runId,

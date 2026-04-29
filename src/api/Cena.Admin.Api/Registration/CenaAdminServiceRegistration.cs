@@ -47,6 +47,15 @@ public static class CenaAdminServiceRegistration
         services.TryAddSingleton<Cena.Actors.RateLimit.ICostBudgetService,
             Cena.Actors.RateLimit.RedisCostBudgetService>();
 
+        // PRR-265 R1 — variant rate-limit gate. Required by
+        // GenerateSimilarEndpoints which is mapped via MapCenaAdminEndpoints
+        // (called by both admin-api AND actor-host). Without this in the
+        // shared composition, actor-host crashes at startup with
+        // "variantGate UNKNOWN — Did you mean to register the parameter as
+        // a service?". Use TryAdd inside AddVariantGenerationGate so a
+        // host with custom impl wins.
+        Cena.Actors.Variants.VariantServiceRegistration.AddVariantGenerationGate(services);
+
         // Quality Gate service (needed by QuestionBankService).
         // RDY-034 §13: pass IDocumentStore so the gate can source FactualAccuracy
         // from the persisted CAS binding for math/physics subjects.

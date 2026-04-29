@@ -78,6 +78,29 @@ public record ExamVisibilityWarning_V1(
 ) : IDelegatedEvent;
 
 /// <summary>
+/// PRR-283 — per-answer audit event. Closes the sparse-audit gap: the
+/// existing ExamSimulationStarted/Submitted/ItemDelivered events told
+/// us "we served item X" but not "student interacted with subpart Y
+/// of X". This event fires on every answer submission (single-cell
+/// or multi-part subpart), giving the audit stream a complete record
+/// of student interaction.
+///
+/// HadContent distinguishes "wrote something" (true) from "explicitly
+/// cleared the field" (false; we still record this so an answer-then-
+/// erase pattern is visible to counsel).
+///
+/// SubpartId is null for single-cell questions.
+/// </summary>
+public record ExamSimulationAnswerSubmitted_V1(
+    string StudentId,
+    string SimulationId,
+    string ItemId,
+    string? SubpartId,
+    bool HadContent,
+    DateTimeOffset SubmittedAt
+) : IDelegatedEvent;
+
+/// <summary>
 /// prr-008: audit event emitted when an item has been successfully delivered
 /// to the student through the `IItemDeliveryGate`. Records the item's
 /// `ProvenanceKind` (never the raw body) so the event stream is auditable
