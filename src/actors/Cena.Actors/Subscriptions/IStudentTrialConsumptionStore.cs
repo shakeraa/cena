@@ -51,6 +51,24 @@ public interface IStudentTrialConsumptionStore
         CancellationToken ct);
 
     /// <summary>
+    /// Phase 1D-fix-2 item 2: atomic check-and-increment that closes the
+    /// TOCTOU window between filter-side cap-check and consumption-site
+    /// increment. When <paramref name="cap"/> &gt; 0, the increment happens
+    /// only if the post-increment count would not exceed the cap; when the
+    /// cap would be exceeded, no increment occurs and the returned
+    /// <see cref="CapIncrementResult.Allowed"/> is false. When
+    /// <paramref name="cap"/> is 0 (unbounded), this method behaves
+    /// identically to <see cref="IncrementAsync"/> and always returns
+    /// Allowed=true.
+    /// </summary>
+    Task<CapIncrementResult> IncrementIfUnderCapAsync(
+        string studentSubjectIdEncrypted,
+        EntitlementFeature feature,
+        int cap,
+        DateTimeOffset now,
+        CancellationToken ct);
+
+    /// <summary>
     /// Reset the counters to all-zero. Idempotent. Used at trial-start so a
     /// re-trial (admin-override path, Phase 2+) gets a clean slate.
     /// </summary>
@@ -58,6 +76,20 @@ public interface IStudentTrialConsumptionStore
         string studentSubjectIdEncrypted,
         CancellationToken ct);
 }
+
+/// <summary>
+/// Outcome of <see cref="IStudentTrialConsumptionStore.IncrementIfUnderCapAsync"/>.
+/// </summary>
+/// <param name="Allowed">
+/// True when the increment was applied; false when the cap would have been
+/// exceeded and no mutation occurred.
+/// </param>
+/// <param name="Snapshot">
+/// The consumption snapshot AFTER the operation. When <see cref="Allowed"/>
+/// is true, reflects the post-increment counters. When false, reflects the
+/// unchanged pre-call state.
+/// </param>
+public sealed record CapIncrementResult(bool Allowed, StudentTrialConsumption Snapshot);
 
 /// <summary>
 /// Strongly-typed feature identifier for cap accounting. Matches the four

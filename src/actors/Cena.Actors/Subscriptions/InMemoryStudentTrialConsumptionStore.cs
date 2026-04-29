@@ -73,6 +73,59 @@ public sealed class InMemoryStudentTrialConsumptionStore : IStudentTrialConsumpt
     }
 
     /// <inheritdoc/>
+    public Task<CapIncrementResult> IncrementIfUnderCapAsync(
+        string studentSubjectIdEncrypted,
+        EntitlementFeature feature,
+        int cap,
+        DateTimeOffset now,
+        CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(studentSubjectIdEncrypted))
+        {
+            throw new ArgumentException(
+                "Student subject id must be non-empty.", nameof(studentSubjectIdEncrypted));
+        }
+        var bucket = _buckets.GetOrAdd(studentSubjectIdEncrypted, _ => new Bucket());
+        lock (bucket.Lock)
+        {
+            // Atomic check-and-increment under the per-key lock. The same
+            // lock IncrementAsync / GetAsync take, so concurrent callers
+            // cannot slip past the cap during the gap between this method's
+            // check and its mutation.
+            if (cap > 0)
+            {
+                var current = feature switch
+                {
+                    EntitlementFeature.TutorTurn => bucket.TutorTurns,
+                    EntitlementFeature.PhotoDiagnostic => bucket.PhotoDiagnostics,
+                    EntitlementFeature.PracticeSession => bucket.Sessions,
+                    EntitlementFeature.Generic => 0,
+                    _ => throw new ArgumentOutOfRangeException(
+                        nameof(feature), feature, "Unknown EntitlementFeature value."),
+                };
+                if (current >= cap)
+                {
+                    return Task.FromResult(new CapIncrementResult(
+                        Allowed: false, Snapshot: bucket.Snapshot()));
+                }
+            }
+            switch (feature)
+            {
+                case EntitlementFeature.TutorTurn: bucket.TutorTurns++; break;
+                case EntitlementFeature.PhotoDiagnostic: bucket.PhotoDiagnostics++; break;
+                case EntitlementFeature.PracticeSession: bucket.Sessions++; break;
+                case EntitlementFeature.Generic: break;
+                default:
+                    throw new ArgumentOutOfRangeException(
+                        nameof(feature), feature, "Unknown EntitlementFeature value.");
+            }
+            bucket.ActiveDates.Add(DateOnly.FromDateTime(now.UtcDateTime));
+            return Task.FromResult(new CapIncrementResult(
+                Allowed: true, Snapshot: bucket.Snapshot()));
+        }
+    }
+
+    /// <inheritdoc/>
     public Task ResetAsync(string studentSubjectIdEncrypted, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(studentSubjectIdEncrypted))

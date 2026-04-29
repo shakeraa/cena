@@ -92,6 +92,50 @@ public sealed class MartenSubscriptionAggregateStore
     }
 
     /// <inheritdoc/>
+    public async Task AppendManyAsync(
+        string parentSubjectId, IReadOnlyList<object> events, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        if (events.Count == 0) return;
+        for (var i = 0; i < events.Count; i++)
+        {
+            if (events[i] is null)
+            {
+                throw new ArgumentException(
+                    $"events[{i}] is null; AppendManyAsync rejects partial batches.",
+                    nameof(events));
+            }
+        }
+
+        var streamKey = SubscriptionAggregate.StreamKey(parentSubjectId);
+        await using var session = _store.LightweightSession();
+
+        // Single SaveChangesAsync at the end → all events land in one
+        // transaction. Marten's StartStream accepts a params object[] so
+        // the first-event-opens-stream rule still holds when the stream
+        // is brand new.
+        var existing = await session.Events.FetchStreamStateAsync(streamKey, token: ct);
+        if (existing is null)
+        {
+            // First event opens the stream; remaining events append in the
+            // same SaveChangesAsync.
+            session.Events.StartStream<SubscriptionAggregate>(streamKey, events[0]);
+            for (var i = 1; i < events.Count; i++)
+            {
+                session.Events.Append(streamKey, events[i]);
+            }
+        }
+        else
+        {
+            for (var i = 0; i < events.Count; i++)
+            {
+                session.Events.Append(streamKey, events[i]);
+            }
+        }
+        await session.SaveChangesAsync(ct);
+    }
+
+    /// <inheritdoc/>
     public async Task<IReadOnlyList<object>> ReadEventsAsync(string parentSubjectId, CancellationToken ct)
     {
         var streamKey = SubscriptionAggregate.StreamKey(parentSubjectId);

@@ -136,4 +136,78 @@ public class StudentTrialConsumptionStoreTests
         var post = await _store.GetAsync(StudentId, CancellationToken.None);
         Assert.Equal(100, post.TutorTurnsUsed);
     }
+
+    // ----- Phase 1D-fix-2 item 2: atomic check-and-increment ------------
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_under_cap_increments_and_returns_allowed()
+    {
+        var post = await _store.IncrementIfUnderCapAsync(
+            StudentId, EntitlementFeature.TutorTurn,
+            cap: 5, now: Day1, ct: CancellationToken.None);
+        Assert.True(post.Allowed);
+        Assert.Equal(1, post.Snapshot.TutorTurnsUsed);
+    }
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_at_cap_returns_disallowed_and_does_not_increment()
+    {
+        for (var i = 0; i < 5; i++)
+        {
+            await _store.IncrementAsync(
+                StudentId, EntitlementFeature.TutorTurn, Day1, CancellationToken.None);
+        }
+        var post = await _store.IncrementIfUnderCapAsync(
+            StudentId, EntitlementFeature.TutorTurn,
+            cap: 5, now: Day1, ct: CancellationToken.None);
+        Assert.False(post.Allowed);
+        Assert.Equal(5, post.Snapshot.TutorTurnsUsed);
+        var fresh = await _store.GetAsync(StudentId, CancellationToken.None);
+        Assert.Equal(5, fresh.TutorTurnsUsed);
+    }
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_zero_cap_treated_as_unbounded()
+    {
+        for (var i = 0; i < 1000; i++)
+        {
+            var r = await _store.IncrementIfUnderCapAsync(
+                StudentId, EntitlementFeature.TutorTurn,
+                cap: 0, now: Day1, ct: CancellationToken.None);
+            Assert.True(r.Allowed);
+        }
+        var fresh = await _store.GetAsync(StudentId, CancellationToken.None);
+        Assert.Equal(1000, fresh.TutorTurnsUsed);
+    }
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_concurrent_callers_cannot_exceed_cap()
+    {
+        // 100 concurrent calls with cap=10. Exactly 10 must succeed; 90
+        // must be rejected. Closes the TOCTOU window between filter check
+        // and consumption-site increment. THIS TEST GUARDS THE PHASE
+        // 1D-fix-2 ITEM 2 ATOMICITY GUARANTEE — failure means callers
+        // can race past caps.
+        var tasks = Enumerable.Range(0, 100)
+            .Select(_ => _store.IncrementIfUnderCapAsync(
+                StudentId, EntitlementFeature.TutorTurn,
+                cap: 10, now: Day1, ct: CancellationToken.None))
+            .ToArray();
+        var results = await Task.WhenAll(tasks);
+        Assert.Equal(10, results.Count(r => r.Allowed));
+        Assert.Equal(90, results.Count(r => !r.Allowed));
+        var fresh = await _store.GetAsync(StudentId, CancellationToken.None);
+        Assert.Equal(10, fresh.TutorTurnsUsed);
+    }
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_Generic_always_allowed_no_counter_change()
+    {
+        var post = await _store.IncrementIfUnderCapAsync(
+            StudentId, EntitlementFeature.Generic,
+            cap: 1, now: Day1, ct: CancellationToken.None);
+        Assert.True(post.Allowed);
+        Assert.Equal(0, post.Snapshot.TutorTurnsUsed);
+        Assert.Equal(1, post.Snapshot.DaysActive);
+    }
 }

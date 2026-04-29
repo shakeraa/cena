@@ -61,6 +61,37 @@ public sealed class InMemorySubscriptionAggregateStore
     }
 
     /// <inheritdoc/>
+    public Task AppendManyAsync(
+        string parentSubjectId, IReadOnlyList<object> events, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(events);
+        if (events.Count == 0) return Task.CompletedTask;
+        // Pre-validate so we throw BEFORE mutating any state — the contract
+        // is "all or none", so a null entry mid-list must reject the batch
+        // without a partial-append observable side-effect.
+        for (var i = 0; i < events.Count; i++)
+        {
+            if (events[i] is null)
+            {
+                throw new ArgumentException(
+                    $"events[{i}] is null; AppendManyAsync rejects partial batches.",
+                    nameof(events));
+            }
+        }
+        var bucket = _streams.GetOrAdd(parentSubjectId, _ => new StreamBucket());
+        lock (bucket.Lock)
+        {
+            // Lock held for the whole append → atomic against concurrent
+            // reads (which take the same lock).
+            for (var i = 0; i < events.Count; i++)
+            {
+                bucket.Events.Add(events[i]);
+            }
+        }
+        return Task.CompletedTask;
+    }
+
+    /// <inheritdoc/>
     public Task<IReadOnlyList<object>> ReadEventsAsync(string parentSubjectId, CancellationToken ct)
     {
         if (!_streams.TryGetValue(parentSubjectId, out var bucket))

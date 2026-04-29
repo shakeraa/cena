@@ -37,6 +37,8 @@ using Cena.Actors.Subscriptions;
 using Cena.Actors.Subscriptions.Events;
 using Cena.Api.Contracts.Subscriptions;
 using Cena.Api.Host.Endpoints;
+using Cena.Infrastructure.Compliance;
+using Cena.Infrastructure.Compliance.KeyStore;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
@@ -231,6 +233,40 @@ public sealed class EntitlementEndpointsTests
     }
 
     [Fact]
+    public async Task StartTrial_SelfPay_persists_real_encrypted_pm_id_recoverable_at_conversion()
+    {
+        // Phase 1D-fix-2 item 1 lock: the persisted pm-id MUST decrypt back
+        // to the original Stripe pm_… string. The first iteration of 1D-fix
+        // hashed the value (one-way), making conversion-flow re-prompt
+        // unavoidable. This test guards against a regression to that mistake.
+        var fx = await NewFixtureAsync();
+        await fx.EnableTrialAllotmentAsync();
+        await fx.SeedParentBindingAsync();
+        const string originalPmId = "pm_1NXyZ_Live123";
+        fx.PaymentProvider.QueueVerify("seti_ok",
+            new SetupIntentVerifyResult(
+                SetupIntentStatus.Succeeded, "card_fp_xyz", originalPmId, null));
+        var ctx = fx.HttpContext();
+        var body = new StartTrialRequestDto("SelfPay", "seti_ok", null, null);
+        await CallStartTrial(ctx, body, fx);
+
+        var events = await fx.Subscriptions.ReadEventsAsync(ParentId, CancellationToken.None);
+        var pmEvent = events.OfType<SubscriptionPaymentMethodAttached_V1>().Single();
+
+        // The conversion flow at Phase 3 will need to decrypt this back to
+        // the original pm_… id to call Stripe Subscriptions.Create. Prove
+        // that round-trip works here.
+        var (success, decrypted) = await fx.Encryptor.TryDecryptAsync(
+            pmEvent.PaymentMethodIdEncrypted, ParentId, CancellationToken.None);
+        Assert.True(success, "Decryption must succeed — persisted value is not real ciphertext if false.");
+        Assert.Equal(originalPmId, decrypted);
+
+        // Sanity: the persisted form is NOT plaintext (defence against a
+        // regression that simply stored the raw pm_id).
+        Assert.NotEqual(originalPmId, pmEvent.PaymentMethodIdEncrypted);
+    }
+
+    [Fact]
     public async Task StartTrial_InstituteCode_happy_path_returns_200_no_payment_method()
     {
         var fx = await NewFixtureAsync();
@@ -289,7 +325,7 @@ public sealed class EntitlementEndpointsTests
         return EntitlementEndpoints.StartTrialAsync(
             ctx, body, fx.Resolver, fx.Subscriptions, fx.Consumption,
             fx.Allotment, fx.Ledger, fx.PaymentProvider, fx.ParentBindings,
-            fx.Clock, CancellationToken.None);
+            fx.Encryptor, fx.Clock, CancellationToken.None);
     }
 
     private static T ExtractValue<T>(IResult result) where T : class
@@ -340,6 +376,7 @@ public sealed class EntitlementEndpointsTests
         public FakePaymentProvider PaymentProvider { get; } = new();
         public DiscountAssignmentService Discounts { get; }
         public StudentEntitlementResolver Resolver { get; }
+        public EncryptedFieldAccessor Encryptor { get; }
         public FakeTimeProvider Clock { get; } = new(Now);
 
         public Fixture()
@@ -355,6 +392,8 @@ public sealed class EntitlementEndpointsTests
                 new InMemoryDiscountCouponProvider(),
                 new NullDiscountIssuedEmailDispatcher(),
                 Clock);
+            Encryptor = new EncryptedFieldAccessor(
+                new InMemorySubjectKeyStore(SubjectKeyDerivation.FromEnvironment()));
         }
 
         public HttpContext HttpContext(bool withSubject = true)
