@@ -162,11 +162,11 @@ public sealed class WeeklyParentDigestWorker : BackgroundService
         var todayMidnightUtc = new DateTimeOffset(
             nowUtc.Year, nowUtc.Month, nowUtc.Day, 0, 0, 0, TimeSpan.Zero);
         var todayEightUtc = todayMidnightUtc.AddHours(8);
-        var daysUntilSunday = ((int)DayOfWeek.Sunday - (int)todayMidnightUtc.DayOfWeek + 7) % 7;
+        var daysToNextSunday = ((int)DayOfWeek.Sunday - (int)todayMidnightUtc.DayOfWeek + 7) % 7;
         var nextSunday = todayEightUtc.AddDays(
-            daysUntilSunday == 0 && nowUtc.TimeOfDay >= TimeSpan.FromHours(8)
+            daysToNextSunday == 0 && nowUtc.TimeOfDay >= TimeSpan.FromHours(8)
                 ? 7
-                : daysUntilSunday);
+                : daysToNextSunday);
         var result = nextSunday - nowUtc;
         return result < TimeSpan.Zero ? TimeSpan.FromMinutes(1) : result;
     }

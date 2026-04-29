@@ -305,11 +305,11 @@ public sealed class UnitEconomicsRollupWorker : BackgroundService
         var todayMidnightUtc = new DateTimeOffset(
             nowUtc.Year, nowUtc.Month, nowUtc.Day, 0, 0, 0, TimeSpan.Zero);
         var todaySixUtc = todayMidnightUtc.AddHours(6);
-        var daysUntilSunday = ((int)DayOfWeek.Sunday - (int)todayMidnightUtc.DayOfWeek + 7) % 7;
+        var daysToNextSunday = ((int)DayOfWeek.Sunday - (int)todayMidnightUtc.DayOfWeek + 7) % 7;
         var nextSunday = todaySixUtc.AddDays(
-            daysUntilSunday == 0 && nowUtc.TimeOfDay >= TimeSpan.FromHours(6)
+            daysToNextSunday == 0 && nowUtc.TimeOfDay >= TimeSpan.FromHours(6)
                 ? 7
-                : daysUntilSunday);
+                : daysToNextSunday);
         var result = nextSunday - nowUtc;
         return result < TimeSpan.Zero ? TimeSpan.FromMinutes(1) : result;
     }
