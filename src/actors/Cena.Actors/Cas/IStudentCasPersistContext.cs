@@ -101,4 +101,25 @@ public sealed record StudentCasPersistContext(
             return $"variant|{SourceShailonCode}|{SourceQuestionIndex}|parametric|{ParametricSeed}";
         }
     }
+
+    /// <summary>
+    /// PRR-272 / ADR-0043 §1.1 / ADR-0059 §15.5 — whether a variant authored
+    /// from this context contributes to the coverage SLO ship-gate count.
+    ///
+    /// Rule: only <see cref="VariationKind.Structural"/> recreations count
+    /// toward coverage. Parametric variants (parameter-substitution against
+    /// the same source structure) are <i>derivative</i> under Israeli
+    /// Copyright Law §16 (per persona-ministry findings 2026-04-28 §14.2)
+    /// and pedagogically thin (one underlying question dressed up N times)
+    /// so they do NOT close coverage gaps regardless of their CAS-verified
+    /// status.
+    ///
+    /// Downstream: the variant-persistence path
+    /// (<c>CasGatedQuestionPersister</c>) carries this value through to the
+    /// persisted entity; the prr-210 projection that feeds
+    /// <c>CoverageCellVariantCounter.Record</c> filters on it; the ship-gate
+    /// at <c>scripts/shipgate/coverage-slo.mjs</c> sees only eligible counts.
+    /// PRR-272 wires the full chain. This property is the stable hook.
+    /// </summary>
+    public bool IsCoverageEligible => VariationKind == VariationKind.Structural;
 }
