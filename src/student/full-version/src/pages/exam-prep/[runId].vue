@@ -250,22 +250,28 @@ function beforeUnloadHandler(e: BeforeUnloadEvent) {
 
 // Phase-4 #1 — Visibility API wiring. Real Ministry exam day cares
 // about tab-switches; our state has VisibilityEvents + we emit
-// ExamVisibilityWarning_V1. Track the moment the page hides + report
-// the duration on visible-again. Best-effort: fire-and-forget so a
-// network blip during reporting doesn't break the runner UX.
+// ExamVisibilityWarning_V1.
+//
+// Iteration-2 noise filter: a 200ms focus-blur (e.g. a notification
+// popup, OS gesture) is not a meaningful audit event. Only report
+// transitions where the away-duration exceeds the noise threshold
+// (default 2s). The 'hidden' immediate-emit is dropped; we only
+// emit on 'visible' return with a measured duration. Tab-close
+// without return is recoverable from the absent 'visible' event +
+// the eventual session-deadline timeout.
+const VISIBILITY_NOISE_FLOOR_MS = 2000
 let lastHiddenAt: number | null = null
 function visibilityHandler() {
   if (state.value?.isSubmitted) return
   if (document.visibilityState === 'hidden') {
     lastHiddenAt = Date.now()
-    // Report the hide immediately so a long-away student is recorded
-    // even if they never come back.
-    reportMockExamVisibility(runId.value, 'hidden', 0).catch(() => {})
   }
   else if (document.visibilityState === 'visible' && lastHiddenAt !== null) {
     const dur = Date.now() - lastHiddenAt
     lastHiddenAt = null
-    reportMockExamVisibility(runId.value, 'visible', dur).catch(() => {})
+    if (dur >= VISIBILITY_NOISE_FLOOR_MS) {
+      reportMockExamVisibility(runId.value, 'visible', dur).catch(() => {})
+    }
   }
 }
 

@@ -71,11 +71,29 @@ public sealed record ExamFormat
         PartBRequiredCount = 3
     };
 
+    /// <summary>
+    /// PRR-295 — Bagrut English 016 (D-tier, 5pt). Structurally different
+    /// from math/physics: reading-comprehension + writing + listening.
+    /// First-pass approximation: 4 short-form (Part A — reading
+    /// passages + comprehension Q's) + 4 long-form (Part B — writing
+    /// + listening), choose 2 of 4 for Part B. Time budget 180 min
+    /// matches the Ministry's published spec.
+    /// </summary>
+    public static readonly ExamFormat BagrutEnglish016 = new()
+    {
+        ExamCode = "016",
+        TimeLimitMinutes = 180,
+        PartAQuestionCount = 4,
+        PartBQuestionCount = 4,
+        PartBRequiredCount = 2,
+    };
+
     public static ExamFormat? FromCode(string examCode) => examCode switch
     {
         "806" => Bagrut806,
         "807" => Bagrut807,
         "036" => BagrutPhysics036,
+        "016" => BagrutEnglish016,
         _ => null
     };
 }

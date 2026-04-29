@@ -58,8 +58,32 @@ export function submitMockExamRun(runId: string): Promise<MockExamResultResponse
   return $api<MockExamResultResponse>(`${ROOT}/${runId}/submit`, { method: 'POST' })
 }
 
-export function getMockExamRunResult(runId: string): Promise<MockExamResultResponse> {
-  return $api<MockExamResultResponse>(`${ROOT}/${runId}/result`)
+export async function getMockExamRunResult(runId: string): Promise<MockExamResultResponse> {
+  // PRR-278 — retry on transient 5xx. The result endpoint runs the
+  // grader, which calls SymPy via the CAS router; a sidecar blip
+  // returns 502/503/504 and the runner page would show "could not
+  // load result" with no recovery. 3 attempts at 0/600/1800 ms
+  // covers the common transient window (sidecar restart ~2s).
+  // ofetch's built-in retry covers $api, but that fires on 5xx in
+  // general — we want to be explicit here so the runner specifically
+  // surfaces "result temporarily unavailable" rather than a stale
+  // error.
+  const backoffs = [0, 600, 1800]
+  let lastErr: unknown
+  for (const wait of backoffs) {
+    if (wait > 0) await new Promise(r => setTimeout(r, wait))
+    try {
+      return await $api<MockExamResultResponse>(`${ROOT}/${runId}/result`)
+    }
+    catch (err: unknown) {
+      const status = (err as { statusCode?: number; status?: number }).statusCode
+        ?? (err as { status?: number }).status
+      lastErr = err
+      // Only retry on transient 5xx; everything else surfaces immediately.
+      if (!status || status < 500 || status >= 600) throw err
+    }
+  }
+  throw lastErr
 }
 
 // Phase 3 #9 — sessionStorage cache for the feature-flags read. The

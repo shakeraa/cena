@@ -73,6 +73,28 @@ public sealed class BagrutPaperStructureDocument
     public List<PaperSection> Sections { get; set; } = new();
 
     /// <summary>
+    /// PRR-293 — Ministry calculator policy for this paper. Real Bagrut
+    /// math שאלונים differ: 5U typically permits a programmable graphing
+    /// calculator with restrictions; 4U is more permissive; some niche
+    /// papers prohibit. Display-only on the runner today (banner plus
+    /// "Calculator: Allowed / Restricted / Prohibited"); a future
+    /// version could enforce by hiding the in-app calculator widget.
+    /// Default <see cref="CalculatorPolicy.Allowed"/> mirrors current
+    /// 5U/4U convention; explicit Prohibited or Restricted overrides
+    /// per-paper.
+    /// </summary>
+    public CalculatorPolicy CalculatorPolicy { get; set; } = CalculatorPolicy.Allowed;
+
+    /// <summary>
+    /// PRR-293 — formula-sheet mode. Real Bagrut day provides a printed
+    /// formula sheet for math 5U + physics; some papers don't. The
+    /// runner doesn't render a formula sheet today (PRR-292 deferred);
+    /// this field is forward-compatible so the structure carries the
+    /// signal to future renderers.
+    /// </summary>
+    public FormulaSheetMode FormulaSheetMode { get; set; } = FormulaSheetMode.None;
+
+    /// <summary>
     /// Total achievable points if the student answers every required
     /// slot. Real Ministry math 5U sums to 100; Phase 1 mirrors that.
     /// </summary>
@@ -81,6 +103,23 @@ public sealed class BagrutPaperStructureDocument
 
     public static string ComposeId(string examCode, string? paperCode) =>
         string.IsNullOrWhiteSpace(paperCode) ? $"{examCode}/default" : $"{examCode}/{paperCode}";
+}
+
+/// <summary>PRR-293 — calculator policy values for a paper structure.</summary>
+public enum CalculatorPolicy
+{
+    Allowed = 0,
+    Restricted = 1,
+    Prohibited = 2,
+}
+
+/// <summary>PRR-293 — formula-sheet supplied at exam time.</summary>
+public enum FormulaSheetMode
+{
+    None = 0,
+    MathBasic = 1,
+    MathAdvanced = 2,
+    PhysicsStandard = 3,
 }
 
 /// <summary>

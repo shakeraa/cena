@@ -118,6 +118,8 @@ public sealed class BagrutPaperStructureCatalog : IBagrutPaperStructureCatalog
             ExamCode = "806",
             PaperCode = null,
             TimeLimitMinutes = 180,
+            CalculatorPolicy = CalculatorPolicy.Allowed,
+            FormulaSheetMode = FormulaSheetMode.MathAdvanced,
             Sections = new List<PaperSection>
             {
                 new(
@@ -153,6 +155,8 @@ public sealed class BagrutPaperStructureCatalog : IBagrutPaperStructureCatalog
             ExamCode = "806",
             PaperCode = "035582",
             TimeLimitMinutes = 180,
+            CalculatorPolicy = CalculatorPolicy.Allowed,
+            FormulaSheetMode = FormulaSheetMode.MathAdvanced,
             Sections = new List<PaperSection>
             {
                 new(
@@ -188,6 +192,8 @@ public sealed class BagrutPaperStructureCatalog : IBagrutPaperStructureCatalog
             ExamCode = "806",
             PaperCode = "035581",
             TimeLimitMinutes = 180,
+            CalculatorPolicy = CalculatorPolicy.Allowed,
+            FormulaSheetMode = FormulaSheetMode.MathAdvanced,
             Sections = new List<PaperSection>
             {
                 new(
@@ -223,6 +229,8 @@ public sealed class BagrutPaperStructureCatalog : IBagrutPaperStructureCatalog
             ExamCode = "807",
             PaperCode = null,
             TimeLimitMinutes = 180,
+            CalculatorPolicy = CalculatorPolicy.Allowed,
+            FormulaSheetMode = FormulaSheetMode.MathBasic,
             Sections = new List<PaperSection>
             {
                 new(
@@ -251,6 +259,42 @@ public sealed class BagrutPaperStructureCatalog : IBagrutPaperStructureCatalog
             },
         },
 
+        // ───────────── 016/default — English 5pt canonical ─────────────
+        new BagrutPaperStructureDocument
+        {
+            Id = "016/default",
+            ExamCode = "016",
+            PaperCode = null,
+            TimeLimitMinutes = 180,
+            CalculatorPolicy = CalculatorPolicy.Prohibited,
+            FormulaSheetMode = FormulaSheetMode.None,
+            Sections = new List<PaperSection>
+            {
+                new(
+                    SectionLabel: "A",
+                    RequiredAnswers: 4,
+                    FallbackTopicId: "english",
+                    Slots: new List<PaperSlot>
+                    {
+                        new(1, "english.reading.comprehension", 2, 3, 15, "Reading comprehension Q1"),
+                        new(2, "english.reading.comprehension", 2, 3, 15, "Reading comprehension Q2"),
+                        new(3, "english.vocabulary",            2, 3, 15, "Vocabulary in context"),
+                        new(4, "english.grammar",               2, 3, 15, "Grammar / usage"),
+                    }),
+                new(
+                    SectionLabel: "B",
+                    RequiredAnswers: 2,
+                    FallbackTopicId: "english",
+                    Slots: new List<PaperSlot>
+                    {
+                        new(1, "english.writing.essay",   3, 4, 20, "Composition essay"),
+                        new(2, "english.writing.summary", 3, 4, 20, "Summary writing"),
+                        new(3, "english.listening",       3, 4, 20, "Listening comprehension"),
+                        new(4, "english.discourse",       3, 4, 20, "Extended discourse analysis"),
+                    }),
+            },
+        },
+
         // ───────────── 036/default — Physics canonical ─────────────
         new BagrutPaperStructureDocument
         {
@@ -258,6 +302,8 @@ public sealed class BagrutPaperStructureCatalog : IBagrutPaperStructureCatalog
             ExamCode = "036",
             PaperCode = null,
             TimeLimitMinutes = 180,
+            CalculatorPolicy = CalculatorPolicy.Allowed,
+            FormulaSheetMode = FormulaSheetMode.PhysicsStandard,
             Sections = new List<PaperSection>
             {
                 new(

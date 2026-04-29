@@ -91,6 +91,7 @@ public sealed class MockExamRunService : IMockExamRunService
     {
         "806" or "807" => "math",
         "036"          => "physics",
+        "016"          => "english",
         _              => "math",
     };
 
@@ -257,7 +258,9 @@ public sealed class MockExamRunService : IMockExamRunService
             PartAQuestionIds: partAIds,
             PartBQuestionIds: partBIds,
             StartedAt: startedAt,
-            Deadline: state.Deadline);
+            Deadline: state.Deadline,
+            CalculatorPolicy: structure.CalculatorPolicy.ToString(),
+            FormulaSheetMode: structure.FormulaSheetMode.ToString());
     }
 
     public async Task<MockExamRunStateResponse?> GetStateAsync(
@@ -950,18 +953,31 @@ public sealed class MockExamRunService : IMockExamRunService
     private async Task<CasVerifyResult> VerifyWithRetryAsync(
         string a, string b, CancellationToken ct)
     {
-        var first = await _cas.VerifyAsync(
-            new CasVerifyRequest(CasOperation.Equivalence, a, b, null), ct);
-        if (first.Status is CasVerifyStatus.Timeout or CasVerifyStatus.CircuitBreakerOpen)
+        // PRR-297 — multi-attempt CAS retry with exponential backoff.
+        // Old: single retry at 150ms. Persistent SymPy flake (>300ms
+        // outage) silently degraded the grade. New: 3 attempts at
+        // 150ms / 400ms / 1200ms (jittered). Total worst-case ~1.75s
+        // which is still under our typical grade-time budget.
+        // Counter so ops can alarm on retry-rate >5% as a SymPy SLO
+        // burn signal.
+        var rng = new Random(HashCode.Combine(a, b));
+        int[] backoffsMs = { 150, 400, 1200 };
+
+        CasVerifyResult last = default!;
+        for (var attempt = 0; attempt <= backoffsMs.Length; attempt++)
         {
-            // Single retry with brief jitter.
-            await Task.Delay(TimeSpan.FromMilliseconds(150), ct);
-            var second = await _cas.VerifyAsync(
+            var result = await _cas.VerifyAsync(
                 new CasVerifyRequest(CasOperation.Equivalence, a, b, null), ct);
-            if (second.Status == CasVerifyStatus.Ok) return second;
-            return first; // both transient — record the first failure
+            if (result.Status == CasVerifyStatus.Ok) return result;
+            last = result;
+            if (result.Status is not (CasVerifyStatus.Timeout or CasVerifyStatus.CircuitBreakerOpen))
+                return result;
+            if (attempt == backoffsMs.Length) break;
+
+            var jitter = rng.Next(50);
+            await Task.Delay(TimeSpan.FromMilliseconds(backoffsMs[attempt] + jitter), ct);
         }
-        return first;
+        return last;
     }
 
     private static IEnumerable<T> Shuffle<T>(IList<T> source, Random rng)

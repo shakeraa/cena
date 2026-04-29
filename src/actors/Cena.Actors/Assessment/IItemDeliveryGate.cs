@@ -55,7 +55,14 @@ public interface IItemDeliveryGate
         string itemId,
         string sessionId,
         string tenantId,
-        string actorId);
+        string actorId,
+        // PRR-301 — additive optional CT. Existing callers continue
+        // working because the default is None. New callers (e.g.,
+        // long-running Marten projections that want cooperative
+        // cancellation) can pass their CT and get
+        // OperationCanceledException at the gate boundary instead of
+        // pinning the request thread.
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -86,8 +93,15 @@ public sealed class ItemDeliveryGate : IItemDeliveryGate
         string itemId,
         string sessionId,
         string tenantId,
-        string actorId)
+        string actorId,
+        CancellationToken cancellationToken = default)
     {
+        // PRR-301 — honor caller cancellation before doing any work.
+        // The gate itself is sync and fast; the CT is here so a saga
+        // that called Cancel mid-pump fails fast rather than emitting
+        // a now-stale audit log.
+        cancellationToken.ThrowIfCancellationRequested();
+
         ArgumentException.ThrowIfNullOrWhiteSpace(itemId);
         ArgumentException.ThrowIfNullOrWhiteSpace(sessionId);
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);

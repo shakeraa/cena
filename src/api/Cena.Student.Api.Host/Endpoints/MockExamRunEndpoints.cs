@@ -67,13 +67,42 @@ public static class MockExamRunEndpoints
             return await next(ctx);
         });
 
-        // GET /feature-flags — public-ish: returns the current flag state
-        // so the SPA can decide whether to show the entry button at all.
-        // Auth still required so anonymous probing doesn't reveal config.
-        app.MapGet("/api/me/exam-prep/feature-flags", (IConfiguration cfg) =>
+        // GET /feature-flags — Phase 3 #9 SPA-cached probe.
+        // PRR-282 — tenant-scoped so a future per-institute kill-switch
+        // can deny on a specific tenant's runner without touching
+        // global config. Today the tenant override is a config lookup;
+        // future Marten-doc-backed override is filed in PRR-302.
+        app.MapGet("/api/me/exam-prep/feature-flags", (
+            HttpContext ctx,
+            IConfiguration cfg) =>
         {
-            var enabled = cfg.GetValue<bool?>("Cena:ExamPrep:RunnerEnabled") ?? true;
-            return Results.Ok(new { runnerEnabled = enabled });
+            // Global flag.
+            var globalEnabled = cfg.GetValue<bool?>("Cena:ExamPrep:RunnerEnabled") ?? true;
+
+            // Per-tenant override (PRR-282). Convention:
+            //   Cena:ExamPrep:Tenants:{tenantId}:RunnerEnabled = false
+            // disables the runner for that tenant only. The student's
+            // tenant claim drives the lookup. An admin can flip a
+            // single-tenant override without affecting other tenants.
+            var tenantId = ctx.User.FindFirst("tenant_id")?.Value
+                ?? ctx.User.FindFirst("school_id")?.Value
+                ?? ctx.User.FindFirst("institute_id")?.Value;
+            var perTenantEnabled = string.IsNullOrEmpty(tenantId)
+                ? (bool?)null
+                : cfg.GetValue<bool?>($"Cena:ExamPrep:Tenants:{tenantId}:RunnerEnabled");
+
+            var enabled = (globalEnabled, perTenantEnabled) switch
+            {
+                (false, _) => false,             // global off → off everywhere
+                (_, false) => false,             // tenant override off → off for this tenant
+                _          => true,
+            };
+
+            return Results.Ok(new
+            {
+                runnerEnabled = enabled,
+                tenantOverride = perTenantEnabled is not null,
+            });
         }).RequireAuthorization().RequireRateLimiting("api");
 
         // POST /  — start a run

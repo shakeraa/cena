@@ -51,7 +51,13 @@ public sealed record MockExamRunStartedResponse(
     IReadOnlyList<string> PartAQuestionIds,
     IReadOnlyList<string> PartBQuestionIds,
     DateTimeOffset StartedAt,
-    DateTimeOffset Deadline);
+    DateTimeOffset Deadline,
+    /// <summary>PRR-293 — calculator policy ("Allowed", "Restricted",
+    /// "Prohibited"). SPA renders a banner.</summary>
+    string CalculatorPolicy = "Allowed",
+    /// <summary>PRR-293 — formula-sheet mode ("None", "MathBasic",
+    /// "MathAdvanced", "PhysicsStandard"). Forward-compat for PRR-292.</summary>
+    string FormulaSheetMode = "None");
 
 /// <summary>Snapshot of run state for the runner UI.</summary>
 public sealed record MockExamRunStateResponse(
