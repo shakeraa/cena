@@ -226,6 +226,15 @@ public class QuestionListProjection : SingleStreamProjection<QuestionReadModel, 
         // The fork creates a new QuestionReadModel in its own stream
     }
 
+    // ── PRR-246 — Bagrut alignment populates QuestionPaperCodes ──
+    public void Apply(QuestionBagrutAlignmentSet_V1 e, QuestionReadModel model)
+    {
+        model.QuestionPaperCodes = e.QuestionPaperCodes is null
+            ? new List<string>()
+            : new List<string>(e.QuestionPaperCodes);
+        model.UpdatedAt = e.SetAt;
+    }
+
     // ── Helpers ──
 
     private static QuestionReadModel FromCreation(
