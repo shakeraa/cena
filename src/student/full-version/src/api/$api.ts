@@ -149,6 +149,38 @@ async function onResponseError(ctx: FetchContext & { response: Response & { _dat
     throw new RetryMarker(request, options)
   }
 
+  // 402 — Phase 2 paywall. RequireEntitlementFilter (server-side) returns
+  // a structured body: {error, reason, tier, effectiveStatus, feature?}.
+  // Hand off to entitlementStore so TrialEndCard.vue + the route guard
+  // can render the paywall. We re-throw the EntitlementBlockedError so
+  // the calling component sees the error and can decide whether to
+  // suppress its own UI (it usually should — the global card covers it).
+  // Do NOT retry — 402 is intentional, not transient.
+  if (status === 402) {
+    const body = (ctx.response?._data ?? {}) as Record<string, unknown>
+    try {
+      const { useEntitlementStore } = await import('@/stores/entitlementStore')
+      useEntitlementStore().record402({
+        error: typeof body.error === 'string' ? body.error : undefined,
+        reason: typeof body.reason === 'string' ? body.reason : undefined,
+        tier: typeof body.tier === 'string' ? body.tier : undefined,
+        effectiveStatus: typeof body.effectiveStatus === 'string'
+          ? body.effectiveStatus
+          : undefined,
+        feature: typeof body.feature === 'string' ? body.feature : null,
+      })
+    }
+    catch {
+      // If the store import fails (e.g. test environment without Pinia),
+      // we still want the EntitlementBlockedError to bubble.
+    }
+    throw new EntitlementBlockedError(
+      typeof body.reason === 'string' ? body.reason : 'entitlement_required',
+      typeof body.feature === 'string' ? body.feature : null,
+      typeof body.effectiveStatus === 'string' ? body.effectiveStatus : 'Unsubscribed',
+    )
+  }
+
   // 429: honor Retry-After if present, else 1s; jitter; retry up to MAX_RETRIES.
   if (status === 429 && meta.retryCount < MAX_RETRIES) {
     meta.retryCount += 1
@@ -183,6 +215,25 @@ class RetryMarker extends Error {
   constructor(public request: any, public options: MetaOptions) {
     super('retry')
     this.name = 'RetryMarker'
+  }
+}
+
+/**
+ * Phase 2 paywall — thrown when the server returns 402 Payment Required.
+ * The entitlementStore has been updated by the time this throws, so the
+ * calling component can rely on `useEntitlementStore().lastBlock` being
+ * set. Components typically catch this and suppress their own error UI
+ * since the global TrialEndCard will render.
+ */
+export class EntitlementBlockedError extends Error {
+  public readonly status = 402
+  constructor(
+    public readonly reason: string,
+    public readonly feature: string | null,
+    public readonly effectiveStatus: string,
+  ) {
+    super(`entitlement_required: ${reason}`)
+    this.name = 'EntitlementBlockedError'
   }
 }
 

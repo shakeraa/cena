@@ -1753,5 +1753,27 @@
       "plus50": "+50% extra time",
       "plus100": "+100% (double time)"
     }
+  },
+  "paywall": {
+    "subscribe": "View subscription",
+    "dismiss": "Not now",
+    "trialCapReached": {
+      "title": "Your trial allotment for this feature is full",
+      "body": {
+        "tutor_turn": "You've used all of your trial AI tutor turns. Subscribe to keep getting personalised explanations.",
+        "photo_diagnostic": "You've used all of your trial photo problems. Subscribe to keep snapping math problems.",
+        "practice_session": "You've used all of your trial practice sessions. Subscribe to keep practising.",
+        "generic": "You've reached the trial allotment for this feature. Subscribe to continue."
+      }
+    },
+    "entitlementRequired": {
+      "title": "A subscription is required to continue",
+      "body": {
+        "unsubscribed": "Cena requires an active subscription. Choose a plan to continue.",
+        "expired": "Your trial has ended. Subscribe to keep using Cena.",
+        "cancelled": "Your subscription was cancelled. Renew to keep using Cena.",
+        "refunded": "Your last payment was refunded. Subscribe again to keep using Cena."
+      }
+    }
   }
 }

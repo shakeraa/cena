@@ -2,6 +2,7 @@
 import { useTheme } from 'vuetify'
 import ScrollToTop from '@core/components/ScrollToTop.vue'
 import UpdateToast from '@/components/UpdateToast.vue'
+import TrialEndCard from '@/components/TrialEndCard.vue'
 import FirstRunLanguageChooser from '@/components/common/FirstRunLanguageChooser.vue'
 import initCore from '@core/initCore'
 import { initConfigStore, useConfigStore } from '@core/stores/config'
@@ -56,6 +57,9 @@ applyLocaleSideEffects(localeStore.code)
       <RouterView />
       <ScrollToTop />
       <UpdateToast />
+      <!-- Phase 2 paywall — global TrialEndCard mounts on entitlement 402s.
+           Self-mounts as VDialog when entitlementStore.isBlocked goes true. -->
+      <TrialEndCard />
 
       <!-- RDY-015: Global aria-live region for dynamic announcements -->
       <div
