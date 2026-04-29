@@ -63,7 +63,7 @@ public sealed class EntitlementEndpointsTests
         var fx = await NewFixtureAsync();
         var ctx = fx.HttpContext(withSubject: false);
         var result = await EntitlementEndpoints.GetEntitlementAsync(
-            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts,
+            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts, fx.Clock,
             CancellationToken.None);
         Assert.Equal("UnauthorizedHttpResult", result.GetType().Name);
     }
@@ -74,7 +74,7 @@ public sealed class EntitlementEndpointsTests
         var fx = await NewFixtureAsync();
         var ctx = fx.HttpContext();
         var result = await EntitlementEndpoints.GetEntitlementAsync(
-            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts,
+            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts, fx.Clock,
             CancellationToken.None);
         var dto = ExtractValue<EntitlementResponseDto>(result);
         Assert.Equal("Unsubscribed", dto.Tier);
@@ -92,7 +92,7 @@ public sealed class EntitlementEndpointsTests
             tutorTurns: 5, photos: 2, sessions: 1, durationDays: 14);
         var ctx = fx.HttpContext();
         var result = await EntitlementEndpoints.GetEntitlementAsync(
-            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts,
+            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts, fx.Clock,
             CancellationToken.None);
         var dto = ExtractValue<EntitlementResponseDto>(result);
         Assert.Equal("TrialPlus", dto.Tier);
@@ -106,6 +106,29 @@ public sealed class EntitlementEndpointsTests
     }
 
     [Fact]
+    public async Task GetEntitlement_daysRemaining_uses_now_clock_not_resolver_LastUpdatedAt()
+    {
+        // Phase 1D-fix-2 iter 4 item 14 regression guard: BuildTrialStateDto
+        // must compute daysRemaining against the live clock. If it used the
+        // resolver's view.LastUpdatedAt (the projection-update timestamp,
+        // not "now"), a trial started 5 days ago would still show 14 days
+        // remaining instead of the correct 9.
+        var fx = await NewFixtureAsync();
+        await fx.SeedActiveTrialAsync(
+            tutorTurns: 5, photos: 2, sessions: 1, durationDays: 14);
+        // Advance the wall clock 5 days past the trial start.
+        fx.Clock.AdvanceTo(Now.AddDays(5));
+        var ctx = fx.HttpContext();
+        var result = await EntitlementEndpoints.GetEntitlementAsync(
+            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts, fx.Clock,
+            CancellationToken.None);
+        var dto = ExtractValue<EntitlementResponseDto>(result);
+        Assert.NotNull(dto.Trial);
+        // 14-day trial, 5 days elapsed → 9 days remaining (ceil of 9.0).
+        Assert.Equal(9, dto.Trial!.DaysRemaining);
+    }
+
+    [Fact]
     public async Task GetEntitlement_HasPaymentMethodOnFile_reflects_parent_stream()
     {
         var fx = await NewFixtureAsync();
@@ -114,7 +137,7 @@ public sealed class EntitlementEndpointsTests
             withPaymentMethod: true);
         var ctx = fx.HttpContext();
         var result = await EntitlementEndpoints.GetEntitlementAsync(
-            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts,
+            ctx, fx.Resolver, fx.Consumption, fx.Subscriptions, fx.Discounts, fx.Clock,
             CancellationToken.None);
         var dto = ExtractValue<EntitlementResponseDto>(result);
         Assert.True(dto.HasPaymentMethodOnFile);
@@ -515,8 +538,9 @@ public sealed class EntitlementEndpointsTests
 
     private sealed class FakeTimeProvider : TimeProvider
     {
-        private readonly DateTimeOffset _now;
+        private DateTimeOffset _now;
         public FakeTimeProvider(DateTimeOffset now) { _now = now; }
         public override DateTimeOffset GetUtcNow() => _now;
+        public void AdvanceTo(DateTimeOffset target) { _now = target; }
     }
 }

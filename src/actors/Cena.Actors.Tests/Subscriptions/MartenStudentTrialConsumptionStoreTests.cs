@@ -223,4 +223,84 @@ public sealed class MartenStudentTrialConsumptionStoreTests : IAsyncLifetime
         var fresh = await _sut.GetAsync(id, CancellationToken.None);
         Assert.Equal(50, fresh.TutorTurnsUsed);
     }
+
+    [Fact]
+    public async Task AdvisoryLockConnection_points_at_same_database_as_marten_session()
+    {
+        // Phase 1D-fix-2 iter 4 item 11: prove the connection used for the
+        // advisory lock targets the SAME Postgres database as the Marten
+        // session. If they diverged, the lock would have no effect on the
+        // session's writes — we'd silently lose the serialisation guarantee.
+        // We extract current_database() through both paths and compare.
+
+        // 1) The lock-side connection (what IncrementIfUnderCapAsync uses):
+        await using var lockConn = (Npgsql.NpgsqlConnection)_store
+            .Storage.Database.CreateConnection();
+        await lockConn.OpenAsync(CancellationToken.None);
+        await using var lockCmd = lockConn.CreateCommand();
+        lockCmd.CommandText = "SELECT current_database()";
+        var lockDb = (string?)await lockCmd.ExecuteScalarAsync(CancellationToken.None);
+
+        // 2) The Marten-session-side: query through the session's Linq
+        // surface. We use a tiny native query so Marten opens the
+        // underlying connection on its own schedule.
+        await using var session = _store.QuerySession();
+        var sessionDb = await session.QueryAsync<string>(
+            "SELECT current_database()", CancellationToken.None);
+
+        Assert.False(string.IsNullOrEmpty(lockDb));
+        Assert.NotEmpty(sessionDb);
+        Assert.Equal(sessionDb[0], lockDb);
+    }
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_lock_is_actually_contended_under_concurrency()
+    {
+        // Phase 1D-fix-2 iter 4 item 12: prove the advisory lock is real
+        // (not just relying on connection-pool serialisation). We measure
+        // wall-clock time for 5 SERIAL calls vs 5 CONCURRENT calls. If the
+        // lock is doing its job, the concurrent run is NOT faster than the
+        // serial run by a meaningful margin (within 2x). If the lock were
+        // a no-op, concurrent would finish ~5x faster because the load-
+        // modify-save would interleave.
+        const string id = "enc::student::marten-atomic-contended";
+        // Warm up the connection pool + Marten session caches.
+        await _sut.IncrementIfUnderCapAsync(
+            id, EntitlementFeature.TutorTurn, cap: 0, now: Day1, ct: CancellationToken.None);
+        await _sut.ResetAsync(id, CancellationToken.None);
+
+        // Serial baseline.
+        var swSerial = System.Diagnostics.Stopwatch.StartNew();
+        for (var i = 0; i < 5; i++)
+        {
+            await _sut.IncrementIfUnderCapAsync(
+                id, EntitlementFeature.TutorTurn,
+                cap: 0, now: Day1, ct: CancellationToken.None);
+        }
+        swSerial.Stop();
+
+        await _sut.ResetAsync(id, CancellationToken.None);
+
+        // Concurrent run on same key. With the lock in place these
+        // serialise; without it they'd run in parallel.
+        var swConcurrent = System.Diagnostics.Stopwatch.StartNew();
+        var tasks = Enumerable.Range(0, 5)
+            .Select(_ => _sut.IncrementIfUnderCapAsync(
+                id, EntitlementFeature.TutorTurn,
+                cap: 0, now: Day1, ct: CancellationToken.None))
+            .ToArray();
+        await Task.WhenAll(tasks);
+        swConcurrent.Stop();
+
+        var fresh = await _sut.GetAsync(id, CancellationToken.None);
+        Assert.Equal(5, fresh.TutorTurnsUsed);
+        // Concurrent must NOT be much faster than serial (lock holds the
+        // critical section). Allow up to 2x speedup as headroom for noise
+        // and concurrent connection-open. If concurrent is 3x+ faster, the
+        // lock probably isn't fired.
+        Assert.True(
+            swConcurrent.Elapsed.TotalMilliseconds * 3 >= swSerial.Elapsed.TotalMilliseconds,
+            $"Lock not contended: serial {swSerial.Elapsed.TotalMilliseconds:F0}ms vs " +
+            $"concurrent {swConcurrent.Elapsed.TotalMilliseconds:F0}ms — should be roughly equal.");
+    }
 }

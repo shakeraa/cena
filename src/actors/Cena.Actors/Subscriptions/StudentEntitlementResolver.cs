@@ -285,9 +285,25 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
     {
         if (_documentStore is null) return null;
         await using var session = _documentStore.QuerySession();
-        var view = await session.LoadAsync<StudentEntitlementDocument>(
+        var doc = await session.LoadAsync<StudentEntitlementDocument>(
             studentSubjectIdEncrypted, ct);
-        return view?.ToView();
+        if (doc is null) return null;
+
+        // Phase 1D-fix-2 iter 4: derive HasPaymentMethodOnFile from the
+        // live parent aggregate. The projection cannot accurately maintain
+        // this flag because the SubscriptionPaymentMethodAttached_V1 event
+        // arrives BEFORE Activated on the trial-then-pay sequence — the
+        // projector would have nothing to update at attach-time and the
+        // subsequent Activated projector would default the flag to false.
+        // One extra Marten round-trip is the cost of correctness.
+        var view = doc.ToView();
+        if (!string.IsNullOrEmpty(doc.SourceParentSubjectIdEncrypted))
+        {
+            var parentAggregate = await _store.LoadAsync(
+                doc.SourceParentSubjectIdEncrypted, ct).ConfigureAwait(false);
+            view = view with { HasPaymentMethodOnFile = parentAggregate.State.HasPaymentMethodOnFile };
+        }
+        return view;
     }
 
     /// <summary>
@@ -414,12 +430,20 @@ public interface IStudentParentIndex
 /// <remarks>
 /// <para>
 /// The projection only fans out paid-subscription events
-/// (<see cref="Events.SubscriptionActivated_V1"/>, sibling link/unlink) and
-/// payment-method attaches. Trialing views are NOT served from this
-/// document — the resolver always uses the parent-bindings path for
-/// trials so the pinned <see cref="Events.TrialCapsSnapshot"/> is
-/// available on the hot path. <see cref="StudentEntitlementView.TrialCaps"/>
-/// is therefore intentionally absent from this document.
+/// (<see cref="Events.SubscriptionActivated_V1"/>, sibling link/unlink).
+/// Trialing views are NOT served from this document — the resolver always
+/// uses the parent-bindings path for trials so the pinned
+/// <see cref="Events.TrialCapsSnapshot"/> is available on the hot path.
+/// </para>
+/// <para>
+/// <see cref="StudentEntitlementView.HasPaymentMethodOnFile"/> is also NOT
+/// projected onto this document. It is derived at resolve-time from the
+/// live parent aggregate because the
+/// <see cref="Events.SubscriptionPaymentMethodAttached_V1"/> event arrives
+/// BEFORE Activated on the trial-then-pay sequence — a projection-side
+/// fan-out would silently drop the flag. One extra round-trip in
+/// <see cref="StudentEntitlementResolver.ResolveViaMartenAsync"/> is the
+/// correctness trade-off.
 /// </para>
 /// </remarks>
 public sealed class StudentEntitlementDocument
@@ -430,16 +454,6 @@ public sealed class StudentEntitlementDocument
     public DateTimeOffset? ValidUntil { get; set; }
     public DateTimeOffset LastUpdatedAt { get; set; }
 
-    /// <summary>
-    /// Phase 1D-fix-2 item 4: payment-method-on-file flag, projected from
-    /// <see cref="Events.SubscriptionPaymentMethodAttached_V1"/>. Conversion
-    /// flow reads this to decide whether the card-collection step can be
-    /// skipped. Defaults false on first activation; updated to true when
-    /// the Attached event lands. Resilient to event ordering — replay sets
-    /// the bit deterministically regardless of Activate-vs-Attach order.
-    /// </summary>
-    public bool HasPaymentMethodOnFile { get; set; }
-
     public StudentEntitlementView ToView() => new(
         StudentSubjectIdEncrypted: Id,
         EffectiveTier: EffectiveTier,
@@ -448,5 +462,5 @@ public sealed class StudentEntitlementDocument
         LastUpdatedAt: LastUpdatedAt,
         EffectiveStatus: SubscriptionStatus.Active,
         TrialCaps: null,
-        HasPaymentMethodOnFile: HasPaymentMethodOnFile);
+        HasPaymentMethodOnFile: false /* derived via aggregate at resolve-time */);
 }

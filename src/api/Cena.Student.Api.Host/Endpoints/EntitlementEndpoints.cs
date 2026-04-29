@@ -48,6 +48,7 @@ using Cena.Api.Contracts.Subscriptions;
 using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 
 namespace Cena.Api.Host.Endpoints;
@@ -99,6 +100,7 @@ public static class EntitlementEndpoints
         IStudentTrialConsumptionStore consumption,
         ISubscriptionAggregateStore subscriptions,
         DiscountAssignmentService discounts,
+        TimeProvider clock,
         CancellationToken ct)
     {
         var subjectId = ExtractSubjectId(ctx);
@@ -114,7 +116,7 @@ public static class EntitlementEndpoints
             // Phase 1D-fix item 1: caps now ride on the view (resolver pins
             // them from SubscriptionState.TrialCaps). No parent re-load.
             var snapshot = await consumption.GetAsync(subjectId, ct).ConfigureAwait(false);
-            trialDto = BuildTrialStateDto(view, view.TrialCaps, snapshot);
+            trialDto = BuildTrialStateDto(view, view.TrialCaps, snapshot, clock.GetUtcNow());
         }
         else if (view.EffectiveStatus is SubscriptionStatus.Active
                  or SubscriptionStatus.PastDue)
@@ -160,12 +162,18 @@ public static class EntitlementEndpoints
     private static TrialStateDto BuildTrialStateDto(
         StudentEntitlementView view,
         TrialCapsSnapshot? caps,
-        StudentTrialConsumption snapshot)
+        StudentTrialConsumption snapshot,
+        DateTimeOffset now)
     {
         int? daysRemaining = null;
         if (view.ValidUntil.HasValue)
         {
-            var diff = view.ValidUntil.Value - view.LastUpdatedAt;
+            // Phase 1D-fix-2 iter 4 item 14: compute against the live clock,
+            // not the resolver's LastUpdatedAt (which is the projection-
+            // update timestamp, not "now"). For a trial started 2 days ago
+            // the projection might still report 14, while the user has
+            // actually 12 days remaining.
+            var diff = view.ValidUntil.Value - now;
             // Floor at 0 so we never report a negative count if the worker
             // hasn't fired yet on a calendar-elapsed trial.
             daysRemaining = (int)Math.Max(0, Math.Ceiling(diff.TotalDays));
@@ -197,7 +205,7 @@ public static class EntitlementEndpoints
     /// </summary>
     internal static async Task<IResult> StartTrialAsync(
         HttpContext ctx,
-        StartTrialRequestDto body,
+        [FromBody] StartTrialRequestDto body,
         IStudentEntitlementResolver resolver,
         ISubscriptionAggregateStore subscriptions,
         IStudentTrialConsumptionStore consumption,
@@ -242,6 +250,13 @@ public static class EntitlementEndpoints
         // parent record on file before a trial can start; the parent stream
         // is keyed on parentSubjectIdEncrypted, not on the student's own id
         // (ADR-0057 §2 parent-keyed subscription).
+        //
+        // Phase 1D-fix-2 iter 4 item 13: sort the parents list ordinal so
+        // multi-parent students get a DETERMINISTIC pick. Without sorting,
+        // the binding-store enumeration order is implementation-defined,
+        // and a trial started against parent A could later be charged
+        // against parent B if the order shifts between calls. ADR-0061
+        // (encryption namespace) is also bound to this choice.
         var parents = parentBindings is IStudentParentIndex idx
             ? await idx.ListParentsForStudentAsync(subjectId, ct).ConfigureAwait(false)
             : Array.Empty<string>();
@@ -250,7 +265,7 @@ public static class EntitlementEndpoints
             return ProblemJson(404, "no_parent_binding",
                 "student has no parent binding on file; cannot start a trial");
         }
-        var parentId = parents[0];
+        var parentId = parents.OrderBy(p => p, StringComparer.Ordinal).First();
 
         // Fingerprint hash + (for card flows) Stripe payment-method id.
         string fingerprintHash;
@@ -394,7 +409,8 @@ public static class EntitlementEndpoints
         // separate fetch.
         var freshView = await resolver.ResolveAsync(subjectId, ct).ConfigureAwait(false);
         var freshSnapshot = await consumption.GetAsync(subjectId, ct).ConfigureAwait(false);
-        var trialDto = BuildTrialStateDto(freshView, freshView.TrialCaps ?? caps, freshSnapshot);
+        var trialDto = BuildTrialStateDto(
+            freshView, freshView.TrialCaps ?? caps, freshSnapshot, clock.GetUtcNow());
         var responseDto = new EntitlementResponseDto(
             Tier: freshView.EffectiveTier.ToString(),
             EffectiveStatus: freshView.EffectiveStatus.ToString(),
