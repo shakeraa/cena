@@ -45,6 +45,7 @@ using Cena.Actors.Parent;
 using Cena.Actors.Subscriptions;
 using Cena.Actors.Subscriptions.Events;
 using Cena.Api.Contracts.Subscriptions;
+using Cena.Infrastructure.Compliance;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Routing;
@@ -204,6 +205,7 @@ public static class EntitlementEndpoints
         ITrialFingerprintLedgerStore ledger,
         IPaymentMethodSetupProvider payment,
         IParentChildBindingStore parentBindings,
+        EncryptedFieldAccessor encryptor,
         TimeProvider clock,
         CancellationToken ct)
     {
@@ -285,14 +287,23 @@ public static class EntitlementEndpoints
                     $"setupIntent did not reach Succeeded (status={verify.Status})");
             }
             fingerprintHash = "card:" + Hash(verify.CardFingerprint);
-            // Phase 1D-fix item 2: Stripe pm_… id encrypted at the wire
-            // boundary per ADR-0038 (postfix-Encrypted convention). For now
-            // we use the same stable hash form used elsewhere in the
-            // subscriptions context — Stripe pm_ids are not PII per Stripe's
-            // own classification, but Cena treats all upstream-provided ids
-            // as opaque tokens that need shred at RTBF time. The actual
-            // crypto-shred wiring lives in SubjectKeyStore (out of scope here).
-            paymentMethodIdEncrypted = "pm-enc:" + Hash(verify.PaymentMethodId ?? string.Empty);
+            // Phase 1D-fix-2 item 1: real AES-GCM encryption via the parent
+            // subject's derived key (ADR-0038, ADR-0061 §"Encryption").
+            // EncryptAsync throws InvalidOperationException when the parent's
+            // key has been tombstoned by RTBF → translate to graceful 410
+            // rather than letting it bubble as 500.
+            try
+            {
+                paymentMethodIdEncrypted = await encryptor
+                    .EncryptAsync(verify.PaymentMethodId ?? string.Empty, parentId, ct)
+                    .ConfigureAwait(false)
+                    ?? string.Empty;
+            }
+            catch (InvalidOperationException)
+            {
+                return ProblemJson(410, "parent_erased",
+                    "the parent's data has been erased; a new subscription stream is required");
+            }
         }
 
         var email = ExtractEmail(ctx) ?? string.Empty;
@@ -346,35 +357,35 @@ public static class EntitlementEndpoints
             return ProblemJson(409, "command_rejected", ex.Message);
         }
 
-        await subscriptions.AppendAsync(parentId, trialEvent, ct).ConfigureAwait(false);
+        // Phase 1D-fix-2 item 3: append TrialStarted_V1 + (optional)
+        // SubscriptionPaymentMethodAttached_V1 atomically. Either both land
+        // or neither does — partial commit would leave a trial without the
+        // captured payment method, breaking the conversion promise.
+        // Idempotency on payment-method-attached: when the same card is
+        // already on file (same fingerprint hash), we omit the second event
+        // from the batch. We check the PRE-trial aggregate state because
+        // TrialStarted_V1 doesn't touch payment-method state — checking
+        // before vs after is equivalent here.
+        var alreadyAttached = paymentMethodIdEncrypted is not null
+            && !string.IsNullOrEmpty(aggregate.State.LastAttachedPaymentMethodFingerprintHash)
+            && string.Equals(
+                aggregate.State.LastAttachedPaymentMethodFingerprintHash,
+                fingerprintHash,
+                StringComparison.Ordinal);
 
-        // Phase 1D-fix item 2: persist the SetupIntent payment-method id
-        // onto the parent stream so conversion-to-paid does not re-prompt
-        // for card details. Idempotency: skip when the same fingerprint is
-        // already on file (same card re-attached). The aggregate guarantees
-        // the freshly-applied state contains the just-appended TrialStarted_V1
-        // already, so we re-load to pick up the post-trial state and check
-        // the prior fingerprint cleanly.
-        if (paymentMethodIdEncrypted is not null)
-        {
-            var postTrial = await subscriptions.LoadAsync(parentId, ct).ConfigureAwait(false);
-            var alreadyAttached = !string.IsNullOrEmpty(
-                postTrial.State.LastAttachedPaymentMethodFingerprintHash)
-                && string.Equals(
-                    postTrial.State.LastAttachedPaymentMethodFingerprintHash,
-                    fingerprintHash,
-                    StringComparison.Ordinal);
-            if (!alreadyAttached)
+        var batch = paymentMethodIdEncrypted is not null && !alreadyAttached
+            ? new object[]
             {
-                var pmEvent = new SubscriptionPaymentMethodAttached_V1(
+                trialEvent,
+                new SubscriptionPaymentMethodAttached_V1(
                     ParentSubjectIdEncrypted: parentId,
                     PaymentMethodIdEncrypted: paymentMethodIdEncrypted,
                     FingerprintHash: fingerprintHash,
                     AttachedAt: startedAt,
-                    Source: PaymentMethodAttachSource.TrialStartSetupIntent);
-                await subscriptions.AppendAsync(parentId, pmEvent, ct).ConfigureAwait(false);
+                    Source: PaymentMethodAttachSource.TrialStartSetupIntent),
             }
-        }
+            : new object[] { trialEvent };
+        await subscriptions.AppendManyAsync(parentId, batch, ct).ConfigureAwait(false);
 
         await consumption.ResetAsync(subjectId, ct).ConfigureAwait(false);
 

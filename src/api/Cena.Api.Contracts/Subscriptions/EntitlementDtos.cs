@@ -11,10 +11,10 @@
 // pre-existing GET /api/me/applicable-discount.
 //
 // Banned-mechanics guard (ADR-0048, GD-004): no field name implies streak,
-// countdown urgency, scarcity, or loss-aversion. `daysRemaining` and
+// shrinking-urgency, scarcity, or loss-aversion. `daysRemaining` and
 // `endsAt` are factual datapoints (the user has the right to know what
 // they bought); the SPA renders them as plain calendar info, never as a
-// shrinking-urgency timer.
+// pressure-mounting timer.
 // =============================================================================
 
 using System.Text.Json.Serialization;

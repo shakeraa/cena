@@ -155,4 +155,72 @@ public sealed class MartenStudentTrialConsumptionStoreTests : IAsyncLifetime
         var fresh = await _sut.GetAsync(id, CancellationToken.None);
         Assert.Equal(post, fresh);
     }
+
+    // ----- Phase 1D-fix-2 item 2: atomic check-and-increment ------------
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_under_cap_increments_and_persists()
+    {
+        const string id = "enc::student::marten-atomic-under";
+        var post = await _sut.IncrementIfUnderCapAsync(
+            id, EntitlementFeature.TutorTurn,
+            cap: 3, now: Day1, ct: CancellationToken.None);
+        Assert.True(post.Allowed);
+        Assert.Equal(1, post.Snapshot.TutorTurnsUsed);
+        var fresh = await _sut.GetAsync(id, CancellationToken.None);
+        Assert.Equal(1, fresh.TutorTurnsUsed);
+    }
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_at_cap_returns_disallowed_and_does_not_persist()
+    {
+        const string id = "enc::student::marten-atomic-at-cap";
+        for (var i = 0; i < 3; i++)
+        {
+            await _sut.IncrementAsync(
+                id, EntitlementFeature.TutorTurn, Day1, CancellationToken.None);
+        }
+        var post = await _sut.IncrementIfUnderCapAsync(
+            id, EntitlementFeature.TutorTurn,
+            cap: 3, now: Day1, ct: CancellationToken.None);
+        Assert.False(post.Allowed);
+        Assert.Equal(3, post.Snapshot.TutorTurnsUsed);
+        var fresh = await _sut.GetAsync(id, CancellationToken.None);
+        Assert.Equal(3, fresh.TutorTurnsUsed);
+    }
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_concurrent_callers_serialise_via_advisory_lock()
+    {
+        const string id = "enc::student::marten-atomic-race";
+        // 20 concurrent calls with cap=5. Exactly 5 must succeed, 15 must
+        // be rejected. Postgres pg_advisory_lock serialises us across
+        // connections — without it, the load-modify-save races and the
+        // database would see ~20 increments.
+        var tasks = Enumerable.Range(0, 20)
+            .Select(_ => _sut.IncrementIfUnderCapAsync(
+                id, EntitlementFeature.TutorTurn,
+                cap: 5, now: Day1, ct: CancellationToken.None))
+            .ToArray();
+        var results = await Task.WhenAll(tasks);
+        Assert.Equal(5, results.Count(r => r.Allowed));
+        Assert.Equal(15, results.Count(r => !r.Allowed));
+        var fresh = await _sut.GetAsync(id, CancellationToken.None);
+        Assert.Equal(5, fresh.TutorTurnsUsed);
+    }
+
+    [Fact]
+    public async Task IncrementIfUnderCapAsync_zero_cap_treated_as_unbounded()
+    {
+        const string id = "enc::student::marten-atomic-unbounded";
+        for (var i = 0; i < 50; i++)
+        {
+            var r = await _sut.IncrementIfUnderCapAsync(
+                id, EntitlementFeature.TutorTurn,
+                cap: 0, now: Day1, ct: CancellationToken.None);
+            Assert.True(r.Allowed);
+        }
+        var fresh = await _sut.GetAsync(id, CancellationToken.None);
+        Assert.Equal(50, fresh.TutorTurnsUsed);
+    }
 }

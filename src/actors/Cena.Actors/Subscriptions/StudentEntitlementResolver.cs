@@ -405,11 +405,23 @@ public interface IStudentParentIndex
 }
 
 /// <summary>
-/// Marten-persisted student entitlement document. Populated by the
-/// projection worker; read by <see cref="StudentEntitlementResolver"/>.
-/// Separate from <see cref="StudentEntitlementView"/> so the in-memory
-/// view stays a pure value object.
+/// Marten-persisted student entitlement document. Populated by
+/// <see cref="StudentEntitlementProjection"/>; read by
+/// <see cref="StudentEntitlementResolver"/>. Separate from
+/// <see cref="StudentEntitlementView"/> so the in-memory view stays a pure
+/// value object.
 /// </summary>
+/// <remarks>
+/// <para>
+/// The projection only fans out paid-subscription events
+/// (<see cref="Events.SubscriptionActivated_V1"/>, sibling link/unlink) and
+/// payment-method attaches. Trialing views are NOT served from this
+/// document — the resolver always uses the parent-bindings path for
+/// trials so the pinned <see cref="Events.TrialCapsSnapshot"/> is
+/// available on the hot path. <see cref="StudentEntitlementView.TrialCaps"/>
+/// is therefore intentionally absent from this document.
+/// </para>
+/// </remarks>
 public sealed class StudentEntitlementDocument
 {
     public string Id { get; set; } = string.Empty;   // = StudentSubjectIdEncrypted
@@ -418,10 +430,23 @@ public sealed class StudentEntitlementDocument
     public DateTimeOffset? ValidUntil { get; set; }
     public DateTimeOffset LastUpdatedAt { get; set; }
 
+    /// <summary>
+    /// Phase 1D-fix-2 item 4: payment-method-on-file flag, projected from
+    /// <see cref="Events.SubscriptionPaymentMethodAttached_V1"/>. Conversion
+    /// flow reads this to decide whether the card-collection step can be
+    /// skipped. Defaults false on first activation; updated to true when
+    /// the Attached event lands. Resilient to event ordering — replay sets
+    /// the bit deterministically regardless of Activate-vs-Attach order.
+    /// </summary>
+    public bool HasPaymentMethodOnFile { get; set; }
+
     public StudentEntitlementView ToView() => new(
         StudentSubjectIdEncrypted: Id,
         EffectiveTier: EffectiveTier,
         SourceParentSubjectIdEncrypted: SourceParentSubjectIdEncrypted,
         ValidUntil: ValidUntil,
-        LastUpdatedAt: LastUpdatedAt);
+        LastUpdatedAt: LastUpdatedAt,
+        EffectiveStatus: SubscriptionStatus.Active,
+        TrialCaps: null,
+        HasPaymentMethodOnFile: HasPaymentMethodOnFile);
 }

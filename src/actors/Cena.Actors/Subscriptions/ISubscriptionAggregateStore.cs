@@ -24,6 +24,20 @@ public interface ISubscriptionAggregateStore
     /// </summary>
     Task AppendAsync(string parentSubjectId, object @event, CancellationToken ct);
 
+    /// <summary>
+    /// Phase 1D-fix-2 item 3: append multiple events atomically in one
+    /// transaction. Either all events land or none do. Required for flows
+    /// that emit more than one event per use-case (start-trial emits
+    /// <see cref="Events.TrialStarted_V1"/> + an optional
+    /// <see cref="Events.SubscriptionPaymentMethodAttached_V1"/> in lockstep
+    /// — partial commit would leave the trial without the captured payment
+    /// method, breaking conversion).
+    /// </summary>
+    Task AppendManyAsync(
+        string parentSubjectId,
+        IReadOnlyList<object> events,
+        CancellationToken ct);
+
     /// <summary>Read the event history for a parent (for read-model projection).</summary>
     Task<IReadOnlyList<object>> ReadEventsAsync(string parentSubjectId, CancellationToken ct);
 }
