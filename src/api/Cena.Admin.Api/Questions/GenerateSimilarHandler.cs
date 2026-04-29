@@ -23,8 +23,10 @@
 
 using Cena.Actors.Events;
 using Cena.Actors.Questions;
+using Cena.Actors.Variants;
 using Cena.Admin.Api.QualityGate;
 using Cena.Infrastructure.Errors;
+using Cena.Infrastructure.RateLimiting;
 using Marten;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
@@ -35,7 +37,22 @@ public sealed record GenerateSimilarRequest(
     int Count = 3,
     float? MinDifficulty = null,
     float? MaxDifficulty = null,
-    string? Language = null);
+    string? Language = null,
+    string? SourcePaperCode = null);
+
+/// <summary>
+/// Curator pseudonym formatting for the per-student scope of
+/// <see cref="IVariantGenerationGate"/>. Curators do NOT have a
+/// SubscriptionTier; we route them through the gate as
+/// <c>curator:{userId}</c> so per-student counters don't collide
+/// with real student ids and the gate path stays uniform with the
+/// future PRR-245 student-facing endpoint.
+/// </summary>
+internal static class CuratorPseudonym
+{
+    public const string Prefix = "curator:";
+    public static string Format(string userId) => Prefix + userId;
+}
 
 public static class GenerateSimilarHandler
 {
@@ -59,14 +76,43 @@ public static class GenerateSimilarHandler
         IQualityGateService qualityGate,
         string generatedBy,
         ILogger logger,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IVariantGenerationGate? variantGate = null,
+        bool variantGateLegalFlagEnabled = true,
+        string? variantGateInstituteId = null)
     {
         if (string.IsNullOrWhiteSpace(questionId))
             return Error("invalid_id", "questionId is required.",
                 ErrorCategory.Validation, StatusCodes.Status400BadRequest);
 
+        // PRR-265 / ADR-0059 §15.5 R1 backstop: if a gate is wired,
+        // run it before any cost-bearing work. Endpoint-level
+        // RequireRateLimiting("ai") is a per-minute burst guard; this
+        // gate enforces the per-day + per-source caps from §15.5.
+        if (variantGate is not null)
+        {
+            var gateContext = new VariantGenerationContext(
+                StudentSubjectIdEncrypted: CuratorPseudonym.Format(generatedBy),
+                InstituteId: variantGateInstituteId,
+                SourcePaperCode: string.IsNullOrWhiteSpace(body.SourcePaperCode)
+                    ? null : body.SourcePaperCode,
+                Kind: VariantKind.Structural,   // GenerateSimilar is structural
+                PaymentVerified: true,           // curators are pre-authorized
+                LegalFlagEnabled: variantGateLegalFlagEnabled);
+
+            var decision = await variantGate.CheckAsync(gateContext, DateTimeOffset.UtcNow, ct);
+            if (!decision.Allowed && decision.DeniedReason is { } reason)
+            {
+                var status = VariantGenerationGateDecision.HttpStatusFor(reason);
+                logger.LogInformation(
+                    "[GENERATE_SIMILAR_GATE_DENIED] reason={Reason} curator={Curator} status={Status}",
+                    decision.DeniedReasonCode, generatedBy, status);
+                return BuildGateDenialResult(decision, status);
+            }
+        }
+
         var core = await RunCoreAsync(questionId, body, store, ai, qualityGate, generatedBy, logger, ct);
-        return core.ErrorCode switch
+        var result = core.ErrorCode switch
         {
             "question_not_found" => Error(core.ErrorCode,
                 core.ErrorMessage ?? "source question not found.",
@@ -76,6 +122,92 @@ public static class GenerateSimilarHandler
                 core.ErrorMessage ?? "unknown error",
                 ErrorCategory.Internal, StatusCodes.Status500InternalServerError),
         };
+
+        // Commit the gate counter ONLY on a successful generation —
+        // failed/error attempts must not burn the cap.
+        if (variantGate is not null && core.ErrorCode is null && core.Response is not null)
+        {
+            var commitContext = new VariantGenerationContext(
+                StudentSubjectIdEncrypted: CuratorPseudonym.Format(generatedBy),
+                InstituteId: variantGateInstituteId,
+                SourcePaperCode: string.IsNullOrWhiteSpace(body.SourcePaperCode)
+                    ? null : body.SourcePaperCode,
+                Kind: VariantKind.Structural,
+                PaymentVerified: true,
+                LegalFlagEnabled: variantGateLegalFlagEnabled);
+            try
+            {
+                await variantGate.CommitAsync(
+                    commitContext,
+                    commitId: $"{questionId}:{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}",
+                    asOfUtc: DateTimeOffset.UtcNow,
+                    ct);
+            }
+            catch (Exception ex)
+            {
+                // Counter advancement is best-effort: a Redis hiccup must
+                // not 500 a successful generation. Surfaced via metrics.
+                logger.LogWarning(ex,
+                    "[GENERATE_SIMILAR_GATE_COMMIT_FAIL] curator={Curator} questionId={QuestionId}",
+                    generatedBy, questionId);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Map a gate denial decision to an HTTP <see cref="IResult"/>. 429s
+    /// carry a <c>Retry-After</c> header (whole seconds).
+    /// </summary>
+    private static IResult BuildGateDenialResult(VariantGenerationGateDecision decision, int status)
+    {
+        var category = status == StatusCodes.Status429TooManyRequests
+            ? ErrorCategory.RateLimit
+            : ErrorCategory.Authorization;
+        var error = new CenaError(
+            decision.DeniedReasonCode ?? "variant_generation_denied",
+            decision.DeniedDetail ?? "Variant generation denied by rate-limit gate.",
+            category,
+            null, null);
+
+        var retrySeconds = decision.RetryAfter.HasValue
+            ? Math.Max(1, (int)Math.Ceiling(decision.RetryAfter.Value.TotalSeconds))
+            : (int?)null;
+        return new GateDenialResult(error, status, retrySeconds);
+    }
+
+    /// <summary>
+    /// Custom <see cref="IResult"/> that writes the canonical
+    /// <c>{ "error": { ... } }</c> envelope plus an optional <c>Retry-After</c>
+    /// header. Implementing IResult directly is cleaner than wrapping
+    /// Results.Json — the latter offers no header-set hook for the
+    /// 429-specific Retry-After requirement.
+    /// </summary>
+    private sealed class GateDenialResult : IResult
+    {
+        private readonly CenaError _error;
+        private readonly int _statusCode;
+        private readonly int? _retryAfterSeconds;
+
+        public GateDenialResult(CenaError error, int statusCode, int? retryAfterSeconds)
+        {
+            _error = error;
+            _statusCode = statusCode;
+            _retryAfterSeconds = retryAfterSeconds;
+        }
+
+        public async Task ExecuteAsync(HttpContext httpContext)
+        {
+            httpContext.Response.StatusCode = _statusCode;
+            if (_retryAfterSeconds.HasValue)
+            {
+                httpContext.Response.Headers["Retry-After"] =
+                    _retryAfterSeconds.Value.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            }
+            await Results.Json(new ErrorResponse(_error), statusCode: _statusCode)
+                .ExecuteAsync(httpContext);
+        }
     }
 
     /// <summary>
