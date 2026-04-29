@@ -162,6 +162,22 @@ public sealed class NoUnregisteredMisconceptionStoreTest
          "in the canonical Marten stream store registered by " +
          "Configuration/MisconceptionStoreRegistrations.cs."),
 
+        // PRR-309: tutor-handoff HTML renderer. Uses StringBuilder.Append
+        // (matched by the "Append" persistence verb) and references the
+        // word "Misconception" via the AppendMisconceptionSection method
+        // that renders a parent-facing PDF section. NOT a persistence
+        // seam — it is a UI renderer composing HTML for the PDF /
+        // handoff document. The misconception data it RENDERS is loaded
+        // from the canonical Marten store registered by
+        // Configuration/MisconceptionStoreRegistrations.cs; this file
+        // does not write to any store.
+        ("src/api/Cena.Api.Contracts/Parenting/ITutorHandoffHtmlRenderer.cs",
+         "prr-309: HTML renderer for the tutor-handoff PDF; " +
+         "AppendMisconceptionSection is StringBuilder.Append composing " +
+         "the rendered output, not a Marten persistence seam. " +
+         "Misconception data it renders is loaded from the canonical " +
+         "store registered by Configuration/MisconceptionStoreRegistrations.cs."),
+
     };
 
     private static IEnumerable<string> ScannedFiles(string repoRoot)
