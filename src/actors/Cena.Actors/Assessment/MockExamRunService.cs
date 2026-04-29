@@ -37,6 +37,8 @@ using Cena.Actors.Cas;
 using Cena.Actors.Content;
 using Cena.Actors.Events;
 using Cena.Actors.Questions;
+using Cena.Actors.ExamTargets;
+using Cena.Actors.Mastery;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
@@ -51,6 +53,14 @@ public sealed class MockExamRunService : IMockExamRunService
     private readonly IItemDeliveryGate _deliveryGate;
     private readonly ILogger<MockExamRunService> _logger;
     private readonly TimeProvider _clock;
+    /// <summary>
+    /// PRR-289 — optional dependency that propagates per-question correctness
+    /// from a submitted mock exam into the skill-keyed mastery store via the
+    /// canonical BKT update path. Null means the host hasn't wired BKT (e.g.
+    /// historical test fixtures); the runner stays callable without it but
+    /// throws away the strongest adaptive signal we have.
+    /// </summary>
+    private readonly IBktStateTracker? _bktTracker;
 
     private static readonly Meter Meter = new("Cena.MockExam", "1.0.0");
     private static readonly Counter<long> RunsStarted =
@@ -77,7 +87,8 @@ public sealed class MockExamRunService : IMockExamRunService
         IBagrutPaperStructureCatalog structureCatalog,
         IItemDeliveryGate deliveryGate,
         ILogger<MockExamRunService> logger,
-        TimeProvider? clock = null)
+        TimeProvider? clock = null,
+        IBktStateTracker? bktTracker = null)
     {
         _store = store;
         _cas = cas;
@@ -85,7 +96,13 @@ public sealed class MockExamRunService : IMockExamRunService
         _deliveryGate = deliveryGate;
         _logger = logger;
         _clock = clock ?? TimeProvider.System;
+        _bktTracker = bktTracker;
     }
+
+    private static readonly Counter<long> BktObservations =
+        Meter.CreateCounter<long>("cena_mock_exam_bkt_observations_total");
+    private static readonly Counter<long> BktSkipped =
+        Meter.CreateCounter<long>("cena_mock_exam_bkt_observations_skipped_total");
 
     private static string SubjectForExamCode(string examCode) => examCode switch
     {
@@ -430,7 +447,229 @@ public sealed class MockExamRunService : IMockExamRunService
             "[MOCK-EXAM] Submitted runId={RunId} studentId={StudentId} score={Score:F1}% pointsAwarded={Awarded}/{TotalPts}",
             state.SimulationId, studentId, result.ScorePercent, result.PointsAwarded, result.TotalPoints);
 
+        // PRR-289 — feed per-question correctness into the BKT mastery store
+        // AFTER the run has been durably submitted. Best-effort: a BKT failure
+        // here must NOT roll back the submit — the student deserves their mark
+        // sheet even if the adaptive-signal pipeline is briefly down.
+        await RecordBktObservationsAsync(state, result, now, ct).ConfigureAwait(false);
+
         return result;
+    }
+
+    /// <summary>
+    /// PRR-289 — propagate per-question correctness from a submitted mock-exam
+    /// into the skill-keyed mastery store via <see cref="IBktStateTracker"/>.
+    /// Multi-part questions emit one observation per subpart (each subpart is
+    /// an independent BKT signal at the parent question's skill level — the
+    /// per-subpart taxonomy isn't surfaced today; if PRR-302 ships per-subpart
+    /// skill tagging, this fans out further).
+    ///
+    /// Best-effort by design: a single failed observation logs + skips; the
+    /// whole call is wrapped in a top-level try/catch so a BKT outage cannot
+    /// fail the surrounding submit.
+    /// </summary>
+    private async Task RecordBktObservationsAsync(
+        ExamSimulationState state,
+        MockExamResultResponse result,
+        DateTimeOffset occurredAt,
+        CancellationToken ct)
+    {
+        if (_bktTracker is null) return;
+        if (!TryMapExamCodeToTargetCode(state.ExamCode, out var examTargetCode))
+        {
+            _logger.LogInformation(
+                "[MOCK-EXAM-BKT] skip runId={RunId} reason=unmapped_exam_code examCode={ExamCode}",
+                state.SimulationId, state.ExamCode);
+            return;
+        }
+
+        try
+        {
+            // Batched-load topic mapping for every gradable question id in
+            // the result. Doing this once here (rather than re-deriving from
+            // GradeAsync's local byId) keeps the BKT path independent of
+            // grading internals — if the grade shape evolves, BKT keeps
+            // working as long as PerQuestion.QuestionId remains stable.
+            var questionIds = result.PerQuestion.Select(pq => pq.QuestionId).ToList();
+            var topicById = await LoadQuestionTopicsAsync(questionIds, ct).ConfigureAwait(false);
+
+            int observed = 0;
+            int skipped = 0;
+            foreach (var pq in result.PerQuestion)
+            {
+                if (!topicById.TryGetValue(pq.QuestionId, out var topic)
+                    || string.IsNullOrWhiteSpace(topic))
+                {
+                    // Question has no topic id → cannot key to a skill.
+                    // Counts as skipped so dashboards see content gaps.
+                    if (PerQuestionHasObservation(pq))
+                    {
+                        BktSkipped.Add(1,
+                            new KeyValuePair<string, object?>("reason", "missing_topic"));
+                        skipped++;
+                    }
+                    continue;
+                }
+
+                SkillCode skillCode;
+                try
+                {
+                    skillCode = SkillCode.Parse(topic);
+                }
+                catch (ArgumentException)
+                {
+                    // SkillCode validation rejects malformed topic ids
+                    // (whitespace, invalid chars). Drop the observation
+                    // rather than mis-key the mastery row.
+                    if (PerQuestionHasObservation(pq))
+                    {
+                        BktSkipped.Add(1,
+                            new KeyValuePair<string, object?>("reason", "invalid_topic_format"));
+                        skipped++;
+                    }
+                    continue;
+                }
+
+                if (pq.Subparts is { Count: > 0 })
+                {
+                    // Multi-part: each subpart with a graded verdict is an
+                    // independent BKT observation at the parent skill.
+                    foreach (var sp in pq.Subparts)
+                    {
+                        if (!sp.Correct.HasValue)
+                        {
+                            BktSkipped.Add(1,
+                                new KeyValuePair<string, object?>("reason", "ungraded_subpart"));
+                            skipped++;
+                            continue;
+                        }
+                        await _bktTracker.UpdateAsync(
+                            studentAnonId: state.StudentId,
+                            examTargetCode: examTargetCode,
+                            skillCode: skillCode,
+                            isCorrect: sp.Correct.Value,
+                            occurredAt: occurredAt,
+                            ct: ct).ConfigureAwait(false);
+                        observed++;
+                    }
+                }
+                else if (pq.Correct.HasValue)
+                {
+                    await _bktTracker.UpdateAsync(
+                        studentAnonId: state.StudentId,
+                        examTargetCode: examTargetCode,
+                        skillCode: skillCode,
+                        isCorrect: pq.Correct.Value,
+                        occurredAt: occurredAt,
+                        ct: ct).ConfigureAwait(false);
+                    observed++;
+                }
+                else
+                {
+                    // Top-level question with no graded verdict (not attempted,
+                    // ungradable, or Part-B unselected). Not a BKT signal.
+                    BktSkipped.Add(1,
+                        new KeyValuePair<string, object?>("reason", "ungraded_question"));
+                    skipped++;
+                }
+            }
+
+            BktObservations.Add(observed,
+                new KeyValuePair<string, object?>("examCode", state.ExamCode));
+            _logger.LogInformation(
+                "[MOCK-EXAM-BKT] runId={RunId} studentId={StudentId} examTarget={Target} observations={Observed} skipped={Skipped}",
+                state.SimulationId, state.StudentId, examTargetCode.Value, observed, skipped);
+        }
+        catch (Exception ex)
+        {
+            // Best-effort: BKT outage MUST NOT fail the submit. The student's
+            // mark sheet is already durable; we lose adaptive signal until
+            // the next submit, which is acceptable.
+            _logger.LogWarning(ex,
+                "[MOCK-EXAM-BKT] BKT propagation failed for runId={RunId} studentId={StudentId} — submit succeeds, signal dropped.",
+                state.SimulationId, state.StudentId);
+        }
+    }
+
+    /// <summary>
+    /// Per-question observation predicate: does this row produce ANY graded
+    /// verdict (top-level or via at least one graded subpart)? Used to
+    /// distinguish "skipped because grading is null" from "skipped because
+    /// taxonomy is missing" in the metrics.
+    /// </summary>
+    private static bool PerQuestionHasObservation(MockExamPerQuestionResult pq)
+    {
+        if (pq.Subparts is { Count: > 0 })
+            return pq.Subparts.Any(s => s.Correct.HasValue);
+        return pq.Correct.HasValue;
+    }
+
+    /// <summary>
+    /// Map a Bagrut exam-code (numeric שאלון) to the canonical
+    /// <see cref="ExamTargetCode"/> the mastery store keys on. Returns false
+    /// for unmapped codes so the caller can log + no-op rather than throw.
+    ///
+    /// The mapping mirrors <see cref="SubjectForExamCode"/> + the unit-tier
+    /// suffix:
+    ///   806 → bagrut-math-5yu
+    ///   807 → bagrut-math-4yu
+    ///   036 → bagrut-physics-5yu
+    /// New codes added to <see cref="SubjectForExamCode"/> MUST be added
+    /// here too — the architecture-test invariant
+    /// (<c>MockExamBktTargetMappingTest</c>) enforces parity.
+    /// </summary>
+    internal static bool TryMapExamCodeToTargetCode(string examCode, out ExamTargetCode code)
+    {
+        var raw = examCode switch
+        {
+            "806" => "bagrut-math-5yu",
+            "807" => "bagrut-math-4yu",
+            "036" => "bagrut-physics-5yu",
+            _     => null,
+        };
+        if (raw is null)
+        {
+            code = default;
+            return false;
+        }
+        return ExamTargetCode.TryParse(raw, out code);
+    }
+
+    /// <summary>
+    /// Single batched query that returns Topic for every question id in
+    /// <paramref name="questionIds"/>. Handles both Marten doc types
+    /// (<see cref="QuestionDocument"/> + <see cref="BagrutMultipartQuestion"/>)
+    /// since either may carry a graded item. The dictionary is keyed by id;
+    /// missing entries map to null (caller skips).
+    /// </summary>
+    private async Task<Dictionary<string, string?>> LoadQuestionTopicsAsync(
+        IReadOnlyList<string> questionIds, CancellationToken ct)
+    {
+        var topics = new Dictionary<string, string?>(StringComparer.Ordinal);
+        if (questionIds.Count == 0) return topics;
+
+        await using var session = _store.QuerySession();
+
+        var docs = await session.Query<QuestionDocument>()
+            .Where(q => questionIds.Contains(q.Id))
+            .Select(q => new { q.Id, q.Topic })
+            .ToListAsync(ct);
+        foreach (var d in docs) topics[d.Id] = d.Topic;
+
+        var multipart = await session.Query<BagrutMultipartQuestion>()
+            .Where(q => questionIds.Contains(q.Id))
+            .Select(q => new { q.Id, q.Topic })
+            .ToListAsync(ct);
+        foreach (var d in multipart)
+        {
+            // Multipart wins if it provides a non-empty Topic — either
+            // store carries the same logical topic, but multipart's Topic
+            // field is non-nullable while QuestionDocument's is nullable,
+            // so prefer multipart when both have an entry.
+            if (!string.IsNullOrWhiteSpace(d.Topic)) topics[d.Id] = d.Topic;
+        }
+
+        return topics;
     }
 
     public async Task<MockExamResultResponse?> GetResultAsync(
