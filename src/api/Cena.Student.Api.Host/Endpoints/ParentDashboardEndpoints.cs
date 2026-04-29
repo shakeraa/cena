@@ -11,7 +11,7 @@
 //
 // PRR-320 backfill: the previous version of this endpoint hard-coded zero
 // values for WeeklyMinutes / MonthlyMinutes / TopicsPracticed /
-// LastActiveAt / ReadinessScore with a "PRR-323 will fill these values"
+// LastActiveAt / ProgressBandIndicator with a "PRR-323 will fill these values"
 // TODO. That comment is now closed — the endpoint delegates to
 // IParentDashboardCardSource (see ParentDashboardServiceRegistration)
 // which composes the scalars from the Marten event log. The Noop
@@ -100,7 +100,7 @@ public static class ParentDashboardEndpoints
                 WeeklyMinutes: card.WeeklyMinutes,
                 MonthlyMinutes: card.MonthlyMinutes,
                 TopicsPracticed: card.TopicsPracticed,
-                ReadinessScore: card.ReadinessScore,
+                ProgressBandIndicator: card.ProgressBandIndicator,
                 LastActiveAt: card.LastActiveAt));
         }
 

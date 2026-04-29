@@ -223,6 +223,6 @@ public class HouseholdDashboardAggregatorTests
             OrdinalInHousehold: ordinal,
             WeeklyMinutesOnTask: weekly,
             MonthlyMinutesOnTask: monthly,
-            ReadinessSnapshot: null,
+            ProgressBandSummary: null,
             Tier: "Premium");
 }

@@ -146,7 +146,7 @@ public sealed class NoopHouseholdCardSource : IHouseholdCardSource
                 OrdinalInHousehold: ls.Ordinal,
                 WeeklyMinutesOnTask: 0,                      // Zero = "no usage data yet".
                 MonthlyMinutesOnTask: 0,
-                ReadinessSnapshot: null,                     // Null = "not computed".
+                ProgressBandSummary: null,                     // Null = "not computed".
                 Tier: ls.Tier.ToString()));
         }
 

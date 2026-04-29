@@ -55,7 +55,7 @@ namespace Cena.Api.Contracts.Subscriptions;
 /// </param>
 /// <param name="WeeklyMinutesOnTask">Total practice minutes in the last 7 days.</param>
 /// <param name="MonthlyMinutesOnTask">Total practice minutes in the last 30 days.</param>
-/// <param name="ReadinessSnapshot">
+/// <param name="ProgressBandSummary">
 /// Short human-readable summary ("On track for 4-unit", "Needs more review",
 /// or null when no exam target is configured). Never a raw score, never
 /// numeric Bagrut prediction (ADR-0050 §bucket-only), never PII.
@@ -67,7 +67,7 @@ public sealed record HouseholdStudentCardDto(
     int OrdinalInHousehold,
     int WeeklyMinutesOnTask,
     int MonthlyMinutesOnTask,
-    string? ReadinessSnapshot,
+    string? ProgressBandSummary,
     string Tier);
 
 /// <summary>

@@ -20,7 +20,7 @@
 //        • cross-student isolation (events from unlinked ids ignored)
 //        • empty linked-student list → empty bundle
 //        • null arg → ArgumentNullException
-//        • ReadinessScore always null (explicitly deferred — PRR-320
+//        • ProgressBandIndicator always null (explicitly deferred — PRR-320
 //          scope documentation)
 // =============================================================================
 
@@ -80,7 +80,7 @@ public class ParentDashboardCardSourceTests
         Assert.Equal(0, zeroCard.MonthlyMinutes);
         Assert.Equal(0, zeroCard.TopicsPracticed);
         Assert.Null(zeroCard.LastActiveAt);
-        Assert.Null(zeroCard.ReadinessScore);
+        Assert.Null(zeroCard.ProgressBandIndicator);
     }
 
     [Fact]
@@ -286,7 +286,7 @@ public class ParentDashboardCardSourceTests
         Assert.Equal(2, bob.TopicsPracticed);
     }
 
-    // ── Fold: ReadinessScore always null (PRR-320 scope doc) ────────────────
+    // ── Fold: ProgressBandIndicator always null (PRR-320 scope doc) ────────────────
 
     [Fact]
     public void Fold_readiness_score_is_null_in_v1_no_readiness_model_wired()
@@ -299,7 +299,7 @@ public class ParentDashboardCardSourceTests
 
         var bundle = MartenParentDashboardCardSource.Fold(events, linked, Now);
 
-        Assert.Null(bundle.PerStudent["enc::alice"].ReadinessScore);
+        Assert.Null(bundle.PerStudent["enc::alice"].ProgressBandIndicator);
     }
 
     // ── Fold: null-arg guards ───────────────────────────────────────────────
@@ -351,6 +351,6 @@ public class ParentDashboardCardSourceTests
         Assert.Equal(0, zero.MonthlyMinutes);
         Assert.Equal(0, zero.TopicsPracticed);
         Assert.Null(zero.LastActiveAt);
-        Assert.Null(zero.ReadinessScore);
+        Assert.Null(zero.ProgressBandIndicator);
     }
 }

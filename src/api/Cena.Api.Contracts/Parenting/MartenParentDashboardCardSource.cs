@@ -38,7 +38,7 @@
 //       The Marten IEvent wrapper carries the append timestamp since
 //       the payload itself has no timestamp field (see PedagogyEvents.cs).
 //
-//     • ReadinessScore: null. A readiness score requires a separate
+//     • ProgressBandIndicator: null. A readiness score requires a separate
 //       readiness model (per-exam-target forecast) that is explicitly
 //       out of scope for PRR-320. Frontend must render "not yet
 //       computed" for null — see memory "Labels match data".
@@ -66,7 +66,7 @@
 //   Contracts transitively via its Cena.Actors project reference.
 //
 // What this is NOT:
-//   - Not a readiness computation (ReadinessScore is null; out of scope).
+//   - Not a readiness computation (ProgressBandIndicator is null; out of scope).
 //   - Not a minutes-on-task projection (uses hint-event proxy; real
 //     projection is a separate task).
 //   - Not a misconception source (misconception data is session-scoped
@@ -276,9 +276,9 @@ public sealed class MartenParentDashboardCardSource : IParentDashboardCardSource
                 MonthlyMinutes: mc * MinutesPerEventProxy,
                 TopicsPracticed: topics,
                 LastActiveAt: last,
-                // ReadinessScore: v1 has no readiness model — null is
+                // ProgressBandIndicator: v1 has no readiness model — null is
                 // the honest answer. Frontend renders "not yet computed".
-                ReadinessScore: null);
+                ProgressBandIndicator: null);
         }
 
         return new ParentDashboardCards(perStudent, now);
