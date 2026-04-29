@@ -381,6 +381,16 @@ public partial class Program
     Cena.Actors.Variants.VariantServiceRegistration
         .AddVariantGenerationGate(builder.Services);
 
+    // PRR-260 / ADR-0059 §15.5 R11: cohort single-flight write lock around
+    // variant generation. Without this, 30 students in one classroom hitting
+    // "generate similar" on the same Bagrut question fan out to 30 parallel
+    // Tier-3 LLM calls (persona-finops flagged this as the #1 cost lever:
+    // 30× variance per cohort). The lock collapses concurrent calls keyed
+    // on the §15.5 dedup key into 1 writer + (N-1) cache readers.
+    // Requires IConnectionMultiplexer (registered above) + IMeterFactory.
+    Cena.Actors.Persistence.VariantSingleFlightServiceRegistration
+        .AddVariantSingleFlightLock(builder.Services);
+
     // prr-033: Ministry Bagrut rubric DSL + version pinning (ADR-0055).
     // Loads contracts/rubric/*.yml on boot; fails fast on malformed rubrics.
     builder.Services.AddCenaRubricVersionPinning(
