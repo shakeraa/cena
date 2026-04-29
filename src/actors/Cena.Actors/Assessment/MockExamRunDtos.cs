@@ -139,7 +139,8 @@ public sealed record MockExamResultResponse(
     IReadOnlyList<MockExamSectionResult> PerSection);
 
 /// <summary>Per-question grading line item (Phase 1E adds Points/PointsAwarded;
-/// Phase 2A adds Subparts when the question is multi-part).</summary>
+/// Phase 2A adds Subparts when the question is multi-part;
+/// PRR-299 adds FirstAnsweredAt + TimeSpent for pacing analytics).</summary>
 public sealed record MockExamPerQuestionResult(
     string QuestionId,
     string Section, // "A" | "B"
@@ -156,7 +157,18 @@ public sealed record MockExamPerQuestionResult(
     /// each subpart has its own line. <see cref="StudentAnswer"/> +
     /// <see cref="CanonicalAnswer"/> are null on the parent in this case
     /// — the answers live on the subpart records.</summary>
-    IReadOnlyList<MockExamSubpartResult>? Subparts = null);
+    IReadOnlyList<MockExamSubpartResult>? Subparts = null,
+    /// <summary>PRR-299 — earliest server-recorded answer timestamp on
+    /// any of this question's answer keys. Null when the question was
+    /// not answered (Part-B unselected, ungraded, etc.).</summary>
+    DateTimeOffset? FirstAnsweredAt = null,
+    /// <summary>PRR-299 — server-computed pacing window:
+    /// <c>FirstAnsweredAt − previous-question's-LastAnsweredAt</c> (or
+    /// <c>− StartedAt</c> when this is the first question engaged).
+    /// The result page renders this as "47 min on Q1" — pedagogical
+    /// diagnostic, NOT a streak / loss-aversion mechanic (GD-004 ban
+    /// applies). Null when not answered.</summary>
+    TimeSpan? TimeSpent = null);
 
 /// <summary>Per-subpart grading detail (a/b/c).</summary>
 public sealed record MockExamSubpartResult(

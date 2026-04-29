@@ -118,6 +118,33 @@ public sealed class ExamSimulationState
     /// <summary>Student answers keyed by question ID.</summary>
     public Dictionary<string, string> Answers { get; set; } = new();
 
+    /// <summary>
+    /// PRR-299 — first-time-engaged timestamp keyed by the same answerKey
+    /// as <see cref="Answers"/> (qid for single-cell, "qid:subpart" for
+    /// multi-part). Set on the first SubmitAnswer for that key and
+    /// preserved on subsequent edits — the value is "when did the student
+    /// FIRST commit an answer for this slot", which is the cleanest proxy
+    /// for "when did they engage with this question". Used by the grader
+    /// to compute per-question pacing on the result page.
+    ///
+    /// NOT a streak/loss-aversion mechanic (GD-004 ban). Pacing is a
+    /// pedagogical diagnostic — the result page surfaces per-question
+    /// time so a student can see their own allocation ("I spent 35 min
+    /// on Q3 and 5 min on Q4") for honest self-reflection, never as a
+    /// countdown or pressure indicator.
+    /// </summary>
+    public Dictionary<string, DateTimeOffset> AnswerTimestamps { get; set; } = new();
+
+    /// <summary>
+    /// PRR-299 — most-recent-engaged timestamp keyed by answerKey. Updated
+    /// on every SubmitAnswer (first call sets it equal to
+    /// <see cref="AnswerTimestamps"/>; subsequent edits overwrite). The
+    /// grader uses this with <see cref="AnswerTimestamps"/> to derive
+    /// "time spent on Q[i] = first(Q[i]) − last(prior question)" per
+    /// the PRR-299 spec.
+    /// </summary>
+    public Dictionary<string, DateTimeOffset> AnswerLastTimestamps { get; set; } = new();
+
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? SubmittedAt { get; set; }
 

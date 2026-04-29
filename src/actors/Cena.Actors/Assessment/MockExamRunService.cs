@@ -419,6 +419,12 @@ public sealed class MockExamRunService : IMockExamRunService
 
         var answerValue = request.Answer ?? "";
         state.Answers[answerKey] = answerValue;
+        // PRR-299: stamp pacing timestamps. TryAdd preserves first-engaged;
+        // direct assignment keeps last-engaged fresh on every edit.
+        var nowAns = _clock.GetUtcNow();
+        state.AnswerTimestamps.TryAdd(answerKey, nowAns);
+        state.AnswerLastTimestamps[answerKey] = nowAns;
+
         session.Store(state);
 
         // PRR-283 — per-answer audit event.
@@ -468,6 +474,11 @@ public sealed class MockExamRunService : IMockExamRunService
                     $"questionId {a.QuestionId} is not part of this run.");
         }
 
+        // PRR-283 + PRR-299: shared timestamp for the whole bulk batch.
+        // PRR-283 audit event timestamp + PRR-299 pacing-engaged stamp
+        // both attribute every entry to the same `now` — the student
+        // engaged the entire submission window from the server's
+        // perspective.
         var ts = _clock.GetUtcNow();
         foreach (var a in request.Answers)
         {
@@ -476,6 +487,9 @@ public sealed class MockExamRunService : IMockExamRunService
                 : $"{a.QuestionId}:{a.SubpartId}";
             var value = a.Answer ?? "";
             state.Answers[key] = value;
+            // PRR-299 — pacing timestamps for every entry in the batch.
+            state.AnswerTimestamps.TryAdd(key, ts);
+            state.AnswerLastTimestamps[key] = ts;
 
             // PRR-283 — emit one per-answer event per submission, so the
             // stream resolution matches the single-answer path. Bulk
@@ -1110,6 +1124,12 @@ public sealed class MockExamRunService : IMockExamRunService
         var scorePercent = totalPoints == 0 ? 0.0 : (100.0 * pointsAwarded / totalPoints);
         var timeTaken = (state.SubmittedAt ?? _clock.GetUtcNow()) - state.StartedAt;
 
+        // PRR-299 — overlay per-question pacing onto the perQuestion list.
+        // The grading pass already produced rows in slot order; we now
+        // walk them in answer-timestamp order to compute TimeSpent honestly,
+        // then rebuild the list preserving the original slot order.
+        var perQuestionWithPacing = OverlayPerQuestionPacing(perQuestion, state);
+
         return new MockExamResultResponse(
             RunId: state.SimulationId,
             ExamCode: state.ExamCode,
@@ -1121,7 +1141,7 @@ public sealed class MockExamRunService : IMockExamRunService
             TimeTaken: timeTaken,
             TimeLimit: TimeSpan.FromMinutes(state.Format.TimeLimitMinutes),
             VisibilityWarnings: state.VisibilityEvents.Count,
-            PerQuestion: perQuestion,
+            PerQuestion: perQuestionWithPacing,
             PointsAwarded: pointsAwarded,
             TotalPoints: totalPoints,
             PerSection: new[]
@@ -1131,6 +1151,101 @@ public sealed class MockExamRunService : IMockExamRunService
                 new MockExamSectionResult("B", sectionBAttempted, sectionBCorrect,
                     sectionBAwarded, sectionBTotalPts),
             });
+    }
+
+    /// <summary>
+    /// PRR-299 — derive per-question pacing from the timestamp dictionaries.
+    ///
+    /// Algorithm:
+    ///   1. For each question id present in <paramref name="perQuestion"/>,
+    ///      collect its answer-keys (single-cell: just the qid; multi-part:
+    ///      "{qid}:{subpartId}" for each subpart). Compute:
+    ///        firstAnsweredAt(q) = min(state.AnswerTimestamps[k]      ∀ k of q)
+    ///        lastAnsweredAt(q)  = max(state.AnswerLastTimestamps[k]  ∀ k of q)
+    ///   2. Sort answered questions by firstAnsweredAt ascending.
+    ///   3. Walk in sorted order, tracking prevLast (initially StartedAt):
+    ///        TimeSpent(q) = firstAnsweredAt(q) − prevLast
+    ///        prevLast     = lastAnsweredAt(q)
+    ///      Negative deltas are clamped to TimeSpan.Zero (defensive — a
+    ///      clock skew or out-of-order answer should not yield "−5 min on Q3").
+    ///   4. Rebuild perQuestion preserving the original slot order; un-
+    ///      answered rows keep null FirstAnsweredAt + TimeSpent.
+    ///
+    /// Internal-static + repo-public for unit tests; pure function (no I/O).
+    /// </summary>
+    internal static IReadOnlyList<MockExamPerQuestionResult> OverlayPerQuestionPacing(
+        IReadOnlyList<MockExamPerQuestionResult> perQuestion,
+        ExamSimulationState state)
+    {
+        // Step 1: collect per-question first/last timestamps.
+        var firstByQ = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+        var lastByQ = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+        foreach (var pq in perQuestion)
+        {
+            // The set of answer-keys for this question:
+            var keys = new List<string>(1);
+            if (pq.Subparts is { Count: > 0 })
+            {
+                foreach (var sp in pq.Subparts)
+                    keys.Add($"{pq.QuestionId}:{sp.SubpartId}");
+            }
+            else
+            {
+                keys.Add(pq.QuestionId);
+            }
+
+            DateTimeOffset? earliest = null, latest = null;
+            foreach (var k in keys)
+            {
+                if (state.AnswerTimestamps.TryGetValue(k, out var first))
+                {
+                    earliest = earliest is null || first < earliest ? first : earliest;
+                }
+                if (state.AnswerLastTimestamps.TryGetValue(k, out var last))
+                {
+                    latest = latest is null || last > latest ? last : latest;
+                }
+            }
+
+            if (earliest.HasValue) firstByQ[pq.QuestionId] = earliest.Value;
+            if (latest.HasValue) lastByQ[pq.QuestionId] = latest.Value;
+        }
+
+        // Step 2 + 3: sort answered questions by firstAnsweredAt and compute
+        // TimeSpent in chain order.
+        var timeSpentByQ = new Dictionary<string, TimeSpan>(StringComparer.Ordinal);
+        var answeredOrder = firstByQ
+            .OrderBy(kv => kv.Value)
+            .Select(kv => kv.Key)
+            .ToList();
+
+        var prevLast = state.StartedAt;
+        foreach (var qid in answeredOrder)
+        {
+            var first = firstByQ[qid];
+            var delta = first - prevLast;
+            // Clock-skew / out-of-order defensive: negative TimeSpent would
+            // confuse the SPA renderer. Clamp to zero.
+            if (delta < TimeSpan.Zero) delta = TimeSpan.Zero;
+            timeSpentByQ[qid] = delta;
+            prevLast = lastByQ.TryGetValue(qid, out var l) ? l : first;
+        }
+
+        // Step 4: rebuild perQuestion in original slot order, overlaying
+        // pacing fields. Records' `with` keyword keeps every other field
+        // pristine (positional-record clone with named override).
+        var rebuilt = new List<MockExamPerQuestionResult>(perQuestion.Count);
+        foreach (var pq in perQuestion)
+        {
+            firstByQ.TryGetValue(pq.QuestionId, out var firstAt);
+            timeSpentByQ.TryGetValue(pq.QuestionId, out var timeSpent);
+            rebuilt.Add(pq with
+            {
+                FirstAnsweredAt = firstByQ.ContainsKey(pq.QuestionId) ? firstAt : null,
+                TimeSpent = timeSpentByQ.ContainsKey(pq.QuestionId) ? timeSpent : null,
+            });
+        }
+        return rebuilt;
     }
 
     private async Task<CasVerifyResult> VerifyWithRetryAsync(
