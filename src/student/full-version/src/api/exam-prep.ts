@@ -98,3 +98,16 @@ export function getMockExamQuestionPreview(
 ): Promise<ExamPrepQuestionPreview> {
   return $api<ExamPrepQuestionPreview>(`${ROOT}/${runId}/question/${questionId}`)
 }
+
+/** Phase-4 #1 — report a tab-switch / visibility-change to the server.
+ * Real Ministry exam day proctors care about these. */
+export function reportMockExamVisibility(
+  runId: string,
+  state: 'hidden' | 'visible' | 'blur',
+  durationAwayMs: number,
+): Promise<MockExamRunStateResponse> {
+  return $api<MockExamRunStateResponse>(`${ROOT}/${runId}/visibility`, {
+    method: 'POST',
+    body: { state, durationAwayMs },
+  })
+}

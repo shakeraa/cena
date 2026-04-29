@@ -26,6 +26,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   getMockExamQuestionPreview,
   getMockExamRunState,
+  reportMockExamVisibility,
   selectMockExamPartB,
   submitMockExamAnswer,
   submitMockExamAnswersBulk,
@@ -225,8 +226,30 @@ function beforeUnloadHandler(e: BeforeUnloadEvent) {
   e.returnValue = ''
 }
 
+// Phase-4 #1 — Visibility API wiring. Real Ministry exam day cares
+// about tab-switches; our state has VisibilityEvents + we emit
+// ExamVisibilityWarning_V1. Track the moment the page hides + report
+// the duration on visible-again. Best-effort: fire-and-forget so a
+// network blip during reporting doesn't break the runner UX.
+let lastHiddenAt: number | null = null
+function visibilityHandler() {
+  if (state.value?.isSubmitted) return
+  if (document.visibilityState === 'hidden') {
+    lastHiddenAt = Date.now()
+    // Report the hide immediately so a long-away student is recorded
+    // even if they never come back.
+    reportMockExamVisibility(runId.value, 'hidden', 0).catch(() => {})
+  }
+  else if (document.visibilityState === 'visible' && lastHiddenAt !== null) {
+    const dur = Date.now() - lastHiddenAt
+    lastHiddenAt = null
+    reportMockExamVisibility(runId.value, 'visible', dur).catch(() => {})
+  }
+}
+
 onMounted(async () => {
   window.addEventListener('beforeunload', beforeUnloadHandler)
+  document.addEventListener('visibilitychange', visibilityHandler)
   await loadState()
   tickInterval = setInterval(() => {
     now.value = Date.now()
@@ -239,6 +262,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   if (tickInterval) clearInterval(tickInterval)
   window.removeEventListener('beforeunload', beforeUnloadHandler)
+  document.removeEventListener('visibilitychange', visibilityHandler)
   for (const qid of Object.keys(debounceTimers)) {
     clearTimeout(debounceTimers[qid])
   }

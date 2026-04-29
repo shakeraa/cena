@@ -240,6 +240,30 @@ public static class MockExamRunEndpoints
             return result is null ? Results.NotFound() : Results.Ok(result);
         });
 
+        // POST /{runId}/visibility  — Phase-4 #1. Real-exam fidelity:
+        // the runner page reports document.visibilityState changes here
+        // so the student stream gets ExamVisibilityWarning_V1 events
+        // matching what the Ministry would proctor for tab-switches.
+        group.MapPost("/{runId}/visibility", async (
+            string runId,
+            HttpContext ctx,
+            [FromServices] IMockExamRunService service,
+            VisibilityEventReport report,
+            CancellationToken ct) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            try
+            {
+                var state = await service.ReportVisibilityEventAsync(studentId, runId, report, ct);
+                return Results.Ok(state);
+            }
+            catch (KeyNotFoundException) { return Results.NotFound(); }
+            catch (UnauthorizedAccessException) { return Results.Forbid(); }
+        });
+
         // GET /{runId}/question/{qid}  — Phase 1D preview (prompt + topic
         // + bloom). The runner uses this to render question stems in the
         // Part-B picker so students don't pick blind. Delivery gate

@@ -79,14 +79,38 @@ public interface IMockExamRunService
     /// run isn't owned by the student. The delivery-gate
     /// chokepoint (ExamSimulationDelivery.AssertDeliverable) is
     /// invoked before serializing — Ministry-derived items never
-    /// reach this surface.
+    /// reach this surface. Phase-4 #2 — also emits
+    /// ExamSimulationItemDelivered_V1 on success so the audit trail
+    /// records every item served.
     /// </summary>
     Task<MockExamQuestionPreview?> GetQuestionPreviewAsync(
         string studentId,
         string runId,
         string questionId,
         CancellationToken ct);
+
+    /// <summary>
+    /// Phase-4 #1 — record a browser visibility-change event during a
+    /// run. Real Ministry exam-day proctors care about tab-switches +
+    /// minimize duration. The runner page reports these via the
+    /// document Visibility API; the service appends to the run state
+    /// + emits <c>ExamVisibilityWarning_V1</c> on the student stream.
+    /// Idempotent only at the event-stream level (every report writes
+    /// a new visibility event); state.VisibilityEvents is appended,
+    /// not deduped.
+    /// </summary>
+    Task<MockExamRunStateResponse> ReportVisibilityEventAsync(
+        string studentId,
+        string runId,
+        VisibilityEventReport report,
+        CancellationToken ct);
 }
+
+public sealed record VisibilityEventReport(
+    /// <summary>"hidden" / "visible" / "blur" — passed through verbatim.</summary>
+    string State,
+    /// <summary>Duration the page was in the prior state, in milliseconds.</summary>
+    long DurationAwayMs);
 
 public sealed record MockExamQuestionPreview(
     string QuestionId,

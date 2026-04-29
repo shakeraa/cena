@@ -443,10 +443,43 @@ public sealed class MockExamRunService : IMockExamRunService
         return await GradeAsync(session, state, ct);
     }
 
+    public async Task<MockExamRunStateResponse> ReportVisibilityEventAsync(
+        string studentId, string runId, VisibilityEventReport report, CancellationToken ct)
+    {
+        ArgumentNullException.ThrowIfNull(report);
+
+        await using var session = _store.LightweightSession();
+        var state = await session.LoadAsync<ExamSimulationState>(runId, ct)
+            ?? throw new KeyNotFoundException($"Run {runId} not found.");
+        if (state.StudentId != studentId)
+            throw new UnauthorizedAccessException("Run does not belong to this student.");
+        // Continue accepting reports even if the run is submitted/expired —
+        // a delayed visibility report after submit is still useful audit.
+
+        var ts = _clock.GetUtcNow();
+        var dur = TimeSpan.FromMilliseconds(Math.Max(0, report.DurationAwayMs));
+        state.VisibilityEvents.Add(new VisibilityEvent(ts, report.State, dur));
+
+        session.Store(state);
+        session.Events.Append(studentId, new ExamVisibilityWarning_V1(
+            StudentId: studentId,
+            SimulationId: runId,
+            VisibilityState: report.State,
+            DurationAway: dur,
+            DetectedAt: ts));
+
+        await session.SaveChangesAsync(ct);
+        return BuildStateResponse(state);
+    }
+
     public async Task<MockExamQuestionPreview?> GetQuestionPreviewAsync(
         string studentId, string runId, string questionId, CancellationToken ct)
     {
-        await using var session = _store.QuerySession();
+        // Phase-4 #2: this is a delivery seam — every served preview gets
+        // a corresponding ExamSimulationItemDelivered_V1 event so the
+        // audit trail can answer "did we serve item X to student Y" by
+        // event-stream replay.
+        await using var session = _store.LightweightSession();
         var state = await session.LoadAsync<ExamSimulationState>(runId, ct);
         if (state is null || state.StudentId != studentId) return null;
 
@@ -466,6 +499,8 @@ public sealed class MockExamRunService : IMockExamRunService
             // as 5xx (P0 SIEM alarm), which is correct.
             AssertDeliverable(multipart.SourceType, questionId, runId, studentId);
 
+            await EmitItemDeliveredAsync(session, studentId, runId, questionId, multipart.SourceType, ct);
+
             return new MockExamQuestionPreview(
                 QuestionId: questionId,
                 Prompt: multipart.Stem,
@@ -483,7 +518,9 @@ public sealed class MockExamRunService : IMockExamRunService
         // For single-cell Q's the derivation is "every active doc is
         // AiRecreated" by the same convention DiagnosticEndpoints uses
         // (see DeriveProvenanceKind). Belt-and-braces.
-        AssertDeliverable(rm?.SourceType ?? "AiRecreated", questionId, runId, studentId);
+        var sourceType = rm?.SourceType ?? "AiRecreated";
+        AssertDeliverable(sourceType, questionId, runId, studentId);
+        await EmitItemDeliveredAsync(session, studentId, runId, questionId, sourceType, ct);
 
         return new MockExamQuestionPreview(
             QuestionId: questionId,
@@ -491,6 +528,30 @@ public sealed class MockExamRunService : IMockExamRunService
             Topic: doc.Topic ?? rm?.Topic,
             BloomsLevel: rm?.BloomsLevel ?? 0,
             Subparts: null);
+    }
+
+    /// <summary>Phase-4 #2 — append an ExamSimulationItemDelivered_V1
+    /// event so the per-student stream has an auditable record of every
+    /// item served. Idempotency: this fires on every preview read, so
+    /// the same item served twice = two events; the projection layer
+    /// can dedup by (SimulationId, ItemId) when needed.</summary>
+    private async Task EmitItemDeliveredAsync(
+        IDocumentSession session, string studentId, string runId, string itemId,
+        string sourceType, CancellationToken ct)
+    {
+        var kind = sourceType switch
+        {
+            "TeacherAuthoredOriginal" => ProvenanceKind.TeacherAuthoredOriginal,
+            "MinistryBagrut"          => ProvenanceKind.MinistryBagrut, // unreachable — gate threw
+            _                          => ProvenanceKind.AiRecreated,
+        };
+        session.Events.Append(studentId, new ExamSimulationItemDelivered_V1(
+            StudentId: studentId,
+            SimulationId: runId,
+            ItemId: itemId,
+            Provenance: kind,
+            DeliveredAt: _clock.GetUtcNow()));
+        await session.SaveChangesAsync(ct);
     }
 
     /// <summary>
@@ -546,12 +607,30 @@ public sealed class MockExamRunService : IMockExamRunService
                 if (pick is null)
                 {
                     pick = TryPick(poolByConcept, section.FallbackTopicId, slot, drawn, rng);
-                    if (pick is not null) SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "section"));
+                    if (pick is not null)
+                    {
+                        SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "section"));
+                        // Phase-4 #3 — fallback honesty. Log the drop so an
+                        // operator can correlate the student's "this Q feels
+                        // generic" complaint with the actual structure miss.
+                        _logger.LogInformation(
+                            "[MOCK-EXAM-FALLBACK] slot {Slot} topic={Topic} fell to section topic={Section}",
+                            slot.SlotNumber, slot.TopicId, section.FallbackTopicId);
+                    }
                 }
                 if (pick is null)
                 {
                     pick = Shuffle(fullPool.Where(q => !drawn.Contains(q.Id)).ToList(), rng).FirstOrDefault();
-                    if (pick is not null) SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "subject"));
+                    if (pick is not null)
+                    {
+                        SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "subject"));
+                        // Loud warning — subject-wide fallback violates the
+                        // structure invariant in spirit. Production-grade
+                        // ops alarm should fire on this counter > 0.
+                        _logger.LogWarning(
+                            "[MOCK-EXAM-FALLBACK-SUBJECT] slot {Slot} topic={Topic} could not be matched; falling to ANY subject item. The pool likely needs more items for {Topic}.",
+                            slot.SlotNumber, slot.TopicId, slot.TopicId);
+                    }
                 }
                 pickedId = pick?.Id;
             }
