@@ -287,4 +287,36 @@ public static class ProcessingPurposeExtensions
 
         return attr?.Description ?? purpose.ToString();
     }
+
+    /// <summary>
+    /// PRR-311 — canonical wire-format key for this purpose. Returns the
+    /// snake_case form used in SIEM logs, consent-event payloads, and
+    /// privacy-dashboard metrics. Stable across the codebase: changing
+    /// the return value here breaks observability/SIEM queries.
+    ///
+    /// Default enum <see cref="object.ToString"/> returns the PascalCase
+    /// field name (e.g. <c>"BehavioralAnalytics"</c>); the canonical wire
+    /// form is <c>"behavioral_analytics"</c>. Use this method anywhere
+    /// you need the wire key.
+    /// </summary>
+    /// <param name="purpose">The processing purpose to canonicalise.</param>
+    /// <returns>The snake_case wire-format key.</returns>
+    public static string ToCanonicalString(this ProcessingPurpose purpose) => purpose switch
+    {
+        ProcessingPurpose.AccountAuth              => "account_auth",
+        ProcessingPurpose.SessionContinuity        => "session_continuity",
+        ProcessingPurpose.AdaptiveRecommendation   => "adaptive_recommendation",
+        ProcessingPurpose.PeerComparison           => "peer_comparison",
+        ProcessingPurpose.LeaderboardDisplay       => "leaderboard_display",
+        ProcessingPurpose.SocialFeatures           => "social_features",
+        ProcessingPurpose.ThirdPartyAi             => "third_party_ai",
+        ProcessingPurpose.BehavioralAnalytics      => "behavioral_analytics",
+        ProcessingPurpose.CrossTenantBenchmarking  => "cross_tenant_benchmarking",
+        ProcessingPurpose.MarketingNudges          => "marketing_nudges",
+        _ => throw new ArgumentOutOfRangeException(
+            nameof(purpose), purpose,
+            "Unknown ProcessingPurpose value. Add a snake_case mapping " +
+            "in ProcessingPurposeExtensions.ToCanonicalString to keep the " +
+            "SIEM / consent-event wire format stable."),
+    };
 }

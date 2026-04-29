@@ -79,14 +79,27 @@ public class ConsentEnforcementTests
         Assert.IsType<Ok>(result);
     }
 
+    // PRR-311: the canonical SIEM/observability wire-format key for a
+    // ProcessingPurpose is snake_case. Default enum ToString() returns
+    // the PascalCase field name (e.g. "BehavioralAnalytics"); we expose
+    // the wire form via ProcessingPurposeExtensions.ToCanonicalString().
+    // The test exercises that extension so a future enum addition that
+    // forgets to wire its mapping fails here loudly.
     [Theory]
-    [InlineData(ProcessingPurpose.PeerComparison, "peer_comparison")]
-    [InlineData(ProcessingPurpose.SocialFeatures, "social_features")]
-    [InlineData(ProcessingPurpose.ThirdPartyAi, "third_party_ai")]
-    [InlineData(ProcessingPurpose.BehavioralAnalytics, "behavioral_analytics")]
-    public void ProcessingPurpose_ToString_ReturnsExpectedValue(ProcessingPurpose purpose, string expected)
+    [InlineData(ProcessingPurpose.AccountAuth,             "account_auth")]
+    [InlineData(ProcessingPurpose.SessionContinuity,       "session_continuity")]
+    [InlineData(ProcessingPurpose.AdaptiveRecommendation,  "adaptive_recommendation")]
+    [InlineData(ProcessingPurpose.PeerComparison,          "peer_comparison")]
+    [InlineData(ProcessingPurpose.LeaderboardDisplay,      "leaderboard_display")]
+    [InlineData(ProcessingPurpose.SocialFeatures,          "social_features")]
+    [InlineData(ProcessingPurpose.ThirdPartyAi,            "third_party_ai")]
+    [InlineData(ProcessingPurpose.BehavioralAnalytics,     "behavioral_analytics")]
+    [InlineData(ProcessingPurpose.CrossTenantBenchmarking, "cross_tenant_benchmarking")]
+    [InlineData(ProcessingPurpose.MarketingNudges,         "marketing_nudges")]
+    public void ProcessingPurpose_ToCanonicalString_Returns_SnakeCase(
+        ProcessingPurpose purpose, string expected)
     {
-        Assert.Equal(expected, purpose.ToString().ToLowerInvariant());
+        Assert.Equal(expected, purpose.ToCanonicalString());
     }
 
     [Fact]
