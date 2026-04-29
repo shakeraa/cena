@@ -42,6 +42,17 @@ public sealed class OutboundSmsPolicyArchitectureTests
         "src/actors/Cena.Actors/ParentDigest/TwilioWhatsAppSender.cs",
         "src/actors/Cena.Actors/ParentDigest/WhatsAppChannel.cs",
 
+        // PRR-307 / prr-437: Meta Cloud API IWhatsAppSender adapter. Same
+        // shape as TwilioWhatsAppSender — declares the SendAsync interface
+        // method AND uses HttpClient.SendAsync internally for the vendor
+        // round-trip. The arch-test regex matches both call shapes; the
+        // class is a sender IMPLEMENTATION (not a caller of
+        // IWhatsAppSender.SendAsync), so it goes here next to its
+        // Twilio sibling. WhatsAppOptOutPolicy continues to be the
+        // single decorator-gate every consumer hits before reaching
+        // either vendor adapter.
+        "src/actors/Cena.Actors/ParentDigest/MetaCloudWhatsAppSender.cs",
+
         // prr-018 predates the policy chain for the in-app notification path
         // that sends SMS reminders about SESSION state (NOT parent nudges).
         // This is a deliberately grandfathered surface — it is student-device
