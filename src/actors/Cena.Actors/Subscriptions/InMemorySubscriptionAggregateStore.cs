@@ -17,9 +17,22 @@ namespace Cena.Actors.Subscriptions;
 /// a lock object so Append is serialized within a stream even under
 /// concurrent writes.
 /// </summary>
-public sealed class InMemorySubscriptionAggregateStore : ISubscriptionAggregateStore
+public sealed class InMemorySubscriptionAggregateStore
+    : ISubscriptionAggregateStore, ISubscriptionStreamEnumerator
 {
     private readonly ConcurrentDictionary<string, StreamBucket> _streams = new();
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<string> EnumerateParentIdsAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        foreach (var key in _streams.Keys)
+        {
+            ct.ThrowIfCancellationRequested();
+            yield return key;
+        }
+        await Task.CompletedTask;
+    }
 
     /// <inheritdoc/>
     public Task<SubscriptionAggregate> LoadAsync(string parentSubjectId, CancellationToken ct)

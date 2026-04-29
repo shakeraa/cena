@@ -30,7 +30,15 @@ public sealed record TrialUtilization(
     int PhotoDiagnosticsUsed,
     int SessionsStarted,
     int DaysActive,
-    bool HitCapBeforeExpiry);
+    bool HitCapBeforeExpiry)
+{
+    /// <summary>
+    /// All-zero utilisation. Used by the trial-expiry worker when a trial
+    /// has no linked primary student or no consumption rows — analytics sees
+    /// a clean "expired with no usage" bucket rather than null.
+    /// </summary>
+    public static TrialUtilization NoConsumption { get; } = new(0, 0, 0, 0, false);
+}
 
 /// <summary>
 /// Trial ended without conversion. <see cref="Outcome"/> is always

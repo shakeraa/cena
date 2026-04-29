@@ -57,8 +57,8 @@ grandfathered:
     baseline_loc: 743
     reason: "Pre-2026-04-20 legacy; split social endpoints by feature group is a follow-up"
   - path: src/api/Cena.Student.Api.Host/Program.cs
-    baseline_loc: 640
-    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. prr-243 added CatalogBackedQuestionPaperCatalogValidator Replace + MapExamTargetQuestionPaperEndpoints (+5 LOC). prr-228 added AddExamTargetRetentionServices() + PerTargetDiagnosticEngine DI registration + MapDiagnosticEndpoints() route-registration call + using statement + comment (+4 LOC). prr-230 added MapExamTargetParentVisibilityEndpoint() route-registration call (+1 LOC). prr-154 + prr-159 added IfThenPlanner + PeerConfusedSignalService DI registrations + MapPeerConfusedSignalEndpoints() (+7 LOC). History: PRR-151/148/149/012/046/022/015/029/203/204/123 collectively +47 LOC from the pre-2026-04-20 legacy base."
+    baseline_loc: 707
+    reason: "Composition root; incremental extraction of service-registration helpers is a follow-up. prr-243 added CatalogBackedQuestionPaperCatalogValidator Replace + MapExamTargetQuestionPaperEndpoints (+5 LOC). prr-228 added AddExamTargetRetentionServices() + PerTargetDiagnosticEngine DI registration + MapDiagnosticEndpoints() route-registration call + using statement + comment (+4 LOC). prr-230 added MapExamTargetParentVisibilityEndpoint() route-registration call (+1 LOC). prr-154 + prr-159 added IfThenPlanner + PeerConfusedSignalService DI registrations + MapPeerConfusedSignalEndpoints() (+7 LOC). Phase 1D trial-then-paywall added MapEntitlementEndpoints() registration on the existing one-liner endpoint chain (+0 LOC, fits in the existing line). History: PRR-151/148/149/012/046/022/015/029/203/204/123 collectively +47 LOC from the pre-2026-04-20 legacy base; concurrent merges between 2026-04-20 and 2026-04-29 added +66 LOC across hardening / OCR / observability / instrumentation work that pre-dated this baseline bump."
 
   # ---- Actor runtime (pre-2026-04-20 legacy) ----
   - path: src/actors/Cena.Actors.Host/Program.cs
