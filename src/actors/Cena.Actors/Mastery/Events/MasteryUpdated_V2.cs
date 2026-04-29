@@ -43,10 +43,27 @@ public static class MasteryEventSource
 /// <see cref="MasteryEventSource.V1UpcastDefault5Yu"/> for events
 /// synthesised by the V1→V2 upcaster.
 /// </param>
+/// <param name="BktDiscountFactor">
+/// PRR-261 / ADR-0059 §15.9 R12 audit field. The observation weight that
+/// was applied to this update, ∈ [0, 1]. <c>null</c> for events from
+/// callers that don't supply timing — interpret as 1.0 (full weight).
+/// 0.5 is the canonical anchored value (Sweller worked-example transient).
+/// Recorded for BKT-calibration audit + future sensitivity analyses.
+/// </param>
+/// <param name="ReferenceAnchoredWithinSeconds">
+/// PRR-261 audit field: elapsed seconds since the most recent reference
+/// (worked-example) render at the moment of the attempt. <c>null</c>
+/// when the call site doesn't track timing OR when no recent reference
+/// existed. Mirrors what was passed to <c>IBktStateTracker.UpdateAsync</c>.
+/// Persisted so calibration analyses can re-derive the discount factor
+/// without re-replaying the source-render history.
+/// </param>
 public sealed record MasteryUpdated_V2(
     string StudentAnonId,
     ExamTargetCode ExamTargetCode,
     SkillCode SkillCode,
     float MasteryProbability,
     DateTimeOffset UpdatedAt,
-    string Source);
+    string Source,
+    float? BktDiscountFactor = null,
+    int? ReferenceAnchoredWithinSeconds = null);
