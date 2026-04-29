@@ -118,17 +118,35 @@ test.describe('E2E_L_05_KEYBOARD_ONLY_SUBSCRIBE', () => {
     const acct = await provisionStudent(page)
 
     // ── 1. Skip-link is the first tab stop ──
+    //
+    // Tightened 2026-04-29 per honest gap audit A.7. The earlier laxer
+    // assertion ("first focus is not <none>") passed when the spec
+    // landed on `body` because focus had not yet propagated. WCAG 2.1
+    // SC 2.4.1 requires the skip-link to be the first Tab stop so
+    // keyboard / SR users don't have to traverse the entire nav.
     await page.goto('/login', { waitUntil: 'domcontentloaded' })
-    // Press Tab from initial state — first focusable element should be
-    // the skip-to-main-content link (per App.vue's <a class="skip-link">).
+
+    // Wait for the skip-link to be present in the DOM before pressing
+    // Tab. App.vue mounts asynchronously after locale-store hydration;
+    // pressing Tab too early lands on `body` because the link isn't
+    // yet attached to the focus order.
+    await page.locator('a.skip-link').first().waitFor({ state: 'attached', timeout: 5_000 })
+
     await page.keyboard.press('Tab')
+    // One frame for the focus event to propagate. document.activeElement
+    // updates synchronously in Chromium but Vue's onFocus handlers may
+    // still run.
+    await page.waitForTimeout(50)
+
     const firstFocus = await focusedSelector(page)
     console.log(`[l-05] first Tab focus: ${firstFocus}`)
-    // The skip link MAY be a11y-toolbar or main skip — both are
-    // acceptable; we just want to see SOMETHING reachable.
     expect(firstFocus,
-      'first Tab from page top must focus a real element (skip-link or first focusable), not <none>',
-    ).not.toBe('<none>')
+      `WCAG 2.1 SC 2.4.1 — first Tab from page top must focus the skip-link ` +
+      `(per App.vue <a class="skip-link" href="#main-content">). ` +
+      `Got: ${firstFocus}. ` +
+      `Regression class: skip-link removed from App.vue, hidden via ` +
+      `display:none, or buried under a focus-trap.`,
+    ).toContain('skip-link')
 
     // ── 2. Keyboard-only sign-in ──
     // Use getByTestId to focus deterministically (the Tab order on /login
