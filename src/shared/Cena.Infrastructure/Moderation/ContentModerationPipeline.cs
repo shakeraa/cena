@@ -134,9 +134,37 @@ public sealed class ContentModerationPipeline : IContentModerationPipeline
         }
 
         // ══════════════════════════════════════════════════════════════
-        // Stage 2: AI safety classification — fail-safe (human review)
+        // Stage 2: AI safety classification — FAIL-SAFE (human review)
+        //
+        // PRR-312: when ClassifyAsync throws (AI service unavailable,
+        // transient network error, model-server crash, etc.) we MUST
+        // route the upload to human review, NOT auto-approve. The
+        // pre-PRR-312 path let the exception propagate, leaving the
+        // caller with no verdict at all — worse than fail-safe because
+        // the caller would either re-throw to the user (bad UX) or
+        // default-allow (privacy/T&S leak).
+        //
+        // Distinct from Stage 1's PhotoDNA fail-CLOSED (full block):
+        // CSAM-hash unavailability is a hard block (we MUST not let a
+        // potential match through), but generic content-safety
+        // unavailability is fail-SAFE (queue for human review — most
+        // uploads are fine, but we don't unilaterally decide).
         // ══════════════════════════════════════════════════════════════
-        var aiScore = await _contentSafety.ClassifyAsync(content, contentType, ct);
+        double aiScore;
+        try
+        {
+            aiScore = await _contentSafety.ClassifyAsync(content, contentType, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogWarning(ex,
+                "[MODERATION] AI safety classifier unavailable for {ContentId} from {Uploader} — routing to human review (fail-safe).",
+                contentId, uploaderId);
+            return new ModerationResult(
+                contentId, ModerationVerdict.NeedsReview, 0.0,
+                ["ai_service_unavailable"], RequiresHumanReview: true,
+                IncidentReportFiled: false, DateTimeOffset.UtcNow);
+        }
 
         // ══════════════════════════════════════════════════════════════
         // Stage 3: Apply policy thresholds (stricter for minors)
