@@ -82,8 +82,35 @@ public sealed class RequireEntitlementFilter : IEndpointFilter
                 return await next(context).ConfigureAwait(false);
 
             case SubscriptionStatus.Trialing:
-                if (await IsTrialCapReachedAsync(view, consumption, _feature, http.RequestAborted)
-                    .ConfigureAwait(false))
+                // Phase 1E + iter-3 atomic close: filter is the cap-claim
+                // point. IncrementIfUnderCapAsync atomically reserves a unit
+                // when within cap, returns Allowed=false when not. This
+                // eliminates the read-then-check TOCTOU window that the
+                // prior IsTrialCapReachedAsync semantics had.
+                //
+                // Generic feature = entitlement check only, no per-feature
+                // accounting. Active/PastDue paths bypass this entirely.
+                // Failed-handler-burns-cap is the documented trade-off
+                // (atomic reservation > forgive-on-failure); rationale in
+                // claude-2 iter-3 audit + ADR-0061 design doc.
+                if (_feature == EntitlementFeature.Generic || view.TrialCaps is null)
+                {
+                    return await next(context).ConfigureAwait(false);
+                }
+                var cap = ResolveCapFor(view.TrialCaps, _feature);
+                if (cap <= 0)
+                {
+                    // 0 = unbounded for this feature per TrialAllotmentConfig.
+                    return await next(context).ConfigureAwait(false);
+                }
+                var capResult = await consumption.IncrementIfUnderCapAsync(
+                        view.StudentSubjectIdEncrypted,
+                        _feature,
+                        cap,
+                        DateTimeOffset.UtcNow,
+                        http.RequestAborted)
+                    .ConfigureAwait(false);
+                if (!capResult.Allowed)
                 {
                     return TrialCapReached(http, view, _feature);
                 }
@@ -94,6 +121,20 @@ public sealed class RequireEntitlementFilter : IEndpointFilter
                 return EntitlementRequired(http, view);
         }
     }
+
+    /// <summary>
+    /// PRIVATE — feature-to-cap resolver shared by the atomic filter path
+    /// and the legacy IsTrialCapReachedAsync API kept for fast-path checks
+    /// outside the filter (entitlement read endpoint, etc.).
+    /// </summary>
+    private static int ResolveCapFor(Cena.Actors.Subscriptions.Events.TrialCapsSnapshot caps, EntitlementFeature feature) =>
+        feature switch
+        {
+            EntitlementFeature.TutorTurn => caps.TrialTutorTurns,
+            EntitlementFeature.PhotoDiagnostic => caps.TrialPhotoDiagnostics,
+            EntitlementFeature.PracticeSession => caps.TrialPracticeSessions,
+            _ => 0,
+        };
 
     /// <summary>
     /// Cap-hit decision. Compares per-student consumption against the pinned
