@@ -174,53 +174,115 @@ public sealed class ConsentAggregateNoProfileCouplingTest
     }
 
     /// <summary>
-    /// PRR-304: strip XML doc-comment lines (///), block-comment leaders
-    /// (/* / *), and trailing // tail-comments. Docstrings are prose that
-    /// legitimately reference cross-context concepts; this test only
-    /// cares about CODE coupling, not narrative.
+    /// PRR-304: strip XML doc-comment lines (///), block-comment bodies
+    /// (/* … */), and // tail-comments while PRESERVING the contents of
+    /// string and char literals. Docstrings are prose that legitimately
+    /// reference cross-context concepts; this test only cares about CODE
+    /// coupling, not narrative. String-literal bodies are preserved so a
+    /// future regression of the form <c>logger.LogError("ConsentAggregate
+    /// invariant violated")</c> still trips the coupling check.
     /// </summary>
-    private static string StripCommentLines(string source)
+    /// <remarks>
+    /// Implementation: char-level scanner that tracks four mutually
+    /// exclusive states — regular string (<c>"…"</c> with <c>\"</c>
+    /// escapes), verbatim string (<c>@"…"</c> with <c>""</c> escapes),
+    /// char literal (<c>'…'</c>), and block comment. Line comments are a
+    /// transient state that ends at the next newline. Interpolated strings
+    /// (<c>$"…"</c>) are treated like regular strings — interpolation
+    /// expressions are not parsed (rare in actor code, and any leaked
+    /// symbol still appears in the post-strip output, which is the
+    /// failure mode we want anyway).
+    /// </remarks>
+    internal static string StripCommentLines(string source)
     {
         var sb = new StringBuilder(source.Length);
-        var inBlock = false;
-        foreach (var rawLine in source.Split('\n'))
+        // Mutually exclusive lexer states.
+        var inLineComment = false;
+        var inBlockComment = false;
+        var inRegularString = false;
+        var inVerbatimString = false;
+        var inCharLiteral = false;
+
+        for (int i = 0; i < source.Length; i++)
         {
-            var line = rawLine;
-            // Track /* ... */ block comments line by line.
-            if (inBlock)
+            var c = source[i];
+            var next = i + 1 < source.Length ? source[i + 1] : '\0';
+
+            // ── exit conditions for line/block comments ──
+            if (inLineComment)
             {
-                var endIdx = line.IndexOf("*/", StringComparison.Ordinal);
-                if (endIdx >= 0)
-                {
-                    line = line[(endIdx + 2)..];
-                    inBlock = false;
-                }
-                else
-                {
-                    continue;   // entire line is inside block comment
-                }
+                if (c == '\n') { inLineComment = false; sb.Append(c); }
+                continue;
             }
-            // Drop any /* ... */ on the same line.
-            while (true)
+            if (inBlockComment)
             {
-                var startIdx = line.IndexOf("/*", StringComparison.Ordinal);
-                if (startIdx < 0) break;
-                var endIdx = line.IndexOf("*/", startIdx + 2, StringComparison.Ordinal);
-                if (endIdx < 0)
+                if (c == '*' && next == '/')
                 {
-                    line = line[..startIdx];
-                    inBlock = true;
-                    break;
+                    inBlockComment = false;
+                    i++; // consume the '/'
                 }
-                line = line[..startIdx] + line[(endIdx + 2)..];
+                else if (c == '\n')
+                {
+                    sb.Append(c); // preserve line numbers for diagnostics
+                }
+                continue;
             }
-            // Drop the line entirely if it's just a single-line comment.
-            var trimmed = line.TrimStart();
-            if (trimmed.StartsWith("//", StringComparison.Ordinal)) continue;
-            // Drop trailing // tail comments.
-            var slashIdx = line.IndexOf("//", StringComparison.Ordinal);
-            if (slashIdx >= 0) line = line[..slashIdx];
-            sb.AppendLine(line);
+
+            // ── inside a regular ("...") string ──
+            if (inRegularString)
+            {
+                if (c == '\\' && next != '\0')
+                {
+                    sb.Append(c); sb.Append(next); i++; continue;
+                }
+                if (c == '"') inRegularString = false;
+                sb.Append(c);
+                continue;
+            }
+
+            // ── inside a verbatim (@"...") string — "" is the escape ──
+            if (inVerbatimString)
+            {
+                if (c == '"' && next == '"')
+                {
+                    sb.Append(c); sb.Append(next); i++; continue;
+                }
+                if (c == '"') inVerbatimString = false;
+                sb.Append(c);
+                continue;
+            }
+
+            // ── inside a '...' char literal — single char with optional escape ──
+            if (inCharLiteral)
+            {
+                if (c == '\\' && next != '\0')
+                {
+                    sb.Append(c); sb.Append(next); i++; continue;
+                }
+                if (c == '\'') inCharLiteral = false;
+                sb.Append(c);
+                continue;
+            }
+
+            // ── outside any string/comment: dispatch on lookahead ──
+            if (c == '/' && next == '/') { inLineComment = true; i++; continue; }
+            if (c == '/' && next == '*') { inBlockComment = true; i++; continue; }
+            if (c == '@' && next == '"') { inVerbatimString = true; sb.Append(c); sb.Append(next); i++; continue; }
+            if (c == '$' && next == '"') { inRegularString = true; sb.Append(c); sb.Append(next); i++; continue; }
+            if (c == '$' && next == '@' && i + 2 < source.Length && source[i + 2] == '"')
+            {
+                inVerbatimString = true;
+                sb.Append(c); sb.Append(next); sb.Append(source[i + 2]); i += 2; continue;
+            }
+            if (c == '@' && next == '$' && i + 2 < source.Length && source[i + 2] == '"')
+            {
+                inVerbatimString = true;
+                sb.Append(c); sb.Append(next); sb.Append(source[i + 2]); i += 2; continue;
+            }
+            if (c == '"') { inRegularString = true; sb.Append(c); continue; }
+            if (c == '\'') { inCharLiteral = true; sb.Append(c); continue; }
+
+            sb.Append(c);
         }
         return sb.ToString();
     }
