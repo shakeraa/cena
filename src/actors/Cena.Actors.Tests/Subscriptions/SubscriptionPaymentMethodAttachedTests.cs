@@ -140,4 +140,58 @@ public class SubscriptionPaymentMethodAttachedTests
         Assert.True(aggregate.State.HasPaymentMethodOnFile);
         Assert.Equal(SubscriptionStatus.Trialing, aggregate.State.Status);
     }
+
+    [Fact]
+    public void Replay_real_trial_then_pay_sequence_carries_HasPM_to_post_activation()
+    {
+        // Phase 1D-fix-2 iter 4 item 15 regression guard: the actual
+        // production sequence is TrialStarted → PaymentMethodAttached →
+        // (months later) → TrialConverted → SubscriptionActivated. The
+        // first iteration of the projection fix queried by parent at
+        // attach-time (before any doc existed) and silently dropped the
+        // flag. The aggregate-driven path (this test's subject) never
+        // had that bug, but we lock it down explicitly so a future
+        // regression on the resolver's projection path won't accidentally
+        // re-introduce the missing-flag pattern via the aggregate too.
+        const string studentId = "enc::student::trial-then-pay";
+        var caps = new TrialCapsSnapshot(14, 50, 10, 6);
+        var events = new object[]
+        {
+            new TrialStarted_V1(
+                ParentId, studentId, TrialKind.SelfPay,
+                Now, Now.AddDays(14), "card:fp-001", "v1-baseline", caps),
+            new SubscriptionPaymentMethodAttached_V1(
+                ParentSubjectIdEncrypted: ParentId,
+                PaymentMethodIdEncrypted: PaymentMethodIdEncrypted,
+                FingerprintHash: FingerprintHash,
+                AttachedAt: Now,
+                Source: PaymentMethodAttachSource.TrialStartSetupIntent),
+            new TrialConverted_V1(
+                ParentSubjectIdEncrypted: ParentId,
+                PrimaryStudentSubjectIdEncrypted: studentId,
+                ConvertedAt: Now.AddDays(7),
+                DaysIntoTrial: 7,
+                ConvertedToTier: SubscriptionTier.Plus,
+                BillingCycle: BillingCycle.Monthly,
+                PaymentTransactionIdEncrypted: "enc::txn::001",
+                UtilizationAtConversion: TrialUtilization.NoConsumption),
+            new SubscriptionActivated_V1(
+                ParentSubjectIdEncrypted: ParentId,
+                PrimaryStudentSubjectIdEncrypted: studentId,
+                Tier: SubscriptionTier.Plus,
+                Cycle: BillingCycle.Monthly,
+                GrossAmountAgorot: 5000,
+                PaymentTransactionIdEncrypted: "enc::txn::001",
+                ActivatedAt: Now.AddDays(7),
+                RenewsAt: Now.AddDays(37)),
+        };
+
+        var aggregate = SubscriptionAggregate.ReplayFrom(events);
+
+        Assert.Equal(SubscriptionStatus.Active, aggregate.State.Status);
+        Assert.True(aggregate.State.HasPaymentMethodOnFile,
+            "After full trial-then-pay replay, HasPaymentMethodOnFile must remain true.");
+        Assert.Equal(PaymentMethodIdEncrypted,
+            aggregate.State.LastAttachedPaymentMethodIdEncrypted);
+    }
 }
