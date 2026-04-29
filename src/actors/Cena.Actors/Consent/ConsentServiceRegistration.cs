@@ -91,4 +91,52 @@ public static class ConsentServiceRegistration
         services.ConfigureMarten(opts => opts.RegisterConsentContext());
         return services;
     }
+
+    /// <summary>
+    /// PRR-267 R3 — register the Bagrut reference consent-token service
+    /// (HMAC-SHA256, 24h wire TTL, ADR-0059 §15.3) and ensure
+    /// <see cref="TimeProvider"/> is in DI for the student-side
+    /// reference endpoints. The pepper comes from
+    /// <c>Cena:Variants:ConsentTokenPepper</c>; in dev environments a
+    /// "dev-only-not-for-prod" fallback is wired so ops accidents leak
+    /// the marker, not a quasi-real key.
+    /// </summary>
+    public static IServiceCollection AddBagrutReferenceConsentTokenService(
+        this IServiceCollection services,
+        Microsoft.Extensions.Configuration.IConfiguration configuration)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(configuration);
+
+        services.TryAddSingleton(TimeProvider.System);
+
+        services.TryAddSingleton<IBagrutReferenceConsentTokenService>(_ =>
+        {
+            var pepper = configuration["Cena:Variants:ConsentTokenPepper"];
+            if (string.IsNullOrWhiteSpace(pepper))
+            {
+                // Dev-only fallback. The marker string is intentional —
+                // if it ever reaches a SIEM scan it surfaces as a clear
+                // "this is dev pepper" signal, not a quasi-real key.
+                pepper = "cena-dev-only-not-for-prod-bagrut-reference-consent-pepper";
+            }
+            return new BagrutReferenceConsentTokenService(pepper);
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// PRR-266 R2 — register the BagrutReferenceItemRendered_V1 retention
+    /// worker (180-day floor, hourly tick). Only one host in the cluster
+    /// should run this; conventionally that's actor-host (which owns
+    /// Marten schema warm).
+    /// </summary>
+    public static IServiceCollection AddBagrutReferenceRetentionWorker(
+        this IServiceCollection services)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        services.AddHostedService<BagrutReferenceRetentionWorker>();
+        return services;
+    }
 }
