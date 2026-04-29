@@ -206,6 +206,57 @@ test.describe('E2E_L_06_SCREEN_READER_SESSION', () => {
       `${allHiddenInteractives.length === 0 ? '' : 'First 3: ' + JSON.stringify(allHiddenInteractives.slice(0, 3))}`,
     ).toEqual([])
 
+    // ── Runtime announcement check (added 2026-04-29 per honest gap
+    //    audit A.8). The earlier version of this spec only verified that
+    //    #cena-live-region was present + visible — it didn't verify that
+    //    text inserted into the region actually CHANGES (the polite live
+    //    region's whole purpose). A regression where someone clears the
+    //    region's MutationObserver wiring or replaces it with an
+    //    aria-live="off" wrapper would NOT have been caught.
+    //
+    //    This block uses a MutationObserver injected from the test side
+    //    to watch #cena-live-region for textContent changes, then
+    //    triggers a known announce path (A11yToolbar's contrast toggle
+    //    calls announce() which writes to the region per
+    //    A11yToolbar.vue:announce). If textContent never updates, the
+    //    announcement pipeline is broken end-to-end.
+    await page.goto(`${STUDENT_SPA_BASE_URL}/home`, { waitUntil: 'domcontentloaded' })
+    await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {})
+
+    // Hook a MutationObserver before triggering the announce.
+    await page.evaluate(() => {
+      (window as unknown as { __liveRegionUpdates: string[] }).__liveRegionUpdates = []
+      const region = document.getElementById('cena-live-region')
+      if (!region) return
+      const obs = new MutationObserver(() => {
+        const text = (region.textContent ?? '').trim()
+        if (text.length > 0) {
+          (window as unknown as { __liveRegionUpdates: string[] }).__liveRegionUpdates.push(text)
+        }
+      })
+      obs.observe(region, { childList: true, characterData: true, subtree: true })
+    })
+
+    // Trigger the announce via the canonical UX path: toolbar handle →
+    // drawer → contrast toggle. The toggle's onContrastToggle invokes
+    // announce() which writes localised text into #cena-live-region.
+    await page.getByTestId('a11y-toolbar-handle').click()
+    await page.getByTestId('a11y-toolbar-drawer').waitFor({ state: 'visible', timeout: 5_000 })
+    const checkbox = page.getByTestId('a11y-contrast-toggle').locator('input[type="checkbox"]').first()
+    await checkbox.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {})
+    await checkbox.click({ force: true })
+    await page.waitForTimeout(500)
+
+    const announceUpdates = await page.evaluate(() =>
+      (window as unknown as { __liveRegionUpdates: string[] }).__liveRegionUpdates,
+    )
+    expect(announceUpdates.length,
+      `aria-live region must receive at least one textContent update after the contrast toggle ` +
+      `(A11yToolbar's onContrastToggle → announce() pipeline). Got ${announceUpdates.length} updates: ` +
+      `${JSON.stringify(announceUpdates)}. ` +
+      `Regression class: announce() helper unwired from store mutations, OR #cena-live-region replaced.`,
+    ).toBeGreaterThan(0)
+
     const appErrors = diag.pageErrors.filter(e =>
       !/localStorage.*access is denied|opaque origin/i.test(e),
     )

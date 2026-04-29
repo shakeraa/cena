@@ -102,37 +102,78 @@ async function provisionAndSignIn(page: Page): Promise<void> {
   await page.waitForURL(url => !url.pathname.startsWith('/login'), { timeout: 20_000 })
 }
 
-async function enableHighContrast(page: Page): Promise<boolean> {
-  // The A11yToolbar handle hides until the user opens the drawer. Try
-  // clicking the toolbar handle / focus + the contrast toggle. If the
-  // toolbar isn't easily reachable in the DOM (some pages collapse
-  // the drawer), set the localStorage preference directly — the
-  // toolbar reads from it on mount.
-  const toggle = page.getByTestId('a11y-contrast-toggle')
-  if (await toggle.isVisible().catch(() => false)) {
-    const before = await toggle.locator('input[type="checkbox"]').isChecked().catch(() => false)
-    if (!before) {
-      await toggle.click()
-      await page.waitForTimeout(300)
-    }
-    return true
+async function enableHighContrast(page: Page): Promise<void> {
+  // Tightened 2026-04-29 per honest gap audit A.9 — drives the REAL
+  // user UX path (open A11yToolbar drawer → click contrast toggle)
+  // instead of bypassing via a localStorage seed. The earlier seed
+  // shortcut tested whether the theme picks up the preference, NOT
+  // whether the toolbar UX itself works. Both classes of regression
+  // matter; this version exercises the click path end-to-end.
+  //
+  // Flow:
+  //   1. Click the always-visible a11y-toolbar-handle (mounted by
+  //      App.vue's <A11yToolbar />, present on every signed-in route).
+  //   2. Wait for the drawer to open (data-testid="a11y-toolbar-drawer").
+  //   3. Toggle contrast (data-testid="a11y-contrast-toggle"). Read
+  //      pre-state so a re-run doesn't flip OFF a previously-on session.
+  //   4. Verify localStorage 'cena-a11y-prefs' reflects highContrast:true
+  //      — that's the canonical persistence the toolbar writes.
+  //
+  // If the handle isn't reachable on a route (regression class — the
+  // toolbar should be globally mounted), the test fails loudly so we
+  // know about it.
+  const handle = page.getByTestId('a11y-toolbar-handle')
+  await handle.waitFor({ state: 'visible', timeout: 8_000 })
+  await handle.click()
+
+  const drawer = page.getByTestId('a11y-toolbar-drawer')
+  await drawer.waitFor({ state: 'visible', timeout: 5_000 })
+
+  const toggleRoot = page.getByTestId('a11y-contrast-toggle')
+  await toggleRoot.waitFor({ state: 'visible', timeout: 5_000 })
+
+  // Vuetify's VSwitch doesn't always propagate a click on the wrapper
+  // to the inner <input>. Drive the checkbox directly so the
+  // `update:model-value` event fires (which calls onContrastToggle →
+  // a11y.toggleContrast() → store mutation → localStorage write).
+  //
+  // The drawer is scrollable; the contrast toggle may be below the
+  // fold. Scroll it into view before clicking.
+  const checkbox = toggleRoot.locator('input[type="checkbox"]').first()
+  await checkbox.scrollIntoViewIfNeeded({ timeout: 5_000 }).catch(() => {})
+  const before = await checkbox.isChecked().catch(() => false)
+  if (!before) {
+    // Use force:true because Vuetify visually hides the input under
+    // the slider thumb (the input is the semantic source of truth,
+    // but isn't directly hit-testable without force).
+    await checkbox.click({ force: true })
+    // VSwitch dispatches change synchronously; the store watch flushes
+    // localStorage on next microtask. Wait one frame for both.
+    await page.waitForTimeout(200)
   }
 
-  // Fallback: write the preference directly. The store key matches
-  // the A11yToolbar's persistence:
-  await page.evaluate(() => {
+  // Verify the persistence layer reflects the toggle. This is what
+  // the SPA reads on every subsequent route mount; if it's not set
+  // here, navigating away will revert.
+  // Canonical key + shape from src/stores/a11yStore.ts:
+  //   STORAGE_KEY = 'cena-student-a11y-prefs'
+  //   prefs.contrast: 'normal' | 'high'
+  const persisted = await page.evaluate(() => {
     try {
-      const prefs = JSON.parse(localStorage.getItem('cena-a11y-prefs') ?? '{}')
-      prefs.highContrast = true
-      localStorage.setItem('cena-a11y-prefs', JSON.stringify(prefs))
-    } catch {
-      // ignore
+      return JSON.parse(localStorage.getItem('cena-student-a11y-prefs') ?? '{}')
+    }
+    catch {
+      return {}
     }
   })
-  // Reload so the toolbar picks up the preference on mount.
-  await page.reload({ waitUntil: 'domcontentloaded' })
-  await page.waitForLoadState('networkidle', { timeout: 8_000 }).catch(() => {})
-  return false
+  if (persisted?.contrast !== 'high') {
+    throw new Error(
+      'A11yToolbar contrast toggle click did NOT persist contrast="high" ' +
+      `to cena-student-a11y-prefs. Got: ${JSON.stringify(persisted)}. ` +
+      'Regression class: store write decoupled from toggle click, OR ' +
+      'localStorage key drift.',
+    )
+  }
 }
 
 test.describe('E2E_L_07_HIGH_CONTRAST_WCAG', () => {
@@ -145,8 +186,8 @@ test.describe('E2E_L_07_HIGH_CONTRAST_WCAG', () => {
     // Land on /home before flipping high-contrast — the toolbar is
     // available across the SPA shell once signed in.
     await page.goto('/home', { waitUntil: 'domcontentloaded' })
-    const usedToggle = await enableHighContrast(page)
-    console.log(`[l-07] high-contrast enabled via ${usedToggle ? 'toolbar click' : 'localStorage seed + reload'}`)
+    await enableHighContrast(page)
+    console.log('[l-07] high-contrast enabled via real toolbar click + persistence verified')
 
     const violationsByRoute: Record<string, Array<{ id: string; nodes: number; impact?: string }>> = {}
 
@@ -169,7 +210,7 @@ test.describe('E2E_L_07_HIGH_CONTRAST_WCAG', () => {
 
     testInfo.attach('l-07-contrast-sweep.json', {
       body: JSON.stringify({
-        usedToolbarToggle: usedToggle,
+        usedToolbarToggle: true,
         violations: violationsByRoute,
         diag,
       }, null, 2),
