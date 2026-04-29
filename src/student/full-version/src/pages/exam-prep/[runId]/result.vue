@@ -86,6 +86,27 @@ onMounted(async () => {
 function startAnotherRun() {
   router.push('/exam-prep')
 }
+
+// PRR-303 — "Download as PDF" via the browser's native print → save-as-PDF
+// dialog. Production-grade approach: no JS-PDF dep (heavy, version-fragile).
+// Print-targeted CSS hides nav + scopes the visible area to the result
+// content; the user picks "Save as PDF" in the print dialog. Works in
+// every browser. The result-page-print body class enables the print
+// stylesheet defined below.
+function downloadAsPdf() {
+  document.body.classList.add('exam-prep-result-print')
+  // Defer to next frame so the class lands before print() opens.
+  requestAnimationFrame(() => {
+    window.print()
+    // Remove the class once print() returns. Browsers fire afterprint
+    // event; bind once, no leak.
+    const cleanup = () => {
+      document.body.classList.remove('exam-prep-result-print')
+      window.removeEventListener('afterprint', cleanup)
+    }
+    window.addEventListener('afterprint', cleanup)
+  })
+}
 </script>
 
 <template>
@@ -317,8 +338,17 @@ function startAnotherRun() {
       </VCardText>
     </VCard>
 
-    <VRow class="mt-4">
+    <VRow class="mt-4 print-hide">
       <VCol cols="12" class="d-flex justify-end">
+        <VBtn
+          color="secondary"
+          variant="outlined"
+          class="me-2"
+          data-testid="exam-prep-result-pdf"
+          @click="downloadAsPdf"
+        >
+          {{ t('examPrep.result.downloadPdf') }}
+        </VBtn>
         <VBtn
           color="primary"
           variant="outlined"
@@ -339,3 +369,39 @@ function startAnotherRun() {
     <VProgressLinear indeterminate color="primary" />
   </VContainer>
 </template>
+
+<style scoped>
+/* PRR-303 — print-friendly mark sheet. body.exam-prep-result-print
+   triggers Save-as-PDF flow; we hide nav + sidebar + interactive
+   buttons, leaving just the score card + per-section + per-question
+   tables. Layout is straight HTML; browser handles pagination. */
+.print-hide {
+  /* No-op outside print mode; the @media print rule below is the
+     load-bearing selector. */
+}
+
+@media print {
+  .print-hide {
+    display: none !important;
+  }
+}
+</style>
+
+<style>
+/* Body-scoped global rule — when the print class is on body, hide
+   the SPA shell (sidebar, app bar, banners) so the printed page
+   contains only the result content. Scoped style above can't reach
+   the layout shell, so this is global. */
+body.exam-prep-result-print .layout-vertical-nav,
+body.exam-prep-result-print .layout-navbar,
+body.exam-prep-result-print .v-navigation-drawer,
+body.exam-prep-result-print .layout-footer,
+body.exam-prep-result-print .v-app-bar {
+  display: none !important;
+}
+body.exam-prep-result-print .layout-content-wrapper,
+body.exam-prep-result-print .layout-page-content {
+  padding: 0 !important;
+  margin: 0 !important;
+}
+</style>

@@ -1723,7 +1723,8 @@
       "partALabel": "Part A",
       "partBLabel": "Part B",
       "trendTitle": "Your last runs on this paper",
-      "trendBody": "Side-by-side scores from your prior runs of this exam format. Use it as a pacing reference, not a target."
+      "trendBody": "Side-by-side scores from your prior runs of this exam format. Use it as a pacing reference, not a target.",
+      "downloadPdf": "Download as PDF"
     },
     "extraTimeLabel": "Extra time (accommodation)",
     "extraTimeNote": "Used for accessibility accommodations. Honored in the timer end-to-end.",
