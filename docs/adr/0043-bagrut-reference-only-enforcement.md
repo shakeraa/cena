@@ -28,6 +28,19 @@ Enforce the Bagrut-reference-only invariant with three defensive layers.
 
 Call sites that type their outbound payloads as `Deliverable<T>` get the invariant enforced by construction.
 
+**§1.1 — "Recreated" means structural recreation (PRR-272 amendment, 2026-04-29)**
+
+In ADR-0043's coverage-counting rule (only recreated CAS-verified variants count toward the SLO), **"recreated" means structural recreation** — different scenario, same skill. Parametric variants (parameter substitution; same scenario, different numbers) are derivative under Israeli Copyright Law §16 (per persona-ministry findings 2026-04-28 §14.2) and **do NOT count toward coverage**.
+
+Implementation: persisted variants carry `coverage_eligible: bool`, derived from `VariationKind`:
+
+- `VariationKind.Structural` ⇒ `coverage_eligible = true`
+- `VariationKind.Parametric` ⇒ `coverage_eligible = false`
+- Whole-question recreations (`AiRecreated` without variant lineage) ⇒ `coverage_eligible = true`
+- `TeacherAuthoredOriginal` ⇒ `coverage_eligible = true`
+
+`CoverageTargetManifest` reader filters cell counts on `coverage_eligible == true`. Architecture test `CoverageEligibleEnforcedTest.cs` catches regressions where a parametric persistence sets the flag true. See [PRR-272](../../tasks/pre-release-review/TASK-PRR-272-parametric-variants-do-not-count-toward-coverage-slo.md) for the projection field, backfill, and ship-gate. [PRR-284](../../tasks/pre-release-review/TASK-PRR-284-coverage-slo-variant-flood-detection-ship-gate.md) adds defense-in-depth: a coverage cell with >50% count from a single source paper code fails the ship-gate regardless of `coverage_eligible` state.
+
 ### §2 — Runtime delivery-gate chokepoint
 
 `src/actors/Cena.Actors/Assessment/IItemDeliveryGate.cs` defines the `IItemDeliveryGate` interface and its default `ItemDeliveryGate` implementation. Every student-delivery seam (exam simulation today; diagnostic, practice session, and tutor playback under migration in Sprint-2) MUST call `AssertDeliverable(provenance, itemId, sessionId, tenantId, actorId)` immediately before serialising an item onto the outbound wire.
