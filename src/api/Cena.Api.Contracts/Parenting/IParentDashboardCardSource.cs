@@ -5,7 +5,7 @@
 // Why this exists:
 //   The /api/me/parent-dashboard endpoint previously hard-coded zero values
 //   for WeeklyMinutes / MonthlyMinutes / TopicsPracticed / LastActiveAt /
-//   ReadinessScore with a "PRR-323 will fill these values" TODO comment.
+//   ProgressBandIndicator with a "PRR-323 will fill these values" TODO comment.
 //   The comment is now closed out by this port + a real Marten-backed
 //   implementation (MartenParentDashboardCardSource).
 //
@@ -112,7 +112,7 @@ public interface IParentDashboardCardSource
 /// <param name="MonthlyMinutes">Practice minutes in the last 30 days.</param>
 /// <param name="TopicsPracticed">Count of distinct concept ids in the last 30 days.</param>
 /// <param name="LastActiveAt">Most-recent engagement timestamp, or null if none.</param>
-/// <param name="ReadinessScore">
+/// <param name="ProgressBandIndicator">
 /// 0-100 readiness score for the student's primary exam target. Null
 /// when no readiness model is wired (current default). A follow-up task
 /// (separate from PRR-320) will wire a real readiness projection here.
@@ -122,7 +122,7 @@ public sealed record ParentDashboardStudentCard(
     int MonthlyMinutes,
     int TopicsPracticed,
     DateTimeOffset? LastActiveAt,
-    int? ReadinessScore);
+    int? ProgressBandIndicator);
 
 // =============================================================================
 // ParentDashboardCards (EPIC-PRR-I PRR-320)
@@ -169,7 +169,7 @@ public sealed record ParentDashboardCards(
             MonthlyMinutes: 0,
             TopicsPracticed: 0,
             LastActiveAt: null,
-            ReadinessScore: null);
+            ProgressBandIndicator: null);
     }
 }
 

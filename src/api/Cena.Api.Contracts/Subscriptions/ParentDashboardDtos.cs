@@ -16,7 +16,7 @@ namespace Cena.Api.Contracts.Subscriptions;
 /// <param name="WeeklyMinutes">Total practice minutes in the last 7 days.</param>
 /// <param name="MonthlyMinutes">Total practice minutes in the last 30 days.</param>
 /// <param name="TopicsPracticed">Count of distinct topics practiced in 30 days.</param>
-/// <param name="ReadinessScore">0-100 readiness score for the student's primary exam target (null if no target).</param>
+/// <param name="ProgressBandIndicator">0-100 readiness score for the student's primary exam target (null if no target).</param>
 /// <param name="LastActiveAt">When the student was last active.</param>
 public sealed record ParentDashboardStudentDto(
     string StudentId,
@@ -25,7 +25,7 @@ public sealed record ParentDashboardStudentDto(
     int WeeklyMinutes,
     int MonthlyMinutes,
     int TopicsPracticed,
-    int? ReadinessScore,
+    int? ProgressBandIndicator,
     DateTimeOffset? LastActiveAt);
 
 /// <summary>Full dashboard response for one household.</summary>
