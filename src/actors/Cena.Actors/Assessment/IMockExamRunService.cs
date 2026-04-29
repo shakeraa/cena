@@ -106,6 +106,21 @@ public interface IMockExamRunService
         CancellationToken ct);
 
     /// <summary>
+    /// PRR-294 — recent submitted runs for this student, optionally
+    /// filtered by examCode + paperCode. Used by the result page to
+    /// render a "your last 3 runs on this paper" trend card. Limit
+    /// caps at 10 to keep the response bounded; client-side display
+    /// shows 3 by default. Returns empty list (not 404) when the
+    /// student has no prior runs.
+    /// </summary>
+    Task<IReadOnlyList<MockExamRunSummary>> GetRecentRunsAsync(
+        string studentId,
+        string? examCode,
+        string? paperCode,
+        int limit,
+        CancellationToken ct);
+
+    /// <summary>
     /// PRR-298 — re-grade a finalized run. Useful when the canonical
     /// answer for one of the served items was discovered to be wrong
     /// (CAS-bug, typo in seed, Ministry-corrected key) and the
@@ -127,6 +142,23 @@ public interface IMockExamRunService
         string runId,
         CancellationToken ct);
 }
+
+/// <summary>
+/// PRR-294 — recent-run summary for the longitudinal "your last N
+/// runs on this paper" card on the result page. Honest framing per
+/// ADR-0048: this is plain trend data, not a streak / loss-aversion
+/// hook. The SPA shows raw scores side by side; no "you improved!"
+/// celebration copy.
+/// </summary>
+public sealed record MockExamRunSummary(
+    string RunId,
+    string ExamCode,
+    string? PaperCode,
+    DateTimeOffset StartedAt,
+    DateTimeOffset SubmittedAt,
+    int PointsAwarded,
+    int TotalPoints,
+    double ScorePercent);
 
 public sealed record VisibilityEventReport(
     /// <summary>"hidden" / "visible" / "blur" — passed through verbatim.</summary>

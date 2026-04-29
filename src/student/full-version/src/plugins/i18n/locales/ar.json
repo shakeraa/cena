@@ -1649,7 +1649,21 @@
       "emptySubmitTitle": "إرسال بلا إجابات؟",
       "emptySubmitBody": "لم تُجِب على أيّ سؤال بعد. هل تريد الإرسال على أيّ حال؟",
       "emptySubmitCancel": "متابعة العمل",
-      "emptySubmitConfirm": "إرسال فارغ"
+      "emptySubmitConfirm": "إرسال فارغ",
+      "calculator": {
+        "label": "سياسة الآلة الحاسبة",
+        "allowed": "مسموح",
+        "restricted": "مقيَّد",
+        "prohibited": "ممنوع"
+      },
+      "formulaSheet": {
+        "label": "ورقة معادلات",
+        "expand": "إظهار ورقة المعادلات",
+        "none": "لا يوجد",
+        "mathbasic": "رياضيات ٤ وحدات أساسيّ",
+        "mathadvanced": "رياضيات ٥ وحدات متقدّم",
+        "physicsstandard": "فيزياء قياسيّ"
+      }
     },
     "result": {
       "title": "نتيجة البَجْروت المحاكاة",
@@ -1671,13 +1685,17 @@
         "no": "لا",
         "notGraded": "—",
         "section": "القسم",
-        "points": "علامات"
+        "points": "علامات",
+        "date": "التاريخ",
+        "score": "العلامة"
       },
       "startAnother": "ابدأ جلسة أخرى",
       "pointsLabel": "علامات",
       "sectionSummary": "ملخّص الأقسام",
       "partALabel": "القسم الأوّل",
-      "partBLabel": "القسم الثاني"
+      "partBLabel": "القسم الثاني",
+      "trendTitle": "جلساتك السابقة على هذا الشاؤلون",
+      "trendBody": "علاماتك في الجلسات السابقة جنباً إلى جنب. للمتابعة لا للقياس."
     },
     "extraTimeLabel": "وقت إضافيّ (تسهيلات)",
     "extraTimeNote": "يُستعمَل لتسهيلات النفاذ. يُحتسَب في المؤقّت من البداية إلى النهاية.",

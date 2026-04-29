@@ -43,7 +43,12 @@ public static class MockExamRunEndpoints
         var group = app.MapGroup("/api/me/exam-prep/runs")
             .WithTags("ExamPrepMockRuns")
             .RequireAuthorization()
-            .RequireRateLimiting("api");
+            // PRR-302 — exam-prep specific limiter (30/min/user) instead
+            // of the broader 60/min api shared with other endpoints.
+            // The runner emits ~25 calls/min during a busy multi-part
+            // exam; 30 leaves headroom while preventing scripted-loop
+            // abuse from pinning the runner pool.
+            .RequireRateLimiting("exam-prep");
 
         // Phase 1G — runner feature flag (Cena:ExamPrep:RunnerEnabled).
         // Default ON; admin can flip to OFF via env var
@@ -249,6 +254,27 @@ public static class MockExamRunEndpoints
             catch (KeyNotFoundException) { return Results.NotFound(); }
             catch (UnauthorizedAccessException) { return Results.Forbid(); }
             catch (InvalidOperationException ex) { return Results.BadRequest(new { error = ex.Message }); }
+        });
+
+        // GET /history?examCode=...&paperCode=...&limit=...  — PRR-294
+        // Recent submitted runs for this student. Powers the
+        // "your last N runs on this paper" trend card on the result
+        // page. Returns empty list (not 404) when no prior runs.
+        group.MapGet("/history", async (
+            HttpContext ctx,
+            [FromServices] IMockExamRunService service,
+            string? examCode,
+            string? paperCode,
+            int? limit,
+            CancellationToken ct) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+            Cena.Infrastructure.Auth.ResourceOwnershipGuard.VerifyStudentAccess(ctx.User, studentId);
+
+            var runs = await service.GetRecentRunsAsync(
+                studentId, examCode, paperCode, limit ?? 5, ct);
+            return Results.Ok(new { runs });
         });
 
         // POST /{runId}/regrade  — PRR-298. Re-runs the grader against

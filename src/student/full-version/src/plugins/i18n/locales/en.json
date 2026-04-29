@@ -1677,7 +1677,21 @@
       "emptySubmitTitle": "Submit with no answers?",
       "emptySubmitBody": "You haven't answered any questions yet. Submit anyway?",
       "emptySubmitCancel": "Keep working",
-      "emptySubmitConfirm": "Submit empty"
+      "emptySubmitConfirm": "Submit empty",
+      "calculator": {
+        "label": "Calculator policy",
+        "allowed": "Allowed",
+        "restricted": "Restricted",
+        "prohibited": "Prohibited"
+      },
+      "formulaSheet": {
+        "label": "Formula sheet",
+        "expand": "Show formula sheet",
+        "none": "None",
+        "mathbasic": "Math 4U basic",
+        "mathadvanced": "Math 5U advanced",
+        "physicsstandard": "Physics standard"
+      }
     },
     "result": {
       "title": "Mock exam result",
@@ -1699,13 +1713,17 @@
         "no": "No",
         "notGraded": "—",
         "section": "Section",
-        "points": "Points"
+        "points": "Points",
+        "date": "Date",
+        "score": "Score"
       },
       "startAnother": "Run another mock",
       "pointsLabel": "points",
       "sectionSummary": "Section summary",
       "partALabel": "Part A",
-      "partBLabel": "Part B"
+      "partBLabel": "Part B",
+      "trendTitle": "Your last runs on this paper",
+      "trendBody": "Side-by-side scores from your prior runs of this exam format. Use it as a pacing reference, not a target."
     },
     "extraTimeLabel": "Extra time (accommodation)",
     "extraTimeNote": "Used for accessibility accommodations. Honored in the timer end-to-end.",

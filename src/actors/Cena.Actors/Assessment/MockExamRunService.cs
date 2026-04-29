@@ -226,6 +226,8 @@ public sealed class MockExamRunService : IMockExamRunService
             StartedAt = startedAt,
             VariantSeed = variantSeed,
             ExtraTimeMinutes = extraTimeMinutes,
+            CalculatorPolicy = structure.CalculatorPolicy.ToString(),
+            FormulaSheetMode = structure.FormulaSheetMode.ToString(),
         };
 
         session.Store(state);
@@ -469,6 +471,66 @@ public sealed class MockExamRunService : IMockExamRunService
         if (state is null || state.StudentId != studentId) return null;
         if (!state.IsSubmitted) return null;
         return await GradeAsync(session, state, ct);
+    }
+
+    public async Task<IReadOnlyList<MockExamRunSummary>> GetRecentRunsAsync(
+        string studentId, string? examCode, string? paperCode, int limit, CancellationToken ct)
+    {
+        // Cap limit defensively — bounded response shape.
+        var capped = Math.Clamp(limit, 1, 10);
+
+        await using var session = _store.QuerySession();
+        var query = session.Query<ExamSimulationState>()
+            .Where(s => s.StudentId == studentId && s.SubmittedAt != null);
+        if (!string.IsNullOrWhiteSpace(examCode))
+            query = query.Where(s => s.ExamCode == examCode);
+        // PaperCode is NOT stored on ExamSimulationState today (it's
+        // request-time display only). Filter is best-effort: returns
+        // all runs for the examCode and the SPA can filter further.
+        // PRR-294 follow-up: persist PaperCode on state for stricter
+        // filtering. For now examCode is the granularity.
+
+        var states = await query
+            .OrderByDescending(s => s.SubmittedAt!.Value)
+            .Take(capped)
+            .ToListAsync(ct);
+
+        // We don't store the graded score on state — re-derive from
+        // submitted answers. For the trend card this is acceptable;
+        // grading is deterministic so re-derive yields the same value
+        // shown on the original result page (assuming canonicals
+        // unchanged; PRR-298 re-grade case will reflect the latest).
+        var summaries = new List<MockExamRunSummary>(states.Count);
+        foreach (var state in states)
+        {
+            // Lightweight re-grade: count answers + canonical hits
+            // without invoking CAS for every Q (perf-bounded). We use
+            // the persisted Answers dict and count which keys had
+            // non-empty values; for points we use the structure +
+            // section weighting as the upper bound.
+            var attempted = state.Answers.Count(a => !string.IsNullOrWhiteSpace(a.Value));
+            var totalPts = await ComputeTotalPointsAsync(session, state.ExamCode, ct);
+            // For trend purposes we re-grade fully (small N; bounded by
+            // cap=10 calls × ~9 questions = 90 CAS calls worst case).
+            var graded = await GradeAsync(session, state, ct);
+            summaries.Add(new MockExamRunSummary(
+                RunId: state.SimulationId,
+                ExamCode: state.ExamCode,
+                PaperCode: paperCode,
+                StartedAt: state.StartedAt,
+                SubmittedAt: state.SubmittedAt!.Value,
+                PointsAwarded: graded.PointsAwarded,
+                TotalPoints: graded.TotalPoints,
+                ScorePercent: graded.ScorePercent));
+            _ = attempted; _ = totalPts; // suppress unused warnings while keeping local for debugging
+        }
+        return summaries;
+    }
+
+    private async Task<int> ComputeTotalPointsAsync(IQuerySession session, string examCode, CancellationToken ct)
+    {
+        var structure = await _structureCatalog.GetAsync(examCode, paperCode: null, ct);
+        return structure.Sections.Sum(s => s.Slots.Take(s.RequiredAnswers).Sum(slot => slot.Points));
     }
 
     public async Task<MockExamResultResponse> RegradeAsync(
@@ -1020,5 +1082,7 @@ public sealed class MockExamRunService : IMockExamRunService
             PartAQuestionIds: s.PartAQuestionIds,
             PartBQuestionIds: s.PartBQuestionIds,
             PartBSelectedIds: s.PartBSelectedIds,
-            AnsweredIds: s.Answers.Keys.ToList());
+            AnsweredIds: s.Answers.Keys.ToList(),
+            CalculatorPolicy: string.IsNullOrEmpty(s.CalculatorPolicy) ? "Allowed" : s.CalculatorPolicy,
+            FormulaSheetMode: string.IsNullOrEmpty(s.FormulaSheetMode) ? "None" : s.FormulaSheetMode);
 }

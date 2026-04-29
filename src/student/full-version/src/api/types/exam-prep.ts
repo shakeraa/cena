@@ -49,6 +49,8 @@ export interface MockExamRunStateResponse {
   partBSelectedIds: string[]
   /** Multi-part subparts use composite "{qid}:{subpartId}" keys here. */
   answeredIds: string[]
+  calculatorPolicy: 'Allowed' | 'Restricted' | 'Prohibited'
+  formulaSheetMode: 'None' | 'MathBasic' | 'MathAdvanced' | 'PhysicsStandard'
 }
 
 export interface SelectPartBRequest {
@@ -115,6 +117,19 @@ export interface MockExamResultResponse {
 /** Phase 1G — feature-flag probe shape. */
 export interface ExamPrepFeatureFlags {
   runnerEnabled: boolean
+  tenantOverride?: boolean
+}
+
+/** PRR-294 — recent-run summary for the result-page trend card. */
+export interface MockExamRunSummary {
+  runId: string
+  examCode: string
+  paperCode: string | null
+  startedAt: string
+  submittedAt: string
+  pointsAwarded: number
+  totalPoints: number
+  scorePercent: number
 }
 
 /** Phase 1D — per-question read shape (for Part-B preview before lock). */

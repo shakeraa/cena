@@ -13,6 +13,7 @@ import type {
   MockExamResultResponse,
   MockExamRunStartedResponse,
   MockExamRunStateResponse,
+  MockExamRunSummary,
   SelectPartBRequest,
   StartMockExamRunRequest,
   SubmitAnswerRequest,
@@ -114,6 +115,19 @@ export async function getMockExamFeatureFlags(): Promise<ExamPrepFeatureFlags> {
   }
   catch { /* ignore */ }
   return fresh
+}
+
+/** PRR-294 — recent submitted runs for the trend card. */
+export function getMockExamHistory(
+  examCode?: string,
+  paperCode?: string,
+  limit: number = 5,
+): Promise<{ runs: MockExamRunSummary[] }> {
+  const params = new URLSearchParams()
+  if (examCode) params.set('examCode', examCode)
+  if (paperCode) params.set('paperCode', paperCode)
+  params.set('limit', String(limit))
+  return $api<{ runs: MockExamRunSummary[] }>(`${ROOT}/history?${params.toString()}`)
 }
 
 export function getMockExamQuestionPreview(

@@ -1648,7 +1648,21 @@
       "emptySubmitTitle": "שליחה ללא תשובות?",
       "emptySubmitBody": "עדיין לא ענית על אף שאלה. לשלוח בכל זאת?",
       "emptySubmitCancel": "להמשיך לעבוד",
-      "emptySubmitConfirm": "שליחה ריקה"
+      "emptySubmitConfirm": "שליחה ריקה",
+      "calculator": {
+        "label": "מחשבון",
+        "allowed": "מותר",
+        "restricted": "מוגבל",
+        "prohibited": "אסור"
+      },
+      "formulaSheet": {
+        "label": "דף נוסחאות",
+        "expand": "הצג דף נוסחאות",
+        "none": "אין",
+        "mathbasic": "מתמטיקה 4 יח״ל בסיסי",
+        "mathadvanced": "מתמטיקה 5 יח״ל מתקדם",
+        "physicsstandard": "פיזיקה תקני"
+      }
     },
     "result": {
       "title": "תוצאות בגרות מדומה",
@@ -1670,13 +1684,17 @@
         "no": "לא",
         "notGraded": "—",
         "section": "פרק",
-        "points": "נקודות"
+        "points": "נקודות",
+        "date": "תאריך",
+        "score": "ציון"
       },
       "startAnother": "ריצה נוספת",
       "pointsLabel": "נקודות",
       "sectionSummary": "סיכום פרקים",
       "partALabel": "פרק א׳",
-      "partBLabel": "פרק ב׳"
+      "partBLabel": "פרק ב׳",
+      "trendTitle": "הריצות האחרונות שלך בשאלון זה",
+      "trendBody": "השוואת ציונים מהריצות הקודמות שלך באותו פורמט. שימוש כעוגן לקצב, לא כיעד."
     },
     "extraTimeLabel": "תוספת זמן (התאמות)",
     "extraTimeNote": "משמש להתאמות נגישות. מובא בחשבון בטיימר מקצה לקצה.",

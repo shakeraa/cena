@@ -22,8 +22,8 @@
 import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
-import { getMockExamRunResult } from '@/api/exam-prep'
-import type { MockExamResultResponse } from '@/api/types/exam-prep'
+import { getMockExamHistory, getMockExamRunResult } from '@/api/exam-prep'
+import type { MockExamResultResponse, MockExamRunSummary } from '@/api/types/exam-prep'
 
 definePage({
   meta: {
@@ -41,7 +41,11 @@ const { t } = useI18n()
 const route = useRoute()
 const router = useRouter()
 const result = ref<MockExamResultResponse | null>(null)
+const history = ref<MockExamRunSummary[]>([])
 const error = ref<string | null>(null)
+
+const priorRuns = computed(() =>
+  history.value.filter(r => r.runId !== result.value?.runId).slice(0, 3))
 
 function parseTimeSpan(ts: string): string {
   const parts = ts.split(':')
@@ -61,6 +65,18 @@ const sectionB = computed(() => result.value?.perSection.find(s => s.sectionLabe
 onMounted(async () => {
   try {
     result.value = await getMockExamRunResult(String(route.params.runId))
+    // PRR-294 — fetch trend data alongside the mark sheet.
+    if (result.value) {
+      try {
+        const hist = await getMockExamHistory(
+          result.value.examCode,
+          result.value.paperCode ?? undefined,
+          5,
+        )
+        history.value = hist.runs ?? []
+      }
+      catch { /* history is best-effort; result page works without it */ }
+    }
   }
   catch {
     error.value = t('examPrep.errors.notFound')
@@ -267,6 +283,35 @@ function startAnotherRun() {
                 <td><bdi dir="ltr" class="text-caption">{{ sp.gradingEngine }}</bdi></td>
               </tr>
             </template>
+          </tbody>
+        </VTable>
+      </VCardText>
+    </VCard>
+
+    <!-- PRR-294 — longitudinal trend card. Honest framing per ADR-0048:
+         no "you improved!" copy; just side-by-side run history. -->
+    <VCard v-if="priorRuns.length > 0" class="mt-4" data-testid="exam-prep-trend-card">
+      <VCardTitle>{{ t('examPrep.result.trendTitle') }}</VCardTitle>
+      <VCardText>
+        <p class="text-body-2 mb-3">{{ t('examPrep.result.trendBody') }}</p>
+        <VTable density="compact">
+          <thead>
+            <tr>
+              <th>{{ t('examPrep.result.col.date') }}</th>
+              <th>{{ t('examPrep.result.col.score') }}</th>
+              <th>{{ t('examPrep.result.col.points') }}</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr
+              v-for="r in priorRuns"
+              :key="r.runId"
+              :data-testid="`exam-prep-trend-row-${r.runId}`"
+            >
+              <td><bdi dir="ltr">{{ new Date(r.submittedAt).toLocaleDateString() }}</bdi></td>
+              <td><bdi dir="ltr">{{ Math.round(r.scorePercent) }}%</bdi></td>
+              <td><bdi dir="ltr">{{ r.pointsAwarded }} / {{ r.totalPoints }}</bdi></td>
+            </tr>
           </tbody>
         </VTable>
       </VCardText>

@@ -76,7 +76,12 @@ public sealed record MockExamRunStateResponse(
     /// <summary>Question IDs the student has submitted an answer for.
     /// Multi-part subparts use composite "{qid}:{subpartId}" keys here
     /// so the SPA can drive per-subpart "answered" indicators.</summary>
-    IReadOnlyList<string> AnsweredIds);
+    IReadOnlyList<string> AnsweredIds,
+    /// <summary>PRR-293 — passed through so the runner can render the
+    /// banner. Defaults to "Allowed" / "None" when state was created
+    /// before these fields existed (back-compat).</summary>
+    string CalculatorPolicy = "Allowed",
+    string FormulaSheetMode = "None");
 
 /// <summary>Student picks the Part-B subset they will answer.</summary>
 public sealed record SelectPartBRequest(IReadOnlyList<string> SelectedQuestionIds);

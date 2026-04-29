@@ -761,6 +761,30 @@ public partial class Program
                 });
         });
     
+        // PRR-302 — Exam-prep runner: tighter than the 60/min "api"
+        // policy. A student can legitimately fire ~30 calls/min during
+        // a heavy multi-part exam (autosave per subpart + previews +
+        // visibility events), so 30/min headroom is right. Partition
+        // by user so a single student's burst doesn't starve another.
+        // Start endpoint is bursty (1-2 starts per session); we keep
+        // the same 30/min ceiling so a script that loops on /runs
+        // can't pin the actor-host into start-grade thrash.
+        options.AddPolicy("exam-prep", httpContext =>
+        {
+            var userId = httpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)
+                ?? httpContext.User.FindFirstValue("sub")
+                ?? "anonymous";
+            return RateLimitPartition.GetFixedWindowLimiter(
+                $"exam-prep:{userId}",
+                _ => new FixedWindowRateLimiterOptions
+                {
+                    PermitLimit = 30,
+                    Window = TimeSpan.FromMinutes(1),
+                    QueueLimit = 0,
+                    AutoReplenishment = true,
+                });
+        });
+
         // RATE-001: Photo uploads: 10 per hour per student
         options.AddPolicy("photo", httpContext =>
         {

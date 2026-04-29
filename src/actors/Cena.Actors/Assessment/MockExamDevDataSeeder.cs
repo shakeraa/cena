@@ -325,6 +325,20 @@ public sealed class MockExamDevDataSeeder : IHostedService
                     ("b", "Q for dT = 10.", "10", 33),
                     ("c", "Q for dT = 100.", "100", 34),
                 }),
+            // PRR-296 — hierarchical subpart example. Real Bagrut math Q's
+            // sometimes split a part into i/ii subsections (e.g. (c)(i)
+            // and (c)(ii)). Schema is free-form on PartId so any
+            // dot-separated path works; runner UI splits on '.' to
+            // indent the second level.
+            ("math", "math.calculus.integral", 3,
+                "Let f(x) = x^2 + 2x:",
+                new[]
+                {
+                    ("a",   "Find f'(x).",                          "2*x + 2", 25),
+                    ("b",   "Find the integral of f from 0 to 1.",   "4/3",    25),
+                    ("c.i", "Find the integral of f from 0 to 2.",   "20/3",   25),
+                    ("c.ii","Find the integral of f from 1 to 2.",   "16/3",   25),
+                }),
         };
 
         await using var sess = store.LightweightSession();

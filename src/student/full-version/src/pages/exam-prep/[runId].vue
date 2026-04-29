@@ -74,6 +74,43 @@ function answerKeyFor(qid: string, subpartId?: string): string {
   return subpartId ? `${qid}:${subpartId}` : qid
 }
 
+// PRR-292 — formula sheet content. Real Bagrut day uses a
+// printed-PDF formula sheet curated by Ministry of Education.
+// Phase 1 in-app sheet: a plain-text fallback so students see the
+// most common formulas. Production-grade rendering (KaTeX + curated
+// MoE-equivalent layout) is incremental — file in PRR-292-followup
+// when product-design has the layout reviewed.
+const FORMULA_SHEETS: Record<string, string> = {
+  MathBasic: `Linear: y = mx + b
+Quadratic: ax² + bx + c = 0,  x = (-b ± √(b²-4ac)) / 2a
+Pythagoras: a² + b² = c²
+Trig (right triangle): sin θ = opp/hyp, cos θ = adj/hyp, tan θ = opp/adj
+Areas: square s²,  rectangle l·w,  triangle ½·b·h,  circle πr²
+Volumes: cube s³,  cylinder πr²h,  sphere (4/3)πr³`,
+  MathAdvanced: `Quadratic: x = (-b ± √(b²-4ac)) / 2a
+Trig identities: sin² + cos² = 1,  sin(2θ) = 2 sin θ cos θ
+Derivative rules: (f·g)' = f'g + fg',  (f/g)' = (f'g - fg')/g²
+Chain rule: (f∘g)' = f'(g(x))·g'(x)
+Integral basics: ∫ x^n dx = x^(n+1)/(n+1) + C  (n ≠ -1),  ∫ 1/x dx = ln|x| + C
+Geometry: V_cone = (1/3)πr²h,  V_sphere = (4/3)πr³
+Vectors: u·v = |u||v| cos θ,  ||u|| = √(u_x² + u_y² + u_z²)
+Probability: P(A∪B) = P(A) + P(B) - P(A∩B),  P(A|B) = P(A∩B)/P(B)
+Growth/decay: A(t) = A₀ · e^(kt)`,
+  PhysicsStandard: `Mechanics: F = ma,  v = u + at,  v² = u² + 2as,  s = ut + ½at²,  KE = ½mv²,  p = mv
+Energy: PE = mgh,  W = F·d·cos θ
+Circular motion: a_c = v²/r,  F_c = mv²/r
+Thermo: Q = mcΔT,  PV = nRT
+Waves: v = fλ,  T = 1/f
+Optics: n = c/v,  1/f = 1/u + 1/v
+E&M: V = IR,  P = IV,  F = qvB,  F = qE
+Modern: E = hf,  λ = h/p`,
+}
+
+const formulaSheetContent = computed(() => {
+  const mode = state.value?.formulaSheetMode ?? 'None'
+  return FORMULA_SHEETS[mode] ?? ''
+})
+
 // Timer
 const now = ref(Date.now())
 let tickInterval: ReturnType<typeof setInterval> | null = null
@@ -335,6 +372,38 @@ function cancelEmptySubmit() {
         </VChip>
       </VCol>
     </VRow>
+
+    <!-- PRR-292/293 — calculator + formula sheet banner -->
+    <VAlert
+      v-if="state.calculatorPolicy !== 'Allowed' || state.formulaSheetMode !== 'None'"
+      type="info"
+      variant="tonal"
+      class="mt-4"
+      data-testid="exam-prep-policy-banner"
+    >
+      <span v-if="state.calculatorPolicy !== 'Allowed'">
+        <strong>{{ t('examPrep.runner.calculator.label') }}:</strong>
+        {{ t(`examPrep.runner.calculator.${state.calculatorPolicy.toLowerCase()}`) }}
+      </span>
+      <span v-if="state.formulaSheetMode !== 'None'" class="ms-3">
+        <strong>{{ t('examPrep.runner.formulaSheet.label') }}:</strong>
+        {{ t(`examPrep.runner.formulaSheet.${state.formulaSheetMode.toLowerCase()}`) }}
+      </span>
+    </VAlert>
+
+    <!-- PRR-292 — collapsible formula sheet panel -->
+    <VExpansionPanels
+      v-if="state.formulaSheetMode !== 'None'"
+      class="mt-2"
+      data-testid="exam-prep-formula-sheet"
+    >
+      <VExpansionPanel>
+        <VExpansionPanelTitle>{{ t('examPrep.runner.formulaSheet.expand') }}</VExpansionPanelTitle>
+        <VExpansionPanelText>
+          <bdi dir="ltr"><pre style="white-space: pre-wrap; margin: 0;">{{ formulaSheetContent }}</pre></bdi>
+        </VExpansionPanelText>
+      </VExpansionPanel>
+    </VExpansionPanels>
 
     <VAlert
       v-if="autoSubmitting"

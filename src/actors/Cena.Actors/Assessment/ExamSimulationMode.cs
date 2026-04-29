@@ -127,6 +127,14 @@ public sealed class ExamSimulationState
     /// time stays auditable.</summary>
     public int ExtraTimeMinutes { get; set; }
 
+    /// <summary>PRR-293 / PRR-292 — calculator policy + formula-sheet
+    /// mode resolved at start-time from the BagrutPaperStructure. Stored
+    /// on state so the runner doesn't need to re-fetch the structure
+    /// on every state poll. Defaults preserve back-compat for state
+    /// rows that predate these fields.</summary>
+    public string CalculatorPolicy { get; set; } = "Allowed";
+    public string FormulaSheetMode { get; set; } = "None";
+
     public DateTimeOffset Deadline =>
         StartedAt.AddMinutes(Format.TimeLimitMinutes + ExtraTimeMinutes);
     public bool IsExpired(DateTimeOffset now) => now >= Deadline;
