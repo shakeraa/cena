@@ -372,6 +372,15 @@ public partial class Program
     Cena.Actors.Diagnosis.PhotoDiagnostic.PhotoDiagnosticServiceRegistration
         .AddPhotoDiagnosticMarten(builder.Services);
 
+    // PRR-265 / ADR-0059 §15.5 R1: variant rate-limit + entitlement gate.
+    // Composes IStudentEntitlementResolver (registered above by
+    // AddSubscriptionsMarten), IVariantRateLimitPolicy (compile-time
+    // ADR-0059 §15.5 defaults), and IVariantRateLimiter (Redis sliding-
+    // window). Consumers: GenerateSimilarHandler (admin curator path);
+    // PRR-245 student-facing endpoint when it lands.
+    Cena.Actors.Variants.VariantServiceRegistration
+        .AddVariantGenerationGate(builder.Services);
+
     // prr-033: Ministry Bagrut rubric DSL + version pinning (ADR-0055).
     // Loads contracts/rubric/*.yml on boot; fails fast on malformed rubrics.
     builder.Services.AddCenaRubricVersionPinning(
