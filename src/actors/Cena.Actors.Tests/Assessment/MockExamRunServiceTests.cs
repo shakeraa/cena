@@ -499,19 +499,30 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
     [Fact]
     public async Task ConcurrentStarts_DifferentStudents_GetDifferentSeeds()
     {
-        // Phase 3 #2 — two starts in tight succession should not collide
-        // on the run shuffle. With the old (studentId, examCode, ticks)
-        // seed, two students starting in the same tick yielded identical
-        // partA/partB orderings.
+        // Phase 3 #2 — two starts in tight succession must not collide on
+        // the run shuffle. With the old (studentId, examCode, ticks) seed,
+        // two students starting in the same tick yielded identical RNG
+        // state and therefore identical draws.
+        //
+        // The right invariant to assert is the SEED, not the question-id
+        // output: when the topic-bound slot has only 1 viable candidate
+        // (a tight test pool, or any production paper where a topic is
+        // genuinely scarce), the IDs converge deterministically — that's
+        // a feature, not a bug. The seed itself must still differ so any
+        // randomness DOWNSTREAM (deficit-fill Shuffle, variant generation,
+        // etc.) gets fresh entropy per run. Loading the persisted
+        // ExamSimulationState gives us VariantSeed directly.
         var run1 = await _service.StartAsync("seed-test-1",
             new StartMockExamRunRequest("806"), CancellationToken.None);
         var run2 = await _service.StartAsync("seed-test-2",
             new StartMockExamRunRequest("806"), CancellationToken.None);
 
-        // The two runs should pick different question orderings (almost
-        // certainly different sets given the pool size; at minimum
-        // different orderings).
-        Assert.NotEqual(run1.PartAQuestionIds, run2.PartAQuestionIds);
+        await using var qs = _store.QuerySession();
+        var state1 = await qs.LoadAsync<ExamSimulationState>(run1.RunId);
+        var state2 = await qs.LoadAsync<ExamSimulationState>(run2.RunId);
+        Assert.NotNull(state1);
+        Assert.NotNull(state2);
+        Assert.NotEqual(state1!.VariantSeed, state2!.VariantSeed);
     }
 
     [Fact]
