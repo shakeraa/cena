@@ -94,5 +94,11 @@ public static class SubscriptionMartenRegistration
         //                                   on each successful record.
         opts.Events.AddEventType<TrialFingerprintRecorded_V1>();
         opts.Schema.For<TrialFingerprintLedger>().Identity(d => d.Id);
+
+        // Phase 1D trial-then-paywall — per-student trial consumption.
+        // Singleton document keyed on encrypted student subject id;
+        // increments are load-modify-save inside a LightweightSession so the
+        // round-trip count is bounded.
+        opts.Schema.For<StudentTrialConsumptionDocument>().Identity(d => d.Id);
     }
 }

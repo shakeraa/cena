@@ -19,13 +19,41 @@ namespace Cena.Actors.Subscriptions;
 /// Thread-safety delegated to Marten's session-per-unit-of-work model
 /// (a fresh <c>LightweightSession</c> per call).
 /// </summary>
-public sealed class MartenSubscriptionAggregateStore : ISubscriptionAggregateStore
+public sealed class MartenSubscriptionAggregateStore
+    : ISubscriptionAggregateStore, ISubscriptionStreamEnumerator
 {
     private readonly IDocumentStore _store;
 
     public MartenSubscriptionAggregateStore(IDocumentStore store)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
+    }
+
+    /// <inheritdoc/>
+    public async IAsyncEnumerable<string> EnumerateParentIdsAsync(
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        await using var session = _store.QuerySession();
+        // Marten doesn't expose a dedicated "list distinct stream keys" API;
+        // we walk the event log filtered to subscription-* streams. Pilot
+        // scale (<1k streams in flight) means a single materialise-and-
+        // distinct is fine. At larger scale a dedicated index document
+        // (TrialingSubscriptionIndex) replaces this scan — that swap lives
+        // behind this same interface.
+        var keys = await session.Events
+            .QueryAllRawEvents()
+            .Where(e => e.StreamKey != null && e.StreamKey.StartsWith(
+                SubscriptionAggregate.StreamKeyPrefix))
+            .Select(e => e.StreamKey!)
+            .Distinct()
+            .ToListAsync(ct);
+        foreach (var key in keys)
+        {
+            ct.ThrowIfCancellationRequested();
+            // Strip the "subscription-" prefix so the caller works in
+            // parent-subject-id space, not stream-key space.
+            yield return key.Substring(SubscriptionAggregate.StreamKeyPrefix.Length);
+        }
     }
 
     /// <inheritdoc/>

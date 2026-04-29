@@ -118,6 +118,13 @@ public static class SubscriptionServiceRegistration
         // ref cleared) is identical between InMemory and Marten variants.
         services.Replace(ServiceDescriptor.Singleton<ITrialFingerprintLedgerStore,
             MartenTrialFingerprintLedgerStore>());
+
+        // Phase 1D trial-then-paywall — per-student trial consumption store.
+        // Replace the InMemory default with Marten-backed so counters survive
+        // pod restarts and are shared across replicas. The interface contract
+        // is identical; only the persistence backing changes.
+        services.Replace(ServiceDescriptor.Singleton<IStudentTrialConsumptionStore,
+            MartenStudentTrialConsumptionStore>());
         return services;
     }
 
@@ -176,6 +183,24 @@ public static class SubscriptionServiceRegistration
         // TryAdd so a host that has already bound a custom impl wins.
         services.TryAddSingleton<ITrialFingerprintLedgerStore,
             InMemoryTrialFingerprintLedgerStore>();
+
+        // Phase 1D trial-then-paywall — per-student trial consumption counters.
+        //   Default store = InMemory.
+        //   AddSubscriptionsMarten replaces with MartenStudentTrialConsumptionStore
+        //   so increments survive pod restarts and are shared across replicas.
+        services.TryAddSingleton<IStudentTrialConsumptionStore,
+            InMemoryStudentTrialConsumptionStore>();
+
+        // Phase 1D trial-then-paywall — TrialExpiryWorker. Reads from the
+        // ISubscriptionStreamEnumerator + ISubscriptionAggregateStore +
+        // IStudentTrialConsumptionStore that are already wired above. The
+        // enumerator is implemented by the same store types (InMemory and
+        // Marten variants both implement the interface) — composition root
+        // resolves the same singleton instance.
+        services.TryAddSingleton<ISubscriptionStreamEnumerator>(sp =>
+            (ISubscriptionStreamEnumerator)sp.GetRequiredService<ISubscriptionAggregateStore>());
+        services.AddOptions<TrialExpiryWorkerOptions>();
+        services.AddHostedService<TrialExpiryWorker>();
 
         // PRR-344 alpha-migration defaults (InMemory). AddSubscriptionsMarten
         // swaps these for the Marten-backed variants so the seed list and
