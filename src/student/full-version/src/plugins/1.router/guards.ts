@@ -2,6 +2,7 @@ import type { RouteLocationNormalized, RouteLocationRaw } from 'vue-router'
 import type { RouteNamedMap, _RouterTyped } from 'unplugin-vue-router'
 import { watch } from 'vue'
 import { useAuthStore } from '@/stores/authStore'
+import { useEntitlementStore } from '@/stores/entitlementStore'
 import { useMeStore } from '@/stores/meStore'
 import { sanitizeReturnTo } from '@/utils/returnTo'
 import { getI18n } from '@/plugins/i18n'
@@ -114,6 +115,24 @@ export const setupGuards = (router: _RouterTyped<RouteNamedMap & { [key: string]
     // Onboarded users who try to re-visit /onboarding get bounced home.
     if (authStore.isSignedIn && isOnboardingRoute && meStore.isOnboarded)
       return { name: 'home' }
+
+    // Phase 2 paywall — routes that opt-in via meta.requiresActiveEntitlement
+    // bounce non-entitled users to the subscription page. Active / PastDue /
+    // Trialing-without-cap-hit pass through. The subscription page itself
+    // is always accessible so users can manage / pay even when blocked.
+    if (
+      authStore.isSignedIn
+      && to.meta.requiresActiveEntitlement === true
+      && to.name !== 'account-subscription'
+    ) {
+      const entitlement = useEntitlementStore()
+      // Lazy-refresh on first guard hit per session; subsequent navigations
+      // trust the cached snapshot until a 402 invalidates it.
+      if (!entitlement.isLoaded && !entitlement.isLoading)
+        await entitlement.refresh()
+      if (!entitlement.isEntitled)
+        return { name: 'account-subscription' }
+    }
 
     return true
   })
