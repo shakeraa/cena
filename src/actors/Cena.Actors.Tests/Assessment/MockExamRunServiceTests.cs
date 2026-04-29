@@ -66,10 +66,17 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
             });
 
         _clock = new FakeTimeProvider(DateTimeOffset.Parse("2026-04-29T10:00:00Z"));
-        _service = new MockExamRunService(_store, _cas, NullLogger<MockExamRunService>.Instance, _clock);
+        var catalog = new BagrutPaperStructureCatalog(
+            _store, NullLogger<BagrutPaperStructureCatalog>.Instance);
+        // Persist seed structures so the service can resolve them during tests.
+        await catalog.UpsertSeedStructuresAsync(CancellationToken.None);
+        _service = new MockExamRunService(_store, _cas, catalog, NullLogger<MockExamRunService>.Instance, _clock);
 
-        // Seed 12 published math questions so Bagrut806 (5+4=9) can draw.
-        await SeedQuestionsAsync(subject: "math", count: 12);
+        // Seed published math questions across all topics referenced by
+        // the seeded BagrutPaperStructure (806/*). 12 topics × 3 blooms =
+        // 36 items — enough headroom for Bagrut806 (9 slots) + Part B
+        // diversity probes.
+        await SeedQuestionsAsync(subject: "math", count: 36);
     }
 
     public Task DisposeAsync()
@@ -211,33 +218,115 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
                 new StartMockExamRunRequest("999"), CancellationToken.None));
     }
 
+    [Fact]
+    public async Task Start_WithPaperCode_DrawsTopicMatchedQuestions()
+    {
+        // Bagrut 806/035582 Part A slot 2 is math.trigonometry. Verify
+        // the drawn item for that slot is concept-tagged accordingly.
+        var run = await _service.StartAsync("student-paper",
+            new StartMockExamRunRequest("806", "035582"), CancellationToken.None);
+
+        await using var qs = _store.QuerySession();
+        var slot2Item = await qs.LoadAsync<QuestionReadModel>(run.PartAQuestionIds[1]);
+        Assert.NotNull(slot2Item);
+        Assert.Contains("math.trigonometry", slot2Item!.Concepts);
+    }
+
+    [Fact]
+    public async Task SectionWeightedGrade_AwardsMinistryStylePoints()
+    {
+        var run = await _service.StartAsync("student-pts",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        // Pick first 2 Part-B Q's so they're definitely the graded subset.
+        var picked = run.PartBQuestionIds.Take(2).ToList();
+        await _service.SelectPartBAsync("student-pts", run.RunId,
+            new SelectPartBRequest(picked), CancellationToken.None);
+
+        // Answer all Part A correctly + both Part B correctly.
+        foreach (var qid in run.PartAQuestionIds)
+        {
+            await _service.SubmitAnswerAsync("student-pts", run.RunId,
+                new SubmitAnswerRequest(qid, $"x = {qid}"), CancellationToken.None);
+        }
+        foreach (var qid in picked)
+        {
+            await _service.SubmitAnswerAsync("student-pts", run.RunId,
+                new SubmitAnswerRequest(qid, $"x = {qid}"), CancellationToken.None);
+        }
+
+        var result = await _service.SubmitAsync("student-pts", run.RunId, CancellationToken.None);
+
+        // Bagrut 806 default: A = 5×14 = 70 pts, B = 2×15 = 30 pts → 100 total
+        Assert.Equal(100, result.TotalPoints);
+        Assert.Equal(100, result.PointsAwarded);
+        Assert.InRange(result.ScorePercent, 99.9, 100.1);
+
+        var sectionA = result.PerSection.First(s => s.SectionLabel == "A");
+        var sectionB = result.PerSection.First(s => s.SectionLabel == "B");
+        Assert.Equal(70, sectionA.TotalPoints);
+        Assert.Equal(70, sectionA.PointsAwarded);
+        Assert.Equal(30, sectionB.TotalPoints);
+        Assert.Equal(30, sectionB.PointsAwarded);
+    }
+
+    [Fact]
+    public async Task PaperStructureCatalog_DefaultExamCodeFallback()
+    {
+        var catalog = new BagrutPaperStructureCatalog(
+            _store, NullLogger<BagrutPaperStructureCatalog>.Instance);
+
+        // Unknown paperCode falls back to the exam-code default.
+        var resolved = await catalog.GetAsync("806", "non-existent-paper", CancellationToken.None);
+        Assert.Equal("806/default", resolved.Id);
+    }
+
     private async Task SeedQuestionsAsync(string subject, int count)
     {
-        await using var sess = _store.LightweightSession();
-        for (var i = 0; i < count; i++)
+        // Topic ids that match the seeded BagrutPaperStructure (806/default
+        // and 806/035582). Includes both fine-grained topics ("math.algebra
+        // .quadratics") and coarse families ("math.algebra"). This way
+        // the slot draw matches deterministically — no need for the
+        // structure-fallback path during the happy-path tests.
+        var topics = new[]
         {
-            var id = $"q-{subject}-{i}";
-            sess.Store(new QuestionReadModel
+            "math.algebra", "math.algebra.quadratics", "math.trigonometry",
+            "math.calculus", "math.calculus.derivative", "math.calculus.integral",
+            "math.functions", "math.geometry", "math.geometry.plane",
+            "math.probability", "math.vectors", "math.growthDecay",
+        };
+
+        await using var sess = _store.LightweightSession();
+        var idx = 0;
+        foreach (var topic in topics)
+        {
+            // Each topic gets 3 items at bloom levels 2, 3, 4 so any slot
+            // band (2-3 for Part A, 3-4 for Part B) finds candidates.
+            for (var bloom = 2; bloom <= 4; bloom++)
             {
-                Id = id,
-                Subject = subject,
-                Status = "Published",
-                BloomsLevel = (i % 4) + 1, // 1..4 stratification
-                Difficulty = (float)((i % 5) * 0.2 + 0.1),
-                StemPreview = $"Q {i}",
-                Concepts = new List<string> { $"{subject}.concept-{i % 3}" },
-                Language = "he",
-            });
-            sess.Store(new QuestionDocument
-            {
-                Id = id,
-                QuestionId = id,
-                Subject = subject,
-                Topic = "algebra",
-                CorrectAnswer = $"x = {id}",
-                Prompt = $"Solve question {i}",
-                QuestionType = "free-text",
-            });
+                var id = $"q-{subject}-{idx++}";
+                sess.Store(new QuestionReadModel
+                {
+                    Id = id,
+                    Subject = subject,
+                    Status = "Published",
+                    BloomsLevel = bloom,
+                    Difficulty = (float)(bloom * 0.2 + 0.1),
+                    StemPreview = $"Test Q for {topic} bloom={bloom}",
+                    Concepts = new List<string> { topic, subject },
+                    Language = "he",
+                });
+                sess.Store(new QuestionDocument
+                {
+                    Id = id,
+                    QuestionId = id,
+                    Subject = subject,
+                    Topic = topic,
+                    CorrectAnswer = $"x = {id}",
+                    Prompt = $"Solve question {idx}",
+                    QuestionType = "free-text",
+                });
+            }
         }
         await sess.SaveChangesAsync();
     }

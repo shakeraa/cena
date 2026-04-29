@@ -1626,7 +1626,8 @@
       "pickPartB": "יש לבחור בדיוק {required} שאלות בפרק ב׳.",
       "partBFailed": "לא הצלחנו לשמור את בחירת פרק ב׳.",
       "answerFailed": "לא הצלחנו לשמור את התשובה.",
-      "submitFailed": "לא הצלחנו לשלוח את הריצה."
+      "submitFailed": "לא הצלחנו לשלוח את הריצה.",
+      "runnerDisabled": "מבחן הבגרות המדומה כרגע מושבת. נסה שוב מאוחר יותר."
     },
     "runner": {
       "title": "ריצת בגרות מדומה",
@@ -1640,7 +1641,8 @@
       "chooseN": "לבחור {required} מתוך {total}",
       "confirmPartB": "נעילת בחירת פרק ב׳",
       "progress": "נענו {answered} מתוך {total}",
-      "submitButton": "סיום ושליחה"
+      "submitButton": "סיום ושליחה",
+      "unsavedDrafts": "{n} תשובות שעוד לא נשמרו — שמירה ב-600 מילישניות או בעת יציאה מהשדה"
     },
     "result": {
       "title": "תוצאות בגרות מדומה",
@@ -1660,9 +1662,15 @@
         "engine": "מנוע",
         "yes": "כן",
         "no": "לא",
-        "notGraded": "—"
+        "notGraded": "—",
+        "section": "פרק",
+        "points": "נקודות"
       },
-      "startAnother": "ריצה נוספת"
+      "startAnother": "ריצה נוספת",
+      "pointsLabel": "נקודות",
+      "sectionSummary": "סיכום פרקים",
+      "partALabel": "פרק א׳",
+      "partBLabel": "פרק ב׳"
     }
   }
 }

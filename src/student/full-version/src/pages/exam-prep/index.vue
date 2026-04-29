@@ -15,10 +15,10 @@
 //   - Time-presentation framing is honest: "Real exam time: 180 min".
 // =============================================================================
 
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
-import { startMockExamRun } from '@/api/exam-prep'
+import { getMockExamFeatureFlags, startMockExamRun } from '@/api/exam-prep'
 import type { ExamCode } from '@/api/types/exam-prep'
 
 definePage({
@@ -55,6 +55,19 @@ const selected = ref<ExamCode>('806')
 const paperCode = ref('')
 const starting = ref(false)
 const error = ref<string | null>(null)
+const runnerEnabled = ref<boolean | null>(null)
+
+onMounted(async () => {
+  try {
+    const flags = await getMockExamFeatureFlags()
+    runnerEnabled.value = flags.runnerEnabled
+  }
+  catch {
+    // If the flags endpoint can't be reached we err on enabled — the
+    // start endpoint is the canonical gate; SPA optimism here is OK.
+    runnerEnabled.value = true
+  }
+})
 
 const previewItem = computed(() =>
   FORMATS.find(f => f.examCode === selected.value) ?? FORMATS[0],
@@ -181,6 +194,7 @@ async function start() {
           color="primary"
           size="large"
           :loading="starting"
+          :disabled="runnerEnabled === false"
           data-testid="exam-prep-start-btn"
           @click="start"
         >
@@ -188,6 +202,16 @@ async function start() {
         </VBtn>
       </VCol>
     </VRow>
+
+    <VAlert
+      v-if="runnerEnabled === false"
+      type="warning"
+      variant="tonal"
+      class="mt-4"
+      data-testid="exam-prep-disabled-banner"
+    >
+      {{ t('examPrep.errors.runnerDisabled') }}
+    </VAlert>
 
     <VAlert
       v-if="error"

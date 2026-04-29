@@ -2,14 +2,14 @@
 // Cena Platform — Mock-exam (Bagrut שאלון playbook) DTOs
 //
 // Wire-shape contracts between the student SPA and the
-// MockExamRunEndpoints. Aggregate counts, IDs, timer fields — everything
-// that is safe to put on a student-bound JSON payload.
+// MockExamRunEndpoints. Aggregate counts, IDs, timer fields, and
+// (Phase 1E) section-weighted Ministry-style scoring breakdown.
 //
 // What is NOT here: raw question bodies. Those are loaded into the
-// runner's session view via a separate /question/{id} read path (or the
-// SPA's existing question loader) so the delivery-gate chokepoint
-// (ExamSimulationDelivery.AssertDeliverable) stays the single point of
-// enforcement for ADR-0043.
+// runner's session view via the existing question read endpoint
+// (separate route) so the delivery-gate chokepoint
+// (ExamSimulationDelivery.AssertDeliverable) stays the single point
+// of enforcement for ADR-0043.
 // =============================================================================
 
 namespace Cena.Actors.Assessment;
@@ -20,9 +20,10 @@ public sealed record StartMockExamRunRequest(
     /// "036" (physics). Maps to <see cref="ExamFormat.FromCode"/>.</summary>
     string ExamCode,
 
-    /// <summary>Optional Ministry שאלון code (e.g., "035582") for
-    /// display-only provenance. Phase 1A does not use this for question
-    /// selection — see follow-up TASK in epic notes.</summary>
+    /// <summary>Optional Ministry שאלון code (e.g., "035582"). Phase 1B
+    /// uses this to look up a per-paper <see cref="BagrutPaperStructure"/>
+    /// and drive topic-aware question selection. If null/unknown, the
+    /// canonical default for the exam code is used.</summary>
     string? PaperCode = null
 );
 
@@ -62,6 +63,14 @@ public sealed record SelectPartBRequest(IReadOnlyList<string> SelectedQuestionId
 /// <summary>Per-question answer submission during the run.</summary>
 public sealed record SubmitAnswerRequest(string QuestionId, string Answer);
 
+/// <summary>Per-section breakdown on the mark sheet (Ministry-style).</summary>
+public sealed record MockExamSectionResult(
+    string SectionLabel,    // "A" / "B"
+    int Attempted,
+    int Correct,
+    int PointsAwarded,
+    int TotalPoints);
+
 /// <summary>Final mark sheet returned after submission.</summary>
 public sealed record MockExamResultResponse(
     string RunId,
@@ -70,13 +79,18 @@ public sealed record MockExamResultResponse(
     int TotalQuestions,
     int QuestionsAttempted,
     int QuestionsCorrect,
+    /// <summary>Phase 1E: percentage based on Ministry-weighted points
+    /// (PointsAwarded / TotalPoints), not the raw correct/attempted ratio.</summary>
     double ScorePercent,
     TimeSpan TimeTaken,
     TimeSpan TimeLimit,
     int VisibilityWarnings,
-    IReadOnlyList<MockExamPerQuestionResult> PerQuestion);
+    IReadOnlyList<MockExamPerQuestionResult> PerQuestion,
+    int PointsAwarded,
+    int TotalPoints,
+    IReadOnlyList<MockExamSectionResult> PerSection);
 
-/// <summary>Per-question grading line item.</summary>
+/// <summary>Per-question grading line item (Phase 1E adds Points/PointsAwarded).</summary>
 public sealed record MockExamPerQuestionResult(
     string QuestionId,
     string Section, // "A" | "B"
@@ -85,4 +99,6 @@ public sealed record MockExamPerQuestionResult(
     string? StudentAnswer,
     string? CanonicalAnswer,
     /// <summary>Engine that decided the verdict (mathnet / sympy / not-graded).</summary>
-    string GradingEngine);
+    string GradingEngine,
+    int Points,
+    int PointsAwarded);

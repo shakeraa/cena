@@ -1,35 +1,39 @@
 <script setup lang="ts">
 // =============================================================================
 // Cena Platform — Mock-exam (Bagrut שאלון playbook) runner page.
+// Phase 1D: Part-B preview + per-input draft autosave + unload guard.
 //
-// Drives a single exam-prep run from start to submit. Two sections:
+// Sections:
 //   * Part A — every question is mandatory; ordered list, free-text input.
-//   * Part B — student picks K of M (real Bagrut "choose subset" rule); only
+//   * Part B — student previews each candidate (prompt + topic + bloom)
+//              before locking the K-of-M selection. Once locked, only
 //              picks count toward the mark sheet.
 //
-// Server-authoritative timer: the runner displays the remaining time
-// computed against `state.deadline` from the server. The timer cannot
-// reach back into the run state — it only renders. If the server
-// reports `isExpired`, the submit button auto-fires (last-write-wins;
-// idempotent on the server).
-//
-// Privacy / safety:
-//   - No hints, no per-question feedback during the run (ExamFormat
-//     invariant, mirrors Ministry exam day).
-//   - No streak / loss-aversion copy (GD-004).
-//   - All math LTR-isolated in <bdi>.
+// UX hardening:
+//   * Per-question text-field auto-saves on input via a 600ms debounce
+//     (in addition to onBlur). Refreshing or losing focus mid-keystroke
+//     no longer drops the answer.
+//   * onbeforeunload guard — if there are unsaved drafts, warn before
+//     navigation. Matches real-exam expectation that you don't
+//     accidentally leave.
+//   * Server-deadline-derived timer (no client drift); auto-submit
+//     when deadline elapses (server is idempotent).
 // =============================================================================
 
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  getMockExamQuestionPreview,
   getMockExamRunState,
   selectMockExamPartB,
   submitMockExamAnswer,
   submitMockExamRun,
 } from '@/api/exam-prep'
-import type { MockExamRunStateResponse } from '@/api/types/exam-prep'
+import type {
+  ExamPrepQuestionPreview,
+  MockExamRunStateResponse,
+} from '@/api/types/exam-prep'
 
 definePage({
   meta: {
@@ -50,18 +54,22 @@ const runId = computed(() => String(route.params.runId))
 
 const state = ref<MockExamRunStateResponse | null>(null)
 const answers = ref<Record<string, string>>({})
+const previews = ref<Record<string, ExamPrepQuestionPreview>>({})
 const partBPicked = ref<string[]>([])
 const submitting = ref(false)
 const error = ref<string | null>(null)
 
-// Timer — recomputed every second from `deadline` so we don't drift.
+// Per-question debounce timers + dirty set so the unload guard knows
+// whether to prompt.
+const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {}
+const dirty = ref<Set<string>>(new Set())
+
+// Timer
 const now = ref(Date.now())
 let tickInterval: ReturnType<typeof setInterval> | null = null
 
 const partBRequired = computed(() => {
   const examCode = state.value?.examCode
-  // Mirror server-side ExamFormat — keeps the UI usable if state.value is
-  // briefly null between fetches.
   if (examCode === '036') return 3
   return 2
 })
@@ -98,10 +106,26 @@ async function loadState() {
     state.value = s
     if (s.isSubmitted) {
       await router.replace(`/exam-prep/${runId.value}/result`)
+      return
     }
+    await loadPreviews()
   }
   catch {
     error.value = t('examPrep.errors.notFound')
+  }
+}
+
+async function loadPreviews() {
+  if (!state.value) return
+  const ids = [...state.value.partAQuestionIds, ...state.value.partBQuestionIds]
+  // Fan-out individual GETs; the per-Q endpoint is bounded + cached
+  // by browser HTTP layer so this scales for the 9-13 Q range we hit.
+  const results = await Promise.allSettled(
+    ids.map(qid => getMockExamQuestionPreview(runId.value, qid)),
+  )
+  for (const r of results) {
+    if (r.status === 'fulfilled')
+      previews.value[r.value.questionId] = r.value
   }
 }
 
@@ -122,7 +146,7 @@ async function lockPartB() {
   }
 }
 
-async function saveAnswer(qid: string) {
+async function persistAnswer(qid: string) {
   const value = (answers.value[qid] ?? '').trim()
   if (!value) return
   try {
@@ -130,6 +154,7 @@ async function saveAnswer(qid: string) {
       questionId: qid,
       answer: value,
     })
+    dirty.value.delete(qid)
   }
   catch (err: unknown) {
     error.value = (err as { data?: { error?: string } })?.data?.error
@@ -137,17 +162,32 @@ async function saveAnswer(qid: string) {
   }
 }
 
+function onInput(qid: string) {
+  dirty.value.add(qid)
+  if (debounceTimers[qid]) clearTimeout(debounceTimers[qid])
+  debounceTimers[qid] = setTimeout(() => persistAnswer(qid), 600)
+}
+
+async function onBlur(qid: string) {
+  if (debounceTimers[qid]) clearTimeout(debounceTimers[qid])
+  await persistAnswer(qid)
+}
+
 async function submitRun() {
   if (submitting.value) return
   submitting.value = true
   try {
-    // Last-chance flush of any pending answers in case onBlur didn't fire.
+    // Cancel pending debounce timers + flush any unsaved.
+    for (const qid of Object.keys(debounceTimers)) {
+      clearTimeout(debounceTimers[qid])
+    }
     for (const qid of allActiveQids.value) {
       const val = (answers.value[qid] ?? '').trim()
       if (val && !state.value?.answeredIds.includes(qid))
         await submitMockExamAnswer(runId.value, { questionId: qid, answer: val })
     }
     await submitMockExamRun(runId.value)
+    dirty.value.clear()
     await router.push(`/exam-prep/${runId.value}/result`)
   }
   catch (err: unknown) {
@@ -157,12 +197,18 @@ async function submitRun() {
   }
 }
 
+function beforeUnloadHandler(e: BeforeUnloadEvent) {
+  if (dirty.value.size === 0 || state.value?.isSubmitted) return
+  e.preventDefault()
+  e.returnValue = ''
+}
+
 onMounted(async () => {
+  window.addEventListener('beforeunload', beforeUnloadHandler)
   await loadState()
   tickInterval = setInterval(() => {
     now.value = Date.now()
     if (remainingMs.value === 0 && !submitting.value && !state.value?.isSubmitted) {
-      // Server-truth: deadline passed. Auto-submit (idempotent).
       submitRun()
     }
   }, 1000)
@@ -170,7 +216,18 @@ onMounted(async () => {
 
 onBeforeUnmount(() => {
   if (tickInterval) clearInterval(tickInterval)
+  window.removeEventListener('beforeunload', beforeUnloadHandler)
+  for (const qid of Object.keys(debounceTimers)) {
+    clearTimeout(debounceTimers[qid])
+  }
 })
+
+// When state.partBSelectedIds changes (after lockPartB), pre-load
+// previews for any newly active Q's (in case loadPreviews missed any).
+watch(
+  () => state.value?.partBSelectedIds,
+  () => loadPreviews(),
+)
 </script>
 
 <template>
@@ -215,9 +272,12 @@ onBeforeUnmount(() => {
           class="mb-4"
           :data-testid="`exam-prep-q-${qid}`"
         >
-          <p class="text-subtitle-1 mb-2">
+          <p class="text-subtitle-1 mb-1">
             {{ t('examPrep.runner.questionLabel', { n: i + 1 }) }}
             <bdi dir="ltr" class="text-caption text-medium-emphasis ms-2">{{ qid }}</bdi>
+          </p>
+          <p v-if="previews[qid]" class="text-body-2 mb-2">
+            <bdi dir="ltr">{{ previews[qid].prompt }}</bdi>
           </p>
           <VTextField
             v-model="answers[qid]"
@@ -225,13 +285,14 @@ onBeforeUnmount(() => {
             variant="outlined"
             density="comfortable"
             :data-testid="`exam-prep-a-${qid}`"
-            @blur="saveAnswer(qid)"
+            @update:model-value="onInput(qid)"
+            @blur="onBlur(qid)"
           />
         </div>
       </VCardText>
     </VCard>
 
-    <!-- Part B — choose K of M -->
+    <!-- Part B — choose K of M with preview -->
     <VCard class="mt-4">
       <VCardTitle>
         {{ t('examPrep.runner.partB') }}
@@ -242,15 +303,36 @@ onBeforeUnmount(() => {
       <VCardText>
         <div v-if="!partBSelectionLocked" data-testid="exam-prep-part-b-picker">
           <p class="text-body-2 mb-2">{{ t('examPrep.runner.partBPickerHelp') }}</p>
-          <VCheckbox
+          <VCard
             v-for="qid in state.partBQuestionIds"
             :key="qid"
-            :value="qid"
-            :model-value="partBPicked"
-            :label="qid"
-            :data-testid="`exam-prep-pick-${qid}`"
-            @update:model-value="(v: unknown) => partBPicked = (v as string[]) ?? []"
-          />
+            variant="outlined"
+            class="mb-2"
+            :data-testid="`exam-prep-pick-card-${qid}`"
+          >
+            <VCardText>
+              <VCheckbox
+                :value="qid"
+                :model-value="partBPicked"
+                hide-details
+                density="compact"
+                :data-testid="`exam-prep-pick-${qid}`"
+                @update:model-value="(v: unknown) => partBPicked = (v as string[]) ?? []"
+              >
+                <template #label>
+                  <span>
+                    <bdi dir="ltr" class="text-caption text-medium-emphasis me-2">{{ qid }}</bdi>
+                    <span v-if="previews[qid]" class="text-body-2">
+                      <bdi dir="ltr">{{ previews[qid].prompt }}</bdi>
+                      <span class="text-caption text-medium-emphasis ms-2">
+                        ({{ previews[qid].topic ?? '—' }})
+                      </span>
+                    </span>
+                  </span>
+                </template>
+              </VCheckbox>
+            </VCardText>
+          </VCard>
           <VBtn
             color="primary"
             :disabled="partBPicked.length !== partBRequired"
@@ -269,9 +351,12 @@ onBeforeUnmount(() => {
             class="mb-4"
             :data-testid="`exam-prep-q-${qid}`"
           >
-            <p class="text-subtitle-1 mb-2">
+            <p class="text-subtitle-1 mb-1">
               {{ t('examPrep.runner.partBQuestionLabel', { n: i + 1 }) }}
               <bdi dir="ltr" class="text-caption text-medium-emphasis ms-2">{{ qid }}</bdi>
+            </p>
+            <p v-if="previews[qid]" class="text-body-2 mb-2">
+              <bdi dir="ltr">{{ previews[qid].prompt }}</bdi>
             </p>
             <VTextField
               v-model="answers[qid]"
@@ -279,7 +364,8 @@ onBeforeUnmount(() => {
               variant="outlined"
               density="comfortable"
               :data-testid="`exam-prep-a-${qid}`"
-              @blur="saveAnswer(qid)"
+              @update:model-value="onInput(qid)"
+              @blur="onBlur(qid)"
             />
           </div>
         </div>
@@ -294,6 +380,9 @@ onBeforeUnmount(() => {
             answered: answeredCount,
             total: allActiveQids.length,
           }) }}
+        </p>
+        <p v-if="dirty.size > 0" class="text-caption text-warning">
+          {{ t('examPrep.runner.unsavedDrafts', { n: dirty.size }) }}
         </p>
       </VCol>
       <VCol cols="12" md="6" class="d-flex justify-end">

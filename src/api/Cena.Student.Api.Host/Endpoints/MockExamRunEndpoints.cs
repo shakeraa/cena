@@ -31,6 +31,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Cena.Student.Api.Host.Endpoints;
 
@@ -42,6 +44,37 @@ public static class MockExamRunEndpoints
             .WithTags("ExamPrepMockRuns")
             .RequireAuthorization()
             .RequireRateLimiting("api");
+
+        // Phase 1G — runner feature flag (Cena:ExamPrep:RunnerEnabled).
+        // Default ON; admin can flip to OFF via env var
+        // Cena__ExamPrep__RunnerEnabled=false to drain the runner without
+        // a redeploy. Returns 503 with a structured error when off so
+        // the SPA shows a banner instead of crashing.
+        group.AddEndpointFilter(async (ctx, next) =>
+        {
+            var config = ctx.HttpContext.RequestServices.GetRequiredService<IConfiguration>();
+            var enabled = config.GetValue<bool?>("Cena:ExamPrep:RunnerEnabled") ?? true;
+            if (!enabled)
+            {
+                return Results.Json(
+                    new
+                    {
+                        error = "Mock-exam runner is disabled.",
+                        code = "EXAM_PREP_RUNNER_DISABLED",
+                    },
+                    statusCode: StatusCodes.Status503ServiceUnavailable);
+            }
+            return await next(ctx);
+        });
+
+        // GET /feature-flags — public-ish: returns the current flag state
+        // so the SPA can decide whether to show the entry button at all.
+        // Auth still required so anonymous probing doesn't reveal config.
+        app.MapGet("/api/me/exam-prep/feature-flags", (IConfiguration cfg) =>
+        {
+            var enabled = cfg.GetValue<bool?>("Cena:ExamPrep:RunnerEnabled") ?? true;
+            return Results.Ok(new { runnerEnabled = enabled });
+        }).RequireAuthorization().RequireRateLimiting("api");
 
         // POST /  — start a run
         group.MapPost("/", async (
@@ -158,6 +191,24 @@ public static class MockExamRunEndpoints
 
             var result = await service.GetResultAsync(studentId, runId, ct);
             return result is null ? Results.NotFound() : Results.Ok(result);
+        });
+
+        // GET /{runId}/question/{qid}  — Phase 1D preview (prompt + topic
+        // + bloom). The runner uses this to render question stems in the
+        // Part-B picker so students don't pick blind. Delivery gate
+        // applies (Ministry-derived items would 403 here).
+        group.MapGet("/{runId}/question/{qid}", async (
+            string runId,
+            string qid,
+            HttpContext ctx,
+            [FromServices] IMockExamRunService service,
+            CancellationToken ct) =>
+        {
+            var studentId = GetStudentId(ctx.User);
+            if (string.IsNullOrEmpty(studentId)) return Results.Unauthorized();
+
+            var preview = await service.GetQuestionPreviewAsync(studentId, runId, qid, ct);
+            return preview is null ? Results.NotFound() : Results.Ok(preview);
         });
 
         return app;

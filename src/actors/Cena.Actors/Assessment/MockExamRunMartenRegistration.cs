@@ -39,6 +39,10 @@ public static class MockExamRunMartenRegistration
         // (it has SimulationId, not Id).
         opts.Schema.For<ExamSimulationState>().Identity(s => s.SimulationId);
 
+        // Phase 1B: per-paper structure catalog. Keyed by composite
+        // "{examCode}/{paperCode}" so per-paper lookup is a 1-row LoadAsync.
+        opts.Schema.For<BagrutPaperStructureDocument>().Identity(d => d.Id);
+
         // Events on the student stream so audit replay reconstructs runs.
         opts.Events.AddEventType<ExamSimulationStarted_V1>();
         opts.Events.AddEventType<ExamSimulationSubmitted_V2>();

@@ -62,6 +62,16 @@ export interface MockExamPerQuestionResult {
   studentAnswer: string | null
   canonicalAnswer: string | null
   gradingEngine: string
+  points: number
+  pointsAwarded: number
+}
+
+export interface MockExamSectionResult {
+  sectionLabel: string
+  attempted: number
+  correct: number
+  pointsAwarded: number
+  totalPoints: number
 }
 
 export interface MockExamResultResponse {
@@ -76,4 +86,20 @@ export interface MockExamResultResponse {
   timeLimit: string
   visibilityWarnings: number
   perQuestion: MockExamPerQuestionResult[]
+  pointsAwarded: number
+  totalPoints: number
+  perSection: MockExamSectionResult[]
+}
+
+/** Phase 1G — feature-flag probe shape. */
+export interface ExamPrepFeatureFlags {
+  runnerEnabled: boolean
+}
+
+/** Phase 1D — per-question read shape (for Part-B preview before lock). */
+export interface ExamPrepQuestionPreview {
+  questionId: string
+  prompt: string
+  topic: string | null
+  bloomsLevel: number
 }

@@ -30,6 +30,36 @@ const FIREBASE_PROJECT_ID = process.env.FIREBASE_PROJECT_ID ?? 'cena-platform'
 const EMU_BEARER = process.env.FIREBASE_EMU_BEARER ?? 'owner'
 const SCHOOL_ID = 'cena-platform'
 
+// =============================================================================
+// GD-004 ship-gate banned-mechanics — full pattern list mirrored from
+// scripts/shipgate/banned-mechanics.yml. The spec asserts the runner +
+// result payloads do not surface ANY of these. (The CI scanner is the
+// authoritative gate; this mirrors its rules so a payload regression is
+// caught at e2e-flow time too.)
+// =============================================================================
+const GD_004_BANNED_PATTERNS: RegExp[] = [
+  /\bcrisis[- ]mode\b/i,
+  /\b(bagrut|exam|study|test)[- ]?countdown\b/i,
+  /\bcountdown\b/i,
+  /\bdays\s+(remaining|until|left)\b/i,
+  /(run\s+out\s+of\s+time|time\s+is\s+running\s+out|almost\s+out\s+of\s+time)/i,
+  /\blast\s+chance\b/i,
+  /\bhurry(?:\s+(?:up|before|now|and))?\b/i,
+  /\bonly\s+\d+\s+(days?|hours?|minutes?|seconds?|left|remaining|to\s+go)\b/i,
+  /\bpractice\s+streaks?\b/i,
+  /(keep\s+your\s+streak|don'?t\s+break\s+your\s+streak)/i,
+  /predicted\s+bagrut(\s+score)?/i,
+  /predicted\s+exam\s+score/i,
+  /exam\s+readiness\s+score/i,
+  /\d{1,3}\s*%\s+chance\s+of\s+(passing|scoring|achieving|getting|reaching)/i,
+]
+
+function assertNoBannedPatterns(haystack: string, scope: string) {
+  for (const pat of GD_004_BANNED_PATTERNS) {
+    expect(pat.test(haystack), `${scope} must not match GD-004 banned pattern ${pat}`).toBe(false)
+  }
+}
+
 async function provisionStudent(
   page: import('@playwright/test').Page,
 ): Promise<{ idToken: string; uid: string; email: string; password: string }> {
@@ -174,14 +204,42 @@ test.describe('E2E_EXAM_001_MOCK_EXAM_RUNNER', () => {
     )
     expect(resultGet.status()).toBe(200)
 
-    // ── Negative-property checks (GD-004 ship-gate) ──
-    // Mock-exam result payload must not surface streak / loss-aversion copy.
-    const resultBody = (await resultGet.text()).toLowerCase()
-    for (const banned of ['streak', "don't lose", 'keep your streak', 'days in a row']) {
-      expect(resultBody, `result payload must not include "${banned}"`).not.toContain(banned)
-    }
+    // ── Negative-property checks (full GD-004 banned-mechanics list) ──
+    const resultBody = await resultGet.text()
+    assertNoBannedPatterns(resultBody, 'mock-exam result payload')
 
     console.log(`[exam-001] full lifecycle green: ${result.questionsAttempted} attempted, ${result.scorePercent.toFixed(1)}%`)
+  })
+
+  test('SPA pages mount without unauthenticated crash @epic-exam @real-browser', async ({ page }) => {
+    test.setTimeout(60_000)
+
+    // Lightweight real-browser smoke: navigate to /exam-prep without
+    // an auth context. The SPA's auth guard should redirect to /login
+    // (not crash). This catches the common "missing imports / build
+    // breakage / i18n key" class of regressions on the runner pages.
+    //
+    // Heavier "logged-in user runs full mock exam through DOM" is
+    // gated on the SPA login flow which is exercised by EPIC-I et al;
+    // the API-driven test above already proves the lifecycle wire.
+
+    const consoleErrors: string[] = []
+    page.on('console', m => {
+      if (m.type() === 'error' && !m.text().includes('Failed to load resource'))
+        consoleErrors.push(m.text())
+    })
+    page.on('pageerror', e => consoleErrors.push(`PageError: ${e.message}`))
+
+    await page.goto('/exam-prep', { waitUntil: 'domcontentloaded' })
+
+    // Either the redirect to /login fired, OR the page mounted (depends
+    // on SPA cache). Both are acceptable; what's NOT acceptable is a
+    // module-import / template error that crashes the bundle.
+    const finalUrl = page.url()
+    expect(finalUrl).toMatch(/\/login|\/exam-prep/)
+    expect(consoleErrors, `console errors on /exam-prep mount: ${consoleErrors.join(' | ')}`).toEqual([])
+
+    console.log(`[exam-001] /exam-prep mount clean (final url: ${finalUrl}, ${consoleErrors.length} errors)`)
   })
 
   test('cross-student access is forbidden @epic-exam @rbac', async ({ page }) => {

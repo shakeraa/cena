@@ -62,4 +62,24 @@ public interface IMockExamRunService
         string studentId,
         string runId,
         CancellationToken ct);
+
+    /// <summary>
+    /// Phase 1D — read a single question's preview (prompt + topic +
+    /// bloom). Returns null if the qid isn't part of the run, or the
+    /// run isn't owned by the student. The delivery-gate
+    /// chokepoint (ExamSimulationDelivery.AssertDeliverable) is
+    /// invoked before serializing — Ministry-derived items never
+    /// reach this surface.
+    /// </summary>
+    Task<MockExamQuestionPreview?> GetQuestionPreviewAsync(
+        string studentId,
+        string runId,
+        string questionId,
+        CancellationToken ct);
 }
+
+public sealed record MockExamQuestionPreview(
+    string QuestionId,
+    string Prompt,
+    string? Topic,
+    int BloomsLevel);

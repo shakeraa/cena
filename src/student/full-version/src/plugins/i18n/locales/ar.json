@@ -1627,7 +1627,8 @@
       "pickPartB": "يرجى اختيار {required} أسئلة بالضبط من القسم الثاني.",
       "partBFailed": "تعذّر حفظ اختيار القسم الثاني.",
       "answerFailed": "تعذّر حفظ الإجابة.",
-      "submitFailed": "تعذّر إرسال الجلسة."
+      "submitFailed": "تعذّر إرسال الجلسة.",
+      "runnerDisabled": "محاكاة البَجْروت معطَّلة حاليّاً. حاول لاحقاً."
     },
     "runner": {
       "title": "جلسة بَجْروت محاكاة قيد التشغيل",
@@ -1641,7 +1642,8 @@
       "chooseN": "اختر {required} من أصل {total}",
       "confirmPartB": "قفل اختيار القسم الثاني",
       "progress": "أُجيب على {answered} من أصل {total}",
-      "submitButton": "إرسال نهائيّ"
+      "submitButton": "إرسال نهائيّ",
+      "unsavedDrafts": "{n} إجابة لم تُحفَظ بعد — ستُحفَظ خلال ٦٠٠ مللي ثانية أو عند الخروج من الحقل"
     },
     "result": {
       "title": "نتيجة البَجْروت المحاكاة",
@@ -1661,9 +1663,15 @@
         "engine": "المحرّك",
         "yes": "نعم",
         "no": "لا",
-        "notGraded": "—"
+        "notGraded": "—",
+        "section": "القسم",
+        "points": "علامات"
       },
-      "startAnother": "ابدأ جلسة أخرى"
+      "startAnother": "ابدأ جلسة أخرى",
+      "pointsLabel": "علامات",
+      "sectionSummary": "ملخّص الأقسام",
+      "partALabel": "القسم الأوّل",
+      "partBLabel": "القسم الثاني"
     }
   }
 }

@@ -137,6 +137,16 @@ public static class IngestionJobsEndpoints
         // POST — enqueue a Bagrut job from a multipart upload. Returns
         // {jobId} immediately; the runner does the OCR off the request
         // thread and the SPA polls /jobs/{id}.
+        //
+        // Authorization: the legacy /api/admin/ingestion/bagrut endpoint
+        // required SuperAdminOnly because Bagrut PDFs trigger Ministry-
+        // text ingest + corpus side-effects. The new /jobs/bagrut path
+        // inherits the group-level AdminOnly policy from MapGroup, which
+        // would silently downgrade the privilege bar — fix per claude-10
+        // m_5d416d42573f Tier-0 callout: re-assert SuperAdminOnly on this
+        // specific route. Other /jobs/* routes (cloud-dir, generate-variants,
+        // queries) stay AdminOnly because they don't carry corpus-write
+        // implications.
         group.MapPost("/bagrut", async (
             HttpRequest request,
             ClaimsPrincipal user,
@@ -198,10 +208,16 @@ public static class IngestionJobsEndpoints
             return Results.Accepted($"/api/admin/ingestion/jobs/{id}",
                 new IngestionDto.EnqueueJobResponse(id));
         }).DisableAntiforgery()
+            // Re-assert SuperAdminOnly on this specific route to undo the
+            // group-level AdminOnly downgrade (Tier-0 fix per claude-10
+            // m_5d416d42573f). Bagrut ingestion writes to the Ministry
+            // corpus — only super-admins may trigger it.
+            .RequireAuthorization(CenaAuthPolicies.SuperAdminOnly)
             .WithName("EnqueueBagrutJob")
             .Produces<IngestionDto.EnqueueJobResponse>(StatusCodes.Status202Accepted)
             .Produces(StatusCodes.Status400BadRequest)
-            .Produces<CenaError>(StatusCodes.Status401Unauthorized);
+            .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+            .Produces<CenaError>(StatusCodes.Status403Forbidden);
 
         // POST — enqueue a "generate variants from Bagrut draft" job (option 2).
         // Body: GenerateVariantsJobPayload. Returns {jobId} immediately.

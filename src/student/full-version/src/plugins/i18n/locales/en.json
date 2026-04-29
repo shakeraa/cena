@@ -1655,7 +1655,8 @@
       "pickPartB": "Pick exactly {required} Part B questions before continuing.",
       "partBFailed": "Could not save your Part B selection.",
       "answerFailed": "Could not save your answer.",
-      "submitFailed": "Could not submit the run."
+      "submitFailed": "Could not submit the run.",
+      "runnerDisabled": "Mock-exam runner is currently disabled. Try again later."
     },
     "runner": {
       "title": "Mock exam in progress",
@@ -1669,7 +1670,8 @@
       "chooseN": "Choose {required} of {total}",
       "confirmPartB": "Lock my Part B picks",
       "progress": "Answered {answered} of {total}",
-      "submitButton": "Submit final"
+      "submitButton": "Submit final",
+      "unsavedDrafts": "{n} unsaved draft answer(s) — saving on blur or in 600ms"
     },
     "result": {
       "title": "Mock exam result",
@@ -1689,9 +1691,15 @@
         "engine": "Engine",
         "yes": "Yes",
         "no": "No",
-        "notGraded": "—"
+        "notGraded": "—",
+        "section": "Section",
+        "points": "Points"
       },
-      "startAnother": "Run another mock"
+      "startAnother": "Run another mock",
+      "pointsLabel": "points",
+      "sectionSummary": "Section summary",
+      "partALabel": "Part A",
+      "partBLabel": "Part B"
     }
   }
 }

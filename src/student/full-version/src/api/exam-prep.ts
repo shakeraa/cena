@@ -8,6 +8,8 @@
 
 import { $api } from '@/api/$api'
 import type {
+  ExamPrepFeatureFlags,
+  ExamPrepQuestionPreview,
   MockExamResultResponse,
   MockExamRunStartedResponse,
   MockExamRunStateResponse,
@@ -46,4 +48,15 @@ export function submitMockExamRun(runId: string): Promise<MockExamResultResponse
 
 export function getMockExamRunResult(runId: string): Promise<MockExamResultResponse> {
   return $api<MockExamResultResponse>(`${ROOT}/${runId}/result`)
+}
+
+export function getMockExamFeatureFlags(): Promise<ExamPrepFeatureFlags> {
+  return $api<ExamPrepFeatureFlags>('/api/me/exam-prep/feature-flags')
+}
+
+export function getMockExamQuestionPreview(
+  runId: string,
+  questionId: string,
+): Promise<ExamPrepQuestionPreview> {
+  return $api<ExamPrepQuestionPreview>(`${ROOT}/${runId}/question/${questionId}`)
 }

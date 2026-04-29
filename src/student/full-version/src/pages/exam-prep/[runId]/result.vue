@@ -1,11 +1,22 @@
 <script setup lang="ts">
 // =============================================================================
 // Cena Platform — Mock-exam (Bagrut שאלון playbook) result / mark sheet.
+// Phase 1E: Ministry-style section breakdown + per-question points.
 //
-// Renders the post-submit grading breakdown: total score, per-question
-// pass/fail, grading engine attribution, time taken vs. limit. Read-only;
-// no engagement copy (GD-004 — no streak, no loss-aversion). Counts
-// itself as honest signal: percentage is over GRADABLE attempted items.
+// Renders:
+//   * Headline: percentage based on weighted points (PointsAwarded /
+//     TotalPoints), exam code + paper code (display).
+//   * Section A breakdown — pts awarded / pts total + correct / attempted.
+//   * Section B breakdown — same shape.
+//   * Per-question table — points + awarded + grading engine.
+//   * Honest note: percentage is over GRADABLE attempted answers; items
+//     without a canonical answer appear in the table but are excluded
+//     from the percentage.
+//
+// Constraints:
+//   * No streak / loss-aversion copy (GD-004).
+//   * All math LTR-isolated in <bdi>.
+//   * "Time taken vs. limit" is shown but not framed as "you ran out".
 // =============================================================================
 
 import { computed, onMounted, ref } from 'vue'
@@ -33,7 +44,6 @@ const result = ref<MockExamResultResponse | null>(null)
 const error = ref<string | null>(null)
 
 function parseTimeSpan(ts: string): string {
-  // C# TimeSpan serializes as "hh:mm:ss" or "d.hh:mm:ss".
   const parts = ts.split(':')
   if (parts.length < 2) return ts
   const last = parts.length - 1
@@ -45,6 +55,8 @@ function parseTimeSpan(ts: string): string {
 
 const partABreakdown = computed(() => result.value?.perQuestion.filter(q => q.section === 'A') ?? [])
 const partBBreakdown = computed(() => result.value?.perQuestion.filter(q => q.section === 'B') ?? [])
+const sectionA = computed(() => result.value?.perSection.find(s => s.sectionLabel === 'A'))
+const sectionB = computed(() => result.value?.perSection.find(s => s.sectionLabel === 'B'))
 
 onMounted(async () => {
   try {
@@ -72,8 +84,9 @@ function startAnotherRun() {
       </VCol>
     </VRow>
 
+    <!-- Top score card + section summary -->
     <VRow>
-      <VCol cols="12" md="6">
+      <VCol cols="12" md="5">
         <VCard data-testid="exam-prep-score-card">
           <VCardTitle>{{ t('examPrep.result.scoreTitle') }}</VCardTitle>
           <VCardText>
@@ -82,14 +95,19 @@ function startAnotherRun() {
                 <bdi dir="ltr">{{ Math.round(result.scorePercent) }}%</bdi>
               </div>
               <div class="ms-4 text-body-2 text-medium-emphasis">
-                {{ t('examPrep.result.scoreSummary', {
-                  correct: result.questionsCorrect,
-                  attempted: result.questionsAttempted,
-                  total: result.totalQuestions,
-                }) }}
+                <bdi dir="ltr">{{ result.pointsAwarded }}</bdi> /
+                <bdi dir="ltr">{{ result.totalPoints }}</bdi>
+                {{ t('examPrep.result.pointsLabel') }}
               </div>
             </div>
             <VDivider class="my-3" />
+            <p class="text-body-2 mb-1">
+              {{ t('examPrep.result.scoreSummary', {
+                correct: result.questionsCorrect,
+                attempted: result.questionsAttempted,
+                total: result.totalQuestions,
+              }) }}
+            </p>
             <p class="text-body-2">
               {{ t('examPrep.result.timeTaken') }}:
               <bdi dir="ltr">{{ parseTimeSpan(result.timeTaken) }}</bdi>
@@ -99,15 +117,43 @@ function startAnotherRun() {
         </VCard>
       </VCol>
 
-      <VCol cols="12" md="6">
-        <VCard>
-          <VCardTitle>{{ t('examPrep.result.gradingTitle') }}</VCardTitle>
+      <VCol cols="12" md="7">
+        <VCard data-testid="exam-prep-section-summary">
+          <VCardTitle>{{ t('examPrep.result.sectionSummary') }}</VCardTitle>
           <VCardText>
-            <p class="text-body-2 mb-2">{{ t('examPrep.result.gradingHonest') }}</p>
+            <VTable density="compact">
+              <thead>
+                <tr>
+                  <th>{{ t('examPrep.result.col.section') }}</th>
+                  <th>{{ t('examPrep.result.col.attempted') }}</th>
+                  <th>{{ t('examPrep.result.col.correct') }}</th>
+                  <th>{{ t('examPrep.result.col.points') }}</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-if="sectionA" data-testid="exam-prep-section-A">
+                  <td><bdi dir="ltr">{{ t('examPrep.result.partALabel') }}</bdi></td>
+                  <td><bdi dir="ltr">{{ sectionA.attempted }}</bdi></td>
+                  <td><bdi dir="ltr">{{ sectionA.correct }}</bdi></td>
+                  <td>
+                    <bdi dir="ltr">{{ sectionA.pointsAwarded }} / {{ sectionA.totalPoints }}</bdi>
+                  </td>
+                </tr>
+                <tr v-if="sectionB" data-testid="exam-prep-section-B">
+                  <td><bdi dir="ltr">{{ t('examPrep.result.partBLabel') }}</bdi></td>
+                  <td><bdi dir="ltr">{{ sectionB.attempted }}</bdi></td>
+                  <td><bdi dir="ltr">{{ sectionB.correct }}</bdi></td>
+                  <td>
+                    <bdi dir="ltr">{{ sectionB.pointsAwarded }} / {{ sectionB.totalPoints }}</bdi>
+                  </td>
+                </tr>
+              </tbody>
+            </VTable>
             <VAlert
               type="info"
               variant="tonal"
               density="compact"
+              class="mt-3"
             >
               {{ t('examPrep.result.gradingNote') }}
             </VAlert>
@@ -116,6 +162,7 @@ function startAnotherRun() {
       </VCol>
     </VRow>
 
+    <!-- Per-question Part A -->
     <VCard class="mt-4">
       <VCardTitle>{{ t('examPrep.result.partAHeading') }}</VCardTitle>
       <VCardText>
@@ -123,6 +170,7 @@ function startAnotherRun() {
           <thead>
             <tr>
               <th>{{ t('examPrep.result.col.question') }}</th>
+              <th>{{ t('examPrep.result.col.points') }}</th>
               <th>{{ t('examPrep.result.col.attempted') }}</th>
               <th>{{ t('examPrep.result.col.correct') }}</th>
               <th>{{ t('examPrep.result.col.engine') }}</th>
@@ -136,8 +184,11 @@ function startAnotherRun() {
             >
               <td><bdi dir="ltr">{{ q.questionId }}</bdi></td>
               <td>
-                <VIcon v-if="q.attempted" icon="ri-check-line" color="success" size="small" />
-                <VIcon v-else icon="ri-close-line" color="error" size="small" />
+                <bdi dir="ltr">{{ q.pointsAwarded }} / {{ q.points }}</bdi>
+              </td>
+              <td>
+                <VIcon v-if="q.attempted" icon="tabler-check" color="success" size="small" />
+                <VIcon v-else icon="tabler-x" color="error" size="small" />
               </td>
               <td>
                 <span v-if="q.correct === true" class="text-success">{{ t('examPrep.result.col.yes') }}</span>
@@ -151,6 +202,7 @@ function startAnotherRun() {
       </VCardText>
     </VCard>
 
+    <!-- Per-question Part B -->
     <VCard class="mt-4">
       <VCardTitle>{{ t('examPrep.result.partBHeading') }}</VCardTitle>
       <VCardText>
@@ -158,6 +210,7 @@ function startAnotherRun() {
           <thead>
             <tr>
               <th>{{ t('examPrep.result.col.question') }}</th>
+              <th>{{ t('examPrep.result.col.points') }}</th>
               <th>{{ t('examPrep.result.col.attempted') }}</th>
               <th>{{ t('examPrep.result.col.correct') }}</th>
               <th>{{ t('examPrep.result.col.engine') }}</th>
@@ -171,8 +224,11 @@ function startAnotherRun() {
             >
               <td><bdi dir="ltr">{{ q.questionId }}</bdi></td>
               <td>
-                <VIcon v-if="q.attempted" icon="ri-check-line" color="success" size="small" />
-                <VIcon v-else icon="ri-close-line" color="error" size="small" />
+                <bdi dir="ltr">{{ q.pointsAwarded }} / {{ q.points }}</bdi>
+              </td>
+              <td>
+                <VIcon v-if="q.attempted" icon="tabler-check" color="success" size="small" />
+                <VIcon v-else icon="tabler-x" color="error" size="small" />
               </td>
               <td>
                 <span v-if="q.correct === true" class="text-success">{{ t('examPrep.result.col.yes') }}</span>
