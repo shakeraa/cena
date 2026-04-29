@@ -8,6 +8,7 @@
 
 using System.Diagnostics.Metrics;
 using Cena.Actors.Api;
+using Cena.Actors.Host;            // PRR-304: AddCenaActorsOpenTelemetry extension
 using Cena.Actors.Diagnosis;
 using Cena.Admin.Api;
 using Cena.Admin.Api.Registration;
@@ -663,40 +664,14 @@ var otelServiceVersion = builder.Configuration["ErrorAggregator:Release"]
     ?? builder.Configuration["Cluster:ServiceVersion"]
     ?? "unknown";
 
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(resource => resource
-        .AddService(
-            serviceName: ServiceName,
-            serviceVersion: otelServiceVersion,
-            serviceInstanceId: Environment.MachineName))
-    .WithTracing(tracing => tracing
-        .AddSource("Cena.Actors.StudentActor")
-        .AddSource("Cena.Actors.LearningSessionActor")
-        .AddSource("Cena.Actors.StagnationDetectorActor")
-        .AddSource("Cena.Actors.OutreachSchedulerActor")
-        .AddSource("Proto.Actor")
-        .AddAspNetCoreInstrumentation()
-        .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)))
-    .WithMetrics(metrics => metrics
-        .AddMeter("Cena.Actors.StudentActor")
-        .AddMeter("Cena.Actors.LearningSessionActor")
-        .AddMeter("Cena.Actors.LlmCircuitBreaker")
-        .AddMeter("Cena.Actors.CurriculumGraph")
-        .AddMeter("Cena.Actors.DeadLetterWatcher")
-        .AddMeter("Cena.Infrastructure.NatsOutbox")
-        .AddMeter("Cena.Actors.Decay")
-        .AddMeter("Cena.Actors.Focus")
-        .AddMeter("Cena.Actors.HealthAggregator")
-        .AddMeter("Cena.Session.Nats")
-        .AddMeter("Npgsql")
-        .AddMeter("Cena.HttpCircuitBreaker")
-        // RDY-OCR-OBSERVABILITY (Phase 4): OCR cascade metrics
-        .AddMeter(Cena.Infrastructure.Ocr.Observability.OcrMetrics.MeterName)
-        .AddAspNetCoreInstrumentation()
-        .AddRuntimeInstrumentation()
-        .AddProcessInstrumentation()
-        .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
-        .AddPrometheusExporter());
+// PRR-304: OpenTelemetry tracing + metrics extracted to
+// CenaActorsOpenTelemetryRegistration.AddCenaActorsOpenTelemetry. Same
+// source list, meter list, exporter endpoints, and Prometheus exporter
+// on the metrics path — mechanical extract, no behaviour change.
+builder.Services.AddCenaActorsOpenTelemetry(
+    otlpEndpoint: otlpEndpoint,
+    serviceName: ServiceName,
+    serviceVersion: otelServiceVersion);
 
 // =============================================================================
 // 8. HEALTH CHECKS

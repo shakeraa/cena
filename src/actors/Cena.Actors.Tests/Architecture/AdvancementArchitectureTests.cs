@@ -59,6 +59,13 @@ public class AdvancementArchitectureTests
                     .Concat(Directory.EnumerateFiles(studentSrc, "*.ts", SearchOption.AllDirectories)))
         {
             if (file.Contains("/node_modules/")) continue;
+            // PRR-304 bonus: skip nested .claude/worktrees/* so a worker's
+            // local worktree doesn't false-positive the global arch test.
+            // Each worktree contains a full src/ tree at e.g.
+            // .claude/worktrees/<task-id>/src/student/full-version/...
+            // and EnumerateFiles(SearchOption.AllDirectories) walks into it.
+            if (file.Contains($"{Path.DirectorySeparatorChar}.claude{Path.DirectorySeparatorChar}worktrees{Path.DirectorySeparatorChar}")) continue;
+            if (file.Contains($"{Path.DirectorySeparatorChar}.agentdb{Path.DirectorySeparatorChar}worktrees{Path.DirectorySeparatorChar}")) continue;
             var text = File.ReadAllText(file);
             foreach (var forbid in forbidden)
             {
@@ -185,6 +192,9 @@ public class AdvancementArchitectureTests
         {
             if (file.Contains($"{Path.DirectorySeparatorChar}bin{Path.DirectorySeparatorChar}")) continue;
             if (file.Contains($"{Path.DirectorySeparatorChar}obj{Path.DirectorySeparatorChar}")) continue;
+            // PRR-304 bonus: skip nested worker worktrees (see same exclusion above).
+            if (file.Contains($"{Path.DirectorySeparatorChar}.claude{Path.DirectorySeparatorChar}worktrees{Path.DirectorySeparatorChar}")) continue;
+            if (file.Contains($"{Path.DirectorySeparatorChar}.agentdb{Path.DirectorySeparatorChar}worktrees{Path.DirectorySeparatorChar}")) continue;
             var rel = Path.GetRelativePath(repoRoot, file);
             if (allowList.Any(a => rel.StartsWith(a, StringComparison.Ordinal))) continue;
 

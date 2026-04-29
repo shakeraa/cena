@@ -1427,71 +1427,11 @@ public static class SessionEndpoints
             EndedAt: doc.EndedAt);
     }
 
-    private static int ExtractInt(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return 0;
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-                return prop.TryGetInt32(out var val) ? val : 0;
-        }
-        catch { /* best-effort */ }
-        return 0;
-    }
-
-    private static double ExtractDouble(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return 0;
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-                return prop.TryGetDouble(out var val) ? val : 0;
-        }
-        catch { /* best-effort */ }
-        return 0;
-    }
-
-    private static bool ExtractBool(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return false;
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-                return prop.ValueKind == JsonValueKind.True;
-        }
-        catch { /* best-effort */ }
-        return false;
-    }
-
-    private static string ExtractString(dynamic evt, string property)
-    {
-        try
-        {
-            object? data = evt.Data;
-            if (data is null) return "";
-            var json = JsonDocument.Parse(JsonSerializer.Serialize(data));
-            if (json.RootElement.TryGetProperty(property, out var prop) ||
-                json.RootElement.TryGetProperty(ToPascalCase(property), out prop))
-                return prop.GetString() ?? "";
-        }
-        catch { /* best-effort */ }
-        return "";
-    }
-
-    private static string ToPascalCase(string camelCase)
-    {
-        if (string.IsNullOrEmpty(camelCase)) return camelCase;
-        return char.ToUpperInvariant(camelCase[0]) + camelCase[1..];
-    }
+    // PRR-304: ExtractInt/Double/Bool/String + ToPascalCase removed
+    // (2026-04-29). They were dynamic-event JSON extractors with PascalCase
+    // fallback for Marten event Data envelopes. Repo-wide grep confirmed
+    // ZERO call sites — neither inside this file nor across the rest of
+    // the solution. Dead code at LOC count.
 
     // ═════════════════════════════════════════════════════════════════════════
     // HARDEN SessionEndpoints: Production-grade helper methods
