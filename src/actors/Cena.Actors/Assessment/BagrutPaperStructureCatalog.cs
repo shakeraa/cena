@@ -85,10 +85,23 @@ public sealed class BagrutPaperStructureCatalog : IBagrutPaperStructureCatalog
         await using var session = _store.LightweightSession();
         foreach (var s in SeededStructures)
             session.Store(s);
+        // PRR-290 — overlay generated synthetic structures (year/season/moed
+        // permutations across 806/807/036). Hand-authored entries above
+        // win on Id collision because they are stored first in this same
+        // SaveChanges (Marten upsert in commit-order). Real Ministry papers
+        // ingested through PRR-251 also win because their composite Id
+        // overrides the synthetic one on next upsert. The synthetic set
+        // is dev scaffolding so the runner + PRR-291 cohort path have a
+        // realistic catalog to match against.
+        var synthetic = BagrutPaperStructureSeeds.BuildSyntheticStructures();
+        foreach (var s in synthetic)
+        {
+            session.Store(s);
+        }
         await session.SaveChangesAsync(ct);
         _logger.LogInformation(
-            "[STRUCTURE] Seeded {Count} canonical Bagrut paper structures into Marten",
-            SeededStructures.Count);
+            "[STRUCTURE] Seeded {Hand} hand-authored + {Synthetic} synthetic Bagrut paper structures into Marten",
+            SeededStructures.Count, synthetic.Count);
     }
 
     // =========================================================================
