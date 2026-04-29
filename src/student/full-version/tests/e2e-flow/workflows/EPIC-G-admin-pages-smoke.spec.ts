@@ -224,8 +224,13 @@ test.describe('EPIC_G_ADMIN_PAGES_SMOKE', () => {
       '/apps/system/actors':        { reason: 'admin-api: SignalR /actors hub negotiate 404',                         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
       '/apps/system/architecture':  { reason: 'admin-api: SignalR /architecture hub negotiate 404',                   surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
       '/apps/system/events':        { reason: 'admin-api: SignalR /events hub negotiate 404',                         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
-      '/instructor':                { reason: 'admin-api: GET /api/instructor/* 404 — endpoint missing',              surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-05' },
-      '/mentor':                    { reason: 'admin-api: GET /api/mentor/institutes 404 — endpoint missing',         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-05' },
+      // BG-05 closed 2026-04-29 on claude-1/bg-05-instructor-mentor:
+      //   /api/instructor/classrooms                  → 200
+      //   /api/mentor/institutes                       → 200 (ADMIN)
+      //   /api/mentor/institutes/{id}                  → 200 (ADMIN)
+      //   /api/mentor/institutes/{id}/classrooms       → 200 (ADMIN)
+      // Allowlist entries removed; staleness gate would otherwise
+      // flag them next CI run (the underlying gap is gone).
     }
 
     // Allowlist budget cap: if the team adds entries faster than they

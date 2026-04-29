@@ -750,6 +750,15 @@ public partial class Program
     // ---- Classroom endpoints (STB-00b) ----
     app.MapClassroomEndpoints();
 
+    // ---- BG-05: Instructor + Mentor consoles ----
+    // The admin SPA's instructor dashboard and mentor dashboard call
+    // these endpoints on mount. Before BG-05 closed the gap, all four
+    // returned 404 and F-02..F-05 e2e specs had no surface to drive.
+    Cena.Admin.Api.Features.InstructorConsole.InstructorClassroomsEndpoint
+        .MapInstructorClassroomsEndpoint(app);
+    Cena.Admin.Api.Features.MentorConsole.MentorInstitutesEndpoint
+        .MapMentorInstitutesEndpoint(app);
+
     // prr-219: StudentPlan multi-target migration safety net
     //   POST /api/admin/institutes/{tenantId}/migrate-student-plan
     Cena.Admin.Api.Host.Endpoints.StudentPlanMigrationEndpoints
