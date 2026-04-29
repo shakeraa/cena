@@ -82,7 +82,7 @@ public sealed class RequireEntitlementFilter : IEndpointFilter
                 return await next(context).ConfigureAwait(false);
 
             case SubscriptionStatus.Trialing:
-                if (await IsTrialCapReachedAsync(view, consumption, http.RequestAborted)
+                if (await IsTrialCapReachedAsync(view, consumption, _feature, http.RequestAborted)
                     .ConfigureAwait(false))
                 {
                     return TrialCapReached(http, view, _feature);
@@ -96,48 +96,57 @@ public sealed class RequireEntitlementFilter : IEndpointFilter
     }
 
     /// <summary>
-    /// Cap-hit decision. Trialing-state cap of 0 means "no per-feature cap"
-    /// per <see cref="TrialAllotmentConfig"/>. For <see cref="EntitlementFeature.Generic"/>,
-    /// the cap-hit gate is always false — the filter is then a pure
-    /// entitlement gate without per-feature accounting.
+    /// Cap-hit decision. Compares per-student consumption against the pinned
+    /// trial caps (carried on the view by the resolver since Phase 1D-fix).
     /// </summary>
-    private async Task<bool> IsTrialCapReachedAsync(
+    /// <remarks>
+    /// <para>
+    /// Decision matrix per cap value:
+    ///   * cap == 0  → unbounded for this feature (TrialAllotmentConfig
+    ///                 convention). Returns false — never gates.
+    ///   * cap &gt; 0  → gates when consumption &gt;= cap. Returns true when
+    ///                 the caller has already used up their allotment.
+    /// </para>
+    /// <para>
+    /// For <see cref="EntitlementFeature.Generic"/> the gate is always false
+    /// — the filter is then a pure entitlement (Active/Trialing/...) check
+    /// without per-feature accounting. Returns false when
+    /// <see cref="StudentEntitlementView.TrialCaps"/> is null (defensive —
+    /// Trialing views always carry caps but a future state-graph extension
+    /// might not).
+    /// </para>
+    /// </remarks>
+    internal static async Task<bool> IsTrialCapReachedAsync(
         StudentEntitlementView view,
         IStudentTrialConsumptionStore consumption,
+        EntitlementFeature feature,
         CancellationToken ct)
     {
-        if (_feature == EntitlementFeature.Generic) return false;
+        if (feature == EntitlementFeature.Generic) return false;
+        if (view.TrialCaps is null) return false;
 
-        // The caps live on the parent's subscription state at trial-start
-        // (TrialCapsSnapshot). The view doesn't carry the snapshot today —
-        // we re-resolve it via the consumption check + the resolver-assigned
-        // tier definition. For TrialPlus we keep the catalog caps at
-        // int.MaxValue (sentinel) so cap-hit is purely controlled by the
-        // pinned snapshot — we therefore need to read the live consumption
-        // and compare against the snapshot.
-        //
-        // Phase 1D limitation: the snapshot is on the parent stream's
-        // SubscriptionState, not on the view. Reading it from the filter
-        // would require re-loading the parent aggregate — a hot-path cost
-        // we want to avoid. Instead, we surface "consumption-vs-cap" via a
-        // lightweight resolver helper on the view: when ValidUntil is
-        // non-null the resolver has populated the precedence-winner view
-        // with TrialPlus tier; we then ask the consumption store for the
-        // per-student counters. Because we *intentionally* do NOT carry the
-        // pinned caps on the view in this phase, the filter only enforces
-        // the calendar bound here — per-feature cap enforcement is
-        // performed in Phase 1E by the consumption-incrementing handler
-        // using IStudentTrialConsumptionCapEnforcer (see ICapEnforcer
-        // below). That keeps the filter cost O(1) per request while
-        // preserving a hard cap on consumption sites.
+        var cap = feature switch
+        {
+            EntitlementFeature.TutorTurn => view.TrialCaps.TrialTutorTurns,
+            EntitlementFeature.PhotoDiagnostic => view.TrialCaps.TrialPhotoDiagnostics,
+            EntitlementFeature.PracticeSession => view.TrialCaps.TrialPracticeSessions,
+            _ => 0,
+        };
+        // Cap of 0 means "no per-feature cap" — the platform admin chose
+        // unbounded for this dimension via TrialAllotmentConfig.
+        if (cap <= 0) return false;
+
         var snapshot = await consumption
             .GetAsync(view.StudentSubjectIdEncrypted, ct)
             .ConfigureAwait(false);
-
-        // No-snapshot fast path — never hit a cap when there is no
-        // consumption history. The check below is a safety net only.
-        _ = snapshot;
-        return false;
+        var used = feature switch
+        {
+            EntitlementFeature.TutorTurn => snapshot.TutorTurnsUsed,
+            EntitlementFeature.PhotoDiagnostic => snapshot.PhotoDiagnosticsUsed,
+            EntitlementFeature.PracticeSession => snapshot.SessionsStarted,
+            _ => 0,
+        };
+        return used >= cap;
     }
 
     /// <summary>

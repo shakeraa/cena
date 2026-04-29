@@ -87,6 +87,31 @@ public sealed class SubscriptionState
     /// </summary>
     public string TrialExperimentVariantId { get; private set; } = string.Empty;
 
+    // ----- Payment-method-on-file (Phase 1D-fix item 2) -----------------
+    // Captured by SubscriptionPaymentMethodAttached_V1 after a successful
+    // SetupIntent verify. The conversion-to-paid flow consumes this so the
+    // parent is not re-prompted for card details.
+
+    /// <summary>True iff at least one payment method has been attached to this stream.</summary>
+    public bool HasPaymentMethodOnFile { get; private set; }
+
+    /// <summary>
+    /// Most-recent attached payment-method id (encrypted per ADR-0038). Null
+    /// when no method has been attached. Conversion flow passes this to
+    /// <c>Subscriptions.Create</c> so the user is not re-prompted.
+    /// </summary>
+    public string? LastAttachedPaymentMethodIdEncrypted { get; private set; }
+
+    /// <summary>
+    /// Fingerprint hash of the most-recent attached card. Used by the
+    /// start-trial handler as an idempotency key — re-attaching the same
+    /// card emits no new event.
+    /// </summary>
+    public string LastAttachedPaymentMethodFingerprintHash { get; private set; } = string.Empty;
+
+    /// <summary>UTC timestamp of the most-recent payment-method attach. Null when none.</summary>
+    public DateTimeOffset? LastPaymentMethodAttachedAt { get; private set; }
+
     /// <summary>
     /// True if the subscription is currently active as of <paramref name="now"/>.
     /// Not simply <see cref="Status"/> == Active — also checks <see cref="RenewsAt"/>.
@@ -251,5 +276,20 @@ public sealed class SubscriptionState
         {
             TrialEndsAt = e.TrialEndedAt;
         }
+    }
+
+    internal void Apply(SubscriptionPaymentMethodAttached_V1 e)
+    {
+        // Pin parent id when this is the first event on a fresh stream
+        // (defensive — start-trial guarantees a TrialStarted_V1 first, but
+        // a future payment-method-only flow may not).
+        if (string.IsNullOrEmpty(ParentSubjectIdEncrypted))
+        {
+            ParentSubjectIdEncrypted = e.ParentSubjectIdEncrypted;
+        }
+        HasPaymentMethodOnFile = true;
+        LastAttachedPaymentMethodIdEncrypted = e.PaymentMethodIdEncrypted;
+        LastAttachedPaymentMethodFingerprintHash = e.FingerprintHash ?? string.Empty;
+        LastPaymentMethodAttachedAt = e.AttachedAt;
     }
 }

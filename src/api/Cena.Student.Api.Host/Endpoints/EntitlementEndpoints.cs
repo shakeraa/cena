@@ -1,28 +1,43 @@
 // =============================================================================
-// Cena Platform — EntitlementEndpoints (Phase 1D, trial-then-paywall §11)
+// Cena Platform — EntitlementEndpoints (Phase 1D + 1D-fix, trial-then-paywall §11)
 //
-// Three consumer-facing endpoints:
+// Two consumer-facing endpoints:
 //
-//   GET  /api/me/entitlement     — entitlement read surface
+//   GET  /api/me/entitlement     — entitlement read surface (tier + trial state
+//                                  + sub state + applicable discount peek +
+//                                  payment-method-on-file flag)
 //   POST /api/me/start-trial     — trial creation (SelfPay/ParentPay/InstituteCode)
-//   POST /api/me/redeem-code     — peek for an applicable discount on the caller's email
 //
-// Auth: all three require an authenticated student token.
+// /api/me/redeem-code was removed in Phase 1D-fix (item 3): the codebase has
+// no code-driven redemption registry — admin issues per-email and the binding
+// is automatic at Stripe checkout via IDiscountCouponProvider.
+// PromotionCodeString is never persisted in event state, so there is no
+// honest way to validate a typed code against the registry. The SPA's
+// existing GET /api/me/applicable-discount path already covers email-based
+// peek; a redundant POST endpoint that ignored its argument was a contract
+// lie and is gone.
+//
+// Auth: both endpoints require an authenticated student token.
 //
 // Wire format: see Cena.Api.Contracts/Subscriptions/EntitlementDtos.cs.
 //
-// Failure response convention: structured JSON with `error` + `reason` +
+// Failure response convention: structured JSON with `error` + `message` +
 // optional `field`. 4xx codes:
 //   400 invalid payload (field-level reason)
 //   401 unauthenticated   (framework before filter)
 //   404 caller has no parent binding (start-trial only)
-//   409 trial_already_used (fingerprint or email collision)
+//   409 trial_already_used (fingerprint or email collision) /
+//        already_entitled (existing Active/Trialing/PastDue) /
+//        command_rejected (domain command refused)
 //   410 trial_not_offered  (TrialAllotmentConfig.TrialEnabled = false)
 //   422 setupintent_unverified (Stripe verify returned non-Succeeded)
 //
-// Idempotency: start-trial is naturally idempotent because StartTrial command
-// requires Status = Unsubscribed. A retry from the same caller after success
-// gets a structured 409 ("trial_already_started_on_stream").
+// Idempotency: start-trial is naturally idempotent because the StartTrial
+// command requires Status = Unsubscribed. Re-calls from a caller already in
+// Trialing get a structured 409 (`already_entitled`). The
+// SubscriptionPaymentMethodAttached_V1 event de-dupes on
+// SubscriptionState.LastAttachedPaymentMethodFingerprintHash so re-running
+// SetupIntent verify against the same card emits no second event.
 // =============================================================================
 
 using System.Security.Claims;
@@ -37,16 +52,15 @@ using Microsoft.AspNetCore.Routing;
 namespace Cena.Api.Host.Endpoints;
 
 /// <summary>
-/// Wires the three /api/me/* endpoints that constitute the consumer-side
-/// entitlement surface for Phase 1D.
+/// Wires the two /api/me/* endpoints that constitute the consumer-side
+/// entitlement surface for Phase 1D + 1D-fix.
 /// </summary>
 public static class EntitlementEndpoints
 {
     public const string EntitlementRoute = "/api/me/entitlement";
     public const string StartTrialRoute = "/api/me/start-trial";
-    public const string RedeemCodeRoute = "/api/me/redeem-code";
 
-    /// <summary>Register the three endpoints on the host's route builder.</summary>
+    /// <summary>Register the endpoints on the host's route builder.</summary>
     public static IEndpointRouteBuilder MapEntitlementEndpoints(
         this IEndpointRouteBuilder app)
     {
@@ -69,19 +83,16 @@ public static class EntitlementEndpoints
             .Produces(StatusCodes.Status410Gone)
             .Produces(StatusCodes.Status422UnprocessableEntity);
 
-        app.MapPost(RedeemCodeRoute, RedeemCodeAsync)
-            .WithName("RedeemCode")
-            .WithTags("Me", "Subscriptions", "Discounts")
-            .RequireAuthorization()
-            .Produces<RedeemCodeResponseDto>(StatusCodes.Status200OK)
-            .Produces(StatusCodes.Status401Unauthorized);
-
         return app;
     }
 
     // ----- GET /api/me/entitlement --------------------------------------
 
-    private static async Task<IResult> GetEntitlementAsync(
+    /// <summary>
+    /// Internal entry point for testability. Tests inject the dependencies
+    /// directly rather than spinning up a full ASP.NET pipeline.
+    /// </summary>
+    internal static async Task<IResult> GetEntitlementAsync(
         HttpContext ctx,
         IStudentEntitlementResolver resolver,
         IStudentTrialConsumptionStore consumption,
@@ -97,25 +108,12 @@ public static class EntitlementEndpoints
         TrialStateDto? trialDto = null;
         SubscriptionStateDto? subDto = null;
 
-        if (view.EffectiveStatus == SubscriptionStatus.Trialing
-            && !string.IsNullOrEmpty(view.SourceParentSubjectIdEncrypted))
+        if (view.EffectiveStatus == SubscriptionStatus.Trialing)
         {
-            // Re-load the parent aggregate to read the pinned caps snapshot.
-            // Pilot scale: one extra round-trip is cheap. Phase 2 read
-            // optimization may push the caps into the view directly.
-            var parentId = view.SourceParentSubjectIdEncrypted;
-            if (parentId.StartsWith(StudentEntitlementResolver.AlphaGraceSourcePrefix,
-                    StringComparison.Ordinal))
-            {
-                // Grace path — no trial caps; surface as Active in the view.
-            }
-            else
-            {
-                var aggregate = await subscriptions.LoadAsync(parentId, ct).ConfigureAwait(false);
-                var caps = aggregate.State.TrialCaps;
-                var snapshot = await consumption.GetAsync(subjectId, ct).ConfigureAwait(false);
-                trialDto = BuildTrialStateDto(view, caps, snapshot);
-            }
+            // Phase 1D-fix item 1: caps now ride on the view (resolver pins
+            // them from SubscriptionState.TrialCaps). No parent re-load.
+            var snapshot = await consumption.GetAsync(subjectId, ct).ConfigureAwait(false);
+            trialDto = BuildTrialStateDto(view, view.TrialCaps, snapshot);
         }
         else if (view.EffectiveStatus is SubscriptionStatus.Active
                  or SubscriptionStatus.PastDue)
@@ -151,6 +149,7 @@ public static class EntitlementEndpoints
         var dto = new EntitlementResponseDto(
             Tier: view.EffectiveTier.ToString(),
             EffectiveStatus: view.EffectiveStatus.ToString(),
+            HasPaymentMethodOnFile: view.HasPaymentMethodOnFile,
             Trial: trialDto,
             Subscription: subDto,
             DiscountApplied: discountDto);
@@ -166,8 +165,8 @@ public static class EntitlementEndpoints
         if (view.ValidUntil.HasValue)
         {
             var diff = view.ValidUntil.Value - view.LastUpdatedAt;
-            // Floor at 0 so we never report a negative remaining count if
-            // the worker hasn't fired yet.
+            // Floor at 0 so we never report a negative count if the worker
+            // hasn't fired yet on a calendar-elapsed trial.
             daysRemaining = (int)Math.Max(0, Math.Ceiling(diff.TotalDays));
         }
         return new TrialStateDto(
@@ -183,7 +182,19 @@ public static class EntitlementEndpoints
 
     // ----- POST /api/me/start-trial -------------------------------------
 
-    private static async Task<IResult> StartTrialAsync(
+    /// <summary>
+    /// Internal entry point for testability. Composes:
+    ///   1. allotment-config gate                 → 410
+    ///   2. existing-entitlement guard            → 409
+    ///   3. parent-binding lookup                 → 404
+    ///   4. SetupIntent server-side re-read       → 422
+    ///   5. fingerprint ledger duplicate-check    → 409
+    ///   6. StartTrial command + Append           → 409 (command_rejected)
+    ///   7. SubscriptionPaymentMethodAttached_V1  → silent on idempotent re-attach
+    ///   8. consumption-counter Reset             → silent
+    ///   9. fresh entitlement read for the response shape
+    /// </summary>
+    internal static async Task<IResult> StartTrialAsync(
         HttpContext ctx,
         StartTrialRequestDto body,
         IStudentEntitlementResolver resolver,
@@ -225,10 +236,10 @@ public static class EntitlementEndpoints
                 $"caller already has an active entitlement (status={existingView.EffectiveStatus})");
         }
 
-        // Find the parent binding for this caller. The student-side caller
-        // must have a parent record on file before a trial can start; the
-        // parent stream is keyed on parentSubjectIdEncrypted, not on the
-        // student's own id (ADR-0057 §2 parent-keyed subscription).
+        // Resolve the parent stream. The student-side caller must have a
+        // parent record on file before a trial can start; the parent stream
+        // is keyed on parentSubjectIdEncrypted, not on the student's own id
+        // (ADR-0057 §2 parent-keyed subscription).
         var parents = parentBindings is IStudentParentIndex idx
             ? await idx.ListParentsForStudentAsync(subjectId, ct).ConfigureAwait(false)
             : Array.Empty<string>();
@@ -239,16 +250,15 @@ public static class EntitlementEndpoints
         }
         var parentId = parents[0];
 
-        // Fingerprint hash + normalised email for the L2/L3a ledger.
+        // Fingerprint hash + (for card flows) Stripe payment-method id.
         string fingerprintHash;
-        string? paymentMethodId = null;
+        string? paymentMethodIdEncrypted = null;
         if (trialKind == TrialKind.InstituteCode)
         {
-            // InstituteCode trials carry no card. The ledger still records a
-            // row (keyed on a derived value) so abuse defense can spot
-            // institute-code recycling within the same email; the
-            // fingerprint slot uses a stable namespace prefix for the
-            // institute code so it cannot collide with a real card hash.
+            // InstituteCode trials carry no card. The ledger row is keyed on
+            // a derived value so abuse defense can spot institute-code
+            // recycling within the same email; the fingerprint slot uses a
+            // stable namespace prefix that cannot collide with a real card hash.
             if (string.IsNullOrWhiteSpace(body.InstituteCode))
             {
                 return ProblemJson(400, "missing_institute_code",
@@ -275,7 +285,14 @@ public static class EntitlementEndpoints
                     $"setupIntent did not reach Succeeded (status={verify.Status})");
             }
             fingerprintHash = "card:" + Hash(verify.CardFingerprint);
-            paymentMethodId = verify.PaymentMethodId;
+            // Phase 1D-fix item 2: Stripe pm_… id encrypted at the wire
+            // boundary per ADR-0038 (postfix-Encrypted convention). For now
+            // we use the same stable hash form used elsewhere in the
+            // subscriptions context — Stripe pm_ids are not PII per Stripe's
+            // own classification, but Cena treats all upstream-provided ids
+            // as opaque tokens that need shred at RTBF time. The actual
+            // crypto-shred wiring lives in SubjectKeyStore (out of scope here).
+            paymentMethodIdEncrypted = "pm-enc:" + Hash(verify.PaymentMethodId ?? string.Empty);
         }
 
         var email = ExtractEmail(ctx) ?? string.Empty;
@@ -330,77 +347,51 @@ public static class EntitlementEndpoints
         }
 
         await subscriptions.AppendAsync(parentId, trialEvent, ct).ConfigureAwait(false);
+
+        // Phase 1D-fix item 2: persist the SetupIntent payment-method id
+        // onto the parent stream so conversion-to-paid does not re-prompt
+        // for card details. Idempotency: skip when the same fingerprint is
+        // already on file (same card re-attached). The aggregate guarantees
+        // the freshly-applied state contains the just-appended TrialStarted_V1
+        // already, so we re-load to pick up the post-trial state and check
+        // the prior fingerprint cleanly.
+        if (paymentMethodIdEncrypted is not null)
+        {
+            var postTrial = await subscriptions.LoadAsync(parentId, ct).ConfigureAwait(false);
+            var alreadyAttached = !string.IsNullOrEmpty(
+                postTrial.State.LastAttachedPaymentMethodFingerprintHash)
+                && string.Equals(
+                    postTrial.State.LastAttachedPaymentMethodFingerprintHash,
+                    fingerprintHash,
+                    StringComparison.Ordinal);
+            if (!alreadyAttached)
+            {
+                var pmEvent = new SubscriptionPaymentMethodAttached_V1(
+                    ParentSubjectIdEncrypted: parentId,
+                    PaymentMethodIdEncrypted: paymentMethodIdEncrypted,
+                    FingerprintHash: fingerprintHash,
+                    AttachedAt: startedAt,
+                    Source: PaymentMethodAttachSource.TrialStartSetupIntent);
+                await subscriptions.AppendAsync(parentId, pmEvent, ct).ConfigureAwait(false);
+            }
+        }
+
         await consumption.ResetAsync(subjectId, ct).ConfigureAwait(false);
 
-        // _ paymentMethodId reserved for future write to a Stripe-payment-
-        // method shadow store (Phase 1E+); silenced for now.
-        _ = paymentMethodId;
-
-        // Build the response by re-reading the entitlement view — same
-        // shape as GET /api/me/entitlement so the SPA can replace state
-        // without a separate fetch.
+        // Build the response by re-reading the entitlement view — same shape
+        // as GET /api/me/entitlement so the SPA can replace state without a
+        // separate fetch.
         var freshView = await resolver.ResolveAsync(subjectId, ct).ConfigureAwait(false);
         var freshSnapshot = await consumption.GetAsync(subjectId, ct).ConfigureAwait(false);
-        var trialDto = BuildTrialStateDto(freshView, caps, freshSnapshot);
+        var trialDto = BuildTrialStateDto(freshView, freshView.TrialCaps ?? caps, freshSnapshot);
         var responseDto = new EntitlementResponseDto(
             Tier: freshView.EffectiveTier.ToString(),
             EffectiveStatus: freshView.EffectiveStatus.ToString(),
+            HasPaymentMethodOnFile: freshView.HasPaymentMethodOnFile,
             Trial: trialDto,
             Subscription: null,
             DiscountApplied: null);
         return Results.Ok(responseDto);
-    }
-
-    // ----- POST /api/me/redeem-code -------------------------------------
-
-    private static async Task<IResult> RedeemCodeAsync(
-        HttpContext ctx,
-        RedeemCodeRequestDto body,
-        DiscountAssignmentService discounts,
-        CancellationToken ct)
-    {
-        var email = ExtractEmail(ctx);
-        if (string.IsNullOrWhiteSpace(email))
-        {
-            return Results.Ok(new RedeemCodeResponseDto(
-                Applied: false,
-                DiscountKind: null,
-                DiscountValue: null,
-                DurationMonths: null,
-                Reason: "no_email_on_token"));
-        }
-        if (body is null || string.IsNullOrWhiteSpace(body.Code))
-        {
-            return Results.Ok(new RedeemCodeResponseDto(
-                Applied: false,
-                DiscountKind: null,
-                DiscountValue: null,
-                DurationMonths: null,
-                Reason: "empty_code"));
-        }
-
-        // Phase 1D scope: the redeem-code endpoint reports availability of
-        // an active discount for the caller's email. The actual binding
-        // happens at Stripe checkout via the existing promotion-code flow.
-        // We treat the supplied `code` as a hint — admin issues per-email,
-        // so the lookup is by email, not by raw code (the code is bound to
-        // the email Stripe-side).
-        var summary = await discounts.FindActiveForEmailAsync(email, ct).ConfigureAwait(false);
-        if (summary is null)
-        {
-            return Results.Ok(new RedeemCodeResponseDto(
-                Applied: false,
-                DiscountKind: null,
-                DiscountValue: null,
-                DurationMonths: null,
-                Reason: "not_found"));
-        }
-        return Results.Ok(new RedeemCodeResponseDto(
-            Applied: true,
-            DiscountKind: summary.Kind.ToString(),
-            DiscountValue: summary.Value,
-            DurationMonths: summary.DurationMonths,
-            Reason: null));
     }
 
     // ----- helpers ------------------------------------------------------

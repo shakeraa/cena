@@ -100,5 +100,10 @@ public static class SubscriptionMartenRegistration
         // increments are load-modify-save inside a LightweightSession so the
         // round-trip count is bounded.
         opts.Schema.For<StudentTrialConsumptionDocument>().Identity(d => d.Id);
+
+        // Phase 1D-fix item 2 — payment-method-on-file capture. Persists the
+        // SetupIntent re-read result onto the parent subscription stream so
+        // conversion-to-paid can reuse the card without re-prompting.
+        opts.Events.AddEventType<SubscriptionPaymentMethodAttached_V1>();
     }
 }
