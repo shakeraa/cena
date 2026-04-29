@@ -43,6 +43,13 @@ public static class MockExamRunMartenRegistration
         // "{examCode}/{paperCode}" so per-paper lookup is a 1-row LoadAsync.
         opts.Schema.For<BagrutPaperStructureDocument>().Identity(d => d.Id);
 
+        // Phase 2A: multi-part Bagrut questions (a/b/c sub-parts with
+        // per-subpart canonical answers + point weights).
+        opts.Schema.For<BagrutMultipartQuestion>()
+            .Identity(d => d.Id)
+            .Index(d => d.Subject)
+            .Index(d => d.Topic);
+
         // Events on the student stream so audit replay reconstructs runs.
         opts.Events.AddEventType<ExamSimulationStarted_V1>();
         opts.Events.AddEventType<ExamSimulationSubmitted_V2>();

@@ -14,6 +14,9 @@ export interface StartMockExamRunRequest {
   examCode: ExamCode
   /** Optional Ministry שאלון code (e.g. "035582"). Display-only today. */
   paperCode?: string
+  /** Phase 2B — accommodation extra-time as a percentage of the canonical
+   * exam time. Server clamps to [0, 100]. Default 0 = standard time. */
+  extraTimePercent?: number
 }
 
 export interface MockExamRunStartedResponse {
@@ -21,6 +24,7 @@ export interface MockExamRunStartedResponse {
   examCode: string
   paperCode: string | null
   timeLimitMinutes: number
+  extraTimeMinutes: number
   partAQuestionCount: number
   partBQuestionCount: number
   partBRequiredCount: number
@@ -35,6 +39,7 @@ export interface MockExamRunStateResponse {
   examCode: string
   paperCode: string | null
   timeLimitMinutes: number
+  extraTimeMinutes: number
   startedAt: string
   deadline: string
   isExpired: boolean
@@ -42,6 +47,7 @@ export interface MockExamRunStateResponse {
   partAQuestionIds: string[]
   partBQuestionIds: string[]
   partBSelectedIds: string[]
+  /** Multi-part subparts use composite "{qid}:{subpartId}" keys here. */
   answeredIds: string[]
 }
 
@@ -52,6 +58,19 @@ export interface SelectPartBRequest {
 export interface SubmitAnswerRequest {
   questionId: string
   answer: string
+  /** Phase 2A — non-null only for multi-part questions ("a"/"b"/"c"). */
+  subpartId?: string
+}
+
+export interface MockExamSubpartResult {
+  subpartId: string
+  attempted: boolean
+  correct: boolean | null
+  studentAnswer: string | null
+  canonicalAnswer: string | null
+  gradingEngine: string
+  points: number
+  pointsAwarded: number
 }
 
 export interface MockExamPerQuestionResult {
@@ -64,6 +83,8 @@ export interface MockExamPerQuestionResult {
   gradingEngine: string
   points: number
   pointsAwarded: number
+  /** Phase 2A — non-null when the question is multi-part. */
+  subparts?: MockExamSubpartResult[]
 }
 
 export interface MockExamSectionResult {
@@ -102,4 +123,13 @@ export interface ExamPrepQuestionPreview {
   prompt: string
   topic: string | null
   bloomsLevel: number
+  /** Phase 2A — non-null for multi-part Q's. The runner renders one
+   * input per subpart; the parent prompt becomes the shared question stem. */
+  subparts?: ExamPrepSubpartPreview[]
+}
+
+export interface ExamPrepSubpartPreview {
+  partId: string
+  prompt: string
+  points: number
 }

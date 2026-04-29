@@ -177,26 +177,41 @@ function startAnotherRun() {
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="q in partABreakdown"
-              :key="q.questionId"
-              :data-testid="`exam-prep-result-row-${q.questionId}`"
-            >
-              <td><bdi dir="ltr">{{ q.questionId }}</bdi></td>
-              <td>
-                <bdi dir="ltr">{{ q.pointsAwarded }} / {{ q.points }}</bdi>
-              </td>
-              <td>
-                <VIcon v-if="q.attempted" icon="tabler-check" color="success" size="small" />
-                <VIcon v-else icon="tabler-x" color="error" size="small" />
-              </td>
-              <td>
-                <span v-if="q.correct === true" class="text-success">{{ t('examPrep.result.col.yes') }}</span>
-                <span v-else-if="q.correct === false" class="text-error">{{ t('examPrep.result.col.no') }}</span>
-                <span v-else class="text-medium-emphasis">{{ t('examPrep.result.col.notGraded') }}</span>
-              </td>
-              <td><bdi dir="ltr" class="text-caption">{{ q.gradingEngine }}</bdi></td>
-            </tr>
+            <template v-for="q in partABreakdown" :key="q.questionId">
+              <tr :data-testid="`exam-prep-result-row-${q.questionId}`">
+                <td><bdi dir="ltr">{{ q.questionId }}</bdi></td>
+                <td><bdi dir="ltr">{{ q.pointsAwarded }} / {{ q.points }}</bdi></td>
+                <td>
+                  <VIcon v-if="q.attempted" icon="tabler-check" color="success" size="small" />
+                  <VIcon v-else icon="tabler-x" color="error" size="small" />
+                </td>
+                <td>
+                  <span v-if="q.correct === true" class="text-success">{{ t('examPrep.result.col.yes') }}</span>
+                  <span v-else-if="q.correct === false" class="text-error">{{ t('examPrep.result.col.no') }}</span>
+                  <span v-else class="text-medium-emphasis">{{ t('examPrep.result.col.notGraded') }}</span>
+                </td>
+                <td><bdi dir="ltr" class="text-caption">{{ q.gradingEngine }}</bdi></td>
+              </tr>
+              <tr
+                v-for="sp in (q.subparts ?? [])"
+                :key="`${q.questionId}:${sp.subpartId}`"
+                :data-testid="`exam-prep-result-subrow-${q.questionId}-${sp.subpartId}`"
+                class="text-caption"
+              >
+                <td class="ps-8"><bdi dir="ltr">└ ({{ sp.subpartId }})</bdi></td>
+                <td><bdi dir="ltr">{{ sp.pointsAwarded }} / {{ sp.points }}</bdi></td>
+                <td>
+                  <VIcon v-if="sp.attempted" icon="tabler-check" color="success" size="x-small" />
+                  <VIcon v-else icon="tabler-x" color="error" size="x-small" />
+                </td>
+                <td>
+                  <span v-if="sp.correct === true" class="text-success">{{ t('examPrep.result.col.yes') }}</span>
+                  <span v-else-if="sp.correct === false" class="text-error">{{ t('examPrep.result.col.no') }}</span>
+                  <span v-else class="text-medium-emphasis">—</span>
+                </td>
+                <td><bdi dir="ltr" class="text-caption">{{ sp.gradingEngine }}</bdi></td>
+              </tr>
+            </template>
           </tbody>
         </VTable>
       </VCardText>
@@ -217,26 +232,41 @@ function startAnotherRun() {
             </tr>
           </thead>
           <tbody>
-            <tr
-              v-for="q in partBBreakdown"
-              :key="q.questionId"
-              :data-testid="`exam-prep-result-row-${q.questionId}`"
-            >
-              <td><bdi dir="ltr">{{ q.questionId }}</bdi></td>
-              <td>
-                <bdi dir="ltr">{{ q.pointsAwarded }} / {{ q.points }}</bdi>
-              </td>
-              <td>
-                <VIcon v-if="q.attempted" icon="tabler-check" color="success" size="small" />
-                <VIcon v-else icon="tabler-x" color="error" size="small" />
-              </td>
-              <td>
-                <span v-if="q.correct === true" class="text-success">{{ t('examPrep.result.col.yes') }}</span>
-                <span v-else-if="q.correct === false" class="text-error">{{ t('examPrep.result.col.no') }}</span>
-                <span v-else class="text-medium-emphasis">{{ t('examPrep.result.col.notGraded') }}</span>
-              </td>
-              <td><bdi dir="ltr" class="text-caption">{{ q.gradingEngine }}</bdi></td>
-            </tr>
+            <template v-for="q in partBBreakdown" :key="q.questionId">
+              <tr :data-testid="`exam-prep-result-row-${q.questionId}`">
+                <td><bdi dir="ltr">{{ q.questionId }}</bdi></td>
+                <td><bdi dir="ltr">{{ q.pointsAwarded }} / {{ q.points }}</bdi></td>
+                <td>
+                  <VIcon v-if="q.attempted" icon="tabler-check" color="success" size="small" />
+                  <VIcon v-else icon="tabler-x" color="error" size="small" />
+                </td>
+                <td>
+                  <span v-if="q.correct === true" class="text-success">{{ t('examPrep.result.col.yes') }}</span>
+                  <span v-else-if="q.correct === false" class="text-error">{{ t('examPrep.result.col.no') }}</span>
+                  <span v-else class="text-medium-emphasis">{{ t('examPrep.result.col.notGraded') }}</span>
+                </td>
+                <td><bdi dir="ltr" class="text-caption">{{ q.gradingEngine }}</bdi></td>
+              </tr>
+              <tr
+                v-for="sp in (q.subparts ?? [])"
+                :key="`${q.questionId}:${sp.subpartId}`"
+                :data-testid="`exam-prep-result-subrow-${q.questionId}-${sp.subpartId}`"
+                class="text-caption"
+              >
+                <td class="ps-8"><bdi dir="ltr">└ ({{ sp.subpartId }})</bdi></td>
+                <td><bdi dir="ltr">{{ sp.pointsAwarded }} / {{ sp.points }}</bdi></td>
+                <td>
+                  <VIcon v-if="sp.attempted" icon="tabler-check" color="success" size="x-small" />
+                  <VIcon v-else icon="tabler-x" color="error" size="x-small" />
+                </td>
+                <td>
+                  <span v-if="sp.correct === true" class="text-success">{{ t('examPrep.result.col.yes') }}</span>
+                  <span v-else-if="sp.correct === false" class="text-error">{{ t('examPrep.result.col.no') }}</span>
+                  <span v-else class="text-medium-emphasis">—</span>
+                </td>
+                <td><bdi dir="ltr" class="text-caption">{{ sp.gradingEngine }}</bdi></td>
+              </tr>
+            </template>
           </tbody>
         </VTable>
       </VCardText>

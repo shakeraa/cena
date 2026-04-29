@@ -72,8 +72,12 @@ public sealed class MockExamDevDataSeeder : IHostedService
             if (catalog is BagrutPaperStructureCatalog impl)
                 await impl.UpsertSeedStructuresAsync(ct);
 
-            // 2. Seed published items for every topic id the structures reference.
+            // 2. Seed published single-cell items (Part A short-form fodder).
             await SeedQuestionsAsync(store, ct);
+
+            // 3. Seed multi-part Bagrut Q's (Part B long-form). Topics
+            //    align with the seeded BagrutPaperStructure Part B slots.
+            await SeedMultipartAsync(store, ct);
         }
         catch (Exception ex)
         {
@@ -193,5 +197,140 @@ public sealed class MockExamDevDataSeeder : IHostedService
 
         await session.SaveChangesAsync(ct);
         _logger.LogInformation("[EXAM-PREP-SEED] upserted {Count} published items for runner pool", seededCount);
+    }
+
+    /// <summary>
+    /// Phase 2A — multi-part Bagrut Q's (a/b/c subparts). One per Part-B
+    /// slot topic per exam (math + physics) at bloom 3 and 4 so the
+    /// slot-aware draw can pick a multi-part candidate every time.
+    /// Real Bagrut Q's are typically 4 subparts at 25/25/25/25; the seed
+    /// uses 3-subpart 33/33/34 spreads for variety.
+    /// </summary>
+    private async Task SeedMultipartAsync(IDocumentStore store, CancellationToken ct)
+    {
+        var defs = new (string subject, string topic, int bloom, string stem,
+            (string id, string prompt, string answer, int pts)[] subparts)[]
+        {
+            ("math", "math.calculus.integral", 4,
+                "Given f(x) = x^2 on [0, 1]:",
+                new[]
+                {
+                    ("a", "Find the integral of f from 0 to 1.", "1/3", 33),
+                    ("b", "Find the integral of f from 0 to 2.", "8/3", 33),
+                    ("c", "Find the integral of 2*f from 0 to 1.",  "2/3", 34),
+                }),
+            ("math", "math.calculus.derivative", 3,
+                "Given f(x) = 3*x^2 + 2*x:",
+                new[]
+                {
+                    ("a", "Find f'(x).", "6*x + 2", 33),
+                    ("b", "Find f'(0).", "2", 33),
+                    ("c", "Find f'(1).", "8", 34),
+                }),
+            ("math", "math.probability", 3,
+                "Two fair coins are tossed:",
+                new[]
+                {
+                    ("a", "P(both heads).",     "1/4", 33),
+                    ("b", "P(at least one head).", "3/4", 33),
+                    ("c", "P(exactly one head).",  "1/2", 34),
+                }),
+            ("math", "math.vectors", 4,
+                "Given u = (3, 4, 0) and v = (0, 0, 5):",
+                new[]
+                {
+                    ("a", "Find ||u||.", "5", 33),
+                    ("b", "Find u . v.", "0", 33),
+                    ("c", "Find ||v||.", "5", 34),
+                }),
+            ("math", "math.growthDecay", 4,
+                "Given f(t) = e^t:",
+                new[]
+                {
+                    ("a", "Find f(0).", "1", 33),
+                    ("b", "Find ln(e).", "1", 33),
+                    ("c", "Find e^0 + ln(e).", "2", 34),
+                }),
+            ("math", "math.functions", 3,
+                "Given g(x) = x + 1:",
+                new[]
+                {
+                    ("a", "Find g(0).", "1", 33),
+                    ("b", "Find g(g(0)).", "2", 33),
+                    ("c", "Find g(g(g(0))).", "3", 34),
+                }),
+            ("math", "math.geometry", 3,
+                "Given a square with side 3 and a circle with radius 2:",
+                new[]
+                {
+                    ("a", "Area of the square.", "9",     33),
+                    ("b", "Perimeter of the square.", "12", 33),
+                    ("c", "Diameter of the circle.", "4",   34),
+                }),
+            ("physics", "physics.mechanics", 4,
+                "A 2 kg block accelerates at 3 m/s^2:",
+                new[]
+                {
+                    ("a", "Force on the block (N).", "6", 33),
+                    ("b", "Velocity at t=2s (m/s).", "6", 33),
+                    ("c", "Distance traveled at t=2s (m).", "6", 34),
+                }),
+            ("physics", "physics.electromagnetism", 3,
+                "A current of 2 A flows through a 3 ohm resistor:",
+                new[]
+                {
+                    ("a", "Voltage across resistor (V).", "6", 33),
+                    ("b", "Power dissipated (W).", "12", 33),
+                    ("c", "Energy in 1 s (J).", "12", 34),
+                }),
+            ("physics", "physics.optics", 4,
+                "A photon has frequency 5 (in arbitrary units, h = 1):",
+                new[]
+                {
+                    ("a", "Energy E = hf.", "5", 33),
+                    ("b", "Period T = 1/f.", "1/5", 33),
+                    ("c", "Doubling f gives E.", "10", 34),
+                }),
+            ("physics", "physics.modern", 4,
+                "Given E = mc^2 with m = 2, c = 3 (arbitrary units):",
+                new[]
+                {
+                    ("a", "Find E.", "18", 33),
+                    ("b", "Find E if m doubles.", "36", 33),
+                    ("c", "Find E if c doubles.", "72", 34),
+                }),
+            ("physics", "physics.thermodynamics", 4,
+                "Given Q = m*c*dT with m = 1, c = 1:",
+                new[]
+                {
+                    ("a", "Q for dT = 5.", "5", 33),
+                    ("b", "Q for dT = 10.", "10", 33),
+                    ("c", "Q for dT = 100.", "100", 34),
+                }),
+        };
+
+        await using var sess = store.LightweightSession();
+        var n = 0;
+        foreach (var (subject, topic, bloom, stem, subparts) in defs)
+        {
+            var id = $"exam-prep-multipart-{topic.Replace('.', '-')}-{bloom}";
+            sess.Store(new BagrutMultipartQuestion
+            {
+                Id = id,
+                Subject = subject,
+                Topic = topic,
+                BloomsLevel = bloom,
+                Stem = stem,
+                SourceType = "TeacherAuthoredOriginal",
+                Language = "en",
+                UpdatedAt = DateTimeOffset.UtcNow,
+                Subparts = subparts
+                    .Select(s => new BagrutQuestionSubpart(s.id, s.prompt, s.answer, s.pts))
+                    .ToList(),
+            });
+            n++;
+        }
+        await sess.SaveChangesAsync(ct);
+        _logger.LogInformation("[EXAM-PREP-SEED] upserted {Count} multi-part Bagrut Q's for Part-B pool", n);
     }
 }

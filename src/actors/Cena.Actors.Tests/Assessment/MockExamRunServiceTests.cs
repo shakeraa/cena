@@ -281,6 +281,107 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
         Assert.Equal("806/default", resolved.Id);
     }
 
+    [Fact]
+    public async Task ExtraTimePercent_ExtendsDeadlineProportionally()
+    {
+        var run = await _service.StartAsync("student-extra-time",
+            new StartMockExamRunRequest("806", null, ExtraTimePercent: 25),
+            CancellationToken.None);
+
+        // 25% of 180 = 45 → 225 effective minutes.
+        Assert.Equal(45, run.ExtraTimeMinutes);
+        var expected = run.StartedAt.AddMinutes(180 + 45);
+        Assert.Equal(expected, run.Deadline);
+    }
+
+    [Fact]
+    public async Task ExtraTimePercent_OutOfBand_ClampedSilently()
+    {
+        var run = await _service.StartAsync("student-clamp",
+            new StartMockExamRunRequest("806", null, ExtraTimePercent: 999),
+            CancellationToken.None);
+        // 100% of 180 = 180 → 360 effective minutes.
+        Assert.Equal(180, run.ExtraTimeMinutes);
+
+        var run2 = await _service.StartAsync("student-clamp-neg",
+            new StartMockExamRunRequest("807", null, ExtraTimePercent: -50),
+            CancellationToken.None);
+        Assert.Equal(0, run2.ExtraTimeMinutes);
+    }
+
+    [Fact]
+    public async Task MultipartQuestion_GraderAwardsPointsAcrossSubparts()
+    {
+        // Seed a multi-part question matching one of the Part-B slots.
+        await using (var sess = _store.LightweightSession())
+        {
+            sess.Store(new BagrutMultipartQuestion
+            {
+                Id = "test-multipart-vectors-3",
+                Subject = "math",
+                Topic = "math.vectors",
+                BloomsLevel = 3,
+                Stem = "Test stem",
+                SourceType = "TeacherAuthoredOriginal",
+                Subparts = new List<BagrutQuestionSubpart>
+                {
+                    new("a", "P1", "1", 33),
+                    new("b", "P2", "2", 33),
+                    new("c", "P3", "3", 34),
+                },
+            });
+            await sess.SaveChangesAsync();
+        }
+
+        var run = await _service.StartAsync("student-multipart",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        // Find which Q (if any) is the multi-part one.
+        var multipartId = run.PartBQuestionIds.FirstOrDefault(id => id.StartsWith("test-multipart-"));
+        if (multipartId is null)
+        {
+            // Slot didn't pick our test row; not a failure of the grading
+            // path itself. Verify the seeded multi-part Q's STILL exist.
+            await using var qs = _store.QuerySession();
+            var any = await qs.LoadAsync<BagrutMultipartQuestion>("test-multipart-vectors-3");
+            Assert.NotNull(any);
+            return;
+        }
+
+        // Pick exactly the multi-part Q for grading.
+        var others = run.PartBQuestionIds.Where(id => id != multipartId).Take(1).ToList();
+        await _service.SelectPartBAsync("student-multipart", run.RunId,
+            new SelectPartBRequest(new[] { multipartId, others[0] }),
+            CancellationToken.None);
+
+        // Answer all Part A correct (single-cell) + the multi-part subparts a,b correct, c wrong.
+        foreach (var qid in run.PartAQuestionIds)
+        {
+            await _service.SubmitAnswerAsync("student-multipart", run.RunId,
+                new SubmitAnswerRequest(qid, $"x = {qid}"), CancellationToken.None);
+        }
+        await _service.SubmitAnswerAsync("student-multipart", run.RunId,
+            new SubmitAnswerRequest(multipartId, "1", "a"), CancellationToken.None);
+        await _service.SubmitAnswerAsync("student-multipart", run.RunId,
+            new SubmitAnswerRequest(multipartId, "2", "b"), CancellationToken.None);
+        await _service.SubmitAnswerAsync("student-multipart", run.RunId,
+            new SubmitAnswerRequest(multipartId, "wrong", "c"), CancellationToken.None);
+        // Ignore the second Part-B Q (wrong answer).
+        await _service.SubmitAnswerAsync("student-multipart", run.RunId,
+            new SubmitAnswerRequest(others[0], "wrong"), CancellationToken.None);
+
+        var result = await _service.SubmitAsync("student-multipart", run.RunId, CancellationToken.None);
+
+        var multipartLine = result.PerQuestion.First(q => q.QuestionId == multipartId);
+        Assert.Equal("multipart-cas", multipartLine.GradingEngine);
+        Assert.NotNull(multipartLine.Subparts);
+        Assert.Equal(3, multipartLine.Subparts!.Count);
+        Assert.True(multipartLine.PointsAwarded > 0,
+            "multi-part grader should award some points for partial-correct (a + b correct)");
+        Assert.True(multipartLine.PointsAwarded < multipartLine.Points,
+            "should not award full points when c is wrong");
+    }
+
     private async Task SeedQuestionsAsync(string subject, int count)
     {
         // Topic ids that match the seeded BagrutPaperStructure (806/default

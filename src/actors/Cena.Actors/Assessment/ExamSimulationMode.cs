@@ -102,7 +102,15 @@ public sealed class ExamSimulationState
 
     public DateTimeOffset StartedAt { get; set; }
     public DateTimeOffset? SubmittedAt { get; set; }
-    public DateTimeOffset Deadline => StartedAt.AddMinutes(Format.TimeLimitMinutes);
+
+    /// <summary>Phase 2B — accommodation extra-time, in minutes. Default
+    /// 0 keeps legacy simulations on standard time. Always added on top
+    /// of <see cref="ExamFormat.TimeLimitMinutes"/> so the canonical
+    /// time stays auditable.</summary>
+    public int ExtraTimeMinutes { get; set; }
+
+    public DateTimeOffset Deadline =>
+        StartedAt.AddMinutes(Format.TimeLimitMinutes + ExtraTimeMinutes);
     public bool IsExpired(DateTimeOffset now) => now >= Deadline;
     public bool IsSubmitted => SubmittedAt.HasValue;
 

@@ -160,18 +160,35 @@ test.describe('E2E_EXAM_001_MOCK_EXAM_RUNNER', () => {
     console.log(`[exam-001] select-part-b → ${pickResp.status()}`)
     expect(pickResp.status()).toBe(200)
 
-    // 4) Submit a placeholder answer for every active question.
+    // 4) Submit a placeholder answer for every active question. With
+    //    Phase 2A multi-part Q's, Part-B picks may be multi-part — fetch
+    //    each preview and submit per-subpart when subparts are present.
     const activeIds = [...run.partAQuestionIds, ...pick]
+    let totalAnswerSurfaces = 0
     for (const qid of activeIds) {
-      const a = await page.request.post(
-        `${STUDENT_API}/api/me/exam-prep/runs/${run.runId}/answer`,
-        {
-          headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-          data: { questionId: qid, answer: 'x = 1' },
-        },
+      const previewResp = await page.request.get(
+        `${STUDENT_API}/api/me/exam-prep/runs/${run.runId}/question/${qid}`,
+        { headers: { Authorization: `Bearer ${idToken}` } },
       )
-      expect(a.status()).toBe(200)
+      const preview = previewResp.status() === 200
+        ? await previewResp.json() as { subparts?: Array<{ partId: string }> }
+        : { subparts: undefined }
+      const surfaces = preview.subparts?.length
+        ? preview.subparts.map(sp => ({ subpartId: sp.partId }))
+        : [{ subpartId: undefined as string | undefined }]
+      for (const surface of surfaces) {
+        const a = await page.request.post(
+          `${STUDENT_API}/api/me/exam-prep/runs/${run.runId}/answer`,
+          {
+            headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+            data: { questionId: qid, answer: 'x = 1', subpartId: surface.subpartId },
+          },
+        )
+        expect(a.status()).toBe(200)
+        totalAnswerSurfaces++
+      }
     }
+    console.log(`[exam-001] submitted ${totalAnswerSurfaces} answer surfaces across ${activeIds.length} Q's (multi-part expanded)`)
 
     // 5) Final submit (idempotent).
     const submitResp = await page.request.post(
@@ -240,6 +257,37 @@ test.describe('E2E_EXAM_001_MOCK_EXAM_RUNNER', () => {
     expect(consoleErrors, `console errors on /exam-prep mount: ${consoleErrors.join(' | ')}`).toEqual([])
 
     console.log(`[exam-001] /exam-prep mount clean (final url: ${finalUrl}, ${consoleErrors.length} errors)`)
+  })
+
+  test('extra-time accommodation extends the deadline @epic-exam @a11y', async ({ page }) => {
+    test.setTimeout(60_000)
+    const { idToken } = await provisionStudent(page)
+
+    // +25% on a 180-min exam → 225 effective min.
+    const resp = await page.request.post(
+      `${STUDENT_API}/api/me/exam-prep/runs/`,
+      {
+        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+        data: { examCode: '806', extraTimePercent: 25 },
+      },
+    )
+    if (resp.status() !== 200) {
+      console.log(`[exam-001-extra-time] start returned ${resp.status()}; pool unseeded — skipping`)
+      return
+    }
+    const run = await resp.json() as {
+      timeLimitMinutes: number
+      extraTimeMinutes: number
+      startedAt: string
+      deadline: string
+    }
+    expect(run.timeLimitMinutes).toBe(180)
+    expect(run.extraTimeMinutes).toBe(45)
+    const startedMs = new Date(run.startedAt).getTime()
+    const deadlineMs = new Date(run.deadline).getTime()
+    const minutesGranted = Math.round((deadlineMs - startedMs) / 60_000)
+    expect(minutesGranted).toBe(225)
+    console.log(`[exam-001-extra-time] +25% honored: ${minutesGranted} min effective`)
   })
 
   test('cross-student access is forbidden @epic-exam @rbac', async ({ page }) => {

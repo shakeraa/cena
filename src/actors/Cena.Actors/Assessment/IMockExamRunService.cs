@@ -82,4 +82,13 @@ public sealed record MockExamQuestionPreview(
     string QuestionId,
     string Prompt,
     string? Topic,
-    int BloomsLevel);
+    int BloomsLevel,
+    /// <summary>Phase 2A — when non-null, the runner renders one input
+    /// per subpart. PartId is locale-free ("a","b","c"); display label
+    /// comes from i18n. The Prompt above carries the shared question
+    /// stem; each subpart carries its own per-part prompt + point
+    /// weight. CanonicalAnswer is intentionally omitted — only the
+    /// grader sees that.</summary>
+    IReadOnlyList<MockExamSubpartPreview>? Subparts = null);
+
+public sealed record MockExamSubpartPreview(string PartId, string Prompt, int Points);

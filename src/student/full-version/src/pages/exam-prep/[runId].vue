@@ -53,16 +53,21 @@ const router = useRouter()
 const runId = computed(() => String(route.params.runId))
 
 const state = ref<MockExamRunStateResponse | null>(null)
+// answers keyed on bare qid (single-cell) OR composite "qid:partId" (multi-part).
 const answers = ref<Record<string, string>>({})
 const previews = ref<Record<string, ExamPrepQuestionPreview>>({})
 const partBPicked = ref<string[]>([])
 const submitting = ref(false)
 const error = ref<string | null>(null)
 
-// Per-question debounce timers + dirty set so the unload guard knows
-// whether to prompt.
+// Per-key debounce timers + dirty set so the unload guard knows whether
+// to prompt. Keys are the same composite scheme as `answers`.
 const debounceTimers: Record<string, ReturnType<typeof setTimeout>> = {}
 const dirty = ref<Set<string>>(new Set())
+
+function answerKeyFor(qid: string, subpartId?: string): string {
+  return subpartId ? `${qid}:${subpartId}` : qid
+}
 
 // Timer
 const now = ref(Date.now())
@@ -146,15 +151,17 @@ async function lockPartB() {
   }
 }
 
-async function persistAnswer(qid: string) {
-  const value = (answers.value[qid] ?? '').trim()
+async function persistAnswer(qid: string, subpartId?: string) {
+  const key = answerKeyFor(qid, subpartId)
+  const value = (answers.value[key] ?? '').trim()
   if (!value) return
   try {
     state.value = await submitMockExamAnswer(runId.value, {
       questionId: qid,
       answer: value,
+      subpartId,
     })
-    dirty.value.delete(qid)
+    dirty.value.delete(key)
   }
   catch (err: unknown) {
     error.value = (err as { data?: { error?: string } })?.data?.error
@@ -162,15 +169,17 @@ async function persistAnswer(qid: string) {
   }
 }
 
-function onInput(qid: string) {
-  dirty.value.add(qid)
-  if (debounceTimers[qid]) clearTimeout(debounceTimers[qid])
-  debounceTimers[qid] = setTimeout(() => persistAnswer(qid), 600)
+function onInput(qid: string, subpartId?: string) {
+  const key = answerKeyFor(qid, subpartId)
+  dirty.value.add(key)
+  if (debounceTimers[key]) clearTimeout(debounceTimers[key])
+  debounceTimers[key] = setTimeout(() => persistAnswer(qid, subpartId), 600)
 }
 
-async function onBlur(qid: string) {
-  if (debounceTimers[qid]) clearTimeout(debounceTimers[qid])
-  await persistAnswer(qid)
+async function onBlur(qid: string, subpartId?: string) {
+  const key = answerKeyFor(qid, subpartId)
+  if (debounceTimers[key]) clearTimeout(debounceTimers[key])
+  await persistAnswer(qid, subpartId)
 }
 
 async function submitRun() {
@@ -178,13 +187,21 @@ async function submitRun() {
   submitting.value = true
   try {
     // Cancel pending debounce timers + flush any unsaved.
-    for (const qid of Object.keys(debounceTimers)) {
-      clearTimeout(debounceTimers[qid])
+    for (const key of Object.keys(debounceTimers)) {
+      clearTimeout(debounceTimers[key])
     }
-    for (const qid of allActiveQids.value) {
-      const val = (answers.value[qid] ?? '').trim()
-      if (val && !state.value?.answeredIds.includes(qid))
-        await submitMockExamAnswer(runId.value, { questionId: qid, answer: val })
+    // Flush every dirty key (single + multi-part composite).
+    for (const key of [...dirty.value]) {
+      const val = (answers.value[key] ?? '').trim()
+      if (!val) continue
+      const sepIdx = key.indexOf(':')
+      const qid = sepIdx >= 0 ? key.slice(0, sepIdx) : key
+      const subpartId = sepIdx >= 0 ? key.slice(sepIdx + 1) : undefined
+      await submitMockExamAnswer(runId.value, {
+        questionId: qid,
+        answer: val,
+        subpartId,
+      })
     }
     await submitMockExamRun(runId.value)
     dirty.value.clear()
@@ -279,7 +296,31 @@ watch(
           <p v-if="previews[qid]" class="text-body-2 mb-2">
             <bdi dir="ltr">{{ previews[qid].prompt }}</bdi>
           </p>
+          <!-- Multi-part Q: one input per subpart. Single-cell: one input. -->
+          <template v-if="previews[qid]?.subparts?.length">
+            <div
+              v-for="sp in previews[qid].subparts"
+              :key="`${qid}:${sp.partId}`"
+              class="mb-2"
+            >
+              <p class="text-body-2 mb-1">
+                <strong><bdi dir="ltr">({{ sp.partId }})</bdi></strong>
+                <span class="ms-2"><bdi dir="ltr">{{ sp.prompt }}</bdi></span>
+                <span class="text-caption text-medium-emphasis ms-2">[{{ sp.points }} {{ t('examPrep.runner.ptsLabel') }}]</span>
+              </p>
+              <VTextField
+                v-model="answers[`${qid}:${sp.partId}`]"
+                :label="t('examPrep.runner.answerLabel')"
+                variant="outlined"
+                density="comfortable"
+                :data-testid="`exam-prep-a-${qid}-${sp.partId}`"
+                @update:model-value="onInput(qid, sp.partId)"
+                @blur="onBlur(qid, sp.partId)"
+              />
+            </div>
+          </template>
           <VTextField
+            v-else
             v-model="answers[qid]"
             :label="t('examPrep.runner.answerLabel')"
             variant="outlined"
@@ -358,7 +399,30 @@ watch(
             <p v-if="previews[qid]" class="text-body-2 mb-2">
               <bdi dir="ltr">{{ previews[qid].prompt }}</bdi>
             </p>
+            <template v-if="previews[qid]?.subparts?.length">
+              <div
+                v-for="sp in previews[qid].subparts"
+                :key="`${qid}:${sp.partId}`"
+                class="mb-2"
+              >
+                <p class="text-body-2 mb-1">
+                  <strong><bdi dir="ltr">({{ sp.partId }})</bdi></strong>
+                  <span class="ms-2"><bdi dir="ltr">{{ sp.prompt }}</bdi></span>
+                  <span class="text-caption text-medium-emphasis ms-2">[{{ sp.points }} {{ t('examPrep.runner.ptsLabel') }}]</span>
+                </p>
+                <VTextField
+                  v-model="answers[`${qid}:${sp.partId}`]"
+                  :label="t('examPrep.runner.answerLabel')"
+                  variant="outlined"
+                  density="comfortable"
+                  :data-testid="`exam-prep-a-${qid}-${sp.partId}`"
+                  @update:model-value="onInput(qid, sp.partId)"
+                  @blur="onBlur(qid, sp.partId)"
+                />
+              </div>
+            </template>
             <VTextField
+              v-else
               v-model="answers[qid]"
               :label="t('examPrep.runner.answerLabel')"
               variant="outlined"

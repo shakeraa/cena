@@ -1671,7 +1671,8 @@
       "confirmPartB": "Lock my Part B picks",
       "progress": "Answered {answered} of {total}",
       "submitButton": "Submit final",
-      "unsavedDrafts": "{n} unsaved draft answer(s) — saving on blur or in 600ms"
+      "unsavedDrafts": "{n} unsaved draft answer(s) — saving on blur or in 600ms",
+      "ptsLabel": "pts"
     },
     "result": {
       "title": "Mock exam result",
@@ -1700,6 +1701,14 @@
       "sectionSummary": "Section summary",
       "partALabel": "Part A",
       "partBLabel": "Part B"
+    },
+    "extraTimeLabel": "Extra time (accommodation)",
+    "extraTimeNote": "Used for accessibility accommodations. Honored in the timer end-to-end.",
+    "extraTimeOptions": {
+      "none": "Standard time (no accommodation)",
+      "plus25": "+25% extra time",
+      "plus50": "+50% extra time",
+      "plus100": "+100% (double time)"
     }
   }
 }

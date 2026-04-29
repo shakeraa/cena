@@ -53,6 +53,7 @@ const FORMATS: FormatPreview[] = [
 
 const selected = ref<ExamCode>('806')
 const paperCode = ref('')
+const extraTimePercent = ref<number>(0)
 const starting = ref(false)
 const error = ref<string | null>(null)
 const runnerEnabled = ref<boolean | null>(null)
@@ -84,6 +85,7 @@ async function start() {
     const res = await startMockExamRun({
       examCode: selected.value,
       paperCode: paperCode.value.trim() || undefined,
+      extraTimePercent: extraTimePercent.value || undefined,
     })
     await router.push(`/exam-prep/${res.runId}`)
   }
@@ -139,6 +141,24 @@ async function start() {
                 </VTooltip>
               </template>
             </VTextField>
+
+            <VSelect
+              v-model="extraTimePercent"
+              :label="t('examPrep.extraTimeLabel')"
+              :items="[
+                { title: t('examPrep.extraTimeOptions.none'), value: 0 },
+                { title: t('examPrep.extraTimeOptions.plus25'), value: 25 },
+                { title: t('examPrep.extraTimeOptions.plus50'), value: 50 },
+                { title: t('examPrep.extraTimeOptions.plus100'), value: 100 },
+              ]"
+              variant="outlined"
+              density="comfortable"
+              class="mt-4"
+              data-testid="exam-prep-extra-time"
+            />
+            <p v-if="extraTimePercent > 0" class="text-caption text-medium-emphasis mt-1">
+              {{ t('examPrep.extraTimeNote') }}
+            </p>
           </VCardText>
         </VCard>
       </VCol>

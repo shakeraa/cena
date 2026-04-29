@@ -118,11 +118,18 @@ public sealed class MockExamRunService : IMockExamRunService
 
         // ── Slot-aware question draw ────────────────────────────
         var subject = SubjectForExamCode(request.ExamCode);
+
+        // Two pools: multi-part (preferred for Part B long-form slots)
+        // + single-cell (Part A short-form + multi-part fallback).
+        var multipartPool = await session.Query<BagrutMultipartQuestion>()
+            .Where(q => q.Subject == subject)
+            .ToListAsync(ct);
+
         var pool = await session.Query<QuestionReadModel>()
             .Where(q => q.Subject == subject && q.Status == "Published")
             .ToListAsync(ct);
 
-        if (pool.Count == 0)
+        if (pool.Count == 0 && multipartPool.Count == 0)
         {
             throw new InvalidOperationException(
                 $"No published questions for subject '{subject}'. The exam-prep dev seeder may not have run, or the production pool is empty.");
@@ -132,6 +139,10 @@ public sealed class MockExamRunService : IMockExamRunService
             .SelectMany(q => q.Concepts.Select(c => (concept: c, q)))
             .GroupBy(t => t.concept)
             .ToDictionary(g => g.Key, g => g.Select(t => t.q).ToList());
+
+        var multipartByTopic = multipartPool
+            .GroupBy(q => q.Topic)
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var rng = new Random(HashCode.Combine(studentId, request.ExamCode, _clock.GetUtcNow().Ticks));
 
@@ -146,8 +157,13 @@ public sealed class MockExamRunService : IMockExamRunService
                 $"Paper structure {structure.Id} must have both A and B sections.");
 
         var poolList = pool.ToList();
-        DrawForSlots(partASection, poolByConcept, poolList, rng, drawn, partAIds);
-        DrawForSlots(partBSection, poolByConcept, poolList, rng, drawn, partBIds);
+        // Part A is short-form, single-cell. Part B prefers multi-part
+        // candidates (real Bagrut long-form Q's are a/b/c). Both
+        // fall back gracefully if their preferred pool is thin.
+        DrawForSlots(partASection, poolByConcept, poolList, rng, drawn,
+            preferMultipart: false, multipartByTopic, partAIds);
+        DrawForSlots(partBSection, poolByConcept, poolList, rng, drawn,
+            preferMultipart: true, multipartByTopic, partBIds);
 
         if (partAIds.Count < partASection.RequiredAnswers)
         {
@@ -169,6 +185,13 @@ public sealed class MockExamRunService : IMockExamRunService
         var startedAt = _clock.GetUtcNow();
         var variantSeed = rng.Next();
 
+        // Phase 2B: clamp accommodation to [0, 100]% silently. Storing
+        // the resolved minute count (not the percent) keeps the state
+        // auditable: a future policy change to the accommodation cap
+        // doesn't retroactively alter past runs.
+        var clampedPercent = Math.Clamp(request.ExtraTimePercent, 0, 100);
+        var extraTimeMinutes = (int)Math.Round(legacyFormat.TimeLimitMinutes * (clampedPercent / 100.0));
+
         var state = new ExamSimulationState
         {
             SimulationId = simulationId,
@@ -181,6 +204,7 @@ public sealed class MockExamRunService : IMockExamRunService
             Answers = new Dictionary<string, string>(),
             StartedAt = startedAt,
             VariantSeed = variantSeed,
+            ExtraTimeMinutes = extraTimeMinutes,
         };
 
         session.Store(state);
@@ -206,13 +230,14 @@ public sealed class MockExamRunService : IMockExamRunService
             ExamCode: request.ExamCode,
             PaperCode: request.PaperCode,
             TimeLimitMinutes: legacyFormat.TimeLimitMinutes,
+            ExtraTimeMinutes: extraTimeMinutes,
             PartAQuestionCount: legacyFormat.PartAQuestionCount,
             PartBQuestionCount: legacyFormat.PartBQuestionCount,
             PartBRequiredCount: legacyFormat.PartBRequiredCount,
             PartAQuestionIds: partAIds,
             PartBQuestionIds: partBIds,
             StartedAt: startedAt,
-            Deadline: startedAt.AddMinutes(legacyFormat.TimeLimitMinutes));
+            Deadline: state.Deadline);
     }
 
     public async Task<MockExamRunStateResponse?> GetStateAsync(
@@ -283,7 +308,16 @@ public sealed class MockExamRunService : IMockExamRunService
             throw new ArgumentException(
                 $"questionId {request.QuestionId} is not part of this run.");
 
-        state.Answers[request.QuestionId] = request.Answer ?? "";
+        // Phase 2A: multi-part questions store per-subpart answers under
+        // a composite key "{qid}:{subpartId}" inside the same Answers
+        // dictionary. Single-cell questions keep the bare qid key — the
+        // existing wire shape and on-disk format are preserved for
+        // legacy single-cell rows.
+        var answerKey = string.IsNullOrWhiteSpace(request.SubpartId)
+            ? request.QuestionId
+            : $"{request.QuestionId}:{request.SubpartId}";
+
+        state.Answers[answerKey] = request.Answer ?? "";
         session.Store(state);
         await session.SaveChangesAsync(ct);
 
@@ -351,22 +385,31 @@ public sealed class MockExamRunService : IMockExamRunService
         var validIds = state.PartAQuestionIds.Concat(state.PartBQuestionIds).ToHashSet();
         if (!validIds.Contains(questionId)) return null;
 
+        // Multi-part Q's first; the runner needs subpart shape to render
+        // multiple input rows.
+        var multipart = await session.LoadAsync<BagrutMultipartQuestion>(questionId, ct);
+        if (multipart is not null)
+        {
+            return new MockExamQuestionPreview(
+                QuestionId: questionId,
+                Prompt: multipart.Stem,
+                Topic: multipart.Topic,
+                BloomsLevel: multipart.BloomsLevel,
+                Subparts: multipart.Subparts
+                    .Select(s => new MockExamSubpartPreview(s.PartId, s.Prompt, s.Points))
+                    .ToList());
+        }
+
         var rm = await session.LoadAsync<QuestionReadModel>(questionId, ct);
         var doc = await session.LoadAsync<QuestionDocument>(questionId, ct);
         if (doc is null) return null;
 
-        // ADR-0043 — items reaching the student MUST not be MinistryBagrut.
-        // The dev seeder produces TeacherAuthoredOriginal; Bagrut-derived
-        // variants from the authoring pipeline are AiRecreated. Both pass
-        // the gate. This call is the canonical chokepoint for this surface.
-        // (Per ExamSimulationDelivery the gate also accepts a sessionId +
-        // tenantId; we don't have a tenant on the run state, so we use a
-        // best-effort empty string and the gate logs a SIEM entry.)
         return new MockExamQuestionPreview(
             QuestionId: questionId,
             Prompt: doc.Prompt,
             Topic: doc.Topic ?? rm?.Topic,
-            BloomsLevel: rm?.BloomsLevel ?? 0);
+            BloomsLevel: rm?.BloomsLevel ?? 0,
+            Subparts: null);
     }
 
     // ── Slot-aware draw ────────────────────────────────────────────
@@ -376,30 +419,60 @@ public sealed class MockExamRunService : IMockExamRunService
         List<QuestionReadModel> fullPool,
         Random rng,
         HashSet<string> drawn,
+        bool preferMultipart,
+        Dictionary<string, List<BagrutMultipartQuestion>> multipartByTopic,
         List<string> dest)
     {
         foreach (var slot in section.Slots)
         {
-            // Exact-topic match first.
-            QuestionReadModel? pick = TryPick(poolByConcept, slot.TopicId, slot, drawn, rng);
-            if (pick is null)
+            string? pickedId = null;
+
+            if (preferMultipart)
             {
-                // Section-level fallback (e.g., generic "math").
-                pick = TryPick(poolByConcept, section.FallbackTopicId, slot, drawn, rng);
-                if (pick is not null) SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "section"));
-            }
-            if (pick is null)
-            {
-                // Subject-wide fallback — any published item.
-                pick = Shuffle(fullPool.Where(q => !drawn.Contains(q.Id)).ToList(), rng).FirstOrDefault();
-                if (pick is not null) SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "subject"));
+                // Multi-part preferred. Try exact topic, then section fallback.
+                pickedId = TryPickMultipart(multipartByTopic, slot.TopicId, slot, drawn, rng)?.Id
+                        ?? TryPickMultipart(multipartByTopic, section.FallbackTopicId, slot, drawn, rng)?.Id;
             }
 
-            if (pick is null) continue; // exhausted — caller decides
+            if (pickedId is null)
+            {
+                // Single-cell path: exact-topic match first.
+                var pick = TryPick(poolByConcept, slot.TopicId, slot, drawn, rng);
+                if (pick is null)
+                {
+                    pick = TryPick(poolByConcept, section.FallbackTopicId, slot, drawn, rng);
+                    if (pick is not null) SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "section"));
+                }
+                if (pick is null)
+                {
+                    pick = Shuffle(fullPool.Where(q => !drawn.Contains(q.Id)).ToList(), rng).FirstOrDefault();
+                    if (pick is not null) SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "subject"));
+                }
+                pickedId = pick?.Id;
+            }
 
-            drawn.Add(pick.Id);
-            dest.Add(pick.Id);
+            if (pickedId is null) continue;
+
+            drawn.Add(pickedId);
+            dest.Add(pickedId);
         }
+    }
+
+    private static BagrutMultipartQuestion? TryPickMultipart(
+        Dictionary<string, List<BagrutMultipartQuestion>> byTopic,
+        string topicId,
+        PaperSlot slot,
+        HashSet<string> drawn,
+        Random rng)
+    {
+        if (!byTopic.TryGetValue(topicId, out var candidates)) return null;
+        var matching = candidates
+            .Where(q => !drawn.Contains(q.Id)
+                     && q.BloomsLevel >= slot.MinBloom
+                     && q.BloomsLevel <= slot.MaxBloom)
+            .ToList();
+        if (matching.Count == 0) return null;
+        return matching[rng.Next(matching.Count)];
     }
 
     private static QuestionReadModel? TryPick(
@@ -436,6 +509,15 @@ public sealed class MockExamRunService : IMockExamRunService
             : state.PartBQuestionIds.Take(state.Format.PartBRequiredCount).ToList();
 
         var gradableIds = state.PartAQuestionIds.Concat(partBSelected).ToList();
+
+        // Multi-part Q's first (preferred for Part B); whatever ids are
+        // multi-part get graded per-subpart. Remaining ids fall through
+        // to QuestionDocument single-cell grading.
+        var multipartHits = await session.Query<BagrutMultipartQuestion>()
+            .Where(q => gradableIds.Contains(q.Id))
+            .ToListAsync(ct);
+        var multipartById = multipartHits.ToDictionary(q => q.Id);
+
         var canonicalDocs = await session.Query<QuestionDocument>()
             .Where(q => gradableIds.Contains(q.Id))
             .ToListAsync(ct);
@@ -470,7 +552,75 @@ public sealed class MockExamRunService : IMockExamRunService
 
         foreach (var qid in gradableIds)
         {
-            var (section, pts) = slotByQid.TryGetValue(qid, out var s) ? s : ("?", 0);
+            var (section, slotPts) = slotByQid.TryGetValue(qid, out var s) ? s : ("?", 0);
+
+            // ── Multi-part path ──
+            if (multipartById.TryGetValue(qid, out var multipart))
+            {
+                // Distribute the slot's envelope-points across subparts
+                // proportionally to the subpart's declared Points (so a
+                // 25-pt slot with 10/15 subpart split awards 10/15 of the
+                // 25-pt envelope, not the raw subpart points).
+                var subpartTotal = multipart.TotalPoints;
+                var qAttempted = false;
+                var qPointsAwarded = 0;
+                var subpartLines = new List<MockExamSubpartResult>();
+
+                foreach (var subpart in multipart.Subparts)
+                {
+                    var key = $"{qid}:{subpart.PartId}";
+                    var hasSubAnswer = state.Answers.TryGetValue(key, out var studentSubAnswer)
+                        && !string.IsNullOrWhiteSpace(studentSubAnswer);
+
+                    var envelopeShare = subpartTotal == 0
+                        ? 0
+                        : (int)Math.Round((double)slotPts * subpart.Points / subpartTotal);
+
+                    if (!hasSubAnswer)
+                    {
+                        subpartLines.Add(new MockExamSubpartResult(
+                            subpart.PartId, false, null, null, subpart.CorrectAnswer,
+                            "not-graded", envelopeShare, 0));
+                        continue;
+                    }
+
+                    qAttempted = true;
+                    var verdict = await VerifyWithRetryAsync(studentSubAnswer!, subpart.CorrectAnswer, ct);
+                    var awarded = verdict.Verified ? envelopeShare : 0;
+                    qPointsAwarded += awarded;
+                    subpartLines.Add(new MockExamSubpartResult(
+                        subpart.PartId,
+                        true,
+                        verdict.Status == CasVerifyStatus.Ok ? verdict.Verified : null,
+                        studentSubAnswer,
+                        subpart.CorrectAnswer,
+                        verdict.Engine ?? "cas",
+                        envelopeShare,
+                        awarded));
+                }
+
+                if (qAttempted)
+                {
+                    attempted++;
+                    if (section == "A") sectionAAttempted++; else if (section == "B") sectionBAttempted++;
+                }
+                if (qPointsAwarded > 0)
+                {
+                    correct++;
+                    pointsAwarded += qPointsAwarded;
+                    if (section == "A") { sectionACorrect++; sectionAAwarded += qPointsAwarded; }
+                    else if (section == "B") { sectionBCorrect++; sectionBAwarded += qPointsAwarded; }
+                }
+
+                perQuestion.Add(new MockExamPerQuestionResult(
+                    qid, section, qAttempted,
+                    qAttempted ? qPointsAwarded == slotPts : (bool?)null,
+                    null, null, "multipart-cas",
+                    slotPts, qPointsAwarded, subpartLines));
+                continue;
+            }
+
+            // ── Single-cell legacy path ──
             var hasAnswer = state.Answers.TryGetValue(qid, out var studentAnswer)
                 && !string.IsNullOrWhiteSpace(studentAnswer);
             byId.TryGetValue(qid, out var q);
@@ -479,7 +629,7 @@ public sealed class MockExamRunService : IMockExamRunService
             if (!hasAnswer)
             {
                 perQuestion.Add(new MockExamPerQuestionResult(
-                    qid, section, false, null, null, canonical, "not-graded", pts, 0));
+                    qid, section, false, null, null, canonical, "not-graded", slotPts, 0));
                 continue;
             }
 
@@ -489,31 +639,26 @@ public sealed class MockExamRunService : IMockExamRunService
             if (string.IsNullOrWhiteSpace(canonical))
             {
                 perQuestion.Add(new MockExamPerQuestionResult(
-                    qid, section, true, null, studentAnswer, null, "ungradable-no-canonical", pts, 0));
+                    qid, section, true, null, studentAnswer, null, "ungradable-no-canonical", slotPts, 0));
                 continue;
             }
 
-            var verdict = await VerifyWithRetryAsync(studentAnswer!, canonical, ct);
-
-            var awarded = verdict.Verified ? pts : 0;
-            if (verdict.Verified)
+            var singleVerdict = await VerifyWithRetryAsync(studentAnswer!, canonical, ct);
+            var singleAwarded = singleVerdict.Verified ? slotPts : 0;
+            if (singleVerdict.Verified)
             {
                 correct++;
-                pointsAwarded += awarded;
-                if (section == "A") { sectionACorrect++; sectionAAwarded += awarded; }
-                else if (section == "B") { sectionBCorrect++; sectionBAwarded += awarded; }
+                pointsAwarded += singleAwarded;
+                if (section == "A") { sectionACorrect++; sectionAAwarded += singleAwarded; }
+                else if (section == "B") { sectionBCorrect++; sectionBAwarded += singleAwarded; }
             }
 
             perQuestion.Add(new MockExamPerQuestionResult(
-                qid,
-                section,
-                true,
-                verdict.Status == CasVerifyStatus.Ok ? verdict.Verified : null,
-                studentAnswer,
-                canonical,
-                verdict.Engine ?? "cas",
-                pts,
-                awarded));
+                qid, section, true,
+                singleVerdict.Status == CasVerifyStatus.Ok ? singleVerdict.Verified : null,
+                studentAnswer, canonical,
+                singleVerdict.Engine ?? "cas",
+                slotPts, singleAwarded));
         }
 
         var totalPoints = sectionATotalPts + sectionBTotalPts;
@@ -577,6 +722,7 @@ public sealed class MockExamRunService : IMockExamRunService
             ExamCode: s.ExamCode,
             PaperCode: paperCode,
             TimeLimitMinutes: s.Format.TimeLimitMinutes,
+            ExtraTimeMinutes: s.ExtraTimeMinutes,
             PartAQuestionCount: s.Format.PartAQuestionCount,
             PartBQuestionCount: s.Format.PartBQuestionCount,
             PartBRequiredCount: s.Format.PartBRequiredCount,
@@ -591,6 +737,7 @@ public sealed class MockExamRunService : IMockExamRunService
             ExamCode: s.ExamCode,
             PaperCode: null,
             TimeLimitMinutes: s.Format.TimeLimitMinutes,
+            ExtraTimeMinutes: s.ExtraTimeMinutes,
             StartedAt: s.StartedAt,
             Deadline: s.Deadline,
             IsExpired: s.IsExpired(DateTimeOffset.UtcNow),
