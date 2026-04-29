@@ -167,6 +167,11 @@ public partial class Program
     // ADR-0038 key store + prr-155 ConsentAggregate (bundled compliance services).
     Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregate(builder.Services.AddCenaComplianceServices(builder.Configuration, builder.Environment));
 
+    // PRR-267 R3: Bagrut reference consent-token service (HMAC-SHA256,
+    // 24h wire TTL). Resolved by the /api/v1/reference endpoints.
+    Cena.Actors.Consent.ConsentServiceRegistration
+        .AddBagrutReferenceConsentTokenService(builder.Services, builder.Configuration);
+
     // prr-148: StudentPlan + EPIC-PRR-I / ADR-0057 Subscription + PRR-301 Stripe (if configured). TimeProvider registered later via ClockRegistration.AddClock.
     builder.Services.AddStudentPlanServices(); Cena.Actors.Subscriptions.SubscriptionServiceRegistration.AddSubscriptionsMarten(builder.Services); Cena.Actors.Subscriptions.Stripe.StripeServiceRegistration.AddStripeCheckoutIfConfigured(builder.Services, builder.Configuration);
 
@@ -1151,6 +1156,12 @@ public partial class Program
     // prr-052: student parent-visibility view + veto also mapped below.
     app.MapConsentEndpoints();
     app.MapParentVisibilityEndpoints();
+
+    // PRR-267 R3: Bagrut reference-library + consent-token endpoints
+    // (ADR-0059 §15.5). Gated by Cena:Variants:BagrutSeedToLlmEnabled
+    // at the handler layer; routes register unconditionally so the
+    // disabled-state JSON 503 surfaces consistently.
+    app.MapBagrutReferenceEndpoints();
 
     // prr-123: Dual-version privacy policy. Public read — no auth required;
     // the app shell renders the current policy during pre-consent onboarding.

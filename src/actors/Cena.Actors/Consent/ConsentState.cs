@@ -38,6 +38,23 @@ public sealed record ConsentGrantInfo(
     string? RevocationReason);
 
 /// <summary>
+/// ADR-0059 §15.3 — Bagrut reference-library consent fact (single
+/// global toggle per student). Populated by
+/// <c>BagrutReferenceConsentGranted_V1</c>; <see cref="RevokedAt"/>
+/// non-null after <c>BagrutReferenceConsentRevoked_V1</c>.
+/// </summary>
+public sealed record BagrutReferenceConsentInfo(
+    DateTimeOffset GrantedAt,
+    string DisclosureVersion,
+    DateTimeOffset? RevokedAt = null,
+    string? RevocationReason = null)
+{
+    /// <summary>True iff active (granted, not revoked, within 90d).</summary>
+    public bool IsActive(DateTimeOffset asOf, TimeSpan functionalTtl) =>
+        RevokedAt is null && (asOf - GrantedAt) <= functionalTtl;
+}
+
+/// <summary>
 /// Folded state of a single <see cref="ConsentAggregate"/> instance. Keyed by
 /// <see cref="ConsentPurpose"/>; empty map = no grants have ever been made.
 /// </summary>
@@ -79,6 +96,18 @@ public sealed class ConsentState
     /// <see cref="IsEffectivelyGranted"/> for the expiry-aware check.
     /// </summary>
     public IReadOnlyDictionary<ConsentPurpose, ConsentGrantInfo> Grants => _grants;
+
+    /// <summary>
+    /// ADR-0059 §15.3 — Bagrut reference-library consent fact. Distinct
+    /// from per-purpose <see cref="_grants"/> because reference-library
+    /// consent has different semantics (one global toggle, not a
+    /// per-data-use-purpose grant). Null = never granted (or revoked).
+    /// Populated = active grant; <see cref="BagrutReferenceConsentInfo.RevokedAt"/>
+    /// non-null = revoked. The 24h wire HMAC token is re-issued from
+    /// this fact by <see cref="IBagrutReferenceConsentTokenService"/>;
+    /// 90d functional retention via the consent stream.
+    /// </summary>
+    public BagrutReferenceConsentInfo? BagrutReference { get; private set; }
 
     /// <summary>
     /// True when the purpose was most recently granted and the grant has not
@@ -259,4 +288,50 @@ public sealed class ConsentState
                 break;
         }
     }
+
+    /// <summary>
+    /// ADR-0059 §15.3 — student granted Bagrut reference-library consent.
+    /// </summary>
+    public void Apply(BagrutReferenceConsentGranted_V1 e)
+    {
+        BagrutReference = new BagrutReferenceConsentInfo(
+            GrantedAt: e.GrantedAt,
+            DisclosureVersion: e.DisclosureVersion,
+            RevokedAt: null,
+            RevocationReason: null);
+    }
+
+    /// <summary>
+    /// ADR-0059 §15.3 — student revoked Bagrut reference-library consent.
+    /// Triggers RTBF cascade on rendered events (handled at the
+    /// retention-worker layer; this fold just records the fact).
+    /// </summary>
+    public void Apply(BagrutReferenceConsentRevoked_V1 e)
+    {
+        if (BagrutReference is null)
+        {
+            // Revoke-before-grant: record the revoke fact so the wire
+            // gate can reject token-issue requests.
+            BagrutReference = new BagrutReferenceConsentInfo(
+                GrantedAt: e.RevokedAt,
+                DisclosureVersion: "(revoke-before-grant)",
+                RevokedAt: e.RevokedAt,
+                RevocationReason: e.Reason);
+            return;
+        }
+        BagrutReference = BagrutReference with
+        {
+            RevokedAt = e.RevokedAt,
+            RevocationReason = e.Reason,
+        };
+    }
+
+    /// <summary>
+    /// ADR-0059 §15.7 — pure-audit event for a single Reference&lt;T&gt;
+    /// render. No state fold; the event is preserved on the consent
+    /// stream and surfaces via <c>ReadEventsAsync</c> for SIEM /
+    /// retention-worker consumers. Implemented as a no-op so replays
+    /// stay deterministic.
+    /// </summary>
+    public void Apply(BagrutReferenceItemRendered_V1 _) { /* pure-audit */ }
 }

@@ -84,6 +84,15 @@ public sealed class ConsentAggregate
             case AdminConsentOverridden_V1 overridden:
                 State.Apply(overridden);
                 break;
+            case BagrutReferenceConsentGranted_V1 bagrutGranted:
+                State.Apply(bagrutGranted);
+                break;
+            case BagrutReferenceConsentRevoked_V1 bagrutRevoked:
+                State.Apply(bagrutRevoked);
+                break;
+            case BagrutReferenceItemRendered_V1 bagrutRendered:
+                State.Apply(bagrutRendered);
+                break;
         }
     }
 

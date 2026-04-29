@@ -135,6 +135,13 @@ builder.Services.AddCenaDataSource(builder.Configuration, builder.Environment, b
 // ADR-0038 SubjectKeyStore + prr-155 ConsentAggregate (bundled compliance primitives).
 Cena.Actors.Consent.ConsentServiceRegistration.AddConsentAggregate(builder.Services.AddCenaComplianceServices(builder.Configuration, builder.Environment));
 
+// PRR-266 R2 — BagrutReferenceItemRendered_V1 retention worker
+// (180-day floor, hourly tick). Owned by actor-host because it owns
+// Marten schema warm + serves long-running BackgroundServices for the
+// rest of the platform.
+Cena.Actors.Consent.ConsentServiceRegistration
+    .AddBagrutReferenceRetentionWorker(builder.Services);
+
 // DB-03: Read AutoCreate mode from config — "None" in prod, "CreateOrUpdate" in dev
 var martenAutoCreate = builder.Configuration.GetValue<string>("Marten:AutoCreate") ?? "CreateOrUpdate";
 

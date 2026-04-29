@@ -35,5 +35,14 @@ public static class ConsentMartenRegistration
         opts.Events.AddEventType<ConsentReviewedByParent_V1>();
         opts.Events.AddEventType<AdminConsentOverridden_V1>();
         opts.Events.AddEventType<StudentVisibilityVetoed_V1>();
+
+        // ADR-0059 §15.7 / PRR-267 — Bagrut reference-library consent
+        // events. Land on the same consent stream so the existing RTBF
+        // crypto-shred cascade (ADR-0042) covers them. ItemRendered_V1
+        // is pure-audit (no state fold); Granted_V1 / Revoked_V1
+        // populate ConsentState.BagrutReference for the issuance gate.
+        opts.Events.AddEventType<BagrutReferenceConsentGranted_V1>();
+        opts.Events.AddEventType<BagrutReferenceConsentRevoked_V1>();
+        opts.Events.AddEventType<BagrutReferenceItemRendered_V1>();
     }
 }
