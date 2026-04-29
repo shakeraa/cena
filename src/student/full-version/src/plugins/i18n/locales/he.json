@@ -192,7 +192,7 @@
     "profile": "פרופיל",
     "settings": "הגדרות",
     "pricing": "מחירים",
-    "subscription": "המנוי שלי",
+    "subscription": "מנוי",
     "signOut": "התנתק",
     "login": "התחברות",
     "register": "הרשמה",
@@ -229,7 +229,8 @@
     "aiTutor": "מורה AI",
     "snapProblem": "צילום שאלה",
     "uploadProblem": "העלאת שאלה",
-    "overview": "סקירה כללית"
+    "overview": "סקירה כללית",
+    "examPrep": "מבחן בגרות מדומה"
   },
   "navSection": {
     "learn": "למידה",

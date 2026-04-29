@@ -52,6 +52,12 @@ const navItems: VerticalNavItems = [
     icon: { icon: 'tabler-affiliate' },
     to: { name: 'knowledge-graph' },
   },
+  {
+    // Mock-exam (Bagrut שאלון playbook) runner — entry to exam-prep flow.
+    title: 'nav.examPrep',
+    icon: { icon: 'tabler-clipboard-text' },
+    to: { name: 'exam-prep' },
+  },
 
   { heading: 'navSection.progress' },
   {
@@ -91,6 +97,12 @@ const navItems: VerticalNavItems = [
     icon: { icon: 'tabler-bulb' },
     to: { name: 'social-peers' },
   },
+  {
+    // /social/friends page existed but had no sidebar entry.
+    title: 'nav.friends',
+    icon: { icon: 'tabler-friends' },
+    to: { name: 'social-friends' },
+  },
 
   { heading: 'navSection.account' },
   {
@@ -107,6 +119,12 @@ const navItems: VerticalNavItems = [
     title: 'nav.settings',
     icon: { icon: 'tabler-settings' },
     to: { name: 'settings' },
+  },
+  {
+    // /account/subscription page existed but had no sidebar entry.
+    title: 'nav.subscription',
+    icon: { icon: 'tabler-credit-card' },
+    to: { name: 'account-subscription' },
   },
 ]
 

@@ -192,7 +192,7 @@
     "profile": "Profile",
     "settings": "Settings",
     "pricing": "Pricing",
-    "subscription": "My subscription",
+    "subscription": "Subscription",
     "signOut": "Sign out",
     "login": "Sign in",
     "register": "Sign up",
@@ -229,7 +229,8 @@
     "aiTutor": "AI Tutor",
     "snapProblem": "Snap Problem",
     "uploadProblem": "Upload Problem",
-    "overview": "Overview"
+    "overview": "Overview",
+    "examPrep": "Mock exam"
   },
   "navSection": {
     "learn": "Learn",

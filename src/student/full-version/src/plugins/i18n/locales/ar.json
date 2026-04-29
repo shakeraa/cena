@@ -193,7 +193,7 @@
     "profile": "الملف الشخصي",
     "settings": "الإعدادات",
     "pricing": "الأسعار",
-    "subscription": "اشتراكي",
+    "subscription": "الاشتراك",
     "signOut": "تسجيل الخروج",
     "login": "تسجيل الدخول",
     "register": "التسجيل",
@@ -230,7 +230,8 @@
     "aiTutor": "المعلم الذكي",
     "snapProblem": "التقاط مسألة",
     "uploadProblem": "رفع مسألة",
-    "overview": "نظرة عامة"
+    "overview": "نظرة عامة",
+    "examPrep": "محاكاة بَجْروت"
   },
   "navSection": {
     "learn": "تعلّم",
