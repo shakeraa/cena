@@ -19,6 +19,7 @@
 // it to the aggregate.
 // =============================================================================
 
+using System.Text;
 using System.Text.RegularExpressions;
 
 namespace Cena.Actors.Tests.Architecture;
@@ -139,6 +140,14 @@ public sealed class ConsentAggregateNoProfileCouplingTest
                 continue;
             }
 
+            // PRR-304: strip XML doc comments (///) and single-line // comments
+            // before matching. Docstrings legitimately explain consent
+            // semantics across bounded contexts (e.g. Reference.cs's prose
+            // about "the longer-lived 90-day fact lives in the ConsentAggregate
+            // event stream") without coupling the code. The arch test is
+            // looking for CODE coupling, not prose.
+            var codeOnly = StripCommentLines(content);
+
             foreach (var forbiddenSymbol in forbidden)
             {
                 // Match as a word-boundary token so we don't false-match on
@@ -147,7 +156,7 @@ public sealed class ConsentAggregateNoProfileCouplingTest
                 // and is allowed (e.g. Host DI composition). But any code in
                 // Cena.Actors/ outside Consent/ shouldn't actually need those.
                 var pattern = @"\b" + Regex.Escape(forbiddenSymbol) + @"\b";
-                if (Regex.IsMatch(content, pattern))
+                if (Regex.IsMatch(codeOnly, pattern))
                 {
                     offenders.Add($"{Path.GetRelativePath(actorsRoot, file)}: references {forbiddenSymbol}");
                     break; // one offender per file is enough for the message
@@ -162,6 +171,58 @@ public sealed class ConsentAggregateNoProfileCouplingTest
                 + "the aggregate is its own bounded context (prr-155). Use IGdprConsentManager or a "
                 + "thin seam instead:\n  " + string.Join("\n  ", offenders));
         }
+    }
+
+    /// <summary>
+    /// PRR-304: strip XML doc-comment lines (///), block-comment leaders
+    /// (/* / *), and trailing // tail-comments. Docstrings are prose that
+    /// legitimately reference cross-context concepts; this test only
+    /// cares about CODE coupling, not narrative.
+    /// </summary>
+    private static string StripCommentLines(string source)
+    {
+        var sb = new StringBuilder(source.Length);
+        var inBlock = false;
+        foreach (var rawLine in source.Split('\n'))
+        {
+            var line = rawLine;
+            // Track /* ... */ block comments line by line.
+            if (inBlock)
+            {
+                var endIdx = line.IndexOf("*/", StringComparison.Ordinal);
+                if (endIdx >= 0)
+                {
+                    line = line[(endIdx + 2)..];
+                    inBlock = false;
+                }
+                else
+                {
+                    continue;   // entire line is inside block comment
+                }
+            }
+            // Drop any /* ... */ on the same line.
+            while (true)
+            {
+                var startIdx = line.IndexOf("/*", StringComparison.Ordinal);
+                if (startIdx < 0) break;
+                var endIdx = line.IndexOf("*/", startIdx + 2, StringComparison.Ordinal);
+                if (endIdx < 0)
+                {
+                    line = line[..startIdx];
+                    inBlock = true;
+                    break;
+                }
+                line = line[..startIdx] + line[(endIdx + 2)..];
+            }
+            // Drop the line entirely if it's just a single-line comment.
+            var trimmed = line.TrimStart();
+            if (trimmed.StartsWith("//", StringComparison.Ordinal)) continue;
+            // Drop trailing // tail comments.
+            var slashIdx = line.IndexOf("//", StringComparison.Ordinal);
+            if (slashIdx >= 0) line = line[..slashIdx];
+            sb.AppendLine(line);
+        }
+        return sb.ToString();
     }
 
     // -------------------------------------------------------------------------
