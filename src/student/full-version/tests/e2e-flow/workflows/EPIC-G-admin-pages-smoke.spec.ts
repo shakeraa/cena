@@ -215,17 +215,25 @@ test.describe('EPIC_G_ADMIN_PAGES_SMOKE', () => {
       ticket?: string
     }
     const KNOWN_BROKEN_ROUTES: Record<string, KnownBrokenEntry> = {
-      '/apps/ingestion/pipeline':   { reason: 'admin-api: GET /api/admin/ingestion/{stats,pipeline-status} 500',     surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-03' },
-      '/apps/questions/languages':  { reason: 'admin-api: GET /api/admin/questions/languages 500',                    surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-02' },
-      '/apps/questions/list':       { reason: 'admin-api: GET /api/admin/questions list 500',                         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-02' },
       '/apps/sessions/live':        { reason: 'admin-api: 401 from realtime endpoint — token shape mismatch',         surfacedAt: '2026-04-27' },
-      '/apps/system/ai-settings':   { reason: 'admin-api: GET /api/admin/ai/settings 500 (renders empty-state cleanly after JS-undefined fix)', surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-01' },
-      '/apps/sessions/monitor':     { reason: 'admin-api: SignalR /sessionMonitor hub negotiate 404',                surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
-      '/apps/system/actors':        { reason: 'admin-api: SignalR /actors hub negotiate 404',                         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
-      '/apps/system/architecture':  { reason: 'admin-api: SignalR /architecture hub negotiate 404',                   surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
-      '/apps/system/events':        { reason: 'admin-api: SignalR /events hub negotiate 404',                         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-04' },
-      '/instructor':                { reason: 'admin-api: GET /api/instructor/* 404 — endpoint missing',              surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-05' },
-      '/mentor':                    { reason: 'admin-api: GET /api/mentor/institutes 404 — endpoint missing',         surfacedAt: '2026-04-27', ticket: 'TASK-E2E-BG-05' },
+      // 2026-04-29 audit (claude-1) — removed 8 entries that no longer
+      // reflect reality. The originally-attributed gaps are either
+      // fixed or never actually surfaced in the current SPA wire:
+      //
+      //   BG-01  /apps/system/ai-settings              → fixed by claude-code (defensive guard + downstream fixes)
+      //   BG-02  /apps/questions/list                  → fixed by claude-code (admin-api list returns 200)
+      //   BG-02  /apps/questions/languages             → page renders cleanly; SPA never called /api/admin/questions/languages, only /api/admin/questions
+      //   BG-03  /apps/ingestion/pipeline              → fixed by claude-code in b21ea479 (Lazy<IAmazonS3>)
+      //   BG-04  /apps/sessions/monitor /actors        → SPA migrated to /admin-hub/cena central hub; per-page negotiate URLs (/sessionMonitor /actors /architecture /events) never existed AND are not called by current SPA code (verified — useAdminLiveStream is the only HubConnectionBuilder caller)
+      //   BG-04  /apps/system/architecture /events      → same migration as above
+      //   BG-05  /instructor /mentor                    → fixed in claude-1/bg-05-instructor-mentor (prior commit on this branch)
+      //
+      // The INFRA-05 staleness gate would otherwise hard-fail in CI because
+      // each of the above routes now has clean console-error status.
+      //
+      // /apps/sessions/live remains: that's an unrelated 401 from a
+      // realtime endpoint with token-shape mismatch — separate gap, not
+      // in the BG-* series.
     }
 
     // Allowlist budget cap: if the team adds entries faster than they
