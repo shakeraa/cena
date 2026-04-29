@@ -357,11 +357,36 @@ public sealed class NatsOutboxPublisher : BackgroundService
 
     private static bool StartsAny(string eventTypeName, params string[] prefixes)
     {
+        // PRR-308: snake_case event names like "cognitive_load_sampled__v1"
+        // do NOT StartsWith("CognitiveLoad", OrdinalIgnoreCase) because the
+        // underscore inside the snake form breaks character-by-character
+        // alignment with the camel-cased prefix (`_` vs `L`). The
+        // pre-PRR-308 case-insensitive StartsWith was a NECESSARY but
+        // INSUFFICIENT fix for the original 2026-04-23 bug.
+        //
+        // Fix: normalise BOTH sides by stripping underscores before
+        // comparison. "cognitive_load_sampled__v1" → "cognitiveloadsampledv1"
+        // and "CognitiveLoad" → "CognitiveLoad". OrdinalIgnoreCase StartsWith
+        // now matches correctly. The normalised event name is computed once
+        // per call.
+        var normalisedEvent = StripUnderscores(eventTypeName);
         foreach (var p in prefixes)
         {
-            if (eventTypeName.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return true;
+            if (normalisedEvent.StartsWith(p, StringComparison.OrdinalIgnoreCase))
+                return true;
         }
         return false;
+    }
+
+    private static string StripUnderscores(string s)
+    {
+        if (string.IsNullOrEmpty(s) || s.IndexOf('_') < 0) return s;
+        var buf = new System.Text.StringBuilder(s.Length);
+        foreach (var ch in s)
+        {
+            if (ch != '_') buf.Append(ch);
+        }
+        return buf.ToString();
     }
 }
 
