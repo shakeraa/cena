@@ -238,7 +238,9 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
                     SourceParentSubjectIdEncrypted: parentSubjectIdEncrypted,
                     ValidUntil: state.RenewsAt,
                     LastUpdatedAt: now,
-                    EffectiveStatus: SubscriptionStatus.Active);
+                    EffectiveStatus: SubscriptionStatus.Active,
+                    TrialCaps: null,
+                    HasPaymentMethodOnFile: state.HasPaymentMethodOnFile);
 
             case SubscriptionStatus.Trialing:
                 // Calendar boundary check: if the trial has passed its
@@ -253,7 +255,12 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
                     SourceParentSubjectIdEncrypted: parentSubjectIdEncrypted,
                     ValidUntil: state.TrialEndsAt,
                     LastUpdatedAt: now,
-                    EffectiveStatus: SubscriptionStatus.Trialing);
+                    EffectiveStatus: SubscriptionStatus.Trialing,
+                    // Pin the caps from the parent stream — Phase 1D-fix #1
+                    // (RequireEntitlementFilter consumes this directly,
+                    // avoiding a parent-aggregate re-load on the hot path).
+                    TrialCaps: state.TrialCaps,
+                    HasPaymentMethodOnFile: state.HasPaymentMethodOnFile);
 
             case SubscriptionStatus.PastDue:
                 return new StudentEntitlementView(
@@ -262,7 +269,9 @@ public sealed class StudentEntitlementResolver : IStudentEntitlementResolver
                     SourceParentSubjectIdEncrypted: parentSubjectIdEncrypted,
                     ValidUntil: state.RenewsAt,
                     LastUpdatedAt: now,
-                    EffectiveStatus: SubscriptionStatus.PastDue);
+                    EffectiveStatus: SubscriptionStatus.PastDue,
+                    TrialCaps: null,
+                    HasPaymentMethodOnFile: state.HasPaymentMethodOnFile);
 
             // Expired / Cancelled / Refunded / Unsubscribed: not a
             // precedence winner. Caller falls through.

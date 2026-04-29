@@ -31,13 +31,30 @@ namespace Cena.Actors.Subscriptions;
 /// tier). Defaults to <see cref="SubscriptionStatus.Active"/> for backward
 /// compatibility with pre-trial call sites that pre-date this field.
 /// </param>
+/// <param name="TrialCaps">
+/// Pinned trial caps (Phase 1D-fix item 1) — populated by the resolver when
+/// <paramref name="EffectiveStatus"/> is <see cref="SubscriptionStatus.Trialing"/>.
+/// Null on Active / PastDue / Unsubscribed / Expired views. The
+/// <c>RequireEntitlementFilter</c> compares per-feature consumption against
+/// these caps to gate cap-hit; carrying the caps on the view avoids a
+/// parent-aggregate re-load on the hot path.
+/// </param>
+/// <param name="HasPaymentMethodOnFile">
+/// True iff the parent stream has at least one
+/// <see cref="Events.SubscriptionPaymentMethodAttached_V1"/> on file (Phase
+/// 1D-fix item 2). Conversion-to-paid uses this to decide whether the SPA
+/// can skip the card-collection step. The raw payment-method id is NOT
+/// surfaced on the view (PCI-DSS scope minimisation).
+/// </param>
 public sealed record StudentEntitlementView(
     string StudentSubjectIdEncrypted,
     SubscriptionTier EffectiveTier,
     string SourceParentSubjectIdEncrypted,
     DateTimeOffset? ValidUntil,
     DateTimeOffset LastUpdatedAt,
-    SubscriptionStatus EffectiveStatus = SubscriptionStatus.Active)
+    SubscriptionStatus EffectiveStatus = SubscriptionStatus.Active,
+    Events.TrialCapsSnapshot? TrialCaps = null,
+    bool HasPaymentMethodOnFile = false)
 {
     /// <summary>Lookup the tier caps from the catalog for this entitlement.</summary>
     public UsageCaps Caps => TierCatalog.Get(EffectiveTier).Caps;

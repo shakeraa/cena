@@ -1,10 +1,14 @@
 // =============================================================================
-// Cena Platform — Entitlement DTOs (Phase 1D, trial-then-paywall §11)
+// Cena Platform — Entitlement DTOs (Phase 1D + 1D-fix, trial-then-paywall §11)
 //
 // Wire-format records for the consumer-facing entitlement surface:
-//   GET    /api/me/entitlement       → EntitlementResponseDto
-//   POST   /api/me/start-trial       → StartTrialRequestDto / EntitlementResponseDto
-//   POST   /api/me/redeem-code       → RedeemCodeRequestDto / RedeemCodeResponseDto
+//   GET  /api/me/entitlement   → EntitlementResponseDto
+//   POST /api/me/start-trial   → StartTrialRequestDto / EntitlementResponseDto
+//
+// /api/me/redeem-code was removed in Phase 1D-fix because the codebase has
+// no code-driven redemption registry — admin issues per-email and Stripe
+// auto-binds at checkout. The SPA peeks discount availability via the
+// pre-existing GET /api/me/applicable-discount.
 //
 // Banned-mechanics guard (ADR-0048, GD-004): no field name implies streak,
 // countdown urgency, scarcity, or loss-aversion. `daysRemaining` and
@@ -25,12 +29,18 @@ namespace Cena.Api.Contracts.Subscriptions;
 /// </summary>
 /// <param name="Tier">Catalog tier name — e.g. "TrialPlus", "Plus", "Premium", "Unsubscribed".</param>
 /// <param name="EffectiveStatus">"Active" | "Trialing" | "PastDue" | "Unsubscribed" | "Expired" | "Cancelled" | "Refunded".</param>
+/// <param name="HasPaymentMethodOnFile">
+/// True iff the parent stream has a SetupIntent-attached card. Conversion
+/// flow uses this to decide whether the SPA can skip the card-collection
+/// step. The raw payment-method id is intentionally NOT surfaced.
+/// </param>
 /// <param name="Trial">Populated when <paramref name="EffectiveStatus"/> is "Trialing".</param>
 /// <param name="Subscription">Populated when <paramref name="EffectiveStatus"/> is "Active" or "PastDue".</param>
 /// <param name="DiscountApplied">When non-null, an applicable per-user discount is staged for the next checkout.</param>
 public sealed record EntitlementResponseDto(
     [property: JsonPropertyName("tier")] string Tier,
     [property: JsonPropertyName("effectiveStatus")] string EffectiveStatus,
+    [property: JsonPropertyName("hasPaymentMethodOnFile")] bool HasPaymentMethodOnFile,
     [property: JsonPropertyName("trial")] TrialStateDto? Trial,
     [property: JsonPropertyName("subscription")] SubscriptionStateDto? Subscription,
     [property: JsonPropertyName("discountApplied")] ApplicableDiscountDto? DiscountApplied);
@@ -64,28 +74,11 @@ public sealed record SubscriptionStateDto(
 ///   "SelfPay" / "ParentPay" — caller MUST supply <see cref="SetupIntentId"/>;
 ///                              server re-reads via Stripe and extracts the
 ///                              card.fingerprint (§5.14 server-side rule).
-///   "InstituteCode"          — no card collected; institute code authorises;
-///                              <see cref="SetupIntentId"/> is ignored.
+///   "InstituteCode"          — caller MUST supply <see cref="InstituteCode"/>;
+///                              no card collected.
 /// </summary>
 public sealed record StartTrialRequestDto(
     [property: JsonPropertyName("trialKind")] string TrialKind,
     [property: JsonPropertyName("setupIntentId")] string? SetupIntentId,
     [property: JsonPropertyName("instituteCode")] string? InstituteCode,
     [property: JsonPropertyName("experimentVariantId")] string? ExperimentVariantId);
-
-/// <summary>Body of POST /api/me/redeem-code (peek for an applicable discount).</summary>
-public sealed record RedeemCodeRequestDto(
-    [property: JsonPropertyName("code")] string Code);
-
-/// <summary>
-/// Response from POST /api/me/redeem-code. <see cref="Applied"/> is true
-/// when an active discount was found for the caller's email; the SPA
-/// stages it for the next checkout. The discount itself is applied at
-/// Stripe-checkout time via the existing promotion-code passthrough.
-/// </summary>
-public sealed record RedeemCodeResponseDto(
-    [property: JsonPropertyName("applied")] bool Applied,
-    [property: JsonPropertyName("discountKind")] string? DiscountKind,
-    [property: JsonPropertyName("discountValue")] int? DiscountValue,
-    [property: JsonPropertyName("durationMonths")] int? DurationMonths,
-    [property: JsonPropertyName("reason")] string? Reason);

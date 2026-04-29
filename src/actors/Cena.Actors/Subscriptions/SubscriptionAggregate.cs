@@ -89,6 +89,9 @@ public sealed class SubscriptionAggregate
             case TrialExpired_V1 trialExpired:
                 State.Apply(trialExpired);
                 break;
+            case SubscriptionPaymentMethodAttached_V1 pmAttached:
+                State.Apply(pmAttached);
+                break;
         }
     }
 
