@@ -37,7 +37,7 @@ public sealed class MockExamBktPropagationTests
         // affected exam code. The test failure message points the dev at
         // the matching switch arm in MockExamRunService.cs.
         Assert.True(
-            MockExamRunService.TryMapExamCodeToTargetCode(examCode, out var target),
+            MockExamBktPropagator.TryMapExamCodeToTargetCode(examCode, out var target),
             $"Expected exam code '{examCode}' to map to a known ExamTargetCode.");
         Assert.Equal(expectedTarget, target.Value);
     }
@@ -50,7 +50,7 @@ public sealed class MockExamBktPropagationTests
     {
         // Caller (RecordBktObservationsAsync) treats false as "log + no-op",
         // never as an exception. Empty / unknown codes must NOT throw.
-        Assert.False(MockExamRunService.TryMapExamCodeToTargetCode(examCode, out _));
+        Assert.False(MockExamBktPropagator.TryMapExamCodeToTargetCode(examCode, out _));
     }
 
     [Fact]
@@ -60,7 +60,7 @@ public sealed class MockExamBktPropagationTests
         // catches a typo that would compile but blow up the gate at runtime.
         foreach (var code in new[] { "806", "807", "036" })
         {
-            Assert.True(MockExamRunService.TryMapExamCodeToTargetCode(code, out var target));
+            Assert.True(MockExamBktPropagator.TryMapExamCodeToTargetCode(code, out var target));
             // Round-trip via the public Parse to catch invalid characters
             // or empty results that the TryParse path silently allows
             // (it's a try, after all).

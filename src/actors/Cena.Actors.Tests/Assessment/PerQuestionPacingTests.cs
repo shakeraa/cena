@@ -2,7 +2,7 @@
 // Cena Platform — Per-question pacing computation tests (PRR-299)
 //
 // Pins the pure-function pacing-overlay logic in
-// MockExamRunService.OverlayPerQuestionPacing. Real-Postgres exercise of the
+// MockExamGrader.OverlayPerQuestionPacing. Real-Postgres exercise of the
 // SubmitAnswer → state.AnswerTimestamps round-trip lives in the integration
 // suite; these tests pin the deterministic transform.
 //
@@ -60,7 +60,7 @@ public sealed class PerQuestionPacingTests
         var state = BuildState(T0);
         var pq = new[] { BuildPq("q1"), BuildPq("q2") };
 
-        var result = MockExamRunService.OverlayPerQuestionPacing(pq, state);
+        var result = MockExamGrader.OverlayPerQuestionPacing(pq, state);
 
         Assert.All(result, r =>
         {
@@ -86,7 +86,7 @@ public sealed class PerQuestionPacingTests
         };
         var pq = new[] { BuildPq("q1", subparts) };
 
-        var result = MockExamRunService.OverlayPerQuestionPacing(pq, state);
+        var result = MockExamGrader.OverlayPerQuestionPacing(pq, state);
 
         Assert.Equal(T0.AddMinutes(5), result[0].FirstAnsweredAt);
     }
@@ -99,7 +99,7 @@ public sealed class PerQuestionPacingTests
         var state = BuildState(T0, ("q1", T0.AddMinutes(10), T0.AddMinutes(10)));
         var pq = new[] { BuildPq("q1") };
 
-        var result = MockExamRunService.OverlayPerQuestionPacing(pq, state);
+        var result = MockExamGrader.OverlayPerQuestionPacing(pq, state);
 
         Assert.Equal(TimeSpan.FromMinutes(10), result[0].TimeSpent);
     }
@@ -116,7 +116,7 @@ public sealed class PerQuestionPacingTests
             ("q2", T0.AddMinutes(18), T0.AddMinutes(20)));
         var pq = new[] { BuildPq("q1"), BuildPq("q2") };
 
-        var result = MockExamRunService.OverlayPerQuestionPacing(pq, state);
+        var result = MockExamGrader.OverlayPerQuestionPacing(pq, state);
 
         Assert.Equal(TimeSpan.FromMinutes(10), result[0].TimeSpent);
         Assert.Equal(TimeSpan.FromMinutes(3), result[1].TimeSpent);
@@ -134,7 +134,7 @@ public sealed class PerQuestionPacingTests
             ("q2", T0.AddMinutes(5), T0.AddMinutes(8)));
         var pq = new[] { BuildPq("q1"), BuildPq("q2") };
 
-        var result = MockExamRunService.OverlayPerQuestionPacing(pq, state);
+        var result = MockExamGrader.OverlayPerQuestionPacing(pq, state);
 
         Assert.Equal("q1", result[0].QuestionId);
         Assert.Equal("q2", result[1].QuestionId);
@@ -159,7 +159,7 @@ public sealed class PerQuestionPacingTests
             ("q2", T0.AddMinutes(15), T0.AddMinutes(15)));
         var pq = new[] { BuildPq("q1"), BuildPq("q2") };
 
-        var result = MockExamRunService.OverlayPerQuestionPacing(pq, state);
+        var result = MockExamGrader.OverlayPerQuestionPacing(pq, state);
 
         Assert.True(result[1].TimeSpent! >= TimeSpan.Zero);
     }
@@ -178,7 +178,7 @@ public sealed class PerQuestionPacingTests
             ("q3", T0.AddMinutes(12), T0.AddMinutes(13)));
         var pq = new[] { BuildPq("q1"), BuildPq("q2"), BuildPq("q3") };
 
-        var result = MockExamRunService.OverlayPerQuestionPacing(pq, state);
+        var result = MockExamGrader.OverlayPerQuestionPacing(pq, state);
 
         Assert.Equal(TimeSpan.FromMinutes(5), result[0].TimeSpent);
         Assert.Null(result[1].TimeSpent);
@@ -193,7 +193,7 @@ public sealed class PerQuestionPacingTests
         var state = BuildState(T0, ("q1", T0.AddMinutes(3), T0.AddMinutes(4)));
         var pq = new[] { BuildPq("q1", subparts: null) };
 
-        var result = MockExamRunService.OverlayPerQuestionPacing(pq, state);
+        var result = MockExamGrader.OverlayPerQuestionPacing(pq, state);
 
         Assert.Equal(T0.AddMinutes(3), result[0].FirstAnsweredAt);
         Assert.Equal(TimeSpan.FromMinutes(3), result[0].TimeSpent);
