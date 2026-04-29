@@ -31,7 +31,6 @@
 //     for first ship; MathLive integration is GD-006 spike work.
 // =============================================================================
 
-using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using Cena.Actors.Cas;
 using Cena.Actors.Content;
@@ -61,6 +60,9 @@ public sealed class MockExamRunService : IMockExamRunService
     /// throws away the strongest adaptive signal we have.
     /// </summary>
     private readonly IBktStateTracker? _bktTracker;
+    private readonly MockExamGrader _grader;
+    private readonly MockExamPaperDraw _paperDraw;
+    private readonly MockExamBktPropagator _bktPropagator;
 
     private static readonly Meter Meter = new("Cena.MockExam", "1.0.0");
     private static readonly Counter<long> RunsStarted =
@@ -69,17 +71,6 @@ public sealed class MockExamRunService : IMockExamRunService
         Meter.CreateCounter<long>("cena_mock_exam_runs_submitted_total");
     private static readonly Counter<long> AnswersSubmitted =
         Meter.CreateCounter<long>("cena_mock_exam_answers_submitted_total");
-    private static readonly Counter<long> SlotFallbacks =
-        Meter.CreateCounter<long>("cena_mock_exam_slot_fallback_total");
-    /// <summary>Phase 3 — time-to-grade observability. Histogram so the
-    /// SLO dashboard can track p50/p95/p99 grading latency separately
-    /// from the broader endpoint latency.</summary>
-    private static readonly Histogram<double> GradeDurationMs =
-        Meter.CreateHistogram<double>("cena_mock_exam_grade_duration_ms");
-
-    /// <summary>Process-scoped counter mixed into the run-shuffle seed
-    /// so two starts within the same tick still produce different draws.</summary>
-    private static long s_seedCounter;
 
     public MockExamRunService(
         IDocumentStore store,
@@ -97,12 +88,10 @@ public sealed class MockExamRunService : IMockExamRunService
         _logger = logger;
         _clock = clock ?? TimeProvider.System;
         _bktTracker = bktTracker;
+        _grader = new MockExamGrader(structureCatalog, cas, _clock);
+        _paperDraw = new MockExamPaperDraw(logger, _clock);
+        _bktPropagator = new MockExamBktPropagator(bktTracker, store, logger);
     }
-
-    private static readonly Counter<long> BktObservations =
-        Meter.CreateCounter<long>("cena_mock_exam_bkt_observations_total");
-    private static readonly Counter<long> BktSkipped =
-        Meter.CreateCounter<long>("cena_mock_exam_bkt_observations_skipped_total");
 
     private static string SubjectForExamCode(string examCode) => examCode switch
     {
@@ -145,158 +134,19 @@ public sealed class MockExamRunService : IMockExamRunService
                 "[MOCK-EXAM] Idempotent re-start: studentId={StudentId} examCode={ExamCode} runId={RunId}",
                 studentId, request.ExamCode, existing.SimulationId);
 
-            return BuildStartedResponse(existing, request.PaperCode);
+            return MockExamWireResponses.BuildStarted(existing, request.PaperCode);
         }
 
-        // ── Slot-aware question draw ────────────────────────────
+        // ── Slot-aware question draw delegated to MockExamPaperDraw ──
         var subject = SubjectForExamCode(request.ExamCode);
-
-        // Two pools: multi-part (preferred for Part B long-form slots)
-        // + single-cell (Part A short-form + multi-part fallback).
-        var multipartPool = await session.Query<BagrutMultipartQuestion>()
-            .Where(q => q.Subject == subject)
-            .ToListAsync(ct);
-
-        var pool = await session.Query<QuestionReadModel>()
-            .Where(q => q.Subject == subject && q.Status == "Published")
-            .ToListAsync(ct);
-
-        if (pool.Count == 0 && multipartPool.Count == 0)
-        {
-            throw new InvalidOperationException(
-                $"No published questions for subject '{subject}'. The exam-prep dev seeder may not have run, or the production pool is empty.");
-        }
-
-        var poolByConcept = pool
-            .SelectMany(q => q.Concepts.Select(c => (concept: c, q)))
-            .GroupBy(t => t.concept)
-            .ToDictionary(g => g.Key, g => g.Select(t => t.q).ToList());
-
-        var multipartByTopic = multipartPool
-            .GroupBy(q => q.Topic)
-            .ToDictionary(g => g.Key, g => g.ToList());
-
-        // PRR-291 — cohort-fairness path. When the student supplies a
-        // specific Ministry שאלון code (paperCode), they invoke the
-        // Bagrut-day fairness invariant: every cohort member in the same
-        // 3-hour window must draw from the SAME shuffled pool, not
-        // independent shuffles. We materialise the pool on first start and
-        // reuse it on subsequent starts in the same window. Self-pay /
-        // practice runs (paperCode null) keep per-student randomness.
-        var nowForCohort = _clock.GetUtcNow();
-        var cohortPool = !string.IsNullOrWhiteSpace(request.PaperCode)
-            ? await session.LoadAsync<BagrutPaperRunPool>(
-                BagrutPaperRunPool.ComposeId(request.PaperCode!,
-                    BagrutPaperRunPool.ComputeWindowStart(nowForCohort)),
-                ct)
-            : null;
-
-        // Phase 3 #2 — stronger seed (per-student randomness path).
-        // Guid.NewGuid + per-process atomic counter ensures two starts in
-        // the same tick get different shuffles (the old (studentId,
-        // examCode, ticks) tuple collided when called twice within a tick).
-        // PRR-291: when a cohort is active the seed switches to the
-        // deterministic ComputeCohortSeed so all cohort members converge
-        // on identical PartA / PartB draws.
-        var rng = cohortPool is not null
-            // Cohort already exists — we won't shuffle, we'll reuse its
-            // frozen lists. RNG only needs to provide a stable VariantSeed
-            // (held on cohortPool), so a no-op deterministic instance is
-            // fine — but we still build one for the (rare) deficit path.
-            ? new Random(cohortPool.VariantSeed)
-            : !string.IsNullOrWhiteSpace(request.PaperCode)
-                // Cohort starts here: deterministic RNG so the FIRST
-                // student's shuffle (which subsequent students will see)
-                // does NOT depend on this individual student.
-                ? new Random(BagrutPaperRunPool.ComputeCohortSeed(
-                    request.PaperCode!,
-                    BagrutPaperRunPool.ComputeWindowStart(nowForCohort)))
-                : new Random(($"{studentId}|{request.ExamCode}|{Guid.NewGuid():N}|" +
-                    $"{System.Threading.Interlocked.Increment(ref s_seedCounter)}").GetHashCode());
-
-        var partAIds = new List<string>();
-        var partBIds = new List<string>();
-        var drawn = new HashSet<string>(StringComparer.Ordinal);
-
-        var partASection = structure.Sections.FirstOrDefault(s => s.SectionLabel == "A");
-        var partBSection = structure.Sections.FirstOrDefault(s => s.SectionLabel == "B");
-        if (partASection is null || partBSection is null)
-            throw new InvalidOperationException(
-                $"Paper structure {structure.Id} must have both A and B sections.");
-
-        if (cohortPool is not null)
-        {
-            // PRR-291 fast path — reuse the frozen cohort lists verbatim.
-            partAIds.AddRange(cohortPool.PartAQuestionIds);
-            partBIds.AddRange(cohortPool.PartBQuestionIds);
-            foreach (var id in partAIds) drawn.Add(id);
-            foreach (var id in partBIds) drawn.Add(id);
-            _logger.LogInformation(
-                "[MOCK-EXAM-COHORT] reuse pool studentId={StudentId} paperCode={PaperCode} windowStart={Window} partA={A} partB={B}",
-                studentId, request.PaperCode, cohortPool.WindowStart, partAIds.Count, partBIds.Count);
-        }
-        else
-        {
-            // Pre-PRR-291 draw path (per-student) OR cohort-seeding path
-            // (first student in a new window). Either way, DrawForSlots
-            // populates partAIds + partBIds; the difference is whether
-            // the RNG was seeded deterministically (cohort) or randomly
-            // (per-student).
-            var poolList = pool.ToList();
-            DrawForSlots(partASection, poolByConcept, poolList, rng, drawn,
-                preferMultipart: false, multipartByTopic, partAIds);
-            DrawForSlots(partBSection, poolByConcept, poolList, rng, drawn,
-                preferMultipart: true, multipartByTopic, partBIds);
-
-            if (partAIds.Count < partASection.RequiredAnswers)
-            {
-                throw new InvalidOperationException(
-                    $"Could not draw enough Part A items: have {partAIds.Count}, need {partASection.RequiredAnswers}.");
-            }
-            if (partBIds.Count < partBSection.Slots.Count)
-            {
-                // We need ALL Part B slot candidates so the student can choose K of N.
-                // If the pool is too small, draw more from the broader subject.
-                var deficit = partBSection.Slots.Count - partBIds.Count;
-                var extras = Shuffle(pool.Where(q => !drawn.Contains(q.Id)).ToList(), rng)
-                    .Take(deficit).Select(q => q.Id).ToList();
-                partBIds.AddRange(extras);
-                foreach (var id in extras) drawn.Add(id);
-            }
-        }
+        var draw = await _paperDraw.DrawAsync(
+            session, structure, request.PaperCode, subject, studentId, request.ExamCode, ct);
+        var partAIds = new List<string>(draw.PartAIds);
+        var partBIds = new List<string>(draw.PartBIds);
 
         var simulationId = Guid.NewGuid().ToString("N")[..16];
         var startedAt = _clock.GetUtcNow();
-        // PRR-291 — variant seed honours cohort fairness too. When the
-        // cohort row exists we reuse its seed; when seeding the cohort we
-        // use a deterministic value (rng.Next() already deterministic
-        // because rng was seeded from ComputeCohortSeed); per-student
-        // path keeps its random rng.Next().
-        var variantSeed = cohortPool?.VariantSeed ?? rng.Next();
-
-        // PRR-291 — persist the cohort pool when this is the seeding
-        // start. Concurrency note: two students can race to seed the
-        // pool. Marten's UPSERT semantics on the same Id mean one wins;
-        // both end up with the SAME PartA/PartB lists because they used
-        // the same deterministic seed. The race is benign.
-        if (cohortPool is null && !string.IsNullOrWhiteSpace(request.PaperCode))
-        {
-            var pool291 = new BagrutPaperRunPool
-            {
-                Id = BagrutPaperRunPool.ComposeId(request.PaperCode!,
-                    BagrutPaperRunPool.ComputeWindowStart(nowForCohort)),
-                PaperCode = request.PaperCode!,
-                WindowStart = BagrutPaperRunPool.ComputeWindowStart(nowForCohort),
-                PartAQuestionIds = new List<string>(partAIds),
-                PartBQuestionIds = new List<string>(partBIds),
-                VariantSeed = variantSeed,
-                SeededAt = nowForCohort,
-            };
-            session.Store(pool291);
-            _logger.LogInformation(
-                "[MOCK-EXAM-COHORT] seed pool studentId={StudentId} paperCode={PaperCode} windowStart={Window} partA={A} partB={B}",
-                studentId, request.PaperCode, pool291.WindowStart, partAIds.Count, partBIds.Count);
-        }
+        var variantSeed = draw.VariantSeed;
 
         // Phase 2B: clamp accommodation to [0, 100]% silently. Storing
         // the resolved minute count (not the percent) keeps the state
@@ -363,7 +213,7 @@ public sealed class MockExamRunService : IMockExamRunService
         await using var session = _store.QuerySession();
         var state = await session.LoadAsync<ExamSimulationState>(runId, ct);
         if (state is null || state.StudentId != studentId) return null;
-        return BuildStateResponse(state);
+        return MockExamWireResponses.BuildState(state);
     }
 
     public async Task<MockExamRunStateResponse> SelectPartBAsync(
@@ -396,7 +246,7 @@ public sealed class MockExamRunService : IMockExamRunService
         session.Store(state);
         await session.SaveChangesAsync(ct);
 
-        return BuildStateResponse(state);
+        return MockExamWireResponses.BuildState(state);
     }
 
     public async Task<MockExamRunStateResponse> SubmitAnswerAsync(
@@ -456,7 +306,7 @@ public sealed class MockExamRunService : IMockExamRunService
         await session.SaveChangesAsync(ct);
 
         AnswersSubmitted.Add(1);
-        return BuildStateResponse(state);
+        return MockExamWireResponses.BuildState(state);
     }
 
     public async Task<MockExamRunStateResponse> SubmitAnswersBulkAsync(
@@ -526,7 +376,7 @@ public sealed class MockExamRunService : IMockExamRunService
 
         AnswersSubmitted.Add(request.Answers.Count,
             new KeyValuePair<string, object?>("path", "bulk"));
-        return BuildStateResponse(state);
+        return MockExamWireResponses.BuildState(state);
     }
 
     public async Task<MockExamResultResponse> SubmitAsync(
@@ -570,226 +420,11 @@ public sealed class MockExamRunService : IMockExamRunService
         // AFTER the run has been durably submitted. Best-effort: a BKT failure
         // here must NOT roll back the submit — the student deserves their mark
         // sheet even if the adaptive-signal pipeline is briefly down.
-        await RecordBktObservationsAsync(state, result, now, ct).ConfigureAwait(false);
+        await _bktPropagator.RecordAsync(state, result, now, ct).ConfigureAwait(false);
 
         return result;
     }
 
-    /// <summary>
-    /// PRR-289 — propagate per-question correctness from a submitted mock-exam
-    /// into the skill-keyed mastery store via <see cref="IBktStateTracker"/>.
-    /// Multi-part questions emit one observation per subpart (each subpart is
-    /// an independent BKT signal at the parent question's skill level — the
-    /// per-subpart taxonomy isn't surfaced today; if PRR-302 ships per-subpart
-    /// skill tagging, this fans out further).
-    ///
-    /// Best-effort by design: a single failed observation logs + skips; the
-    /// whole call is wrapped in a top-level try/catch so a BKT outage cannot
-    /// fail the surrounding submit.
-    /// </summary>
-    private async Task RecordBktObservationsAsync(
-        ExamSimulationState state,
-        MockExamResultResponse result,
-        DateTimeOffset occurredAt,
-        CancellationToken ct)
-    {
-        if (_bktTracker is null) return;
-        if (!TryMapExamCodeToTargetCode(state.ExamCode, out var examTargetCode))
-        {
-            _logger.LogInformation(
-                "[MOCK-EXAM-BKT] skip runId={RunId} reason=unmapped_exam_code examCode={ExamCode}",
-                state.SimulationId, state.ExamCode);
-            return;
-        }
-
-        try
-        {
-            // Batched-load topic mapping for every gradable question id in
-            // the result. Doing this once here (rather than re-deriving from
-            // GradeAsync's local byId) keeps the BKT path independent of
-            // grading internals — if the grade shape evolves, BKT keeps
-            // working as long as PerQuestion.QuestionId remains stable.
-            var questionIds = result.PerQuestion.Select(pq => pq.QuestionId).ToList();
-            var topicById = await LoadQuestionTopicsAsync(questionIds, ct).ConfigureAwait(false);
-
-            int observed = 0;
-            int skipped = 0;
-            foreach (var pq in result.PerQuestion)
-            {
-                if (!topicById.TryGetValue(pq.QuestionId, out var topic)
-                    || string.IsNullOrWhiteSpace(topic))
-                {
-                    // Question has no topic id → cannot key to a skill.
-                    // Counts as skipped so dashboards see content gaps.
-                    if (PerQuestionHasObservation(pq))
-                    {
-                        BktSkipped.Add(1,
-                            new KeyValuePair<string, object?>("reason", "missing_topic"));
-                        skipped++;
-                    }
-                    continue;
-                }
-
-                SkillCode skillCode;
-                try
-                {
-                    skillCode = SkillCode.Parse(topic);
-                }
-                catch (ArgumentException)
-                {
-                    // SkillCode validation rejects malformed topic ids
-                    // (whitespace, invalid chars). Drop the observation
-                    // rather than mis-key the mastery row.
-                    if (PerQuestionHasObservation(pq))
-                    {
-                        BktSkipped.Add(1,
-                            new KeyValuePair<string, object?>("reason", "invalid_topic_format"));
-                        skipped++;
-                    }
-                    continue;
-                }
-
-                if (pq.Subparts is { Count: > 0 })
-                {
-                    // Multi-part: each subpart with a graded verdict is an
-                    // independent BKT observation at the parent skill.
-                    foreach (var sp in pq.Subparts)
-                    {
-                        if (!sp.Correct.HasValue)
-                        {
-                            BktSkipped.Add(1,
-                                new KeyValuePair<string, object?>("reason", "ungraded_subpart"));
-                            skipped++;
-                            continue;
-                        }
-                        await _bktTracker.UpdateAsync(
-                            studentAnonId: state.StudentId,
-                            examTargetCode: examTargetCode,
-                            skillCode: skillCode,
-                            isCorrect: sp.Correct.Value,
-                            occurredAt: occurredAt,
-                            ct: ct).ConfigureAwait(false);
-                        observed++;
-                    }
-                }
-                else if (pq.Correct.HasValue)
-                {
-                    await _bktTracker.UpdateAsync(
-                        studentAnonId: state.StudentId,
-                        examTargetCode: examTargetCode,
-                        skillCode: skillCode,
-                        isCorrect: pq.Correct.Value,
-                        occurredAt: occurredAt,
-                        ct: ct).ConfigureAwait(false);
-                    observed++;
-                }
-                else
-                {
-                    // Top-level question with no graded verdict (not attempted,
-                    // ungradable, or Part-B unselected). Not a BKT signal.
-                    BktSkipped.Add(1,
-                        new KeyValuePair<string, object?>("reason", "ungraded_question"));
-                    skipped++;
-                }
-            }
-
-            BktObservations.Add(observed,
-                new KeyValuePair<string, object?>("examCode", state.ExamCode));
-            _logger.LogInformation(
-                "[MOCK-EXAM-BKT] runId={RunId} studentId={StudentId} examTarget={Target} observations={Observed} skipped={Skipped}",
-                state.SimulationId, state.StudentId, examTargetCode.Value, observed, skipped);
-        }
-        catch (Exception ex)
-        {
-            // Best-effort: BKT outage MUST NOT fail the submit. The student's
-            // mark sheet is already durable; we lose adaptive signal until
-            // the next submit, which is acceptable.
-            _logger.LogWarning(ex,
-                "[MOCK-EXAM-BKT] BKT propagation failed for runId={RunId} studentId={StudentId} — submit succeeds, signal dropped.",
-                state.SimulationId, state.StudentId);
-        }
-    }
-
-    /// <summary>
-    /// Per-question observation predicate: does this row produce ANY graded
-    /// verdict (top-level or via at least one graded subpart)? Used to
-    /// distinguish "skipped because grading is null" from "skipped because
-    /// taxonomy is missing" in the metrics.
-    /// </summary>
-    private static bool PerQuestionHasObservation(MockExamPerQuestionResult pq)
-    {
-        if (pq.Subparts is { Count: > 0 })
-            return pq.Subparts.Any(s => s.Correct.HasValue);
-        return pq.Correct.HasValue;
-    }
-
-    /// <summary>
-    /// Map a Bagrut exam-code (numeric שאלון) to the canonical
-    /// <see cref="ExamTargetCode"/> the mastery store keys on. Returns false
-    /// for unmapped codes so the caller can log + no-op rather than throw.
-    ///
-    /// The mapping mirrors <see cref="SubjectForExamCode"/> + the unit-tier
-    /// suffix:
-    ///   806 → bagrut-math-5yu
-    ///   807 → bagrut-math-4yu
-    ///   036 → bagrut-physics-5yu
-    /// New codes added to <see cref="SubjectForExamCode"/> MUST be added
-    /// here too — the architecture-test invariant
-    /// (<c>MockExamBktTargetMappingTest</c>) enforces parity.
-    /// </summary>
-    internal static bool TryMapExamCodeToTargetCode(string examCode, out ExamTargetCode code)
-    {
-        var raw = examCode switch
-        {
-            "806" => "bagrut-math-5yu",
-            "807" => "bagrut-math-4yu",
-            "036" => "bagrut-physics-5yu",
-            _     => null,
-        };
-        if (raw is null)
-        {
-            code = default;
-            return false;
-        }
-        return ExamTargetCode.TryParse(raw, out code);
-    }
-
-    /// <summary>
-    /// Single batched query that returns Topic for every question id in
-    /// <paramref name="questionIds"/>. Handles both Marten doc types
-    /// (<see cref="QuestionDocument"/> + <see cref="BagrutMultipartQuestion"/>)
-    /// since either may carry a graded item. The dictionary is keyed by id;
-    /// missing entries map to null (caller skips).
-    /// </summary>
-    private async Task<Dictionary<string, string?>> LoadQuestionTopicsAsync(
-        IReadOnlyList<string> questionIds, CancellationToken ct)
-    {
-        var topics = new Dictionary<string, string?>(StringComparer.Ordinal);
-        if (questionIds.Count == 0) return topics;
-
-        await using var session = _store.QuerySession();
-
-        var docs = await session.Query<QuestionDocument>()
-            .Where(q => questionIds.Contains(q.Id))
-            .Select(q => new { q.Id, q.Topic })
-            .ToListAsync(ct);
-        foreach (var d in docs) topics[d.Id] = d.Topic;
-
-        var multipart = await session.Query<BagrutMultipartQuestion>()
-            .Where(q => questionIds.Contains(q.Id))
-            .Select(q => new { q.Id, q.Topic })
-            .ToListAsync(ct);
-        foreach (var d in multipart)
-        {
-            // Multipart wins if it provides a non-empty Topic — either
-            // store carries the same logical topic, but multipart's Topic
-            // field is non-nullable while QuestionDocument's is nullable,
-            // so prefer multipart when both have an entry.
-            if (!string.IsNullOrWhiteSpace(d.Topic)) topics[d.Id] = d.Topic;
-        }
-
-        return topics;
-    }
 
     public async Task<MockExamResultResponse?> GetResultAsync(
         string studentId, string runId, CancellationToken ct)
@@ -811,7 +446,7 @@ public sealed class MockExamRunService : IMockExamRunService
             throw new UnauthorizedAccessException("Run does not belong to this student.");
         if (state.IsSubmitted)
             throw new InvalidOperationException("Run already submitted; nothing to pause.");
-        if (state.IsPaused) return BuildStateResponse(state); // idempotent
+        if (state.IsPaused) return MockExamWireResponses.BuildState(state); // idempotent
 
         state.PausedAt = _clock.GetUtcNow();
         session.Store(state);
@@ -820,7 +455,7 @@ public sealed class MockExamRunService : IMockExamRunService
         _logger.LogInformation(
             "[MOCK-EXAM] Paused runId={RunId} studentId={StudentId} totalPausedMs={Total}",
             runId, studentId, state.TotalPausedMs);
-        return BuildStateResponse(state);
+        return MockExamWireResponses.BuildState(state);
     }
 
     public async Task<MockExamRunStateResponse> ResumeAsync(
@@ -833,7 +468,7 @@ public sealed class MockExamRunService : IMockExamRunService
             throw new UnauthorizedAccessException("Run does not belong to this student.");
         if (state.IsSubmitted)
             throw new InvalidOperationException("Run already submitted; nothing to resume.");
-        if (!state.IsPaused) return BuildStateResponse(state); // idempotent
+        if (!state.IsPaused) return MockExamWireResponses.BuildState(state); // idempotent
 
         var pausedDuration = _clock.GetUtcNow() - state.PausedAt!.Value;
         state.TotalPausedMs += (long)Math.Max(0, pausedDuration.TotalMilliseconds);
@@ -844,7 +479,7 @@ public sealed class MockExamRunService : IMockExamRunService
         _logger.LogInformation(
             "[MOCK-EXAM] Resumed runId={RunId} studentId={StudentId} pausedThisRoundMs={Round} totalPausedMs={Total}",
             runId, studentId, (long)pausedDuration.TotalMilliseconds, state.TotalPausedMs);
-        return BuildStateResponse(state);
+        return MockExamWireResponses.BuildState(state);
     }
 
     public async Task<IReadOnlyList<MockExamRunSummary>> GetRecentRunsAsync(
@@ -951,7 +586,7 @@ public sealed class MockExamRunService : IMockExamRunService
             DetectedAt: ts));
 
         await session.SaveChangesAsync(ct);
-        return BuildStateResponse(state);
+        return MockExamWireResponses.BuildState(state);
     }
 
     public async Task<MockExamQuestionPreview?> GetQuestionPreviewAsync(
@@ -1060,506 +695,13 @@ public sealed class MockExamRunService : IMockExamRunService
             actorId: actorId);
     }
 
-    // ── Slot-aware draw ────────────────────────────────────────────
-    private void DrawForSlots(
-        PaperSection section,
-        Dictionary<string, List<QuestionReadModel>> poolByConcept,
-        List<QuestionReadModel> fullPool,
-        Random rng,
-        HashSet<string> drawn,
-        bool preferMultipart,
-        Dictionary<string, List<BagrutMultipartQuestion>> multipartByTopic,
-        List<string> dest)
-    {
-        foreach (var slot in section.Slots)
-        {
-            string? pickedId = null;
-
-            if (preferMultipart)
-            {
-                // Multi-part preferred. Try exact topic, then section fallback.
-                pickedId = TryPickMultipart(multipartByTopic, slot.TopicId, slot, drawn, rng)?.Id
-                        ?? TryPickMultipart(multipartByTopic, section.FallbackTopicId, slot, drawn, rng)?.Id;
-            }
-
-            if (pickedId is null)
-            {
-                // Single-cell path: exact-topic match first.
-                var pick = TryPick(poolByConcept, slot.TopicId, slot, drawn, rng);
-                if (pick is null)
-                {
-                    pick = TryPick(poolByConcept, section.FallbackTopicId, slot, drawn, rng);
-                    if (pick is not null)
-                    {
-                        SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "section"));
-                        // Phase-4 #3 — fallback honesty. Log the drop so an
-                        // operator can correlate the student's "this Q feels
-                        // generic" complaint with the actual structure miss.
-                        _logger.LogInformation(
-                            "[MOCK-EXAM-FALLBACK] slot {Slot} topic={Topic} fell to section topic={Section}",
-                            slot.SlotNumber, slot.TopicId, section.FallbackTopicId);
-                    }
-                }
-                if (pick is null)
-                {
-                    pick = Shuffle(fullPool.Where(q => !drawn.Contains(q.Id)).ToList(), rng).FirstOrDefault();
-                    if (pick is not null)
-                    {
-                        SlotFallbacks.Add(1, new KeyValuePair<string, object?>("level", "subject"));
-                        // Loud warning — subject-wide fallback violates the
-                        // structure invariant in spirit. Production-grade
-                        // ops alarm should fire on this counter > 0.
-                        _logger.LogWarning(
-                            "[MOCK-EXAM-FALLBACK-SUBJECT] slot {Slot} topic={Topic} could not be matched; falling to ANY subject item. The pool likely needs more items for {Topic}.",
-                            slot.SlotNumber, slot.TopicId, slot.TopicId);
-                    }
-                }
-                pickedId = pick?.Id;
-            }
-
-            if (pickedId is null) continue;
-
-            drawn.Add(pickedId);
-            dest.Add(pickedId);
-        }
-    }
-
-    private static BagrutMultipartQuestion? TryPickMultipart(
-        Dictionary<string, List<BagrutMultipartQuestion>> byTopic,
-        string topicId,
-        PaperSlot slot,
-        HashSet<string> drawn,
-        Random rng)
-    {
-        if (!byTopic.TryGetValue(topicId, out var candidates)) return null;
-        var matching = candidates
-            .Where(q => !drawn.Contains(q.Id)
-                     && q.BloomsLevel >= slot.MinBloom
-                     && q.BloomsLevel <= slot.MaxBloom)
-            .ToList();
-        if (matching.Count == 0) return null;
-        return matching[rng.Next(matching.Count)];
-    }
-
-    private static QuestionReadModel? TryPick(
-        Dictionary<string, List<QuestionReadModel>> poolByConcept,
-        string conceptId,
-        PaperSlot slot,
-        HashSet<string> drawn,
-        Random rng)
-    {
-        if (!poolByConcept.TryGetValue(conceptId, out var candidates)) return null;
-        var matching = candidates
-            .Where(q => !drawn.Contains(q.Id)
-                     && q.BloomsLevel >= slot.MinBloom
-                     && q.BloomsLevel <= slot.MaxBloom)
-            .ToList();
-        if (matching.Count == 0) return null;
-        return matching[rng.Next(matching.Count)];
-    }
-
-    // ── Grading (Phase 1E + 1H + 3 grade-timer) ─────────────────────
+    // ── Grading delegated to MockExamGrader (single-responsibility extract).
+    // The grader owns the Stopwatch + grade-duration metric; runner stays
+    // focused on state-machine orchestration. All 5 internal callers
+    // (StartAsync continuation / SubmitAsync / GetRecentRunsAsync / RegradeAsync)
+    // keep calling GradeAsync unchanged.
     private async Task<MockExamResultResponse> GradeAsync(
-        IQuerySession session, ExamSimulationState state, CancellationToken ct)
-    {
-        var sw = Stopwatch.StartNew();
-        try
-        {
-            return await GradeInternalAsync(session, state, ct);
-        }
-        finally
-        {
-            sw.Stop();
-            GradeDurationMs.Record(sw.Elapsed.TotalMilliseconds,
-                new KeyValuePair<string, object?>("examCode", state.ExamCode));
-        }
-    }
+        IQuerySession session, ExamSimulationState state, CancellationToken ct) =>
+        await _grader.GradeAsync(session, state, ct);
 
-    private async Task<MockExamResultResponse> GradeInternalAsync(
-        IQuerySession session, ExamSimulationState state, CancellationToken ct)
-    {
-        var structure = await _structureCatalog.GetAsync(state.ExamCode, paperCode: null, ct);
-        var partASection = structure.Sections.First(s => s.SectionLabel == "A");
-        var partBSection = structure.Sections.First(s => s.SectionLabel == "B");
-
-        // For Part B, only the SELECTED ids count toward the mark sheet
-        // (real Bagrut: unselected long-form Q's are not graded). If the
-        // student never confirmed a Part-B subset, default to the first
-        // RequiredAnswers slots for grading purposes (auto-selected).
-        var partBSelected = state.PartBSelectedIds.Count > 0
-            ? state.PartBSelectedIds
-            : state.PartBQuestionIds.Take(state.Format.PartBRequiredCount).ToList();
-
-        var gradableIds = state.PartAQuestionIds.Concat(partBSelected).ToList();
-
-        // Multi-part Q's first (preferred for Part B); whatever ids are
-        // multi-part get graded per-subpart. Remaining ids fall through
-        // to QuestionDocument single-cell grading.
-        var multipartHits = await session.Query<BagrutMultipartQuestion>()
-            .Where(q => gradableIds.Contains(q.Id))
-            .ToListAsync(ct);
-        var multipartById = multipartHits.ToDictionary(q => q.Id);
-
-        var canonicalDocs = await session.Query<QuestionDocument>()
-            .Where(q => gradableIds.Contains(q.Id))
-            .ToListAsync(ct);
-        var byId = canonicalDocs.ToDictionary(q => q.Id);
-
-        // Map qid → slot (so we know its point weight + section).
-        var slotByQid = new Dictionary<string, (string section, int points)>();
-        for (var i = 0; i < state.PartAQuestionIds.Count; i++)
-        {
-            var pts = i < partASection.Slots.Count ? partASection.Slots[i].Points : 0;
-            slotByQid[state.PartAQuestionIds[i]] = ("A", pts);
-        }
-        // Part B: weight by slot order in the SELECTED list against the section's slot pts.
-        for (var i = 0; i < partBSelected.Count; i++)
-        {
-            var pts = i < partBSection.Slots.Count ? partBSection.Slots[i].Points : 0;
-            slotByQid[partBSelected[i]] = ("B", pts);
-        }
-
-        var perQuestion = new List<MockExamPerQuestionResult>(gradableIds.Count);
-        var attempted = 0;
-        var correct = 0;
-        var pointsAwarded = 0;
-        var sectionATotalPts = partASection.Slots.Take(partASection.RequiredAnswers).Sum(s => s.Points);
-        var sectionBTotalPts = partBSection.Slots.Take(partBSection.RequiredAnswers).Sum(s => s.Points);
-        var sectionAAwarded = 0;
-        var sectionBAwarded = 0;
-        var sectionAAttempted = 0;
-        var sectionBAttempted = 0;
-        var sectionACorrect = 0;
-        var sectionBCorrect = 0;
-
-        foreach (var qid in gradableIds)
-        {
-            var (section, slotPts) = slotByQid.TryGetValue(qid, out var s) ? s : ("?", 0);
-
-            // ── Multi-part path ──
-            if (multipartById.TryGetValue(qid, out var multipart))
-            {
-                // Distribute the slot's envelope-points across subparts
-                // proportionally to the subpart's declared Points (so a
-                // 25-pt slot with 10/15 subpart split awards 10/15 of the
-                // 25-pt envelope, not the raw subpart points).
-                //
-                // Phase 3 #3 — Math.Round per subpart can leak rounding
-                // (25 split as 33/33/34 → 8.25 + 8.25 + 8.5 → 8/8/9 = 25 ✓
-                // but 30/35/35 of 100 → 30/35/35 = 100 ✓; 10/15/25 of 25 →
-                // 5/7.5/12.5 → 5/8/13 = 26 ✗). Compute floor for all
-                // subparts then assign the remainder to the LAST subpart
-                // so envelope == sum-of-shares is invariant.
-                var subpartTotal = multipart.TotalPoints;
-                var subpartShares = new int[multipart.Subparts.Count];
-                if (subpartTotal > 0)
-                {
-                    for (var i = 0; i < multipart.Subparts.Count; i++)
-                        subpartShares[i] = (int)((long)slotPts * multipart.Subparts[i].Points / subpartTotal);
-                    var assigned = subpartShares.Sum();
-                    if (subpartShares.Length > 0)
-                        subpartShares[^1] += slotPts - assigned;
-                }
-
-                var qAttempted = false;
-                var qPointsAwarded = 0;
-                var subpartLines = new List<MockExamSubpartResult>();
-
-                for (var i = 0; i < multipart.Subparts.Count; i++)
-                {
-                    var subpart = multipart.Subparts[i];
-                    var key = $"{qid}:{subpart.PartId}";
-                    var hasSubAnswer = state.Answers.TryGetValue(key, out var studentSubAnswer)
-                        && !string.IsNullOrWhiteSpace(studentSubAnswer);
-
-                    var envelopeShare = subpartShares[i];
-
-                    if (!hasSubAnswer)
-                    {
-                        subpartLines.Add(new MockExamSubpartResult(
-                            subpart.PartId, false, null, null, subpart.CorrectAnswer,
-                            "not-graded", envelopeShare, 0));
-                        continue;
-                    }
-
-                    qAttempted = true;
-                    var verdict = await VerifyWithRetryAsync(studentSubAnswer!, subpart.CorrectAnswer, ct);
-                    var awarded = verdict.Verified ? envelopeShare : 0;
-                    qPointsAwarded += awarded;
-                    subpartLines.Add(new MockExamSubpartResult(
-                        subpart.PartId,
-                        true,
-                        verdict.Status == CasVerifyStatus.Ok ? verdict.Verified : null,
-                        studentSubAnswer,
-                        subpart.CorrectAnswer,
-                        verdict.Engine ?? "cas",
-                        envelopeShare,
-                        awarded));
-                }
-
-                if (qAttempted)
-                {
-                    attempted++;
-                    if (section == "A") sectionAAttempted++; else if (section == "B") sectionBAttempted++;
-                }
-                if (qPointsAwarded > 0)
-                {
-                    correct++;
-                    pointsAwarded += qPointsAwarded;
-                    if (section == "A") { sectionACorrect++; sectionAAwarded += qPointsAwarded; }
-                    else if (section == "B") { sectionBCorrect++; sectionBAwarded += qPointsAwarded; }
-                }
-
-                perQuestion.Add(new MockExamPerQuestionResult(
-                    qid, section, qAttempted,
-                    qAttempted ? qPointsAwarded == slotPts : (bool?)null,
-                    null, null, "multipart-cas",
-                    slotPts, qPointsAwarded, subpartLines));
-                continue;
-            }
-
-            // ── Single-cell legacy path ──
-            var hasAnswer = state.Answers.TryGetValue(qid, out var studentAnswer)
-                && !string.IsNullOrWhiteSpace(studentAnswer);
-            byId.TryGetValue(qid, out var q);
-            var canonical = string.IsNullOrWhiteSpace(q?.CorrectAnswer) ? null : q!.CorrectAnswer;
-
-            if (!hasAnswer)
-            {
-                perQuestion.Add(new MockExamPerQuestionResult(
-                    qid, section, false, null, null, canonical, "not-graded", slotPts, 0));
-                continue;
-            }
-
-            attempted++;
-            if (section == "A") sectionAAttempted++; else if (section == "B") sectionBAttempted++;
-
-            if (string.IsNullOrWhiteSpace(canonical))
-            {
-                perQuestion.Add(new MockExamPerQuestionResult(
-                    qid, section, true, null, studentAnswer, null, "ungradable-no-canonical", slotPts, 0));
-                continue;
-            }
-
-            var singleVerdict = await VerifyWithRetryAsync(studentAnswer!, canonical, ct);
-            var singleAwarded = singleVerdict.Verified ? slotPts : 0;
-            if (singleVerdict.Verified)
-            {
-                correct++;
-                pointsAwarded += singleAwarded;
-                if (section == "A") { sectionACorrect++; sectionAAwarded += singleAwarded; }
-                else if (section == "B") { sectionBCorrect++; sectionBAwarded += singleAwarded; }
-            }
-
-            perQuestion.Add(new MockExamPerQuestionResult(
-                qid, section, true,
-                singleVerdict.Status == CasVerifyStatus.Ok ? singleVerdict.Verified : null,
-                studentAnswer, canonical,
-                singleVerdict.Engine ?? "cas",
-                slotPts, singleAwarded));
-        }
-
-        var totalPoints = sectionATotalPts + sectionBTotalPts;
-        var scorePercent = totalPoints == 0 ? 0.0 : (100.0 * pointsAwarded / totalPoints);
-        var timeTaken = (state.SubmittedAt ?? _clock.GetUtcNow()) - state.StartedAt;
-
-        // PRR-299 — overlay per-question pacing onto the perQuestion list.
-        // The grading pass already produced rows in slot order; we now
-        // walk them in answer-timestamp order to compute TimeSpent honestly,
-        // then rebuild the list preserving the original slot order.
-        var perQuestionWithPacing = OverlayPerQuestionPacing(perQuestion, state);
-
-        return new MockExamResultResponse(
-            RunId: state.SimulationId,
-            ExamCode: state.ExamCode,
-            PaperCode: null,
-            TotalQuestions: gradableIds.Count,
-            QuestionsAttempted: attempted,
-            QuestionsCorrect: correct,
-            ScorePercent: scorePercent,
-            TimeTaken: timeTaken,
-            TimeLimit: TimeSpan.FromMinutes(state.Format.TimeLimitMinutes),
-            VisibilityWarnings: state.VisibilityEvents.Count,
-            PerQuestion: perQuestionWithPacing,
-            PointsAwarded: pointsAwarded,
-            TotalPoints: totalPoints,
-            PerSection: new[]
-            {
-                new MockExamSectionResult("A", sectionAAttempted, sectionACorrect,
-                    sectionAAwarded, sectionATotalPts),
-                new MockExamSectionResult("B", sectionBAttempted, sectionBCorrect,
-                    sectionBAwarded, sectionBTotalPts),
-            });
-    }
-
-    /// <summary>
-    /// PRR-299 — derive per-question pacing from the timestamp dictionaries.
-    ///
-    /// Algorithm:
-    ///   1. For each question id present in <paramref name="perQuestion"/>,
-    ///      collect its answer-keys (single-cell: just the qid; multi-part:
-    ///      "{qid}:{subpartId}" for each subpart). Compute:
-    ///        firstAnsweredAt(q) = min(state.AnswerTimestamps[k]      ∀ k of q)
-    ///        lastAnsweredAt(q)  = max(state.AnswerLastTimestamps[k]  ∀ k of q)
-    ///   2. Sort answered questions by firstAnsweredAt ascending.
-    ///   3. Walk in sorted order, tracking prevLast (initially StartedAt):
-    ///        TimeSpent(q) = firstAnsweredAt(q) − prevLast
-    ///        prevLast     = lastAnsweredAt(q)
-    ///      Negative deltas are clamped to TimeSpan.Zero (defensive — a
-    ///      clock skew or out-of-order answer should not yield "−5 min on Q3").
-    ///   4. Rebuild perQuestion preserving the original slot order; un-
-    ///      answered rows keep null FirstAnsweredAt + TimeSpent.
-    ///
-    /// Internal-static + repo-public for unit tests; pure function (no I/O).
-    /// </summary>
-    internal static IReadOnlyList<MockExamPerQuestionResult> OverlayPerQuestionPacing(
-        IReadOnlyList<MockExamPerQuestionResult> perQuestion,
-        ExamSimulationState state)
-    {
-        // Step 1: collect per-question first/last timestamps.
-        var firstByQ = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
-        var lastByQ = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
-        foreach (var pq in perQuestion)
-        {
-            // The set of answer-keys for this question:
-            var keys = new List<string>(1);
-            if (pq.Subparts is { Count: > 0 })
-            {
-                foreach (var sp in pq.Subparts)
-                    keys.Add($"{pq.QuestionId}:{sp.SubpartId}");
-            }
-            else
-            {
-                keys.Add(pq.QuestionId);
-            }
-
-            DateTimeOffset? earliest = null, latest = null;
-            foreach (var k in keys)
-            {
-                if (state.AnswerTimestamps.TryGetValue(k, out var first))
-                {
-                    earliest = earliest is null || first < earliest ? first : earliest;
-                }
-                if (state.AnswerLastTimestamps.TryGetValue(k, out var last))
-                {
-                    latest = latest is null || last > latest ? last : latest;
-                }
-            }
-
-            if (earliest.HasValue) firstByQ[pq.QuestionId] = earliest.Value;
-            if (latest.HasValue) lastByQ[pq.QuestionId] = latest.Value;
-        }
-
-        // Step 2 + 3: sort answered questions by firstAnsweredAt and compute
-        // TimeSpent in chain order.
-        var timeSpentByQ = new Dictionary<string, TimeSpan>(StringComparer.Ordinal);
-        var answeredOrder = firstByQ
-            .OrderBy(kv => kv.Value)
-            .Select(kv => kv.Key)
-            .ToList();
-
-        var prevLast = state.StartedAt;
-        foreach (var qid in answeredOrder)
-        {
-            var first = firstByQ[qid];
-            var delta = first - prevLast;
-            // Clock-skew / out-of-order defensive: negative TimeSpent would
-            // confuse the SPA renderer. Clamp to zero.
-            if (delta < TimeSpan.Zero) delta = TimeSpan.Zero;
-            timeSpentByQ[qid] = delta;
-            prevLast = lastByQ.TryGetValue(qid, out var l) ? l : first;
-        }
-
-        // Step 4: rebuild perQuestion in original slot order, overlaying
-        // pacing fields. Records' `with` keyword keeps every other field
-        // pristine (positional-record clone with named override).
-        var rebuilt = new List<MockExamPerQuestionResult>(perQuestion.Count);
-        foreach (var pq in perQuestion)
-        {
-            firstByQ.TryGetValue(pq.QuestionId, out var firstAt);
-            timeSpentByQ.TryGetValue(pq.QuestionId, out var timeSpent);
-            rebuilt.Add(pq with
-            {
-                FirstAnsweredAt = firstByQ.ContainsKey(pq.QuestionId) ? firstAt : null,
-                TimeSpent = timeSpentByQ.ContainsKey(pq.QuestionId) ? timeSpent : null,
-            });
-        }
-        return rebuilt;
-    }
-
-    private async Task<CasVerifyResult> VerifyWithRetryAsync(
-        string a, string b, CancellationToken ct)
-    {
-        // PRR-297 — multi-attempt CAS retry with exponential backoff.
-        // Old: single retry at 150ms. Persistent SymPy flake (>300ms
-        // outage) silently degraded the grade. New: 3 attempts at
-        // 150ms / 400ms / 1200ms (jittered). Total worst-case ~1.75s
-        // which is still under our typical grade-time budget.
-        // Counter so ops can alarm on retry-rate >5% as a SymPy SLO
-        // burn signal.
-        var rng = new Random(HashCode.Combine(a, b));
-        int[] backoffsMs = { 150, 400, 1200 };
-
-        CasVerifyResult last = default!;
-        for (var attempt = 0; attempt <= backoffsMs.Length; attempt++)
-        {
-            var result = await _cas.VerifyAsync(
-                new CasVerifyRequest(CasOperation.Equivalence, a, b, null), ct);
-            if (result.Status == CasVerifyStatus.Ok) return result;
-            last = result;
-            if (result.Status is not (CasVerifyStatus.Timeout or CasVerifyStatus.CircuitBreakerOpen))
-                return result;
-            if (attempt == backoffsMs.Length) break;
-
-            var jitter = rng.Next(50);
-            await Task.Delay(TimeSpan.FromMilliseconds(backoffsMs[attempt] + jitter), ct);
-        }
-        return last;
-    }
-
-    private static IEnumerable<T> Shuffle<T>(IList<T> source, Random rng)
-    {
-        var arr = source.ToArray();
-        for (var i = arr.Length - 1; i > 0; i--)
-        {
-            var j = rng.Next(i + 1);
-            (arr[i], arr[j]) = (arr[j], arr[i]);
-        }
-        return arr;
-    }
-
-    private static MockExamRunStartedResponse BuildStartedResponse(ExamSimulationState s, string? paperCode) =>
-        new(
-            RunId: s.SimulationId,
-            ExamCode: s.ExamCode,
-            PaperCode: paperCode,
-            TimeLimitMinutes: s.Format.TimeLimitMinutes,
-            ExtraTimeMinutes: s.ExtraTimeMinutes,
-            PartAQuestionCount: s.Format.PartAQuestionCount,
-            PartBQuestionCount: s.Format.PartBQuestionCount,
-            PartBRequiredCount: s.Format.PartBRequiredCount,
-            PartAQuestionIds: s.PartAQuestionIds,
-            PartBQuestionIds: s.PartBQuestionIds,
-            StartedAt: s.StartedAt,
-            Deadline: s.Deadline);
-
-    private static MockExamRunStateResponse BuildStateResponse(ExamSimulationState s) =>
-        new(
-            RunId: s.SimulationId,
-            ExamCode: s.ExamCode,
-            PaperCode: null,
-            TimeLimitMinutes: s.Format.TimeLimitMinutes,
-            ExtraTimeMinutes: s.ExtraTimeMinutes,
-            StartedAt: s.StartedAt,
-            Deadline: s.Deadline,
-            IsExpired: s.IsExpired(DateTimeOffset.UtcNow),
-            IsSubmitted: s.IsSubmitted,
-            PartAQuestionIds: s.PartAQuestionIds,
-            PartBQuestionIds: s.PartBQuestionIds,
-            PartBSelectedIds: s.PartBSelectedIds,
-            AnsweredIds: s.Answers.Keys.ToList(),
-            CalculatorPolicy: string.IsNullOrEmpty(s.CalculatorPolicy) ? "Allowed" : s.CalculatorPolicy,
-            FormulaSheetMode: string.IsNullOrEmpty(s.FormulaSheetMode) ? "None" : s.FormulaSheetMode,
-            IsPaused: s.IsPaused,
-            TotalPausedMs: s.TotalPausedMs);
 }
