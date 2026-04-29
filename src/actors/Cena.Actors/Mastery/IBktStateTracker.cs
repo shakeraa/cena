@@ -40,6 +40,16 @@ public interface IBktStateTracker
     /// <param name="isCorrect">Observation: did the student succeed?</param>
     /// <param name="occurredAt">Wall-clock of the attempt.</param>
     /// <param name="ct">Cancellation.</param>
+    /// <param name="referenceAnchoredWithinSeconds">
+    /// PRR-261 / ADR-0059 §15.9 R12: when this attempt arrives within
+    /// <see cref="BktReferenceAnchorDiscountPolicy.WindowSeconds"/> of a
+    /// reference (worked-example) render of the source question, supply
+    /// the elapsed seconds here so the BKT update is half-weighted
+    /// (Sweller worked-example transient). Pass <c>null</c> (the
+    /// default) when there is no recent reference render or when the
+    /// call site does not track timing. Behaviour is unchanged for
+    /// callers that omit this argument.
+    /// </param>
     /// <returns>
     /// The posterior P(L) after the update (clamped to [0.001, 0.999]).
     /// Callers that need the full row should read via
@@ -51,5 +61,6 @@ public interface IBktStateTracker
         SkillCode skillCode,
         bool isCorrect,
         DateTimeOffset occurredAt,
-        CancellationToken ct = default);
+        CancellationToken ct = default,
+        int? referenceAnchoredWithinSeconds = null);
 }

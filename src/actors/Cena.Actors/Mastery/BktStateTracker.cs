@@ -41,6 +41,7 @@ public sealed class BktStateTracker : IBktStateTracker
     private readonly ISkillKeyedMasteryStore _store;
     private readonly IBktParameterProvider _parameters;
     private readonly IMasteryEventSink? _sink;
+    private readonly IBktReferenceAnchorDiscountPolicy _discountPolicy;
 
     /// <summary>
     /// Initial P(L) used when no row exists yet for a key. Mirrors
@@ -53,11 +54,16 @@ public sealed class BktStateTracker : IBktStateTracker
     public BktStateTracker(
         ISkillKeyedMasteryStore store,
         IBktParameterProvider parameters,
-        IMasteryEventSink? sink = null)
+        IMasteryEventSink? sink = null,
+        IBktReferenceAnchorDiscountPolicy? discountPolicy = null)
     {
         _store = store ?? throw new ArgumentNullException(nameof(store));
         _parameters = parameters ?? throw new ArgumentNullException(nameof(parameters));
         _sink = sink;
+        // PRR-261: default to the ADR-0059 §15.9 R12 policy (5min/0.5×).
+        // Tests can substitute via the optional param without breaking
+        // the existing zero-arg construction sites.
+        _discountPolicy = discountPolicy ?? BktReferenceAnchorDiscountPolicy.Default;
     }
 
     /// <inheritdoc />
@@ -67,7 +73,8 @@ public sealed class BktStateTracker : IBktStateTracker
         SkillCode skillCode,
         bool isCorrect,
         DateTimeOffset occurredAt,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        int? referenceAnchoredWithinSeconds = null)
     {
         if (string.IsNullOrWhiteSpace(studentAnonId))
         {
@@ -82,7 +89,15 @@ public sealed class BktStateTracker : IBktStateTracker
         var priorAttempts = prior?.AttemptCount ?? 0;
 
         var bktParams = _parameters.GetParameters(skillCode.Value);
-        var posterior = BktTracer.Update(priorProbability, isCorrect, bktParams);
+        // PRR-261: resolve the discount factor for this attempt. When no
+        // timing is supplied (referenceAnchoredWithinSeconds == null) OR
+        // the elapsed time is outside the window, the policy returns
+        // 1.0 and UpdateWithDiscount is bit-identical to Update — so
+        // the existing call sites that don't pass timing observe NO
+        // change in posterior.
+        var discountFactor = _discountPolicy.ResolveDiscountFactor(referenceAnchoredWithinSeconds);
+        var posterior = BktTracer.UpdateWithDiscount(
+            priorProbability, isCorrect, bktParams, discountFactor);
 
         var nextRow = new SkillKeyedMasteryRow(
             Key: key,
@@ -95,13 +110,19 @@ public sealed class BktStateTracker : IBktStateTracker
 
         if (_sink is not null)
         {
+            // PRR-261: emit the discount factor + raw seconds so calibration
+            // analytics can audit how often the worked-example transient
+            // discount fired and re-derive the posterior trajectory if the
+            // factor or window are tuned downstream.
             var @event = new MasteryUpdated_V2(
                 StudentAnonId: studentAnonId,
                 ExamTargetCode: examTargetCode,
                 SkillCode: skillCode,
                 MasteryProbability: posterior,
                 UpdatedAt: occurredAt,
-                Source: MasteryEventSource.Native);
+                Source: MasteryEventSource.Native,
+                BktDiscountFactor: discountFactor,
+                ReferenceAnchoredWithinSeconds: referenceAnchoredWithinSeconds);
             await _sink.AppendAsync(@event, ct).ConfigureAwait(false);
         }
 
