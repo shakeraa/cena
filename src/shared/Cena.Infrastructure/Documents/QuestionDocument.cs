@@ -279,5 +279,19 @@ public sealed record BagrutAlignment
 
     /// <summary>Estimated solve time in minutes (10-25). Used for session time budgeting.</summary>
     public int EstimatedMinutes { get; init; } = 15;
+
+    /// <summary>
+    /// PRR-246 — Ministry שאלון codes this item is aligned to (e.g.,
+    /// ["035581", "035582"]). A single recreated question may legitimately
+    /// align to multiple paper codes when the underlying skill family is
+    /// shared across שאלון variants. Empty list = aligned only to the
+    /// canonical default for ExamCode.
+    ///
+    /// Drives MartenQuestionPool's exam-target filter:
+    /// when SessionMode=ExamPrep + the student's ExamTarget supplies
+    /// QuestionPaperCodes=["035582"], only items whose
+    /// QuestionPaperCodes contains "035582" surface in the pool.
+    /// </summary>
+    public List<string> QuestionPaperCodes { get; init; } = new();
 }
 

@@ -6,7 +6,7 @@
 
 using System.Security.Claims;
 using System.Threading.RateLimiting;
-using Cena.Actors.Bus;
+using Cena.Actors.Bus; using Cena.Student.Api.Host.Cas;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
 using Cena.Actors.Notifications;
@@ -526,19 +526,7 @@ public partial class Program
     builder.Services.AddSingleton<Cena.Actors.Cas.IMathNetVerifier, Cena.Actors.Cas.MathNetVerifier>();
     // prr-010: SymPy template guard runs on every CAS request before NATS marshalling.
     builder.Services.AddSingleton<Cena.Actors.Cas.ISymPyTemplateGuard, Cena.Actors.Cas.SymPyTemplateGuard>(); builder.Services.AddSingleton<Cena.Actors.Cas.ISymPySidecarClient, Cena.Actors.Cas.SymPySidecarClient>();
-    builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>();
-
-    // PRR-252 — student-side CAS-gated persister registration (mirrors the admin-api
-    // canonical chain in CenaAdminServiceRegistration.cs:78-88). Registered here so
-    // PRR-245's variant-generation endpoint can route every author-owned variant
-    // through the same single-writer ADR-0002 enforcement path the admin pipeline uses.
-    // Endpoint-layer auth is the caller's responsibility (ResourceOwnershipGuard.VerifyStudentAccess
-    // before invoking the persister); the persister itself is identity-agnostic.
-    builder.Services.AddSingleton<Cena.Actors.Cas.IMathContentDetector, Cena.Actors.Cas.MathContentDetector>();
-    builder.Services.AddSingleton<Cena.Actors.Cas.IStemSolutionExtractor, Cena.Actors.Cas.StemSolutionExtractor>();
-    builder.Services.AddSingleton<Cena.Actors.Cas.ICasGateModeProvider, Cena.Actors.Cas.CasGateModeProvider>();
-    builder.Services.AddScoped<Cena.Actors.Cas.ICasVerificationGate, Cena.Actors.Cas.CasVerificationGate>();
-    builder.Services.AddScoped<Cena.Actors.Cas.ICasGatedQuestionPersister, Cena.Actors.Cas.CasGatedQuestionPersister>();
+    builder.Services.AddSingleton<Cena.Actors.Cas.ICasRouterService, Cena.Actors.Cas.CasRouterService>(); builder.Services.AddCenaCasPersistence(); // PRR-252
 
     builder.Services.AddSingleton<Cena.Actors.Services.ErrorPatternMatching.IErrorPatternMatcher,
         Cena.Actors.Services.ErrorPatternMatching.BuggyRuleMatchers.DistExpSumMatcher>();

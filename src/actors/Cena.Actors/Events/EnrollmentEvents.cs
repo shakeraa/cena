@@ -113,5 +113,13 @@ public record QuestionBagrutAlignmentSet_V1(
     bool IsProofQuestion,
     int EstimatedMinutes,
     string SetBy,
-    DateTimeOffset SetAt
+    DateTimeOffset SetAt,
+    /// <summary>
+    /// PRR-246 — Ministry שאלון codes the question is aligned to (e.g.,
+    /// ["035581", "035582"]). Empty list = aligned only to the canonical
+    /// default for ExamCode. Populated for new alignments; legacy events
+    /// deserialized before this field existed get an empty list (Marten's
+    /// JSON deserializer fills the default).
+    /// </summary>
+    IReadOnlyList<string>? QuestionPaperCodes = null
 ) : IDelegatedEvent;

@@ -192,9 +192,29 @@ public static class SessionEndpoints
                         sessionId);
                 }
 
-                // Load a Marten-backed question pool for the requested subjects
+                // PRR-246 + ADR-0043 — Load with explicit pool policy.
+                // Default policy excludes BagrutReference items (closes the
+                // P0 ship-gate hold). When examScope="exam-prep", look up
+                // the active ExamTarget's QuestionPaperCodes and pass them
+                // so the pool restricts to items aligned to the student's
+                // chosen Ministry שאלון set.
+                IReadOnlyList<string>? activePaperCodes = null;
+                if (request.ExamScope == "exam-prep"
+                    && !string.IsNullOrWhiteSpace(request.ActiveExamTargetId))
+                {
+                    activePaperCodes = await ResolveActiveExamTargetPaperCodesAsync(
+                        ctx.RequestServices,
+                        studentId,
+                        request.ActiveExamTargetId!,
+                        ct: ctx.RequestAborted);
+                }
+
+                var poolPolicy = new Cena.Actors.Serving.QuestionPoolPolicy(
+                    AllowReferenceItems: false,
+                    QuestionPaperCodes: activePaperCodes);
+
                 var pool = await MartenQuestionPool.LoadAsync(
-                    store, request.Subjects, logger);
+                    store, request.Subjects, poolPolicy, logger);
 
                 if (pool.ItemCount > 0)
                 {
@@ -1440,6 +1460,35 @@ public static class SessionEndpoints
     /// <summary>
     /// Gets the real concept ID from a question using the question bank.
     /// </summary>
+    /// <summary>
+    /// PRR-246 — resolve the QuestionPaperCodes of a student's active
+    /// ExamTarget so the question pool can filter to items aligned to
+    /// the chosen Ministry שאלון set.
+    ///
+    /// Returns null when the target cannot be resolved (student has no
+    /// plan; target id not on the plan; target is archived). Caller
+    /// should treat null as "no exam-target binding" — the strict pool
+    /// default still applies (ADR-0043 SourceType filter on), only the
+    /// exam-prep paper-code filter is skipped.
+    /// </summary>
+    private static async Task<IReadOnlyList<string>?> ResolveActiveExamTargetPaperCodesAsync(
+        IServiceProvider services,
+        string studentId,
+        string activeExamTargetId,
+        CancellationToken ct)
+    {
+        var aggregateStore = services.GetService<Cena.Actors.StudentPlan.IStudentPlanAggregateStore>();
+        if (aggregateStore is null) return null;
+
+        var plan = await aggregateStore.LoadAsync(studentId, ct);
+        var target = plan?.State?.Targets?.FirstOrDefault(t =>
+            t.Id.Value == activeExamTargetId && t.IsActive);
+        if (target is null) return null;
+
+        var codes = target.QuestionPaperCodes;
+        return codes is { Count: > 0 } ? codes.ToList() : null;
+    }
+
     private static async Task<string> GetConceptIdForQuestionAsync(
         string questionId,
         IQuestionBank questionBank)

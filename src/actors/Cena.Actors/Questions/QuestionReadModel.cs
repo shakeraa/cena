@@ -51,4 +51,13 @@ public class QuestionReadModel
     /// Wiggins &amp; McTighe (2005) and Anderson &amp; Krathwohl (2001).
     /// </summary>
     public string? LearningObjectiveId { get; set; }
+
+    /// <summary>
+    /// PRR-246 — Ministry שאלון codes this item is aligned to. Sourced from
+    /// BagrutAlignment.QuestionPaperCodes on the canonical QuestionDocument.
+    /// Empty list = aligned only to the exam's default paper.
+    /// Indexed by Marten so MartenQuestionPool can filter on ExamTarget
+    /// QuestionPaperCodes membership without a sequential scan.
+    /// </summary>
+    public List<string> QuestionPaperCodes { get; set; } = new();
 }
