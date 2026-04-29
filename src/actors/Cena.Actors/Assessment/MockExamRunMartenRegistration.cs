@@ -43,6 +43,15 @@ public static class MockExamRunMartenRegistration
         // "{examCode}/{paperCode}" so per-paper lookup is a 1-row LoadAsync.
         opts.Schema.For<BagrutPaperStructureDocument>().Identity(d => d.Id);
 
+        // PRR-291 — cohort fairness frozen pool. Keyed on
+        // "{paperCode}|{windowStartUtc:yyyy-MM-ddTHH}". First start in a
+        // window seeds the pool; subsequent starts in the same window
+        // load the row and reuse the frozen PartA/PartB lists verbatim.
+        opts.Schema.For<BagrutPaperRunPool>()
+            .Identity(d => d.Id)
+            .Index(d => d.PaperCode)
+            .Index(d => d.WindowStart);
+
         // Phase 2A: multi-part Bagrut questions (a/b/c sub-parts with
         // per-subpart canonical answers + point weights).
         opts.Schema.For<BagrutMultipartQuestion>()

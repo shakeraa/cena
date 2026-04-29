@@ -158,13 +158,43 @@ public sealed class MockExamRunService : IMockExamRunService
             .GroupBy(q => q.Topic)
             .ToDictionary(g => g.Key, g => g.ToList());
 
-        // Phase 3 #2 — stronger seed. Guid.NewGuid + per-process atomic
-        // counter ensures two starts in the same tick get different
-        // shuffles (the old (studentId, examCode, ticks) tuple collided
-        // when called twice within a tick). Hash-mix down to int for
-        // Random's seed.
-        var seedSource = $"{studentId}|{request.ExamCode}|{Guid.NewGuid():N}|{System.Threading.Interlocked.Increment(ref s_seedCounter)}";
-        var rng = new Random(seedSource.GetHashCode());
+        // PRR-291 — cohort-fairness path. When the student supplies a
+        // specific Ministry שאלון code (paperCode), they invoke the
+        // Bagrut-day fairness invariant: every cohort member in the same
+        // 3-hour window must draw from the SAME shuffled pool, not
+        // independent shuffles. We materialise the pool on first start and
+        // reuse it on subsequent starts in the same window. Self-pay /
+        // practice runs (paperCode null) keep per-student randomness.
+        var nowForCohort = _clock.GetUtcNow();
+        var cohortPool = !string.IsNullOrWhiteSpace(request.PaperCode)
+            ? await session.LoadAsync<BagrutPaperRunPool>(
+                BagrutPaperRunPool.ComposeId(request.PaperCode!,
+                    BagrutPaperRunPool.ComputeWindowStart(nowForCohort)),
+                ct)
+            : null;
+
+        // Phase 3 #2 — stronger seed (per-student randomness path).
+        // Guid.NewGuid + per-process atomic counter ensures two starts in
+        // the same tick get different shuffles (the old (studentId,
+        // examCode, ticks) tuple collided when called twice within a tick).
+        // PRR-291: when a cohort is active the seed switches to the
+        // deterministic ComputeCohortSeed so all cohort members converge
+        // on identical PartA / PartB draws.
+        var rng = cohortPool is not null
+            // Cohort already exists — we won't shuffle, we'll reuse its
+            // frozen lists. RNG only needs to provide a stable VariantSeed
+            // (held on cohortPool), so a no-op deterministic instance is
+            // fine — but we still build one for the (rare) deficit path.
+            ? new Random(cohortPool.VariantSeed)
+            : !string.IsNullOrWhiteSpace(request.PaperCode)
+                // Cohort starts here: deterministic RNG so the FIRST
+                // student's shuffle (which subsequent students will see)
+                // does NOT depend on this individual student.
+                ? new Random(BagrutPaperRunPool.ComputeCohortSeed(
+                    request.PaperCode!,
+                    BagrutPaperRunPool.ComputeWindowStart(nowForCohort)))
+                : new Random(($"{studentId}|{request.ExamCode}|{Guid.NewGuid():N}|" +
+                    $"{System.Threading.Interlocked.Increment(ref s_seedCounter)}").GetHashCode());
 
         var partAIds = new List<string>();
         var partBIds = new List<string>();
@@ -176,34 +206,79 @@ public sealed class MockExamRunService : IMockExamRunService
             throw new InvalidOperationException(
                 $"Paper structure {structure.Id} must have both A and B sections.");
 
-        var poolList = pool.ToList();
-        // Part A is short-form, single-cell. Part B prefers multi-part
-        // candidates (real Bagrut long-form Q's are a/b/c). Both
-        // fall back gracefully if their preferred pool is thin.
-        DrawForSlots(partASection, poolByConcept, poolList, rng, drawn,
-            preferMultipart: false, multipartByTopic, partAIds);
-        DrawForSlots(partBSection, poolByConcept, poolList, rng, drawn,
-            preferMultipart: true, multipartByTopic, partBIds);
-
-        if (partAIds.Count < partASection.RequiredAnswers)
+        if (cohortPool is not null)
         {
-            throw new InvalidOperationException(
-                $"Could not draw enough Part A items: have {partAIds.Count}, need {partASection.RequiredAnswers}.");
+            // PRR-291 fast path — reuse the frozen cohort lists verbatim.
+            partAIds.AddRange(cohortPool.PartAQuestionIds);
+            partBIds.AddRange(cohortPool.PartBQuestionIds);
+            foreach (var id in partAIds) drawn.Add(id);
+            foreach (var id in partBIds) drawn.Add(id);
+            _logger.LogInformation(
+                "[MOCK-EXAM-COHORT] reuse pool studentId={StudentId} paperCode={PaperCode} windowStart={Window} partA={A} partB={B}",
+                studentId, request.PaperCode, cohortPool.WindowStart, partAIds.Count, partBIds.Count);
         }
-        if (partBIds.Count < partBSection.Slots.Count)
+        else
         {
-            // We need ALL Part B slot candidates so the student can choose K of N.
-            // If the pool is too small, draw more from the broader subject.
-            var deficit = partBSection.Slots.Count - partBIds.Count;
-            var extras = Shuffle(pool.Where(q => !drawn.Contains(q.Id)).ToList(), rng)
-                .Take(deficit).Select(q => q.Id).ToList();
-            partBIds.AddRange(extras);
-            foreach (var id in extras) drawn.Add(id);
+            // Pre-PRR-291 draw path (per-student) OR cohort-seeding path
+            // (first student in a new window). Either way, DrawForSlots
+            // populates partAIds + partBIds; the difference is whether
+            // the RNG was seeded deterministically (cohort) or randomly
+            // (per-student).
+            var poolList = pool.ToList();
+            DrawForSlots(partASection, poolByConcept, poolList, rng, drawn,
+                preferMultipart: false, multipartByTopic, partAIds);
+            DrawForSlots(partBSection, poolByConcept, poolList, rng, drawn,
+                preferMultipart: true, multipartByTopic, partBIds);
+
+            if (partAIds.Count < partASection.RequiredAnswers)
+            {
+                throw new InvalidOperationException(
+                    $"Could not draw enough Part A items: have {partAIds.Count}, need {partASection.RequiredAnswers}.");
+            }
+            if (partBIds.Count < partBSection.Slots.Count)
+            {
+                // We need ALL Part B slot candidates so the student can choose K of N.
+                // If the pool is too small, draw more from the broader subject.
+                var deficit = partBSection.Slots.Count - partBIds.Count;
+                var extras = Shuffle(pool.Where(q => !drawn.Contains(q.Id)).ToList(), rng)
+                    .Take(deficit).Select(q => q.Id).ToList();
+                partBIds.AddRange(extras);
+                foreach (var id in extras) drawn.Add(id);
+            }
         }
 
         var simulationId = Guid.NewGuid().ToString("N")[..16];
         var startedAt = _clock.GetUtcNow();
-        var variantSeed = rng.Next();
+        // PRR-291 — variant seed honours cohort fairness too. When the
+        // cohort row exists we reuse its seed; when seeding the cohort we
+        // use a deterministic value (rng.Next() already deterministic
+        // because rng was seeded from ComputeCohortSeed); per-student
+        // path keeps its random rng.Next().
+        var variantSeed = cohortPool?.VariantSeed ?? rng.Next();
+
+        // PRR-291 — persist the cohort pool when this is the seeding
+        // start. Concurrency note: two students can race to seed the
+        // pool. Marten's UPSERT semantics on the same Id mean one wins;
+        // both end up with the SAME PartA/PartB lists because they used
+        // the same deterministic seed. The race is benign.
+        if (cohortPool is null && !string.IsNullOrWhiteSpace(request.PaperCode))
+        {
+            var pool291 = new BagrutPaperRunPool
+            {
+                Id = BagrutPaperRunPool.ComposeId(request.PaperCode!,
+                    BagrutPaperRunPool.ComputeWindowStart(nowForCohort)),
+                PaperCode = request.PaperCode!,
+                WindowStart = BagrutPaperRunPool.ComputeWindowStart(nowForCohort),
+                PartAQuestionIds = new List<string>(partAIds),
+                PartBQuestionIds = new List<string>(partBIds),
+                VariantSeed = variantSeed,
+                SeededAt = nowForCohort,
+            };
+            session.Store(pool291);
+            _logger.LogInformation(
+                "[MOCK-EXAM-COHORT] seed pool studentId={StudentId} paperCode={PaperCode} windowStart={Window} partA={A} partB={B}",
+                studentId, request.PaperCode, pool291.WindowStart, partAIds.Count, partBIds.Count);
+        }
 
         // Phase 2B: clamp accommodation to [0, 100]% silently. Storing
         // the resolved minute count (not the percent) keeps the state
