@@ -93,8 +93,14 @@ public sealed class InsufficientAnonymityException : Exception
 
     public InsufficientAnonymityException(string surface, int k)
         : base(
-            $"Aggregate group size below k-anonymity floor for surface '{surface}' " +
-            $"(k={k}). Endpoint MUST return 404 with diagnostic_reason=below_anonymity_floor.")
+            // PRR-310: do NOT mention the word "size" or any actual cohort
+            // count. An attacker probing "is the cohort < k?" learns the
+            // truth from a 404 + this message; the message must not give
+            // them an additional confirmation channel via terminology.
+            // The structured logger (RecordSuppression) carries the same
+            // signal in a non-leaky form (counter labels) for ops dashboards.
+            $"k-anonymity floor not met for surface '{surface}' (k={k}). " +
+            "Endpoint MUST return 404 with diagnostic_reason=below_anonymity_floor.")
     {
         Surface = surface;
         K = k;
