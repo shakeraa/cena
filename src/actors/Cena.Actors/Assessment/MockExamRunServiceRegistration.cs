@@ -28,6 +28,24 @@ public static class MockExamRunServiceRegistration
         this IServiceCollection services, IConfiguration? configuration = null)
     {
         services.ConfigureMarten(opts => opts.RegisterMockExamRunContext());
+
+        // PRR-322 — cost rate configuration. Bound via the standard
+        // IOptions<T> pattern from "Cena:MockExamCostRates" so per-env
+        // appsettings can override defaults. Defaults are 2026-Q2
+        // estimates; reconcile against vendor invoices monthly.
+        if (configuration is not null)
+        {
+            services.Configure<MockExamCostRateConfig>(
+                configuration.GetSection("Cena:MockExamCostRates"));
+        }
+        else
+        {
+            // Test/embedded scenarios that don't pass a configuration
+            // root still need IOptions<MockExamCostRateConfig> resolvable
+            // — register an empty Configure so defaults kick in.
+            services.Configure<MockExamCostRateConfig>(_ => { });
+        }
+
         services.TryAddScoped<IMockExamRunService, MockExamRunService>();
         services.TryAddScoped<IBagrutPaperStructureCatalog, BagrutPaperStructureCatalog>();
         // ItemDeliveryGate isn't always registered globally — register it

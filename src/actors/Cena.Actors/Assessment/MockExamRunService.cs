@@ -41,6 +41,7 @@ using Cena.Actors.Mastery;
 using Cena.Infrastructure.Documents;
 using Marten;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Cena.Actors.Assessment;
 
@@ -72,6 +73,16 @@ public sealed class MockExamRunService : IMockExamRunService
     private static readonly Counter<long> AnswersSubmitted =
         Meter.CreateCounter<long>("cena_mock_exam_answers_submitted_total");
 
+    // PRR-322 — per-run cost counter, scraped by the per-tenant Grafana
+    // panels in deploy/observability. Tagged examCode + studentTenant so
+    // ops can split by either axis. USD because that's the operator-
+    // facing finops unit; the equivalent token / call-count metrics live
+    // on the existing ILlmCostMetric + cas histograms separately.
+    private static readonly Counter<double> RunCostUsd =
+        Meter.CreateCounter<double>("cena_mock_exam_run_cost_usd_total");
+
+    private readonly MockExamCostRateConfig _costRates;
+
     public MockExamRunService(
         IDocumentStore store,
         ICasRouterService cas,
@@ -79,7 +90,8 @@ public sealed class MockExamRunService : IMockExamRunService
         IItemDeliveryGate deliveryGate,
         ILogger<MockExamRunService> logger,
         TimeProvider? clock = null,
-        IBktStateTracker? bktTracker = null)
+        IBktStateTracker? bktTracker = null,
+        IOptions<MockExamCostRateConfig>? costRates = null)
     {
         _store = store;
         _cas = cas;
@@ -88,6 +100,7 @@ public sealed class MockExamRunService : IMockExamRunService
         _logger = logger;
         _clock = clock ?? TimeProvider.System;
         _bktTracker = bktTracker;
+        _costRates = costRates?.Value ?? new MockExamCostRateConfig();
         _grader = new MockExamGrader(structureCatalog, cas, _clock);
         _paperDraw = new MockExamPaperDraw(logger, _clock);
         _bktPropagator = new MockExamBktPropagator(bktTracker, store, logger);
@@ -391,12 +404,19 @@ public sealed class MockExamRunService : IMockExamRunService
 
         if (state.IsSubmitted)
         {
+            // Idempotent re-submit: just re-render the mark sheet. NO cost
+            // doc rewrite — the canonical cost was captured on the first
+            // submit; re-grades are read-only views (they DO consume CAS,
+            // but that cost is bounded by the SymPy SLO, not this run).
             return await GradeAsync(session, state, ct);
         }
 
         var now = _clock.GetUtcNow();
         state.SubmittedAt = now;
-        var result = await GradeAsync(session, state, ct);
+        // PRR-322 — measured grade so we can attribute CAS cost to the
+        // run. Bare GradeAsync stays for non-cost paths (StartAsync auto-
+        // grade, GetResultAsync re-render).
+        var (result, casAttempts) = await _grader.GradeAndMeasureAsync(session, state, ct);
 
         session.Store(state);
         session.Events.Append(studentId, new ExamSimulationSubmitted_V2(
@@ -409,12 +429,30 @@ public sealed class MockExamRunService : IMockExamRunService
             VisibilityWarnings: result.VisibilityWarnings,
             SubmittedAt: now));
 
+        // PRR-322 — per-run cost attribution. Build the cost doc from
+        // measured counts × rates. LLM tokens / OCR calls are zero today
+        // (no LLM or OCR call sites on the mock-exam path; verified
+        // 2026-04-30 via grep — see MockExamRunCost.cs comment for the
+        // PRR-322f-* follow-ups that wire those when consumers exist).
+        // Computed BEFORE SaveChanges so it lands in the same Marten
+        // transaction as the state + event append (atomic w/ submit).
+        var costDoc = ComputeRunCost(state, casAttempts, llmTokensIn: 0, llmTokensOut: 0, ocrCalls: 0, now);
+        session.Store(costDoc);
+
         await session.SaveChangesAsync(ct);
 
         RunsSubmitted.Add(1, new KeyValuePair<string, object?>("examCode", state.ExamCode));
+        // OTel run-cost counter — tagged for per-tenant + per-exam splits
+        // in Grafana. studentTenant is "unknown" until ADR-0001 Phase 1
+        // threads tenant-id onto ExamSimulationState.
+        RunCostUsd.Add((double)costDoc.TotalUsd,
+            new KeyValuePair<string, object?>("examCode",      state.ExamCode),
+            new KeyValuePair<string, object?>("studentTenant", costDoc.StudentTenant ?? "unknown"));
+
         _logger.LogInformation(
-            "[MOCK-EXAM] Submitted runId={RunId} studentId={StudentId} score={Score:F1}% pointsAwarded={Awarded}/{TotalPts}",
-            state.SimulationId, studentId, result.ScorePercent, result.PointsAwarded, result.TotalPoints);
+            "[MOCK-EXAM] Submitted runId={RunId} studentId={StudentId} score={Score:F1}% pointsAwarded={Awarded}/{TotalPts} cost=${Cost:F4} (cas={Cas})",
+            state.SimulationId, studentId, result.ScorePercent, result.PointsAwarded, result.TotalPoints,
+            costDoc.TotalUsd, casAttempts);
 
         // PRR-289 — feed per-question correctness into the BKT mastery store
         // AFTER the run has been durably submitted. Best-effort: a BKT failure
@@ -423,6 +461,51 @@ public sealed class MockExamRunService : IMockExamRunService
         await _bktPropagator.RecordAsync(state, result, now, ct).ConfigureAwait(false);
 
         return result;
+    }
+
+    /// <summary>
+    /// PRR-322 — pure cost computation, factored out so unit tests can pin
+    /// the count × rate formula without spinning up Marten / the runner.
+    /// All inputs are integer counts; all outputs are decimal USD rounded
+    /// to 6 places (sub-cent precision so per-run costs in the $0.0001
+    /// range don't all round to zero).
+    /// </summary>
+    internal MockExamRunCost ComputeRunCost(
+        ExamSimulationState state,
+        int casAttempts,
+        int llmTokensIn,
+        int llmTokensOut,
+        int ocrCalls,
+        DateTimeOffset now)
+    {
+        var casCost = Math.Round(casAttempts * _costRates.CasUsdPerCall, 6, MidpointRounding.AwayFromZero);
+        var llmCost = Math.Round(
+            (llmTokensIn  / 1000m) * _costRates.LlmInputUsdPer1kTokens +
+            (llmTokensOut / 1000m) * _costRates.LlmOutputUsdPer1kTokens,
+            6, MidpointRounding.AwayFromZero);
+        var ocrCost = Math.Round(ocrCalls * _costRates.OcrUsdPerCall, 6, MidpointRounding.AwayFromZero);
+        var total   = casCost + llmCost + ocrCost;
+
+        return new MockExamRunCost
+        {
+            Id              = state.SimulationId,
+            StudentId       = state.StudentId,
+            ExamCode        = state.ExamCode,
+            // ADR-0001 Phase 1 hasn't landed; ExamSimulationState carries
+            // no tenant id yet. Null here is HONEST — when the field
+            // arrives, populate it inline; until then "unknown" surfaces
+            // in the OTel counter label so dashboards don't drop the row.
+            StudentTenant   = null,
+            CasCallsCount   = casAttempts,
+            LlmTokensInput  = llmTokensIn,
+            LlmTokensOutput = llmTokensOut,
+            OcrCallsCount   = ocrCalls,
+            CasCostUsd      = casCost,
+            LlmCostUsd      = llmCost,
+            OcrCostUsd      = ocrCost,
+            TotalUsd        = total,
+            ComputedAt      = now,
+        };
     }
 
 

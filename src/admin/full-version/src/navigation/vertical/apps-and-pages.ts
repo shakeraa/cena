@@ -8,6 +8,16 @@ export default [
     subject: 'Content',
   },
   {
+    // PRR-322 — per-run cost attribution + 30-day projection.
+    // Auth gate is page-level (action=read, subject=Content matches the
+    // ModeratorOrAbove server policy on the backing endpoints).
+    title: 'Mock-exam Cost',
+    icon: { icon: 'tabler-coin' },
+    to: 'apps-mock-exam-runs-cost',
+    action: 'read',
+    subject: 'Content',
+  },
+  {
     title: 'Ingestion Settings',
     icon: { icon: 'tabler-settings-automation' },
     to: 'apps-ingestion-settings',
