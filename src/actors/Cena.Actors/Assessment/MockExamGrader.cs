@@ -42,6 +42,15 @@ public sealed class MockExamGrader
     private static readonly Histogram<double> GradeDurationMs =
         Meter.CreateHistogram<double>("cena_mock_exam_grade_duration_ms");
 
+    // PRR-322: ambient counter the grader bumps each time it invokes the
+    // CAS router (including PRR-297 retries). Stored in AsyncLocal so the
+    // grader's signature stays unchanged for non-cost-tracking callers
+    // (StartAsync auto-grade, GetResultAsync re-grade) while SubmitAsync
+    // can opt-in by entering a tracking scope. AsyncLocal flows across
+    // awaits within the same logical call but not across thread-pool
+    // hand-offs the grader doesn't make — safe for our pattern.
+    private static readonly AsyncLocal<int?> _casAttemptCounter = new();
+
     public MockExamGrader(
         IBagrutPaperStructureCatalog structureCatalog,
         ICasRouterService cas,
@@ -72,6 +81,32 @@ public sealed class MockExamGrader
             sw.Stop();
             GradeDurationMs.Record(sw.Elapsed.TotalMilliseconds,
                 new KeyValuePair<string, object?>("examCode", state.ExamCode));
+        }
+    }
+
+    /// <summary>
+    /// PRR-322 — grade variant that records every CAS-call attempt
+    /// (including PRR-297 retries) into <paramref name="casAttempts"/> so
+    /// MockExamRunService.SubmitAsync can persist a MockExamRunCost doc.
+    /// SubmitAsync uses this; StartAsync auto-grade and GetResultAsync use
+    /// the bare GradeAsync to avoid double-counting on idempotent re-grades.
+    /// </summary>
+    public async Task<(MockExamResultResponse Result, int CasAttempts)>
+        GradeAndMeasureAsync(IQuerySession session, ExamSimulationState state, CancellationToken ct)
+    {
+        // Enter a counter scope on this AsyncLocal frame. The value is
+        // reset to 0 here, mutated by VerifyWithRetryAsync, then read out
+        // before exit. Out-of-scope grades see _casAttemptCounter.Value
+        // == null and skip the bump path.
+        _casAttemptCounter.Value = 0;
+        try
+        {
+            var result = await GradeAsync(session, state, ct);
+            return (result, _casAttemptCounter.Value ?? 0);
+        }
+        finally
+        {
+            _casAttemptCounter.Value = null;
         }
     }
 
@@ -387,6 +422,12 @@ public sealed class MockExamGrader
         CasVerifyResult last = default!;
         for (var attempt = 0; attempt <= backoffsMs.Length; attempt++)
         {
+            // PRR-322: bump the ambient cost counter for every attempt,
+            // not just the winning one — each VerifyAsync round-trip is
+            // real CPU on the SymPy sidecar regardless of outcome.
+            if (_casAttemptCounter.Value is int prior)
+                _casAttemptCounter.Value = prior + 1;
+
             var result = await _cas.VerifyAsync(
                 new CasVerifyRequest(CasOperation.Equivalence, a, b, null), ct);
             if (result.Status == CasVerifyStatus.Ok) return result;

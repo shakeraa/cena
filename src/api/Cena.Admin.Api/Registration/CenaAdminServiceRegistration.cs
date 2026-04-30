@@ -447,6 +447,10 @@ public static class CenaAdminServiceRegistration
         // instead of accepting free-text typos.
         app.MapCuratorTaxonomyEndpoints();
 
+        // PRR-322 — mock-exam run cost telemetry. /api/admin/mock-exam-runs/cost/{runs|daily|projection}
+        // backs the admin dashboard's per-run cost table + 30-day rollup chart.
+        Cena.Admin.Api.Assessment.MockExamRunCostEndpoints.MapMockExamRunCostEndpoints(app);
+
         // RDY-057 (Phase 3): POST /api/admin/ingestion/bagrut — SuperAdmin-only
         // PDF ingest trigger that routes to BagrutPdfIngestionService.
         app.MapBagrutIngestEndpoints();

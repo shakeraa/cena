@@ -26,6 +26,7 @@
 // =============================================================================
 
 using Cena.Actors.Events;
+using Cena.Infrastructure.Documents;
 using Marten;
 
 namespace Cena.Actors.Assessment;
@@ -58,6 +59,15 @@ public static class MockExamRunMartenRegistration
             .Identity(d => d.Id)
             .Index(d => d.Subject)
             .Index(d => d.Topic);
+
+        // PRR-322 — per-run cost telemetry doc. Keyed on runId; written
+        // once by SubmitAsync. Indexed on ExamCode + ComputedAt so the
+        // admin dashboard's daily-rollup + per-exam-code filter queries
+        // hit indexes instead of full-scanning the JSONB column.
+        opts.Schema.For<MockExamRunCost>()
+            .Identity(d => d.Id)
+            .Index(d => d.ExamCode)
+            .Index(d => d.ComputedAt);
 
         // Events on the student stream so audit replay reconstructs runs.
         opts.Events.AddEventType<ExamSimulationStarted_V1>();
