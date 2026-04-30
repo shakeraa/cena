@@ -90,25 +90,49 @@ const variantsForm = ref({
 // ADR-0059 §15.5 + PRR-249: source-anchored variant flow is
 // implementation-complete but gated on legal sign-off. Probe the
 // feature-flag readback when the dialog opens so we render the
-// 'Disabled' banner up front rather than failing on submit.
+// 'Disabled' banner up front rather than failing on submit. cm audit
+// 2026-04-30 extended the probe with aiProviderConfigured so the
+// dialog also surfaces 'No API key configured' before the click —
+// closes the silent-Completed pattern where the strategy reported
+// 'LLM returned 0 candidates' without surfacing the real reason.
+const variantsAiProviderConfigured = ref<boolean | null>(null)
+const variantsAiProviderName = ref<string>('')
+const variantsAiProviderReason = ref<string>('')
+
 import { watch } from 'vue'
 watch(variantsDialogOpen, async (open) => {
   if (!open) return
   variantsFlagEnabled.value = null
+  variantsAiProviderConfigured.value = null
   try {
-    const data = await $api<{ bagrutSeedToLlmEnabled: boolean, bagrutSeedDisabledReason: string }>(
-      '/admin/ingestion/jobs/feature-flags',
-    )
+    const data = await $api<{
+      bagrutSeedToLlmEnabled: boolean,
+      bagrutSeedDisabledReason: string,
+      aiProviderConfigured: boolean,
+      aiProviderName: string,
+      aiProviderNotConfiguredReason: string,
+    }>('/admin/ingestion/jobs/feature-flags')
     variantsFlagEnabled.value = !!data.bagrutSeedToLlmEnabled
     variantsFlagReason.value = data.bagrutSeedDisabledReason ?? ''
+    variantsAiProviderConfigured.value = !!data.aiProviderConfigured
+    variantsAiProviderName.value = data.aiProviderName ?? 'AI provider'
+    variantsAiProviderReason.value = data.aiProviderNotConfiguredReason ?? ''
   }
   catch {
     variantsFlagEnabled.value = false
     variantsFlagReason.value = 'Could not load feature flag state — check admin-api connectivity.'
+    variantsAiProviderConfigured.value = false
+    variantsAiProviderReason.value = 'Could not check AI provider configuration — check admin-api connectivity.'
   }
 })
 
 const { openDrawer: openJobsDrawer } = useIngestionJobs()
+
+// Single computed gate the Enqueue button (and the dialog body's banner
+// selection) bind to. Either gate failing blocks the submit; the
+// per-banner v-if below picks the right copy.
+const variantsCanEnqueue = computed(() =>
+  variantsFlagEnabled.value === true && variantsAiProviderConfigured.value === true)
 
 const enqueueVariants = async () => {
   if (!item.value) return
@@ -683,20 +707,39 @@ const moveToReview = async () => {
         </VCardTitle>
         <VDivider />
         <VCardText class="pt-4">
-          <!-- ADR-0059 §15.5 + PRR-249 feature-flag gate. Implementation
-               is production-grade; legal sign-off is a separate gate. -->
+          <!-- Pre-flight gate banners. Order matters: the legal gate
+               wins if both gates fail (PRR-249 supersedes ops config).
+               cm audit 2026-04-30: aiProviderConfigured added so the
+               curator learns about a missing API key BEFORE clicking
+               Enqueue, instead of via a silently-Completed job. -->
           <VAlert
             v-if="variantsFlagEnabled === false"
             type="warning"
             variant="tonal"
             density="compact"
             class="mb-3"
+            data-test="variants-legal-gate-banner"
           >
             <div class="font-weight-medium mb-1">
               Disabled pending legal sign-off (PRR-249)
             </div>
             <div class="text-body-2">
               {{ variantsFlagReason }}
+            </div>
+          </VAlert>
+          <VAlert
+            v-else-if="variantsAiProviderConfigured === false"
+            type="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+            data-test="variants-no-api-key-banner"
+          >
+            <div class="font-weight-medium mb-1">
+              {{ variantsAiProviderName }} not configured — cannot generate variants
+            </div>
+            <div class="text-body-2">
+              {{ variantsAiProviderReason }}
             </div>
           </VAlert>
           <VAlert
@@ -805,8 +848,9 @@ const moveToReview = async () => {
           <VBtn
             color="primary"
             :loading="variantsSubmitting"
-            :disabled="variantsFlagEnabled === false"
+            :disabled="!variantsCanEnqueue"
             @click="enqueueVariants"
+            data-test="variants-enqueue-button"
           >
             <VIcon
               icon="tabler-player-play"
