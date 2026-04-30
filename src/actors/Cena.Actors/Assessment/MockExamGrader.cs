@@ -43,13 +43,15 @@ public sealed class MockExamGrader
         Meter.CreateHistogram<double>("cena_mock_exam_grade_duration_ms");
 
     // PRR-322: ambient counter the grader bumps each time it invokes the
-    // CAS router (including PRR-297 retries). Stored in AsyncLocal so the
-    // grader's signature stays unchanged for non-cost-tracking callers
-    // (StartAsync auto-grade, GetResultAsync re-grade) while SubmitAsync
-    // can opt-in by entering a tracking scope. AsyncLocal flows across
-    // awaits within the same logical call but not across thread-pool
-    // hand-offs the grader doesn't make — safe for our pattern.
-    private static readonly AsyncLocal<int?> _casAttemptCounter = new();
+    // CAS router (including PRR-297 retries). Stored as AsyncLocal of a
+    // *reference type* so child-task mutations propagate back to the
+    // parent that opened the scope. The shape is a single-element int
+    // array because AsyncLocal<int?> would lose mutations from the child
+    // (AsyncLocal flows DOWN across awaits but writes in the child do
+    // NOT flow back UP — caught by PRR-322f-integration-test 2026-04-30
+    // which exercised the SubmitAsync path against live cena-postgres
+    // and observed CasCallsCount=0 instead of the expected 7).
+    private static readonly AsyncLocal<int[]?> _casAttemptCounter = new();
 
     public MockExamGrader(
         IBagrutPaperStructureCatalog structureCatalog,
@@ -94,15 +96,19 @@ public sealed class MockExamGrader
     public async Task<(MockExamResultResponse Result, int CasAttempts)>
         GradeAndMeasureAsync(IQuerySession session, ExamSimulationState state, CancellationToken ct)
     {
-        // Enter a counter scope on this AsyncLocal frame. The value is
-        // reset to 0 here, mutated by VerifyWithRetryAsync, then read out
-        // before exit. Out-of-scope grades see _casAttemptCounter.Value
-        // == null and skip the bump path.
-        _casAttemptCounter.Value = 0;
+        // Enter a counter scope. The shared int[] reference flows down
+        // to VerifyWithRetryAsync via AsyncLocal; mutations to the array
+        // contents are visible here on return because both sides hold
+        // the same object reference. Re-assigning _casAttemptCounter.Value
+        // inside the child would NOT propagate back — see field comment.
+        // Out-of-scope grades see _casAttemptCounter.Value == null and
+        // skip the bump path.
+        var counter = new int[1];
+        _casAttemptCounter.Value = counter;
         try
         {
             var result = await GradeAsync(session, state, ct);
-            return (result, _casAttemptCounter.Value ?? 0);
+            return (result, counter[0]);
         }
         finally
         {
@@ -424,9 +430,12 @@ public sealed class MockExamGrader
         {
             // PRR-322: bump the ambient cost counter for every attempt,
             // not just the winning one — each VerifyAsync round-trip is
-            // real CPU on the SymPy sidecar regardless of outcome.
-            if (_casAttemptCounter.Value is int prior)
-                _casAttemptCounter.Value = prior + 1;
+            // real CPU on the SymPy sidecar regardless of outcome. The
+            // counter is a shared int[1] reference scoped by
+            // GradeAndMeasureAsync; mutating the array in-place is what
+            // makes the increment visible to the parent on await return.
+            if (_casAttemptCounter.Value is int[] counter)
+                counter[0]++;
 
             var result = await _cas.VerifyAsync(
                 new CasVerifyRequest(CasOperation.Equivalence, a, b, null), ct);
