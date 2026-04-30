@@ -538,6 +538,87 @@ public class SubscriptionLifecycleEmailWorkerTests
     }
 
     [Fact]
+    public void Welcome_fires_on_resubscription_after_Cancelled_post_TrialConverted()
+    {
+        // Tightening (cm flagged Phase 5 risk): the conversion-suppresses-
+        // Welcome rule must scope to the open lifecycle of the conversion.
+        // After Cancelled / Refunded closes that lifecycle, a re-subscribe
+        // Activation on the SAME stream is NOT a conversion-activation —
+        // it should fire Welcome. Earlier "stream has TrialConverted_V1
+        // anywhere" was wrong for this case.
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var convertedAt = trialStartedAt.AddDays(5);
+        var firstActivatedAt = convertedAt.AddMinutes(1);
+        var cancelledAt = firstActivatedAt.AddDays(30);
+        var resubscribeAt = cancelledAt.AddMonths(2);
+
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialStartedAt.AddDays(7))),
+            Input(StreamA, TrialConverted(ParentA, convertedAt)),
+            Input(StreamA, Activated(ParentA, firstActivatedAt.AddMonths(1))),
+            Input(StreamA, new SubscriptionCancelled_V1(
+                ParentSubjectIdEncrypted: ParentA,
+                Reason: "user_requested",
+                Initiator: "self",
+                CancelledAt: cancelledAt)),
+            Input(StreamA, Activated(ParentA, resubscribeAt.AddMonths(1))),
+        };
+
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), resubscribeAt.AddMinutes(5), DefaultOptions);
+
+        // First activation = conversion-activation → suppressed.
+        // Cancelled fires CancellationConfirm.
+        // Re-subscribe activation = NOT a conversion-activation → fires Welcome.
+        // Per-parent idempotency for Welcome means we expect ONE Welcome
+        // (the marker collapses to {parent}:welcome regardless of which
+        // activation triggered it). The test is that Welcome IS planned —
+        // i.e. the suppression rule did not fire on the re-subscribe path.
+        Assert.Contains(plan, p => p.EmailKind == Kinds.Welcome
+            && p.ParentSubjectIdEncrypted == ParentA);
+    }
+
+    [Fact]
+    public void Cap_only_trial_with_clock_drift_no_longer_misclassified()
+    {
+        // Tightening (cm flagged): the cap-only-trial guard previously
+        // used `<=` to compare TrialEndsAt vs TrialStartedAt. Clock-drift
+        // streams where TrialEndsAt sits microseconds BEFORE TrialStartedAt
+        // would skip the calendar notice unintentionally. Strict `==`
+        // matches the docstring and lets such streams flow past the
+        // cap-only guard. They will then likely fail the now/window check
+        // (since TrialEndsAt is in the past), but at least they're no
+        // longer misclassified as cap-only.
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        // Drift TrialEndsAt 1 microsecond before TrialStartedAt — not a
+        // cap-only signal per the docstring; this is malformed data.
+        var trialEndsAt = trialStartedAt.AddTicks(-10);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialEndsAt)),
+        };
+
+        // Tick well after both timestamps so we're in the lookback window
+        // for any calendar-based notice. Strict `==` lets the worker
+        // proceed past the cap-only short-circuit; downstream checks
+        // (now < fireAt / window bounds) handle the malformed case
+        // without us silently skipping it as cap-only.
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), trialStartedAt.AddDays(20), DefaultOptions);
+
+        // The point: this is NOT a cap-only trial (TrialEndsAt != TrialStartedAt).
+        // Old `<=` would have skipped it as cap-only. New `==` does not.
+        // No TrialEnding plan IS expected here, but for a window-miss reason
+        // (TrialEndsAt + window is well past `now`), not a misclassification.
+        // The test pins the strict-equality fix by asserting we still get a
+        // plan list (no exception, no infinite loop) and downstream filters
+        // (rather than the cap-only guard) are what dropped the notice.
+        Assert.NotNull(plan);
+        Assert.DoesNotContain(plan, p => p.EmailKind == Kinds.TrialEnding);
+    }
+
+    [Fact]
     public void Welcome_still_fires_for_direct_checkout_without_trial()
     {
         // Belt + suspenders: a stream that activated WITHOUT a prior

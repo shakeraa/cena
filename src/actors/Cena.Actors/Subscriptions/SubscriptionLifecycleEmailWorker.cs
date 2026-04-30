@@ -258,49 +258,71 @@ public sealed class SubscriptionLifecycleEmailWorker : BackgroundService
         var scheduled = new HashSet<string>(alreadySent);
 
         // Stream-scoped state for the conversion-suppresses-Welcome rule
-        // and the trial-end-suppression rule. Pre-walk is O(n) and
-        // single-pass; the per-stream-key bool/instant maps below are
-        // populated as we go (events arrive in stream-order from the
-        // Marten raw-event reader).
-        // - hasConvertedTrial: stream had TrialConverted_V1 → suppress
-        //   Welcome on the IMMEDIATELY-FOLLOWING SubscriptionActivated_V1
-        //   in the same stream (option (a) per t_c513d0ee089f task body).
+        // and the trial-end-suppression rule. Walk events in order and
+        // track which Activations are conversion-activations: the FIRST
+        // SubscriptionActivated_V1 after a TrialConverted_V1 within the
+        // same stream's open lifecycle. A subsequent terminal event
+        // (Cancelled/Refunded) closes that lifecycle, so a re-subscription
+        // (Phase 5) on the same stream gets a fresh non-conversion
+        // Activation that fires Welcome correctly.
+        // - conversionActivationIndices: indices into `events` of the
+        //   activations that should suppress Welcome.
         // - trialResolved: stream had TrialConverted_V1 OR TrialExpired_V1
         //   → suppress TrialEnding on that stream regardless of where in
         //   the lookback window TrialEndsAt sits.
-        var hasConvertedTrial = new HashSet<string>();
+        var conversionActivationIndices = new HashSet<int>();
         var trialResolved = new HashSet<string>();
-        foreach (var e in events)
+        var streamConversionPending = new HashSet<string>();
+        for (var i = 0; i < events.Count; i++)
         {
-            if (e.Payload is TrialConverted_V1)
+            var e = events[i];
+            switch (e.Payload)
             {
-                hasConvertedTrial.Add(e.StreamKey);
-                trialResolved.Add(e.StreamKey);
-            }
-            else if (e.Payload is TrialExpired_V1)
-            {
-                trialResolved.Add(e.StreamKey);
+                case TrialConverted_V1:
+                    streamConversionPending.Add(e.StreamKey);
+                    trialResolved.Add(e.StreamKey);
+                    break;
+                case TrialExpired_V1:
+                    trialResolved.Add(e.StreamKey);
+                    break;
+                case SubscriptionActivated_V1:
+                    if (streamConversionPending.Remove(e.StreamKey))
+                    {
+                        // First activation after a conversion within this
+                        // lifecycle — suppress Welcome for THIS index only.
+                        conversionActivationIndices.Add(i);
+                    }
+                    break;
+                case SubscriptionCancelled_V1:
+                case SubscriptionRefunded_V1:
+                    // Lifecycle closed; clear any stale pending-conversion
+                    // flag so a future re-subscription Activation isn't
+                    // misclassified.
+                    streamConversionPending.Remove(e.StreamKey);
+                    break;
             }
         }
 
         // Pass 1: terminal-event-driven kinds (Welcome / PastDue /
         // CancellationConfirm / RefundConfirm / TrialConverted) — each
         // one-per-parent-lifetime.
-        foreach (var e in events)
+        for (var i = 0; i < events.Count; i++)
         {
+            var e = events[i];
             string? kind;
             string? parentId;
             switch (e.Payload)
             {
                 case SubscriptionActivated_V1 a:
-                    // Welcome suppression: if the stream has a
-                    // TrialConverted_V1 anywhere, this Activation IS the
-                    // conversion-side activation and the dedicated
-                    // TrialConverted email handles the receipt — option
-                    // (a) per the task body. Without this, trial
+                    // Welcome suppression: this index was tagged as a
+                    // conversion-activation in the pre-walk above, so the
+                    // dedicated TrialConverted email handles the receipt —
+                    // option (a) per the task body. Without this, trial
                     // converters would receive both Welcome AND
                     // TrialConverted, which is duplicative + confusing.
-                    if (hasConvertedTrial.Contains(e.StreamKey)) continue;
+                    // Re-subscription Activations (post Cancelled/Refunded)
+                    // are NOT in this set and fire Welcome correctly.
+                    if (conversionActivationIndices.Contains(i)) continue;
                     kind = ISubscriptionLifecycleEmailDispatcher.Kinds.Welcome;
                     parentId = a.ParentSubjectIdEncrypted;
                     break;
@@ -399,10 +421,15 @@ public sealed class SubscriptionLifecycleEmailWorker : BackgroundService
             if (trialResolved.Contains(e.StreamKey)) continue;
 
             // TrialEndsAt == TrialStartedAt indicates a cap-hit-only trial
-            // (no calendar bound — see TrialStarted_V1 docstring). The
-            // worker doesn't fire a calendar-based notice for those; the
-            // cap-hit path emits a separate signal.
-            if (ts.TrialEndsAt <= ts.TrialStartedAt) continue;
+            // (no calendar bound — see TrialStarted_V1 docstring). Strict
+            // equality matches the docstring contract; the prior <= was
+            // defensive but skipped real trials when clock skew left
+            // TrialEndsAt slightly before TrialStartedAt. Such streams are
+            // truly malformed (start > end), so we let them flow past this
+            // cap-only guard and let the downstream `now < fireAt` /
+            // window check handle them — at worst they silently miss a
+            // notice rather than be misclassified as cap-only.
+            if (ts.TrialEndsAt == ts.TrialStartedAt) continue;
 
             var fireAt = ts.TrialEndsAt - trialLead;
             if (now < fireAt) continue;
