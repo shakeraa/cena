@@ -93,6 +93,18 @@ public sealed record MovedToReview_V1(
     int QuestionCount,
     DateTimeOffset Timestamp);
 
+/// <summary>
+/// Curator approved an InReview item for publication. Transitions the
+/// kanban from "In Review" → "Published". Requires the curator metadata
+/// to be in "confirmed" state — without confirmation, the item carries
+/// no curator-validated subject/language/sourceType and must not advance.
+/// </summary>
+public sealed record PipelineItemApproved_V1(
+    string PipelineItemId,
+    string ApprovedBy,
+    int QuestionCount,
+    DateTimeOffset Timestamp);
+
 /// <summary>Pipeline processing completed (all stages done).</summary>
 public sealed record PipelineCompleted_V1(
     string PipelineItemId,

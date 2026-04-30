@@ -737,6 +737,7 @@ public static class MartenConfiguration
         opts.Events.AddEventType<QuestionsRecreated_V1>();
         opts.Events.AddEventType<PipelineStageFailed_V1>();
         opts.Events.AddEventType<MovedToReview_V1>();
+        opts.Events.AddEventType<PipelineItemApproved_V1>();
         opts.Events.AddEventType<ContentExtracted_V1>();
         opts.Events.AddEventType<PipelineCompleted_V1>();
     }

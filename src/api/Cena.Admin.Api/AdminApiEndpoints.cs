@@ -733,6 +733,24 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
+        // Approve an InReview item → Published. Gated on metadataState=confirmed
+        // and currentStage=InReview; both conditions are enforced in
+        // IngestionPipelineService.ApproveAsync. The wire shape returns
+        // { success, reason? } so the SPA can render "metadata not confirmed"
+        // without needing a separate error envelope.
+        group.MapPost("/items/{id}/approve", async (string id, ClaimsPrincipal user, IIngestionPipelineService service) =>
+        {
+            var approvedBy = user.FindFirst("user_id")?.Value
+                ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? "unknown";
+            var (ok, reason) = await service.ApproveAsync(id, approvedBy);
+            return Results.Ok(new { success = ok, reason });
+        }).WithName("ApprovePipelineItem")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+
         group.MapPost("/upload", async (HttpRequest request, IIngestionPipelineService service) =>
         {
             // REV-011.3: File upload validation
