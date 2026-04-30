@@ -637,6 +637,144 @@ public sealed class MockExamRunServiceTests : IAsyncLifetime
             "should not award full points when c is wrong");
     }
 
+    // PRR-322f-integration-test (t_309860d7fefa) — live cena-postgres
+    // proof that Submit materializes a MockExamRunCost doc with non-zero
+    // CasCallsCount + USD totals coherent with the count×rate formula.
+    // Pairs with MockExamRunCostTests (unit) which pin the formula in
+    // isolation — together they cover formula correctness + the actual
+    // Marten write path the formula's persisted through.
+    [Fact]
+    public async Task Submit_Writes_NonZero_Cost_Doc()
+    {
+        var run = await _service.StartAsync("student-cost",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        // Pick Part-B subset
+        var pickedB = run.PartBQuestionIds.Take(2).ToList();
+        await _service.SelectPartBAsync("student-cost", run.RunId,
+            new SelectPartBRequest(pickedB), CancellationToken.None);
+
+        // Answer: all PartA correct (CAS Success), one PartB correct, one
+        // PartB wrong (CAS Failed but still a real attempt). This drives
+        // the grader's VerifyWithRetryAsync once per gradable question —
+        // PRR-297 retries only fire on Timeout / CircuitBreakerOpen which
+        // the test substitute never returns, so each VerifyAsync call
+        // counts as exactly 1 attempt.
+        foreach (var qid in run.PartAQuestionIds)
+        {
+            await _service.SubmitAnswerAsync("student-cost", run.RunId,
+                new SubmitAnswerRequest(qid, $"x = {qid}"), CancellationToken.None);
+        }
+        await _service.SubmitAnswerAsync("student-cost", run.RunId,
+            new SubmitAnswerRequest(pickedB[0], $"x = {pickedB[0]}"), CancellationToken.None);
+        await _service.SubmitAnswerAsync("student-cost", run.RunId,
+            new SubmitAnswerRequest(pickedB[1], "wrong-answer"), CancellationToken.None);
+
+        await _service.SubmitAsync("student-cost", run.RunId, CancellationToken.None);
+
+        // Cost doc keyed on runId — load from the SAME store the service
+        // wrote to so we exercise the real Marten persistence path.
+        await using var qs = _store.QuerySession();
+        var cost = await qs.LoadAsync<MockExamRunCost>(run.RunId);
+
+        Assert.NotNull(cost);
+        Assert.Equal(run.RunId,    cost!.Id);
+        Assert.Equal("student-cost", cost.StudentId);
+        Assert.Equal("806",        cost.ExamCode);
+
+        // 5 PartA + 2 PartB = 7 gradable questions. Each gradable question
+        // hits the grader's VerifyWithRetryAsync exactly once under the
+        // non-retriable test substitute, so CasCallsCount must be ≥ 7.
+        // Allow ≥ rather than == in case a future seeded structure adds a
+        // gradable slot — the load-bearing assertion is "non-zero AND
+        // proportional to gradable count", not the exact 7.
+        Assert.True(cost.CasCallsCount >= 7,
+            $"expected CasCallsCount ≥ 7 (5 PartA + 2 PartB), got {cost.CasCallsCount}");
+
+        // LLM + OCR streams unwired on the mock-exam path today (no
+        // ILlmGateway / IOcrService consumers in the runner). Pin to zero
+        // so PRR-322f-llm-attribution + PRR-322f-ocr-attribution flip the
+        // assertion when they wire those paths.
+        Assert.Equal(0, cost.LlmTokensInput);
+        Assert.Equal(0, cost.LlmTokensOutput);
+        Assert.Equal(0, cost.OcrCallsCount);
+        Assert.Equal(0m, cost.LlmCostUsd);
+        Assert.Equal(0m, cost.OcrCostUsd);
+
+        // CAS USD = CasCallsCount × CasUsdPerCall (default 0.0001). Total
+        // == CAS-only today. Exact equality is OK because 0.0001 is
+        // representable in decimal. Use ≥ so the assertion still holds if
+        // future structures add gradable slots.
+        var expectedCasUsd = cost.CasCallsCount * 0.0001m;
+        Assert.Equal(expectedCasUsd, cost.CasCostUsd);
+        Assert.Equal(expectedCasUsd, cost.TotalUsd);
+        Assert.True(cost.TotalUsd > 0m);
+
+        // StudentTenant placeholder per ADR-0001 Phase 1 deferral —
+        // stays null until tenant id threads onto ExamSimulationState.
+        Assert.Null(cost.StudentTenant);
+
+        // ComputedAt was assigned at submit-time by the service from the
+        // injected TimeProvider. Pinned by this test to the fake clock
+        // (2026-04-29T10:00:00Z) — equality is fine since FakeTimeProvider
+        // doesn't advance.
+        Assert.Equal(_clock.GetUtcNow(), cost.ComputedAt);
+    }
+
+    // Idempotent re-submit: a second Submit on an already-submitted run
+    // re-renders the mark sheet but MUST NOT rewrite the cost doc — the
+    // canonical run cost was captured on the first submit; re-grades are
+    // read-only views (they DO consume CAS, but bounded by the SymPy SLO,
+    // not this run). Pinned here against live Marten so a regression in
+    // the IsSubmitted-early-return guard surfaces immediately.
+    [Fact]
+    public async Task Submit_Twice_Does_Not_Rewrite_Cost_Doc()
+    {
+        var run = await _service.StartAsync("student-cost-2",
+            new StartMockExamRunRequest("806"), CancellationToken.None);
+
+        var pickedB = run.PartBQuestionIds.Take(2).ToList();
+        await _service.SelectPartBAsync("student-cost-2", run.RunId,
+            new SelectPartBRequest(pickedB), CancellationToken.None);
+
+        foreach (var qid in run.PartAQuestionIds)
+        {
+            await _service.SubmitAnswerAsync("student-cost-2", run.RunId,
+                new SubmitAnswerRequest(qid, $"x = {qid}"), CancellationToken.None);
+        }
+        await _service.SubmitAnswerAsync("student-cost-2", run.RunId,
+            new SubmitAnswerRequest(pickedB[0], $"x = {pickedB[0]}"), CancellationToken.None);
+        await _service.SubmitAnswerAsync("student-cost-2", run.RunId,
+            new SubmitAnswerRequest(pickedB[1], $"x = {pickedB[1]}"), CancellationToken.None);
+
+        await _service.SubmitAsync("student-cost-2", run.RunId, CancellationToken.None);
+
+        await using (var qs1 = _store.QuerySession())
+        {
+            var first = await qs1.LoadAsync<MockExamRunCost>(run.RunId);
+            Assert.NotNull(first);
+
+            // Snapshot the values to compare after re-submit.
+            var firstSnapshot = (
+                first!.CasCallsCount,
+                first.CasCostUsd,
+                first.TotalUsd,
+                first.ComputedAt);
+
+            // Idempotent re-submit (state.IsSubmitted already true).
+            await _service.SubmitAsync("student-cost-2", run.RunId, CancellationToken.None);
+
+            await using var qs2 = _store.QuerySession();
+            var second = await qs2.LoadAsync<MockExamRunCost>(run.RunId);
+
+            Assert.NotNull(second);
+            Assert.Equal(firstSnapshot.CasCallsCount,  second!.CasCallsCount);
+            Assert.Equal(firstSnapshot.CasCostUsd,     second.CasCostUsd);
+            Assert.Equal(firstSnapshot.TotalUsd,       second.TotalUsd);
+            Assert.Equal(firstSnapshot.ComputedAt,     second.ComputedAt);
+        }
+    }
+
     private async Task SeedQuestionsAsync(string subject, int count)
     {
         // Topic ids that match the seeded BagrutPaperStructure (806/default
