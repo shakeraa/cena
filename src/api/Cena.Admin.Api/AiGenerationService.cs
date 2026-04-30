@@ -172,7 +172,18 @@ public sealed record BatchGenerateResponse(
     // RDY-034: how many candidates were dropped because the CAS gate
     // contradicted the authored answer (Enforce mode only).
     int DroppedForCasFailure = 0,
-    IReadOnlyList<CasDropReason>? CasDropReasons = null);
+    IReadOnlyList<CasDropReason>? CasDropReasons = null,
+    // PRR-322f-audit / 2026-04-30: thread provenance from the underlying
+    // GenerateQuestionsAsync response so persistence callers
+    // (GenerateVariantsJobStrategy + AiIsomorphGenerator) can populate
+    // QuestionDocument's AiGenerationState fields with REAL values
+    // instead of null. Was discarded entirely before this audit;
+    // variants shipped with `ModelTemperature: null` and a synthetic
+    // breadcrumb in the PromptText field. Defaults preserve back-compat
+    // for any third-party caller; new callers should pass them through.
+    string? PromptUsed = null,
+    float TemperatureUsed = 0f,
+    string? RawOutput = null);
 
 // ── Template (OCR) Generation Request/Response (CNT-002) ──
 
@@ -791,7 +802,10 @@ public sealed class AiGenerationService : IAiGenerationService
                 NeedsReview: 0,
                 AutoRejected: 0,
                 ModelUsed: generateResponse.ModelUsed,
-                Error: generateResponse.Error);
+                Error: generateResponse.Error,
+                PromptUsed: generateResponse.PromptUsed,
+                TemperatureUsed: generateResponse.TemperatureUsed,
+                RawOutput: generateResponse.RawOutput);
         }
 
         var results = new List<BatchGenerateResult>();
@@ -867,7 +881,16 @@ public sealed class AiGenerationService : IAiGenerationService
             ModelUsed:         generateResponse.ModelUsed,
             Error:             null,
             DroppedForCasFailure: drops.Count,
-            CasDropReasons:    drops);
+            CasDropReasons:    drops,
+            // PRR-322f-audit: pass through the real prompt / temperature /
+            // raw model output so persistence callers can populate
+            // QuestionDocument.AiGenerationState honestly. The same prompt
+            // (and the same single LLM round-trip's raw output) is
+            // attributed to every variant in the batch — that's accurate:
+            // GenerateQuestionsAsync is one call returning N questions.
+            PromptUsed:        generateResponse.PromptUsed,
+            TemperatureUsed:   generateResponse.TemperatureUsed,
+            RawOutput:         generateResponse.RawOutput);
     }
 
     // ── Template (OCR) Generation (CNT-002) ──

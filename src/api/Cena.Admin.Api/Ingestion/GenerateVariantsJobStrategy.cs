@@ -140,38 +140,7 @@ internal sealed class GenerateVariantsJobStrategy : IIngestionJobStrategy
                 continue;
             }
 
-            var difficulty = (float)Math.Clamp((decimal)r.Question.Difficulty, 0m, 1m);
-            var createReq = new CreateQuestionRequest(
-                SourceType: "ai-generated",
-                Stem: r.Question.Stem,
-                StemHtml: null,
-                Options: r.Question.Options
-                    .Select(o => new CreateOptionRequest(
-                        Label: o.Label,
-                        Text: o.Text,
-                        TextHtml: null,
-                        IsCorrect: o.IsCorrect,
-                        DistractorRationale: o.DistractorRationale))
-                    .ToList(),
-                Subject: payload.Subject,
-                Topic: r.Question.Topic ?? payload.Topic,
-                Grade: payload.Grade,
-                BloomsLevel: r.Question.BloomsLevel,
-                Difficulty: difficulty,
-                ConceptIds: null,
-                Language: payload.Language,
-                SourceDocId: null,
-                SourceUrl: null,
-                SourceFilename: null,
-                OriginalText: null,
-                // Provenance lineage: link variant back to the Bagrut
-                // draft + pdf so curators can trace the seed.
-                PromptText: $"variant-of:{payload.DraftId} · pdf:{draft.SourcePdfId} · exam:{draft.ExamCode}",
-                ModelId: batch.ModelUsed,
-                ModelTemperature: null,
-                RawModelOutput: null,
-                Explanation: r.Question.Explanation,
-                LearningObjectiveId: null);
+            var createReq = BuildVariantCreateRequest(r, batch, draft, payload);
 
             try
             {
@@ -186,7 +155,7 @@ internal sealed class GenerateVariantsJobStrategy : IIngestionJobStrategy
                 }
                 persistedIds.Add(detail.Id);
                 await progress.LogAsync("info",
-                    $"[v{idx}] persisted as {detail.Id} (Bloom={r.Question.BloomsLevel}, diff={difficulty:F2})",
+                    $"[v{idx}] persisted as {detail.Id} (Bloom={r.Question.BloomsLevel}, diff={r.Question.Difficulty:F2})",
                     ct);
             }
             catch (Exception ex)
@@ -271,6 +240,47 @@ internal sealed class GenerateVariantsJobStrategy : IIngestionJobStrategy
 
     private static string Truncate(string s, int n) =>
         s.Length <= n ? s : s.Substring(0, n) + "…";
+
+    // ADR-0059 §15.5 + PRR-322f-llm-attribution + PRR-322f-ocr-attribution:
+    // Build the CreateQuestionRequest with full provenance lineage so curators
+    // can trace every variant back to its Bagrut seed (DraftId + pdf + exam-page)
+    // AND to the LLM call that produced it (PromptUsed + temperature + raw output).
+    // Extracted as a static helper so the per-variant block in ExecuteAsync stays
+    // tight + so the contract is unit-testable in isolation.
+    internal static CreateQuestionRequest BuildVariantCreateRequest(
+        BatchGenerateResult result,
+        BatchGenerateResponse batch,
+        Cena.Infrastructure.Documents.BagrutDraftPayloadDocument draft,
+        GenerateVariantsJobPayload payload)
+    {
+        var difficulty = (float)Math.Clamp((decimal)result.Question.Difficulty, 0m, 1m);
+        return new CreateQuestionRequest(
+            SourceType: "ai-generated",
+            Stem: result.Question.Stem,
+            StemHtml: null,
+            Options: result.Question.Options
+                .Select(o => new CreateOptionRequest(
+                    Label: o.Label, Text: o.Text, TextHtml: null,
+                    IsCorrect: o.IsCorrect, DistractorRationale: o.DistractorRationale))
+                .ToList(),
+            Subject: payload.Subject,
+            Topic: result.Question.Topic ?? payload.Topic,
+            Grade: payload.Grade,
+            BloomsLevel: result.Question.BloomsLevel,
+            Difficulty: difficulty,
+            ConceptIds: null,
+            Language: payload.Language,
+            SourceDocId:    payload.DraftId,
+            SourceUrl:      $"bagrut-pdf:{draft.SourcePdfId}",
+            SourceFilename: $"{draft.ExamCode}-page{draft.SourcePage}.pdf",
+            OriginalText:   draft.Prompt,
+            PromptText:        batch.PromptUsed ?? "",
+            ModelId:           batch.ModelUsed,
+            ModelTemperature:  batch.TemperatureUsed,
+            RawModelOutput:    batch.RawOutput,
+            Explanation:       result.Question.Explanation,
+            LearningObjectiveId: null);
+    }
 }
 
 public sealed record GenerateVariantsJobPayload(
