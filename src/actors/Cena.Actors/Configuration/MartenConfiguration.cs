@@ -589,6 +589,15 @@ public static class MartenConfiguration
         opts.Schema.For<PlatformSettingsDocument>()
             .Identity(x => x.Id);
 
+        // ── AI Generation Settings — singleton doc, id='ai-settings-singleton'.
+        // Registered here so actor-host's startup ApplyAllConfiguredChanges-
+        // ToDatabaseAsync creates the table for every host in the stack
+        // (admin-api waits on actor-host's healthcheck before it boots).
+        // The cipher + probe + service stay in Cena.Admin.Api — only the
+        // doc type is shared.
+        opts.Schema.For<AiSettingsDocument>()
+            .Identity(x => x.Id);
+
         // ── Focus Analytics Rollups (ADM-014) ──
         opts.Schema.For<FocusSessionRollupDocument>()
             .Identity(x => x.Id)

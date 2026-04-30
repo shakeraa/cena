@@ -336,6 +336,15 @@ public static class CenaAdminServiceRegistration
         services.AddScoped<ICulturalContextReviewBoardService, CulturalContextReviewBoardService>();
         services.AddScoped<IEventStreamService, EventStreamService>();
         services.AddScoped<IOutreachEngagementService, OutreachEngagementService>();
+        // AI settings — Marten-backed AiSettingsDocument + AES-GCM cipher
+        // (HKDF-derived from the platform root master key) + real Anthropic
+        // probe. AiGenerationService stays Singleton so the in-process cache
+        // and circuit breaker keep shared state across requests; its three
+        // new dependencies are all singleton-safe.
+        services.AddSingleton<Cena.Admin.Api.AiSettings.IApiKeyCipher,
+            Cena.Admin.Api.AiSettings.HkdfApiKeyCipher>();
+        services.AddSingleton<Cena.Admin.Api.AiSettings.IAnthropicConnectionProbe,
+            Cena.Admin.Api.AiSettings.AnthropicConnectionProbe>();
         services.AddSingleton<IAiGenerationService, AiGenerationService>();
 
         // prr-200 (ADR-0002, ADR-0032): Deterministic parametric template
