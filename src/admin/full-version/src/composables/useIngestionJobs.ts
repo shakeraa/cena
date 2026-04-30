@@ -127,6 +127,46 @@ export interface JobLogEntry {
   message: string
 }
 
+export interface IngestionJobDetail extends IngestionJobSummary {
+  // ResultJson is the serialized strategy return value. Shape is
+  // strategy-specific. For GenerateVariants the SPA parses it into
+  // GenerateVariantsResult below. Null while the job is still
+  // queued/running, or when the strategy returned null.
+  resultJson: string | null
+}
+
+// GenerateVariantsJobStrategy.ExecuteAsync return shape, mirrored here
+// so the drawer can render persistedQuestionIds[] as deep-links and
+// persistFailures[] as a per-candidate ledger without adding a new
+// backend DTO. Keep field names aligned with the anonymous object at
+// GenerateVariantsJobStrategy.cs:241-261.
+export interface GenerateVariantsResult {
+  sourceDraftId: string
+  sourcePdfId?: string | null
+  requested: number
+  generated: number
+  passedQualityGate: number
+  persistedQuestionIds: string[]
+  persistFailures: string[]
+  sample: Array<{
+    stem: string
+    topic: string | null
+    bloomsLevel: string | null
+    difficulty: number
+    passedQualityGate: boolean
+    casOutcome: string | null
+  }>
+}
+
+async function fetchJobDetail(jobId: string): Promise<IngestionJobDetail | null> {
+  try {
+    return await $api<IngestionJobDetail>(`/admin/ingestion/jobs/${jobId}`)
+  }
+  catch {
+    return null
+  }
+}
+
 async function enqueueCloudDir(payload: {
   provider: string
   bucketOrPath: string
@@ -182,6 +222,7 @@ export function useIngestionJobs() {
     runningCount,
     fetchJobs,
     fetchLogs,
+    fetchJobDetail,
     startPolling,
     stopPolling,
     enqueueBagrut,
