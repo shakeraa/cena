@@ -47,13 +47,15 @@ public sealed class StripeWebhookHandler
     private readonly IProcessedWebhookLog _processedLog;
     private readonly TimeProvider _clock;
     private readonly DiscountAssignmentService? _discountService;
+    private readonly IStudentTrialConsumptionStore? _consumptionStore;
 
     public StripeWebhookHandler(
         StripeOptions options,
         ISubscriptionAggregateStore store,
         IProcessedWebhookLog processedLog,
         TimeProvider clock,
-        DiscountAssignmentService? discountService = null)
+        DiscountAssignmentService? discountService = null,
+        IStudentTrialConsumptionStore? consumptionStore = null)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _store = store ?? throw new ArgumentNullException(nameof(store));
@@ -61,6 +63,12 @@ public sealed class StripeWebhookHandler
         _clock = clock ?? throw new ArgumentNullException(nameof(clock));
         // Optional — hosts that don't wire the discount-codes feature pass null.
         _discountService = discountService;
+        // Optional — used during Trial → Active conversion to capture
+        // TrialUtilization for the TrialConverted_V1 analytics marker.
+        // Hosts that haven't wired the consumption store get a Trialing →
+        // Active conversion with TrialUtilization.NoConsumption (analytics
+        // degraded but conversion semantics intact).
+        _consumptionStore = consumptionStore;
     }
 
     /// <summary>
@@ -169,19 +177,82 @@ public sealed class StripeWebhookHandler
     {
         var invoice = (Invoice?)ev.Data.Object
             ?? throw new InvalidOperationException("invoice.paid missing body.");
-        var parentId = invoice.SubscriptionDetails?.Metadata is { Count: > 0 } meta
-            ? RequireMeta(meta, "cena_parent_id")
-            : invoice.Metadata is { Count: > 0 } m ? RequireMeta(m, "cena_parent_id") : null;
-        if (string.IsNullOrWhiteSpace(parentId)) return;
+        var meta = invoice.SubscriptionDetails?.Metadata is { Count: > 0 } m1 ? m1
+                 : invoice.Metadata is { Count: > 0 } m2 ? m2
+                 : null;
+        if (meta is null) return;
+        var parentId = RequireMeta(meta, "cena_parent_id");
 
         var aggregate = await _store.LoadAsync(parentId, ct);
-        // Only emit renewal if already active; first-invoice payment is handled by checkout.session.completed.
+        var now = _clock.GetUtcNow();
+
+        // Trial → Paid conversion (Phase 3 conversion-flow). Stripe's
+        // SetupIntent flow does NOT fire checkout.session.completed at
+        // conversion — only invoice.paid. So a Trialing-state invoice.paid
+        // IS the conversion event. Emit TrialConverted_V1 (analytics marker)
+        // + SubscriptionActivated_V1 atomically: Apply(TrialConverted)
+        // is a no-op on Status, then Apply(SubscriptionActivated) flips to
+        // Active. Without the marker the trial-conversion analytics row,
+        // conversion email, and post-trial receipt all silently never fire.
+        if (aggregate.State.Status == SubscriptionStatus.Trialing)
+        {
+            var tier = ParseTier(RequireMeta(meta, "cena_tier"));
+            var cycle = ParseCycle(RequireMeta(meta, "cena_cycle"));
+
+            var primary = aggregate.State.LinkedStudents.FirstOrDefault()
+                ?? throw new InvalidOperationException(
+                    "Trial state has no linked primary student — stream is corrupt.");
+
+            var utilization = TrialUtilization.NoConsumption;
+            if (_consumptionStore is not null)
+            {
+                var consumption = await _consumptionStore
+                    .GetAsync(primary.StudentSubjectIdEncrypted, ct)
+                    .ConfigureAwait(false);
+                utilization = new TrialUtilization(
+                    TutorTurnsUsed: consumption.TutorTurnsUsed,
+                    PhotoDiagnosticsUsed: consumption.PhotoDiagnosticsUsed,
+                    SessionsStarted: consumption.SessionsStarted,
+                    DaysActive: consumption.DaysActive,
+                    HitCapBeforeExpiry: false);
+            }
+
+            var paymentTxnId = invoice.Id ?? string.Empty;
+            var trialConverted = SubscriptionCommands.ConvertTrial(
+                currentState: aggregate.State,
+                convertedToTier: tier,
+                billingCycle: cycle,
+                paymentTransactionIdEncrypted: paymentTxnId,
+                utilizationAtConversion: utilization,
+                convertedAt: now);
+
+            var activated = SubscriptionCommands.Activate(
+                currentState: aggregate.State,
+                parentSubjectIdEncrypted: parentId,
+                primaryStudentSubjectIdEncrypted: primary.StudentSubjectIdEncrypted,
+                tier: tier,
+                cycle: cycle,
+                paymentTransactionIdEncrypted: paymentTxnId,
+                activatedAt: now);
+
+            // AppendManyAsync rejects partial batches — either both events
+            // land or neither does. This is the same atomicity guarantee
+            // Phase 1D-fix iter 2 added for StartTrial + SetupIntent.
+            await _store.AppendManyAsync(
+                parentId,
+                new object[] { trialConverted, activated },
+                ct);
+            return;
+        }
+
+        // Renewal: only emit when already active (or PastDue recovering).
+        // First-invoice for direct-checkout flows is handled by
+        // checkout.session.completed; this branch covers ongoing renewals.
         if (aggregate.State.Status != SubscriptionStatus.Active &&
             aggregate.State.Status != SubscriptionStatus.PastDue)
         {
             return;
         }
-        var now = _clock.GetUtcNow();
         var nextRenewsAt = SubscriptionCommands.ComputeNextRenewal(now, aggregate.State.CurrentCycle);
         var evt = new RenewalProcessed_V1(
             ParentSubjectIdEncrypted: parentId,
