@@ -144,7 +144,13 @@ public sealed class BagrutDraftPersistence : IBagrutDraftPersistence
                 CurrentStage = Cena.Actors.Ingest.PipelineStage.InReview,
                 Status = "processing",
                 StageHistory = new List<StageRecord> { stageRecord },
-                ExtractedQuestionCount = 1,
+                // Variants count starts at 0 — a Bagrut draft is the
+                // *source* for AI-generated variants, not a variant
+                // itself. GenerateVariantsJobStrategy increments this
+                // (and ExtractedQuestionIds) when each candidate
+                // persists, so the kanban "N variants" label tracks
+                // the actual count in the question bank.
+                ExtractedQuestionCount = 0,
                 AvgQualityScore = (float)d.ExtractionConfidence,
                 SubmittedBy = submittedBy,
                 SubmittedAt = now,

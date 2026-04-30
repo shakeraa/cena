@@ -441,6 +441,12 @@ public static class CenaAdminServiceRegistration
         // under /api/admin/ingestion/pipeline/{id}/metadata (GET/PATCH/DELETE).
         app.MapCuratorMetadataEndpoints();
 
+        // Curator Taxonomy lookup — /api/admin/ingestion/taxonomy/leaves[?track=3u|4u|5u]
+        // backs the autocomplete in the Curator Metadata Panel so the
+        // taxonomy node field validates against bagrut-taxonomy.json
+        // instead of accepting free-text typos.
+        app.MapCuratorTaxonomyEndpoints();
+
         // RDY-057 (Phase 3): POST /api/admin/ingestion/bagrut — SuperAdmin-only
         // PDF ingest trigger that routes to BagrutPdfIngestionService.
         app.MapBagrutIngestEndpoints();
