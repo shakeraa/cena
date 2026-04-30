@@ -90,9 +90,6 @@ grandfathered:
   - path: src/actors/Cena.Actors.Tests/Compliance/RetentionWorkerTests.cs
     baseline_loc: 711
     reason: "Comprehensive retention coverage; split by scenario group is a follow-up"
-  - path: src/shared/Cena.Infrastructure.Tests/Compliance/RightToErasureEndToEndTests.cs
-    baseline_loc: 593
-    reason: "E2E erasure coverage; split by phase is a follow-up"
   - path: src/api/Cena.Admin.Api.Tests/QualityGate/QualityGateTestData.cs
     baseline_loc: 548
     reason: "Test-data fixtures; static data, refactor into per-category partials is a follow-up"
