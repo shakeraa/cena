@@ -199,45 +199,47 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
 
     public async Task<bool> RetryItemAsync(string id)
     {
-        // HONEST FAILURE: this method historically reset the doc back to
-        // Status=processing+CurrentStage=Incoming and returned true, but:
-        //   1. NO worker scans for retriable items and re-invokes the
-        //      orchestrator. The 4 callers of IIngestionOrchestrator
-        //      .ProcessFileAsync are all upload-path entry points.
-        //   2. NO bytes are persisted during initial ingestion — the
-        //      orchestrator reads the file into memory, runs OCR, and
-        //      discards. The S3Key field on the doc points to a path no
-        //      PutObject ever lands at.
-        // Even if a worker existed, it would have no bytes to re-process.
+        // PRR-RETRY-IMPL: reset the doc to a retriable state. The actual
+        // re-processing happens out-of-band on the IngestionRetryWorker
+        // (Actor Host BackgroundService) which scans for items where
+        // Status=processing+CurrentStage=Incoming+RetryCount>0 past their
+        // backoff window, fetches the persisted bytes via the configured
+        // IIngestionBytesStore, and re-invokes ProcessFileAsync.
         //
-        // A real Retry needs both halves: bytes persistence (S3 PutObject
-        // or local-disk write during ProcessFileAsync) + a retry worker
-        // (BackgroundService scanning for Status=processing items past
-        // a backoff window, re-fetching bytes, re-invoking the orchestrator).
-        // That's filed as PRR-RETRY-IMPL.
-        //
-        // Until that lands, the honest behavior is to refuse rather than
-        // lie. The endpoint that wraps this returns 501 Not Implemented
-        // with a message; the SPA renders it in the existing error path.
-        // The doc is NOT mutated — leaving the doc in its "Failed" or
-        // "stuck-Incoming" state is more honest than pretending we
-        // re-queued it.
-        await using var session = _store.QuerySession();
+        // Legacy items (BytesPersisted=false) cannot be retried — the
+        // bytes were never durably persisted. We refuse here with a
+        // distinct error so the SPA can render "please re-upload" rather
+        // than a generic failure. The doc is NOT mutated in that case.
+        await using var session = _store.LightweightSession();
         var item = await session.LoadAsync<PipelineItemDocument>(id);
         if (item is null) return false;
 
-        _logger.LogWarning(
-            "RetryItemAsync called for {ItemId}, but retry is not implemented " +
-            "(PRR-RETRY-IMPL). Pipeline doc unchanged; admin should re-upload " +
-            "via /api/admin/ingestion/upload. CurrentStage={Stage} Status={Status}.",
-            id, item.CurrentStage, item.Status);
-        // Throw so the endpoint can map to 501. The previous "return false"
-        // path was indistinguishable from "item not found" (which returns 404).
-        throw new NotImplementedException(
-            "Pipeline retry is not yet implemented. The original file bytes are not " +
-            "persisted during ingestion, so there is nothing to re-process. " +
-            "Until PRR-RETRY-IMPL ships, please re-upload the file via " +
-            "POST /api/admin/ingestion/upload.");
+        if (!item.BytesPersisted)
+        {
+            _logger.LogWarning(
+                "RetryItemAsync refused for {ItemId}: BytesPersisted=false (legacy item, " +
+                "uploaded before PRR-RETRY-IMPL). Curator must re-upload via /api/admin/ingestion/upload.",
+                id);
+            throw new InvalidOperationException(
+                "BYTES_NOT_PERSISTED: this pipeline item was uploaded before bytes-persistence " +
+                "was wired (or the bytes-store PUT failed at upload time). The original file is " +
+                "not retrievable, so retry cannot run. Please re-upload via " +
+                "POST /api/admin/ingestion/upload.");
+        }
+
+        item.RetryCount++;
+        item.Status = "processing";
+        item.CurrentStage = Cena.Actors.Ingest.PipelineStage.Incoming;
+        item.LastError = null;
+        item.UpdatedAt = DateTimeOffset.UtcNow;
+        session.Store(item);
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "RetryItemAsync: reset {ItemId} to retriable (attempt {Attempt}); " +
+            "IngestionRetryWorker will pick it up after backoff.",
+            id, item.RetryCount);
+        return true;
     }
 
     public async Task<bool> RejectPipelineItemAsync(string id, string reason)

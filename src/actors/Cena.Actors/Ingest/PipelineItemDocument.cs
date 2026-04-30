@@ -74,6 +74,13 @@ public sealed class PipelineItemDocument
     public string? LastError { get; set; }
     public int RetryCount { get; set; }
 
+    // PRR-RETRY-IMPL: when the original file bytes were durably persisted
+    // to the configured bytes store (S3 or local disk) at upload time.
+    // The retry worker fetches them via S3Key; legacy items pre-fix have
+    // false here and the Retry endpoint refuses with a clean
+    // "please re-upload" error rather than silently no-oping.
+    public bool BytesPersisted { get; set; }
+
     // Audit
     public string SubmittedBy { get; set; } = "";
     public DateTimeOffset SubmittedAt { get; set; }

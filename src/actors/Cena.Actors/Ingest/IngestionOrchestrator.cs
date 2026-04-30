@@ -50,6 +50,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
     private readonly IDocumentStore _store;
     private readonly INatsConnection _nats;
     private readonly ICasGatedQuestionPersister _persister;
+    private readonly IIngestionBytesStore _bytesStore;
     private readonly ILogger<IngestionOrchestrator> _logger;
 
     public IngestionOrchestrator(
@@ -61,6 +62,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
         IDocumentStore store,
         INatsConnection nats,
         ICasGatedQuestionPersister persister,
+        IIngestionBytesStore bytesStore,
         ILogger<IngestionOrchestrator> logger)
     {
         _ocrClient = ocrClient;
@@ -71,6 +73,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
         _store = store;
         _nats = nats;
         _persister = persister;
+        _bytesStore = bytesStore;
         _logger = logger;
     }
 
@@ -88,6 +91,21 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
             var contentHash = Convert.ToHexStringLower(SHA256.HashData(fileBytes));
             var s3Key = $"incoming/{now:yyyy/MM/dd}/{contentHash}/{request.Filename}";
 
+            // PRR-RETRY-IMPL: persist the raw bytes BEFORE we kick off OCR
+            // so a retry can replay the file even if the OCR sidecar (or
+            // anything downstream) fails. PUT failure is logged but does
+            // not fail the upload — BytesPersisted=false flags the item
+            // as "non-retryable", and the Retry endpoint refuses cleanly
+            // with a "please re-upload" error rather than silently no-op.
+            var bytesPersisted = await _bytesStore.PutAsync(
+                s3Key, fileBytes, request.ContentType, ct);
+            if (!bytesPersisted)
+            {
+                _logger.LogWarning(
+                    "Bytes-store PUT failed for {ItemId} ({Bytes} bytes); item will not be retryable.",
+                    pipelineItemId, fileBytes.Length);
+            }
+
             var pipelineItem = new PipelineItemDocument
             {
                 Id = pipelineItemId,
@@ -98,6 +116,7 @@ public sealed class IngestionOrchestrator : IIngestionOrchestrator
                 ContentHash = contentHash,
                 ContentType = request.ContentType,
                 FileSizeBytes = fileBytes.Length,
+                BytesPersisted = bytesPersisted,
                 CurrentStage = PipelineStage.Incoming,
                 SubmittedBy = request.SubmittedBy,
                 SubmittedAt = now,

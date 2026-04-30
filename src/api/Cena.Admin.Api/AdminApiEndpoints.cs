@@ -681,14 +681,24 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-        // Retry endpoint — see RetryItemAsync NotImplementedException + PRR-RETRY-IMPL.
+        // Retry endpoint — PRR-RETRY-IMPL. Resets the doc to retriable;
+        // IngestionRetryWorker (Actor Host BackgroundService) picks it up
+        // after the backoff window and re-feeds the orchestrator with the
+        // persisted bytes. Legacy items uploaded before bytes-persistence
+        // (BytesPersisted=false) get a 409 with error="bytes_not_persisted"
+        // so the SPA can render "please re-upload" rather than a generic failure.
         group.MapPost("/items/{id}/retry", async (string id, IIngestionPipelineService service) =>
         {
             try { var ok = await service.RetryItemAsync(id); return ok ? Results.Ok() : Results.NotFound(); }
-            catch (NotImplementedException ex) { return Results.Json(new { error = "retry_not_implemented", message = ex.Message }, statusCode: StatusCodes.Status501NotImplemented); }
+            catch (InvalidOperationException ex) when (ex.Message.StartsWith("BYTES_NOT_PERSISTED"))
+            {
+                return Results.Json(
+                    new { error = "bytes_not_persisted", message = ex.Message },
+                    statusCode: StatusCodes.Status409Conflict);
+            }
         }).WithName("RetryPipelineItem")
     .Produces(StatusCodes.Status200OK).Produces<CenaError>(StatusCodes.Status404NotFound)
-    .Produces(StatusCodes.Status501NotImplemented).Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces(StatusCodes.Status409Conflict).Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests).Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
         group.MapPost("/items/{id}/reject", async (string id, RejectPipelineItemRequest request, IIngestionPipelineService service) =>
