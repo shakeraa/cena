@@ -683,11 +683,25 @@ public static class AdminApiEndpoints
 
         group.MapPost("/items/{id}/retry", async (string id, IIngestionPipelineService service) =>
         {
-            var success = await service.RetryItemAsync(id);
-            return success ? Results.Ok() : Results.NotFound();
+            // Retry currently throws NotImplementedException because the
+            // bytes-persistence + retry-worker pair is not in place
+            // (PRR-RETRY-IMPL). Map that to 501 with the message body so
+            // the SPA can render it in the existing error path.
+            try
+            {
+                var success = await service.RetryItemAsync(id);
+                return success ? Results.Ok() : Results.NotFound();
+            }
+            catch (NotImplementedException ex)
+            {
+                return Results.Json(
+                    new { error = "retry_not_implemented", message = ex.Message },
+                    statusCode: StatusCodes.Status501NotImplemented);
+            }
         }).WithName("RetryPipelineItem")
     .Produces(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status404NotFound)
+    .Produces(StatusCodes.Status501NotImplemented)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
