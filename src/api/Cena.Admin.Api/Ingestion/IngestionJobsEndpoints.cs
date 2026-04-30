@@ -68,11 +68,26 @@ public static class IngestionJobsEndpoints
             .Produces(StatusCodes.Status404NotFound);
 
         // Feature-flag readback for the SPA. Lets the Generate Variants
-        // dialog render a 'Disabled pending legal sign-off' banner up
-        // front instead of failing on submit (ADR-0059 §15.5 + PRR-249
-        // gating per claude-code directive m_ed53adeb90d2).
-        group.MapGet("/feature-flags", (IConfiguration cfg) =>
+        // dialog render an up-front banner instead of failing on submit:
+        //   - 'Disabled pending legal sign-off' (ADR-0059 §15.5 + PRR-249)
+        //   - 'AI provider not configured' (no API key set for the active
+        //     provider — pre-flight catches the silent-Completed pattern
+        //     where the LLM call fails fast and the strategy reported
+        //     'LLM returned 0 candidates' without surfacing the actual
+        //     reason; cm audit 2026-04-30).
+        group.MapGet("/feature-flags", async (
+            IConfiguration cfg, IAiGenerationService ai) =>
         {
+            // Source of truth for "is an API key configured" is the
+            // settings service that resolves config + admin-runtime
+            // settings together. We check the active provider's view —
+            // not 'any provider' — because the strategy will route to
+            // the active one.
+            var settings = await ai.GetSettingsAsync();
+            var activeView = settings.Providers
+                .FirstOrDefault(p => p.Provider == settings.ActiveProvider);
+            var aiProviderConfigured = activeView?.HasApiKey ?? false;
+
             return Results.Ok(new
             {
                 bagrutSeedToLlmEnabled =
@@ -80,6 +95,12 @@ public static class IngestionJobsEndpoints
                 bagrutSeedDisabledReason =
                     "Source-anchored variant generation is implementation-complete but gated " +
                     "on PRR-249 legal-delta memo sign-off (ADR-0059 §15.5). See docs/engineering/feature-flags.md.",
+                aiProviderConfigured,
+                aiProviderName = activeView?.DisplayName ?? settings.ActiveProvider.ToString(),
+                aiProviderNotConfiguredReason =
+                    "No API key configured for the active AI provider. Set it under " +
+                    "Settings → AI Providers, or via the Anthropic:ApiKey configuration / " +
+                    "ANTHROPIC_API_KEY environment variable.",
             });
         }).WithName("GetIngestionJobFeatureFlags")
             .Produces(StatusCodes.Status200OK);

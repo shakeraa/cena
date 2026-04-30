@@ -103,6 +103,29 @@ internal sealed class GenerateVariantsJobStrategy : IIngestionJobStrategy
 
         var batch = await ai.BatchGenerateAsync(batchRequest, qualityGate);
 
+        // Fail-fast on LLM-call failure (no API key, circuit-breaker open,
+        // model not reachable). Pre-audit, the strategy continued through
+        // an empty Results list and reported 'Generated 0 · 0 passed · 0
+        // persisted' as a Completed job — silent failure that masked the
+        // real reason ("No API key configured for Anthropic" was on
+        // batch.Error but never logged). Throwing here lets the runner
+        // mark the job Failed with the actual error message; the drawer
+        // renders it in the existing red-error path and the curator can
+        // act. Same family as the AsyncLocal write-back trap (cm audit
+        // 2026-04-30): don't let pure-function-tested code paths
+        // silently produce zero on the wider call chain.
+        if (!batch.Success)
+        {
+            var reason = string.IsNullOrWhiteSpace(batch.Error)
+                ? "AI batch generation failed without an error message — see admin-api logs for details."
+                : batch.Error;
+            await progress.LogAsync("error",
+                $"AI batch generation failed: {reason}",
+                ct);
+            throw new InvalidOperationException(
+                $"AI batch generation failed: {reason}");
+        }
+
         var passedQg = batch.Results.Count(r => r.PassedQualityGate);
         await progress.LogAsync("info",
             $"LLM returned {batch.Results.Count} candidates · {passedQg} passed quality gate · model={batch.ModelUsed}",
