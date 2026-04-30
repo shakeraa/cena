@@ -104,10 +104,25 @@ public sealed record OcrRegion(
     string Text,
     float Confidence);
 
+// QualityScores surfaces aggregate scores for the pipeline item's
+// detail view in the Curator inspector.
+//
+//   MathCorrectness     — derived from item.AvgQualityScore (ingestion-stage).
+//   LanguageQuality     — averaged over QuestionState.LastQualityEvaluation.LanguageQuality
+//                         across the item's persisted questions/variants. Null
+//                         when no questions exist yet OR none have a quality
+//                         evaluation. The SPA hides the bar in the null case.
+//   PedagogicalQuality  — same as LanguageQuality but for the pedagogical dim.
+//   PlagiarismScore     — derived from item.DuplicateCount (ingestion-stage).
+//
+// The two LLM-rubric dimensions used to be hardcoded to 80 / 75. That
+// shipped a lie — every detail panel showed the same numbers regardless
+// of the real evaluation. Made nullable so "we don't have a measurement"
+// is expressible end-to-end (per the no-stubs ban, 2026-04-11).
 public sealed record QualityScores(
     int MathCorrectness,
-    int LanguageQuality,
-    int PedagogicalQuality,
+    int? LanguageQuality,
+    int? PedagogicalQuality,
     int PlagiarismScore);
 
 public sealed record ExtractedQuestion(

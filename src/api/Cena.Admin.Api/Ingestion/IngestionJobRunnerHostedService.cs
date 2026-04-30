@@ -583,6 +583,50 @@ internal sealed class GenerateVariantsJobStrategy : IIngestionJobStrategy
             }
         }
 
+        // Update the source PipelineItemDocument so the kanban
+        // "N variants" label and the sidebar `extractedQuestions`
+        // list reflect the variants actually persisted.
+        //
+        // Race window: this is a LoadAsync → mutate → SaveChangesAsync
+        // pair, which TOCTOU-races if two GenerateVariants jobs run
+        // against the same draft concurrently (curator double-click
+        // across tabs, or two curators on one draft). Mitigation: this
+        // is a single-curator-clicked path on a low-frequency surface,
+        // and the worst case is "second job's variant IDs clobber the
+        // first" — the underlying QuestionReadModel rows persist either
+        // way; only the kanban list view is affected. A Postgres advisory
+        // lock would close the window if usage ever justifies it (see
+        // feedback_marten_concurrency_patterns).
+        if (persistedIds.Count > 0)
+        {
+            await using var writeSession = store.LightweightSession();
+            var pipelineDoc = await writeSession.LoadAsync<Cena.Actors.Ingest.PipelineItemDocument>(
+                payload.DraftId, ct);
+            if (pipelineDoc is not null)
+            {
+                pipelineDoc.ExtractedQuestionIds.AddRange(persistedIds);
+                pipelineDoc.ExtractedQuestionCount =
+                    pipelineDoc.ExtractedQuestionIds.Count;
+                pipelineDoc.UpdatedAt = DateTimeOffset.UtcNow;
+                writeSession.Store(pipelineDoc);
+                await writeSession.SaveChangesAsync(ct);
+
+                await progress.LogAsync("info",
+                    $"Linked {persistedIds.Count} variants to source pipeline doc {payload.DraftId}",
+                    ct);
+            }
+            else
+            {
+                // Draft row vanished between job-start and writeback —
+                // rare (only if curator rejected/deleted the source mid-
+                // job). Variants still persisted; just don't appear in
+                // the kanban view of the source.
+                await progress.LogAsync("warn",
+                    $"Source pipeline doc {payload.DraftId} not found at variant-writeback; {persistedIds.Count} variants persisted but not linked to kanban view",
+                    ct);
+            }
+        }
+
         await progress.ReportAsync(100,
             $"Generated {batch.Results.Count} · {passedQg} passed · {persistedIds.Count} persisted",
             ct);

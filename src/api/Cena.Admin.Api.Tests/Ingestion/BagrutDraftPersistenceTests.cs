@@ -461,6 +461,27 @@ public sealed class BagrutDraftPersistenceTests
     }
 
     [Fact]
+    public async Task PersistAsync_Starts_ExtractedQuestionCount_At_Zero()
+    {
+        // Bagrut drafts are *sources* for AI-generated variants, not
+        // variants themselves. The kanban + sidebar both label this
+        // count "variants"; starting at 1 lied — no variants exist
+        // until GenerateVariantsJobStrategy persists candidates.
+        // See ItemDetailPanel.vue (sidebar reads ExtractedQuestionIds
+        // length) and pipeline.vue (kanban reads ExtractedQuestionCount);
+        // alignment requires this to start at zero.
+        await _persistence.PersistAsync(
+            examCode: "math-5u-2026-35581",
+            sourcePdfId: "pdf-abc",
+            sourceFilename: null,
+            submittedBy: "curator@cena.dev",
+            drafts: new[] { MakeDraft() });
+
+        Assert.Equal(0, _storedItems[0].ExtractedQuestionCount);
+        Assert.Empty(_storedItems[0].ExtractedQuestionIds);
+    }
+
+    [Fact]
     public async Task PersistAsync_Empty_Drafts_Returns_Empty_Without_Storing()
     {
         var ids = await _persistence.PersistAsync(

@@ -14,8 +14,13 @@ interface ProcessingStage {
 
 interface QualityScores {
   mathCorrectness: number
-  languageQuality: number
-  pedagogicalQuality: number
+  // LanguageQuality / PedagogicalQuality are computed from per-question
+  // QualityGate evaluations (averaged over the item's variants). They
+  // come back null when no variants have a QualityGate evaluation yet
+  // — in that case we hide the bar instead of rendering a misleading
+  // constant. Was hardcoded 80 / 75 before 2026-04-30.
+  languageQuality: number | null
+  pedagogicalQuality: number | null
   plagiarismScore: number
 }
 

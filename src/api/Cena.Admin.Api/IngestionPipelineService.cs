@@ -135,6 +135,8 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
         }
 
         var extractedQuestions = new List<ExtractedQuestion>();
+        int? languageQualityAvg    = null;
+        int? pedagogicalQualityAvg = null;
         if (item.ExtractedQuestionIds.Count > 0)
         {
             var questions = await session.Query<Cena.Actors.Questions.QuestionReadModel>()
@@ -147,6 +149,34 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
                 Answer: null,
                 Confidence: q.QualityScore / 100f
             )).ToList();
+
+            // Per-dimension scores live on QuestionState.LastQualityEvaluation
+            // (event-sourced). QuestionReadModel only carries the composite
+            // QualityScore — adding the two dimensions to the projection
+            // would let us avoid this fan-out, but it's a wider change than
+            // this fix. Per-call cost: N stream rehydrations on detail-panel
+            // open, where N is the variants count for one Bagrut draft
+            // (typically 5-20). Acceptable for a curator-action endpoint.
+            // If the cost ever bites, promote the two ints into
+            // QuestionListProjection.
+            var langScores = new List<int>();
+            var pedScores  = new List<int>();
+            foreach (var qid in item.ExtractedQuestionIds)
+            {
+                var qstate = await session.Events
+                    .AggregateStreamAsync<Cena.Actors.Questions.QuestionState>(qid);
+                var eval = qstate?.LastQualityEvaluation;
+                if (eval is null) continue;
+                langScores.Add(eval.LanguageQuality);
+                pedScores.Add(eval.PedagogicalQuality);
+            }
+            // Round-half-away-from-zero so a 79.5 average doesn't display
+            // as "79" via banker's rounding — curators read these as
+            // grades and the small visual difference matters.
+            if (langScores.Count > 0)
+                languageQualityAvg = (int)Math.Round(langScores.Average(), MidpointRounding.AwayFromZero);
+            if (pedScores.Count > 0)
+                pedagogicalQualityAvg = (int)Math.Round(pedScores.Average(), MidpointRounding.AwayFromZero);
         }
 
         return new PipelineItemDetailResponse(
@@ -161,8 +191,8 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
             OcrResult: ocrOutput,
             Quality: new QualityScores(
                 MathCorrectness: (int)((item.AvgQualityScore ?? 0) * 100),
-                LanguageQuality: 80,
-                PedagogicalQuality: 75,
+                LanguageQuality: languageQualityAvg,
+                PedagogicalQuality: pedagogicalQualityAvg,
                 PlagiarismScore: item.DuplicateCount ?? 0),
             ExtractedQuestions: extractedQuestions);
     }
