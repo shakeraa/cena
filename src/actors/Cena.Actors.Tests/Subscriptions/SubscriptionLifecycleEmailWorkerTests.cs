@@ -348,6 +348,213 @@ public class SubscriptionLifecycleEmailWorkerTests
         Assert.DoesNotContain(plan, p => p.EmailKind == Kinds.RenewalUpcoming);
     }
 
+    // ---- Pass 3: TrialEnding + TrialConverted (t_c513d0ee089f) ------------
+
+    [Fact]
+    public void Within_window_fires_TrialEnding_with_per_cycle_marker()
+    {
+        // Trial started 2026-05-01, ends 2026-05-08 (7-day trial). At
+        // 2026-05-07 (1 day before end, default lead) the notice fires.
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var trialEndsAt = trialStartedAt.AddDays(7);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialEndsAt)),
+        };
+
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), trialEndsAt.AddDays(-1), DefaultOptions);
+
+        var ending = plan.SingleOrDefault(p => p.EmailKind == Kinds.TrialEnding);
+        Assert.NotNull(ending);
+        Assert.Equal(ParentA, ending!.ParentSubjectIdEncrypted);
+        // Marker id includes TrialEndsAt so a second trial cycle (rare,
+        // but possible if abuse-defense lets it through) gets its own
+        // notice.
+        Assert.Contains(Kinds.TrialEnding, ending.MarkerId);
+        Assert.Contains(trialEndsAt.ToUniversalTime().ToString("o"), ending.MarkerId);
+    }
+
+    [Fact]
+    public void Too_early_does_not_fire_TrialEnding()
+    {
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var trialEndsAt = trialStartedAt.AddDays(7);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialEndsAt)),
+        };
+        // 2026-05-04 is 4 days before end — well before the 1-day lead.
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), trialStartedAt.AddDays(3), DefaultOptions);
+
+        Assert.DoesNotContain(plan, p => p.EmailKind == Kinds.TrialEnding);
+    }
+
+    [Fact]
+    public void Past_window_does_not_fire_TrialEnding()
+    {
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var trialEndsAt = trialStartedAt.AddDays(7);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialEndsAt)),
+        };
+        // 7 days after the trial ended — way past the 25h window.
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), trialEndsAt.AddDays(7), DefaultOptions);
+
+        Assert.DoesNotContain(plan, p => p.EmailKind == Kinds.TrialEnding);
+    }
+
+    [Fact]
+    public void Converted_trial_suppresses_TrialEnding()
+    {
+        // Trial converted 1 day before end → TrialEnding must NOT fire,
+        // even though we're inside the lead window.
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var trialEndsAt = trialStartedAt.AddDays(7);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialEndsAt)),
+            Input(StreamA, TrialConverted(ParentA, trialStartedAt.AddDays(6))),
+        };
+
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), trialEndsAt.AddDays(-1), DefaultOptions);
+
+        Assert.DoesNotContain(plan, p => p.EmailKind == Kinds.TrialEnding);
+        // But TrialConverted itself fires.
+        Assert.Contains(plan, p => p.EmailKind == Kinds.TrialConverted);
+    }
+
+    [Fact]
+    public void Cap_only_trial_does_not_fire_TrialEnding()
+    {
+        // Cap-hit-only trial: TrialEndsAt == TrialStartedAt (no calendar
+        // bound — see TrialStarted_V1.TrialEndsAt docstring). The worker
+        // must NOT compute a fire-window from that; the cap-hit path
+        // emits its own signal.
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialStartedAt)),
+        };
+
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), trialStartedAt.AddDays(1), DefaultOptions);
+
+        Assert.DoesNotContain(plan, p => p.EmailKind == Kinds.TrialEnding);
+    }
+
+    [Fact]
+    public void TrialEnding_is_per_cycle_idempotent_across_ticks()
+    {
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var trialEndsAt = trialStartedAt.AddDays(7);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialEndsAt)),
+        };
+
+        var firstTick = trialEndsAt.AddDays(-1);
+        var firstPlan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), firstTick, DefaultOptions);
+        var first = Assert.Single(firstPlan, p => p.EmailKind == Kinds.TrialEnding);
+
+        // Second tick still inside the 25h window — marker now in
+        // alreadySent — must NOT re-fire.
+        var sentMarkers = new HashSet<string> { first.MarkerId };
+        var secondPlan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, sentMarkers, firstTick.AddHours(2), DefaultOptions);
+
+        Assert.DoesNotContain(secondPlan, p => p.EmailKind == Kinds.TrialEnding);
+    }
+
+    [Fact]
+    public void TrialConverted_event_produces_TrialConverted_email()
+    {
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var trialEndsAt = trialStartedAt.AddDays(7);
+        var convertedAt = trialStartedAt.AddDays(5);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialEndsAt)),
+            Input(StreamA, TrialConverted(ParentA, convertedAt)),
+        };
+
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), convertedAt.AddMinutes(5), DefaultOptions);
+
+        var converted = Assert.Single(plan, p => p.EmailKind == Kinds.TrialConverted);
+        Assert.Equal(ParentA, converted.ParentSubjectIdEncrypted);
+        // Per-parent marker (NOT per-cycle) — a parent who converts
+        // multiple trial cycles in their lifetime is rare, and the
+        // task body picked option (a) per-parent idempotent.
+        Assert.Equal($"{ParentA}:{Kinds.TrialConverted}", converted.MarkerId);
+    }
+
+    [Fact]
+    public void TrialConverted_is_per_parent_idempotent()
+    {
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var trialEndsAt = trialStartedAt.AddDays(7);
+        var convertedAt = trialStartedAt.AddDays(5);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialEndsAt)),
+            Input(StreamA, TrialConverted(ParentA, convertedAt)),
+        };
+
+        var sentMarkers = new HashSet<string> { $"{ParentA}:{Kinds.TrialConverted}" };
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, sentMarkers, convertedAt.AddMinutes(5), DefaultOptions);
+
+        Assert.DoesNotContain(plan, p => p.EmailKind == Kinds.TrialConverted);
+    }
+
+    [Fact]
+    public void Welcome_is_suppressed_when_TrialConverted_precedes_Activation()
+    {
+        // The Phase 3 conversion path emits TrialConverted_V1 then
+        // SubscriptionActivated_V1 in the same stream. Welcome email
+        // would duplicate the TrialConverted email — option (a) per the
+        // task body suppresses Welcome on streams that have a
+        // TrialConverted_V1 anywhere.
+        var trialStartedAt = new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero);
+        var convertedAt = trialStartedAt.AddDays(5);
+        var inputs = new[]
+        {
+            Input(StreamA, TrialStarted(ParentA, trialStartedAt, trialStartedAt.AddDays(7))),
+            Input(StreamA, TrialConverted(ParentA, convertedAt)),
+            Input(StreamA, Activated(ParentA, convertedAt.AddMonths(1))),
+        };
+
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), convertedAt.AddMinutes(5), DefaultOptions);
+
+        Assert.DoesNotContain(plan, p => p.EmailKind == Kinds.Welcome);
+        Assert.Contains(plan, p => p.EmailKind == Kinds.TrialConverted);
+    }
+
+    [Fact]
+    public void Welcome_still_fires_for_direct_checkout_without_trial()
+    {
+        // Belt + suspenders: a stream that activated WITHOUT a prior
+        // TrialConverted_V1 (direct checkout, no trial) keeps the
+        // Welcome behaviour — the suppression rule MUST be scoped to
+        // streams with conversion only.
+        var inputs = new[]
+        {
+            Input(StreamB, Activated(ParentB, MonthlyRenewsAt)),
+        };
+        var plan = SubscriptionLifecycleEmailWorker.ClassifyDispatches(
+            inputs, new HashSet<string>(), ActivatedAt, DefaultOptions);
+
+        Assert.Single(plan, p => p.EmailKind == Kinds.Welcome
+            && p.ParentSubjectIdEncrypted == ParentB);
+    }
+
     // ---- Helpers -----------------------------------------------------------
 
     private static SubscriptionActivated_V1 Activated(string parentId, DateTimeOffset renewsAt) =>
@@ -360,6 +567,32 @@ public class SubscriptionLifecycleEmailWorkerTests
             PaymentTransactionIdEncrypted: "txn",
             ActivatedAt: renewsAt.AddMonths(-1),
             RenewsAt: renewsAt);
+
+    private static TrialStarted_V1 TrialStarted(
+        string parentId, DateTimeOffset startedAt, DateTimeOffset endsAt) =>
+        new(
+            ParentSubjectIdEncrypted: parentId,
+            PrimaryStudentSubjectIdEncrypted: "enc::student",
+            TrialKind: TrialKind.ParentPay,
+            TrialStartedAt: startedAt,
+            TrialEndsAt: endsAt,
+            FingerprintHash: "fp-test",
+            ExperimentVariantId: "v1-baseline",
+            CapsSnapshot: new TrialCapsSnapshot(7, 50, 5, 50));
+
+    private static TrialConverted_V1 TrialConverted(
+        string parentId, DateTimeOffset convertedAt) =>
+        new(
+            ParentSubjectIdEncrypted: parentId,
+            PrimaryStudentSubjectIdEncrypted: "enc::student",
+            ConvertedAt: convertedAt,
+            DaysIntoTrial: (int)(convertedAt - new DateTimeOffset(2026, 5, 1, 10, 0, 0, TimeSpan.Zero)).TotalDays,
+            ConvertedToTier: SubscriptionTier.Premium,
+            BillingCycle: BillingCycle.Monthly,
+            PaymentTransactionIdEncrypted: "txn-converted",
+            UtilizationAtConversion: new TrialUtilization(
+                TutorTurnsUsed: 12, PhotoDiagnosticsUsed: 1, SessionsStarted: 8,
+                DaysActive: 5, HitCapBeforeExpiry: false));
 
     private static LifecycleEventInput Input(string stream, object payload) =>
         new(stream, payload);

@@ -1,20 +1,34 @@
 // =============================================================================
 // Cena Platform — SubscriptionLifecycleEmailWorker (EPIC-PRR-I PRR-345)
 //
-// Transactional emails for the subscription lifecycle, all 5 kinds:
-//   - Welcome            (on SubscriptionActivated_V1; per-parent idempotent)
+// Transactional emails for the subscription lifecycle, all 7 kinds:
+//   - Welcome            (on SubscriptionActivated_V1 from a non-trial path;
+//                         suppressed when TrialConverted_V1 immediately
+//                         precedes the activation in the stream — trial
+//                         converters get the dedicated TrialConverted email
+//                         instead, per t_c513d0ee089f cm 2026-04-30)
 //   - RenewalUpcoming    (4 days before RenewsAt; per-cycle idempotent)
 //   - PastDue            (on PaymentFailed_V1; per-parent idempotent)
 //   - CancellationConfirm(on SubscriptionCancelled_V1; per-parent idempotent)
 //   - RefundConfirm      (on SubscriptionRefunded_V1; per-parent idempotent)
+//   - TrialEnding        (1 day before TrialEndsAt by default; per-cycle
+//                         idempotent on TrialEndsAt; suppressed for trials
+//                         that have already converted or expired — same
+//                         shape as RenewalUpcoming)
+//   - TrialConverted     (on TrialConverted_V1; per-parent idempotent;
+//                         post-conversion confirmation/receipt with the
+//                         converted-to tier + cycle + amount-paid carried
+//                         on the event payload)
 //
 // Idempotency: LifecycleEmailMarker documents. Marker id shape:
 //   - Kinds tied to a single terminal event : "{parentId}:{kind}"
 //   - RenewalUpcoming (recurring per cycle) : "{parentId}:renewal_upcoming:{renewsAt:o}"
+//   - TrialEnding (per-cycle on TrialEndsAt)  : "{parentId}:trial_ending:{trialEndsAt:o}"
 //
 // Honest framing per memory "Honest not complimentary" — no guilt-trip on
-// cancellation, no pressure on past-due, no fake enthusiasm on welcome.
-// The ISubscriptionLifecycleEmailDispatcher seam owns template selection +
+// cancellation, no pressure on past-due, no fake enthusiasm on welcome,
+// no streak-style copy on trial-ending. The
+// ISubscriptionLifecycleEmailDispatcher seam owns template selection +
 // locale rendering; legal-reviewed HE / AR / EN copy is supplied by the
 // concrete dispatcher impl (content + counsel gate).
 // =============================================================================
@@ -53,6 +67,9 @@ public interface ISubscriptionLifecycleEmailDispatcher
         public const string PastDue = "past_due";
         public const string CancellationConfirm = "cancellation_confirm";
         public const string RefundConfirm = "refund_confirm";
+        // t_c513d0ee089f / 2026-04-30: trial lifecycle emails
+        public const string TrialEnding = "trial_ending";
+        public const string TrialConverted = "trial_converted";
     }
 
     /// <summary>Dispatch a transactional lifecycle email.</summary>
@@ -79,6 +96,23 @@ public sealed class SubscriptionLifecycleEmailWorkerOptions
     /// falls in overlapping windows.
     /// </summary>
     public int RenewalUpcomingWindowHours { get; set; } = 25;
+
+    /// <summary>
+    /// Days before TrialEndsAt at which TrialEnding fires. Default 1.
+    /// Same shape as RenewalUpcomingLeadDays. A trial that has already
+    /// converted (TrialConverted_V1 on the stream) or expired
+    /// (TrialExpired_V1 on the stream) suppresses the upcoming notice
+    /// regardless of how close TrialEndsAt is.
+    /// </summary>
+    public int TrialEndingLeadDays { get; set; } = 1;
+
+    /// <summary>
+    /// Lookback window for the trial-ending scan, in hours. Same role as
+    /// RenewalUpcomingWindowHours; 25h default gives an hour of drift
+    /// slack while the per-cycle marker prevents duplicate dispatch on
+    /// overlap.
+    /// </summary>
+    public int TrialEndingWindowHours { get; set; } = 25;
 
     /// <summary>Tick cadence in hours. Default 1.</summary>
     public int TickIntervalHours { get; set; } = 1;
@@ -223,8 +257,35 @@ public sealed class SubscriptionLifecycleEmailWorker : BackgroundService
         // up twice in the input list).
         var scheduled = new HashSet<string>(alreadySent);
 
+        // Stream-scoped state for the conversion-suppresses-Welcome rule
+        // and the trial-end-suppression rule. Pre-walk is O(n) and
+        // single-pass; the per-stream-key bool/instant maps below are
+        // populated as we go (events arrive in stream-order from the
+        // Marten raw-event reader).
+        // - hasConvertedTrial: stream had TrialConverted_V1 → suppress
+        //   Welcome on the IMMEDIATELY-FOLLOWING SubscriptionActivated_V1
+        //   in the same stream (option (a) per t_c513d0ee089f task body).
+        // - trialResolved: stream had TrialConverted_V1 OR TrialExpired_V1
+        //   → suppress TrialEnding on that stream regardless of where in
+        //   the lookback window TrialEndsAt sits.
+        var hasConvertedTrial = new HashSet<string>();
+        var trialResolved = new HashSet<string>();
+        foreach (var e in events)
+        {
+            if (e.Payload is TrialConverted_V1)
+            {
+                hasConvertedTrial.Add(e.StreamKey);
+                trialResolved.Add(e.StreamKey);
+            }
+            else if (e.Payload is TrialExpired_V1)
+            {
+                trialResolved.Add(e.StreamKey);
+            }
+        }
+
         // Pass 1: terminal-event-driven kinds (Welcome / PastDue /
-        // CancellationConfirm / RefundConfirm) — one-per-parent-lifetime.
+        // CancellationConfirm / RefundConfirm / TrialConverted) — each
+        // one-per-parent-lifetime.
         foreach (var e in events)
         {
             string? kind;
@@ -232,6 +293,14 @@ public sealed class SubscriptionLifecycleEmailWorker : BackgroundService
             switch (e.Payload)
             {
                 case SubscriptionActivated_V1 a:
+                    // Welcome suppression: if the stream has a
+                    // TrialConverted_V1 anywhere, this Activation IS the
+                    // conversion-side activation and the dedicated
+                    // TrialConverted email handles the receipt — option
+                    // (a) per the task body. Without this, trial
+                    // converters would receive both Welcome AND
+                    // TrialConverted, which is duplicative + confusing.
+                    if (hasConvertedTrial.Contains(e.StreamKey)) continue;
                     kind = ISubscriptionLifecycleEmailDispatcher.Kinds.Welcome;
                     parentId = a.ParentSubjectIdEncrypted;
                     break;
@@ -246,6 +315,10 @@ public sealed class SubscriptionLifecycleEmailWorker : BackgroundService
                 case SubscriptionRefunded_V1 r:
                     kind = ISubscriptionLifecycleEmailDispatcher.Kinds.RefundConfirm;
                     parentId = r.ParentSubjectIdEncrypted;
+                    break;
+                case TrialConverted_V1 tc:
+                    kind = ISubscriptionLifecycleEmailDispatcher.Kinds.TrialConverted;
+                    parentId = tc.ParentSubjectIdEncrypted;
                     break;
                 default:
                     continue;
@@ -299,6 +372,50 @@ public sealed class SubscriptionLifecycleEmailWorker : BackgroundService
             plan.Add(new LifecycleDispatchPlanItem(
                 parentId,
                 ISubscriptionLifecycleEmailDispatcher.Kinds.RenewalUpcoming,
+                markerId));
+        }
+
+        // Pass 3: TrialEnding — same shape as RenewalUpcoming, keyed off
+        // TrialStarted_V1.TrialEndsAt. Streams with TrialConverted_V1 or
+        // TrialExpired_V1 already in the log skip the notice — the trial
+        // is resolved either way and the curator-facing message would be
+        // misleading. Per-cycle marker on TrialEndsAt prevents a duplicate
+        // when overlap windows fire across multiple ticks; if a parent
+        // ever runs a SECOND trial (rare; abuse-defense usually blocks)
+        // the new TrialStarted_V1 carries a different TrialEndsAt and the
+        // marker key changes accordingly.
+        var trialLead = TimeSpan.FromDays(Math.Max(0, options.TrialEndingLeadDays));
+        var trialWindow = TimeSpan.FromHours(Math.Max(1, options.TrialEndingWindowHours));
+
+        foreach (var e in events)
+        {
+            if (e.Payload is not TrialStarted_V1 ts) continue;
+            if (string.IsNullOrEmpty(ts.ParentSubjectIdEncrypted)) continue;
+
+            // Suppression: trial already resolved (converted or expired).
+            // The trial-ending notice is a heads-up before paywall; it
+            // makes no sense for a trial that has already moved past
+            // that decision point.
+            if (trialResolved.Contains(e.StreamKey)) continue;
+
+            // TrialEndsAt == TrialStartedAt indicates a cap-hit-only trial
+            // (no calendar bound — see TrialStarted_V1 docstring). The
+            // worker doesn't fire a calendar-based notice for those; the
+            // cap-hit path emits a separate signal.
+            if (ts.TrialEndsAt <= ts.TrialStartedAt) continue;
+
+            var fireAt = ts.TrialEndsAt - trialLead;
+            if (now < fireAt) continue;
+            if (now >= fireAt + trialWindow) continue;
+
+            var endsKey = ts.TrialEndsAt.ToUniversalTime().ToString("o");
+            var markerId = $"{ts.ParentSubjectIdEncrypted}:" +
+                $"{ISubscriptionLifecycleEmailDispatcher.Kinds.TrialEnding}:" +
+                $"{endsKey}";
+            if (!scheduled.Add(markerId)) continue;
+            plan.Add(new LifecycleDispatchPlanItem(
+                ts.ParentSubjectIdEncrypted,
+                ISubscriptionLifecycleEmailDispatcher.Kinds.TrialEnding,
                 markerId));
         }
 
