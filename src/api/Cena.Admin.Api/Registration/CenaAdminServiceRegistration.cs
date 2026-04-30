@@ -171,6 +171,14 @@ public static class CenaAdminServiceRegistration
         services.TryAddSingleton<Cena.Actors.StudentPlan.IRetakeCohortReader,
             Cena.Actors.StudentPlan.InMemoryRetakeCohortReader>();
 
+        // Phase 4 trial-cohort dashboard reader. Reads Trial* events from
+        // the Marten event store + computes funnel metrics. No projection
+        // — direct event-store read at low expected trial volume keeps the
+        // implementation projection-replay-gap-free per
+        // feedback_event_sourcing_replay_check.
+        services.TryAddScoped<Features.TrialCohort.ITrialCohortReader,
+            Features.TrialCohort.MartenTrialCohortReader>();
+
         // prr-244: Per-institute pricing override domain. Loads defaults
         // from contracts/pricing/default-pricing.yml at startup — throws
         // InvalidOperationException if the file is missing or
@@ -608,6 +616,8 @@ public static class CenaAdminServiceRegistration
         app.MapOutreachEngagementEndpoints();
         app.MapAiGenerationEndpoints();
         app.MapQuestionPipelineEndpoints();
+        // Phase 4: trial-cohort dashboard read endpoint (Trial* event funnel).
+        Features.TrialCohort.TrialCohortEndpoint.MapTrialCohortEndpoint(app);
 
         // SAI Admin endpoints (ADM-017 through ADM-023)
         app.MapTutoringAdminEndpoints();

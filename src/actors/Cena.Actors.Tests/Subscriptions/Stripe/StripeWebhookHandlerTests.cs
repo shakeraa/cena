@@ -124,21 +124,21 @@ public class StripeWebhookHandlerTests
         var trialStarted = new TrialStarted_V1(
             ParentSubjectIdEncrypted: parentId,
             PrimaryStudentSubjectIdEncrypted: primaryStudentId,
-            Kind: TrialKind.SelfPay,
+            TrialKind: TrialKind.SelfPay,
             TrialStartedAt: DateTimeOffset.UtcNow.AddDays(-7),
             TrialEndsAt: DateTimeOffset.UtcNow.AddDays(7),
             FingerprintHash: "sha256:fp-convert",
-            FingerprintNormalizationVersion: "v1-baseline",
-            Caps: new TrialCapsSnapshot(14, 50, 10, 6));
+            ExperimentVariantId: "v1-baseline",
+            CapsSnapshot: new TrialCapsSnapshot(14, 50, 10, 6));
         await store.AppendAsync(parentId, trialStarted, CancellationToken.None);
 
         // Provide a real consumption store so the TrialConverted event
         // carries non-zero utilization — exercises the wired-store path.
         var consumption = new InMemoryStudentTrialConsumptionStore();
         await consumption.IncrementIfUnderCapAsync(
-            primaryStudentId, EntitlementFeature.TutorTurn, 50, CancellationToken.None);
+            primaryStudentId, EntitlementFeature.TutorTurn, 50, DateTimeOffset.UtcNow, CancellationToken.None);
         await consumption.IncrementIfUnderCapAsync(
-            primaryStudentId, EntitlementFeature.PhotoDiagnostic, 10, CancellationToken.None);
+            primaryStudentId, EntitlementFeature.PhotoDiagnostic, 10, DateTimeOffset.UtcNow, CancellationToken.None);
 
         var log = new InMemoryProcessedWebhookLog();
         var handler = new StripeWebhookHandler(_options, store, log,
