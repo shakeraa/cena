@@ -5,6 +5,7 @@ import ContentPipelineChart from '@/views/admin/dashboard/ContentPipelineChart.v
 import SystemAlerts from '@/views/admin/dashboard/SystemAlerts.vue'
 import RecentActivityTimeline from '@/views/admin/dashboard/RecentActivityTimeline.vue'
 import TutoringBudgetCard from '@/views/admin/dashboard/TutoringBudgetCard.vue'
+import TrialCohortCard from '@/views/admin/dashboard/TrialCohortCard.vue'
 
 definePage({
   meta: {
@@ -191,6 +192,12 @@ const widgetData = computed(() => {
         sm="4"
       >
         <TutoringBudgetCard />
+      </VCol>
+      <VCol
+        cols="12"
+        sm="4"
+      >
+        <TrialCohortCard />
       </VCol>
       <VCol
         cols="12"
