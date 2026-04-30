@@ -241,12 +241,17 @@ internal sealed class GenerateVariantsJobStrategy : IIngestionJobStrategy
     private static string Truncate(string s, int n) =>
         s.Length <= n ? s : s.Substring(0, n) + "…";
 
-    // ADR-0059 §15.5 + PRR-322f-llm-attribution + PRR-322f-ocr-attribution:
-    // Build the CreateQuestionRequest with full provenance lineage so curators
-    // can trace every variant back to its Bagrut seed (DraftId + pdf + exam-page)
-    // AND to the LLM call that produced it (PromptUsed + temperature + raw output).
-    // Extracted as a static helper so the per-variant block in ExecuteAsync stays
-    // tight + so the contract is unit-testable in isolation.
+    /// <summary>
+    /// PRR-322f-audit / 2026-04-30: pure construction of the
+    /// CreateQuestionRequest a single batch-result becomes when persisted
+    /// as a Bagrut variant. Extracted from the inline code so the
+    /// provenance contract can be unit-tested without mocking the entire
+    /// job-runner pipeline (Marten + IAiGenerationService + IQuestionBankService
+    /// + IJobProgressReporter). Keep the field assignments aligned with
+    /// QuestionState.QuestionProvenanceState (source) + AiGenerationState
+    /// (LLM) — the two distinct provenance states the question aggregate
+    /// records.
+    /// </summary>
     internal static CreateQuestionRequest BuildVariantCreateRequest(
         BatchGenerateResult result,
         BatchGenerateResponse batch,
@@ -254,14 +259,18 @@ internal sealed class GenerateVariantsJobStrategy : IIngestionJobStrategy
         GenerateVariantsJobPayload payload)
     {
         var difficulty = (float)Math.Clamp((decimal)result.Question.Difficulty, 0m, 1m);
+
         return new CreateQuestionRequest(
             SourceType: "ai-generated",
             Stem: result.Question.Stem,
             StemHtml: null,
             Options: result.Question.Options
                 .Select(o => new CreateOptionRequest(
-                    Label: o.Label, Text: o.Text, TextHtml: null,
-                    IsCorrect: o.IsCorrect, DistractorRationale: o.DistractorRationale))
+                    Label: o.Label,
+                    Text: o.Text,
+                    TextHtml: null,
+                    IsCorrect: o.IsCorrect,
+                    DistractorRationale: o.DistractorRationale))
                 .ToList(),
             Subject: payload.Subject,
             Topic: result.Question.Topic ?? payload.Topic,
@@ -270,10 +279,20 @@ internal sealed class GenerateVariantsJobStrategy : IIngestionJobStrategy
             Difficulty: difficulty,
             ConceptIds: null,
             Language: payload.Language,
+            // Source-provenance: populates QuestionProvenanceState. The
+            // Bagrut draft IS the source for these variants. Was null /
+            // null / null / null pre-audit; curators couldn't trace any
+            // variant back to its seed without parsing the synthetic
+            // string previously dumped into PromptText.
             SourceDocId:    payload.DraftId,
             SourceUrl:      $"bagrut-pdf:{draft.SourcePdfId}",
             SourceFilename: $"{draft.ExamCode}-page{draft.SourcePage}.pdf",
             OriginalText:   draft.Prompt,
+            // AI-generation provenance: populates AiGenerationState. Real
+            // values now (was null / synthetic-breadcrumb / null pre-audit).
+            // PromptText holds the actual LLM prompt used (shared across
+            // the N variants in this batch — one GenerateQuestionsAsync
+            // call). ModelTemperature + RawModelOutput likewise.
             PromptText:        batch.PromptUsed ?? "",
             ModelId:           batch.ModelUsed,
             ModelTemperature:  batch.TemperatureUsed,
