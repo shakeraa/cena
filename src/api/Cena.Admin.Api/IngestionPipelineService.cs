@@ -24,6 +24,14 @@ public interface IIngestionPipelineService
     Task<bool> RejectPipelineItemAsync(string id, string reason);
     Task<UploadFileResponse> UploadFileAsync(string filename, string contentType);
     Task<bool> MoveToReviewAsync(string id);
+    /// <summary>
+    /// Curator approves an InReview item for publication and transitions
+    /// it to <see cref="Cena.Actors.Ingest.PipelineStage.Published"/>.
+    /// Returns <c>(false, "&lt;reason&gt;")</c> when the item cannot advance
+    /// — typically because metadata is unconfirmed or the item is not
+    /// currently in InReview. <c>(true, null)</c> on success.
+    /// </summary>
+    Task<(bool Success, string? Reason)> ApproveAsync(string id, string approvedBy);
     Task<UploadFileResponse> UploadFromRequestAsync(HttpRequest request);
     Task<PipelineStatsResponse> GetStatsAsync();
     Task<CloudDirListResponse> ListCloudDirectoryAsync(CloudDirListRequest request);
@@ -275,6 +283,76 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
 
         _logger.LogInformation("Moved pipeline item {ItemId} to review", id);
         return true;
+    }
+
+    public async Task<(bool Success, string? Reason)> ApproveAsync(string id, string approvedBy)
+    {
+        if (string.IsNullOrWhiteSpace(approvedBy))
+            return (false, "approved_by_required");
+
+        await using var session = _store.LightweightSession();
+        var item = await session.LoadAsync<PipelineItemDocument>(id);
+        if (item is null) return (false, "not_found");
+
+        // Gate 1: stage must be InReview. Approving a still-processing item
+        // would skip stage validation; approving a Published item is a
+        // no-op the SPA shouldn't have offered. Reject loudly so the
+        // operator notices a state-machine drift.
+        if (item.CurrentStage != Cena.Actors.Ingest.PipelineStage.InReview)
+        {
+            _logger.LogWarning(
+                "ApproveAsync rejected: item {ItemId} is at stage {Stage}, expected InReview",
+                id, item.CurrentStage);
+            return (false, $"wrong_stage:{item.CurrentStage}");
+        }
+
+        // Gate 2: curator metadata must be confirmed. Without confirmation,
+        // there's no validated Subject/Language/SourceType — publishing
+        // would push unverified content downstream. RDY-019e §4 ties the
+        // stage transition to the metadata handshake.
+        if (!string.Equals(item.MetadataState, "confirmed", StringComparison.Ordinal))
+        {
+            _logger.LogWarning(
+                "ApproveAsync rejected: item {ItemId} metadata state is {State}, expected confirmed",
+                id, item.MetadataState);
+            return (false, $"metadata_unconfirmed:{item.MetadataState}");
+        }
+
+        var now = DateTimeOffset.UtcNow;
+
+        // Close the InReview stage record if open, then append a Published
+        // stage record so the StageHistory timeline reflects the transition
+        // in the same shape every other transition uses.
+        var openInReview = item.StageHistory.LastOrDefault(s =>
+            s.Stage == Cena.Actors.Ingest.PipelineStage.InReview && s.CompletedAt is null);
+        if (openInReview is not null)
+        {
+            openInReview.CompletedAt = now;
+            openInReview.Status = "completed";
+        }
+
+        item.StageHistory.Add(new StageRecord
+        {
+            Stage = Cena.Actors.Ingest.PipelineStage.Published,
+            StartedAt = now,
+            CompletedAt = now,
+            Status = "completed",
+        });
+
+        item.CurrentStage = Cena.Actors.Ingest.PipelineStage.Published;
+        item.Status = "published";
+        item.CompletedAt = now;
+        item.UpdatedAt = now;
+        session.Store(item);
+
+        session.Events.Append(id, new PipelineItemApproved_V1(
+            id, approvedBy, item.ExtractedQuestionCount, now));
+        await session.SaveChangesAsync();
+
+        _logger.LogInformation(
+            "Approved pipeline item {ItemId} for publication (by {ApprovedBy}, {QuestionCount} questions)",
+            id, approvedBy, item.ExtractedQuestionCount);
+        return (true, null);
     }
 
     public async Task<UploadFileResponse> UploadFromRequestAsync(HttpRequest request)

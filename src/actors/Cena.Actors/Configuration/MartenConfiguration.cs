@@ -603,6 +603,15 @@ public static class MartenConfiguration
         opts.Schema.For<PlatformSettingsDocument>()
             .Identity(x => x.Id);
 
+        // ── AI Generation Settings — singleton doc, id='ai-settings-singleton'.
+        // Registered here so actor-host's startup ApplyAllConfiguredChanges-
+        // ToDatabaseAsync creates the table for every host in the stack
+        // (admin-api waits on actor-host's healthcheck before it boots).
+        // The cipher + probe + service stay in Cena.Admin.Api — only the
+        // doc type is shared.
+        opts.Schema.For<AiSettingsDocument>()
+            .Identity(x => x.Id);
+
         // ── Focus Analytics Rollups (ADM-014) ──
         opts.Schema.For<FocusSessionRollupDocument>()
             .Identity(x => x.Id)
@@ -742,6 +751,7 @@ public static class MartenConfiguration
         opts.Events.AddEventType<QuestionsRecreated_V1>();
         opts.Events.AddEventType<PipelineStageFailed_V1>();
         opts.Events.AddEventType<MovedToReview_V1>();
+        opts.Events.AddEventType<PipelineItemApproved_V1>();
         opts.Events.AddEventType<ContentExtracted_V1>();
         opts.Events.AddEventType<PipelineCompleted_V1>();
     }

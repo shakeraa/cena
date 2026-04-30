@@ -364,6 +364,44 @@ const moveToReview = async () => {
     actionLoading.value = false
   }
 }
+
+// Approve gate state. Backend rejects with reason="metadata_unconfirmed:..."
+// until the curator clicks Save in CuratorMetadataPanel; surface that as a
+// readable hint instead of a generic toast so the curator knows what to do.
+const approveError = ref<string | null>(null)
+
+const approveItem = async () => {
+  approveError.value = null
+  actionLoading.value = true
+  try {
+    const res = await $api<{ success: boolean; reason?: string | null }>(
+      `/admin/ingestion/items/${props.itemId}/approve`,
+      { method: 'POST' })
+    if (!res.success) {
+      // Map backend reason codes to operator-facing copy. Anything we
+      // don't recognise falls through with the raw code so the curator
+      // can still file it.
+      const reason = res.reason ?? ''
+      if (reason.startsWith('metadata_unconfirmed'))
+        approveError.value = 'Confirm the curator metadata above before publishing.'
+      else if (reason.startsWith('wrong_stage'))
+        approveError.value = `Cannot publish from stage ${reason.split(':')[1] ?? '?'} — only InReview items can be approved.`
+      else if (reason === 'not_found')
+        approveError.value = 'Item not found — it may have been removed.'
+      else
+        approveError.value = `Cannot publish: ${reason || 'unknown reason'}`
+      return
+    }
+    emit('item-updated')
+    fetchDetail()
+  }
+  catch (error: any) {
+    approveError.value = error?.data?.message ?? error?.message ?? 'Approval failed'
+  }
+  finally {
+    actionLoading.value = false
+  }
+}
 </script>
 
 <template>
@@ -628,6 +666,20 @@ const moveToReview = async () => {
           >
             {{ retryError }}
           </VAlert>
+          <!-- Approve gate hint — fires when /approve returns success=false.
+               The most common reason is "metadata_unconfirmed", which means
+               the curator hasn't clicked Save in the CuratorMetadataPanel
+               yet. Reusing the warning style keeps the visual weight low. -->
+          <VAlert
+            v-if="approveError"
+            color="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+            data-test="approve-error"
+          >
+            {{ approveError }}
+          </VAlert>
           <div class="d-flex gap-3 flex-wrap">
             <VBtn
               color="warning"
@@ -664,6 +716,23 @@ const moveToReview = async () => {
                 start
               />
               Move to Review
+            </VBtn>
+            <!-- Approve & Publish — only shows on InReview items so the
+                 curator never sees it on items that have already been
+                 published, rejected, or are still mid-pipeline. Backend
+                 enforces metadataState=confirmed; the alert above
+                 surfaces the reason when the gate refuses. -->
+            <VBtn
+              v-if="item && item.currentStage === 'InReview'"
+              color="success"
+              :loading="actionLoading"
+              @click="approveItem"
+            >
+              <VIcon
+                icon="tabler-check"
+                start
+              />
+              Approve &amp; Publish
             </VBtn>
 
             <!-- Option 2: AI variant generation from Bagrut drafts. Sends

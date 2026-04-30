@@ -9,6 +9,7 @@ using Cena.Infrastructure.Auth;
 using Marten;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -732,6 +733,24 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
+        // Approve an InReview item → Published. Gated on metadataState=confirmed
+        // and currentStage=InReview; both conditions are enforced in
+        // IngestionPipelineService.ApproveAsync. The wire shape returns
+        // { success, reason? } so the SPA can render "metadata not confirmed"
+        // without needing a separate error envelope.
+        group.MapPost("/items/{id}/approve", async (string id, ClaimsPrincipal user, IIngestionPipelineService service) =>
+        {
+            var approvedBy = user.FindFirst("user_id")?.Value
+                ?? user.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value
+                ?? "unknown";
+            var (ok, reason) = await service.ApproveAsync(id, approvedBy);
+            return Results.Ok(new { success = ok, reason });
+        }).WithName("ApprovePipelineItem")
+    .Produces<object>(StatusCodes.Status200OK)
+    .Produces<CenaError>(StatusCodes.Status401Unauthorized)
+    .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
+    .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+
         group.MapPost("/upload", async (HttpRequest request, IIngestionPipelineService service) =>
         {
             // REV-011.3: File upload validation
@@ -1076,10 +1095,22 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
     .Produces<CenaError>(StatusCodes.Status500InternalServerError);
 
-        group.MapPost("/test-connection", async (AiProvider provider, IAiGenerationService service) =>
+        // [FromBody] — minimal-API primitive params bind from query by default;
+        // the admin SPA POSTs the provider name in the JSON body (e.g. "Anthropic"),
+        // so without this attribute the call 400s with "provider not provided
+        // from query string."
+        group.MapPost("/test-connection", async ([FromBody] AiProvider provider, IAiGenerationService service, CancellationToken ct) =>
         {
-            var ok = await service.TestConnectionAsync(provider);
-            return Results.Ok(new { connected = ok });
+            var result = await service.TestConnectionAsync(provider, ct);
+            // Wire shape: { connected, error?, details? }. Frontend renders
+            // 'error' in the badge tooltip when connected=false so the
+            // operator sees "Invalid API key" instead of bare "Failed".
+            return Results.Ok(new
+            {
+                connected = result.Success,
+                error = result.Error,
+                details = result.Details,
+            });
         }).WithName("TestAiConnection")
     .Produces<object>(StatusCodes.Status200OK)
     .Produces<CenaError>(StatusCodes.Status401Unauthorized)

@@ -14,8 +14,11 @@ using Anthropic;
 using Anthropic.Core;
 using Anthropic.Models.Messages;
 using Cena.Actors.Cas;
+using Cena.Admin.Api.AiSettings;
 using Cena.Admin.Api.QualityGate;
+using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Llm;
+using Marten;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -29,7 +32,12 @@ namespace Cena.Admin.Api;
 /// Supported LLM providers for question generation.
 /// Only Anthropic is implemented; additional providers must be added here
 /// alongside a real <c>CallXxxAsync</c> implementation (no stubs).
+/// Serialized as a string ("Anthropic") so the admin SPA can key UI state
+/// (per-provider api-key inputs, active-provider chip) by name; numeric
+/// serialization caused apiKeys["Anthropic"] vs apiKeys[0] to mismatch and
+/// silently dropped the API key on save.
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum AiProvider
 {
     Anthropic
@@ -228,7 +236,12 @@ public interface IAiGenerationService
     Task<AiGenerateResponse> GenerateQuestionsAsync(AiGenerateRequest request);
     Task<AiSettingsResponse> GetSettingsAsync();
     Task<bool> UpdateSettingsAsync(UpdateAiSettingsRequest request, string userId);
-    Task<bool> TestConnectionAsync(AiProvider provider);
+    /// <summary>
+    /// Real Anthropic ping using the persisted (decrypted) API key and the
+    /// configured model. Returns a structured ConnectionTestResult with a
+    /// categorized failure reason on the unhappy path. Never throws.
+    /// </summary>
+    Task<ConnectionTestResult> TestConnectionAsync(AiProvider provider, CancellationToken ct = default);
     Task<BatchGenerateResponse> BatchGenerateAsync(BatchGenerateRequest request, QualityGateServices.IQualityGateService qualityGate);
     Task<TemplateGenerateResponse> GenerateFromTemplateAsync(TemplateGenerateRequest request, QualityGateServices.IQualityGateService qualityGate);
 }
@@ -277,14 +290,23 @@ public sealed class AiGenerationService : IAiGenerationService
     private static readonly TimeSpan OpenDuration = TimeSpan.FromSeconds(90);
     private readonly object _cbLock = new();
 
-    // Anthropic SDK client — lazily created when API key is set
+    // Anthropic SDK client — lazily created when API key is set. The client
+    // is keyed by the plaintext API key; cache hits when the persisted key
+    // hasn't changed since the last call.
     private AnthropicClient? _anthropicClient;
     private string? _lastApiKey;
 
-    // In-memory settings (production: persist to Marten document store)
-    private AiProvider _activeProvider = AiProvider.Anthropic;
-    private readonly Dictionary<AiProvider, AiProviderConfig> _providers;
-    private AiGenerationDefaults _defaults;
+    // ── Persistence + cipher (production: Marten-backed AiSettingsDocument) ──
+    private readonly IDocumentStore _documentStore;
+    private readonly IApiKeyCipher _cipher;
+    private readonly IAnthropicConnectionProbe _probe;
+
+    // 5-second hot cache of the AiSettingsDocument so the per-request load
+    // doesn't hit Marten on every Generate call. Invalidated on Update.
+    private AiSettingsDocument? _cachedDoc;
+    private DateTimeOffset _cachedAt;
+    private static readonly TimeSpan DocCacheTtl = TimeSpan.FromSeconds(5);
+    private readonly SemaphoreSlim _docCacheLock = new(1, 1);
 
     // JSON options for parsing tool_use output
     private static readonly JsonSerializerOptions JsonOpts = new()
@@ -294,7 +316,7 @@ public sealed class AiGenerationService : IAiGenerationService
     };
 
     // Routing config constants (from routing-config.yaml, task: question_generation ~ video_script)
-    private const string SonnetModelId = "claude-sonnet-4-6-20260215";
+    private const string SonnetModelId = "claude-sonnet-4-6";
     private const float DefaultTemperature = 0.5f;
     private const int DefaultMaxTokens = 4096;
     // Cost per million tokens (routing-config.yaml section 1: claude_sonnet_4_6)
@@ -308,6 +330,9 @@ public sealed class AiGenerationService : IAiGenerationService
         IServiceScopeFactory scopeFactory,
         ICasGateModeProvider casGateMode,
         ILlmCostMetric featureCost,
+        IDocumentStore documentStore,
+        IApiKeyCipher cipher,
+        IAnthropicConnectionProbe probe,
         IActivityPropagator? activityPropagator = null)
     {
         _logger = logger;
@@ -315,6 +340,9 @@ public sealed class AiGenerationService : IAiGenerationService
         _scopeFactory = scopeFactory;
         _casGateMode = casGateMode;
         _featureCost = featureCost;
+        _documentStore = documentStore;
+        _cipher = cipher;
+        _probe = probe;
         _activityPropagator = activityPropagator;
 
         var meter = meterFactory.Create("Cena.Admin.LlmMetrics", "1.0.0");
@@ -329,119 +357,249 @@ public sealed class AiGenerationService : IAiGenerationService
             "llm_cost_usd",
             unit: "USD",
             description: "LLM cost in USD");
+    }
 
-        _providers = new()
+    // ── Persistence helpers ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Load the singleton settings doc, hitting Marten at most once per
+    /// DocCacheTtl. Returns a fresh defaulted document when none exists yet
+    /// (first run) — never returns null.
+    /// </summary>
+    private async Task<AiSettingsDocument> LoadDocAsync(CancellationToken ct = default)
+    {
+        await _docCacheLock.WaitAsync(ct).ConfigureAwait(false);
+        try
         {
-            [AiProvider.Anthropic] = new(AiProvider.Anthropic, "", SonnetModelId,
-                DefaultTemperature, null, null, true),
-        };
+            if (_cachedDoc is not null && DateTimeOffset.UtcNow - _cachedAt < DocCacheTtl)
+                return _cachedDoc;
 
-        _defaults = new("he", 3, "4 Units", 5, true);
+            AiSettingsDocument? doc = null;
+            try
+            {
+                await using var session = _documentStore.QuerySession();
+                doc = await session.LoadAsync<AiSettingsDocument>(AiSettingsDocument.SingletonId, ct).ConfigureAwait(false);
+            }
+            catch (Marten.Exceptions.MartenCommandException ex)
+                when (ex.InnerException is Npgsql.PostgresException pg && pg.SqlState == "42P01")
+            {
+                // The mt_doc_aisettingsdocument table doesn't exist yet —
+                // happens on the very first GET before any save has run, or
+                // in any environment where the migrator hasn't applied the
+                // schema. Marten's CreateOrUpdate auto-create only fires on
+                // writes, not reads. Treat as "no settings persisted" and
+                // let the next save (which uses LightweightSession) trigger
+                // schema creation. Logged as a one-time INFO so the
+                // operator sees the cold-start.
+                _logger.LogInformation(
+                    "AiSettingsDocument table not yet created — returning defaults until first save");
+                doc = null;
+            }
+
+            _cachedDoc = doc ?? new AiSettingsDocument();
+            _cachedAt = DateTimeOffset.UtcNow;
+            return _cachedDoc;
+        }
+        finally
+        {
+            _docCacheLock.Release();
+        }
+    }
+
+    /// <summary>Persist the doc and refresh the hot cache atomically.</summary>
+    private async Task SaveDocAsync(AiSettingsDocument doc, CancellationToken ct = default)
+    {
+        doc.Id = AiSettingsDocument.SingletonId;
+        doc.UpdatedAt = DateTimeOffset.UtcNow;
+
+        await using var session = _documentStore.LightweightSession();
+        session.Store(doc);
+        await session.SaveChangesAsync(ct).ConfigureAwait(false);
+
+        await _docCacheLock.WaitAsync(ct).ConfigureAwait(false);
+        try
+        {
+            _cachedDoc = doc;
+            _cachedAt = DateTimeOffset.UtcNow;
+        }
+        finally
+        {
+            _docCacheLock.Release();
+        }
+    }
+
+    /// <summary>
+    /// Resolve the active API key: persisted (decrypt-from-cipher) first,
+    /// IConfiguration <c>Anthropic:ApiKey</c> as fallback. Returns null when
+    /// neither source has a key. Decryption failures (tampered cipher,
+    /// missing master key) log an error and treat the key as unset.
+    /// </summary>
+    private string? ResolveApiKey(AiSettingsDocument doc)
+    {
+        if (!string.IsNullOrEmpty(doc.AnthropicApiKeyCipher))
+        {
+            if (_cipher.TryDecryptFromWire(doc.AnthropicApiKeyCipher, out var plaintext))
+                return plaintext;
+
+            _logger.LogError(
+                "[SIEM] Failed to decrypt persisted Anthropic API key — master key may have rotated, " +
+                "or the cipher blob is corrupt. Falling back to IConfiguration.");
+        }
+
+        var fromConfig = _configuration["Anthropic:ApiKey"];
+        return string.IsNullOrWhiteSpace(fromConfig) ? null : fromConfig;
+    }
+
+    /// <summary>
+    /// Project a doc into the public AiProviderConfig view used by the
+    /// internal call sites. The returned ApiKey is plaintext (resolved via
+    /// <see cref="ResolveApiKey"/>); never store this value back.
+    /// </summary>
+    private AiProviderConfig ProjectAnthropicConfig(AiSettingsDocument doc, string? resolvedApiKey)
+    {
+        return new AiProviderConfig(
+            AiProvider.Anthropic,
+            resolvedApiKey ?? "",
+            string.IsNullOrWhiteSpace(doc.AnthropicModelId) ? SonnetModelId : doc.AnthropicModelId,
+            doc.AnthropicTemperature,
+            doc.AnthropicBaseUrl,
+            doc.AnthropicApiVersion,
+            doc.AnthropicEnabled);
     }
 
     public async Task<AiGenerateResponse> GenerateQuestionsAsync(AiGenerateRequest request)
     {
-        var config = _providers[_activeProvider];
-
-        // Resolve API key: explicit config first, then IConfiguration
-        var apiKey = !string.IsNullOrEmpty(config.ApiKey)
-            ? config.ApiKey
-            : _configuration["Anthropic:ApiKey"];
+        var doc = await LoadDocAsync().ConfigureAwait(false);
+        var apiKey = ResolveApiKey(doc);
+        var effectiveConfig = ProjectAnthropicConfig(doc, apiKey);
 
         if (string.IsNullOrEmpty(apiKey))
         {
             return new AiGenerateResponse(false, Array.Empty<AiGeneratedQuestion>(),
-                "", config.ModelId, config.Temperature, null,
+                "", effectiveConfig.ModelId, effectiveConfig.Temperature, null,
                 "No API key configured for Anthropic. Set Anthropic:ApiKey in configuration or go to Settings > AI Providers.");
         }
-
-        // Inject the resolved key into config for downstream use
-        var effectiveConfig = config with { ApiKey = apiKey };
 
         var prompt = AiPromptBuilder.BuildPrompt(request, effectiveConfig);
 
         _logger.LogInformation(
-            "Generating {Count} questions via {Provider}/{Model} for {Subject}/{Grade}",
-            request.Count, _activeProvider, effectiveConfig.ModelId, request.Subject, request.Grade);
+            "Generating {Count} questions via Anthropic/{Model} for {Subject}/{Grade}",
+            request.Count, effectiveConfig.ModelId, request.Subject, request.Grade);
 
         try
         {
-            var (rawOutput, questions) = _activeProvider switch
-            {
-                AiProvider.Anthropic => await CallAnthropicAsync(effectiveConfig, prompt, request),
-                _ => throw new NotSupportedException($"Provider {_activeProvider} not implemented")
-            };
+            var (rawOutput, questions) = await CallAnthropicAsync(effectiveConfig, prompt, request);
 
             return new AiGenerateResponse(true, questions, prompt, effectiveConfig.ModelId,
                 effectiveConfig.Temperature, rawOutput, null);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "AI generation failed for {Provider}", _activeProvider);
+            _logger.LogError(ex, "AI generation failed for Anthropic");
             return new AiGenerateResponse(false, Array.Empty<AiGeneratedQuestion>(),
                 prompt, effectiveConfig.ModelId, effectiveConfig.Temperature, null, ex.Message);
         }
     }
 
-    public Task<AiSettingsResponse> GetSettingsAsync()
+    public async Task<AiSettingsResponse> GetSettingsAsync()
     {
-        var views = _providers.Values.Select(p => new AiProviderConfigView(
-            p.Provider,
-            p.Provider switch
-            {
-                AiProvider.Anthropic => "Anthropic (Claude)",
-                _ => p.Provider.ToString()
-            },
-            p.IsEnabled,
-            !string.IsNullOrEmpty(p.ApiKey) || !string.IsNullOrEmpty(_configuration["Anthropic:ApiKey"]),
-            p.ModelId,
-            p.Temperature,
-            p.BaseUrl)).ToList();
+        var doc = await LoadDocAsync().ConfigureAwait(false);
 
-        return Task.FromResult(new AiSettingsResponse(_activeProvider, views, _defaults));
+        var hasApiKey = !string.IsNullOrEmpty(doc.AnthropicApiKeyCipher)
+            || !string.IsNullOrEmpty(_configuration["Anthropic:ApiKey"]);
+
+        var view = new AiProviderConfigView(
+            AiProvider.Anthropic,
+            "Anthropic (Claude)",
+            doc.AnthropicEnabled,
+            hasApiKey,
+            string.IsNullOrWhiteSpace(doc.AnthropicModelId) ? SonnetModelId : doc.AnthropicModelId,
+            doc.AnthropicTemperature,
+            doc.AnthropicBaseUrl);
+
+        var defaults = new AiGenerationDefaults(
+            doc.DefaultLanguage,
+            doc.DefaultBloomsLevel,
+            doc.DefaultGrade,
+            doc.QuestionsPerBatch,
+            doc.AutoRunQualityGate);
+
+        // ActiveProvider in the doc is stored as a string for forward-compat;
+        // parse defensively and fall back to Anthropic on unknown values.
+        var active = Enum.TryParse<AiProvider>(doc.ActiveProvider, ignoreCase: true, out var parsed)
+            ? parsed
+            : AiProvider.Anthropic;
+
+        return new AiSettingsResponse(active, new[] { view }, defaults);
     }
 
-    public Task<bool> UpdateSettingsAsync(UpdateAiSettingsRequest request, string userId)
+    public async Task<bool> UpdateSettingsAsync(UpdateAiSettingsRequest request, string userId)
     {
-        if (request.ActiveProvider.HasValue)
-            _activeProvider = request.ActiveProvider.Value;
-
-        var current = _providers[_activeProvider];
-        _providers[_activeProvider] = current with
+        var doc = await LoadDocAsync().ConfigureAwait(false);
+        // Mutate a copy — the cached doc must not change until the save
+        // succeeds, otherwise a failed write leaves stale state in memory.
+        var next = new AiSettingsDocument
         {
-            ApiKey = request.ApiKey ?? current.ApiKey,
-            ModelId = request.ModelId ?? current.ModelId,
-            Temperature = request.Temperature ?? current.Temperature,
-            BaseUrl = request.BaseUrl ?? current.BaseUrl,
-            ApiVersion = request.ApiVersion ?? current.ApiVersion,
-            IsEnabled = true
+            Id = AiSettingsDocument.SingletonId,
+            ActiveProvider = request.ActiveProvider?.ToString() ?? doc.ActiveProvider,
+            AnthropicApiKeyCipher = doc.AnthropicApiKeyCipher,
+            AnthropicModelId = request.ModelId ?? doc.AnthropicModelId,
+            AnthropicTemperature = request.Temperature ?? doc.AnthropicTemperature,
+            AnthropicBaseUrl = request.BaseUrl ?? doc.AnthropicBaseUrl,
+            AnthropicApiVersion = request.ApiVersion ?? doc.AnthropicApiVersion,
+            AnthropicEnabled = doc.AnthropicEnabled,
+            DefaultLanguage = request.DefaultLanguage ?? doc.DefaultLanguage,
+            DefaultBloomsLevel = request.DefaultBloomsLevel ?? doc.DefaultBloomsLevel,
+            DefaultGrade = request.DefaultGrade ?? doc.DefaultGrade,
+            QuestionsPerBatch = request.QuestionsPerBatch ?? doc.QuestionsPerBatch,
+            AutoRunQualityGate = request.AutoRunQualityGate ?? doc.AutoRunQualityGate,
+            UpdatedBy = userId,
         };
 
-        _defaults = new(
-            request.DefaultLanguage ?? _defaults.DefaultLanguage,
-            request.DefaultBloomsLevel ?? _defaults.DefaultBloomsLevel,
-            request.DefaultGrade ?? _defaults.DefaultGrade,
-            request.QuestionsPerBatch ?? _defaults.QuestionsPerBatch,
-            request.AutoRunQualityGate ?? _defaults.AutoRunQualityGate);
-
-        _logger.LogInformation("AI settings updated by {UserId}: provider={Provider}, model={Model}",
-            userId, _activeProvider, _providers[_activeProvider].ModelId);
-
-        return Task.FromResult(true);
-    }
-
-    public Task<bool> TestConnectionAsync(AiProvider provider)
-    {
-        if (!_providers.TryGetValue(provider, out var config))
+        // Encrypt the new key, if one was supplied. An empty/whitespace value
+        // means "leave existing key alone"; the SPA passes apiKey: undefined
+        // when the user is editing other fields and not the key.
+        if (!string.IsNullOrWhiteSpace(request.ApiKey))
         {
-            _logger.LogWarning("Unknown AI provider requested for test: {Provider}", provider);
-            return Task.FromResult(false);
+            next.AnthropicApiKeyCipher = _cipher.EncryptToWire(request.ApiKey);
         }
 
-        var hasKey = !string.IsNullOrEmpty(config.ApiKey)
-            || !string.IsNullOrEmpty(_configuration["Anthropic:ApiKey"]);
-        _logger.LogInformation("Testing {Provider} connection: hasKey={HasKey}", provider, hasKey);
-        return Task.FromResult(hasKey);
+        await SaveDocAsync(next).ConfigureAwait(false);
+
+        _logger.LogInformation(
+            "AI settings updated by {UserId}: provider={Provider}, model={Model}, keyChanged={KeyChanged}",
+            userId, next.ActiveProvider, next.AnthropicModelId,
+            !string.IsNullOrWhiteSpace(request.ApiKey));
+
+        return true;
+    }
+
+    public async Task<ConnectionTestResult> TestConnectionAsync(AiProvider provider, CancellationToken ct = default)
+    {
+        if (provider != AiProvider.Anthropic)
+        {
+            _logger.LogWarning("TestConnection requested for unsupported provider {Provider}", provider);
+            return ConnectionTestResult.Fail(
+                $"Provider '{provider}' not supported", "UNSUPPORTED_PROVIDER");
+        }
+
+        var doc = await LoadDocAsync(ct).ConfigureAwait(false);
+        var apiKey = ResolveApiKey(doc);
+
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            return ConnectionTestResult.Fail("No API key configured", "CONFIG_MISSING_KEY");
+        }
+
+        var modelId = string.IsNullOrWhiteSpace(doc.AnthropicModelId)
+            ? SonnetModelId
+            : doc.AnthropicModelId;
+
+        _logger.LogInformation(
+            "Testing Anthropic connection (model={Model}, baseUrl={BaseUrl})",
+            modelId, doc.AnthropicBaseUrl ?? "(default)");
+
+        return await _probe.ProbeAsync(apiKey, modelId, doc.AnthropicBaseUrl, ct).ConfigureAwait(false);
     }
 
     // ── Prompt Builder ──
@@ -558,7 +716,10 @@ public sealed class AiGenerationService : IAiGenerationService
 
             var createParams = new MessageCreateParams
             {
-                Model = SonnetModelId,
+                // Use the configured model, not the hardcoded fallback. The
+                // admin can pick any Anthropic model via the SPA dropdown;
+                // pinning SonnetModelId here silently ignored that choice.
+                Model = modelName,
                 MaxTokens = DefaultMaxTokens,
                 Temperature = config.Temperature,
                 System = systemBlocks,
@@ -578,7 +739,7 @@ public sealed class AiGenerationService : IAiGenerationService
             activity?.SetTag("trace_id", traceId);
             activity?.SetTag("task", "question_generation");
             activity?.SetTag("tier", "tier3");
-            activity?.SetTag("model_id", SonnetModelId);
+            activity?.SetTag("model_id", modelName);
 
             var response = await client.Messages.Create(createParams);
             sw.Stop();
@@ -900,6 +1061,14 @@ public sealed class AiGenerationService : IAiGenerationService
     {
         if (string.IsNullOrWhiteSpace(req.OcrText))
         {
+            // Surface the *currently configured* model so the SPA's error toast
+            // matches the rest of the UI's "Model" field. SonnetModelId is the
+            // fallback when the singleton doc has never been written.
+            var doc = await LoadDocAsync().ConfigureAwait(false);
+            var modelForError = string.IsNullOrWhiteSpace(doc.AnthropicModelId)
+                ? SonnetModelId
+                : doc.AnthropicModelId;
+
             return new TemplateGenerateResponse(
                 Success: false,
                 Results: Array.Empty<BatchGenerateResult>(),
@@ -907,7 +1076,7 @@ public sealed class AiGenerationService : IAiGenerationService
                 PassedQualityGate: 0,
                 NeedsReview: 0,
                 AutoRejected: 0,
-                ModelUsed: _providers[_activeProvider].ModelId,
+                ModelUsed: modelForError,
                 Error: "OcrText is required for template-based generation.");
         }
 
