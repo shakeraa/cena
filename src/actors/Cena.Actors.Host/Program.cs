@@ -472,6 +472,13 @@ builder.Services.AddSingleton<Cena.Actors.Ingest.IDeduplicationService, Cena.Act
 builder.Services.AddSingleton<Cena.Actors.Ingest.IContentExtractorService, Cena.Actors.Ingest.ContentExtractorService>();
 builder.Services.AddScoped<Cena.Actors.Ingest.IIngestionOrchestrator, Cena.Actors.Ingest.IngestionOrchestrator>();
 
+// PRR-RETRY-IMPL: retry worker scans for stuck-Incoming items the curator
+// asked to replay (RetryCount > 0, past exponential-capped backoff) and
+// re-feeds the orchestrator with the persisted bytes. Lives on Actor Host
+// because that's where IIngestionOrchestrator is registered. Settings:
+// Cena:Ingestion:RetryWorker:{ TickSeconds, MaxAttempts, Enabled }.
+builder.Services.AddHostedService<Cena.Actors.Ingest.IngestionRetryWorker>();
+
 // RDY-061 Phase 2: student advancement aggregate + NATS subscriber that
 // cascades chapter transitions from ConceptMastered events.
 builder.Services.AddScoped<Cena.Actors.Advancement.IStudentAdvancementService,

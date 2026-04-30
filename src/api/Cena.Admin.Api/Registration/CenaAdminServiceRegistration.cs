@@ -25,6 +25,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 namespace Cena.Admin.Api.Registration;
 
@@ -226,6 +227,29 @@ public static class CenaAdminServiceRegistration
         // Registers IAmazonS3 unconditionally; its factory only instantiates
         // when S3DirectoryProvider is actually dispatched (IsEnabled gate).
         services.AddCloudDirectoryProviders();
+
+        // PRR-RETRY-IMPL: bytes store for retry replay. Selects between
+        // S3 / local-disk / null at startup from
+        // Cena:Ingestion:BytesStore:Backend. Registered with TryAdd so
+        // tests can provide a stub before this call. The S3 impl reuses
+        // the same Lazy<IAmazonS3> wired by AddCloudDirectoryProviders
+        // above, so it does not double-register the AWS client.
+        services.AddOptions<Cena.Actors.Ingest.IngestionBytesStoreOptions>()
+            .BindConfiguration("Cena:Ingestion:BytesStore");
+        services.AddOptions<Cena.Actors.Ingest.IngestionRetryWorkerOptions>()
+            .BindConfiguration("Cena:Ingestion:RetryWorker");
+        services.TryAddSingleton<Cena.Actors.Ingest.IIngestionBytesStore>(sp =>
+        {
+            var opts = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<
+                Cena.Actors.Ingest.IngestionBytesStoreOptions>>().Value;
+            var backend = (opts.Backend ?? "local").Trim().ToLowerInvariant();
+            return backend switch
+            {
+                "s3" => ActivatorUtilities.CreateInstance<Cena.Admin.Api.Ingestion.S3IngestionBytesStore>(sp),
+                "null" => ActivatorUtilities.CreateInstance<Cena.Actors.Ingest.NullIngestionBytesStore>(sp),
+                _ => ActivatorUtilities.CreateInstance<Cena.Actors.Ingest.LocalDiskIngestionBytesStore>(sp),
+            };
+        });
 
         // Auto-watch background scanner: drives the AutoWatch toggle on
         // saved cloud directories. Idempotent re-scan thanks to SHA-256
