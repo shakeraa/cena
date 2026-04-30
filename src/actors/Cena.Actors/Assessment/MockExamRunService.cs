@@ -64,6 +64,7 @@ public sealed class MockExamRunService : IMockExamRunService
     private readonly MockExamGrader _grader;
     private readonly MockExamPaperDraw _paperDraw;
     private readonly MockExamBktPropagator _bktPropagator;
+    private readonly MockExamItemPreview _itemPreview;
 
     private static readonly Meter Meter = new("Cena.MockExam", "1.0.0");
     private static readonly Counter<long> RunsStarted =
@@ -104,6 +105,7 @@ public sealed class MockExamRunService : IMockExamRunService
         _grader = new MockExamGrader(structureCatalog, cas, _clock);
         _paperDraw = new MockExamPaperDraw(logger, _clock);
         _bktPropagator = new MockExamBktPropagator(bktTracker, store, logger);
+        _itemPreview = new MockExamItemPreview(store, deliveryGate, _clock);
     }
 
     private static string SubjectForExamCode(string examCode) => examCode switch
@@ -672,119 +674,13 @@ public sealed class MockExamRunService : IMockExamRunService
         return MockExamWireResponses.BuildState(state);
     }
 
-    public async Task<MockExamQuestionPreview?> GetQuestionPreviewAsync(
-        string studentId, string runId, string questionId, CancellationToken ct)
-    {
-        // Phase-4 #2: this is a delivery seam — every served preview gets
-        // a corresponding ExamSimulationItemDelivered_V1 event so the
-        // audit trail can answer "did we serve item X to student Y" by
-        // event-stream replay.
-        await using var session = _store.LightweightSession();
-        var state = await session.LoadAsync<ExamSimulationState>(runId, ct);
-        if (state is null || state.StudentId != studentId) return null;
+    // Item preview + delivery-gate delegated to MockExamItemPreview (LOC-ratchet extract).
+    public Task<MockExamQuestionPreview?> GetQuestionPreviewAsync(
+        string studentId, string runId, string questionId, CancellationToken ct) =>
+        _itemPreview.GetAsync(studentId, runId, questionId, ct);
 
-        var validIds = state.PartAQuestionIds.Concat(state.PartBQuestionIds).ToHashSet();
-        if (!validIds.Contains(questionId)) return null;
-
-        // Multi-part Q's first; the runner needs subpart shape to render
-        // multiple input rows.
-        var multipart = await session.LoadAsync<BagrutMultipartQuestion>(questionId, ct);
-        if (multipart is not null)
-        {
-            // ADR-0043 chokepoint — derive provenance from the doc and
-            // throw on MinistryBagrut. Today TeacherAuthoredOriginal +
-            // AiRecreated are the only legitimate writers; the gate is
-            // belt-and-braces against a future writer slipping a Ministry
-            // doc into the multi-part pool. Throw escapes to the endpoint
-            // as 5xx (P0 SIEM alarm), which is correct.
-            AssertDeliverable(multipart.SourceType, questionId, runId, studentId);
-
-            await EmitItemDeliveredAsync(session, studentId, runId, questionId, multipart.SourceType, ct);
-
-            return new MockExamQuestionPreview(
-                QuestionId: questionId,
-                Prompt: multipart.Stem,
-                Topic: multipart.Topic,
-                BloomsLevel: multipart.BloomsLevel,
-                Subparts: multipart.Subparts
-                    .Select(s => new MockExamSubpartPreview(s.PartId, s.Prompt, s.Points))
-                    .ToList());
-        }
-
-        var rm = await session.LoadAsync<QuestionReadModel>(questionId, ct);
-        var doc = await session.LoadAsync<QuestionDocument>(questionId, ct);
-        if (doc is null) return null;
-
-        // For single-cell Q's the derivation is "every active doc is
-        // AiRecreated" by the same convention DiagnosticEndpoints uses
-        // (see DeriveProvenanceKind). Belt-and-braces.
-        var sourceType = rm?.SourceType ?? "AiRecreated";
-        AssertDeliverable(sourceType, questionId, runId, studentId);
-        await EmitItemDeliveredAsync(session, studentId, runId, questionId, sourceType, ct);
-
-        return new MockExamQuestionPreview(
-            QuestionId: questionId,
-            Prompt: doc.Prompt,
-            Topic: doc.Topic ?? rm?.Topic,
-            BloomsLevel: rm?.BloomsLevel ?? 0,
-            Subparts: null);
-    }
-
-    /// <summary>Phase-4 #2 — append an ExamSimulationItemDelivered_V1
-    /// event so the per-student stream has an auditable record of every
-    /// item served. Idempotency: this fires on every preview read, so
-    /// the same item served twice = two events; the projection layer
-    /// can dedup by (SimulationId, ItemId) when needed.</summary>
-    private async Task EmitItemDeliveredAsync(
-        IDocumentSession session, string studentId, string runId, string itemId,
-        string sourceType, CancellationToken ct)
-    {
-        var kind = sourceType switch
-        {
-            "TeacherAuthoredOriginal" => ProvenanceKind.TeacherAuthoredOriginal,
-            "MinistryBagrut"          => ProvenanceKind.MinistryBagrut, // unreachable — gate threw
-            _                          => ProvenanceKind.AiRecreated,
-        };
-        session.Events.Append(studentId, new ExamSimulationItemDelivered_V1(
-            StudentId: studentId,
-            SimulationId: runId,
-            ItemId: itemId,
-            Provenance: kind,
-            DeliveredAt: _clock.GetUtcNow()));
-        await session.SaveChangesAsync(ct);
-    }
-
-    /// <summary>
-    /// Maps the doc's stored SourceType label to a Provenance + invokes
-    /// the central gate. Throws on MinistryBagrut.
-    /// </summary>
-    private void AssertDeliverable(string sourceType, string itemId, string sessionId, string actorId)
-    {
-        var kind = sourceType switch
-        {
-            "TeacherAuthoredOriginal" => ProvenanceKind.TeacherAuthoredOriginal,
-            "AiRecreated"             => ProvenanceKind.AiRecreated,
-            "MinistryBagrut"          => ProvenanceKind.MinistryBagrut,
-            _                          => ProvenanceKind.AiRecreated, // pragmatic default
-        };
-        // Best-effort tenantId — the runner state doesn't carry one
-        // today (the run is keyed on studentId only). Gate logs both
-        // sessionId + actorId, so trace+SIEM remain correlatable.
-        _deliveryGate.AssertDeliverable(
-            provenance: new Provenance(kind, _clock.GetUtcNow(), sourceType),
-            itemId: itemId,
-            sessionId: sessionId,
-            tenantId: "(exam-prep-runner)",
-            actorId: actorId);
-    }
-
-    // ── Grading delegated to MockExamGrader (single-responsibility extract).
-    // The grader owns the Stopwatch + grade-duration metric; runner stays
-    // focused on state-machine orchestration. All 5 internal callers
-    // (StartAsync continuation / SubmitAsync / GetRecentRunsAsync / RegradeAsync)
-    // keep calling GradeAsync unchanged.
+    // Grading delegated to MockExamGrader (single-responsibility extract).
     private async Task<MockExamResultResponse> GradeAsync(
         IQuerySession session, ExamSimulationState state, CancellationToken ct) =>
         await _grader.GradeAsync(session, state, ct);
-
 }
