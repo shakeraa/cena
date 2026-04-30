@@ -282,14 +282,28 @@ const formatTimestamp = (ts: string | null): string => {
   return new Date(ts).toLocaleString()
 }
 
+const retryError = ref<string | null>(null)
+
 const retryItem = async () => {
   actionLoading.value = true
+  retryError.value = null
   try {
     await $api(`/admin/ingestion/items/${props.itemId}/retry`, { method: 'POST' })
     emit('item-updated')
     fetchDetail()
   }
-  catch (error) {
+  catch (error: any) {
+    // 501 Not Implemented = honest message from the backend that retry is
+    // not yet wired (see PRR-RETRY-IMPL). Render the body message inline
+    // rather than swallowing as a generic console error so the curator
+    // knows to re-upload.
+    if (error?.response?.status === 501 || error?.statusCode === 501) {
+      retryError.value = error?.data?.message
+        ?? 'Retry is not yet implemented; please re-upload the file.'
+    }
+    else {
+      retryError.value = error?.data?.message ?? error?.message ?? 'Retry failed.'
+    }
     console.error('Retry failed:', error)
   }
   finally {
@@ -507,9 +521,16 @@ const moveToReview = async () => {
               <div class="mb-3">
                 <div class="d-flex justify-space-between mb-1">
                   <span class="text-body-2">Language Quality</span>
-                  <span class="text-body-2 font-weight-medium">{{ item.qualityScores.languageQuality }}%</span>
+                  <span class="text-body-2 font-weight-medium">
+                    {{ item.qualityScores.languageQuality === null ? '—' : item.qualityScores.languageQuality + '%' }}
+                  </span>
                 </div>
+                <!-- Hide progress bar when evaluator hasn't run; rendering 0%
+                     would lie about a "real" zero score. cm #5 fix made the
+                     backend return null instead of hardcoded 80; this matches
+                     the SPA-side. -->
                 <VProgressLinear
+                  v-if="item.qualityScores.languageQuality !== null"
                   :model-value="item.qualityScores.languageQuality"
                   color="primary"
                   rounded
@@ -519,9 +540,12 @@ const moveToReview = async () => {
               <div class="mb-3">
                 <div class="d-flex justify-space-between mb-1">
                   <span class="text-body-2">Pedagogical Quality</span>
-                  <span class="text-body-2 font-weight-medium">{{ item.qualityScores.pedagogicalQuality }}%</span>
+                  <span class="text-body-2 font-weight-medium">
+                    {{ item.qualityScores.pedagogicalQuality === null ? '—' : item.qualityScores.pedagogicalQuality + '%' }}
+                  </span>
                 </div>
                 <VProgressLinear
+                  v-if="item.qualityScores.pedagogicalQuality !== null"
                   :model-value="item.qualityScores.pedagogicalQuality"
                   color="info"
                   rounded
@@ -568,6 +592,18 @@ const moveToReview = async () => {
           <h6 class="text-h6 mb-3">
             Actions
           </h6>
+          <!-- Retry error surface — 501 Not Implemented from backend
+               renders here so curator knows to re-upload (PRR-RETRY-IMPL).  -->
+          <VAlert
+            v-if="retryError"
+            color="warning"
+            variant="tonal"
+            density="compact"
+            class="mb-3"
+            data-test="retry-error"
+          >
+            {{ retryError }}
+          </VAlert>
           <div class="d-flex gap-3 flex-wrap">
             <VBtn
               color="warning"
