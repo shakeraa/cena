@@ -104,6 +104,11 @@ services:
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
       - ASPNETCORE_URLS=http://+:5052
+      # OTel OTLP exporter target. The collector lives in
+      # config/docker-compose.observability.yml and shares cena_default;
+      # override via Cluster__OtlpEndpoint so traces+metrics+logs reach
+      # otel-collector → Jaeger / Prometheus / Loki.
+      - Cluster__OtlpEndpoint=http://otel-collector:4317
       # appsettings.Development.json pins localhost:5433 etc; override via
       # ConnectionStrings__ so the container talks to the sibling services
       # on the compose network.
@@ -193,6 +198,8 @@ services:
       # Override the appsettings.json Kestrel endpoint (which pins port 5051)
       # so the container listens on the port compose maps (5050).
       - Kestrel__Endpoints__Http__Url=http://0.0.0.0:5050
+      # OTel OTLP exporter — see admin-api block above for context.
+      - Cluster__OtlpEndpoint=http://otel-collector:4317
       - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
       - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
       - ConnectionStrings__Redis=cena-redis:6379
@@ -376,6 +383,9 @@ services:
         condition: service_started
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
+      # OTel OTLP exporter — actor-host emits Proto.Cluster + actor-lifecycle
+      # spans + per-actor metrics. Same target as the API hosts.
+      - Cluster__OtlpEndpoint=http://otel-collector:4317
       - ConnectionStrings__PostgreSQL=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
       - CENA_POSTGRES_CONNECTION=Host=cena-postgres;Port=5432;Database=cena;Username=cena;Password=cena_dev_password;Search Path=cena,public
       - ConnectionStrings__Redis=cena-redis:6379
