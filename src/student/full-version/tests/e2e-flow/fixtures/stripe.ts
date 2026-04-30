@@ -31,6 +31,28 @@ export interface StripeScope {
    * Trigger a `checkout.session.expired` — user dismissed the modal.
    */
   triggerCheckoutExpired(checkoutSessionId: string): Promise<void>
+  /**
+   * Trigger an `invoice.paid` webhook — drives trial → paid conversion
+   * (Phase 3, d9c663e2). Stripe's SetupIntent flow fires this NOT
+   * checkout.session.completed at conversion, so a Trialing-state
+   * invoice.paid IS the conversion event.
+   *
+   * Backend reaction (StripeWebhookHandler.HandleInvoicePaidAsync):
+   *   - if aggregate.Status == Trialing →
+   *     emits TrialConverted_V1 + SubscriptionActivated_V1 atomically
+   *   - if aggregate.Status == Active|PastDue →
+   *     emits RenewalProcessed_V1
+   *   - otherwise no-op
+   *
+   * Required overrides (passed via `extraMetadata`): cena_parent_id,
+   * cena_tier (Basic|Plus|Premium), cena_cycle (Monthly|Annual). The
+   * fixture seeds them under subscription_details.metadata since that's
+   * the canonical location HandleInvoicePaidAsync reads.
+   */
+  triggerInvoicePaid(
+    checkoutSessionId: string,
+    extraMetadata: { parentId: string; tier: string; cycle: string },
+  ): Promise<void>
 }
 
 const STRIPE_CLI = process.env.STRIPE_CLI ?? 'stripe'
@@ -89,6 +111,23 @@ export function createStripeScope(tenantId: string): StripeScope {
     },
     async triggerCheckoutExpired(checkoutSessionId: string) {
       await trigger('checkout.session.expired', checkoutSessionId)
+    },
+    async triggerInvoicePaid(
+      checkoutSessionId: string,
+      extraMetadata: { parentId: string; tier: string; cycle: string },
+    ) {
+      // HandleInvoicePaidAsync looks at subscription_details.metadata
+      // first, then invoice.metadata as fallback. Stripe CLI overrides
+      // with dotted keys hit the top-level invoice.metadata; setting
+      // both via cena_* keys covers either branch.
+      await trigger('invoice.paid', checkoutSessionId, [
+        `--override=metadata.cena_parent_id=${extraMetadata.parentId}`,
+        `--override=metadata.cena_tier=${extraMetadata.tier}`,
+        `--override=metadata.cena_cycle=${extraMetadata.cycle}`,
+        `--override=subscription_details.metadata.cena_parent_id=${extraMetadata.parentId}`,
+        `--override=subscription_details.metadata.cena_tier=${extraMetadata.tier}`,
+        `--override=subscription_details.metadata.cena_cycle=${extraMetadata.cycle}`,
+      ])
     },
   }
 }
