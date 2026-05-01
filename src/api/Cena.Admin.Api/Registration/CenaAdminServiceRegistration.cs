@@ -281,6 +281,17 @@ public static class CenaAdminServiceRegistration
         services.AddHostedService<Ingestion.IngestionJobRunnerHostedService>();
 
         services.AddScoped<IIngestionPipelineService, IngestionPipelineService>();
+
+        // Visual review (2026-05-01): persistent source-PDF store keyed by
+        // sha256(pdfBytes). Curators load the original document side-by-side
+        // with the OCR-extracted output. Bind RootDirectory from
+        // Ingestion:BagrutPdfStorage; defaults to {Tmp}/cena-source-pdfs so
+        // dev works without config (matches FigureStorageOptions convention).
+        // Production hosts override to /var/cena/source-pdfs (bind-mount).
+        services.AddOptions<Ingestion.BagrutPdfStorageOptions>()
+            .BindConfiguration("Ingestion:BagrutPdfStorage");
+        services.TryAddSingleton<Ingestion.IBagrutPdfStore, Ingestion.LocalFileSystemBagrutPdfStore>();
+
         // RDY-OCR-WIREUP-C (Phase 2.3): Bagrut PDF ingestion routes through
         // the real OCR cascade (IOcrCascadeService, ADR-0033). No stubs.
         services.AddScoped<Ingestion.IBagrutPdfIngestionService, Ingestion.BagrutPdfIngestionService>();
@@ -495,6 +506,11 @@ public static class CenaAdminServiceRegistration
         // RDY-057 (Phase 3): POST /api/admin/ingestion/bagrut — SuperAdmin-only
         // PDF ingest trigger that routes to BagrutPdfIngestionService.
         app.MapBagrutIngestEndpoints();
+
+        // Visual review (2026-05-01): GET /api/admin/ingestion/items/{id}/source.pdf
+        // and GET .../items/{id}/figures/{figureIndex}. ModeratorOrAbove
+        // gated; back the curator's side-by-side review panel.
+        app.MapVisualReviewEndpoints();
 
         // Async tracking surface for long-running ingestion ops (Bagrut +
         // cloud-dir). Drives the IngestionJobsDrawer in the admin SPA.
