@@ -624,6 +624,10 @@ public static class CenaAdminServiceRegistration
         app.MapEventStreamEndpoints();
         app.MapOutreachEngagementEndpoints();
         app.MapAiGenerationEndpoints();
+        // POST /api/admin/ai/test-connection lives standalone so the route-smoke
+        // test can mount just that endpoint without dragging in the rest of the
+        // AI group's services. See AiSettings/AiTestConnectionEndpoint.cs.
+        AiSettings.AiTestConnectionEndpoint.MapAiTestConnectionEndpoint(app);
         app.MapQuestionPipelineEndpoints();
         // Phase 4: trial-cohort dashboard read endpoint (Trial* event funnel).
         Features.TrialCohort.TrialCohortEndpoint.MapTrialCohortEndpoint(app);

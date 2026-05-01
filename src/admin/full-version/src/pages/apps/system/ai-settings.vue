@@ -29,8 +29,32 @@ const loading = ref(true)
 const saving = ref(false)
 const saveSuccess = ref(false)
 const testingProvider = ref<string | null>(null)
-const testResult = ref<{ provider: string; ok: boolean } | null>(null)
+
+interface TestConnectionResult {
+  provider: string
+  ok: boolean
+  // Human-readable message from the probe ("Invalid API key", "Model 'X' not found...").
+  error?: string
+  // Stable category code from the probe (AUTH_FAILED, MODEL_NOT_FOUND, etc.).
+  // Used to look up an actionable hint for the operator.
+  category?: string
+}
+const testResult = ref<TestConnectionResult | null>(null)
 const error = ref<string | null>(null)
+
+// Operator-facing remediation hints keyed by the probe's category code.
+// AnthropicConnectionProbe.Categorize is the source of truth for these codes.
+const testConnectionHints: Record<string, string> = {
+  AUTH_FAILED: 'Re-paste a fresh Anthropic API key in the field above and click Save Settings.',
+  MODEL_NOT_FOUND: 'The selected model is not accessible to this API key. Pick a different model or contact Anthropic to enable it.',
+  RATE_LIMITED: 'Anthropic is rate-limiting this key. Wait ~1 minute and retry.',
+  UPSTREAM_ERROR: 'Anthropic returned a 5xx. Usually transient — retry in a minute. If it persists check status.anthropic.com.',
+  NETWORK_UNREACHABLE: 'The backend cannot reach api.anthropic.com. Check container DNS / firewall / proxy.',
+  TIMEOUT: 'The probe timed out. Anthropic may be slow — retry in a minute.',
+  CONFIG_MISSING_KEY: 'No API key is configured. Enter a key above and click Save Settings.',
+  UNSUPPORTED_PROVIDER: 'This provider is not yet supported by the backend.',
+  UNEXPECTED_ERROR: 'Something unexpected went wrong. Check admin-api container logs for the stack trace.',
+}
 
 const settings = ref<AiSettings>({
   activeProvider: 'Anthropic',
@@ -144,15 +168,34 @@ const testConnection = async (provider: string) => {
   testingProvider.value = provider
   testResult.value = null
   try {
-    const data = await $api<{ connected: boolean }>('/admin/ai/test-connection', {
-      method: 'POST',
-      body: provider,
-    })
+    // Body is wrapped { provider } — sending a raw string makes ofetch send
+    // Content-Type: text/plain which the .NET binder rejects with 415 before
+    // the probe ever runs (the SPA then renders bare "Failed" with no
+    // category). See TestConnectionRequest in AiGenerationService.cs.
+    const data = await $api<{ connected: boolean; error?: string; details?: string }>(
+      '/admin/ai/test-connection',
+      {
+        method: 'POST',
+        body: { provider },
+      },
+    )
 
-    testResult.value = { provider, ok: data.connected }
+    testResult.value = {
+      provider,
+      ok: data.connected,
+      error: data.error ?? undefined,
+      category: data.details ?? undefined,
+    }
   }
-  catch {
-    testResult.value = { provider, ok: false }
+  catch (err: any) {
+    // Surface server-side error envelope when present so transport-layer
+    // failures (401, 415, 5xx) carry actionable detail instead of "Failed".
+    testResult.value = {
+      provider,
+      ok: false,
+      error: err?.data?.error ?? err?.data?.message ?? err?.message ?? 'Request failed',
+      category: err?.data?.details ?? `HTTP_${err?.response?.status ?? 'ERROR'}`,
+    }
   }
   finally {
     testingProvider.value = null
@@ -355,6 +398,61 @@ onMounted(fetchSettings)
                   >
                     Test Connection
                   </VBtn>
+
+                  <!-- Probe result envelope: when the test fails, render the
+                       human message from the probe + the category-mapped
+                       remediation hint so the operator knows whether to
+                       re-paste the key, wait it out, or fix container DNS. -->
+                  <VAlert
+                    v-if="testResult && testResult.provider === settings.activeProvider && !testResult.ok"
+                    color="error"
+                    variant="tonal"
+                    icon="tabler-plug-x"
+                    class="mt-4"
+                    closable
+                    data-test="ai-test-connection-error"
+                    @click:close="testResult = null"
+                  >
+                    <template #title>
+                      <span data-test="ai-test-connection-error-message">
+                        {{ testResult.error ?? 'Connection test failed.' }}
+                      </span>
+                      <VChip
+                        v-if="testResult.category"
+                        size="x-small"
+                        color="error"
+                        variant="outlined"
+                        class="ml-2"
+                        label
+                        data-test="ai-test-connection-error-category"
+                      >
+                        {{ testResult.category }}
+                      </VChip>
+                    </template>
+                    <div
+                      v-if="testResult.category && testConnectionHints[testResult.category]"
+                      class="text-body-2"
+                      data-test="ai-test-connection-error-hint"
+                    >
+                      {{ testConnectionHints[testResult.category] }}
+                    </div>
+                  </VAlert>
+
+                  <!-- Success envelope: confirms which model acknowledged the
+                       probe so the operator sees they tested the model they
+                       actually configured. -->
+                  <VAlert
+                    v-if="testResult && testResult.provider === settings.activeProvider && testResult.ok"
+                    color="success"
+                    variant="tonal"
+                    icon="tabler-plug-connected"
+                    class="mt-4"
+                    closable
+                    data-test="ai-test-connection-success"
+                    @click:close="testResult = null"
+                  >
+                    {{ testResult.error ?? 'Connection successful.' }}
+                  </VAlert>
                 </VCol>
               </VRow>
             </VCardText>

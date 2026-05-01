@@ -43,6 +43,18 @@ public enum AiProvider
     Anthropic
 }
 
+/// <summary>
+/// Wrapper request body for POST /api/admin/ai/test-connection. The SPA's
+/// HTTP client (ofetch) does NOT auto-encode raw-string bodies as JSON —
+/// it sends Content-Type: text/plain, which the minimal-API binder for
+/// [FromBody] AiProvider rejected with 415 before the probe ever ran (the
+/// SPA then surfaced a bare "Failed" badge with no category). Wrapping the
+/// enum in an object lets ofetch JSON-encode automatically and sets
+/// Content-Type: application/json, so the binder succeeds and the typed
+/// error category from AnthropicConnectionProbe reaches the SPA.
+/// </summary>
+public sealed record TestConnectionRequest(AiProvider Provider);
+
 public sealed record AiProviderConfig(
     AiProvider Provider,
     string ApiKey,
