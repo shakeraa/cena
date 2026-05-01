@@ -52,6 +52,15 @@ interface ItemDetail {
   errors: string[]
   createdAt: string
   updatedAt: string
+  // Question content surfaced for curator review on the InReview stage.
+  // The panel previously only showed metadata + scores so the curator
+  // had nothing to actually review (2026-05-01 user report).
+  // - ocrText: raw OCR'd source PDF text (the "original question").
+  // - recreatedQuestions: post-OCR cleanup output — what the re_created
+  //   stage produced and what variant generation seeds from.
+  ocrText: string | null
+  ocrConfidence: number | null
+  recreatedQuestions: Array<{ index: number, text: string, confidence: number }>
 }
 
 interface Props {
@@ -247,6 +256,9 @@ const fetchDetail = async () => {
         .map(s => `${s.stage}: ${s.errorMessage}`),
       createdAt: resp.submittedAt,
       updatedAt: resp.completedAt ?? resp.submittedAt,
+      ocrText: resp.ocrResult?.extractedText ?? null,
+      ocrConfidence: resp.ocrResult?.confidence ?? null,
+      recreatedQuestions: resp.extractedQuestions ?? [],
     }
   }
   catch (error) {
@@ -473,6 +485,112 @@ const approveItem = async () => {
             class="mb-4"
             @confirmed="() => emit('item-updated')"
           />
+
+          <VDivider class="mb-4" />
+
+          <!-- Question Content — what the curator is reviewing.
+               OCR (original) + recreated form. Without this section,
+               approving was a black-box (only metadata + scores were
+               visible). 2026-05-01 user report.
+               Math content (LaTeX/MathML in OCR'd Bagrut text) MUST be
+               LTR even on RTL admin pages — wrap in <bdi dir="ltr"> per
+               feedback_math_always_ltr memory rule. Real KaTeX rendering
+               is a separate follow-up; for now we show the raw LaTeX
+               source which is readable enough for curator review. -->
+          <h6 class="text-h6 mb-3">
+            Question Content
+          </h6>
+
+          <div
+            v-if="!item.ocrText && !item.recreatedQuestions.length"
+            class="text-body-2 text-disabled mb-4"
+            data-test="item-detail-no-content"
+          >
+            No question content yet — pipeline is still processing.
+          </div>
+
+          <!-- Recreated questions (post-OCR cleanup) — what variant
+               generation will seed from. Show first since this is what
+               the curator approves on. -->
+          <div
+            v-if="item.recreatedQuestions.length"
+            class="mb-4"
+            data-test="item-detail-recreated"
+          >
+            <div class="text-body-2 text-medium-emphasis mb-2 d-flex align-center">
+              <VIcon
+                icon="tabler-sparkles"
+                size="16"
+                class="me-1"
+              />
+              Recreated questions ({{ item.recreatedQuestions.length }}) — what variant generation will seed from
+            </div>
+            <VCard
+              v-for="q in item.recreatedQuestions"
+              :key="q.index"
+              variant="outlined"
+              class="mb-2"
+            >
+              <VCardText class="py-3">
+                <div class="d-flex justify-space-between align-center mb-2">
+                  <span class="text-caption text-medium-emphasis">
+                    Question {{ q.index + 1 }}
+                  </span>
+                  <VChip
+                    size="x-small"
+                    :color="q.confidence >= 0.85 ? 'success' : q.confidence >= 0.65 ? 'warning' : 'error'"
+                    label
+                  >
+                    {{ Math.round(q.confidence * 100) }}% confidence
+                  </VChip>
+                </div>
+                <bdi
+                  dir="ltr"
+                  style="display: block; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.875rem;"
+                  data-test="item-detail-recreated-text"
+                >{{ q.text }}</bdi>
+              </VCardText>
+            </VCard>
+          </div>
+
+          <!-- Original OCR text (raw) — collapsed by default; the
+               curator usually trusts the recreated form but needs the
+               source on hand to spot OCR errors. -->
+          <VExpansionPanels
+            v-if="item.ocrText"
+            class="mb-4"
+            data-test="item-detail-ocr-original"
+          >
+            <VExpansionPanel>
+              <VExpansionPanelTitle>
+                <span class="d-flex align-center">
+                  <VIcon
+                    icon="tabler-file-text"
+                    size="16"
+                    class="me-1"
+                  />
+                  Original (OCR raw text)
+                  <VChip
+                    v-if="item.ocrConfidence !== null"
+                    size="x-small"
+                    :color="item.ocrConfidence >= 0.85 ? 'success' : item.ocrConfidence >= 0.65 ? 'warning' : 'error'"
+                    variant="outlined"
+                    label
+                    class="ms-2"
+                  >
+                    {{ Math.round(item.ocrConfidence * 100) }}% OCR
+                  </VChip>
+                </span>
+              </VExpansionPanelTitle>
+              <VExpansionPanelText>
+                <bdi
+                  dir="ltr"
+                  style="display: block; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8125rem;"
+                  data-test="item-detail-ocr-text"
+                >{{ item.ocrText }}</bdi>
+              </VExpansionPanelText>
+            </VExpansionPanel>
+          </VExpansionPanels>
 
           <VDivider class="mb-4" />
 
