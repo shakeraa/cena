@@ -161,6 +161,29 @@ public sealed class LocalFileSystemBagrutPdfStoreTests : IDisposable
     }
 
     [Fact]
+    public async Task ProductionIdFormat_PdfDashHex_RoundTrips()
+    {
+        // Locks the production ID shape emitted by
+        // BagrutPdfIngestionService.GeneratePdfId: "pdf-" + 12 hex chars.
+        // Earlier ValidateId rejected this with ArgumentException, and the
+        // item-detail endpoint 500'd for every InReview / Published row
+        // (2026-05-01 user report).
+        var prodId = "pdf-f04f4f0b91b5";
+
+        await _store.PersistAsync(prodId, new byte[] { 1, 2, 3 });
+        Assert.True(await _store.ExistsAsync(prodId));
+
+        await using var stream = await _store.OpenReadAsync(prodId);
+        Assert.NotNull(stream);
+
+        // Bucket prefix is the first 2 chars of the lowercased id —
+        // here that's "pd" because of the prefix. Locks the convention.
+        var (dir, path) = _store.ResolvePath(prodId);
+        Assert.Equal(Path.Combine(_root, "pd"), dir);
+        Assert.Equal(Path.Combine(_root, "pd", prodId + ".pdf"), path);
+    }
+
+    [Fact]
     public async Task MixedCaseHex_NormalizesToLower()
     {
         // sha256 hex from BagrutPdfIngestionService is already lowercase,

@@ -118,14 +118,25 @@ public sealed class LocalFileSystemBagrutPdfStore : IBagrutPdfStore
         if (string.IsNullOrWhiteSpace(pdfId))
             throw new ArgumentException("pdfId is required.", nameof(pdfId));
 
-        // Tighten to hex to avoid path traversal (`..`) or directory
-        // separators slipping in. BagrutPdfIngestionService.GeneratePdfId
-        // emits sha256 hex (64 chars).
+        // Allowed alphabet: lowercase hex (0-9, a-f), uppercase hex (A-F),
+        // plus the two characters that appear in the literal "pdf-"
+        // prefix actually emitted by BagrutPdfIngestionService.GeneratePdfId
+        // ("pdf-" + 12 hex chars). The set is path-safe: no '/', no '\',
+        // no '.', so '..' or directory separators can't sneak in.
+        //
+        // Earlier we required pure hex which rejected every real production
+        // id ("pdf-f04f4f0b91b5") and crashed the item-detail endpoint
+        // with a 500 (2026-05-01 user report on InReview / Published rows).
         foreach (var ch in pdfId)
         {
-            var ok = (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f') || (ch >= 'A' && ch <= 'F');
+            var ok = (ch >= '0' && ch <= '9')
+                  || (ch >= 'a' && ch <= 'f')
+                  || (ch >= 'A' && ch <= 'F')
+                  || ch == 'p' || ch == 'd' || ch == 'f' || ch == '-';
             if (!ok)
-                throw new ArgumentException($"pdfId must be hex. Got: '{pdfId}'", nameof(pdfId));
+                throw new ArgumentException(
+                    $"pdfId must be hex (optionally with 'pdf-' prefix). Got: '{pdfId}'",
+                    nameof(pdfId));
         }
     }
 }
