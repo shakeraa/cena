@@ -50,12 +50,22 @@ scrape_configs:
     scrape_interval: 15s
 
   # NATS exposes /varz (JSON) on :8222, not Prometheus exposition format.
-  # Add prometheus-nats-exporter as a sidecar if NATS metrics are needed —
-  # the bare nats:8222 endpoint cannot be scraped directly.
-  #
+  # The prometheus-nats-exporter sidecar (in observability compose) polls
+  # /varz/connz/jsz/routez and re-exposes them as Prometheus exposition on
+  # :7777/metrics, giving us connection counts, JetStream consumer/stream
+  # backlogs, and routing health on the cena.* subjects.
+  - job_name: "cena-nats"
+    static_configs:
+      - targets: ["nats-exporter:7777"]
+        labels:
+          service: "nats"
+    metrics_path: /metrics
+    scrape_interval: 30s
+
   # SymPy sidecar is a pure NATS worker (subscribes to cena.cas.verify.sympy);
   # it has no HTTP listener, so no /metrics is exposed. Health is observed
-  # via NATS request/reply latency from actor-host instead.
+  # via NATS request/reply latency from actor-host instead, plus the
+  # consumer-lag metrics on cena-nats above.
 
   # PRR-435: OTel Collector re-exposes OTLP metrics on :8889.
   - job_name: "cena-otel-collector"

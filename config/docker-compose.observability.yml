@@ -105,5 +105,17 @@ services:
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
 
+  # NATS doesn't expose Prometheus metrics natively — this sidecar polls
+  # the NATS HTTP monitoring endpoint (/varz, /connz, /jsz, /routez) and
+  # re-exposes them as Prometheus exposition on :7777/metrics. Targeted
+  # by the `cena-nats` job in prometheus.yml.
+  nats-exporter:
+    image: natsio/prometheus-nats-exporter:latest
+    container_name: cena-nats-exporter
+    command: ["-varz", "-jsz=all", "-connz", "-routez", "-port=7777", "http://cena-nats:8222"]
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
   grafana_data:
