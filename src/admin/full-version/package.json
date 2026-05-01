@@ -42,6 +42,7 @@
     "eslint-plugin-regexp": "2.10.0",
     "firebase": "^12.11.0",
     "jwt-decode": "4.0.0",
+    "katex": "^0.16.45",
     "mapbox-gl": "3.5.2",
     "ofetch": "1.5.0",
     "pinia": "3.0.3",

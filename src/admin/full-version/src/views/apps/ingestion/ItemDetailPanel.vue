@@ -2,6 +2,7 @@
 import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { $api } from '@/utils/api'
 import { useIngestionJobs } from '@/composables/useIngestionJobs'
+import { renderMixedMathText } from '@/utils/renderMixedMathText'
 import CuratorMetadataPanel from './CuratorMetadataPanel.vue'
 
 interface ProcessingStage {
@@ -502,7 +503,7 @@ const approveItem = async () => {
           </h6>
 
           <div
-            v-if="!item.ocrText && !item.recreatedQuestions.length"
+            v-if="!item.ocrText && !(item.recreatedQuestions?.length)"
             class="text-body-2 text-disabled mb-4"
             data-test="item-detail-no-content"
           >
@@ -511,9 +512,17 @@ const approveItem = async () => {
 
           <!-- Recreated questions (post-OCR cleanup) — what variant
                generation will seed from. Show first since this is what
-               the curator approves on. -->
+               the curator approves on.
+               Math LaTeX in `q.text` is KaTeX-rendered via
+               renderMixedMathText (bdi dir=ltr per memory rule).
+               Optional chaining on `recreatedQuestions?.length` is
+               load-bearing: Vite HMR can replace the template while the
+               existing `item` ref still has the pre-2026-05-01 shape
+               without `recreatedQuestions`; without `?.length` Vue
+               throws on undefined access and the section silently fails
+               to render. -->
           <div
-            v-if="item.recreatedQuestions.length"
+            v-if="item.recreatedQuestions?.length"
             class="mb-4"
             data-test="item-detail-recreated"
           >
@@ -544,11 +553,17 @@ const approveItem = async () => {
                     {{ Math.round(q.confidence * 100) }}% confidence
                   </VChip>
                 </div>
-                <bdi
-                  dir="ltr"
-                  style="display: block; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.875rem;"
+                <!-- v-html is safe here because renderMixedMathText
+                     escapes prose segments and KaTeX's renderToString
+                     produces sanitized HTML for the math segments
+                     (with throwOnError:false the only path that
+                     surfaces user content is escapeHtml inside
+                     renderMixedMathText). -->
+                <div
+                  class="cena-mmt-block"
                   data-test="item-detail-recreated-text"
-                >{{ q.text }}</bdi>
+                  v-html="renderMixedMathText(q.text)"
+                />
               </VCardText>
             </VCard>
           </div>
@@ -583,11 +598,11 @@ const approveItem = async () => {
                 </span>
               </VExpansionPanelTitle>
               <VExpansionPanelText>
-                <bdi
-                  dir="ltr"
-                  style="display: block; white-space: pre-wrap; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.8125rem;"
+                <div
+                  class="cena-mmt-block"
                   data-test="item-detail-ocr-text"
-                >{{ item.ocrText }}</bdi>
+                  v-html="renderMixedMathText(item.ocrText)"
+                />
               </VExpansionPanelText>
             </VExpansionPanel>
           </VExpansionPanels>
@@ -1072,3 +1087,37 @@ const approveItem = async () => {
     </div>
   </VNavigationDrawer>
 </template>
+
+<style scoped>
+/* cena-mmt-* classes — emitted by renderMixedMathText.
+   Wraps prose + KaTeX math output into a single readable block. */
+.cena-mmt-block {
+  font-size: 0.9rem;
+  line-height: 1.55;
+  word-wrap: break-word;
+}
+
+.cena-mmt-block :deep(.cena-mmt-text) {
+  white-space: pre-wrap;
+  font-family: inherit;
+}
+
+.cena-mmt-block :deep(.cena-mmt-math) {
+  display: inline-block;
+}
+
+.cena-mmt-block :deep(.cena-mmt-math--block) {
+  display: block;
+  margin: 0.5rem 0;
+  text-align: center;
+}
+
+.cena-mmt-block :deep(.cena-mmt-math-error) {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.875em;
+  color: rgb(var(--v-theme-error));
+  background: rgba(var(--v-theme-error), 0.08);
+  padding: 0.1em 0.3em;
+  border-radius: 0.2em;
+}
+</style>
