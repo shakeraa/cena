@@ -249,6 +249,14 @@ services:
       # X-Test-Probe-Token header. Rotate by updating both sides.
       - CENA_TEST_PROBE_TOKEN=dev-only-test-probe-token-do-not-ship
     restart: unless-stopped
+    # CPU cap mirrors admin-api (see admin-api block above for the
+    # 2026-05-01 hot-loop incident rationale). Memory uncapped to match
+    # actual ~3.7G steady-state working set; CPU cap is the actual
+    # containment for runaways. ALERT-CPU-001 pages on sustained >100%.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5050/health/ready"]
       interval: 30s
@@ -439,6 +447,14 @@ services:
       # is up. The sidecar's docker-compose listens on host port 50051.
       - Ocr__Sidecar__BaseUrl=${OCR_SIDECAR_URL:-http://cena-ocr-sidecar:50051}
     restart: unless-stopped
+    # CPU cap mirrors admin-api + student-api (see admin-api block for the
+    # 2026-05-01 hot-loop incident rationale). actor-host owns the Marten
+    # schema warm; if a projection rebuild ever loops, the cap contains it
+    # before it can starve the Docker daemon's healthcheck timer threads.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
     # actor-host owns Marten schema warm (CenaEventStoreIndexes etc).
     # admin-api / student-api wait on this healthcheck via service_healthy
     # before starting so only one host runs the schema reconcile, eliminating
