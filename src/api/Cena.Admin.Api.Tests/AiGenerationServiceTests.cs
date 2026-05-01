@@ -349,6 +349,80 @@ public sealed class AiGenerationServiceTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task TestConnection_OverrideKey_UsedInsteadOfPersistedCipher()
+    {
+        // Operator pasted a fresh key in the form but hasn't clicked Save —
+        // SPA still passes it as override. Probe must see the override, not
+        // the (possibly stale) persisted cipher.
+        var (service, probe) = CreateService();
+        await service.UpdateSettingsAsync(new UpdateAiSettingsRequest(
+            ActiveProvider: AiProvider.Anthropic,
+            ApiKey: "sk-ant-OLD-AND-INVALID", ModelId: null, Temperature: null,
+            BaseUrl: null, ApiVersion: null,
+            DefaultLanguage: null, DefaultBloomsLevel: null,
+            DefaultGrade: null, QuestionsPerBatch: null,
+            AutoRunQualityGate: null), "test-user");
+
+        probe.NextResult = ConnectionTestResult.Ok("ok");
+        var result = await service.TestConnectionAsync(
+            AiProvider.Anthropic,
+            apiKeyOverride: "sk-ant-FRESH-FROM-FORM",
+            modelIdOverride: null);
+
+        Assert.True(result.Success);
+        // Override wins over the persisted cipher.
+        Assert.Equal("sk-ant-FRESH-FROM-FORM", probe.LastApiKey);
+    }
+
+    [Fact]
+    public async Task TestConnection_OverrideModel_UsedInsteadOfPersistedModelId()
+    {
+        var (service, probe) = CreateService();
+        await service.UpdateSettingsAsync(new UpdateAiSettingsRequest(
+            ActiveProvider: AiProvider.Anthropic,
+            ApiKey: "sk-ant-real", ModelId: "claude-sonnet-4-6", Temperature: null,
+            BaseUrl: null, ApiVersion: null,
+            DefaultLanguage: null, DefaultBloomsLevel: null,
+            DefaultGrade: null, QuestionsPerBatch: null,
+            AutoRunQualityGate: null), "test-user");
+
+        probe.NextResult = ConnectionTestResult.Ok("ok");
+        var result = await service.TestConnectionAsync(
+            AiProvider.Anthropic,
+            apiKeyOverride: null,
+            modelIdOverride: "claude-opus-4-7");
+
+        Assert.True(result.Success);
+        Assert.Equal("claude-opus-4-7", probe.LastModelId);
+    }
+
+    [Fact]
+    public async Task TestConnection_BlankOverrides_FallBackToPersistedValues()
+    {
+        // An empty-string override (e.g. the SPA sending "" for a cleared
+        // input) MUST NOT clobber the persisted cipher. Treat blank/whitespace
+        // as "no override".
+        var (service, probe) = CreateService();
+        await service.UpdateSettingsAsync(new UpdateAiSettingsRequest(
+            ActiveProvider: AiProvider.Anthropic,
+            ApiKey: "sk-ant-real", ModelId: "claude-sonnet-4-6", Temperature: null,
+            BaseUrl: null, ApiVersion: null,
+            DefaultLanguage: null, DefaultBloomsLevel: null,
+            DefaultGrade: null, QuestionsPerBatch: null,
+            AutoRunQualityGate: null), "test-user");
+
+        probe.NextResult = ConnectionTestResult.Ok("ok");
+        var result = await service.TestConnectionAsync(
+            AiProvider.Anthropic,
+            apiKeyOverride: "   ",
+            modelIdOverride: "");
+
+        Assert.True(result.Success);
+        Assert.Equal("sk-ant-real", probe.LastApiKey);
+        Assert.Equal("claude-sonnet-4-6", probe.LastModelId);
+    }
+
+    [Fact]
     public async Task GenerateQuestions_PromptContainsBagrutContext()
     {
         var (service, _) = CreateService();

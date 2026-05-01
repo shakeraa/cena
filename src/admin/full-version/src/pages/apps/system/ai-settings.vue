@@ -45,10 +45,12 @@ const error = ref<string | null>(null)
 // Operator-facing remediation hints keyed by the probe's category code.
 // AnthropicConnectionProbe.Categorize is the source of truth for these codes.
 const testConnectionHints: Record<string, string> = {
-  AUTH_FAILED: 'Re-paste a fresh Anthropic API key in the field above and click Save Settings.',
+  AUTH_FAILED: 'The API key Anthropic received is not valid. Paste a fresh key above and click Test Connection (no need to Save first).',
+  INSUFFICIENT_CREDITS: 'Your Anthropic account has insufficient credit balance. Top up at console.anthropic.com → Plans & Billing.',
   MODEL_NOT_FOUND: 'The selected model is not accessible to this API key. Pick a different model or contact Anthropic to enable it.',
   RATE_LIMITED: 'Anthropic is rate-limiting this key. Wait ~1 minute and retry.',
   UPSTREAM_ERROR: 'Anthropic returned a 5xx. Usually transient — retry in a minute. If it persists check status.anthropic.com.',
+  INVALID_REQUEST: 'Anthropic rejected the request shape (model, payload, or headers). See the message above for the upstream reason.',
   NETWORK_UNREACHABLE: 'The backend cannot reach api.anthropic.com. Check container DNS / firewall / proxy.',
   TIMEOUT: 'The probe timed out. Anthropic may be slow — retry in a minute.',
   CONFIG_MISSING_KEY: 'No API key is configured. Enter a key above and click Save Settings.',
@@ -168,15 +170,29 @@ const testConnection = async (provider: string) => {
   testingProvider.value = provider
   testResult.value = null
   try {
-    // Body is wrapped { provider } — sending a raw string makes ofetch send
-    // Content-Type: text/plain which the .NET binder rejects with 415 before
-    // the probe ever runs (the SPA then renders bare "Failed" with no
-    // category). See TestConnectionRequest in AiGenerationService.cs.
+    // Body is wrapped { provider, apiKey?, modelId? } — sending a raw string
+    // makes ofetch send Content-Type: text/plain which the .NET binder rejects
+    // with 415 before the probe ever runs. See TestConnectionRequest in
+    // AiGenerationService.cs.
+    //
+    // Pass the typed key + selected model as overrides so the operator can
+    // verify a fresh key BEFORE clicking Save Settings — otherwise Test
+    // Connection would silently probe whatever cipher happens to be in
+    // Marten, which may be stale or never-updated, producing AUTH_FAILED
+    // even when the field-value key is fine. Backend treats both fields as
+    // request-scope only; nothing is persisted from this call.
+    const typedKey = apiKeys.value[provider]?.trim() || undefined
+    const selectedModel = activeProviderConfig.value?.modelId || undefined
+
     const data = await $api<{ connected: boolean; error?: string; details?: string }>(
       '/admin/ai/test-connection',
       {
         method: 'POST',
-        body: { provider },
+        body: {
+          provider,
+          apiKey: typedKey,
+          modelId: selectedModel,
+        },
       },
     )
 

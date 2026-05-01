@@ -47,7 +47,11 @@ public static class AiTestConnectionEndpoint
         IAiGenerationService service,
         CancellationToken ct)
     {
-        var result = await service.TestConnectionAsync(request.Provider, ct);
+        var result = await service.TestConnectionAsync(
+            request.Provider,
+            request.ApiKey,
+            request.ModelId,
+            ct);
         return Results.Ok(new
         {
             connected = result.Success,
