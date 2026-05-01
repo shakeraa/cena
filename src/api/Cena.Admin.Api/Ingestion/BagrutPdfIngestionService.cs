@@ -112,14 +112,17 @@ public interface IBagrutPdfIngestionService
 public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
 {
     private readonly IOcrCascadeService _cascade;
+    private readonly IBagrutPdfStore _pdfStore;
     private readonly ILogger<BagrutPdfIngestionService> _logger;
 
     public BagrutPdfIngestionService(
         IOcrCascadeService cascade,
+        IBagrutPdfStore pdfStore,
         ILogger<BagrutPdfIngestionService> logger)
     {
-        _cascade = cascade;
-        _logger  = logger;
+        _cascade  = cascade;
+        _pdfStore = pdfStore;
+        _logger   = logger;
     }
 
     public async Task<PdfIngestionResult> IngestAsync(
@@ -137,6 +140,22 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
         _logger.LogInformation(
             "Bagrut ingestion start: pdf={PdfId} exam={ExamCode} size_kb={SizeKb} uploader={Uploader}",
             pdfId, examCode, pdfBytes.Length / 1024, uploadedBy);
+
+        // Persist the source PDF before OCR runs. Curators need the original
+        // bytes to do side-by-side visual review against the extracted output.
+        // Content-addressable: same id = same bytes, so re-ingesting an
+        // identical PDF is a no-op write. Failure here is logged but does
+        // not abort ingestion — the OCR result is still useful, the visual
+        // review surface degrades to "PDF not retained — re-upload".
+        try
+        {
+            await _pdfStore.PersistAsync(pdfId, pdfBytes, ct).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex,
+                "Bagrut PDF persistence failed (continuing ingestion): pdf={PdfId}", pdfId);
+        }
 
         var hints = new OcrContextHints(
             Subject: "math",

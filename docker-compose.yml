@@ -162,3 +162,10 @@ volumes:
   nats_data:
   neo4j_data:
   localstack_data:
+  # Visual-review (2026-05-01): persistent storage for Bagrut source PDFs
+  # (sha256-keyed) + OCR figure crops. admin-api binds both; actor-host
+  # binds ocr-figures only. Survives container recreation; named volumes
+  # so the host path is managed by Docker (no chown chores in dev). Wipe
+  # via `docker volume rm cena_source_pdfs cena_ocr_figures` when needed.
+  cena_source_pdfs:
+  cena_ocr_figures:

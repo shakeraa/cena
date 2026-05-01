@@ -187,6 +187,24 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
                 pedagogicalQualityAvg = (int)Math.Round(pedScores.Average(), MidpointRounding.AwayFromZero);
         }
 
+        // Visual-review (2026-05-01): surface source-PDF availability +
+        // figure list so the SPA can render the side-by-side viewer.
+        // Bagrut items have a sibling BagrutDraftPayloadDocument; non-Bagrut
+        // (cloud-dir, photo-upload) items don't, so HasSourcePdf is false
+        // and Figures is empty for those — the curator panel falls back to
+        // text-only review.
+        bool hasSourcePdf = false;
+        IReadOnlyList<ItemFigureRef>? figures = null;
+        if (string.Equals(item.SourceType, "bagrut", StringComparison.OrdinalIgnoreCase))
+        {
+            var payload = await session.LoadAsync<BagrutDraftPayloadDocument>(item.Id);
+            if (payload is not null)
+            {
+                hasSourcePdf = !string.IsNullOrWhiteSpace(payload.SourcePdfId);
+                figures = ParseFigureSpec(payload.FigureSpecJson, item.Id);
+            }
+        }
+
         return new PipelineItemDetailResponse(
             Id: item.Id,
             SourceFilename: item.SourceFilename,
@@ -202,7 +220,54 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
                 LanguageQuality: languageQualityAvg,
                 PedagogicalQuality: pedagogicalQualityAvg,
                 PlagiarismScore: item.DuplicateCount ?? 0),
-            ExtractedQuestions: extractedQuestions);
+            ExtractedQuestions: extractedQuestions,
+            HasSourcePdf: hasSourcePdf,
+            Figures: figures);
+    }
+
+    /// <summary>
+    /// Parse the Bagrut FigureSpecJson written by BagrutPdfIngestionService
+    /// into a list of ItemFigureRef the SPA can iterate. The URL points at
+    /// the figure stream endpoint indexed by position in the original spec.
+    /// Returns an empty list (not null) when the spec is missing or
+    /// malformed so the SPA can branch on `figures.length === 0` cleanly.
+    /// </summary>
+    private static IReadOnlyList<ItemFigureRef> ParseFigureSpec(string? json, string itemId)
+    {
+        if (string.IsNullOrWhiteSpace(json))
+            return Array.Empty<ItemFigureRef>();
+
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty("figures", out var arr)
+                || arr.ValueKind != System.Text.Json.JsonValueKind.Array)
+                return Array.Empty<ItemFigureRef>();
+
+            var refs = new List<ItemFigureRef>(arr.GetArrayLength());
+            int i = 0;
+            foreach (var f in arr.EnumerateArray())
+            {
+                int page = f.TryGetProperty("page", out var p) && p.TryGetInt32(out var pv) ? pv : 0;
+                string? kind = f.TryGetProperty("kind", out var k) ? k.GetString() : null;
+                string? alt  = f.TryGetProperty("altText", out var a) ? a.GetString() : null;
+                refs.Add(new ItemFigureRef(
+                    Index: i,
+                    Page: page,
+                    Kind: kind,
+                    AltText: alt,
+                    Url: $"/api/admin/ingestion/items/{itemId}/figures/{i}"));
+                i++;
+            }
+            return refs;
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            // FigureSpecJson is server-generated; a malformed value is a
+            // bug we'd want to see in logs, but it must not crash the
+            // detail panel. Return empty list and move on.
+            return Array.Empty<ItemFigureRef>();
+        }
     }
 
     public async Task<bool> RetryItemAsync(string id)

@@ -63,6 +63,15 @@ interface ItemDetail {
   ocrText: string | null
   ocrConfidence: number | null
   recreatedQuestions: Array<{ index: number, text: string, confidence: number }>
+  // Visual-review (2026-05-01): the curator's side-by-side panel needs
+  // the original PDF + figure crops to validate that the OCR + cleanup
+  // didn't drop diagrams. Backend surfaces:
+  //   - hasSourcePdf: true iff GET .../source.pdf will return bytes
+  //   - figures[]:    per-figure record with the stream URL
+  // Both default to false/[] for non-Bagrut items, which falls back to
+  // the original text-only review experience.
+  hasSourcePdf: boolean
+  figures: Array<{ index: number, page: number, kind: string | null, altText: string | null, url: string }>
 }
 
 interface Props {
@@ -250,6 +259,9 @@ interface BackendDetailResponse {
   ocrResult: { extractedText: string, confidence: number } | null
   quality: BackendQuality | null
   extractedQuestions: Array<{ index: number, text: string, confidence: number }>
+  // Visual-review (2026-05-01).
+  hasSourcePdf?: boolean
+  figures?: Array<{ index: number, page: number, kind: string | null, altText: string | null, url: string }>
 }
 
 const stageStatusMap: Record<string, ProcessingStage['status']> = {
@@ -298,6 +310,8 @@ const fetchDetail = async () => {
       ocrText: resp.ocrResult?.extractedText ?? null,
       ocrConfidence: resp.ocrResult?.confidence ?? null,
       recreatedQuestions: resp.extractedQuestions ?? [],
+      hasSourcePdf: resp.hasSourcePdf ?? false,
+      figures: (resp.figures ?? []) as ItemDetail['figures'],
     }
   }
   catch (error) {
@@ -526,6 +540,118 @@ const approveItem = async () => {
           />
 
           <VDivider class="mb-4" />
+
+          <!-- Visual review (2026-05-01) — side-by-side original PDF +
+               extracted figures. Curators flagged that approving from
+               text alone meant they couldn't catch dropped diagrams or
+               misaligned bounding boxes. PDF goes left so a familiar
+               native control owns the bulk of the surface; the
+               extracted figure gallery on the right lets the curator
+               eye-check that every figure on the page made it to the
+               recreated question. Section is hidden when the item has
+               neither PDF nor figures so non-Bagrut sources keep the
+               original layout. -->
+          <div
+            v-if="item.hasSourcePdf || item.figures.length > 0"
+            class="mb-4"
+            data-test="item-detail-visual-review"
+          >
+            <h6 class="text-h6 mb-3">
+              Visual review
+            </h6>
+            <div class="cena-visual-grid">
+              <div class="cena-visual-side cena-visual-pdf">
+                <div class="text-caption text-medium-emphasis mb-2 d-flex align-center">
+                  <VIcon
+                    icon="tabler-file-text"
+                    size="16"
+                    class="me-1"
+                  />
+                  Original PDF
+                  <VChip
+                    v-if="!item.hasSourcePdf"
+                    size="x-small"
+                    color="warning"
+                    variant="outlined"
+                    label
+                    class="ms-2"
+                  >
+                    Not retained
+                  </VChip>
+                </div>
+                <embed
+                  v-if="item.hasSourcePdf"
+                  :src="`/api/admin/ingestion/items/${item.id}/source.pdf`"
+                  type="application/pdf"
+                  class="cena-visual-pdf-embed"
+                  data-test="item-detail-pdf-embed"
+                >
+                <div
+                  v-else
+                  class="cena-visual-fallback text-body-2 text-disabled"
+                  data-test="item-detail-pdf-missing"
+                >
+                  Source PDF was not retained for this item. Re-upload to enable side-by-side review.
+                </div>
+              </div>
+              <div class="cena-visual-side cena-visual-figures">
+                <div class="text-caption text-medium-emphasis mb-2 d-flex align-center">
+                  <VIcon
+                    icon="tabler-photo"
+                    size="16"
+                    class="me-1"
+                  />
+                  Extracted figures
+                  <VChip
+                    size="x-small"
+                    :color="item.figures.length > 0 ? 'success' : 'default'"
+                    variant="outlined"
+                    label
+                    class="ms-2"
+                  >
+                    {{ item.figures.length }}
+                  </VChip>
+                </div>
+                <div
+                  v-if="item.figures.length === 0"
+                  class="cena-visual-fallback text-body-2 text-disabled"
+                  data-test="item-detail-no-figures"
+                >
+                  No figures extracted by the OCR cascade.
+                </div>
+                <div
+                  v-else
+                  class="cena-figure-grid"
+                  data-test="item-detail-figure-grid"
+                >
+                  <a
+                    v-for="fig in item.figures"
+                    :key="fig.index"
+                    :href="fig.url"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="cena-figure-tile"
+                    :title="fig.altText ?? `Figure on page ${fig.page}`"
+                    data-test="item-detail-figure-tile"
+                  >
+                    <img
+                      :src="fig.url"
+                      :alt="fig.altText ?? `Figure on page ${fig.page}`"
+                      loading="lazy"
+                    >
+                    <span class="cena-figure-caption text-caption">
+                      p{{ fig.page }}<span v-if="fig.kind"> · {{ fig.kind }}</span>
+                    </span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <VDivider
+            v-if="item.hasSourcePdf || item.figures.length > 0"
+            class="mb-4"
+          />
 
           <!-- Question Content — what the curator is reviewing.
                OCR (original) + recreated form. Without this section,
@@ -1279,5 +1405,75 @@ const approveItem = async () => {
 }
 .cena-diff-body :deep(.cena-diff-eq) {
   color: rgb(var(--v-theme-on-surface));
+}
+
+/* cena-visual-* — side-by-side original PDF + extracted figures.
+   PDF gets the wider column on desktop (3fr) since it carries the
+   bulk of context; figures gallery is the tighter inspector column
+   (2fr). Stacked vertically below 900px so a small admin window
+   doesn't squash either side past usefulness. */
+.cena-visual-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+@media (min-width: 900px) {
+  .cena-visual-grid {
+    grid-template-columns: 3fr 2fr;
+  }
+}
+.cena-visual-side {
+  background: rgba(var(--v-theme-surface-variant), 0.4);
+  border-radius: 0.4rem;
+  padding: 0.75rem;
+  min-width: 0;
+}
+.cena-visual-pdf-embed {
+  inline-size: 100%;
+  block-size: 70vh;
+  min-block-size: 420px;
+  border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
+  border-radius: 0.25rem;
+  background: rgb(var(--v-theme-surface));
+}
+.cena-visual-fallback {
+  padding: 1.25rem 0.75rem;
+  text-align: center;
+  border: 1px dashed rgba(var(--v-theme-outline-variant), 0.7);
+  border-radius: 0.25rem;
+}
+.cena-figure-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+.cena-figure-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  text-decoration: none;
+  background: rgb(var(--v-theme-surface));
+  border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
+  border-radius: 0.25rem;
+  transition: border-color 0.15s ease;
+}
+.cena-figure-tile:hover {
+  border-color: rgb(var(--v-theme-primary));
+}
+.cena-figure-tile img {
+  inline-size: 100%;
+  block-size: auto;
+  max-block-size: 120px;
+  object-fit: contain;
+  background: rgba(var(--v-theme-surface-variant), 0.5);
+  border-radius: 0.15rem;
+}
+.cena-figure-caption {
+  color: rgb(var(--v-theme-on-surface-variant));
+  text-align: center;
+  word-break: break-word;
 }
 </style>

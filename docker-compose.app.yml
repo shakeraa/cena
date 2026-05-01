@@ -158,6 +158,22 @@ services:
       # ADR-0059 §15.5 + PRR-249 — source-anchored variant flow. Flag-flip
       # ONLY after legal-delta memo signs §6. See docs/engineering/feature-flags.md.
       - Cena__Variants__BagrutSeedToLlmEnabled=${OCR_VARIANTS_BAGRUT_SEED_ENABLED:-false}
+      # Visual-review (2026-05-01): persist Bagrut source PDFs + OCR figure
+      # crops to disk so curators can render them side-by-side with the
+      # extracted output. Both directories are container-internal paths; the
+      # named-volume binds below survive container recreation. Default
+      # `OutputDirectory` for figures lives under {Tmp}/cena-ocr-figures
+      # (FigureStorageOptions); override here to land both content types under
+      # /var/cena and use the matching named volumes.
+      - Ingestion__BagrutPdfStorage__RootDirectory=/var/cena/source-pdfs
+      - Ocr__FigureStorage__OutputDirectory=/var/cena/ocr-figures
+    volumes:
+      # Source PDFs (sha256-keyed). Curators read these via
+      # GET /api/admin/ingestion/items/{id}/source.pdf.
+      - cena_source_pdfs:/var/cena/source-pdfs
+      # OCR figure crops written by Layer2cFigureExtraction. Curators
+      # read these via the figure-stream endpoint surfaced on item detail.
+      - cena_ocr_figures:/var/cena/ocr-figures
     restart: unless-stopped
     # CPU ceiling only. The admin-api hot-loop incident on 2026-05-01
     # (BagrutCorpusSeedData stalled on Postgres → Kestrel thread-pool
@@ -446,6 +462,15 @@ services:
       # via the compose network DNS name when docker-compose.ocr-sidecar.yml
       # is up. The sidecar's docker-compose listens on host port 50051.
       - Ocr__Sidecar__BaseUrl=${OCR_SIDECAR_URL:-http://cena-ocr-sidecar:50051}
+      # Visual-review parity with admin-api: when actor-host's
+      # IngestionJobRunner runs the OCR cascade (e.g. CloudDir ingestion
+      # strategy), figure crops land in the same volume admin-api reads
+      # from so the figure-stream endpoint resolves regardless of which
+      # host wrote them. See admin-api block for the source-pdfs +
+      # ocr-figures rationale.
+      - Ocr__FigureStorage__OutputDirectory=/var/cena/ocr-figures
+    volumes:
+      - cena_ocr_figures:/var/cena/ocr-figures
     restart: unless-stopped
     # CPU cap mirrors admin-api + student-api (see admin-api block for the
     # 2026-05-01 hot-loop incident rationale). actor-host owns the Marten

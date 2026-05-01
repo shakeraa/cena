@@ -25,12 +25,13 @@ namespace Cena.Admin.Api.Tests.Ingestion;
 public sealed class BagrutPdfIngestionServiceTests
 {
     private readonly IOcrCascadeService _cascade = Substitute.For<IOcrCascadeService>();
+    private readonly IBagrutPdfStore _pdfStore = Substitute.For<IBagrutPdfStore>();
     private readonly BagrutPdfIngestionService _service;
 
     public BagrutPdfIngestionServiceTests()
     {
         _service = new BagrutPdfIngestionService(
-            _cascade, NullLogger<BagrutPdfIngestionService>.Instance);
+            _cascade, _pdfStore, NullLogger<BagrutPdfIngestionService>.Instance);
     }
 
     private static OcrCascadeResult MakeResult(

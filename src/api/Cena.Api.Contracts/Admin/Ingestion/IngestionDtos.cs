@@ -72,6 +72,18 @@ public sealed record PipelineItem(
     bool HasError);
 
 // Item Detail
+//
+// Visual-review fields (added 2026-05-01):
+//   HasSourcePdf — true when the source PDF is retrievable via
+//                  GET /api/admin/ingestion/items/{id}/source.pdf.
+//                  False for items uploaded before persistent PDF storage
+//                  was added, so the SPA can render a "PDF not retained"
+//                  fallback instead of a broken <embed>.
+//   Figures      — per-figure spec including a relative URL to the figure
+//                  stream endpoint. Empty list when the OCR cascade
+//                  extracted no figures or the FigureSpecJson is missing.
+//                  The SPA renders these inline alongside the recreated
+//                  question text.
 public sealed record PipelineItemDetailResponse(
     string Id,
     string SourceFilename,
@@ -83,7 +95,16 @@ public sealed record PipelineItemDetailResponse(
     IReadOnlyList<StageProcessingInfo> StageHistory,
     OcrOutput? OcrResult,
     QualityScores Quality,
-    IReadOnlyList<ExtractedQuestion> ExtractedQuestions);
+    IReadOnlyList<ExtractedQuestion> ExtractedQuestions,
+    bool HasSourcePdf = false,
+    IReadOnlyList<ItemFigureRef>? Figures = null);
+
+public sealed record ItemFigureRef(
+    int Index,
+    int Page,
+    string? Kind,
+    string? AltText,
+    string Url);
 
 public sealed record StageProcessingInfo(
     string Stage,
