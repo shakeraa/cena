@@ -113,18 +113,18 @@ public partial class Program
     {
     var builder = WebApplication.CreateBuilder(args);
 
-    // Bound the startup phase. .NET's default is TimeSpan.InfiniteTimeSpan,
-    // which on 2026-05-01 turned a stalled BagrutCorpusSeedData.SaveChangesAsync
-    // into an indefinite hot loop (Kestrel thread-pool starvation → 132% CPU
-    // → Docker daemon healthcheck cascade). A bounded startup fails-loud
-    // (container restart-loops, surface in logs/alerts) instead of silent
-    // CPU burn. 60s is generous for the canonical seed path; if a future
-    // seed legitimately needs longer it should run as a BackgroundService
-    // post-startup, not block boot.
-    builder.Services.Configure<HostOptions>(o =>
-    {
-        o.StartupTimeout = TimeSpan.FromSeconds(60);
-    });
+    // Layer 2 (HostOptions.StartupTimeout = 60s) was retired the same day
+    // it shipped. The bound was meant to fail-loud on a stalled seed
+    // instead of silent CPU burn — but in practice it fired during
+    // legitimate cold-boot CulturalContextSeeder + BagrutCorpus seed
+    // CountAsync calls, cancelling them mid-Marten-warm and crashing
+    // both admin-api and actor-host into restart loops. The original
+    // hot-loop incident class is already covered by Layer 1 (idempotent
+    // seeds — bagrut is now skip-on-existing, cultural-context already
+    // was), Layer 3 (cgroup CPU cap of 2.0 — contains any future
+    // runaway), and Layer 4 (ALERT-CPU-001 ServiceCpuRunaway pages on
+    // sustained >100%). No timeout means cold boots take whatever they
+    // need; the CPU cap + alert handle the silent-burn class.
 
     if (Environment.GetEnvironmentVariable("CENA_OPENAPI_GEN") == "1")
     {
