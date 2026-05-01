@@ -44,16 +44,27 @@ public enum AiProvider
 }
 
 /// <summary>
-/// Wrapper request body for POST /api/admin/ai/test-connection. The SPA's
-/// HTTP client (ofetch) does NOT auto-encode raw-string bodies as JSON —
-/// it sends Content-Type: text/plain, which the minimal-API binder for
-/// [FromBody] AiProvider rejected with 415 before the probe ever ran (the
-/// SPA then surfaced a bare "Failed" badge with no category). Wrapping the
-/// enum in an object lets ofetch JSON-encode automatically and sets
-/// Content-Type: application/json, so the binder succeeds and the typed
-/// error category from AnthropicConnectionProbe reaches the SPA.
+/// Request body for POST /api/admin/ai/test-connection.
+///
+/// Wrapping the enum in an object (vs. [FromBody] AiProvider directly) is
+/// load-bearing: ofetch does NOT auto-encode raw-string bodies as JSON —
+/// it sends Content-Type: text/plain, which the minimal-API binder rejected
+/// with 415 before the probe ever ran (the SPA then surfaced a bare
+/// "Failed" badge with no category).
+///
+/// <see cref="ApiKey"/> + <see cref="ModelId"/> are optional overrides that
+/// let the SPA test the value currently typed in the form BEFORE clicking
+/// Save Settings — so an operator pasting a fresh key + Test Connection
+/// gets a verdict on the typed key, not on the previously persisted (and
+/// possibly stale) cipher. Pre-existing behaviour is preserved when both
+/// are null/blank: the service decrypts the persisted cipher and uses the
+/// persisted modelId as before. Override values are NEVER persisted —
+/// they live only in the request scope.
 /// </summary>
-public sealed record TestConnectionRequest(AiProvider Provider);
+public sealed record TestConnectionRequest(
+    AiProvider Provider,
+    string? ApiKey = null,
+    string? ModelId = null);
 
 public sealed record AiProviderConfig(
     AiProvider Provider,
@@ -249,11 +260,19 @@ public interface IAiGenerationService
     Task<AiSettingsResponse> GetSettingsAsync();
     Task<bool> UpdateSettingsAsync(UpdateAiSettingsRequest request, string userId);
     /// <summary>
-    /// Real Anthropic ping using the persisted (decrypted) API key and the
-    /// configured model. Returns a structured ConnectionTestResult with a
-    /// categorized failure reason on the unhappy path. Never throws.
+    /// Real Anthropic ping. By default uses the persisted (decrypted) API key
+    /// and configured model. Optional <paramref name="apiKeyOverride"/> /
+    /// <paramref name="modelIdOverride"/> let the SPA test the value typed
+    /// in the form before persisting — overrides are scoped to the request
+    /// and never written back to Marten. Returns a structured
+    /// ConnectionTestResult with a categorized failure reason on the unhappy
+    /// path. Never throws.
     /// </summary>
-    Task<ConnectionTestResult> TestConnectionAsync(AiProvider provider, CancellationToken ct = default);
+    Task<ConnectionTestResult> TestConnectionAsync(
+        AiProvider provider,
+        string? apiKeyOverride = null,
+        string? modelIdOverride = null,
+        CancellationToken ct = default);
     Task<BatchGenerateResponse> BatchGenerateAsync(BatchGenerateRequest request, QualityGateServices.IQualityGateService qualityGate);
     Task<TemplateGenerateResponse> GenerateFromTemplateAsync(TemplateGenerateRequest request, QualityGateServices.IQualityGateService qualityGate);
 }
@@ -586,7 +605,11 @@ public sealed class AiGenerationService : IAiGenerationService
         return true;
     }
 
-    public async Task<ConnectionTestResult> TestConnectionAsync(AiProvider provider, CancellationToken ct = default)
+    public async Task<ConnectionTestResult> TestConnectionAsync(
+        AiProvider provider,
+        string? apiKeyOverride = null,
+        string? modelIdOverride = null,
+        CancellationToken ct = default)
     {
         if (provider != AiProvider.Anthropic)
         {
@@ -596,20 +619,28 @@ public sealed class AiGenerationService : IAiGenerationService
         }
 
         var doc = await LoadDocAsync(ct).ConfigureAwait(false);
-        var apiKey = ResolveApiKey(doc);
+
+        // Override > persisted cipher > IConfiguration. Lets the SPA test a
+        // typed-but-not-yet-saved key without persisting it first.
+        var apiKey = !string.IsNullOrWhiteSpace(apiKeyOverride)
+            ? apiKeyOverride
+            : ResolveApiKey(doc);
 
         if (string.IsNullOrEmpty(apiKey))
         {
             return ConnectionTestResult.Fail("No API key configured", "CONFIG_MISSING_KEY");
         }
 
-        var modelId = string.IsNullOrWhiteSpace(doc.AnthropicModelId)
-            ? SonnetModelId
-            : doc.AnthropicModelId;
+        // Override > persisted modelId > default Sonnet pin.
+        var modelId = !string.IsNullOrWhiteSpace(modelIdOverride)
+            ? modelIdOverride
+            : (string.IsNullOrWhiteSpace(doc.AnthropicModelId) ? SonnetModelId : doc.AnthropicModelId);
 
         _logger.LogInformation(
-            "Testing Anthropic connection (model={Model}, baseUrl={BaseUrl})",
-            modelId, doc.AnthropicBaseUrl ?? "(default)");
+            "Testing Anthropic connection (model={Model}, baseUrl={BaseUrl}, source={Source})",
+            modelId,
+            doc.AnthropicBaseUrl ?? "(default)",
+            !string.IsNullOrWhiteSpace(apiKeyOverride) ? "request-override" : "persisted-cipher");
 
         return await _probe.ProbeAsync(apiKey, modelId, doc.AnthropicBaseUrl, ct).ConfigureAwait(false);
     }

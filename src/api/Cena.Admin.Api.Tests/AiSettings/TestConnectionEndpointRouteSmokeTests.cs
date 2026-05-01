@@ -114,7 +114,11 @@ public sealed class TestConnectionEndpointRouteSmokeTests
     public async Task HandleAsync_ProbeSuccess_ReturnsConnectedTrueWithDetails()
     {
         var service = Substitute.For<IAiGenerationService>();
-        service.TestConnectionAsync(AiProvider.Anthropic, Arg.Any<CancellationToken>())
+        service.TestConnectionAsync(
+                AiProvider.Anthropic,
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(ConnectionTestResult.Ok(
                 "Authenticated. Model 'claude-sonnet-4-6' acknowledged the probe.")));
 
@@ -124,8 +128,7 @@ public sealed class TestConnectionEndpointRouteSmokeTests
             CancellationToken.None);
 
         var ok = Assert.IsAssignableFrom<IValueHttpResult>(result);
-        var payload = Assert.IsType<AiTestConnectionResponseAccessor>(
-            new AiTestConnectionResponseAccessor(ok.Value!));
+        var payload = new AiTestConnectionResponseAccessor(ok.Value!);
         Assert.True(payload.Connected);
         Assert.Null(payload.Error);
         Assert.Contains("acknowledged the probe", payload.Details);
@@ -135,7 +138,11 @@ public sealed class TestConnectionEndpointRouteSmokeTests
     public async Task HandleAsync_ProbeFailure_PropagatesCategoryCode()
     {
         var service = Substitute.For<IAiGenerationService>();
-        service.TestConnectionAsync(AiProvider.Anthropic, Arg.Any<CancellationToken>())
+        service.TestConnectionAsync(
+                AiProvider.Anthropic,
+                Arg.Any<string?>(),
+                Arg.Any<string?>(),
+                Arg.Any<CancellationToken>())
             .Returns(Task.FromResult(
                 ConnectionTestResult.Fail("Invalid API key", "AUTH_FAILED")));
 
@@ -152,6 +159,41 @@ public sealed class TestConnectionEndpointRouteSmokeTests
         // actionable hint instead of a bare "Failed" badge — that visibility
         // is the whole point of this fix.
         Assert.Equal("AUTH_FAILED", payload.Details);
+    }
+
+    [Fact]
+    public async Task HandleAsync_PassesApiKeyAndModelOverrides_ToService()
+    {
+        // Locks the override flow: when the SPA passes a typed-but-not-yet-saved
+        // key (and the currently-selected model in the dropdown), those values
+        // MUST reach the service so the probe tests them — not the persisted
+        // cipher. Pre-existing behaviour (both null → service uses persisted)
+        // is covered by the two tests above.
+        var service = Substitute.For<IAiGenerationService>();
+        service.TestConnectionAsync(
+                AiProvider.Anthropic,
+                "sk-ant-typed-but-not-saved",
+                "claude-opus-4-7",
+                Arg.Any<CancellationToken>())
+            .Returns(Task.FromResult(ConnectionTestResult.Ok("ok")));
+
+        var result = await AiTestConnectionEndpoint.HandleAsync(
+            new TestConnectionRequest(
+                AiProvider.Anthropic,
+                ApiKey: "sk-ant-typed-but-not-saved",
+                ModelId: "claude-opus-4-7"),
+            service,
+            CancellationToken.None);
+
+        var ok = Assert.IsAssignableFrom<IValueHttpResult>(result);
+        var payload = new AiTestConnectionResponseAccessor(ok.Value!);
+        Assert.True(payload.Connected);
+
+        await service.Received(1).TestConnectionAsync(
+            AiProvider.Anthropic,
+            "sk-ant-typed-but-not-saved",
+            "claude-opus-4-7",
+            Arg.Any<CancellationToken>());
     }
 
     /// <summary>

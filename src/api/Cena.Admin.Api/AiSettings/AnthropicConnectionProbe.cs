@@ -87,10 +87,37 @@ public sealed class AnthropicConnectionProbe : IAnthropicConnectionProbe
     /// stable categories the SPA can render. The SDK's typed error hierarchy
     /// changes between minor versions, so we match on HTTP semantics where
     /// available and fall back to message inspection.
+    ///
+    /// Order is significant: more-specific 400 sub-cases (credit balance,
+    /// model rejection) are checked BEFORE the general 401-style auth match
+    /// so a "credit balance too low" 400 doesn't get miscategorized as
+    /// AUTH_FAILED.
     /// </summary>
     private ConnectionTestResult Categorize(Exception ex, string modelId)
     {
         var message = ex.Message ?? "";
+
+        // Always log the raw upstream message at debug-friendly level so an
+        // operator can inspect why categorization landed where it did. The
+        // category-specific log lines below intentionally omit the upstream
+        // text (PII / token leak risk on hot paths); this single line is the
+        // diagnostic source of truth for "why did the probe say X?".
+        _logger.LogInformation(
+            "Anthropic probe raw failure (model={Model}, exType={ExType}): {Message}",
+            modelId, ex.GetType().Name, message);
+
+        // 400 / insufficient credit balance — Anthropic returns this as
+        // invalid_request_error rather than 402, so it MUST be checked
+        // before the generic invalid_request_error match below.
+        if (message.Contains("credit balance", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("billing", StringComparison.OrdinalIgnoreCase)
+            || message.Contains("insufficient_credit", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Anthropic probe rejected: insufficient credit balance");
+            return ConnectionTestResult.Fail(
+                "Insufficient Anthropic credit balance — top up your account at console.anthropic.com",
+                "INSUFFICIENT_CREDITS");
+        }
 
         // 401 / authentication
         if (message.Contains("401", StringComparison.Ordinal)
@@ -131,6 +158,19 @@ public sealed class AnthropicConnectionProbe : IAnthropicConnectionProbe
         {
             _logger.LogWarning(ex, "Anthropic probe failed: upstream error");
             return ConnectionTestResult.Fail("Anthropic upstream error", "UPSTREAM_ERROR");
+        }
+
+        // 400 / invalid_request_error — generic catch (model rejection,
+        // malformed body, payload too large, etc.). Surfaces the upstream
+        // message so the operator sees the actual reason without having to
+        // tail container logs.
+        if (message.Contains("400", StringComparison.Ordinal)
+            || message.Contains("invalid_request_error", StringComparison.OrdinalIgnoreCase))
+        {
+            _logger.LogWarning("Anthropic probe rejected: invalid request");
+            return ConnectionTestResult.Fail(
+                $"Anthropic rejected the request: {ex.Message}",
+                "INVALID_REQUEST");
         }
 
         // Network / DNS / TLS
