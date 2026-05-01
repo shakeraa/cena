@@ -6,6 +6,7 @@
 
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Cena.Actors.Bus; using Cena.Student.Api.Host.Cas;
 using Cena.Actors.Configuration;
 using Cena.Actors.Diagnosis;
@@ -1091,9 +1092,22 @@ public partial class Program
     // ---- Prometheus metrics endpoint ----
     app.MapPrometheusScrapingEndpoint();
     
-    // ---- Health check ----
+    // ---- Health checks (RDY-011 — split semantics; see admin-api Program.cs for rationale) ----
+    // /health/live: process alive (no checks). K8s liveness target — never
+    //                false-negatives during startup or transient dep hiccups.
+    // /health/ready: filtered to "ready"-tagged checks (Postgres + Redis + NATS
+    //                + circuit-breakers + DLQ depth). Docker healthcheck targets
+    //                this so wedged deps flip the container unhealthy without
+    //                a host crash. Replaces the retired Layer 2 StartupTimeout.
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "cena-student-api" }));
-    app.MapHealthChecks("/health/live"); app.MapHealthChecks("/health/ready");
+    app.MapHealthChecks("/health/live", new HealthCheckOptions
+    {
+        Predicate = _ => false,
+    });
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready"),
+    });
 
     // ---- Student-facing REST endpoints (migrated from Cena.Api.Host) ----
     
