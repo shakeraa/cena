@@ -159,24 +159,24 @@ services:
       # ONLY after legal-delta memo signs §6. See docs/engineering/feature-flags.md.
       - Cena__Variants__BagrutSeedToLlmEnabled=${OCR_VARIANTS_BAGRUT_SEED_ENABLED:-false}
     restart: unless-stopped
-    # CPU + memory ceilings. The admin-api hot-loop incident on 2026-05-01
+    # CPU ceiling only. The admin-api hot-loop incident on 2026-05-01
     # (BagrutCorpusSeedData stalled on Postgres → Kestrel thread-pool
     # starvation → 132% CPU) cascaded into the rest of the stack purely
     # because the runaway grabbed enough host CPU to starve the Docker
-    # daemon's healthcheck timer threads. The CPU cap is the real
-    # containment mechanism; the memory cap is a secondary leak-guard.
+    # daemon's healthcheck timer threads. The CPU cap is the actual
+    # containment for that class of failure.
     #
-    # Memory was originally 2G — turned out to be too tight: admin-api's
-    # baseline is ~400MB but Marten projection rebuild + bagrut seed
-    # spikes above 2G transiently, killing the container with SIGKILL
-    # (exit 137) and producing a restart-loop. Sibling services
-    # (actor-host, student-api) each sit at ~3.7G steady-state. 4G gives
-    # comfortable headroom for spikes while still capping runaway leaks.
+    # No memory cap. Briefly tried 2G (too tight, OOM-killed in seed) and
+    # 4G (89% of cap at idle baseline of 3.6G — same growth pattern as
+    # sibling services actor-host / student-api which run uncapped at
+    # ~3.7G). Adding a memory cap only re-enabled the OOM crashloop class
+    # of failure without addressing the actual incident category. Match
+    # the sibling services' uncapped memory; rely on host-level monitoring
+    # for true leak detection.
     deploy:
       resources:
         limits:
           cpus: '2.0'
-          memory: 4G
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5052/health/live"]
       interval: 30s
