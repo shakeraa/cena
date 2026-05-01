@@ -1081,7 +1081,14 @@ const approveItem = async () => {
               />
               Reject
             </VBtn>
+            <!-- Move to Review — only valid as a forward transition from
+                 stages upstream of InReview. Hiding it on InReview/Published/
+                 Failed prevents no-op re-emission of MovedToReview_V1
+                 (backend would happily re-fire the event) and the curator
+                 confusion of seeing the same button on a row that's
+                 already at the target stage. -->
             <VBtn
+              v-if="item && !['InReview', 'Published', 'Failed'].includes(item.currentStage)"
               color="primary"
               variant="tonal"
               :loading="actionLoading"
@@ -1121,9 +1128,19 @@ const approveItem = async () => {
                  OCR has settled and the curator has eyes on the content
                  (InReview onward). Earlier stages (OcrProcessing, ReCreated)
                  may still have malformed text → seeding the LLM with
-                 garbage produces garbage variants and burns budget. -->
+                 garbage produces garbage variants and burns budget.
+                 Content gate (added 2026-05-01): also require non-empty
+                 recreated content. The previous gate let curators click
+                 Generate on items where the OCR returned an empty stem —
+                 the LLM was being asked to seed variants from "" which
+                 produces hallucinations and burns budget. The button is
+                 now hidden until there is actual content for the LLM
+                 to anchor on. -->
             <VBtn
-              v-if="item && item.sourceType === 'bagrut' && (item.currentStage === 'InReview' || item.currentStage === 'Published')"
+              v-if="item
+                && item.sourceType === 'bagrut'
+                && (item.currentStage === 'InReview' || item.currentStage === 'Published')
+                && (item.recreatedQuestions?.length ?? 0) > 0"
               color="info"
               variant="tonal"
               @click="variantsDialogOpen = true"
