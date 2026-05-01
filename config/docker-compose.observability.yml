@@ -1,16 +1,31 @@
 # ═══════════════════════════════════════════════════════════════════════
 # Cena Platform — Observability Stack (RES-002)
-# Usage: docker compose -f docker-compose.yml -f config/docker-compose.observability.yml up
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f config/docker-compose.observability.yml up -d
+#
+# All services attach to the existing cena_default network created by the
+# main compose stack so Prometheus can reach `cena-actor-host:5050`,
+# `cena-admin-api:5052`, etc., and the OTel collector is reachable from
+# the .NET services as `otel-collector:4317` / `:4318`.
 # ═══════════════════════════════════════════════════════════════════════
+
+networks:
+  default:
+    name: cena_default
+    external: true
 
 services:
   prometheus:
     image: prom/prometheus:latest
     container_name: cena-prometheus
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      # Compose resolves relative paths from the directory of the FIRST
+      # compose file passed via -f (the repo root for the canonical
+      # invocation), so paths are written from the project root.
+      - ./config/prometheus.yml:/etc/prometheus/prometheus.yml
       # PRR-434: Critical-alert rules + self-resolving routing.
-      - ./prometheus/rules:/etc/prometheus/rules:ro
+      - ./config/prometheus/rules:/etc/prometheus/rules:ro
     ports:
       - "9090:9090"
     depends_on:
@@ -26,7 +41,7 @@ services:
     image: prom/alertmanager:latest
     container_name: cena-alertmanager
     volumes:
-      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - ./config/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
     command:
       - "--config.file=/etc/alertmanager/alertmanager.yml"
     ports:
@@ -47,8 +62,8 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-cena_dev_grafana}
       - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/var/lib/grafana/dashboards/cena-actors.json
     volumes:
-      - ./grafana/provisioning:/etc/grafana/provisioning
-      - ./grafana/dashboards:/var/lib/grafana/dashboards
+      - ./config/grafana/provisioning:/etc/grafana/provisioning
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards
       - grafana_data:/var/lib/grafana
     depends_on:
       prometheus:
@@ -59,7 +74,7 @@ services:
     container_name: cena-otel-collector
     command: ["--config=/etc/otel-collector.yaml"]
     volumes:
-      - ./otel-collector.yaml:/etc/otel-collector.yaml:ro
+      - ./config/otel-collector.yaml:/etc/otel-collector.yaml:ro
     ports:
       - "4317:4317"
       - "4318:4318"
@@ -89,6 +104,18 @@ services:
       - "16686:16686"
     environment:
       COLLECTOR_OTLP_ENABLED: "true"
+
+  # NATS doesn't expose Prometheus metrics natively — this sidecar polls
+  # the NATS HTTP monitoring endpoint (/varz, /connz, /jsz, /routez) and
+  # re-exposes them as Prometheus exposition on :7777/metrics. Targeted
+  # by the `cena-nats` job in prometheus.yml.
+  nats-exporter:
+    image: natsio/prometheus-nats-exporter:latest
+    container_name: cena-nats-exporter
+    command: ["-varz", "-jsz=all", "-connz", "-routez", "-port=7777", "http://cena-nats:8222"]
+    depends_on:
+      - prometheus
+    restart: unless-stopped
 
 volumes:
   grafana_data:

@@ -6,10 +6,10 @@
 # from config/prometheus/rules/ per EPIC-PRR-L PRR-434 (6 CriticalAlert
 # records from ObservabilityConfiguration.cs materialized as live rules).
 #
-# Kestrel binds the .NET services on host ports: 5050 (student-api),
-# 5052 (admin-api), 5119 (actor-host Prometheus endpoint). NATS monitoring
-# endpoint is 8222. `host.docker.internal` routes from inside the compose
-# network back to the host ports.
+# Targets resolve via the cena_default compose network. ASP.NET services
+# expose /metrics on the same Kestrel port that serves HTTP traffic
+# (PrometheusExporter middleware), so Prometheus must run inside
+# cena_default — see config/docker-compose.observability.yml networks block.
 # =============================================================================
 
 global:
@@ -27,7 +27,7 @@ alerting:
 scrape_configs:
   - job_name: "cena-actor-host"
     static_configs:
-      - targets: ["host.docker.internal:5119"]
+      - targets: ["cena-actor-host:5050"]
         labels:
           service: "actor-host"
     metrics_path: /metrics
@@ -35,7 +35,7 @@ scrape_configs:
 
   - job_name: "cena-admin-api"
     static_configs:
-      - targets: ["host.docker.internal:5052"]
+      - targets: ["cena-admin-api:5052"]
         labels:
           service: "admin-api"
     metrics_path: /metrics
@@ -43,27 +43,29 @@ scrape_configs:
 
   - job_name: "cena-student-api"
     static_configs:
-      - targets: ["host.docker.internal:5050"]
+      - targets: ["cena-student-api:5050"]
         labels:
           service: "student-api"
     metrics_path: /metrics
     scrape_interval: 15s
 
+  # NATS exposes /varz (JSON) on :8222, not Prometheus exposition format.
+  # The prometheus-nats-exporter sidecar (in observability compose) polls
+  # /varz/connz/jsz/routez and re-exposes them as Prometheus exposition on
+  # :7777/metrics, giving us connection counts, JetStream consumer/stream
+  # backlogs, and routing health on the cena.* subjects.
   - job_name: "cena-nats"
     static_configs:
-      - targets: ["host.docker.internal:8222"]
+      - targets: ["nats-exporter:7777"]
         labels:
           service: "nats"
     metrics_path: /metrics
     scrape_interval: 30s
 
-  - job_name: "cena-sympy-sidecar"
-    static_configs:
-      - targets: ["host.docker.internal:8000"]
-        labels:
-          service: "sympy-sidecar"
-    metrics_path: /metrics
-    scrape_interval: 30s
+  # SymPy sidecar is a pure NATS worker (subscribes to cena.cas.verify.sympy);
+  # it has no HTTP listener, so no /metrics is exposed. Health is observed
+  # via NATS request/reply latency from actor-host instead, plus the
+  # consumer-lag metrics on cena-nats above.
 
   # PRR-435: OTel Collector re-exposes OTLP metrics on :8889.
   - job_name: "cena-otel-collector"
