@@ -68,6 +68,28 @@ public static class BagrutCorpusSeedData
 
     public static async Task SeedAsync(IDocumentStore store, ILogger logger)
     {
+        // Idempotency guard. The previous "Marten upsert handles re-run" claim
+        // assumed SaveChangesAsync was cheap when ids already exist — in
+        // practice an over-loaded Postgres + sync-over-async on the startup
+        // path produced the 132% CPU hot-loop incident on 2026-05-01: every
+        // restart re-issued 10 upserts, each blocked on a slow connection,
+        // Kestrel's thread pool starved, the daemon's healthcheck loop
+        // starved, the whole stack flipped unhealthy.
+        //
+        // Cheap COUNT-with-marker query up front turns subsequent boots into
+        // a no-op. Mirrors the LearningObjective seed's "already seeded — N
+        // present, skipping" pattern that already exists in DatabaseSeeder.
+        await using var probeSession = store.LightweightSession();
+        var existing = await probeSession.Query<BagrutCorpusItemDocument>()
+            .CountAsync(x => x.IngestedBy == DevSeederMarker);
+        if (existing >= SeededItemCount)
+        {
+            logger.LogInformation(
+                "[bagrut-corpus-seed] {Count} dev-fixture rows already present — skipping",
+                existing);
+            return;
+        }
+
         logger.LogInformation("[bagrut-corpus-seed] starting — {Count} synthetic items", SeededItemCount);
 
         var items = BuildItems(DateTimeOffset.UtcNow);

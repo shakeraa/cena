@@ -103,6 +103,53 @@ models:
     is_trusted_provider: true
     notes: "Multi-factor reasoning — methodology switches, complex decisions"
 
+  # ─── Anthropic alias rows ───────────────────────────────────────────
+  # Anthropic's API accepts both dated model_ids (e.g. claude-sonnet-4-6-20260215)
+  # and undated aliases (claude-sonnet-4-6). The admin SPA dropdown saves the
+  # alias form into Marten, so the prr-046 pricing lookup MUST find a row keyed
+  # by the exact alias — otherwise variant generation fail-louds with
+  # "LLM pricing not found for model_id='claude-sonnet-4-6'". Each alias row
+  # mirrors the pricing of its dated counterpart so the bill is identical
+  # regardless of which form the operator persists.
+  claude_sonnet_4_6_alias:
+    model_id: "claude-sonnet-4-6"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "sonnet"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 3.00
+    cost_per_output_mtok: 15.00
+    cost_per_cached_input_mtok: 0.30
+    is_trusted_provider: true
+    notes: "Alias for claude-sonnet-4-6-20260215 — same pricing, undated form used by SPA dropdown"
+
+  claude_opus_4_6_alias:
+    model_id: "claude-opus-4-6"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "opus"
+    context_window: 1000000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 5.00
+    cost_per_output_mtok: 25.00
+    cost_per_cached_input_mtok: 0.50
+    is_trusted_provider: true
+    notes: "Alias for claude-opus-4-6-20260215 — same pricing"
+
+  claude_haiku_4_5_alias:
+    model_id: "claude-haiku-4-5-20251001"
+    provider: "anthropic"
+    api_base_url: "https://api.anthropic.com/v1"
+    tier: "sonnet"
+    context_window: 200000
+    max_output_tokens: 8192
+    cost_per_input_mtok: 1.00
+    cost_per_output_mtok: 5.00
+    cost_per_cached_input_mtok: 0.10
+    is_trusted_provider: true
+    notes: "Alias matching SPA dropdown's claude-haiku-4-5-20251001 — same pricing as claude-haiku-4-5-20260101"
+
 
 # ─────────────────────────────────────────────────────────────────────
 # 2. TASK-TO-MODEL MAPPING & FALLBACK CHAINS
