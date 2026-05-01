@@ -112,6 +112,20 @@ public partial class Program
     public static WebApplication BuildApp(string[] args)
     {
     var builder = WebApplication.CreateBuilder(args);
+
+    // Bound the startup phase. .NET's default is TimeSpan.InfiniteTimeSpan,
+    // which on 2026-05-01 turned a stalled BagrutCorpusSeedData.SaveChangesAsync
+    // into an indefinite hot loop (Kestrel thread-pool starvation → 132% CPU
+    // → Docker daemon healthcheck cascade). A bounded startup fails-loud
+    // (container restart-loops, surface in logs/alerts) instead of silent
+    // CPU burn. 60s is generous for the canonical seed path; if a future
+    // seed legitimately needs longer it should run as a BackgroundService
+    // post-startup, not block boot.
+    builder.Services.Configure<HostOptions>(o =>
+    {
+        o.StartupTimeout = TimeSpan.FromSeconds(60);
+    });
+
     if (Environment.GetEnvironmentVariable("CENA_OPENAPI_GEN") == "1")
     {
         // PRR-438: swagger-gen boot must not collide with a running Docker

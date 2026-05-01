@@ -75,10 +75,23 @@ public static class CriticalAlerts
         "critical", "cena.photo.csam_flag", "count > 0",
         TimeSpan.FromSeconds(30));
 
+    // Service CPU runaway. Catches the class of failure that produced the
+    // 2026-05-01 admin-api hot-loop incident: any .NET service spinning
+    // >100% CPU for 2 minutes is wedged on something it isn't telling us
+    // about (deadlock, thread-pool starvation, retry storm). Upstream of
+    // the cgroup limit we added in docker-compose.app.yml — the limit
+    // contains the blast radius, this alert pages on the cause.
+    public static readonly CriticalAlert ServiceCpuRunaway = new(
+        "ALERT-CPU-001", "Service CPU Runaway",
+        "A .NET service has consumed >100% CPU for 2 minutes — likely thread-pool starvation or a retry storm.",
+        "warning", "process_cpu_seconds_total", "rate > 1.0",
+        TimeSpan.FromMinutes(2));
+
     public static IReadOnlyList<CriticalAlert> All => new[]
     {
         CasSidecarDown, DailyCostExceeded, ErrorRateHigh,
-        QueueDepthHigh, ExamIntegrityViolation, CsamDetection
+        QueueDepthHigh, ExamIntegrityViolation, CsamDetection,
+        ServiceCpuRunaway
     };
 }
 

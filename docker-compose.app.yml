@@ -159,6 +159,19 @@ services:
       # ONLY after legal-delta memo signs §6. See docs/engineering/feature-flags.md.
       - Cena__Variants__BagrutSeedToLlmEnabled=${OCR_VARIANTS_BAGRUT_SEED_ENABLED:-false}
     restart: unless-stopped
+    # CPU + memory ceilings. The admin-api hot-loop incident on 2026-05-01
+    # (BagrutCorpusSeedData stalled on Postgres → Kestrel thread-pool
+    # starvation → 132% CPU) cascaded into the rest of the stack purely
+    # because the runaway grabbed enough host CPU to starve the Docker
+    # daemon's healthcheck timer threads. With these caps the offender
+    # spins inside its sandbox and the rest of the compose network stays
+    # observable. Numbers are generous for normal load; revisit on real
+    # traffic.
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5052/health/live"]
       interval: 30s

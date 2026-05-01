@@ -82,3 +82,19 @@ groups:
         annotations:
           summary: "CSAM flag fired in photo ingestion pipeline"
           description: "Photo ingestion flagged content requiring immediate review. Quarantine workflow should have fired automatically — verify and follow NCMEC workflow (EPIC-PRR-H §3.1 PRR-249)."
+
+      # ALERT-CPU-001 — Service CPU runaway
+      # Pages when any .NET service consumes >100% CPU sustained for 2m.
+      # Companion to the cgroup `cpus: '2.0'` limit in docker-compose.app.yml:
+      # the limit contains the blast radius, this alert pages on the cause
+      # (thread-pool starvation / retry storm / deadlock spin). Filter on
+      # service label so the alert tells the operator which container.
+      - alert: ServiceCpuRunaway
+        expr: rate(process_cpu_seconds_total{service=~"admin-api|student-api|actor-host"}[1m]) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+          alert_id: ALERT-CPU-001
+        annotations:
+          summary: "{{ $labels.service }} CPU > 100% for 2m"
+          description: "{{ $labels.service }} has been consuming >100% CPU sustained for 2 minutes — likely thread-pool starvation or a retry storm. Check `docker stats cena-{{ $labels.service }}` and tail `docker logs cena-{{ $labels.service }}` for the loop signature. Reference: 2026-05-01 admin-api BagrutCorpusSeedData hot-loop incident."
