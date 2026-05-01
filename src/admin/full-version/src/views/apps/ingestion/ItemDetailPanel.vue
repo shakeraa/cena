@@ -541,16 +541,22 @@ const approveItem = async () => {
 
           <VDivider class="mb-4" />
 
-          <!-- Visual review (2026-05-01) — side-by-side original PDF +
-               extracted figures. Curators flagged that approving from
-               text alone meant they couldn't catch dropped diagrams or
-               misaligned bounding boxes. PDF goes left so a familiar
-               native control owns the bulk of the surface; the
-               extracted figure gallery on the right lets the curator
-               eye-check that every figure on the page made it to the
-               recreated question. Section is hidden when the item has
-               neither PDF nor figures so non-Bagrut sources keep the
-               original layout. -->
+          <!-- Visual review (2026-05-01) — original PDF + extracted
+               figures, side-by-side when both exist, full-width when
+               only one is present. Curators flagged that approving
+               from text alone meant they couldn't catch dropped diagrams
+               or misaligned bounding boxes.
+               Layout rules:
+                 - PDF + figures → 3fr / 2fr split (PDF wider).
+                 - PDF only → PDF full width.
+                 - Figures only → figures full width.
+                 - Neither → section hidden entirely; a one-line VAlert
+                   below explains the empty state for legacy items so
+                   the curator isn't left guessing why visual review
+                   is missing.
+               Each column renders only when it has content so an
+               item with figures-but-no-PDF doesn't show an empty
+               "Original PDF" stub, and vice-versa. -->
           <div
             v-if="item.hasSourcePdf || item.figures.length > 0"
             class="mb-4"
@@ -559,8 +565,14 @@ const approveItem = async () => {
             <h6 class="text-h6 mb-3">
               Visual review
             </h6>
-            <div class="cena-visual-grid">
-              <div class="cena-visual-side cena-visual-pdf">
+            <div
+              class="cena-visual-grid"
+              :class="{ 'cena-visual-grid--single': !(item.hasSourcePdf && item.figures.length > 0) }"
+            >
+              <div
+                v-if="item.hasSourcePdf"
+                class="cena-visual-side cena-visual-pdf"
+              >
                 <div class="text-caption text-medium-emphasis mb-2 d-flex align-center">
                   <VIcon
                     icon="tabler-file-text"
@@ -568,33 +580,18 @@ const approveItem = async () => {
                     class="me-1"
                   />
                   Original PDF
-                  <VChip
-                    v-if="!item.hasSourcePdf"
-                    size="x-small"
-                    color="warning"
-                    variant="outlined"
-                    label
-                    class="ms-2"
-                  >
-                    Not retained
-                  </VChip>
                 </div>
                 <embed
-                  v-if="item.hasSourcePdf"
                   :src="`/api/admin/ingestion/items/${item.id}/source.pdf`"
                   type="application/pdf"
                   class="cena-visual-pdf-embed"
                   data-test="item-detail-pdf-embed"
                 >
-                <div
-                  v-else
-                  class="cena-visual-fallback text-body-2 text-disabled"
-                  data-test="item-detail-pdf-missing"
-                >
-                  Source PDF was not retained for this item. Re-upload to enable side-by-side review.
-                </div>
               </div>
-              <div class="cena-visual-side cena-visual-figures">
+              <div
+                v-if="item.figures.length > 0"
+                class="cena-visual-side cena-visual-figures"
+              >
                 <div class="text-caption text-medium-emphasis mb-2 d-flex align-center">
                   <VIcon
                     icon="tabler-photo"
@@ -604,7 +601,7 @@ const approveItem = async () => {
                   Extracted figures
                   <VChip
                     size="x-small"
-                    :color="item.figures.length > 0 ? 'success' : 'default'"
+                    color="success"
                     variant="outlined"
                     label
                     class="ms-2"
@@ -613,14 +610,6 @@ const approveItem = async () => {
                   </VChip>
                 </div>
                 <div
-                  v-if="item.figures.length === 0"
-                  class="cena-visual-fallback text-body-2 text-disabled"
-                  data-test="item-detail-no-figures"
-                >
-                  No figures extracted by the OCR cascade.
-                </div>
-                <div
-                  v-else
                   class="cena-figure-grid"
                   data-test="item-detail-figure-grid"
                 >
@@ -648,10 +637,25 @@ const approveItem = async () => {
             </div>
           </div>
 
-          <VDivider
-            v-if="item.hasSourcePdf || item.figures.length > 0"
+          <!-- One-line explainer for legacy Bagrut items (no PDF on disk
+               and no figures extracted). Without this the curator just
+               sees the panel skip from Curator Metadata to Question
+               Content with no hint that visual review *would* be there
+               for newer uploads. -->
+          <VAlert
+            v-if="item.sourceType === 'bagrut' && !item.hasSourcePdf && item.figures.length === 0"
+            type="info"
+            variant="tonal"
+            density="compact"
             class="mb-4"
-          />
+            data-test="item-detail-visual-unavailable"
+          >
+            <span class="text-body-2">
+              Visual review unavailable — this item was uploaded before persistent PDF + figure storage was added. Re-upload via the Bagrut ingest flow to enable the side-by-side viewer.
+            </span>
+          </VAlert>
+
+          <VDivider class="mb-4" />
 
           <!-- Question Content — what the curator is reviewing.
                OCR (original) + recreated form. Without this section,
@@ -1439,6 +1443,13 @@ const approveItem = async () => {
   .cena-visual-grid {
     grid-template-columns: 3fr 2fr;
   }
+}
+/* When only one of {PDF, figures} is present, drop back to one column
+   so the present side fills the whole row instead of leaving an empty
+   half (which is what made the panel look broken with a 0-figure
+   item, 2026-05-01 user report). */
+.cena-visual-grid.cena-visual-grid--single {
+  grid-template-columns: 1fr;
 }
 .cena-visual-side {
   background: rgba(var(--v-theme-surface-variant), 0.4);

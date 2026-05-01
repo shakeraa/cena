@@ -50,13 +50,21 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
     // calls all live in the per-provider implementations now.
     private readonly ICloudDirectoryProviderRegistry _cloudDirRegistry;
 
+    // Visual-review (2026-05-01): nullable so the existing host
+    // composition that doesn't pass a store stays buildable. When null,
+    // hasSourcePdf falls back to the SourcePdfId-string check (legacy
+    // behaviour) — which is fine for unit tests but lies to the SPA
+    // when bytes were never persisted (the embed renders, then 404s).
+    private readonly Cena.Admin.Api.Ingestion.IBagrutPdfStore? _pdfStore;
+
     public IngestionPipelineService(
         IDocumentStore store,
         IConnectionMultiplexer redis,
         ILogger<IngestionPipelineService> logger,
         ICloudDirectoryProviderRegistry cloudDirRegistry,
         IIngestionOrchestrator? orchestrator = null,
-        Cena.Admin.Api.Ingestion.ICuratorMetadataService? metadataService = null)
+        Cena.Admin.Api.Ingestion.ICuratorMetadataService? metadataService = null,
+        Cena.Admin.Api.Ingestion.IBagrutPdfStore? pdfStore = null)
     {
         _store = store;
         _redis = redis;
@@ -64,6 +72,7 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
         _metadataService = metadataService;
         _logger = logger;
         _cloudDirRegistry = cloudDirRegistry;
+        _pdfStore = pdfStore;
     }
 
     public async Task<PipelineStatusResponse> GetPipelineStatusAsync()
@@ -193,6 +202,15 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
         // (cloud-dir, photo-upload) items don't, so HasSourcePdf is false
         // and Figures is empty for those — the curator panel falls back to
         // text-only review.
+        //
+        // hasSourcePdf semantics: "the GET /source.pdf endpoint will return
+        // bytes". A SourcePdfId string is NOT enough — items uploaded
+        // before the PDF store landed have a SourcePdfId reference but no
+        // bytes on disk, and the SPA's <embed> would render then 404
+        // ("localhost refused to connect" in the browser). Probe the store
+        // for actual existence so the SPA can correctly fall back to the
+        // "PDF not retained — re-upload" placeholder. _pdfStore is
+        // nullable for tests that don't wire it.
         bool hasSourcePdf = false;
         IReadOnlyList<ItemFigureRef>? figures = null;
         if (string.Equals(item.SourceType, "bagrut", StringComparison.OrdinalIgnoreCase))
@@ -200,7 +218,12 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
             var payload = await session.LoadAsync<BagrutDraftPayloadDocument>(item.Id);
             if (payload is not null)
             {
-                hasSourcePdf = !string.IsNullOrWhiteSpace(payload.SourcePdfId);
+                if (!string.IsNullOrWhiteSpace(payload.SourcePdfId))
+                {
+                    hasSourcePdf = _pdfStore is null
+                        ? false   // no store wired → conservatively claim "no" so the SPA hides the embed
+                        : await _pdfStore.ExistsAsync(payload.SourcePdfId);
+                }
                 figures = ParseFigureSpec(payload.FigureSpecJson, item.Id);
             }
         }
