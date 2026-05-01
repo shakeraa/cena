@@ -3,6 +3,7 @@ import { PerfectScrollbar } from 'vue3-perfect-scrollbar'
 import { $api } from '@/utils/api'
 import { useIngestionJobs } from '@/composables/useIngestionJobs'
 import { renderMixedMathText } from '@/utils/renderMixedMathText'
+import { renderTextDiff } from '@/utils/renderTextDiff'
 import CuratorMetadataPanel from './CuratorMetadataPanel.vue'
 
 interface ProcessingStage {
@@ -79,6 +80,43 @@ const emit = defineEmits<Emit>()
 
 const item = ref<ItemDetail | null>(null)
 const loading = ref(false)
+
+// Per-question "show diff" toggle. Keyed by question.index so each
+// question card holds its own state. When true, the recreated text
+// renders as a side-by-side word-level diff against the OCR raw text;
+// when false, the recreated text renders as plain KaTeX-formatted output
+// (the default — diff view is opt-in and recomputed on demand).
+const diffOpen = ref<Record<number, boolean>>({})
+
+function toggleDiff(questionIndex: number) {
+  diffOpen.value = { ...diffOpen.value, [questionIndex]: !diffOpen.value[questionIndex] }
+}
+
+/**
+ * Compute the diff between the OCR raw text and the recreated text for
+ * one question. Memoised across renders by Vue's template-render
+ * mechanics (toggleDiff triggers a re-render and the call returns the
+ * fresh diff). For multi-question items we slice the OCR text per-index
+ * by paragraph if a sentinel boundary is present, else fall back to the
+ * full OCR vs the recreated question (which still surfaces the
+ * insertion/deletion structure even if alignment is approximate).
+ */
+function diffForQuestion(questionIndex: number, recreatedText: string) {
+  const ocr = item.value?.ocrText ?? ''
+  if (!ocr || !recreatedText)
+    return null
+
+  // Try splitting the OCR text by double-newline boundaries, which is
+  // how Anthropic's OCR + Mathpix typically separates question stems
+  // in multi-question PDFs. If we get exactly one chunk per question,
+  // align by index. Otherwise diff against the whole OCR.
+  const ocrChunks = ocr.split(/\n\s*\n/)
+  const ocrSlice = ocrChunks.length === item.value!.recreatedQuestions.length
+    ? ocrChunks[questionIndex] ?? ''
+    : ocr
+
+  return renderTextDiff(ocrSlice, recreatedText)
+}
 const actionLoading = ref(false)
 
 // Generate-variants dialog state (option 2)
@@ -545,25 +583,98 @@ const approveItem = async () => {
                   <span class="text-caption text-medium-emphasis">
                     Question {{ q.index + 1 }}
                   </span>
-                  <VChip
-                    size="x-small"
-                    :color="q.confidence >= 0.85 ? 'success' : q.confidence >= 0.65 ? 'warning' : 'error'"
-                    label
-                  >
-                    {{ Math.round(q.confidence * 100) }}% confidence
-                  </VChip>
+                  <div class="d-flex align-center gap-2">
+                    <VChip
+                      size="x-small"
+                      :color="q.confidence >= 0.85 ? 'success' : q.confidence >= 0.65 ? 'warning' : 'error'"
+                      label
+                    >
+                      {{ Math.round(q.confidence * 100) }}% confidence
+                    </VChip>
+                    <!-- Diff toggle. Curator clicks to compare recreated
+                         vs OCR raw side-by-side with word-level
+                         insertion/deletion highlights. Off by default
+                         because the formatted KaTeX render is the
+                         primary review surface; diff is the "what
+                         changed?" deep-dive. -->
+                    <VBtn
+                      v-if="item.ocrText"
+                      size="x-small"
+                      variant="text"
+                      :color="diffOpen[q.index] ? 'primary' : undefined"
+                      :prepend-icon="diffOpen[q.index] ? 'tabler-eye-off' : 'tabler-git-compare'"
+                      data-test="item-detail-diff-toggle"
+                      @click="toggleDiff(q.index)"
+                    >
+                      {{ diffOpen[q.index] ? 'Hide diff' : 'Diff vs OCR' }}
+                    </VBtn>
+                  </div>
                 </div>
-                <!-- v-html is safe here because renderMixedMathText
-                     escapes prose segments and KaTeX's renderToString
-                     produces sanitized HTML for the math segments
-                     (with throwOnError:false the only path that
-                     surfaces user content is escapeHtml inside
-                     renderMixedMathText). -->
+
+                <!-- Default view: KaTeX-formatted recreated question.
+                     v-html safe — see renderMixedMathText for the
+                     escape + bdi-LTR + KaTeX-fallback chain. -->
                 <div
+                  v-if="!diffOpen[q.index]"
                   class="cena-mmt-block"
                   data-test="item-detail-recreated-text"
                   v-html="renderMixedMathText(q.text)"
                 />
+
+                <!-- Diff view: side-by-side OCR raw (left) vs recreated
+                     (right) with word-level (or char-level for
+                     math-heavy content) insertions and deletions
+                     highlighted via <ins>/<del> tags. v-html safe —
+                     renderTextDiff escapes all input segments before
+                     wrapping in our own tags. -->
+                <div
+                  v-else-if="diffForQuestion(q.index, q.text) !== null"
+                  class="cena-diff-grid"
+                  data-test="item-detail-diff-view"
+                >
+                  <div class="cena-diff-side">
+                    <div class="cena-diff-header text-caption text-medium-emphasis">
+                      OCR raw
+                      <VChip
+                        v-if="diffForQuestion(q.index, q.text)!.ocr.changeCount > 0"
+                        size="x-small"
+                        color="error"
+                        variant="outlined"
+                        label
+                        class="ms-2"
+                      >
+                        −{{ diffForQuestion(q.index, q.text)!.ocr.changeCount }}
+                      </VChip>
+                    </div>
+                    <bdi
+                      dir="ltr"
+                      class="cena-diff-body"
+                      data-test="item-detail-diff-ocr"
+                      v-html="diffForQuestion(q.index, q.text)!.ocr.html"
+                    />
+                  </div>
+                  <div class="cena-diff-side">
+                    <div class="cena-diff-header text-caption text-medium-emphasis">
+                      Recreated
+                      <VChip
+                        v-if="diffForQuestion(q.index, q.text)!.recreated.changeCount > 0"
+                        size="x-small"
+                        color="success"
+                        variant="outlined"
+                        label
+                        class="ms-2"
+                      >
+                        +{{ diffForQuestion(q.index, q.text)!.recreated.changeCount }}
+                      </VChip>
+                    </div>
+                    <bdi
+                      dir="ltr"
+                      class="cena-diff-body"
+                      data-test="item-detail-diff-recreated"
+                      v-html="diffForQuestion(q.index, q.text)!.recreated.html"
+                    />
+                  </div>
+                </div>
               </VCardText>
             </VCard>
           </div>
@@ -1119,5 +1230,54 @@ const approveItem = async () => {
   background: rgba(var(--v-theme-error), 0.08);
   padding: 0.1em 0.3em;
   border-radius: 0.2em;
+}
+
+/* cena-diff-* — side-by-side OCR-vs-recreated diff view
+   Two columns at >=720px, stacked below. Word-level <ins>/<del>
+   highlights from renderTextDiff. */
+.cena-diff-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  margin-top: 0.25rem;
+}
+@media (min-width: 720px) {
+  .cena-diff-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+.cena-diff-side {
+  background: rgba(var(--v-theme-surface-variant), 0.4);
+  border-radius: 0.4rem;
+  padding: 0.5rem 0.75rem;
+}
+.cena-diff-header {
+  display: flex;
+  align-items: center;
+  margin-block-end: 0.25rem;
+  font-weight: 600;
+}
+.cena-diff-body {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.cena-diff-body :deep(.cena-diff-ins) {
+  background: rgba(var(--v-theme-success), 0.18);
+  text-decoration: none;
+  padding: 0 0.1em;
+  border-radius: 0.15em;
+}
+.cena-diff-body :deep(.cena-diff-del) {
+  background: rgba(var(--v-theme-error), 0.16);
+  text-decoration: line-through;
+  padding: 0 0.1em;
+  border-radius: 0.15em;
+}
+.cena-diff-body :deep(.cena-diff-eq) {
+  color: rgb(var(--v-theme-on-surface));
 }
 </style>
