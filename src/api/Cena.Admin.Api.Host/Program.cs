@@ -6,6 +6,7 @@
 
 using System.Security.Claims;
 using System.Threading.RateLimiting;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Cena.Actors.Assessment.Rubric;
 using Cena.Actors.Bus;
 using Cena.Actors.Configuration;
@@ -741,10 +742,28 @@ public partial class Program
     // ---- Prometheus metrics endpoint ----
     app.MapPrometheusScrapingEndpoint();
     
-    // ---- Health check ----
+    // ---- Health checks (RDY-011 — split semantics) ----
+    // /health/live: process alive — returns 200 the moment Kestrel binds.
+    // No DB / Redis / seed checks. K8s livenessProbe target; a stuck seed
+    // does NOT flip livez red.
+    //
+    // /health/ready: ready to serve traffic — runs only the checks tagged
+    // "ready" in DependencyHealthChecks (Postgres + Redis). Stays 503 until
+    // those clear, so Docker's healthcheck (which now targets /ready, see
+    // docker-compose.app.yml) marks the container unhealthy during a wedged
+    // seed/dependency without crashing it. Replaces the retired Layer 2
+    // HostOptions.StartupTimeout — Kestrel can come up immediately while
+    // seeds finish in the background; Layer 3 CPU cap + Layer 4 alert
+    // remain the containment for true silent-burn cases.
     app.MapGet("/health", () => Results.Ok(new { status = "healthy", service = "cena-admin-api" }));
-    app.MapHealthChecks("/health/live");
-    app.MapHealthChecks("/health/ready");
+    app.MapHealthChecks("/health/live", new HealthCheckOptions
+    {
+        Predicate = _ => false,
+    });
+    app.MapHealthChecks("/health/ready", new HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready"),
+    });
     
     // ---- Admin REST API endpoints (migrated from Cena.Api.Host) ----
     app.MapCenaAdminEndpoints();
