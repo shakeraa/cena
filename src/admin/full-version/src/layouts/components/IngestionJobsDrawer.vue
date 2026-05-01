@@ -13,7 +13,12 @@
 ============================================================================= -->
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, computed, ref, watch, nextTick } from 'vue'
-import { useIngestionJobs, type IngestionJobSummary, type JobLogEntry } from '@/composables/useIngestionJobs'
+import {
+  useIngestionJobs,
+  type IngestionJobSummary,
+  type JobLogEntry,
+  type GenerateVariantsResult,
+} from '@/composables/useIngestionJobs'
 
 const {
   jobs,
@@ -21,6 +26,7 @@ const {
   drawerOpen,
   fetchJobs,
   fetchLogs,
+  fetchJobDetail,
   startPolling,
   stopPolling,
   cancelJob,
@@ -140,11 +146,55 @@ function stopLogPolling() {
   }
 }
 
+// Per-selected-job parsed result for GenerateVariants. Hydrated when
+// the selected job is terminal+completed AND type === 'generatevariants'.
+// Fetched once via /jobs/{id} (which carries ResultJson on the detail
+// DTO; the LIST endpoint deliberately omits it to keep the drawer's
+// 3s job-list poll cheap). Persisted variant IDs render as router-link
+// chips so the curator can deep-link straight to the question editor.
+const variantsResult = ref<GenerateVariantsResult | null>(null)
+const variantsResultJobId = ref<string | null>(null)
+const variantsResultError = ref<string | null>(null)
+
+const isVariantsType = (type: string | null | undefined) =>
+  type?.toLowerCase() === 'generatevariants'
+
+async function maybeLoadVariantsResult(jobId: string) {
+  variantsResult.value = null
+  variantsResultError.value = null
+  variantsResultJobId.value = jobId
+
+  const job = jobs.value.find(j => j.id === jobId)
+  if (!job || !isVariantsType(job.type) || job.status !== 'completed') return
+
+  const detail = await fetchJobDetail(jobId)
+  if (!detail || variantsResultJobId.value !== jobId) return  // selection moved on
+
+  if (!detail.resultJson) return
+  try {
+    variantsResult.value = JSON.parse(detail.resultJson) as GenerateVariantsResult
+  }
+  catch (err: any) {
+    variantsResultError.value = `Could not parse variant result: ${err?.message ?? err}`
+  }
+}
+
 watch(selectedJobId, async (id) => {
   logEntries.value = []
   if (!id) return
-  await loadLogs(id)
+  await Promise.all([loadLogs(id), maybeLoadVariantsResult(id)])
   startLogPolling()
+})
+
+// Re-hydrate the result block when a selected variants job transitions
+// into 'completed' (so user sees the result without having to click
+// elsewhere and back). Status changes propagate via the 3s job-list
+// poll already.
+watch(() => selectedJob.value?.status, (status, prev) => {
+  if (status === 'completed' && prev && prev !== 'completed'
+      && selectedJob.value && isVariantsType(selectedJob.value.type)) {
+    maybeLoadVariantsResult(selectedJob.value.id)
+  }
 })
 
 watch(() => selectedJob.value?.status, (status, prev) => {
@@ -214,6 +264,18 @@ const formatTimestamp = (ts: string) => {
   const d = new Date(ts)
   return `${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
 }
+
+// Truncate sample stems for the persisted-IDs chip labels. Only used
+// when we have at least as many samples as IDs (positionally aligned;
+// the strategy emits sample[].Take(5) so for a count > 5 only the
+// first 5 stems are matched and the rest fall back to bare IDs).
+const stemForIndex = (idx: number): string | null => {
+  const s = variantsResult.value?.sample?.[idx]?.stem
+  if (!s) return null
+  return s.length > 60 ? `${s.slice(0, 57)}…` : s
+}
+
+const showFailures = ref(false)
 </script>
 
 <template>
@@ -409,6 +471,86 @@ const formatTimestamp = (ts: string) => {
             </VCard>
           </VTabsWindowItem>
         </VTabsWindow>
+      </div>
+
+      <!-- Variant-result block: only renders for a completed
+           generate_variants job once /jobs/{id} returns ResultJson.
+           Surfaces the full ledger (persisted IDs, persist failures,
+           summary counts) so the curator can act on the variants
+           without leaving the drawer to hunt them down in the kanban. -->
+      <div
+        v-if="selectedJob && isVariantsType(selectedJob.type) && selectedJob.status === 'completed'"
+        class="border-t px-3 py-2"
+        style="background: rgb(var(--v-theme-surface)); flex: 0 0 auto;"
+        data-test="variants-result-block"
+      >
+        <div v-if="variantsResultError" class="text-caption text-error">
+          {{ variantsResultError }}
+        </div>
+        <div v-else-if="!variantsResult" class="text-caption text-medium-emphasis">
+          Loading variant result…
+        </div>
+        <template v-else>
+          <div class="d-flex align-center mb-2">
+            <VIcon icon="tabler-sparkles" size="16" class="me-1 text-info" />
+            <span class="text-body-2 font-weight-medium">
+              Generated {{ variantsResult.generated }} ·
+              {{ variantsResult.passedQualityGate }} passed QG ·
+              {{ variantsResult.persistedQuestionIds.length }} persisted
+            </span>
+          </div>
+
+          <div
+            v-if="variantsResult.persistedQuestionIds.length === 0"
+            class="text-caption text-medium-emphasis mb-2"
+            data-test="variants-result-empty"
+          >
+            No variants persisted. See the log panel below for per-candidate drop reasons (quality gate / CAS gate).
+          </div>
+          <div v-else class="mb-2" data-test="variants-result-persisted">
+            <div class="text-caption text-medium-emphasis mb-1">
+              Persisted variants (click to open in editor):
+            </div>
+            <div class="d-flex flex-wrap" style="gap: 6px;">
+              <RouterLink
+                v-for="(qid, idx) in variantsResult.persistedQuestionIds"
+                :key="qid"
+                :to="{ name: 'apps-questions-edit-id', params: { id: qid } }"
+                class="text-decoration-none"
+              >
+                <VChip
+                  size="small"
+                  variant="tonal"
+                  color="success"
+                  prepend-icon="tabler-external-link"
+                  :title="stemForIndex(idx) ?? qid"
+                >
+                  {{ stemForIndex(idx) ?? qid }}
+                </VChip>
+              </RouterLink>
+            </div>
+          </div>
+
+          <div
+            v-if="variantsResult.persistFailures.length > 0"
+            data-test="variants-result-failures"
+          >
+            <VBtn
+              size="x-small"
+              variant="text"
+              color="warning"
+              :prepend-icon="showFailures ? 'tabler-chevron-down' : 'tabler-chevron-right'"
+              @click="showFailures = !showFailures"
+            >
+              {{ variantsResult.persistFailures.length }} persist failure{{ variantsResult.persistFailures.length === 1 ? '' : 's' }}
+            </VBtn>
+            <div v-if="showFailures" class="mt-1 ps-3 text-caption text-warning">
+              <div v-for="(f, idx) in variantsResult.persistFailures" :key="idx">
+                · {{ f }}
+              </div>
+            </div>
+          </div>
+        </template>
       </div>
 
       <!-- Bottom half: log panel for the selected job -->
