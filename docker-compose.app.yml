@@ -163,15 +163,20 @@ services:
     # (BagrutCorpusSeedData stalled on Postgres → Kestrel thread-pool
     # starvation → 132% CPU) cascaded into the rest of the stack purely
     # because the runaway grabbed enough host CPU to starve the Docker
-    # daemon's healthcheck timer threads. With these caps the offender
-    # spins inside its sandbox and the rest of the compose network stays
-    # observable. Numbers are generous for normal load; revisit on real
-    # traffic.
+    # daemon's healthcheck timer threads. The CPU cap is the real
+    # containment mechanism; the memory cap is a secondary leak-guard.
+    #
+    # Memory was originally 2G — turned out to be too tight: admin-api's
+    # baseline is ~400MB but Marten projection rebuild + bagrut seed
+    # spikes above 2G transiently, killing the container with SIGKILL
+    # (exit 137) and producing a restart-loop. Sibling services
+    # (actor-host, student-api) each sit at ~3.7G steady-state. 4G gives
+    # comfortable headroom for spikes while still capping runaway leaks.
     deploy:
       resources:
         limits:
           cpus: '2.0'
-          memory: 2G
+          memory: 4G
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:5052/health/live"]
       interval: 30s

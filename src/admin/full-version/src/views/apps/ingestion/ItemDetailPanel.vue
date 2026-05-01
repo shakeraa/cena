@@ -154,6 +154,12 @@ const enqueueVariants = async () => {
     })
     variantsDialogOpen.value = false
     openJobsDrawer()
+    // Close THIS drawer too — without it, ItemDetailPanel (which is itself a
+    // VNavigationDrawer, not just the inner form dialog) stays mounted on top
+    // of the freshly-opened IngestionJobsDrawer and the operator can't see
+    // the job they just enqueued. The two-way binding in pipeline.vue picks
+    // this up.
+    emit('update:isOpen', false)
   }
   catch (err: any) {
     console.error('enqueueVariants failed', err)
@@ -739,9 +745,15 @@ const approveItem = async () => {
                  the draft id + curator-chosen subject/grade/blooms to a
                  background job; results surface in the Ingestion Jobs
                  drawer. ADR-0043 isomorph rejector still gates each
-                 candidate. -->
+                 candidate.
+                 Stage gate: only InReview + Published. ADR-0059 §15.5 lets
+                 the LLM see Bagrut drafts as creative seed, but only after
+                 OCR has settled and the curator has eyes on the content
+                 (InReview onward). Earlier stages (OcrProcessing, ReCreated)
+                 may still have malformed text → seeding the LLM with
+                 garbage produces garbage variants and burns budget. -->
             <VBtn
-              v-if="item && item.sourceType === 'bagrut'"
+              v-if="item && item.sourceType === 'bagrut' && (item.currentStage === 'InReview' || item.currentStage === 'Published')"
               color="info"
               variant="tonal"
               @click="variantsDialogOpen = true"
