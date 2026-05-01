@@ -169,3 +169,8 @@ volumes:
   # via `docker volume rm cena_source_pdfs cena_ocr_figures` when needed.
   cena_source_pdfs:
   cena_ocr_figures:
+  # Firebase Auth emulator persistence (2026-05-01). Entrypoint exports
+  # users on graceful shutdown + imports them on startup so dev login
+  # survives container recreation and Docker Desktop restarts. Wipe via
+  # `docker volume rm cena_firebase_users` to force a clean re-seed.
+  cena_firebase_users:

@@ -32,6 +32,13 @@ services:
       - "4000:4000"   # Emulator UI
     volumes:
       - ./docker/firebase-emulator/seed-dev-users.sh:/seed/seed-dev-users.sh:ro
+      # Persist auth emulator state across container restarts. Entrypoint
+      # passes --import + --export-on-exit pointing at this directory so
+      # the dev user roster survives docker stop/start cycles AND Docker
+      # Desktop restarts. First boot (volume empty) → entrypoint runs the
+      # seed once and the next graceful shutdown captures it. See
+      # docker/firebase-emulator/entrypoint.sh.
+      - cena_firebase_users:/data
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:9099/ > /dev/null || exit 1"]
