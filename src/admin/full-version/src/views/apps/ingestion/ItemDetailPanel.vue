@@ -611,149 +611,6 @@ const approveItem = async () => {
             @confirmed="() => emit('item-updated')"
           />
 
-          <VDivider class="mb-4" />
-
-          <!-- Visual review (2026-05-01) — original PDF + extracted
-               figures, side-by-side when both exist, full-width when
-               only one is present. Curators flagged that approving
-               from text alone meant they couldn't catch dropped diagrams
-               or misaligned bounding boxes.
-               Layout rules:
-                 - PDF + figures → 3fr / 2fr split (PDF wider).
-                 - PDF only → PDF full width.
-                 - Figures only → figures full width.
-                 - Neither → section hidden entirely; a one-line VAlert
-                   below explains the empty state for legacy items so
-                   the curator isn't left guessing why visual review
-                   is missing.
-               Each column renders only when it has content so an
-               item with figures-but-no-PDF doesn't show an empty
-               "Original PDF" stub, and vice-versa. -->
-          <div
-            v-if="item.hasSourcePdf || item.figures.length > 0"
-            class="mb-4"
-            data-test="item-detail-visual-review"
-          >
-            <h6 class="text-h6 mb-3">
-              Visual review
-            </h6>
-            <div
-              class="cena-visual-grid"
-              :class="{ 'cena-visual-grid--single': !(item.hasSourcePdf && item.figures.length > 0) }"
-            >
-              <div
-                v-if="item.hasSourcePdf"
-                class="cena-visual-side cena-visual-pdf"
-              >
-                <div class="text-caption text-medium-emphasis mb-2 d-flex align-center">
-                  <VIcon
-                    icon="tabler-file-text"
-                    size="16"
-                    class="me-1"
-                  />
-                  Original PDF
-                </div>
-                <!-- Use blob URL set by loadVisualReviewBlobs (auth-aware
-                     fetch). Direct src="/api/..." would 401 because the
-                     <embed> element doesn't carry the JWT. While the blob
-                     is in flight, show a lightweight skeleton-ish state. -->
-                <embed
-                  v-if="pdfBlobUrl"
-                  :src="pdfBlobUrl"
-                  type="application/pdf"
-                  class="cena-visual-pdf-embed"
-                  data-test="item-detail-pdf-embed"
-                >
-                <div
-                  v-else
-                  class="cena-visual-fallback text-body-2 text-disabled"
-                  data-test="item-detail-pdf-loading"
-                >
-                  Loading PDF…
-                </div>
-              </div>
-              <div
-                v-if="item.figures.length > 0"
-                class="cena-visual-side cena-visual-figures"
-              >
-                <div class="text-caption text-medium-emphasis mb-2 d-flex align-center">
-                  <VIcon
-                    icon="tabler-photo"
-                    size="16"
-                    class="me-1"
-                  />
-                  Extracted figures
-                  <VChip
-                    size="x-small"
-                    color="success"
-                    variant="outlined"
-                    label
-                    class="ms-2"
-                  >
-                    {{ item.figures.length }}
-                  </VChip>
-                </div>
-                <div
-                  class="cena-figure-grid"
-                  data-test="item-detail-figure-grid"
-                >
-                  <!-- Same auth-aware blob URL trick as the PDF embed
-                       above — <img src="/api/..."> would 401. Show a
-                       loading shimmer until the blob lands; figure tile
-                       still clickable (links to the blob URL too once
-                       loaded) so curators can open in a new tab. -->
-                  <a
-                    v-for="fig in item.figures"
-                    :key="fig.index"
-                    :href="figureBlobUrls[fig.index] ?? '#'"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="cena-figure-tile"
-                    :title="fig.altText ?? `Figure on page ${fig.page}`"
-                    data-test="item-detail-figure-tile"
-                    @click="(!figureBlobUrls[fig.index]) && $event.preventDefault()"
-                  >
-                    <img
-                      v-if="figureBlobUrls[fig.index]"
-                      :src="figureBlobUrls[fig.index]"
-                      :alt="fig.altText ?? `Figure on page ${fig.page}`"
-                      loading="lazy"
-                    >
-                    <div
-                      v-else
-                      class="cena-figure-tile-loading text-caption text-disabled"
-                    >
-                      Loading…
-                    </div>
-                    <span class="cena-figure-caption text-caption">
-                      p{{ fig.page }}<span v-if="fig.kind"> · {{ fig.kind }}</span>
-                    </span>
-                  </a>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- One-line explainer for legacy Bagrut items (no PDF on disk
-               and no figures extracted). Without this the curator just
-               sees the panel skip from Curator Metadata to Question
-               Content with no hint that visual review *would* be there
-               for newer uploads. -->
-          <VAlert
-            v-if="item.sourceType === 'bagrut' && !item.hasSourcePdf && item.figures.length === 0"
-            type="info"
-            variant="tonal"
-            density="compact"
-            class="mb-4"
-            data-test="item-detail-visual-unavailable"
-          >
-            <span class="text-body-2">
-              Visual review unavailable — this item was uploaded before persistent PDF + figure storage was added. Re-upload via the Bagrut ingest flow to enable the side-by-side viewer.
-            </span>
-          </VAlert>
-
-          <VDivider class="mb-4" />
-
           <!-- Question Content — what the curator is reviewing.
                OCR (original) + recreated form. Without this section,
                approving was a black-box (only metadata + scores were
@@ -946,6 +803,143 @@ const approveItem = async () => {
           </VExpansionPanels>
 
           <VDivider class="mb-4" />
+
+          <!-- Visual review (2026-05-01, reordered 2026-05-02) — original
+               PDF + extracted figures. Sits BELOW Question Content so
+               the recreated text the curator approves is the first
+               thing on screen; the PDF is a verification surface, not
+               the primary content. Curators flagged that approving from
+               text alone meant they couldn't catch dropped diagrams or
+               misaligned bounding boxes.
+               Layout rules (within the visual block):
+                 - PDF + figures → 3fr / 2fr split (PDF wider).
+                 - PDF only → PDF full width.
+                 - Figures only → figures full width.
+                 - Neither → section hidden entirely; the legacy-item
+                   VAlert below explains the empty state. -->
+          <div
+            v-if="item.hasSourcePdf || item.figures.length > 0"
+            class="mb-4"
+            data-test="item-detail-visual-review"
+          >
+            <h6 class="text-h6 mb-3">
+              Visual review
+            </h6>
+            <div
+              class="cena-visual-grid"
+              :class="{ 'cena-visual-grid--single': !(item.hasSourcePdf && item.figures.length > 0) }"
+            >
+              <div
+                v-if="item.hasSourcePdf"
+                class="cena-visual-side cena-visual-pdf"
+              >
+                <div class="text-caption text-medium-emphasis mb-2 d-flex align-center">
+                  <VIcon
+                    icon="tabler-file-text"
+                    size="16"
+                    class="me-1"
+                  />
+                  Original PDF
+                </div>
+                <!-- Use blob URL set by loadVisualReviewBlobs (auth-aware
+                     fetch). Direct src="/api/..." would 401 because the
+                     <embed> element doesn't carry the JWT. While the blob
+                     is in flight, show a lightweight skeleton-ish state. -->
+                <embed
+                  v-if="pdfBlobUrl"
+                  :src="pdfBlobUrl"
+                  type="application/pdf"
+                  class="cena-visual-pdf-embed"
+                  data-test="item-detail-pdf-embed"
+                >
+                <div
+                  v-else
+                  class="cena-visual-fallback text-body-2 text-disabled"
+                  data-test="item-detail-pdf-loading"
+                >
+                  Loading PDF…
+                </div>
+              </div>
+              <div
+                v-if="item.figures.length > 0"
+                class="cena-visual-side cena-visual-figures"
+              >
+                <div class="text-caption text-medium-emphasis mb-2 d-flex align-center">
+                  <VIcon
+                    icon="tabler-photo"
+                    size="16"
+                    class="me-1"
+                  />
+                  Extracted figures
+                  <VChip
+                    size="x-small"
+                    color="success"
+                    variant="outlined"
+                    label
+                    class="ms-2"
+                  >
+                    {{ item.figures.length }}
+                  </VChip>
+                </div>
+                <div
+                  class="cena-figure-grid"
+                  data-test="item-detail-figure-grid"
+                >
+                  <a
+                    v-for="fig in item.figures"
+                    :key="fig.index"
+                    :href="figureBlobUrls[fig.index] ?? '#'"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="cena-figure-tile"
+                    :title="fig.altText ?? `Figure on page ${fig.page}`"
+                    data-test="item-detail-figure-tile"
+                    @click="(!figureBlobUrls[fig.index]) && $event.preventDefault()"
+                  >
+                    <img
+                      v-if="figureBlobUrls[fig.index]"
+                      :src="figureBlobUrls[fig.index]"
+                      :alt="fig.altText ?? `Figure on page ${fig.page}`"
+                      loading="lazy"
+                    >
+                    <div
+                      v-else
+                      class="cena-figure-tile-loading text-caption text-disabled"
+                    >
+                      Loading…
+                    </div>
+                    <span class="cena-figure-caption text-caption">
+                      p{{ fig.page }}<span v-if="fig.kind"> · {{ fig.kind }}</span>
+                    </span>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Legacy-item explainer: shows only when there's no PDF on
+               disk and no figures (item uploaded before persistent
+               storage was added). Without this the curator skips from
+               Question Content straight to Processing Stages with no
+               hint that visual review *would* be there for newer
+               uploads. -->
+          <VAlert
+            v-if="item.sourceType === 'bagrut' && !item.hasSourcePdf && item.figures.length === 0"
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="mb-4"
+            data-test="item-detail-visual-unavailable"
+          >
+            <span class="text-body-2">
+              Visual review unavailable — this item was uploaded before persistent PDF + figure storage was added. Re-upload via the Bagrut ingest flow to enable the side-by-side viewer.
+            </span>
+          </VAlert>
+
+          <VDivider
+            v-if="item.hasSourcePdf || item.figures.length > 0 || (item.sourceType === 'bagrut' && !item.hasSourcePdf && item.figures.length === 0)"
+            class="mb-4"
+          />
 
           <!-- Processing Stages -->
           <h6 class="text-h6 mb-3">
@@ -1556,8 +1550,13 @@ const approveItem = async () => {
 }
 .cena-visual-pdf-embed {
   inline-size: 100%;
-  block-size: 70vh;
-  min-block-size: 420px;
+  /* 50vh keeps the recreated-question section visible above the fold
+     in a typical drawer view. Curators can still scroll inside the PDF
+     viewer to see all pages, and click the embed's own fullscreen icon
+     for a closer look. The previous 70vh swallowed the screen and
+     buried the recreated text below. */
+  block-size: 50vh;
+  min-block-size: 360px;
   border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
   border-radius: 0.25rem;
   background: rgb(var(--v-theme-surface));
