@@ -88,17 +88,26 @@ echo "[cena-up] daemon OK"
 # Map each service to the source paths whose changes warrant a rebuild.
 # (Only Dockerfile/source-code changes need rebuild; compose env vars
 # and compose-file edits are picked up by `restart`.)
-declare -A SVC_SOURCE_PATHS=(
-  [admin-api]="src/api/Cena.Admin.Api src/api/Cena.Admin.Api.Host src/shared src/actors/Cena.Actors"
-  [student-api]="src/api/Cena.Student.Api.Host src/shared src/actors/Cena.Actors"
-  [actor-host]="src/actors src/shared"
-  [admin-spa]="src/admin/full-version/dev.Dockerfile src/admin/full-version/package.json"
-  [student-spa]="src/student/full-version/dev.Dockerfile src/student/full-version/package.json"
-)
+#
+# Implemented as a case-statement vs. `declare -A` because macOS's
+# default /bin/bash is 3.2 which doesn't support associative arrays —
+# `/usr/bin/env bash` may resolve to that on systems without a Homebrew
+# bash on PATH ahead of /bin. case keeps us compatible.
+svc_source_paths() {
+  case "$1" in
+    admin-api)   echo "src/api/Cena.Admin.Api src/api/Cena.Admin.Api.Host src/shared src/actors/Cena.Actors" ;;
+    student-api) echo "src/api/Cena.Student.Api.Host src/shared src/actors/Cena.Actors" ;;
+    actor-host)  echo "src/actors src/shared" ;;
+    admin-spa)   echo "src/admin/full-version/dev.Dockerfile src/admin/full-version/package.json" ;;
+    student-spa) echo "src/student/full-version/dev.Dockerfile src/student/full-version/package.json" ;;
+    *)           echo "" ;;
+  esac
+}
 
 needs_build() {
   local svc="$1"
-  local paths="${SVC_SOURCE_PATHS[$svc]:-}"
+  local paths
+  paths="$(svc_source_paths "$svc")"
   [[ -z "$paths" ]] && return 1   # unknown service → no rebuild
   # Treat both staged and unstaged changes as triggers.
   if ! git diff --quiet -- $paths 2>/dev/null; then
