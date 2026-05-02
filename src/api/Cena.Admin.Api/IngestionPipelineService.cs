@@ -225,6 +225,33 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
                         : await _pdfStore.ExistsAsync(payload.SourcePdfId);
                 }
                 figures = ParseFigureSpec(payload.FigureSpecJson, item.Id);
+
+                // Surface the draft prompt as the "extracted question" so
+                // the curator panel has content to review BEFORE variants
+                // are generated. For Bagrut drafts, item.ExtractedQuestionIds
+                // is empty by design (variants are spawned later), so
+                // without this fallback the panel renders "No question
+                // content yet — pipeline is still processing" indefinitely
+                // (2026-05-01 user report). The prompt + LaTeX combo is
+                // exactly what BagrutPdfIngestionService put in the payload
+                // — same content the AI variant generator will seed from.
+                if (extractedQuestions.Count == 0)
+                {
+                    var combined = string.IsNullOrWhiteSpace(payload.LatexContent)
+                        ? payload.Prompt
+                        : $"{payload.Prompt}\n\n{payload.LatexContent}";
+                    if (!string.IsNullOrWhiteSpace(combined))
+                    {
+                        extractedQuestions = new List<ExtractedQuestion>
+                        {
+                            new ExtractedQuestion(
+                                Index: 0,
+                                Text: combined,
+                                Answer: null,
+                                Confidence: (float)payload.ExtractionConfidence)
+                        };
+                    }
+                }
             }
         }
 

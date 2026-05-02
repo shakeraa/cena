@@ -79,7 +79,14 @@ COPY --from=publish /app/publish .
 # Non-root user (uid 10001 matches podSecurityContext.runAsUser in Helm chart)
 RUN groupadd --system --gid 10001 cena \
  && useradd --system --uid 10001 --gid cena --shell /usr/sbin/nologin cena \
- && chown -R cena:cena /app
+ && chown -R cena:cena /app \
+ && mkdir -p /var/cena/ocr-figures \
+ && chown -R cena:cena /var/cena
+# Pre-create + chown /var/cena/ocr-figures BEFORE the USER directive so
+# the cena_ocr_figures named volume (compose.app.yml) inherits cena:cena
+# ownership on first mount. Mirrors the admin-api Dockerfile fix —
+# without this, Layer2cFigureExtraction running on actor-host can't
+# write figure crops and OCR figure extraction silently degrades.
 USER cena:cena
 
 # Actor cluster advertised port (Proto.Cluster gossip)

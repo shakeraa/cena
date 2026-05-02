@@ -67,7 +67,18 @@ COPY --from=publish /app/publish .
 
 RUN groupadd --system --gid 10001 cena \
  && useradd --system --uid 10001 --gid cena --shell /usr/sbin/nologin cena \
- && chown -R cena:cena /app
+ && chown -R cena:cena /app \
+ && mkdir -p /var/cena/source-pdfs /var/cena/ocr-figures \
+ && chown -R cena:cena /var/cena
+# Pre-create + chown the bind targets BEFORE the USER directive so a
+# freshly-created named volume mounted at /var/cena/source-pdfs (or
+# /var/cena/ocr-figures) inherits cena:cena ownership on first mount.
+# Without this, Docker auto-creates the mount point as root:root, the
+# cena process can't write, and BagrutPdfStore.PersistAsync fails with
+# UnauthorizedAccessException — silently swallowed by the catch in
+# BagrutPdfIngestionService and surfaced to the curator as
+# "Visual review unavailable" on freshly-uploaded items
+# (2026-05-01 user report).
 USER cena:cena
 
 EXPOSE 5052
