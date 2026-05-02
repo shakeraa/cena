@@ -90,6 +90,68 @@ const emit = defineEmits<Emit>()
 const item = ref<ItemDetail | null>(null)
 const loading = ref(false)
 
+// Visual-review blob URLs (2026-05-02). The native <embed> + <img> tags
+// don't carry the Authorization header, so direct src="/api/..." returns
+// 401 and the browser shows the broken-document icon. Workaround: fetch
+// the binary via $api (which DOES carry the JWT), turn the response into
+// a Blob, expose the resulting object URL, and use THAT as the src.
+// Lifecycle: revoked on item change + on drawer close + on unmount —
+// without revoke, every open of the drawer leaks ~1 MB per PDF.
+const pdfBlobUrl = ref<string | null>(null)
+const figureBlobUrls = ref<Record<number, string>>({})
+
+function revokeVisualReviewBlobs() {
+  if (pdfBlobUrl.value) {
+    URL.revokeObjectURL(pdfBlobUrl.value)
+    pdfBlobUrl.value = null
+  }
+  for (const url of Object.values(figureBlobUrls.value))
+    URL.revokeObjectURL(url)
+  figureBlobUrls.value = {}
+}
+
+async function loadVisualReviewBlobs(d: ItemDetail) {
+  // Always revoke first — we may be reloading for a different item.
+  revokeVisualReviewBlobs()
+
+  if (d.hasSourcePdf) {
+    try {
+      const blob = await $api<Blob>(
+        `/admin/ingestion/items/${d.id}/source.pdf`,
+        { responseType: 'blob' },
+      )
+      // The watcher below may have changed the active item between
+      // dispatch and resolve — only attach if we're still on it.
+      if (item.value?.id === d.id)
+        pdfBlobUrl.value = URL.createObjectURL(blob)
+    }
+    catch (err) {
+      // 404 (PDF not retained) or 500 — leave pdfBlobUrl null and the
+      // template falls back to its info-banner. Don't surface a toast,
+      // the curator will get the explainer alert below.
+      console.warn('PDF blob fetch failed:', err)
+    }
+  }
+
+  for (const fig of d.figures) {
+    try {
+      const blob = await $api<Blob>(
+        `/admin/ingestion/items/${d.id}/figures/${fig.index}`,
+        { responseType: 'blob' },
+      )
+      if (item.value?.id === d.id)
+        figureBlobUrls.value = { ...figureBlobUrls.value, [fig.index]: URL.createObjectURL(blob) }
+    }
+    catch (err) {
+      console.warn(`figure ${fig.index} blob fetch failed:`, err)
+    }
+  }
+}
+
+onBeforeUnmount(() => {
+  revokeVisualReviewBlobs()
+})
+
 // Per-question "show diff" toggle. Keyed by question.index so each
 // question card holds its own state. When true, the recreated text
 // renders as a side-by-side word-level diff against the OCR raw text;
@@ -313,6 +375,14 @@ const fetchDetail = async () => {
       hasSourcePdf: resp.hasSourcePdf ?? false,
       figures: (resp.figures ?? []) as ItemDetail['figures'],
     }
+
+    // Fire-and-forget binary fetches for the visual-review surface.
+    // Reads the freshly-set item.value, so it picks up the new id +
+    // figure list without us threading them through. Awaiting would
+    // make the panel block on PDF-blob latency for no reason — the
+    // text-side of the panel renders immediately while embeds fade in.
+    if (item.value)
+      loadVisualReviewBlobs(item.value)
   }
   catch (error) {
     console.error('Failed to fetch item detail:', error)
@@ -331,6 +401,8 @@ watch(() => props.itemId, (newId) => {
 watch(() => props.isOpen, (open) => {
   if (open && props.itemId)
     fetchDetail()
+  else if (!open)
+    revokeVisualReviewBlobs()   // free PDF/figure blob memory on close
 })
 
 const handleClose = () => {
@@ -581,12 +653,24 @@ const approveItem = async () => {
                   />
                   Original PDF
                 </div>
+                <!-- Use blob URL set by loadVisualReviewBlobs (auth-aware
+                     fetch). Direct src="/api/..." would 401 because the
+                     <embed> element doesn't carry the JWT. While the blob
+                     is in flight, show a lightweight skeleton-ish state. -->
                 <embed
-                  :src="`/api/admin/ingestion/items/${item.id}/source.pdf`"
+                  v-if="pdfBlobUrl"
+                  :src="pdfBlobUrl"
                   type="application/pdf"
                   class="cena-visual-pdf-embed"
                   data-test="item-detail-pdf-embed"
                 >
+                <div
+                  v-else
+                  class="cena-visual-fallback text-body-2 text-disabled"
+                  data-test="item-detail-pdf-loading"
+                >
+                  Loading PDF…
+                </div>
               </div>
               <div
                 v-if="item.figures.length > 0"
@@ -613,21 +697,34 @@ const approveItem = async () => {
                   class="cena-figure-grid"
                   data-test="item-detail-figure-grid"
                 >
+                  <!-- Same auth-aware blob URL trick as the PDF embed
+                       above — <img src="/api/..."> would 401. Show a
+                       loading shimmer until the blob lands; figure tile
+                       still clickable (links to the blob URL too once
+                       loaded) so curators can open in a new tab. -->
                   <a
                     v-for="fig in item.figures"
                     :key="fig.index"
-                    :href="fig.url"
+                    :href="figureBlobUrls[fig.index] ?? '#'"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="cena-figure-tile"
                     :title="fig.altText ?? `Figure on page ${fig.page}`"
                     data-test="item-detail-figure-tile"
+                    @click="(!figureBlobUrls[fig.index]) && $event.preventDefault()"
                   >
                     <img
-                      :src="fig.url"
+                      v-if="figureBlobUrls[fig.index]"
+                      :src="figureBlobUrls[fig.index]"
                       :alt="fig.altText ?? `Figure on page ${fig.page}`"
                       loading="lazy"
                     >
+                    <div
+                      v-else
+                      class="cena-figure-tile-loading text-caption text-disabled"
+                    >
+                      Loading…
+                    </div>
                     <span class="cena-figure-caption text-caption">
                       p{{ fig.page }}<span v-if="fig.kind"> · {{ fig.kind }}</span>
                     </span>
@@ -1496,6 +1593,15 @@ const approveItem = async () => {
   block-size: auto;
   max-block-size: 120px;
   object-fit: contain;
+  background: rgba(var(--v-theme-surface-variant), 0.5);
+  border-radius: 0.15rem;
+}
+.cena-figure-tile-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 100%;
+  min-block-size: 80px;
   background: rgba(var(--v-theme-surface-variant), 0.5);
   border-radius: 0.15rem;
 }
