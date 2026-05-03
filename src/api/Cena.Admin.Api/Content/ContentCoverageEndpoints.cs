@@ -9,6 +9,7 @@
 // /api/admin/content/* endpoints.
 // =============================================================================
 
+using Cena.Admin.Api;
 using Cena.Infrastructure.Auth;
 using Cena.Infrastructure.Errors;
 using Microsoft.AspNetCore.Builder;
@@ -37,9 +38,7 @@ public static class ContentCoverageEndpoints
         })
         .WithName("GetContentCoverage")
         .Produces<ContentCoverageReport>(StatusCodes.Status200OK)
-        .Produces<CenaError>(StatusCodes.Status401Unauthorized)
-        .Produces<CenaError>(StatusCodes.Status429TooManyRequests)
-        .Produces<CenaError>(StatusCodes.Status500InternalServerError);
+        .WithStandardErrorResponses();
 
         return app;
     }
