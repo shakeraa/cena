@@ -134,16 +134,23 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
     private readonly IAnthropicLlmRuntime? _runtime;
 
     /// <summary>
-    /// Full DI ctor used in production. The optional dependencies are
-    /// nullable so unit tests can construct the extractor with a fake
-    /// Anthropic call path (see InvokeLlmAsync override seam).
+    /// Full DI ctor used in production. <paramref name="invoker"/> is
+    /// REQUIRED — production DI registers
+    /// <see cref="DefaultAnthropicConceptExtractionInvoker"/> against
+    /// <see cref="IAnthropicConceptExtractionInvoker"/> (see
+    /// CenaAdminServiceRegistration), and unit tests inject a fake
+    /// invoker explicitly. The earlier inline-fallback (new'ing up the
+    /// default here when invoker was null) hid the registration coupling
+    /// from the container and made it possible for a host that forgot
+    /// to register the invoker to silently get a runtime-coupled
+    /// instance instead of a clean DI graph.
     /// </summary>
     public HybridConceptExtractor(
         RulesOnlyConceptExtractor rulesTier,
         BagrutTaxonomyCatalog catalog,
         ILogger<HybridConceptExtractor> logger,
         IConfiguration configuration,
-        IAnthropicConceptExtractionInvoker? invoker = null,
+        IAnthropicConceptExtractionInvoker invoker,
         IAnthropicLlmRuntime? runtime = null,
         IDocumentStore? documentStore = null,
         IApiKeyCipher? cipher = null,
@@ -154,6 +161,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(configuration);
+        ArgumentNullException.ThrowIfNull(invoker);
 
         _rulesTier = rulesTier;
         _catalog = catalog;
@@ -164,14 +172,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         _featureCost = featureCost;
         _activityPropagator = activityPropagator;
         _runtime = runtime;
-        // Default to the real Anthropic-backed invoker only when a runtime
-        // is available (production DI supplies both). Test ctors pass a
-        // fake invoker explicitly and leave runtime null.
-        _invoker = invoker ?? (runtime is not null
-            ? new DefaultAnthropicConceptExtractionInvoker(runtime)
-            : throw new ArgumentException(
-                "Either an IAnthropicConceptExtractionInvoker or an IAnthropicLlmRuntime must be supplied.",
-                nameof(invoker)));
+        _invoker = invoker;
     }
 
     public async Task<ExtractionResult> ExtractAsync(
