@@ -66,10 +66,9 @@ public sealed class UnsubscribeTokensTests
         var (svc, _) = NewService();
         var token = svc.Issue(ParentA, ChildA, InstX, Now, TimeSpan.FromDays(14));
 
-        // Flip the last character of the signature segment.
-        var parts = token.Split('.');
-        var sig = parts[1];
-        var tampered = parts[0] + "." + (sig[^1] == 'A' ? sig[..^1] + "B" : sig[..^1] + "A");
+        // Tamper at the byte level. See <see cref="TamperSignature"/> for
+        // why a base64url last-char flip is racy (~6.25 % no-op decode).
+        var tampered = TamperSignature(token);
 
         var result = await svc.VerifyAndConsumeAsync(tampered, InstX, Now.AddMinutes(1));
         Assert.Equal(UnsubscribeTokenOutcome.Tampered, result.Outcome);
@@ -157,5 +156,46 @@ public sealed class UnsubscribeTokensTests
             TimeSpan.FromHours(1), nonceOverride: "deterministic-nonce");
         var result = await svc.VerifyAndConsumeAsync(token, InstX, Now.AddMinutes(1));
         Assert.Equal("deterministic-nonce", result.Payload!.Nonce);
+    }
+
+    // ── Helpers ─────────────────────────────────────────────────────────
+
+    // Deterministically tampers the HMAC signature segment of <token> by
+    // decoding it, XORing the first byte with 0xFF, and re-encoding.
+    //
+    // The earlier approach — flipping the LAST CHAR of the base64url-encoded
+    // signature ('A'<->'B') — was racy: HMAC-SHA256 produces 32 bytes,
+    // which encode to 43 base64url chars whose final character carries only
+    // the top 4 bits of the last byte (the bottom 2 bits are unused). Any
+    // pair of last chars sharing high-4-bits (e.g. {A,B,C,D}, {E,F,G,H},
+    // …) decodes to the SAME 32 bytes, so the "tampered" token re-decodes
+    // to the original signature ~6.25 % of the time, the verifier returns
+    // Valid, and the test fails. Byte-level XOR is independent of base64url
+    // alphabet quirks and provably non-trivial.
+    private static string TamperSignature(string token)
+    {
+        var parts = token.Split('.', 2);
+        Assert.Equal(2, parts.Length);
+        var sig = Base64UrlDecode(parts[1]);
+        Assert.NotEmpty(sig);
+        sig[0] ^= 0xFF;
+        return parts[0] + "." + Base64UrlEncode(sig);
+    }
+
+    private static string Base64UrlEncode(byte[] bytes)
+    {
+        var b64 = Convert.ToBase64String(bytes);
+        return b64.TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static byte[] Base64UrlDecode(string s)
+    {
+        var b64 = s.Replace('-', '+').Replace('_', '/');
+        switch (b64.Length % 4)
+        {
+            case 2: b64 += "=="; break;
+            case 3: b64 += "="; break;
+        }
+        return Convert.FromBase64String(b64);
     }
 }

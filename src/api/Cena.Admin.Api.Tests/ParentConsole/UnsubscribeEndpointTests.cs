@@ -155,9 +155,10 @@ public sealed class UnsubscribeEndpointTests
     {
         var ctx = NewFixture();
         var token = ctx.TokenService.Issue(ParentA, ChildA, InstX, Now, TimeSpan.FromDays(14));
-        var parts = token.Split('.');
-        var tampered = parts[0] + "." + (parts[1][^1] == 'A'
-            ? parts[1][..^1] + "B" : parts[1][..^1] + "A");
+        // Tamper at the byte level rather than at the base64url-character
+        // level. See <see cref="TamperSignature"/> for why a last-char flip
+        // is racy.
+        var tampered = TamperSignature(token);
         var http = MakeHttp(InstX);
 
         var result = await UnsubscribeEndpoint.HandleUnsubscribeAsync(
@@ -260,5 +261,44 @@ public sealed class UnsubscribeEndpointTests
     {
         var valueProp = result.GetType().GetProperty("Value");
         return valueProp?.GetValue(result);
+    }
+
+    // Deterministically tampers the HMAC signature segment of <token> by
+    // decoding it, XORing the first byte with 0xFF, and re-encoding.
+    //
+    // The earlier approach — flipping the LAST CHAR of the base64url-encoded
+    // signature ('A'<->'B') — was racy: HMAC-SHA256 produces 32 bytes,
+    // which encode to 43 base64url chars whose final character carries only
+    // the top 4 bits of the last byte (the bottom 2 bits are unused). Any
+    // pair of last chars sharing high-4-bits (e.g. {A,B,C,D}, {E,F,G,H},
+    // …) decodes to the SAME 32 bytes, so the "tampered" token re-decodes
+    // to the original signature ~6.25 % of the time, the verifier returns
+    // Valid, and the test fails. Byte-level XOR is independent of base64url
+    // alphabet quirks and provably non-trivial.
+    private static string TamperSignature(string token)
+    {
+        var parts = token.Split('.', 2);
+        Assert.Equal(2, parts.Length);
+        var sig = Base64UrlDecode(parts[1]);
+        Assert.NotEmpty(sig);
+        sig[0] ^= 0xFF;
+        return parts[0] + "." + Base64UrlEncode(sig);
+    }
+
+    private static string Base64UrlEncode(byte[] bytes)
+    {
+        var b64 = Convert.ToBase64String(bytes);
+        return b64.TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+
+    private static byte[] Base64UrlDecode(string s)
+    {
+        var b64 = s.Replace('-', '+').Replace('_', '/');
+        switch (b64.Length % 4)
+        {
+            case 2: b64 += "=="; break;
+            case 3: b64 += "="; break;
+        }
+        return Convert.FromBase64String(b64);
     }
 }
