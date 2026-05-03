@@ -290,6 +290,12 @@ public static class CenaAdminServiceRegistration
         services.TryAddSingleton<Cena.Actors.Mastery.BagrutTaxonomyCatalog>(_ =>
             Cena.Actors.Mastery.BagrutTaxonomyCatalog.LoadFromDisk());
         services.TryAddSingleton<Cena.Actors.Mastery.Extraction.RulesOnlyConceptExtractor>();
+        // The Anthropic invoker is the test seam HybridConceptExtractor consumes.
+        // Registered explicitly so the DI graph is the single source of truth —
+        // the extractor's ctor no longer falls back to new'ing one inline when
+        // null, which used to hide the coupling between extractor and runtime.
+        services.TryAddSingleton<Cena.Admin.Api.Mastery.Extraction.IAnthropicConceptExtractionInvoker,
+            Cena.Admin.Api.Mastery.Extraction.DefaultAnthropicConceptExtractionInvoker>();
         services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IQuestionConceptExtractor,
             Cena.Admin.Api.Mastery.Extraction.HybridConceptExtractor>();
         services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IConceptItemPublicationCounter,
