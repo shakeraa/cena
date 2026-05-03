@@ -229,6 +229,7 @@ export PATH="/opt/homebrew/bin:$PATH"   # Homebrew arm64 Node
 - **Claude Code main session** is the default coordinator. Worker name: `claude-code`. Owns enqueue, review, merge-to-main.
 - **Every worker** identifies itself with a consistent `--worker <name>` flag (`kimi-coder`, `claude-subagent-<purpose>`, `human-<name>`, etc.).
 - **No worker pushes to `main` directly.** Push feature branches named `<worker>/<task-id>-<slug>`; the coordinator reviews and merges.
+- **`fetch` before any compare to `origin/main`, rebase before push, `--force-with-lease` for any rewrite.** Plain `git pull` does NOT guarantee a fresh view of `origin/main`; a stale view + plain `git push` can silently overwrite a recently-merged PR. Full protocol: [docs/engineering/git-workflow.md](docs/engineering/git-workflow.md). The 2026-05-03 incident that motivated this rule is documented there.
 - **Claim before working.** An in-progress task is held by exactly one worker; the atomic claim is enforced by SQLite.
 - **Fail fast and loudly.** If a task blocks, call `fail` with a reason; do not silently drop.
 - **Never delete or update tasks** unless you are the coordinator.
