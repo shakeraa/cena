@@ -301,6 +301,11 @@ builder.Services.AddSingleton<IExplanationCacheService, ExplanationCacheService>
 builder.Services.AddLlmCostMetric(Path.Combine(
     builder.Environment.ContentRootPath,
     Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
+// prr-143 + 2026-05-03 runtime upgrade: register IActivityPropagator on the
+// actor host too — AddCenaAdminServices below pulls AnthropicLlmRuntime which
+// resolves IActivityPropagator? optionally. Idempotent (TryAddSingleton) so
+// safe alongside Tutor / per-feature LLM service registrations.
+builder.Services.AddLlmActivityPropagator();
 // prr-022 / ADR-0047: PII prompt scrubber — injected by every [TaskRouting]
 // service that composes student free-text into its prompt.
 builder.Services.AddPiiPromptScrubber();

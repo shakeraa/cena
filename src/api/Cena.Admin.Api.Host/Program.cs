@@ -422,6 +422,13 @@ public partial class Program
         builder.Environment.ContentRootPath,
         Cena.Infrastructure.Llm.LlmCostMetricRegistration.DefaultRoutingConfigRelativePath));
 
+    // prr-143 + 2026-05-03 runtime upgrade: register IActivityPropagator
+    // so AnthropicLlmRuntime, AiGenerationService, OcrTextEnhancer,
+    // HybridConceptExtractor and QualityGateService can stamp trace_id on
+    // outbound LLM calls and on circuit-breaker SIEM logs. Idempotent
+    // (TryAddSingleton) so re-registration in shared composition is safe.
+    builder.Services.AddLlmActivityPropagator();
+
     // prr-026: k-anonymity enforcer — injected by every aggregate
     // teacher/classroom/institute surface that serves a statistical claim.
     builder.Services.AddKAnonymityEnforcer();
