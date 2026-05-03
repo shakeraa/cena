@@ -270,6 +270,16 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
             }
         }
 
+        // 2026-05-03: TaxonomyNode for the 0-figures banner refinement.
+        // Curator-confirmed wins over auto-extracted (the curator
+        // trumps the heuristic), and a null TaxonomyNode is meaningful
+        // — the SPA falls back to the generic "may be missing diagrams"
+        // copy when classification couldn't bucket the item. We do NOT
+        // synthesise a taxonomy here; null is honest.
+        var taxonomyNode  = item.CuratorMetadata?.TaxonomyNode
+                            ?? item.AutoExtractedMetadata?.TaxonomyNode;
+        var metadataState = item.MetadataState;
+
         return new PipelineItemDetailResponse(
             Id: item.Id,
             SourceFilename: item.SourceFilename,
@@ -290,7 +300,9 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
             Figures: figures,
             EnhancedText: enhancedText,
             EnhancedAt: enhancedAt,
-            EnhancedBy: enhancedBy);
+            EnhancedBy: enhancedBy,
+            TaxonomyNode: taxonomyNode,
+            MetadataState: metadataState);
     }
 
     /// <summary>

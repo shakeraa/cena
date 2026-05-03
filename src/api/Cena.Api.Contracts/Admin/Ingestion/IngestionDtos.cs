@@ -110,7 +110,20 @@ public sealed record PipelineItemDetailResponse(
     IReadOnlyList<ItemFigureRef>? Figures = null,
     string? EnhancedText = null,
     DateTimeOffset? EnhancedAt = null,
-    string? EnhancedBy = null);
+    string? EnhancedBy = null,
+    // 2026-05-03: surface the auto-classified taxonomy node + metadata
+    // state so the SPA can refine the 0-figures warning. The banner
+    // text varies by topic — geometry/calculus/vectors/trig nearly
+    // always carry diagrams (warning stays loud), but pure algebra /
+    // probability / functions can legitimately have none (warning
+    // softens to a verify-prompt). Source: PipelineItemDocument.
+    // CuratorMetadata?.TaxonomyNode (curator-confirmed) preferred over
+    // AutoExtractedMetadata?.TaxonomyNode (heuristic seed); null when
+    // neither exists. Format: dotted path like "calculus.derivative_rules".
+    string? TaxonomyNode = null,
+    // "pending" | "auto_extracted" | "confirmed" — drives whether the
+    // SPA shows "we think this is..." vs. "curator confirmed this is...".
+    string? MetadataState = null);
 
 public sealed record ItemFigureRef(
     int Index,
