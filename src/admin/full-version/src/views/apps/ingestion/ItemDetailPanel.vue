@@ -4,6 +4,7 @@ import { $api } from '@/utils/api'
 import { useIngestionJobs } from '@/composables/useIngestionJobs'
 import { renderMixedMathText } from '@/utils/renderMixedMathText'
 import { renderTextDiff } from '@/utils/renderTextDiff'
+import ConceptReviewPanel from './ConceptReviewPanel.vue'
 import CuratorMetadataPanel from './CuratorMetadataPanel.vue'
 
 interface ProcessingStage {
@@ -62,7 +63,10 @@ interface ItemDetail {
   //   stage produced and what variant generation seeds from.
   ocrText: string | null
   ocrConfidence: number | null
-  recreatedQuestions: Array<{ index: number, text: string, confidence: number }>
+  // 2026-05-03: sourcePage added so the SPA can render a per-card PDF
+  // thumbnail at #page=N. Null when the page can't be inferred (legacy
+  // items, non-Bagrut sources).
+  recreatedQuestions: Array<{ index: number, text: string, confidence: number, sourcePage?: number | null }>
   // Visual-review (2026-05-01): the curator's side-by-side panel needs
   // the original PDF + figure crops to validate that the OCR + cleanup
   // didn't drop diagrams. Backend surfaces:
@@ -89,6 +93,43 @@ const emit = defineEmits<Emit>()
 
 const item = ref<ItemDetail | null>(null)
 const loading = ref(false)
+
+// ADR-0062 Phase 1.5 — OCR cleanup pass state, keyed by recreated-
+// question index. Curator clicks "Enhance with LLM" on a card; we POST
+// /enhance-text and stash the result in enhancedTexts[index]. The card
+// then offers a toggle between original and enhanced views.
+const enhancedTexts = ref<Record<number, string>>({})
+const enhanceLoading = ref<Record<number, boolean>>({})
+const enhanceErrors = ref<Record<number, string>>({})
+const showEnhanced = ref<Record<number, boolean>>({})
+
+async function enhanceQuestion(index: number) {
+  if (!item.value)
+    return
+  enhanceLoading.value = { ...enhanceLoading.value, [index]: true }
+  enhanceErrors.value = { ...enhanceErrors.value, [index]: '' }
+  try {
+    const resp = await $api<{ enhancedText: string }>(
+      `/admin/ingestion/items/${item.value.id}/enhance-text`,
+      { method: 'POST' },
+    )
+    enhancedTexts.value = { ...enhancedTexts.value, [index]: resp.enhancedText }
+    showEnhanced.value = { ...showEnhanced.value, [index]: true }
+  }
+  catch (e: any) {
+    enhanceErrors.value = {
+      ...enhanceErrors.value,
+      [index]: e?.data?.message ?? e?.message ?? 'Enhance failed.',
+    }
+  }
+  finally {
+    enhanceLoading.value = { ...enhanceLoading.value, [index]: false }
+  }
+}
+
+function toggleEnhanced(index: number) {
+  showEnhanced.value = { ...showEnhanced.value, [index]: !showEnhanced.value[index] }
+}
 
 // Visual-review blob URLs (2026-05-02). The native <embed> + <img> tags
 // don't carry the Authorization header, so direct src="/api/..." returns
@@ -635,6 +676,35 @@ const approveItem = async () => {
             @confirmed="() => emit('item-updated')"
           />
 
+          <!-- ADR-0062 Phase 1 — Concept review panel. Bagrut-only for
+               now (the closed-set catalog covers math). Confirming here
+               emits QuestionConceptsConfirmed_V1 and opens the
+               first-200-items publish gate for this item. -->
+          <ConceptReviewPanel
+            v-if="item.sourceType === 'bagrut'"
+            :item-id="props.itemId"
+            class="mb-4"
+            @confirmed="() => emit('item-updated')"
+          />
+
+          <!-- 0-figures banner: when source type says "expected figures
+               present" (per CuratorMetadata.ExpectedFigures = true) but
+               the OCR layer extracted none, surface the limitation so
+               the curator doesn't approve a stem that's missing its
+               diagram. Hard rule for Bagrut math papers: most have at
+               least one figure. -->
+          <VAlert
+            v-if="item.sourceType === 'bagrut' && item.figures.length === 0"
+            type="warning"
+            density="compact"
+            variant="tonal"
+            class="mb-4"
+            data-test="item-detail-no-figures-warning"
+          >
+            <strong>OCR figure extraction returned 0 figures.</strong>
+            Bagrut math papers almost always include diagrams. Verify against the original PDF below — if a diagram is visibly present but missing here, flag the item for re-OCR rather than approving.
+          </VAlert>
+
           <!-- Question Content — what the curator is reviewing.
                OCR (original) + recreated form. Without this section,
                approving was a black-box (only metadata + scores were
@@ -699,7 +769,10 @@ const approveItem = async () => {
               <VCardText class="py-3">
                 <div class="d-flex justify-space-between align-center mb-2">
                   <span class="text-caption text-medium-emphasis">
-                    Question {{ q.index + 1 }}
+                    Question {{ q.index + 1 }}<span
+                      v-if="q.sourcePage"
+                      class="ms-2 text-disabled"
+                    >· p{{ q.sourcePage }}</span>
                   </span>
                   <div class="d-flex align-center gap-2">
                     <VChip
@@ -709,6 +782,26 @@ const approveItem = async () => {
                     >
                       {{ Math.round(q.confidence * 100) }}% confidence
                     </VChip>
+                    <!-- ADR-0062 Phase 1.5 — LLM cleanup pass. Wraps math
+                         in LaTeX delimiters, restores paragraph breaks,
+                         marks figure anchors. Real Anthropic call (cost
+                         metered via the question-generation cost path).
+                         Toggle hides/shows the enhanced view; original is
+                         always reachable. -->
+                    <VBtn
+                      v-if="item.sourceType === 'bagrut'"
+                      size="x-small"
+                      variant="text"
+                      :loading="enhanceLoading[q.index]"
+                      :color="enhancedTexts[q.index] && showEnhanced[q.index] ? 'primary' : undefined"
+                      :prepend-icon="enhancedTexts[q.index] ? (showEnhanced[q.index] ? 'tabler-eye-off' : 'tabler-eye') : 'tabler-wand'"
+                      data-test="item-detail-enhance-toggle"
+                      @click="enhancedTexts[q.index] ? toggleEnhanced(q.index) : enhanceQuestion(q.index)"
+                    >
+                      {{ enhancedTexts[q.index]
+                        ? (showEnhanced[q.index] ? 'Show original' : 'Show enhanced')
+                        : 'Enhance with LLM' }}
+                    </VBtn>
                     <!-- Diff toggle. Curator clicks to compare recreated
                          vs OCR raw side-by-side with word-level
                          insertion/deletion highlights. Off by default
@@ -729,15 +822,61 @@ const approveItem = async () => {
                   </div>
                 </div>
 
-                <!-- Default view: KaTeX-formatted recreated question.
-                     v-html safe — see renderMixedMathText for the
-                     escape + bdi-LTR + KaTeX-fallback chain. -->
+                <VAlert
+                  v-if="enhanceErrors[q.index]"
+                  type="error"
+                  density="compact"
+                  variant="tonal"
+                  class="mb-2"
+                >
+                  {{ enhanceErrors[q.index] }}
+                </VAlert>
+
+                <!-- Recreated card body. 2-column inside the card when a
+                     sourcePage is known: text on the left, PDF page
+                     thumbnail on the right (anchored to #page=N so the
+                     curator sees exactly the page this stem came from).
+                     Below 900px the thumbnail wraps under the text. -->
                 <div
                   v-if="!diffOpen[q.index]"
-                  class="cena-mmt-block"
-                  data-test="item-detail-recreated-text"
-                  v-html="renderMixedMathText(q.text)"
-                />
+                  class="cena-recreated-card"
+                  :class="{ 'cena-recreated-card--with-page': q.sourcePage && pdfBlobUrl }"
+                >
+                  <!-- Default view: KaTeX-formatted recreated question, OR
+                       enhanced version when toggled. Same renderer for
+                       both — enhanced text uses the SAME LaTeX delimiters
+                       renderMixedMathText already understands, so no new
+                       render path. v-html safe per the renderer's
+                       escape + bdi-LTR + KaTeX-fallback chain. -->
+                  <div
+                    class="cena-mmt-block cena-recreated-text"
+                    data-test="item-detail-recreated-text"
+                    v-html="renderMixedMathText(
+                      showEnhanced[q.index] && enhancedTexts[q.index]
+                        ? enhancedTexts[q.index]
+                        : q.text
+                    )"
+                  />
+                  <!-- PDF page thumbnail anchored to the source page.
+                       The browser's PDF viewer honours #page=N so we
+                       jump to the exact page without rendering it
+                       client-side (no PDF.js dependency). Keep the
+                       embed compact so it doesn't dominate the card. -->
+                  <div
+                    v-if="q.sourcePage && pdfBlobUrl"
+                    class="cena-recreated-page"
+                    data-test="item-detail-recreated-page"
+                  >
+                    <div class="text-caption text-medium-emphasis mb-1">
+                      Source page {{ q.sourcePage }}
+                    </div>
+                    <embed
+                      :src="`${pdfBlobUrl}#page=${q.sourcePage}&toolbar=0&navpanes=0`"
+                      type="application/pdf"
+                      class="cena-recreated-page-embed"
+                    >
+                  </div>
+                </div>
 
                 <!-- Diff view: side-by-side OCR raw (left) vs recreated
                      (right) with word-level (or char-level for
@@ -1577,6 +1716,31 @@ const approveItem = async () => {
   /* Prevents long math expressions from forcing a horizontal scroll on
      the content column; KaTeX-rendered blocks already handle their
      own overflow inside the rendered span. */
+}
+
+/* Per-recreated-card 2-column: text + PDF page thumbnail. The thumbnail
+   is anchored to the question's sourcePage via #page=N — no PDF.js
+   dependency, the browser's native PDF viewer handles it. */
+.cena-recreated-card {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.75rem;
+  align-items: start;
+}
+@media (min-width: 900px) {
+  .cena-recreated-card.cena-recreated-card--with-page {
+    grid-template-columns: 1fr 240px;
+  }
+}
+.cena-recreated-text {
+  min-inline-size: 0;
+}
+.cena-recreated-page-embed {
+  inline-size: 100%;
+  block-size: 280px;
+  border: 1px solid rgba(var(--v-theme-outline-variant), 0.6);
+  border-radius: 0.25rem;
+  background: rgb(var(--v-theme-surface));
 }
 .cena-content-figures {
   background: rgba(var(--v-theme-surface-variant), 0.4);

@@ -245,6 +245,14 @@ public sealed record TemplateGenerateResponse(
     int DroppedForCasFailure = 0,
     IReadOnlyList<CasDropReason>? CasDropReasons = null);
 
+// ── ADR-0062 Phase 1.5 — OCR cleanup pass DTOs ──
+public sealed record EnhanceOcrTextRequest(string OcrText, string? SourceContext = null);
+public sealed record EnhanceOcrTextResponse(
+    bool Success,
+    string EnhancedText,
+    string? ModelUsed,
+    string? Error);
+
 // ── Circuit Breaker (in-process, mirrors LlmCircuitBreakerActor thresholds) ──
 
 public sealed class CircuitOpenException : Exception
@@ -259,6 +267,17 @@ public interface IAiGenerationService
     Task<AiGenerateResponse> GenerateQuestionsAsync(AiGenerateRequest request);
     Task<AiSettingsResponse> GetSettingsAsync();
     Task<bool> UpdateSettingsAsync(UpdateAiSettingsRequest request, string userId);
+    /// <summary>
+    /// ADR-0062 Phase 1.5 — runs the OCR-cleanup pass on a Bagrut draft's
+    /// raw text. Asks Anthropic to wrap math in LaTeX delimiters, restore
+    /// paragraph breaks, and emit a structured shape the curator can
+    /// review/accept. Reuses the same API key + circuit breaker + cost
+    /// metrics as question generation. Never throws — returns Success=false
+    /// with a Reason on the unhappy path so the SPA can surface it inline.
+    /// </summary>
+    Task<EnhanceOcrTextResponse> EnhanceOcrTextAsync(
+        EnhanceOcrTextRequest request,
+        CancellationToken ct = default);
     /// <summary>
     /// Real Anthropic ping. By default uses the persisted (decrypted) API key
     /// and configured model. Optional <paramref name="apiKeyOverride"/> /
@@ -1231,5 +1250,121 @@ public sealed class AiGenerationService : IAiGenerationService
             Error:             null,
             DroppedForCasFailure: drops.Count,
             CasDropReasons:    drops);
+    }
+
+    // ──────────────────────────────────────────────────────────────────────
+    // ADR-0062 Phase 1.5 — OCR cleanup pass
+    //
+    // Curators on the InReview kanban often see raw OCR text (no LaTeX
+    // delimiters, broken paragraph breaks, math symbols flowing into prose).
+    // This method asks Anthropic to:
+    //   - wrap math in \( ... \) (inline) / \[ ... \] (display) delimiters
+    //   - restore paragraph breaks lost during OCR token clustering
+    //   - emit Hebrew/Arabic prose with proper RTL flow preserved
+    //   - mark figure-anchor positions ([[FIGURE:p<page>]]) so the SPA
+    //     can interleave figure thumbnails inline with text
+    // The output is rendered through the SAME renderMixedMathText path
+    // the curator already trusts — no new render plumbing on the SPA side.
+    // Prompt is short and stable (good cache_control ephemeral candidate;
+    // skipped here since enhance is rare-call and cache hit ratio is low).
+    // ──────────────────────────────────────────────────────────────────────
+    public async Task<EnhanceOcrTextResponse> EnhanceOcrTextAsync(
+        EnhanceOcrTextRequest req,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(req.OcrText))
+            return new EnhanceOcrTextResponse(false, "", null, "ocrText is required.");
+
+        var doc = await LoadDocAsync(ct).ConfigureAwait(false);
+        var apiKey = ResolveApiKey(doc);
+        if (string.IsNullOrEmpty(apiKey))
+            return new EnhanceOcrTextResponse(false, "", null,
+                "No API key configured for Anthropic. Set Anthropic:ApiKey in Settings > AI Providers.");
+
+        var config = ProjectAnthropicConfig(doc, apiKey);
+        var modelName = config.ModelId;
+
+        try { RequestCircuitPermission(modelName); }
+        catch (CircuitOpenException ex)
+        {
+            return new EnhanceOcrTextResponse(false, "", modelName, ex.Message);
+        }
+
+        var sw = Stopwatch.StartNew();
+        try
+        {
+            var client = GetOrCreateClient(apiKey);
+            var systemPrompt =
+                "You are an OCR-cleanup assistant for Israeli Bagrut math papers. " +
+                "Input: raw OCR text from a Bagrut question (Hebrew/Arabic with embedded math). " +
+                "Output rules: " +
+                "1) Wrap inline math in \\( ... \\) and display math in \\[ ... \\]. " +
+                "2) Preserve Hebrew/Arabic prose verbatim and keep RTL paragraph flow. " +
+                "3) Restore paragraph breaks; do not invent content. " +
+                "4) Where the source clearly references a figure (e.g. 'see graph', 'in the diagram'), " +
+                "insert a marker on its own line: [[FIGURE:p<page>]] when a page is given, else [[FIGURE]]. " +
+                "5) Return ONLY the cleaned text. No commentary.";
+            var userPrompt = req.OcrText;
+
+            var createParams = new MessageCreateParams
+            {
+                Model = modelName,
+                MaxTokens = Math.Min(DefaultMaxTokens, 2048),
+                Temperature = 0.0f,
+                System = new List<TextBlockParam> { new TextBlockParam { Text = systemPrompt } },
+                Messages = new List<MessageParam>
+                {
+                    new MessageParam { Role = "user", Content = userPrompt }
+                },
+            };
+
+            var traceId = _activityPropagator?.GetTraceId();
+            using var activity = _activityPropagator?.StartLlmActivity("ocr_text_enhance");
+            activity?.SetTag("trace_id", traceId);
+            activity?.SetTag("task", "ocr_text_enhance");
+            activity?.SetTag("tier", "tier3");
+            activity?.SetTag("model_id", modelName);
+
+            var response = await client.Messages.Create(createParams);
+            sw.Stop();
+
+            var inputTokens = response.Usage.InputTokens;
+            var outputTokens = response.Usage.OutputTokens;
+            EmitMetrics(modelName, "ocr_text_enhance", sw.ElapsedMilliseconds,
+                inputTokens, outputTokens);
+
+            string? text = null;
+            foreach (var block in response.Content)
+            {
+                if (block.TryPickText(out var t))
+                {
+                    text = t.Text;
+                    break;
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                activity?.SetTag("outcome", "empty");
+                return new EnhanceOcrTextResponse(false, "", modelName,
+                    "Anthropic returned an empty response.");
+            }
+
+            activity?.SetTag("outcome", "success");
+            activity?.SetTag("input_tokens", (long)inputTokens);
+            activity?.SetTag("output_tokens", (long)outputTokens);
+            _logger.LogInformation(
+                "AiGeneration OCR-enhance OK (trace_id={TraceId} model={Model} input={Input} output={Output})",
+                traceId, modelName, inputTokens, outputTokens);
+
+            RecordSuccess(modelName);
+            return new EnhanceOcrTextResponse(true, text!.Trim(), modelName, null);
+        }
+        catch (Exception ex)
+        {
+            sw.Stop();
+            _logger.LogError(ex, "OCR text enhancement failed for Anthropic");
+            return new EnhanceOcrTextResponse(false, "", modelName, ex.Message);
+        }
     }
 }

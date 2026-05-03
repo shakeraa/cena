@@ -27,6 +27,7 @@ namespace Cena.Admin.Api.Tests.Ingestion;
 public sealed class QuestionConceptsEndpointsRouteSmokeTests
 {
     private const string ConceptsRoutePattern = "/api/admin/ingestion/items/{id}/concepts";
+    private const string EnhanceRoutePattern  = "/api/admin/ingestion/items/{id}/enhance-text";
 
     private const string SyntheticTaxonomyJson = """
     {
@@ -97,6 +98,35 @@ public sealed class QuestionConceptsEndpointsRouteSmokeTests
             .ToHashSet();
         Assert.Contains("GET", methods);
         Assert.Contains("POST", methods);
+    }
+
+    [Fact]
+    public void MapsEnhanceTextRoute_ProtectedByModeratorOrAbove()
+    {
+        // ADR-0062 Phase 1.5 — POST /items/{id}/enhance-text. Curator-
+        // initiated OCR cleanup pass; auth + rate-limit enforced by the
+        // group, exception mapping happens inside the handler.
+        var app = BuildTestApp();
+        app.MapQuestionConceptsEndpoints();
+
+        var endpoint = Endpoints(app)
+            .SingleOrDefault(e => e.RoutePattern.RawText == EnhanceRoutePattern);
+        Assert.NotNull(endpoint);
+
+        var methods = endpoint!.Metadata
+            .GetOrderedMetadata<Microsoft.AspNetCore.Routing.HttpMethodMetadata>()
+            .SelectMany(m => m.HttpMethods)
+            .ToHashSet();
+        Assert.Contains("POST", methods);
+
+        var authAttrs = endpoint.Metadata.GetOrderedMetadata<AuthorizeAttribute>();
+        Assert.NotEmpty(authAttrs);
+        Assert.Contains(authAttrs, a => a.Policy == CenaAuthPolicies.ModeratorOrAbove);
+
+        var rateLimits = endpoint.Metadata
+            .GetOrderedMetadata<EnableRateLimitingAttribute>();
+        Assert.NotEmpty(rateLimits);
+        Assert.Contains(rateLimits, r => r.PolicyName == "api");
     }
 
     [Fact]

@@ -150,7 +150,14 @@ public sealed record ExtractedQuestion(
     int Index,
     string Text,
     string? Answer,
-    float Confidence);
+    float Confidence,
+    // 2026-05-03: source page on the original PDF (1-based). Populated
+    // for Bagrut drafts (single page per draft) and for variants whose
+    // SourceFilename encodes the page (e.g. "math-5u-2026-35581-page3.pdf").
+    // Null for items where the page can't be inferred (cloud-dir uploads,
+    // legacy items). The SPA uses this to render a thumbnail of the
+    // exact PDF page next to each recreated card via #page=N.
+    int? SourcePage = null);
 
 // Pipeline Actions
 public sealed record RetryItemRequest(string? Reason);

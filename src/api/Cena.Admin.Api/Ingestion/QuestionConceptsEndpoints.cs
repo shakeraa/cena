@@ -37,6 +37,7 @@ using Cena.Actors.Events;
 using Cena.Actors.Ingest;
 using Cena.Actors.Mastery;
 using Cena.Infrastructure.Auth;
+using Cena.Infrastructure.Documents;
 using Cena.Infrastructure.Errors;
 using Marten;
 using Marten.Events;
@@ -201,6 +202,57 @@ public static class QuestionConceptsEndpoints
         .Produces<CenaError>(StatusCodes.Status404NotFound)
         .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
+        // ADR-0062 Phase 1.5 — OCR cleanup pass. Curator clicks "Enhance
+        // with LLM" on the InReview drawer; we run the Bagrut draft's
+        // raw text through Anthropic, return the cleaned result. The SPA
+        // displays it in-place (toggle to original); confirming concepts
+        // does NOT depend on this — it's a quality-of-life surface.
+        // Returns 404 if the item or its draft payload is missing,
+        // 400 with a structured CenaError on AI provider error so the
+        // SPA can render the failure inline.
+        group.MapPost("/{id}/enhance-text", async (
+            string id,
+            [FromServices] IDocumentStore store,
+            [FromServices] IAiGenerationService ai,
+            CancellationToken ct) =>
+        {
+            await using var session = store.QuerySession();
+            var item = await session.LoadAsync<PipelineItemDocument>(id, ct);
+            if (item is null)
+                return NotFound("item_not_found", $"No pipeline item with id '{id}'.");
+
+            var payload = await session.LoadAsync<BagrutDraftPayloadDocument>(id, ct);
+            if (payload is null)
+                return NotFound("draft_payload_not_found",
+                    $"Item '{id}' has no Bagrut draft payload — enhance-text only applies to Bagrut drafts.");
+
+            var ocrInput = string.IsNullOrWhiteSpace(payload.LatexContent)
+                ? payload.Prompt
+                : $"{payload.Prompt}\n\n{payload.LatexContent}";
+            if (string.IsNullOrWhiteSpace(ocrInput))
+                return BadRequest("empty_ocr_text",
+                    "Draft has no prompt or LaTeX content to enhance.");
+
+            var resp = await ai.EnhanceOcrTextAsync(
+                new EnhanceOcrTextRequest(ocrInput, payload.ExamCode), ct);
+            if (!resp.Success)
+                return BadRequest("ai_enhance_failed",
+                    resp.Error ?? "Anthropic call failed without a reason.");
+
+            return Results.Ok(new EnhanceTextResponse(
+                ItemId: id,
+                OriginalText: ocrInput,
+                EnhancedText: resp.EnhancedText,
+                ModelUsed: resp.ModelUsed,
+                EnhancedAt: DateTimeOffset.UtcNow));
+        })
+        .DisableAntiforgery()
+        .WithName("EnhanceItemOcrText")
+        .Produces<EnhanceTextResponse>(StatusCodes.Status200OK)
+        .Produces<CenaError>(StatusCodes.Status400BadRequest)
+        .Produces<CenaError>(StatusCodes.Status404NotFound)
+        .Produces<CenaError>(StatusCodes.Status401Unauthorized);
+
         return app;
     }
 
@@ -296,3 +348,11 @@ public sealed record ConceptConfirmResponse(
     string Action,
     string ConfirmedBy,
     DateTimeOffset ConfirmedAt);
+
+// ADR-0062 Phase 1.5 — OCR cleanup pass response.
+public sealed record EnhanceTextResponse(
+    string ItemId,
+    string OriginalText,
+    string EnhancedText,
+    string? ModelUsed,
+    DateTimeOffset EnhancedAt);

@@ -160,33 +160,38 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
                 .Where(q => q.Id.IsOneOf(item.ExtractedQuestionIds.ToArray()))
                 .ToListAsync();
 
-            extractedQuestions = questions.Select((q, i) => new ExtractedQuestion(
-                Index: i,
-                Text: q.StemPreview,
-                Answer: null,
-                Confidence: q.QualityScore / 100f
-            )).ToList();
-
+            // Per-question source page lives on QuestionState.Provenance.SourceFilename
+            // (event-sourced; not on QuestionReadModel). Same fan-out as
+            // the quality-score block below, but populated FIRST so the
+            // ExtractedQuestion ctor can include SourcePage on each row.
+            var sourcePageByQid = new Dictionary<string, int?>(StringComparer.Ordinal);
             // Per-dimension scores live on QuestionState.LastQualityEvaluation
             // (event-sourced). QuestionReadModel only carries the composite
-            // QualityScore — adding the two dimensions to the projection
-            // would let us avoid this fan-out, but it's a wider change than
-            // this fix. Per-call cost: N stream rehydrations on detail-panel
-            // open, where N is the variants count for one Bagrut draft
-            // (typically 5-20). Acceptable for a curator-action endpoint.
-            // If the cost ever bites, promote the two ints into
-            // QuestionListProjection.
+            // QualityScore. Per-call cost: N stream rehydrations on detail-
+            // panel open (typically 5-20). Acceptable for a curator-action
+            // endpoint. Promote into QuestionListProjection if the cost bites.
             var langScores = new List<int>();
             var pedScores  = new List<int>();
             foreach (var qid in item.ExtractedQuestionIds)
             {
                 var qstate = await session.Events
                     .AggregateStreamAsync<Cena.Actors.Questions.QuestionState>(qid);
+                if (qstate?.Provenance?.SourceFilename is { Length: > 0 } fn)
+                    sourcePageByQid[qid] = ExtractPageFromFilename(fn);
                 var eval = qstate?.LastQualityEvaluation;
                 if (eval is null) continue;
                 langScores.Add(eval.LanguageQuality);
                 pedScores.Add(eval.PedagogicalQuality);
             }
+
+            extractedQuestions = questions.Select((q, i) => new ExtractedQuestion(
+                Index: i,
+                Text: q.StemPreview,
+                Answer: null,
+                Confidence: q.QualityScore / 100f,
+                SourcePage: sourcePageByQid.TryGetValue(q.Id, out var p) ? p : null
+            )).ToList();
+
             // Round-half-away-from-zero so a 79.5 average doesn't display
             // as "79" via banker's rounding — curators read these as
             // grades and the small visual difference matters.
@@ -248,7 +253,8 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
                                 Index: 0,
                                 Text: combined,
                                 Answer: null,
-                                Confidence: (float)payload.ExtractionConfidence)
+                                Confidence: (float)payload.ExtractionConfidence,
+                                SourcePage: payload.SourcePage > 0 ? payload.SourcePage : null)
                         };
                     }
                 }
@@ -273,6 +279,23 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
             ExtractedQuestions: extractedQuestions,
             HasSourcePdf: hasSourcePdf,
             Figures: figures);
+    }
+
+    /// <summary>
+    /// Pull the 1-based page number out of a Bagrut variant filename.
+    /// Variants persisted by GenerateVariantsJobStrategy.BuildVariantCreateRequest
+    /// use the convention "{examCode}-page{N}.pdf" — e.g.
+    /// "math-5u-2026-35581-page3.pdf" → 3. Returns null when the
+    /// pattern doesn't match (legacy items, non-Bagrut sources).
+    /// </summary>
+    internal static int? ExtractPageFromFilename(string? filename)
+    {
+        if (string.IsNullOrWhiteSpace(filename)) return null;
+        var m = System.Text.RegularExpressions.Regex.Match(
+            filename, @"-page(?<n>\d+)\.pdf$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        if (!m.Success) return null;
+        return int.TryParse(m.Groups["n"].Value, out var n) && n > 0 ? n : null;
     }
 
     /// <summary>
