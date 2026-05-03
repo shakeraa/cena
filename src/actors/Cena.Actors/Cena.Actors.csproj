@@ -20,7 +20,7 @@
 
   <ItemGroup>
     <PackageReference Include="Anthropic" Version="12.9.0" />
-    <PackageReference Include="Marten" Version="8.26.2" />
+    <PackageReference Include="Marten" Version="8.34.2" />
     <PackageReference Include="Npgsql" Version="9.0.4" />
     <PackageReference Include="NATS.Net" Version="2.7.3" />
     <PackageReference Include="Neo4j.Driver" Version="6.0.0" />
