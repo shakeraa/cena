@@ -47,6 +47,8 @@ public sealed class QuestionBankService : IQuestionBankService
     private readonly ICasVerificationGate _casGate;
     private readonly ICasGateModeProvider _casGateMode;
     private readonly ICasGatedQuestionPersister _persister;
+    // ADR-0062 Phase 1 calibration gate — first 200 items require curator-confirm.
+    private readonly Cena.Actors.Mastery.Extraction.IConceptCurationCalibrationCounter _calibrationCounter;
     private readonly ILogger<QuestionBankService> _logger;
 
     public QuestionBankService(
@@ -55,6 +57,7 @@ public sealed class QuestionBankService : IQuestionBankService
         ICasVerificationGate casGate,
         ICasGateModeProvider casGateMode,
         ICasGatedQuestionPersister persister,
+        Cena.Actors.Mastery.Extraction.IConceptCurationCalibrationCounter calibrationCounter,
         ILogger<QuestionBankService> logger)
     {
         _store = store;
@@ -62,6 +65,7 @@ public sealed class QuestionBankService : IQuestionBankService
         _casGate = casGate;
         _casGateMode = casGateMode;
         _persister = persister;
+        _calibrationCounter = calibrationCounter;
         _logger = logger;
     }
 
@@ -472,6 +476,12 @@ public sealed class QuestionBankService : IQuestionBankService
         var state = await session.Events.AggregateStreamAsync<QuestionState>(id);
         if (state == null) return false;
         if (state.Status != DomainStatus.Approved) return false;
+
+        // ADR-0062 Phase 1 calibration gate. Throws ConceptCalibrationGateRejectedException
+        // when the item went through the new extraction pipeline but lacks
+        // QuestionConceptsConfirmed_V1 AND the calibration phase is still active
+        // (count < CalibrationThreshold, default 200). Fail-open on counter errors.
+        await Cena.Admin.Api.Concepts.PublishCalibrationGate.EnforceAsync(id, state, _calibrationCounter, _logger);
 
         var evt = new QuestionPublished_V1(id, userId, DateTimeOffset.UtcNow);
         session.Events.Append(id, state.EventVersion + 1, evt);

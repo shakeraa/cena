@@ -159,6 +159,15 @@ public sealed class QuestionState
     public DateTimeOffset? UpdatedAt { get; set; }
     public int EventVersion { get; set; }
 
+    // ADR-0062 Phase 1 — publish-gate flags. Set by the corresponding Apply
+    // handlers below. PublishCalibrationGate.RequiresConfirm reads them to
+    // decide whether a draft is ineligible for publish without a curator
+    // concept confirm. Counted from event presence (not from ConceptIds
+    // being non-empty) so an empty extraction still records "the new
+    // pipeline ran" and a confirm-with-empty-list still wins.
+    public bool HasConceptExtractionEvent { get; set; }
+    public bool HasConceptConfirmEvent { get; set; }
+
     // ── Apply Methods ──
 
     // ── V1 Apply methods are retained for back-compat with existing unit
@@ -399,6 +408,7 @@ public sealed class QuestionState
 
     public void Apply(QuestionConceptsExtracted_V1 e)
     {
+        HasConceptExtractionEvent = true;
         // Skip empty extractions (rule tier produced nothing) so a
         // re-extraction with no rules-tier hit doesn't blank a curator's
         // confirmed concept set.
@@ -410,6 +420,7 @@ public sealed class QuestionState
 
     public void Apply(QuestionConceptsConfirmed_V1 e)
     {
+        HasConceptConfirmEvent = true;
         // Curator override always wins, even if the list is empty —
         // that's a deliberate "no concepts apply" signal we don't
         // second-guess.

@@ -294,6 +294,11 @@ public static class CenaAdminServiceRegistration
             Cena.Admin.Api.Mastery.Extraction.HybridConceptExtractor>();
         services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IConceptItemPublicationCounter,
             Cena.Actors.Mastery.Extraction.NullConceptItemPublicationCounter>();
+        // ADR-0062 Phase 1 — calibration corpus publish-gate counter.
+        // Singleton because the counter caches the in-flight count and the
+        // "calibration complete" flag inside the instance (monotone).
+        services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IConceptCurationCalibrationCounter,
+            Cena.Actors.Mastery.Extraction.MartenConceptCurationCalibrationCounter>();
 
         services.AddScoped<Ingestion.IBagrutDraftPersistence, Ingestion.BagrutDraftPersistence>();
         services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.BagrutIngestionJobStrategy>();

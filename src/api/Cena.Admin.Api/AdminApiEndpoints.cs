@@ -884,15 +884,12 @@ public static class AdminApiEndpoints
     .Produces<CenaError>(StatusCodes.Status404NotFound)
     .WithStandardErrorResponses();
 
-        group.MapPost("/{id}/publish", async (string id, HttpContext ctx, IQuestionBankService service) =>
-        {
-            var userId = ctx.User.FindFirst("sub")?.Value ?? "anonymous";
-            var success = await service.PublishAsync(id, userId);
-            return success ? Results.Ok() : Results.NotFound();
-        }).WithName("PublishQuestion")
-    .Produces(StatusCodes.Status200OK)
-    .Produces<CenaError>(StatusCodes.Status404NotFound)
-    .WithStandardErrorResponses();
+        group.MapPost("/{id}/publish", Cena.Admin.Api.Concepts.PublishCalibrationGate.PublishWithGateAsync)
+            .WithName("PublishQuestion")
+            .Produces(StatusCodes.Status200OK)
+            .Produces<CenaError>(StatusCodes.Status404NotFound)
+            .Produces<CenaError>(StatusCodes.Status409Conflict)
+            .WithStandardErrorResponses();
 
         group.MapPost("/{id}/language-versions", async (string id, AddLanguageVersionRequest request, HttpContext ctx, IQuestionBankService service) =>
         {
