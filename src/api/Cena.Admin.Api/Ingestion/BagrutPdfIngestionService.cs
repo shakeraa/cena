@@ -232,10 +232,12 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
     {
         // Group blocks by bbox.Page (1-indexed). Blocks without a bbox are
         // treated as page 1 (common for scanned single-page inputs).
+        // Keep the full OcrTextBlock here (not just text) so JoinTextBlocks
+        // can use bbox.Y/X for line + reading-order reconstruction.
         var textByPage = result.TextBlocks
             .Where(t => !string.IsNullOrWhiteSpace(t.Text))
             .GroupBy(t => t.Bbox?.Page ?? 1)
-            .ToDictionary(g => g.Key, g => g.Select(b => b.Text!).ToList());
+            .ToDictionary(g => g.Key, g => g.ToList());
 
         var mathByPage = result.MathBlocks
             .Where(m => !string.IsNullOrWhiteSpace(m.Latex))
@@ -258,7 +260,7 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
         foreach (var pageNumber in allPages)
         {
             var text = textByPage.TryGetValue(pageNumber, out var tList)
-                ? string.Join("\n", tList)
+                ? JoinTextBlocks(tList)
                 : string.Empty;
 
             // Concatenate validated LaTeX for a quick preview; fall back
@@ -405,5 +407,101 @@ public sealed class BagrutPdfIngestionService : IBagrutPdfIngestionService
     {
         var hash = System.Security.Cryptography.SHA256.HashData(pdfBytes);
         return $"pdf-{Convert.ToHexString(hash)[..12].ToLowerInvariant()}";
+    }
+
+    /// <summary>
+    /// Reconstruct readable prose from OCR text blocks. The cascade emits
+    /// one block per token (Mathpix/Gemini behaviour), so the previous
+    /// `string.Join("\n", ...)` rendered every word on its own line in
+    /// the curator panel (2026-05-02 user report).
+    ///
+    /// Strategy:
+    ///   1. Group blocks into lines using bbox.Y proximity. A block joins
+    ///      the running line when its Y center lies within a tolerance
+    ///      band proportional to the line's average glyph height. This is
+    ///      cheap and robust against small baseline jitter without merging
+    ///      paragraphs.
+    ///   2. Within each line, sort by X. RTL-dominant lines (Hebrew /
+    ///      Arabic) sort X descending so that logical Unicode order
+    ///      matches reading order; LTR lines sort ascending. Mixed lines
+    ///      go LTR — the BiDi algorithm handles visual reorder at render
+    ///      time.
+    ///   3. Lines join with `\n`, blocks within a line join with a single
+    ///      space. Tokens are trimmed so we don't get "word  word".
+    ///
+    /// Blocks without a bbox (rare — typically scanned single-page
+    /// inputs) appear at the end joined with spaces.
+    /// </summary>
+    internal static string JoinTextBlocks(IReadOnlyList<OcrTextBlock> blocks)
+    {
+        if (blocks.Count == 0) return string.Empty;
+
+        var withBox = blocks
+            .Where(b => b.Bbox is not null && !string.IsNullOrWhiteSpace(b.Text))
+            .ToList();
+        var withoutBox = blocks
+            .Where(b => b.Bbox is null && !string.IsNullOrWhiteSpace(b.Text))
+            .Select(b => b.Text!.Trim())
+            .ToList();
+
+        if (withBox.Count == 0)
+            return string.Join(" ", withoutBox);
+
+        // Sort by Y first (top→bottom), then X (left→right) as a stable
+        // baseline. Line-grouping below picks up runs that share Y.
+        var sorted = withBox
+            .OrderBy(b => b.Bbox!.Y)
+            .ThenBy(b => b.Bbox!.X)
+            .ToList();
+
+        var lines = new List<List<OcrTextBlock>>();
+        var currentLine = new List<OcrTextBlock> { sorted[0] };
+        double lineYCenter = sorted[0].Bbox!.Y + sorted[0].Bbox!.H / 2.0;
+        double lineHeight  = Math.Max(sorted[0].Bbox!.H, 1.0);
+
+        for (int i = 1; i < sorted.Count; i++)
+        {
+            var bb = sorted[i].Bbox!;
+            var yCenter = bb.Y + bb.H / 2.0;
+            // Tolerance = half the larger of (line's running height, this
+            // block's height). Lets a 12pt main-line absorb a 10pt
+            // adjacent token; rejects a 12pt token sitting one line down.
+            var tolerance = Math.Max(lineHeight, Math.Max(bb.H, 1.0)) * 0.5;
+            if (Math.Abs(yCenter - lineYCenter) <= tolerance)
+            {
+                currentLine.Add(sorted[i]);
+                // Re-average so the running center tracks the line's
+                // actual centroid as more tokens join.
+                lineYCenter = (lineYCenter * (currentLine.Count - 1) + yCenter) / currentLine.Count;
+                lineHeight  = (lineHeight  * (currentLine.Count - 1) + bb.H) / currentLine.Count;
+            }
+            else
+            {
+                lines.Add(currentLine);
+                currentLine = new List<OcrTextBlock> { sorted[i] };
+                lineYCenter = yCenter;
+                lineHeight  = Math.Max(bb.H, 1.0);
+            }
+        }
+        lines.Add(currentLine);
+
+        var lineStrings = new List<string>(lines.Count);
+        foreach (var line in lines)
+        {
+            // RTL-dominant when ≥50% of blocks on this line are RTL.
+            // Mixed-script falls back to LTR sort + BiDi at render time.
+            var rtlShare = line.Count(b => b.IsRtl) / (double)line.Count;
+            var ordered = rtlShare >= 0.5
+                ? line.OrderByDescending(b => b.Bbox!.X)
+                : line.OrderBy(b => b.Bbox!.X);
+            var joined = string.Join(" ", ordered.Select(b => b.Text!.Trim()));
+            if (!string.IsNullOrWhiteSpace(joined))
+                lineStrings.Add(joined);
+        }
+
+        var result = string.Join("\n", lineStrings);
+        if (withoutBox.Count > 0)
+            result += (result.Length > 0 ? "\n" : "") + string.Join(" ", withoutBox);
+        return result;
     }
 }
