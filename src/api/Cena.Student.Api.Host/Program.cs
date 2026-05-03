@@ -47,9 +47,7 @@ using Polly;
 using Microsoft.AspNetCore.RateLimiting;
 using NATS.Client.Core;
 using NatsEventSubscriber = Cena.Admin.Api.NatsEventSubscriber;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
+using Cena.Student.Api.Host;
 using Serilog;
 using StackExchange.Redis;
 
@@ -959,34 +957,8 @@ public partial class Program
     // ---- Health checks ----
     builder.Services.AddHealthChecks();
     
-    // ---- OpenTelemetry ----
-    var otlpEndpoint = builder.Configuration.GetValue<string>("Cluster:OtlpEndpoint")
-        ?? "http://localhost:4317";
-    
-    // RDY-064 / ADR-0058 §3: release correlation. service.version shares the
-    // CENA_GIT_SHA string that Sentry uses for release tags.
-    var otelServiceVersion = builder.Configuration["ErrorAggregator:Release"]
-        ?? builder.Configuration["Cluster:ServiceVersion"]
-        ?? "unknown";
-
-    builder.Services.AddOpenTelemetry()
-        .ConfigureResource(resource => resource
-            .AddService(
-                serviceName: "cena-student-api",
-                serviceVersion: otelServiceVersion,
-                serviceInstanceId: Environment.MachineName))
-        .WithTracing(tracing => tracing
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint)))
-        .WithMetrics(metrics => metrics
-            // RDY-OCR-OBSERVABILITY (Phase 4): OCR cascade metrics
-            .AddMeter(Cena.Infrastructure.Ocr.Observability.OcrMetrics.MeterName)
-            .AddAspNetCoreInstrumentation()
-            .AddRuntimeInstrumentation()
-            .AddProcessInstrumentation()
-            .AddOtlpExporter(o => o.Endpoint = new Uri(otlpEndpoint))
-            .AddPrometheusExporter());
+    // ---- OpenTelemetry / Prometheus (RDY-064 / ADR-0058 §3) ----
+    builder.Services.AddCenaStudentTelemetry(builder.Configuration);
     
     // =============================================================================
     // BUILD & PIPELINE
