@@ -96,16 +96,29 @@ public static class QuestionConceptsEndpoints
 
             // Catalog snapshot — the SPA picker source. Stable order so
             // the dropdown doesn't shuffle between renders.
+            //
+            // TopicLabels / SubtopicLabels are passed straight through from
+            // the catalog (taxonomy v1.1+ ships en/he/ar). All leaves with
+            // the same SkillCode share the same labels (topic/subtopic
+            // keys are a function of the SkillCode), so taking the first
+            // group member's labels is correct. The SPA picks the right
+            // language at render time via vue-i18n's current locale.
             var catalogView = catalog.AllLeaves
                 .GroupBy(l => l.SkillCode.Value)
-                .Select(g => new ConceptCatalogEntry(
-                    SkillCode:   g.Key,
-                    ConceptId:   g.First().ConceptId,
-                    Topic:       g.First().TopicKey,
-                    Subtopic:    g.First().SubtopicKey,
-                    Tracks:      g.Select(l => l.TrackId).Distinct().OrderBy(t => t).ToArray(),
-                    BloomMin:    g.Min(l => l.BloomMin),
-                    BloomMax:    g.Max(l => l.BloomMax)))
+                .Select(g =>
+                {
+                    var first = g.First();
+                    return new ConceptCatalogEntry(
+                        SkillCode:      g.Key,
+                        ConceptId:      first.ConceptId,
+                        Topic:          first.TopicKey,
+                        Subtopic:       first.SubtopicKey,
+                        Tracks:         g.Select(l => l.TrackId).Distinct().OrderBy(t => t).ToArray(),
+                        BloomMin:       g.Min(l => l.BloomMin),
+                        BloomMax:       g.Max(l => l.BloomMax),
+                        TopicLabels:    first.TopicLabels,
+                        SubtopicLabels: first.SubtopicLabels);
+                })
                 .OrderBy(e => e.SkillCode, StringComparer.Ordinal)
                 .ToArray();
 
@@ -344,7 +357,16 @@ public sealed record ConceptCatalogEntry(
     string Subtopic,
     string[] Tracks,                 // ["math_3u","math_4u","math_5u"]
     int BloomMin,
-    int BloomMax);
+    int BloomMax,
+    // 2026-05-03: localized display labels for the curator UI. Keyed by
+    // language code ("en" / "he" / "ar"). The English keys above remain
+    // canonical for storage / event sourcing — these maps are purely
+    // presentational. SPA picks the right language via vue-i18n's
+    // current locale at render time. Falls back to the English key when
+    // a translation is missing (older taxonomy.json without the labels
+    // block returns en-only entries derived from the English key).
+    IReadOnlyDictionary<string, string> TopicLabels,
+    IReadOnlyDictionary<string, string> SubtopicLabels);
 
 public sealed record ConceptReviewResponse(
     string ItemId,

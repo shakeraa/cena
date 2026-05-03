@@ -42,6 +42,22 @@ namespace Cena.Actors.Mastery;
 public sealed class BagrutTaxonomyCatalog
 {
     /// <summary>One taxonomy leaf with its identifiers and Bloom metadata.</summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="TopicLabels"/> and <see cref="SubtopicLabels"/> carry display
+    /// strings for the curator UI keyed by language code ("en" / "he" / "ar").
+    /// English keys (e.g. <c>calculus.derivative_rules</c>) remain canonical
+    /// for storage / event sourcing — labels are purely presentational and
+    /// consumed only by the SPA via <see cref="ConceptCatalogEntry"/>.
+    /// </para>
+    /// <para>
+    /// Both maps fall back to the English key when the language is missing
+    /// (older taxonomy JSON without a labels block, or a new lang code added
+    /// before translations land). The fallback happens in
+    /// <see cref="LocalizedTopic"/> / <see cref="LocalizedSubtopic"/> so call
+    /// sites don't have to write the same defensive lookup.
+    /// </para>
+    /// </remarks>
     public sealed record LeafEntry(
         SkillCode SkillCode,                // canonical SkillCode (e.g. math.calculus.derivative-rules)
         string ConceptId,                   // taxonomy seed id (e.g. "CAL-003")
@@ -49,13 +65,38 @@ public sealed class BagrutTaxonomyCatalog
         string TopicKey,                    // "calculus"
         string SubtopicKey,                 // "derivative_rules"
         int BloomMin,
-        int BloomMax)
+        int BloomMax,
+        IReadOnlyDictionary<string, string> TopicLabels,    // { "en": "Calculus", "he": "...", "ar": "..." }
+        IReadOnlyDictionary<string, string> SubtopicLabels) // { "en": "Derivative rules", "he": "...", "ar": "..." }
     {
         /// <summary>Track-relative leaf path: "calculus.derivative_rules".</summary>
         public string TrackRelativePath => $"{TopicKey}.{SubtopicKey}";
 
         /// <summary>Full leaf id used by the existing TaxonomyCache: "math_5u.calculus.derivative_rules".</summary>
         public string LeafId => $"{TrackId}.{TopicKey}.{SubtopicKey}";
+
+        /// <summary>
+        /// Topic display label for <paramref name="lang"/> (e.g. "he"); falls
+        /// back to the English label if the language is missing, then to the
+        /// English key as a last resort. Never returns null/empty.
+        /// </summary>
+        public string LocalizedTopic(string lang)
+            => Lookup(TopicLabels, lang) ?? TopicKey;
+
+        /// <summary>
+        /// Subtopic display label for <paramref name="lang"/> (e.g. "ar");
+        /// falls back to English then the underlying subtopic key. Never
+        /// returns null/empty.
+        /// </summary>
+        public string LocalizedSubtopic(string lang)
+            => Lookup(SubtopicLabels, lang) ?? SubtopicKey;
+
+        private static string? Lookup(IReadOnlyDictionary<string, string> labels, string lang)
+        {
+            if (labels.TryGetValue(lang, out var v) && !string.IsNullOrWhiteSpace(v)) return v;
+            if (labels.TryGetValue("en", out var en) && !string.IsNullOrWhiteSpace(en)) return en;
+            return null;
+        }
     }
 
     private readonly IReadOnlyList<LeafEntry> _allLeaves;
@@ -256,6 +297,16 @@ public sealed class BagrutTaxonomyCatalog
                 "bagrut-taxonomy.json: missing or invalid 'tracks' object");
         }
 
+        // Display-label maps — taxonomy v1.1+ ships an optional `labels`
+        // block. Older taxonomy JSON (or synthetic test catalogs) omits it,
+        // in which case we hand each leaf an EN-only fallback derived from
+        // the English key so LocalizedTopic / LocalizedSubtopic still
+        // return readable strings.
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> topicLabels =
+            ReadLabelMap(root, "topics");
+        IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>> subtopicLabels =
+            ReadLabelMap(root, "subtopics");
+
         var leaves = new List<LeafEntry>(80);
         foreach (var trackProperty in tracksJson.EnumerateObject())
         {
@@ -295,19 +346,85 @@ public sealed class BagrutTaxonomyCatalog
                     var skillSlug = $"math.{topicKey}.{subKey.Replace('_', '-')}".ToLowerInvariant();
                     var skillCode = SkillCode.Parse(skillSlug);
 
+                    var topicLbl = topicLabels.TryGetValue(topicKey, out var tl)
+                        ? tl
+                        : EnglishOnlyFallback(topicKey);
+                    var subLbl = subtopicLabels.TryGetValue(subKey, out var sl)
+                        ? sl
+                        : EnglishOnlyFallback(subKey);
+
                     leaves.Add(new LeafEntry(
-                        SkillCode:   skillCode,
-                        ConceptId:   conceptId,
-                        TrackId:     trackId,
-                        TopicKey:    topicKey,
-                        SubtopicKey: subKey,
-                        BloomMin:    bloomMin,
-                        BloomMax:    bloomMax));
+                        SkillCode:      skillCode,
+                        ConceptId:      conceptId,
+                        TrackId:        trackId,
+                        TopicKey:       topicKey,
+                        SubtopicKey:    subKey,
+                        BloomMin:       bloomMin,
+                        BloomMax:       bloomMax,
+                        TopicLabels:    topicLbl,
+                        SubtopicLabels: subLbl));
                 }
             }
         }
 
         return new BagrutTaxonomyCatalog(leaves);
+    }
+
+    /// <summary>
+    /// Read the optional <c>labels.{section}</c> map from the taxonomy
+    /// JSON. Section is "topics" or "subtopics". Returns an empty map
+    /// when the labels block is absent so callers fall through to the
+    /// English-key fallback.
+    /// </summary>
+    private static IReadOnlyDictionary<string, IReadOnlyDictionary<string, string>>
+        ReadLabelMap(JsonElement root, string section)
+    {
+        var result = new Dictionary<string, IReadOnlyDictionary<string, string>>(StringComparer.Ordinal);
+        if (!root.TryGetProperty("labels", out var labelsJson)
+            || labelsJson.ValueKind != JsonValueKind.Object)
+        {
+            return result;
+        }
+        if (!labelsJson.TryGetProperty(section, out var sectionJson)
+            || sectionJson.ValueKind != JsonValueKind.Object)
+        {
+            return result;
+        }
+        foreach (var keyProp in sectionJson.EnumerateObject())
+        {
+            if (keyProp.Value.ValueKind != JsonValueKind.Object) continue;
+            var langMap = new Dictionary<string, string>(StringComparer.Ordinal);
+            foreach (var langProp in keyProp.Value.EnumerateObject())
+            {
+                if (langProp.Value.ValueKind == JsonValueKind.String)
+                {
+                    var s = langProp.Value.GetString();
+                    if (!string.IsNullOrWhiteSpace(s))
+                        langMap[langProp.Name] = s;
+                }
+            }
+            if (langMap.Count > 0)
+                result[keyProp.Name] = langMap;
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Build an English-only label dictionary by humanising the key
+    /// ("derivative_rules" → "Derivative rules"). Used as the fallback
+    /// when the taxonomy JSON has no labels block (older test fixtures).
+    /// </summary>
+    private static IReadOnlyDictionary<string, string> EnglishOnlyFallback(string key)
+    {
+        // Replace underscores with spaces, capitalise first letter only —
+        // Title Case isn't appropriate for "of" / "and" but for fallback
+        // text this is good enough; the real translations live in the
+        // labels block.
+        var spaced = key.Replace('_', ' ').Trim();
+        if (spaced.Length == 0)
+            return new Dictionary<string, string>(StringComparer.Ordinal) { ["en"] = key };
+        var humanised = char.ToUpperInvariant(spaced[0]) + spaced[1..];
+        return new Dictionary<string, string>(StringComparer.Ordinal) { ["en"] = humanised };
     }
 
     private static string ResolveDefaultPath()
