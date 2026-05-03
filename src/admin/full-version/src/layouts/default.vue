@@ -43,6 +43,14 @@ watch([isFallbackStateActive, refLoadingIndicator], () => {
 
     <AppLoadingIndicator ref="refLoadingIndicator" />
 
+    <!--
+      2026-05-03 — surfaces "Anthropic LLM tier is unreachable / API key
+      missing" so curators know multi-concept extraction + variant generation
+      have silently fallen back to rules-only output. Component renders nothing
+      when the integration is healthy — no layout shift in the happy path.
+    -->
+    <IntegrationStatusBanner />
+
     <main id="main-content">
       <RouterView v-slot="{ Component }">
         <Suspense

@@ -1536,4 +1536,30 @@ public static class AdminApiEndpoints
 
         return app;
     }
+
+    /// <summary>
+    /// 2026-05-03 — surface "is the Anthropic LLM tier reachable?" so the
+    /// admin SPA renders a banner the moment the key is missing or every
+    /// recent call has failed. Keeps the curator from having to inspect
+    /// container logs to discover the LLM tier silently degraded.
+    /// </summary>
+    public static IEndpointRouteBuilder MapIntegrationStatusEndpoints(this IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/admin/integrations")
+            .WithTags("Integrations")
+            .RequireAuthorization(CenaAuthPolicies.AdminOnly)
+            .RequireRateLimiting("api");
+
+        group.MapGet("/anthropic/status",
+            async (Cena.Admin.Api.AiSettings.IAnthropicIntegrationStatusService svc, CancellationToken ct) =>
+            {
+                var status = await svc.GetStatusAsync(ct);
+                return Results.Ok(status);
+            })
+            .WithName("GetAnthropicIntegrationStatus")
+            .Produces<Cena.Admin.Api.AiSettings.AnthropicIntegrationStatus>(StatusCodes.Status200OK)
+            .WithStandardErrorResponses();
+
+        return app;
+    }
 }

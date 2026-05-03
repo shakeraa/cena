@@ -306,6 +306,14 @@ public static class CenaAdminServiceRegistration
         services.TryAddSingleton<Cena.Actors.Mastery.Extraction.IConceptCurationCalibrationCounter,
             Cena.Actors.Mastery.Extraction.MartenConceptCurationCalibrationCounter>();
 
+        // 2026-05-03 — surface "is the Anthropic LLM tier reachable?" so the
+        // admin SPA can render a banner instead of the previous silent
+        // log-and-degrade behaviour. Singleton because it carries an
+        // in-memory sliding window of recent call outcomes per process.
+        services.TryAddSingleton<
+            Cena.Admin.Api.AiSettings.IAnthropicIntegrationStatusService,
+            Cena.Admin.Api.AiSettings.AnthropicIntegrationStatusService>();
+
         services.AddScoped<Ingestion.IBagrutDraftPersistence, Ingestion.BagrutDraftPersistence>();
         services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.BagrutIngestionJobStrategy>();
         services.AddScoped<Ingestion.IIngestionJobStrategy, Ingestion.CloudDirIngestionJobStrategy>();
@@ -562,6 +570,10 @@ public static class CenaAdminServiceRegistration
         app.MapFocusAnalyticsEndpoints();
         app.MapMasteryTrackingEndpoints();
         app.MapSystemMonitoringEndpoints();
+        // 2026-05-03 — Anthropic integration status (key configured? recent
+        // call success rate?) drives the admin SPA banner that tells curators
+        // when the LLM tier silently degraded.
+        app.MapIntegrationStatusEndpoints();
         app.MapIngestionPipelineEndpoints();
         // RDY-019e-IMPL (Phase 1C): CuratorMetadata handshake endpoints
         // under /api/admin/ingestion/pipeline/{id}/metadata (GET/PATCH/DELETE).

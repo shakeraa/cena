@@ -165,6 +165,14 @@ services:
       # ADR-0059 §15.5 + PRR-249 — source-anchored variant flow. Flag-flip
       # ONLY after legal-delta memo signs §6. See docs/engineering/feature-flags.md.
       - Cena__Variants__BagrutSeedToLlmEnabled=${OCR_VARIANTS_BAGRUT_SEED_ENABLED:-false}
+      # ADR-0062 Phase-3 — LLM-backed Bagrut question segmenter (Haiku one-shot).
+      # Default OFF; flip to true after curator validates LLM output on real
+      # Bagrut PDFs. When ON and the LLM call fails, fail-open fallback to the
+      # OneDraftPerPageSegmenter is automatic — never blocks ingestion.
+      # Local dev: set CENA_BAGRUT_LLM_SEGMENTER_ENABLED=true in the repo-root
+      # .env to flip on. Prod stays default-off until the legal-delta + curator
+      # validation pass complete.
+      - Cena__Ingestion__BagrutLlmSegmenterEnabled=${CENA_BAGRUT_LLM_SEGMENTER_ENABLED:-false}
       # Visual-review (2026-05-01): persist Bagrut source PDFs + OCR figure
       # crops to disk so curators can render them side-by-side with the
       # extracted output. Both directories are container-internal paths; the

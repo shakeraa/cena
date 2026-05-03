@@ -132,6 +132,10 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
     // singleton. When null, breaker checks + legacy-meter emission no-op
     // and the LLM tier behaves like the breaker is permanently closed.
     private readonly IAnthropicLlmRuntime? _runtime;
+    // Optional: tests pass null; production DI provides the singleton so
+    // the admin SPA banner reflects "concept-extraction LLM tier failed
+    // here is what came back" within 60s of a failure.
+    private readonly Cena.Admin.Api.AiSettings.IAnthropicIntegrationStatusService? _integrationStatus;
 
     /// <summary>
     /// Full DI ctor used in production. <paramref name="invoker"/> is
@@ -155,7 +159,8 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         IDocumentStore? documentStore = null,
         IApiKeyCipher? cipher = null,
         ILlmCostMetric? featureCost = null,
-        IActivityPropagator? activityPropagator = null)
+        IActivityPropagator? activityPropagator = null,
+        Cena.Admin.Api.AiSettings.IAnthropicIntegrationStatusService? integrationStatus = null)
     {
         ArgumentNullException.ThrowIfNull(rulesTier);
         ArgumentNullException.ThrowIfNull(catalog);
@@ -173,6 +178,7 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         _activityPropagator = activityPropagator;
         _runtime = runtime;
         _invoker = invoker;
+        _integrationStatus = integrationStatus;
     }
 
     public async Task<ExtractionResult> ExtractAsync(
@@ -237,9 +243,16 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
         var apiKey = await TryResolveApiKeyAsync(ct).ConfigureAwait(false);
         if (string.IsNullOrEmpty(apiKey))
         {
-            _logger.LogDebug(
+            // INFO not Debug — this is the "you forgot to configure
+            // the API key, here's why your LLM tier is silent" line
+            // that the integration banner reflects within 60s.
+            _logger.LogInformation(
                 "HybridConceptExtractor: no Anthropic API key configured — falling back to rules tier (qid={QuestionId})",
                 input.QuestionId);
+            _integrationStatus?.RecordFailure(
+                "concept_extraction",
+                Cena.Admin.Api.AiSettings.AnthropicCallFailureKind.AuthFailure,
+                "No Anthropic API key configured (neither AiSettingsDocument cipher nor IConfiguration[\"Anthropic:ApiKey\"]).");
             return Array.Empty<QuestionConcept>();
         }
 
@@ -249,6 +262,10 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
             _logger.LogWarning(
                 "HybridConceptExtractor: circuit open ({Message}); falling back to rules tier (qid={QuestionId})",
                 ex.Message, input.QuestionId);
+            _integrationStatus?.RecordFailure(
+                "concept_extraction",
+                Cena.Admin.Api.AiSettings.AnthropicCallFailureKind.CircuitOpen,
+                ex.Message);
             return Array.Empty<QuestionConcept>();
         }
 
@@ -324,14 +341,19 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
                 traceId, input.QuestionId, inputTokens, outputTokens, sw.ElapsedMilliseconds, parsed.Count);
 
             _runtime?.RecordSuccess(HaikuModelId);
+            _integrationStatus?.RecordSuccess("concept_extraction");
             return parsed;
         }
-        catch (CircuitOpenException)
+        catch (CircuitOpenException ex)
         {
             sw.Stop();
             // Already logged by RequestCircuitPermission path; this
             // catch handles a race where the breaker tripped between
             // our permission check and the outbound call. Degrade.
+            _integrationStatus?.RecordFailure(
+                "concept_extraction",
+                Cena.Admin.Api.AiSettings.AnthropicCallFailureKind.CircuitOpen,
+                ex.Message);
             return Array.Empty<QuestionConcept>();
         }
         catch (Exception ex)
@@ -344,8 +366,33 @@ public sealed class HybridConceptExtractor : IQuestionConceptExtractor
             _logger.LogWarning(ex,
                 "HybridConceptExtractor: Anthropic call failed (trace_id={TraceId} qid={QuestionId} duration={DurationMs}ms) — falling back to rules tier",
                 traceId, input.QuestionId, sw.ElapsedMilliseconds);
+            _integrationStatus?.RecordFailure(
+                "concept_extraction",
+                ClassifyExceptionKind(ex),
+                ex.Message);
             return Array.Empty<QuestionConcept>();
         }
+    }
+
+    /// <summary>
+    /// Map a thrown exception to a coarse failure kind for the integration
+    /// banner. Pattern-matches on message + type because the Anthropic SDK
+    /// surfaces different shapes depending on the SDK version. Defaults to
+    /// <see cref="Cena.Admin.Api.AiSettings.AnthropicCallFailureKind.Other"/>
+    /// when nothing fits — better to label "Other" honestly than to mislead.
+    /// </summary>
+    private static Cena.Admin.Api.AiSettings.AnthropicCallFailureKind ClassifyExceptionKind(Exception ex)
+    {
+        var msg = ex.Message ?? "";
+        if (msg.Contains("401", StringComparison.Ordinal)
+            || msg.Contains("authentication", StringComparison.OrdinalIgnoreCase)
+            || msg.Contains("invalid_api_key", StringComparison.OrdinalIgnoreCase))
+            return Cena.Admin.Api.AiSettings.AnthropicCallFailureKind.AuthFailure;
+        if (ex is HttpRequestException || ex is TaskCanceledException
+            || msg.Contains("timeout", StringComparison.OrdinalIgnoreCase)
+            || msg.Contains("connection", StringComparison.OrdinalIgnoreCase))
+            return Cena.Admin.Api.AiSettings.AnthropicCallFailureKind.Transport;
+        return Cena.Admin.Api.AiSettings.AnthropicCallFailureKind.Other;
     }
 
     // ── Tool-use parsing + canonicalization (closed-set defense) ─────────

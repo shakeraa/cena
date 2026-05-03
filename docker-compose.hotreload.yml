@@ -57,6 +57,12 @@ services:
     environment:
       - DOTNET_USE_POLLING_FILE_WATCHER=true
       - DOTNET_WATCH_RESTART_ON_RUDE_EDIT=true
+      # ADR-0062 Phase-3 — LLM-backed Bagrut segmenter ON by default in the
+      # hot-reload (dev) overlay so the curator can validate output without
+      # editing .env. Prod compose (docker-compose.app.yml) keeps this
+      # default-OFF until the curator-validation gate passes. Local dev
+      # override: set CENA_BAGRUT_LLM_SEGMENTER_ENABLED=false to disable.
+      - Cena__Ingestion__BagrutLlmSegmenterEnabled=${CENA_BAGRUT_LLM_SEGMENTER_ENABLED:-true}
     volumes:
       - ./src:/src/src
       - ./db/migrations:/src/db/migrations
