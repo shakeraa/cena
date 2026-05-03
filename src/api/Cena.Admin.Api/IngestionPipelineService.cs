@@ -218,11 +218,20 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
         // nullable for tests that don't wire it.
         bool hasSourcePdf = false;
         IReadOnlyList<ItemFigureRef>? figures = null;
+        // ADR-0062 Phase 1.5 — enhanced-text persistence. Surfaced on the
+        // detail response so the SPA renders the cleaned view on panel
+        // open without a fresh /enhance-text round-trip.
+        string? enhancedText = null;
+        DateTimeOffset? enhancedAt = null;
+        string? enhancedBy = null;
         if (string.Equals(item.SourceType, "bagrut", StringComparison.OrdinalIgnoreCase))
         {
             var payload = await session.LoadAsync<BagrutDraftPayloadDocument>(item.Id);
             if (payload is not null)
             {
+                enhancedText = payload.EnhancedText;
+                enhancedAt = payload.EnhancedAt;
+                enhancedBy = payload.EnhancedBy;
                 if (!string.IsNullOrWhiteSpace(payload.SourcePdfId))
                 {
                     hasSourcePdf = _pdfStore is null
@@ -278,7 +287,10 @@ public sealed partial class IngestionPipelineService : IIngestionPipelineService
                 PlagiarismScore: item.DuplicateCount ?? 0),
             ExtractedQuestions: extractedQuestions,
             HasSourcePdf: hasSourcePdf,
-            Figures: figures);
+            Figures: figures,
+            EnhancedText: enhancedText,
+            EnhancedAt: enhancedAt,
+            EnhancedBy: enhancedBy);
     }
 
     /// <summary>

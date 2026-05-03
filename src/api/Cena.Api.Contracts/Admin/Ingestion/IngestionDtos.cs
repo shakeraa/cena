@@ -84,6 +84,16 @@ public sealed record PipelineItem(
 //                  extracted no figures or the FigureSpecJson is missing.
 //                  The SPA renders these inline alongside the recreated
 //                  question text.
+//
+// OCR-enhancement persistence (ADR-0062 Phase 1.5, added 2026-05-03):
+//   EnhancedText — Anthropic-cleaned text persisted on the draft after a
+//                  successful POST /enhance-text. Null until the draft
+//                  has been enhanced at least once. The SPA renders this
+//                  immediately on panel open (no LLM call) when present;
+//                  only fires auto-enhance when null.
+//   EnhancedAt   — UTC timestamp of the most recent enhance.
+//   EnhancedBy   — Anthropic model id ("claude-sonnet-4-6") for the
+//                  "Enhanced via LLM (model)" badge.
 public sealed record PipelineItemDetailResponse(
     string Id,
     string SourceFilename,
@@ -97,7 +107,10 @@ public sealed record PipelineItemDetailResponse(
     QualityScores Quality,
     IReadOnlyList<ExtractedQuestion> ExtractedQuestions,
     bool HasSourcePdf = false,
-    IReadOnlyList<ItemFigureRef>? Figures = null);
+    IReadOnlyList<ItemFigureRef>? Figures = null,
+    string? EnhancedText = null,
+    DateTimeOffset? EnhancedAt = null,
+    string? EnhancedBy = null);
 
 public sealed record ItemFigureRef(
     int Index,

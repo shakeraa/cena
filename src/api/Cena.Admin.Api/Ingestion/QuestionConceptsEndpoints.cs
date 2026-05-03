@@ -205,20 +205,23 @@ public static class QuestionConceptsEndpoints
         .Produces<CenaError>(StatusCodes.Status401Unauthorized);
 
         // ADR-0062 Phase 1.5 — OCR cleanup pass. Curator clicks "Enhance
-        // with LLM" on the InReview drawer; we run the Bagrut draft's
-        // raw text through Anthropic, return the cleaned result. The SPA
-        // displays it in-place (toggle to original); confirming concepts
-        // does NOT depend on this — it's a quality-of-life surface.
-        // Returns 404 if the item or its draft payload is missing,
-        // 400 with a structured CenaError on AI provider error so the
-        // SPA can render the failure inline.
+        // with LLM" on the InReview drawer (or the SPA fires it
+        // automatically on first open); we run the Bagrut draft's raw
+        // text through Anthropic, return the cleaned result, AND persist
+        // it on the BagrutDraftPayloadDocument so the next GET /detail
+        // round-trip shows the enhanced view without a second LLM call.
+        // The enhancer itself caches by sha256(input) (24h TTL) so a
+        // refresh of the SPA — or two curators on the same item — never
+        // pay for the same Anthropic call twice. Returns 404 if the
+        // item or its draft payload is missing, 400 with a structured
+        // CenaError on AI provider error.
         group.MapPost("/{id}/enhance-text", async (
             string id,
             [FromServices] IDocumentStore store,
             [FromServices] IOcrTextEnhancer enhancer,
             CancellationToken ct) =>
         {
-            await using var session = store.QuerySession();
+            await using var session = store.LightweightSession();
             var item = await session.LoadAsync<PipelineItemDocument>(id, ct);
             if (item is null)
                 return NotFound("item_not_found", $"No pipeline item with id '{id}'.");
@@ -241,12 +244,28 @@ public static class QuestionConceptsEndpoints
                 return BadRequest("ai_enhance_failed",
                     resp.Error ?? "Anthropic call failed without a reason.");
 
+            // Persist enhanced text + metadata on the draft so the next
+            // GET /detail returns the cleaned view without re-firing the
+            // enhance call. Last-write-wins; under concurrent enhance
+            // calls the result is identical (temperature=0) so the race
+            // is benign. enhancedAt comes from "now" rather than a
+            // re-cached ComputedAt because the contract for the SPA is
+            // "when was this surfaced to a curator", not "when did the
+            // first compute happen" — that lives in the cache row.
+            var nowUtc = DateTimeOffset.UtcNow;
+            payload.EnhancedText = resp.EnhancedText;
+            payload.EnhancedAt = nowUtc;
+            payload.EnhancedBy = resp.ModelUsed;
+            payload.EnhancedInputHash = resp.InputHash;
+            session.Store(payload);
+            await session.SaveChangesAsync(ct);
+
             return Results.Ok(new EnhanceTextResponse(
                 ItemId: id,
                 OriginalText: ocrInput,
                 EnhancedText: resp.EnhancedText,
                 ModelUsed: resp.ModelUsed,
-                EnhancedAt: DateTimeOffset.UtcNow));
+                EnhancedAt: nowUtc));
         })
         .DisableAntiforgery()
         .WithName("EnhanceItemOcrText")

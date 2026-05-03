@@ -476,6 +476,15 @@ interface BackendDetailResponse {
   // Visual-review (2026-05-01).
   hasSourcePdf?: boolean
   figures?: Array<{ index: number, page: number, kind: string | null, altText: string | null, url: string }>
+  // ADR-0062 Phase 1.5 (2026-05-03) — enhanced text persisted on the
+  // BagrutDraftPayloadDocument by the /enhance-text endpoint. Present
+  // when the draft has been enhanced at least once. The SPA uses these
+  // to render the cleaned view immediately on panel open WITHOUT
+  // firing a fresh /enhance-text POST — the cache layer makes that
+  // call cheap, the persistence layer makes it unnecessary.
+  enhancedText?: string | null
+  enhancedAt?: string | null
+  enhancedBy?: string | null
 }
 
 const stageStatusMap: Record<string, ProcessingStage['status']> = {
@@ -540,6 +549,31 @@ const fetchDetail = async () => {
       figures: (resp.figures ?? []) as ItemDetail['figures'],
     }
 
+    // ADR-0062 Phase 1.5 (2026-05-03) — if the backend persisted the
+    // enhanced text on the draft, apply it locally and mark the
+    // auto-enhance trigger as already-fired. This is what makes "open
+    // a previously enhanced item" instant: the SPA shows the cleaned
+    // view from cache without firing the /enhance-text POST. The
+    // backend's draft persistence is the source of truth; the
+    // sha256-keyed cache is a deduplication mechanism that lives
+    // inside the enhancer service.
+    if (resp.enhancedText && item.value) {
+      const next: Record<number, string> = {}
+      const nextShow: Record<number, boolean> = {}
+      for (const q of item.value.recreatedQuestions) {
+        next[q.index] = resp.enhancedText
+        nextShow[q.index] = true
+      }
+      enhancedTexts.value = next
+      showEnhanced.value = nextShow
+      enhancedModelUsed.value = resp.enhancedBy ?? null
+      enhancedAt.value = resp.enhancedAt ?? null
+      // Pre-mark the auto-enhance guard so autoEnhanceIfNeeded skips —
+      // we already have the result; firing a network call would just
+      // hit the cache and waste a round-trip.
+      enhanceTriggeredFor.value.add(resp.id)
+    }
+
     // Fire-and-forget binary fetches for the visual-review surface.
     // Reads the freshly-set item.value, so it picks up the new id +
     // figure list without us threading them through. Awaiting would
@@ -549,7 +583,8 @@ const fetchDetail = async () => {
       loadVisualReviewBlobs(item.value)
       // Gap A — auto-enhance on first open. Fire-and-forget; the
       // panel renders immediately and the badge + cleaned text fade
-      // in when the response lands.
+      // in when the response lands. No-op when the persisted-enhanced-
+      // text branch above already pre-marked the guard.
       autoEnhanceIfNeeded(item.value)
     }
   }

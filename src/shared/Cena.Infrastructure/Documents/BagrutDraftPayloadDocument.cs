@@ -44,4 +44,39 @@ public sealed class BagrutDraftPayloadDocument
     public List<string> ReviewNotes { get; set; } = new();
 
     public DateTimeOffset CreatedAt { get; set; }
+
+    // ── ADR-0062 Phase 1.5 — OCR enhancement persistence ───────────────
+    // The /enhance-text endpoint runs the (Prompt + LatexContent) blob
+    // through Anthropic and writes the cleaned result back here so the
+    // SPA renders the enhanced view immediately on refresh, without
+    // re-firing the LLM call. Source of truth for "what the curator sees
+    // by default"; the OcrEnhancementCacheDocument is a separate concern
+    // (cross-draft hit reuse) keyed on the input hash.
+
+    /// <summary>
+    /// Anthropic-cleaned text (math wrapped in \(...\)/\[...\], paragraph
+    /// breaks restored, [[FIGURE:p&lt;n&gt;]] markers inserted). Null when the
+    /// draft has never been enhanced or the input has changed since the
+    /// last enhance (detected via <see cref="EnhancedInputHash"/>).
+    /// </summary>
+    public string? EnhancedText { get; set; }
+
+    /// <summary>UTC timestamp the enhanced text was computed.</summary>
+    public DateTimeOffset? EnhancedAt { get; set; }
+
+    /// <summary>
+    /// Anthropic model id that produced <see cref="EnhancedText"/> (e.g.
+    /// "claude-sonnet-4-6"). Surfaced in the SPA's "Enhanced via LLM
+    /// (model)" badge.
+    /// </summary>
+    public string? EnhancedBy { get; set; }
+
+    /// <summary>
+    /// SHA-256 (lower-hex) of the input that produced <see cref="EnhancedText"/>.
+    /// Lets a re-OCR of the source page silently invalidate the stale
+    /// enhanced text — when the curator re-OCRs, the new (Prompt + LatexContent)
+    /// hash differs from this stored hash and the SPA-side check
+    /// (`enhancedInputHash !== currentInputHash`) hides the stale view.
+    /// </summary>
+    public string? EnhancedInputHash { get; set; }
 }
